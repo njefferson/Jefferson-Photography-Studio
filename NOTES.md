@@ -41,9 +41,23 @@ white-balance control normally allows**.
 - Do **not** want pseudo code or drafts — wants it run through **review passes
   until it is as good as it can be**.
 
+## Confirmed (2026-06-17)
+
+- Camera: **Nikon Z50, IR-converted**. Filters: **red** + **720nm**.
+- Input: **DNG-first** (validated decoding the real `DSC_0788.dng` with LibRaw).
+- Output: **JPEG q92 Display P3** + **16-bit TIFF**; also **export `.dcp`/`.cube`
+  for Lightroom/Photoshop** generated from the in-app edit.
+- Platform: **offline-first PWA**, iPad A3355 (A16); native App Store build later.
+- Looks: **build our own equivalents**, do not redistribute Rob Shea's IP.
+- Confirmed the 2000K white-balance crux on the real file (needed gains
+  R 0.42 / G 7.8 / B 2.1 — impossible in Lightroom, trivial in our pipeline).
+
+See **`PLAN.md`** for the full build plan.
+
 ## Status
 
-- [ ] Research Rob Shea's IR editing method
-- [ ] Confirm scope and stack
-- [ ] Identify pitfalls (esp. RAW + sub-range white balance in a web app)
-- [ ] Build
+- [x] Research Rob Shea's IR editing method
+- [x] Confirm scope and stack
+- [x] Identify pitfalls (esp. RAW + sub-range white balance in a web app)
+- [x] Validate DNG decode + WB + swap on a real file
+- [ ] Build (Phase 1: scaffold + import + decode + render)
