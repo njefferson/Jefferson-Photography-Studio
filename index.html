@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#0b0b0d" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <title>IRstudio</title>
+  </head>
+  <body>
+    <div id="app">
+      <header class="bar">
+        <span class="brand">IRstudio</span>
+        <label class="open-btn">
+          Open image
+          <input id="file" type="file" accept=".dng,.zip,image/*" hidden />
+        </label>
+      </header>
+
+      <div id="stage">
+        <canvas id="view"></canvas>
+        <p id="hint">Open a DNG (or a .zip of one) to begin.</p>
+      </div>
+
+      <aside id="panel" hidden>
+        <fieldset>
+          <legend>White balance <small>(unbounded — no 2000K floor)</small></legend>
+          <label>Red gain <input id="wbR" type="range" min="0.05" max="8" step="0.01" value="1" /></label>
+          <label>Green gain <input id="wbG" type="range" min="0.05" max="8" step="0.01" value="1" /></label>
+          <label>Blue gain <input id="wbB" type="range" min="0.05" max="8" step="0.01" value="1" /></label>
+          <button id="wbTapHint" type="button">Tap the image on foliage to auto-set</button>
+        </fieldset>
+
+        <fieldset>
+          <legend>Channel swap</legend>
+          <select id="swap">
+            <option value="none">None</option>
+            <option value="rb" selected>Red ↔ Blue (classic)</option>
+          </select>
+        </fieldset>
+
+        <fieldset>
+          <legend>Hue / Saturation / Tone</legend>
+          <label>Hue shift <input id="hue" type="range" min="-180" max="180" step="1" value="0" /></label>
+          <label>Saturation <input id="sat" type="range" min="0" max="2" step="0.01" value="1" /></label>
+          <label>Contrast <input id="con" type="range" min="0.5" max="2" step="0.01" value="1" /></label>
+        </fieldset>
+      </aside>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

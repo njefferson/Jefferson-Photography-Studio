@@ -1,0 +1,16 @@
+{
+  "name": "irstudio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Infrared photo editor — unbounded white balance, channel swap, hue shifts (Rob Shea method).",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "vite": "^5.4.2"
+  }
+}

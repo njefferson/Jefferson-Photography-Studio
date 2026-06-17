@@ -1,0 +1,81 @@
+:root {
+  color-scheme: dark;
+  --bg: #0b0b0d;
+  --panel: #16161a;
+  --line: #2a2a31;
+  --accent: #7aa2ff;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  font: 15px/1.4 -apple-system, system-ui, sans-serif;
+  background: var(--bg);
+  color: #e8e8ea;
+  -webkit-text-size-adjust: 100%;
+}
+#app {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  grid-template-rows: auto 1fr;
+  grid-template-areas: "bar bar" "stage panel";
+  height: 100dvh;
+}
+.bar {
+  grid-area: bar;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  padding-top: max(10px, env(safe-area-inset-top));
+  border-bottom: 1px solid var(--line);
+}
+.brand { font-weight: 600; letter-spacing: 0.02em; }
+.open-btn {
+  background: var(--accent);
+  color: #07101f;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+#stage {
+  grid-area: stage;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: 12px;
+}
+#view {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 6px;
+  touch-action: manipulation;
+}
+#hint { color: #9a9aa2; text-align: center; max-width: 32ch; }
+#panel {
+  grid-area: panel;
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+  padding: 14px;
+  overflow-y: auto;
+}
+fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 0 0 14px; }
+legend { padding: 0 6px; color: #c7c7cf; }
+legend small { color: #80808a; font-weight: 400; }
+label { display: block; margin: 10px 0; font-size: 13px; color: #b8b8c0; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+select, button {
+  width: 100%;
+  background: #202028;
+  color: inherit;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px;
+}
+button { cursor: pointer; }
+
+@media (max-width: 760px) {
+  #app { grid-template-columns: 1fr; grid-template-areas: "bar" "stage" "panel"; grid-template-rows: auto 1fr auto; }
+  #panel { border-left: none; border-top: 1px solid var(--line); max-height: 45dvh; }
+}
