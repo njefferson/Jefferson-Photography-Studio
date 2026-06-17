@@ -1,0 +1,161 @@
+// Full-resolution export. Re-decodes raw at native resolution (the live view
+// uses a half-res proxy), applies the exact edit pipeline on the CPU, and saves
+// a JPEG or 16-bit TIFF to the device.
+
+import { compileEdit, toLinear8, type EditParams } from "./pipeline";
+import { demosaicPixelLinear, type RawCfa } from "./raw/demosaic";
+import { readMosaicedCfa } from "./raw/dngRaw";
+import { readNefCfa } from "./raw/nef";
+import { Tiff } from "./raw/tiff";
+import type { ImportedFile } from "./import";
+import type { DecodedImage } from "./decode";
+
+export type ExportFormat = "jpeg" | "tiff";
+
+export interface ExportOptions {
+  format: ExportFormat;
+  scale: number; // 1 = native
+  quality: number; // JPEG quality 0..1
+}
+
+type Source =
+  | { cfa: RawCfa }
+  | { pixels: Uint8ClampedArray; width: number; height: number };
+
+export async function exportImage(
+  file: ImportedFile,
+  current: DecodedImage,
+  params: EditParams,
+  opts: ExportOptions,
+): Promise<void> {
+  const src = getSource(file, current);
+  const srcW = "cfa" in src ? src.cfa.width : src.width;
+  const srcH = "cfa" in src ? src.cfa.height : src.height;
+  const w = Math.max(1, Math.round(srcW * opts.scale));
+  const h = Math.max(1, Math.round(srcH * opts.scale));
+
+  const edit = compileEdit(params);
+  const out = new Float32Array(3);
+  const baseName = file.name.replace(/\.[^.]+$/, "");
+
+  // Linear RGB at a source pixel.
+  const sampleLinear =
+    "cfa" in src
+      ? (x: number, y: number) => demosaicPixelLinear(src.cfa, x, y)
+      : (x: number, y: number) => {
+          const i = (y * src.width + x) * 4;
+          return [toLinear8(src.pixels[i]), toLinear8(src.pixels[i + 1]), toLinear8(src.pixels[i + 2])] as [number, number, number];
+        };
+
+  if (opts.format === "jpeg") {
+    const data = new Uint8ClampedArray(w * h * 4);
+    for (let y = 0; y < h; y++) {
+      const sy = Math.min(srcH - 1, Math.round((y / h) * srcH));
+      for (let x = 0; x < w; x++) {
+        const sx = Math.min(srcW - 1, Math.round((x / w) * srcW));
+        const [r, g, b] = sampleLinear(sx, sy);
+        edit(r, g, b, out);
+        const o = (y * w + x) * 4;
+        data[o] = out[0] * 255;
+        data[o + 1] = out[1] * 255;
+        data[o + 2] = out[2] * 255;
+        data[o + 3] = 255;
+      }
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    canvas.getContext("2d")!.putImageData(new ImageData(data, w, h), 0, 0);
+    const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", opts.quality));
+    if (blob) download(blob, `${baseName}.jpg`);
+  } else {
+    const rgb = new Uint16Array(w * h * 3);
+    for (let y = 0; y < h; y++) {
+      const sy = Math.min(srcH - 1, Math.round((y / h) * srcH));
+      for (let x = 0; x < w; x++) {
+        const sx = Math.min(srcW - 1, Math.round((x / w) * srcW));
+        const [r, g, b] = sampleLinear(sx, sy);
+        edit(r, g, b, out);
+        const o = (y * w + x) * 3;
+        rgb[o] = out[0] * 65535;
+        rgb[o + 1] = out[1] * 65535;
+        rgb[o + 2] = out[2] * 65535;
+      }
+    }
+    download(new Blob([writeTiff16(rgb, w, h)]), `${baseName}.tif`);
+  }
+}
+
+function getSource(file: ImportedFile, current: DecodedImage): Source {
+  if (file.kind === "nef") return { cfa: readNefCfa(file.bytes) };
+  if (file.kind === "dng") {
+    const raw = new Tiff(file.bytes)
+      .allIfds()
+      .find((d) => d.num(254)[0] === 0 && d.num(262)[0] === 32803 && d.num(259)[0] === 7);
+    if (raw) return { cfa: readMosaicedCfa(file.bytes, raw) };
+  }
+  // Non-mosaiced (JPEG/PNG/lossy-linear DNG/preview): the decode is already
+  // full-resolution 8-bit.
+  if (!current.pixels) throw new Error("No full-resolution source available to export.");
+  return { pixels: current.pixels, width: current.width, height: current.height };
+}
+
+/** Minimal baseline TIFF: RGB, 16-bit/channel, uncompressed, single strip. */
+export function writeTiff16(rgb: Uint16Array, w: number, h: number): ArrayBuffer {
+  const entries = 11;
+  const ifdOffset = 8;
+  const ifdSize = 2 + entries * 12 + 4;
+  const bitsOffset = ifdOffset + ifdSize; // 3 shorts
+  const sampleFmtOffset = bitsOffset + 6; // 3 shorts
+  const dataOffset = sampleFmtOffset + 6;
+  const dataBytes = w * h * 3 * 2;
+  const buf = new ArrayBuffer(dataOffset + dataBytes);
+  const dv = new DataView(buf);
+  // Header (little-endian).
+  dv.setUint16(0, 0x4949, true);
+  dv.setUint16(2, 42, true);
+  dv.setUint32(4, ifdOffset, true);
+  dv.setUint16(ifdOffset, entries, true);
+
+  let p = ifdOffset + 2;
+  const tag = (id: number, type: number, count: number, value: number) => {
+    dv.setUint16(p, id, true);
+    dv.setUint16(p + 2, type, true);
+    dv.setUint32(p + 4, count, true);
+    dv.setUint32(p + 8, value, true);
+    p += 12;
+  };
+  const SHORT = 3, LONG = 4;
+  tag(256, LONG, 1, w); // ImageWidth
+  tag(257, LONG, 1, h); // ImageLength
+  tag(258, SHORT, 3, bitsOffset); // BitsPerSample -> [16,16,16]
+  tag(259, SHORT, 1, 1); // Compression: none
+  tag(262, SHORT, 1, 2); // Photometric: RGB
+  tag(273, LONG, 1, dataOffset); // StripOffsets
+  tag(277, SHORT, 1, 3); // SamplesPerPixel
+  tag(278, LONG, 1, h); // RowsPerStrip
+  tag(279, LONG, 1, dataBytes); // StripByteCounts
+  tag(284, SHORT, 1, 1); // PlanarConfig: chunky
+  tag(339, SHORT, 3, sampleFmtOffset); // SampleFormat -> [1,1,1] unsigned
+  dv.setUint32(p, 0, true); // next IFD = 0
+
+  for (let i = 0; i < 3; i++) {
+    dv.setUint16(bitsOffset + i * 2, 16, true);
+    dv.setUint16(sampleFmtOffset + i * 2, 1, true);
+  }
+  // Pixel data, little-endian 16-bit.
+  const o = new Uint16Array(buf, dataOffset, w * h * 3);
+  o.set(rgb);
+  return buf;
+}
+
+function download(blob: Blob, name: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}

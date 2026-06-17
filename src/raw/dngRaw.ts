@@ -4,7 +4,7 @@
 
 import type { Ifd } from "./tiff";
 import { decodeLJ92 } from "./lj92";
-import { demosaicBinned, type LinearImage } from "./demosaic";
+import { demosaicBinned, type LinearImage, type RawCfa } from "./demosaic";
 
 const T_IMAGE_WIDTH = 256;
 const T_IMAGE_LENGTH = 257;
@@ -19,7 +19,14 @@ const T_TILE_BYTECOUNTS = 325;
 const T_BLACK_LEVEL = 50714;
 const T_WHITE_LEVEL = 50717;
 
+/** Demosaiced half-res linear proxy for live editing. */
 export function decodeMosaicedDng(bytes: Uint8Array, raw: Ifd): LinearImage {
+  const c = readMosaicedCfa(bytes, raw);
+  return demosaicBinned(c.cfa, c.width, c.height, c.pattern, c.black, c.white);
+}
+
+/** Full Bayer frame + metadata (for native-resolution export). */
+export function readMosaicedCfa(bytes: Uint8Array, raw: Ifd): RawCfa {
   const width = raw.num(T_IMAGE_WIDTH)[0];
   const height = raw.num(T_IMAGE_LENGTH)[0];
   const cfa = new Uint16Array(width * height);
@@ -50,7 +57,7 @@ export function decodeMosaicedDng(bytes: Uint8Array, raw: Ifd): LinearImage {
   const black = raw.num(T_BLACK_LEVEL)[0] ?? 0;
   const white = raw.num(T_WHITE_LEVEL)[0] ?? 65535;
 
-  return demosaicBinned(cfa, width, height, pattern, black, white);
+  return { cfa, width, height, pattern, black, white };
 }
 
 /** LJ92-decode one tile/strip and write its Bayer samples into the full CFA. */

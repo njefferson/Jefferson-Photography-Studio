@@ -71,5 +71,6 @@ See **`PLAN.md`** for the full build plan.
 - [x] Verify pure-JS lossless-JPEG (LJ92) decoder bit-exact vs LibRaw
 - [x] Port LJ92 decoder to TypeScript + demosaic (mosaiced DNG) — bit-exact
 - [x] Nikon NEF decoder (Compression 34713) — bit-exact, ~0.8s full frame in JS
-- [ ] Export images, then `.dcp`/`.cube` profiles
-- [ ] Full-resolution export-quality demosaic (current proxy is 2x2 binned)
+- [x] Export: JPEG + 16-bit TIFF, native-res bilinear demosaic, resolution choice
+- [ ] `.dcp` / `.cube` profile export for Lightroom/Photoshop
+- [ ] Display-P3 JPEG output (currently sRGB); per-color HSL; B&W mode for 720nm

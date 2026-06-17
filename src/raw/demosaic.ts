@@ -12,6 +12,17 @@ export interface LinearImage {
   linear: Float32Array;
 }
 
+/** A raw Bayer frame plus the metadata needed to interpret it. */
+export interface RawCfa {
+  cfa: Uint16Array;
+  width: number;
+  height: number;
+  /** 2x2 color indices [tl,tr,bl,br], 0=R 1=G 2=B. */
+  pattern: number[];
+  black: number;
+  white: number;
+}
+
 /**
  * @param cfa     full-frame single-channel sensor values
  * @param pattern 2x2 color indices [tl,tr,bl,br], 0=R 1=G 2=B
@@ -53,4 +64,42 @@ export function demosaicBinned(
     }
   }
   return { width: ow, height: oh, linear: out };
+}
+
+/**
+ * Full-resolution bilinear demosaic of one pixel -> linear normalized RGB.
+ * Missing channels are the average of the same-colored neighbors in the 3x3
+ * window (equivalent to bilinear Bayer interpolation), with edge clamping.
+ * Used by the export path where native resolution matters.
+ */
+export function demosaicPixelLinear(c: RawCfa, x: number, y: number): [number, number, number] {
+  const { cfa, width, height, pattern, black, white } = c;
+  const scale = 1 / Math.max(1, white - black);
+  const at = (xx: number, yy: number) => {
+    const cx = xx < 0 ? 0 : xx >= width ? width - 1 : xx;
+    const cy = yy < 0 ? 0 : yy >= height ? height - 1 : yy;
+    return Math.max(0, (cfa[cy * width + cx] - black) * scale);
+  };
+  const colorAt = (xx: number, yy: number) => pattern[(yy & 1) * 2 + (xx & 1)];
+
+  const rgb: [number, number, number] = [0, 0, 0];
+  for (let ch = 0; ch < 3; ch++) {
+    if (colorAt(x, y) === ch) {
+      rgb[ch] = at(x, y);
+      continue;
+    }
+    let sum = 0;
+    let n = 0;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        if (colorAt(x + dx, y + dy) === ch) {
+          sum += at(x + dx, y + dy);
+          n++;
+        }
+      }
+    }
+    rgb[ch] = n ? sum / n : 0;
+  }
+  return rgb;
 }

@@ -1,7 +1,8 @@
 import "./style.css";
-import { importFile } from "./import";
+import { importFile, type ImportedFile } from "./import";
 import { decode, type DecodedImage } from "./decode";
 import { Renderer, type EditParams } from "./gl";
+import { exportImage, type ExportFormat } from "./export";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -12,6 +13,7 @@ const fileInput = $("file") as HTMLInputElement;
 
 const renderer = new Renderer(canvas);
 let current: DecodedImage | null = null;
+let currentFile: ImportedFile | null = null;
 
 const params: EditParams = {
   wb: [1, 1, 1],
@@ -29,6 +31,10 @@ const ui = {
   hue: $("hue") as HTMLInputElement,
   sat: $("sat") as HTMLInputElement,
   con: $("con") as HTMLInputElement,
+  exFormat: $("exFormat") as HTMLSelectElement,
+  exScale: $("exScale") as HTMLSelectElement,
+  exQuality: $("exQuality") as HTMLInputElement,
+  exBtn: $("exBtn") as HTMLButtonElement,
 };
 
 function syncFromUI() {
@@ -74,6 +80,7 @@ fileInput.addEventListener("change", async () => {
     }
     const img = await decode(imported);
     current = img;
+    currentFile = imported;
     renderer.setImage(img);
     panel.hidden = false;
     hint.hidden = true;
@@ -87,6 +94,34 @@ fileInput.addEventListener("change", async () => {
   } catch (err) {
     hint.hidden = false;
     hint.textContent = "Could not open this file: " + (err as Error).message;
+  }
+});
+
+// Export & save to device.
+ui.exFormat.addEventListener("change", () => {
+  // Quality only applies to JPEG.
+  document.getElementById("exQualityRow")!.style.display =
+    ui.exFormat.value === "jpeg" ? "" : "none";
+});
+
+ui.exBtn.addEventListener("click", async () => {
+  if (!current || !currentFile) return;
+  const original = ui.exBtn.textContent;
+  ui.exBtn.disabled = true;
+  ui.exBtn.textContent = "Exporting…";
+  // Let the label paint before the synchronous export loop runs.
+  await new Promise((r) => requestAnimationFrame(() => r(null)));
+  try {
+    await exportImage(currentFile, current, params, {
+      format: ui.exFormat.value as ExportFormat,
+      scale: Number(ui.exScale.value),
+      quality: Number(ui.exQuality.value),
+    });
+  } catch (err) {
+    alert("Export failed: " + (err as Error).message);
+  } finally {
+    ui.exBtn.disabled = false;
+    ui.exBtn.textContent = original;
   }
 });
 

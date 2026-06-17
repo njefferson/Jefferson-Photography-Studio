@@ -7,7 +7,7 @@
 // the project's real NEFs.
 
 import { Tiff } from "./tiff";
-import { demosaicBinned, type LinearImage } from "./demosaic";
+import { demosaicBinned, type LinearImage, type RawCfa } from "./demosaic";
 
 // Predefined Huffman trees (dcraw `nikon_tree`): first 16 bytes are the count of
 // codes per bit-length, the rest are the symbol values (symbol = shl<<4 | len).
@@ -64,7 +64,14 @@ function buildHuffLut(tree: number[]): HuffLut {
   return { sym, len, maxlen };
 }
 
+/** Demosaiced half-res linear proxy for live editing. */
 export function decodeNef(bytes: Uint8Array): LinearImage {
+  const c = readNefCfa(bytes);
+  return demosaicBinned(c.cfa, c.width, c.height, c.pattern, c.black, c.white);
+}
+
+/** Full Bayer frame + metadata (for native-resolution export). */
+export function readNefCfa(bytes: Uint8Array): RawCfa {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const main = new Reader(view, bytes[0] === 0x49);
 
@@ -88,7 +95,7 @@ export function decodeNef(bytes: Uint8Array): LinearImage {
   // well and tap-WB compensates for the rest. Refine later if needed.
   const black = raw.num(50714)[0] ?? 1008;
   const white = raw.num(50717)[0] ?? (1 << bps) - 1;
-  return demosaicBinned(cfa, width, height, pattern, black, white);
+  return { cfa, width, height, pattern, black, white };
 }
 
 interface NikonParams {
