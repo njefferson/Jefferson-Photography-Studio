@@ -74,7 +74,7 @@ fileInput.addEventListener("change", async () => {
     }
     const img = await decode(imported);
     current = img;
-    renderer.setImage(img.width, img.height, img.pixels);
+    renderer.setImage(img);
     panel.hidden = false;
     hint.hidden = true;
     if (img.isRaw) {
@@ -94,11 +94,7 @@ fileInput.addEventListener("change", async () => {
 canvas.addEventListener("click", (e) => {
   if (!current) return;
   const [px, py] = renderer.toImagePixel(e.offsetX, e.offsetY);
-  const i = (py * current.width + px) * 4;
-  const toLin = (v: number) => Math.pow(v / 255, 2.2);
-  const r = Math.max(1e-4, toLin(current.pixels[i]));
-  const g = Math.max(1e-4, toLin(current.pixels[i + 1]));
-  const b = Math.max(1e-4, toLin(current.pixels[i + 2]));
+  const [r, g, b] = linearAt(current, px, py);
   const mean = (r + g + b) / 3;
   params.wb = [
     clamp(mean / r, 0.05, 8),
@@ -109,22 +105,36 @@ canvas.addEventListener("click", (e) => {
   draw();
 });
 
+/** Linear RGB at an image pixel, from whichever buffer the decoder produced. */
+function linearAt(img: DecodedImage, x: number, y: number): [number, number, number] {
+  const i = (y * img.width + x) * 4;
+  if (img.linear) {
+    return [
+      Math.max(1e-4, img.linear[i]),
+      Math.max(1e-4, img.linear[i + 1]),
+      Math.max(1e-4, img.linear[i + 2]),
+    ];
+  }
+  const p = img.pixels!;
+  const toLin = (v: number) => Math.max(1e-4, Math.pow(v / 255, 2.2));
+  return [toLin(p[i]), toLin(p[i + 1]), toLin(p[i + 2])];
+}
+
 function clamp(v: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, v));
 }
 
 // Gray-world white balance over a subsampled grid, in linear space.
 function grayWorldWB(img: DecodedImage): [number, number, number] {
-  const { width, height, pixels } = img;
-  const toLin = (v: number) => Math.pow(v / 255, 2.2);
+  const { width, height } = img;
   let r = 0, g = 0, b = 0, n = 0;
   const step = Math.max(1, Math.floor(Math.min(width, height) / 256));
   for (let y = 0; y < height; y += step) {
     for (let x = 0; x < width; x += step) {
-      const i = (y * width + x) * 4;
-      r += toLin(pixels[i]);
-      g += toLin(pixels[i + 1]);
-      b += toLin(pixels[i + 2]);
+      const [pr, pg, pb] = linearAt(img, x, y);
+      r += pr;
+      g += pg;
+      b += pb;
       n++;
     }
   }

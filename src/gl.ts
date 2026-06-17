@@ -29,13 +29,14 @@ uniform bool u_swap;
 uniform float u_hue;   // radians
 uniform float u_sat;
 uniform float u_con;
+uniform bool u_linear; // true when the texture already holds linear values
 
 vec3 toLinear(vec3 c){ return pow(c, vec3(2.2)); }
 vec3 toGamma(vec3 c){ return pow(max(c, 0.0), vec3(1.0/2.2)); }
 
 void main() {
   vec3 c = texture(u_tex, v_uv).rgb;
-  c = toLinear(c);
+  if (!u_linear) c = toLinear(c);
 
   // White balance (the unbounded gains that Lightroom can't reach).
   c *= u_wb;
@@ -69,6 +70,7 @@ export class Renderer {
   private loc: Record<string, WebGLUniformLocation | null> = {};
   private imgW = 0;
   private imgH = 0;
+  private isLinear = false;
 
   constructor(private canvas: HTMLCanvasElement) {
     const gl = canvas.getContext("webgl2", { preserveDrawingBuffer: true });
@@ -84,9 +86,12 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_linear"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
+    // Float textures (for 14-bit linear raw) need this extension to be color-
+    // renderable; sampling works regardless, and we filter NEAREST.
+    gl.getExtension("EXT_color_buffer_float");
 
     this.tex = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, this.tex);
@@ -96,18 +101,30 @@ export class Renderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   }
 
-  setImage(width: number, height: number, pixels: Uint8ClampedArray) {
+  setImage(img: { width: number; height: number; pixels?: Uint8ClampedArray; linear?: Float32Array }) {
     const gl = this.gl;
+    const { width, height } = img;
     this.imgW = width;
     this.imgH = height;
+    this.isLinear = !!img.linear;
     this.canvas.width = width;
     this.canvas.height = height;
     gl.viewport(0, 0, width, height);
     gl.bindTexture(gl.TEXTURE_2D, this.tex);
-    gl.texImage2D(
-      gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE,
-      new Uint8Array(pixels.buffer),
-    );
+    if (img.linear) {
+      // Float textures aren't reliably linear-filterable across devices; the
+      // canvas is 1:1 with the texture, so NEAREST is correct anyway.
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, width, height, 0, gl.RGBA, gl.FLOAT, img.linear);
+    } else {
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texImage2D(
+        gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+        new Uint8Array(img.pixels!.buffer),
+      );
+    }
   }
 
   render(p: EditParams) {
@@ -120,6 +137,7 @@ export class Renderer {
     gl.uniform1f(this.loc.u_hue, (p.hue * Math.PI) / 180);
     gl.uniform1f(this.loc.u_sat, p.sat);
     gl.uniform1f(this.loc.u_con, p.contrast);
+    gl.uniform1i(this.loc.u_linear, this.isLinear ? 1 : 0);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.tex);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
