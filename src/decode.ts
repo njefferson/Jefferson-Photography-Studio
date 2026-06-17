@@ -10,6 +10,7 @@
 import type { ImportedFile } from "./import";
 import { Tiff, type Ifd } from "./raw/tiff";
 import { decodeMosaicedDng } from "./raw/dngRaw";
+import { decodeNef } from "./raw/nef";
 
 export interface DecodedImage {
   width: number;
@@ -30,6 +31,10 @@ const COMP_LOSSY_DNG = 34892;
 export async function decode(file: ImportedFile): Promise<DecodedImage> {
   if (file.kind === "jpeg" || file.kind === "png") {
     return { ...(await decodeBitmap(file.bytes)), isRaw: false };
+  }
+  if (file.kind === "nef") {
+    const img = decodeNef(file.bytes);
+    return { width: img.width, height: img.height, linear: img.linear, isRaw: true };
   }
   if (file.kind === "dng" || file.kind === "tiff") {
     return decodeDng(file.bytes);

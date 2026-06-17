@@ -4,7 +4,7 @@
 
 import { readZip, pickImageEntry } from "./zip";
 
-export type ImageKind = "dng" | "tiff" | "jpeg" | "png" | "unknown";
+export type ImageKind = "dng" | "nef" | "tiff" | "jpeg" | "png" | "unknown";
 
 export interface ImportedFile {
   name: string;
@@ -34,22 +34,28 @@ export async function importFile(file: File): Promise<ImportedFile> {
   if (lower.endsWith(".zip") || isZip(buf)) {
     const entry = pickImageEntry(await readZip(buf));
     if (!entry) throw new Error("Zip contained no recognizable image file.");
-    const kind = sniff(entry.bytes);
+    const name = entry.name.split("/").pop() ?? entry.name;
     return {
-      name: entry.name.split("/").pop() ?? entry.name,
-      kind,
+      name,
+      kind: refineKind(sniff(entry.bytes), name),
       bytes: entry.bytes,
       looksTranscoded: false,
     };
   }
 
   const bytes = new Uint8Array(buf);
-  const kind = sniff(bytes);
+  const kind = refineKind(sniff(bytes), file.name);
   // Expected RAW by name but got a JPEG => iOS transcoded it.
   const expectedRaw = /\.(dng|nef|raw|arw|cr2|cr3|raf)$/i.test(lower);
   const looksTranscoded = expectedRaw && kind === "jpeg";
 
   return { name: file.name, kind, bytes, looksTranscoded };
+}
+
+// NEF and DNG share the TIFF magic; the extension disambiguates.
+function refineKind(kind: ImageKind, name: string): ImageKind {
+  if (kind === "dng" && /\.nef$/i.test(name)) return "nef";
+  return kind;
 }
 
 function isZip(buf: ArrayBuffer): boolean {
