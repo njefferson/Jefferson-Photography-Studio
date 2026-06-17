@@ -18,10 +18,17 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      # Create the Pages project on first run; harmless (and ignored) afterwards.
+      - name: Ensure Cloudflare Pages project exists
+        continue-on-error: true
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages project create infrared-photography-studio --production-branch=main
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          # Creates the project on first run; served at the project's pages.dev URL.
-          command: pages deploy dist --project-name=infrared-photography-studio --branch=main
+          command: pages deploy dist --project-name=infrared-photography-studio --branch=main --commit-dirty=true
