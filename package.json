@@ -1,9 +1,9 @@
 {
-  "name": "irstudio",
+  "name": "infrared-photography-studio",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Infrared photo editor — unbounded white balance, channel swap, hue shifts (Rob Shea method).",
+  "description": "Infrared Photography Studio (IPS) — unbounded white balance, channel swap, hue shifts for color-IR photos.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

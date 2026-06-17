@@ -1,6 +1,6 @@
 // Minimal offline cache. Caches the app shell on first run and serves
-// cache-first so IRstudio works with no network. Bump CACHE to invalidate.
-const CACHE = "irstudio-v1";
+// cache-first so IPS works with no network. Bump CACHE to invalidate.
+const CACHE = "ips-v1";
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.add("./")));

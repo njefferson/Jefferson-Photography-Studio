@@ -1,6 +1,6 @@
 {
-  "name": "IRstudio",
-  "short_name": "IRstudio",
+  "name": "Infrared Photography Studio",
+  "short_name": "IPS",
   "description": "Infrared photo editor — unbounded white balance, channel swap, hue shifts.",
   "start_url": "./",
   "scope": "./",
