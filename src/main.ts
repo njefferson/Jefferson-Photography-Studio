@@ -77,11 +77,11 @@ fileInput.addEventListener("change", async () => {
     renderer.setImage(img.width, img.height, img.pixels);
     panel.hidden = false;
     hint.hidden = true;
-    if (!img.isRaw) {
-      console.info(
-        "Showing embedded preview. Full RAW decode (LibRaw-WASM) is the next step; " +
-          "white balance will then operate on true sensor data.",
-      );
+    if (img.isRaw) {
+      // Raw opens un-white-balanced (the IR magenta). Auto-neutralize as a
+      // starting point; the user refines by tapping foliage.
+      params.wb = grayWorldWB(img);
+      syncToUI();
     }
     syncFromUI();
   } catch (err) {
@@ -111,6 +111,28 @@ canvas.addEventListener("click", (e) => {
 
 function clamp(v: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, v));
+}
+
+// Gray-world white balance over a subsampled grid, in linear space.
+function grayWorldWB(img: DecodedImage): [number, number, number] {
+  const { width, height, pixels } = img;
+  const toLin = (v: number) => Math.pow(v / 255, 2.2);
+  let r = 0, g = 0, b = 0, n = 0;
+  const step = Math.max(1, Math.floor(Math.min(width, height) / 256));
+  for (let y = 0; y < height; y += step) {
+    for (let x = 0; x < width; x += step) {
+      const i = (y * width + x) * 4;
+      r += toLin(pixels[i]);
+      g += toLin(pixels[i + 1]);
+      b += toLin(pixels[i + 2]);
+      n++;
+    }
+  }
+  r = Math.max(1e-4, r / n);
+  g = Math.max(1e-4, g / n);
+  b = Math.max(1e-4, b / n);
+  const mean = (r + g + b) / 3;
+  return [clamp(mean / r, 0.05, 8), clamp(mean / g, 0.05, 8), clamp(mean / b, 0.05, 8)];
 }
 
 // Offline support.
