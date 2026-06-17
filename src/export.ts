@@ -149,7 +149,7 @@ export function writeTiff16(rgb: Uint16Array, w: number, h: number): ArrayBuffer
   return buf;
 }
 
-function download(blob: Blob, name: string) {
+export function download(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

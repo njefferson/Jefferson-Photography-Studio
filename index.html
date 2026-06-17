@@ -69,6 +69,13 @@
           <label id="exQualityRow">Quality <input id="exQuality" type="range" min="0.5" max="1" step="0.01" value="0.92" /></label>
           <button id="exBtn" type="button">Export &amp; Save</button>
         </fieldset>
+
+        <fieldset>
+          <legend>Profiles &amp; LUTs <small>(your look, reusable)</small></legend>
+          <label><input id="profWB" type="checkbox" /> Bake current white balance in</label>
+          <button id="cubeBtn" type="button">Export .cube (Photoshop / video)</button>
+          <button id="dcpBtn" type="button">Export .dcp (Lightroom — beta)</button>
+        </fieldset>
       </aside>
     </div>
     <script type="module" src="/src/main.ts"></script>

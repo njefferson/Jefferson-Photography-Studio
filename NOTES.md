@@ -72,5 +72,7 @@ See **`PLAN.md`** for the full build plan.
 - [x] Port LJ92 decoder to TypeScript + demosaic (mosaiced DNG) — bit-exact
 - [x] Nikon NEF decoder (Compression 34713) — bit-exact, ~0.8s full frame in JS
 - [x] Export: JPEG + 16-bit TIFF, native-res bilinear demosaic, resolution choice
-- [ ] `.dcp` / `.cube` profile export for Lightroom/Photoshop
+- [x] `.cube` LUT export (creative look) — verified vs pipeline (mean err 0.0012)
+- [x] `.dcp` profile export — structure validated; **needs a Lightroom colour test**
+- [ ] Validate/calibrate .dcp colour in Lightroom (needs ACR; user to test)
 - [ ] Display-P3 JPEG output (currently sRGB); per-color HSL; B&W mode for 720nm

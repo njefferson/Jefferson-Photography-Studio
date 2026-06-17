@@ -2,7 +2,9 @@ import "./style.css";
 import { importFile, type ImportedFile } from "./import";
 import { decode, type DecodedImage } from "./decode";
 import { Renderer, type EditParams } from "./gl";
-import { exportImage, type ExportFormat } from "./export";
+import { exportImage, download, type ExportFormat } from "./export";
+import { generateCube } from "./lut";
+import { generateDcp } from "./dcp";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -35,7 +37,14 @@ const ui = {
   exScale: $("exScale") as HTMLSelectElement,
   exQuality: $("exQuality") as HTMLInputElement,
   exBtn: $("exBtn") as HTMLButtonElement,
+  profWB: $("profWB") as HTMLInputElement,
+  cubeBtn: $("cubeBtn") as HTMLButtonElement,
+  dcpBtn: $("dcpBtn") as HTMLButtonElement,
 };
+
+function baseName(): string {
+  return (currentFile?.name ?? "IPS-look").replace(/\.[^.]+$/, "");
+}
 
 function syncFromUI() {
   params.wb = [Number(ui.wbR.value), Number(ui.wbG.value), Number(ui.wbB.value)];
@@ -123,6 +132,17 @@ ui.exBtn.addEventListener("click", async () => {
     ui.exBtn.disabled = false;
     ui.exBtn.textContent = original;
   }
+});
+
+// Profile / LUT export — encodes the current look for reuse elsewhere.
+ui.cubeBtn.addEventListener("click", () => {
+  const text = generateCube(params, { includeWB: ui.profWB.checked, title: baseName() });
+  download(new Blob([text], { type: "text/plain" }), `${baseName()}.cube`);
+});
+
+ui.dcpBtn.addEventListener("click", () => {
+  const buf = generateDcp(params, currentFile?.bytes, `${baseName()} (IPS)`);
+  download(new Blob([new Uint8Array(buf)], { type: "application/octet-stream" }), `${baseName()}.dcp`);
 });
 
 // Tap-to-white-balance: neutralize the tapped point (foliage = the IR move).

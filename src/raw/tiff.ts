@@ -1,5 +1,9 @@
 // Minimal TIFF/DNG reader shared by the JPEG and mosaiced-raw decode paths.
 
+function nonZero(v: number): number {
+  return v === 0 ? 1 : v;
+}
+
 export class Ifd {
   constructor(
     private tiff: Tiff,
@@ -33,7 +37,7 @@ export class Tiff {
     return this.view.getUint32(o, this.le);
   }
   readNumbers(type: number, count: number, valueOffset: number): number[] {
-    const size = type === 3 ? 2 : type === 4 || type === 11 ? 4 : type === 5 ? 8 : 1;
+    const size = type === 3 ? 2 : type === 4 || type === 11 ? 4 : type === 5 || type === 10 ? 8 : 1;
     const base = size * count <= 4 ? valueOffset : this.u32(valueOffset);
     const out: number[] = [];
     for (let i = 0; i < count; i++) {
@@ -41,6 +45,8 @@ export class Tiff {
       if (type === 3) out.push(this.u16(p));
       else if (type === 4) out.push(this.u32(p));
       else if (type === 5) out.push(this.u32(p) / Math.max(1, this.u32(p + 4)));
+      else if (type === 10) out.push(this.view.getInt32(p, this.le) / nonZero(this.view.getInt32(p + 4, this.le))); // SRATIONAL
+      else if (type === 11) out.push(this.view.getFloat32(p, this.le)); // FLOAT
       else out.push(this.view.getUint8(p));
     }
     return out;
