@@ -65,7 +65,10 @@ export function applyEdit(r: number, g: number, b: number, p: EditParams): [numb
  * Precompute the edit for export: trig and the hue matrix are computed once,
  * not per pixel. Returns a function writing gamma RGB (0..1) into `out`.
  */
-export function compileEdit(p: EditParams): (r: number, g: number, b: number, out: Float32Array) => void {
+export function compileEdit(
+  p: EditParams,
+  cam?: number[],
+): (r: number, g: number, b: number, out: Float32Array) => void {
   const a = (p.hue * Math.PI) / 180;
   const cos = Math.cos(a);
   const sin = Math.sin(a);
@@ -87,6 +90,15 @@ export function compileEdit(p: EditParams): (r: number, g: number, b: number, ou
     r *= wr;
     g *= wg;
     b *= wb;
+    // Camera-native -> linear sRGB (after WB, before swap), matching the shader.
+    if (cam) {
+      const cr = cam[0] * r + cam[1] * g + cam[2] * b;
+      const cg = cam[3] * r + cam[4] * g + cam[5] * b;
+      const cb = cam[6] * r + cam[7] * g + cam[8] * b;
+      r = cr;
+      g = cg;
+      b = cb;
+    }
     if (swap) {
       const t = r;
       r = b;

@@ -7,6 +7,7 @@ import { demosaicPixelLinear, type RawCfa } from "./raw/demosaic";
 import { readMosaicedCfa } from "./raw/dngRaw";
 import { readNefCfa } from "./raw/nef";
 import { Tiff } from "./raw/tiff";
+import { camToSrgbLinear, NIKON_Z50_COLOR_MATRIX } from "./color";
 import type { ImportedFile } from "./import";
 import type { DecodedImage } from "./decode";
 
@@ -19,7 +20,7 @@ export interface ExportOptions {
 }
 
 type Source =
-  | { cfa: RawCfa }
+  | { cfa: RawCfa; cam: number[] }
   | { pixels: Uint8ClampedArray; width: number; height: number };
 
 export async function exportImage(
@@ -34,11 +35,13 @@ export async function exportImage(
   const w = Math.max(1, Math.round(srcW * opts.scale));
   const h = Math.max(1, Math.round(srcH * opts.scale));
 
-  const edit = compileEdit(params);
+  // The matrix is applied inside the edit (after white balance), matching the
+  // shader exactly so the export matches the preview.
+  const edit = compileEdit(params, "cfa" in src ? src.cam : undefined);
   const out = new Float32Array(3);
   const baseName = file.name.replace(/\.[^.]+$/, "");
 
-  // Linear RGB at a source pixel.
+  // Camera-native linear RGB at a source pixel.
   const sampleLinear =
     "cfa" in src
       ? (x: number, y: number) => demosaicPixelLinear(src.cfa, x, y)
@@ -87,12 +90,16 @@ export async function exportImage(
 }
 
 function getSource(file: ImportedFile, current: DecodedImage): Source {
-  if (file.kind === "nef") return { cfa: readNefCfa(file.bytes) };
+  if (file.kind === "nef") {
+    return { cfa: readNefCfa(file.bytes), cam: camToSrgbLinear(NIKON_Z50_COLOR_MATRIX) };
+  }
   if (file.kind === "dng") {
-    const raw = new Tiff(file.bytes)
-      .allIfds()
-      .find((d) => d.num(254)[0] === 0 && d.num(262)[0] === 32803 && d.num(259)[0] === 7);
-    if (raw) return { cfa: readMosaicedCfa(file.bytes, raw) };
+    const ifds = new Tiff(file.bytes).allIfds();
+    const raw = ifds.find((d) => d.num(254)[0] === 0 && d.num(262)[0] === 32803 && d.num(259)[0] === 7);
+    if (raw) {
+      const cm = ifds.map((d) => d.num(50721)).find((v) => v.length === 9) ?? NIKON_Z50_COLOR_MATRIX;
+      return { cfa: readMosaicedCfa(file.bytes, raw), cam: camToSrgbLinear(cm) };
+    }
   }
   // Non-mosaiced (JPEG/PNG/lossy-linear DNG/preview): the decode is already
   // full-resolution 8-bit.

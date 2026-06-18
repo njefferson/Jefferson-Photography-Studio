@@ -40,6 +40,7 @@ const ui = {
   profWB: $("profWB") as HTMLInputElement,
   cubeBtn: $("cubeBtn") as HTMLButtonElement,
   dcpBtn: $("dcpBtn") as HTMLButtonElement,
+  preset: $("preset") as HTMLButtonElement,
 };
 
 function baseName(): string {
@@ -59,7 +60,22 @@ function syncToUI() {
   ui.wbR.value = String(params.wb[0]);
   ui.wbG.value = String(params.wb[1]);
   ui.wbB.value = String(params.wb[2]);
+  ui.swap.value = params.swapRB ? "rb" : "none";
+  ui.hue.value = String(params.hue);
+  ui.sat.value = String(params.sat);
+  ui.con.value = String(params.contrast);
 }
+
+// One-tap Aerochrome look: swap + saturation + a touch of contrast. The camera
+// matrix gives us separated hues to work with; tune Hue/WB from here.
+ui.preset.addEventListener("click", () => {
+  params.swapRB = true;
+  params.hue = 0;
+  params.sat = 1.8;
+  params.contrast = 1.12;
+  syncToUI();
+  draw();
+});
 
 let raf = 0;
 function draw() {

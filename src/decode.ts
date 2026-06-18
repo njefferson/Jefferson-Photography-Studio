@@ -11,6 +11,7 @@ import type { ImportedFile } from "./import";
 import { Tiff, type Ifd } from "./raw/tiff";
 import { decodeMosaicedDng } from "./raw/dngRaw";
 import { decodeNef } from "./raw/nef";
+import { camToSrgbLinear, NIKON_Z50_COLOR_MATRIX } from "./color";
 
 export interface DecodedImage {
   width: number;
@@ -19,6 +20,10 @@ export interface DecodedImage {
   pixels?: Uint8ClampedArray;
   /** Linear float RGBA (mosaiced-raw path). Present instead of `pixels`. */
   linear?: Float32Array;
+  /** Camera-native -> linear sRGB 3x3 (row-major), applied after white balance.
+   *  Present only for camera-native raw (NEF, mosaiced DNG); absent when the
+   *  source is already display/profiled (JPEG, preview, lossy-linear DNG). */
+  camMatrix?: number[];
   /** True when these are true (un-white-balanced) sensor values. */
   isRaw: boolean;
 }
@@ -34,7 +39,13 @@ export async function decode(file: ImportedFile): Promise<DecodedImage> {
   }
   if (file.kind === "nef") {
     const img = decodeNef(file.bytes);
-    return { width: img.width, height: img.height, linear: img.linear, isRaw: true };
+    return {
+      width: img.width,
+      height: img.height,
+      linear: img.linear,
+      camMatrix: camToSrgbLinear(NIKON_Z50_COLOR_MATRIX),
+      isRaw: true,
+    };
   }
   if (file.kind === "dng" || file.kind === "tiff") {
     return decodeDng(file.bytes);
@@ -82,13 +93,29 @@ async function decodeDng(bytes: Uint8Array): Promise<DecodedImage> {
   );
   if (cfaRaw) {
     const img = decodeMosaicedDng(bytes, cfaRaw);
-    return { width: img.width, height: img.height, linear: img.linear, isRaw: true };
+    const cm = readColorMatrix1(ifds) ?? NIKON_Z50_COLOR_MATRIX;
+    return {
+      width: img.width,
+      height: img.height,
+      linear: img.linear,
+      camMatrix: camToSrgbLinear(cm),
+      isRaw: true,
+    };
   }
 
   // Fallback: embedded preview.
   const preview = pickLargestPreview(bytes, ifds);
   if (preview) return { ...(await decodeBitmap(preview)), isRaw: false };
   throw new Error("No decodable image found in this DNG.");
+}
+
+/** ColorMatrix1 (tag 50721, 9 SRATIONAL) from any IFD that carries it. */
+function readColorMatrix1(ifds: Ifd[]): number[] | undefined {
+  for (const d of ifds) {
+    const cm = d.num(50721);
+    if (cm.length === 9) return cm;
+  }
+  return undefined;
 }
 
 function isJpegComp(c: number | undefined) {

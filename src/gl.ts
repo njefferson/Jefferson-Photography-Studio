@@ -30,6 +30,8 @@ uniform float u_hue;   // radians
 uniform float u_sat;
 uniform float u_con;
 uniform bool u_linear; // true when the texture already holds linear values
+uniform mat3 u_cam;    // camera-native -> linear sRGB
+uniform bool u_useCam; // apply u_cam (camera-native raw only)
 
 vec3 toLinear(vec3 c){ return pow(c, vec3(2.2)); }
 vec3 toGamma(vec3 c){ return pow(max(c, 0.0), vec3(1.0/2.2)); }
@@ -40,6 +42,10 @@ void main() {
 
   // White balance (the unbounded gains that Lightroom can't reach).
   c *= u_wb;
+
+  // Camera colour matrix: separates infrared chroma into distinct hues so the
+  // channel swap can produce real false colour instead of a single tint.
+  if (u_useCam) c = u_cam * c;
 
   // Channel swap.
   if (u_swap) c = c.bgr;
@@ -71,6 +77,7 @@ export class Renderer {
   private imgW = 0;
   private imgH = 0;
   private isLinear = false;
+  private camMatrix: Float32Array | null = null;
 
   constructor(private canvas: HTMLCanvasElement) {
     const gl = canvas.getContext("webgl2", { preserveDrawingBuffer: true });
@@ -86,7 +93,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_linear"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_linear", "u_cam", "u_useCam"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -101,12 +108,14 @@ export class Renderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   }
 
-  setImage(img: { width: number; height: number; pixels?: Uint8ClampedArray; linear?: Float32Array }) {
+  setImage(img: { width: number; height: number; pixels?: Uint8ClampedArray; linear?: Float32Array; camMatrix?: number[] }) {
     const gl = this.gl;
     const { width, height } = img;
     this.imgW = width;
     this.imgH = height;
     this.isLinear = !!img.linear;
+    // Upload column-major for GLSL (our matrix is row-major).
+    this.camMatrix = img.camMatrix ? rowToColMajor(img.camMatrix) : null;
     this.canvas.width = width;
     this.canvas.height = height;
     gl.viewport(0, 0, width, height);
@@ -138,6 +147,8 @@ export class Renderer {
     gl.uniform1f(this.loc.u_sat, p.sat);
     gl.uniform1f(this.loc.u_con, p.contrast);
     gl.uniform1i(this.loc.u_linear, this.isLinear ? 1 : 0);
+    gl.uniform1i(this.loc.u_useCam, this.camMatrix ? 1 : 0);
+    if (this.camMatrix) gl.uniformMatrix3fv(this.loc.u_cam, false, this.camMatrix);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.tex);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -150,6 +161,11 @@ export class Renderer {
     const y = Math.round((cssY / r.height) * this.imgH);
     return [Math.max(0, Math.min(this.imgW - 1, x)), Math.max(0, Math.min(this.imgH - 1, y))];
   }
+}
+
+/** Row-major 3x3 -> column-major Float32Array for uniformMatrix3fv. */
+function rowToColMajor(m: number[]): Float32Array {
+  return new Float32Array([m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]]);
 }
 
 function link(gl: WebGL2RenderingContext, vs: string, fs: string): WebGLProgram {
