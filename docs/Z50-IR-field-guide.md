@@ -54,6 +54,23 @@ Note: the Picture Control **Hue** adjustment is only a small global shift (±3),
 but no Picture Control can swap channels — so don't chase the full false-color
 look in-camera.
 
+### Custom Picture Controls (one-tap previews)
+
+A camera-valid Picture Control must be written by the camera or Nikon's free
+**Picture Control Utility 2** — the `.NP3` binary is proprietary, so build it the
+reliable way (in-camera) rather than hand-forging the file.
+
+**In-camera:** Photo Shooting Menu → **Manage Picture Control** → **Save/edit** →
+pick a base → adjust → **Save as** a C-slot. Move between cards/bodies with
+**Load/save → Copy to card / Copy to camera**.
+
+| Save as | Base | Sharpening | Contrast | Brightness | Saturation | Hue | Notes |
+|---------|------|-----------|----------|-----------|-----------|-----|-------|
+| **C-1 "IR Color"** | Vivid | +1 | +2 | +1 | +3 | 0 | red / 590 / none |
+| **C-2 "IR Mono"** | Monochrome | +1 | +2 | +1 | — | — | 720nm; add toning to taste |
+
+Brightness +1 only lifts the dark IR **preview/JPEG**; it never touches the NEF.
+
 ## 4. Filter cheat-sheet
 
 | Filter | In-camera look after PRE WB | Best use |
