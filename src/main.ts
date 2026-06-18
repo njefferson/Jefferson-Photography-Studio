@@ -19,6 +19,7 @@ let currentFile: ImportedFile | null = null;
 
 const params: EditParams = {
   wb: [1, 1, 1],
+  exposure: 1,
   swapRB: true,
   hue: 0,
   sat: 1,
@@ -29,6 +30,8 @@ const ui = {
   wbR: $("wbR") as HTMLInputElement,
   wbG: $("wbG") as HTMLInputElement,
   wbB: $("wbB") as HTMLInputElement,
+  expo: $("expo") as HTMLInputElement,
+  autoBtn: $("autoBtn") as HTMLButtonElement,
   swap: $("swap") as HTMLSelectElement,
   hue: $("hue") as HTMLInputElement,
   sat: $("sat") as HTMLInputElement,
@@ -49,6 +52,7 @@ function baseName(): string {
 
 function syncFromUI() {
   params.wb = [Number(ui.wbR.value), Number(ui.wbG.value), Number(ui.wbB.value)];
+  params.exposure = Number(ui.expo.value);
   params.swapRB = ui.swap.value === "rb";
   params.hue = Number(ui.hue.value);
   params.sat = Number(ui.sat.value);
@@ -60,11 +64,20 @@ function syncToUI() {
   ui.wbR.value = String(params.wb[0]);
   ui.wbG.value = String(params.wb[1]);
   ui.wbB.value = String(params.wb[2]);
+  ui.expo.value = String(params.exposure);
   ui.swap.value = params.swapRB ? "rb" : "none";
   ui.hue.value = String(params.hue);
   ui.sat.value = String(params.sat);
   ui.con.value = String(params.contrast);
 }
+
+// Auto: brightness-preserving white balance + auto-exposure.
+ui.autoBtn.addEventListener("click", () => {
+  if (!current) return;
+  autoAdjust(current);
+  syncToUI();
+  draw();
+});
 
 // One-tap Aerochrome look: swap + saturation + a touch of contrast. The camera
 // matrix gives us separated hues to work with; tune Hue/WB from here.
@@ -86,7 +99,7 @@ function draw() {
   });
 }
 
-for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.swap, ui.hue, ui.sat, ui.con]) {
+for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.swap, ui.hue, ui.sat, ui.con]) {
   el.addEventListener("input", syncFromUI);
 }
 
@@ -110,9 +123,9 @@ fileInput.addEventListener("change", async () => {
     panel.hidden = false;
     hint.hidden = true;
     if (img.isRaw) {
-      // Raw opens un-white-balanced (the IR magenta). Auto-neutralize as a
-      // starting point; the user refines by tapping foliage.
-      params.wb = grayWorldWB(img);
+      // Raw opens un-white-balanced (the IR magenta) and dark. Auto white
+      // balance + exposure as a starting point; refine by tapping foliage.
+      autoAdjust(img);
       syncToUI();
     }
     syncFromUI();
@@ -167,14 +180,49 @@ canvas.addEventListener("click", (e) => {
   const [px, py] = renderer.toImagePixel(e.offsetX, e.offsetY);
   const [r, g, b] = linearAt(current, px, py);
   const mean = (r + g + b) / 3;
-  params.wb = [
-    clamp(mean / r, 0.05, 8),
-    clamp(mean / g, 0.05, 8),
-    clamp(mean / b, 0.05, 8),
-  ];
+  // Brightness-preserving so tapping recolors without darkening.
+  params.wb = lumNormalize([mean / r, mean / g, mean / b]);
   syncToUI();
   draw();
 });
+
+/** Scale WB gains so a neutral keeps its luminance (no overall darkening). */
+function lumNormalize(g: number[]): [number, number, number] {
+  const l = 0.2126 * g[0] + 0.7152 * g[1] + 0.0722 * g[2] || 1;
+  return [clamp(g[0] / l, 0.02, 16), clamp(g[1] / l, 0.02, 16), clamp(g[2] / l, 0.02, 16)];
+}
+
+/** White balance + exposure in one shot. */
+function autoAdjust(img: DecodedImage) {
+  params.wb = grayWorldWB(img);
+  params.exposure = autoExposure(img, params.wb);
+}
+
+/** Exposure so the bright end of the image (post WB + camera matrix) ~= 0.85. */
+function autoExposure(img: DecodedImage, wb: [number, number, number]): number {
+  const cm = img.camMatrix;
+  const { width, height } = img;
+  const lums: number[] = [];
+  const step = Math.max(1, Math.floor(Math.min(width, height) / 160));
+  for (let y = 0; y < height; y += step) {
+    for (let x = 0; x < width; x += step) {
+      let [r, g, b] = linearAt(img, x, y);
+      r *= wb[0];
+      g *= wb[1];
+      b *= wb[2];
+      if (cm) {
+        const cr = cm[0] * r + cm[1] * g + cm[2] * b;
+        const cg = cm[3] * r + cm[4] * g + cm[5] * b;
+        const cb = cm[6] * r + cm[7] * g + cm[8] * b;
+        r = cr; g = cg; b = cb;
+      }
+      lums.push(0.2126 * r + 0.7152 * g + 0.0722 * b);
+    }
+  }
+  lums.sort((a, b) => a - b);
+  const p = lums[Math.floor(lums.length * 0.97)] || 1e-4;
+  return clamp(0.85 / Math.max(p, 1e-4), 0.1, 32);
+}
 
 /** Linear RGB at an image pixel, from whichever buffer the decoder produced. */
 function linearAt(img: DecodedImage, x: number, y: number): [number, number, number] {
@@ -213,7 +261,7 @@ function grayWorldWB(img: DecodedImage): [number, number, number] {
   g = Math.max(1e-4, g / n);
   b = Math.max(1e-4, b / n);
   const mean = (r + g + b) / 3;
-  return [clamp(mean / r, 0.05, 8), clamp(mean / g, 0.05, 8), clamp(mean / b, 0.05, 8)];
+  return lumNormalize([mean / r, mean / g, mean / b]);
 }
 
 // Offline support.

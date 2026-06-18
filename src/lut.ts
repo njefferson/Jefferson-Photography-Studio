@@ -17,7 +17,7 @@ export interface CubeOptions {
 
 export function generateCube(params: EditParams, opts: CubeOptions = {}): string {
   const N = opts.size ?? 33;
-  const p: EditParams = opts.includeWB ? params : { ...params, wb: [1, 1, 1] };
+  const p: EditParams = opts.includeWB ? params : { ...params, wb: [1, 1, 1], exposure: 1 };
   const edit = compileEdit(p);
   const out = new Float32Array(3);
 

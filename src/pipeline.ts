@@ -4,6 +4,7 @@
 
 export interface EditParams {
   wb: [number, number, number];
+  exposure: number;
   swapRB: boolean;
   hue: number; // degrees
   sat: number;
@@ -18,10 +19,10 @@ const REC709 = [0.2126, 0.7152, 0.0722];
  * @returns gamma-encoded RGB in 0..1.
  */
 export function applyEdit(r: number, g: number, b: number, p: EditParams): [number, number, number] {
-  // White balance.
-  r *= p.wb[0];
-  g *= p.wb[1];
-  b *= p.wb[2];
+  // Exposure then white balance.
+  r *= p.wb[0] * p.exposure;
+  g *= p.wb[1] * p.exposure;
+  b *= p.wb[2] * p.exposure;
 
   // Channel swap.
   if (p.swapRB) {
@@ -81,7 +82,9 @@ export function compileEdit(
   const c20 = 0.299 - 0.3 * cos + 1.25 * sin;
   const c21 = 0.587 - 0.588 * cos - 1.05 * sin;
   const c22 = 0.114 + 0.886 * cos - 0.203 * sin;
-  const [wr, wg, wb] = p.wb;
+  // Fold exposure into the WB gains (both linear; order commutes).
+  const ex = p.exposure;
+  const wr = p.wb[0] * ex, wg = p.wb[1] * ex, wb = p.wb[2] * ex;
   const swap = p.swapRB;
   const sat = p.sat;
   const con = p.contrast;

@@ -5,6 +5,7 @@
 
 export interface EditParams {
   wb: [number, number, number]; // per-channel gains, unbounded
+  exposure: number; // linear brightness multiplier, 1 = unchanged
   swapRB: boolean; // red <-> blue
   hue: number; // degrees
   sat: number; // 1 = unchanged
@@ -29,6 +30,7 @@ uniform bool u_swap;
 uniform float u_hue;   // radians
 uniform float u_sat;
 uniform float u_con;
+uniform float u_exposure;
 uniform bool u_linear; // true when the texture already holds linear values
 uniform mat3 u_cam;    // camera-native -> linear sRGB
 uniform bool u_useCam; // apply u_cam (camera-native raw only)
@@ -40,7 +42,8 @@ void main() {
   vec3 c = texture(u_tex, v_uv).rgb;
   if (!u_linear) c = toLinear(c);
 
-  // White balance (the unbounded gains that Lightroom can't reach).
+  // Exposure (linear) then white balance (the unbounded gains Lightroom can't reach).
+  c *= u_exposure;
   c *= u_wb;
 
   // Camera colour matrix: separates infrared chroma into distinct hues so the
@@ -93,7 +96,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_linear", "u_cam", "u_useCam"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -146,6 +149,7 @@ export class Renderer {
     gl.uniform1f(this.loc.u_hue, (p.hue * Math.PI) / 180);
     gl.uniform1f(this.loc.u_sat, p.sat);
     gl.uniform1f(this.loc.u_con, p.contrast);
+    gl.uniform1f(this.loc.u_exposure, p.exposure);
     gl.uniform1i(this.loc.u_linear, this.isLinear ? 1 : 0);
     gl.uniform1i(this.loc.u_useCam, this.camMatrix ? 1 : 0);
     if (this.camMatrix) gl.uniformMatrix3fv(this.loc.u_cam, false, this.camMatrix);
