@@ -84,8 +84,8 @@ ui.autoBtn.addEventListener("click", () => {
 ui.preset.addEventListener("click", () => {
   params.swapRB = true;
   params.hue = 0;
-  params.sat = 1.8;
-  params.contrast = 1.12;
+  params.sat = 2.5;
+  params.contrast = 1.6;
   syncToUI();
   draw();
 });
