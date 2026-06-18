@@ -27,18 +27,23 @@ still has to happen in Infrared Photography Studio (IPS).
 This is what beats Lightroom's 2000K floor — it measures real multipliers off
 foliage instead of picking a Kelvin number.
 
-1. Photo Shooting Menu → **White balance** → **Preset manual (PRE)**
-   (or reach it from the **`i`** menu).
-2. Pick a slot — use **d-1 for the red filter**, **d-2 for 720nm**, so you can
-   switch quickly later.
-3. Highlight **PRE** and **press-and-hold OK** until the **PRE indicator blinks**.
-4. Fill the frame with **sunlit green foliage** (grass/leaves in the same light
-   you'll shoot), then **press the shutter** to measure.
-5. Look for **"Gd"** (good). If it fails, get closer to the foliage / more light
-   and retry.
+**Easiest route on the Z50 — measure from an existing photo** (no fiddly
+press-and-hold; the body has no dedicated WB button):
 
-Re-measure when the light changes a lot (full sun ↔ overcast). The measured WB
-makes foliage go neutral and sky go cyan/teal — the correct "before-swap" base.
+1. Take a normal photo that **fills the frame with sunlit green foliage**,
+   through your IR filter.
+2. Photo Shooting Menu → **White balance** → **Preset manual (PRE)** → open the
+   screen that lets you **scroll through images on the card**.
+3. Scroll to that foliage shot and **press OK** to select it as the source.
+4. The camera computes the preset from that image. Assign it to a slot
+   (**d-1 red filter**, **d-2 720nm**) so you can switch quickly.
+
+Re-do it when the light changes a lot (full sun ↔ overcast). The result makes
+foliage neutral and sky cyan/teal — the correct "before-swap" IR base.
+
+> Live "measure now" mode also exists but is entered from the **shooting
+> screen** (press-and-hold OK until PRE blinks), which is awkward without a WB
+> button — the select-an-image method above does the same thing.
 
 ## 3. Picture Control (preview punch only)
 
