@@ -12,6 +12,9 @@ export interface EditParams {
   /** 0..1 bilateral strength, applied to LINEAR data BEFORE everything else
    *  (see raw/denoise.ts) — not part of compileEdit's per-pixel math. */
   denoise: number;
+  /** Per-channel tone tint applied after saturation (e.g. sepia over mono).
+   *  [1,1,1] = none. */
+  tint: [number, number, number];
 }
 
 const REC709 = [0.2126, 0.7152, 0.0722];
@@ -45,6 +48,7 @@ export function compileEdit(
   const swap = p.swapRB;
   const sat = p.sat;
   const con = p.contrast;
+  const [tr, tg, tb] = p.tint;
 
   return (r, g, b, out) => {
     r *= wr;
@@ -78,6 +82,10 @@ export function compileEdit(
     nr = luma + (nr - luma) * satEff;
     ng = luma + (ng - luma) * satEff;
     nb = luma + (nb - luma) * satEff;
+    // Tone tint (sepia etc.) after saturation so it survives mono looks.
+    nr *= tr;
+    ng *= tg;
+    nb *= tb;
     out[0] = toGamma((nr - 0.5) * con + 0.5);
     out[1] = toGamma((ng - 0.5) * con + 0.5);
     out[2] = toGamma((nb - 0.5) * con + 0.5);

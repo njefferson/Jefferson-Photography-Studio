@@ -28,6 +28,7 @@ const params: EditParams = {
   sat: 1,
   contrast: 1,
   denoise: 0,
+  tint: [1, 1, 1],
 };
 
 const ui = {
@@ -37,7 +38,7 @@ const ui = {
   expo: $("expo") as HTMLInputElement,
   dn: $("dn") as HTMLInputElement,
   autoBtn: $("autoBtn") as HTMLButtonElement,
-  swap: $("swap") as HTMLSelectElement,
+  swapBtn: $("swapBtn") as HTMLButtonElement,
   hue: $("hue") as HTMLInputElement,
   sat: $("sat") as HTMLInputElement,
   con: $("con") as HTMLInputElement,
@@ -53,6 +54,7 @@ const ui = {
   lookGoldie: $("lookGoldie") as HTMLButtonElement,
   lookNatural: $("lookNatural") as HTMLButtonElement,
   lookMono: $("lookMono") as HTMLButtonElement,
+  lookSepia: $("lookSepia") as HTMLButtonElement,
 };
 
 function baseName(): string {
@@ -62,7 +64,6 @@ function baseName(): string {
 function syncFromUI() {
   params.wb = [Number(ui.wbR.value), Number(ui.wbG.value), Number(ui.wbB.value)];
   params.exposure = Number(ui.expo.value);
-  params.swapRB = ui.swap.value === "rb";
   params.hue = Number(ui.hue.value);
   params.sat = Number(ui.sat.value);
   params.contrast = Number(ui.con.value);
@@ -77,7 +78,7 @@ function syncToUI() {
   ui.wbB.value = String(params.wb[2]);
   ui.expo.value = String(params.exposure);
   ui.dn.value = String(params.denoise);
-  ui.swap.value = params.swapRB ? "rb" : "none";
+  ui.swapBtn.setAttribute("aria-pressed", String(params.swapRB));
   ui.hue.value = String(params.hue);
   ui.sat.value = String(params.sat);
   ui.con.value = String(params.contrast);
@@ -101,6 +102,7 @@ interface Look {
   /** Multiplies the current white balance — Aero Red over-cools so post-swap
    *  foliage lands crimson; Goldie also lifts green so it lands gold. */
   wbBias?: [number, number, number];
+  tint?: [number, number, number];
   raw: { sat: number; contrast: number };
   jpeg: { sat: number; contrast: number };
 }
@@ -110,6 +112,7 @@ const LOOKS: Record<string, Look> = {
   goldie: { swapRB: true, hue: 0, wbBias: [0.78, 1.22, 1.4], raw: { sat: 1.7, contrast: 1.35 }, jpeg: { sat: 1.2, contrast: 1.2 } },
   natural: { swapRB: false, hue: 0, raw: { sat: 1.2, contrast: 1.15 }, jpeg: { sat: 1.1, contrast: 1.15 } },
   mono: { swapRB: false, hue: 0, raw: { sat: 0, contrast: 1.5 }, jpeg: { sat: 0, contrast: 1.5 } },
+  sepia: { swapRB: false, hue: 0, tint: [1.12, 1.0, 0.78], raw: { sat: 0, contrast: 1.35 }, jpeg: { sat: 0, contrast: 1.35 } },
 };
 
 // The bias currently baked into params.wb, so switching looks replaces the
@@ -130,6 +133,7 @@ function applyLook(name: keyof typeof LOOKS) {
   params.hue = look.hue;
   params.sat = strength.sat;
   params.contrast = strength.contrast;
+  params.tint = look.tint ?? [1, 1, 1];
   syncToUI();
   draw();
 }
@@ -139,6 +143,7 @@ ui.lookRed.addEventListener("click", () => applyLook("red"));
 ui.lookGoldie.addEventListener("click", () => applyLook("goldie"));
 ui.lookNatural.addEventListener("click", () => applyLook("natural"));
 ui.lookMono.addEventListener("click", () => applyLook("mono"));
+ui.lookSepia.addEventListener("click", () => applyLook("sepia"));
 
 let raf = 0;
 function draw() {
@@ -149,9 +154,15 @@ function draw() {
   });
 }
 
-for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.dn, ui.swap, ui.hue, ui.sat, ui.con]) {
+for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.dn, ui.hue, ui.sat, ui.con]) {
   el.addEventListener("input", syncFromUI);
 }
+
+ui.swapBtn.addEventListener("click", () => {
+  params.swapRB = !params.swapRB;
+  syncToUI();
+  draw();
+});
 
 // Photomator-style compare divider for denoise: left of the handle shows the
 // image without denoise, right with. Visible only while denoise > 0.
@@ -282,11 +293,47 @@ function lumNormalize(g: number[]): [number, number, number] {
   return [clamp(g[0] / l, 0.02, 16), clamp(g[1] / l, 0.02, 16), clamp(g[2] / l, 0.02, 16)];
 }
 
-/** White balance + exposure in one shot. */
+/** White balance + exposure + noise-matched denoise in one shot. */
 function autoAdjust(img: DecodedImage) {
   params.wb = grayWorldWB(img);
   params.exposure = autoExposure(img, params.wb);
+  params.denoise = estimateDenoise(img);
   lookBias = [1, 1, 1]; // fresh neutral WB — no look bias baked in
+}
+
+/**
+ * Auto denoise strength from measured shadow noise: median relative
+ * neighbor-difference of luma over the darkest 40% of pixels (flat shadow
+ * areas ≈ pure noise; the median ignores the minority of real edges).
+ * Mapping calibrated on real Z50 NEFs; capped so detail always survives.
+ */
+function estimateDenoise(img: DecodedImage): number {
+  const { width, height } = img;
+  const step = Math.max(1, Math.floor(Math.min(width, height) / 200));
+  const lumaAt = (x: number, y: number) => {
+    const [r, g, b] = linearAt(img, x, y);
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const all: number[] = [];
+  for (let y = 0; y < height; y += step) {
+    for (let x = 0; x < width; x += step) all.push(lumaAt(x, y));
+  }
+  all.sort((a, b) => a - b);
+  const thr = all[Math.floor(all.length * 0.4)];
+  const diffs: number[] = [];
+  for (let y = 0; y < height - 1; y += step) {
+    for (let x = 0; x < width - 1; x += step) {
+      const la = lumaAt(x, y);
+      const lb = lumaAt(x + 1, y);
+      const m = (la + lb) / 2;
+      if (m > thr) continue;
+      diffs.push(Math.abs(la - lb) / (m + 0.01));
+    }
+  }
+  if (!diffs.length) return 0;
+  diffs.sort((a, b) => a - b);
+  const med = diffs[Math.floor(diffs.length / 2)];
+  return clamp(0.2 + (med - 0.013) * 25, 0, 0.8);
 }
 
 /** Exposure so the bright end of the image (post WB + camera matrix) ~= 0.85. */

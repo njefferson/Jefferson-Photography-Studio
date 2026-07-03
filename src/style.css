@@ -125,6 +125,12 @@ select, button {
   padding: 8px;
 }
 button { cursor: pointer; }
+.toggle[aria-pressed="true"] {
+  background: var(--accent);
+  color: #07101f;
+  font-weight: 600;
+  border-color: var(--accent);
+}
 .look-row { display: flex; flex-wrap: wrap; gap: 6px; }
 .look-row button { min-width: 30%; }
 .look-row button { flex: 1; padding: 8px 4px; font-size: 13px; }

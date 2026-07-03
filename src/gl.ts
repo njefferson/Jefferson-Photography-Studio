@@ -30,6 +30,7 @@ uniform float u_exposure;
 uniform bool u_linear; // true when the texture already holds linear values
 uniform mat3 u_cam;    // camera-native -> linear sRGB
 uniform bool u_useCam; // apply u_cam (camera-native raw only)
+uniform vec3 u_tint;     // tone tint after saturation ([1,1,1] = none)
 uniform float u_denoise; // 0..1 bilateral strength (see raw/denoise.ts)
 uniform vec2 u_texel;    // 1/textureSize
 uniform float u_split;   // compare divider: denoise applies where uv.x >= split
@@ -89,6 +90,9 @@ void main() {
   float satEff = u_sat <= 1.0 ? u_sat : 1.0 + (u_sat - 1.0) * smoothstep(0.02, 0.20, luma);
   c = mix(vec3(luma), c, satEff);
 
+  // Tone tint (sepia etc.) after saturation so it survives mono looks.
+  c *= u_tint;
+
   // Contrast around mid grey.
   c = (c - 0.5) * u_con + 0.5;
 
@@ -119,7 +123,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_texel", "u_split"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_texel", "u_split", "u_tint"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -169,6 +173,7 @@ export class Renderer {
     gl.useProgram(this.prog);
     gl.uniform1i(this.loc.u_tex, 0);
     gl.uniform1f(this.loc.u_denoise, p.denoise);
+    gl.uniform3f(this.loc.u_tint, p.tint[0], p.tint[1], p.tint[2]);
     gl.uniform2f(this.loc.u_texel, 1 / this.imgW, 1 / this.imgH);
     gl.uniform1f(this.loc.u_split, split);
     gl.uniform3f(this.loc.u_wb, p.wb[0], p.wb[1], p.wb[2]);
