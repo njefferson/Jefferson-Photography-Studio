@@ -542,9 +542,10 @@ function grayWorldWB(img: DecodedImage): [number, number, number] {
   });
 }
 
-// Support link in the ⓘ dialog. Set COFFEE_URL to enable (e.g. a Buy Me a
-// Coffee / Ko-fi page); the link stays hidden while it is empty.
-const COFFEE_URL = "";
+// Support link in the ⓘ dialog. PayPal donate flow to the author's account;
+// swap for a PayPal.Me / Buy Me a Coffee URL anytime. Hidden while empty.
+const COFFEE_URL =
+  "https://www.paypal.com/donate/?business=noah.jefferson%40gmail.com&item_name=Support+Infrared+Photography+Studio&currency_code=USD";
 {
   const coffee = $("coffee") as HTMLAnchorElement;
   if (COFFEE_URL) {
