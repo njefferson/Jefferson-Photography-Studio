@@ -6,6 +6,8 @@
   --accent: #7aa2ff;
 }
 * { box-sizing: border-box; }
+/* The hidden attribute must always win, even over ID display rules. */
+[hidden] { display: none !important; }
 html, body { margin: 0; height: 100%; }
 body {
   font: 15px/1.4 -apple-system, system-ui, sans-serif;
