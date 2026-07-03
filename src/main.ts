@@ -47,6 +47,8 @@ const ui = {
   cubeBtn: $("cubeBtn") as HTMLButtonElement,
   dcpBtn: $("dcpBtn") as HTMLButtonElement,
   lookAero: $("lookAero") as HTMLButtonElement,
+  lookRed: $("lookRed") as HTMLButtonElement,
+  lookGoldie: $("lookGoldie") as HTMLButtonElement,
   lookNatural: $("lookNatural") as HTMLButtonElement,
   lookMono: $("lookMono") as HTMLButtonElement,
 };
@@ -91,18 +93,34 @@ ui.autoBtn.addEventListener("click", () => {
 interface Look {
   swapRB: boolean;
   hue: number;
+  /** Multiplies the current white balance — Aero Red over-cools so post-swap
+   *  foliage lands crimson; Goldie also lifts green so it lands gold. */
+  wbBias?: [number, number, number];
   raw: { sat: number; contrast: number };
   jpeg: { sat: number; contrast: number };
 }
 const LOOKS: Record<string, Look> = {
   aero: { swapRB: true, hue: 0, raw: { sat: 2.5, contrast: 1.6 }, jpeg: { sat: 1.3, contrast: 1.2 } },
+  red: { swapRB: true, hue: 0, wbBias: [0.78, 1.02, 1.35], raw: { sat: 1.8, contrast: 1.4 }, jpeg: { sat: 1.3, contrast: 1.2 } },
+  goldie: { swapRB: true, hue: 0, wbBias: [0.78, 1.22, 1.4], raw: { sat: 1.7, contrast: 1.35 }, jpeg: { sat: 1.2, contrast: 1.2 } },
   natural: { swapRB: false, hue: 0, raw: { sat: 1.2, contrast: 1.15 }, jpeg: { sat: 1.1, contrast: 1.15 } },
   mono: { swapRB: false, hue: 0, raw: { sat: 0, contrast: 1.5 }, jpeg: { sat: 0, contrast: 1.5 } },
 };
 
+// The bias currently baked into params.wb, so switching looks replaces the
+// previous look's bias instead of compounding it.
+let lookBias: [number, number, number] = [1, 1, 1];
+
 function applyLook(name: keyof typeof LOOKS) {
   const look = LOOKS[name];
   const strength = current?.camMatrix ? look.raw : look.jpeg;
+  const bias = look.wbBias ?? [1, 1, 1];
+  params.wb = [
+    clamp((params.wb[0] / lookBias[0]) * bias[0], 0.02, 16),
+    clamp((params.wb[1] / lookBias[1]) * bias[1], 0.02, 16),
+    clamp((params.wb[2] / lookBias[2]) * bias[2], 0.02, 16),
+  ];
+  lookBias = bias;
   params.swapRB = look.swapRB;
   params.hue = look.hue;
   params.sat = strength.sat;
@@ -112,6 +130,8 @@ function applyLook(name: keyof typeof LOOKS) {
 }
 
 ui.lookAero.addEventListener("click", () => applyLook("aero"));
+ui.lookRed.addEventListener("click", () => applyLook("red"));
+ui.lookGoldie.addEventListener("click", () => applyLook("goldie"));
 ui.lookNatural.addEventListener("click", () => applyLook("natural"));
 ui.lookMono.addEventListener("click", () => applyLook("mono"));
 
@@ -210,6 +230,7 @@ canvas.addEventListener("click", (e) => {
   const mean = (r + g + b) / 3;
   // Brightness-preserving so tapping recolors without darkening.
   params.wb = lumNormalize([mean / r, mean / g, mean / b]);
+  lookBias = [1, 1, 1]; // fresh neutral WB — no look bias baked in
   syncToUI();
   draw();
 });
@@ -224,6 +245,7 @@ function lumNormalize(g: number[]): [number, number, number] {
 function autoAdjust(img: DecodedImage) {
   params.wb = grayWorldWB(img);
   params.exposure = autoExposure(img, params.wb);
+  lookBias = [1, 1, 1]; // fresh neutral WB — no look bias baked in
 }
 
 /** Exposure so the bright end of the image (post WB + camera matrix) ~= 0.85. */

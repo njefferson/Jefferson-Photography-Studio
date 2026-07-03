@@ -101,7 +101,8 @@ select, button {
   padding: 8px;
 }
 button { cursor: pointer; }
-.look-row { display: flex; gap: 6px; }
+.look-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.look-row button { min-width: 30%; }
 .look-row button { flex: 1; padding: 8px 4px; font-size: 13px; }
 
 @media (max-width: 760px) {
