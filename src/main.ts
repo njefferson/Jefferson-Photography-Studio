@@ -542,10 +542,8 @@ function grayWorldWB(img: DecodedImage): [number, number, number] {
   });
 }
 
-// Support link in the ⓘ dialog. PayPal donate flow to the author's account;
-// swap for a PayPal.Me / Buy Me a Coffee URL anytime. Hidden while empty.
-const COFFEE_URL =
-  "https://www.paypal.com/donate/?business=noah.jefferson%40gmail.com&item_name=Support+Infrared+Photography+Studio&currency_code=USD";
+// Support link in the ⓘ dialog. Hidden while empty.
+const COFFEE_URL = "https://paypal.me/WishUponGames";
 {
   const coffee = $("coffee") as HTMLAnchorElement;
   if (COFFEE_URL) {
