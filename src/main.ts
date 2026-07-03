@@ -40,7 +40,6 @@ const ui = {
   wbG: $("wbG") as HTMLInputElement,
   wbB: $("wbB") as HTMLInputElement,
   expo: $("expo") as HTMLInputElement,
-  dn: $("dn") as HTMLInputElement,
   autoBtn: $("autoBtn") as HTMLButtonElement,
   swapBtn: $("swapBtn") as HTMLButtonElement,
   hue: $("hue") as HTMLInputElement,
@@ -80,10 +79,8 @@ function syncFromUI() {
   params.sat = Number(ui.sat.value);
   params.contrast = Number(ui.con.value);
   params.glow = Number(ui.glow.value);
-  params.denoise = Number(ui.dn.value);
   params.sky = [Number(ui.skyHue.value), Number(ui.skySat.value), Number(ui.skyLum.value)];
   params.foliage = [Number(ui.folHue.value), Number(ui.folSat.value), Number(ui.folLum.value)];
-  updateSplitHandle();
   draw();
 }
 
@@ -92,7 +89,6 @@ function syncToUI() {
   ui.wbG.value = String(params.wb[1]);
   ui.wbB.value = String(params.wb[2]);
   ui.expo.value = String(params.exposure);
-  ui.dn.value = String(params.denoise);
   ui.swapBtn.setAttribute("aria-pressed", String(params.swapRB));
   ui.hue.value = String(params.hue);
   ui.sat.value = String(params.sat);
@@ -130,7 +126,7 @@ interface Look {
   jpeg: { sat: number; contrast: number };
 }
 const LOOKS: Record<string, Look> = {
-  aero: { swapRB: true, hue: 0, raw: { sat: 2.5, contrast: 1.6 }, jpeg: { sat: 1.3, contrast: 1.2 } },
+  aero: { swapRB: true, hue: 0, raw: { sat: 2.5, contrast: 1.3 }, jpeg: { sat: 1.3, contrast: 1.15 } },
   red: { swapRB: true, hue: 0, wbBias: [0.78, 1.02, 1.35], raw: { sat: 1.8, contrast: 1.4 }, jpeg: { sat: 1.3, contrast: 1.2 } },
   goldie: { swapRB: true, hue: 0, wbBias: [0.78, 1.22, 1.4], raw: { sat: 1.7, contrast: 1.35 }, jpeg: { sat: 1.2, contrast: 1.2 } },
   natural: { swapRB: false, hue: 0, raw: { sat: 1.2, contrast: 1.15 }, jpeg: { sat: 1.1, contrast: 1.15 } },
@@ -178,11 +174,11 @@ function draw() {
   if (raf) return;
   raf = requestAnimationFrame(() => {
     raf = 0;
-    renderer.render(params, params.denoise > 0 ? splitFrac : 0);
+    renderer.render(params);
   });
 }
 
-for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.dn, ui.hue, ui.sat, ui.con, ui.glow,
+for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.hue, ui.sat, ui.con, ui.glow,
   ui.skyHue, ui.skySat, ui.skyLum, ui.folHue, ui.folSat, ui.folLum]) {
   el.addEventListener("input", syncFromUI);
 }
@@ -193,44 +189,21 @@ ui.swapBtn.addEventListener("click", () => {
   draw();
 });
 
-// Photomator-style compare divider for denoise: left of the handle shows the
-// image without denoise, right with. Visible only while denoise > 0.
-let splitFrac = 0.5;
-const splitHandle = $("splitHandle") as HTMLDivElement;
-const stage = $("stage") as HTMLDivElement;
-
-function updateSplitHandle() {
-  const show = params.denoise > 0 && !!current;
-  splitHandle.hidden = !show;
-  if (!show) return;
-  const c = canvas.getBoundingClientRect();
-  const s = stage.getBoundingClientRect();
-  splitHandle.style.left = `${c.left - s.left + splitFrac * c.width}px`;
-  splitHandle.style.top = `${c.top - s.top}px`;
-  splitHandle.style.height = `${c.height}px`;
-}
-
-splitHandle.addEventListener("pointerdown", (e) => {
-  e.preventDefault();
-  splitHandle.setPointerCapture(e.pointerId);
-  const move = (ev: PointerEvent) => {
-    const c = canvas.getBoundingClientRect();
-    splitFrac = Math.min(1, Math.max(0, (ev.clientX - c.left) / c.width));
-    updateSplitHandle();
-    draw();
-  };
-  const up = () => {
-    splitHandle.removeEventListener("pointermove", move);
-    splitHandle.removeEventListener("pointerup", up);
-  };
-  splitHandle.addEventListener("pointermove", move);
-  splitHandle.addEventListener("pointerup", up);
-});
-
-window.addEventListener("resize", updateSplitHandle);
-
 const welcome = $("welcome") as HTMLDivElement;
+const welcomeClose = $("welcomeClose") as HTMLButtonElement;
 const lesson = $("lesson") as HTMLDivElement;
+const lessonShow = $("lessonShow") as HTMLButtonElement;
+
+// "Examples" in the header re-opens the welcome/example chooser at any time;
+// the ✕ (only shown once an image is loaded) returns to the photo.
+$("examplesBtn").addEventListener("click", () => {
+  welcomeClose.hidden = !current;
+  hint.hidden = !!current;
+  welcome.hidden = false;
+});
+welcomeClose.addEventListener("click", () => {
+  welcome.hidden = true;
+});
 
 async function openImported(imported: ImportedFile) {
   const img = await decode(imported);
@@ -241,6 +214,7 @@ async function openImported(imported: ImportedFile) {
   panel.hidden = false;
   welcome.hidden = true;
   lesson.hidden = true;
+  lessonShow.hidden = true;
   if (img.isRaw) {
     // Raw opens un-white-balanced (the IR magenta) and dark. Auto white
     // balance + exposure as a starting point; refine by tapping foliage.
@@ -285,10 +259,10 @@ const EXAMPLES: Record<string, { file: string; title: string; steps: string[] }>
   },
   lodge: {
     file: "./examples/lodge.dng",
-    title: "Motor lodge — white balance & denoise",
+    title: "Motor lodge — white balance & film looks",
     steps: [
       "Tap Auto, then tap the trees (not the sign) and watch the colors shift.",
-      "Denoise was set automatically — drag the divider on the photo to compare off/on.",
+      "Noise reduction is automatic on raw files — shadows stay clean even at high saturation.",
       "Try B&W IR and HIE Glow for the classic film feel.",
     ],
   },
@@ -321,6 +295,7 @@ async function loadExample(key: string) {
       return li;
     }));
     lesson.hidden = false;
+    lessonShow.hidden = true;
   } catch (err) {
     alert("Could not load the example: " + (err as Error).message);
   } finally {
@@ -331,8 +306,14 @@ async function loadExample(key: string) {
 document.querySelectorAll<HTMLButtonElement>(".ex").forEach((b) => {
   b.addEventListener("click", () => loadExample(b.dataset.ex!));
 });
+// "Got it" minimizes the lesson to a floating "?" that brings it back.
 $("lessonClose").addEventListener("click", () => {
   lesson.hidden = true;
+  lessonShow.hidden = false;
+});
+lessonShow.addEventListener("click", () => {
+  lesson.hidden = false;
+  lessonShow.hidden = true;
 });
 
 // Export & save to device.

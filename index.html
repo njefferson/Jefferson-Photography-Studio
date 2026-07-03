@@ -19,16 +19,21 @@
           Infrared Photography Studio
           <button id="infoBtn" class="info-btn" type="button" aria-label="What's new">i</button>
         </span>
-        <label class="open-btn">
-          Open image
-          <input id="file" type="file" accept=".dng,.nef,.zip,image/*" hidden />
-        </label>
+        <span class="bar-actions">
+          <button id="examplesBtn" class="bar-btn" type="button">Examples</button>
+          <label class="open-btn">
+            Open image
+            <input id="file" type="file" accept=".dng,.nef,.zip,image/*" hidden />
+          </label>
+        </span>
       </header>
 
       <div id="stage">
         <canvas id="view"></canvas>
         <div id="welcome">
-          <p id="hint">Open a DNG or NEF (or a .zip of one) to begin.</p>
+          <button id="welcomeClose" class="welcome-close" type="button" hidden>&#10005;</button>
+          <p id="hint">Edit infrared photos — RAW (NEF / DNG) unlocks the full color magic.</p>
+          <label class="open-btn welcome-open" for="file">Open image</label>
           <p class="ex-title">&hellip;or try an example photo:</p>
           <div class="ex-list">
             <button class="ex" data-ex="canopy" type="button">
@@ -47,7 +52,7 @@
           <ol id="lessonSteps"></ol>
           <button id="lessonClose" type="button">Got it</button>
         </div>
-        <div id="splitHandle" hidden><div class="grip">&#8596;</div></div>
+        <button id="lessonShow" class="lesson-show" type="button" hidden>?</button>
       </div>
 
       <aside id="panel" hidden>
@@ -59,12 +64,6 @@
           <label>Green gain <input id="wbG" type="range" min="0.02" max="16" step="0.01" value="1" /></label>
           <label>Blue gain <input id="wbB" type="range" min="0.02" max="16" step="0.01" value="1" /></label>
           <small style="color:#80808a">Tip: tap foliage in the image to set white balance.</small>
-        </fieldset>
-
-        <fieldset>
-          <legend>Denoise <small>(raw-level, before all edits)</small></legend>
-          <label>Strength <input id="dn" type="range" min="0" max="1" step="0.01" value="0" /></label>
-          <small style="color:#80808a">Drag the divider on the photo — left: off, right: on.</small>
         </fieldset>
 
         <fieldset>
