@@ -9,6 +9,9 @@ export interface EditParams {
   hue: number; // degrees
   sat: number;
   contrast: number;
+  /** 0..1 bilateral strength, applied to LINEAR data BEFORE everything else
+   *  (see raw/denoise.ts) — not part of compileEdit's per-pixel math. */
+  denoise: number;
 }
 
 const REC709 = [0.2126, 0.7152, 0.0722];

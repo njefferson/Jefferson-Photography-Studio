@@ -27,6 +27,7 @@ const params: EditParams = {
   hue: 0,
   sat: 1,
   contrast: 1,
+  denoise: 0,
 };
 
 const ui = {
@@ -34,6 +35,7 @@ const ui = {
   wbG: $("wbG") as HTMLInputElement,
   wbB: $("wbB") as HTMLInputElement,
   expo: $("expo") as HTMLInputElement,
+  dn: $("dn") as HTMLInputElement,
   autoBtn: $("autoBtn") as HTMLButtonElement,
   swap: $("swap") as HTMLSelectElement,
   hue: $("hue") as HTMLInputElement,
@@ -64,6 +66,8 @@ function syncFromUI() {
   params.hue = Number(ui.hue.value);
   params.sat = Number(ui.sat.value);
   params.contrast = Number(ui.con.value);
+  params.denoise = Number(ui.dn.value);
+  updateSplitHandle();
   draw();
 }
 
@@ -72,6 +76,7 @@ function syncToUI() {
   ui.wbG.value = String(params.wb[1]);
   ui.wbB.value = String(params.wb[2]);
   ui.expo.value = String(params.exposure);
+  ui.dn.value = String(params.denoise);
   ui.swap.value = params.swapRB ? "rb" : "none";
   ui.hue.value = String(params.hue);
   ui.sat.value = String(params.sat);
@@ -140,13 +145,49 @@ function draw() {
   if (raf) return;
   raf = requestAnimationFrame(() => {
     raf = 0;
-    renderer.render(params);
+    renderer.render(params, params.denoise > 0 ? splitFrac : 0);
   });
 }
 
-for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.swap, ui.hue, ui.sat, ui.con]) {
+for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.dn, ui.swap, ui.hue, ui.sat, ui.con]) {
   el.addEventListener("input", syncFromUI);
 }
+
+// Photomator-style compare divider for denoise: left of the handle shows the
+// image without denoise, right with. Visible only while denoise > 0.
+let splitFrac = 0.5;
+const splitHandle = $("splitHandle") as HTMLDivElement;
+const stage = $("stage") as HTMLDivElement;
+
+function updateSplitHandle() {
+  const show = params.denoise > 0 && !!current;
+  splitHandle.hidden = !show;
+  if (!show) return;
+  const c = canvas.getBoundingClientRect();
+  const s = stage.getBoundingClientRect();
+  splitHandle.style.left = `${c.left - s.left + splitFrac * c.width}px`;
+  splitHandle.style.top = `${c.top - s.top}px`;
+  splitHandle.style.height = `${c.height}px`;
+}
+
+splitHandle.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  splitHandle.setPointerCapture(e.pointerId);
+  const move = (ev: PointerEvent) => {
+    const c = canvas.getBoundingClientRect();
+    splitFrac = Math.min(1, Math.max(0, (ev.clientX - c.left) / c.width));
+    updateSplitHandle();
+    draw();
+  };
+  const up = () => {
+    splitHandle.removeEventListener("pointermove", move);
+    splitHandle.removeEventListener("pointerup", up);
+  };
+  splitHandle.addEventListener("pointermove", move);
+  splitHandle.addEventListener("pointerup", up);
+});
+
+window.addEventListener("resize", updateSplitHandle);
 
 fileInput.addEventListener("change", async () => {
   const f = fileInput.files?.[0];

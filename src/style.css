@@ -67,10 +67,34 @@ body {
 }
 #stage {
   grid-area: stage;
+  position: relative;
   display: grid;
   place-items: center;
   overflow: hidden;
   padding: 12px;
+}
+#splitHandle {
+  position: absolute;
+  width: 2px;
+  margin-left: -1px;
+  background: rgba(255, 255, 255, 0.85);
+  cursor: ew-resize;
+  touch-action: none;
+}
+#splitHandle .grip {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #fff;
+  color: #111;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
 }
 #view {
   max-width: 100%;

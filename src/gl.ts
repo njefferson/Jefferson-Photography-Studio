@@ -30,13 +30,38 @@ uniform float u_exposure;
 uniform bool u_linear; // true when the texture already holds linear values
 uniform mat3 u_cam;    // camera-native -> linear sRGB
 uniform bool u_useCam; // apply u_cam (camera-native raw only)
+uniform float u_denoise; // 0..1 bilateral strength (see raw/denoise.ts)
+uniform vec2 u_texel;    // 1/textureSize
+uniform float u_split;   // compare divider: denoise applies where uv.x >= split
+
+const vec3 LUMA_W = vec3(0.2126, 0.7152, 0.0722);
 
 vec3 toLinear(vec3 c){ return pow(c, vec3(2.2)); }
 vec3 toGamma(vec3 c){ return pow(max(c, 0.0), vec3(1.0/2.2)); }
+vec3 fetchLin(vec2 uv){ vec3 s = texture(u_tex, uv).rgb; return u_linear ? s : toLinear(s); }
 
 void main() {
-  vec3 c = texture(u_tex, v_uv).rgb;
-  if (!u_linear) c = toLinear(c);
+  vec3 c = fetchLin(v_uv);
+
+  // Denoise FIRST, on linear sensor data, before the big IR gains amplify the
+  // noise. Same 5x5 brightness-adaptive bilateral as raw/denoise.ts.
+  if (u_denoise > 0.0 && v_uv.x >= u_split) {
+    float sigma = 0.08 + 0.55 * u_denoise;
+    float inv2s2 = 1.0 / (2.0 * sigma * sigma);
+    float lc = dot(c, LUMA_W);
+    vec3 sum = vec3(0.0);
+    float wsum = 0.0;
+    for (int dy = -2; dy <= 2; dy++) {
+      for (int dx = -2; dx <= 2; dx++) {
+        vec3 s = fetchLin(v_uv + vec2(float(dx), float(dy)) * u_texel);
+        float rel = (dot(s, LUMA_W) - lc) / (lc + 0.02);
+        float w = exp(-float(dx*dx + dy*dy) / 4.5) * exp(-rel * rel * inv2s2);
+        sum += s * w;
+        wsum += w;
+      }
+    }
+    c = sum / wsum;
+  }
 
   // Exposure (linear) then white balance (the unbounded gains Lightroom can't reach).
   c *= u_exposure;
@@ -94,7 +119,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_texel", "u_split"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -137,11 +162,15 @@ export class Renderer {
     }
   }
 
-  render(p: EditParams) {
+  /** @param split 0..1 — denoise applies right of this fraction (0 = whole image). */
+  render(p: EditParams, split = 0) {
     const gl = this.gl;
     if (!this.imgW) return;
     gl.useProgram(this.prog);
     gl.uniform1i(this.loc.u_tex, 0);
+    gl.uniform1f(this.loc.u_denoise, p.denoise);
+    gl.uniform2f(this.loc.u_texel, 1 / this.imgW, 1 / this.imgH);
+    gl.uniform1f(this.loc.u_split, split);
     gl.uniform3f(this.loc.u_wb, p.wb[0], p.wb[1], p.wb[2]);
     gl.uniform1i(this.loc.u_swap, p.swapRB ? 1 : 0);
     gl.uniform1f(this.loc.u_hue, (p.hue * Math.PI) / 180);

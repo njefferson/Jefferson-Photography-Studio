@@ -28,6 +28,7 @@
       <div id="stage">
         <canvas id="view"></canvas>
         <p id="hint">Open a DNG (or a .zip of one) to begin.</p>
+        <div id="splitHandle" hidden><div class="grip">&#8596;</div></div>
       </div>
 
       <aside id="panel" hidden>
@@ -39,6 +40,12 @@
           <label>Green gain <input id="wbG" type="range" min="0.02" max="16" step="0.01" value="1" /></label>
           <label>Blue gain <input id="wbB" type="range" min="0.02" max="16" step="0.01" value="1" /></label>
           <small style="color:#80808a">Tip: tap foliage in the image to set white balance.</small>
+        </fieldset>
+
+        <fieldset>
+          <legend>Denoise <small>(raw-level, before all edits)</small></legend>
+          <label>Strength <input id="dn" type="range" min="0" max="1" step="0.01" value="0" /></label>
+          <small style="color:#80808a">Drag the divider on the photo — left: off, right: on.</small>
         </fieldset>
 
         <fieldset>

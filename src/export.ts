@@ -8,6 +8,7 @@ import { readMosaicedCfa } from "./raw/dngRaw";
 import { readNefCfa } from "./raw/nef";
 import { Tiff } from "./raw/tiff";
 import { camToSrgbLinear, NIKON_Z50_COLOR_MATRIX } from "./color";
+import { makeRowDenoiser } from "./raw/denoise";
 import type { ImportedFile } from "./import";
 import type { DecodedImage } from "./decode";
 
@@ -41,14 +42,16 @@ export async function exportImage(
   const out = new Float32Array(3);
   const baseName = file.name.replace(/\.[^.]+$/, "");
 
-  // Camera-native linear RGB at a source pixel.
-  const sampleLinear =
+  // Camera-native linear RGB at a source pixel; denoise wraps the sampler so it
+  // acts on linear data BEFORE white balance/exposure amplify the noise.
+  const rawSample =
     "cfa" in src
       ? (x: number, y: number) => demosaicPixelLinear(src.cfa, x, y)
       : (x: number, y: number) => {
           const i = (y * src.width + x) * 4;
           return [toLinear8(src.pixels[i]), toLinear8(src.pixels[i + 1]), toLinear8(src.pixels[i + 2])] as [number, number, number];
         };
+  const sampleLinear = makeRowDenoiser(rawSample, srcW, srcH, params.denoise);
 
   if (opts.format === "jpeg") {
     const data = new Uint8ClampedArray(w * h * 4);
