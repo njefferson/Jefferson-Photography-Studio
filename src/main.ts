@@ -46,7 +46,9 @@ const ui = {
   profWB: $("profWB") as HTMLInputElement,
   cubeBtn: $("cubeBtn") as HTMLButtonElement,
   dcpBtn: $("dcpBtn") as HTMLButtonElement,
-  preset: $("preset") as HTMLButtonElement,
+  lookAero: $("lookAero") as HTMLButtonElement,
+  lookNatural: $("lookNatural") as HTMLButtonElement,
+  lookMono: $("lookMono") as HTMLButtonElement,
 };
 
 function baseName(): string {
@@ -82,16 +84,36 @@ ui.autoBtn.addEventListener("click", () => {
   draw();
 });
 
-// One-tap Aerochrome look: swap + saturation + a touch of contrast. The camera
-// matrix gives us separated hues to work with; tune Hue/WB from here.
-ui.preset.addEventListener("click", () => {
-  params.swapRB = true;
-  params.hue = 0;
-  params.sat = 2.5;
-  params.contrast = 1.6;
+// One-tap looks. Tuned on real Z50-IR files; raw (camera-native) sources take
+// the full-strength recipe, JPEGs a gentler one — camera JPEGs already carry
+// colour rendering, so the raw-strength saturation goes garish on them.
+// Looks never touch WB/exposure (those are per-shot; use Auto / tap foliage).
+interface Look {
+  swapRB: boolean;
+  hue: number;
+  raw: { sat: number; contrast: number };
+  jpeg: { sat: number; contrast: number };
+}
+const LOOKS: Record<string, Look> = {
+  aero: { swapRB: true, hue: 0, raw: { sat: 2.5, contrast: 1.6 }, jpeg: { sat: 1.3, contrast: 1.2 } },
+  natural: { swapRB: false, hue: 0, raw: { sat: 1.2, contrast: 1.15 }, jpeg: { sat: 1.1, contrast: 1.15 } },
+  mono: { swapRB: false, hue: 0, raw: { sat: 0, contrast: 1.5 }, jpeg: { sat: 0, contrast: 1.5 } },
+};
+
+function applyLook(name: keyof typeof LOOKS) {
+  const look = LOOKS[name];
+  const strength = current?.camMatrix ? look.raw : look.jpeg;
+  params.swapRB = look.swapRB;
+  params.hue = look.hue;
+  params.sat = strength.sat;
+  params.contrast = strength.contrast;
   syncToUI();
   draw();
-});
+}
+
+ui.lookAero.addEventListener("click", () => applyLook("aero"));
+ui.lookNatural.addEventListener("click", () => applyLook("natural"));
+ui.lookMono.addEventListener("click", () => applyLook("mono"));
 
 let raf = 0;
 function draw() {

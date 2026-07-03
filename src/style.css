@@ -101,6 +101,8 @@ select, button {
   padding: 8px;
 }
 button { cursor: pointer; }
+.look-row { display: flex; gap: 6px; }
+.look-row button { flex: 1; padding: 8px 4px; font-size: 13px; }
 
 @media (max-width: 760px) {
   #app { grid-template-columns: 1fr; grid-template-areas: "bar" "stage" "panel"; grid-template-rows: auto 1fr auto; }
