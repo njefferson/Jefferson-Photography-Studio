@@ -9,6 +9,7 @@ import { readNefCfa } from "./raw/nef";
 import { Tiff } from "./raw/tiff";
 import { camToSrgbLinear, NIKON_Z50_COLOR_MATRIX } from "./color";
 import { makeRowDenoiser } from "./raw/denoise";
+import { buildGlowMap, sampleGlow, GLOW_GAIN } from "./glow";
 import type { ImportedFile } from "./import";
 import type { DecodedImage } from "./decode";
 
@@ -52,6 +53,10 @@ export async function exportImage(
           return [toLinear8(src.pixels[i]), toLinear8(src.pixels[i + 1]), toLinear8(src.pixels[i + 2])] as [number, number, number];
         };
   const sampleLinear = makeRowDenoiser(rawSample, srcW, srcH, params.denoise);
+  // HIE glow map at full resolution (cheap: built on a coarse grid).
+  const gmap = params.glow > 0 ? buildGlowMap(rawSample, srcW, srcH) : null;
+  const glowAt = (sx: number, sy: number) =>
+    gmap ? params.glow * GLOW_GAIN * sampleGlow(gmap, (sx + 0.5) / srcW, (sy + 0.5) / srcH) : 0;
 
   if (opts.format === "jpeg") {
     const data = new Uint8ClampedArray(w * h * 4);
@@ -60,7 +65,7 @@ export async function exportImage(
       for (let x = 0; x < w; x++) {
         const sx = Math.min(srcW - 1, Math.round((x / w) * srcW));
         const [r, g, b] = sampleLinear(sx, sy);
-        edit(r, g, b, out);
+        edit(r, g, b, out, glowAt(sx, sy));
         const o = (y * w + x) * 4;
         data[o] = out[0] * 255;
         data[o + 1] = out[1] * 255;
@@ -81,7 +86,7 @@ export async function exportImage(
       for (let x = 0; x < w; x++) {
         const sx = Math.min(srcW - 1, Math.round((x / w) * srcW));
         const [r, g, b] = sampleLinear(sx, sy);
-        edit(r, g, b, out);
+        edit(r, g, b, out, glowAt(sx, sy));
         const o = (y * w + x) * 3;
         rgb[o] = out[0] * 65535;
         rgb[o + 1] = out[1] * 65535;

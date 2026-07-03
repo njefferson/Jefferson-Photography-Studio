@@ -15,6 +15,9 @@ export interface EditParams {
   /** Per-channel tone tint applied after saturation (e.g. sepia over mono).
    *  [1,1,1] = none. */
   tint: [number, number, number];
+  /** 0..1 HIE halation strength. Spatial (uses the per-image glow map); the
+   *  per-pixel amount is passed into the compiled edit as `glow`. */
+  glow: number;
 }
 
 const REC709 = [0.2126, 0.7152, 0.0722];
@@ -29,7 +32,7 @@ const REC709 = [0.2126, 0.7152, 0.0722];
 export function compileEdit(
   p: EditParams,
   cam?: number[],
-): (r: number, g: number, b: number, out: Float32Array) => void {
+): (r: number, g: number, b: number, out: Float32Array, glow?: number) => void {
   const a = (p.hue * Math.PI) / 180;
   const cos = Math.cos(a);
   const sin = Math.sin(a);
@@ -50,7 +53,7 @@ export function compileEdit(
   const con = p.contrast;
   const [tr, tg, tb] = p.tint;
 
-  return (r, g, b, out) => {
+  return (r, g, b, out, glow = 0) => {
     r *= wr;
     g *= wg;
     b *= wb;
@@ -86,6 +89,10 @@ export function compileEdit(
     nr *= tr;
     ng *= tg;
     nb *= tb;
+    // Halation glow: scattered light adds in LINEAR, before contrast/gamma.
+    nr += glow;
+    ng += glow;
+    nb += glow;
     out[0] = toGamma((nr - 0.5) * con + 0.5);
     out[1] = toGamma((ng - 0.5) * con + 0.5);
     out[2] = toGamma((nb - 0.5) * con + 0.5);

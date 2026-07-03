@@ -5,6 +5,7 @@ import { Renderer, type EditParams } from "./gl";
 import { exportImage, download, type ExportFormat } from "./export";
 import { generateCube } from "./lut";
 import { generateDcp } from "./dcp";
+import { buildGlowMap } from "./glow";
 
 // Injected at build time from git history (see vite.config.ts).
 declare const __CHANGELOG__: { hash: string; date: string; subject: string }[];
@@ -29,6 +30,7 @@ const params: EditParams = {
   contrast: 1,
   denoise: 0,
   tint: [1, 1, 1],
+  glow: 0,
 };
 
 const ui = {
@@ -42,6 +44,7 @@ const ui = {
   hue: $("hue") as HTMLInputElement,
   sat: $("sat") as HTMLInputElement,
   con: $("con") as HTMLInputElement,
+  glow: $("glow") as HTMLInputElement,
   exFormat: $("exFormat") as HTMLSelectElement,
   exScale: $("exScale") as HTMLSelectElement,
   exQuality: $("exQuality") as HTMLInputElement,
@@ -55,6 +58,7 @@ const ui = {
   lookNatural: $("lookNatural") as HTMLButtonElement,
   lookMono: $("lookMono") as HTMLButtonElement,
   lookSepia: $("lookSepia") as HTMLButtonElement,
+  lookHie: $("lookHie") as HTMLButtonElement,
 };
 
 function baseName(): string {
@@ -67,6 +71,7 @@ function syncFromUI() {
   params.hue = Number(ui.hue.value);
   params.sat = Number(ui.sat.value);
   params.contrast = Number(ui.con.value);
+  params.glow = Number(ui.glow.value);
   params.denoise = Number(ui.dn.value);
   updateSplitHandle();
   draw();
@@ -82,6 +87,7 @@ function syncToUI() {
   ui.hue.value = String(params.hue);
   ui.sat.value = String(params.sat);
   ui.con.value = String(params.contrast);
+  ui.glow.value = String(params.glow);
 }
 
 // Auto: brightness-preserving white balance + auto-exposure.
@@ -103,6 +109,7 @@ interface Look {
    *  foliage lands crimson; Goldie also lifts green so it lands gold. */
   wbBias?: [number, number, number];
   tint?: [number, number, number];
+  glow?: number;
   raw: { sat: number; contrast: number };
   jpeg: { sat: number; contrast: number };
 }
@@ -113,6 +120,7 @@ const LOOKS: Record<string, Look> = {
   natural: { swapRB: false, hue: 0, raw: { sat: 1.2, contrast: 1.15 }, jpeg: { sat: 1.1, contrast: 1.15 } },
   mono: { swapRB: false, hue: 0, raw: { sat: 0, contrast: 1.5 }, jpeg: { sat: 0, contrast: 1.5 } },
   sepia: { swapRB: false, hue: 0, tint: [1.12, 1.0, 0.78], raw: { sat: 0, contrast: 1.35 }, jpeg: { sat: 0, contrast: 1.35 } },
+  hie: { swapRB: false, hue: 0, glow: 0.6, raw: { sat: 0, contrast: 1.45 }, jpeg: { sat: 0, contrast: 1.45 } },
 };
 
 // The bias currently baked into params.wb, so switching looks replaces the
@@ -134,6 +142,7 @@ function applyLook(name: keyof typeof LOOKS) {
   params.sat = strength.sat;
   params.contrast = strength.contrast;
   params.tint = look.tint ?? [1, 1, 1];
+  params.glow = look.glow ?? 0;
   syncToUI();
   draw();
 }
@@ -144,6 +153,7 @@ ui.lookGoldie.addEventListener("click", () => applyLook("goldie"));
 ui.lookNatural.addEventListener("click", () => applyLook("natural"));
 ui.lookMono.addEventListener("click", () => applyLook("mono"));
 ui.lookSepia.addEventListener("click", () => applyLook("sepia"));
+ui.lookHie.addEventListener("click", () => applyLook("hie"));
 
 let raf = 0;
 function draw() {
@@ -154,7 +164,7 @@ function draw() {
   });
 }
 
-for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.dn, ui.hue, ui.sat, ui.con]) {
+for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.dn, ui.hue, ui.sat, ui.con, ui.glow]) {
   el.addEventListener("input", syncFromUI);
 }
 
@@ -217,6 +227,7 @@ fileInput.addEventListener("change", async () => {
     current = img;
     currentFile = imported;
     renderer.setImage(toPreview(img));
+    renderer.setGlowMap(buildGlowMap((x, y) => linearAt(img, x, y), img.width, img.height));
     panel.hidden = false;
     hint.hidden = true;
     if (img.isRaw) {

@@ -31,6 +31,8 @@ uniform bool u_linear; // true when the texture already holds linear values
 uniform mat3 u_cam;    // camera-native -> linear sRGB
 uniform bool u_useCam; // apply u_cam (camera-native raw only)
 uniform vec3 u_tint;     // tone tint after saturation ([1,1,1] = none)
+uniform sampler2D u_glowTex; // per-image blurred highlight map (see glow.ts)
+uniform float u_glow;        // 0..1 HIE halation strength
 uniform float u_denoise; // 0..1 bilateral strength (see raw/denoise.ts)
 uniform vec2 u_texel;    // 1/textureSize
 uniform float u_split;   // compare divider: denoise applies where uv.x >= split
@@ -93,6 +95,10 @@ void main() {
   // Tone tint (sepia etc.) after saturation so it survives mono looks.
   c *= u_tint;
 
+  // Halation glow: scattered light adds in LINEAR, before contrast/gamma.
+  // 0.7 = GLOW_GAIN in glow.ts — keep in sync.
+  c += vec3(u_glow * 0.7 * texture(u_glowTex, v_uv).r);
+
   // Contrast around mid grey.
   c = (c - 0.5) * u_con + 0.5;
 
@@ -108,6 +114,7 @@ export class Renderer {
   private imgH = 0;
   private isLinear = false;
   private camMatrix: Float32Array | null = null;
+  private glowTex: WebGLTexture;
 
   constructor(private canvas: HTMLCanvasElement) {
     const gl = canvas.getContext("webgl2", { preserveDrawingBuffer: true });
@@ -123,7 +130,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_texel", "u_split", "u_tint"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -136,6 +143,31 @@ export class Renderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    // Glow map texture (unit 1); starts as a single black texel so the shader
+    // safely reads zero glow until a map is set.
+    this.glowTex = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, this.glowTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 1, 1, 0, gl.RED, gl.UNSIGNED_BYTE, new Uint8Array([0]));
+  }
+
+  /** Upload the per-image blurred highlight map (or clear it with null). */
+  setGlowMap(map: { width: number; height: number; data: Float32Array } | null) {
+    const gl = this.gl;
+    gl.bindTexture(gl.TEXTURE_2D, this.glowTex);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    if (!map) {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 1, 1, 0, gl.RED, gl.UNSIGNED_BYTE, new Uint8Array([0]));
+      return;
+    }
+    const u8 = new Uint8Array(map.data.length);
+    for (let i = 0; i < u8.length; i++) u8[i] = Math.min(255, Math.max(0, Math.round(map.data[i] * 255)));
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, map.width, map.height, 0, gl.RED, gl.UNSIGNED_BYTE, u8);
   }
 
   setImage(img: { width: number; height: number; pixels?: Uint8ClampedArray; linear?: Float32Array; camMatrix?: number[] }) {
@@ -185,6 +217,10 @@ export class Renderer {
     gl.uniform1i(this.loc.u_linear, this.isLinear ? 1 : 0);
     gl.uniform1i(this.loc.u_useCam, this.camMatrix ? 1 : 0);
     if (this.camMatrix) gl.uniformMatrix3fv(this.loc.u_cam, false, this.camMatrix);
+    gl.uniform1f(this.loc.u_glow, p.glow);
+    gl.uniform1i(this.loc.u_glowTex, 1);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, this.glowTex);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.tex);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
