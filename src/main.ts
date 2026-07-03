@@ -119,7 +119,7 @@ fileInput.addEventListener("change", async () => {
     const img = await decode(imported);
     current = img;
     currentFile = imported;
-    renderer.setImage(img);
+    renderer.setImage(toPreview(img));
     panel.hidden = false;
     hint.hidden = true;
     if (img.isRaw) {
@@ -177,7 +177,10 @@ ui.dcpBtn.addEventListener("click", () => {
 // Tap-to-white-balance: neutralize the tapped point (foliage = the IR move).
 canvas.addEventListener("click", (e) => {
   if (!current) return;
-  const [px, py] = renderer.toImagePixel(e.offsetX, e.offsetY);
+  const [pvx, pvy] = renderer.toImagePixel(e.offsetX, e.offsetY);
+  // The renderer may show a downscaled proxy; map back to full-res coords.
+  const px = Math.min(current.width - 1, Math.round((pvx * current.width) / Math.max(1, previewW)));
+  const py = Math.min(current.height - 1, Math.round((pvy * current.height) / Math.max(1, previewH)));
   const [r, g, b] = linearAt(current, px, py);
   const mean = (r + g + b) / 3;
   // Brightness-preserving so tapping recolors without darkening.
@@ -221,7 +224,40 @@ function autoExposure(img: DecodedImage, wb: [number, number, number]): number {
   }
   lums.sort((a, b) => a - b);
   const p = lums[Math.floor(lums.length * 0.97)] || 1e-4;
-  return clamp(0.85 / Math.max(p, 1e-4), 0.1, 32);
+  // Clamp to the exposure slider's range so the value round-trips exactly.
+  return clamp(0.85 / Math.max(p, 1e-4), 0.1, 16);
+}
+
+// iOS Safari silently clamps large WebGL drawing buffers (symptom: black
+// canvas). The raw paths already produce a <=2800px half-res proxy, but the
+// full-res 8-bit path (lossy DNG / big JPEG) can reach 20MP+ — downscale that
+// for display only. `current` keeps full resolution for sampling and export.
+const MAX_PREVIEW = 2800;
+let previewW = 0;
+let previewH = 0;
+
+function toPreview(img: DecodedImage): { width: number; height: number; pixels?: Uint8ClampedArray; linear?: Float32Array; camMatrix?: number[] } {
+  previewW = img.width;
+  previewH = img.height;
+  if (!img.pixels || Math.max(img.width, img.height) <= MAX_PREVIEW) return img;
+  const s = MAX_PREVIEW / Math.max(img.width, img.height);
+  const w = Math.max(1, Math.round(img.width * s));
+  const h = Math.max(1, Math.round(img.height * s));
+  const src = document.createElement("canvas");
+  src.width = img.width;
+  src.height = img.height;
+  const copy = new Uint8ClampedArray(img.pixels.length);
+  copy.set(img.pixels);
+  src.getContext("2d")!.putImageData(new ImageData(copy, img.width, img.height), 0, 0);
+  const dst = document.createElement("canvas");
+  dst.width = w;
+  dst.height = h;
+  const ctx = dst.getContext("2d")!;
+  ctx.drawImage(src, 0, 0, w, h);
+  const { data } = ctx.getImageData(0, 0, w, h);
+  previewW = w;
+  previewH = h;
+  return { width: w, height: h, pixels: data, camMatrix: img.camMatrix };
 }
 
 /** Linear RGB at an image pixel, from whichever buffer the decoder produced. */

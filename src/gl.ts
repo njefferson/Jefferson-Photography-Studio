@@ -3,14 +3,10 @@
 //
 // Order matches PLAN.md: white balance -> channel swap -> hue/sat -> tone.
 
-export interface EditParams {
-  wb: [number, number, number]; // per-channel gains, unbounded
-  exposure: number; // linear brightness multiplier, 1 = unchanged
-  swapRB: boolean; // red <-> blue
-  hue: number; // degrees
-  sat: number; // 1 = unchanged
-  contrast: number; // 1 = unchanged
-}
+// Single source of truth for edit parameters lives in pipeline.ts so the GPU
+// preview and CPU export can never drift apart.
+import type { EditParams } from "./pipeline";
+export type { EditParams };
 
 const VERT = `#version 300 es
 in vec2 a_pos;

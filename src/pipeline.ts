@@ -13,54 +13,8 @@ export interface EditParams {
 
 const REC709 = [0.2126, 0.7152, 0.0722];
 
-/**
- * @param r,g,b linear input (raw is already linear; 8-bit sources must be
- *              linearized by the caller first).
- * @returns gamma-encoded RGB in 0..1.
- */
-export function applyEdit(r: number, g: number, b: number, p: EditParams): [number, number, number] {
-  // Exposure then white balance.
-  r *= p.wb[0] * p.exposure;
-  g *= p.wb[1] * p.exposure;
-  b *= p.wb[2] * p.exposure;
-
-  // Channel swap.
-  if (p.swapRB) {
-    const t = r;
-    r = b;
-    b = t;
-  }
-
-  // Hue rotation (same matrix as the shader).
-  const a = (p.hue * Math.PI) / 180;
-  const cos = Math.cos(a);
-  const sin = Math.sin(a);
-  const c00 = 0.299 + 0.701 * cos + 0.168 * sin;
-  const c01 = 0.587 - 0.587 * cos + 0.33 * sin;
-  const c02 = 0.114 - 0.114 * cos - 0.497 * sin;
-  const c10 = 0.299 - 0.299 * cos - 0.328 * sin;
-  const c11 = 0.587 + 0.413 * cos + 0.035 * sin;
-  const c12 = 0.114 - 0.114 * cos + 0.292 * sin;
-  const c20 = 0.299 - 0.3 * cos + 1.25 * sin;
-  const c21 = 0.587 - 0.588 * cos - 1.05 * sin;
-  const c22 = 0.114 + 0.886 * cos - 0.203 * sin;
-  let nr = c00 * r + c10 * g + c20 * b;
-  let ng = c01 * r + c11 * g + c21 * b;
-  let nb = c02 * r + c12 * g + c22 * b;
-
-  // Saturation around luma.
-  const luma = nr * REC709[0] + ng * REC709[1] + nb * REC709[2];
-  nr = luma + (nr - luma) * p.sat;
-  ng = luma + (ng - luma) * p.sat;
-  nb = luma + (nb - luma) * p.sat;
-
-  // Contrast around mid grey.
-  nr = (nr - 0.5) * p.contrast + 0.5;
-  ng = (ng - 0.5) * p.contrast + 0.5;
-  nb = (nb - 0.5) * p.contrast + 0.5;
-
-  return [toGamma(nr), toGamma(ng), toGamma(nb)];
-}
+// (The per-pixel edit lives in compileEdit below; the GPU shader in gl.ts is
+// kept numerically identical to it.)
 
 /**
  * Precompute the edit for export: trig and the hue matrix are computed once,

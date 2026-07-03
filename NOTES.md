@@ -74,5 +74,12 @@ See **`PLAN.md`** for the full build plan.
 - [x] Export: JPEG + 16-bit TIFF, native-res bilinear demosaic, resolution choice
 - [x] `.cube` LUT export (creative look) — verified vs pipeline (mean err 0.0012)
 - [x] `.dcp` profile export — structure validated; **needs a Lightroom colour test**
+- [x] Deployed: Cloudflare Pages via GitHub Actions (auto on push)
+- [x] Camera color matrix (fixes flat IR color); exposure + Auto; punchy preset
+- [x] Review pass: preview proxy for >2800px 8-bit sources (iOS WebGL buffer
+      limit), single EditParams definition, NEF white level 15520, exposure
+      clamp matches slider
 - [ ] Validate/calibrate .dcp colour in Lightroom (needs ACR; user to test)
 - [ ] Display-P3 JPEG output (currently sRGB); per-color HSL; B&W mode for 720nm
+- [ ] Nice-to-have: RGBA16F preview texture (halve GPU memory); box-filtered
+      downscale on scaled exports; LJ92 restart-marker path untested on real file

@@ -91,10 +91,10 @@ export function readNefCfa(bytes: Uint8Array): RawCfa {
 
   const pat = raw.num(33422);
   const pattern = pat.length === 4 ? pat : [0, 1, 1, 2];
-  // Nikon stores levels in MakerNote; standard 14-bit Z-series defaults work
-  // well and tap-WB compensates for the rest. Refine later if needed.
+  // NEF has no DNG level tags; these are the Z-series values LibRaw reports for
+  // these files (black 1008, white 15520 at 14-bit). Tap-WB absorbs the rest.
   const black = raw.num(50714)[0] ?? 1008;
-  const white = raw.num(50717)[0] ?? (1 << bps) - 1;
+  const white = raw.num(50717)[0] ?? (bps === 14 ? 15520 : (1 << bps) - 1);
   return { cfa, width, height, pattern, black, white };
 }
 
