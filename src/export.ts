@@ -25,12 +25,21 @@ type Source =
   | { cfa: RawCfa; cam: number[] }
   | { pixels: Uint8ClampedArray; width: number; height: number };
 
+export interface ExportResult {
+  blob: Blob;
+  name: string;
+}
+
+/** Yield to the event loop so the progress UI can paint mid-export. */
+const tick = () => new Promise<void>((r) => setTimeout(r, 0));
+
 export async function exportImage(
   file: ImportedFile,
   current: DecodedImage,
   params: EditParams,
   opts: ExportOptions,
-): Promise<void> {
+  onProgress?: (fraction: number) => void,
+): Promise<ExportResult> {
   const src = getSource(file, current);
   const srcW = "cfa" in src ? src.cfa.width : src.width;
   const srcH = "cfa" in src ? src.cfa.height : src.height;
@@ -61,6 +70,10 @@ export async function exportImage(
   if (opts.format === "jpeg") {
     const data = new Uint8ClampedArray(w * h * 4);
     for (let y = 0; y < h; y++) {
+      if (y % 16 === 0) {
+        onProgress?.(y / h);
+        await tick();
+      }
       const sy = Math.min(srcH - 1, Math.round((y / h) * srcH));
       for (let x = 0; x < w; x++) {
         const sx = Math.min(srcW - 1, Math.round((x / w) * srcW));
@@ -73,15 +86,21 @@ export async function exportImage(
         data[o + 3] = 255;
       }
     }
+    onProgress?.(1);
     const canvas = document.createElement("canvas");
     canvas.width = w;
     canvas.height = h;
     canvas.getContext("2d")!.putImageData(new ImageData(data, w, h), 0, 0);
     const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", opts.quality));
-    if (blob) download(blob, `${baseName}.jpg`);
+    if (!blob) throw new Error("JPEG encoding failed.");
+    return { blob, name: `${baseName}.jpg` };
   } else {
     const rgb = new Uint16Array(w * h * 3);
     for (let y = 0; y < h; y++) {
+      if (y % 16 === 0) {
+        onProgress?.(y / h);
+        await tick();
+      }
       const sy = Math.min(srcH - 1, Math.round((y / h) * srcH));
       for (let x = 0; x < w; x++) {
         const sx = Math.min(srcW - 1, Math.round((x / w) * srcW));
@@ -93,7 +112,8 @@ export async function exportImage(
         rgb[o + 2] = out[2] * 65535;
       }
     }
-    download(new Blob([writeTiff16(rgb, w, h)]), `${baseName}.tif`);
+    onProgress?.(1);
+    return { blob: new Blob([writeTiff16(rgb, w, h)], { type: "image/tiff" }), name: `${baseName}.tif` };
   }
 }
 

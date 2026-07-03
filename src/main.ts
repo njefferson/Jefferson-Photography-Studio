@@ -269,24 +269,77 @@ ui.exFormat.addEventListener("change", () => {
     ui.exFormat.value === "jpeg" ? "" : "none";
 });
 
+// Export flow: progress overlay while rendering, then a "Save image" button.
+// The save happens on its own tap so iOS lets us open the native share sheet
+// ("Save Image" -> Photos) and the app never navigates away.
+const busy = $("busy") as HTMLDivElement;
+const busyText = $("busyText") as HTMLParagraphElement;
+const busySpinner = $("busySpinner") as HTMLDivElement;
+const busyActions = $("busyActions") as HTMLDivElement;
+const busySave = $("busySave") as HTMLButtonElement;
+const busyClose = $("busyClose") as HTMLButtonElement;
+let pendingSave: { blob: Blob; name: string } | null = null;
+
+function showBusy(text: string) {
+  busyText.textContent = text;
+  busySpinner.hidden = false;
+  busyActions.hidden = true;
+  busy.hidden = false;
+}
+
+function hideBusy() {
+  busy.hidden = true;
+  pendingSave = null;
+}
+
+busyClose.addEventListener("click", hideBusy);
+
+busySave.addEventListener("click", async () => {
+  if (!pendingSave) return;
+  const { blob, name } = pendingSave;
+  const file = new File([blob], name, { type: blob.type || "application/octet-stream" });
+  const nav = navigator as Navigator & { canShare?: (d: { files: File[] }) => boolean };
+  if (nav.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file] } as ShareData);
+      hideBusy();
+      return;
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return; // user cancelled the sheet
+      // Fall through to a plain download on any other failure.
+    }
+  }
+  download(blob, name);
+  hideBusy();
+});
+
 ui.exBtn.addEventListener("click", async () => {
   if (!current || !currentFile) return;
-  const original = ui.exBtn.textContent;
   ui.exBtn.disabled = true;
-  ui.exBtn.textContent = "Exporting…";
-  // Let the label paint before the synchronous export loop runs.
-  await new Promise((r) => requestAnimationFrame(() => r(null)));
+  showBusy("Exporting… 0%");
   try {
-    await exportImage(currentFile, current, params, {
-      format: ui.exFormat.value as ExportFormat,
-      scale: Number(ui.exScale.value),
-      quality: Number(ui.exQuality.value),
-    });
+    const result = await exportImage(
+      currentFile,
+      current,
+      params,
+      {
+        format: ui.exFormat.value as ExportFormat,
+        scale: Number(ui.exScale.value),
+        quality: Number(ui.exQuality.value),
+      },
+      (f) => {
+        busyText.textContent = `Exporting… ${Math.round(f * 100)}%`;
+      },
+    );
+    pendingSave = result;
+    busyText.textContent = `Ready — ${result.name}`;
+    busySpinner.hidden = true;
+    busyActions.hidden = false;
   } catch (err) {
+    hideBusy();
     alert("Export failed: " + (err as Error).message);
   } finally {
     ui.exBtn.disabled = false;
-    ui.exBtn.textContent = original;
   }
 });
 
@@ -487,6 +540,17 @@ function grayWorldWB(img: DecodedImage): [number, number, number] {
   dlg.addEventListener("click", (e) => {
     if (e.target === dlg) dlg.close(); // tap outside to dismiss
   });
+}
+
+// Support link in the ⓘ dialog. Set COFFEE_URL to enable (e.g. a Buy Me a
+// Coffee / Ko-fi page); the link stays hidden while it is empty.
+const COFFEE_URL = "";
+{
+  const coffee = $("coffee") as HTMLAnchorElement;
+  if (COFFEE_URL) {
+    coffee.href = COFFEE_URL;
+    coffee.hidden = false;
+  }
 }
 
 // Offline support.
