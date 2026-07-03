@@ -156,6 +156,8 @@ button { cursor: pointer; }
 #busyActions button { flex: 1; }
 #busyActions .primary { background: var(--accent); color: #07101f; font-weight: 600; border-color: var(--accent); }
 .coffee { color: var(--accent); text-decoration: none; font-size: 13px; }
+.coffee-row { font-size: 13px; color: #b8b8c0; }
+.coffee-row a { margin-left: 6px; }
 
 .toggle[aria-pressed="true"] {
   background: var(--accent);

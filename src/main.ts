@@ -542,13 +542,19 @@ function grayWorldWB(img: DecodedImage): [number, number, number] {
   });
 }
 
-// Support link in the ⓘ dialog. Hidden while empty.
+// Support links in the ⓘ dialog. Each stays hidden while its URL is empty.
 const COFFEE_URL = "https://paypal.me/WishUponGames";
+const VENMO_URL = "https://venmo.com/u/noahjefferson";
 {
   const coffee = $("coffee") as HTMLAnchorElement;
   if (COFFEE_URL) {
     coffee.href = COFFEE_URL;
     coffee.hidden = false;
+  }
+  const venmo = $("venmo") as HTMLAnchorElement;
+  if (VENMO_URL) {
+    venmo.href = VENMO_URL;
+    venmo.hidden = false;
   }
 }
 
