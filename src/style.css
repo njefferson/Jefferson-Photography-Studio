@@ -29,7 +29,34 @@ body {
   padding-top: max(10px, env(safe-area-inset-top));
   border-bottom: 1px solid var(--line);
 }
-.brand { font-weight: 600; letter-spacing: 0.02em; }
+.brand { font-weight: 600; letter-spacing: 0.02em; display: inline-flex; align-items: center; gap: 8px; }
+.info-btn {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: #202028;
+  color: #b8b8c0;
+  font: italic 600 13px/1 Georgia, serif;
+  cursor: pointer;
+}
+#infoDlg {
+  background: var(--panel);
+  color: #e8e8ea;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px 20px;
+  max-width: min(520px, 90vw);
+}
+#infoDlg::backdrop { background: rgba(0, 0, 0, 0.55); }
+#infoDlg h2 { margin: 0 0 10px; font-size: 16px; }
+#infoDlg ol { margin: 0 0 14px; padding-left: 20px; }
+#infoDlg li { margin: 8px 0; font-size: 13px; line-height: 1.45; }
+#infoDlg a { color: var(--accent); text-decoration: none; }
+#infoDlg a:active { text-decoration: underline; }
+#infoDlg small { color: #80808a; }
+#infoDlg button { width: auto; padding: 8px 16px; }
 .open-btn {
   background: var(--accent);
   color: #07101f;

@@ -6,6 +6,9 @@ import { exportImage, download, type ExportFormat } from "./export";
 import { generateCube } from "./lut";
 import { generateDcp } from "./dcp";
 
+// Injected at build time from git history (see vite.config.ts).
+declare const __CHANGELOG__: { hash: string; date: string; subject: string }[];
+
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 const canvas = $("view") as HTMLCanvasElement;
@@ -298,6 +301,30 @@ function grayWorldWB(img: DecodedImage): [number, number, number] {
   b = Math.max(1e-4, b / n);
   const mean = (r + g + b) / 3;
   return lumNormalize([mean / r, mean / g, mean / b]);
+}
+
+// ⓘ What's new — the last 5 commits, injected at build time, each linked to
+// its commit on GitHub.
+{
+  const dlg = $("infoDlg") as HTMLDialogElement;
+  const list = $("changeList") as HTMLOListElement;
+  for (const c of __CHANGELOG__) {
+    const li = document.createElement("li");
+    const a = document.createElement("a");
+    a.href = `https://github.com/njefferson/IRstudio/commit/${c.hash}`;
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.textContent = c.subject;
+    const when = document.createElement("small");
+    when.textContent = ` — ${c.date}`;
+    li.append(a, when);
+    list.append(li);
+  }
+  $("infoBtn").addEventListener("click", () => dlg.showModal());
+  $("infoClose").addEventListener("click", () => dlg.close());
+  dlg.addEventListener("click", (e) => {
+    if (e.target === dlg) dlg.close(); // tap outside to dismiss
+  });
 }
 
 // Offline support.

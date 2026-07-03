@@ -12,6 +12,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The build embeds the last 5 commits as the in-app changelog.
+          fetch-depth: 10
       - uses: actions/setup-node@v4
         with:
           node-version: 20

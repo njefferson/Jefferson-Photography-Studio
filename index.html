@@ -15,7 +15,10 @@
   <body>
     <div id="app">
       <header class="bar">
-        <span class="brand">Infrared Photography Studio</span>
+        <span class="brand">
+          Infrared Photography Studio
+          <button id="infoBtn" class="info-btn" type="button" aria-label="What's new">i</button>
+        </span>
         <label class="open-btn">
           Open image
           <input id="file" type="file" accept=".dng,.nef,.zip,image/*" hidden />
@@ -81,6 +84,13 @@
         </fieldset>
       </aside>
     </div>
+
+    <dialog id="infoDlg">
+      <h2>What's new</h2>
+      <ol id="changeList" reversed></ol>
+      <button id="infoClose" type="button">Close</button>
+    </dialog>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
