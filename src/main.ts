@@ -229,6 +229,27 @@ splitHandle.addEventListener("pointerdown", (e) => {
 
 window.addEventListener("resize", updateSplitHandle);
 
+const welcome = $("welcome") as HTMLDivElement;
+const lesson = $("lesson") as HTMLDivElement;
+
+async function openImported(imported: ImportedFile) {
+  const img = await decode(imported);
+  current = img;
+  currentFile = imported;
+  renderer.setImage(toPreview(img));
+  renderer.setGlowMap(buildGlowMap((x, y) => linearAt(img, x, y), img.width, img.height));
+  panel.hidden = false;
+  welcome.hidden = true;
+  lesson.hidden = true;
+  if (img.isRaw) {
+    // Raw opens un-white-balanced (the IR magenta) and dark. Auto white
+    // balance + exposure as a starting point; refine by tapping foliage.
+    autoAdjust(img);
+    syncToUI();
+  }
+  syncFromUI();
+}
+
 fileInput.addEventListener("change", async () => {
   const f = fileInput.files?.[0];
   if (!f) return;
@@ -242,24 +263,76 @@ fileInput.addEventListener("change", async () => {
         "import from Files — or zip the DNG first — rather than the Photo Library.";
       return;
     }
-    const img = await decode(imported);
-    current = img;
-    currentFile = imported;
-    renderer.setImage(toPreview(img));
-    renderer.setGlowMap(buildGlowMap((x, y) => linearAt(img, x, y), img.width, img.height));
-    panel.hidden = false;
-    hint.hidden = true;
-    if (img.isRaw) {
-      // Raw opens un-white-balanced (the IR magenta) and dark. Auto white
-      // balance + exposure as a starting point; refine by tapping foliage.
-      autoAdjust(img);
-      syncToUI();
-    }
-    syncFromUI();
+    await openImported(imported);
   } catch (err) {
+    welcome.hidden = false;
     hint.hidden = false;
     hint.textContent = "Could not open this file: " + (err as Error).message;
   }
+});
+
+// --- Example photos: fetched on demand, opened through the normal raw path,
+// each with a short lesson overlay showing what to try. ---
+const EXAMPLES: Record<string, { file: string; title: string; steps: string[] }> = {
+  canopy: {
+    file: "./examples/canopy.dng",
+    title: "Golden canopy — try the Looks",
+    steps: [
+      "Tap Aerochrome, Aero Red and Goldie to compare one-tap looks.",
+      "Tap the trees in the photo to set white balance from foliage.",
+      "Slide Saturation and Contrast to taste, then Export & Save.",
+    ],
+  },
+  lodge: {
+    file: "./examples/lodge.dng",
+    title: "Motor lodge — white balance & denoise",
+    steps: [
+      "Tap Auto, then tap the trees (not the sign) and watch the colors shift.",
+      "Denoise was set automatically — drag the divider on the photo to compare off/on.",
+      "Try B&W IR and HIE Glow for the classic film feel.",
+    ],
+  },
+  hillside: {
+    file: "./examples/hillside.dng",
+    title: "Hillside & sky — per-color grading",
+    steps: [
+      "Tap Aerochrome first.",
+      "In Per-color, slide Sky hue toward +40 — the sky moves, the foliage doesn't.",
+      "Now shift Foliage hue and brightness independently.",
+    ],
+  },
+};
+
+async function loadExample(key: string) {
+  const ex = EXAMPLES[key];
+  if (!ex) return;
+  showBusy("Loading example…");
+  try {
+    const res = await fetch(ex.file);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    await openImported({ name: `${key}.dng`, kind: "dng", bytes, looksTranscoded: false });
+    // Show the lesson card for this example.
+    ($("lessonTitle") as HTMLElement).textContent = ex.title;
+    const ol = $("lessonSteps") as HTMLOListElement;
+    ol.replaceChildren(...ex.steps.map((s) => {
+      const li = document.createElement("li");
+      li.textContent = s;
+      return li;
+    }));
+    lesson.hidden = false;
+  } catch (err) {
+    alert("Could not load the example: " + (err as Error).message);
+  } finally {
+    hideBusy();
+  }
+}
+
+document.querySelectorAll<HTMLButtonElement>(".ex").forEach((b) => {
+  b.addEventListener("click", () => loadExample(b.dataset.ex!));
+});
+$("lessonClose").addEventListener("click", () => {
+  lesson.hidden = true;
 });
 
 // Export & save to device.

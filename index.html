@@ -27,7 +27,26 @@
 
       <div id="stage">
         <canvas id="view"></canvas>
-        <p id="hint">Open a DNG (or a .zip of one) to begin.</p>
+        <div id="welcome">
+          <p id="hint">Open a DNG or NEF (or a .zip of one) to begin.</p>
+          <p class="ex-title">&hellip;or try an example photo:</p>
+          <div class="ex-list">
+            <button class="ex" data-ex="canopy" type="button">
+              <img src="./examples/canopy.png" alt="" /><span>Golden canopy<br /><small>Try the Looks</small></span>
+            </button>
+            <button class="ex" data-ex="lodge" type="button">
+              <img src="./examples/lodge.png" alt="" /><span>Motor lodge<br /><small>White balance &amp; denoise</small></span>
+            </button>
+            <button class="ex" data-ex="hillside" type="button">
+              <img src="./examples/hillside.png" alt="" /><span>Hillside &amp; sky<br /><small>Per-color grading</small></span>
+            </button>
+          </div>
+        </div>
+        <div id="lesson" hidden>
+          <h3 id="lessonTitle"></h3>
+          <ol id="lessonSteps"></ol>
+          <button id="lessonClose" type="button">Got it</button>
+        </div>
         <div id="splitHandle" hidden><div class="grip">&#8596;</div></div>
       </div>
 

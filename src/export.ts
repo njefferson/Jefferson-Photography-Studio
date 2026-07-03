@@ -123,7 +123,7 @@ function getSource(file: ImportedFile, current: DecodedImage): Source {
   }
   if (file.kind === "dng") {
     const ifds = new Tiff(file.bytes).allIfds();
-    const raw = ifds.find((d) => d.num(254)[0] === 0 && d.num(262)[0] === 32803 && d.num(259)[0] === 7);
+    const raw = ifds.find((d) => d.num(254)[0] === 0 && d.num(262)[0] === 32803 && (d.num(259)[0] === 7 || d.num(259)[0] === 1));
     if (raw) {
       const cm = ifds.map((d) => d.num(50721)).find((v) => v.length === 9) ?? NIKON_Z50_COLOR_MATRIX;
       return { cfa: readMosaicedCfa(file.bytes, raw), cam: camToSrgbLinear(cm) };

@@ -27,9 +27,27 @@ export function decodeMosaicedDng(bytes: Uint8Array, raw: Ifd): LinearImage {
 
 /** Full Bayer frame + metadata (for native-resolution export). */
 export function readMosaicedCfa(bytes: Uint8Array, raw: Ifd): RawCfa {
+  const comp = raw.num(259)[0];
   const width = raw.num(T_IMAGE_WIDTH)[0];
   const height = raw.num(T_IMAGE_LENGTH)[0];
   const cfa = new Uint16Array(width * height);
+
+  if (comp === 1) {
+    // Uncompressed 16-bit CFA (our bundled example DNGs): copy strips directly.
+    const le = bytes[0] === 0x49;
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const offsets = raw.num(T_STRIP_OFFSETS);
+    const counts = raw.num(T_STRIP_BYTECOUNTS);
+    const rowsPerStrip = raw.num(T_ROWS_PER_STRIP)[0] || height;
+    for (let s = 0; s < offsets.length; s++) {
+      const rows = Math.min(rowsPerStrip, height - s * rowsPerStrip);
+      const n = Math.min(rows * width, counts[s] >> 1);
+      const base = offsets[s];
+      const dst = s * rowsPerStrip * width;
+      for (let i = 0; i < n; i++) cfa[dst + i] = view.getUint16(base + i * 2, le);
+    }
+    return finish(cfa, width, height, raw);
+  }
 
   const tileOffsets = raw.num(T_TILE_OFFSETS);
   if (tileOffsets.length) {
@@ -50,6 +68,10 @@ export function readMosaicedCfa(bytes: Uint8Array, raw: Ifd): RawCfa {
     }
   }
 
+  return finish(cfa, width, height, raw);
+}
+
+function finish(cfa: Uint16Array, width: number, height: number, raw: Ifd): RawCfa {
   // CFAPattern: 4 bytes (0=R,1=G,2=B); default RGGB.
   const pat = raw.num(T_CFA_PATTERN);
   const pattern = pat.length === 4 ? pat : [0, 1, 1, 2];

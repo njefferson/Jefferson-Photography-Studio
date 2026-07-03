@@ -87,9 +87,10 @@ async function decodeDng(bytes: Uint8Array): Promise<DecodedImage> {
     return { ...(await decodeTiledJpeg(bytes, linearRaw)), isRaw: true };
   }
 
-  // Mosaiced DNG (14-bit, lossless JPEG) -> pure-JS LJ92 + demosaic.
+  // Mosaiced DNG -> pure-JS decode + demosaic (Compression 7 = lossless JPEG,
+  // Compression 1 = uncompressed, used by the bundled example files).
   const cfaRaw = ifds.find(
-    (d) => d.num(254)[0] === 0 && d.num(262)[0] === PHOTO_CFA && d.num(259)[0] === COMP_JPEG,
+    (d) => d.num(254)[0] === 0 && d.num(262)[0] === PHOTO_CFA && (d.num(259)[0] === COMP_JPEG || d.num(259)[0] === 1),
   );
   if (cfaRaw) {
     const img = decodeMosaicedDng(bytes, cfaRaw);
