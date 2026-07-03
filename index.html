@@ -75,6 +75,16 @@
         </fieldset>
 
         <fieldset>
+          <legend>Per-color <small>(sky &amp; foliage bands)</small></legend>
+          <label>Sky hue <input id="skyHue" type="range" min="-60" max="60" step="1" value="0" /></label>
+          <label>Sky saturation <input id="skySat" type="range" min="0" max="2" step="0.01" value="1" /></label>
+          <label>Sky brightness <input id="skyLum" type="range" min="0.5" max="1.5" step="0.01" value="1" /></label>
+          <label>Foliage hue <input id="folHue" type="range" min="-60" max="60" step="1" value="0" /></label>
+          <label>Foliage saturation <input id="folSat" type="range" min="0" max="2" step="0.01" value="1" /></label>
+          <label>Foliage brightness <input id="folLum" type="range" min="0.5" max="1.5" step="0.01" value="1" /></label>
+        </fieldset>
+
+        <fieldset>
           <legend>Export</legend>
           <label>Format
             <select id="exFormat">
@@ -105,6 +115,12 @@
     <dialog id="infoDlg">
       <h2>What's new</h2>
       <ol id="changeList" reversed></ol>
+      <p class="works-with">
+        <strong>Works with:</strong> JPEG/PNG from any camera · RAW from any Bayer-sensor
+        camera converted to DNG (free Adobe DNG Converter, or Lightroom's Convert to DNG) ·
+        Nikon NEF natively (classic compressed; not the Z8/Z9 High-Efficiency format) ·
+        Fujifilm X-Trans not supported. Tuned on an IR-converted Nikon Z50.
+      </p>
       <button id="infoClose" type="button">Close</button>
     </dialog>
 

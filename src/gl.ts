@@ -31,6 +31,8 @@ uniform bool u_linear; // true when the texture already holds linear values
 uniform mat3 u_cam;    // camera-native -> linear sRGB
 uniform bool u_useCam; // apply u_cam (camera-native raw only)
 uniform vec3 u_tint;     // tone tint after saturation ([1,1,1] = none)
+uniform vec3 u_sky;      // sky band [hueShiftDeg, satScale, lumScale]
+uniform vec3 u_fol;      // foliage band [hueShiftDeg, satScale, lumScale]
 uniform sampler2D u_glowTex; // per-image blurred highlight map (see glow.ts)
 uniform float u_glow;        // 0..1 HIE halation strength
 uniform float u_denoise; // 0..1 bilateral strength (see raw/denoise.ts)
@@ -42,6 +44,25 @@ const vec3 LUMA_W = vec3(0.2126, 0.7152, 0.0722);
 vec3 toLinear(vec3 c){ return pow(c, vec3(2.2)); }
 vec3 toGamma(vec3 c){ return pow(max(c, 0.0), vec3(1.0/2.2)); }
 vec3 fetchLin(vec2 uv){ vec3 s = texture(u_tex, uv).rgb; return u_linear ? s : toLinear(s); }
+
+vec3 rgb2hsv(vec3 c){
+  vec4 K = vec4(0.0, -1.0/3.0, 2.0/3.0, -1.0);
+  vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+  vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+  float d = q.x - min(q.w, q.y);
+  float e = 1e-10;
+  return vec3(abs(q.z + (q.w - q.y) / (6.0*d + e)), d/(q.x + e), q.x);
+}
+vec3 hsv2rgb(vec3 c){
+  vec4 K = vec4(1.0, 2.0/3.0, 1.0/3.0, 3.0);
+  vec3 p = abs(fract(c.xxx + K.xyz)*6.0 - K.www);
+  return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+float bandWeight(float hue, float center, float plateau, float edge){
+  float d = abs(hue - center);
+  d = min(d, 360.0 - d);
+  return 1.0 - smoothstep(plateau, edge, d);
+}
 
 void main() {
   vec3 c = fetchLin(v_uv);
@@ -92,6 +113,18 @@ void main() {
   float satEff = u_sat <= 1.0 ? u_sat : 1.0 + (u_sat - 1.0) * smoothstep(0.02, 0.20, luma);
   c = mix(vec3(luma), c, satEff);
 
+  // Per-colour bands (sky ~200°, foliage ~0°), matching pipeline.ts.
+  if (u_sky != vec3(0.0, 1.0, 1.0) || u_fol != vec3(0.0, 1.0, 1.0)) {
+    vec3 hsv = rgb2hsv(max(c, 0.0));
+    float h = hsv.x * 360.0;
+    float wS = bandWeight(h, 200.0, 50.0, 90.0);
+    float wF = bandWeight(h, 0.0, 60.0, 100.0);
+    h += u_sky.x * wS + u_fol.x * wF;
+    float s = min(1.0, hsv.y * (1.0 + (u_sky.y - 1.0) * wS) * (1.0 + (u_fol.y - 1.0) * wF));
+    float v = hsv.z * (1.0 + (u_sky.z - 1.0) * wS) * (1.0 + (u_fol.z - 1.0) * wF);
+    c = hsv2rgb(vec3(fract(h / 360.0), s, v));
+  }
+
   // Tone tint (sepia etc.) after saturation so it survives mono looks.
   c *= u_tint;
 
@@ -130,7 +163,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -206,6 +239,8 @@ export class Renderer {
     gl.uniform1i(this.loc.u_tex, 0);
     gl.uniform1f(this.loc.u_denoise, p.denoise);
     gl.uniform3f(this.loc.u_tint, p.tint[0], p.tint[1], p.tint[2]);
+    gl.uniform3f(this.loc.u_sky, p.sky[0], p.sky[1], p.sky[2]);
+    gl.uniform3f(this.loc.u_fol, p.foliage[0], p.foliage[1], p.foliage[2]);
     gl.uniform2f(this.loc.u_texel, 1 / this.imgW, 1 / this.imgH);
     gl.uniform1f(this.loc.u_split, split);
     gl.uniform3f(this.loc.u_wb, p.wb[0], p.wb[1], p.wb[2]);

@@ -31,6 +31,8 @@ const params: EditParams = {
   denoise: 0,
   tint: [1, 1, 1],
   glow: 0,
+  sky: [0, 1, 1],
+  foliage: [0, 1, 1],
 };
 
 const ui = {
@@ -45,6 +47,12 @@ const ui = {
   sat: $("sat") as HTMLInputElement,
   con: $("con") as HTMLInputElement,
   glow: $("glow") as HTMLInputElement,
+  skyHue: $("skyHue") as HTMLInputElement,
+  skySat: $("skySat") as HTMLInputElement,
+  skyLum: $("skyLum") as HTMLInputElement,
+  folHue: $("folHue") as HTMLInputElement,
+  folSat: $("folSat") as HTMLInputElement,
+  folLum: $("folLum") as HTMLInputElement,
   exFormat: $("exFormat") as HTMLSelectElement,
   exScale: $("exScale") as HTMLSelectElement,
   exQuality: $("exQuality") as HTMLInputElement,
@@ -73,6 +81,8 @@ function syncFromUI() {
   params.contrast = Number(ui.con.value);
   params.glow = Number(ui.glow.value);
   params.denoise = Number(ui.dn.value);
+  params.sky = [Number(ui.skyHue.value), Number(ui.skySat.value), Number(ui.skyLum.value)];
+  params.foliage = [Number(ui.folHue.value), Number(ui.folSat.value), Number(ui.folLum.value)];
   updateSplitHandle();
   draw();
 }
@@ -88,6 +98,12 @@ function syncToUI() {
   ui.sat.value = String(params.sat);
   ui.con.value = String(params.contrast);
   ui.glow.value = String(params.glow);
+  ui.skyHue.value = String(params.sky[0]);
+  ui.skySat.value = String(params.sky[1]);
+  ui.skyLum.value = String(params.sky[2]);
+  ui.folHue.value = String(params.foliage[0]);
+  ui.folSat.value = String(params.foliage[1]);
+  ui.folLum.value = String(params.foliage[2]);
 }
 
 // Auto: brightness-preserving white balance + auto-exposure.
@@ -143,6 +159,8 @@ function applyLook(name: keyof typeof LOOKS) {
   params.contrast = strength.contrast;
   params.tint = look.tint ?? [1, 1, 1];
   params.glow = look.glow ?? 0;
+  params.sky = [0, 1, 1];
+  params.foliage = [0, 1, 1];
   syncToUI();
   draw();
 }
@@ -164,7 +182,8 @@ function draw() {
   });
 }
 
-for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.dn, ui.hue, ui.sat, ui.con, ui.glow]) {
+for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.dn, ui.hue, ui.sat, ui.con, ui.glow,
+  ui.skyHue, ui.skySat, ui.skyLum, ui.folHue, ui.folSat, ui.folLum]) {
   el.addEventListener("input", syncFromUI);
 }
 

@@ -18,6 +18,53 @@ export interface EditParams {
   /** 0..1 HIE halation strength. Spatial (uses the per-image glow map); the
    *  per-pixel amount is passed into the compiled edit as `glow`. */
   glow: number;
+  /** Per-colour band adjustments: [hueShiftDeg, satScale, lumScale].
+   *  Sky targets cyans/blues (~200°), foliage targets reds/golds (~0°),
+   *  each with a soft falloff. Neutral = [0, 1, 1]. */
+  sky: [number, number, number];
+  foliage: [number, number, number];
+}
+
+// --- HSV helpers shared by the per-colour bands (mirrored in the shader) ---
+
+function rgb2hsv(r: number, g: number, b: number): [number, number, number] {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const d = max - min;
+  let h = 0;
+  if (d > 1e-9) {
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60;
+    if (h < 0) h += 360;
+  }
+  return [h, max < 1e-9 ? 0 : d / max, max];
+}
+
+function hsv2rgb(h: number, s: number, v: number): [number, number, number] {
+  h = ((h % 360) + 360) % 360;
+  const c = v * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = v - c;
+  let r = 0, g = 0, b = 0;
+  if (h < 60) [r, g, b] = [c, x, 0];
+  else if (h < 120) [r, g, b] = [x, c, 0];
+  else if (h < 180) [r, g, b] = [0, c, x];
+  else if (h < 240) [r, g, b] = [0, x, c];
+  else if (h < 300) [r, g, b] = [x, 0, c];
+  else [r, g, b] = [c, 0, x];
+  return [r + m, g + m, b + m];
+}
+
+/** Band weight: 1 inside the plateau, smoothstep falloff to 0. */
+function bandWeight(hue: number, center: number, plateau: number, edge: number): number {
+  let d = Math.abs(hue - center);
+  if (d > 180) d = 360 - d;
+  if (d <= plateau) return 1;
+  if (d >= edge) return 0;
+  const t = (d - plateau) / (edge - plateau);
+  return 1 - t * t * (3 - 2 * t);
 }
 
 const REC709 = [0.2126, 0.7152, 0.0722];
@@ -52,6 +99,10 @@ export function compileEdit(
   const sat = p.sat;
   const con = p.contrast;
   const [tr, tg, tb] = p.tint;
+  const sky = p.sky;
+  const fol = p.foliage;
+  const bandsActive =
+    sky[0] !== 0 || sky[1] !== 1 || sky[2] !== 1 || fol[0] !== 0 || fol[1] !== 1 || fol[2] !== 1;
 
   return (r, g, b, out, glow = 0) => {
     r *= wr;
@@ -85,6 +136,20 @@ export function compileEdit(
     nr = luma + (nr - luma) * satEff;
     ng = luma + (ng - luma) * satEff;
     nb = luma + (nb - luma) * satEff;
+    // Per-colour bands (sky ~200°, foliage ~0°), matching the shader: hue
+    // shift, sat scale and lum scale weighted by hue distance to the band.
+    if (bandsActive) {
+      const cr = Math.max(0, nr);
+      const cg = Math.max(0, ng);
+      const cb = Math.max(0, nb);
+      let [h, s, v] = rgb2hsv(cr, cg, cb);
+      const wS = bandWeight(h, 200, 50, 90);
+      const wF = bandWeight(h, 0, 60, 100);
+      h += sky[0] * wS + fol[0] * wF;
+      s = Math.min(1, s * (1 + (sky[1] - 1) * wS) * (1 + (fol[1] - 1) * wF));
+      v = v * (1 + (sky[2] - 1) * wS) * (1 + (fol[2] - 1) * wF);
+      [nr, ng, nb] = hsv2rgb(h, s, v);
+    }
     // Tone tint (sepia etc.) after saturation so it survives mono looks.
     nr *= tr;
     ng *= tg;
