@@ -58,9 +58,11 @@ void main() {
   );
   c = hueMat * c;
 
-  // Saturation around luma.
+  // Saturation around luma. Boosts (sat > 1) fade out in deep shadows so the
+  // look doesn't amplify chroma noise there; reductions apply everywhere.
   float luma = dot(c, vec3(0.2126, 0.7152, 0.0722));
-  c = mix(vec3(luma), c, u_sat);
+  float satEff = u_sat <= 1.0 ? u_sat : 1.0 + (u_sat - 1.0) * smoothstep(0.02, 0.20, luma);
+  c = mix(vec3(luma), c, satEff);
 
   // Contrast around mid grey.
   c = (c - 0.5) * u_con + 0.5;

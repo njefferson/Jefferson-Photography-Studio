@@ -65,9 +65,16 @@ export function compileEdit(
     let ng = c01 * r + c11 * g + c21 * b;
     let nb = c02 * r + c12 * g + c22 * b;
     const luma = nr * REC709[0] + ng * REC709[1] + nb * REC709[2];
-    nr = luma + (nr - luma) * sat;
-    ng = luma + (ng - luma) * sat;
-    nb = luma + (nb - luma) * sat;
+    // Match the shader: saturation boosts fade out in deep shadows
+    // (smoothstep(0.02, 0.20, luma)) so they don't amplify chroma noise.
+    let satEff = sat;
+    if (sat > 1) {
+      const t = Math.min(1, Math.max(0, (luma - 0.02) / 0.18));
+      satEff = 1 + (sat - 1) * t * t * (3 - 2 * t);
+    }
+    nr = luma + (nr - luma) * satEff;
+    ng = luma + (ng - luma) * satEff;
+    nb = luma + (nb - luma) * satEff;
     out[0] = toGamma((nr - 0.5) * con + 0.5);
     out[1] = toGamma((ng - 0.5) * con + 0.5);
     out[2] = toGamma((nb - 0.5) * con + 0.5);
