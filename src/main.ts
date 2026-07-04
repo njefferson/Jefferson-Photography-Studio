@@ -109,6 +109,7 @@ function syncFromUI() {
   }
   clampToneOrder();
   updateToneWidget();
+  updateBandLabels();
   draw();
 }
 
@@ -141,6 +142,18 @@ function syncToUI() {
     ui.tones[i].value = String((params.tone[i] - TONE_DEFAULT[i]) * 100);
   }
   updateToneWidget();
+  updateBandLabels();
+}
+
+// The per-color bands follow the subject through a channel swap (the swap
+// reflects every hue), so the colors each box grabs flip with the swap state —
+// the sub-labels keep the user oriented.
+function updateBandLabels() {
+  const skySub = document.getElementById("skyBandSub");
+  const folSub = document.getElementById("folBandSub");
+  if (!skySub || !folSub) return;
+  skySub.textContent = params.swapRB ? "(reds & golds — swapped)" : "(teals & blues)";
+  folSub.textContent = params.swapRB ? "(teals & blues — swapped)" : "(reds & golds)";
 }
 
 // Auto: brightness-preserving white balance + auto-exposure.
@@ -644,9 +657,8 @@ const EXAMPLES: Record<string, { file: string; title: string; steps: string[]; r
     title: "Lesson 3 · Hillside & sky — per-color grading",
     steps: [
       "Tap Aerochrome first.",
-      "In Per-color, the Sky box grabs the cool colors on screen (teals/blues) and Foliage grabs the warm ones (reds/golds). Slide the Sky hue toward +40 — the cool tones move, the warm ones don't.",
-      "Now shift the Foliage hue and luminance independently.",
-      "Channel-swapping makes sky and foliage trade colors — after a swap, just reach for the other box.",
+      "In Per-color, drag the Sky hue slider and watch which colors move — then try the Foliage box. Each box owns half the color wheel; the small text under its name shows which half it's holding right now.",
+      "Toggle the R⇄B channel swap and drag again — the boxes follow the swap and their small text updates.",
       "Reset per-color (the button in that section) returns both bands to neutral.",
     ],
   },

@@ -19,11 +19,12 @@ export interface EditParams {
    *  per-pixel amount is passed into the compiled edit as `glow`. */
   glow: number;
   /** Per-colour band adjustments: [hueShiftDeg, satScale, lumScale].
-   *  The two bands split the whole hue circle: sky takes the cool half
-   *  (teals/blues/violets, centred ~210°), foliage the warm half (reds/golds/
-   *  yellow-greens) as its complement — every colour on screen answers to
-   *  exactly one box, no dead zone between them. Targeting is by DISPLAYED
-   *  colour: after a channel swap the subjects trade bands.
+   *  The two bands split the whole hue circle: sky takes one half, foliage
+   *  the complement — every colour on screen answers to exactly one box, no
+   *  dead zone. The bands FOLLOW THE SUBJECT through a channel swap: with
+   *  swap off, sky = the cool half (centred 210°); with swap on, the swap has
+   *  reflected every hue (h -> 240 - h), so the sky band re-centres on 30° to
+   *  keep pointing at the same real-world subject. Labels stay honest.
    *  Neutral = [0, 1, 1]. */
   sky: [number, number, number];
   foliage: [number, number, number];
@@ -208,7 +209,9 @@ export function compileEdit(
       const cg = Math.max(0, ng);
       const cb = Math.max(0, nb);
       let [h, s, v] = rgb2hsv(cr, cg, cb);
-      const wS = bandWeight(h, 210, 55, 105);
+      // R<->B swap reflects hue (h -> 240 - h); re-centre so the sky band
+      // stays glued to the same subject in both swap states.
+      const wS = bandWeight(h, swap ? 30 : 210, 55, 105);
       const wF = 1 - wS;
       h += sky[0] * wS + fol[0] * wF;
       s = Math.min(1, s * (1 + (sky[1] - 1) * wS) * (1 + (fol[1] - 1) * wF));

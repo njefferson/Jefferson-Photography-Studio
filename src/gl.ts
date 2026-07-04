@@ -119,11 +119,13 @@ void main() {
   float satEff = u_sat <= 1.0 ? u_sat : 1.0 + (u_sat - 1.0) * smoothstep(0.02, 0.20, luma);
   c = mix(vec3(luma), c, satEff);
 
-  // Per-colour bands (complementary cool/warm halves), matching pipeline.ts.
+  // Per-colour bands (complementary halves), matching pipeline.ts. The swap
+  // reflects hue (h -> 240 - h), so the sky band re-centres to stay glued to
+  // the same real-world subject in both swap states.
   if (u_sky != vec3(0.0, 1.0, 1.0) || u_fol != vec3(0.0, 1.0, 1.0)) {
     vec3 hsv = rgb2hsv(max(c, 0.0));
     float h = hsv.x * 360.0;
-    float wS = bandWeight(h, 210.0, 55.0, 105.0);
+    float wS = bandWeight(h, u_swap ? 30.0 : 210.0, 55.0, 105.0);
     float wF = 1.0 - wS;
     h += u_sky.x * wS + u_fol.x * wF;
     float s = min(1.0, hsv.y * (1.0 + (u_sky.y - 1.0) * wS) * (1.0 + (u_fol.y - 1.0) * wF));

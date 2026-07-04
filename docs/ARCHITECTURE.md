@@ -33,11 +33,15 @@ decode -> LINEAR camera-native RGB
   -> CHANNEL SWAP     (r<->b)
   -> GLOBAL HUE (YIQ) (global rotation CANNOT move sky and foliage apart)
   -> SATURATION       (boost fades below ~0.2 luma to avoid chroma noise)
-  -> PER-COLOR BANDS  (complementary halves of the hue circle: sky = cool,
-                       centred 210° plateau 55 edge 105; foliage = 1 - sky.
-                       Full coverage, no dead zone. Targets DISPLAYED color,
-                       so a channel swap makes subjects trade bands — the UI
-                       says so. hue/sat/lum each)
+  -> PER-COLOR BANDS  (complementary halves of the hue circle: sky centred
+                       210° plateau 55 edge 105, foliage = 1 - sky. Full
+                       coverage, no dead zone. The R<->B swap reflects hue
+                       (h -> 240 - h), so with swap ON the sky band re-centres
+                       to 30° — bands FOLLOW THE SUBJECT through a swap
+                       (owner's decision, 2026-07-04: the boxes are labeled
+                       Sky/Foliage and must keep meaning that). The band-box
+                       sub-labels in the panel update live with the swap
+                       state. hue/sat/lum each)
   -> TINT             (sepia over mono)
   -> GLOW             (adds blurred-highlight map in linear; HIE halation)
   -> CONTRAST         ((c-0.5)*k+0.5)
