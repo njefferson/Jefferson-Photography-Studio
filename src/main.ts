@@ -596,10 +596,11 @@ fileInput.addEventListener("change", async () => {
 
 // --- Example photos: fetched on demand, opened through the normal raw path,
 // each with a short lesson overlay showing what to try. ---
-const EXAMPLES: Record<string, { file: string; title: string; steps: string[]; rotate?: number }> = {
+const EXAMPLES: Record<string, { file: string; title: string; steps: string[]; rotate?: number; expand?: string[] }> = {
   canopy: {
     file: "./examples/canopy.dng",
     rotate: 3,
+    expand: ["fsLooks", "fsHueSat", "fsExport"],
     title: "Lesson 1 · Golden canopy — the Looks",
     steps: [
       "Tap Aerochrome, Aero Red and Goldie to compare — press one twice to flip its R⇄B swap.",
@@ -610,6 +611,7 @@ const EXAMPLES: Record<string, { file: string; title: string; steps: string[]; r
   lodge: {
     file: "./examples/lodge.dng",
     rotate: 3,
+    expand: ["fsWb", "fsDenoise", "fsLooks"],
     title: "Lesson 2 · Motor lodge — white balance & film looks",
     steps: [
       "Tap around the photo — trees, grass, even the sign — each tap sets white balance from that point and the colors shift. Auto brings you back.",
@@ -619,6 +621,7 @@ const EXAMPLES: Record<string, { file: string; title: string; steps: string[]; r
   },
   hillside: {
     file: "./examples/hillside.dng",
+    expand: ["fsLooks", "fsPerColor"],
     title: "Lesson 3 · Hillside & sky — per-color grading",
     steps: [
       "Tap Aerochrome first.",
@@ -641,6 +644,14 @@ async function loadExample(key: string) {
     if (ex.rotate) {
       renderer.setRotation(ex.rotate);
       draw();
+    }
+    // Unfold exactly the sections this lesson teaches.
+    if (ex.expand) {
+      document.querySelectorAll<HTMLFieldSetElement>("#panel fieldset").forEach((fs) => {
+        fs.classList.toggle("collapsed", !ex.expand!.includes(fs.id));
+      });
+      panel.scrollTop = 0;
+      updateScrollCues();
     }
     // Show the lesson card for this example.
     ($("lessonTitle") as HTMLElement).textContent = ex.title;

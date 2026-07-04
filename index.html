@@ -61,7 +61,7 @@
 
       <aside id="panel" hidden>
         <div id="panelUp" class="scroll-cue up" hidden><span>&#9650; more</span></div>
-        <fieldset>
+        <fieldset id="fsWb">
           <legend>White balance &amp; exposure <small>(no 2000K floor)</small></legend>
           <small style="color:#80808a">White balance, exposure and denoise are set automatically when a photo opens; refine from there.</small>
           <button id="autoBtn" type="button">Auto (white balance + exposure)</button>
@@ -72,19 +72,19 @@
           <small style="color:#80808a">Tip: tap foliage in the image to set white balance.</small>
         </fieldset>
 
-        <fieldset>
+        <fieldset id="fsDenoise">
           <legend>Denoise</legend>
           <label>Strength <input id="dn" type="range" min="0" max="1" step="0.01" value="0" /></label>
           <small style="color:#80808a">Set automatically from the photo's measured noise; adjust to taste.</small>
         </fieldset>
 
-        <fieldset>
+        <fieldset id="fsSwap">
           <legend>Channel swap</legend>
           <button id="swapBtn" type="button" class="toggle" aria-pressed="true">R &#8646; B channel swap</button>
           <small style="color:#80808a">The core false-color move — swaps the red and blue channels. Colour looks switch it on; toggle here or re-press a look to compare.</small>
         </fieldset>
 
-        <fieldset>
+        <fieldset id="fsLooks">
           <legend>Looks</legend>
           <div class="look-row">
             <button id="lookAero" type="button">Aerochrome<small class="look-sub"></small></button>
@@ -98,7 +98,7 @@
           <small style="color:#80808a">Press a look again to flip its R&#8646;B channel swap — the state shows under its name.</small>
         </fieldset>
 
-        <fieldset>
+        <fieldset id="fsHueSat">
           <legend>Hue / Saturation / Tone</legend>
           <label>Hue shift <input id="hue" type="range" min="-180" max="180" step="1" value="0" /></label>
           <label>Saturation <input id="sat" type="range" min="0" max="3" step="0.01" value="1" /></label>
@@ -107,7 +107,7 @@
           <small style="color:#80808a">Film-style halation — layers onto any look, not only HIE B&amp;W.</small>
         </fieldset>
 
-        <fieldset>
+        <fieldset id="fsCurve">
           <legend>Tone curve</legend>
           <svg id="toneSvg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Tone curve"></svg>
           <label>Blacks <input id="tone0" type="range" min="-25" max="25" step="0.5" value="0" /></label>
@@ -118,7 +118,7 @@
           <button id="toneReset" type="button">Reset tone</button>
         </fieldset>
 
-        <fieldset>
+        <fieldset id="fsPerColor">
           <legend>Per-color</legend>
           <div class="band">
             <div class="band-title">Sky <small>(cyans &amp; blues)</small></div>
@@ -135,7 +135,7 @@
           <button id="pcReset" type="button">Reset per-color</button>
         </fieldset>
 
-        <fieldset>
+        <fieldset id="fsExport">
           <legend>Export</legend>
           <label>Format
             <select id="exFormat">
@@ -154,7 +154,7 @@
           <button id="exBtn" type="button">Export &amp; Save</button>
         </fieldset>
 
-        <fieldset>
+        <fieldset id="fsProfiles">
           <legend>Profiles &amp; LUTs <small>(your look, reusable)</small></legend>
           <label><input id="profWB" type="checkbox" /> Bake current white balance in</label>
           <button id="cubeBtn" type="button">Export .cube (Photoshop / video)</button>
