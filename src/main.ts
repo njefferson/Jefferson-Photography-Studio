@@ -119,6 +119,8 @@ ui.autoBtn.addEventListener("click", () => {
 // Looks never touch WB/exposure (those are per-shot; use Auto / tap foliage).
 interface Look {
   swapRB: boolean;
+  /** Repeat presses flip the R<->B swap (colour looks only). */
+  toggleSwap?: boolean;
   hue: number;
   /** Multiplies the current white balance — Aero Red over-cools so post-swap
    *  foliage lands crimson; Goldie also lifts green so it lands gold. */
@@ -131,10 +133,10 @@ interface Look {
 const LOOKS: Record<string, Look> = {
   // Gentle contrast by default: it never crushes shadow detail (road shade,
   // dark foliage). Scenes with big empty dark skies take Contrast up well.
-  aero: { swapRB: true, hue: 0, raw: { sat: 3.0, contrast: 1.15 }, jpeg: { sat: 1.35, contrast: 1.12 } },
-  red: { swapRB: true, hue: 0, wbBias: [0.78, 1.02, 1.35], raw: { sat: 1.8, contrast: 1.4 }, jpeg: { sat: 1.3, contrast: 1.2 } },
-  goldie: { swapRB: true, hue: 0, wbBias: [0.78, 1.22, 1.4], raw: { sat: 1.7, contrast: 1.35 }, jpeg: { sat: 1.2, contrast: 1.2 } },
-  natural: { swapRB: false, hue: 0, raw: { sat: 1.2, contrast: 1.15 }, jpeg: { sat: 1.1, contrast: 1.15 } },
+  aero: { swapRB: true, toggleSwap: true, hue: 0, raw: { sat: 3.0, contrast: 1.15 }, jpeg: { sat: 1.35, contrast: 1.12 } },
+  red: { swapRB: true, toggleSwap: true, hue: 0, wbBias: [0.78, 1.02, 1.35], raw: { sat: 1.8, contrast: 1.4 }, jpeg: { sat: 1.3, contrast: 1.2 } },
+  goldie: { swapRB: true, toggleSwap: true, hue: 0, wbBias: [0.78, 1.22, 1.4], raw: { sat: 1.7, contrast: 1.35 }, jpeg: { sat: 1.2, contrast: 1.2 } },
+  natural: { swapRB: false, toggleSwap: true, hue: 0, raw: { sat: 1.2, contrast: 1.15 }, jpeg: { sat: 1.1, contrast: 1.15 } },
   mono: { swapRB: false, hue: 0, raw: { sat: 0, contrast: 1.5 }, jpeg: { sat: 0, contrast: 1.5 } },
   sepia: { swapRB: false, hue: 0, tint: [1.12, 1.0, 0.78], raw: { sat: 0, contrast: 1.35 }, jpeg: { sat: 0, contrast: 1.35 } },
   hie: { swapRB: false, hue: 0, glow: 0.6, raw: { sat: 0, contrast: 1.45 }, jpeg: { sat: 0, contrast: 1.45 } },
@@ -166,13 +168,52 @@ function applyLook(name: keyof typeof LOOKS) {
   draw();
 }
 
-ui.lookAero.addEventListener("click", () => applyLook("aero"));
-ui.lookRed.addEventListener("click", () => applyLook("red"));
-ui.lookGoldie.addEventListener("click", () => applyLook("goldie"));
-ui.lookNatural.addEventListener("click", () => applyLook("natural"));
-ui.lookMono.addEventListener("click", () => applyLook("mono"));
-ui.lookSepia.addEventListener("click", () => applyLook("sepia"));
-ui.lookHie.addEventListener("click", () => applyLook("hie"));
+// Look buttons are stateful: first press applies the look and highlights the
+// button; pressing the SAME look again flips its R<->B channel swap, with the
+// state shown under the name.
+let activeLook: string | null = null;
+const lookButtons: Record<string, HTMLButtonElement> = {
+  aero: ui.lookAero,
+  red: ui.lookRed,
+  goldie: ui.lookGoldie,
+  natural: ui.lookNatural,
+  mono: ui.lookMono,
+  sepia: ui.lookSepia,
+  hie: ui.lookHie,
+};
+
+function updateLookUI() {
+  for (const [key, btn] of Object.entries(lookButtons)) {
+    const active = activeLook === key;
+    btn.classList.toggle("active", active);
+    const sub = btn.querySelector(".look-sub") as HTMLElement | null;
+    if (!sub) continue;
+    const look = LOOKS[key];
+    if (look.toggleSwap) {
+      sub.textContent = active ? (params.swapRB ? "R⇄B on" : "R⇄B off") : "R⇄B";
+    } else if (key === "hie") {
+      sub.textContent = "glow";
+    } else {
+      sub.textContent = "";
+    }
+  }
+}
+
+function pressLook(key: string) {
+  if (activeLook === key && LOOKS[key].toggleSwap) {
+    params.swapRB = !params.swapRB;
+    syncToUI();
+    draw();
+  } else {
+    activeLook = key;
+    applyLook(key);
+  }
+  updateLookUI();
+}
+
+for (const key of Object.keys(lookButtons)) {
+  lookButtons[key].addEventListener("click", () => pressLook(key));
+}
 
 let raf = 0;
 function draw() {
@@ -191,6 +232,7 @@ for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.dn, ui.hue, ui.sat, ui.con
 ui.swapBtn.addEventListener("click", () => {
   params.swapRB = !params.swapRB;
   syncToUI();
+  updateLookUI();
   draw();
 });
 
@@ -397,6 +439,8 @@ async function openImported(imported: ImportedFile) {
     sky: [0, 1, 1],
     foliage: [0, 1, 1],
   };
+  activeLook = null;
+  updateLookUI();
   syncFromUI();
   requestAnimationFrame(updateScrollCues);
 }

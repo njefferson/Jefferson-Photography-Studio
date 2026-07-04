@@ -22,11 +22,17 @@ body {
   grid-template-areas: "bar bar" "stage panel";
   height: 100dvh;
 }
+/* No image yet -> panel hidden -> give the stage the full width. */
+#app:has(#panel[hidden]) {
+  grid-template-columns: 1fr 0;
+}
 .bar {
   grid-area: bar;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px 18px;
   padding: 10px 16px;
   padding-top: max(10px, env(safe-area-inset-top));
   border-bottom: 1px solid var(--line);
@@ -169,9 +175,10 @@ body {
   overflow-y: auto;
 }
 fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 0 0 14px; }
-legend { padding: 0 6px; color: #c7c7cf; }
+legend { padding: 0 6px; color: #c7c7cf; margin: 0 auto; text-align: center; }
 legend small { color: #80808a; font-weight: 400; }
-label { display: block; margin: 10px 0; font-size: 13px; color: #b8b8c0; }
+label { display: block; margin: 10px 0; font-size: 13px; color: #b8b8c0; text-align: center; }
+fieldset > small { display: block; text-align: center; margin: 6px 0; }
 input[type="range"] { width: 100%; accent-color: var(--accent); }
 select, button {
   width: 100%;
@@ -223,8 +230,24 @@ button { cursor: pointer; }
   border-color: var(--accent);
 }
 .look-row { display: flex; flex-wrap: wrap; gap: 6px; }
-.look-row button { min-width: 30%; }
-.look-row button { flex: 1; padding: 8px 4px; font-size: 13px; }
+.look-row button {
+  flex: 1;
+  min-width: 30%;
+  padding: 7px 4px 5px;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.look-row button.active {
+  background: var(--accent);
+  color: #07101f;
+  border-color: var(--accent);
+  font-weight: 600;
+}
+.look-sub { font-size: 9px; color: #80808a; min-height: 11px; font-weight: 400; }
+.look-row button.active .look-sub { color: #07101f; }
 
 @media (max-width: 760px) {
   #app { grid-template-columns: 1fr; grid-template-areas: "bar" "stage" "panel"; grid-template-rows: auto 1fr auto; }
@@ -249,14 +272,23 @@ button { cursor: pointer; }
 
 .scroll-cue {
   position: sticky;
-  display: block;
-  text-align: center;
-  font-size: 10px;
-  color: var(--accent);
+  display: flex;
+  justify-content: center;
+  height: 0;
+  overflow: visible;
   z-index: 6;
   pointer-events: none;
-  height: 16px;
-  line-height: 16px;
 }
-.scroll-cue.up { top: 0; margin-bottom: -16px; background: linear-gradient(var(--panel) 40%, transparent); }
-.scroll-cue.down { bottom: 0; margin-top: -16px; background: linear-gradient(transparent, var(--panel) 60%); }
+.scroll-cue span {
+  background: #23232c;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 14px;
+  font-size: 11px;
+  color: var(--accent);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
+}
+.scroll-cue.up { top: 4px; }
+.scroll-cue.down { bottom: 10px; }
+.scroll-cue.down span { transform: translateY(-100%); }

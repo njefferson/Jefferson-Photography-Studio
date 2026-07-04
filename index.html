@@ -59,7 +59,7 @@
       </div>
 
       <aside id="panel" hidden>
-        <div id="panelUp" class="scroll-cue up" hidden>&#9650;</div>
+        <div id="panelUp" class="scroll-cue up" hidden><span>&#9650; more</span></div>
         <fieldset>
           <legend>White balance &amp; exposure <small>(no 2000K floor)</small></legend>
           <small style="color:#80808a">White balance, exposure and denoise are set automatically when a photo opens; refine from there.</small>
@@ -80,20 +80,21 @@
         <fieldset>
           <legend>Channel swap</legend>
           <button id="swapBtn" type="button" class="toggle" aria-pressed="true">R &#8646; B channel swap</button>
-          <small style="color:#80808a">The core false-color move — swaps red and blue. Looks marked <span class="badge">R&#8646;B</span> switch it on; toggle it to see what it does.</small>
+          <small style="color:#80808a">The core false-color move — swaps the red and blue channels. Colour looks switch it on; toggle here or re-press a look to compare.</small>
         </fieldset>
 
         <fieldset>
           <legend>Looks</legend>
           <div class="look-row">
-            <button id="lookAero" type="button">Aerochrome <small class="badge">R&#8646;B</small></button>
-            <button id="lookRed" type="button">Aero Red <small class="badge">R&#8646;B</small></button>
-            <button id="lookGoldie" type="button">Goldie <small class="badge">R&#8646;B</small></button>
-            <button id="lookNatural" type="button">Natural IR</button>
-            <button id="lookMono" type="button">B&amp;W IR</button>
-            <button id="lookSepia" type="button">Sepia IR</button>
-            <button id="lookHie" type="button">HIE B&amp;W <small class="badge">glow</small></button>
+            <button id="lookAero" type="button">Aerochrome<small class="look-sub"></small></button>
+            <button id="lookRed" type="button">Aero Red<small class="look-sub"></small></button>
+            <button id="lookGoldie" type="button">Goldie<small class="look-sub"></small></button>
+            <button id="lookNatural" type="button">Natural IR<small class="look-sub"></small></button>
+            <button id="lookMono" type="button">B&amp;W IR<small class="look-sub"></small></button>
+            <button id="lookSepia" type="button">Sepia IR<small class="look-sub"></small></button>
+            <button id="lookHie" type="button">HIE B&amp;W<small class="look-sub"></small></button>
           </div>
+          <small style="color:#80808a">Press a look again to flip its R&#8646;B channel swap — the state shows under its name.</small>
         </fieldset>
 
         <fieldset>
@@ -140,7 +141,7 @@
           <button id="cubeBtn" type="button">Export .cube (Photoshop / video)</button>
           <button id="dcpBtn" type="button">Export .dcp (Lightroom — beta)</button>
         </fieldset>
-        <div id="panelDown" class="scroll-cue down" hidden>&#9660;</div>
+        <div id="panelDown" class="scroll-cue down" hidden><span>&#9660; more</span></div>
       </aside>
     </div>
 
