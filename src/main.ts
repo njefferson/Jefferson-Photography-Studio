@@ -289,6 +289,10 @@ function draw() {
 // --- Tone-curve widget: five draggable dots (blacks/shadows/mids/whites/
 // highlights) mirrored by the sliders below it. ---
 const toneSvg = $("toneSvg") as unknown as SVGSVGElement;
+// The svg viewBox is padded so the corner dots draw whole (iOS Safari clips
+// to the viewBox regardless of CSS overflow). Keep in sync with index.html.
+const TONE_VB_MIN = -8;
+const TONE_VB_SPAN = 116;
 const toneDots: SVGCircleElement[] = [];
 let tonePath: SVGPathElement;
 {
@@ -318,7 +322,7 @@ let tonePath: SVGPathElement;
   for (let i = 0; i < 5; i++) {
     const c = document.createElementNS(NS, "circle");
     c.setAttribute("cx", String(TONE_X[i] * 100));
-    c.setAttribute("r", "4.5");
+    c.setAttribute("r", "5.5");
     c.setAttribute("class", "tone-dot");
     toneSvg.appendChild(c);
     toneDots.push(c);
@@ -327,7 +331,9 @@ let tonePath: SVGPathElement;
       c.setPointerCapture(e.pointerId);
       const move = (ev: PointerEvent) => {
         const r = toneSvg.getBoundingClientRect();
-        params.tone[i] = 1 - (ev.clientY - r.top) / Math.max(1, r.height);
+        // Pointer -> padded viewBox units -> 0..100 plot -> 0..1 value.
+        const vb = TONE_VB_MIN + TONE_VB_SPAN * ((ev.clientY - r.top) / Math.max(1, r.height));
+        params.tone[i] = 1 - vb / 100;
         clampToneOrder();
         syncToUI();
         draw();

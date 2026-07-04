@@ -112,7 +112,10 @@
 
         <fieldset id="fsCurve">
           <legend>Tone curve</legend>
-          <svg id="toneSvg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Tone curve"></svg>
+          <!-- viewBox padded 8 units so the corner dots (Blacks, Highlights)
+               render whole: iOS Safari clips SVG to the viewBox no matter what
+               CSS overflow says. Keep in sync with TONE_VB in main.ts. -->
+          <svg id="toneSvg" viewBox="-8 -8 116 116" preserveAspectRatio="none" aria-label="Tone curve"></svg>
           <label>Blacks <input id="tone0" type="range" min="-25" max="25" step="0.5" value="0" /></label>
           <label>Shadows <input id="tone1" type="range" min="-25" max="25" step="0.5" value="0" /></label>
           <label>Midtones <input id="tone2" type="range" min="-25" max="25" step="0.5" value="0" /></label>
