@@ -283,6 +283,7 @@ button { cursor: pointer; }
   pointer-events: none;
 }
 .scroll-cue span {
+  display: inline-block;
   background: #23232c;
   border: 1px solid var(--line);
   border-radius: 999px;
