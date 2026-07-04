@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - claude/lost-session-info-huy4ha
       - staging
   workflow_dispatch:
 
