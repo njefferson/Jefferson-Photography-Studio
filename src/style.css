@@ -336,7 +336,10 @@ button { cursor: pointer; }
   border-radius: 6px;
   touch-action: none;
   display: block;
-  margin: 8px 0;
+  /* Corner dots (Blacks at 0,100 / Highlights at 100,0) straddle the viewBox
+     edge — let them render whole instead of being cut in half. */
+  overflow: visible;
+  margin: 8px 2px;
 }
 .tone-grid { stroke: #22222a; stroke-width: 0.6; }
 .tone-diag { stroke: #2c2c36; stroke-width: 0.8; stroke-dasharray: 3 3; }
