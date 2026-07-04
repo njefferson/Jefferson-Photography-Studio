@@ -68,6 +68,33 @@ function changelog() {
   }
 }
 
+/** The in-app Roadmap, parsed from the "Next capability release" section of
+ *  NOTES.md so that section stays the single source of truth (see the note at
+ *  the top of it). Each `- [ ]`/`- [x]` bullet becomes one item; the shown
+ *  title is the text up to the first " — ", stripped of markdown emphasis. */
+function roadmap() {
+  try {
+    const notes = readFileSync(new URL("./NOTES.md", import.meta.url), "utf8");
+    const lines = notes.split("\n");
+    const start = lines.findIndex((l) => /^##\s+Next capability release/i.test(l));
+    if (start < 0) return [];
+    const items: { done: boolean; title: string }[] = [];
+    for (let i = start + 1; i < lines.length; i++) {
+      if (/^##\s/.test(lines[i])) break; // stop at the next section heading
+      const m = lines[i].match(/^-\s+\[([ xX])\]\s+(.+)$/);
+      if (!m) continue;
+      const title = m[2]
+        .split(" — ")[0] // title = text before the em-dash detail
+        .replace(/\*\*|`|_/g, "") // drop markdown emphasis
+        .trim();
+      if (title) items.push({ done: m[1].toLowerCase() === "x", title });
+    }
+    return items;
+  } catch {
+    return [];
+  }
+}
+
 function appVersion() {
   try {
     return versionFor(git("git rev-parse HEAD"), versionBase(), versionCommit());
@@ -84,6 +111,7 @@ export default defineConfig({
   },
   define: {
     __CHANGELOG__: JSON.stringify(changelog()),
+    __ROADMAP__: JSON.stringify(roadmap()),
     __APP_VERSION__: JSON.stringify(appVersion()),
   },
 });

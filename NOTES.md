@@ -98,10 +98,24 @@ See **`PLAN.md`** for the full build plan.
 
 ## Next capability release (owner's roadmap, 2026-07-04)
 
-- Tone controls: **Highlights, Whites, Shadows, Blacks** sliders + a global
-  **Luminance** slider.
-- **Reset** button (whole edit), **Go back** (undo), and **Save / Load my look**
-  with **five memory slots**.
+> SOURCE OF TRUTH for the in-app Roadmap (behind the ⓘ button). `vite.config.ts`
+> parses the `- [ ]` / `- [x]` checkbox bullets below at build time and injects
+> them as `__ROADMAP__`; the dialog renders each item's TITLE — the text up to
+> the first " — " (space em-dash space). Keep every roadmap item a single
+> top-level checkbox bullet with a short bold title so the parser stays
+> reliable. Editing this list updates the app on the next deploy. Both the
+> roadmap and the patch notes (last commits) refresh automatically on push.
+
+- [ ] **Global Luminance slider** — one overall lift/drop on top of the tone
+  curve. The five-point tone curve (Blacks/Shadows/Midtones/Whites/Highlights)
+  already covers those bands (owner decision 2026-07-04), so no separate
+  Lightroom-style range sliders — Luminance is the only new tone control.
+- [ ] **Reset** — return the whole edit to the fresh-open automatic baseline.
+- [ ] **Go back (undo)** — step backward through edit changes.
+- [ ] **Save / Load my look** — five memory slots that persist across sessions.
 - [x] **Live histogram** — floating, unobtrusive RGB + luminance readout near
   the image (Lightroom-style: red/green/blue with white where they overlap),
   updates as edits change. Toggle in the header; preference remembered.
+- [x] **Roadmap + patch-notes hub** — the ⓘ dialog now shows the next-release
+  roadmap and the latest updates, each with a "More" link to the full history
+  and notes on GitHub.

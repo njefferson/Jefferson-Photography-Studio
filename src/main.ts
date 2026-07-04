@@ -11,6 +11,7 @@ import { drawHistogram } from "./histogram";
 
 // Injected at build time from git history (see vite.config.ts).
 declare const __CHANGELOG__: { hash: string; date: string; subject: string; version: string }[];
+declare const __ROADMAP__: { done: boolean; title: string }[];
 declare const __APP_VERSION__: string;
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -1039,6 +1040,24 @@ function grayWorldWB(img: DecodedImage): [number, number, number] {
     li.append(ver, a, when);
     list.append(li);
   }
+
+  // Roadmap — the next-release items, parsed at build time from the
+  // "Next capability release" section of NOTES.md (source of truth). Pending
+  // items sit above already-shipped ones so the "what's coming" reads first.
+  const roadmap = $("roadmapList") as HTMLUListElement;
+  const items = [...__ROADMAP__].sort((x, y) => Number(x.done) - Number(y.done));
+  for (const it of items) {
+    const li = document.createElement("li");
+    if (it.done) li.className = "done";
+    const mark = document.createElement("span");
+    mark.className = "rm-mark";
+    mark.textContent = it.done ? "✓" : "○";
+    const text = document.createElement("span");
+    text.textContent = it.title;
+    li.append(mark, text);
+    roadmap.append(li);
+  }
+
   $("infoBtn").addEventListener("click", () => dlg.showModal());
   $("infoClose").addEventListener("click", () => dlg.close());
   dlg.addEventListener("click", (e) => {

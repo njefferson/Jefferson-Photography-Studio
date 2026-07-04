@@ -49,6 +49,12 @@ decode -> LINEAR camera-native RGB
   -> GLOW             (adds blurred-highlight map in linear; HIE halation)
   -> CONTRAST         ((c-0.5)*k+0.5)
   -> GAMMA 2.2
+  -> TONE CURVE       (five fixed-x control points blacks/shadows/midtones/
+                       whites/highlights, monotone-cubic Fritsch–Carlson,
+                       per channel in DISPLAY/gamma space — the very last step.
+                       `EditParams.tone`, identity = TONE_DEFAULT. This is the
+                       Lightroom-style tone control; a global Luminance slider
+                       rides on top of it, not a separate set of range sliders.)
 ```
 
 Implemented twice, kept numerically identical ON PURPOSE:
@@ -193,6 +199,17 @@ and NO Nikon body can channel-swap in camera. Field guide:
   faint tails stay visible. Toggled from the header button; preference persists
   in `localStorage` (`ips-hist`). `pointer-events:none` so tap-to-WB still works
   through it. Refreshed from `draw()` and the hold-to-compare path.
+- ⓘ dialog = **patch notes + roadmap hub**. Both are injected at build time by
+  `vite.config.ts`, so both refresh automatically on every push:
+  - *Patch notes* = last 5 commits (`__CHANGELOG__`), each linked to its commit
+    with its real version number; a "More" link opens the full commit history
+    on GitHub (earlier versions).
+  - *Roadmap* = the `__ROADMAP__` list, parsed from the `## Next capability
+    release` section of NOTES.md — that section is the SINGLE SOURCE OF TRUTH.
+    Each `- [ ]`/`- [x]` bullet becomes one item; the shown title is the text
+    before the first " — ". Pending items render above shipped ones; a "More"
+    link opens NOTES.md on GitHub for the full picture. To change the in-app
+    roadmap, edit that NOTES.md section — do not hard-code items in the app.
 - WB gain + exposure sliders are LOG-scale: the `<input>` stores a 0..1000
   position; `toPos`/`fromPos` in main.ts map it exponentially over
   0.02–16x (WB) / 0.1–16x (exposure) so 1.0 sits near mid-track. On a linear
