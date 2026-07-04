@@ -7,6 +7,7 @@ import { TONE_DEFAULT, TONE_X, toneEvaluator } from "./pipeline";
 import { generateCube } from "./lut";
 import { generateDcp } from "./dcp";
 import { buildGlowMap } from "./glow";
+import { drawHistogram } from "./histogram";
 
 // Injected at build time from git history (see vite.config.ts).
 declare const __CHANGELOG__: { hash: string; date: string; subject: string; version: string }[];
@@ -76,6 +77,34 @@ const ui = {
 function baseName(): string {
   return (currentFile?.name ?? "IPS-look").replace(/\.[^.]+$/, "");
 }
+
+// --- Live histogram: a floating RGB + luminance readout that re-tallies the
+// GPU output every time the edit changes. Toggled from the header; the
+// preference sticks across sessions. ---
+const histWrap = $("histWrap") as HTMLDivElement;
+const histCanvas = $("histogram") as HTMLCanvasElement;
+const histBtn = $("histBtn") as HTMLButtonElement;
+let histEnabled = localStorage.getItem("ips-hist") !== "0";
+
+function updateHistVisibility() {
+  histBtn.setAttribute("aria-pressed", String(histEnabled));
+  histWrap.hidden = !current || !histEnabled;
+}
+
+/** Recompute + repaint the histogram for a param set (skipped when hidden). */
+function refreshHistogram(p: EditParams) {
+  if (!current || !histEnabled) return;
+  const h = renderer.histogram(p);
+  if (h) drawHistogram(histCanvas, h);
+}
+
+histBtn.addEventListener("click", () => {
+  histEnabled = !histEnabled;
+  localStorage.setItem("ips-hist", histEnabled ? "1" : "0");
+  updateHistVisibility();
+  if (histEnabled) refreshHistogram(params);
+});
+updateHistVisibility(); // reflect the stored preference on the toggle at startup
 
 // WB gains and exposure span 0.02–16x / 0.1–16x; on a linear track every
 // realistic value (0.3–3) crowds into the bottom tenth, which reads as the
@@ -283,6 +312,7 @@ function draw() {
       renderer.setToneCurve(params.tone);
     }
     renderer.render(params);
+    refreshHistogram(params);
   });
 }
 
@@ -416,7 +446,9 @@ let holdTimer = 0;
 
 function showOriginal(on: boolean) {
   if (!current || !origParams) return;
-  renderer.render(on ? origParams : params);
+  const p = on ? origParams : params;
+  renderer.render(p);
+  refreshHistogram(p);
 }
 
 const origBtn = $("origBtn") as HTMLButtonElement;
@@ -566,9 +598,11 @@ $("examplesBtn").addEventListener("click", () => {
   welcomeClose.hidden = !current;
   hint.hidden = !!current;
   welcome.hidden = false;
+  histWrap.hidden = true; // keep the histogram from floating over the chooser
 });
 welcomeClose.addEventListener("click", () => {
   welcome.hidden = true;
+  updateHistVisibility();
 });
 
 async function openImported(imported: ImportedFile) {
@@ -583,6 +617,7 @@ async function openImported(imported: ImportedFile) {
   welcome.hidden = true;
   lesson.hidden = true;
   lessonShow.hidden = true;
+  updateHistVisibility();
   // EVERY open starts from a fresh automatic baseline (white balance,
   // exposure, denoise) — raw or JPEG alike.
   autoAdjust(img);

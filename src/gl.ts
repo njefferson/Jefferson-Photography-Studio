@@ -165,6 +165,13 @@ export class Renderer {
   private camMatrix: Float32Array | null = null;
   private glowTex: WebGLTexture;
   private toneTex: WebGLTexture;
+  // Small offscreen target for the live histogram: the full edit re-rendered at
+  // <=HIST_MAX px so a per-frame GPU->CPU readback stays cheap on the iPad.
+  private histFbo: WebGLFramebuffer | null = null;
+  private histTex: WebGLTexture | null = null;
+  private histW = 0;
+  private histH = 0;
+  private histBuf: Uint8Array | null = null;
 
   constructor(private canvas: HTMLCanvasElement) {
     const gl = canvas.getContext("webgl2", { preserveDrawingBuffer: true });
@@ -288,10 +295,11 @@ export class Renderer {
     }
   }
 
-  /** @param split 0..1 — denoise applies right of this fraction (0 = whole image). */
-  render(p: EditParams, split = 0) {
+  /** Bind the program, every edit uniform, and the three input textures. Shared
+   *  by the on-screen render and the offscreen histogram pass so they can never
+   *  disagree about what the pixels are. */
+  private bindPipeline(p: EditParams, split: number, rot: number) {
     const gl = this.gl;
-    if (!this.imgW) return;
     gl.useProgram(this.prog);
     gl.uniform1i(this.loc.u_tex, 0);
     gl.uniform1f(this.loc.u_denoise, p.denoise);
@@ -310,7 +318,7 @@ export class Renderer {
     gl.uniform1i(this.loc.u_useCam, this.camMatrix ? 1 : 0);
     if (this.camMatrix) gl.uniformMatrix3fv(this.loc.u_cam, false, this.camMatrix);
     gl.uniform1f(this.loc.u_glow, p.glow);
-    gl.uniform1i(this.loc.u_rot, this.rotQ);
+    gl.uniform1i(this.loc.u_rot, rot);
     gl.uniform1i(this.loc.u_glowTex, 1);
     gl.uniform1i(this.loc.u_toneTex, 2);
     gl.activeTexture(gl.TEXTURE2);
@@ -319,7 +327,75 @@ export class Renderer {
     gl.bindTexture(gl.TEXTURE_2D, this.glowTex);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.tex);
+  }
+
+  /** @param split 0..1 — denoise applies right of this fraction (0 = whole image). */
+  render(p: EditParams, split = 0) {
+    const gl = this.gl;
+    if (!this.imgW) return;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+    this.bindPipeline(p, split, this.rotQ);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  // Longest edge of the offscreen histogram render. Small enough that the
+  // readback is a fraction of a millisecond; large enough (~48k samples) that
+  // the distribution matches the full image.
+  private static readonly HIST_MAX = 220;
+
+  /**
+   * Re-render the current edit into a tiny offscreen buffer and tally its
+   * displayed (post-gamma, 8-bit) pixels into per-channel + luminance bins.
+   * Rotation is ignored — it never changes the value distribution — so the pass
+   * is orientation-agnostic. Returns null before any image is loaded.
+   */
+  histogram(p: EditParams): { r: Uint32Array; g: Uint32Array; b: Uint32Array; l: Uint32Array } | null {
+    const gl = this.gl;
+    if (!this.imgW) return null;
+    const scale = Math.min(1, Renderer.HIST_MAX / Math.max(this.imgW, this.imgH));
+    const w = Math.max(1, Math.round(this.imgW * scale));
+    const h = Math.max(1, Math.round(this.imgH * scale));
+    if (!this.histFbo) {
+      this.histFbo = gl.createFramebuffer();
+      this.histTex = gl.createTexture();
+    }
+    if (w !== this.histW || h !== this.histH) {
+      this.histW = w;
+      this.histH = h;
+      this.histBuf = new Uint8Array(w * h * 4);
+      gl.bindTexture(gl.TEXTURE_2D, this.histTex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.histFbo);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.histTex, 0);
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.histFbo);
+    gl.viewport(0, 0, w, h);
+    this.bindPipeline(p, 0, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    const buf = this.histBuf!;
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+    // Restore the default framebuffer so the next on-screen render is unaffected.
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+
+    const r = new Uint32Array(256);
+    const g = new Uint32Array(256);
+    const b = new Uint32Array(256);
+    const l = new Uint32Array(256);
+    for (let i = 0; i < buf.length; i += 4) {
+      const R = buf[i], G = buf[i + 1], B = buf[i + 2];
+      r[R]++;
+      g[G]++;
+      b[B]++;
+      // Rec.709 luma with integer weights summing to 256 (max index = 255).
+      l[(R * 54 + G * 183 + B * 19) >> 8]++;
+    }
+    return { r, g, b, l };
   }
 
   /** Image coordinates (px) for a pointer at CLIENT coords. Uses the live

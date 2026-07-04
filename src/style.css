@@ -99,6 +99,39 @@ body {
   user-select: none;
   -webkit-touch-callout: none;
 }
+/* Floating histogram: sits over the top-right of the image, semi-transparent,
+   and never intercepts taps/pinch (pointer-events: none) so white-balance
+   tapping still works through it. Lesson card lives top-left, so no clash. */
+#histWrap {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 6;
+  padding: 6px;
+  border-radius: 8px;
+  background: rgba(10, 10, 14, 0.5);
+  border: 1px solid rgba(120, 120, 135, 0.35);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+#histogram {
+  display: block;
+  width: 200px;
+  height: 75px;
+  opacity: 0.92;
+}
+.bar-btn[aria-pressed="true"] {
+  background: var(--accent);
+  color: #07101f;
+  font-weight: 600;
+  border-color: var(--accent);
+}
+@media (max-width: 760px) {
+  #histWrap { top: 12px; right: 12px; padding: 4px; }
+  #histogram { width: 150px; height: 58px; }
+}
 #hint { color: #9a9aa2; text-align: center; max-width: 40ch; margin: 0 auto; }
 #welcome {
   position: absolute;

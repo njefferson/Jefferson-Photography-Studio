@@ -21,6 +21,7 @@
         </span>
         <span class="bar-actions">
           <button id="origBtn" class="bar-btn" type="button" title="Press and hold to compare with the original">Hold: Original</button>
+          <button id="histBtn" class="bar-btn" type="button" aria-pressed="true" title="Show or hide the live histogram">Histogram</button>
           <button id="rotateBtn" class="bar-btn" type="button" aria-label="Rotate 90 degrees clockwise">&#8635; Rotate 90&deg;</button>
           <button id="helpBtn" class="bar-btn" type="button">Help</button>
           <button id="examplesBtn" class="bar-btn" type="button">Tutorials</button>
@@ -33,6 +34,9 @@
 
       <div id="stage">
         <canvas id="view"></canvas>
+        <div id="histWrap" hidden aria-label="Live RGB histogram">
+          <canvas id="histogram" width="256" height="96"></canvas>
+        </div>
         <div id="welcome">
           <button id="welcomeClose" class="welcome-close" type="button" hidden>&#10005;</button>
           <p id="hint">Edit infrared photos — RAW (NEF / DNG) unlocks the full color magic.</p>

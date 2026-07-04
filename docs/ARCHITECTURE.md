@@ -174,6 +174,22 @@ and NO Nikon body can channel-swap in camera. Field guide:
 
 ## UI conventions
 
+- Live histogram (`histogram.ts` + `Renderer.histogram()`): a floating,
+  semi-transparent RGB+luminance readout over the top-right of the image
+  (Lightroom style — red/green/blue mountains, white where they stack). It is
+  computed by RE-RENDERING the current edit into a tiny offscreen framebuffer
+  (`HIST_MAX`=220px longest edge) and reading those ~48k post-gamma pixels back
+  into four 256-bin tallies — NOT by reading the full preview buffer (too slow
+  on iPad). The offscreen pass shares `bindPipeline()` with the on-screen render
+  so the two can never disagree; it restores the default framebuffer + viewport
+  after readback (verified: on-screen frame is byte-identical after the pass).
+  Rotation is ignored in the histogram pass (it can't change the value
+  distribution). Drawn with additive (`lighter`) compositing so channel overlap
+  glows toward white with no extra passes; normalization ignores the 0/255
+  spikes (IR frames pin huge counts at pure black) and uses sqrt scaling so
+  faint tails stay visible. Toggled from the header button; preference persists
+  in `localStorage` (`ips-hist`). `pointer-events:none` so tap-to-WB still works
+  through it. Refreshed from `draw()` and the hold-to-compare path.
 - WB gain + exposure sliders are LOG-scale: the `<input>` stores a 0..1000
   position; `toPos`/`fromPos` in main.ts map it exponentially over
   0.02–16x (WB) / 0.1–16x (exposure) so 1.0 sits near mid-track. On a linear
