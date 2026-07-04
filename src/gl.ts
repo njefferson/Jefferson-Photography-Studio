@@ -5,7 +5,7 @@
 
 // Single source of truth for edit parameters lives in pipeline.ts so the GPU
 // preview and CPU export can never drift apart.
-import type { EditParams } from "./pipeline";
+import { toneEvaluator, toneIsIdentity, type EditParams } from "./pipeline";
 export type { EditParams };
 
 const VERT = `#version 300 es
@@ -40,6 +40,7 @@ uniform vec3 u_sky;      // sky band [hueShiftDeg, satScale, lumScale]
 uniform vec3 u_fol;      // foliage band [hueShiftDeg, satScale, lumScale]
 uniform sampler2D u_glowTex; // per-image blurred highlight map (see glow.ts)
 uniform float u_glow;        // 0..1 HIE halation strength
+uniform sampler2D u_toneTex; // 256x1 tone-curve LUT (identity when neutral)
 uniform float u_denoise; // 0..1 bilateral strength (see raw/denoise.ts)
 uniform vec2 u_texel;    // 1/textureSize
 uniform float u_split;   // compare divider: denoise applies where uv.x >= split
@@ -140,7 +141,14 @@ void main() {
   // Contrast around mid grey.
   c = (c - 0.5) * u_con + 0.5;
 
-  frag = vec4(toGamma(clamp(c, 0.0, 1.0)), 1.0);
+  vec3 g = toGamma(clamp(c, 0.0, 1.0));
+  // Tone curve (blacks/shadows/mids/whites/highlights), display space.
+  g = vec3(
+    texture(u_toneTex, vec2(g.r, 0.5)).r,
+    texture(u_toneTex, vec2(g.g, 0.5)).r,
+    texture(u_toneTex, vec2(g.b, 0.5)).r
+  );
+  frag = vec4(g, 1.0);
 }`;
 
 export class Renderer {
@@ -154,6 +162,7 @@ export class Renderer {
   private isLinear = false;
   private camMatrix: Float32Array | null = null;
   private glowTex: WebGLTexture;
+  private toneTex: WebGLTexture;
 
   constructor(private canvas: HTMLCanvasElement) {
     const gl = canvas.getContext("webgl2", { preserveDrawingBuffer: true });
@@ -169,7 +178,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_toneTex"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -193,6 +202,31 @@ export class Renderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 1, 1, 0, gl.RED, gl.UNSIGNED_BYTE, new Uint8Array([0]));
+
+    // Tone-curve LUT (unit 2); a 2-texel [0,255] ramp with LINEAR filtering is
+    // an exact identity until a curve is set.
+    this.toneTex = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, this.toneTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 2, 1, 0, gl.RED, gl.UNSIGNED_BYTE, new Uint8Array([0, 255]));
+  }
+
+  /** Rebuild the tone LUT from the five control points (cheap; on change only). */
+  setToneCurve(tone: readonly number[]) {
+    const gl = this.gl;
+    gl.bindTexture(gl.TEXTURE_2D, this.toneTex);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    if (toneIsIdentity(tone)) {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 2, 1, 0, gl.RED, gl.UNSIGNED_BYTE, new Uint8Array([0, 255]));
+      return;
+    }
+    const fn = toneEvaluator(tone);
+    const lut = new Uint8Array(256);
+    for (let i = 0; i < 256; i++) lut[i] = Math.round(fn(i / 255) * 255);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 256, 1, 0, gl.RED, gl.UNSIGNED_BYTE, lut);
   }
 
   /** Display rotation in 90-degree CW steps; swaps the canvas aspect. */
@@ -276,6 +310,9 @@ export class Renderer {
     gl.uniform1f(this.loc.u_glow, p.glow);
     gl.uniform1i(this.loc.u_rot, this.rotQ);
     gl.uniform1i(this.loc.u_glowTex, 1);
+    gl.uniform1i(this.loc.u_toneTex, 2);
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, this.toneTex);
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, this.glowTex);
     gl.activeTexture(gl.TEXTURE0);

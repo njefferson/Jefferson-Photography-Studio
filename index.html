@@ -37,6 +37,7 @@
           <button id="welcomeClose" class="welcome-close" type="button" hidden>&#10005;</button>
           <p id="hint">Edit infrared photos — RAW (NEF / DNG) unlocks the full color magic.</p>
           <label class="open-btn welcome-open" for="file">Open image</label>
+          <hr class="welcome-div" />
           <p class="ex-title">&hellip;or learn by doing — tutorials &amp; examples:</p>
           <div class="ex-list">
             <button class="ex" data-ex="canopy" type="button">
@@ -107,15 +108,30 @@
         </fieldset>
 
         <fieldset>
+          <legend>Tone curve</legend>
+          <svg id="toneSvg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Tone curve"></svg>
+          <label>Blacks <input id="tone0" type="range" min="-25" max="25" step="0.5" value="0" /></label>
+          <label>Shadows <input id="tone1" type="range" min="-25" max="25" step="0.5" value="0" /></label>
+          <label>Midtones <input id="tone2" type="range" min="-25" max="25" step="0.5" value="0" /></label>
+          <label>Whites <input id="tone3" type="range" min="-25" max="25" step="0.5" value="0" /></label>
+          <label>Highlights <input id="tone4" type="range" min="-25" max="25" step="0.5" value="0" /></label>
+          <button id="toneReset" type="button">Reset tone</button>
+        </fieldset>
+
+        <fieldset>
           <legend>Per-color</legend>
-          <div class="band-title">Sky <small>(cyans &amp; blues)</small></div>
-          <label>Hue <input id="skyHue" type="range" min="-60" max="60" step="1" value="0" /></label>
-          <label>Saturation <input id="skySat" type="range" min="0" max="2" step="0.01" value="1" /></label>
-          <label>Luminance <input id="skyLum" type="range" min="0.5" max="1.5" step="0.01" value="1" /></label>
-          <div class="band-title">Foliage <small>(reds &amp; golds)</small></div>
-          <label>Hue <input id="folHue" type="range" min="-60" max="60" step="1" value="0" /></label>
-          <label>Saturation <input id="folSat" type="range" min="0" max="2" step="0.01" value="1" /></label>
-          <label>Luminance <input id="folLum" type="range" min="0.5" max="1.5" step="0.01" value="1" /></label>
+          <div class="band">
+            <div class="band-title">Sky <small>(cyans &amp; blues)</small></div>
+            <label>Hue <input id="skyHue" type="range" min="-60" max="60" step="1" value="0" /></label>
+            <label>Saturation <input id="skySat" type="range" min="0" max="2" step="0.01" value="1" /></label>
+            <label>Luminance <input id="skyLum" type="range" min="0.5" max="1.5" step="0.01" value="1" /></label>
+          </div>
+          <div class="band">
+            <div class="band-title">Foliage <small>(reds &amp; golds)</small></div>
+            <label>Hue <input id="folHue" type="range" min="-60" max="60" step="1" value="0" /></label>
+            <label>Saturation <input id="folSat" type="range" min="0" max="2" step="0.01" value="1" /></label>
+            <label>Luminance <input id="folLum" type="range" min="0.5" max="1.5" step="0.01" value="1" /></label>
+          </div>
           <button id="pcReset" type="button">Reset per-color</button>
         </fieldset>
 

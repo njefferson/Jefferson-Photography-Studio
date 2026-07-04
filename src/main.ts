@@ -3,6 +3,7 @@ import { importFile, type ImportedFile } from "./import";
 import { decode, type DecodedImage } from "./decode";
 import { Renderer, type EditParams } from "./gl";
 import { exportImage, download, type ExportFormat } from "./export";
+import { TONE_DEFAULT, TONE_X, toneEvaluator } from "./pipeline";
 import { generateCube } from "./lut";
 import { generateDcp } from "./dcp";
 import { buildGlowMap } from "./glow";
@@ -33,6 +34,7 @@ const params: EditParams = {
   glow: 0,
   sky: [0, 1, 1],
   foliage: [0, 1, 1],
+  tone: [...TONE_DEFAULT],
 };
 
 const ui = {
@@ -53,6 +55,7 @@ const ui = {
   folHue: $("folHue") as HTMLInputElement,
   folSat: $("folSat") as HTMLInputElement,
   folLum: $("folLum") as HTMLInputElement,
+  tones: [0, 1, 2, 3, 4].map((i) => $(`tone${i}`) as HTMLInputElement),
   exFormat: $("exFormat") as HTMLSelectElement,
   exScale: $("exScale") as HTMLSelectElement,
   exQuality: $("exQuality") as HTMLInputElement,
@@ -83,7 +86,20 @@ function syncFromUI() {
   params.denoise = Number(ui.dn.value);
   params.sky = [Number(ui.skyHue.value), Number(ui.skySat.value), Number(ui.skyLum.value)];
   params.foliage = [Number(ui.folHue.value), Number(ui.folSat.value), Number(ui.folLum.value)];
+  for (let i = 0; i < 5; i++) {
+    params.tone[i] = TONE_DEFAULT[i] + Number(ui.tones[i].value) / 100;
+  }
+  clampToneOrder();
+  updateToneWidget();
   draw();
+}
+
+/** Keep the five tone points in ascending order with a small gap. */
+function clampToneOrder() {
+  for (let i = 0; i < 5; i++) {
+    const lo = i === 0 ? 0 : params.tone[i - 1] + 0.01;
+    params.tone[i] = clamp(params.tone[i], Math.max(lo, TONE_DEFAULT[i] - 0.25), Math.min(1, TONE_DEFAULT[i] + 0.25));
+  }
 }
 
 function syncToUI() {
@@ -103,6 +119,10 @@ function syncToUI() {
   ui.folHue.value = String(params.foliage[0]);
   ui.folSat.value = String(params.foliage[1]);
   ui.folLum.value = String(params.foliage[2]);
+  for (let i = 0; i < 5; i++) {
+    ui.tones[i].value = String((params.tone[i] - TONE_DEFAULT[i]) * 100);
+  }
+  updateToneWidget();
 }
 
 // Auto: brightness-preserving white balance + auto-exposure.
@@ -164,6 +184,7 @@ function applyLook(name: keyof typeof LOOKS) {
   params.glow = look.glow ?? 0;
   params.sky = [0, 1, 1];
   params.foliage = [0, 1, 1];
+  params.tone = [...TONE_DEFAULT];
   syncToUI();
   draw();
 }
@@ -220,16 +241,108 @@ for (const key of Object.keys(lookButtons)) {
 }
 
 let raf = 0;
+let lastToneKey = "";
 function draw() {
   if (raf) return;
   raf = requestAnimationFrame(() => {
     raf = 0;
+    const key = params.tone.join(",");
+    if (key !== lastToneKey) {
+      lastToneKey = key;
+      renderer.setToneCurve(params.tone);
+    }
     renderer.render(params);
   });
 }
 
+// --- Tone-curve widget: five draggable dots (blacks/shadows/mids/whites/
+// highlights) mirrored by the sliders below it. ---
+const toneSvg = $("toneSvg") as unknown as SVGSVGElement;
+const toneDots: SVGCircleElement[] = [];
+let tonePath: SVGPathElement;
+{
+  const NS = "http://www.w3.org/2000/svg";
+  // subtle grid
+  for (const f of [0.25, 0.5, 0.75]) {
+    for (const vert of [true, false]) {
+      const l = document.createElementNS(NS, "line");
+      l.setAttribute("x1", vert ? String(f * 100) : "0");
+      l.setAttribute("y1", vert ? "0" : String(f * 100));
+      l.setAttribute("x2", vert ? String(f * 100) : "100");
+      l.setAttribute("y2", vert ? "100" : String(f * 100));
+      l.setAttribute("class", "tone-grid");
+      toneSvg.appendChild(l);
+    }
+  }
+  const diag = document.createElementNS(NS, "line");
+  diag.setAttribute("x1", "0");
+  diag.setAttribute("y1", "100");
+  diag.setAttribute("x2", "100");
+  diag.setAttribute("y2", "0");
+  diag.setAttribute("class", "tone-diag");
+  toneSvg.appendChild(diag);
+  tonePath = document.createElementNS(NS, "path");
+  tonePath.setAttribute("class", "tone-path");
+  toneSvg.appendChild(tonePath);
+  for (let i = 0; i < 5; i++) {
+    const c = document.createElementNS(NS, "circle");
+    c.setAttribute("cx", String(TONE_X[i] * 100));
+    c.setAttribute("r", "4.5");
+    c.setAttribute("class", "tone-dot");
+    toneSvg.appendChild(c);
+    toneDots.push(c);
+    c.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      c.setPointerCapture(e.pointerId);
+      const move = (ev: PointerEvent) => {
+        const r = toneSvg.getBoundingClientRect();
+        params.tone[i] = 1 - (ev.clientY - r.top) / Math.max(1, r.height);
+        clampToneOrder();
+        syncToUI();
+        draw();
+      };
+      const up = () => {
+        c.removeEventListener("pointermove", move);
+        c.removeEventListener("pointerup", up);
+      };
+      c.addEventListener("pointermove", move);
+      c.addEventListener("pointerup", up);
+    });
+  }
+}
+
+function updateToneWidget() {
+  const fn = toneEvaluator(params.tone);
+  let d = "";
+  for (let s = 0; s <= 64; s++) {
+    const x = s / 64;
+    d += `${s === 0 ? "M" : "L"}${(x * 100).toFixed(1)},${((1 - fn(x)) * 100).toFixed(1)}`;
+  }
+  tonePath.setAttribute("d", d);
+  for (let i = 0; i < 5; i++) {
+    toneDots[i].setAttribute("cy", String((1 - params.tone[i]) * 100));
+  }
+}
+
+$("toneReset").addEventListener("click", () => {
+  params.tone = [...TONE_DEFAULT];
+  syncToUI();
+  draw();
+});
+
+// Collapsible panel sections: tap a title to fold it to just the title.
+document.querySelectorAll<HTMLFieldSetElement>("#panel fieldset").forEach((fs) => {
+  const legend = fs.querySelector("legend");
+  if (!legend) return;
+  legend.classList.add("collapsible");
+  legend.addEventListener("click", () => {
+    fs.classList.toggle("collapsed");
+    updateScrollCues();
+  });
+});
+
 for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.dn, ui.hue, ui.sat, ui.con, ui.glow,
-  ui.skyHue, ui.skySat, ui.skyLum, ui.folHue, ui.folSat, ui.folLum]) {
+  ui.skyHue, ui.skySat, ui.skyLum, ui.folHue, ui.folSat, ui.folLum, ...ui.tones]) {
   el.addEventListener("input", syncFromUI);
 }
 
@@ -450,6 +563,7 @@ async function openImported(imported: ImportedFile) {
     glow: 0,
     sky: [0, 1, 1],
     foliage: [0, 1, 1],
+    tone: [...TONE_DEFAULT],
   };
   activeLook = null;
   updateLookUI();

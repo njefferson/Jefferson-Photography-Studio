@@ -23,6 +23,66 @@ export interface EditParams {
    *  each with a soft falloff. Neutral = [0, 1, 1]. */
   sky: [number, number, number];
   foliage: [number, number, number];
+  /** Tone curve control-point outputs at inputs [0,.25,.5,.75,1]:
+   *  blacks, shadows, midtones, whites, highlights. Identity = TONE_DEFAULT.
+   *  Applied per channel in display (gamma) space, after everything else. */
+  tone: [number, number, number, number, number];
+}
+
+export const TONE_X = [0, 0.25, 0.5, 0.75, 1] as const;
+export const TONE_DEFAULT: [number, number, number, number, number] = [0, 0.25, 0.5, 0.75, 1];
+
+export function toneIsIdentity(y: readonly number[]): boolean {
+  return y.every((v, i) => Math.abs(v - TONE_DEFAULT[i]) < 1e-4);
+}
+
+/**
+ * Monotone cubic (Fritsch–Carlson) through the five fixed-x control points —
+ * smooth, and never overshoots between points. Same curve drives the GPU LUT,
+ * the CPU export and the on-screen widget.
+ */
+export function toneEvaluator(y: readonly number[]): (v: number) => number {
+  const x = TONE_X;
+  const n = 5;
+  const d: number[] = [];
+  const m: number[] = new Array(n);
+  for (let i = 0; i < n - 1; i++) d.push((y[i + 1] - y[i]) / (x[i + 1] - x[i]));
+  m[0] = d[0];
+  m[n - 1] = d[n - 2];
+  for (let i = 1; i < n - 1; i++) m[i] = d[i - 1] * d[i] <= 0 ? 0 : (d[i - 1] + d[i]) / 2;
+  for (let i = 0; i < n - 1; i++) {
+    if (d[i] === 0) {
+      m[i] = 0;
+      m[i + 1] = 0;
+      continue;
+    }
+    const a = m[i] / d[i];
+    const b = m[i + 1] / d[i];
+    const s = a * a + b * b;
+    if (s > 9) {
+      const t = 3 / Math.sqrt(s);
+      m[i] = t * a * d[i];
+      m[i + 1] = t * b * d[i];
+    }
+  }
+  return (v: number) => {
+    if (v <= 0) return y[0];
+    if (v >= 1) return y[4];
+    let i = 3;
+    if (v < x[1]) i = 0;
+    else if (v < x[2]) i = 1;
+    else if (v < x[3]) i = 2;
+    const h = x[i + 1] - x[i];
+    const t = (v - x[i]) / h;
+    const t2 = t * t;
+    const t3 = t2 * t;
+    const out =
+      y[i] * (2 * t3 - 3 * t2 + 1) +
+      m[i] * h * (t3 - 2 * t2 + t) +
+      y[i + 1] * (-2 * t3 + 3 * t2) +
+      m[i + 1] * h * (t3 - t2);
+    return Math.min(1, Math.max(0, out));
+  };
 }
 
 // --- HSV helpers shared by the per-colour bands (mirrored in the shader) ---
@@ -99,6 +159,7 @@ export function compileEdit(
   const sat = p.sat;
   const con = p.contrast;
   const [tr, tg, tb] = p.tint;
+  const toneFn = toneIsIdentity(p.tone) ? null : toneEvaluator(p.tone);
   const sky = p.sky;
   const fol = p.foliage;
   const bandsActive =
@@ -161,6 +222,11 @@ export function compileEdit(
     out[0] = toGamma((nr - 0.5) * con + 0.5);
     out[1] = toGamma((ng - 0.5) * con + 0.5);
     out[2] = toGamma((nb - 0.5) * con + 0.5);
+    if (toneFn) {
+      out[0] = toneFn(out[0]);
+      out[1] = toneFn(out[1]);
+      out[2] = toneFn(out[2]);
+    }
   };
 }
 
