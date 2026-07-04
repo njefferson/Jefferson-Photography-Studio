@@ -190,7 +190,11 @@ function updateLookUI() {
     if (!sub) continue;
     const look = LOOKS[key];
     if (look.toggleSwap) {
-      sub.textContent = active ? (params.swapRB ? "R⇄B on" : "R⇄B off") : "R⇄B";
+      // Mini two-segment toggle: shows BOTH states so it reads as pressable;
+      // the active look fills its current segment.
+      const normOn = active && !params.swapRB ? " on" : "";
+      const swapOn = active && params.swapRB ? " on" : "";
+      sub.innerHTML = `<span class="seg${normOn}">norm</span><span class="seg${swapOn}">R⇄B</span>`;
     } else if (key === "hie") {
       sub.textContent = "glow";
     } else {
@@ -474,8 +478,8 @@ const EXAMPLES: Record<string, { file: string; title: string; steps: string[]; r
     rotate: 3,
     title: "Golden canopy — try the Looks",
     steps: [
-      "Tap Aerochrome, Aero Red and Goldie to compare one-tap looks.",
-      "Tap the trees in the photo to set white balance from foliage.",
+      "Tap Aerochrome, Aero Red and Goldie to compare — press one twice to flip its R⇄B swap.",
+      "Tap different things in the photo — leaves, road, sky — each sets white balance from that point. Auto brings you back.",
       "Slide Saturation and Contrast to taste, then Export & Save.",
     ],
   },
@@ -484,9 +488,9 @@ const EXAMPLES: Record<string, { file: string; title: string; steps: string[]; r
     rotate: 3,
     title: "Motor lodge — white balance & film looks",
     steps: [
-      "Tap Auto, then tap the trees (not the sign) and watch the colors shift.",
+      "Tap around the photo — trees, grass, even the sign — each tap sets white balance from that point and the colors shift. Auto brings you back.",
       "Denoise is set automatically from the photo — fine-tune it with the slider.",
-      "Try B&W IR and HIE Glow for the classic film feel.",
+      "Try B&W IR and HIE B&W for the classic film feel.",
     ],
   },
   hillside: {
@@ -495,7 +499,7 @@ const EXAMPLES: Record<string, { file: string; title: string; steps: string[]; r
     steps: [
       "Tap Aerochrome first.",
       "In Per-color, slide Sky hue toward +40 — the sky moves, the foliage doesn't.",
-      "Now shift Foliage hue and brightness independently.",
+      "Now shift Foliage hue and brightness independently. Auto resets white balance anytime.",
     ],
   },
 };

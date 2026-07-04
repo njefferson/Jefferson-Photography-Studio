@@ -292,3 +292,16 @@ button { cursor: pointer; }
 .scroll-cue.up { top: 4px; }
 .scroll-cue.down { bottom: 10px; }
 .scroll-cue.down span { transform: translateY(-100%); }
+
+.look-sub { display: flex; gap: 3px; align-items: center; }
+.seg {
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 0 4px;
+  font-size: 8px;
+  line-height: 12px;
+  color: #8a8a94;
+  background: transparent;
+}
+.look-row button.active .seg { border-color: rgba(7, 16, 31, 0.35); color: rgba(7, 16, 31, 0.65); }
+.look-row button.active .seg.on { background: #07101f; color: #cfe0ff; border-color: #07101f; font-weight: 600; }
