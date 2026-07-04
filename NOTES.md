@@ -83,3 +83,10 @@ See **`PLAN.md`** for the full build plan.
 - [ ] Display-P3 JPEG output (currently sRGB); per-color HSL; B&W mode for 720nm
 - [ ] Nice-to-have: RGBA16F preview texture (halve GPU memory); box-filtered
       downscale on scaled exports; LJ92 restart-marker path untested on real file
+
+## Next capability release (owner's roadmap, 2026-07-04)
+
+- Tone controls: **Highlights, Whites, Shadows, Blacks** sliders + a global
+  **Luminance** slider.
+- **Reset** button (whole edit), **Go back** (undo), and **Save / Load my look**
+  with **five memory slots**.
