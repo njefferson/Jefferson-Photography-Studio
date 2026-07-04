@@ -342,7 +342,7 @@ button { cursor: pointer; }
 .band { border: 1px solid var(--line); border-radius: 6px; padding: 2px 8px 6px; margin: 8px 0; }
 
 #panel legend.collapsible { cursor: pointer; -webkit-user-select: none; user-select: none; }
-#panel legend.collapsible::after { content: "  \25BE"; font-size: 15px; color: var(--accent); vertical-align: -1px; }
+#panel legend.collapsible::after { content: "  \25BE"; font-size: 20px; color: var(--accent); vertical-align: -3px; line-height: 0; }
 #panel fieldset.collapsed legend.collapsible::after { content: "  \25B8"; }
 #panel fieldset.collapsed > :not(legend) { display: none; }
 
