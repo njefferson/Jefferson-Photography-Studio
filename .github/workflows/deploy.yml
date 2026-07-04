@@ -14,8 +14,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # The build embeds the last 5 commits as the in-app changelog.
-          fetch-depth: 10
+          # Full history + tags: the build derives real version numbers from
+          # the commit count (v0.N) and shows an exact tag (v1.0+) when present.
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 20
