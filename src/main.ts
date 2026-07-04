@@ -546,17 +546,15 @@ async function openImported(imported: ImportedFile) {
   welcome.hidden = true;
   lesson.hidden = true;
   lessonShow.hidden = true;
-  if (img.isRaw) {
-    // Raw opens un-white-balanced (the IR magenta) and dark. Auto white
-    // balance + exposure as a starting point; refine by tapping foliage.
-    autoAdjust(img);
-    syncToUI();
-  }
+  // EVERY open starts from a fresh automatic baseline (white balance,
+  // exposure, denoise) — raw or JPEG alike.
+  autoAdjust(img);
+  syncToUI();
   // Snapshot the as-imported baseline for press-and-hold comparison.
   origParams = {
-    wb: img.isRaw ? ([...params.wb] as [number, number, number]) : [1, 1, 1],
-    exposure: img.isRaw ? params.exposure : 1,
-    denoise: img.isRaw ? params.denoise : 0,
+    wb: [...params.wb] as [number, number, number],
+    exposure: params.exposure,
+    denoise: params.denoise,
     swapRB: false,
     hue: 0,
     sat: 1,
@@ -569,6 +567,9 @@ async function openImported(imported: ImportedFile) {
   };
   activeLook = null;
   updateLookUI();
+  // Tidy the panel for the new photo: everything folded, scrolled to the top.
+  document.querySelectorAll<HTMLFieldSetElement>("#panel fieldset").forEach((fs) => fs.classList.add("collapsed"));
+  panel.scrollTop = 0;
   syncFromUI();
   requestAnimationFrame(updateScrollCues);
 }
