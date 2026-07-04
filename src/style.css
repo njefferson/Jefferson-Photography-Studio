@@ -59,7 +59,10 @@ body {
 }
 #infoDlg::backdrop, #helpDlg::backdrop { background: rgba(0, 0, 0, 0.55); }
 #infoDlg h2, #helpDlg h2 { margin: 0 0 10px; font-size: 16px; }
-#infoDlg ol, #helpDlg ol, #helpDlg ul { margin: 0 0 14px; padding-left: 20px; }
+#infoDlg ol, #infoDlg ul, #helpDlg ol, #helpDlg ul { margin: 0 0 14px; padding-left: 20px; }
+#infoDlg ul { list-style: none; padding-left: 2px; }
+#infoDlg li strong { color: #e8e8ea; font-variant-numeric: tabular-nums; }
+.info-ver { margin: -6px 0 10px; font-size: 12px; color: #80808a; }
 #infoDlg li, #helpDlg li { margin: 8px 0; font-size: 13px; line-height: 1.45; }
 #infoDlg a, #helpDlg a { color: var(--accent); text-decoration: none; }
 #infoDlg a:active, #helpDlg a:active { text-decoration: underline; }

@@ -84,6 +84,15 @@ See **`PLAN.md`** for the full build plan.
 - [ ] Nice-to-have: RGBA16F preview texture (halve GPU memory); box-filtered
       downscale on scaled exports; LJ92 restart-marker path untested on real file
 
+## Versioning (agreed 2026-07-04)
+
+- Every update so far is retroactively **v0.N** (N = update sequence number,
+  derived from git commit count at build time — no manual list needed).
+- When the current staging batch is verified and promoted, the owner declares
+  **v1.0** by tagging: `git tag v1.0 && git push origin v1.0`. Builds show an
+  exact tag on HEAD in preference to the 0.N scheme.
+- The ⓘ dialog shows the running version and a version per changelog entry.
+
 ## Next capability release (owner's roadmap, 2026-07-04)
 
 - Tone controls: **Highlights, Whites, Shadows, Blacks** sliders + a global

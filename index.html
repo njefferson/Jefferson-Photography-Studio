@@ -66,10 +66,12 @@
           <legend>White balance &amp; exposure <small>(no 2000K floor)</small></legend>
           <small style="color:#80808a">White balance, exposure and denoise are set automatically when a photo opens; refine from there.</small>
           <button id="autoBtn" type="button">Auto (white balance + exposure)</button>
-          <label>Exposure <input id="expo" type="range" min="0.1" max="16" step="0.01" value="1" /></label>
-          <label>Red gain <input id="wbR" type="range" min="0.02" max="16" step="0.01" value="1" /></label>
-          <label>Green gain <input id="wbG" type="range" min="0.02" max="16" step="0.01" value="1" /></label>
-          <label>Blue gain <input id="wbB" type="range" min="0.02" max="16" step="0.01" value="1" /></label>
+          <!-- Log-scale tracks: the input stores a 0..1000 position; main.ts
+               maps it exponentially so 1x sits near mid-track (values below = 1.0). -->
+          <label>Exposure <input id="expo" type="range" min="0" max="1000" step="1" value="454" /></label>
+          <label>Red gain <input id="wbR" type="range" min="0" max="1000" step="1" value="585" /></label>
+          <label>Green gain <input id="wbG" type="range" min="0" max="1000" step="1" value="585" /></label>
+          <label>Blue gain <input id="wbB" type="range" min="0" max="1000" step="1" value="585" /></label>
           <small style="color:#80808a">Tip: tap foliage in the image to set white balance.</small>
         </fieldset>
 
@@ -121,14 +123,17 @@
 
         <fieldset id="fsPerColor">
           <legend>Per-color</legend>
+          <small style="color:#80808a">Each box grabs its color range <em>as seen on
+            screen</em> — after a channel swap, sky and foliage trade colors, so
+            reach for the box that matches the color you're looking at.</small>
           <div class="band">
-            <div class="band-title">Sky <small>(cyans &amp; blues)</small></div>
+            <div class="band-title">Sky <small>(teals, blues &amp; violets)</small></div>
             <label>Hue <input id="skyHue" type="range" min="-60" max="60" step="1" value="0" /></label>
             <label>Saturation <input id="skySat" type="range" min="0" max="2" step="0.01" value="1" /></label>
             <label>Luminance <input id="skyLum" type="range" min="0.5" max="1.5" step="0.01" value="1" /></label>
           </div>
           <div class="band">
-            <div class="band-title">Foliage <small>(reds &amp; golds)</small></div>
+            <div class="band-title">Foliage <small>(reds, golds &amp; greens)</small></div>
             <label>Hue <input id="folHue" type="range" min="-60" max="60" step="1" value="0" /></label>
             <label>Saturation <input id="folSat" type="range" min="0" max="2" step="0.01" value="1" /></label>
             <label>Luminance <input id="folLum" type="range" min="0.5" max="1.5" step="0.01" value="1" /></label>
@@ -178,7 +183,8 @@
 
     <dialog id="infoDlg">
       <h2>What's new</h2>
-      <ol id="changeList" reversed></ol>
+      <p id="infoVer" class="info-ver"></p>
+      <ul id="changeList"></ul>
       <p class="coffee-row">&#9749; Enjoying this? Buy me a coffee:
         <a id="coffee" class="coffee" target="_blank" rel="noopener" hidden>PayPal</a>
         <a id="venmo" class="coffee" target="_blank" rel="noopener" hidden>Venmo</a>
@@ -209,8 +215,10 @@
         Looks tagged <span class="badge">R&#8646;B</span> use the <strong>red&#8646;blue channel swap</strong> —
         the move that makes IR sky blue and foliage red/gold. Toggle the swap button to see its effect on any look.
         <strong>HIE glow</strong> is film-style halation — the HIE B&amp;W look uses it, and the slider layers it onto any other look too.</p>
-        <p><strong>Per-color</strong> moves sky (cyans/blues) and foliage (reds/golds) independently —
-        e.g. Aerochrome, then Sky hue +40 for a deeper blue sky without touching the trees.</p>
+        <p><strong>Per-color</strong> moves the cool colors (Sky box: teals/blues/violets) and the warm
+        colors (Foliage box: reds/golds/greens) independently — e.g. Aerochrome, then Sky hue +40 for a
+        deeper blue sky without touching the trees. The boxes target what's <em>on screen</em>, so after
+        a channel swap the sky and foliage trade boxes.</p>
 
         <h3>Profiles</h3>
         <p><strong>.cube</strong> bakes your color look for Photoshop/video apps. <strong>.dcp</strong> is a

@@ -19,8 +19,12 @@ export interface EditParams {
    *  per-pixel amount is passed into the compiled edit as `glow`. */
   glow: number;
   /** Per-colour band adjustments: [hueShiftDeg, satScale, lumScale].
-   *  Sky targets cyans/blues (~200°), foliage targets reds/golds (~0°),
-   *  each with a soft falloff. Neutral = [0, 1, 1]. */
+   *  The two bands split the whole hue circle: sky takes the cool half
+   *  (teals/blues/violets, centred ~210°), foliage the warm half (reds/golds/
+   *  yellow-greens) as its complement — every colour on screen answers to
+   *  exactly one box, no dead zone between them. Targeting is by DISPLAYED
+   *  colour: after a channel swap the subjects trade bands.
+   *  Neutral = [0, 1, 1]. */
   sky: [number, number, number];
   foliage: [number, number, number];
   /** Tone curve control-point outputs at inputs [0,.25,.5,.75,1]:
@@ -197,15 +201,15 @@ export function compileEdit(
     nr = luma + (nr - luma) * satEff;
     ng = luma + (ng - luma) * satEff;
     nb = luma + (nb - luma) * satEff;
-    // Per-colour bands (sky ~200°, foliage ~0°), matching the shader: hue
-    // shift, sat scale and lum scale weighted by hue distance to the band.
+    // Per-colour bands (complementary cool/warm halves), matching the shader:
+    // hue shift, sat scale and lum scale weighted by hue distance to the band.
     if (bandsActive) {
       const cr = Math.max(0, nr);
       const cg = Math.max(0, ng);
       const cb = Math.max(0, nb);
       let [h, s, v] = rgb2hsv(cr, cg, cb);
-      const wS = bandWeight(h, 200, 50, 90);
-      const wF = bandWeight(h, 0, 60, 100);
+      const wS = bandWeight(h, 210, 55, 105);
+      const wF = 1 - wS;
       h += sky[0] * wS + fol[0] * wF;
       s = Math.min(1, s * (1 + (sky[1] - 1) * wS) * (1 + (fol[1] - 1) * wF));
       v = v * (1 + (sky[2] - 1) * wS) * (1 + (fol[2] - 1) * wF);

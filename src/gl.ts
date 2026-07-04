@@ -119,12 +119,12 @@ void main() {
   float satEff = u_sat <= 1.0 ? u_sat : 1.0 + (u_sat - 1.0) * smoothstep(0.02, 0.20, luma);
   c = mix(vec3(luma), c, satEff);
 
-  // Per-colour bands (sky ~200°, foliage ~0°), matching pipeline.ts.
+  // Per-colour bands (complementary cool/warm halves), matching pipeline.ts.
   if (u_sky != vec3(0.0, 1.0, 1.0) || u_fol != vec3(0.0, 1.0, 1.0)) {
     vec3 hsv = rgb2hsv(max(c, 0.0));
     float h = hsv.x * 360.0;
-    float wS = bandWeight(h, 200.0, 50.0, 90.0);
-    float wF = bandWeight(h, 0.0, 60.0, 100.0);
+    float wS = bandWeight(h, 210.0, 55.0, 105.0);
+    float wF = 1.0 - wS;
     h += u_sky.x * wS + u_fol.x * wF;
     float s = min(1.0, hsv.y * (1.0 + (u_sky.y - 1.0) * wS) * (1.0 + (u_fol.y - 1.0) * wF));
     float v = hsv.z * (1.0 + (u_sky.z - 1.0) * wS) * (1.0 + (u_fol.z - 1.0) * wF);

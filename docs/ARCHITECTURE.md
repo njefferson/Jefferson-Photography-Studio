@@ -33,7 +33,11 @@ decode -> LINEAR camera-native RGB
   -> CHANNEL SWAP     (r<->b)
   -> GLOBAL HUE (YIQ) (global rotation CANNOT move sky and foliage apart)
   -> SATURATION       (boost fades below ~0.2 luma to avoid chroma noise)
-  -> PER-COLOR BANDS  (sky ~200°, foliage ~0°, hue/sat/lum each)
+  -> PER-COLOR BANDS  (complementary halves of the hue circle: sky = cool,
+                       centred 210° plateau 55 edge 105; foliage = 1 - sky.
+                       Full coverage, no dead zone. Targets DISPLAYED color,
+                       so a channel swap makes subjects trade bands — the UI
+                       says so. hue/sat/lum each)
   -> TINT             (sepia over mono)
   -> GLOW             (adds blurred-highlight map in linear; HIE halation)
   -> CONTRAST         ((c-0.5)*k+0.5)
@@ -150,6 +154,26 @@ near-monochrome ("white forest"; ratio ~2.4:1.4:1). PRE white balance measured
 off foliage gets partway in-camera but cannot fully cool a red-filter shot,
 and NO Nikon body can channel-swap in camera. Field guide:
 `docs/Z50-IR-field-guide.md`.
+
+## Versioning
+
+- Pre-1.0: every update is `v0.N`, N = commit count at that commit
+  (`git rev-list --count`), computed at build time in `vite.config.ts`.
+  No manual bookkeeping; the number is derived from history.
+- `v1.0` and beyond: put an exact git tag on HEAD (`git tag v1.0`) — the
+  build shows the tag instead. The owner declares that milestone.
+- Shown in the ⓘ dialog ("You're on vX.Y") and per changelog entry.
+
+## UI conventions
+
+- WB gain + exposure sliders are LOG-scale: the `<input>` stores a 0..1000
+  position; `toPos`/`fromPos` in main.ts map it exponentially over
+  0.02–16x (WB) / 0.1–16x (exposure) so 1.0 sits near mid-track. On a linear
+  track every realistic gain crowded into the bottom tenth and read as
+  "auto WB collapsed to the floor" even when correct.
+- Headless verification: the real shader can be exercised in the sandbox with
+  `/opt/pw-browsers/chromium --headless --dump-dom` + an esbuild-bundled page
+  that instantiates `Renderer` and readPixels — see the band-slider bug hunt.
 
 ## Working agreements with the owner
 

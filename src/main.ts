@@ -9,7 +9,8 @@ import { generateDcp } from "./dcp";
 import { buildGlowMap } from "./glow";
 
 // Injected at build time from git history (see vite.config.ts).
-declare const __CHANGELOG__: { hash: string; date: string; subject: string }[];
+declare const __CHANGELOG__: { hash: string; date: string; subject: string; version: string }[];
+declare const __APP_VERSION__: string;
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -76,9 +77,26 @@ function baseName(): string {
   return (currentFile?.name ?? "IPS-look").replace(/\.[^.]+$/, "");
 }
 
+// WB gains and exposure span 0.02–16x / 0.1–16x; on a linear track every
+// realistic value (0.3–3) crowds into the bottom tenth, which reads as the
+// sliders "falling to the floor" even when the balance is correct. The track
+// therefore stores a 0..1000 position mapped exponentially, putting 1.0 near
+// mid-track with fine control around it.
+const WB_LO = 0.02, WB_HI = 16, EX_LO = 0.1, EX_HI = 16;
+function toPos(v: number, lo: number, hi: number): number {
+  return Math.round((1000 * Math.log(clamp(v, lo, hi) / lo)) / Math.log(hi / lo));
+}
+function fromPos(p: number, lo: number, hi: number): number {
+  return lo * Math.pow(hi / lo, clamp(p, 0, 1000) / 1000);
+}
+
 function syncFromUI() {
-  params.wb = [Number(ui.wbR.value), Number(ui.wbG.value), Number(ui.wbB.value)];
-  params.exposure = Number(ui.expo.value);
+  params.wb = [
+    fromPos(Number(ui.wbR.value), WB_LO, WB_HI),
+    fromPos(Number(ui.wbG.value), WB_LO, WB_HI),
+    fromPos(Number(ui.wbB.value), WB_LO, WB_HI),
+  ];
+  params.exposure = fromPos(Number(ui.expo.value), EX_LO, EX_HI);
   params.hue = Number(ui.hue.value);
   params.sat = Number(ui.sat.value);
   params.contrast = Number(ui.con.value);
@@ -103,10 +121,10 @@ function clampToneOrder() {
 }
 
 function syncToUI() {
-  ui.wbR.value = String(params.wb[0]);
-  ui.wbG.value = String(params.wb[1]);
-  ui.wbB.value = String(params.wb[2]);
-  ui.expo.value = String(params.exposure);
+  ui.wbR.value = String(toPos(params.wb[0], WB_LO, WB_HI));
+  ui.wbG.value = String(toPos(params.wb[1], WB_LO, WB_HI));
+  ui.wbB.value = String(toPos(params.wb[2], WB_LO, WB_HI));
+  ui.expo.value = String(toPos(params.exposure, EX_LO, EX_HI));
   ui.dn.value = String(params.denoise);
   ui.swapBtn.setAttribute("aria-pressed", String(params.swapRB));
   ui.hue.value = String(params.hue);
@@ -626,8 +644,9 @@ const EXAMPLES: Record<string, { file: string; title: string; steps: string[]; r
     title: "Lesson 3 · Hillside & sky — per-color grading",
     steps: [
       "Tap Aerochrome first.",
-      "In Per-color, slide the Sky hue toward +40 — the sky moves, the foliage doesn't.",
+      "In Per-color, the Sky box grabs the cool colors on screen (teals/blues) and Foliage grabs the warm ones (reds/golds). Slide the Sky hue toward +40 — the cool tones move, the warm ones don't.",
       "Now shift the Foliage hue and luminance independently.",
+      "Channel-swapping makes sky and foliage trade colors — after a swap, just reach for the other box.",
       "Reset per-color (the button in that section) returns both bands to neutral.",
     ],
   },
@@ -946,13 +965,17 @@ function grayWorldWB(img: DecodedImage): [number, number, number] {
   return lumNormalize([mean / r, mean / g, mean / b]);
 }
 
-// ⓘ What's new — the last 5 commits, injected at build time, each linked to
-// its commit on GitHub.
+// ⓘ What's new — the last 5 updates, injected at build time, each carrying
+// its real version number (v0.N = Nth update ever; v1.0 arrives by git tag)
+// and linked to its commit on GitHub.
 {
   const dlg = $("infoDlg") as HTMLDialogElement;
-  const list = $("changeList") as HTMLOListElement;
+  const list = $("changeList") as HTMLUListElement;
+  ($("infoVer") as HTMLElement).textContent = `You're on v${__APP_VERSION__}`;
   for (const c of __CHANGELOG__) {
     const li = document.createElement("li");
+    const ver = document.createElement("strong");
+    ver.textContent = `v${c.version} `;
     const a = document.createElement("a");
     a.href = `https://github.com/njefferson/IRstudio/commit/${c.hash}`;
     a.target = "_blank";
@@ -960,7 +983,7 @@ function grayWorldWB(img: DecodedImage): [number, number, number] {
     a.textContent = c.subject;
     const when = document.createElement("small");
     when.textContent = ` — ${c.date}`;
-    li.append(a, when);
+    li.append(ver, a, when);
     list.append(li);
   }
   $("infoBtn").addEventListener("click", () => dlg.showModal());
