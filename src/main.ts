@@ -40,6 +40,7 @@ const ui = {
   wbG: $("wbG") as HTMLInputElement,
   wbB: $("wbB") as HTMLInputElement,
   expo: $("expo") as HTMLInputElement,
+  dn: $("dn") as HTMLInputElement,
   autoBtn: $("autoBtn") as HTMLButtonElement,
   swapBtn: $("swapBtn") as HTMLButtonElement,
   hue: $("hue") as HTMLInputElement,
@@ -79,6 +80,7 @@ function syncFromUI() {
   params.sat = Number(ui.sat.value);
   params.contrast = Number(ui.con.value);
   params.glow = Number(ui.glow.value);
+  params.denoise = Number(ui.dn.value);
   params.sky = [Number(ui.skyHue.value), Number(ui.skySat.value), Number(ui.skyLum.value)];
   params.foliage = [Number(ui.folHue.value), Number(ui.folSat.value), Number(ui.folLum.value)];
   draw();
@@ -89,6 +91,7 @@ function syncToUI() {
   ui.wbG.value = String(params.wb[1]);
   ui.wbB.value = String(params.wb[2]);
   ui.expo.value = String(params.exposure);
+  ui.dn.value = String(params.denoise);
   ui.swapBtn.setAttribute("aria-pressed", String(params.swapRB));
   ui.hue.value = String(params.hue);
   ui.sat.value = String(params.sat);
@@ -126,7 +129,9 @@ interface Look {
   jpeg: { sat: number; contrast: number };
 }
 const LOOKS: Record<string, Look> = {
-  aero: { swapRB: true, hue: 0, raw: { sat: 2.5, contrast: 1.3 }, jpeg: { sat: 1.3, contrast: 1.15 } },
+  // Gentle contrast by default: it never crushes shadow detail (road shade,
+  // dark foliage). Scenes with big empty dark skies take Contrast up well.
+  aero: { swapRB: true, hue: 0, raw: { sat: 3.0, contrast: 1.15 }, jpeg: { sat: 1.35, contrast: 1.12 } },
   red: { swapRB: true, hue: 0, wbBias: [0.78, 1.02, 1.35], raw: { sat: 1.8, contrast: 1.4 }, jpeg: { sat: 1.3, contrast: 1.2 } },
   goldie: { swapRB: true, hue: 0, wbBias: [0.78, 1.22, 1.4], raw: { sat: 1.7, contrast: 1.35 }, jpeg: { sat: 1.2, contrast: 1.2 } },
   natural: { swapRB: false, hue: 0, raw: { sat: 1.2, contrast: 1.15 }, jpeg: { sat: 1.1, contrast: 1.15 } },
@@ -178,7 +183,7 @@ function draw() {
   });
 }
 
-for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.hue, ui.sat, ui.con, ui.glow,
+for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.dn, ui.hue, ui.sat, ui.con, ui.glow,
   ui.skyHue, ui.skySat, ui.skyLum, ui.folHue, ui.folSat, ui.folLum]) {
   el.addEventListener("input", syncFromUI);
 }
@@ -188,6 +193,99 @@ ui.swapBtn.addEventListener("click", () => {
   syncToUI();
   draw();
 });
+
+// Rotate 90° clockwise per tap. Applies to the preview and the export.
+$("rotateBtn").addEventListener("click", () => {
+  if (!current) return;
+  renderer.setRotation(renderer.rotation + 1);
+  resetZoom();
+  draw();
+});
+
+// --- Pinch to zoom, drag to pan (when zoomed). A quick tap still sets white
+// balance; any real movement suppresses the tap. ---
+let zoom = 1;
+let panX = 0;
+let panY = 0;
+let tapSuppressed = false;
+const activePointers = new Map<number, { x: number; y: number }>();
+let pinch: { dist: number; zoom: number; midX: number; midY: number; panX: number; panY: number } | null = null;
+let panDrag: { x: number; y: number; panX: number; panY: number } | null = null;
+
+function applyZoom() {
+  if (zoom <= 1.001) {
+    zoom = 1;
+    panX = 0;
+    panY = 0;
+    canvas.style.transform = "";
+    return;
+  }
+  // Keep the image from being flung entirely off-screen.
+  const maxX = (canvas.clientWidth * (zoom - 1)) / 2 + 60;
+  const maxY = (canvas.clientHeight * (zoom - 1)) / 2 + 60;
+  panX = clamp(panX, -maxX, maxX);
+  panY = clamp(panY, -maxY, maxY);
+  canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
+}
+
+function resetZoom() {
+  zoom = 1;
+  applyZoom();
+}
+
+canvas.style.transformOrigin = "center center";
+
+canvas.addEventListener("pointerdown", (e) => {
+  activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  canvas.setPointerCapture(e.pointerId);
+  if (activePointers.size === 2) {
+    const [a, b] = [...activePointers.values()];
+    const stageRect = canvas.parentElement!.getBoundingClientRect();
+    pinch = {
+      dist: Math.hypot(a.x - b.x, a.y - b.y),
+      zoom,
+      midX: (a.x + b.x) / 2 - (stageRect.left + stageRect.width / 2),
+      midY: (a.y + b.y) / 2 - (stageRect.top + stageRect.height / 2),
+      panX,
+      panY,
+    };
+    panDrag = null;
+    tapSuppressed = true;
+  } else if (zoom > 1) {
+    panDrag = { x: e.clientX, y: e.clientY, panX, panY };
+  }
+});
+
+canvas.addEventListener("pointermove", (e) => {
+  const p = activePointers.get(e.pointerId);
+  if (!p) return;
+  if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > 8) tapSuppressed = true;
+  p.x = e.clientX;
+  p.y = e.clientY;
+  if (pinch && activePointers.size === 2) {
+    const [a, b] = [...activePointers.values()];
+    const dist = Math.hypot(a.x - b.x, a.y - b.y);
+    const next = clamp((pinch.zoom * dist) / Math.max(1, pinch.dist), 1, 8);
+    // Keep the image point under the pinch midpoint anchored.
+    const k = next / pinch.zoom;
+    panX = pinch.midX - (pinch.midX - pinch.panX) * k;
+    panY = pinch.midY - (pinch.midY - pinch.panY) * k;
+    zoom = next;
+    applyZoom();
+  } else if (panDrag) {
+    panX = panDrag.panX + (e.clientX - panDrag.x);
+    panY = panDrag.panY + (e.clientY - panDrag.y);
+    applyZoom();
+  }
+});
+
+function endPointer(e: PointerEvent) {
+  activePointers.delete(e.pointerId);
+  if (activePointers.size < 2) pinch = null;
+  if (activePointers.size === 0) panDrag = null;
+}
+canvas.addEventListener("pointerup", endPointer);
+canvas.addEventListener("pointercancel", endPointer);
 
 const welcome = $("welcome") as HTMLDivElement;
 const welcomeClose = $("welcomeClose") as HTMLButtonElement;
@@ -210,6 +308,8 @@ async function openImported(imported: ImportedFile) {
   current = img;
   currentFile = imported;
   renderer.setImage(toPreview(img));
+  renderer.setRotation(img.rotate ?? 0);
+  resetZoom();
   renderer.setGlowMap(buildGlowMap((x, y) => linearAt(img, x, y), img.width, img.height));
   panel.hidden = false;
   welcome.hidden = true;
@@ -247,9 +347,10 @@ fileInput.addEventListener("change", async () => {
 
 // --- Example photos: fetched on demand, opened through the normal raw path,
 // each with a short lesson overlay showing what to try. ---
-const EXAMPLES: Record<string, { file: string; title: string; steps: string[] }> = {
+const EXAMPLES: Record<string, { file: string; title: string; steps: string[]; rotate?: number }> = {
   canopy: {
     file: "./examples/canopy.dng",
+    rotate: 3,
     title: "Golden canopy — try the Looks",
     steps: [
       "Tap Aerochrome, Aero Red and Goldie to compare one-tap looks.",
@@ -259,10 +360,11 @@ const EXAMPLES: Record<string, { file: string; title: string; steps: string[] }>
   },
   lodge: {
     file: "./examples/lodge.dng",
+    rotate: 3,
     title: "Motor lodge — white balance & film looks",
     steps: [
       "Tap Auto, then tap the trees (not the sign) and watch the colors shift.",
-      "Noise reduction is automatic on raw files — shadows stay clean even at high saturation.",
+      "Denoise is set automatically from the photo — fine-tune it with the slider.",
       "Try B&W IR and HIE Glow for the classic film feel.",
     ],
   },
@@ -286,6 +388,10 @@ async function loadExample(key: string) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const bytes = new Uint8Array(await res.arrayBuffer());
     await openImported({ name: `${key}.dng`, kind: "dng", bytes, looksTranscoded: false });
+    if (ex.rotate) {
+      renderer.setRotation(ex.rotate);
+      draw();
+    }
     // Show the lesson card for this example.
     ($("lessonTitle") as HTMLElement).textContent = ex.title;
     const ol = $("lessonSteps") as HTMLOListElement;
@@ -380,6 +486,7 @@ ui.exBtn.addEventListener("click", async () => {
         format: ui.exFormat.value as ExportFormat,
         scale: Number(ui.exScale.value),
         quality: Number(ui.exQuality.value),
+        rotate: renderer.rotation,
       },
       (f) => {
         busyText.textContent = `Exporting… ${Math.round(f * 100)}%`;
@@ -409,9 +516,14 @@ ui.dcpBtn.addEventListener("click", () => {
 });
 
 // Tap-to-white-balance: neutralize the tapped point (foliage = the IR move).
+// Skipped when the gesture was a pan/pinch rather than a tap.
 canvas.addEventListener("click", (e) => {
   if (!current) return;
-  const [pvx, pvy] = renderer.toImagePixel(e.offsetX, e.offsetY);
+  if (tapSuppressed) {
+    tapSuppressed = false;
+    return;
+  }
+  const [pvx, pvy] = renderer.toImagePixel(e.clientX, e.clientY);
   // The renderer may show a downscaled proxy; map back to full-res coords.
   const px = Math.min(current.width - 1, Math.round((pvx * current.width) / Math.max(1, previewW)));
   const py = Math.min(current.height - 1, Math.round((pvy * current.height) / Math.max(1, previewH)));

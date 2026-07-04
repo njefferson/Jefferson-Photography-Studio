@@ -20,6 +20,7 @@
           <button id="infoBtn" class="info-btn" type="button" aria-label="What's new">i</button>
         </span>
         <span class="bar-actions">
+          <button id="rotateBtn" class="bar-btn" type="button" aria-label="Rotate 90 degrees">&#8635;</button>
           <button id="examplesBtn" class="bar-btn" type="button">Examples</button>
           <label class="open-btn">
             Open image
@@ -64,6 +65,12 @@
           <label>Green gain <input id="wbG" type="range" min="0.02" max="16" step="0.01" value="1" /></label>
           <label>Blue gain <input id="wbB" type="range" min="0.02" max="16" step="0.01" value="1" /></label>
           <small style="color:#80808a">Tip: tap foliage in the image to set white balance.</small>
+        </fieldset>
+
+        <fieldset>
+          <legend>Denoise</legend>
+          <label>Strength <input id="dn" type="range" min="0" max="1" step="0.01" value="0" /></label>
+          <small style="color:#80808a">Set automatically from the photo's measured noise; adjust to taste.</small>
         </fieldset>
 
         <fieldset>

@@ -11,8 +11,13 @@ export type { EditParams };
 const VERT = `#version 300 es
 in vec2 a_pos;
 out vec2 v_uv;
+uniform int u_rot; // display rotation in 90-degree CW steps (0..3)
 void main() {
-  v_uv = vec2(a_pos.x * 0.5 + 0.5, 0.5 - a_pos.y * 0.5);
+  vec2 uv = vec2(a_pos.x * 0.5 + 0.5, 0.5 - a_pos.y * 0.5);
+  if (u_rot == 1) uv = vec2(uv.y, 1.0 - uv.x);
+  else if (u_rot == 2) uv = vec2(1.0 - uv.x, 1.0 - uv.y);
+  else if (u_rot == 3) uv = vec2(1.0 - uv.y, uv.x);
+  v_uv = uv;
   gl_Position = vec4(a_pos, 0.0, 1.0);
 }`;
 
@@ -145,6 +150,7 @@ export class Renderer {
   private loc: Record<string, WebGLUniformLocation | null> = {};
   private imgW = 0;
   private imgH = 0;
+  private rotQ = 0; // display rotation, 90-degree CW steps
   private isLinear = false;
   private camMatrix: Float32Array | null = null;
   private glowTex: WebGLTexture;
@@ -163,7 +169,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -189,6 +195,23 @@ export class Renderer {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 1, 1, 0, gl.RED, gl.UNSIGNED_BYTE, new Uint8Array([0]));
   }
 
+  /** Display rotation in 90-degree CW steps; swaps the canvas aspect. */
+  setRotation(q: number) {
+    this.rotQ = ((q % 4) + 4) % 4;
+    if (this.imgW) this.applySize();
+  }
+
+  get rotation() {
+    return this.rotQ;
+  }
+
+  private applySize() {
+    const odd = (this.rotQ & 1) === 1;
+    this.canvas.width = odd ? this.imgH : this.imgW;
+    this.canvas.height = odd ? this.imgW : this.imgH;
+    this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+  }
+
   /** Upload the per-image blurred highlight map (or clear it with null). */
   setGlowMap(map: { width: number; height: number; data: Float32Array } | null) {
     const gl = this.gl;
@@ -211,9 +234,7 @@ export class Renderer {
     this.isLinear = !!img.linear;
     // Upload column-major for GLSL (our matrix is row-major).
     this.camMatrix = img.camMatrix ? rowToColMajor(img.camMatrix) : null;
-    this.canvas.width = width;
-    this.canvas.height = height;
-    gl.viewport(0, 0, width, height);
+    this.applySize();
     gl.bindTexture(gl.TEXTURE_2D, this.tex);
     if (img.linear) {
       // Float textures aren't reliably linear-filterable across devices; the
@@ -253,6 +274,7 @@ export class Renderer {
     gl.uniform1i(this.loc.u_useCam, this.camMatrix ? 1 : 0);
     if (this.camMatrix) gl.uniformMatrix3fv(this.loc.u_cam, false, this.camMatrix);
     gl.uniform1f(this.loc.u_glow, p.glow);
+    gl.uniform1i(this.loc.u_rot, this.rotQ);
     gl.uniform1i(this.loc.u_glowTex, 1);
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, this.glowTex);
@@ -261,11 +283,19 @@ export class Renderer {
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 
-  /** Image coordinates (px) for a click at canvas-relative (x,y) in CSS pixels. */
-  toImagePixel(cssX: number, cssY: number): [number, number] {
+  /** Image coordinates (px) for a pointer at CLIENT coords. Uses the live
+   *  bounding rect, so CSS zoom/pan transforms and rotation are handled. */
+  toImagePixel(clientX: number, clientY: number): [number, number] {
     const r = this.canvas.getBoundingClientRect();
-    const x = Math.round((cssX / r.width) * this.imgW);
-    const y = Math.round((cssY / r.height) * this.imgH);
+    const u = (clientX - r.left) / Math.max(1, r.width);
+    const v = (clientY - r.top) / Math.max(1, r.height);
+    let iu = u;
+    let iv = v;
+    if (this.rotQ === 1) { iu = v; iv = 1 - u; }
+    else if (this.rotQ === 2) { iu = 1 - u; iv = 1 - v; }
+    else if (this.rotQ === 3) { iu = 1 - v; iv = u; }
+    const x = Math.round(iu * this.imgW);
+    const y = Math.round(iv * this.imgH);
     return [Math.max(0, Math.min(this.imgW - 1, x)), Math.max(0, Math.min(this.imgH - 1, y))];
   }
 }

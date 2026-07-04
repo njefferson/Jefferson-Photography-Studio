@@ -19,6 +19,7 @@ export interface ExportOptions {
   format: ExportFormat;
   scale: number; // 1 = native
   quality: number; // JPEG quality 0..1
+  rotate?: number; // display rotation, 90-degree CW steps (0..3)
 }
 
 type Source =
@@ -43,8 +44,25 @@ export async function exportImage(
   const src = getSource(file, current);
   const srcW = "cfa" in src ? src.cfa.width : src.width;
   const srcH = "cfa" in src ? src.cfa.height : src.height;
-  const w = Math.max(1, Math.round(srcW * opts.scale));
-  const h = Math.max(1, Math.round(srcH * opts.scale));
+  const rot = ((opts.rotate ?? 0) % 4 + 4) % 4;
+  const outW = rot & 1 ? srcH : srcW;
+  const outH = rot & 1 ? srcW : srcH;
+  const w = Math.max(1, Math.round(outW * opts.scale));
+  const h = Math.max(1, Math.round(outH * opts.scale));
+  // Output pixel -> source pixel, applying the display rotation (same mapping
+  // as the preview shader).
+  const toSrc = (x: number, y: number): [number, number] => {
+    const u = (x + 0.5) / w;
+    const v = (y + 0.5) / h;
+    let iu = u, iv = v;
+    if (rot === 1) { iu = v; iv = 1 - u; }
+    else if (rot === 2) { iu = 1 - u; iv = 1 - v; }
+    else if (rot === 3) { iu = 1 - v; iv = u; }
+    return [
+      Math.min(srcW - 1, Math.floor(iu * srcW)),
+      Math.min(srcH - 1, Math.floor(iv * srcH)),
+    ];
+  };
 
   // The matrix is applied inside the edit (after white balance), matching the
   // shader exactly so the export matches the preview.
@@ -67,16 +85,22 @@ export async function exportImage(
   const glowAt = (sx: number, sy: number) =>
     gmap ? params.glow * GLOW_GAIN * sampleGlow(gmap, (sx + 0.5) / srcW, (sy + 0.5) / srcH) : 0;
 
+  // When rotated 90/270, the outer loop follows output COLUMNS so that source
+  // rows stay constant per pass (keeps the denoiser's row cache effective).
+  const outerN = rot & 1 ? w : h;
+  const innerN = rot & 1 ? h : w;
+
   if (opts.format === "jpeg") {
     const data = new Uint8ClampedArray(w * h * 4);
-    for (let y = 0; y < h; y++) {
-      if (y % 16 === 0) {
-        onProgress?.(y / h);
+    for (let oIdx = 0; oIdx < outerN; oIdx++) {
+      if (oIdx % 16 === 0) {
+        onProgress?.(oIdx / outerN);
         await tick();
       }
-      const sy = Math.min(srcH - 1, Math.round((y / h) * srcH));
-      for (let x = 0; x < w; x++) {
-        const sx = Math.min(srcW - 1, Math.round((x / w) * srcW));
+      for (let iIdx = 0; iIdx < innerN; iIdx++) {
+        const x = rot & 1 ? oIdx : iIdx;
+        const y = rot & 1 ? iIdx : oIdx;
+        const [sx, sy] = toSrc(x, y);
         const [r, g, b] = sampleLinear(sx, sy);
         edit(r, g, b, out, glowAt(sx, sy));
         const o = (y * w + x) * 4;
@@ -96,14 +120,15 @@ export async function exportImage(
     return { blob, name: `${baseName}.jpg` };
   } else {
     const rgb = new Uint16Array(w * h * 3);
-    for (let y = 0; y < h; y++) {
-      if (y % 16 === 0) {
-        onProgress?.(y / h);
+    for (let oIdx = 0; oIdx < outerN; oIdx++) {
+      if (oIdx % 16 === 0) {
+        onProgress?.(oIdx / outerN);
         await tick();
       }
-      const sy = Math.min(srcH - 1, Math.round((y / h) * srcH));
-      for (let x = 0; x < w; x++) {
-        const sx = Math.min(srcW - 1, Math.round((x / w) * srcW));
+      for (let iIdx = 0; iIdx < innerN; iIdx++) {
+        const x = rot & 1 ? oIdx : iIdx;
+        const y = rot & 1 ? iIdx : oIdx;
+        const [sx, sy] = toSrc(x, y);
         const [r, g, b] = sampleLinear(sx, sy);
         edit(r, g, b, out, glowAt(sx, sy));
         const o = (y * w + x) * 3;

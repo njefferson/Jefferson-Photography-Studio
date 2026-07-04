@@ -26,6 +26,17 @@ export interface DecodedImage {
   camMatrix?: number[];
   /** True when these are true (un-white-balanced) sensor values. */
   isRaw: boolean;
+  /** Display rotation in 90-degree CW steps, from the file's Orientation tag. */
+  rotate?: number;
+}
+
+/** TIFF/EXIF Orientation (tag 274) -> display rotation in 90-degree CW steps. */
+function orientationToRotate(ifds: Ifd[]): number {
+  const o = ifds[0]?.num(274)[0];
+  if (o === 6) return 1;
+  if (o === 3) return 2;
+  if (o === 8) return 3;
+  return 0;
 }
 
 const PHOTO_LINEAR_RAW = 34892;
@@ -45,6 +56,7 @@ export async function decode(file: ImportedFile): Promise<DecodedImage> {
       linear: img.linear,
       camMatrix: camToSrgbLinear(NIKON_Z50_COLOR_MATRIX),
       isRaw: true,
+      rotate: orientationToRotate(new Tiff(file.bytes).allIfds()),
     };
   }
   if (file.kind === "dng" || file.kind === "tiff") {
@@ -84,7 +96,7 @@ async function decodeDng(bytes: Uint8Array): Promise<DecodedImage> {
     (d) => d.num(254)[0] === 0 && d.num(262)[0] === PHOTO_LINEAR_RAW && isJpegComp(d.num(259)[0]),
   );
   if (linearRaw) {
-    return { ...(await decodeTiledJpeg(bytes, linearRaw)), isRaw: true };
+    return { ...(await decodeTiledJpeg(bytes, linearRaw)), isRaw: true, rotate: orientationToRotate(ifds) };
   }
 
   // Mosaiced DNG -> pure-JS decode + demosaic (Compression 7 = lossless JPEG,
@@ -101,6 +113,7 @@ async function decodeDng(bytes: Uint8Array): Promise<DecodedImage> {
       linear: img.linear,
       camMatrix: camToSrgbLinear(cm),
       isRaw: true,
+      rotate: orientationToRotate(ifds),
     };
   }
 

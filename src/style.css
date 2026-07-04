@@ -80,7 +80,7 @@ body {
   max-height: 100%;
   object-fit: contain;
   border-radius: 6px;
-  touch-action: manipulation;
+  touch-action: none;
 }
 #hint { color: #9a9aa2; text-align: center; max-width: 40ch; margin: 0 auto; }
 #welcome {
