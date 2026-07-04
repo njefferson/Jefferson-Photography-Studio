@@ -84,14 +84,17 @@ See **`PLAN.md`** for the full build plan.
 - [ ] Nice-to-have: RGBA16F preview texture (halve GPU memory); box-filtered
       downscale on scaled exports; LJ92 restart-marker path untested on real file
 
-## Versioning (agreed 2026-07-04)
+## Versioning (agreed 2026-07-04, promoted to 1.0 same day)
 
-- Every update so far is retroactively **v0.N** (N = update sequence number,
+- Pre-1.0 history is retroactively **v0.N** (N = update sequence number,
   derived from git commit count at build time — no manual list needed).
-- When the current staging batch is verified and promoted, the owner declares
-  **v1.0** by tagging: `git tag v1.0 && git push origin v1.0`. Builds show an
-  exact tag on HEAD in preference to the 0.N scheme.
+- The **VERSION file** declares the base ("1.0"); updates after it are
+  automatic point releases: 1.0.1, 1.0.2, … Bump VERSION to declare the next
+  milestone (1.1, 2.0). Git tags are NOT used — this environment's git remote
+  refuses tag pushes.
 - The ⓘ dialog shows the running version and a version per changelog entry.
+- CI must check out full history (`fetch-depth: 0` in deploy.yml) or the
+  commit counts — and therefore the version numbers — come out wrong.
 
 ## Next capability release (owner's roadmap, 2026-07-04)
 

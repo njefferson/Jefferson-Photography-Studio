@@ -161,11 +161,15 @@ and NO Nikon body can channel-swap in camera. Field guide:
 
 ## Versioning
 
-- Pre-1.0: every update is `v0.N`, N = commit count at that commit
-  (`git rev-list --count`), computed at build time in `vite.config.ts`.
-  No manual bookkeeping; the number is derived from history.
-- `v1.0` and beyond: put an exact git tag on HEAD (`git tag v1.0`) — the
-  build shows the tag instead. The owner declares that milestone.
+- Computed at build time in `vite.config.ts` from git history + the VERSION
+  file; no manual bookkeeping.
+- Pre-1.0 history: `v0.N`, N = commit count at that commit.
+- The VERSION file declares a base (e.g. "1.0") at the commit that changes
+  it; later commits are automatic point releases `1.0.M` (M = commits since
+  the declaration). Bump VERSION for the next milestone.
+- Git tags are NOT usable — the remote proxy refuses tag pushes (403).
+- CI needs `fetch-depth: 0` (deploy.yml) or commit counts are truncated and
+  every version comes out wrong.
 - Shown in the ⓘ dialog ("You're on vX.Y") and per changelog entry.
 
 ## UI conventions
