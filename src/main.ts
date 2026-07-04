@@ -330,11 +330,13 @@ $("toneReset").addEventListener("click", () => {
   draw();
 });
 
-// Collapsible panel sections: tap a title to fold it to just the title.
+// Collapsible panel sections: tap a title to fold/unfold. Everything starts
+// minimized so the panel reads as a tidy table of contents.
 document.querySelectorAll<HTMLFieldSetElement>("#panel fieldset").forEach((fs) => {
   const legend = fs.querySelector("legend");
   if (!legend) return;
   legend.classList.add("collapsible");
+  fs.classList.add("collapsed");
   legend.addEventListener("click", () => {
     fs.classList.toggle("collapsed");
     updateScrollCues();
