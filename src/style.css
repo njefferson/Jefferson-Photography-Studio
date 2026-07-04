@@ -286,8 +286,10 @@ button { cursor: pointer; }
   background: #23232c;
   border: 1px solid var(--line);
   border-radius: 999px;
-  padding: 3px 14px;
-  font-size: 11px;
+  padding: 4px 0;
+  width: 44px;
+  text-align: center;
+  font-size: 12px;
   color: var(--accent);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
   white-space: nowrap;
@@ -343,3 +345,6 @@ button { cursor: pointer; }
 #panel legend.collapsible::after { content: "  \25BE"; font-size: 15px; color: var(--accent); vertical-align: -1px; }
 #panel fieldset.collapsed legend.collapsible::after { content: "  \25B8"; }
 #panel fieldset.collapsed > :not(legend) { display: none; }
+
+.lesson-next { font-size: 12px; color: #9a9aa2; margin: 0 0 10px; line-height: 1.45; border-top: 1px solid var(--line); padding-top: 8px; }
+.lesson-next strong { color: #c9c9d1; }
