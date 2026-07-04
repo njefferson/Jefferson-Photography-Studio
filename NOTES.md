@@ -116,7 +116,10 @@ See **`PLAN.md`** for the full build plan.
 - [x] **Go back (undo)** — step backward through edit changes. Header button;
   slider drags coalesce into one step, discrete actions are atomic.
 - [x] **Save / Load my look** — five memory slots (My looks panel) that persist
-  across sessions in localStorage; a slot stores the full edit + look state.
+  across sessions in localStorage. A slot stores the CREATIVE grade only (swap,
+  hue, sat, contrast, tint, glow, per-color, tone, luminance) — NOT the per-shot
+  white balance / exposure / denoise (owner decision 2026-07-04) — so a look
+  drops onto any photo on top of its own balance, like the built-in Looks.
 - [x] **Live histogram** — floating, unobtrusive RGB + luminance readout near
   the image (Lightroom-style: red/green/blue with white where they overlap),
   updates as edits change. Toggle in the header; preference remembered.

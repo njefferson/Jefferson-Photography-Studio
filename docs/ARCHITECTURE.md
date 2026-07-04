@@ -233,10 +233,14 @@ and NO Nikon body can channel-swap in camera. Field guide:
   - `baseline` is snapshotted at the end of `openImported` (after the automatic
     WB/exposure/denoise) — that's the Reset target. Reset settles current edits
     first, so Reset is itself undoable.
-  - **Save/Load looks**: five `localStorage` slots (`ips-look-slot-N`) holding a
-    JSON snapshot; global (not per photo) so a look is reusable. `readSlot`
-    validates shape and coerces missing fields (e.g. `lum`) so a stale slot
-    can't corrupt the edit. Loading applies as one undoable step.
+  - **Save/Load looks**: five `localStorage` slots (`ips-look-slot-N`). A slot
+    stores the CREATIVE grade only (`SavedLook` — swap/hue/sat/contrast/tint/
+    glow/sky/foliage/tone/lum), NOT the per-shot white balance / exposure /
+    denoise, so a look drops onto any photo on top of its own balance (like the
+    built-in Looks). Loading keeps the current WB/exposure/denoise, clears
+    `activeLook` (a loaded custom grade isn't one built-in look), and records
+    one undoable step. `readSlot` coerces every field (and reads older full
+    snapshots) so a stale slot can't corrupt the edit.
 - WB gain + exposure sliders are LOG-scale: the `<input>` stores a 0..1000
   position; `toPos`/`fromPos` in main.ts map it exponentially over
   0.02–16x (WB) / 0.1–16x (exposure) so 1.0 sits near mid-track. On a linear

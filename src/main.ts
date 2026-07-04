@@ -429,12 +429,65 @@ const slotKey = (i: number) => `ips-look-slot-${i}`;
 const slotList = $("slotList") as HTMLDivElement;
 const slotEls: { name: HTMLSpanElement; save: HTMLButtonElement; load: HTMLButtonElement }[] = [];
 
-function readSlot(i: number): Snapshot | null {
+// A saved look is the CREATIVE grade only — no per-shot white balance, exposure
+// or denoise — so it drops onto any photo on top of that photo's own balance
+// (matching how the built-in Looks behave). Undo/Reset snapshots stay full.
+type SavedLook = {
+  swapRB: boolean;
+  hue: number;
+  sat: number;
+  contrast: number;
+  tint: [number, number, number];
+  glow: number;
+  sky: [number, number, number];
+  foliage: [number, number, number];
+  tone: [number, number, number, number, number];
+  lum: number;
+};
+
+function currentLook(): SavedLook {
+  return {
+    swapRB: params.swapRB,
+    hue: params.hue,
+    sat: params.sat,
+    contrast: params.contrast,
+    tint: [...params.tint] as [number, number, number],
+    glow: params.glow,
+    sky: [...params.sky] as [number, number, number],
+    foliage: [...params.foliage] as [number, number, number],
+    tone: [...params.tone] as [number, number, number, number, number],
+    lum: params.lum,
+  };
+}
+
+const tuple3 = (a: unknown, d: [number, number, number]): [number, number, number] =>
+  Array.isArray(a) && a.length === 3 ? [+a[0], +a[1], +a[2]] : d;
+const numOr = (v: unknown, d: number): number => (typeof v === "number" && isFinite(v) ? v : d);
+
+/** Parse a saved slot, tolerating older full-snapshot slots ({params:{…}}) and
+ *  coercing every field so a stale or partial slot can't corrupt the edit. */
+function readSlot(i: number): SavedLook | null {
   const raw = localStorage.getItem(slotKey(i));
   if (!raw) return null;
   try {
-    const s = JSON.parse(raw) as Snapshot;
-    if (s && s.params && Array.isArray(s.params.wb) && Array.isArray(s.params.tone)) return s;
+    const o = JSON.parse(raw);
+    const s = o?.params ?? o; // accept {params:{…}} (old full snapshot) or flat
+    if (s && Array.isArray(s.tone) && typeof s.sat === "number") {
+      return {
+        swapRB: !!s.swapRB,
+        hue: numOr(s.hue, 0),
+        sat: numOr(s.sat, 1),
+        contrast: numOr(s.contrast, 1),
+        tint: tuple3(s.tint, [1, 1, 1]),
+        glow: numOr(s.glow, 0),
+        sky: tuple3(s.sky, [0, 1, 1]),
+        foliage: tuple3(s.foliage, [0, 1, 1]),
+        tone: s.tone.length === 5
+          ? [+s.tone[0], +s.tone[1], +s.tone[2], +s.tone[3], +s.tone[4]]
+          : [...TONE_DEFAULT],
+        lum: numOr(s.lum, 1),
+      };
+    }
   } catch {
     /* corrupt slot — treat as empty */
   }
@@ -443,16 +496,31 @@ function readSlot(i: number): Snapshot | null {
 
 function saveSlot(i: number) {
   if (!current) return;
-  localStorage.setItem(slotKey(i), JSON.stringify(snapshot()));
+  localStorage.setItem(slotKey(i), JSON.stringify(currentLook()));
   updateSlotUI();
 }
 
 function loadSlot(i: number) {
-  const s = readSlot(i);
-  if (!s || !current) return;
+  const look = readSlot(i);
+  if (!look || !current) return;
   flushRecord(); // settle current edits
-  applySnapshot(s);
-  flushRecord(); // record the load as its own atomic undo step
+  // Apply the creative grade; keep this photo's white balance, exposure, denoise.
+  params.swapRB = look.swapRB;
+  params.hue = look.hue;
+  params.sat = look.sat;
+  params.contrast = look.contrast;
+  params.tint = look.tint;
+  params.glow = look.glow;
+  params.sky = look.sky;
+  params.foliage = look.foliage;
+  params.tone = look.tone;
+  params.lum = look.lum;
+  activeLook = null; // a loaded custom grade isn't one specific built-in look
+  clampToneOrder();
+  syncToUI();
+  updateLookUI();
+  draw();
+  flushRecord(); // record the load as one atomic undo step
 }
 
 function updateSlotUI() {
