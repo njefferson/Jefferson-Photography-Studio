@@ -102,3 +102,6 @@ See **`PLAN.md`** for the full build plan.
   **Luminance** slider.
 - **Reset** button (whole edit), **Go back** (undo), and **Save / Load my look**
   with **five memory slots**.
+- [x] **Live histogram** — floating, unobtrusive RGB + luminance readout near
+  the image (Lightroom-style: red/green/blue with white where they overlap),
+  updates as edits change. Toggle in the header; preference remembered.
