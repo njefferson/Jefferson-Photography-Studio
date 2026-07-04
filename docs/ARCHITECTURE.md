@@ -210,6 +210,17 @@ and NO Nikon body can channel-swap in camera. Field guide:
     before the first " — ". Pending items render above shipped ones; a "More"
     link opens NOTES.md on GitHub for the full picture. To change the in-app
     roadmap, edit that NOTES.md section — do not hard-code items in the app.
+- Tone LUT (`u_toneTex`) is a **256-entry** ramp, and the neutral/identity path
+  must be too. A 2-texel `[0,255]` ramp is NOT an identity under LINEAR+CLAMP:
+  the texel centres sit at u=0.25/0.75, so it clamps everything below 25% to
+  black and above 75% to white (a silent shadow-crush/highlight-blow on the
+  default curve; the histogram re-renders the same pipeline so it agreed and
+  never exposed it). Fixed 2026-07-04 — `IDENTITY_LUT` samples the diagonal to
+  <½ LSB. Verified GPU==CPU on a full gradient (identity maxErr 0).
+- Global **Luminance** (`u_lum`, `EditParams.lum`) is the last display-space op,
+  after the tone LUT: `pow(g, 1/lum)`, endpoints pinned so it lifts the body
+  without clipping. Same math in `compileEdit` (so `.cube` bakes it). Log-scale
+  slider 0.5–2× (`LUM_LO/HI`), neutral 1.0 mid-track, in the Tone curve panel.
 - WB gain + exposure sliders are LOG-scale: the `<input>` stores a 0..1000
   position; `toPos`/`fromPos` in main.ts map it exponentially over
   0.02–16x (WB) / 0.1–16x (exposure) so 1.0 sits near mid-track. On a linear

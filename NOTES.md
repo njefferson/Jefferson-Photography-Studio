@@ -106,10 +106,11 @@ See **`PLAN.md`** for the full build plan.
 > reliable. Editing this list updates the app on the next deploy. Both the
 > roadmap and the patch notes (last commits) refresh automatically on push.
 
-- [ ] **Global Luminance slider** — one overall lift/drop on top of the tone
+- [x] **Global Luminance slider** — one overall lift/drop on top of the tone
   curve. The five-point tone curve (Blacks/Shadows/Midtones/Whites/Highlights)
   already covers those bands (owner decision 2026-07-04), so no separate
   Lightroom-style range sliders — Luminance is the only new tone control.
+  Display-space pow (endpoints pinned, no clipping); in the Tone curve panel.
 - [ ] **Reset** — return the whole edit to the fresh-open automatic baseline.
 - [ ] **Go back (undo)** — step backward through edit changes.
 - [ ] **Save / Load my look** — five memory slots that persist across sessions.

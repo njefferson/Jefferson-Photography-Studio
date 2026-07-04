@@ -32,6 +32,12 @@ export interface EditParams {
    *  blacks, shadows, midtones, whites, highlights. Identity = TONE_DEFAULT.
    *  Applied per channel in display (gamma) space, after everything else. */
   tone: [number, number, number, number, number];
+  /** Global luminance: one overall lift/drop that rides ON TOP of the tone
+   *  curve. Applied per channel in display (gamma) space as the very last
+   *  step: out = pow(out, 1/lum). >1 brightens the body, <1 darkens; the 0/1
+   *  endpoints stay pinned so it lifts shadows/midtones without clipping.
+   *  Neutral = 1. Same math in the shader (u_lum). */
+  lum: number;
 }
 
 export const TONE_X = [0, 0.25, 0.5, 0.75, 1] as const;
@@ -165,6 +171,9 @@ export function compileEdit(
   const con = p.contrast;
   const [tr, tg, tb] = p.tint;
   const toneFn = toneIsIdentity(p.tone) ? null : toneEvaluator(p.tone);
+  // Global luminance rides on top of the tone curve: pow in display space,
+  // endpoints pinned. exponent = 1/lum (lum>1 brightens). 1 = neutral.
+  const lumExp = p.lum && p.lum !== 1 ? 1 / p.lum : 0;
   const sky = p.sky;
   const fol = p.foliage;
   const bandsActive =
@@ -233,6 +242,12 @@ export function compileEdit(
       out[0] = toneFn(out[0]);
       out[1] = toneFn(out[1]);
       out[2] = toneFn(out[2]);
+    }
+    // Global luminance — the very last step, matching the shader's u_lum.
+    if (lumExp) {
+      out[0] = Math.pow(out[0], lumExp);
+      out[1] = Math.pow(out[1], lumExp);
+      out[2] = Math.pow(out[2], lumExp);
     }
   };
 }

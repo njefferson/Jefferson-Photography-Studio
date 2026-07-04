@@ -120,6 +120,9 @@
                render whole: iOS Safari clips SVG to the viewBox no matter what
                CSS overflow says. Keep in sync with TONE_VB in main.ts. -->
           <svg id="toneSvg" viewBox="-8 -8 116 116" preserveAspectRatio="none" aria-label="Tone curve"></svg>
+          <!-- Global luminance rides on top of the five-point curve: a log-scale
+               track (0.5–2x) storing a 0..1000 position, neutral 1.0 at 500. -->
+          <label>Luminance <small>(overall)</small> <input id="lum" type="range" min="0" max="1000" step="1" value="500" /></label>
           <label>Blacks <input id="tone0" type="range" min="-25" max="25" step="0.5" value="0" /></label>
           <label>Shadows <input id="tone1" type="range" min="-25" max="25" step="0.5" value="0" /></label>
           <label>Midtones <input id="tone2" type="range" min="-25" max="25" step="0.5" value="0" /></label>

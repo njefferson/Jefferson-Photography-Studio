@@ -38,6 +38,7 @@ const params: EditParams = {
   sky: [0, 1, 1],
   foliage: [0, 1, 1],
   tone: [...TONE_DEFAULT],
+  lum: 1,
 };
 
 const ui = {
@@ -52,6 +53,7 @@ const ui = {
   sat: $("sat") as HTMLInputElement,
   con: $("con") as HTMLInputElement,
   glow: $("glow") as HTMLInputElement,
+  lum: $("lum") as HTMLInputElement,
   skyHue: $("skyHue") as HTMLInputElement,
   skySat: $("skySat") as HTMLInputElement,
   skyLum: $("skyLum") as HTMLInputElement,
@@ -113,6 +115,9 @@ updateHistVisibility(); // reflect the stored preference on the toggle at startu
 // therefore stores a 0..1000 position mapped exponentially, putting 1.0 near
 // mid-track with fine control around it.
 const WB_LO = 0.02, WB_HI = 16, EX_LO = 0.1, EX_HI = 16;
+// Global luminance spans 0.5–2x on the same kind of log track; 1.0 (neutral)
+// lands dead centre so brighten/darken are symmetric around it.
+const LUM_LO = 0.5, LUM_HI = 2;
 function toPos(v: number, lo: number, hi: number): number {
   return Math.round((1000 * Math.log(clamp(v, lo, hi) / lo)) / Math.log(hi / lo));
 }
@@ -131,6 +136,7 @@ function syncFromUI() {
   params.sat = Number(ui.sat.value);
   params.contrast = Number(ui.con.value);
   params.glow = Number(ui.glow.value);
+  params.lum = fromPos(Number(ui.lum.value), LUM_LO, LUM_HI);
   params.denoise = Number(ui.dn.value);
   params.sky = [Number(ui.skyHue.value), Number(ui.skySat.value), Number(ui.skyLum.value)];
   params.foliage = [Number(ui.folHue.value), Number(ui.folSat.value), Number(ui.folLum.value)];
@@ -162,6 +168,7 @@ function syncToUI() {
   ui.sat.value = String(params.sat);
   ui.con.value = String(params.contrast);
   ui.glow.value = String(params.glow);
+  ui.lum.value = String(toPos(params.lum, LUM_LO, LUM_HI));
   ui.skyHue.value = String(params.sky[0]);
   ui.skySat.value = String(params.sky[1]);
   ui.skyLum.value = String(params.sky[2]);
@@ -246,6 +253,7 @@ function applyLook(name: keyof typeof LOOKS) {
   params.sky = [0, 1, 1];
   params.foliage = [0, 1, 1];
   params.tone = [...TONE_DEFAULT];
+  params.lum = 1;
   syncToUI();
   draw();
 }
@@ -411,7 +419,7 @@ document.querySelectorAll<HTMLFieldSetElement>("#panel fieldset").forEach((fs) =
   });
 });
 
-for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.dn, ui.hue, ui.sat, ui.con, ui.glow,
+for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.dn, ui.hue, ui.sat, ui.con, ui.glow, ui.lum,
   ui.skyHue, ui.skySat, ui.skyLum, ui.folHue, ui.folSat, ui.folLum, ...ui.tones]) {
   el.addEventListener("input", syncFromUI);
 }
@@ -637,6 +645,7 @@ async function openImported(imported: ImportedFile) {
     sky: [0, 1, 1],
     foliage: [0, 1, 1],
     tone: [...TONE_DEFAULT],
+    lum: 1,
   };
   activeLook = null;
   updateLookUI();
