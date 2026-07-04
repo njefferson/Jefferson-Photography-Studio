@@ -10,10 +10,13 @@ An offline-first PWA (Vite + TypeScript, no framework) that edits infrared
 photos from an IR-converted Nikon Z50: true raw decode in pure JS, unbounded
 white balance, red↔blue channel swap, camera-matrix color, one-tap looks,
 denoise, halation glow, per-color grading, full-res export, and Lightroom
-profile generation. Deployed to Cloudflare Pages by GitHub Actions on every
-push (`.github/workflows/deploy.yml`; needs CLOUDFLARE_API_TOKEN /
-CLOUDFLARE_ACCOUNT_ID repo secrets). Live at
-https://infrared-photography-studio.pages.dev
+profile generation. Deployed to Cloudflare Pages by GitHub Actions
+(`.github/workflows/deploy.yml`; needs CLOUDFLARE_API_TOKEN /
+CLOUDFLARE_ACCOUNT_ID repo secrets). Branches (renamed/cleaned 2026-07-04):
+push to `main` (the default) deploys PRODUCTION at
+https://infrared-photography-studio.pages.dev; push to `staging` deploys the
+preview at https://staging.infrared-photography-studio.pages.dev. Note the
+lowercase branch names — GitHub Actions trigger matching is case-sensitive.
 
 ## The one sentence that explains everything
 
