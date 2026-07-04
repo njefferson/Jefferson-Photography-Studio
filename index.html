@@ -23,7 +23,7 @@
           <button id="origBtn" class="bar-btn" type="button" title="Press and hold to compare with the original">Hold: Original</button>
           <button id="rotateBtn" class="bar-btn" type="button" aria-label="Rotate 90 degrees clockwise">&#8635; Rotate 90&deg;</button>
           <button id="helpBtn" class="bar-btn" type="button">Help</button>
-          <button id="examplesBtn" class="bar-btn" type="button">Examples</button>
+          <button id="examplesBtn" class="bar-btn" type="button">Tutorials</button>
           <label class="open-btn">
             Open image
             <input id="file" type="file" accept=".dng,.nef,.zip,image/*" hidden />
@@ -37,16 +37,16 @@
           <button id="welcomeClose" class="welcome-close" type="button" hidden>&#10005;</button>
           <p id="hint">Edit infrared photos — RAW (NEF / DNG) unlocks the full color magic.</p>
           <label class="open-btn welcome-open" for="file">Open image</label>
-          <p class="ex-title">&hellip;or try an example photo:</p>
+          <p class="ex-title">&hellip;or learn by doing — tutorials &amp; examples:</p>
           <div class="ex-list">
             <button class="ex" data-ex="canopy" type="button">
-              <img src="./examples/canopy.png" alt="" /><span>Golden canopy<br /><small>Try the Looks</small></span>
+              <img src="./examples/canopy.png" alt="" /><span>Lesson 1 — Golden canopy<br /><small>Try the Looks</small></span>
             </button>
             <button class="ex" data-ex="lodge" type="button">
-              <img src="./examples/lodge.png" alt="" /><span>Motor lodge<br /><small>White balance &amp; denoise</small></span>
+              <img src="./examples/lodge.png" alt="" /><span>Lesson 2 — Motor lodge<br /><small>White balance &amp; denoise</small></span>
             </button>
             <button class="ex" data-ex="hillside" type="button">
-              <img src="./examples/hillside.png" alt="" /><span>Hillside &amp; sky<br /><small>Per-color grading</small></span>
+              <img src="./examples/hillside.png" alt="" /><span>Lesson 3 — Hillside &amp; sky<br /><small>Per-color grading</small></span>
             </button>
           </div>
         </div>
@@ -107,13 +107,16 @@
         </fieldset>
 
         <fieldset>
-          <legend>Per-color <small>(sky &amp; foliage bands)</small></legend>
-          <label>Sky hue <input id="skyHue" type="range" min="-60" max="60" step="1" value="0" /></label>
-          <label>Sky saturation <input id="skySat" type="range" min="0" max="2" step="0.01" value="1" /></label>
-          <label>Sky brightness <input id="skyLum" type="range" min="0.5" max="1.5" step="0.01" value="1" /></label>
-          <label>Foliage hue <input id="folHue" type="range" min="-60" max="60" step="1" value="0" /></label>
-          <label>Foliage saturation <input id="folSat" type="range" min="0" max="2" step="0.01" value="1" /></label>
-          <label>Foliage brightness <input id="folLum" type="range" min="0.5" max="1.5" step="0.01" value="1" /></label>
+          <legend>Per-color</legend>
+          <div class="band-title">Sky <small>(cyans &amp; blues)</small></div>
+          <label>Hue <input id="skyHue" type="range" min="-60" max="60" step="1" value="0" /></label>
+          <label>Saturation <input id="skySat" type="range" min="0" max="2" step="0.01" value="1" /></label>
+          <label>Luminance <input id="skyLum" type="range" min="0.5" max="1.5" step="0.01" value="1" /></label>
+          <div class="band-title">Foliage <small>(reds &amp; golds)</small></div>
+          <label>Hue <input id="folHue" type="range" min="-60" max="60" step="1" value="0" /></label>
+          <label>Saturation <input id="folSat" type="range" min="0" max="2" step="0.01" value="1" /></label>
+          <label>Luminance <input id="folLum" type="range" min="0.5" max="1.5" step="0.01" value="1" /></label>
+          <button id="pcReset" type="button">Reset per-color</button>
         </fieldset>
 
         <fieldset>

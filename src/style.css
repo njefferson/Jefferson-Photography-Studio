@@ -5,7 +5,7 @@
   --line: #2a2a31;
   --accent: #7aa2ff;
 }
-* { box-sizing: border-box; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 /* The hidden attribute must always win, even over ID display rules. */
 [hidden] { display: none !important; }
 html, body { margin: 0; height: 100%; }
@@ -92,6 +92,9 @@ body {
   object-fit: contain;
   border-radius: 6px;
   touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 #hint { color: #9a9aa2; text-align: center; max-width: 40ch; margin: 0 auto; }
 #welcome {
@@ -305,3 +308,13 @@ button { cursor: pointer; }
 }
 .look-row button.active .seg { border-color: rgba(7, 16, 31, 0.35); color: rgba(7, 16, 31, 0.65); }
 .look-row button.active .seg.on { background: #07101f; color: #cfe0ff; border-color: #07101f; font-weight: 600; }
+
+.band-title {
+  text-align: center;
+  margin: 12px 0 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #c7c7cf;
+}
+.band-title small { color: #80808a; font-weight: 400; }
+#pcReset { margin-top: 8px; }

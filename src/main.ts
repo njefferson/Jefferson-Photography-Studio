@@ -240,6 +240,14 @@ ui.swapBtn.addEventListener("click", () => {
   draw();
 });
 
+// Reset the per-color bands to neutral (Auto deliberately doesn't touch them).
+$("pcReset").addEventListener("click", () => {
+  params.sky = [0, 1, 1];
+  params.foliage = [0, 1, 1];
+  syncToUI();
+  draw();
+});
+
 // Help dialog (usage guide; the ⓘ dialog stays what's-new + support).
 const helpDlg = $("helpDlg") as HTMLDialogElement;
 $("helpBtn").addEventListener("click", () => helpDlg.showModal());
@@ -476,7 +484,7 @@ const EXAMPLES: Record<string, { file: string; title: string; steps: string[]; r
   canopy: {
     file: "./examples/canopy.dng",
     rotate: 3,
-    title: "Golden canopy — try the Looks",
+    title: "Lesson 1 · Golden canopy — the Looks",
     steps: [
       "Tap Aerochrome, Aero Red and Goldie to compare — press one twice to flip its R⇄B swap.",
       "Tap different things in the photo — leaves, road, sky — each sets white balance from that point. Auto brings you back.",
@@ -486,7 +494,7 @@ const EXAMPLES: Record<string, { file: string; title: string; steps: string[]; r
   lodge: {
     file: "./examples/lodge.dng",
     rotate: 3,
-    title: "Motor lodge — white balance & film looks",
+    title: "Lesson 2 · Motor lodge — white balance & film looks",
     steps: [
       "Tap around the photo — trees, grass, even the sign — each tap sets white balance from that point and the colors shift. Auto brings you back.",
       "Denoise is set automatically from the photo — fine-tune it with the slider.",
@@ -495,11 +503,12 @@ const EXAMPLES: Record<string, { file: string; title: string; steps: string[]; r
   },
   hillside: {
     file: "./examples/hillside.dng",
-    title: "Hillside & sky — per-color grading",
+    title: "Lesson 3 · Hillside & sky — per-color grading",
     steps: [
       "Tap Aerochrome first.",
-      "In Per-color, slide Sky hue toward +40 — the sky moves, the foliage doesn't.",
-      "Now shift Foliage hue and brightness independently. Auto resets white balance anytime.",
+      "In Per-color, slide the Sky hue toward +40 — the sky moves, the foliage doesn't.",
+      "Now shift the Foliage hue and luminance independently.",
+      "Reset per-color (the button in that section) returns both bands to neutral.",
     ],
   },
 };
