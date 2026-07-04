@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - claude/lost-session-info-huy4ha
+      - staging
   workflow_dispatch:
 
 jobs:
@@ -34,4 +35,6 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=infrared-photography-studio --branch=main --commit-dirty=true
+          # staging branch -> preview URL (staging.infrared-photography-studio.pages.dev);
+          # everything else -> production.
+          command: pages deploy dist --project-name=infrared-photography-studio --branch=${{ github.ref_name == 'staging' && 'staging' || 'main' }} --commit-dirty=true

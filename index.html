@@ -20,7 +20,9 @@
           <button id="infoBtn" class="info-btn" type="button" aria-label="What's new">i</button>
         </span>
         <span class="bar-actions">
-          <button id="rotateBtn" class="bar-btn" type="button" aria-label="Rotate 90 degrees">&#8635;</button>
+          <button id="origBtn" class="bar-btn" type="button" title="Press and hold to compare with the original">Hold: Original</button>
+          <button id="rotateBtn" class="bar-btn" type="button" aria-label="Rotate 90 degrees clockwise">&#8635; Rotate 90&deg;</button>
+          <button id="helpBtn" class="bar-btn" type="button">Help</button>
           <button id="examplesBtn" class="bar-btn" type="button">Examples</button>
           <label class="open-btn">
             Open image
@@ -57,8 +59,10 @@
       </div>
 
       <aside id="panel" hidden>
+        <div id="panelUp" class="scroll-cue up" hidden>&#9650;</div>
         <fieldset>
           <legend>White balance &amp; exposure <small>(no 2000K floor)</small></legend>
+          <small style="color:#80808a">White balance, exposure and denoise are set automatically when a photo opens; refine from there.</small>
           <button id="autoBtn" type="button">Auto (white balance + exposure)</button>
           <label>Exposure <input id="expo" type="range" min="0.1" max="16" step="0.01" value="1" /></label>
           <label>Red gain <input id="wbR" type="range" min="0.02" max="16" step="0.01" value="1" /></label>
@@ -75,19 +79,20 @@
 
         <fieldset>
           <legend>Channel swap</legend>
-          <button id="swapBtn" type="button" class="toggle" aria-pressed="true">Red ↔ Blue swap</button>
+          <button id="swapBtn" type="button" class="toggle" aria-pressed="true">R &#8646; B channel swap</button>
+          <small style="color:#80808a">The core false-color move — swaps red and blue. Looks marked <span class="badge">R&#8646;B</span> switch it on; toggle it to see what it does.</small>
         </fieldset>
 
         <fieldset>
           <legend>Looks</legend>
           <div class="look-row">
-            <button id="lookAero" type="button">Aerochrome</button>
-            <button id="lookRed" type="button">Aero Red</button>
-            <button id="lookGoldie" type="button">Goldie</button>
+            <button id="lookAero" type="button">Aerochrome <small class="badge">R&#8646;B</small></button>
+            <button id="lookRed" type="button">Aero Red <small class="badge">R&#8646;B</small></button>
+            <button id="lookGoldie" type="button">Goldie <small class="badge">R&#8646;B</small></button>
             <button id="lookNatural" type="button">Natural IR</button>
             <button id="lookMono" type="button">B&amp;W IR</button>
             <button id="lookSepia" type="button">Sepia IR</button>
-            <button id="lookHie" type="button">HIE Glow</button>
+            <button id="lookHie" type="button">HIE B&amp;W <small class="badge">glow</small></button>
           </div>
         </fieldset>
 
@@ -97,6 +102,7 @@
           <label>Saturation <input id="sat" type="range" min="0" max="3" step="0.01" value="1" /></label>
           <label>Contrast <input id="con" type="range" min="0.5" max="2" step="0.01" value="1" /></label>
           <label>HIE glow <input id="glow" type="range" min="0" max="1" step="0.01" value="0" /></label>
+          <small style="color:#80808a">Film-style halation — layers onto any look, not only HIE B&amp;W.</small>
         </fieldset>
 
         <fieldset>
@@ -134,6 +140,7 @@
           <button id="cubeBtn" type="button">Export .cube (Photoshop / video)</button>
           <button id="dcpBtn" type="button">Export .dcp (Lightroom — beta)</button>
         </fieldset>
+        <div id="panelDown" class="scroll-cue down" hidden>&#9660;</div>
       </aside>
     </div>
 
@@ -151,17 +158,57 @@
     <dialog id="infoDlg">
       <h2>What's new</h2>
       <ol id="changeList" reversed></ol>
-      <p class="works-with">
-        <strong>Works with:</strong> JPEG/PNG from any camera · RAW from any Bayer-sensor
-        camera converted to DNG (free Adobe DNG Converter, or Lightroom's Convert to DNG) ·
-        Nikon NEF natively (classic compressed; not the Z8/Z9 High-Efficiency format) ·
-        Fujifilm X-Trans not supported. Tuned on an IR-converted Nikon Z50.
-      </p>
       <p class="coffee-row">&#9749; Enjoying this? Buy me a coffee:
         <a id="coffee" class="coffee" target="_blank" rel="noopener" hidden>PayPal</a>
         <a id="venmo" class="coffee" target="_blank" rel="noopener" hidden>Venmo</a>
       </p>
       <button id="infoClose" type="button">Close</button>
+    </dialog>
+
+    <dialog id="helpDlg">
+      <h2>How to use Infrared Photography Studio</h2>
+      <div class="help-body">
+        <h3>Quick start</h3>
+        <ol>
+          <li><strong>Open image</strong> (or pick an example). RAW — NEF or DNG — unlocks the full color range.</li>
+          <li>On open, the app <strong>automatically</strong> sets white balance, exposure and denoise from the photo itself.</li>
+          <li><strong>Tap foliage</strong> in the photo to fine-tune white balance — the classic IR move.</li>
+          <li>Pick a <strong>Look</strong>, adjust sliders to taste, then <strong>Export &amp; Save</strong>.</li>
+        </ol>
+
+        <h3>Gestures</h3>
+        <ul>
+          <li><strong>Tap</strong> the photo — set white balance from that point (aim at foliage).</li>
+          <li><strong>Pinch</strong> — zoom (up to 8&times;); drag to pan while zoomed.</li>
+          <li><strong>Press &amp; hold</strong> the photo (or the <em>Hold: Original</em> button) — compare with the original.</li>
+        </ul>
+
+        <h3>Looks &amp; adjustments</h3>
+        <p>Looks are one-tap recipes; every slider stays live afterwards so you can push further.
+        Looks tagged <span class="badge">R&#8646;B</span> use the <strong>red&#8646;blue channel swap</strong> —
+        the move that makes IR sky blue and foliage red/gold. Toggle the swap button to see its effect on any look.
+        <strong>HIE glow</strong> is film-style halation — the HIE B&amp;W look uses it, and the slider layers it onto any other look too.</p>
+        <p><strong>Per-color</strong> moves sky (cyans/blues) and foliage (reds/golds) independently —
+        e.g. Aerochrome, then Sky hue +40 for a deeper blue sky without touching the trees.</p>
+
+        <h3>Profiles</h3>
+        <p><strong>.cube</strong> bakes your color look for Photoshop/video apps. <strong>.dcp</strong> is a
+        Lightroom camera profile (beta). Denoise and glow are spatial effects and can't ride along in profiles.</p>
+
+        <h3>Works with</h3>
+        <p>JPEG/PNG from any camera &middot; RAW from any Bayer-sensor camera converted to DNG
+        (free Adobe DNG Converter, or Lightroom's Convert to DNG) &middot; Nikon NEF natively
+        (classic compressed; not Z8/Z9 High-Efficiency) &middot; Fujifilm X-Trans not supported.
+        Tuned on an IR-converted Nikon Z50.</p>
+
+        <h3>Tips</h3>
+        <ul>
+          <li>Import from <strong>Files</strong>, not the Photo Library — iOS silently converts RAW to JPEG there. A zipped RAW also works.</li>
+          <li>Scenes with big empty dark skies take more Contrast; scenes with shadow detail (roads, dark trees) look best gentle.</li>
+          <li>720nm-filter shots are near-monochrome by nature — that's what B&amp;W IR, Sepia IR and HIE B&amp;W are for.</li>
+        </ul>
+      </div>
+      <button id="helpClose" type="button">Close</button>
     </dialog>
 
     <script type="module" src="/src/main.ts"></script>

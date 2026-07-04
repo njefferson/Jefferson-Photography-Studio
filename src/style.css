@@ -43,7 +43,7 @@ body {
   font: italic 600 13px/1 Georgia, serif;
   cursor: pointer;
 }
-#infoDlg {
+#infoDlg, #helpDlg {
   background: var(--panel);
   color: #e8e8ea;
   border: 1px solid var(--line);
@@ -51,14 +51,14 @@ body {
   padding: 18px 20px;
   max-width: min(520px, 90vw);
 }
-#infoDlg::backdrop { background: rgba(0, 0, 0, 0.55); }
-#infoDlg h2 { margin: 0 0 10px; font-size: 16px; }
-#infoDlg ol { margin: 0 0 14px; padding-left: 20px; }
-#infoDlg li { margin: 8px 0; font-size: 13px; line-height: 1.45; }
-#infoDlg a { color: var(--accent); text-decoration: none; }
-#infoDlg a:active { text-decoration: underline; }
-#infoDlg small { color: #80808a; }
-#infoDlg button { width: auto; padding: 8px 16px; }
+#infoDlg::backdrop, #helpDlg::backdrop { background: rgba(0, 0, 0, 0.55); }
+#infoDlg h2, #helpDlg h2 { margin: 0 0 10px; font-size: 16px; }
+#infoDlg ol, #helpDlg ol, #helpDlg ul { margin: 0 0 14px; padding-left: 20px; }
+#infoDlg li, #helpDlg li { margin: 8px 0; font-size: 13px; line-height: 1.45; }
+#infoDlg a, #helpDlg a { color: var(--accent); text-decoration: none; }
+#infoDlg a:active, #helpDlg a:active { text-decoration: underline; }
+#infoDlg small, #helpDlg small { color: #80808a; }
+#infoDlg button, #helpDlg button { width: auto; padding: 8px 16px; }
 .open-btn {
   background: var(--accent);
   color: #07101f;
@@ -123,7 +123,7 @@ body {
 .lesson-show {
   position: absolute;
   left: 20px;
-  bottom: 20px;
+  top: 20px;
   width: 38px;
   height: 38px;
   padding: 0;
@@ -230,3 +230,33 @@ button { cursor: pointer; }
   #app { grid-template-columns: 1fr; grid-template-areas: "bar" "stage" "panel"; grid-template-rows: auto 1fr auto; }
   #panel { border-left: none; border-top: 1px solid var(--line); max-height: 45dvh; }
 }
+
+#helpDlg { max-width: min(640px, 92vw); max-height: 82vh; overflow-y: auto; }
+.help-body { font-size: 13px; color: #c9c9d1; line-height: 1.5; }
+.help-body h3 { margin: 14px 0 6px; font-size: 13px; color: #e8e8ea; }
+.help-body p { margin: 6px 0; }
+
+.badge {
+  font-size: 9px;
+  background: #262635;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1px 4px;
+  color: #9fb3e8;
+  vertical-align: 1px;
+  white-space: nowrap;
+}
+
+.scroll-cue {
+  position: sticky;
+  display: block;
+  text-align: center;
+  font-size: 10px;
+  color: var(--accent);
+  z-index: 6;
+  pointer-events: none;
+  height: 16px;
+  line-height: 16px;
+}
+.scroll-cue.up { top: 0; margin-bottom: -16px; background: linear-gradient(var(--panel) 40%, transparent); }
+.scroll-cue.down { bottom: 0; margin-top: -16px; background: linear-gradient(transparent, var(--panel) 60%); }

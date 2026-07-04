@@ -194,6 +194,53 @@ ui.swapBtn.addEventListener("click", () => {
   draw();
 });
 
+// Help dialog (usage guide; the ⓘ dialog stays what's-new + support).
+const helpDlg = $("helpDlg") as HTMLDialogElement;
+$("helpBtn").addEventListener("click", () => helpDlg.showModal());
+$("helpClose").addEventListener("click", () => helpDlg.close());
+helpDlg.addEventListener("click", (e) => {
+  if (e.target === helpDlg) helpDlg.close();
+});
+
+// Press-and-hold comparison with the as-imported original (auto WB/exposure/
+// denoise, no creative edits). Works from the header button or by holding the
+// photo itself.
+let origParams: EditParams | null = null;
+let holdTimer = 0;
+
+function showOriginal(on: boolean) {
+  if (!current || !origParams) return;
+  renderer.render(on ? origParams : params);
+}
+
+const origBtn = $("origBtn") as HTMLButtonElement;
+for (const ev of ["pointerdown"] as const) {
+  origBtn.addEventListener(ev, (e) => {
+    e.preventDefault();
+    origBtn.setPointerCapture((e as PointerEvent).pointerId);
+    showOriginal(true);
+  });
+}
+for (const ev of ["pointerup", "pointercancel", "pointerleave"] as const) {
+  origBtn.addEventListener(ev, () => showOriginal(false));
+}
+
+// Panel scroll cues: arrows appear when there is more panel above/below.
+const cueUp = $("panelUp") as HTMLDivElement;
+const cueDown = $("panelDown") as HTMLDivElement;
+function updateScrollCues() {
+  if (panel.hidden) {
+    cueUp.hidden = true;
+    cueDown.hidden = true;
+    return;
+  }
+  const max = panel.scrollHeight - panel.clientHeight;
+  cueUp.hidden = panel.scrollTop < 12;
+  cueDown.hidden = max <= 0 || panel.scrollTop > max - 12;
+}
+panel.addEventListener("scroll", updateScrollCues, { passive: true });
+window.addEventListener("resize", updateScrollCues);
+
 // Rotate 90° clockwise per tap. Applies to the preview and the export.
 $("rotateBtn").addEventListener("click", () => {
   if (!current) return;
@@ -238,7 +285,17 @@ canvas.style.transformOrigin = "center center";
 canvas.addEventListener("pointerdown", (e) => {
   activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   canvas.setPointerCapture(e.pointerId);
+  // Long-press (held still) shows the original for comparison.
+  clearTimeout(holdTimer);
+  if (activePointers.size === 1) {
+    holdTimer = window.setTimeout(() => {
+      tapSuppressed = true;
+      showOriginal(true);
+    }, 400);
+  }
   if (activePointers.size === 2) {
+    clearTimeout(holdTimer);
+    showOriginal(false);
     const [a, b] = [...activePointers.values()];
     const stageRect = canvas.parentElement!.getBoundingClientRect();
     pinch = {
@@ -259,7 +316,10 @@ canvas.addEventListener("pointerdown", (e) => {
 canvas.addEventListener("pointermove", (e) => {
   const p = activePointers.get(e.pointerId);
   if (!p) return;
-  if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > 8) tapSuppressed = true;
+  if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > 8) {
+    tapSuppressed = true;
+    clearTimeout(holdTimer);
+  }
   p.x = e.clientX;
   p.y = e.clientY;
   if (pinch && activePointers.size === 2) {
@@ -281,6 +341,8 @@ canvas.addEventListener("pointermove", (e) => {
 
 function endPointer(e: PointerEvent) {
   activePointers.delete(e.pointerId);
+  clearTimeout(holdTimer);
+  showOriginal(false);
   if (activePointers.size < 2) pinch = null;
   if (activePointers.size === 0) panDrag = null;
 }
@@ -321,7 +383,22 @@ async function openImported(imported: ImportedFile) {
     autoAdjust(img);
     syncToUI();
   }
+  // Snapshot the as-imported baseline for press-and-hold comparison.
+  origParams = {
+    wb: img.isRaw ? ([...params.wb] as [number, number, number]) : [1, 1, 1],
+    exposure: img.isRaw ? params.exposure : 1,
+    denoise: img.isRaw ? params.denoise : 0,
+    swapRB: false,
+    hue: 0,
+    sat: 1,
+    contrast: 1,
+    tint: [1, 1, 1],
+    glow: 0,
+    sky: [0, 1, 1],
+    foliage: [0, 1, 1],
+  };
   syncFromUI();
+  requestAnimationFrame(updateScrollCues);
 }
 
 fileInput.addEventListener("change", async () => {
