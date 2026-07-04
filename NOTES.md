@@ -111,9 +111,12 @@ See **`PLAN.md`** for the full build plan.
   already covers those bands (owner decision 2026-07-04), so no separate
   Lightroom-style range sliders — Luminance is the only new tone control.
   Display-space pow (endpoints pinned, no clipping); in the Tone curve panel.
-- [ ] **Reset** — return the whole edit to the fresh-open automatic baseline.
-- [ ] **Go back (undo)** — step backward through edit changes.
-- [ ] **Save / Load my look** — five memory slots that persist across sessions.
+- [x] **Reset** — return the whole edit to the fresh-open automatic baseline.
+  Header button; snapshots the baseline at open, restores it, itself undoable.
+- [x] **Go back (undo)** — step backward through edit changes. Header button;
+  slider drags coalesce into one step, discrete actions are atomic.
+- [x] **Save / Load my look** — five memory slots (My looks panel) that persist
+  across sessions in localStorage; a slot stores the full edit + look state.
 - [x] **Live histogram** — floating, unobtrusive RGB + luminance readout near
   the image (Lightroom-style: red/green/blue with white where they overlap),
   updates as edits change. Toggle in the header; preference remembered.

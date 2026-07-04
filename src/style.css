@@ -276,6 +276,11 @@ button { cursor: pointer; }
   font-weight: 600;
   border-color: var(--accent);
 }
+.slot-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.slot { display: flex; align-items: center; gap: 8px; }
+.slot-name { flex: 1; font-size: 13px; color: #b8b8c0; }
+.slot button { width: auto; padding: 6px 12px; font-size: 13px; }
+.slot button:disabled { opacity: 0.4; }
 .look-row { display: flex; flex-wrap: wrap; gap: 6px; }
 .look-row button {
   flex: 1;

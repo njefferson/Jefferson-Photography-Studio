@@ -199,6 +199,7 @@ ui.autoBtn.addEventListener("click", () => {
   autoAdjust(current);
   syncToUI();
   draw();
+  flushRecord();
 });
 
 // One-tap looks. Tuned on real Z50-IR files; raw (camera-native) sources take
@@ -303,15 +304,191 @@ function pressLook(key: string) {
     applyLook(key);
   }
   updateLookUI();
+  flushRecord();
 }
 
 for (const key of Object.keys(lookButtons)) {
   lookButtons[key].addEventListener("click", () => pressLook(key));
 }
 
+// --- Edit history: snapshots power Go back (undo), Reset (whole edit) and the
+// saved-look slots. A snapshot is the full editor state — the EditParams plus
+// the look highlight (activeLook) and the WB bias a look baked in (lookBias),
+// so undo/load restore exactly what was on screen, look button and all.
+// (Rotation and zoom are view state, not part of the edit, so they stay put.)
+type Snapshot = { params: EditParams; activeLook: string | null; lookBias: [number, number, number] };
+
+function cloneParams(p: EditParams): EditParams {
+  return {
+    wb: [...p.wb] as [number, number, number],
+    exposure: p.exposure,
+    swapRB: p.swapRB,
+    hue: p.hue,
+    sat: p.sat,
+    contrast: p.contrast,
+    denoise: p.denoise,
+    tint: [...p.tint] as [number, number, number],
+    glow: p.glow,
+    sky: [...p.sky] as [number, number, number],
+    foliage: [...p.foliage] as [number, number, number],
+    tone: [...p.tone] as [number, number, number, number, number],
+    lum: p.lum,
+  };
+}
+
+function snapshot(): Snapshot {
+  return { params: cloneParams(params), activeLook, lookBias: [...lookBias] as [number, number, number] };
+}
+
+/** Restore a snapshot into the live editor (in place — `params` keeps identity)
+ *  and repaint. Missing/old fields fall back to neutral so a stale saved slot
+ *  can't corrupt the edit. */
+function applySnapshot(s: Snapshot) {
+  const c = cloneParams({ ...params, ...s.params, lum: s.params.lum ?? 1 });
+  params.wb = c.wb;
+  params.exposure = c.exposure;
+  params.swapRB = c.swapRB;
+  params.hue = c.hue;
+  params.sat = c.sat;
+  params.contrast = c.contrast;
+  params.denoise = c.denoise;
+  params.tint = c.tint;
+  params.glow = c.glow;
+  params.sky = c.sky;
+  params.foliage = c.foliage;
+  params.tone = c.tone;
+  params.lum = c.lum;
+  activeLook = s.activeLook ?? null;
+  lookBias = (s.lookBias ? [...s.lookBias] : [1, 1, 1]) as [number, number, number];
+  syncToUI();
+  updateLookUI();
+  draw();
+}
+
+const undoStack: Snapshot[] = [];
+let settled: Snapshot | null = null; // last recorded state (advances on settle)
+let baseline: Snapshot | null = null; // fresh-open automatic baseline (Reset target)
+let recordTimer = 0;
+const HISTORY_MAX = 100;
+
+const undoBtn = $("undoBtn") as HTMLButtonElement;
+const resetBtn = $("resetBtn") as HTMLButtonElement;
+
+function updateEditButtons() {
+  undoBtn.disabled = undoStack.length === 0;
+  resetBtn.disabled = !baseline || !current;
+}
+
+/** Record the previous settled state onto the undo stack when the edit has
+ *  actually changed. Continuous slider drags coalesce (one entry per gesture)
+ *  via the debounce; discrete actions call this straight away to be atomic. */
+function flushRecord() {
+  clearTimeout(recordTimer);
+  recordTimer = 0;
+  if (!settled) return;
+  const now = snapshot();
+  if (JSON.stringify(now) !== JSON.stringify(settled)) {
+    undoStack.push(settled);
+    if (undoStack.length > HISTORY_MAX) undoStack.shift();
+    settled = now;
+    updateEditButtons();
+  }
+}
+
+function recordSoon() {
+  if (!settled) return;
+  clearTimeout(recordTimer);
+  recordTimer = window.setTimeout(flushRecord, 350);
+}
+
+function undo() {
+  flushRecord(); // fold any in-flight edit into history first
+  const prev = undoStack.pop();
+  if (!prev) return;
+  applySnapshot(prev);
+  settled = snapshot(); // now == prev; don't let the repaint re-record it
+  clearTimeout(recordTimer);
+  recordTimer = 0;
+  updateEditButtons();
+}
+
+function resetEdit() {
+  if (!baseline || !current) return;
+  flushRecord(); // settle current edits so Reset itself is undoable
+  applySnapshot(baseline);
+}
+
+undoBtn.addEventListener("click", undo);
+resetBtn.addEventListener("click", resetEdit);
+
+// --- Saved-look slots: five localStorage-backed memory slots that persist
+// across sessions. A slot stores a full snapshot; loading applies it as one
+// undoable step. Slots are global (not per photo) so a look can be reused. ---
+const SLOTS = 5;
+const slotKey = (i: number) => `ips-look-slot-${i}`;
+const slotList = $("slotList") as HTMLDivElement;
+const slotEls: { name: HTMLSpanElement; save: HTMLButtonElement; load: HTMLButtonElement }[] = [];
+
+function readSlot(i: number): Snapshot | null {
+  const raw = localStorage.getItem(slotKey(i));
+  if (!raw) return null;
+  try {
+    const s = JSON.parse(raw) as Snapshot;
+    if (s && s.params && Array.isArray(s.params.wb) && Array.isArray(s.params.tone)) return s;
+  } catch {
+    /* corrupt slot — treat as empty */
+  }
+  return null;
+}
+
+function saveSlot(i: number) {
+  if (!current) return;
+  localStorage.setItem(slotKey(i), JSON.stringify(snapshot()));
+  updateSlotUI();
+}
+
+function loadSlot(i: number) {
+  const s = readSlot(i);
+  if (!s || !current) return;
+  flushRecord(); // settle current edits
+  applySnapshot(s);
+  flushRecord(); // record the load as its own atomic undo step
+}
+
+function updateSlotUI() {
+  for (let i = 0; i < SLOTS; i++) {
+    const filled = !!readSlot(i);
+    slotEls[i].name.textContent = filled ? `Slot ${i + 1} ✓` : `Slot ${i + 1}`;
+    slotEls[i].save.disabled = !current;
+    slotEls[i].load.disabled = !filled || !current;
+  }
+}
+
+for (let i = 0; i < SLOTS; i++) {
+  const row = document.createElement("div");
+  row.className = "slot";
+  const name = document.createElement("span");
+  name.className = "slot-name";
+  const save = document.createElement("button");
+  save.type = "button";
+  save.className = "slot-save";
+  save.textContent = "Save";
+  const load = document.createElement("button");
+  load.type = "button";
+  load.className = "slot-load";
+  load.textContent = "Load";
+  save.addEventListener("click", () => saveSlot(i));
+  load.addEventListener("click", () => loadSlot(i));
+  row.append(name, save, load);
+  slotList.append(row);
+  slotEls.push({ name, save, load });
+}
+updateSlotUI(); // reflect any slots saved in a previous session
+
 let raf = 0;
 let lastToneKey = "";
 function draw() {
+  recordSoon();
   if (raf) return;
   raf = requestAnimationFrame(() => {
     raf = 0;
@@ -404,6 +581,7 @@ $("toneReset").addEventListener("click", () => {
   params.tone = [...TONE_DEFAULT];
   syncToUI();
   draw();
+  flushRecord();
 });
 
 // Collapsible panel sections: tap a title to fold/unfold. Everything starts
@@ -429,6 +607,7 @@ ui.swapBtn.addEventListener("click", () => {
   syncToUI();
   updateLookUI();
   draw();
+  flushRecord();
 });
 
 // Reset the per-color bands to neutral (Auto deliberately doesn't touch them).
@@ -437,6 +616,7 @@ $("pcReset").addEventListener("click", () => {
   params.foliage = [0, 1, 1];
   syncToUI();
   draw();
+  flushRecord();
 });
 
 // Help dialog (usage guide; the ⓘ dialog stays what's-new + support).
@@ -653,6 +833,16 @@ async function openImported(imported: ImportedFile) {
   document.querySelectorAll<HTMLFieldSetElement>("#panel fieldset").forEach((fs) => fs.classList.add("collapsed"));
   panel.scrollTop = 0;
   syncFromUI();
+  // Fresh photo: snapshot the automatic baseline (the Reset target) and start
+  // a clean undo history. Do this AFTER syncFromUI so the baseline is exactly
+  // what the user first sees.
+  baseline = snapshot();
+  settled = snapshot();
+  undoStack.length = 0;
+  clearTimeout(recordTimer);
+  recordTimer = 0;
+  updateEditButtons();
+  updateSlotUI();
   requestAnimationFrame(updateScrollCues);
 }
 
@@ -878,6 +1068,7 @@ canvas.addEventListener("click", (e) => {
   lookBias = [1, 1, 1]; // fresh neutral WB — no look bias baked in
   syncToUI();
   draw();
+  flushRecord();
 });
 
 /** Scale WB gains so a neutral keeps its luminance (no overall darkening). */

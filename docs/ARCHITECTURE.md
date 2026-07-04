@@ -221,6 +221,22 @@ and NO Nikon body can channel-swap in camera. Field guide:
   after the tone LUT: `pow(g, 1/lum)`, endpoints pinned so it lifts the body
   without clipping. Same math in `compileEdit` (so `.cube` bakes it). Log-scale
   slider 0.5–2× (`LUM_LO/HI`), neutral 1.0 mid-track, in the Tone curve panel.
+- Edit history (Undo / Reset / saved looks) is built on **snapshots** in
+  `main.ts`. A `Snapshot` = the full editor state: the `EditParams` plus
+  `activeLook` (which look button is lit) and `lookBias` (the WB bias a look
+  baked in), so restoring one reproduces exactly what was on screen. Rotation
+  and zoom are VIEW state, not part of a snapshot — Undo/Reset leave them.
+  - `draw()` calls `recordSoon()` (350 ms debounce) so a continuous slider drag
+    coalesces into ONE undo entry; discrete actions (look, swap, Auto, tap-WB,
+    per-color/tone reset, slot load) call `flushRecord()` to be atomic. The
+    debounce records the PREVIOUS settled state, so Undo lands on pre-edit.
+  - `baseline` is snapshotted at the end of `openImported` (after the automatic
+    WB/exposure/denoise) — that's the Reset target. Reset settles current edits
+    first, so Reset is itself undoable.
+  - **Save/Load looks**: five `localStorage` slots (`ips-look-slot-N`) holding a
+    JSON snapshot; global (not per photo) so a look is reusable. `readSlot`
+    validates shape and coerces missing fields (e.g. `lum`) so a stale slot
+    can't corrupt the edit. Loading applies as one undoable step.
 - WB gain + exposure sliders are LOG-scale: the `<input>` stores a 0..1000
   position; `toPos`/`fromPos` in main.ts map it exponentially over
   0.02–16x (WB) / 0.1–16x (exposure) so 1.0 sits near mid-track. On a linear
