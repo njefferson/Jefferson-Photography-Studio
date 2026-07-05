@@ -820,6 +820,7 @@ let hslPickArmed = false;
 function setHslPick(on: boolean) {
   hslPickArmed = on;
   hslPickBtn.setAttribute("aria-pressed", String(on));
+  if (on) setTat(false); // the two picture tools are mutually exclusive
 }
 hslPickBtn.addEventListener("click", () => setHslPick(!hslPickArmed));
 
@@ -1274,8 +1275,100 @@ function resetZoom() {
 
 canvas.style.transformOrigin = "center center";
 
+// --- Drag on photo to adjust (Lightroom-style targeted adjustment): arm the
+// tool, then drag on the image. The colour under your finger picks its mixer
+// chip (the same eight bands the chips drive); dragging UP/DOWN scales that
+// colour's LUMINANCE, LEFT/RIGHT shifts its HUE. It steers params.hsl straight
+// from the picture — no new pipeline math, just the mixer from the photo. While
+// armed it takes over the canvas (no tap-WB / pan / pinch / hold), so it stays
+// a deliberate mode you toggle off, and one drag commits one undo step. ---
+const hslDragBtn = $("hslDrag") as HTMLButtonElement;
+const tatHud = $("tatHud") as HTMLDivElement;
+const tatSwatch = $("tatSwatch") as HTMLSpanElement;
+const tatText = $("tatText") as HTMLSpanElement;
+const TAT_HUE_SPAN = 100; // degrees of hue shift across one full canvas-width drag
+const TAT_LUM_SPAN = 1.6; // luminance-scale change across one full canvas-height drag
+let tatArmed = false;
+let tatDrag: { id: number; chip: number; x: number; y: number; hue0: number; lum0: number; w: number; h: number } | null = null;
+
+function setTat(on: boolean) {
+  tatArmed = on;
+  hslDragBtn.setAttribute("aria-pressed", String(on));
+  if (on) setHslPick(false); // mutually exclusive with pick-from-photo
+  if (!on) hideTatHud();
+}
+hslDragBtn.addEventListener("click", () => setTat(!tatArmed));
+
+function showTatHud() {
+  if (!tatDrag) return;
+  const c = tatDrag.chip;
+  tatSwatch.style.background = `hsl(${HSL_CENTERS[c]}deg 75% 55%)`;
+  const hue = params.hsl[c * 3];
+  const lum = params.hsl[c * 3 + 2];
+  tatText.textContent = `${HSL_NAMES[c]} · Hue ${hue > 0 ? "+" : ""}${hue}° · Lum ${lum.toFixed(2)}`;
+  tatHud.hidden = false;
+}
+function hideTatHud() {
+  tatHud.hidden = true;
+}
+
+function startTat(e: PointerEvent) {
+  // Pick the owning chip from the DISPLAYED colour (display space = what the
+  // mixer classifies). Near-grey has no meaningful hue -> keep the current chip.
+  const px = renderer.readDisplayedPixel(e.clientX, e.clientY);
+  let chip = hslSel;
+  if (px) {
+    const [r, g, b] = px;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+    if (d >= 4) {
+      let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      h *= 60;
+      if (h < 0) h += 360;
+      chip = chipForHue(h);
+    }
+  }
+  hslSel = chip;
+  updateHslUI();
+  const rect = canvas.getBoundingClientRect();
+  tatDrag = {
+    id: e.pointerId,
+    chip,
+    x: e.clientX,
+    y: e.clientY,
+    hue0: params.hsl[chip * 3],
+    lum0: params.hsl[chip * 3 + 2],
+    w: Math.max(1, rect.width),
+    h: Math.max(1, rect.height),
+  };
+  tapSuppressed = true; // never also fire tap-to-WB after the drag
+  canvas.setPointerCapture(e.pointerId);
+  showTatHud();
+}
+
+function moveTat(e: PointerEvent) {
+  if (!tatDrag || e.pointerId !== tatDrag.id) return;
+  const dx = e.clientX - tatDrag.x;
+  const dy = e.clientY - tatDrag.y; // screen-down is positive
+  // Match the mixer sliders' own resolution: hue integer, luminance to 0.01.
+  const hue = clamp(Math.round(tatDrag.hue0 + (dx / tatDrag.w) * TAT_HUE_SPAN), -60, 60);
+  const lum = clamp(Math.round((tatDrag.lum0 - (dy / tatDrag.h) * TAT_LUM_SPAN) * 100) / 100, 0.3, 1.7);
+  params.hsl[tatDrag.chip * 3] = hue;
+  params.hsl[tatDrag.chip * 3 + 2] = lum;
+  updateHslUI();
+  showTatHud();
+  draw();
+}
+
+function endTat() {
+  if (!tatDrag) return;
+  tatDrag = null;
+  hideTatHud();
+  flushRecord(); // one drag = one undo step
+}
+
 canvas.addEventListener("pointerdown", (e) => {
   if (brushPaintOn()) { e.preventDefault(); startPaint(e); return; }
+  if (tatArmed) { if (!tatDrag) { e.preventDefault(); startTat(e); } return; }
   activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   canvas.setPointerCapture(e.pointerId);
   // Long-press (held still) shows the original for comparison.
@@ -1312,6 +1405,7 @@ canvas.addEventListener("pointermove", (e) => {
     paintStroke(u, v);
     return;
   }
+  if (tatDrag) { moveTat(e); return; }
   const p = activePointers.get(e.pointerId);
   if (!p) return;
   if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > 8) {
@@ -1339,6 +1433,7 @@ canvas.addEventListener("pointermove", (e) => {
 
 function endPointer(e: PointerEvent) {
   if (painting) { endPaint(); return; }
+  if (tatDrag) { if (e.pointerId === tatDrag.id) endTat(); return; }
   activePointers.delete(e.pointerId);
   clearTimeout(holdTimer);
   showOriginal(false);

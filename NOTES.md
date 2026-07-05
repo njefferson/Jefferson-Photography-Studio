@@ -106,10 +106,15 @@ See **`PLAN.md`** for the full build plan.
 > reliable. Editing this list updates the app on the next deploy. Both the
 > roadmap and the patch notes (last commits) refresh automatically on push.
 
-- [ ] **Drag on photo to adjust** — Lightroom-style targeted adjustment (owner
-  request 2026-07-05): touch the photo and drag UP/DOWN for that colour's
-  luminance, LEFT/RIGHT for its hue. Builds directly on the display-space
-  mixer + readDisplayedPixel (the pick tool is the first half of this).
+- [x] **Drag on photo to adjust** — Lightroom-style targeted adjustment (shipped
+  2026-07-05): arm the tool, then drag on the photo — UP/DOWN scales that
+  colour's luminance, LEFT/RIGHT shifts its hue. The colour under your finger
+  picks its mixer chip (display space, via readDisplayedPixel), so it just
+  steers the existing 8-chip mixer's params.hsl from the picture — NO new
+  pipeline math (GPU/CPU mixer untouched). Sustained mode: while armed it owns
+  the canvas from tap-WB / pan / pinch / hold; one drag = one undo step; a
+  floating readout names the colour and shows the live hue/luminance. The
+  drag→param mapping, chip pick and re-render are verified in headless chromium.
 - [ ] **Mask by color** — a mask type that selects everything matching a tapped
   colour (weight from hue/sat distance in display space — chroma-key style).
   Classical per-pixel math; fits the existing mask engine as type 3.

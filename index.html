@@ -40,6 +40,10 @@
         <div id="histWrap" hidden aria-label="Live RGB histogram">
           <canvas id="histogram" width="256" height="96"></canvas>
         </div>
+        <div id="tatHud" hidden aria-hidden="true">
+          <span id="tatSwatch" class="tat-swatch"></span>
+          <span id="tatText"></span>
+        </div>
         <div id="welcome">
           <button id="welcomeClose" class="welcome-close" type="button" hidden>&#10005;</button>
           <p id="hint">Edit infrared photos — RAW (NEF / DNG) unlocks the full color magic.</p>
@@ -182,6 +186,8 @@
           <div id="hslChips" class="hsl-chips"></div>
           <button id="hslPick" type="button" class="toggle" aria-pressed="false">&#127919; Pick color from photo</button>
           <small style="color:#80808a">Tap the photo and the chip that owns that exact on-screen color selects itself.</small>
+          <button id="hslDrag" type="button" class="toggle" aria-pressed="false">&#10021; Drag on photo to adjust</button>
+          <small style="color:#80808a">Turn on, then drag on the photo: up/down changes that color's brightness, left/right shifts its hue.</small>
           <label>Hue <input id="hslHue" type="range" min="-60" max="60" step="1" value="0" /></label>
           <label>Saturation <input id="hslSat" type="range" min="0" max="2" step="0.01" value="1" /></label>
           <label>Luminance <input id="hslLum" type="range" min="0.3" max="1.7" step="0.01" value="1" /></label>

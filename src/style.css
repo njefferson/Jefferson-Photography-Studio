@@ -140,6 +140,38 @@ body {
   #histWrap { top: 12px; right: 12px; padding: 4px; }
   #histogram { width: 150px; height: 58px; }
 }
+/* Drag-to-adjust readout: floats top-left of the stage (clear of the finger)
+   while a targeted drag is in flight; ignores pointer events. */
+#tatHud {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 11px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #eef;
+  background: rgba(10, 10, 14, 0.62);
+  border: 1px solid rgba(120, 120, 135, 0.4);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+.tat-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  flex: none;
+}
+@media (max-width: 760px) {
+  #tatHud { top: 12px; left: 12px; padding: 5px 9px; font-size: 12px; }
+}
 #hint { color: #9a9aa2; text-align: center; max-width: 40ch; margin: 0 auto; }
 #welcome {
   position: absolute;
