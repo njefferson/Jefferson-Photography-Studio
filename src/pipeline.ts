@@ -38,6 +38,65 @@ export interface EditParams {
    *  endpoints stay pinned so it lifts shadows/midtones without clipping.
    *  Neutral = 1. Same math in the shader (u_lum). */
   lum: number;
+  /** Local masks (radial / linear gradient), each carrying a few local
+   *  adjustments applied weighted by the mask, in linear space before global
+   *  contrast/gamma. Spatial (they read the pixel's image-uv), so — like
+   *  denoise and glow — they are NOT baked into the .cube LUT. Max MAX_MASKS. */
+  masks: MaskLayer[];
+}
+
+export const MAX_MASKS = 4;
+
+/** A local-adjustment mask. `type` 0 = radial, 1 = linear gradient. Geometry is
+ *  in image-uv [0..1] so it anchors to the photo through rotation/zoom. */
+export interface MaskLayer {
+  type: 0 | 1;
+  cx: number; // radial: centre x; linear: start x
+  cy: number; // radial: centre y; linear: start y
+  rx: number; // radial: x radius (uv fraction)
+  ry: number; // radial: y radius (uv fraction)
+  feather: number; // radial: 0..1 soft edge
+  lx: number; // linear: end x
+  ly: number; // linear: end y
+  invert: boolean;
+  // Local adjustments — neutral = brightness/contrast/saturation 1, hue/warmth 0.
+  brightness: number;
+  contrast: number;
+  saturation: number;
+  hue: number; // degrees
+  warmth: number; // -1..1, + warmer
+}
+
+export function neutralMask(type: 0 | 1): MaskLayer {
+  return type === 0
+    ? { type, cx: 0.5, cy: 0.5, rx: 0.35, ry: 0.35, feather: 0.5, lx: 0.5, ly: 0.85, invert: false, brightness: 1, contrast: 1, saturation: 1, hue: 0, warmth: 0 }
+    : { type, cx: 0.5, cy: 0.12, rx: 0.35, ry: 0.35, feather: 0.5, lx: 0.5, ly: 0.5, invert: false, brightness: 1, contrast: 1, saturation: 1, hue: 0, warmth: 0 };
+}
+
+export function maskIsActive(m: MaskLayer): boolean {
+  return m.brightness !== 1 || m.contrast !== 1 || m.saturation !== 1 || m.hue !== 0 || m.warmth !== 0;
+}
+
+function smooth01(edge0: number, edge1: number, x: number): number {
+  const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0 || 1e-4)));
+  return t * t * (3 - 2 * t);
+}
+
+/** Mask weight 0..1 at image-uv (u,v). Kept numerically identical to the shader. */
+export function maskWeight(m: MaskLayer, u: number, v: number): number {
+  let w: number;
+  if (m.type === 0) {
+    const dx = (u - m.cx) / Math.max(1e-4, m.rx);
+    const dy = (v - m.cy) / Math.max(1e-4, m.ry);
+    const r = Math.sqrt(dx * dx + dy * dy);
+    w = 1 - smooth01(1 - m.feather, 1, r); // 1 in the core, 0 past the edge
+  } else {
+    const gx = m.lx - m.cx, gy = m.ly - m.cy;
+    const len2 = gx * gx + gy * gy || 1e-4;
+    const t = ((u - m.cx) * gx + (v - m.cy) * gy) / len2;
+    w = 1 - Math.min(1, Math.max(0, t)); // full at the start point, 0 at the end
+  }
+  return m.invert ? 1 - w : w;
 }
 
 export const TONE_X = [0, 0.25, 0.5, 0.75, 1] as const;
@@ -150,7 +209,7 @@ const REC709 = [0.2126, 0.7152, 0.0722];
 export function compileEdit(
   p: EditParams,
   cam?: number[],
-): (r: number, g: number, b: number, out: Float32Array, glow?: number) => void {
+): (r: number, g: number, b: number, out: Float32Array, glow?: number, u?: number, v?: number) => void {
   const a = (p.hue * Math.PI) / 180;
   const cos = Math.cos(a);
   const sin = Math.sin(a);
@@ -178,8 +237,9 @@ export function compileEdit(
   const fol = p.foliage;
   const bandsActive =
     sky[0] !== 0 || sky[1] !== 1 || sky[2] !== 1 || fol[0] !== 0 || fol[1] !== 1 || fol[2] !== 1;
+  const masks = (p.masks ?? []).filter(maskIsActive).slice(0, MAX_MASKS);
 
-  return (r, g, b, out, glow = 0) => {
+  return (r, g, b, out, glow = 0, u, v) => {
     r *= wr;
     g *= wg;
     b *= wb;
@@ -235,6 +295,40 @@ export function compileEdit(
     nr += glow;
     ng += glow;
     nb += glow;
+    // Local masks: each adjustment weighted by the mask, in linear space before
+    // global contrast/gamma. Spatial (needs image-uv), so skipped when u/v are
+    // absent (e.g. the .cube LUT bake) — matching denoise/glow.
+    if (masks.length && u !== undefined && v !== undefined) {
+      for (const m of masks) {
+        const w = maskWeight(m, u, v);
+        if (w <= 0) continue;
+        // warmth (linear temp shift)
+        nr *= 1 + 0.5 * m.warmth * w;
+        nb *= 1 - 0.5 * m.warmth * w;
+        // brightness (linear multiply)
+        const bf = 1 + (m.brightness - 1) * w;
+        nr *= bf; ng *= bf; nb *= bf;
+        // saturation (luma-based, matches the global sat model)
+        const L = nr * REC709[0] + ng * REC709[1] + nb * REC709[2];
+        const sf = 1 + (m.saturation - 1) * w;
+        nr = L + (nr - L) * sf; ng = L + (ng - L) * sf; nb = L + (nb - L) * sf;
+        // hue rotate by hue*w degrees (same matrix as the global hue)
+        if (m.hue !== 0) {
+          const a = (m.hue * Math.PI) / 180 * w;
+          const cs = Math.cos(a), sn = Math.sin(a);
+          const k00 = 0.299 + 0.701 * cs + 0.168 * sn, k01 = 0.587 - 0.587 * cs + 0.33 * sn, k02 = 0.114 - 0.114 * cs - 0.497 * sn;
+          const k10 = 0.299 - 0.299 * cs - 0.328 * sn, k11 = 0.587 + 0.413 * cs + 0.035 * sn, k12 = 0.114 - 0.114 * cs + 0.292 * sn;
+          const k20 = 0.299 - 0.3 * cs + 1.25 * sn, k21 = 0.587 - 0.588 * cs - 1.05 * sn, k22 = 0.114 + 0.886 * cs - 0.203 * sn;
+          const rr = k00 * nr + k10 * ng + k20 * nb;
+          const gg = k01 * nr + k11 * ng + k21 * nb;
+          const bb = k02 * nr + k12 * ng + k22 * nb;
+          nr = rr; ng = gg; nb = bb;
+        }
+        // contrast (linear, around mid grey)
+        const cf = 1 + (m.contrast - 1) * w;
+        nr = (nr - 0.5) * cf + 0.5; ng = (ng - 0.5) * cf + 0.5; nb = (nb - 0.5) * cf + 0.5;
+      }
+    }
     out[0] = toGamma((nr - 0.5) * con + 0.5);
     out[1] = toGamma((ng - 0.5) * con + 0.5);
     out[2] = toGamma((nb - 0.5) * con + 0.5);

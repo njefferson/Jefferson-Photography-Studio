@@ -5,7 +5,7 @@
 
 // Single source of truth for edit parameters lives in pipeline.ts so the GPU
 // preview and CPU export can never drift apart.
-import { toneEvaluator, toneIsIdentity, type EditParams } from "./pipeline";
+import { toneEvaluator, toneIsIdentity, maskIsActive, MAX_MASKS, type EditParams } from "./pipeline";
 export type { EditParams };
 
 // A faithful 256-entry identity ramp for the tone LUT. A 2-texel [0,255] ramp
@@ -52,6 +52,13 @@ uniform sampler2D u_glowTex; // per-image blurred highlight map (see glow.ts)
 uniform float u_glow;        // 0..1 HIE halation strength
 uniform sampler2D u_toneTex; // 256x1 tone-curve LUT (identity when neutral)
 uniform float u_lum;         // global luminance: out = pow(out, 1/u_lum) (1 = neutral)
+// Local masks (radial/linear), max 4 — kept identical to pipeline.ts.
+uniform int u_maskCount;
+uniform int u_maskType[4];   // 0 = radial, 1 = linear
+uniform vec4 u_maskGeoA[4];  // radial (cx,cy,rx,ry) | linear (cx,cy,lx,ly)
+uniform vec2 u_maskGeoB[4];  // (feather, invert)
+uniform vec4 u_maskAdj[4];   // (brightness, contrast, saturation, warmth)
+uniform float u_maskHue[4];  // degrees
 uniform float u_denoise; // 0..1 bilateral strength (see raw/denoise.ts)
 uniform vec2 u_texel;    // 1/textureSize
 uniform float u_split;   // compare divider: denoise applies where uv.x >= split
@@ -79,6 +86,23 @@ float bandWeight(float hue, float center, float plateau, float edge){
   float d = abs(hue - center);
   d = min(d, 360.0 - d);
   return 1.0 - smoothstep(plateau, edge, d);
+}
+float maskWeight(int i, vec2 uv){
+  vec4 gA = u_maskGeoA[i];
+  float w;
+  if (u_maskType[i] == 0) {
+    float dx = (uv.x - gA.x) / max(1e-4, gA.z);
+    float dy = (uv.y - gA.y) / max(1e-4, gA.w);
+    float r = sqrt(dx*dx + dy*dy);
+    w = 1.0 - smoothstep(1.0 - u_maskGeoB[i].x, 1.0, r);
+  } else {
+    vec2 g = vec2(gA.z - gA.x, gA.w - gA.y);
+    float len2 = max(1e-4, dot(g, g));
+    float t = dot(uv - gA.xy, g) / len2;
+    w = 1.0 - clamp(t, 0.0, 1.0);
+  }
+  if (u_maskGeoB[i].y > 0.5) w = 1.0 - w;
+  return w;
 }
 
 void main() {
@@ -151,6 +175,31 @@ void main() {
   // 0.7 = GLOW_GAIN in glow.ts — keep in sync.
   c += vec3(u_glow * 0.7 * texture(u_glowTex, v_uv).r);
 
+  // Local masks: each adjustment weighted by the mask, in linear space before
+  // global contrast/gamma. Identical math to compileEdit in pipeline.ts.
+  for (int i = 0; i < u_maskCount; i++) {
+    float w = maskWeight(i, v_uv);
+    if (w <= 0.0) continue;
+    vec4 adj = u_maskAdj[i]; // brightness, contrast, saturation, warmth
+    c.r *= 1.0 + 0.5 * adj.w * w;
+    c.b *= 1.0 - 0.5 * adj.w * w;
+    c *= 1.0 + (adj.x - 1.0) * w;
+    float ml = dot(c, LUMA_W);
+    c = mix(vec3(ml), c, 1.0 + (adj.z - 1.0) * w);
+    float hue = u_maskHue[i];
+    if (hue != 0.0) {
+      float a = radians(hue) * w;
+      float cs = cos(a), sn = sin(a);
+      mat3 hm = mat3(
+        0.299 + 0.701*cs + 0.168*sn, 0.587 - 0.587*cs + 0.330*sn, 0.114 - 0.114*cs - 0.497*sn,
+        0.299 - 0.299*cs - 0.328*sn, 0.587 + 0.413*cs + 0.035*sn, 0.114 - 0.114*cs + 0.292*sn,
+        0.299 - 0.300*cs + 1.250*sn, 0.587 - 0.588*cs - 1.050*sn, 0.114 + 0.886*cs - 0.203*sn
+      );
+      c = hm * c;
+    }
+    c = (c - 0.5) * (1.0 + (adj.y - 1.0) * w) + 0.5;
+  }
+
   // Contrast around mid grey.
   c = (c - 0.5) * u_con + 0.5;
 
@@ -200,7 +249,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_toneTex", "u_lum"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_toneTex", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -333,6 +382,28 @@ export class Renderer {
     gl.uniform1f(this.loc.u_glow, p.glow);
     gl.uniform1i(this.loc.u_rot, rot);
     gl.uniform1f(this.loc.u_lum, p.lum || 1);
+    // Local masks (up to MAX_MASKS = 4, the shader array size).
+    const masks = (p.masks ?? []).filter(maskIsActive).slice(0, MAX_MASKS);
+    gl.uniform1i(this.loc.u_maskCount, masks.length);
+    if (masks.length) {
+      const types = new Int32Array(MAX_MASKS);
+      const geoA = new Float32Array(MAX_MASKS * 4);
+      const geoB = new Float32Array(MAX_MASKS * 2);
+      const adj = new Float32Array(MAX_MASKS * 4);
+      const hue = new Float32Array(MAX_MASKS);
+      masks.forEach((m, i) => {
+        types[i] = m.type;
+        geoA.set(m.type === 0 ? [m.cx, m.cy, m.rx, m.ry] : [m.cx, m.cy, m.lx, m.ly], i * 4);
+        geoB.set([m.feather, m.invert ? 1 : 0], i * 2);
+        adj.set([m.brightness, m.contrast, m.saturation, m.warmth], i * 4);
+        hue[i] = m.hue;
+      });
+      gl.uniform1iv(this.loc.u_maskType, types);
+      gl.uniform4fv(this.loc.u_maskGeoA, geoA);
+      gl.uniform2fv(this.loc.u_maskGeoB, geoB);
+      gl.uniform4fv(this.loc.u_maskAdj, adj);
+      gl.uniform1fv(this.loc.u_maskHue, hue);
+    }
     gl.uniform1i(this.loc.u_glowTex, 1);
     gl.uniform1i(this.loc.u_toneTex, 2);
     gl.activeTexture(gl.TEXTURE2);
@@ -410,6 +481,24 @@ export class Renderer {
       l[(R * 54 + G * 183 + B * 19) >> 8]++;
     }
     return { r, g, b, l };
+  }
+
+  /** Image-uv [0..1] for a pointer at CLIENT coords (for placing masks). */
+  clientToImageUv(clientX: number, clientY: number): [number, number] {
+    const [px, py] = this.toImagePixel(clientX, clientY);
+    return [px / Math.max(1, this.imgW), py / Math.max(1, this.imgH)];
+  }
+
+  /** CLIENT coords for a point given in image-uv [0..1] — the inverse of
+   *  toImagePixel's rotation mapping, using the live (transformed) rect so it
+   *  tracks zoom/pan/rotation. Returns viewport pixels. */
+  imageUvToClient(u: number, v: number): [number, number] {
+    const r = this.canvas.getBoundingClientRect();
+    let du = u, dv = v;
+    if (this.rotQ === 1) { du = 1 - v; dv = u; }
+    else if (this.rotQ === 2) { du = 1 - u; dv = 1 - v; }
+    else if (this.rotQ === 3) { du = v; dv = 1 - u; }
+    return [r.left + du * r.width, r.top + dv * r.height];
   }
 
   /** Image coordinates (px) for a pointer at CLIENT coords. Uses the live

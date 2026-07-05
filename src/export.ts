@@ -103,7 +103,7 @@ export async function exportImage(
         const y = rot & 1 ? iIdx : oIdx;
         const [sx, sy] = toSrc(x, y);
         const [r, g, b] = sampleLinear(sx, sy);
-        edit(r, g, b, out, glowAt(sx, sy));
+        edit(r, g, b, out, glowAt(sx, sy), (sx + 0.5) / srcW, (sy + 0.5) / srcH);
         const o = (y * w + x) * 4;
         data[o] = out[0] * 255;
         data[o + 1] = out[1] * 255;
@@ -134,7 +134,7 @@ export async function exportImage(
         const y = rot & 1 ? iIdx : oIdx;
         const [sx, sy] = toSrc(x, y);
         const [r, g, b] = sampleLinear(sx, sy);
-        edit(r, g, b, out, glowAt(sx, sy));
+        edit(r, g, b, out, glowAt(sx, sy), (sx + 0.5) / srcW, (sy + 0.5) / srcH);
         const o = (y * w + x) * 3;
         rgb[o] = out[0] * 65535;
         rgb[o + 1] = out[1] * 65535;

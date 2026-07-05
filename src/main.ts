@@ -3,7 +3,7 @@ import { importFile, type ImportedFile } from "./import";
 import { decode, type DecodedImage } from "./decode";
 import { Renderer, type EditParams } from "./gl";
 import { exportImage, download, type ExportFormat } from "./export";
-import { TONE_DEFAULT, TONE_X, toneEvaluator } from "./pipeline";
+import { TONE_DEFAULT, TONE_X, toneEvaluator, neutralMask, MAX_MASKS, type MaskLayer } from "./pipeline";
 import { generateCube } from "./lut";
 import { generateDcp } from "./dcp";
 import { buildGlowMap } from "./glow";
@@ -39,6 +39,7 @@ const params: EditParams = {
   foliage: [0, 1, 1],
   tone: [...TONE_DEFAULT],
   lum: 1,
+  masks: [],
 };
 
 const ui = {
@@ -333,6 +334,7 @@ function cloneParams(p: EditParams): EditParams {
     foliage: [...p.foliage] as [number, number, number],
     tone: [...p.tone] as [number, number, number, number, number],
     lum: p.lum,
+    masks: (p.masks ?? []).map((m) => ({ ...m })),
   };
 }
 
@@ -358,10 +360,14 @@ function applySnapshot(s: Snapshot) {
   params.foliage = c.foliage;
   params.tone = c.tone;
   params.lum = c.lum;
+  params.masks = c.masks;
   activeLook = s.activeLook ?? null;
   lookBias = (s.lookBias ? [...s.lookBias] : [1, 1, 1]) as [number, number, number];
+  if (selectedMask >= params.masks.length) selectedMask = params.masks.length - 1;
   syncToUI();
   updateLookUI();
+  updateMaskUI();
+  renderMaskOverlay();
   draw();
 }
 
@@ -567,6 +573,7 @@ function draw() {
     }
     renderer.render(params);
     refreshHistogram(params);
+    positionMaskOverlay();
   });
 }
 
@@ -687,6 +694,224 @@ $("pcReset").addEventListener("click", () => {
   flushRecord();
 });
 
+// --- Local masks: radial / linear gradient with a few local adjustments,
+// placed by dragging handles on the photo. Geometry is in image-uv so masks
+// stay glued to the subject through zoom/pan/rotation. ---
+const SVGNS = "http://www.w3.org/2000/svg";
+const maskOverlay = $("maskOverlay") as unknown as SVGSVGElement;
+const maskList = $("maskList") as HTMLDivElement;
+const maskEditor = $("maskEditor") as HTMLDivElement;
+const addRadialBtn = $("addRadial") as HTMLButtonElement;
+const addLinearBtn = $("addLinear") as HTMLButtonElement;
+const mUI = {
+  brightness: $("mBrightness") as HTMLInputElement,
+  contrast: $("mContrast") as HTMLInputElement,
+  sat: $("mSat") as HTMLInputElement,
+  hue: $("mHue") as HTMLInputElement,
+  warmth: $("mWarmth") as HTMLInputElement,
+  feather: $("mFeather") as HTMLInputElement,
+  featherRow: $("mFeatherRow") as HTMLElement,
+  invert: $("mInvert") as HTMLButtonElement,
+};
+let selectedMask = -1;
+let overlayHandles: { el: SVGCircleElement; role: string }[] = [];
+let overlayShape: SVGPolygonElement | SVGLineElement | null = null;
+
+function currentMask(): MaskLayer | null {
+  return selectedMask >= 0 && selectedMask < params.masks.length ? params.masks[selectedMask] : null;
+}
+
+function addMask(type: 0 | 1) {
+  if (!current || params.masks.length >= MAX_MASKS) return;
+  const m = neutralMask(type);
+  m.brightness = type === 0 ? 1.25 : 1.15; // a gentle default so it's visible at once
+  params.masks.push(m);
+  selectedMask = params.masks.length - 1;
+  updateMaskUI();
+  renderMaskOverlay();
+  draw();
+  flushRecord();
+}
+
+function deleteMask(i: number) {
+  params.masks.splice(i, 1);
+  if (selectedMask >= params.masks.length) selectedMask = params.masks.length - 1;
+  updateMaskUI();
+  renderMaskOverlay();
+  draw();
+  flushRecord();
+}
+
+function selectMask(i: number) {
+  selectedMask = i;
+  updateMaskUI();
+  renderMaskOverlay();
+}
+
+function updateMaskUI() {
+  maskList.replaceChildren(
+    ...params.masks.map((m, i) => {
+      const row = document.createElement("div");
+      row.className = "mask-row";
+      const pick = document.createElement("button");
+      pick.type = "button";
+      pick.className = "mask-pick" + (i === selectedMask ? " active" : "");
+      pick.textContent = `${m.type === 0 ? "Radial" : "Gradient"} ${i + 1}`;
+      pick.addEventListener("click", () => selectMask(i));
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "mask-del";
+      del.textContent = "×";
+      del.setAttribute("aria-label", "Delete mask");
+      del.addEventListener("click", () => deleteMask(i));
+      row.append(pick, del);
+      return row;
+    }),
+  );
+  const m = currentMask();
+  maskEditor.hidden = !m;
+  addRadialBtn.disabled = !current || params.masks.length >= MAX_MASKS;
+  addLinearBtn.disabled = !current || params.masks.length >= MAX_MASKS;
+  if (m) {
+    mUI.brightness.value = String(m.brightness);
+    mUI.contrast.value = String(m.contrast);
+    mUI.sat.value = String(m.saturation);
+    mUI.hue.value = String(m.hue);
+    mUI.warmth.value = String(m.warmth);
+    mUI.feather.value = String(m.feather);
+    mUI.featherRow.hidden = m.type !== 0;
+    mUI.invert.setAttribute("aria-pressed", String(m.invert));
+  }
+}
+
+function syncMaskFromUI() {
+  const m = currentMask();
+  if (!m) return;
+  m.brightness = Number(mUI.brightness.value);
+  m.contrast = Number(mUI.contrast.value);
+  m.saturation = Number(mUI.sat.value);
+  m.hue = Number(mUI.hue.value);
+  m.warmth = Number(mUI.warmth.value);
+  m.feather = Number(mUI.feather.value);
+  draw();
+  positionMaskOverlay(); // feather changes the outline
+}
+
+for (const el of [mUI.brightness, mUI.contrast, mUI.sat, mUI.hue, mUI.warmth, mUI.feather]) {
+  el.addEventListener("input", syncMaskFromUI);
+}
+mUI.invert.addEventListener("click", () => {
+  const m = currentMask();
+  if (!m) return;
+  m.invert = !m.invert;
+  mUI.invert.setAttribute("aria-pressed", String(m.invert));
+  draw();
+  flushRecord();
+});
+$("mDelete").addEventListener("click", () => { if (selectedMask >= 0) deleteMask(selectedMask); });
+addRadialBtn.addEventListener("click", () => addMask(0));
+addLinearBtn.addEventListener("click", () => addMask(1));
+
+function mkHandle(role: string): SVGCircleElement {
+  const c = document.createElementNS(SVGNS, "circle");
+  c.setAttribute("r", "9");
+  c.setAttribute("class", "mask-handle");
+  attachHandleDrag(c, role);
+  overlayHandles.push({ el: c, role });
+  return c;
+}
+
+// (Re)build the overlay element set for the selected mask. Cheap, but only call
+// when the SET of elements changes (select/add/delete/type) — NOT during a drag,
+// which would destroy the element holding the pointer capture.
+function renderMaskOverlay() {
+  const m = currentMask();
+  const showable = !!current && !panel.hidden && welcome.hidden && !!m;
+  maskOverlay.toggleAttribute("hidden", !showable);
+  overlayHandles = [];
+  overlayShape = null;
+  if (!showable || !m) {
+    maskOverlay.replaceChildren();
+    return;
+  }
+  const kids: SVGElement[] = [];
+  if (m.type === 0) {
+    overlayShape = document.createElementNS(SVGNS, "polygon");
+    overlayShape.setAttribute("class", "mask-shape");
+    kids.push(overlayShape, mkHandle("center"), mkHandle("rx"), mkHandle("ry"));
+  } else {
+    overlayShape = document.createElementNS(SVGNS, "line");
+    overlayShape.setAttribute("class", "mask-line");
+    kids.push(overlayShape, mkHandle("start"), mkHandle("end"));
+  }
+  maskOverlay.replaceChildren(...kids);
+  positionMaskOverlay();
+}
+
+// Reposition existing overlay elements from the current geometry + live rect.
+// Safe to call every frame and mid-drag (no element churn).
+function positionMaskOverlay() {
+  const m = currentMask();
+  if (!m || maskOverlay.hasAttribute("hidden")) return;
+  const rect = maskOverlay.getBoundingClientRect();
+  const loc = (u: number, v: number): [number, number] => {
+    const [x, y] = renderer.imageUvToClient(u, v);
+    return [x - rect.left, y - rect.top];
+  };
+  if (m.type === 0 && overlayShape) {
+    const pts: string[] = [];
+    for (let a = 0; a <= 48; a++) {
+      const t = (a / 48) * Math.PI * 2;
+      const [x, y] = loc(m.cx + m.rx * Math.cos(t), m.cy + m.ry * Math.sin(t));
+      pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+    }
+    (overlayShape as SVGPolygonElement).setAttribute("points", pts.join(" "));
+  } else if (overlayShape) {
+    const [x0, y0] = loc(m.cx, m.cy);
+    const [x1, y1] = loc(m.lx, m.ly);
+    overlayShape.setAttribute("x1", String(x0));
+    overlayShape.setAttribute("y1", String(y0));
+    overlayShape.setAttribute("x2", String(x1));
+    overlayShape.setAttribute("y2", String(y1));
+  }
+  for (const h of overlayHandles) {
+    let u = m.cx, v = m.cy;
+    if (h.role === "rx") { u = m.cx + m.rx; v = m.cy; }
+    else if (h.role === "ry") { u = m.cx; v = m.cy + m.ry; }
+    else if (h.role === "end") { u = m.lx; v = m.ly; }
+    const [x, y] = loc(u, v);
+    h.el.setAttribute("cx", String(x));
+    h.el.setAttribute("cy", String(y));
+  }
+}
+
+function attachHandleDrag(el: SVGCircleElement, role: string) {
+  el.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    el.setPointerCapture(e.pointerId);
+    const move = (ev: PointerEvent) => {
+      const m = currentMask();
+      if (!m) return;
+      const [uu, vv] = renderer.clientToImageUv(ev.clientX, ev.clientY);
+      const u = clamp(uu, 0, 1), v = clamp(vv, 0, 1);
+      if (role === "center" || role === "start") { m.cx = u; m.cy = v; }
+      else if (role === "rx") m.rx = clamp(Math.abs(u - m.cx), 0.02, 1.5);
+      else if (role === "ry") m.ry = clamp(Math.abs(v - m.cy), 0.02, 1.5);
+      else if (role === "end") { m.lx = u; m.ly = v; }
+      positionMaskOverlay();
+      draw();
+    };
+    const up = () => {
+      el.removeEventListener("pointermove", move);
+      el.removeEventListener("pointerup", up);
+      flushRecord();
+    };
+    el.addEventListener("pointermove", move);
+    el.addEventListener("pointerup", up);
+  });
+}
+
 // Help dialog (usage guide; the ⓘ dialog stays what's-new + support).
 const helpDlg = $("helpDlg") as HTMLDialogElement;
 $("helpBtn").addEventListener("click", () => helpDlg.showModal());
@@ -735,6 +960,7 @@ function updateScrollCues() {
 }
 panel.addEventListener("scroll", updateScrollCues, { passive: true });
 window.addEventListener("resize", updateScrollCues);
+window.addEventListener("resize", positionMaskOverlay);
 
 // Rotate 90° clockwise per tap. Applies to the preview and the export.
 $("rotateBtn").addEventListener("click", () => {
@@ -760,6 +986,7 @@ function applyZoom() {
     panX = 0;
     panY = 0;
     canvas.style.transform = "";
+    positionMaskOverlay();
     return;
   }
   // Keep the image from being flung entirely off-screen.
@@ -768,6 +995,7 @@ function applyZoom() {
   panX = clamp(panX, -maxX, maxX);
   panY = clamp(panY, -maxY, maxY);
   canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
+  positionMaskOverlay();
 }
 
 function resetZoom() {
@@ -856,10 +1084,12 @@ $("examplesBtn").addEventListener("click", () => {
   hint.hidden = !!current;
   welcome.hidden = false;
   histWrap.hidden = true; // keep the histogram from floating over the chooser
+  renderMaskOverlay(); // hide the overlay while the chooser is up
 });
 welcomeClose.addEventListener("click", () => {
   welcome.hidden = true;
   updateHistVisibility();
+  renderMaskOverlay();
 });
 
 async function openImported(imported: ImportedFile) {
@@ -894,12 +1124,18 @@ async function openImported(imported: ImportedFile) {
     foliage: [0, 1, 1],
     tone: [...TONE_DEFAULT],
     lum: 1,
+    masks: [],
   };
   activeLook = null;
   updateLookUI();
   // Tidy the panel for the new photo: everything folded, scrolled to the top.
   document.querySelectorAll<HTMLFieldSetElement>("#panel fieldset").forEach((fs) => fs.classList.add("collapsed"));
   panel.scrollTop = 0;
+  // Masks are composition-specific — never carry them to a new photo.
+  params.masks = [];
+  selectedMask = -1;
+  updateMaskUI();
+  renderMaskOverlay();
   syncFromUI();
   // Fresh photo: snapshot the automatic baseline (the Reset target) and start
   // a clean undo history. Do this AFTER syncFromUI so the baseline is exactly

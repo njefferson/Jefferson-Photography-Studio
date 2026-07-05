@@ -36,6 +36,7 @@
 
       <div id="stage">
         <canvas id="view"></canvas>
+        <svg id="maskOverlay" hidden aria-hidden="true"></svg>
         <div id="histWrap" hidden aria-label="Live RGB histogram">
           <canvas id="histogram" width="256" height="96"></canvas>
         </div>
@@ -157,6 +158,28 @@
             <label>Luminance <input id="folLum" type="range" min="0.5" max="1.5" step="0.01" value="1" /></label>
           </div>
           <button id="pcReset" type="button">Reset per-color</button>
+        </fieldset>
+
+        <fieldset id="fsMasks">
+          <legend>Masks <small>(local adjustments)</small></legend>
+          <small style="color:#80808a">Add a radial or gradient mask, drag it on the photo, then adjust only that area. Tap a mask to select it.</small>
+          <div class="mask-add">
+            <button id="addRadial" type="button">+ Radial</button>
+            <button id="addLinear" type="button">+ Gradient</button>
+          </div>
+          <div id="maskList" class="mask-list"></div>
+          <div id="maskEditor" hidden>
+            <label>Brightness <input id="mBrightness" type="range" min="0.3" max="2" step="0.01" value="1" /></label>
+            <label>Contrast <input id="mContrast" type="range" min="0.5" max="2" step="0.01" value="1" /></label>
+            <label>Saturation <input id="mSat" type="range" min="0" max="2" step="0.01" value="1" /></label>
+            <label>Hue <input id="mHue" type="range" min="-60" max="60" step="1" value="0" /></label>
+            <label>Warmth <input id="mWarmth" type="range" min="-1" max="1" step="0.01" value="0" /></label>
+            <label id="mFeatherRow">Feather <input id="mFeather" type="range" min="0.02" max="1" step="0.01" value="0.5" /></label>
+            <div class="mask-editor-actions">
+              <button id="mInvert" type="button" class="toggle" aria-pressed="false">Invert</button>
+              <button id="mDelete" type="button">Delete mask</button>
+            </div>
+          </div>
         </fieldset>
 
         <fieldset id="fsExport">

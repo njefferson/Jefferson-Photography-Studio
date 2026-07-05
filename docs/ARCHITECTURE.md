@@ -47,6 +47,12 @@ decode -> LINEAR camera-native RGB
                        state. hue/sat/lum each)
   -> TINT             (sepia over mono)
   -> GLOW             (adds blurred-highlight map in linear; HIE halation)
+  -> LOCAL MASKS      (radial/linear, up to 4; each applies local brightness/
+                       contrast/saturation/hue/warmth weighted by the mask, in
+                       LINEAR space here. Geometry is image-uv so masks stick to
+                       the subject through zoom/pan/rotation. Spatial (reads the
+                       pixel's uv) -> like denoise/glow, NOT baked into the .cube
+                       LUT. compileEdit takes (u,v); the shader uses v_uv.)
   -> CONTRAST         ((c-0.5)*k+0.5)
   -> GAMMA 2.2
   -> TONE CURVE       (five fixed-x control points blacks/shadows/midtones/
@@ -248,6 +254,15 @@ and NO Nikon body can channel-swap in camera. Field guide:
     `activeLook` (a loaded custom grade isn't one built-in look), and records
     one undoable step. `readSlot` coerces every field (and reads older full
     snapshots) so a stale slot can't corrupt the edit.
+- Local masks: geometry is stored in **image-uv** so it survives rotation/zoom.
+  The stage SVG overlay (`#maskOverlay`, `pointer-events:none` so tap-to-WB still
+  works through it) draws the selected mask; handles map image-uv↔client via
+  `Renderer.imageUvToClient` / `clientToImageUv` (inverse of `toImagePixel`, so
+  rotation is handled). `renderMaskOverlay()` rebuilds elements only on
+  select/add/delete (never mid-drag — that would destroy the captured handle);
+  `positionMaskOverlay()` just repositions existing elements and is called every
+  frame, on zoom/pan, resize and rotate. Masks are composition-specific: reset on
+  every open, excluded from saved looks (portable), but part of undo/reset.
 - WB gain + exposure sliders are LOG-scale: the `<input>` stores a 0..1000
   position; `toPos`/`fromPos` in main.ts map it exponentially over
   0.02–16x (WB) / 0.1–16x (exposure) so 1.0 sits near mid-track. On a linear
