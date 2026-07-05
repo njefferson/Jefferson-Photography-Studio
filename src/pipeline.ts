@@ -55,10 +55,11 @@ export interface EditParams {
   /** 8-channel HSL colour mixer: flat [hueShiftDeg, satScale, lumScale] × 8
    *  bands at HSL_CENTERS (red, orange, yellow, green, aqua, blue, purple,
    *  magenta). Weights interpolate smoothly between ADJACENT band centres, so
-   *  every hue answers to at most two chips. Operates on DISPLAYED colour
-   *  (after swap/bands — does NOT follow the swap, unlike Sky/Foliage).
-   *  Pure per-pixel colour math -> IS baked into the .cube LUT.
-   *  Neutral = HSL_DEFAULT. */
+   *  every hue answers to at most two chips. Runs in DISPLAY space on the
+   *  near-final colour (after gamma + tone curve, before global lum) so the
+   *  hue it classifies is exactly the hue on screen. Does NOT follow the swap
+   *  (unlike Sky/Foliage). Pure per-pixel colour math -> IS baked into the
+   *  .cube LUT. Neutral = hslDefault(). */
   hsl: number[];
   /** Clarity -1..1: local contrast as a RATIO against the per-image blurred-
    *  luma map (LocalMap) — pow(L/Lblur, clarity*0.5), clamped. Ratio-based, so
@@ -465,19 +466,6 @@ export function compileEdit(
       v = v * (1 + (sky[2] - 1) * wS) * (1 + (fol[2] - 1) * wF);
       [nr, ng, nb] = hsv2rgb(h, s, v);
     }
-    // 8-channel HSL mixer on the DISPLAYED colour (after swap/bands, before
-    // tint), matching the shader.
-    if (mixerOn) {
-      let [h, s, v] = rgb2hsv(Math.max(0, nr), Math.max(0, ng), Math.max(0, nb));
-      const [dh, ds, dl] = hslAt(p.hsl, h);
-      h += dh;
-      // POWER-curve saturation, not a multiplier: s^(1/ds) moves low-sat
-      // pixels visibly (IR skies live near s≈0.05, where a multiplier does
-      // nothing) yet stays gentle near s=1. Identity at ds=1, bounded ≤1.
-      s = Math.pow(Math.min(1, Math.max(0, s)), 1 / Math.max(0.05, ds));
-      v *= dl;
-      [nr, ng, nb] = hsv2rgb(h, s, v);
-    }
     // Tone tint (sepia etc.) after saturation so it survives mono looks.
     nr *= tr;
     ng *= tg;
@@ -527,6 +515,23 @@ export function compileEdit(
       out[0] = toneFn(out[0]);
       out[1] = toneFn(out[1]);
       out[2] = toneFn(out[2]);
+    }
+    // 8-channel HSL mixer in DISPLAY space, on the near-final colour (after
+    // gamma + tone curve) — so the hue it classifies is EXACTLY the hue on
+    // screen, and the chip you pick owns the colour you see. (It originally
+    // ran mid-pipeline in linear space; contrast/gamma/tone shifted hues
+    // between there and the display, so chips felt unbound from the live
+    // image — field feedback 2026-07-05.)
+    if (mixerOn) {
+      let [h, s, v] = rgb2hsv(out[0], out[1], out[2]);
+      const [dh, ds, dl] = hslAt(p.hsl, h);
+      h += dh;
+      // POWER-curve saturation, not a multiplier: s^(1/ds) moves low-sat
+      // pixels visibly (IR skies live near s≈0.05, where a multiplier does
+      // nothing) yet stays gentle near s=1. Identity at ds=1, bounded ≤1.
+      s = Math.pow(Math.min(1, Math.max(0, s)), 1 / Math.max(0.05, ds));
+      v = Math.min(1, v * dl);
+      [out[0], out[1], out[2]] = hsv2rgb(h, s, v);
     }
     // Global luminance — the very last step, matching the shader's u_lum.
     if (lumExp) {

@@ -801,6 +801,50 @@ $("hslReset").addEventListener("click", () => {
   draw();
   flushRecord();
 });
+
+// Pick-from-photo: arm, tap the image, and the chip owning that pixel's
+// ON-SCREEN hue selects itself (the mixer runs in display space, so the
+// displayed hue IS the hue the mixer classifies).
+const hslPickBtn = $("hslPick") as HTMLButtonElement;
+let hslPickArmed = false;
+
+function setHslPick(on: boolean) {
+  hslPickArmed = on;
+  hslPickBtn.setAttribute("aria-pressed", String(on));
+}
+hslPickBtn.addEventListener("click", () => setHslPick(!hslPickArmed));
+
+/** Chip index owning a display hue — the band with the majority weight
+ *  (same segment blend as hslAt in pipeline.ts). */
+function chipForHue(h: number): number {
+  h = ((h % 360) + 360) % 360;
+  let i = 7;
+  for (let k = 0; k < 7; k++) {
+    if (h >= HSL_CENTERS[k] && h < HSL_CENTERS[k + 1]) { i = k; break; }
+  }
+  const c0 = HSL_CENTERS[i];
+  const c1 = i === 7 ? 360 : HSL_CENTERS[i + 1];
+  const t = (h - c0) / (c1 - c0);
+  return t * t * (3 - 2 * t) < 0.5 ? i : (i + 1) % 8;
+}
+
+/** Handle an armed pick tap. Returns true when it consumed the tap. */
+function handleHslPick(clientX: number, clientY: number): boolean {
+  if (!hslPickArmed) return false;
+  setHslPick(false); // one-shot
+  const px = renderer.readDisplayedPixel(clientX, clientY);
+  if (!px) return true;
+  const [r, g, b] = px;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  if (d >= 4) { // ignore near-grey taps (no meaningful hue)
+    let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    h *= 60;
+    if (h < 0) h += 360;
+    hslSel = chipForHue(h);
+    updateHslUI();
+  }
+  return true;
+}
 updateHslUI();
 
 // --- Local masks: radial / linear gradient with a few local adjustments,
@@ -1591,6 +1635,8 @@ canvas.addEventListener("click", (e) => {
     tapSuppressed = false;
     return;
   }
+  // Armed colour-mixer pick eats the tap (it must NOT also set white balance).
+  if (handleHslPick(e.clientX, e.clientY)) return;
   const [pvx, pvy] = renderer.toImagePixel(e.clientX, e.clientY);
   // The renderer may show a downscaled proxy; map back to full-res coords.
   const px = Math.min(current.width - 1, Math.round((pvx * current.width) / Math.max(1, previewW)));

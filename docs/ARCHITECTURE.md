@@ -61,16 +61,6 @@ decode -> LINEAR camera-native RGB
                        Sky/Foliage and must keep meaning that). The band-box
                        sub-labels in the panel update live with the swap
                        state. hue/sat/lum each)
-  -> HSL MIXER        (8 fixed bands R/O/Y/G/Aqua/B/Purple/Magenta at
-                       HSL_CENTERS, each hue/sat/lum; weights smoothstep
-                       between ADJACENT centres so every hue answers to ≤2
-                       chips, weight 1 at a centre. Saturation is a POWER
-                       curve s^(1/slider), not a multiplier — a multiplier is
-                       invisible on low-sat IR skies (s≈0.05); the power curve
-                       moves them visibly and stays gentle near s=1 (field
-                       feedback 2026-07-05). Targets DISPLAYED colour — does
-                       NOT follow the swap (unlike Sky/Foliage). Pure
-                       per-pixel colour math -> IS baked into the .cube LUT.)
   -> TINT             (sepia over mono)
   -> GLOW             (adds blurred-highlight map in linear; HIE halation)
   -> LOCAL MASKS      (radial/linear, up to 4; each applies local brightness/
@@ -83,10 +73,25 @@ decode -> LINEAR camera-native RGB
   -> GAMMA 2.2
   -> TONE CURVE       (five fixed-x control points blacks/shadows/midtones/
                        whites/highlights, monotone-cubic Fritsch–Carlson,
-                       per channel in DISPLAY/gamma space — the very last step.
+                       per channel in DISPLAY/gamma space (HSL mixer + global
+                       Luminance run after it).
                        `EditParams.tone`, identity = TONE_DEFAULT. This is the
                        Lightroom-style tone control; a global Luminance slider
                        rides on top of it, not a separate set of range sliders.)
+  -> HSL MIXER        (moved AFTER gamma+tone 2026-07-05: it ran mid-pipeline
+                       in linear space and chips felt "unbound to live colors"
+                       — contrast/gamma/tone shifted hues between there and
+                       the screen. Now it classifies the NEAR-FINAL display
+                       colour, so the chip you pick owns the colour you see.
+                       8 bands at HSL_CENTERS, hue/sat/lum each; weights
+                       smoothstep between ADJACENT centres (≤2 chips per hue).
+                       Saturation is a POWER curve s^(1/slider) — a multiplier
+                       is invisible on low-sat IR skies. Does NOT follow the
+                       swap. Colour-only -> IS baked into the .cube LUT.
+                       "Pick color from photo" (one-shot, eats the tap so it
+                       never sets WB) reads the drawing buffer via
+                       readDisplayedPixel and selects the majority-weight
+                       chip. Runs after TONE CURVE, before global LUMINANCE.)
 ```
 
 Implemented twice, kept numerically identical ON PURPOSE:

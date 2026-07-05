@@ -212,26 +212,6 @@ void main() {
     c = hsv2rgb(vec3(fract(h / 360.0), s, v));
   }
 
-  // 8-channel HSL mixer on the DISPLAYED colour (after swap/bands, before
-  // tint). Weights blend between the two ADJACENT band centres — matches
-  // hslAt in pipeline.ts.
-  if (u_hslOn) {
-    vec3 hsv = rgb2hsv(max(c, 0.0));
-    float h = hsv.x * 360.0;
-    const float CTR[9] = float[9](0.0, 30.0, 60.0, 120.0, 180.0, 240.0, 280.0, 320.0, 360.0);
-    int bi = 7;
-    for (int k = 0; k < 7; k++) {
-      if (h >= CTR[k] && h < CTR[k + 1]) { bi = k; break; }
-    }
-    int bj = bi == 7 ? 0 : bi + 1;
-    float t = (h - CTR[bi]) / (CTR[bi + 1] - CTR[bi]);
-    float w = t * t * (3.0 - 2.0 * t);
-    vec3 adj = mix(u_hsl[bi], u_hsl[bj], w);
-    // Power-curve saturation (see pipeline.ts): visible on low-sat IR pixels.
-    float s2 = pow(clamp(hsv.y, 0.0, 1.0), 1.0 / max(0.05, adj.y));
-    c = hsv2rgb(vec3(fract((h + adj.x) / 360.0), s2, hsv.z * adj.z));
-  }
-
   // Tone tint (sepia etc.) after saturation so it survives mono looks.
   c *= u_tint;
 
@@ -280,6 +260,24 @@ void main() {
     texture(u_toneTex, vec2(g.g, 0.5)).r,
     texture(u_toneTex, vec2(g.b, 0.5)).r
   );
+  // 8-channel HSL mixer in DISPLAY space (after gamma + tone curve) so the
+  // hue it classifies is exactly the hue on screen. Matches pipeline.ts.
+  if (u_hslOn) {
+    vec3 hsv = rgb2hsv(g);
+    float h = hsv.x * 360.0;
+    const float CTR[9] = float[9](0.0, 30.0, 60.0, 120.0, 180.0, 240.0, 280.0, 320.0, 360.0);
+    int bi = 7;
+    for (int k = 0; k < 7; k++) {
+      if (h >= CTR[k] && h < CTR[k + 1]) { bi = k; break; }
+    }
+    int bj = bi == 7 ? 0 : bi + 1;
+    float t = (h - CTR[bi]) / (CTR[bi + 1] - CTR[bi]);
+    float w = t * t * (3.0 - 2.0 * t);
+    vec3 adj = mix(u_hsl[bi], u_hsl[bj], w);
+    // Power-curve saturation (see pipeline.ts): visible on low-sat IR pixels.
+    float s2 = pow(clamp(hsv.y, 0.0, 1.0), 1.0 / max(0.05, adj.y));
+    g = hsv2rgb(vec3(fract((h + adj.x) / 360.0), s2, min(1.0, hsv.z * adj.z)));
+  }
   // Global luminance rides on top of the tone curve (endpoints pinned).
   if (u_lum != 1.0) g = pow(clamp(g, 0.0, 1.0), vec3(1.0 / u_lum));
   frag = vec4(g, 1.0);
@@ -632,6 +630,21 @@ export class Renderer {
       l[(R * 54 + G * 183 + B * 19) >> 8]++;
     }
     return { r, g, b, l };
+  }
+
+  /** The DISPLAYED pixel colour under a pointer at CLIENT coords — read
+   *  straight from the drawing buffer (preserveDrawingBuffer is on), so it is
+   *  exactly what the user sees. Used by the mixer's pick-from-photo. */
+  readDisplayedPixel(clientX: number, clientY: number): [number, number, number] | null {
+    if (!this.imgW) return null;
+    const r = this.canvas.getBoundingClientRect();
+    const x = Math.max(0, Math.min(this.canvas.width - 1, Math.floor(((clientX - r.left) / Math.max(1, r.width)) * this.canvas.width)));
+    const y = Math.max(0, Math.min(this.canvas.height - 1, Math.floor(((clientY - r.top) / Math.max(1, r.height)) * this.canvas.height)));
+    const gl = this.gl;
+    const buf = new Uint8Array(4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.readPixels(x, this.canvas.height - 1 - y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+    return [buf[0], buf[1], buf[2]];
   }
 
   /** Image-uv [0..1] for a pointer at CLIENT coords (for placing masks). */
