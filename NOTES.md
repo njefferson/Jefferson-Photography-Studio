@@ -116,9 +116,11 @@ See **`PLAN.md`** for the full build plan.
 - [x] **IR hot-spot & vignette correction** — a radial luminance gain in linear
   space after WB (`radialGain`): Hot-spot (+ size) darkens the centre to cancel
   the IR-converted lens's hot-spot; Vignette brightens (correct) or darkens
-  (add) the corners. IR-native — no general editor does the hot-spot. Spatial,
-  so skipped in the .cube LUT like masks/denoise/glow. GPU==CPU ≤1 LSB. In the
-  "IR lens fixes" panel. (Colour-cast hot-spot correction could follow.)
+  (add) the corners. Circular IN PIXELS (aspect-corrected; hot-spots are
+  optically round), r = 1 at the frame corner. IR-native — no general editor
+  does the hot-spot. Spatial, so skipped in the .cube LUT like masks/denoise/
+  glow. GPU==CPU ≤1 LSB; pixel-circularity verified on a non-square frame. In
+  the "IR lens fixes" panel. (Colour-cast hot-spot correction could follow.)
 - [x] **Global Luminance slider** — one overall lift/drop on top of the tone
   curve. The five-point tone curve (Blacks/Shadows/Midtones/Whites/Highlights)
   already covers those bands (owner decision 2026-07-04), so no separate

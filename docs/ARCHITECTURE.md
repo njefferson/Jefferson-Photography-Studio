@@ -31,8 +31,10 @@ decode -> LINEAR camera-native RGB
   -> DENOISE          (bilateral, BEFORE any gains amplify noise)
   -> EXPOSURE, WB     (linear multipliers; WB luminance-normalized)
   -> IR LENS FIX      (radial luminance gain: hot-spot darkens centre, vignette
-                       brightens/darkens corners. `radialGain`, elliptical to the
-                       frame. Spatial (image-uv) -> NOT in the .cube LUT.)
+                       brightens/darkens corners. `radialGain` is CIRCULAR IN
+                       PIXELS — hot-spots are optically round — via an aspect
+                       term (u_aspect / compileEdit's aspect arg); r = 1 at the
+                       frame corner. Spatial (image-uv) -> NOT in the .cube LUT.)
   -> CAMERA MATRIX    (cam->sRGB, row-normalized; SEPARATES IR hues — without
                        it all IR chroma sits on one magenta axis and swap/sat
                        cannot produce false color. Biggest single discovery.)
@@ -273,7 +275,11 @@ and NO Nikon body can channel-swap in camera. Field guide:
     samples `m.brush`. Re-uploaded only when a `rev` changes. Undo equality uses
     `snapSig()` (a JSON replacer that drops the `data` buffer, comparing `rev`)
     so the bitmap is never serialised; a stroke commits one undo step on
-    pointer-up (`recordSoon` is suppressed while `painting`). Paint mode
+    pointer-up (`recordSoon` is suppressed while `painting`). Snapshots SHARE
+    brush buffers (copy-on-write): `cloneParams` does not copy `data`;
+    `startPaint` and Clear give the LIVE mask a fresh buffer before mutating,
+    so history entries stay immutable and 100 snapshots don't hold 100 bitmap
+    copies. Never mutate a brush's `data` in place anywhere else. Paint mode
     intercepts single-pointer canvas drags (guards atop the canvas pointer
     handlers) and sets `tapSuppressed` so it never also fires tap-to-WB.
 - WB gain + exposure sliders are LOG-scale: the `<input>` stores a 0..1000

@@ -193,13 +193,15 @@ export function toneEvaluator(y: readonly number[]): (v: number) => number {
   };
 }
 
-/** Radial IR-lens correction gain at image-uv (u,v). Elliptical to the frame
- *  (a circle in uv), so no aspect term is threaded through. Kept numerically
- *  identical to the shader. 1 = no change. */
-export function radialGain(hotspot: number, hotspotSize: number, vignette: number, u: number, v: number): number {
-  const ex = (u - 0.5) * 2, ey = (v - 0.5) * 2;
-  const r = Math.sqrt(ex * ex + ey * ey); // 0 centre, 1 edge-mid, ~1.414 corner
-  const gVig = 1 + vignette * 0.85 * smooth01(0.1, 1.4142, r);
+/** Radial IR-lens correction gain at image-uv (u,v). CIRCULAR IN PIXELS (a
+ *  lens hot-spot is optically round), so the caller passes the image aspect
+ *  (width/height); r is normalised to 1 at the frame corner. Kept numerically
+ *  identical to the shader (u_aspect). 1 = no change. */
+export function radialGain(hotspot: number, hotspotSize: number, vignette: number, u: number, v: number, aspect: number): number {
+  const a = aspect > 0 ? aspect : 1;
+  const dx = (u - 0.5) * a, dy = v - 0.5; // height units — circular in pixels
+  const r = (2 * Math.sqrt(dx * dx + dy * dy)) / Math.sqrt(a * a + 1); // 1 = corner
+  const gVig = 1 + vignette * 0.85 * smooth01(0.07, 1, r);
   const gHot = 1 - hotspot * (1 - smooth01(0, Math.max(1e-3, hotspotSize), r));
   return Math.max(0, gVig * gHot);
 }
@@ -258,6 +260,9 @@ const REC709 = [0.2126, 0.7152, 0.0722];
 export function compileEdit(
   p: EditParams,
   cam?: number[],
+  /** Image width/height — needed by the lens fixes so the hot-spot stays
+   *  circular in pixels. Callers without uv (LUT bake) can omit it. */
+  aspect = 1,
 ): (r: number, g: number, b: number, out: Float32Array, glow?: number, u?: number, v?: number) => void {
   const a = (p.hue * Math.PI) / 180;
   const cos = Math.cos(a);
@@ -296,7 +301,7 @@ export function compileEdit(
     // IR lens correction: radial luminance gain after WB (spatial -> skipped in
     // the LUT bake where u/v are absent), matching the shader.
     if (lensOn && u !== undefined && v !== undefined) {
-      const gain = radialGain(p.hotspot, p.hotspotSize, p.vignette, u, v);
+      const gain = radialGain(p.hotspot, p.hotspotSize, p.vignette, u, v, aspect);
       r *= gain; g *= gain; b *= gain;
     }
     // Camera-native -> linear sRGB (after WB, before swap), matching the shader.

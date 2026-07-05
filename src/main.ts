@@ -346,10 +346,12 @@ function cloneParams(p: EditParams): EditParams {
     foliage: [...p.foliage] as [number, number, number],
     tone: [...p.tone] as [number, number, number, number, number],
     lum: p.lum,
-    masks: (p.masks ?? []).map((m) => ({
-      ...m,
-      brush: m.brush ? { w: m.brush.w, h: m.brush.h, data: new Uint8Array(m.brush.data) } : undefined,
-    })),
+    // Brush bitmaps are SHARED between snapshots, not copied (copy-on-write):
+    // a stroke clones the live buffer before mutating (startPaint/Clear), so a
+    // history entry's pixels can never change under it. Without this, every
+    // snapshot duplicated up to 4 x ~100KB bitmaps — tens of MB of undo history
+    // in a heavy brush session on the iPad.
+    masks: (p.masks ?? []).map((m) => ({ ...m })),
     hotspot: p.hotspot,
     hotspotSize: p.hotspotSize,
     vignette: p.vignette,
@@ -1020,6 +1022,10 @@ function startPaint(e: PointerEvent) {
   tapSuppressed = true; // don't also fire a tap-to-WB after the stroke
   canvas.setPointerCapture(e.pointerId);
   lastPaintUv = null;
+  // Copy-on-write: undo snapshots share this brush's buffer, so give the live
+  // mask a fresh copy before the stroke mutates it — history stays intact.
+  const m = currentMask();
+  if (m?.brush) m.brush = { w: m.brush.w, h: m.brush.h, data: new Uint8Array(m.brush.data) };
   const [u, v] = renderer.clientToImageUv(e.clientX, e.clientY);
   paintStroke(u, v);
 }
@@ -1036,7 +1042,8 @@ mUI.erase.addEventListener("click", () => toggleAttr(mUI.erase));
 mUI.clearBrush.addEventListener("click", () => {
   const m = currentMask();
   if (!m || !m.brush) return;
-  m.brush.data.fill(0);
+  // Fresh buffer, not fill(0) — snapshots may share the old one (copy-on-write).
+  m.brush = { w: m.brush.w, h: m.brush.h, data: new Uint8Array(m.brush.w * m.brush.h) };
   m.rev = (m.rev ?? 0) + 1;
   draw();
   flushRecord();

@@ -67,7 +67,9 @@ export async function exportImage(
 
   // The matrix is applied inside the edit (after white balance), matching the
   // shader exactly so the export matches the preview.
-  const edit = compileEdit(params, "cfa" in src ? src.cam : undefined);
+  // Aspect = SOURCE dims (the uv we pass below are source-space), so the lens
+  // fix stays circular in pixels regardless of display rotation.
+  const edit = compileEdit(params, "cfa" in src ? src.cam : undefined, srcW / srcH);
   const out = new Float32Array(3);
   const baseName = file.name.replace(/\.[^.]+$/, "");
 
