@@ -52,6 +52,44 @@ export interface EditParams {
   hotspot: number;
   hotspotSize: number;
   vignette: number;
+  /** Clarity -1..1: local contrast as a RATIO against the per-image blurred-
+   *  luma map (LocalMap) — pow(L/Lblur, clarity*0.5), clamped. Ratio-based, so
+   *  it is exposure- and WB-invariant. Applied on LINEAR source data before
+   *  exposure/WB. Spatial (needs the map + uv) -> skipped in the .cube LUT. */
+  clarity: number;
+  /** Dehaze -1..1: subtracts the local veil (blurred dark-channel map) with a
+   *  white-airlight renormalisation — + removes haze, - adds it. Same spatial
+   *  caveats as clarity. */
+  dehaze: number;
+}
+
+/** Per-image low-res reference maps for clarity/dehaze: blurred luminance (R)
+ *  and blurred dark-channel (G), sqrt-encoded to 8 bits with a shared linear
+ *  `scale` (decode: (v/255)^2 * scale). The GPU samples the SAME bytes as an
+ *  RG8 texture, so CPU/GPU stay within filtering error of each other. Built
+ *  once per image by buildLocalMap (localmap.ts) — glow-map pattern. */
+export interface LocalMap {
+  width: number;
+  height: number;
+  /** RG interleaved, 2 bytes per texel: [lumaEnc, darkEnc]. */
+  rg: Uint8Array;
+  scale: number;
+}
+
+/** Bilinear sample of the ENCODED map bytes at image-uv, then decode — the
+ *  same order the GPU uses (texture filtering happens on encoded values). */
+export function sampleLocalMap(m: LocalMap, u: number, v: number): [number, number] {
+  const x = Math.min(m.width - 1.001, Math.max(0, u * m.width - 0.5));
+  const y = Math.min(m.height - 1.001, Math.max(0, v * m.height - 0.5));
+  const x0 = Math.floor(x), y0 = Math.floor(y);
+  const fx = x - x0, fy = y - y0;
+  const at = (xx: number, yy: number, c: number) => m.rg[(yy * m.width + xx) * 2 + c];
+  const bil = (c: number) => {
+    const a = at(x0, y0, c), b = at(x0 + 1, y0, c), d = at(x0, y0 + 1, c), e = at(x0 + 1, y0 + 1, c);
+    return a + (b - a) * fx + (d - a) * fy + (a - b - d + e) * fx * fy;
+  };
+  const dec = (enc: number) => { const t = enc / 255; return t * t * m.scale; };
+  return [dec(bil(0)), dec(bil(1))];
 }
 
 export const MAX_MASKS = 4;
@@ -263,6 +301,8 @@ export function compileEdit(
   /** Image width/height — needed by the lens fixes so the hot-spot stays
    *  circular in pixels. Callers without uv (LUT bake) can omit it. */
   aspect = 1,
+  /** Per-image clarity/dehaze reference maps; omit (LUT bake) to skip both. */
+  local?: LocalMap,
 ): (r: number, g: number, b: number, out: Float32Array, glow?: number, u?: number, v?: number) => void {
   const a = (p.hue * Math.PI) / 180;
   const cos = Math.cos(a);
@@ -293,8 +333,30 @@ export function compileEdit(
     sky[0] !== 0 || sky[1] !== 1 || sky[2] !== 1 || fol[0] !== 0 || fol[1] !== 1 || fol[2] !== 1;
   const masks = (p.masks ?? []).filter(maskIsActive).slice(0, MAX_MASKS);
   const lensOn = (p.hotspot ?? 0) !== 0 || (p.vignette ?? 0) !== 0;
+  const cl = p.clarity ?? 0;
+  const dz = p.dehaze ?? 0;
+  const localOn = local && (cl !== 0 || dz !== 0);
 
   return (r, g, b, out, glow = 0, u, v) => {
+    // Clarity/dehaze act on LINEAR source data before exposure/WB, using the
+    // per-image maps — matching the shader (which runs them after denoise).
+    if (localOn && u !== undefined && v !== undefined) {
+      const [Lb, Dv] = sampleLocalMap(local, u, v);
+      if (dz !== 0) {
+        // White-airlight haze model: J = (I - d·V) / (1 - d·V); +d removes the
+        // local veil, -d adds one. Denominator floored so it can't explode.
+        const t = Math.max(0.1, 1 - dz * Dv);
+        r = Math.max(0, (r - dz * Dv) / t);
+        g = Math.max(0, (g - dz * Dv) / t);
+        b = Math.max(0, (b - dz * Dv) / t);
+      }
+      if (cl !== 0) {
+        const L = r * REC709[0] + g * REC709[1] + b * REC709[2];
+        const ratio = Math.min(4, Math.max(0.25, L / Math.max(Lb, 1e-5)));
+        const gain = Math.pow(ratio, cl * 0.5);
+        r *= gain; g *= gain; b *= gain;
+      }
+    }
     r *= wr;
     g *= wg;
     b *= wb;

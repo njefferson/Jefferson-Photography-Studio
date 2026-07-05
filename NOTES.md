@@ -155,8 +155,12 @@ See **`PLAN.md`** for the full build plan.
 > fits the existing per-pixel GPU shader + CPU mirror — no ML, no server.
 
 Classical, subscription-grade tools (fit the current architecture directly):
-- **Clarity / Texture / Dehaze** — local contrast; reuse the low-res map trick
-  already built for glow.
+- [x] **Clarity / Dehaze** (shipped 2026-07-05) — in Hue/Saturation/Tone.
+  Per-image low-res maps (localmap.ts): clarity = exposure-invariant ratio vs
+  blurred luma; dehaze = dark-channel veil subtraction. GPU==CPU ≤1 LSB; part
+  of saved looks; rebuilt at full res on export. **Texture** (fine-radius local
+  contrast) folds into the Detail-sharpening item below — it needs pixel-
+  neighbourhood taps, not a low-res map.
 - **Full 8-channel HSL + per-channel R/G/B curves** — extends the per-colour
   bands and the luminance tone curve; same per-pixel model.
 - **Crop / straighten / perspective (Upright)** — geometry via the vertex

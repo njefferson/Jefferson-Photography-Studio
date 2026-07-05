@@ -7,6 +7,7 @@ import { TONE_DEFAULT, TONE_X, toneEvaluator, neutralMask, MAX_MASKS, type MaskL
 import { generateCube } from "./lut";
 import { generateDcp } from "./dcp";
 import { buildGlowMap } from "./glow";
+import { buildLocalMap } from "./localmap";
 import { drawHistogram } from "./histogram";
 
 // Injected at build time from git history (see vite.config.ts).
@@ -43,6 +44,8 @@ const params: EditParams = {
   hotspot: 0,
   hotspotSize: 0.5,
   vignette: 0,
+  clarity: 0,
+  dehaze: 0,
 };
 
 const ui = {
@@ -61,6 +64,8 @@ const ui = {
   hotspot: $("hotspot") as HTMLInputElement,
   hotspotSize: $("hotspotSize") as HTMLInputElement,
   vignette: $("vignette") as HTMLInputElement,
+  clarity: $("clarity") as HTMLInputElement,
+  dehaze: $("dehaze") as HTMLInputElement,
   skyHue: $("skyHue") as HTMLInputElement,
   skySat: $("skySat") as HTMLInputElement,
   skyLum: $("skyLum") as HTMLInputElement,
@@ -147,6 +152,8 @@ function syncFromUI() {
   params.hotspot = Number(ui.hotspot.value);
   params.hotspotSize = Number(ui.hotspotSize.value);
   params.vignette = Number(ui.vignette.value);
+  params.clarity = Number(ui.clarity.value);
+  params.dehaze = Number(ui.dehaze.value);
   params.denoise = Number(ui.dn.value);
   params.sky = [Number(ui.skyHue.value), Number(ui.skySat.value), Number(ui.skyLum.value)];
   params.foliage = [Number(ui.folHue.value), Number(ui.folSat.value), Number(ui.folLum.value)];
@@ -182,6 +189,8 @@ function syncToUI() {
   ui.hotspot.value = String(params.hotspot);
   ui.hotspotSize.value = String(params.hotspotSize);
   ui.vignette.value = String(params.vignette);
+  ui.clarity.value = String(params.clarity);
+  ui.dehaze.value = String(params.dehaze);
   ui.skyHue.value = String(params.sky[0]);
   ui.skySat.value = String(params.sky[1]);
   ui.skyLum.value = String(params.sky[2]);
@@ -355,6 +364,8 @@ function cloneParams(p: EditParams): EditParams {
     hotspot: p.hotspot,
     hotspotSize: p.hotspotSize,
     vignette: p.vignette,
+    clarity: p.clarity,
+    dehaze: p.dehaze,
   };
 }
 
@@ -391,6 +402,8 @@ function applySnapshot(s: Snapshot) {
   params.hotspot = c.hotspot;
   params.hotspotSize = c.hotspotSize;
   params.vignette = c.vignette;
+  params.clarity = c.clarity ?? 0;
+  params.dehaze = c.dehaze ?? 0;
   activeLook = s.activeLook ?? null;
   lookBias = (s.lookBias ? [...s.lookBias] : [1, 1, 1]) as [number, number, number];
   if (selectedMask >= params.masks.length) selectedMask = params.masks.length - 1;
@@ -479,6 +492,8 @@ type SavedLook = {
   foliage: [number, number, number];
   tone: [number, number, number, number, number];
   lum: number;
+  clarity: number;
+  dehaze: number;
 };
 
 function currentLook(): SavedLook {
@@ -493,6 +508,8 @@ function currentLook(): SavedLook {
     foliage: [...params.foliage] as [number, number, number],
     tone: [...params.tone] as [number, number, number, number, number],
     lum: params.lum,
+    clarity: params.clarity,
+    dehaze: params.dehaze,
   };
 }
 
@@ -522,6 +539,8 @@ function readSlot(i: number): SavedLook | null {
           ? [+s.tone[0], +s.tone[1], +s.tone[2], +s.tone[3], +s.tone[4]]
           : [...TONE_DEFAULT],
         lum: numOr(s.lum, 1),
+        clarity: numOr(s.clarity, 0),
+        dehaze: numOr(s.dehaze, 0),
       };
     }
   } catch {
@@ -551,6 +570,8 @@ function loadSlot(i: number) {
   params.foliage = look.foliage;
   params.tone = look.tone;
   params.lum = look.lum;
+  params.clarity = look.clarity;
+  params.dehaze = look.dehaze;
   activeLook = null; // a loaded custom grade isn't one specific built-in look
   clampToneOrder();
   syncToUI();
@@ -703,7 +724,7 @@ document.querySelectorAll<HTMLFieldSetElement>("#panel fieldset").forEach((fs) =
 });
 
 for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.dn, ui.hue, ui.sat, ui.con, ui.glow, ui.lum,
-  ui.hotspot, ui.hotspotSize, ui.vignette,
+  ui.hotspot, ui.hotspotSize, ui.vignette, ui.clarity, ui.dehaze,
   ui.skyHue, ui.skySat, ui.skyLum, ui.folHue, ui.folSat, ui.folLum, ...ui.tones]) {
   el.addEventListener("input", syncFromUI);
 }
@@ -1245,6 +1266,7 @@ async function openImported(imported: ImportedFile) {
   renderer.setRotation(img.rotate ?? 0);
   resetZoom();
   renderer.setGlowMap(buildGlowMap((x, y) => linearAt(img, x, y), img.width, img.height));
+  renderer.setLocalMap(buildLocalMap((x, y) => linearAt(img, x, y), img.width, img.height));
   panel.hidden = false;
   welcome.hidden = true;
   lesson.hidden = true;
@@ -1273,6 +1295,8 @@ async function openImported(imported: ImportedFile) {
     hotspot: 0,
     hotspotSize: 0.5,
     vignette: 0,
+    clarity: 0,
+    dehaze: 0,
   };
   activeLook = null;
   updateLookUI();

@@ -10,6 +10,7 @@ import { Tiff } from "./raw/tiff";
 import { camToSrgbLinear, NIKON_Z50_COLOR_MATRIX } from "./color";
 import { makeRowDenoiser } from "./raw/denoise";
 import { buildGlowMap, sampleGlow, GLOW_GAIN } from "./glow";
+import { buildLocalMap } from "./localmap";
 import { SRGB_ICC, embedIccInJpeg } from "./icc";
 import type { ImportedFile } from "./import";
 import type { DecodedImage } from "./decode";
@@ -67,10 +68,6 @@ export async function exportImage(
 
   // The matrix is applied inside the edit (after white balance), matching the
   // shader exactly so the export matches the preview.
-  // Aspect = SOURCE dims (the uv we pass below are source-space), so the lens
-  // fix stays circular in pixels regardless of display rotation.
-  const edit = compileEdit(params, "cfa" in src ? src.cam : undefined, srcW / srcH);
-  const out = new Float32Array(3);
   const baseName = file.name.replace(/\.[^.]+$/, "");
 
   // Camera-native linear RGB at a source pixel; denoise wraps the sampler so it
@@ -82,6 +79,15 @@ export async function exportImage(
           const i = (y * src.width + x) * 4;
           return [toLinear8(src.pixels[i]), toLinear8(src.pixels[i + 1]), toLinear8(src.pixels[i + 2])] as [number, number, number];
         };
+  // Aspect = SOURCE dims (the uv we pass below are source-space), so the lens
+  // fix stays circular in pixels regardless of display rotation. The clarity/
+  // dehaze maps are rebuilt from the full-res source (cheap: coarse grid).
+  const localMap =
+    (params.clarity ?? 0) !== 0 || (params.dehaze ?? 0) !== 0
+      ? buildLocalMap(rawSample, srcW, srcH)
+      : undefined;
+  const edit = compileEdit(params, "cfa" in src ? src.cam : undefined, srcW / srcH, localMap);
+  const out = new Float32Array(3);
   const sampleLinear = makeRowDenoiser(rawSample, srcW, srcH, params.denoise);
   // HIE glow map at full resolution (cheap: built on a coarse grid).
   const gmap = params.glow > 0 ? buildGlowMap(rawSample, srcW, srcH) : null;

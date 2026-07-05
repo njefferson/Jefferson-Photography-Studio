@@ -5,7 +5,7 @@
 
 // Single source of truth for edit parameters lives in pipeline.ts so the GPU
 // preview and CPU export can never drift apart.
-import { toneEvaluator, toneIsIdentity, maskIsActive, MAX_MASKS, type EditParams } from "./pipeline";
+import { toneEvaluator, toneIsIdentity, maskIsActive, MAX_MASKS, type EditParams, type LocalMap } from "./pipeline";
 export type { EditParams };
 
 // A faithful 256-entry identity ramp for the tone LUT. A 2-texel [0,255] ramp
@@ -64,6 +64,10 @@ uniform float u_hotspot;     // IR hot-spot correction (darken centre) 0..0.8
 uniform float u_hotspotSize; // hot-spot radial extent
 uniform float u_vignette;    // -1..1 (+ brighten corners, - darken)
 uniform float u_aspect;      // image width/height — keeps the lens fix circular in pixels
+uniform float u_clarity;     // -1..1 local contrast vs the blurred-luma map
+uniform float u_dehaze;      // -1..1 veil subtraction vs the dark-channel map
+uniform sampler2D u_localTex; // RG8: sqrt-encoded blurred luma (R) + dark channel (G)
+uniform float u_localScale;   // linear decode scale for u_localTex
 uniform float u_denoise; // 0..1 bilateral strength (see raw/denoise.ts)
 uniform vec2 u_texel;    // 1/textureSize
 uniform float u_split;   // compare divider: denoise applies where uv.x >= split
@@ -140,6 +144,23 @@ void main() {
       }
     }
     c = sum / wsum;
+  }
+
+  // Clarity / Dehaze on LINEAR source data (after denoise, before exposure/WB),
+  // referencing the per-image maps. Identical math to compileEdit.
+  if (u_clarity != 0.0 || u_dehaze != 0.0) {
+    vec2 e = texture(u_localTex, v_uv).rg;
+    float Lb = e.r * e.r * u_localScale;
+    float Dv = e.g * e.g * u_localScale;
+    if (u_dehaze != 0.0) {
+      float t = max(0.1, 1.0 - u_dehaze * Dv);
+      c = max((c - u_dehaze * Dv) / t, 0.0);
+    }
+    if (u_clarity != 0.0) {
+      float L = dot(c, LUMA_W);
+      float ratio = clamp(L / max(Lb, 1e-5), 0.25, 4.0);
+      c *= pow(ratio, u_clarity * 0.5);
+    }
   }
 
   // Exposure (linear) then white balance (the unbounded gains Lightroom can't reach).
@@ -252,6 +273,8 @@ export class Renderer {
   private toneTex: WebGLTexture;
   private brushTex: WebGLTexture;
   private brushSig = ""; // re-upload the packed brush texture only when it changes
+  private localTex: WebGLTexture;
+  private localScale = 1;
   // Small offscreen target for the live histogram: the full edit re-rendered at
   // <=HIST_MAX px so a per-frame GPU->CPU readback stays cheap on the iPad.
   private histFbo: WebGLFramebuffer | null = null;
@@ -274,7 +297,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_toneTex", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskTex", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_toneTex", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskTex", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_clarity", "u_dehaze", "u_localTex", "u_localScale"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -318,6 +341,31 @@ export class Renderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
+
+    // Clarity/dehaze reference maps (unit 4); a single zero texel until an
+    // image's map is set (the shader branch is off while the sliders are 0).
+    this.localTex = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, this.localTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG8, 1, 1, 0, gl.RG, gl.UNSIGNED_BYTE, new Uint8Array([0, 0]));
+  }
+
+  /** Upload the per-image clarity/dehaze maps (or clear with null). */
+  setLocalMap(m: LocalMap | null) {
+    const gl = this.gl;
+    gl.bindTexture(gl.TEXTURE_2D, this.localTex);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    if (!m) {
+      this.localScale = 1;
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG8, 1, 1, 0, gl.RG, gl.UNSIGNED_BYTE, new Uint8Array([0, 0]));
+      return;
+    }
+    this.localScale = m.scale;
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG8, m.width, m.height, 0, gl.RG, gl.UNSIGNED_BYTE, new Uint8Array(m.rg));
   }
 
   /** Pack the active brush masks into the RGBA brush texture (channel per mask),
@@ -446,6 +494,12 @@ export class Renderer {
     gl.uniform1f(this.loc.u_hotspotSize, p.hotspotSize ?? 0.5);
     gl.uniform1f(this.loc.u_vignette, p.vignette ?? 0);
     gl.uniform1f(this.loc.u_aspect, this.imgH ? this.imgW / this.imgH : 1);
+    gl.uniform1f(this.loc.u_clarity, p.clarity ?? 0);
+    gl.uniform1f(this.loc.u_dehaze, p.dehaze ?? 0);
+    gl.uniform1f(this.loc.u_localScale, this.localScale);
+    gl.uniform1i(this.loc.u_localTex, 4);
+    gl.activeTexture(gl.TEXTURE4);
+    gl.bindTexture(gl.TEXTURE_2D, this.localTex);
     // Local masks (up to MAX_MASKS = 4, the shader array size).
     const masks = (p.masks ?? []).filter(maskIsActive).slice(0, MAX_MASKS);
     this.updateBrushTexture(masks);

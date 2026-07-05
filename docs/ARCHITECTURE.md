@@ -29,6 +29,13 @@ raw itself and applies arbitrary gains, which is the entire reason it exists.
 ```
 decode -> LINEAR camera-native RGB
   -> DENOISE          (bilateral, BEFORE any gains amplify noise)
+  -> CLARITY/DEHAZE   (before exposure/WB, on linear source data, vs per-image
+                       LOW-RES MAPS (localmap.ts, RG8: blurred luma + blurred
+                       dark-channel, sqrt-encoded, shared scale). Clarity =
+                       pow(L/Lblur, k) — ratio-based, so exposure/WB-invariant.
+                       Dehaze = white-airlight veil subtraction (I-dV)/(1-dV).
+                       Spatial -> NOT in the .cube LUT. CPU bilinears the SAME
+                       encoded bytes the GPU filters, then decodes — parity.)
   -> EXPOSURE, WB     (linear multipliers; WB luminance-normalized)
   -> IR LENS FIX      (radial luminance gain: hot-spot darkens centre, vignette
                        brightens/darkens corners. `radialGain` is CIRCULAR IN
