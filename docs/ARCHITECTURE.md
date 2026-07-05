@@ -263,6 +263,16 @@ and NO Nikon body can channel-swap in camera. Field guide:
   `positionMaskOverlay()` just repositions existing elements and is called every
   frame, on zoom/pan, resize and rotate. Masks are composition-specific: reset on
   every open, excluded from saved looks (portable), but part of undo/reset.
+  - **Brush masks** (type 2): a painted single-channel bitmap at ≤384px working
+    res (`BrushMask`), bilinearly sampled. GLSL can't dynamically index samplers,
+    so up to 4 brush masks pack into ONE RGBA texture (`u_maskTex`, one channel
+    per mask index; `texture(u_maskTex, v_uv)[i]`); the CPU mirror bilinearly
+    samples `m.brush`. Re-uploaded only when a `rev` changes. Undo equality uses
+    `snapSig()` (a JSON replacer that drops the `data` buffer, comparing `rev`)
+    so the bitmap is never serialised; a stroke commits one undo step on
+    pointer-up (`recordSoon` is suppressed while `painting`). Paint mode
+    intercepts single-pointer canvas drags (guards atop the canvas pointer
+    handlers) and sets `tapSuppressed` so it never also fires tap-to-WB.
 - WB gain + exposure sliders are LOG-scale: the `<input>` stores a 0..1000
   position; `toPos`/`fromPos` in main.ts map it exponentially over
   0.02–16x (WB) / 0.1–16x (exposure) so 1.0 sits near mid-track. On a linear

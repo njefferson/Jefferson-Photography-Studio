@@ -47,10 +47,20 @@ export interface EditParams {
 
 export const MAX_MASKS = 4;
 
-/** A local-adjustment mask. `type` 0 = radial, 1 = linear gradient. Geometry is
- *  in image-uv [0..1] so it anchors to the photo through rotation/zoom. */
+/** A painted brush mask: a single-channel 0..255 weight bitmap at a small
+ *  working resolution (bilinearly sampled). `rev` bumps on each stroke so undo
+ *  equality can compare cheaply without serialising the pixels. */
+export interface BrushMask {
+  w: number;
+  h: number;
+  data: Uint8Array;
+}
+
+/** A local-adjustment mask. `type` 0 = radial, 1 = linear gradient, 2 = brush.
+ *  Geometry is in image-uv [0..1] so it anchors to the photo through
+ *  rotation/zoom. */
 export interface MaskLayer {
-  type: 0 | 1;
+  type: 0 | 1 | 2;
   cx: number; // radial: centre x; linear: start x
   cy: number; // radial: centre y; linear: start y
   rx: number; // radial: x radius (uv fraction)
@@ -59,6 +69,8 @@ export interface MaskLayer {
   lx: number; // linear: end x
   ly: number; // linear: end y
   invert: boolean;
+  brush?: BrushMask; // type 2 only
+  rev?: number; // bumps on each brush stroke (undo equality)
   // Local adjustments — neutral = brightness/contrast/saturation 1, hue/warmth 0.
   brightness: number;
   contrast: number;
@@ -67,10 +79,11 @@ export interface MaskLayer {
   warmth: number; // -1..1, + warmer
 }
 
-export function neutralMask(type: 0 | 1): MaskLayer {
-  return type === 0
-    ? { type, cx: 0.5, cy: 0.5, rx: 0.35, ry: 0.35, feather: 0.5, lx: 0.5, ly: 0.85, invert: false, brightness: 1, contrast: 1, saturation: 1, hue: 0, warmth: 0 }
-    : { type, cx: 0.5, cy: 0.12, rx: 0.35, ry: 0.35, feather: 0.5, lx: 0.5, ly: 0.5, invert: false, brightness: 1, contrast: 1, saturation: 1, hue: 0, warmth: 0 };
+export function neutralMask(type: 0 | 1 | 2): MaskLayer {
+  const base = { cx: 0.5, cy: 0.5, rx: 0.35, ry: 0.35, feather: 0.5, lx: 0.5, ly: 0.85, invert: false, brightness: 1, contrast: 1, saturation: 1, hue: 0, warmth: 0 };
+  if (type === 1) return { ...base, type, cx: 0.5, cy: 0.12, lx: 0.5, ly: 0.5 };
+  if (type === 2) return { ...base, type, rev: 0 };
+  return { ...base, type };
 }
 
 export function maskIsActive(m: MaskLayer): boolean {
@@ -82,6 +95,20 @@ function smooth01(edge0: number, edge1: number, x: number): number {
   return t * t * (3 - 2 * t);
 }
 
+/** Bilinear sample of a brush bitmap (0..1) at image-uv. Matches the GPU's
+ *  LINEAR texture sampling of the packed brush texture. */
+function sampleBrush(b: BrushMask, u: number, v: number): number {
+  const fx = Math.min(1, Math.max(0, u)) * (b.w - 1);
+  const fy = Math.min(1, Math.max(0, v)) * (b.h - 1);
+  const x0 = Math.floor(fx), y0 = Math.floor(fy);
+  const x1 = Math.min(b.w - 1, x0 + 1), y1 = Math.min(b.h - 1, y0 + 1);
+  const tx = fx - x0, ty = fy - y0;
+  const s = (x: number, y: number) => b.data[y * b.w + x];
+  const top = s(x0, y0) * (1 - tx) + s(x1, y0) * tx;
+  const bot = s(x0, y1) * (1 - tx) + s(x1, y1) * tx;
+  return (top * (1 - ty) + bot * ty) / 255;
+}
+
 /** Mask weight 0..1 at image-uv (u,v). Kept numerically identical to the shader. */
 export function maskWeight(m: MaskLayer, u: number, v: number): number {
   let w: number;
@@ -90,11 +117,13 @@ export function maskWeight(m: MaskLayer, u: number, v: number): number {
     const dy = (v - m.cy) / Math.max(1e-4, m.ry);
     const r = Math.sqrt(dx * dx + dy * dy);
     w = 1 - smooth01(1 - m.feather, 1, r); // 1 in the core, 0 past the edge
-  } else {
+  } else if (m.type === 1) {
     const gx = m.lx - m.cx, gy = m.ly - m.cy;
     const len2 = gx * gx + gy * gy || 1e-4;
     const t = ((u - m.cx) * gx + (v - m.cy) * gy) / len2;
     w = 1 - Math.min(1, Math.max(0, t)); // full at the start point, 0 at the end
+  } else {
+    w = m.brush ? sampleBrush(m.brush, u, v) : 0;
   }
   return m.invert ? 1 - w : w;
 }

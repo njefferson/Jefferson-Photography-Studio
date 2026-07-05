@@ -166,9 +166,19 @@
           <div class="mask-add">
             <button id="addRadial" type="button">+ Radial</button>
             <button id="addLinear" type="button">+ Gradient</button>
+            <button id="addBrush" type="button">+ Brush</button>
           </div>
           <div id="maskList" class="mask-list"></div>
           <div id="maskEditor" hidden>
+            <div id="brushControls" hidden>
+              <small style="color:#80808a">Paint on the photo to build the mask. Turn Paint off to pan/zoom.</small>
+              <div class="mask-editor-actions">
+                <button id="mPaint" type="button" class="toggle" aria-pressed="true">Paint</button>
+                <button id="mErase" type="button" class="toggle" aria-pressed="false">Erase</button>
+                <button id="mClearBrush" type="button">Clear paint</button>
+              </div>
+              <label>Brush size <input id="mBrushSize" type="range" min="0.03" max="0.4" step="0.01" value="0.14" /></label>
+            </div>
             <label>Brightness <input id="mBrightness" type="range" min="0.3" max="2" step="0.01" value="1" /></label>
             <label>Contrast <input id="mContrast" type="range" min="0.5" max="2" step="0.01" value="1" /></label>
             <label>Saturation <input id="mSat" type="range" min="0" max="2" step="0.01" value="1" /></label>

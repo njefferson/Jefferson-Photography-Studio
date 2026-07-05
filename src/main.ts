@@ -334,8 +334,18 @@ function cloneParams(p: EditParams): EditParams {
     foliage: [...p.foliage] as [number, number, number],
     tone: [...p.tone] as [number, number, number, number, number],
     lum: p.lum,
-    masks: (p.masks ?? []).map((m) => ({ ...m })),
+    masks: (p.masks ?? []).map((m) => ({
+      ...m,
+      brush: m.brush ? { w: m.brush.w, h: m.brush.h, data: new Uint8Array(m.brush.data) } : undefined,
+    })),
   };
+}
+
+// Snapshot signature for undo equality — cheap: skips the brush pixel buffers
+// (a stroke bumps the mask's `rev`, which IS compared) so we never serialise
+// hundreds of KB of bitmap on every frame.
+function snapSig(s: Snapshot): string {
+  return JSON.stringify(s, (k, v) => (k === "data" && v instanceof Uint8Array ? undefined : v));
 }
 
 function snapshot(): Snapshot {
@@ -393,7 +403,7 @@ function flushRecord() {
   recordTimer = 0;
   if (!settled) return;
   const now = snapshot();
-  if (JSON.stringify(now) !== JSON.stringify(settled)) {
+  if (snapSig(now) !== snapSig(settled)) {
     undoStack.push(settled);
     if (undoStack.length > HISTORY_MAX) undoStack.shift();
     settled = now;
@@ -402,7 +412,7 @@ function flushRecord() {
 }
 
 function recordSoon() {
-  if (!settled) return;
+  if (!settled || painting) return; // a paint stroke commits once, on pointerup
   clearTimeout(recordTimer);
   recordTimer = window.setTimeout(flushRecord, 350);
 }
@@ -703,6 +713,7 @@ const maskList = $("maskList") as HTMLDivElement;
 const maskEditor = $("maskEditor") as HTMLDivElement;
 const addRadialBtn = $("addRadial") as HTMLButtonElement;
 const addLinearBtn = $("addLinear") as HTMLButtonElement;
+const addBrushBtn = $("addBrush") as HTMLButtonElement;
 const mUI = {
   brightness: $("mBrightness") as HTMLInputElement,
   contrast: $("mContrast") as HTMLInputElement,
@@ -712,7 +723,13 @@ const mUI = {
   feather: $("mFeather") as HTMLInputElement,
   featherRow: $("mFeatherRow") as HTMLElement,
   invert: $("mInvert") as HTMLButtonElement,
+  brushControls: $("brushControls") as HTMLElement,
+  paint: $("mPaint") as HTMLButtonElement,
+  erase: $("mErase") as HTMLButtonElement,
+  brushSize: $("mBrushSize") as HTMLInputElement,
+  clearBrush: $("mClearBrush") as HTMLButtonElement,
 };
+const BRUSH_MAX_EDGE = 384; // working resolution of the painted mask bitmap
 let selectedMask = -1;
 let overlayHandles: { el: SVGCircleElement; role: string }[] = [];
 let overlayShape: SVGPolygonElement | SVGLineElement | null = null;
@@ -721,10 +738,18 @@ function currentMask(): MaskLayer | null {
   return selectedMask >= 0 && selectedMask < params.masks.length ? params.masks[selectedMask] : null;
 }
 
-function addMask(type: 0 | 1) {
+function addMask(type: 0 | 1 | 2) {
   if (!current || params.masks.length >= MAX_MASKS) return;
   const m = neutralMask(type);
-  m.brightness = type === 0 ? 1.25 : 1.15; // a gentle default so it's visible at once
+  m.brightness = type === 1 ? 1.15 : 1.25; // a gentle default so it does something
+  if (type === 2) {
+    const s = Math.min(1, BRUSH_MAX_EDGE / Math.max(current.width, current.height));
+    const bw = Math.max(1, Math.round(current.width * s));
+    const bh = Math.max(1, Math.round(current.height * s));
+    m.brush = { w: bw, h: bh, data: new Uint8Array(bw * bh) };
+    mUI.paint.setAttribute("aria-pressed", "true"); // start ready to paint
+    mUI.erase.setAttribute("aria-pressed", "false");
+  }
   params.masks.push(m);
   selectedMask = params.masks.length - 1;
   updateMaskUI();
@@ -756,7 +781,8 @@ function updateMaskUI() {
       const pick = document.createElement("button");
       pick.type = "button";
       pick.className = "mask-pick" + (i === selectedMask ? " active" : "");
-      pick.textContent = `${m.type === 0 ? "Radial" : "Gradient"} ${i + 1}`;
+      const label = m.type === 0 ? "Radial" : m.type === 1 ? "Gradient" : "Brush";
+      pick.textContent = `${label} ${i + 1}`;
       pick.addEventListener("click", () => selectMask(i));
       const del = document.createElement("button");
       del.type = "button";
@@ -770,8 +796,10 @@ function updateMaskUI() {
   );
   const m = currentMask();
   maskEditor.hidden = !m;
-  addRadialBtn.disabled = !current || params.masks.length >= MAX_MASKS;
-  addLinearBtn.disabled = !current || params.masks.length >= MAX_MASKS;
+  const full = !current || params.masks.length >= MAX_MASKS;
+  addRadialBtn.disabled = full;
+  addLinearBtn.disabled = full;
+  addBrushBtn.disabled = full;
   if (m) {
     mUI.brightness.value = String(m.brightness);
     mUI.contrast.value = String(m.contrast);
@@ -780,6 +808,7 @@ function updateMaskUI() {
     mUI.warmth.value = String(m.warmth);
     mUI.feather.value = String(m.feather);
     mUI.featherRow.hidden = m.type !== 0;
+    mUI.brushControls.hidden = m.type !== 2;
     mUI.invert.setAttribute("aria-pressed", String(m.invert));
   }
 }
@@ -826,7 +855,8 @@ function mkHandle(role: string): SVGCircleElement {
 // which would destroy the element holding the pointer capture.
 function renderMaskOverlay() {
   const m = currentMask();
-  const showable = !!current && !panel.hidden && welcome.hidden && !!m;
+  // Brush masks have no geometry handles — the painting itself is the feedback.
+  const showable = !!current && !panel.hidden && welcome.hidden && !!m && m.type !== 2;
   maskOverlay.toggleAttribute("hidden", !showable);
   overlayHandles = [];
   overlayShape = null;
@@ -911,6 +941,88 @@ function attachHandleDrag(el: SVGCircleElement, role: string) {
     el.addEventListener("pointerup", up);
   });
 }
+
+// --- Brush painting: with Paint on, drag on the photo to paint into the
+// selected brush mask (or Erase). Interpolates between moves for smooth
+// strokes; one stroke = one undo step. ---
+let painting = false;
+let lastPaintUv: [number, number] | null = null;
+
+function brushPaintOn(): boolean {
+  const m = currentMask();
+  return !!m && m.type === 2 && mUI.paint.getAttribute("aria-pressed") === "true";
+}
+function brushRadiusPx(): number {
+  const m = currentMask();
+  if (!m || !m.brush) return 8;
+  return Math.max(1, Number(mUI.brushSize.value) * Math.max(m.brush.w, m.brush.h));
+}
+function stampBrush(u: number, v: number) {
+  const m = currentMask();
+  if (!m || !m.brush) return;
+  const b = m.brush;
+  const erase = mUI.erase.getAttribute("aria-pressed") === "true";
+  const r = brushRadiusPx();
+  const cx = clamp(u, 0, 1) * (b.w - 1);
+  const cy = clamp(v, 0, 1) * (b.h - 1);
+  const x0 = Math.max(0, Math.floor(cx - r)), x1 = Math.min(b.w - 1, Math.ceil(cx + r));
+  const y0 = Math.max(0, Math.floor(cy - r)), y1 = Math.min(b.h - 1, Math.ceil(cy + r));
+  const hard = 0.55; // solid inner fraction, soft to the edge
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      const d = Math.hypot(x - cx, y - cy) / r;
+      if (d > 1) continue;
+      let fall = 1;
+      if (d > hard) { const t = (d - hard) / (1 - hard); fall = 1 - t * t * (3 - 2 * t); }
+      const idx = y * b.w + x;
+      const amt = fall * 255;
+      b.data[idx] = erase ? Math.max(0, b.data[idx] - amt) : Math.min(255, Math.max(b.data[idx], amt));
+    }
+  }
+  m.rev = (m.rev ?? 0) + 1;
+}
+function paintStroke(u: number, v: number) {
+  const m = currentMask();
+  if (!m || !m.brush) return;
+  if (lastPaintUv) {
+    const [lu, lv] = lastPaintUv;
+    const distPx = Math.hypot((u - lu) * (m.brush.w - 1), (v - lv) * (m.brush.h - 1));
+    const step = Math.max(1, brushRadiusPx() * 0.3);
+    const n = Math.max(1, Math.ceil(distPx / step));
+    for (let k = 1; k <= n; k++) stampBrush(lu + (u - lu) * (k / n), lv + (v - lv) * (k / n));
+  } else {
+    stampBrush(u, v);
+  }
+  lastPaintUv = [u, v];
+  draw();
+}
+function startPaint(e: PointerEvent) {
+  painting = true;
+  tapSuppressed = true; // don't also fire a tap-to-WB after the stroke
+  canvas.setPointerCapture(e.pointerId);
+  lastPaintUv = null;
+  const [u, v] = renderer.clientToImageUv(e.clientX, e.clientY);
+  paintStroke(u, v);
+}
+function endPaint() {
+  if (!painting) return;
+  painting = false;
+  lastPaintUv = null;
+  flushRecord();
+}
+
+const toggleAttr = (el: HTMLElement) => el.setAttribute("aria-pressed", String(el.getAttribute("aria-pressed") !== "true"));
+mUI.paint.addEventListener("click", () => toggleAttr(mUI.paint));
+mUI.erase.addEventListener("click", () => toggleAttr(mUI.erase));
+mUI.clearBrush.addEventListener("click", () => {
+  const m = currentMask();
+  if (!m || !m.brush) return;
+  m.brush.data.fill(0);
+  m.rev = (m.rev ?? 0) + 1;
+  draw();
+  flushRecord();
+});
+addBrushBtn.addEventListener("click", () => addMask(2));
 
 // Help dialog (usage guide; the ⓘ dialog stays what's-new + support).
 const helpDlg = $("helpDlg") as HTMLDialogElement;
@@ -1006,6 +1118,7 @@ function resetZoom() {
 canvas.style.transformOrigin = "center center";
 
 canvas.addEventListener("pointerdown", (e) => {
+  if (brushPaintOn()) { e.preventDefault(); startPaint(e); return; }
   activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   canvas.setPointerCapture(e.pointerId);
   // Long-press (held still) shows the original for comparison.
@@ -1037,6 +1150,11 @@ canvas.addEventListener("pointerdown", (e) => {
 });
 
 canvas.addEventListener("pointermove", (e) => {
+  if (painting) {
+    const [u, v] = renderer.clientToImageUv(e.clientX, e.clientY);
+    paintStroke(u, v);
+    return;
+  }
   const p = activePointers.get(e.pointerId);
   if (!p) return;
   if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > 8) {
@@ -1063,6 +1181,7 @@ canvas.addEventListener("pointermove", (e) => {
 });
 
 function endPointer(e: PointerEvent) {
+  if (painting) { endPaint(); return; }
   activePointers.delete(e.pointerId);
   clearTimeout(holdTimer);
   showOriginal(false);

@@ -106,12 +106,13 @@ See **`PLAN.md`** for the full build plan.
 > reliable. Editing this list updates the app on the next deploy. Both the
 > roadmap and the patch notes (last commits) refresh automatically on push.
 
-- [x] **Local masking** — radial + linear gradient masks (up to 4), each with
-  local brightness/contrast/saturation/hue/warmth, dragged on the photo with
-  handles. Same math in shader + compileEdit (verified GPU==CPU ≤1 LSB across
-  radial/linear/stacked); export applies them, the .cube LUT skips them (spatial,
-  like denoise/glow). Brush is the fast-follow (v1.1); the full adjustment set
-  per mask can come later too. The core paid-editor capability, now free.
+- [x] **Local masking** — radial + linear gradient + **brush** masks (up to 4),
+  each with local brightness/contrast/saturation/hue/warmth. Radial/linear are
+  dragged with handles; the brush is painted on the photo (Paint/Erase, size,
+  Clear; one stroke = one undo step). Same math in shader + compileEdit (verified
+  GPU==CPU ≤2 LSB across radial/linear/brush/stacked/inverted); export applies
+  them, the .cube LUT skips them (spatial, like denoise/glow). The core
+  paid-editor capability, now free. (Later: full adjustment set per mask.)
 - [ ] **IR hot-spot & vignette correction** — radial luminance/colour regain
   tuned for the IR-converted lens centre hot-spot (a real Z50 field issue).
   IR-native (no subscription tool does it), per-pixel, verifiable.

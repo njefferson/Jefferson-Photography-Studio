@@ -59,6 +59,7 @@ uniform vec4 u_maskGeoA[4];  // radial (cx,cy,rx,ry) | linear (cx,cy,lx,ly)
 uniform vec2 u_maskGeoB[4];  // (feather, invert)
 uniform vec4 u_maskAdj[4];   // (brightness, contrast, saturation, warmth)
 uniform float u_maskHue[4];  // degrees
+uniform sampler2D u_maskTex; // brush masks packed 1-per-channel (rgba = mask 0..3)
 uniform float u_denoise; // 0..1 bilateral strength (see raw/denoise.ts)
 uniform vec2 u_texel;    // 1/textureSize
 uniform float u_split;   // compare divider: denoise applies where uv.x >= split
@@ -178,7 +179,13 @@ void main() {
   // Local masks: each adjustment weighted by the mask, in linear space before
   // global contrast/gamma. Identical math to compileEdit in pipeline.ts.
   for (int i = 0; i < u_maskCount; i++) {
-    float w = maskWeight(i, v_uv);
+    float w;
+    if (u_maskType[i] == 2) {
+      w = texture(u_maskTex, v_uv)[i]; // brush: packed channel per mask
+      if (u_maskGeoB[i].y > 0.5) w = 1.0 - w; // invert
+    } else {
+      w = maskWeight(i, v_uv);
+    }
     if (w <= 0.0) continue;
     vec4 adj = u_maskAdj[i]; // brightness, contrast, saturation, warmth
     c.r *= 1.0 + 0.5 * adj.w * w;
@@ -227,6 +234,8 @@ export class Renderer {
   private camMatrix: Float32Array | null = null;
   private glowTex: WebGLTexture;
   private toneTex: WebGLTexture;
+  private brushTex: WebGLTexture;
+  private brushSig = ""; // re-upload the packed brush texture only when it changes
   // Small offscreen target for the live histogram: the full edit re-rendered at
   // <=HIST_MAX px so a per-frame GPU->CPU readback stays cheap on the iPad.
   private histFbo: WebGLFramebuffer | null = null;
@@ -249,7 +258,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_toneTex", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_toneTex", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskTex"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -283,6 +292,41 @@ export class Renderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 256, 1, 0, gl.RED, gl.UNSIGNED_BYTE, IDENTITY_LUT);
+
+    // Brush-mask texture (unit 3): up to 4 painted masks packed one-per-channel.
+    // Starts as a single transparent texel (all masks empty).
+    this.brushTex = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, this.brushTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
+  }
+
+  /** Pack the active brush masks into the RGBA brush texture (channel per mask),
+   *  re-uploading only when their content changes. `masks` is the same filtered,
+   *  ordered list used to set the uniforms. */
+  private updateBrushTexture(masks: EditParams["masks"]) {
+    const gl = this.gl;
+    const brushes = masks.map((m, i) => ({ m, i })).filter((x) => x.m.type === 2 && x.m.brush);
+    const sig = brushes.map((x) => `${x.i}:${x.m.brush!.w}x${x.m.brush!.h}:${x.m.rev ?? 0}`).join("|");
+    if (sig === this.brushSig) return;
+    this.brushSig = sig;
+    gl.bindTexture(gl.TEXTURE_2D, this.brushTex);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    if (!brushes.length) {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
+      return;
+    }
+    const bw = brushes[0].m.brush!.w, bh = brushes[0].m.brush!.h;
+    const packed = new Uint8Array(bw * bh * 4);
+    for (const { m, i } of brushes) {
+      const b = m.brush!;
+      if (b.w !== bw || b.h !== bh) continue; // all brush masks share one size
+      for (let p = 0; p < bw * bh; p++) packed[p * 4 + i] = b.data[p];
+    }
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, bw, bh, 0, gl.RGBA, gl.UNSIGNED_BYTE, packed);
   }
 
   /** Rebuild the tone LUT from the five control points (cheap; on change only). */
@@ -384,6 +428,7 @@ export class Renderer {
     gl.uniform1f(this.loc.u_lum, p.lum || 1);
     // Local masks (up to MAX_MASKS = 4, the shader array size).
     const masks = (p.masks ?? []).filter(maskIsActive).slice(0, MAX_MASKS);
+    this.updateBrushTexture(masks);
     gl.uniform1i(this.loc.u_maskCount, masks.length);
     if (masks.length) {
       const types = new Int32Array(MAX_MASKS);
@@ -406,6 +451,9 @@ export class Renderer {
     }
     gl.uniform1i(this.loc.u_glowTex, 1);
     gl.uniform1i(this.loc.u_toneTex, 2);
+    gl.uniform1i(this.loc.u_maskTex, 3);
+    gl.activeTexture(gl.TEXTURE3);
+    gl.bindTexture(gl.TEXTURE_2D, this.brushTex);
     gl.activeTexture(gl.TEXTURE2);
     gl.bindTexture(gl.TEXTURE_2D, this.toneTex);
     gl.activeTexture(gl.TEXTURE1);
