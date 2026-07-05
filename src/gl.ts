@@ -155,8 +155,12 @@ void main() {
     float Lb = e.r * e.r * u_localScale;
     float Dv = e.g * e.g * u_localScale;
     if (u_dehaze != 0.0) {
-      float t = max(0.1, 1.0 - u_dehaze * Dv);
-      c = max((c - u_dehaze * Dv) / t, 0.0);
+      // Hue-preserving: veil-subtract the luminance, scale all channels alike.
+      float L0 = dot(c, LUMA_W);
+      if (L0 > 1e-6) {
+        float L1 = max(0.0, L0 - u_dehaze * Dv) / max(0.1, 1.0 - u_dehaze * Dv);
+        c *= L1 / L0;
+      }
     }
     if (u_clarity != 0.0) {
       float L = dot(c, LUMA_W);
@@ -223,7 +227,9 @@ void main() {
     float t = (h - CTR[bi]) / (CTR[bi + 1] - CTR[bi]);
     float w = t * t * (3.0 - 2.0 * t);
     vec3 adj = mix(u_hsl[bi], u_hsl[bj], w);
-    c = hsv2rgb(vec3(fract((h + adj.x) / 360.0), min(1.0, hsv.y * adj.y), hsv.z * adj.z));
+    // Power-curve saturation (see pipeline.ts): visible on low-sat IR pixels.
+    float s2 = pow(clamp(hsv.y, 0.0, 1.0), 1.0 / max(0.05, adj.y));
+    c = hsv2rgb(vec3(fract((h + adj.x) / 360.0), s2, hsv.z * adj.z));
   }
 
   // Tone tint (sepia etc.) after saturation so it survives mono looks.

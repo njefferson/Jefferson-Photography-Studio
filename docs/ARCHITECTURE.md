@@ -33,7 +33,11 @@ decode -> LINEAR camera-native RGB
                        LOW-RES MAPS (localmap.ts, RG8: blurred luma + blurred
                        dark-channel, sqrt-encoded, shared scale). Clarity =
                        pow(L/Lblur, k) — ratio-based, so exposure/WB-invariant.
-                       Dehaze = white-airlight veil subtraction (I-dV)/(1-dV).
+                       Dehaze is HUE-PRESERVING: veil-subtracts LUMINANCE only
+                       ((L-dV)/(1-dV)), then scales all channels by L1/L0.
+                       NEVER subtract per-channel here — camera-native channels
+                       are wildly imbalanced pre-WB, so an equal cut shifts hue
+                       hard once the WB gains amplify it (field bug 2026-07-05).
                        Spatial -> NOT in the .cube LUT. CPU bilinears the SAME
                        encoded bytes the GPU filters, then decodes — parity.)
   -> EXPOSURE, WB     (linear multipliers; WB luminance-normalized)
@@ -60,8 +64,12 @@ decode -> LINEAR camera-native RGB
   -> HSL MIXER        (8 fixed bands R/O/Y/G/Aqua/B/Purple/Magenta at
                        HSL_CENTERS, each hue/sat/lum; weights smoothstep
                        between ADJACENT centres so every hue answers to ≤2
-                       chips, weight 1 at a centre. Targets DISPLAYED colour —
-                       does NOT follow the swap (unlike Sky/Foliage). Pure
+                       chips, weight 1 at a centre. Saturation is a POWER
+                       curve s^(1/slider), not a multiplier — a multiplier is
+                       invisible on low-sat IR skies (s≈0.05); the power curve
+                       moves them visibly and stays gentle near s=1 (field
+                       feedback 2026-07-05). Targets DISPLAYED colour — does
+                       NOT follow the swap (unlike Sky/Foliage). Pure
                        per-pixel colour math -> IS baked into the .cube LUT.)
   -> TINT             (sepia over mono)
   -> GLOW             (adds blurred-highlight map in linear; HIE halation)

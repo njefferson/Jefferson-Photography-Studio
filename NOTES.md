@@ -155,13 +155,18 @@ See **`PLAN.md`** for the full build plan.
 > fits the existing per-pixel GPU shader + CPU mirror — no ML, no server.
 
 Classical, subscription-grade tools (fit the current architecture directly):
-- [x] **Clarity / Dehaze** (shipped 2026-07-05) — in Hue/Saturation/Tone.
+- [x] **Clarity / Dehaze** (shipped 2026-07-05; dehaze reworked same day after
+  iPad testing found colour shifts — now hue-preserving: luminance-only veil
+  subtraction, all channels scaled alike) — in Hue/Saturation/Tone.
   Per-image low-res maps (localmap.ts): clarity = exposure-invariant ratio vs
   blurred luma; dehaze = dark-channel veil subtraction. GPU==CPU ≤1 LSB; part
   of saved looks; rebuilt at full res on export. **Texture** (fine-radius local
   contrast) folds into the Detail-sharpening item below — it needs pixel-
   neighbourhood taps, not a low-res map.
-- [x] **8-channel HSL colour mixer** (shipped 2026-07-05) — Color mixer panel:
+- [x] **8-channel HSL colour mixer** (shipped 2026-07-05; strengthened same
+  day after iPad testing found it too subtle — saturation is now a power curve
+  s^(1/slider) so low-sat IR pixels move visibly; hue ±60, lum 0.3–1.7) —
+  Color mixer panel:
   8 chips (R/O/Y/G/Aqua/B/Purple/Magenta), hue/sat/lum per chip, smooth
   adjacent-band blending. Targets displayed colour (doesn't follow the swap);
   bakes into .cube (non-spatial). GPU==CPU ≤1 LSB over the full hue wheel;

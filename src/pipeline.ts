@@ -392,12 +392,18 @@ export function compileEdit(
     if (localOn && u !== undefined && v !== undefined) {
       const [Lb, Dv] = sampleLocalMap(local, u, v);
       if (dz !== 0) {
-        // White-airlight haze model: J = (I - d·V) / (1 - d·V); +d removes the
-        // local veil, -d adds one. Denominator floored so it can't explode.
-        const t = Math.max(0.1, 1 - dz * Dv);
-        r = Math.max(0, (r - dz * Dv) / t);
-        g = Math.max(0, (g - dz * Dv) / t);
-        b = Math.max(0, (b - dz * Dv) / t);
+        // HUE-PRESERVING haze removal: veil-subtract the LUMINANCE only, then
+        // scale all channels by the same factor. (Per-channel subtraction in
+        // camera-native space shifted colours badly — the native channels are
+        // wildly imbalanced pre-WB, so an equal cut is a huge relative cut to
+        // the weak channel, then the WB gains blow the error up. Field-found
+        // on the iPad, 2026-07-05.)
+        const L0 = r * REC709[0] + g * REC709[1] + b * REC709[2];
+        if (L0 > 1e-6) {
+          const L1 = Math.max(0, L0 - dz * Dv) / Math.max(0.1, 1 - dz * Dv);
+          const k = L1 / L0;
+          r *= k; g *= k; b *= k;
+        }
       }
       if (cl !== 0) {
         const L = r * REC709[0] + g * REC709[1] + b * REC709[2];
@@ -465,7 +471,10 @@ export function compileEdit(
       let [h, s, v] = rgb2hsv(Math.max(0, nr), Math.max(0, ng), Math.max(0, nb));
       const [dh, ds, dl] = hslAt(p.hsl, h);
       h += dh;
-      s = Math.min(1, s * ds);
+      // POWER-curve saturation, not a multiplier: s^(1/ds) moves low-sat
+      // pixels visibly (IR skies live near s≈0.05, where a multiplier does
+      // nothing) yet stays gentle near s=1. Identity at ds=1, bounded ≤1.
+      s = Math.pow(Math.min(1, Math.max(0, s)), 1 / Math.max(0.05, ds));
       v *= dl;
       [nr, ng, nb] = hsv2rgb(h, s, v);
     }
