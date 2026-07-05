@@ -119,9 +119,19 @@ See **`PLAN.md`** for the full build plan.
   to exit) making that obvious; one drag = one undo step; a floating readout
   names the colour and shows the live hue/luminance. The drag→param mapping,
   stable re-touch, chip pick and re-render are verified in headless chromium.
-- [ ] **Mask by color** — a mask type that selects everything matching a tapped
-  colour (weight from hue/sat distance in display space — chroma-key style).
-  Classical per-pixel math; fits the existing mask engine as type 3.
+- [x] **Mask by color** — a mask type (3) that selects everything matching a
+  tapped colour (shipped 2026-07-05). Weight is a chroma-key: the pixel's
+  DISPLAY-space hue/saturation distance to the target, measured in the HSV
+  chroma plane via a branch-free opponent projection (hue AND saturation in one
+  number, hue's influence fading as pixels desaturate). Range widens the band,
+  Feather softens the edge. Targeted by tapping the photo — the tap reads the
+  mask-stage colour through the shader's u_readMode, the exact colour the key
+  compares against, so the colour you touch selects itself (and colour masks key
+  on that fixed pre-mask colour, so stacking order never shifts the selection).
+  Carries the same local brightness/contrast/saturation/hue/warmth as the other
+  masks; spatial, so skipped in the .cube LUT. GPU==CPU verified ≤2 LSB
+  (colour-key alone and stacked = 1 LSB) in headless chromium, plus a controlled
+  selectivity render and a real tap-to-pick UI flow.
 - [ ] **Mask by subject / sky / background** — auto-select masks (owner request
   2026-07-05). Honest scoping: true subject/background segmentation needs an
   on-device ML model (WebGPU — the "frontier" backlog item); SKY may get a

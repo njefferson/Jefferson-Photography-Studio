@@ -200,14 +200,24 @@
 
         <fieldset id="fsMasks">
           <legend>Masks <small>(local adjustments)</small></legend>
-          <small style="color:#80808a">Add a radial or gradient mask, drag it on the photo, then adjust only that area. Tap a mask to select it.</small>
+          <small style="color:#80808a">Add a radial, gradient, brush or colour mask, target it on the photo, then adjust only that area. Tap a mask to select it.</small>
           <div class="mask-add">
             <button id="addRadial" type="button">+ Radial</button>
             <button id="addLinear" type="button">+ Gradient</button>
             <button id="addBrush" type="button">+ Brush</button>
+            <button id="addColor" type="button">+ Colour</button>
           </div>
           <div id="maskList" class="mask-list"></div>
           <div id="maskEditor" hidden>
+            <div id="colorControls" hidden>
+              <small style="color:#80808a">Tap the photo to choose the colour to match, then adjust below. Widen Range to include more shades; Feather softens the edge.</small>
+              <div class="mask-editor-actions">
+                <button id="mColorPick" type="button" class="toggle" aria-pressed="false">&#127919; Pick colour</button>
+                <span id="mColorSwatch" class="color-swatch"></span>
+                <span id="mColorSwatchText" style="color:#80808a;font-size:.85em"></span>
+              </div>
+              <label>Range <input id="mColorRange" type="range" min="0.02" max="0.8" step="0.01" value="0.25" /></label>
+            </div>
             <div id="brushControls" hidden>
               <small style="color:#80808a">Paint on the photo to build the mask. Turn Paint off to pan/zoom.</small>
               <div class="mask-editor-actions">

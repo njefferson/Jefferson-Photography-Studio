@@ -112,21 +112,28 @@ export interface BrushMask {
   data: Uint8Array;
 }
 
-/** A local-adjustment mask. `type` 0 = radial, 1 = linear gradient, 2 = brush.
- *  Geometry is in image-uv [0..1] so it anchors to the photo through
- *  rotation/zoom. */
+/** A local-adjustment mask. `type` 0 = radial, 1 = linear gradient, 2 = brush,
+ *  3 = colour (chroma-key). Geometry is in image-uv [0..1] so it anchors to the
+ *  photo through rotation/zoom; a colour mask has no geometry — its weight comes
+ *  from each pixel's hue/saturation distance to a tapped colour instead. */
 export interface MaskLayer {
-  type: 0 | 1 | 2;
+  type: 0 | 1 | 2 | 3;
   cx: number; // radial: centre x; linear: start x
   cy: number; // radial: centre y; linear: start y
   rx: number; // radial: x radius (uv fraction)
   ry: number; // radial: y radius (uv fraction)
-  feather: number; // radial: 0..1 soft edge
+  feather: number; // radial/colour: 0..1 soft edge
   lx: number; // linear: end x
   ly: number; // linear: end y
   invert: boolean;
   brush?: BrushMask; // type 2 only
   rev?: number; // bumps on each brush stroke (undo equality)
+  // Colour mask (type 3): the tapped target and how wide a band it selects. The
+  // key is the pixel's DISPLAY-space hue/saturation at the mask stage (see
+  // colorMaskWeight); satTarget is HSV saturation (0..1), hueTarget in degrees.
+  hueTarget: number; // degrees
+  satTarget: number; // 0..1 (HSV)
+  colorRange: number; // chroma-plane distance at which selection reaches 0
   // Local adjustments — neutral = brightness/contrast/saturation 1, hue/warmth 0.
   brightness: number;
   contrast: number;
@@ -135,8 +142,8 @@ export interface MaskLayer {
   warmth: number; // -1..1, + warmer
 }
 
-export function neutralMask(type: 0 | 1 | 2): MaskLayer {
-  const base = { cx: 0.5, cy: 0.5, rx: 0.35, ry: 0.35, feather: 0.5, lx: 0.5, ly: 0.85, invert: false, brightness: 1, contrast: 1, saturation: 1, hue: 0, warmth: 0 };
+export function neutralMask(type: 0 | 1 | 2 | 3): MaskLayer {
+  const base = { cx: 0.5, cy: 0.5, rx: 0.35, ry: 0.35, feather: 0.5, lx: 0.5, ly: 0.85, invert: false, hueTarget: 0, satTarget: 0, colorRange: 0.25, brightness: 1, contrast: 1, saturation: 1, hue: 0, warmth: 0 };
   if (type === 1) return { ...base, type, cx: 0.5, cy: 0.12, lx: 0.5, ly: 0.5 };
   if (type === 2) return { ...base, type, rev: 0 };
   return { ...base, type };
@@ -181,6 +188,38 @@ export function maskWeight(m: MaskLayer, u: number, v: number): number {
   } else {
     w = m.brush ? sampleBrush(m.brush, u, v) : 0;
   }
+  return m.invert ? 1 - w : w;
+}
+
+/** The HSV chroma-plane vector s·(cosH, sinH) of a DISPLAY-space colour, but
+ *  derived DIRECTLY from RGB via the opponent projection instead of through
+ *  rgb2hsv. This is algebraically the same point (|v| = HSV saturation, angle =
+ *  HSV hue) yet it is CONTINUOUS — no hue-angle branch, no wrap discontinuity —
+ *  so the GPU and CPU agree to float epsilon even at the hexagon vertices where
+ *  the two rgb2hsv formulations otherwise drift ~1°. (a,b)/V = S·(cosH,sinH)
+ *  because (a,b) has magnitude = chroma C and S = C/V. Identical in the shader. */
+export function chromaVec(r: number, g: number, b: number): [number, number] {
+  const V = Math.max(r, g, b);
+  if (V <= 1e-6) return [0, 0];
+  return [(r - 0.5 * (g + b)) / V, (0.8660254037844386 * (g - b)) / V];
+}
+
+/** Colour-mask (type 3) weight for a DISPLAY-space pixel colour (gamma RGB,
+ *  0..1). Chroma-key: project the pixel and the tapped target onto the HSV
+ *  chroma plane (hue angle × saturation radius) and measure Euclidean distance
+ *  — one number that folds hue AND saturation together and naturally fades hue's
+ *  influence as pixels desaturate (a near-grey pixel sits near the origin
+ *  whatever its noisy hue). Weight is 1 at the target, smoothstep-falling to 0
+ *  past `colorRange`; `feather` widens the soft transition. Kept numerically
+ *  identical to the shader's colorMaskWeight. */
+export function colorMaskWeight(m: MaskLayer, r: number, g: number, b: number): number {
+  const [px, py] = chromaVec(r, g, b);
+  const tRad = (m.hueTarget * Math.PI) / 180;
+  const tx = m.satTarget * Math.cos(tRad), ty = m.satTarget * Math.sin(tRad);
+  const dist = Math.hypot(px - tx, py - ty);
+  const edge = Math.max(1e-4, m.colorRange);
+  const plateau = edge * (1 - m.feather);
+  const w = 1 - smooth01(plateau, edge, dist);
   return m.invert ? 1 - w : w;
 }
 
@@ -478,8 +517,18 @@ export function compileEdit(
     // global contrast/gamma. Spatial (needs image-uv), so skipped when u/v are
     // absent (e.g. the .cube LUT bake) — matching denoise/glow.
     if (masks.length && u !== undefined && v !== undefined) {
+      // Colour masks key on the mask-STAGE colour (gamma-encoded, before any
+      // mask) — exactly what a tap samples via Renderer.readColorKeyPixel, so
+      // the colour you touch selects itself and stacking order can't shift the
+      // selection. Captured once; matches the shader's cKey.
+      const kr = toGamma(nr), kg = toGamma(ng), kb = toGamma(nb);
       for (const m of masks) {
-        const w = maskWeight(m, u, v);
+        let w: number;
+        if (m.type === 3) {
+          w = colorMaskWeight(m, kr, kg, kb);
+        } else {
+          w = maskWeight(m, u, v);
+        }
         if (w <= 0) continue;
         // warmth (linear temp shift)
         nr *= 1 + 0.5 * m.warmth * w;

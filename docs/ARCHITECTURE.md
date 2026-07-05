@@ -63,12 +63,16 @@ decode -> LINEAR camera-native RGB
                        state. hue/sat/lum each)
   -> TINT             (sepia over mono)
   -> GLOW             (adds blurred-highlight map in linear; HIE halation)
-  -> LOCAL MASKS      (radial/linear, up to 4; each applies local brightness/
-                       contrast/saturation/hue/warmth weighted by the mask, in
-                       LINEAR space here. Geometry is image-uv so masks stick to
-                       the subject through zoom/pan/rotation. Spatial (reads the
-                       pixel's uv) -> like denoise/glow, NOT baked into the .cube
-                       LUT. compileEdit takes (u,v); the shader uses v_uv.)
+  -> LOCAL MASKS      (radial/linear/brush/colour, up to 4; each applies local
+                       brightness/contrast/saturation/hue/warmth weighted by the
+                       mask, in LINEAR space here. Radial/linear/brush geometry is
+                       image-uv so masks stick to the subject through zoom/pan/
+                       rotation; a COLOUR mask (type 3) has no geometry — its
+                       weight is a chroma-key on the pixel's own DISPLAY-space
+                       hue/saturation (see the colour-mask note below). Spatial
+                       (reads the pixel's uv and/or colour) -> like denoise/glow,
+                       NOT baked into the .cube LUT. compileEdit takes (u,v); the
+                       shader uses v_uv.)
   -> CONTRAST         ((c-0.5)*k+0.5)
   -> GAMMA 2.2
   -> TONE CURVE       (five fixed-x control points blacks/shadows/midtones/
@@ -352,6 +356,39 @@ and NO Nikon body can channel-swap in camera. Field guide:
     copies. Never mutate a brush's `data` in place anywhere else. Paint mode
     intercepts single-pointer canvas drags (guards atop the canvas pointer
     handlers) and sets `tapSuppressed` so it never also fires tap-to-WB.
+  - **Colour masks** (type 3): a chroma-key with NO geometry — the weight comes
+    from each pixel's own colour, not its position. `colorMaskWeight` measures
+    the Euclidean distance in the HSV **chroma plane** between the pixel and the
+    tapped target (`hueTarget`°, `satTarget` = HSV S), 1 at the target and
+    smoothstep-falling to 0 past `colorRange` (`feather` widens the soft edge).
+    One distance folds hue AND saturation together and naturally fades hue's
+    influence as pixels desaturate (a near-grey pixel sits near the origin
+    whatever its noisy hue). CRUCIAL DETAIL that earned the ≤2 LSB parity: do NOT
+    build the chroma vector from `rgb2hsv` — the GPU and CPU rgb2hsv formulations
+    drift ~1° at the hexagon vertices, and a colour-dependent weight through a
+    steep smoothstep amplifies that into ~3 LSB at the selection edge (geometric
+    masks never see this — their weight is colour-independent). Instead both
+    sides use `chromaVec`, the branch-free opponent projection
+    `(R-½(G+B), √3⁄2·(G-B)) / V`, which is algebraically the SAME point
+    (`|v|`=HSV saturation, angle=HSV hue) but CONTINUOUS — no hue-angle branch,
+    no wrap — so GPU==CPU to float epsilon. The mask keys on the **mask-stage**
+    display colour (the running linear colour gamma-encoded just before the mask
+    loop, captured ONCE as `cKey` and reused by every colour mask): (1) it is the
+    exact colour a tap samples — the shader's `u_readMode==1` emits that same
+    pre-mask colour, and `Renderer.readColorKeyPixel` reads it — so the colour
+    you touch selects itself; (2) keying on a FIXED pre-mask colour (not the
+    running colour mutated by earlier masks in the loop) means stacking order
+    can't shift the selection and upstream 1-LSB rounding can't cascade into the
+    steep key (that cascade was the last 3-LSB straggler in the stacked case).
+    The tap stores the target from the same `chromaVec` (hueTarget = atan2 angle,
+    satTarget = radius), so a pixel of the tapped colour lands exactly on the
+    target. Geometry uniforms are reused: `u_maskGeoA` carries
+    `(hueTarget, satTarget, colorRange, -)` for type 3, `u_maskGeoB` stays
+    `(feather, invert)`. Colour masks show no overlay handles (like brush).
+    Verified in headless chromium: GPU==CPU ≤2 LSB (colour-key alone and stacked
+    = 1 LSB; the 2-LSB pixels are near-grey points from the pre-existing
+    mixer/tone/lum display ops), a controlled hue×sat selectivity render, and a
+    real tap-to-pick + adjust + undo UI flow.
 - WB gain + exposure sliders are LOG-scale: the `<input>` stores a 0..1000
   position; `toPos`/`fromPos` in main.ts map it exponentially over
   0.02–16x (WB) / 0.1–16x (exposure) so 1.0 sits near mid-track. On a linear

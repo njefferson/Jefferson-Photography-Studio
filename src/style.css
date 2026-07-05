@@ -350,8 +350,18 @@ button { cursor: pointer; }
 #maskOverlay .mask-shape { fill: rgba(120, 200, 255, 0.06); stroke: rgba(130, 205, 255, 0.9); stroke-width: 1.5; stroke-dasharray: 6 4; }
 #maskOverlay .mask-line { stroke: rgba(130, 205, 255, 0.9); stroke-width: 1.5; stroke-dasharray: 6 4; }
 #maskOverlay .mask-handle { fill: rgba(12, 12, 16, 0.72); stroke: #82cdff; stroke-width: 2; pointer-events: auto; cursor: grab; touch-action: none; }
-.mask-add { display: flex; gap: 6px; margin: 8px 0; }
+.mask-add { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
 .mask-add button { width: auto; padding: 6px 12px; font-size: 13px; }
+/* Colour-mask target swatch: shows the tapped colour that drives the key. */
+.color-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  background: #3a3a42;
+  flex: none;
+  align-self: center;
+}
 .mask-list { display: flex; flex-direction: column; gap: 4px; }
 .mask-row { display: flex; align-items: center; gap: 6px; }
 .mask-row .mask-pick { flex: 1; text-align: left; padding: 6px 10px; font-size: 13px; }

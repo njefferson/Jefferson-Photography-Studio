@@ -60,6 +60,8 @@ uniform vec2 u_maskGeoB[4];  // (feather, invert)
 uniform vec4 u_maskAdj[4];   // (brightness, contrast, saturation, warmth)
 uniform float u_maskHue[4];  // degrees
 uniform sampler2D u_maskTex; // brush masks packed 1-per-channel (rgba = mask 0..3)
+uniform int u_readMode;      // 1 = output the mask-stage DISPLAY colour and stop
+                             //     (lets the colour mask read its own key colour)
 uniform float u_hotspot;     // IR hot-spot correction (darken centre) 0..0.8
 uniform float u_hotspotSize; // hot-spot radial extent
 uniform float u_vignette;    // -1..1 (+ brighten corners, - darken)
@@ -121,6 +123,26 @@ float maskWeight(int i, vec2 uv){
     float t = dot(uv - gA.xy, g) / len2;
     w = 1.0 - clamp(t, 0.0, 1.0);
   }
+  if (u_maskGeoB[i].y > 0.5) w = 1.0 - w;
+  return w;
+}
+// Colour mask (type 3): weight from the pixel's DISPLAY-space hue/saturation
+// distance to the tapped target, chroma-key style. c is the running LINEAR
+// colour at the mask stage; gamma-encode it so the hue matches the screen.
+// u_maskGeoA[i] = (hueTargetDeg, satTarget, colorRange, -). Matches pipeline.ts.
+float colorMaskWeight(int i, vec3 c){
+  vec4 gA = u_maskGeoA[i]; // (hueTargetDeg, satTarget, colorRange, -)
+  vec3 d = toGamma(clamp(c, 0.0, 1.0));
+  // HSV chroma-plane vector s*(cosH,sinH) straight from RGB (opponent
+  // projection / V) — continuous, so it matches pipeline.ts to float epsilon.
+  float V = max(max(d.r, d.g), d.b);
+  vec2 pv = V > 1e-6 ? vec2((d.r - 0.5 * (d.g + d.b)) / V, 0.8660254 * (d.g - d.b) / V) : vec2(0.0);
+  float tRad = radians(gA.x);
+  vec2 tv = vec2(gA.y * cos(tRad), gA.y * sin(tRad));
+  float dist = length(pv - tv);
+  float edge = max(1e-4, gA.z);
+  float plateau = edge * (1.0 - u_maskGeoB[i].x);
+  float w = 1.0 - smoothstep(plateau, edge, dist);
   if (u_maskGeoB[i].y > 0.5) w = 1.0 - w;
   return w;
 }
@@ -219,6 +241,16 @@ void main() {
   // 0.7 = GLOW_GAIN in glow.ts — keep in sync.
   c += vec3(u_glow * 0.7 * texture(u_glowTex, v_uv).r);
 
+  // Colour-mask key read: emit the mask-stage colour in DISPLAY space and stop,
+  // so a tap can sample exactly what colorMaskWeight keys against. (Must sit
+  // right before the mask loop — the key is the colour BEFORE any mask.)
+  if (u_readMode == 1) { frag = vec4(toGamma(clamp(c, 0.0, 1.0)), 1.0); return; }
+
+  // Colour masks all key on the mask-STAGE colour (this fixed cKey, before any
+  // mask) — exactly what a tap samples — so the colour you touch selects itself
+  // and stacking order can't shift the selection. Matches compileEdit.
+  vec3 cKey = c;
+
   // Local masks: each adjustment weighted by the mask, in linear space before
   // global contrast/gamma. Identical math to compileEdit in pipeline.ts.
   for (int i = 0; i < u_maskCount; i++) {
@@ -226,6 +258,8 @@ void main() {
     if (u_maskType[i] == 2) {
       w = texture(u_maskTex, v_uv)[i]; // brush: packed channel per mask
       if (u_maskGeoB[i].y > 0.5) w = 1.0 - w; // invert
+    } else if (u_maskType[i] == 3) {
+      w = colorMaskWeight(i, cKey); // chroma-key on the fixed mask-stage colour
     } else {
       w = maskWeight(i, v_uv);
     }
@@ -321,7 +355,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_toneTex", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskTex", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_toneTex", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -492,10 +526,11 @@ export class Renderer {
   /** Bind the program, every edit uniform, and the three input textures. Shared
    *  by the on-screen render and the offscreen histogram pass so they can never
    *  disagree about what the pixels are. */
-  private bindPipeline(p: EditParams, split: number, rot: number) {
+  private bindPipeline(p: EditParams, split: number, rot: number, readMode = 0) {
     const gl = this.gl;
     gl.useProgram(this.prog);
     gl.uniform1i(this.loc.u_tex, 0);
+    gl.uniform1i(this.loc.u_readMode, readMode);
     gl.uniform1f(this.loc.u_denoise, p.denoise);
     gl.uniform3f(this.loc.u_tint, p.tint[0], p.tint[1], p.tint[2]);
     gl.uniform3f(this.loc.u_sky, p.sky[0], p.sky[1], p.sky[2]);
@@ -539,7 +574,12 @@ export class Renderer {
       const hue = new Float32Array(MAX_MASKS);
       masks.forEach((m, i) => {
         types[i] = m.type;
-        geoA.set(m.type === 0 ? [m.cx, m.cy, m.rx, m.ry] : [m.cx, m.cy, m.lx, m.ly], i * 4);
+        geoA.set(
+          m.type === 0 ? [m.cx, m.cy, m.rx, m.ry]
+          : m.type === 3 ? [m.hueTarget, m.satTarget, m.colorRange, 0]
+          : [m.cx, m.cy, m.lx, m.ly],
+          i * 4,
+        );
         geoB.set([m.feather, m.invert ? 1 : 0], i * 2);
         adj.set([m.brightness, m.contrast, m.saturation, m.warmth], i * 4);
         hue[i] = m.hue;
@@ -611,7 +651,7 @@ export class Renderer {
    *  (rotation ignored — it never changes displayed colour values) and leave it
    *  bound. Shared by histogram() and readUvPixel(); the caller reads pixels
    *  then calls restoreDefaultFbo(). Returns the FBO size. */
-  private renderOffscreen(p: EditParams): { w: number; h: number } {
+  private renderOffscreen(p: EditParams, readMode = 0): { w: number; h: number } {
     const gl = this.gl;
     const scale = Math.min(1, Renderer.HIST_MAX / Math.max(this.imgW, this.imgH));
     const w = Math.max(1, Math.round(this.imgW * scale));
@@ -635,7 +675,7 @@ export class Renderer {
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.histFbo);
     gl.viewport(0, 0, w, h);
-    this.bindPipeline(p, 0, 0);
+    this.bindPipeline(p, 0, 0, readMode);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     return { w, h };
   }
@@ -658,6 +698,23 @@ export class Renderer {
     if (!this.imgW) return null;
     const gl = this.gl;
     const { w, h } = this.renderOffscreen(p);
+    const x = Math.max(0, Math.min(w - 1, Math.round(u * w)));
+    const y = Math.max(0, Math.min(h - 1, Math.round(v * h)));
+    const buf = new Uint8Array(4);
+    // GL reads bottom-origin; flip to match image-uv (v = 0 at the top).
+    gl.readPixels(x, h - 1 - y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+    this.restoreDefaultFbo();
+    return [buf[0], buf[1], buf[2]];
+  }
+
+  /** The mask-stage DISPLAY colour at image-uv (u,v) — the colour BEFORE any
+   *  local mask, gamma-encoded, exactly what colorMaskWeight keys against (via
+   *  the shader's u_readMode). The colour mask's tap-to-pick reads this so the
+   *  colour you touch is the colour that selects itself. */
+  readColorKeyPixel(p: EditParams, u: number, v: number): [number, number, number] | null {
+    if (!this.imgW) return null;
+    const gl = this.gl;
+    const { w, h } = this.renderOffscreen(p, 1);
     const x = Math.max(0, Math.min(w - 1, Math.round(u * w)));
     const y = Math.max(0, Math.min(h - 1, Math.round(v * h)));
     const buf = new Uint8Array(4);

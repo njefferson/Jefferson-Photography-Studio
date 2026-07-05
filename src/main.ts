@@ -3,7 +3,7 @@ import { importFile, type ImportedFile } from "./import";
 import { decode, type DecodedImage } from "./decode";
 import { Renderer, type EditParams } from "./gl";
 import { exportImage, download, type ExportFormat } from "./export";
-import { TONE_DEFAULT, TONE_X, toneEvaluator, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, type MaskLayer } from "./pipeline";
+import { TONE_DEFAULT, TONE_X, toneEvaluator, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, chromaVec, type MaskLayer } from "./pipeline";
 import { generateCube } from "./lut";
 import { generateDcp } from "./dcp";
 import { buildGlowMap } from "./glow";
@@ -820,7 +820,7 @@ let hslPickArmed = false;
 function setHslPick(on: boolean) {
   hslPickArmed = on;
   hslPickBtn.setAttribute("aria-pressed", String(on));
-  if (on) setTat(false); // the two picture tools are mutually exclusive
+  if (on) { setTat(false); setColorPick(false); } // picture tools are mutually exclusive
 }
 hslPickBtn.addEventListener("click", () => setHslPick(!hslPickArmed));
 
@@ -867,6 +867,7 @@ const maskEditor = $("maskEditor") as HTMLDivElement;
 const addRadialBtn = $("addRadial") as HTMLButtonElement;
 const addLinearBtn = $("addLinear") as HTMLButtonElement;
 const addBrushBtn = $("addBrush") as HTMLButtonElement;
+const addColorBtn = $("addColor") as HTMLButtonElement;
 const mUI = {
   brightness: $("mBrightness") as HTMLInputElement,
   contrast: $("mContrast") as HTMLInputElement,
@@ -881,6 +882,11 @@ const mUI = {
   erase: $("mErase") as HTMLButtonElement,
   brushSize: $("mBrushSize") as HTMLInputElement,
   clearBrush: $("mClearBrush") as HTMLButtonElement,
+  colorControls: $("colorControls") as HTMLElement,
+  colorPick: $("mColorPick") as HTMLButtonElement,
+  colorRange: $("mColorRange") as HTMLInputElement,
+  colorSwatch: $("mColorSwatch") as HTMLElement,
+  colorSwatchText: $("mColorSwatchText") as HTMLElement,
 };
 const BRUSH_MAX_EDGE = 384; // working resolution of the painted mask bitmap
 let selectedMask = -1;
@@ -891,10 +897,13 @@ function currentMask(): MaskLayer | null {
   return selectedMask >= 0 && selectedMask < params.masks.length ? params.masks[selectedMask] : null;
 }
 
-function addMask(type: 0 | 1 | 2) {
+function addMask(type: 0 | 1 | 2 | 3) {
   if (!current || params.masks.length >= MAX_MASKS) return;
   const m = neutralMask(type);
-  m.brightness = type === 1 ? 1.15 : 1.25; // a gentle default so it does something
+  // A gentle default so a fresh mask does something. Colour masks lean on
+  // saturation (the owner's taste — make the matched colour pop).
+  if (type === 3) m.saturation = 1.4;
+  else m.brightness = type === 1 ? 1.15 : 1.25;
   if (type === 2) {
     const s = Math.min(1, BRUSH_MAX_EDGE / Math.max(current.width, current.height));
     const bw = Math.max(1, Math.round(current.width * s));
@@ -907,6 +916,7 @@ function addMask(type: 0 | 1 | 2) {
   selectedMask = params.masks.length - 1;
   updateMaskUI();
   renderMaskOverlay();
+  if (type === 3) setColorPick(true); // arm the tap-to-pick target immediately
   draw();
   flushRecord();
 }
@@ -922,6 +932,7 @@ function deleteMask(i: number) {
 
 function selectMask(i: number) {
   selectedMask = i;
+  setColorPick(false); // arming is per-mask; disarm when the selection changes
   updateMaskUI();
   renderMaskOverlay();
 }
@@ -934,7 +945,7 @@ function updateMaskUI() {
       const pick = document.createElement("button");
       pick.type = "button";
       pick.className = "mask-pick" + (i === selectedMask ? " active" : "");
-      const label = m.type === 0 ? "Radial" : m.type === 1 ? "Gradient" : "Brush";
+      const label = m.type === 0 ? "Radial" : m.type === 1 ? "Gradient" : m.type === 2 ? "Brush" : "Colour";
       pick.textContent = `${label} ${i + 1}`;
       pick.addEventListener("click", () => selectMask(i));
       const del = document.createElement("button");
@@ -960,10 +971,27 @@ function updateMaskUI() {
     mUI.hue.value = String(m.hue);
     mUI.warmth.value = String(m.warmth);
     mUI.feather.value = String(m.feather);
-    mUI.featherRow.hidden = m.type !== 0;
+    // Feather is the soft edge for radial AND colour masks (transition width).
+    mUI.featherRow.hidden = m.type !== 0 && m.type !== 3;
     mUI.brushControls.hidden = m.type !== 2;
+    mUI.colorControls.hidden = m.type !== 3;
+    if (m.type === 3) {
+      mUI.colorRange.value = String(m.colorRange);
+      updateColorSwatch(m);
+    }
     mUI.invert.setAttribute("aria-pressed", String(m.invert));
   }
+}
+
+/** Reflect the tapped target colour on the swatch + label. */
+function updateColorSwatch(m: MaskLayer) {
+  const picked = m.satTarget > 0.001 || m.hueTarget !== 0;
+  mUI.colorSwatch.style.background = picked
+    ? `hsl(${m.hueTarget}deg ${Math.round(Math.min(1, m.satTarget) * 75 + 15)}% 50%)`
+    : "#3a3a42";
+  mUI.colorSwatchText.textContent = picked
+    ? `Hue ${Math.round(m.hueTarget)}° · Sat ${m.satTarget.toFixed(2)}`
+    : "Tap the photo to pick a colour";
 }
 
 function syncMaskFromUI() {
@@ -975,11 +1003,12 @@ function syncMaskFromUI() {
   m.hue = Number(mUI.hue.value);
   m.warmth = Number(mUI.warmth.value);
   m.feather = Number(mUI.feather.value);
+  m.colorRange = Number(mUI.colorRange.value);
   draw();
   positionMaskOverlay(); // feather changes the outline
 }
 
-for (const el of [mUI.brightness, mUI.contrast, mUI.sat, mUI.hue, mUI.warmth, mUI.feather]) {
+for (const el of [mUI.brightness, mUI.contrast, mUI.sat, mUI.hue, mUI.warmth, mUI.feather, mUI.colorRange]) {
   el.addEventListener("input", syncMaskFromUI);
 }
 mUI.invert.addEventListener("click", () => {
@@ -993,6 +1022,44 @@ mUI.invert.addEventListener("click", () => {
 $("mDelete").addEventListener("click", () => { if (selectedMask >= 0) deleteMask(selectedMask); });
 addRadialBtn.addEventListener("click", () => addMask(0));
 addLinearBtn.addEventListener("click", () => addMask(1));
+addColorBtn.addEventListener("click", () => addMask(3));
+
+// Colour-mask target pick: arm, tap the photo, and the mask keys on that
+// colour. Reads the mask-stage DISPLAY colour (before any mask) via
+// readColorKeyPixel — exactly what the shader/CPU colour key compares against,
+// so the colour you touch is the colour that selects itself.
+let colorPickArmed = false;
+function setColorPick(on: boolean) {
+  const m = currentMask();
+  colorPickArmed = on && !!m && m.type === 3;
+  mUI.colorPick.setAttribute("aria-pressed", String(colorPickArmed));
+  if (colorPickArmed) { setHslPick(false); setTat(false); } // picture tools are exclusive
+}
+mUI.colorPick.addEventListener("click", () => setColorPick(!colorPickArmed));
+
+/** Handle an armed colour-mask target tap. Returns true when it consumed it. */
+function handleColorMaskPick(clientX: number, clientY: number): boolean {
+  if (!colorPickArmed) return false;
+  const m = currentMask();
+  setColorPick(false); // one-shot
+  if (!m || m.type !== 3) return true;
+  const [uu, vv] = renderer.clientToImageUv(clientX, clientY);
+  const px = renderer.readColorKeyPixel(params, uu, vv);
+  if (px) {
+    // Store the target from the SAME chroma-plane projection the key uses, so a
+    // pixel of the tapped colour lands exactly on the target (hueTarget = angle,
+    // satTarget = radius = HSV saturation). chromaVec takes any RGB scale.
+    const [cx, cy] = chromaVec(px[0], px[1], px[2]);
+    let h = (Math.atan2(cy, cx) * 180) / Math.PI;
+    if (h < 0) h += 360;
+    m.hueTarget = h;
+    m.satTarget = Math.hypot(cx, cy);
+    updateColorSwatch(m);
+    draw();
+    flushRecord();
+  }
+  return true;
+}
 
 function mkHandle(role: string): SVGCircleElement {
   const c = document.createElementNS(SVGNS, "circle");
@@ -1008,8 +1075,9 @@ function mkHandle(role: string): SVGCircleElement {
 // which would destroy the element holding the pointer capture.
 function renderMaskOverlay() {
   const m = currentMask();
-  // Brush masks have no geometry handles — the painting itself is the feedback.
-  const showable = !!current && !panel.hidden && welcome.hidden && !!m && m.type !== 2;
+  // Brush and colour masks have no geometry handles — the paint / the colour
+  // key itself is the feedback.
+  const showable = !!current && !panel.hidden && welcome.hidden && !!m && m.type !== 2 && m.type !== 3;
   maskOverlay.toggleAttribute("hidden", !showable);
   overlayHandles = [];
   overlayShape = null;
@@ -1298,7 +1366,7 @@ function setTat(on: boolean) {
   // A standing banner (not the transient drag readout) makes it obvious the
   // canvas is in adjust mode and how to hand it back to tap-WB / pan / pinch.
   tatBanner.hidden = !on;
-  if (on) setHslPick(false); // mutually exclusive with pick-from-photo
+  if (on) { setHslPick(false); setColorPick(false); } // mutually exclusive with the other picture tools
   if (!on) hideTatHud();
 }
 hslDragBtn.addEventListener("click", () => setTat(!tatArmed));
@@ -1522,6 +1590,7 @@ async function openImported(imported: ImportedFile) {
   // Masks are composition-specific — never carry them to a new photo.
   params.masks = [];
   selectedMask = -1;
+  setColorPick(false);
   updateMaskUI();
   renderMaskOverlay();
   syncFromUI();
@@ -1750,7 +1819,8 @@ canvas.addEventListener("click", (e) => {
     tapSuppressed = false;
     return;
   }
-  // Armed colour-mixer pick eats the tap (it must NOT also set white balance).
+  // Armed picks eat the tap (they must NOT also set white balance).
+  if (handleColorMaskPick(e.clientX, e.clientY)) return;
   if (handleHslPick(e.clientX, e.clientY)) return;
   const [pvx, pvy] = renderer.toImagePixel(e.clientX, e.clientY);
   // The renderer may show a downscaled proxy; map back to full-res coords.
