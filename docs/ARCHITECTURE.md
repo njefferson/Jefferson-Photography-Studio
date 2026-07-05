@@ -57,6 +57,12 @@ decode -> LINEAR camera-native RGB
                        Sky/Foliage and must keep meaning that). The band-box
                        sub-labels in the panel update live with the swap
                        state. hue/sat/lum each)
+  -> HSL MIXER        (8 fixed bands R/O/Y/G/Aqua/B/Purple/Magenta at
+                       HSL_CENTERS, each hue/sat/lum; weights smoothstep
+                       between ADJACENT centres so every hue answers to ≤2
+                       chips, weight 1 at a centre. Targets DISPLAYED colour —
+                       does NOT follow the swap (unlike Sky/Foliage). Pure
+                       per-pixel colour math -> IS baked into the .cube LUT.)
   -> TINT             (sepia over mono)
   -> GLOW             (adds blurred-highlight map in linear; HIE halation)
   -> LOCAL MASKS      (radial/linear, up to 4; each applies local brightness/

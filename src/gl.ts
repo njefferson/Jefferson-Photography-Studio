@@ -5,7 +5,7 @@
 
 // Single source of truth for edit parameters lives in pipeline.ts so the GPU
 // preview and CPU export can never drift apart.
-import { toneEvaluator, toneIsIdentity, maskIsActive, MAX_MASKS, type EditParams, type LocalMap } from "./pipeline";
+import { toneEvaluator, toneIsIdentity, maskIsActive, hslIsNeutral, MAX_MASKS, type EditParams, type LocalMap } from "./pipeline";
 export type { EditParams };
 
 // A faithful 256-entry identity ramp for the tone LUT. A 2-texel [0,255] ramp
@@ -68,6 +68,8 @@ uniform float u_clarity;     // -1..1 local contrast vs the blurred-luma map
 uniform float u_dehaze;      // -1..1 veil subtraction vs the dark-channel map
 uniform sampler2D u_localTex; // RG8: sqrt-encoded blurred luma (R) + dark channel (G)
 uniform float u_localScale;   // linear decode scale for u_localTex
+uniform bool u_hslOn;        // 8-channel HSL mixer active
+uniform vec3 u_hsl[8];       // per band: (hueShiftDeg, satScale, lumScale)
 uniform float u_denoise; // 0..1 bilateral strength (see raw/denoise.ts)
 uniform vec2 u_texel;    // 1/textureSize
 uniform float u_split;   // compare divider: denoise applies where uv.x >= split
@@ -206,6 +208,24 @@ void main() {
     c = hsv2rgb(vec3(fract(h / 360.0), s, v));
   }
 
+  // 8-channel HSL mixer on the DISPLAYED colour (after swap/bands, before
+  // tint). Weights blend between the two ADJACENT band centres — matches
+  // hslAt in pipeline.ts.
+  if (u_hslOn) {
+    vec3 hsv = rgb2hsv(max(c, 0.0));
+    float h = hsv.x * 360.0;
+    const float CTR[9] = float[9](0.0, 30.0, 60.0, 120.0, 180.0, 240.0, 280.0, 320.0, 360.0);
+    int bi = 7;
+    for (int k = 0; k < 7; k++) {
+      if (h >= CTR[k] && h < CTR[k + 1]) { bi = k; break; }
+    }
+    int bj = bi == 7 ? 0 : bi + 1;
+    float t = (h - CTR[bi]) / (CTR[bi + 1] - CTR[bi]);
+    float w = t * t * (3.0 - 2.0 * t);
+    vec3 adj = mix(u_hsl[bi], u_hsl[bj], w);
+    c = hsv2rgb(vec3(fract((h + adj.x) / 360.0), min(1.0, hsv.y * adj.y), hsv.z * adj.z));
+  }
+
   // Tone tint (sepia etc.) after saturation so it survives mono looks.
   c *= u_tint;
 
@@ -297,7 +317,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_toneTex", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskTex", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_clarity", "u_dehaze", "u_localTex", "u_localScale"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_toneTex", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskTex", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -496,6 +516,9 @@ export class Renderer {
     gl.uniform1f(this.loc.u_aspect, this.imgH ? this.imgW / this.imgH : 1);
     gl.uniform1f(this.loc.u_clarity, p.clarity ?? 0);
     gl.uniform1f(this.loc.u_dehaze, p.dehaze ?? 0);
+    const mixerOn = !hslIsNeutral(p.hsl);
+    gl.uniform1i(this.loc.u_hslOn, mixerOn ? 1 : 0);
+    if (mixerOn) gl.uniform3fv(this.loc.u_hsl, new Float32Array(p.hsl));
     gl.uniform1f(this.loc.u_localScale, this.localScale);
     gl.uniform1i(this.loc.u_localTex, 4);
     gl.activeTexture(gl.TEXTURE4);

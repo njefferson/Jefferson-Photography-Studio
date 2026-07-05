@@ -3,7 +3,7 @@ import { importFile, type ImportedFile } from "./import";
 import { decode, type DecodedImage } from "./decode";
 import { Renderer, type EditParams } from "./gl";
 import { exportImage, download, type ExportFormat } from "./export";
-import { TONE_DEFAULT, TONE_X, toneEvaluator, neutralMask, MAX_MASKS, type MaskLayer } from "./pipeline";
+import { TONE_DEFAULT, TONE_X, toneEvaluator, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, type MaskLayer } from "./pipeline";
 import { generateCube } from "./lut";
 import { generateDcp } from "./dcp";
 import { buildGlowMap } from "./glow";
@@ -46,6 +46,7 @@ const params: EditParams = {
   vignette: 0,
   clarity: 0,
   dehaze: 0,
+  hsl: hslDefault(),
 };
 
 const ui = {
@@ -202,6 +203,7 @@ function syncToUI() {
   }
   updateToneWidget();
   updateBandLabels();
+  updateHslUI();
 }
 
 // The per-color bands follow the subject through a channel swap (the swap
@@ -277,6 +279,7 @@ function applyLook(name: keyof typeof LOOKS) {
   params.foliage = [0, 1, 1];
   params.tone = [...TONE_DEFAULT];
   params.lum = 1;
+  params.hsl = hslDefault();
   syncToUI();
   draw();
 }
@@ -366,6 +369,7 @@ function cloneParams(p: EditParams): EditParams {
     vignette: p.vignette,
     clarity: p.clarity,
     dehaze: p.dehaze,
+    hsl: [...(p.hsl ?? hslDefault())],
   };
 }
 
@@ -404,6 +408,7 @@ function applySnapshot(s: Snapshot) {
   params.vignette = c.vignette;
   params.clarity = c.clarity ?? 0;
   params.dehaze = c.dehaze ?? 0;
+  params.hsl = c.hsl?.length === 24 ? c.hsl : hslDefault();
   activeLook = s.activeLook ?? null;
   lookBias = (s.lookBias ? [...s.lookBias] : [1, 1, 1]) as [number, number, number];
   if (selectedMask >= params.masks.length) selectedMask = params.masks.length - 1;
@@ -494,6 +499,7 @@ type SavedLook = {
   lum: number;
   clarity: number;
   dehaze: number;
+  hsl: number[];
 };
 
 function currentLook(): SavedLook {
@@ -510,6 +516,7 @@ function currentLook(): SavedLook {
     lum: params.lum,
     clarity: params.clarity,
     dehaze: params.dehaze,
+    hsl: [...params.hsl],
   };
 }
 
@@ -541,6 +548,7 @@ function readSlot(i: number): SavedLook | null {
         lum: numOr(s.lum, 1),
         clarity: numOr(s.clarity, 0),
         dehaze: numOr(s.dehaze, 0),
+        hsl: Array.isArray(s.hsl) && s.hsl.length === 24 ? s.hsl.map((x: unknown, i: number) => numOr(x, i % 3 === 0 ? 0 : 1)) : hslDefault(),
       };
     }
   } catch {
@@ -572,6 +580,7 @@ function loadSlot(i: number) {
   params.lum = look.lum;
   params.clarity = look.clarity;
   params.dehaze = look.dehaze;
+  params.hsl = [...look.hsl];
   activeLook = null; // a loaded custom grade isn't one specific built-in look
   clampToneOrder();
   syncToUI();
@@ -745,6 +754,54 @@ $("pcReset").addEventListener("click", () => {
   draw();
   flushRecord();
 });
+
+// --- 8-channel HSL colour mixer: eight colour chips, three sliders for the
+// selected chip. Chips with a non-neutral band get an accent ring. ---
+const HSL_NAMES = ["Red", "Orange", "Yellow", "Green", "Aqua", "Blue", "Purple", "Magenta"];
+const hslChipsEl = $("hslChips") as HTMLDivElement;
+const hslUI = {
+  hue: $("hslHue") as HTMLInputElement,
+  sat: $("hslSat") as HTMLInputElement,
+  lum: $("hslLum") as HTMLInputElement,
+};
+let hslSel = 0;
+const hslChips: HTMLButtonElement[] = [];
+for (let i = 0; i < 8; i++) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "hsl-chip";
+  b.style.background = `hsl(${HSL_CENTERS[i]}deg 75% 55%)`;
+  b.title = HSL_NAMES[i];
+  b.setAttribute("aria-label", `${HSL_NAMES[i]} band`);
+  b.addEventListener("click", () => {
+    hslSel = i;
+    updateHslUI();
+  });
+  hslChipsEl.append(b);
+  hslChips.push(b);
+}
+
+function updateHslUI() {
+  hslChips.forEach((b, i) => {
+    b.classList.toggle("active", i === hslSel);
+    const tweaked = params.hsl[i * 3] !== 0 || params.hsl[i * 3 + 1] !== 1 || params.hsl[i * 3 + 2] !== 1;
+    b.classList.toggle("tweaked", tweaked && i !== hslSel);
+  });
+  hslUI.hue.value = String(params.hsl[hslSel * 3]);
+  hslUI.sat.value = String(params.hsl[hslSel * 3 + 1]);
+  hslUI.lum.value = String(params.hsl[hslSel * 3 + 2]);
+}
+
+hslUI.hue.addEventListener("input", () => { params.hsl[hslSel * 3] = Number(hslUI.hue.value); updateHslUI(); draw(); });
+hslUI.sat.addEventListener("input", () => { params.hsl[hslSel * 3 + 1] = Number(hslUI.sat.value); updateHslUI(); draw(); });
+hslUI.lum.addEventListener("input", () => { params.hsl[hslSel * 3 + 2] = Number(hslUI.lum.value); updateHslUI(); draw(); });
+$("hslReset").addEventListener("click", () => {
+  params.hsl = hslDefault();
+  updateHslUI();
+  draw();
+  flushRecord();
+});
+updateHslUI();
 
 // --- Local masks: radial / linear gradient with a few local adjustments,
 // placed by dragging handles on the photo. Geometry is in image-uv so masks
@@ -1297,6 +1354,7 @@ async function openImported(imported: ImportedFile) {
     vignette: 0,
     clarity: 0,
     dehaze: 0,
+    hsl: hslDefault(),
   };
   activeLook = null;
   updateLookUI();

@@ -161,8 +161,14 @@ Classical, subscription-grade tools (fit the current architecture directly):
   of saved looks; rebuilt at full res on export. **Texture** (fine-radius local
   contrast) folds into the Detail-sharpening item below — it needs pixel-
   neighbourhood taps, not a low-res map.
-- **Full 8-channel HSL + per-channel R/G/B curves** — extends the per-colour
-  bands and the luminance tone curve; same per-pixel model.
+- [x] **8-channel HSL colour mixer** (shipped 2026-07-05) — Color mixer panel:
+  8 chips (R/O/Y/G/Aqua/B/Purple/Magenta), hue/sat/lum per chip, smooth
+  adjacent-band blending. Targets displayed colour (doesn't follow the swap);
+  bakes into .cube (non-spatial). GPU==CPU ≤1 LSB over the full hue wheel;
+  band isolation verified (neutral bands exactly untouched). Looks reset the
+  mixer; saved looks carry it. Per-channel R/G/B CURVES remain open below.
+- **Per-channel R/G/B point curves** — extends the luminance tone curve to
+  independent channels; same per-pixel model.
 - **Crop / straighten / perspective (Upright)** — geometry via the vertex
   shader we already rotate in; crop is a display+export region.
 - **Detail sharpening** (unsharp / deconvolution) — mirror the existing 5×5

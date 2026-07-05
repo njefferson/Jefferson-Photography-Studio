@@ -292,6 +292,17 @@ button { cursor: pointer; }
 #maskEditor { margin-top: 10px; }
 .mask-editor-actions { display: flex; gap: 6px; margin-top: 8px; }
 .mask-editor-actions button { width: auto; padding: 6px 12px; font-size: 13px; }
+.hsl-chips { display: flex; gap: 8px; margin: 10px 0; flex-wrap: wrap; }
+.hsl-chip {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  padding: 0;
+  cursor: pointer;
+}
+.hsl-chip.active { border-color: #fff; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25); }
+.hsl-chip.tweaked { border-color: var(--accent); }
 .slot-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
 .slot { display: flex; align-items: center; gap: 8px; }
 .slot-name { flex: 1; font-size: 13px; color: #b8b8c0; }

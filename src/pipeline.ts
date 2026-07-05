@@ -52,6 +52,14 @@ export interface EditParams {
   hotspot: number;
   hotspotSize: number;
   vignette: number;
+  /** 8-channel HSL colour mixer: flat [hueShiftDeg, satScale, lumScale] × 8
+   *  bands at HSL_CENTERS (red, orange, yellow, green, aqua, blue, purple,
+   *  magenta). Weights interpolate smoothly between ADJACENT band centres, so
+   *  every hue answers to at most two chips. Operates on DISPLAYED colour
+   *  (after swap/bands — does NOT follow the swap, unlike Sky/Foliage).
+   *  Pure per-pixel colour math -> IS baked into the .cube LUT.
+   *  Neutral = HSL_DEFAULT. */
+  hsl: number[];
   /** Clarity -1..1: local contrast as a RATIO against the per-image blurred-
    *  luma map (LocalMap) — pow(L/Lblur, clarity*0.5), clamped. Ratio-based, so
    *  it is exposure- and WB-invariant. Applied on LINEAR source data before
@@ -244,6 +252,46 @@ export function radialGain(hotspot: number, hotspotSize: number, vignette: numbe
   return Math.max(0, gVig * gHot);
 }
 
+// --- 8-channel HSL colour mixer (mirrored in the shader) ---
+
+/** Band centres in degrees: red, orange, yellow, green, aqua, blue, purple,
+ *  magenta. Non-uniform on purpose (matches how editors cluster warm hues). */
+export const HSL_CENTERS = [0, 30, 60, 120, 180, 240, 280, 320] as const;
+
+export function hslDefault(): number[] {
+  const a: number[] = [];
+  for (let i = 0; i < 8; i++) a.push(0, 1, 1);
+  return a;
+}
+
+export function hslIsNeutral(hsl: readonly number[] | undefined): boolean {
+  if (!hsl || hsl.length !== 24) return true;
+  for (let i = 0; i < 8; i++) {
+    if (hsl[i * 3] !== 0 || hsl[i * 3 + 1] !== 1 || hsl[i * 3 + 2] !== 1) return false;
+  }
+  return true;
+}
+
+/** Blended [hueShift, satScale, lumScale] at hue h (degrees): smoothstep
+ *  between the two adjacent band centres. Identical in the shader. */
+export function hslAt(hsl: readonly number[], h: number): [number, number, number] {
+  h = ((h % 360) + 360) % 360;
+  let i = 7; // last segment (320..360 wraps to red)
+  for (let k = 0; k < 7; k++) {
+    if (h >= HSL_CENTERS[k] && h < HSL_CENTERS[k + 1]) { i = k; break; }
+  }
+  const c0 = HSL_CENTERS[i];
+  const c1 = i === 7 ? 360 : HSL_CENTERS[i + 1];
+  const j = (i + 1) % 8;
+  const t = (h - c0) / (c1 - c0);
+  const w = t * t * (3 - 2 * t); // weight of the NEXT band
+  return [
+    hsl[i * 3] * (1 - w) + hsl[j * 3] * w,
+    hsl[i * 3 + 1] * (1 - w) + hsl[j * 3 + 1] * w,
+    hsl[i * 3 + 2] * (1 - w) + hsl[j * 3 + 2] * w,
+  ];
+}
+
 // --- HSV helpers shared by the per-colour bands (mirrored in the shader) ---
 
 function rgb2hsv(r: number, g: number, b: number): [number, number, number] {
@@ -336,6 +384,7 @@ export function compileEdit(
   const cl = p.clarity ?? 0;
   const dz = p.dehaze ?? 0;
   const localOn = local && (cl !== 0 || dz !== 0);
+  const mixerOn = !hslIsNeutral(p.hsl);
 
   return (r, g, b, out, glow = 0, u, v) => {
     // Clarity/dehaze act on LINEAR source data before exposure/WB, using the
@@ -408,6 +457,16 @@ export function compileEdit(
       h += sky[0] * wS + fol[0] * wF;
       s = Math.min(1, s * (1 + (sky[1] - 1) * wS) * (1 + (fol[1] - 1) * wF));
       v = v * (1 + (sky[2] - 1) * wS) * (1 + (fol[2] - 1) * wF);
+      [nr, ng, nb] = hsv2rgb(h, s, v);
+    }
+    // 8-channel HSL mixer on the DISPLAYED colour (after swap/bands, before
+    // tint), matching the shader.
+    if (mixerOn) {
+      let [h, s, v] = rgb2hsv(Math.max(0, nr), Math.max(0, ng), Math.max(0, nb));
+      const [dh, ds, dl] = hslAt(p.hsl, h);
+      h += dh;
+      s = Math.min(1, s * ds);
+      v *= dl;
       [nr, ng, nb] = hsv2rgb(h, s, v);
     }
     // Tone tint (sepia etc.) after saturation so it survives mono looks.
