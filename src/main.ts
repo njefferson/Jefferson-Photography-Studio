@@ -22,7 +22,16 @@ const hint = $("hint") as HTMLParagraphElement;
 const panel = $("panel") as HTMLElement;
 const fileInput = $("file") as HTMLInputElement;
 
-const renderer = new Renderer(canvas);
+// No WebGL2 -> a clear explanation with options instead of a blank page. The
+// throw halts this module; the static overlay needs no scripting to stay up.
+const renderer = (() => {
+  try {
+    return new Renderer(canvas);
+  } catch (err) {
+    document.getElementById("unsupported")!.hidden = false;
+    throw err;
+  }
+})();
 let current: DecodedImage | null = null;
 let currentFile: ImportedFile | null = null;
 
@@ -1515,8 +1524,8 @@ async function loadExample(key: string) {
     }));
     lesson.hidden = false;
     lessonShow.hidden = true;
-  } catch (err) {
-    alert("Could not load the example: " + (err as Error).message);
+  } catch {
+    alert("Couldn't load the example — it downloads on first use, so check your connection and try again. (Once loaded, everything works offline.)");
   } finally {
     hideBusy();
   }

@@ -186,6 +186,23 @@ orientation tag). Regeneration scripts live in the session notes/history —
 the recipe: readNefCfa -> bin planes -> writeDng(Comp 1) -> verify through
 `decodeMosaicedDng` -> render thumbs at the CURRENT Aerochrome values.
 
+## Graceful failure (no dead ends — added 2026-07-05)
+
+Every hard break explains itself and offers options; never a blank page or a
+raw exception string:
+- No WebGL2 -> `#unsupported` overlay (static HTML/CSS; main.ts shows it and
+  re-throws, halting the module). Covers old browsers and locked-down webviews;
+  tells in-app-browser users to use "Open in browser".
+- ZIP import without DecompressionStream (Safari <16.4 / Firefox <113) ->
+  guard in import.ts with the direct-import alternative.
+- Unknown file types get ONE native-decode attempt (decodeBitmap) before
+  failing — which makes HEIC WORK in Safari; elsewhere HEIC is detected by
+  ftyp brand and the message says use Safari or export JPEG.
+- NEF decode failure -> assume Z8/Z9 High-Efficiency, point at DNG Converter.
+- Example fetch failure -> actionable alert (offline explanation); note the SW
+  serves cached examples when offline, and Playwright route-abort tests need
+  `serviceWorkers: 'block'` or the SW satisfies the request anyway.
+
 ## iOS/Safari landmines (each one bit us)
 
 1. WebGL drawing buffers over ~16.7MP silently clamp -> black canvas. Preview

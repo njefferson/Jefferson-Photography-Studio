@@ -49,20 +49,46 @@ export async function decode(file: ImportedFile): Promise<DecodedImage> {
     return { ...(await decodeBitmap(file.bytes)), isRaw: false };
   }
   if (file.kind === "nef") {
-    const img = decodeNef(file.bytes);
-    return {
-      width: img.width,
-      height: img.height,
-      linear: img.linear,
-      camMatrix: camToSrgbLinear(NIKON_Z50_COLOR_MATRIX),
-      isRaw: true,
-      rotate: orientationToRotate(new Tiff(file.bytes).allIfds()),
-    };
+    try {
+      const img = decodeNef(file.bytes);
+      return {
+        width: img.width,
+        height: img.height,
+        linear: img.linear,
+        camMatrix: camToSrgbLinear(NIKON_Z50_COLOR_MATRIX),
+        isRaw: true,
+        rotate: orientationToRotate(new Tiff(file.bytes).allIfds()),
+      };
+    } catch {
+      throw new Error(
+        "This NEF couldn't be decoded — newer Nikon “High Efficiency” NEFs (Z8/Z9) aren't supported. " +
+          "Convert it to DNG with the free Adobe DNG Converter and it will open here.",
+      );
+    }
   }
   if (file.kind === "dng" || file.kind === "tiff") {
     return decodeDng(file.bytes);
   }
-  throw new Error(`Unsupported file type: ${file.kind}`);
+  // Unknown type: give the browser's own decoder one chance (Safari opens
+  // HEIC this way), then fail with directions instead of a dead end.
+  try {
+    return { ...(await decodeBitmap(file.bytes)), isRaw: false };
+  } catch {
+    throw new Error(
+      isHeic(file.bytes)
+        ? "This is a HEIC photo, which this browser can't decode. Open this app in Safari to use it, or export the photo as JPEG from Photos first."
+        : "This file type isn't supported. Use JPEG, PNG, DNG or Nikon NEF — any other camera's RAW converts with the free Adobe DNG Converter.",
+    );
+  }
+}
+
+/** HEIC/HEIF container sniff: ISO-BMFF 'ftyp' with a HEIF brand. */
+function isHeic(bytes: Uint8Array): boolean {
+  if (bytes.length < 12) return false;
+  const tag = String.fromCharCode(bytes[4], bytes[5], bytes[6], bytes[7]);
+  if (tag !== "ftyp") return false;
+  const brand = String.fromCharCode(bytes[8], bytes[9], bytes[10], bytes[11]);
+  return ["heic", "heix", "hevc", "heif", "mif1", "msf1"].includes(brand);
 }
 
 function toBlob(bytes: Uint8Array): Blob {

@@ -32,6 +32,12 @@ export async function importFile(file: File): Promise<ImportedFile> {
 
   // Zip: extract the first real image entry.
   if (lower.endsWith(".zip") || isZip(buf)) {
+    if (typeof DecompressionStream === "undefined") {
+      throw new Error(
+        "ZIP import needs a newer browser (Safari 16.4+, Chrome, Edge, or Firefox 113+). " +
+          "Tip: import the RAW file directly from Files instead — that works here.",
+      );
+    }
     const entry = pickImageEntry(await readZip(buf));
     if (!entry) throw new Error("Zip contained no recognizable image file.");
     const name = entry.name.split("/").pop() ?? entry.name;
