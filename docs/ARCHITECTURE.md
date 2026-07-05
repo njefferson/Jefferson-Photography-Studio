@@ -243,7 +243,11 @@ and NO Nikon body can channel-swap in camera. Field guide:
   faint tails stay visible. Toggled from the header button; preference persists
   in `localStorage` (`ips-hist`). `pointer-events:none` so tap-to-WB still works
   through it. Refreshed from `draw()` and the hold-to-compare path.
-- ⓘ dialog = **patch notes + roadmap hub**. Both are injected at build time by
+- ⓘ dialog = **patch notes + roadmap hub**. It AUTO-OPENS once when the app
+  version changed since the last visit (`localStorage` `ips-whatsnew` stores
+  the last-seen version; written immediately on load so reloads never
+  re-trigger; first-ever visit records silently — the welcome screen owns
+  that moment). Both are injected at build time by
   `vite.config.ts`, so both refresh automatically on every push:
   - *Patch notes* = last 5 commits (`__CHANGELOG__`), each linked to its commit
     with its real version number; a "More" link opens the full commit history

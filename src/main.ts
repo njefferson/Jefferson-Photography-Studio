@@ -1844,6 +1844,18 @@ function grayWorldWB(img: DecodedImage): [number, number, number] {
   dlg.addEventListener("click", (e) => {
     if (e.target === dlg) dlg.close(); // tap outside to dismiss
   });
+
+  // Auto-open "What's new" ONCE when the app has updated since the last
+  // visit. First-ever visit records the version silently (the welcome screen
+  // owns that moment); marking the version immediately means a reload never
+  // re-triggers it.
+  const SEEN_KEY = "ips-whatsnew";
+  const seen = localStorage.getItem(SEEN_KEY);
+  localStorage.setItem(SEEN_KEY, __APP_VERSION__);
+  if (seen !== null && seen !== __APP_VERSION__) {
+    // Let the first frame paint so the dialog opens over a live app.
+    requestAnimationFrame(() => dlg.showModal());
+  }
 }
 
 // Support links in the ⓘ dialog. Each stays hidden while its URL is empty.
