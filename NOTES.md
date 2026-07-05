@@ -109,12 +109,16 @@ See **`PLAN.md`** for the full build plan.
 - [x] **Drag on photo to adjust** — Lightroom-style targeted adjustment (shipped
   2026-07-05): arm the tool, then drag on the photo — UP/DOWN scales that
   colour's luminance, LEFT/RIGHT shifts its hue. The colour under your finger
-  picks its mixer chip (display space, via readDisplayedPixel), so it just
-  steers the existing 8-chip mixer's params.hsl from the picture — NO new
-  pipeline math (GPU/CPU mixer untouched). Sustained mode: while armed it owns
-  the canvas from tap-WB / pan / pinch / hold; one drag = one undo step; a
-  floating readout names the colour and shows the live hue/luminance. The
-  drag→param mapping, chip pick and re-render are verified in headless chromium.
+  picks its mixer chip from the colour BEFORE the mixer (renders the pixel with
+  the mixer neutral), so it just steers the existing 8-chip mixer's params.hsl
+  from the picture — NO new pipeline math (GPU/CPU mixer untouched). Picking the
+  pre-mixer colour means touching the same spot twice grabs the SAME chip and
+  keeps building on its current values (a display-space pick drifted to a fresh
+  chip as your own hue-shift moved the colour). Sustained mode: while armed it
+  owns the canvas from tap-WB / pan / pinch / hold, with a standing banner (tap
+  to exit) making that obvious; one drag = one undo step; a floating readout
+  names the colour and shows the live hue/luminance. The drag→param mapping,
+  stable re-touch, chip pick and re-render are verified in headless chromium.
 - [ ] **Mask by color** — a mask type that selects everything matching a tapped
   colour (weight from hue/sat distance in display space — chroma-key style).
   Classical per-pixel math; fits the existing mask engine as type 3.

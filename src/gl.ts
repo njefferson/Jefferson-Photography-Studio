@@ -587,6 +587,32 @@ export class Renderer {
   histogram(p: EditParams): { r: Uint32Array; g: Uint32Array; b: Uint32Array; l: Uint32Array } | null {
     const gl = this.gl;
     if (!this.imgW) return null;
+    const { w, h } = this.renderOffscreen(p);
+    const buf = this.histBuf!;
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+    this.restoreDefaultFbo();
+
+    const r = new Uint32Array(256);
+    const g = new Uint32Array(256);
+    const b = new Uint32Array(256);
+    const l = new Uint32Array(256);
+    for (let i = 0; i < buf.length; i += 4) {
+      const R = buf[i], G = buf[i + 1], B = buf[i + 2];
+      r[R]++;
+      g[G]++;
+      b[B]++;
+      // Rec.709 luma with integer weights summing to 256 (max index = 255).
+      l[(R * 54 + G * 183 + B * 19) >> 8]++;
+    }
+    return { r, g, b, l };
+  }
+
+  /** Ensure the offscreen FBO exists at the histogram scale, render `p` into it
+   *  (rotation ignored — it never changes displayed colour values) and leave it
+   *  bound. Shared by histogram() and readUvPixel(); the caller reads pixels
+   *  then calls restoreDefaultFbo(). Returns the FBO size. */
+  private renderOffscreen(p: EditParams): { w: number; h: number } {
+    const gl = this.gl;
     const scale = Math.min(1, Renderer.HIST_MAX / Math.max(this.imgW, this.imgH));
     const w = Math.max(1, Math.round(this.imgW * scale));
     const h = Math.max(1, Math.round(this.imgH * scale));
@@ -611,25 +637,34 @@ export class Renderer {
     gl.viewport(0, 0, w, h);
     this.bindPipeline(p, 0, 0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
-    const buf = this.histBuf!;
-    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
-    // Restore the default framebuffer so the next on-screen render is unaffected.
+    return { w, h };
+  }
+
+  /** Restore the default framebuffer + viewport after an offscreen pass, so the
+   *  next on-screen render is unaffected. */
+  private restoreDefaultFbo() {
+    const gl = this.gl;
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+  }
 
-    const r = new Uint32Array(256);
-    const g = new Uint32Array(256);
-    const b = new Uint32Array(256);
-    const l = new Uint32Array(256);
-    for (let i = 0; i < buf.length; i += 4) {
-      const R = buf[i], G = buf[i + 1], B = buf[i + 2];
-      r[R]++;
-      g[G]++;
-      b[B]++;
-      // Rec.709 luma with integer weights summing to 256 (max index = 255).
-      l[(R * 54 + G * 183 + B * 19) >> 8]++;
-    }
-    return { r, g, b, l };
+  /** The DISPLAYED colour a pixel would take under `p` at image-uv (u,v), read
+   *  from the offscreen render (rotation ignored — uv is image space). Lets a
+   *  caller classify a pixel WITHOUT some effect by passing neutralised params:
+   *  the drag-to-adjust tool reads it with the mixer neutral so the chip it
+   *  grabs is the colour BEFORE the mixer — stable no matter how far that colour
+   *  has already been pushed, and the chip that actually controls the area. */
+  readUvPixel(p: EditParams, u: number, v: number): [number, number, number] | null {
+    if (!this.imgW) return null;
+    const gl = this.gl;
+    const { w, h } = this.renderOffscreen(p);
+    const x = Math.max(0, Math.min(w - 1, Math.round(u * w)));
+    const y = Math.max(0, Math.min(h - 1, Math.round(v * h)));
+    const buf = new Uint8Array(4);
+    // GL reads bottom-origin; flip to match image-uv (v = 0 at the top).
+    gl.readPixels(x, h - 1 - y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+    this.restoreDefaultFbo();
+    return [buf[0], buf[1], buf[2]];
   }
 
   /** The DISPLAYED pixel colour under a pointer at CLIENT coords — read

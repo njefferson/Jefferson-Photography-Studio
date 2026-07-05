@@ -172,6 +172,42 @@ body {
 @media (max-width: 760px) {
   #tatHud { top: 12px; left: 12px; padding: 5px 9px; font-size: 12px; }
 }
+/* Standing "adjust mode is on" banner — top-centre, tappable to exit. Sits
+   above the image so it's unmissable while the canvas is a colour-tuning
+   surface (and tap-WB / pan / pinch are handed off). */
+#tatBanner {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 7;
+  width: auto;
+  max-width: min(90%, 520px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 7px 16px;
+  border-radius: 999px;
+  text-align: center;
+  line-height: 1.25;
+  font-size: 13px;
+  font-weight: 600;
+  color: #07101f;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+}
+#tatBanner .tat-banner-off {
+  font-size: 11px;
+  font-weight: 500;
+  opacity: 0.85;
+}
+@media (max-width: 760px) {
+  #tatBanner { top: 10px; padding: 6px 13px; font-size: 12px; }
+  #tatBanner .tat-banner-off { font-size: 10px; }
+}
 #hint { color: #9a9aa2; text-align: center; max-width: 40ch; margin: 0 auto; }
 #welcome {
   position: absolute;

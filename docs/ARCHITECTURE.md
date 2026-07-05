@@ -97,12 +97,24 @@ decode -> LINEAR camera-native RGB
                        a vertical drag -> that chip's lumScale and horizontal ->
                        its hueShift, straight into params.hsl. Pure UI over the
                        existing mixer — NO shader/CPU change, so the "change
-                       both or neither" rule does not apply. While armed it owns
-                       the canvas ahead of tap-WB / pan / pinch / hold (brush
-                       paint still takes priority above it); startTat sets
-                       tapSuppressed so the trailing click never sets WB; one
-                       drag = one undo step (flushRecord on pointerup, deduped).
-                       Runs after TONE CURVE, before global LUMINANCE.)
+                       both or neither" rule does not apply. CRUCIAL: it picks
+                       the chip from the colour BEFORE the mixer (Renderer.
+                       readUvPixel renders the pixel with hsl neutralised into
+                       the shared offscreen FBO), NOT the displayed colour — the
+                       mixer SHIFTS the underlying hue, so the shifted display
+                       colour points at a different, wrong chip, whereas the
+                       pre-mixer colour is invariant, so touching the same spot
+                       twice grabs the SAME chip and keeps building on its
+                       current values (field bug 2026-07-05: re-touch drifted to
+                       a fresh neutral chip). readUvPixel and histogram() share
+                       renderOffscreen()/restoreDefaultFbo(); readUvPixel flips
+                       y (image-uv v=0 is top, GL is bottom-origin). While armed
+                       it owns the canvas ahead of tap-WB / pan / pinch / hold
+                       (brush paint still takes priority above it); a standing
+                       accent banner (#tatBanner, tap to exit) makes the mode
+                       obvious; startTat sets tapSuppressed so the trailing click
+                       never sets WB; one drag = one undo step (flushRecord on
+                       pointerup, deduped). Runs after TONE, before LUMINANCE.)
 ```
 
 Implemented twice, kept numerically identical ON PURPOSE:

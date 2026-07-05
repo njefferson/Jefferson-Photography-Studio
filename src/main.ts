@@ -1286,6 +1286,7 @@ const hslDragBtn = $("hslDrag") as HTMLButtonElement;
 const tatHud = $("tatHud") as HTMLDivElement;
 const tatSwatch = $("tatSwatch") as HTMLSpanElement;
 const tatText = $("tatText") as HTMLSpanElement;
+const tatBanner = $("tatBanner") as HTMLButtonElement;
 const TAT_HUE_SPAN = 100; // degrees of hue shift across one full canvas-width drag
 const TAT_LUM_SPAN = 1.6; // luminance-scale change across one full canvas-height drag
 let tatArmed = false;
@@ -1294,10 +1295,14 @@ let tatDrag: { id: number; chip: number; x: number; y: number; hue0: number; lum
 function setTat(on: boolean) {
   tatArmed = on;
   hslDragBtn.setAttribute("aria-pressed", String(on));
+  // A standing banner (not the transient drag readout) makes it obvious the
+  // canvas is in adjust mode and how to hand it back to tap-WB / pan / pinch.
+  tatBanner.hidden = !on;
   if (on) setHslPick(false); // mutually exclusive with pick-from-photo
   if (!on) hideTatHud();
 }
 hslDragBtn.addEventListener("click", () => setTat(!tatArmed));
+tatBanner.addEventListener("click", () => setTat(false)); // tap the banner to exit
 
 function showTatHud() {
   if (!tatDrag) return;
@@ -1313,9 +1318,14 @@ function hideTatHud() {
 }
 
 function startTat(e: PointerEvent) {
-  // Pick the owning chip from the DISPLAYED colour (display space = what the
-  // mixer classifies). Near-grey has no meaningful hue -> keep the current chip.
-  const px = renderer.readDisplayedPixel(e.clientX, e.clientY);
+  // Pick the owning chip from the colour BEFORE the mixer (render this pixel
+  // with the mixer neutral). That colour doesn't move as you push a chip, so
+  // touching the same spot again grabs the SAME chip and keeps building on its
+  // current values — and it's the chip that actually controls that area (the
+  // mixer shifts the underlying hue, so the shifted display colour would point
+  // at a different, wrong chip). Near-grey has no hue -> keep the current chip.
+  const [uu, vv] = renderer.clientToImageUv(e.clientX, e.clientY);
+  const px = renderer.readUvPixel({ ...params, hsl: hslDefault() }, uu, vv);
   let chip = hslSel;
   if (px) {
     const [r, g, b] = px;
