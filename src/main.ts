@@ -1472,13 +1472,14 @@ const EXAMPLES: Record<string, { file: string; title: string; steps: string[]; r
   },
   hillside: {
     file: "./examples/hillside.dng",
-    expand: ["fsLooks", "fsPerColor"],
-    title: "Lesson 3 · Hillside & sky — per-color grading",
+    expand: ["fsLooks", "fsPerColor", "fsMixer"],
+    title: "Lesson 3 · Hillside & sky — the color tools",
     steps: [
       "Tap Aerochrome first.",
-      "In Per-color, drag the Sky hue slider and watch which colors move — then try the Foliage box. Each box owns half the color wheel; the small text under its name shows which half it's holding right now.",
-      "Toggle the R⇄B channel swap and drag again — the boxes follow the swap and their small text updates.",
-      "Reset per-color (the button in that section) returns both bands to neutral.",
+      "The color tools go from broad to surgical. Broadest: the R⇄B channel swap flips the whole color world; Hue shift (in Hue/Saturation/Tone) rotates every color together — use it for big moves.",
+      "In Per-color, drag the Sky hue slider — each box owns half the color wheel and follows the swap; the small text shows which colors it's holding.",
+      "Most surgical: the Color mixer. Tap “Pick color from photo”, then tap the sky — the chip owning that exact color selects itself. Now drag its Hue and Saturation: only that color moves.",
+      "A chip bends only its own neighborhood (so smooth skies can't tear into bands). Need a bigger throw? Make the move with Hue shift first, then finish with the chip.",
     ],
   },
 };

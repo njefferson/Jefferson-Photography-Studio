@@ -106,6 +106,18 @@ See **`PLAN.md`** for the full build plan.
 > reliable. Editing this list updates the app on the next deploy. Both the
 > roadmap and the patch notes (last commits) refresh automatically on push.
 
+- [ ] **Drag on photo to adjust** — Lightroom-style targeted adjustment (owner
+  request 2026-07-05): touch the photo and drag UP/DOWN for that colour's
+  luminance, LEFT/RIGHT for its hue. Builds directly on the display-space
+  mixer + readDisplayedPixel (the pick tool is the first half of this).
+- [ ] **Mask by color** — a mask type that selects everything matching a tapped
+  colour (weight from hue/sat distance in display space — chroma-key style).
+  Classical per-pixel math; fits the existing mask engine as type 3.
+- [ ] **Mask by subject / sky / background** — auto-select masks (owner request
+  2026-07-05). Honest scoping: true subject/background segmentation needs an
+  on-device ML model (WebGPU — the "frontier" backlog item); SKY may get a
+  classical heuristic first (position + colour + gradient). Architect as mask
+  types so they slot into the same engine when ready.
 - [x] **Local masking** — radial + linear gradient + **brush** masks (up to 4),
   each with local brightness/contrast/saturation/hue/warmth. Radial/linear are
   dragged with handles; the brush is painted on the photo (Paint/Erase, size,
