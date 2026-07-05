@@ -60,6 +60,9 @@ uniform vec2 u_maskGeoB[4];  // (feather, invert)
 uniform vec4 u_maskAdj[4];   // (brightness, contrast, saturation, warmth)
 uniform float u_maskHue[4];  // degrees
 uniform sampler2D u_maskTex; // brush masks packed 1-per-channel (rgba = mask 0..3)
+uniform float u_hotspot;     // IR hot-spot correction (darken centre) 0..0.8
+uniform float u_hotspotSize; // hot-spot radial extent
+uniform float u_vignette;    // -1..1 (+ brighten corners, - darken)
 uniform float u_denoise; // 0..1 bilateral strength (see raw/denoise.ts)
 uniform vec2 u_texel;    // 1/textureSize
 uniform float u_split;   // compare divider: denoise applies where uv.x >= split
@@ -87,6 +90,13 @@ float bandWeight(float hue, float center, float plateau, float edge){
   float d = abs(hue - center);
   d = min(d, 360.0 - d);
   return 1.0 - smoothstep(plateau, edge, d);
+}
+float radialGain(vec2 uv){
+  vec2 e = (uv - 0.5) * 2.0;
+  float r = length(e); // 0 centre, 1 edge-mid, ~1.414 corner
+  float gVig = 1.0 + u_vignette * 0.85 * smoothstep(0.1, 1.4142, r);
+  float gHot = 1.0 - u_hotspot * (1.0 - smoothstep(0.0, max(1e-3, u_hotspotSize), r));
+  return max(0.0, gVig * gHot);
 }
 float maskWeight(int i, vec2 uv){
   vec4 gA = u_maskGeoA[i];
@@ -132,6 +142,9 @@ void main() {
   // Exposure (linear) then white balance (the unbounded gains Lightroom can't reach).
   c *= u_exposure;
   c *= u_wb;
+
+  // IR lens correction: radial luminance gain (hot-spot / vignette) after WB.
+  if (u_hotspot != 0.0 || u_vignette != 0.0) c *= radialGain(v_uv);
 
   // Camera colour matrix: separates infrared chroma into distinct hues so the
   // channel swap can produce real false colour instead of a single tint.
@@ -258,7 +271,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_toneTex", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskTex"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_toneTex", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskTex", "u_hotspot", "u_hotspotSize", "u_vignette"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -426,6 +439,9 @@ export class Renderer {
     gl.uniform1f(this.loc.u_glow, p.glow);
     gl.uniform1i(this.loc.u_rot, rot);
     gl.uniform1f(this.loc.u_lum, p.lum || 1);
+    gl.uniform1f(this.loc.u_hotspot, p.hotspot ?? 0);
+    gl.uniform1f(this.loc.u_hotspotSize, p.hotspotSize ?? 0.5);
+    gl.uniform1f(this.loc.u_vignette, p.vignette ?? 0);
     // Local masks (up to MAX_MASKS = 4, the shader array size).
     const masks = (p.masks ?? []).filter(maskIsActive).slice(0, MAX_MASKS);
     this.updateBrushTexture(masks);

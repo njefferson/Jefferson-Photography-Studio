@@ -43,6 +43,15 @@ export interface EditParams {
    *  contrast/gamma. Spatial (they read the pixel's image-uv), so — like
    *  denoise and glow — they are NOT baked into the .cube LUT. Max MAX_MASKS. */
   masks: MaskLayer[];
+  /** IR lens corrections — a radial LUMINANCE gain in linear space, just after
+   *  white balance (a flat-field correction). Spatial (needs image-uv), so
+   *  skipped in the .cube LUT like masks/denoise/glow.
+   *  - hotspot 0..0.8: darkens the centre to cancel the IR hot-spot.
+   *  - hotspotSize 0.15..1: radial extent of the hot-spot region.
+   *  - vignette -1..1: + brightens corners (correct falloff), - darkens them. */
+  hotspot: number;
+  hotspotSize: number;
+  vignette: number;
 }
 
 export const MAX_MASKS = 4;
@@ -184,6 +193,17 @@ export function toneEvaluator(y: readonly number[]): (v: number) => number {
   };
 }
 
+/** Radial IR-lens correction gain at image-uv (u,v). Elliptical to the frame
+ *  (a circle in uv), so no aspect term is threaded through. Kept numerically
+ *  identical to the shader. 1 = no change. */
+export function radialGain(hotspot: number, hotspotSize: number, vignette: number, u: number, v: number): number {
+  const ex = (u - 0.5) * 2, ey = (v - 0.5) * 2;
+  const r = Math.sqrt(ex * ex + ey * ey); // 0 centre, 1 edge-mid, ~1.414 corner
+  const gVig = 1 + vignette * 0.85 * smooth01(0.1, 1.4142, r);
+  const gHot = 1 - hotspot * (1 - smooth01(0, Math.max(1e-3, hotspotSize), r));
+  return Math.max(0, gVig * gHot);
+}
+
 // --- HSV helpers shared by the per-colour bands (mirrored in the shader) ---
 
 function rgb2hsv(r: number, g: number, b: number): [number, number, number] {
@@ -267,11 +287,18 @@ export function compileEdit(
   const bandsActive =
     sky[0] !== 0 || sky[1] !== 1 || sky[2] !== 1 || fol[0] !== 0 || fol[1] !== 1 || fol[2] !== 1;
   const masks = (p.masks ?? []).filter(maskIsActive).slice(0, MAX_MASKS);
+  const lensOn = (p.hotspot ?? 0) !== 0 || (p.vignette ?? 0) !== 0;
 
   return (r, g, b, out, glow = 0, u, v) => {
     r *= wr;
     g *= wg;
     b *= wb;
+    // IR lens correction: radial luminance gain after WB (spatial -> skipped in
+    // the LUT bake where u/v are absent), matching the shader.
+    if (lensOn && u !== undefined && v !== undefined) {
+      const gain = radialGain(p.hotspot, p.hotspotSize, p.vignette, u, v);
+      r *= gain; g *= gain; b *= gain;
+    }
     // Camera-native -> linear sRGB (after WB, before swap), matching the shader.
     if (cam) {
       const cr = cam[0] * r + cam[1] * g + cam[2] * b;

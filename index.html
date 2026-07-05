@@ -88,6 +88,14 @@
           <small style="color:#80808a">Set automatically from the photo's measured noise; adjust to taste.</small>
         </fieldset>
 
+        <fieldset id="fsLens">
+          <legend>IR lens fixes <small>(hot-spot &amp; vignette)</small></legend>
+          <small style="color:#80808a">IR-converted lenses often brighten the center (a "hot-spot"). Pull it down with Hot-spot and set its size; use Vignette to correct edge darkening (right) or add it (left).</small>
+          <label>Hot-spot <input id="hotspot" type="range" min="0" max="0.8" step="0.01" value="0" /></label>
+          <label>Hot-spot size <input id="hotspotSize" type="range" min="0.15" max="1" step="0.01" value="0.5" /></label>
+          <label>Vignette <input id="vignette" type="range" min="-1" max="1" step="0.01" value="0" /></label>
+        </fieldset>
+
         <fieldset id="fsSwap">
           <legend>Channel swap</legend>
           <button id="swapBtn" type="button" class="toggle" aria-pressed="true">R &#8646; B channel swap</button>

@@ -40,6 +40,9 @@ const params: EditParams = {
   tone: [...TONE_DEFAULT],
   lum: 1,
   masks: [],
+  hotspot: 0,
+  hotspotSize: 0.5,
+  vignette: 0,
 };
 
 const ui = {
@@ -55,6 +58,9 @@ const ui = {
   con: $("con") as HTMLInputElement,
   glow: $("glow") as HTMLInputElement,
   lum: $("lum") as HTMLInputElement,
+  hotspot: $("hotspot") as HTMLInputElement,
+  hotspotSize: $("hotspotSize") as HTMLInputElement,
+  vignette: $("vignette") as HTMLInputElement,
   skyHue: $("skyHue") as HTMLInputElement,
   skySat: $("skySat") as HTMLInputElement,
   skyLum: $("skyLum") as HTMLInputElement,
@@ -138,6 +144,9 @@ function syncFromUI() {
   params.contrast = Number(ui.con.value);
   params.glow = Number(ui.glow.value);
   params.lum = fromPos(Number(ui.lum.value), LUM_LO, LUM_HI);
+  params.hotspot = Number(ui.hotspot.value);
+  params.hotspotSize = Number(ui.hotspotSize.value);
+  params.vignette = Number(ui.vignette.value);
   params.denoise = Number(ui.dn.value);
   params.sky = [Number(ui.skyHue.value), Number(ui.skySat.value), Number(ui.skyLum.value)];
   params.foliage = [Number(ui.folHue.value), Number(ui.folSat.value), Number(ui.folLum.value)];
@@ -170,6 +179,9 @@ function syncToUI() {
   ui.con.value = String(params.contrast);
   ui.glow.value = String(params.glow);
   ui.lum.value = String(toPos(params.lum, LUM_LO, LUM_HI));
+  ui.hotspot.value = String(params.hotspot);
+  ui.hotspotSize.value = String(params.hotspotSize);
+  ui.vignette.value = String(params.vignette);
   ui.skyHue.value = String(params.sky[0]);
   ui.skySat.value = String(params.sky[1]);
   ui.skyLum.value = String(params.sky[2]);
@@ -338,6 +350,9 @@ function cloneParams(p: EditParams): EditParams {
       ...m,
       brush: m.brush ? { w: m.brush.w, h: m.brush.h, data: new Uint8Array(m.brush.data) } : undefined,
     })),
+    hotspot: p.hotspot,
+    hotspotSize: p.hotspotSize,
+    vignette: p.vignette,
   };
 }
 
@@ -371,6 +386,9 @@ function applySnapshot(s: Snapshot) {
   params.tone = c.tone;
   params.lum = c.lum;
   params.masks = c.masks;
+  params.hotspot = c.hotspot;
+  params.hotspotSize = c.hotspotSize;
+  params.vignette = c.vignette;
   activeLook = s.activeLook ?? null;
   lookBias = (s.lookBias ? [...s.lookBias] : [1, 1, 1]) as [number, number, number];
   if (selectedMask >= params.masks.length) selectedMask = params.masks.length - 1;
@@ -683,6 +701,7 @@ document.querySelectorAll<HTMLFieldSetElement>("#panel fieldset").forEach((fs) =
 });
 
 for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.dn, ui.hue, ui.sat, ui.con, ui.glow, ui.lum,
+  ui.hotspot, ui.hotspotSize, ui.vignette,
   ui.skyHue, ui.skySat, ui.skyLum, ui.folHue, ui.folSat, ui.folLum, ...ui.tones]) {
   el.addEventListener("input", syncFromUI);
 }
@@ -1244,6 +1263,9 @@ async function openImported(imported: ImportedFile) {
     tone: [...TONE_DEFAULT],
     lum: 1,
     masks: [],
+    hotspot: 0,
+    hotspotSize: 0.5,
+    vignette: 0,
   };
   activeLook = null;
   updateLookUI();

@@ -113,9 +113,12 @@ See **`PLAN.md`** for the full build plan.
   GPU==CPU ≤2 LSB across radial/linear/brush/stacked/inverted); export applies
   them, the .cube LUT skips them (spatial, like denoise/glow). The core
   paid-editor capability, now free. (Later: full adjustment set per mask.)
-- [ ] **IR hot-spot & vignette correction** — radial luminance/colour regain
-  tuned for the IR-converted lens centre hot-spot (a real Z50 field issue).
-  IR-native (no subscription tool does it), per-pixel, verifiable.
+- [x] **IR hot-spot & vignette correction** — a radial luminance gain in linear
+  space after WB (`radialGain`): Hot-spot (+ size) darkens the centre to cancel
+  the IR-converted lens's hot-spot; Vignette brightens (correct) or darkens
+  (add) the corners. IR-native — no general editor does the hot-spot. Spatial,
+  so skipped in the .cube LUT like masks/denoise/glow. GPU==CPU ≤1 LSB. In the
+  "IR lens fixes" panel. (Colour-cast hot-spot correction could follow.)
 - [x] **Global Luminance slider** — one overall lift/drop on top of the tone
   curve. The five-point tone curve (Blacks/Shadows/Midtones/Whites/Highlights)
   already covers those bands (owner decision 2026-07-04), so no separate
@@ -141,9 +144,13 @@ See **`PLAN.md`** for the full build plan.
 
 > Not parsed into the in-app roadmap (only "Next capability release" is) — this
 > is the fuller backlog reachable via the ⓘ dialog's "More → full notes" link.
-> The theme: give away, on-device and free, the capabilities photo editors have
-> gated behind a subscription for decades — almost all classical DSP that fits
-> the existing per-pixel GPU shader + CPU mirror, no ML and no server.
+> Positioning (recalibrated 2026-07-05, per Noah): the pitch is NOT purely
+> "beat the subscription" — Affinity Photo 2 went free (Canva, late 2025). The
+> real moat is: **free, on-device, no account, no install (runs in the iPad
+> browser), and IR-native** — the channel-swap / sub-2000K WB / hot-spot work
+> that no general editor does at all (free or paid), plus things the IR/stacking
+> specialists still charge for (Helicon/Zerene). Almost all classical DSP that
+> fits the existing per-pixel GPU shader + CPU mirror — no ML, no server.
 
 Classical, subscription-grade tools (fit the current architecture directly):
 - **Clarity / Texture / Dehaze** — local contrast; reuse the low-res map trick

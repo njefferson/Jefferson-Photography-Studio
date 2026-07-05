@@ -30,6 +30,9 @@ raw itself and applies arbitrary gains, which is the entire reason it exists.
 decode -> LINEAR camera-native RGB
   -> DENOISE          (bilateral, BEFORE any gains amplify noise)
   -> EXPOSURE, WB     (linear multipliers; WB luminance-normalized)
+  -> IR LENS FIX      (radial luminance gain: hot-spot darkens centre, vignette
+                       brightens/darkens corners. `radialGain`, elliptical to the
+                       frame. Spatial (image-uv) -> NOT in the .cube LUT.)
   -> CAMERA MATRIX    (cam->sRGB, row-normalized; SEPARATES IR hues — without
                        it all IR chroma sits on one magenta axis and swap/sat
                        cannot produce false color. Biggest single discovery.)
