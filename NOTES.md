@@ -106,6 +106,13 @@ See **`PLAN.md`** for the full build plan.
 > reliable. Editing this list updates the app on the next deploy. Both the
 > roadmap and the patch notes (last commits) refresh automatically on push.
 
+- [ ] **Local masking** — radial + linear gradient + brush; the existing
+  adjustments apply inside the mask. The single capability paid editors gate
+  behind a subscription. Biggest data-model lift: EditParams becomes a base
+  plus a list of masked adjustment layers. Pure per-pixel in the GPU/CPU mirror.
+- [ ] **IR hot-spot & vignette correction** — radial luminance/colour regain
+  tuned for the IR-converted lens centre hot-spot (a real Z50 field issue).
+  IR-native (no subscription tool does it), per-pixel, verifiable.
 - [x] **Global Luminance slider** — one overall lift/drop on top of the tone
   curve. The five-point tone curve (Blacks/Shadows/Midtones/Whites/Highlights)
   already covers those bands (owner decision 2026-07-04), so no separate
@@ -126,3 +133,48 @@ See **`PLAN.md`** for the full build plan.
 - [x] **Roadmap + patch-notes hub** — the ⓘ dialog now shows the next-release
   roadmap and the latest updates, each with a "More" link to the full history
   and notes on GitHub.
+
+## Future / bigger bets (backlog, 2026-07-05)
+
+> Not parsed into the in-app roadmap (only "Next capability release" is) — this
+> is the fuller backlog reachable via the ⓘ dialog's "More → full notes" link.
+> The theme: give away, on-device and free, the capabilities photo editors have
+> gated behind a subscription for decades — almost all classical DSP that fits
+> the existing per-pixel GPU shader + CPU mirror, no ML and no server.
+
+Classical, subscription-grade tools (fit the current architecture directly):
+- **Clarity / Texture / Dehaze** — local contrast; reuse the low-res map trick
+  already built for glow.
+- **Full 8-channel HSL + per-channel R/G/B curves** — extends the per-colour
+  bands and the luminance tone curve; same per-pixel model.
+- **Crop / straighten / perspective (Upright)** — geometry via the vertex
+  shader we already rotate in; crop is a display+export region.
+- **Detail sharpening** (unsharp / deconvolution) — mirror the existing 5×5
+  bilateral pattern (shader + CPU export).
+- **Heal / clone** for sensor dust & hot pixels — clone-stamp first,
+  content-aware later.
+- **Copy settings + batch apply/export** across a folder — builds on the
+  snapshot system shipped 2026-07-04; no ML.
+- **Channel mixer (full 3×3)** — custom false colour beyond the R↔B swap;
+  IR-native, per-pixel.
+
+Known gap to fix (real-world failure):
+- **sRGB ICC on export, both formats.** CONFIRMED in the audit: the JPEG path
+  (`canvas.toBlob`) and the hand-written 16-bit TIFF (`writeTiff16`) are BOTH
+  emitted UNTAGGED today — no ICC, no colour-space marker. Embed a public-domain
+  sRGB profile (JPEG APP2 `ICC_PROFILE` segment; TIFF tag 34675). Small, high
+  value, independent — good standalone quick win.
+
+Frontier (needs WebGPU + an ML model — a real departure from pure-JS/no-WASM):
+- AI denoise, AI subject/sky masking, super-resolution. Cheaper classical
+  stand-in first: Lanczos super-resolution, edge-aware upscale.
+
+Second discipline:
+- **Macro (focus-stacking) mode** — a parallel mode in the same codebase:
+  routes `/ir` + `/macro`, a two-door chooser at `/`, per-route scoped
+  manifests, route-based code-splitting so the stacking engine never loads for
+  IR users. Heavy new engine: per-frame align (translation + rotation + scale,
+  for focus breathing) then Laplacian-pyramid blend; iPad Safari memory is the
+  binding constraint (tile + stream, never hold all frames). Scoped from Noah's
+  build spec 2026-07-05; Phase 0 audit complete (see docs). Blocked on real
+  Z50 II focus-shift sets + installable names/icons before v1 ships.
