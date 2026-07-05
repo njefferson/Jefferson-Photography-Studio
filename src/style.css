@@ -292,6 +292,23 @@ button { cursor: pointer; }
 #maskEditor { margin-top: 10px; }
 .mask-editor-actions { display: flex; gap: 6px; margin-top: 8px; }
 .mask-editor-actions button { width: auto; padding: 6px 12px; font-size: 13px; }
+.a2hs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  margin: 14px auto 0;
+  max-width: 560px;
+  padding: 8px 12px;
+  border: 1px solid rgba(130, 205, 255, 0.35);
+  border-radius: 10px;
+  background: rgba(130, 205, 255, 0.08);
+  font-size: 13px;
+  color: #cfe6f5;
+}
+.a2hs .share-ico { color: var(--accent); font-size: 15px; }
+.a2hs button { width: auto; padding: 5px 10px; font-size: 13px; }
+.a2hs .a2hs-close { background: none; border: none; color: #80808a; font-size: 14px; cursor: pointer; }
 .hsl-chips { display: flex; gap: 8px; margin: 10px 0; flex-wrap: wrap; }
 .hsl-chip {
   width: 30px;

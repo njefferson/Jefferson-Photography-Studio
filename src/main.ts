@@ -1874,6 +1874,45 @@ const VENMO_URL = "https://venmo.com/u/noahjefferson";
   }
 }
 
+// --- "Add to Home Screen" hint on the welcome screen. iOS has NO install
+// API — users must do Share -> Add to Home Screen themselves, and most don't
+// know it exists — so we teach the gesture. Hidden when already running as an
+// installed app; dismissible (remembered); on Chromium/Android the real
+// install prompt (beforeinstallprompt) upgrades the hint to an Install button.
+{
+  const a2hs = $("a2hs") as HTMLDivElement;
+  const installBtn = $("a2hsInstall") as HTMLButtonElement;
+  const A2HS_KEY = "ips-a2hs";
+  const standalone =
+    window.matchMedia("(display-mode: standalone)").matches ||
+    (navigator as Navigator & { standalone?: boolean }).standalone === true;
+  // iPadOS in desktop mode reports MacIntel + touch; catch it too.
+  const isIOS =
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  let installEvt: (Event & { prompt?: () => Promise<void> }) | null = null;
+
+  const shouldShow = () => !standalone && localStorage.getItem(A2HS_KEY) !== "no" && (isIOS || !!installEvt);
+  const refresh = () => { a2hs.hidden = !shouldShow(); };
+
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault(); // keep Chrome's mini-bar quiet; we offer our own button
+    installEvt = e as typeof installEvt;
+    installBtn.hidden = false;
+    ($("a2hsText") as HTMLElement).textContent = "Use it like an app — install for full screen & offline:";
+    refresh();
+  });
+  installBtn.addEventListener("click", async () => {
+    await installEvt?.prompt?.();
+    a2hs.hidden = true;
+  });
+  $("a2hsClose").addEventListener("click", () => {
+    localStorage.setItem(A2HS_KEY, "no");
+    a2hs.hidden = true;
+  });
+  refresh();
+}
+
 // Offline support.
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
