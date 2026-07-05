@@ -120,18 +120,22 @@ See **`PLAN.md`** for the full build plan.
   names the colour and shows the live hue/luminance. The drag→param mapping,
   stable re-touch, chip pick and re-render are verified in headless chromium.
 - [x] **Mask by color** — a mask type (3) that selects everything matching a
-  tapped colour (shipped 2026-07-05). Weight is a chroma-key: the pixel's
-  DISPLAY-space hue/saturation distance to the target, measured in the HSV
-  chroma plane via a branch-free opponent projection (hue AND saturation in one
-  number, hue's influence fading as pixels desaturate). Range widens the band,
-  Feather softens the edge. Targeted by tapping the photo — the tap reads the
-  mask-stage colour through the shader's u_readMode, the exact colour the key
-  compares against, so the colour you touch selects itself (and colour masks key
-  on that fixed pre-mask colour, so stacking order never shifts the selection).
-  Carries the same local brightness/contrast/saturation/hue/warmth as the other
-  masks; spatial, so skipped in the .cube LUT. GPU==CPU verified ≤2 LSB
-  (colour-key alone and stacked = 1 LSB) in headless chromium, plus a controlled
-  selectivity render and a real tap-to-pick UI flow.
+  tapped colour (shipped 2026-07-05; reworked same day after iPad testing found
+  it non-selective on real IR frames and the one-shot pick falling through to
+  tap-WB). Weight is a chroma-key: the pixel's hue/saturation distance to the
+  target in the HSV chroma plane (branch-free opponent projection — hue AND
+  saturation in one number), NORMALISED by the target's own saturation so
+  "Range" discriminates hues even on chroma-flat IR frames. The key space is
+  contrast+gamma of the pre-mask colour (pure ALU — the tone LUT texture broke
+  GPU==CPU parity; tone/mixer/lum also excluded so later grading never moves
+  the mask). Picking is a SUSTAINED mode with a standing bottom banner: while
+  armed every tap re-picks (never tap-WB — the one-shot version nuked the grade
+  by re-white-balancing on the second tap), tap the banner to exit; unpicked
+  masks are inert; the swatch shows the true tapped colour. Same local
+  adjustments as the other masks; spatial, so skipped in the .cube LUT.
+  GPU==CPU verified ≤2 LSB in headless chromium, plus a controlled selectivity
+  render and a real pick → adjust → re-pick → undo UI flow (sky provably
+  untouched when foliage is picked).
 - [ ] **Mask by subject / sky / background** — auto-select masks (owner request
   2026-07-05). Honest scoping: true subject/background segmentation needs an
   on-device ML model (WebGPU — the "frontier" backlog item); SKY may get a

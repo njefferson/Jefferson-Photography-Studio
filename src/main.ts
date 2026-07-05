@@ -3,7 +3,7 @@ import { importFile, type ImportedFile } from "./import";
 import { decode, type DecodedImage } from "./decode";
 import { Renderer, type EditParams } from "./gl";
 import { exportImage, download, type ExportFormat } from "./export";
-import { TONE_DEFAULT, TONE_X, toneEvaluator, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, chromaVec, type MaskLayer } from "./pipeline";
+import { TONE_DEFAULT, TONE_X, toneEvaluator, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, chromaVec, hsv2rgb, type MaskLayer } from "./pipeline";
 import { generateCube } from "./lut";
 import { generateDcp } from "./dcp";
 import { buildGlowMap } from "./glow";
@@ -981,14 +981,22 @@ function updateMaskUI() {
     }
     mUI.invert.setAttribute("aria-pressed", String(m.invert));
   }
+  // If the armed pick's mask vanished under it (undo, delete, photo switch),
+  // disarm so the banner never lies about what a tap will do.
+  if (colorPickArmed && (!m || m.type !== 3)) setColorPick(false);
 }
 
-/** Reflect the tapped target colour on the swatch + label. */
+/** Reflect the tapped target colour on the swatch + label. The swatch shows
+ *  the ACTUAL tapped colour (hue/sat drive the key; valTarget is kept for
+ *  exactly this), so "did it grab what I touched" is answerable at a glance. */
 function updateColorSwatch(m: MaskLayer) {
-  const picked = m.satTarget > 0.001 || m.hueTarget !== 0;
-  mUI.colorSwatch.style.background = picked
-    ? `hsl(${m.hueTarget}deg ${Math.round(Math.min(1, m.satTarget) * 75 + 15)}% 50%)`
-    : "#3a3a42";
+  const picked = m.satTarget >= 0;
+  if (picked) {
+    const [r, g, b] = hsv2rgb(m.hueTarget, Math.min(1, m.satTarget), m.valTarget ?? 0.75);
+    mUI.colorSwatch.style.background = `rgb(${Math.round(r * 255)} ${Math.round(g * 255)} ${Math.round(b * 255)})`;
+  } else {
+    mUI.colorSwatch.style.background = "#3a3a42";
+  }
   mUI.colorSwatchText.textContent = picked
     ? `Hue ${Math.round(m.hueTarget)}° · Sat ${m.satTarget.toFixed(2)}`
     : "Tap the photo to pick a colour";
@@ -1024,25 +1032,32 @@ addRadialBtn.addEventListener("click", () => addMask(0));
 addLinearBtn.addEventListener("click", () => addMask(1));
 addColorBtn.addEventListener("click", () => addMask(3));
 
-// Colour-mask target pick: arm, tap the photo, and the mask keys on that
-// colour. Reads the mask-stage DISPLAY colour (before any mask) via
-// readColorKeyPixel — exactly what the shader/CPU colour key compares against,
-// so the colour you touch is the colour that selects itself.
+// Colour-mask target pick: arm, then tap the photo and the mask keys on that
+// colour. SUSTAINED (the TAT lesson): while armed, EVERY tap re-picks and a
+// standing banner owns the moment — the mode never silently hands the canvas
+// back to tap-WB. (The first cut was one-shot: it disarmed after the tap, so
+// tapping a second colour set WHITE BALANCE and visually nuked the grade —
+// field bug 2026-07-05.) Exit via the button, the banner, or selecting
+// another mask. Reads the key-space colour via readColorKeyPixel — exactly
+// what the shader/CPU key compares against, so the colour you touch selects
+// itself.
+const colorBanner = $("colorBanner") as HTMLButtonElement;
 let colorPickArmed = false;
 function setColorPick(on: boolean) {
   const m = currentMask();
   colorPickArmed = on && !!m && m.type === 3;
   mUI.colorPick.setAttribute("aria-pressed", String(colorPickArmed));
+  colorBanner.hidden = !colorPickArmed;
   if (colorPickArmed) { setHslPick(false); setTat(false); } // picture tools are exclusive
 }
 mUI.colorPick.addEventListener("click", () => setColorPick(!colorPickArmed));
+colorBanner.addEventListener("click", () => setColorPick(false)); // tap the banner to exit
 
 /** Handle an armed colour-mask target tap. Returns true when it consumed it. */
 function handleColorMaskPick(clientX: number, clientY: number): boolean {
   if (!colorPickArmed) return false;
   const m = currentMask();
-  setColorPick(false); // one-shot
-  if (!m || m.type !== 3) return true;
+  if (!m || m.type !== 3) { setColorPick(false); return true; } // stale arm (undo etc.)
   const [uu, vv] = renderer.clientToImageUv(clientX, clientY);
   const px = renderer.readColorKeyPixel(params, uu, vv);
   if (px) {
@@ -1054,11 +1069,12 @@ function handleColorMaskPick(clientX: number, clientY: number): boolean {
     if (h < 0) h += 360;
     m.hueTarget = h;
     m.satTarget = Math.hypot(cx, cy);
+    m.valTarget = Math.max(px[0], px[1], px[2]) / 255; // swatch cosmetics only
     updateColorSwatch(m);
     draw();
-    flushRecord();
+    flushRecord(); // each re-pick is one undo step (deduped when unchanged)
   }
-  return true;
+  return true; // stays armed — tap again to re-pick, banner/button to exit
 }
 
 function mkHandle(role: string): SVGCircleElement {

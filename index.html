@@ -48,6 +48,10 @@
           <span>&#10021; Drag to adjust is ON — drag a color to tune it</span>
           <span class="tat-banner-off">Tap here to turn off &amp; restore tap / pan / pinch</span>
         </button>
+        <button id="colorBanner" type="button" hidden>
+          <span>&#127919; Colour mask — tap the photo to pick the colour to match</span>
+          <span class="tat-banner-off">Tap again to re-pick &middot; tap here when done</span>
+        </button>
         <div id="welcome">
           <button id="welcomeClose" class="welcome-close" type="button" hidden>&#10005;</button>
           <p id="hint">Edit infrared photos — RAW (NEF / DNG) unlocks the full color magic.</p>
@@ -210,13 +214,13 @@
           <div id="maskList" class="mask-list"></div>
           <div id="maskEditor" hidden>
             <div id="colorControls" hidden>
-              <small style="color:#80808a">Tap the photo to choose the colour to match, then adjust below. Widen Range to include more shades; Feather softens the edge.</small>
+              <small style="color:#80808a">With Pick on, tap the photo to choose the colour to match — tap again to re-pick. Widen Range to include more shades; Feather softens the edge. Add another Colour mask to grade a second colour.</small>
               <div class="mask-editor-actions">
                 <button id="mColorPick" type="button" class="toggle" aria-pressed="false">&#127919; Pick colour</button>
                 <span id="mColorSwatch" class="color-swatch"></span>
                 <span id="mColorSwatchText" style="color:#80808a;font-size:.85em"></span>
               </div>
-              <label>Range <input id="mColorRange" type="range" min="0.02" max="0.8" step="0.01" value="0.25" /></label>
+              <label>Range <input id="mColorRange" type="range" min="0.05" max="1.5" step="0.01" value="0.5" /></label>
             </div>
             <div id="brushControls" hidden>
               <small style="color:#80808a">Paint on the photo to build the mask. Turn Paint off to pan/zoom.</small>

@@ -126,23 +126,36 @@ float maskWeight(int i, vec2 uv){
   if (u_maskGeoB[i].y > 0.5) w = 1.0 - w;
   return w;
 }
+// The colour a pre-mask LINEAR pixel DISPLAYS, with masks and the steering
+// tools (tone/mixer/lum) off: contrast -> gamma. The colour-mask key space.
+// Pure ALU on purpose — routing it through the tone LUT texture broke GPU==CPU
+// (8-bit filtered lookup vs exact float math; field lesson 2026-07-05).
+vec3 keyDisplay(vec3 c){
+  return toGamma(clamp((c - 0.5) * u_con + 0.5, 0.0, 1.0));
+}
 // Colour mask (type 3): weight from the pixel's DISPLAY-space hue/saturation
 // distance to the tapped target, chroma-key style. c is the running LINEAR
-// colour at the mask stage; gamma-encode it so the hue matches the screen.
+// colour at the mask stage (before any mask); keyDisplay() lifts it to what
+// it shows on screen. The distance is NORMALISED by the target's own
+// saturation, so Range means "how far from THIS colour, relative to how
+// colourful it is" — hue discrimination stays constant whether the image's
+// chroma is vivid or IR-flat (absolute distance could not discriminate on
+// low-sat IR frames; field bug 2026-07-05). satTarget < 0 = unpicked -> inert.
 // u_maskGeoA[i] = (hueTargetDeg, satTarget, colorRange, -). Matches pipeline.ts.
 float colorMaskWeight(int i, vec3 c){
   vec4 gA = u_maskGeoA[i]; // (hueTargetDeg, satTarget, colorRange, -)
-  vec3 d = toGamma(clamp(c, 0.0, 1.0));
+  if (gA.y < 0.0) return 0.0; // unpicked mask is inert (invert included)
+  vec3 d = keyDisplay(c);
   // HSV chroma-plane vector s*(cosH,sinH) straight from RGB (opponent
   // projection / V) — continuous, so it matches pipeline.ts to float epsilon.
   float V = max(max(d.r, d.g), d.b);
   vec2 pv = V > 1e-6 ? vec2((d.r - 0.5 * (d.g + d.b)) / V, 0.8660254 * (d.g - d.b) / V) : vec2(0.0);
   float tRad = radians(gA.x);
   vec2 tv = vec2(gA.y * cos(tRad), gA.y * sin(tRad));
-  float dist = length(pv - tv);
+  float nd = length(pv - tv) / max(0.08, gA.y);
   float edge = max(1e-4, gA.z);
   float plateau = edge * (1.0 - u_maskGeoB[i].x);
-  float w = 1.0 - smoothstep(plateau, edge, dist);
+  float w = 1.0 - smoothstep(plateau, edge, nd);
   if (u_maskGeoB[i].y > 0.5) w = 1.0 - w;
   return w;
 }
@@ -241,10 +254,10 @@ void main() {
   // 0.7 = GLOW_GAIN in glow.ts — keep in sync.
   c += vec3(u_glow * 0.7 * texture(u_glowTex, v_uv).r);
 
-  // Colour-mask key read: emit the mask-stage colour in DISPLAY space and stop,
-  // so a tap can sample exactly what colorMaskWeight keys against. (Must sit
-  // right before the mask loop — the key is the colour BEFORE any mask.)
-  if (u_readMode == 1) { frag = vec4(toGamma(clamp(c, 0.0, 1.0)), 1.0); return; }
+  // Colour-mask key read: emit the key-space colour (keyDisplay of the
+  // pre-mask colour) and stop, so a tap samples exactly what colorMaskWeight
+  // keys against. (Must sit right before the mask loop.)
+  if (u_readMode == 1) { frag = vec4(keyDisplay(c), 1.0); return; }
 
   // Colour masks all key on the mask-STAGE colour (this fixed cKey, before any
   // mask) — exactly what a tap samples — so the colour you touch selects itself

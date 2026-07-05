@@ -175,7 +175,8 @@ body {
 /* Standing "adjust mode is on" banner — top-centre, tappable to exit. Sits
    above the image so it's unmissable while the canvas is a colour-tuning
    surface (and tap-WB / pan / pinch are handed off). */
-#tatBanner {
+#tatBanner,
+#colorBanner {
   position: absolute;
   top: 16px;
   left: 50%;
@@ -199,14 +200,20 @@ body {
   box-shadow: 0 3px 14px rgba(0, 0, 0, 0.45);
   cursor: pointer;
 }
-#tatBanner .tat-banner-off {
+#tatBanner .tat-banner-off,
+#colorBanner .tat-banner-off {
   font-size: 11px;
   font-weight: 500;
   opacity: 0.85;
 }
+/* The colour-pick banner sits at the BOTTOM: in IR shots the sky — a prime
+   pick target — is at the top, and a top banner ate those taps (exiting the
+   mode instead of re-picking; found by the headless UI flow). */
+#colorBanner { top: auto; bottom: 16px; }
 @media (max-width: 760px) {
-  #tatBanner { top: 10px; padding: 6px 13px; font-size: 12px; }
-  #tatBanner .tat-banner-off { font-size: 10px; }
+  #tatBanner, #colorBanner { top: 10px; padding: 6px 13px; font-size: 12px; }
+  #tatBanner .tat-banner-off, #colorBanner .tat-banner-off { font-size: 10px; }
+  #colorBanner { top: auto; bottom: 10px; }
 }
 #hint { color: #9a9aa2; text-align: center; max-width: 40ch; margin: 0 auto; }
 #welcome {

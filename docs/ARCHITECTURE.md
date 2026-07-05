@@ -357,38 +357,56 @@ and NO Nikon body can channel-swap in camera. Field guide:
     intercepts single-pointer canvas drags (guards atop the canvas pointer
     handlers) and sets `tapSuppressed` so it never also fires tap-to-WB.
   - **Colour masks** (type 3): a chroma-key with NO geometry — the weight comes
-    from each pixel's own colour, not its position. `colorMaskWeight` measures
-    the Euclidean distance in the HSV **chroma plane** between the pixel and the
-    tapped target (`hueTarget`°, `satTarget` = HSV S), 1 at the target and
-    smoothstep-falling to 0 past `colorRange` (`feather` widens the soft edge).
-    One distance folds hue AND saturation together and naturally fades hue's
-    influence as pixels desaturate (a near-grey pixel sits near the origin
-    whatever its noisy hue). CRUCIAL DETAIL that earned the ≤2 LSB parity: do NOT
-    build the chroma vector from `rgb2hsv` — the GPU and CPU rgb2hsv formulations
-    drift ~1° at the hexagon vertices, and a colour-dependent weight through a
-    steep smoothstep amplifies that into ~3 LSB at the selection edge (geometric
-    masks never see this — their weight is colour-independent). Instead both
-    sides use `chromaVec`, the branch-free opponent projection
-    `(R-½(G+B), √3⁄2·(G-B)) / V`, which is algebraically the SAME point
-    (`|v|`=HSV saturation, angle=HSV hue) but CONTINUOUS — no hue-angle branch,
-    no wrap — so GPU==CPU to float epsilon. The mask keys on the **mask-stage**
-    display colour (the running linear colour gamma-encoded just before the mask
-    loop, captured ONCE as `cKey` and reused by every colour mask): (1) it is the
-    exact colour a tap samples — the shader's `u_readMode==1` emits that same
-    pre-mask colour, and `Renderer.readColorKeyPixel` reads it — so the colour
-    you touch selects itself; (2) keying on a FIXED pre-mask colour (not the
-    running colour mutated by earlier masks in the loop) means stacking order
-    can't shift the selection and upstream 1-LSB rounding can't cascade into the
-    steep key (that cascade was the last 3-LSB straggler in the stacked case).
-    The tap stores the target from the same `chromaVec` (hueTarget = atan2 angle,
-    satTarget = radius), so a pixel of the tapped colour lands exactly on the
-    target. Geometry uniforms are reused: `u_maskGeoA` carries
-    `(hueTarget, satTarget, colorRange, -)` for type 3, `u_maskGeoB` stays
-    `(feather, invert)`. Colour masks show no overlay handles (like brush).
-    Verified in headless chromium: GPU==CPU ≤2 LSB (colour-key alone and stacked
-    = 1 LSB; the 2-LSB pixels are near-grey points from the pre-existing
-    mixer/tone/lum display ops), a controlled hue×sat selectivity render, and a
-    real tap-to-pick + adjust + undo UI flow.
+    from each pixel's own colour, not its position. `colorMaskWeight` projects
+    the pixel and the tapped target onto the HSV **chroma plane** (hue angle ×
+    saturation radius), takes the Euclidean distance, and — CRUCIAL, field bug
+    2026-07-05 — divides it by the TARGET's own saturation: `colorRange` means
+    "how far from THIS colour, relative to how colourful it is". IR frames live
+    at key-saturations ~0.1–0.3, where every hue sits within an absolute 0.25 of
+    every other — the first cut used absolute distance and the mask selected
+    nearly everything, so the sliders read as broken on the iPad. Normalising by
+    `max(0.08, satTarget)` makes hue discrimination independent of the image's
+    overall chroma level. Weight is 1 at the target, smoothstep to 0 past
+    `colorRange` (`feather` widens the soft edge); near-grey pixels still sit
+    near the origin whatever their noisy hue. `satTarget < 0` = no colour picked
+    yet → the mask is INERT (0 everywhere, invert included) instead of keying on
+    a meaningless default.
+    The KEY SPACE is `keyDisplay` = contrast → gamma of the pre-mask linear
+    colour, captured ONCE before the mask loop (`cKey`): (1) it is the exact
+    colour a tap samples — the shader's `u_readMode==1` emits it and
+    `Renderer.readColorKeyPixel` reads it — so the colour you touch selects
+    itself; (2) fixed pre-mask, so stacking order can't shift the selection and
+    upstream rounding can't cascade into the steep key; (3) tone/mixer/lum are
+    EXCLUDED both for TAT-style stability (steering tools you tweak after
+    masking must not move the mask) and because the tone curve is a filtered
+    8-bit LUT texture on the GPU — routing the key through it broke GPU==CPU to
+    15 LSB (quantisation amplified by the selection edge, and real Apple-GPU
+    filtering wouldn't deterministically match a CPU emulation anyway). The key
+    stays pure ALU. SECOND parity lesson: do NOT build the chroma vector from
+    `rgb2hsv` — the GPU and CPU formulations drift ~1° at the hexagon vertices
+    (≈3 LSB at the edge); both sides use `chromaVec`, the branch-free opponent
+    projection `(R-½(G+B), √3⁄2·(G-B)) / V` — the SAME point (|v|=HSV S,
+    angle=HSV H) but continuous, so GPU==CPU to float epsilon.
+    TARGETING is a SUSTAINED pick mode (the TAT lesson, relearned 2026-07-05 on
+    the iPad): the first cut was one-shot — it disarmed after the tap, so
+    tapping a second colour fell through to tap-to-WB and re-balanced the whole
+    photo ("selecting a different color undoes the work"). Now, while armed
+    (auto-armed on +Colour), EVERY tap re-picks; a standing banner
+    (`#colorBanner`, tap to exit) owns the moment, and it sits at the BOTTOM of
+    the stage — IR skies are at the top, and a top banner ate exactly those
+    re-pick taps (found by the headless UI flow, which clicks the sky). The tap
+    stores the target via the same `chromaVec` (hueTarget = atan2 angle,
+    satTarget = radius) plus `valTarget` (HSV V, swatch cosmetics ONLY) so the
+    panel swatch shows the actual tapped colour. Arming disarms stale-safe via
+    updateMaskUI when the mask vanishes (undo/delete/new photo). Geometry
+    uniforms are reused: `u_maskGeoA` = `(hueTarget, satTarget, colorRange, -)`
+    for type 3, `u_maskGeoB` stays `(feather, invert)`; no overlay handles
+    (like brush). Verified in headless chromium: GPU==CPU ≤2 LSB across
+    solo/inverted/stacked/full-stack configs (the 2-LSB pixels are near-grey
+    points from the pre-existing mixer/tone/lum display ops), a controlled
+    hue×sat selectivity render, and a real UI flow — pick foliage on the canopy
+    example → sky probes provably untouched, re-pick the sky while armed keeps
+    the slider work and never fires tap-WB, undo fully unwinds.
 - WB gain + exposure sliders are LOG-scale: the `<input>` stores a 0..1000
   position; `toPos`/`fromPos` in main.ts map it exponentially over
   0.02–16x (WB) / 0.1–16x (exposure) so 1.0 sits near mid-track. On a linear

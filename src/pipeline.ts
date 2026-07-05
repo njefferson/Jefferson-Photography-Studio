@@ -128,12 +128,15 @@ export interface MaskLayer {
   invert: boolean;
   brush?: BrushMask; // type 2 only
   rev?: number; // bumps on each brush stroke (undo equality)
-  // Colour mask (type 3): the tapped target and how wide a band it selects. The
-  // key is the pixel's DISPLAY-space hue/saturation at the mask stage (see
-  // colorMaskWeight); satTarget is HSV saturation (0..1), hueTarget in degrees.
+  // Colour mask (type 3): the tapped target and how wide a band it selects.
+  // The key is the pixel's DISPLAY-space hue/saturation — the pre-mask colour
+  // pushed through contrast+gamma+tone (see colorMaskWeight); satTarget is HSV
+  // saturation (0..1), hueTarget in degrees. satTarget < 0 = no colour picked
+  // yet -> the mask is inert (weight 0 everywhere, invert included).
   hueTarget: number; // degrees
-  satTarget: number; // 0..1 (HSV)
-  colorRange: number; // chroma-plane distance at which selection reaches 0
+  satTarget: number; // 0..1 (HSV); -1 = unpicked (mask inert)
+  valTarget: number; // HSV value of the tapped colour — swatch cosmetics ONLY
+  colorRange: number; // normalised chroma distance at which selection reaches 0
   // Local adjustments — neutral = brightness/contrast/saturation 1, hue/warmth 0.
   brightness: number;
   contrast: number;
@@ -143,7 +146,7 @@ export interface MaskLayer {
 }
 
 export function neutralMask(type: 0 | 1 | 2 | 3): MaskLayer {
-  const base = { cx: 0.5, cy: 0.5, rx: 0.35, ry: 0.35, feather: 0.5, lx: 0.5, ly: 0.85, invert: false, hueTarget: 0, satTarget: 0, colorRange: 0.25, brightness: 1, contrast: 1, saturation: 1, hue: 0, warmth: 0 };
+  const base = { cx: 0.5, cy: 0.5, rx: 0.35, ry: 0.35, feather: 0.5, lx: 0.5, ly: 0.85, invert: false, hueTarget: 0, satTarget: -1, valTarget: 0.75, colorRange: 0.5, brightness: 1, contrast: 1, saturation: 1, hue: 0, warmth: 0 };
   if (type === 1) return { ...base, type, cx: 0.5, cy: 0.12, lx: 0.5, ly: 0.5 };
   if (type === 2) return { ...base, type, rev: 0 };
   return { ...base, type };
@@ -204,22 +207,30 @@ export function chromaVec(r: number, g: number, b: number): [number, number] {
   return [(r - 0.5 * (g + b)) / V, (0.8660254037844386 * (g - b)) / V];
 }
 
-/** Colour-mask (type 3) weight for a DISPLAY-space pixel colour (gamma RGB,
- *  0..1). Chroma-key: project the pixel and the tapped target onto the HSV
- *  chroma plane (hue angle × saturation radius) and measure Euclidean distance
- *  — one number that folds hue AND saturation together and naturally fades hue's
- *  influence as pixels desaturate (a near-grey pixel sits near the origin
- *  whatever its noisy hue). Weight is 1 at the target, smoothstep-falling to 0
- *  past `colorRange`; `feather` widens the soft transition. Kept numerically
- *  identical to the shader's colorMaskWeight. */
+/** Colour-mask (type 3) weight for a KEY-space pixel colour (gamma RGB, 0..1 —
+ *  the pre-mask colour through contrast+gamma; see compileEdit). Chroma-key:
+ *  project the pixel and the tapped target onto the HSV chroma plane (hue
+ *  angle × saturation radius), measure Euclidean distance, then NORMALISE by
+ *  the target's own saturation — so `colorRange` means "how far from THIS
+ *  colour, relative to how colourful it is", and hue discrimination stays
+ *  constant whether the image's chroma is vivid or IR-flat. (An absolute
+ *  distance could not discriminate on low-sat IR frames — everything sat
+ *  within the default Range of everything else; field bug 2026-07-05.) One
+ *  number folds hue AND saturation; hue's influence still fades as pixels
+ *  desaturate (near-grey pixels sit near the origin whatever their noisy
+ *  hue). Weight is 1 at the target, smoothstep-falling to 0 past `colorRange`;
+ *  `feather` widens the soft transition. An unpicked mask (satTarget < 0) is
+ *  inert — 0 everywhere, invert included. Kept numerically identical to the
+ *  shader's colorMaskWeight. */
 export function colorMaskWeight(m: MaskLayer, r: number, g: number, b: number): number {
+  if (m.satTarget < 0) return 0; // no colour picked yet
   const [px, py] = chromaVec(r, g, b);
   const tRad = (m.hueTarget * Math.PI) / 180;
   const tx = m.satTarget * Math.cos(tRad), ty = m.satTarget * Math.sin(tRad);
-  const dist = Math.hypot(px - tx, py - ty);
+  const nd = Math.hypot(px - tx, py - ty) / Math.max(0.08, m.satTarget);
   const edge = Math.max(1e-4, m.colorRange);
   const plateau = edge * (1 - m.feather);
-  const w = 1 - smooth01(plateau, edge, dist);
+  const w = 1 - smooth01(plateau, edge, nd);
   return m.invert ? 1 - w : w;
 }
 
@@ -349,7 +360,7 @@ function rgb2hsv(r: number, g: number, b: number): [number, number, number] {
   return [h, max < 1e-9 ? 0 : d / max, max];
 }
 
-function hsv2rgb(h: number, s: number, v: number): [number, number, number] {
+export function hsv2rgb(h: number, s: number, v: number): [number, number, number] {
   h = ((h % 360) + 360) % 360;
   const c = v * s;
   const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
@@ -420,6 +431,7 @@ export function compileEdit(
   const bandsActive =
     sky[0] !== 0 || sky[1] !== 1 || sky[2] !== 1 || fol[0] !== 0 || fol[1] !== 1 || fol[2] !== 1;
   const masks = (p.masks ?? []).filter(maskIsActive).slice(0, MAX_MASKS);
+  const hasColorMask = masks.some((m) => m.type === 3);
   const lensOn = (p.hotspot ?? 0) !== 0 || (p.vignette ?? 0) !== 0;
   const cl = p.clarity ?? 0;
   const dz = p.dehaze ?? 0;
@@ -517,11 +529,22 @@ export function compileEdit(
     // global contrast/gamma. Spatial (needs image-uv), so skipped when u/v are
     // absent (e.g. the .cube LUT bake) — matching denoise/glow.
     if (masks.length && u !== undefined && v !== undefined) {
-      // Colour masks key on the mask-STAGE colour (gamma-encoded, before any
-      // mask) — exactly what a tap samples via Renderer.readColorKeyPixel, so
-      // the colour you touch selects itself and stacking order can't shift the
-      // selection. Captured once; matches the shader's cKey.
-      const kr = toGamma(nr), kg = toGamma(ng), kb = toGamma(nb);
+      // Colour masks key on the pre-mask colour pushed through contrast +
+      // gamma — the colour this pixel DISPLAYS with masks and the steering
+      // tools (tone/mixer/lum) off. Steering tools are excluded for TAT-style
+      // stability (the key must not drift as you grade after masking) — and
+      // tone specifically CANNOT join the key: on the GPU it is a filtered
+      // 8-bit LUT texture whose quantisation the steep selection edge
+      // amplifies past the ≤2 LSB parity bar (field lesson 2026-07-05). This
+      // is exactly what a tap samples via Renderer.readColorKeyPixel (shader
+      // u_readMode), so the colour you touch selects itself; fixed pre-mask,
+      // so stacking order can't shift the selection.
+      let kr = 0, kg = 0, kb = 0;
+      if (hasColorMask) {
+        kr = toGamma((nr - 0.5) * con + 0.5);
+        kg = toGamma((ng - 0.5) * con + 0.5);
+        kb = toGamma((nb - 0.5) * con + 0.5);
+      }
       for (const m of masks) {
         let w: number;
         if (m.type === 3) {
