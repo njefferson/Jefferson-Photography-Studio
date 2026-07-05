@@ -131,6 +131,13 @@ without better evidence.
   Structure validated with tifffile; COLOR NEVER VALIDATED IN LIGHTROOM (beta).
 - Lightroom .xmp presets in `presets/` (Temperature floor 2000 + Calibration
   faux swap; a true swap is impossible in Lightroom without a profile).
+- Image exports embed an **sRGB ICC profile** (`src/icc.ts`, `SRGB_ICC`) so files
+  are never untagged: JPEG gets an APP2 `ICC_PROFILE` segment (`embedIccInJpeg`,
+  inserted after SOI/APP0), the 16-bit TIFF gets tag 34675 (`writeTiff16`). The
+  profile is a minimal valid ICC v2 display profile — sRGB/Rec.709 primaries,
+  gamma-2.2 TRC (what `toGamma` writes, not the sRGB piecewise curve), D50 PCS
+  with the standard D65→D50-adapted colorants. If the pipeline's encode ever
+  changes to true sRGB piecewise, swap the TRC to a `para` curve to match.
 
 ## Example photos (`public/examples/`)
 

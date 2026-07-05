@@ -10,6 +10,7 @@ import { Tiff } from "./raw/tiff";
 import { camToSrgbLinear, NIKON_Z50_COLOR_MATRIX } from "./color";
 import { makeRowDenoiser } from "./raw/denoise";
 import { buildGlowMap, sampleGlow, GLOW_GAIN } from "./glow";
+import { SRGB_ICC, embedIccInJpeg } from "./icc";
 import type { ImportedFile } from "./import";
 import type { DecodedImage } from "./decode";
 
@@ -117,7 +118,10 @@ export async function exportImage(
     canvas.getContext("2d")!.putImageData(new ImageData(data, w, h), 0, 0);
     const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", opts.quality));
     if (!blob) throw new Error("JPEG encoding failed.");
-    return { blob, name: `${baseName}.jpg` };
+    // canvas.toBlob emits an UNTAGGED JPEG; embed the sRGB profile so viewers
+    // don't have to guess the colour space.
+    const tagged = embedIccInJpeg(new Uint8Array(await blob.arrayBuffer()));
+    return { blob: new Blob([tagged.buffer as ArrayBuffer], { type: "image/jpeg" }), name: `${baseName}.jpg` };
   } else {
     const rgb = new Uint16Array(w * h * 3);
     for (let oIdx = 0; oIdx < outerN; oIdx++) {
@@ -160,16 +164,18 @@ function getSource(file: ImportedFile, current: DecodedImage): Source {
   return { pixels: current.pixels, width: current.width, height: current.height };
 }
 
-/** Minimal baseline TIFF: RGB, 16-bit/channel, uncompressed, single strip. */
-export function writeTiff16(rgb: Uint16Array, w: number, h: number): ArrayBuffer {
-  const entries = 11;
+/** Minimal baseline TIFF: RGB, 16-bit/channel, uncompressed, single strip, with
+ *  an embedded ICC profile (tag 34675) so the output is never untagged. */
+export function writeTiff16(rgb: Uint16Array, w: number, h: number, icc: Uint8Array = SRGB_ICC): ArrayBuffer {
+  const entries = 12;
   const ifdOffset = 8;
   const ifdSize = 2 + entries * 12 + 4;
   const bitsOffset = ifdOffset + ifdSize; // 3 shorts
   const sampleFmtOffset = bitsOffset + 6; // 3 shorts
   const dataOffset = sampleFmtOffset + 6;
   const dataBytes = w * h * 3 * 2;
-  const buf = new ArrayBuffer(dataOffset + dataBytes);
+  const iccOffset = dataOffset + dataBytes; // ICC bytes appended after pixels
+  const buf = new ArrayBuffer(iccOffset + icc.length);
   const dv = new DataView(buf);
   // Header (little-endian).
   dv.setUint16(0, 0x4949, true);
@@ -185,7 +191,8 @@ export function writeTiff16(rgb: Uint16Array, w: number, h: number): ArrayBuffer
     dv.setUint32(p + 8, value, true);
     p += 12;
   };
-  const SHORT = 3, LONG = 4;
+  const SHORT = 3, LONG = 4, UNDEFINED = 7;
+  // Tags MUST stay in ascending ID order.
   tag(256, LONG, 1, w); // ImageWidth
   tag(257, LONG, 1, h); // ImageLength
   tag(258, SHORT, 3, bitsOffset); // BitsPerSample -> [16,16,16]
@@ -197,6 +204,7 @@ export function writeTiff16(rgb: Uint16Array, w: number, h: number): ArrayBuffer
   tag(279, LONG, 1, dataBytes); // StripByteCounts
   tag(284, SHORT, 1, 1); // PlanarConfig: chunky
   tag(339, SHORT, 3, sampleFmtOffset); // SampleFormat -> [1,1,1] unsigned
+  tag(34675, UNDEFINED, icc.length, iccOffset); // ICC profile (InterColorProfile)
   dv.setUint32(p, 0, true); // next IFD = 0
 
   for (let i = 0; i < 3; i++) {
@@ -206,6 +214,8 @@ export function writeTiff16(rgb: Uint16Array, w: number, h: number): ArrayBuffer
   // Pixel data, little-endian 16-bit.
   const o = new Uint16Array(buf, dataOffset, w * h * 3);
   o.set(rgb);
+  // ICC profile bytes.
+  new Uint8Array(buf, iccOffset, icc.length).set(icc);
   return buf;
 }
 

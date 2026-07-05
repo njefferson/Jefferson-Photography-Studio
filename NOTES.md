@@ -158,12 +158,13 @@ Classical, subscription-grade tools (fit the current architecture directly):
 - **Channel mixer (full 3×3)** — custom false colour beyond the R↔B swap;
   IR-native, per-pixel.
 
-Known gap to fix (real-world failure):
-- **sRGB ICC on export, both formats.** CONFIRMED in the audit: the JPEG path
-  (`canvas.toBlob`) and the hand-written 16-bit TIFF (`writeTiff16`) are BOTH
-  emitted UNTAGGED today — no ICC, no colour-space marker. Embed a public-domain
-  sRGB profile (JPEG APP2 `ICC_PROFILE` segment; TIFF tag 34675). Small, high
-  value, independent — good standalone quick win.
+Known gap — FIXED 2026-07-05:
+- [x] **sRGB ICC on export, both formats.** JPEG (`canvas.toBlob`) and the
+  hand-written 16-bit TIFF (`writeTiff16`) were both emitted UNTAGGED. Now every
+  export embeds a minimal valid sRGB profile (`src/icc.ts`: sRGB primaries,
+  gamma-2.2 TRC = what the pipeline writes, D50 PCS) — JPEG APP2 `ICC_PROFILE`
+  segment, TIFF tag 34675. Verified byte-exact (profile parses; colorants + TRC
+  decode correctly; both round-trip). This is shared-core for the macro mode too.
 
 Frontier (needs WebGPU + an ML model — a real departure from pure-JS/no-WASM):
 - AI denoise, AI subject/sky masking, super-resolution. Cheaper classical
