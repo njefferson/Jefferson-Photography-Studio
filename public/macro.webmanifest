@@ -1,8 +1,8 @@
 {
-  "name": "Photography Studio",
-  "short_name": "Studio",
-  "description": "On-device photo tools — infrared editing and macro focus stacking.",
-  "start_url": "./",
+  "name": "Macro Focus Stacking",
+  "short_name": "Macro",
+  "description": "Combine a focus-shift burst into one fully-sharp macro frame, on-device.",
+  "start_url": "./macro.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",

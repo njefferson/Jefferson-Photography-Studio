@@ -38,6 +38,8 @@ body {
   border-bottom: 1px solid var(--line);
 }
 .brand { font-weight: 600; letter-spacing: 0.02em; display: inline-flex; align-items: center; gap: 8px; }
+.home-link { color: #9a9aa4; text-decoration: none; font-size: 1.3em; line-height: 1; padding: 0 0.15em 0.1em; }
+.home-link:active { color: #fff; }
 .info-btn {
   width: 22px;
   height: 22px;

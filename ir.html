@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#0b0b0d" />
+    <link rel="manifest" href="./ir.webmanifest" />
+    <title>Infrared Photography Studio</title>
+  </head>
+  <body>
+    <div id="app">
+      <header class="bar">
+        <span class="brand">
+          <a class="home-link" href="./index.html" aria-label="Back to Studio" title="Back to Studio">&#8249;</a>
+          Infrared Photography Studio
+          <button id="infoBtn" class="info-btn" type="button" aria-label="What's new">i</button>
+        </span>
+        <span class="bar-actions">
+          <button id="undoBtn" class="bar-btn" type="button" disabled title="Go back one edit step">&#8630; Go back</button>
+          <button id="resetBtn" class="bar-btn" type="button" disabled title="Reset the whole edit to how the photo first opened">Reset</button>
+          <button id="origBtn" class="bar-btn" type="button" title="Press and hold to compare with the original">Hold: Original</button>
+          <button id="histBtn" class="bar-btn" type="button" aria-pressed="true" title="Show or hide the live histogram">Histogram</button>
+          <button id="rotateBtn" class="bar-btn" type="button" aria-label="Rotate 90 degrees clockwise">&#8635; Rotate 90&deg;</button>
+          <button id="helpBtn" class="bar-btn" type="button">Help</button>
+          <button id="examplesBtn" class="bar-btn" type="button">Tutorials</button>
+          <label class="open-btn">
+            Open image
+            <input id="file" type="file" accept=".dng,.nef,.zip,image/*" hidden />
+          </label>
+        </span>
+      </header>
+
+      <div id="stage">
+        <canvas id="view"></canvas>
+        <svg id="maskOverlay" hidden aria-hidden="true"></svg>
+        <div id="histWrap" hidden aria-label="Live RGB histogram">
+          <canvas id="histogram" width="256" height="96"></canvas>
+        </div>
+        <div id="tatHud" hidden aria-hidden="true">
+          <span id="tatSwatch" class="tat-swatch"></span>
+          <span id="tatText"></span>
+        </div>
+        <button id="tatBanner" type="button" hidden>
+          <span>&#10021; Drag to adjust is ON — drag a color to tune it</span>
+          <span class="tat-banner-off">Tap here to turn off &amp; restore tap / pan / pinch</span>
+        </button>
+        <button id="colorBanner" type="button" hidden>
+          <span>&#127919; Colour mask — tap the photo to pick the colour to match</span>
+          <span class="tat-banner-off">Tap again to re-pick &middot; tap here when done</span>
+        </button>
+        <div id="welcome">
+          <button id="welcomeClose" class="welcome-close" type="button" hidden>&#10005;</button>
+          <p id="hint">Edit infrared photos — RAW (NEF / DNG) unlocks the full color magic.</p>
+          <label class="open-btn welcome-open" for="file">Open image</label>
+          <hr class="welcome-div" />
+          <div id="a2hs" class="a2hs" hidden>
+            <span id="a2hsText">Use it like an app: tap <span class="share-ico" aria-label="Share">&#x2BAD;</span> Share, then <strong>Add to Home Screen</strong> — full screen, works offline.</span>
+            <button id="a2hsInstall" type="button" hidden>Install app</button>
+            <button id="a2hsClose" type="button" class="a2hs-close" aria-label="Dismiss">&#10005;</button>
+          </div>
+          <p class="ex-title">&hellip;or learn by doing — tutorials &amp; examples:</p>
+          <div class="ex-list">
+            <button class="ex" data-ex="canopy" type="button">
+              <img src="./examples/canopy.png" alt="" /><span>Lesson 1 — Golden canopy<br /><small>Try the Looks</small></span>
+            </button>
+            <button class="ex" data-ex="lodge" type="button">
+              <img src="./examples/lodge.png" alt="" /><span>Lesson 2 — Motor lodge<br /><small>White balance &amp; denoise</small></span>
+            </button>
+            <button class="ex" data-ex="hillside" type="button">
+              <img src="./examples/hillside.png" alt="" /><span>Lesson 3 — Hillside &amp; sky<br /><small>Per-color grading</small></span>
+            </button>
+          </div>
+        </div>
+        <div id="lesson" hidden>
+          <h3 id="lessonTitle"></h3>
+          <ol id="lessonSteps"></ol>
+          <p class="lesson-next">When you're done: tap <strong>Tutorials</strong> up top for another lesson, or <strong>Open image</strong> to edit your own photo.</p>
+          <button id="lessonClose" type="button">Got it</button>
+        </div>
+        <button id="lessonShow" class="lesson-show" type="button" hidden>?</button>
+      </div>
+
+      <aside id="panel" hidden>
+        <div id="panelUp" class="scroll-cue up" hidden><span>&#9650;</span></div>
+        <fieldset id="fsWb">
+          <legend>White balance &amp; exposure <small>(no 2000K floor)</small></legend>
+          <small style="color:#80808a">White balance, exposure and denoise are set automatically when a photo opens; refine from there.</small>
+          <button id="autoBtn" type="button">Auto (white balance + exposure)</button>
+          <!-- Log-scale tracks: the input stores a 0..1000 position; main.ts
+               maps it exponentially so 1x sits near mid-track (values below = 1.0). -->
+          <label>Exposure <input id="expo" type="range" min="0" max="1000" step="1" value="454" /></label>
+          <label>Red gain <input id="wbR" type="range" min="0" max="1000" step="1" value="585" /></label>
+          <label>Green gain <input id="wbG" type="range" min="0" max="1000" step="1" value="585" /></label>
+          <label>Blue gain <input id="wbB" type="range" min="0" max="1000" step="1" value="585" /></label>
+          <small style="color:#80808a">Tip: tap foliage in the image to set white balance.</small>
+        </fieldset>
+
+        <fieldset id="fsDenoise">
+          <legend>Denoise</legend>
+          <label>Strength <input id="dn" type="range" min="0" max="1" step="0.01" value="0" /></label>
+          <small style="color:#80808a">Set automatically from the photo's measured noise; adjust to taste.</small>
+        </fieldset>
+
+        <fieldset id="fsLens">
+          <legend>IR lens fixes <small>(hot-spot &amp; vignette)</small></legend>
+          <small style="color:#80808a">IR-converted lenses often brighten the center (a "hot-spot"). Pull it down with Hot-spot and set its size; use Vignette to correct edge darkening (right) or add it (left).</small>
+          <label>Hot-spot <input id="hotspot" type="range" min="0" max="0.8" step="0.01" value="0" /></label>
+          <label>Hot-spot size <input id="hotspotSize" type="range" min="0.15" max="1" step="0.01" value="0.5" /></label>
+          <label>Vignette <input id="vignette" type="range" min="-1" max="1" step="0.01" value="0" /></label>
+        </fieldset>
+
+        <fieldset id="fsSwap">
+          <legend>Channel swap</legend>
+          <button id="swapBtn" type="button" class="toggle" aria-pressed="true">R &#8646; B channel swap</button>
+          <small style="color:#80808a">The core false-color move — swaps the red and blue channels. Colour looks switch it on; toggle here or re-press a look to compare.</small>
+        </fieldset>
+
+        <fieldset id="fsLooks">
+          <legend>Looks</legend>
+          <div class="look-row">
+            <button id="lookAero" type="button">Aerochrome<small class="look-sub"></small></button>
+            <button id="lookRed" type="button">Aero Red<small class="look-sub"></small></button>
+            <button id="lookGoldie" type="button">Goldie<small class="look-sub"></small></button>
+            <button id="lookNatural" type="button">Natural IR<small class="look-sub"></small></button>
+            <button id="lookMono" type="button">B&amp;W IR<small class="look-sub"></small></button>
+            <button id="lookSepia" type="button">Sepia IR<small class="look-sub"></small></button>
+            <button id="lookHie" type="button">HIE B&amp;W<small class="look-sub"></small></button>
+          </div>
+          <small style="color:#80808a">Press a look again to flip its R&#8646;B channel swap — the state shows under its name.</small>
+        </fieldset>
+
+        <fieldset id="fsMyLooks">
+          <legend>My looks <small>(saved on this device)</small></legend>
+          <small style="color:#80808a">Save the current edit into a slot, then load it back onto any photo later. Slots persist on this device between sessions.</small>
+          <div id="slotList" class="slot-list"></div>
+        </fieldset>
+
+        <fieldset id="fsHueSat">
+          <legend>Hue / Saturation / Tone</legend>
+          <label>Hue shift <input id="hue" type="range" min="-180" max="180" step="1" value="0" /></label>
+          <label>Saturation <input id="sat" type="range" min="0" max="3" step="0.01" value="1" /></label>
+          <label>Contrast <input id="con" type="range" min="0.5" max="2" step="0.01" value="1" /></label>
+          <label>Clarity <input id="clarity" type="range" min="-1" max="1" step="0.01" value="0" /></label>
+          <label>Dehaze <input id="dehaze" type="range" min="-1" max="1" step="0.01" value="0" /></label>
+          <small style="color:#80808a">Clarity punches up local contrast (midtone structure); Dehaze cuts atmospheric haze (left adds it back for mood).</small>
+          <label>HIE glow <input id="glow" type="range" min="0" max="1" step="0.01" value="0" /></label>
+          <small style="color:#80808a">Film-style halation — layers onto any look, not only HIE B&amp;W.</small>
+        </fieldset>
+
+        <fieldset id="fsCurve">
+          <legend>Tone curve</legend>
+          <!-- viewBox padded 8 units so the corner dots (Blacks, Highlights)
+               render whole: iOS Safari clips SVG to the viewBox no matter what
+               CSS overflow says. Keep in sync with TONE_VB in main.ts. -->
+          <svg id="toneSvg" viewBox="-8 -8 116 116" preserveAspectRatio="none" aria-label="Tone curve"></svg>
+          <!-- Global luminance rides on top of the five-point curve: a log-scale
+               track (0.5–2x) storing a 0..1000 position, neutral 1.0 at 500. -->
+          <label>Luminance <small>(overall)</small> <input id="lum" type="range" min="0" max="1000" step="1" value="500" /></label>
+          <label>Blacks <input id="tone0" type="range" min="-25" max="25" step="0.5" value="0" /></label>
+          <label>Shadows <input id="tone1" type="range" min="-25" max="25" step="0.5" value="0" /></label>
+          <label>Midtones <input id="tone2" type="range" min="-25" max="25" step="0.5" value="0" /></label>
+          <label>Whites <input id="tone3" type="range" min="-25" max="25" step="0.5" value="0" /></label>
+          <label>Highlights <input id="tone4" type="range" min="-25" max="25" step="0.5" value="0" /></label>
+          <button id="toneReset" type="button">Reset tone</button>
+        </fieldset>
+
+        <fieldset id="fsPerColor">
+          <legend>Per-color</legend>
+          <small style="color:#80808a">The boxes follow the subject through a
+            channel swap — Sky keeps meaning sky. The small text shows the colors
+            each box is grabbing right now.</small>
+          <div class="band">
+            <div class="band-title">Sky <small id="skyBandSub">(teals &amp; blues)</small></div>
+            <label>Hue <input id="skyHue" type="range" min="-60" max="60" step="1" value="0" /></label>
+            <label>Saturation <input id="skySat" type="range" min="0" max="2" step="0.01" value="1" /></label>
+            <label>Luminance <input id="skyLum" type="range" min="0.5" max="1.5" step="0.01" value="1" /></label>
+          </div>
+          <div class="band">
+            <div class="band-title">Foliage <small id="folBandSub">(reds &amp; golds)</small></div>
+            <label>Hue <input id="folHue" type="range" min="-60" max="60" step="1" value="0" /></label>
+            <label>Saturation <input id="folSat" type="range" min="0" max="2" step="0.01" value="1" /></label>
+            <label>Luminance <input id="folLum" type="range" min="0.5" max="1.5" step="0.01" value="1" /></label>
+          </div>
+          <button id="pcReset" type="button">Reset per-color</button>
+        </fieldset>
+
+        <fieldset id="fsMixer">
+          <legend>Color mixer <small>(8 colors)</small></legend>
+          <small style="color:#80808a">Pick a color chip, then move just that color. Unlike Sky/Foliage these target the colors as displayed, so they don't follow the channel swap.</small>
+          <div id="hslChips" class="hsl-chips"></div>
+          <button id="hslPick" type="button" class="toggle" aria-pressed="false">&#127919; Pick color from photo</button>
+          <small style="color:#80808a">Tap the photo and the chip that owns that exact on-screen color selects itself.</small>
+          <button id="hslDrag" type="button" class="toggle" aria-pressed="false">&#10021; Drag on photo to adjust</button>
+          <small style="color:#80808a">Turn on, then drag on the photo: up/down changes that color's brightness, left/right shifts its hue.</small>
+          <label>Hue <input id="hslHue" type="range" min="-60" max="60" step="1" value="0" /></label>
+          <label>Saturation <input id="hslSat" type="range" min="0" max="2" step="0.01" value="1" /></label>
+          <label>Luminance <input id="hslLum" type="range" min="0.3" max="1.7" step="0.01" value="1" /></label>
+          <button id="hslReset" type="button">Reset color mixer</button>
+        </fieldset>
+
+        <fieldset id="fsMasks">
+          <legend>Masks <small>(local adjustments)</small></legend>
+          <small style="color:#80808a">Add a radial, gradient, brush, colour or sky mask, target it on the photo, then adjust only that area. Tap a mask to select it.</small>
+          <div class="mask-add">
+            <button id="addRadial" type="button">+ Radial</button>
+            <button id="addLinear" type="button">+ Gradient</button>
+            <button id="addBrush" type="button">+ Brush</button>
+            <button id="addColor" type="button">+ Colour</button>
+            <button id="addSky" type="button">+ Sky</button>
+          </div>
+          <div id="maskList" class="mask-list"></div>
+          <div id="maskEditor" hidden>
+            <div id="colorControls" hidden>
+              <small style="color:#80808a">With Pick on, tap the photo to choose the colour to match — tap again to re-pick. Widen Range to include more shades; Feather softens the edge. Add another Colour mask to grade a second colour.</small>
+              <div class="mask-editor-actions">
+                <button id="mColorPick" type="button" class="toggle" aria-pressed="false">&#127919; Pick colour</button>
+                <span id="mColorSwatch" class="color-swatch"></span>
+                <span id="mColorSwatchText" style="color:#80808a;font-size:.85em"></span>
+              </div>
+              <label>Range <input id="mColorRange" type="range" min="0.05" max="1.5" step="0.01" value="0.5" /></label>
+            </div>
+            <div id="brushControls" hidden>
+              <small style="color:#80808a">Paint on the photo to build the mask. Turn Paint off to pan/zoom.</small>
+              <div class="mask-editor-actions">
+                <button id="mPaint" type="button" class="toggle" aria-pressed="true">Paint</button>
+                <button id="mErase" type="button" class="toggle" aria-pressed="false">Erase</button>
+                <button id="mClearBrush" type="button">Clear paint</button>
+              </div>
+              <label>Brush size <input id="mBrushSize" type="range" min="0.03" max="0.4" step="0.01" value="0.14" /></label>
+            </div>
+            <div id="skyControls" hidden>
+              <small style="color:#80808a">The sky is found automatically from the top of the photo — no tapping needed. Reach grows or tightens the selection; Feather softens its edge. Invert to grade everything <em>but</em> the sky.</small>
+              <p id="mSkyStatus" style="color:#80808a;font-size:.85em;margin:.35em 0"></p>
+              <label>Reach <input id="mSkyReach" type="range" min="0.5" max="2" step="0.01" value="1" /></label>
+            </div>
+            <label>Brightness <input id="mBrightness" type="range" min="0.3" max="2" step="0.01" value="1" /></label>
+            <label>Contrast <input id="mContrast" type="range" min="0.5" max="2" step="0.01" value="1" /></label>
+            <label>Saturation <input id="mSat" type="range" min="0" max="2" step="0.01" value="1" /></label>
+            <label>Hue <input id="mHue" type="range" min="-60" max="60" step="1" value="0" /></label>
+            <label>Warmth <input id="mWarmth" type="range" min="-1" max="1" step="0.01" value="0" /></label>
+            <label id="mFeatherRow">Feather <input id="mFeather" type="range" min="0.02" max="1" step="0.01" value="0.5" /></label>
+            <div class="mask-editor-actions">
+              <button id="mInvert" type="button" class="toggle" aria-pressed="false">Invert</button>
+              <button id="mDelete" type="button">Delete mask</button>
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset id="fsExport">
+          <legend>Export</legend>
+          <label>Format
+            <select id="exFormat">
+              <option value="jpeg">JPEG</option>
+              <option value="tiff">16-bit TIFF</option>
+            </select>
+          </label>
+          <label>Resolution
+            <select id="exScale">
+              <option value="1">Full (native)</option>
+              <option value="0.5">50%</option>
+              <option value="0.25">25%</option>
+            </select>
+          </label>
+          <label id="exQualityRow">Quality <input id="exQuality" type="range" min="0.5" max="1" step="0.01" value="0.92" /></label>
+          <button id="exBtn" type="button">Export &amp; Save</button>
+        </fieldset>
+
+        <fieldset id="fsProfiles">
+          <legend>Profiles &amp; LUTs <small>(your look, reusable)</small></legend>
+          <label><input id="profWB" type="checkbox" /> Bake current white balance in</label>
+          <button id="cubeBtn" type="button">Export .cube (Photoshop / video)</button>
+          <button id="dcpBtn" type="button">Export .dcp (Lightroom — beta)</button>
+        </fieldset>
+        <div id="panelDown" class="scroll-cue down" hidden><span>&#9660;</span></div>
+      </aside>
+    </div>
+
+    <div id="unsupported" hidden>
+      <div class="unsupported-card">
+        <h2>This browser can't run the editor</h2>
+        <p>The live photo preview needs <strong>WebGL2</strong>, which this browser doesn't provide.</p>
+        <p><strong>Options:</strong></p>
+        <ul>
+          <li>On iPhone/iPad: update to <strong>iOS 15 or later</strong> and use Safari.</li>
+          <li>On a computer or Android: use a current <strong>Chrome, Edge, Firefox or Safari</strong>.</li>
+          <li>Opened from inside another app (Instagram, a chat)? Use its <strong>&#8943; menu &rarr; Open in browser</strong>.</li>
+        </ul>
+        <p>Nothing to install and no account — it just needs a current browser.</p>
+      </div>
+    </div>
+
+    <div id="busy" hidden>
+      <div class="busy-card">
+        <div class="spinner" id="busySpinner"></div>
+        <p id="busyText">Exporting…</p>
+        <div id="busyActions" hidden>
+          <button id="busySave" type="button" class="primary">Save image</button>
+          <button id="busyClose" type="button">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <dialog id="infoDlg">
+      <h2>What's new</h2>
+      <p id="infoVer" class="info-ver"></p>
+      <ul id="changeList"></ul>
+      <p class="more-row">
+        <a href="https://github.com/njefferson/IRstudio/commits/main" target="_blank" rel="noopener">More &mdash; earlier versions &rarr;</a>
+      </p>
+      <h3 class="rm-head">Roadmap</h3>
+      <ul id="roadmapList" class="roadmap"></ul>
+      <p class="more-row">
+        <a href="https://github.com/njefferson/IRstudio/blob/main/NOTES.md" target="_blank" rel="noopener">More &mdash; full roadmap &amp; notes &rarr;</a>
+      </p>
+      <p class="coffee-row">&#9749; Enjoying this? Buy me a coffee:
+        <a id="coffee" class="coffee" target="_blank" rel="noopener" hidden>PayPal</a>
+        <a id="venmo" class="coffee" target="_blank" rel="noopener" hidden>Venmo</a>
+      </p>
+      <button id="infoClose" type="button">Close</button>
+    </dialog>
+
+    <dialog id="helpDlg">
+      <h2>How to use Infrared Photography Studio</h2>
+      <div class="help-body">
+        <h3>Quick start</h3>
+        <ol>
+          <li><strong>Open image</strong> (or pick an example). RAW — NEF or DNG — unlocks the full color range.</li>
+          <li>On open, the app <strong>automatically</strong> sets white balance, exposure and denoise from the photo itself.</li>
+          <li><strong>Tap foliage</strong> in the photo to fine-tune white balance — the classic IR move.</li>
+          <li>Pick a <strong>Look</strong>, adjust sliders to taste, then <strong>Export &amp; Save</strong>.</li>
+        </ol>
+
+        <h3>Gestures</h3>
+        <ul>
+          <li><strong>Tap</strong> the photo — set white balance from that point (aim at foliage).</li>
+          <li><strong>Pinch</strong> — zoom (up to 8&times;); drag to pan while zoomed.</li>
+          <li><strong>Press &amp; hold</strong> the photo (or the <em>Hold: Original</em> button) — compare with the original.</li>
+        </ul>
+
+        <h3>Looks &amp; adjustments</h3>
+        <p>Looks are one-tap recipes; every slider stays live afterwards so you can push further.
+        Looks tagged <span class="badge">R&#8646;B</span> use the <strong>red&#8646;blue channel swap</strong> —
+        the move that makes IR sky blue and foliage red/gold. Toggle the swap button to see its effect on any look.
+        <strong>HIE glow</strong> is film-style halation — the HIE B&amp;W look uses it, and the slider layers it onto any other look too.</p>
+        <p><strong>Per-color</strong> moves the Sky and Foliage color bands independently — e.g.
+        Aerochrome, then Sky hue +40 for a deeper sky without touching the trees. The bands follow the
+        subject through a channel swap (Sky keeps meaning sky); the small text under each box shows the
+        colors it's grabbing right now.</p>
+
+        <h3>Which color tool when?</h3>
+        <p>The color tools stack from broadest to most surgical — reach for the smallest one that does the job:</p>
+        <ul>
+          <li><strong>Channel swap</strong> — flips the whole color world at once (red&#8646;blue). The IR move.</li>
+          <li><strong>Hue shift</strong> — rotates <em>every</em> color together, as far as you like. Use this for big moves: getting a color family into the right neighborhood.</li>
+          <li><strong>Per-color (Sky / Foliage)</strong> — each box owns half the color wheel, and they follow the swap.</li>
+          <li><strong>Color mixer</strong> — eight chips for surgery on one color. Use <em>Pick color from photo</em>: tap the button, tap the photo, and the chip owning that exact on-screen color selects itself.</li>
+        </ul>
+        <p>A mixer chip bends only its own neighborhood on purpose: photos hold smooth color gradients
+        (a sky drifts from cyan to blue), and nearby colors must land near each other or those gradients
+        tear into visible bands. That's why a chip's Hue reaches &plusmn;60&deg; and fades toward its
+        neighbors — it's what keeps the adjustment invisible-clean. When one chip's reach isn't enough,
+        make the big move with <strong>Hue shift</strong> first, then finish with the chip.</p>
+
+        <h3>Light &amp; area tools</h3>
+        <ul>
+          <li><strong>Clarity</strong> — punches up local structure (or softens, pulled left). <strong>Dehaze</strong> — cuts the veil that flattens distant subjects; brightness-only, so colors stay put.</li>
+          <li><strong>Tone curve + Luminance</strong> — the curve shapes blacks through highlights; Luminance lifts or drops the whole image without clipping either end.</li>
+          <li><strong>Masks</strong> — radial, gradient, or painted brush: local adjustments for one area only. Masks belong to the photo; saved looks stay portable.</li>
+          <li><strong>IR lens fixes</strong> — pulls down the center hot-spot IR-converted lenses produce, and corrects (or adds) corner vignette.</li>
+        </ul>
+
+        <h3>Profiles</h3>
+        <p><strong>.cube</strong> bakes your color look for Photoshop/video apps. <strong>.dcp</strong> is a
+        Lightroom camera profile (beta). Denoise and glow are spatial effects and can't ride along in profiles.</p>
+
+        <h3>Works with</h3>
+        <p>JPEG/PNG from any camera &middot; HEIC (in Safari) &middot; RAW from any Bayer-sensor camera converted to DNG
+        (free Adobe DNG Converter, or Lightroom's Convert to DNG) &middot; Nikon NEF natively
+        (classic compressed; not Z8/Z9 High-Efficiency) &middot; Fujifilm X-Trans not supported.
+        Tuned on an IR-converted Nikon Z50.</p>
+
+        <h3>Install as an app</h3>
+        <p>On iPad/iPhone: tap Safari's <strong>Share</strong> button (the square with the arrow), then
+        <strong>Add to Home Screen</strong>. You get a full-screen app with its own icon that works
+        offline. On Android/Chrome, use the browser's <strong>Install app</strong> menu entry.</p>
+
+        <h3>Tips</h3>
+        <ul>
+          <li>Import from <strong>Files</strong>, not the Photo Library — iOS silently converts RAW to JPEG there. A zipped RAW also works.</li>
+          <li>Scenes with big empty dark skies take more Contrast; scenes with shadow detail (roads, dark trees) look best gentle.</li>
+          <li>720nm-filter shots are near-monochrome by nature — that's what B&amp;W IR, Sepia IR and HIE B&amp;W are for.</li>
+        </ul>
+      </div>
+      <button id="helpClose" type="button">Close</button>
+    </dialog>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

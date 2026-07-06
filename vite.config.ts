@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 // Offline-first PWA, no framework. Relative base so it runs from any path
 // (incl. "Add to Home Screen" on the iPad).
@@ -108,6 +109,17 @@ export default defineConfig({
   build: {
     target: "es2020",
     sourcemap: true,
+    rollupOptions: {
+      // Three route entries. Each HTML pulls only its own bundle, so the IR
+      // editor never loads the macro engine and vice-versa (route-based code
+      // splitting). Cloudflare Pages serves `ir.html` at `/ir`, `macro.html`
+      // at `/macro`; `index.html` is the two-door chooser.
+      input: {
+        chooser: resolve(__dirname, "index.html"),
+        ir: resolve(__dirname, "ir.html"),
+        macro: resolve(__dirname, "macro.html"),
+      },
+    },
   },
   define: {
     __CHANGELOG__: JSON.stringify(changelog()),

@@ -479,6 +479,59 @@ and NO Nikon body can channel-swap in camera. Field guide:
   `/opt/pw-browsers/chromium --headless --dump-dom` + an esbuild-bundled page
   that instantiates `Renderer` and readPixels — see the band-slider bug hunt.
 
+## Macro focus-stacking mode (second discipline)
+
+A parallel tool in the same codebase, shipped JPEG-first 2026-07-06.
+
+**App shape — the two-door split.** `index.html` is a tiny standalone chooser
+(its own ~0.2 KB bundle, imports neither editor). `ir.html` is the unchanged
+IR editor; `macro.html` is the stacker. Vite builds all three as separate
+entries (`build.rollupOptions.input`), so each route pulls ONLY its own bundle
+— the IR editor (~100 KB) never loads for macro users and the macro engine
+(~7 KB) never loads for IR users (route-based code-splitting). Cloudflare Pages
+serves `ir.html` at `/ir` and `macro.html` at `/macro` (clean URLs); links use
+the `.html` form so `vite preview` and offline both work. Per-route manifests
+(`manifest`/`ir`/`macro`.webmanifest) each set their own `start_url` so "Add to
+Home Screen" from a mode installs INTO that mode. The service worker is shared
+and unchanged (network-first navigations already cover the new pages). Each
+mode has a back-to-Studio link (`‹`) — modes announce themselves and offer an
+obvious exit.
+
+**The engine (`src/macro/stack.ts`).** Combines a focus-shift burst into one
+all-in-focus frame. Classical DSP, no ML.
+- MEMORY is the binding constraint: a 20 MP × 11-frame stack is ~900 MB fully
+  decoded → tab crash. So it STREAMS — decode ONE frame at a time at the
+  working resolution (`createImageBitmap` with `resizeWidth/Height` = native
+  decode+scale, never the full 20 MP), fold it into the running result, release
+  it. Peak memory is a couple of full-frame buffers, independent of frame count.
+- SELECTION, not averaging: per pixel, keep the RGB of the frame with the
+  highest focus measure seen so far (streaming argmax). The focus measure is the
+  box-summed squared Laplacian of luma (the "modified Laplacian"). A soft
+  weighted MEAN was tried first and read SOFTER than a single frame — the 10
+  defocused frames veil the subject (measured, 2026-07-06). Winner-take-all is
+  the right model; bokeh (all focus measures ~0) keeps the seed frame, and the
+  bokeh is near-identical across frames so it stays clean.
+- ALIGN: coarse integer translation per frame vs frame 0 (SSD search on a
+  downsampled luma). Noah's set was tripod-steady (drift ≈0), so translation
+  sufficed; rotation + breathing-scale are deferred until a set needs them.
+- Verified in headless chromium on the real 11-frame set: result is 2.8×
+  sharper than frame 0 across the subject box, bokeh untouched, save enabled;
+  plus a full UI flow (chooser doors, IR intact, load→stack→result).
+
+**Next refinements (not yet built):** Laplacian-pyramid blend (softens the
+selection-noise the hard argmax leaves in low-contrast transitions), full-res
+TILED export (v1 stacks at a 2048 px preview res — the tiled path decodes each
+frame's strip on demand so full-res stays memory-safe), and scale/rotation
+align for handheld sets.
+
+**RAW input is DEFERRED — the Z50 II shoots High-Efficiency NEF.** The macro
+files are `NIKON Z50_2` (EXIF), NIKKOR Z DX 50-250 mm pseudo-macro, ~14.5 MB /
+20.6 MP — that size is HE/HE★ NEF (a TicoRAW-class codec), NOT the traditional
+Huffman NEF `raw/nef.ts` decodes (which is Z50-only and already rejects
+Z8/Z9 High-Efficiency). Confirmed HE by the owner. A HE-NEF decoder is a
+separate large effort; JPEG-first sidesteps it entirely. If RAW macro is wanted
+later, that decoder (or shooting Lossless NEF) is the prerequisite.
+
 ## Working agreements with the owner
 
 - Verify against real files before shipping; show rendered proof.

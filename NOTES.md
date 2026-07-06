@@ -252,11 +252,21 @@ Frontier (needs WebGPU + an ML model — a real departure from pure-JS/no-WASM):
   stand-in first: Lanczos super-resolution, edge-aware upscale.
 
 Second discipline:
-- **Macro (focus-stacking) mode** — a parallel mode in the same codebase:
-  routes `/ir` + `/macro`, a two-door chooser at `/`, per-route scoped
-  manifests, route-based code-splitting so the stacking engine never loads for
-  IR users. Heavy new engine: per-frame align (translation + rotation + scale,
-  for focus breathing) then Laplacian-pyramid blend; iPad Safari memory is the
-  binding constraint (tile + stream, never hold all frames). Scoped from Noah's
-  build spec 2026-07-05; Phase 0 audit complete (see docs). Blocked on real
-  Z50 II focus-shift sets + installable names/icons before v1 ships.
+- **Macro (focus-stacking) mode** — a parallel mode in the same codebase.
+  SHIPPED (2026-07-06, JPEG-first): the two-door split (`/` chooser →
+  `ir.html` + `macro.html`, per-route manifests, route-based code-splitting so
+  the ~7 KB stacking engine never loads for IR users and the 100 KB IR editor
+  never loads for macro users) and a working JPEG stacker — streaming, memory-
+  safe (decode one frame at a time; peak RAM independent of frame count),
+  per-pixel max-sharpness selection (modified-Laplacian focus measure) with
+  coarse translation align. Verified on Noah's real 11-frame Z50 II set: 2.8×
+  sharper across the subject than any single frame, bokeh untouched (headless
+  harness + rendered proof). Next refinements: Laplacian-pyramid blend (smooth
+  the selection-noise in low-contrast transitions), full-resolution tiled
+  export (v1 works at a 2048 px preview res), and breathing scale/rotation
+  align (this set was tripod-steady, drift ≈0, so translation sufficed).
+  DEFERRED — **RAW (NEF) input**: the Z50 II shoots **High-Efficiency NEF**
+  (confirmed by Noah; ~14.5 MB / 20 MP), a TicoRAW-class codec `nef.ts` cannot
+  decode; a HE-NEF decoder is a separate large effort. Still open: final
+  installable names/icons (placeholders in place — "Photography Studio" /
+  "Macro Focus Stacking").

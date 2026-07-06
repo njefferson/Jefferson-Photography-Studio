@@ -1,8 +1,8 @@
 {
-  "name": "Photography Studio",
-  "short_name": "Studio",
-  "description": "On-device photo tools — infrared editing and macro focus stacking.",
-  "start_url": "./",
+  "name": "Infrared Photography Studio",
+  "short_name": "IR",
+  "description": "Infrared photo editor — unbounded white balance, channel swap, hue shifts.",
+  "start_url": "./ir.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#0b0b0d" />
+    <link rel="manifest" href="./macro.webmanifest" />
+    <title>Macro Focus Stacking</title>
+  </head>
+  <body>
+    <div id="app">
+      <header class="bar">
+        <a class="home" href="./index.html" aria-label="Back to Studio">‹ Studio</a>
+        <span class="brand">Macro Focus Stacking</span>
+        <button id="helpBtn" class="info-btn" type="button" aria-label="How it works">i</button>
+      </header>
+
+      <main id="stage">
+        <!-- Empty state -->
+        <section id="intake" class="intake">
+          <div class="intake-card" id="dropZone">
+            <h1>Stack a focus-shift set</h1>
+            <p>
+              Load the frames from an in-camera focus-shift burst (JPEG). They'll be
+              combined into one frame that's sharp from front to back, with the
+              background left soft.
+            </p>
+            <label class="open-btn" for="files">Choose frames</label>
+            <input id="files" type="file" accept="image/jpeg,image/png" multiple hidden />
+            <p class="hint" id="intakeHint">…or drag the set onto this panel.</p>
+          </div>
+        </section>
+
+        <!-- Working view (hidden until frames load) -->
+        <section id="work" hidden>
+          <div id="view">
+            <canvas id="result"></canvas>
+            <div id="viewHint" class="view-hint">Tap <b>Stack</b> to combine the set.</div>
+          </div>
+          <div id="filmstrip" class="filmstrip"></div>
+          <div class="controls">
+            <button id="stackBtn" type="button" class="primary">Stack</button>
+            <button id="compareBtn" type="button" hidden>Hold to compare</button>
+            <button id="saveBtn" type="button" hidden>Save image</button>
+            <button id="resetBtn" type="button" class="ghost">New set</button>
+          </div>
+          <div id="progress" class="progress" hidden><div id="progressBar"></div><span id="progressText"></span></div>
+          <p id="status" class="status"></p>
+        </section>
+      </main>
+
+      <dialog id="helpDlg">
+        <h2>Macro focus stacking</h2>
+        <p>
+          A macro shot has paper-thin depth of field, so a single frame is only
+          sharp in one slice. A focus-shift burst walks the focus through the
+          subject; this tool measures where each frame is sharpest and blends
+          those regions into one fully-sharp image, keeping the background bokeh
+          smooth.
+        </p>
+        <p class="muted">
+          JPEG sets only for now. Everything runs on your device — nothing is
+          uploaded.
+        </p>
+        <button id="helpClose" type="button">Close</button>
+      </dialog>
+    </div>
+    <script type="module" src="/src/macro/main.ts"></script>
+  </body>
+</html>
