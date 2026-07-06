@@ -523,11 +523,25 @@ all-in-focus frame. Classical DSP, no ML.
   frame 0 across the subject box (no transition grain), bokeh untouched, save
   enabled; plus a full UI flow (chooser doors, IR intact, load→stack→result).
 
-**Next refinements (not yet built):** full-res TILED export (v1 stacks at a
-2048 px preview res — the tiled path will decode each frame's strip on demand so
-full-res stays memory-safe), and scale/rotation align for handheld sets. The
-pyramid build is ~O(frames) and runs a few seconds per stack at preview res;
-worth watching on the iPad.
+**Full-res export (`stackFocusFullRes`).** The preview stacks at 2048 px; Save
+renders the SAME pyramid blend at full resolution (20 MP), TILED so peak memory
+stays bounded. Tiles carry a `halo` (256 px ≥ the base band's spatial support),
+so adjacent tile CORES butt together seam-free with no feather pass (verified:
+tile-boundary contrast ratios 1.1–1.4, below any seam threshold). Processed
+ROW-BAND / frame-outer: each frame's full-width strip is decoded ONCE per tile
+row and fanned to that row's column tiles, so a full-res frame is decoded rows×
+(not tiles×) times while only one row of tile pyramids is resident. Alignment
+shifts are estimated once on a 480 px luma and scaled to full-res px. Cost is
+real — ~1–1.5 min for an 11-frame 20 MP stack in headless SOFTWARE decode
+(faster on the iPad's hardware decoder); it runs on the main thread with a
+progress bar (a Web Worker is the obvious future move). The iOS share landmine
+applies: navigator.share needs a FRESH tap, so Save is TWO-PHASE — first tap
+renders ("Export full-res" → progress → "Full resolution ready"), the button
+flips to "Save image", and the next fresh tap hands the finished JPEG to the
+share sheet.
+
+**Next refinements (not yet built):** scale/rotation align for handheld sets,
+and moving the full-res render to a Web Worker so the UI never janks.
 
 **RAW input is DEFERRED — the Z50 II shoots High-Efficiency NEF.** The macro
 files are `NIKON Z50_2` (EXIF), NIKKOR Z DX 50-250 mm pseudo-macro, ~14.5 MB /

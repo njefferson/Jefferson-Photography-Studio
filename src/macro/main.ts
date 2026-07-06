@@ -1,5 +1,5 @@
 import "./macro.css";
-import { stackFocus, type StackFrame } from "./stack";
+import { stackFocus, stackFocusFullRes, type StackFrame } from "./stack";
 
 // Macro focus-stacking mode. Loads a focus-shift JPEG set, blends it into one
 // all-in-focus frame, and lets you compare and save. The heavy engine lives in
@@ -44,6 +44,7 @@ function reset() {
   intake.hidden = false;
   compareBtn.hidden = true;
   saveBtn.hidden = true;
+  fullBlob = null;
   status.textContent = "";
   filesInput.value = "";
 }
@@ -115,6 +116,7 @@ async function runStack() {
     status.textContent = `Stacked ${frames.length} frames in ${secs}s` + (moved ? ` · aligned ${moved} frame${moved > 1 ? "s" : ""}.` : " · no alignment needed.");
     compareBtn.hidden = false;
     saveBtn.hidden = false;
+    markSaveNeedsRender(); // a new stack invalidates any prior full-res render
     // Decode one frame for hold-to-compare (the first = front-focus).
     compareImg = await decodePreview(frames[0].blob);
   } catch (err) {
@@ -153,26 +155,72 @@ for (const ev of ["pointerup", "pointercancel", "pointerleave"] as const) {
   resultCanvas.addEventListener(ev, () => showCompare(false));
 }
 
-async function save() {
-  if (!result) return;
-  const blob = await new Promise<Blob | null>((r) => resultCanvas.toBlob(r, "image/jpeg", 0.92));
-  if (!blob) return;
+// Two-phase save (iOS landmine: navigator.share needs a FRESH tap, so the long
+// full-res render can't sit between the tap and share()). First tap RENDERS the
+// full-resolution stack; when it's ready the button flips to "Save image", and
+// the next (fresh) tap hands the finished file to the share sheet / download.
+let fullBlob: Blob | null = null;
+
+function markSaveNeedsRender() {
+  fullBlob = null;
+  saveBtn.textContent = "Export full-res";
+}
+
+async function renderFullRes() {
+  saveBtn.disabled = true;
+  stackBtn.disabled = true;
+  resetBtn.disabled = true;
+  progress.hidden = false;
+  const t0 = performance.now();
+  try {
+    const res = await stackFocusFullRes(frames, {
+      align: true,
+      onProgress: (done, total, phase) => {
+        progressBar.style.setProperty("--p", Math.round((done / total) * 100) + "%");
+        progressText.textContent = phase;
+      },
+    });
+    const c = document.createElement("canvas");
+    c.width = res.width; c.height = res.height;
+    c.getContext("2d")!.putImageData(res.image, 0, 0);
+    fullBlob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/jpeg", 0.92));
+    const secs = ((performance.now() - t0) / 1000).toFixed(0);
+    status.textContent = `Full resolution ready — ${res.width}×${res.height} (${secs}s). Tap Save image.`;
+    saveBtn.textContent = "Save image";
+  } catch (err) {
+    status.textContent = "Could not render full resolution: " + (err as Error).message;
+    markSaveNeedsRender();
+  } finally {
+    progress.hidden = true;
+    saveBtn.disabled = false;
+    stackBtn.disabled = false;
+    resetBtn.disabled = false;
+  }
+}
+
+async function doSave() {
+  if (!fullBlob) return;
   const base = frames[0]?.name.replace(/\.[^.]+$/, "") || "stack";
-  const file = new File([blob], `${base}-stacked.jpg`, { type: "image/jpeg" });
-  // iOS: navigator.share off a fresh tap opens the share sheet (Save to Photos).
+  const file = new File([fullBlob], `${base}-stacked.jpg`, { type: "image/jpeg" });
+  // iOS: share off a fresh tap opens the share sheet (Save to Photos).
   if (navigator.canShare?.({ files: [file] })) {
     try { await navigator.share({ files: [file] }); return; } catch { /* fall through to download */ }
   }
-  const url = URL.createObjectURL(blob);
+  const url = URL.createObjectURL(fullBlob);
   const a = document.createElement("a");
   a.href = url; a.download = file.name; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 
+function onSaveTap() {
+  if (fullBlob) doSave();       // fresh tap on a ready file → hand off to iOS
+  else renderFullRes();          // first tap → render full resolution
+}
+
 // Wiring
 filesInput.addEventListener("change", () => filesInput.files && loadFiles(filesInput.files));
 stackBtn.addEventListener("click", runStack);
-saveBtn.addEventListener("click", save);
+saveBtn.addEventListener("click", onSaveTap);
 resetBtn.addEventListener("click", reset);
 
 for (const ev of ["dragenter", "dragover"] as const) {

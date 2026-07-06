@@ -261,9 +261,13 @@ Second discipline:
   a Laplacian-pyramid blend (merge by max local contrast per frequency band —
   seamless, no transition grain) with coarse translation align. Verified on
   Noah's real 11-frame Z50 II set: sharp front-to-back, bokeh untouched, no
-  seams (headless harness + rendered proof). Next refinements: full-resolution
-  tiled export (v1 works at a 2048 px preview res), and breathing scale/rotation
-  align (this set was tripod-steady, drift ≈0, so translation sufficed).
+  seams (headless harness + rendered proof). Full-resolution export SHIPPED
+  (2026-07-06): the preview stacks at 2048 px, Save re-renders the pyramid blend
+  at full 20 MP, TILED with a halo so it's memory-safe and seam-free; two-phase
+  Save for the iOS fresh-tap share rule. ~1 min/stack in headless software
+  decode (faster on device). Next refinements: breathing scale/rotation align
+  (this set was tripod-steady, drift ≈0, so translation sufficed), and a Web
+  Worker so the full-res render never janks the UI.
   DEFERRED — **RAW (NEF) input**: the Z50 II shoots **High-Efficiency NEF**
   (confirmed by Noah; ~14.5 MB / 20 MP), a TicoRAW-class codec `nef.ts` cannot
   decode; a HE-NEF decoder is a separate large effort. Macro mode is named
