@@ -1,5 +1,5 @@
 import "./macro.css";
-import { stackFocus, stackFocusFullRes, type StackFrame } from "./stack";
+import { stackFocus, type StackFrame } from "./stack";
 
 // Macro focus-stacking mode. Loads a focus-shift JPEG set, blends it into one
 // all-in-focus frame, and lets you compare and save. The heavy engine lives in
@@ -166,36 +166,52 @@ function markSaveNeedsRender() {
   saveBtn.textContent = "Export full-res";
 }
 
-async function renderFullRes() {
+function renderFullRes(): Promise<void> {
   saveBtn.disabled = true;
   stackBtn.disabled = true;
   resetBtn.disabled = true;
   progress.hidden = false;
   const t0 = performance.now();
-  try {
-    const res = await stackFocusFullRes(frames, {
-      align: true,
-      onProgress: (done, total, phase) => {
-        progressBar.style.setProperty("--p", Math.round((done / total) * 100) + "%");
-        progressText.textContent = phase;
-      },
-    });
-    const c = document.createElement("canvas");
-    c.width = res.width; c.height = res.height;
-    c.getContext("2d")!.putImageData(res.image, 0, 0);
-    fullBlob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/jpeg", 0.92));
-    const secs = ((performance.now() - t0) / 1000).toFixed(0);
-    status.textContent = `Full resolution ready — ${res.width}×${res.height} (${secs}s). Tap Save image.`;
-    saveBtn.textContent = "Save image";
-  } catch (err) {
-    status.textContent = "Could not render full resolution: " + (err as Error).message;
-    markSaveNeedsRender();
-  } finally {
-    progress.hidden = true;
-    saveBtn.disabled = false;
-    stackBtn.disabled = false;
-    resetBtn.disabled = false;
-  }
+  // Run the tiled full-res stack in a worker so the main thread (and the
+  // progress bar) stays responsive through the ~minute-long render.
+  const worker = new Worker(new URL("./export.worker.ts", import.meta.url), { type: "module" });
+  return new Promise<void>((resolve) => {
+    const finish = () => {
+      worker.terminate();
+      progress.hidden = true;
+      saveBtn.disabled = false;
+      stackBtn.disabled = false;
+      resetBtn.disabled = false;
+      resolve();
+    };
+    worker.onmessage = async (e: MessageEvent) => {
+      const m = e.data;
+      if (m.type === "progress") {
+        progressBar.style.setProperty("--p", Math.round((m.done / m.total) * 100) + "%");
+        progressText.textContent = m.phase;
+      } else if (m.type === "done") {
+        const img = new ImageData(new Uint8ClampedArray(m.buffer), m.width, m.height);
+        const c = document.createElement("canvas");
+        c.width = m.width; c.height = m.height;
+        c.getContext("2d")!.putImageData(img, 0, 0);
+        fullBlob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/jpeg", 0.92));
+        const secs = ((performance.now() - t0) / 1000).toFixed(0);
+        status.textContent = `Full resolution ready — ${m.width}×${m.height} (${secs}s). Tap Save image.`;
+        saveBtn.textContent = "Save image";
+        finish();
+      } else if (m.type === "error") {
+        status.textContent = "Could not render full resolution: " + m.message;
+        markSaveNeedsRender();
+        finish();
+      }
+    };
+    worker.onerror = (err) => {
+      status.textContent = "Could not render full resolution: " + err.message;
+      markSaveNeedsRender();
+      finish();
+    };
+    worker.postMessage({ frames: frames.map((f) => ({ blob: f.blob, name: f.name })), opts: { align: true } });
+  });
 }
 
 async function doSave() {

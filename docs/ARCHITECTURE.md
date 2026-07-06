@@ -533,8 +533,12 @@ row and fanned to that row's column tiles, so a full-res frame is decoded rows×
 (not tiles×) times while only one row of tile pyramids is resident. Alignment
 shifts are estimated once on a 480 px luma and scaled to full-res px. Cost is
 real — ~1–1.5 min for an 11-frame 20 MP stack in headless SOFTWARE decode
-(faster on the iPad's hardware decoder); it runs on the main thread with a
-progress bar (a Web Worker is the obvious future move). The iOS share landmine
+(faster on the iPad's hardware decoder); it runs in a **Web Worker**
+(`export.worker.ts`, its own code-split chunk loaded only on export) so the main
+thread and the progress bar stay responsive through the render. The finished
+pixel buffer is TRANSFERRED (zero-copy) back. Worker failure falls back to an
+honest error message (module workers need Safari 15+, fine on the target iPad).
+The iOS share landmine
 applies: navigator.share needs a FRESH tap, so Save is TWO-PHASE — first tap
 renders ("Export full-res" → progress → "Full resolution ready"), the button
 flips to "Save image", and the next fresh tap hands the finished JPEG to the

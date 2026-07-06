@@ -265,9 +265,11 @@ Second discipline:
   (2026-07-06): the preview stacks at 2048 px, Save re-renders the pyramid blend
   at full 20 MP, TILED with a halo so it's memory-safe and seam-free; two-phase
   Save for the iOS fresh-tap share rule. ~1 min/stack in headless software
-  decode (faster on device). Next refinements: breathing scale/rotation align
-  (this set was tripod-steady, drift ≈0, so translation sufficed), and a Web
-  Worker so the full-res render never janks the UI.
+  decode (faster on device). The full-res render runs in a Web Worker
+  (`export.worker.ts`) so the UI never janks; total time is similar (compute is
+  compute) — the next lever for actual wall-clock is parallelising the tile rows
+  across several workers (one per core). Other refinement: breathing scale/
+  rotation align (this set was tripod-steady, drift ≈0, so translation sufficed).
   DEFERRED — **RAW (NEF) input**: the Z50 II shoots **High-Efficiency NEF**
   (confirmed by Noah; ~14.5 MB / 20 MP), a TicoRAW-class codec `nef.ts` cannot
   decode; a HE-NEF decoder is a separate large effort. Macro mode is named
