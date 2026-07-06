@@ -257,19 +257,20 @@ Second discipline:
   `ir.html` + `macro.html`, per-route manifests, route-based code-splitting so
   the ~7 KB stacking engine never loads for IR users and the 100 KB IR editor
   never loads for macro users) and a working JPEG stacker — streaming, memory-
-  safe (decode one frame at a time; peak RAM independent of frame count),
-  a Laplacian-pyramid blend (merge by max local contrast per frequency band —
-  seamless, no transition grain) with coarse translation align. Verified on
-  Noah's real 11-frame Z50 II set: sharp front-to-back, bokeh untouched, no
-  seams (headless harness + rendered proof). Full-resolution export SHIPPED
-  (2026-07-06): the preview stacks at 2048 px, Save re-renders the pyramid blend
-  at full 20 MP, TILED with a halo so it's memory-safe and seam-free; two-phase
-  Save for the iOS fresh-tap share rule. ~1 min/stack in headless software
-  decode (faster on device). The full-res render runs in a Web Worker
-  (`export.worker.ts`) so the UI never janks; total time is similar (compute is
-  compute) — the next lever for actual wall-clock is parallelising the tile rows
-  across several workers (one per core). Other refinement: breathing scale/
-  rotation align (this set was tripod-steady, drift ≈0, so translation sufficed).
+  safe (peak RAM independent of frame count) with coarse translation align.
+  ENGINE = DEPTH-MAP SELECTION: per pixel pick the sharpest frame, mode-filter
+  the selection map to kill grain, gather whole pixels — can't halo (no band
+  mixing) or veil (no averaging). This replaced an earlier Laplacian-pyramid
+  blend that RANG at strong edges (bright halos on thin petals over the blown
+  background — Noah caught it in a full-res export, IMG_0934). Full-resolution
+  export SHIPPED and simplified: same per-pixel method at native 20 MP, two
+  memory-bounded streaming passes, NO tiling (so no seams), in a Web Worker
+  (`export.worker.ts`, UI stays responsive), two-phase Save for the iOS fresh-tap
+  share rule, ~30 s/stack in headless software decode (faster on device).
+  Verified on Noah's real 11-frame Z50 II set: no halos (high-mag petal-edge
+  crop), smooth bokeh, sharper than any single frame. Next refinements: breathing
+  scale/rotation align (this set was tripod-steady, drift ≈0), and an optional
+  confidence floor to push subject crispness further.
   DEFERRED — **RAW (NEF) input**: the Z50 II shoots **High-Efficiency NEF**
   (confirmed by Noah; ~14.5 MB / 20 MP), a TicoRAW-class codec `nef.ts` cannot
   decode; a HE-NEF decoder is a separate large effort. Macro mode is named

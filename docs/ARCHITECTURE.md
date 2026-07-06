@@ -497,55 +497,56 @@ and unchanged (network-first navigations already cover the new pages). Each
 mode has a back-to-Studio link (`‹`) — modes announce themselves and offer an
 obvious exit.
 
-**The engine (`src/macro/stack.ts`).** Combines a focus-shift burst into one
-all-in-focus frame. Classical DSP, no ML.
-- MEMORY is the binding constraint: a 20 MP × 11-frame stack is ~900 MB fully
-  decoded → tab crash. So it STREAMS — decode ONE frame at a time at the
-  working resolution (`createImageBitmap` with `resizeWidth/Height` = native
-  decode+scale, never the full 20 MP), fold it into the running result, release
-  it. Peak memory is a couple of full-frame buffers, independent of frame count.
-- BLEND — Laplacian pyramid (`pyramid.ts`): each frame is split into frequency
-  bands; at every band + pixel the coefficient from the frame with the most
-  LOCAL CONTRAST (blurred luma-band energy) wins; the merged pyramid collapses
-  to the result. Per-band selection dissolves seams — the bands blend across the
-  focus/bokeh boundary at their own scale. The base (lowest band) is AVERAGED
-  (it carries near-identical overall tone; selecting it mottles). It streams:
-  `PyramidBlender.add()` folds one frame's pyramid and discards it, so peak RAM
-  is the merged pyramid + one frame's, independent of frame count. Two earlier
-  tries are recorded in the code: a soft weighted MEAN veiled the subject (pulls
-  in the 10 defocused frames, read softer than a single frame), and a hard
-  per-pixel argmax was sharp but left grain in low-contrast transitions
-  (measured 2026-07-06). The pyramid fixed both.
-- ALIGN: coarse integer translation per frame vs frame 0 (SSD search on a
-  downsampled luma). Noah's set was tripod-steady (drift ≈0), so translation
-  sufficed; rotation + breathing-scale are deferred until a set needs them.
-- Verified in headless chromium on the real 11-frame set: result is sharper than
-  frame 0 across the subject box (no transition grain), bokeh untouched, save
-  enabled; plus a full UI flow (chooser doors, IR intact, load→stack→result).
+**The engine (`src/macro/stack.ts`) — depth-map selection.** Combines a
+focus-shift burst into one all-in-focus frame. Classical DSP, no ML. The method
+was reached by elimination (all measured on the real set / IMG_0934, 2026-07-06):
+- Soft weighted MEAN → veiled the subject (the 10 defocused frames leak in).
+- Hard per-pixel ARGMAX → sharp, but grainy: on low-texture surfaces the focus
+  measure is ~equal across frames, so the winner flickers per pixel.
+- Laplacian-PYRAMID band merge → killed the grain but RANG — mixing frequency
+  bands OVERSHOOTS at strong edges, so thin petals over a blown background got
+  bright halos (the bug Noah caught). ABANDONED; the pyramid module is gone.
+
+The keeper: per pixel, pick the frame with the highest (smoothed) focus measure
+→ a SELECTION MAP; MODE-FILTER that map (majority vote in a small window) to
+erase the isolated flips that were the grain; then GATHER the actual pixels from
+the chosen frames. Selecting whole pixels can't overshoot (no halos) and never
+averages (no veil); mode-filtering the map removes grain without softening (a
+mode filter preserves regions/edges). CRITICAL SCALING: the focus-measure blur
+AND the mode window scale with the ACTUAL resolution — at full res an unscaled
+(too-small) blur leaves the measure noisy in flat bokeh, so the selection picks
+frames at random and prints their subtle bokeh differences as SPECKLE (field
+bug, first full-res export). `fmR = 4·res/2048`, mode `r = 2·res/2048` (capped).
+- MEMORY: selection + gather are per-pixel (+ a tiny window), NOT spatial like a
+  pyramid — so NO tiling even at full 20 MP. Two streaming passes over the
+  frames (one decoded at a time); only whole-image index/energy maps (a few
+  bytes/px) + the output stay resident. Peak RAM is independent of frame count.
+  Preview additionally HOLDS the small frames (single decode pass, faster);
+  full-res re-decodes in pass 2 to never hold more than one 20 MP frame.
+- ALIGN: coarse integer translation per frame vs frame 0 (SSD on downsampled
+  luma). Noah's set was tripod-steady (drift ≈0); rotation + breathing-scale
+  deferred until a set needs them.
+- Verified in headless chromium on the real 11-frame set: sharper than frame 0
+  across the subject, NO halos (high-mag petal-edge crop), smooth bokeh, no
+  seams; plus the full UI + worker save flow.
 
 **Full-res export (`stackFocusFullRes`).** The preview stacks at 2048 px; Save
-renders the SAME pyramid blend at full resolution (20 MP), TILED so peak memory
-stays bounded. Tiles carry a `halo` (256 px ≥ the base band's spatial support),
-so adjacent tile CORES butt together seam-free with no feather pass (verified:
-tile-boundary contrast ratios 1.1–1.4, below any seam threshold). Processed
-ROW-BAND / frame-outer: each frame's full-width strip is decoded ONCE per tile
-row and fanned to that row's column tiles, so a full-res frame is decoded rows×
-(not tiles×) times while only one row of tile pyramids is resident. Alignment
-shifts are estimated once on a 480 px luma and scaled to full-res px. Cost is
-real — ~1–1.5 min for an 11-frame 20 MP stack in headless SOFTWARE decode
-(faster on the iPad's hardware decoder); it runs in a **Web Worker**
-(`export.worker.ts`, its own code-split chunk loaded only on export) so the main
-thread and the progress bar stay responsive through the render. The finished
-pixel buffer is TRANSFERRED (zero-copy) back. Worker failure falls back to an
-honest error message (module workers need Safari 15+, fine on the target iPad).
-The iOS share landmine
+renders the same selection at full native resolution (20 MP) — same code, just
+no downscale and the memory-bounded two-pass. No tiling (the method is
+per-pixel), so no seams to worry about. ~30 s for an 11-frame stack in headless
+SOFTWARE decode (faster on the iPad's hardware decoder). Runs in a **Web
+Worker** (`export.worker.ts`, its own code-split chunk, loaded only on export)
+so the main thread + progress bar stay responsive; the finished pixel buffer is
+TRANSFERRED (zero-copy) back. Worker failure → honest error message (module
+workers need Safari 15+, fine on the target iPad). The iOS share landmine
 applies: navigator.share needs a FRESH tap, so Save is TWO-PHASE — first tap
 renders ("Export full-res" → progress → "Full resolution ready"), the button
-flips to "Save image", and the next fresh tap hands the finished JPEG to the
-share sheet.
+flips to "Save image", and the next fresh tap hands the JPEG to the share sheet.
 
-**Next refinements (not yet built):** scale/rotation align for handheld sets,
-and moving the full-res render to a Web Worker so the UI never janks.
+**Next refinements (not yet built):** scale/rotation align for handheld sets; and
+if the subject wants to be crisper still, a confidence floor (flat/bokeh pixels
+→ one consistent frame) would let the focus-measure blur shrink for finer
+selection without reintroducing bokeh speckle.
 
 **RAW input is DEFERRED — the Z50 II shoots High-Efficiency NEF.** The macro
 files are `NIKON Z50_2` (EXIF), NIKKOR Z DX 50-250 mm pseudo-macro, ~14.5 MB /

@@ -2,57 +2,57 @@
 // one image that is sharp everywhere the stack had focus, leaving the bokeh
 // smooth. Classical DSP, no ML.
 //
-// MEMORY IS THE BINDING CONSTRAINT (iPad Safari): a 20 MP × 11-frame stack is
-// ~900 MB if fully decoded, which crashes the tab. So we STREAM — decode one
-// frame at a time at the working resolution, fold it into running accumulators,
-// and release it before the next. Peak memory is a handful of full-frame
-// float buffers, independent of frame count.
+// METHOD — depth-map selection (the "PMax/DMap" family), reached after three
+// tries measured on real frames (2026-07-06):
+//   1. soft weighted MEAN — veiled the subject (the 10 defocused frames leak in).
+//   2. hard per-pixel ARGMAX — sharp, but grainy: on low-texture surfaces the
+//      focus measure is ~equal across frames, so the winner flickers per pixel.
+//   3. Laplacian-PYRAMID band merge — killed the grain but RANG: mixing bands
+//      overshoots at strong edges, so thin petals over a blown background got
+//      bright halos (field bug IMG_0934).
+// This one: pick, per pixel, the frame with the highest (smoothed) focus measure
+// — a SELECTION MAP — then MODE-FILTER that map (majority vote in a small window)
+// to erase the isolated flips that caused the grain, then GATHER the actual
+// pixels from the chosen frames. Selecting whole pixels can't overshoot (no
+// halos) and never averages (no veil); mode-filtering the map removes the grain
+// without softening detail (edges/regions survive a mode filter). Bokeh, where
+// every measure is ~0, resolves to a near-constant frame and stays smooth.
 //
-// Method: Laplacian-pyramid focus blend (see pyramid.ts). Each frame is
-//   decomposed into frequency bands; at every band + pixel the coefficient from
-//   the frame with the most local contrast wins; the pyramid is collapsed back.
-//   Per-band selection dissolves the seams a raw per-pixel argmax leaves in
-//   low-contrast transitions. (Earlier tries, for the record: a soft weighted
-//   MEAN veiled the subject — it pulls in the 10 defocused frames — and a hard
-//   per-pixel argmax was sharp but left grain in low-contrast transitions;
-//   measured on the real set, 2026-07-06.)
+// MEMORY: selection + gather are per-pixel (+ a tiny window), NOT spatial like a
+// pyramid — so NO tiling is needed even at full 20 MP. Two streaming passes over
+// the frames, one frame decoded at a time; only whole-image index/energy maps
+// (a few bytes/px) and the output stay resident. Peak RAM is independent of
+// frame count.
 //
-// Alignment: a coarse integer translation per frame vs. the reference (frame 0),
-// estimated on a downsampled luma by SSD search. Focus-shift bursts are usually
-// tripod-steady (the bundled set measured ≈0 drift), but handheld sets need it.
-// Rotation / breathing-scale are deferred (noted honestly) until a real set
-// needs them.
-
-import { PyramidBlender } from "./pyramid";
+// Alignment: coarse integer translation per frame vs frame 0 (SSD on downsampled
+// luma). Rotation / breathing-scale deferred until a set needs them.
 
 export interface StackFrame {
-  /** Something decodable to pixels at a target size. */
   blob: Blob;
   name: string;
 }
 
 export interface StackOptions {
-  /** Longest output edge in px (working/preview resolution). */
+  /** Longest working edge in px (preview). Use a huge value for full-res. */
   longEdge: number;
-  /** Enable coarse translation alignment vs the first frame. */
+  align?: boolean;
+  onProgress?: (done: number, total: number, phase: string) => void;
+}
+
+export interface FullResOptions {
   align?: boolean;
   onProgress?: (done: number, total: number, phase: string) => void;
 }
 
 export interface StackResult {
   image: ImageData;
-  /** Per-frame estimated shift (px at working res), for diagnostics/UI. */
   shifts: { name: string; dx: number; dy: number }[];
   width: number;
   height: number;
 }
 
-/** Decode a blob to RGBA at a bounded size (longest edge = longEdge), using the
- *  browser's native JPEG decoder with resize so we never hold the full 20 MP. */
+/** Decode a blob to RGBA at a bounded size (longest edge = longEdge). */
 async function decodeAt(blob: Blob, longEdge: number): Promise<ImageData> {
-  // First a tiny probe to read the natural size, so we can pick the resize dims
-  // preserving aspect. createImageBitmap with resizeWidth/Height decodes+scales
-  // in one native step.
   const probe = await createImageBitmap(blob);
   const nw = probe.width, nh = probe.height;
   const scale = Math.min(1, longEdge / Math.max(nw, nh));
@@ -67,17 +67,13 @@ async function decodeAt(blob: Blob, longEdge: number): Promise<ImageData> {
   return ctx.getImageData(0, 0, w, h);
 }
 
-function luma(img: ImageData): Float32Array {
-  const { data, width, height } = img;
-  const L = new Float32Array(width * height);
-  for (let i = 0; i < width * height; i++) {
-    L[i] = 0.2126 * data[i * 4] + 0.7152 * data[i * 4 + 1] + 0.0722 * data[i * 4 + 2];
-  }
+function luma(data: Uint8ClampedArray, n: number): Float32Array {
+  const L = new Float32Array(n);
+  for (let i = 0; i < n; i++) L[i] = 0.2126 * data[i * 4] + 0.7152 * data[i * 4 + 1] + 0.0722 * data[i * 4 + 2];
   return L;
 }
 
-/** Coarse integer translation of L vs ref, minimizing SSD on a downsampled
- *  copy over a small search window. Returns [dx, dy] in full-working px. */
+/** Coarse integer translation of L vs ref (SSD on a downsampled copy). */
 function estimateShift(ref: Float32Array, L: Float32Array, w: number, h: number): [number, number] {
   const tw = 240;
   const s = Math.min(1, tw / w);
@@ -92,185 +88,153 @@ function estimateShift(ref: Float32Array, L: Float32Array, w: number, h: number)
   let best: [number, number] = [0, 0], bestS = Infinity;
   for (let dy = -R; dy <= R; dy++) {
     for (let dx = -R; dx <= R; dx++) {
-      let sum = 0, n = 0;
-      for (let y = R; y < dh - R; y += 2) {
-        for (let x = R; x < dw - R; x += 2) {
-          const d = a[y * dw + x] - b[(y + dy) * dw + (x + dx)];
-          sum += d * d; n++;
-        }
-      }
-      sum /= n;
+      let sum = 0, nn = 0;
+      for (let y = R; y < dh - R; y += 2) for (let x = R; x < dw - R; x += 2) { const d = a[y * dw + x] - b[(y + dy) * dw + (x + dx)]; sum += d * d; nn++; }
+      sum /= nn;
       if (sum < bestS) { bestS = sum; best = [dx, dy]; }
     }
   }
   return [Math.round(best[0] / s), Math.round(best[1] / s)];
 }
 
-export async function stackFocus(frames: StackFrame[], opts: StackOptions): Promise<StackResult> {
-  const { longEdge, align = true, onProgress } = opts;
+/** Modified-Laplacian focus measure, box-blurred by `r` so the selection is
+ *  coherent before the mode filter. `r` scales with resolution (see stackSelect)
+ *  so preview and full-res smooth the measure by the same image fraction — vital
+ *  in flat bokeh, where too small an `r` leaves the measure noisy and the
+ *  selection picks frames at random, printing the frames' subtle bokeh
+ *  differences as speckle. */
+function focusMeasure(L: Float32Array, w: number, h: number, r: number): Float32Array {
+  const e = new Float32Array(w * h);
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      const v = 4 * L[i] - L[i - 1] - L[i + 1] - L[i - w] - L[i + w];
+      e[i] = v * v;
+    }
+  }
+  return boxBlur(e, w, h, r);
+}
+
+function boxBlur(src: Float32Array, w: number, h: number, r: number): Float32Array {
+  if (r < 1) return src;
+  const inv = 1 / (2 * r + 1);
+  const tmp = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) { let s = 0; for (let x = -r; x <= r; x++) s += src[y * w + Math.min(w - 1, Math.max(0, x))]; for (let x = 0; x < w; x++) { tmp[y * w + x] = s * inv; s += src[y * w + Math.min(w - 1, x + r + 1)] - src[y * w + Math.max(0, x - r)]; } }
+  const out = new Float32Array(w * h);
+  for (let x = 0; x < w; x++) { let s = 0; for (let y = -r; y <= r; y++) s += tmp[Math.min(h - 1, Math.max(0, y)) * w + x]; for (let y = 0; y < h; y++) { out[y * w + x] = s * inv; s += tmp[Math.min(h - 1, y + r + 1) * w + x] - tmp[Math.max(0, y - r) * w + x]; } }
+  return out;
+}
+
+/** Majority-vote (mode) filter of a selection-index map over a (2r+1)² window —
+ *  erases isolated selection flips (the grain) while region boundaries survive.
+ *  nFrames is small, so a per-pixel count array is cheap. */
+function modeFilter(idx: Int16Array, w: number, h: number, nFrames: number, r: number): Int16Array {
+  if (r < 1) return idx;
+  const out = new Int16Array(w * h);
+  const cnt = new Int32Array(nFrames);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      cnt.fill(0);
+      let best = idx[y * w + x], bc = 0;
+      for (let dy = -r; dy <= r; dy++) {
+        const yy = Math.min(h - 1, Math.max(0, y + dy)) * w;
+        for (let dx = -r; dx <= r; dx++) {
+          const v = idx[yy + Math.min(w - 1, Math.max(0, x + dx))];
+          const c = ++cnt[v];
+          if (c > bc) { bc = c; best = v; }
+        }
+      }
+      out[y * w + x] = best;
+    }
+  }
+  return out;
+}
+
+/**
+ * Focus-stack a set at working resolution `longEdge` (pass a huge value for
+ * full native resolution). Two streaming passes: (1) decode each frame, build
+ * its focus measure, keep the running argmax → a selection map; mode-filter it;
+ * (2) decode each frame again and gather its selected pixels.
+ */
+async function stackSelect(frames: StackFrame[], longEdge: number, align: boolean, hold: boolean, onProgress?: StackOptions["onProgress"]): Promise<StackResult> {
   const total = frames.length;
   if (!total) throw new Error("No frames to stack.");
+  // `hold` (preview): keep every decoded frame so gather needs no second decode
+  // — the small preview frames fit in RAM. Full-res sets hold=false and instead
+  // re-decodes in pass 2, so it never holds more than one 20 MP frame at once.
+  const steps = total * (hold ? 1 : 2) + 1;
+  let step = 0;
 
-  // Reference frame fixes the output geometry + alignment anchor, and seeds the
-  // running selection (so bokeh, where no frame ever wins, keeps its pixels).
-  onProgress?.(0, total, "decoding");
   const first = await decodeAt(frames[0].blob, longEdge);
-  const w = first.width, h = first.height, N = w * h;
-  const refL = luma(first);
+  const w = first.width, h = first.height, n = w * h;
+  const refL = luma(first.data, n);
 
-  const blender = new PyramidBlender(w, h);
+  const bestE = new Float32Array(n);
+  const idx = new Int16Array(n);
   const shifts: { name: string; dx: number; dy: number }[] = [];
+  const kept: (Uint8ClampedArray | null)[] = hold ? [] : [];
+  // Smoothing scaled to the ACTUAL resolution (not the longEdge cap), so the
+  // selection field has the same coherence at preview and full-res.
+  const res = Math.max(w, h);
+  const fmR = Math.max(3, Math.round((4 * res) / 2048));
 
-  // Split an aligned frame into R/G/B float planes (applying the integer shift
-  // so it registers to the reference) and fold it into the pyramid blend.
-  const fold = (img: ImageData, dx: number, dy: number) => {
-    const data = img.data;
-    const R = new Float32Array(N), G = new Float32Array(N), B = new Float32Array(N);
+  // Pass 1: selection map (+ keep frames when hold).
+  for (let f = 0; f < total; f++) {
+    onProgress?.(step++, steps, "analysing");
+    const img = f === 0 ? first : await decodeAt(frames[f].blob, longEdge);
+    if (img.width !== w || img.height !== h) throw new Error("Frames are not the same size — is this one focus-shift set?");
+    const [dx, dy] = f === 0 || !align ? [0, 0] : estimateShift(refL, luma(img.data, n), w, h);
+    shifts.push({ name: frames[f].name, dx, dy });
+    if (hold) kept.push(img.data);
+    const E = focusMeasure(luma(img.data, n), w, h, fmR);
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         const o = y * w + x;
         const sx = Math.min(w - 1, Math.max(0, x + dx));
         const sy = Math.min(h - 1, Math.max(0, y + dy));
-        const si = (sy * w + sx) * 4;
-        R[o] = data[si]; G[o] = data[si + 1]; B[o] = data[si + 2];
+        const e = E[sy * w + sx];
+        if (f === 0 || e > bestE[o]) { bestE[o] = e; idx[o] = f; }
       }
     }
-    blender.add(R, G, B);
-  };
-
-  fold(first, 0, 0);
-  shifts.push({ name: frames[0].name, dx: 0, dy: 0 });
-
-  for (let f = 1; f < total; f++) {
-    onProgress?.(f, total, "stacking");
-    const img = await decodeAt(frames[f].blob, longEdge);
-    if (img.width !== w || img.height !== h) throw new Error("Frames are not the same size — is this one focus-shift set?");
-    let dx = 0, dy = 0;
-    if (align) [dx, dy] = estimateShift(refL, luma(img), w, h);
-    shifts.push({ name: frames[f].name, dx, dy });
-    fold(img, dx, dy);
   }
 
-  onProgress?.(total, total, "compositing");
-  return { image: blender.finish(), shifts, width: w, height: h };
-}
+  onProgress?.(step++, steps, "cleaning");
+  const r = Math.max(2, Math.min(8, Math.round((2 * res) / 2048)));
+  const idxF = modeFilter(idx, w, h, total, r);
 
-// --- Full-resolution TILED export -----------------------------------------
-// The preview stacks at ~2048 px because a full-res in-memory pyramid over all
-// frames would blow the iPad RAM budget. For export we keep full resolution but
-// tile the output: each tile runs the SAME pyramid blend over just its own
-// region (plus a halo), so peak memory is one tile's pyramid, not the whole
-// frame. The halo (≥ the base band's spatial support) makes adjacent tiles
-// agree at their shared border, so the cores butt together seam-free without a
-// feather pass. Frames are decoded per tile at full res, cropped to the tile —
-// N×tiles decodes, the price of never holding a full-res frame set.
-
-export interface FullResOptions {
-  align?: boolean;
-  /** Core tile edge in px (halo added around it). Smaller = less peak RAM. */
-  tile?: number;
-  halo?: number;
-  onProgress?: (done: number, total: number, phase: string) => void;
-}
-
-async function naturalSize(blob: Blob): Promise<[number, number]> {
-  const b = await createImageBitmap(blob);
-  const s: [number, number] = [b.width, b.height];
-  b.close();
-  return s;
-}
-
-/** Decode a full-width strip [rows sy..sy+vh) of a frame at full res to ImageData. */
-async function decodeStrip(blob: Blob, sy: number, vh: number, natW: number): Promise<ImageData> {
-  const bmp = await createImageBitmap(blob, 0, sy, natW, vh);
-  const c = new OffscreenCanvas(natW, vh);
-  const ctx = c.getContext("2d", { willReadFrequently: true })!;
-  ctx.drawImage(bmp, 0, 0);
-  bmp.close();
-  return ctx.getImageData(0, 0, natW, vh);
-}
-
-export async function stackFocusFullRes(frames: StackFrame[], opts: FullResOptions = {}): Promise<StackResult> {
-  const { align = true, tile = 1536, halo = 256, onProgress } = opts;
-  const total = frames.length;
-  if (!total) throw new Error("No frames to stack.");
-
-  const [natW, natH] = await naturalSize(frames[0].blob);
-
-  // Estimate each frame's integer shift ONCE, cheaply, on a downscaled luma, and
-  // scale it to full-res pixels (reused for every tile).
-  onProgress?.(0, 1, "aligning");
-  const alignEdge = 480;
-  const ref = await decodeAt(frames[0].blob, alignEdge);
-  const refLo = luma(ref);
-  const loW = ref.width, loH = ref.height;
-  const scale = natW / loW;
-  const shifts: { name: string; dx: number; dy: number }[] = [{ name: frames[0].name, dx: 0, dy: 0 }];
-  for (let f = 1; f < total; f++) {
-    if (align) {
-      const lo = await decodeAt(frames[f].blob, alignEdge);
-      if (lo.width !== loW || lo.height !== loH) throw new Error("Frames are not the same size — is this one focus-shift set?");
-      const [dx, dy] = estimateShift(refLo, luma(lo), loW, loH);
-      shifts.push({ name: frames[f].name, dx: Math.round(dx * scale), dy: Math.round(dy * scale) });
+  // Pass 2: gather the selected pixels (from kept frames, or re-decode).
+  const out = new ImageData(w, h);
+  for (let f = 0; f < total; f++) {
+    let d: Uint8ClampedArray;
+    if (hold) {
+      d = kept[f]!;
     } else {
-      shifts.push({ name: frames[f].name, dx: 0, dy: 0 });
+      onProgress?.(step++, steps, "compositing");
+      d = (await decodeAt(frames[f].blob, longEdge)).data;
     }
-  }
-
-  const out = new ImageData(natW, natH);
-  const cols = Math.ceil(natW / tile), rows = Math.ceil(natH / tile);
-  const steps = rows * total;
-  let step = 0;
-
-  // Process a ROW of tiles at a time, decoding each frame's strip ONCE for the
-  // row and fanning it out to that row's column tiles — so a full-res frame is
-  // decoded rows× (not tiles×) times, while only one row of tile pyramids is
-  // ever resident.
-  for (let ty = 0; ty < rows; ty++) {
-    const coreY = ty * tile, coreH = Math.min(tile, natH - coreY);
-    const py0 = Math.max(0, coreY - halo), pye = Math.min(natH, coreY + coreH + halo);
-    const ph = pye - py0;
-
-    const colTiles = [];
-    for (let tx = 0; tx < cols; tx++) {
-      const coreX = tx * tile, coreW = Math.min(tile, natW - coreX);
-      const px0 = Math.max(0, coreX - halo), pxe = Math.min(natW, coreX + coreW + halo);
-      colTiles.push({ coreX, coreW, px0, pw: pxe - px0, blender: new PyramidBlender(pxe - px0, ph) });
-    }
-
-    for (let f = 0; f < total; f++) {
-      onProgress?.(step++, steps, `row ${ty + 1}/${rows}`);
-      const { dx, dy } = shifts[f];
-      const sy = Math.min(natH - 1, Math.max(0, py0 + dy));
-      const syE = Math.min(natH, Math.max(1, pye + dy));
-      const vh = Math.max(1, syE - sy);
-      const strip = await decodeStrip(frames[f].blob, sy, vh, natW);
-      const sdata = strip.data;
-      for (const ct of colTiles) {
-        const R = new Float32Array(ct.pw * ph), G = new Float32Array(ct.pw * ph), B = new Float32Array(ct.pw * ph);
-        for (let oy = 0; oy < ph; oy++) {
-          const gyy = Math.min(sy + vh - 1, Math.max(sy, py0 + dy + oy)) - sy;
-          for (let ox = 0; ox < ct.pw; ox++) {
-            const sxx = Math.min(natW - 1, Math.max(0, ct.px0 + ox + dx));
-            const si = (gyy * natW + sxx) * 4, o = oy * ct.pw + ox;
-            R[o] = sdata[si]; G[o] = sdata[si + 1]; B[o] = sdata[si + 2];
-          }
-        }
-        ct.blender.add(R, G, B);
-      }
-    }
-
-    for (const ct of colTiles) {
-      const tileImg = ct.blender.finish();
-      const ox0 = ct.coreX - ct.px0, oy0 = coreY - py0;
-      for (let y = 0; y < coreH; y++) {
-        const src = ((oy0 + y) * ct.pw + ox0) * 4;
-        const dst = ((coreY + y) * natW + ct.coreX) * 4;
-        out.data.set(tileImg.data.subarray(src, src + ct.coreW * 4), dst);
+    const { dx, dy } = shifts[f];
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const o = y * w + x;
+        if (idxF[o] !== f) continue;
+        const sx = Math.min(w - 1, Math.max(0, x + dx));
+        const sy = Math.min(h - 1, Math.max(0, y + dy));
+        const si = (sy * w + sx) * 4;
+        out.data[o * 4] = d[si]; out.data[o * 4 + 1] = d[si + 1]; out.data[o * 4 + 2] = d[si + 2]; out.data[o * 4 + 3] = 255;
       }
     }
   }
 
   onProgress?.(steps, steps, "done");
-  return { image: out, shifts, width: natW, height: natH };
+  return { image: out, shifts, width: w, height: h };
+}
+
+export function stackFocus(frames: StackFrame[], opts: StackOptions): Promise<StackResult> {
+  // Preview: hold the small frames in RAM for a single decode pass.
+  return stackSelect(frames, opts.longEdge, opts.align ?? true, true, opts.onProgress);
+}
+
+export function stackFocusFullRes(frames: StackFrame[], opts: FullResOptions = {}): Promise<StackResult> {
+  // Full native resolution (1e9 px cap => no downscale); memory-bounded two-pass.
+  return stackSelect(frames, 1e9, opts.align ?? true, false, opts.onProgress);
 }
