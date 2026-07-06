@@ -258,12 +258,11 @@ Second discipline:
   the ~7 KB stacking engine never loads for IR users and the 100 KB IR editor
   never loads for macro users) and a working JPEG stacker — streaming, memory-
   safe (decode one frame at a time; peak RAM independent of frame count),
-  per-pixel max-sharpness selection (modified-Laplacian focus measure) with
-  coarse translation align. Verified on Noah's real 11-frame Z50 II set: 2.8×
-  sharper across the subject than any single frame, bokeh untouched (headless
-  harness + rendered proof). Next refinements: Laplacian-pyramid blend (smooth
-  the selection-noise in low-contrast transitions), full-resolution tiled
-  export (v1 works at a 2048 px preview res), and breathing scale/rotation
+  a Laplacian-pyramid blend (merge by max local contrast per frequency band —
+  seamless, no transition grain) with coarse translation align. Verified on
+  Noah's real 11-frame Z50 II set: sharp front-to-back, bokeh untouched, no
+  seams (headless harness + rendered proof). Next refinements: full-resolution
+  tiled export (v1 works at a 2048 px preview res), and breathing scale/rotation
   align (this set was tripod-steady, drift ≈0, so translation sufficed).
   DEFERRED — **RAW (NEF) input**: the Z50 II shoots **High-Efficiency NEF**
   (confirmed by Noah; ~14.5 MB / 20 MP), a TicoRAW-class codec `nef.ts` cannot

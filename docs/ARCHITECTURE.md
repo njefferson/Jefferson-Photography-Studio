@@ -504,25 +504,30 @@ all-in-focus frame. Classical DSP, no ML.
   working resolution (`createImageBitmap` with `resizeWidth/Height` = native
   decode+scale, never the full 20 MP), fold it into the running result, release
   it. Peak memory is a couple of full-frame buffers, independent of frame count.
-- SELECTION, not averaging: per pixel, keep the RGB of the frame with the
-  highest focus measure seen so far (streaming argmax). The focus measure is the
-  box-summed squared Laplacian of luma (the "modified Laplacian"). A soft
-  weighted MEAN was tried first and read SOFTER than a single frame — the 10
-  defocused frames veil the subject (measured, 2026-07-06). Winner-take-all is
-  the right model; bokeh (all focus measures ~0) keeps the seed frame, and the
-  bokeh is near-identical across frames so it stays clean.
+- BLEND — Laplacian pyramid (`pyramid.ts`): each frame is split into frequency
+  bands; at every band + pixel the coefficient from the frame with the most
+  LOCAL CONTRAST (blurred luma-band energy) wins; the merged pyramid collapses
+  to the result. Per-band selection dissolves seams — the bands blend across the
+  focus/bokeh boundary at their own scale. The base (lowest band) is AVERAGED
+  (it carries near-identical overall tone; selecting it mottles). It streams:
+  `PyramidBlender.add()` folds one frame's pyramid and discards it, so peak RAM
+  is the merged pyramid + one frame's, independent of frame count. Two earlier
+  tries are recorded in the code: a soft weighted MEAN veiled the subject (pulls
+  in the 10 defocused frames, read softer than a single frame), and a hard
+  per-pixel argmax was sharp but left grain in low-contrast transitions
+  (measured 2026-07-06). The pyramid fixed both.
 - ALIGN: coarse integer translation per frame vs frame 0 (SSD search on a
   downsampled luma). Noah's set was tripod-steady (drift ≈0), so translation
   sufficed; rotation + breathing-scale are deferred until a set needs them.
-- Verified in headless chromium on the real 11-frame set: result is 2.8×
-  sharper than frame 0 across the subject box, bokeh untouched, save enabled;
-  plus a full UI flow (chooser doors, IR intact, load→stack→result).
+- Verified in headless chromium on the real 11-frame set: result is sharper than
+  frame 0 across the subject box (no transition grain), bokeh untouched, save
+  enabled; plus a full UI flow (chooser doors, IR intact, load→stack→result).
 
-**Next refinements (not yet built):** Laplacian-pyramid blend (softens the
-selection-noise the hard argmax leaves in low-contrast transitions), full-res
-TILED export (v1 stacks at a 2048 px preview res — the tiled path decodes each
-frame's strip on demand so full-res stays memory-safe), and scale/rotation
-align for handheld sets.
+**Next refinements (not yet built):** full-res TILED export (v1 stacks at a
+2048 px preview res — the tiled path will decode each frame's strip on demand so
+full-res stays memory-safe), and scale/rotation align for handheld sets. The
+pyramid build is ~O(frames) and runs a few seconds per stack at preview res;
+worth watching on the iPad.
 
 **RAW input is DEFERRED — the Z50 II shoots High-Efficiency NEF.** The macro
 files are `NIKON Z50_2` (EXIF), NIKKOR Z DX 50-250 mm pseudo-macro, ~14.5 MB /
