@@ -1,5 +1,5 @@
 {
-  "name": "Macro Focus Stacking",
+  "name": "Macro Studio",
   "short_name": "Macro",
   "description": "Combine a focus-shift burst into one fully-sharp macro frame, on-device.",
   "start_url": "./macro.html",
@@ -9,6 +9,8 @@
   "background_color": "#0b0b0d",
   "theme_color": "#0b0b0d",
   "icons": [
-    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    { "src": "./macro-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "./macro-icon-180.png", "sizes": "180x180", "type": "image/png", "purpose": "any" },
+    { "src": "./macro-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

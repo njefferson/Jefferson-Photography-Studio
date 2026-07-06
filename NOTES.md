@@ -267,6 +267,7 @@ Second discipline:
   align (this set was tripod-steady, drift ≈0, so translation sufficed).
   DEFERRED — **RAW (NEF) input**: the Z50 II shoots **High-Efficiency NEF**
   (confirmed by Noah; ~14.5 MB / 20 MP), a TicoRAW-class codec `nef.ts` cannot
-  decode; a HE-NEF decoder is a separate large effort. Still open: final
-  installable names/icons (placeholders in place — "Photography Studio" /
-  "Macro Focus Stacking").
+  decode; a HE-NEF decoder is a separate large effort. Macro mode is named
+  **"Macro Studio"** (flower icon, `public/macro-icon.svg` + 180/512 PNGs for
+  iOS home-screen). Still open: the umbrella/chooser name (placeholder
+  "Photography Studio") and the IR-mode iOS PNG icon.
