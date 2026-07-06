@@ -113,11 +113,16 @@ export interface BrushMask {
 }
 
 /** A local-adjustment mask. `type` 0 = radial, 1 = linear gradient, 2 = brush,
- *  3 = colour (chroma-key). Geometry is in image-uv [0..1] so it anchors to the
- *  photo through rotation/zoom; a colour mask has no geometry — its weight comes
- *  from each pixel's hue/saturation distance to a tapped colour instead. */
+ *  3 = colour (chroma-key), 4 = sky (classical heuristic). Geometry is in
+ *  image-uv [0..1] so it anchors to the photo through rotation/zoom; a colour
+ *  mask has no geometry — its weight is each pixel's hue/saturation distance to
+ *  a tapped colour. A SKY mask also has no live geometry: its weight is a
+ *  bitmap GENERATED once by the sky heuristic (sky.ts) and stored in `brush`,
+ *  so it is sampled through the exact same path as a painted brush mask — the
+ *  connectivity/flood-fill work that a per-pixel weight function cannot express
+ *  happens in JS at generation time, not in the shader. */
 export interface MaskLayer {
-  type: 0 | 1 | 2 | 3;
+  type: 0 | 1 | 2 | 3 | 4;
   cx: number; // radial: centre x; linear: start x
   cy: number; // radial: centre y; linear: start y
   rx: number; // radial: x radius (uv fraction)
@@ -126,8 +131,12 @@ export interface MaskLayer {
   lx: number; // linear: end x
   ly: number; // linear: end y
   invert: boolean;
-  brush?: BrushMask; // type 2 only
-  rev?: number; // bumps on each brush stroke (undo equality)
+  brush?: BrushMask; // type 2 (painted) and type 4 (generated sky) both use this
+  rev?: number; // bumps on each brush stroke / sky regeneration (undo equality)
+  /** Sky mask (type 4) "Reach": scales the heuristic's growth tolerances when
+   *  regenerating the bitmap (1 = calibrated default, >1 grows more eagerly).
+   *  Unused by other mask types. */
+  reach: number;
   // Colour mask (type 3): the tapped target and how wide a band it selects.
   // The key is the pixel's DISPLAY-space hue/saturation — the pre-mask colour
   // pushed through contrast+gamma+tone (see colorMaskWeight); satTarget is HSV
@@ -145,10 +154,11 @@ export interface MaskLayer {
   warmth: number; // -1..1, + warmer
 }
 
-export function neutralMask(type: 0 | 1 | 2 | 3): MaskLayer {
-  const base = { cx: 0.5, cy: 0.5, rx: 0.35, ry: 0.35, feather: 0.5, lx: 0.5, ly: 0.85, invert: false, hueTarget: 0, satTarget: -1, valTarget: 0.75, colorRange: 0.5, brightness: 1, contrast: 1, saturation: 1, hue: 0, warmth: 0 };
+export function neutralMask(type: 0 | 1 | 2 | 3 | 4): MaskLayer {
+  const base = { cx: 0.5, cy: 0.5, rx: 0.35, ry: 0.35, feather: 0.5, lx: 0.5, ly: 0.85, invert: false, hueTarget: 0, satTarget: -1, valTarget: 0.75, colorRange: 0.5, reach: 1, brightness: 1, contrast: 1, saturation: 1, hue: 0, warmth: 0 };
   if (type === 1) return { ...base, type, cx: 0.5, cy: 0.12, lx: 0.5, ly: 0.5 };
   if (type === 2) return { ...base, type, rev: 0 };
+  if (type === 4) return { ...base, type, rev: 0 }; // sky: bitmap filled by the heuristic on add
   return { ...base, type };
 }
 
@@ -161,14 +171,24 @@ function smooth01(edge0: number, edge1: number, x: number): number {
   return t * t * (3 - 2 * t);
 }
 
-/** Bilinear sample of a brush bitmap (0..1) at image-uv. Matches the GPU's
- *  LINEAR texture sampling of the packed brush texture. */
+/** Bilinear sample of a bitmap mask (0..1) at image-uv — brush (type 2) and sky
+ *  (type 4). Replicates the GPU's LINEAR texture sampling EXACTLY: WebGL samples
+ *  at texel coordinate `u*size - 0.5` (texel centres) with CLAMP_TO_EDGE, not
+ *  `u*(size-1)`. The two conventions agree only at u=0.5, so at a soft mask edge
+ *  under a strong local adjustment the half-texel gap otherwise pushed a handful
+ *  of edge pixels past the parity bar (found by the sky-mask harness, 2026-07-06
+ *  — the sky's gaussian-feathered edge exposes what brush strokes mostly hid). */
 function sampleBrush(b: BrushMask, u: number, v: number): number {
-  const fx = Math.min(1, Math.max(0, u)) * (b.w - 1);
-  const fy = Math.min(1, Math.max(0, v)) * (b.h - 1);
-  const x0 = Math.floor(fx), y0 = Math.floor(fy);
-  const x1 = Math.min(b.w - 1, x0 + 1), y1 = Math.min(b.h - 1, y0 + 1);
-  const tx = fx - x0, ty = fy - y0;
+  const fx = Math.min(1, Math.max(0, u)) * b.w - 0.5;
+  const fy = Math.min(1, Math.max(0, v)) * b.h - 0.5;
+  const ix = Math.floor(fx), iy = Math.floor(fy);
+  const tx = fx - ix, ty = fy - iy;
+  // Clamp EACH neighbour independently from the unclamped floor — CLAMP_TO_EDGE
+  // collapses both taps to the border texel when the coord runs off the edge
+  // (clamping x0 then x1=x0+1 would wrongly reach a second texel at the border).
+  const cx = (i: number) => Math.max(0, Math.min(b.w - 1, i));
+  const cy = (i: number) => Math.max(0, Math.min(b.h - 1, i));
+  const x0 = cx(ix), x1 = cx(ix + 1), y0 = cy(iy), y1 = cy(iy + 1);
   const s = (x: number, y: number) => b.data[y * b.w + x];
   const top = s(x0, y0) * (1 - tx) + s(x1, y0) * tx;
   const bot = s(x0, y1) * (1 - tx) + s(x1, y1) * tx;
@@ -189,6 +209,9 @@ export function maskWeight(m: MaskLayer, u: number, v: number): number {
     const t = ((u - m.cx) * gx + (v - m.cy) * gy) / len2;
     w = 1 - Math.min(1, Math.max(0, t)); // full at the start point, 0 at the end
   } else {
+    // Brush (type 2) and sky (type 4): weight is the stored bitmap, bilinearly
+    // sampled — identical to the shader's packed-texture read. (Colour masks,
+    // type 3, never reach here; compileEdit routes them to colorMaskWeight.)
     w = m.brush ? sampleBrush(m.brush, u, v) : 0;
   }
   return m.invert ? 1 - w : w;

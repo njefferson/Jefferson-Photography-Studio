@@ -8,6 +8,7 @@ import { generateCube } from "./lut";
 import { generateDcp } from "./dcp";
 import { buildGlowMap } from "./glow";
 import { buildLocalMap } from "./localmap";
+import { buildSkyMask } from "./sky";
 import { drawHistogram } from "./histogram";
 
 // Injected at build time from git history (see vite.config.ts).
@@ -868,6 +869,7 @@ const addRadialBtn = $("addRadial") as HTMLButtonElement;
 const addLinearBtn = $("addLinear") as HTMLButtonElement;
 const addBrushBtn = $("addBrush") as HTMLButtonElement;
 const addColorBtn = $("addColor") as HTMLButtonElement;
+const addSkyBtn = $("addSky") as HTMLButtonElement;
 const mUI = {
   brightness: $("mBrightness") as HTMLInputElement,
   contrast: $("mContrast") as HTMLInputElement,
@@ -887,6 +889,9 @@ const mUI = {
   colorRange: $("mColorRange") as HTMLInputElement,
   colorSwatch: $("mColorSwatch") as HTMLElement,
   colorSwatchText: $("mColorSwatchText") as HTMLElement,
+  skyControls: $("skyControls") as HTMLElement,
+  skyReach: $("mSkyReach") as HTMLInputElement,
+  skyStatus: $("mSkyStatus") as HTMLElement,
 };
 const BRUSH_MAX_EDGE = 384; // working resolution of the painted mask bitmap
 let selectedMask = -1;
@@ -897,12 +902,12 @@ function currentMask(): MaskLayer | null {
   return selectedMask >= 0 && selectedMask < params.masks.length ? params.masks[selectedMask] : null;
 }
 
-function addMask(type: 0 | 1 | 2 | 3) {
+function addMask(type: 0 | 1 | 2 | 3 | 4) {
   if (!current || params.masks.length >= MAX_MASKS) return;
   const m = neutralMask(type);
-  // A gentle default so a fresh mask does something. Colour masks lean on
-  // saturation (the owner's taste — make the matched colour pop).
-  if (type === 3) m.saturation = 1.4;
+  // A gentle default so a fresh mask does something. Colour and sky masks lean
+  // on saturation (the owner's taste — make the matched area pop).
+  if (type === 3 || type === 4) m.saturation = type === 4 ? 1.3 : 1.4;
   else m.brightness = type === 1 ? 1.15 : 1.25;
   if (type === 2) {
     const s = Math.min(1, BRUSH_MAX_EDGE / Math.max(current.width, current.height));
@@ -912,6 +917,7 @@ function addMask(type: 0 | 1 | 2 | 3) {
     mUI.paint.setAttribute("aria-pressed", "true"); // start ready to paint
     mUI.erase.setAttribute("aria-pressed", "false");
   }
+  if (type === 4) regenerateSkyMask(m); // detect the sky now (fills m.brush)
   params.masks.push(m);
   selectedMask = params.masks.length - 1;
   updateMaskUI();
@@ -919,6 +925,44 @@ function addMask(type: 0 | 1 | 2 | 3) {
   if (type === 3) setColorPick(true); // arm the tap-to-pick target immediately
   draw();
   flushRecord();
+}
+
+// Sky mask (type 4): run the classical heuristic on the current image and bake
+// the result into the mask's bitmap (the brush path samples it — no shader
+// change). WB is the AUTO gray-world balance (not the live edit) so the
+// selection never drifts as the photo is graded. Copy-on-write: always assign a
+// FRESH buffer (undo snapshots share the old one) and bump `rev`.
+function regenerateSkyMask(m: MaskLayer) {
+  if (!current) return;
+  const res = buildSkyMask(
+    (x, y) => linearAt(current!, x, y),
+    current.width,
+    current.height,
+    renderer.rotation,
+    current.camMatrix ?? null,
+    grayWorldWB(current),
+    BRUSH_MAX_EDGE,
+    m.reach ?? 1,
+    m.feather,
+  );
+  m.brush = res.mask; // fresh buffer from buildSkyMask — safe for copy-on-write
+  m.rev = (m.rev ?? 0) + 1;
+}
+
+/** Sky-mask status line, read straight from the generated bitmap so it is
+ *  accurate per mask: coverage of texels the mask actually selects. Near-zero
+ *  coverage means the heuristic found no sky — keep the label honest and point
+ *  at the manual alternatives instead of pretending. */
+function updateSkyStatus() {
+  const m = currentMask();
+  if (!m || m.type !== 4 || !m.brush) return;
+  const d = m.brush.data;
+  let on = 0;
+  for (let i = 0; i < d.length; i++) if (d[i] > 127) on++;
+  const frac = d.length ? on / d.length : 0;
+  mUI.skyStatus.textContent = frac < 0.005
+    ? "No clear sky found — try a Brush or Colour mask, or raise Reach."
+    : `Sky detected — ${Math.round(frac * 100)}% of the frame. Invert for everything but the sky.`;
 }
 
 function deleteMask(i: number) {
@@ -945,7 +989,7 @@ function updateMaskUI() {
       const pick = document.createElement("button");
       pick.type = "button";
       pick.className = "mask-pick" + (i === selectedMask ? " active" : "");
-      const label = m.type === 0 ? "Radial" : m.type === 1 ? "Gradient" : m.type === 2 ? "Brush" : "Colour";
+      const label = m.type === 0 ? "Radial" : m.type === 1 ? "Gradient" : m.type === 2 ? "Brush" : m.type === 3 ? "Colour" : "Sky";
       pick.textContent = `${label} ${i + 1}`;
       pick.addEventListener("click", () => selectMask(i));
       const del = document.createElement("button");
@@ -964,6 +1008,8 @@ function updateMaskUI() {
   addRadialBtn.disabled = full;
   addLinearBtn.disabled = full;
   addBrushBtn.disabled = full;
+  addColorBtn.disabled = full;
+  addSkyBtn.disabled = full;
   if (m) {
     mUI.brightness.value = String(m.brightness);
     mUI.contrast.value = String(m.contrast);
@@ -971,13 +1017,18 @@ function updateMaskUI() {
     mUI.hue.value = String(m.hue);
     mUI.warmth.value = String(m.warmth);
     mUI.feather.value = String(m.feather);
-    // Feather is the soft edge for radial AND colour masks (transition width).
-    mUI.featherRow.hidden = m.type !== 0 && m.type !== 3;
+    // Feather is the soft edge for radial, colour AND sky masks (transition width).
+    mUI.featherRow.hidden = m.type !== 0 && m.type !== 3 && m.type !== 4;
     mUI.brushControls.hidden = m.type !== 2;
     mUI.colorControls.hidden = m.type !== 3;
+    mUI.skyControls.hidden = m.type !== 4;
     if (m.type === 3) {
       mUI.colorRange.value = String(m.colorRange);
       updateColorSwatch(m);
+    }
+    if (m.type === 4) {
+      mUI.skyReach.value = String(m.reach);
+      updateSkyStatus();
     }
     mUI.invert.setAttribute("aria-pressed", String(m.invert));
   }
@@ -1005,13 +1056,19 @@ function updateColorSwatch(m: MaskLayer) {
 function syncMaskFromUI() {
   const m = currentMask();
   if (!m) return;
+  const newFeather = Number(mUI.feather.value);
+  // A sky mask bakes its feather into the bitmap, so a feather change means a
+  // regenerate — but ONLY when it actually moved (this handler also fires for
+  // brightness/sat/etc., which don't touch the bitmap).
+  const skyNeedsRebuild = m.type === 4 && m.feather !== newFeather;
   m.brightness = Number(mUI.brightness.value);
   m.contrast = Number(mUI.contrast.value);
   m.saturation = Number(mUI.sat.value);
   m.hue = Number(mUI.hue.value);
   m.warmth = Number(mUI.warmth.value);
-  m.feather = Number(mUI.feather.value);
+  m.feather = newFeather;
   m.colorRange = Number(mUI.colorRange.value);
+  if (skyNeedsRebuild) { regenerateSkyMask(m); updateSkyStatus(); }
   draw();
   positionMaskOverlay(); // feather changes the outline
 }
@@ -1019,6 +1076,17 @@ function syncMaskFromUI() {
 for (const el of [mUI.brightness, mUI.contrast, mUI.sat, mUI.hue, mUI.warmth, mUI.feather, mUI.colorRange]) {
   el.addEventListener("input", syncMaskFromUI);
 }
+// Sky "Reach" scales the detection tolerances — regenerate the bitmap on drag
+// (cheap at the brush working resolution; one gesture coalesces to one undo
+// step via draw()'s debounce, like every other mask slider).
+mUI.skyReach.addEventListener("input", () => {
+  const m = currentMask();
+  if (!m || m.type !== 4) return;
+  m.reach = Number(mUI.skyReach.value);
+  regenerateSkyMask(m);
+  updateSkyStatus();
+  draw();
+});
 mUI.invert.addEventListener("click", () => {
   const m = currentMask();
   if (!m) return;
@@ -1031,6 +1099,7 @@ $("mDelete").addEventListener("click", () => { if (selectedMask >= 0) deleteMask
 addRadialBtn.addEventListener("click", () => addMask(0));
 addLinearBtn.addEventListener("click", () => addMask(1));
 addColorBtn.addEventListener("click", () => addMask(3));
+addSkyBtn.addEventListener("click", () => addMask(4));
 
 // Colour-mask target pick: arm, then tap the photo and the mask keys on that
 // colour. SUSTAINED (the TAT lesson): while armed, EVERY tap re-picks and a
@@ -1091,9 +1160,10 @@ function mkHandle(role: string): SVGCircleElement {
 // which would destroy the element holding the pointer capture.
 function renderMaskOverlay() {
   const m = currentMask();
-  // Brush and colour masks have no geometry handles — the paint / the colour
-  // key itself is the feedback.
-  const showable = !!current && !panel.hidden && welcome.hidden && !!m && m.type !== 2 && m.type !== 3;
+  // Brush, colour and sky masks have no geometry handles — the paint / the
+  // colour key / the detected region itself is the feedback. Only radial (0)
+  // and linear (1) masks draw a handle overlay.
+  const showable = !!current && !panel.hidden && welcome.hidden && !!m && (m.type === 0 || m.type === 1);
   maskOverlay.toggleAttribute("hidden", !showable);
   overlayHandles = [];
   overlayShape = null;
@@ -1321,6 +1391,11 @@ $("rotateBtn").addEventListener("click", () => {
   if (!current) return;
   renderer.setRotation(renderer.rotation + 1);
   resetZoom();
+  // A sky mask keys off the display-top edge, so a rotation re-detects it to
+  // stay glued to the sky in the new orientation.
+  let rebuilt = false;
+  for (const m of params.masks) if (m.type === 4) { regenerateSkyMask(m); rebuilt = true; }
+  if (rebuilt) updateSkyStatus();
   draw();
 });
 

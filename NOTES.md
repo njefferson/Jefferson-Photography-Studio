@@ -136,11 +136,28 @@ See **`PLAN.md`** for the full build plan.
   GPU==CPU verified ≤2 LSB in headless chromium, plus a controlled selectivity
   render and a real pick → adjust → re-pick → undo UI flow (sky provably
   untouched when foliage is picked).
-- [ ] **Mask by subject / sky / background** — auto-select masks (owner request
-  2026-07-05). Honest scoping: true subject/background segmentation needs an
-  on-device ML model (WebGPU — the "frontier" backlog item); SKY may get a
-  classical heuristic first (position + colour + gradient). Architect as mask
-  types so they slot into the same engine when ready.
+- [x] **Mask by sky** — auto-select the sky with a classical heuristic, no ML
+  (mask type 4, shipped 2026-07-06). Measured on the real frames first: in
+  linear IR the sunlit FOLIAGE is the brightest thing and lodge's sky is the
+  DARKEST region, so "sky is bright" is dropped entirely. The real signals are
+  smoothness (sky gradient ~0.004–0.03 vs 0.1–0.4 for foliage) plus colour
+  coherence, with a LEARNED (never assumed) sky colour/luma model. It seeds on
+  the smooth pixels along the display-top edge, learns the model robustly
+  (median + MAD), floods down while pixels stay near it (non-level horizons and
+  vertical gradients pass for free — no line fitting), then re-adds enclosed
+  holes (sky through branches). The connectivity work runs once in JS (sky.ts)
+  and bakes a WEIGHT BITMAP, sampled through the existing brush-mask path — so
+  there is NO sky-specific shader math and GPU==CPU is automatic. Reach loosens/
+  tightens the grow, Feather softens the edge, Invert grades everything but the
+  sky; no-sky frames say so and stay inert. Spatial, so skipped in the .cube LUT
+  like the other masks. GPU==CPU verified ≤1 LSB (solo/inverted/stacked/strong-
+  adjust) on canopy/lodge/hillside, plus rendered proof and a real add→grade→
+  invert→undo UI flow (foliage provably untouched).
+- [ ] **Mask by subject / background** — auto-select the subject or the
+  background (owner request 2026-07-05). Honest scoping: true subject/background
+  segmentation needs an on-device ML model (WebGPU — the "frontier" backlog
+  item); there is no classical stand-in the way sky had one. Architect as a mask
+  type so it slots into the same engine when ready.
 - [x] **Local masking** — radial + linear gradient + **brush** masks (up to 4),
   each with local brightness/contrast/saturation/hue/warmth. Radial/linear are
   dragged with handles; the brush is painted on the photo (Paint/Erase, size,

@@ -268,8 +268,11 @@ void main() {
   // global contrast/gamma. Identical math to compileEdit in pipeline.ts.
   for (int i = 0; i < u_maskCount; i++) {
     float w;
-    if (u_maskType[i] == 2) {
-      w = texture(u_maskTex, v_uv)[i]; // brush: packed channel per mask
+    if (u_maskType[i] == 2 || u_maskType[i] == 4) {
+      // Brush (painted) and sky (heuristic-generated) both read their weight
+      // from the packed bitmap texture — the sky heuristic's connectivity work
+      // is baked into the bitmap in JS, so there is no sky-specific shader math.
+      w = texture(u_maskTex, v_uv)[i]; // packed channel per mask
       if (u_maskGeoB[i].y > 0.5) w = 1.0 - w; // invert
     } else if (u_maskType[i] == 3) {
       w = colorMaskWeight(i, cKey); // chroma-key on the fixed mask-stage colour
@@ -439,12 +442,13 @@ export class Renderer {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG8, m.width, m.height, 0, gl.RG, gl.UNSIGNED_BYTE, new Uint8Array(m.rg));
   }
 
-  /** Pack the active brush masks into the RGBA brush texture (channel per mask),
-   *  re-uploading only when their content changes. `masks` is the same filtered,
-   *  ordered list used to set the uniforms. */
+  /** Pack the active bitmap masks — brush (type 2) and sky (type 4) — into the
+   *  RGBA brush texture (channel per mask), re-uploading only when their content
+   *  changes. `masks` is the same filtered, ordered list used to set the
+   *  uniforms, so a mask's channel index matches its shader loop index. */
   private updateBrushTexture(masks: EditParams["masks"]) {
     const gl = this.gl;
-    const brushes = masks.map((m, i) => ({ m, i })).filter((x) => x.m.type === 2 && x.m.brush);
+    const brushes = masks.map((m, i) => ({ m, i })).filter((x) => (x.m.type === 2 || x.m.type === 4) && x.m.brush);
     const sig = brushes.map((x) => `${x.i}:${x.m.brush!.w}x${x.m.brush!.h}:${x.m.rev ?? 0}`).join("|");
     if (sig === this.brushSig) return;
     this.brushSig = sig;

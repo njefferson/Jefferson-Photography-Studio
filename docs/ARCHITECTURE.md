@@ -63,16 +63,19 @@ decode -> LINEAR camera-native RGB
                        state. hue/sat/lum each)
   -> TINT             (sepia over mono)
   -> GLOW             (adds blurred-highlight map in linear; HIE halation)
-  -> LOCAL MASKS      (radial/linear/brush/colour, up to 4; each applies local
-                       brightness/contrast/saturation/hue/warmth weighted by the
-                       mask, in LINEAR space here. Radial/linear/brush geometry is
-                       image-uv so masks stick to the subject through zoom/pan/
-                       rotation; a COLOUR mask (type 3) has no geometry — its
-                       weight is a chroma-key on the pixel's own DISPLAY-space
-                       hue/saturation (see the colour-mask note below). Spatial
-                       (reads the pixel's uv and/or colour) -> like denoise/glow,
-                       NOT baked into the .cube LUT. compileEdit takes (u,v); the
-                       shader uses v_uv.)
+  -> LOCAL MASKS      (radial/linear/brush/colour/sky, up to 4; each applies
+                       local brightness/contrast/saturation/hue/warmth weighted
+                       by the mask, in LINEAR space here. Radial/linear/brush
+                       geometry is image-uv so masks stick to the subject through
+                       zoom/pan/rotation; a COLOUR mask (type 3) has no geometry —
+                       its weight is a chroma-key on the pixel's own DISPLAY-space
+                       hue/saturation; a SKY mask (type 4) also has no geometry —
+                       its weight is a BITMAP the sky heuristic generates once in
+                       JS and stores in `brush`, sampled through the exact same
+                       path as a painted brush mask (see the sky-mask note below).
+                       Spatial (reads the pixel's uv and/or colour) -> like
+                       denoise/glow, NOT baked into the .cube LUT. compileEdit
+                       takes (u,v); the shader uses v_uv.)
   -> CONTRAST         ((c-0.5)*k+0.5)
   -> GAMMA 2.2
   -> TONE CURVE       (five fixed-x control points blacks/shadows/midtones/
@@ -356,6 +359,16 @@ and NO Nikon body can channel-swap in camera. Field guide:
     copies. Never mutate a brush's `data` in place anywhere else. Paint mode
     intercepts single-pointer canvas drags (guards atop the canvas pointer
     handlers) and sets `tapSuppressed` so it never also fires tap-to-WB.
+    PARITY LESSON (2026-07-06, from the sky-mask harness): `sampleBrush` must
+    replicate the GPU's texture sampling EXACTLY — WebGL LINEAR samples at texel
+    coordinate `u*size - 0.5` (texel centres) with CLAMP_TO_EDGE, NOT `u*(size-1)`.
+    The two agree only at u=0.5, so at a soft mask edge under a strong local
+    adjustment the half-texel gap pushed a cluster of edge pixels to 16–32 LSB.
+    CLAMP_TO_EDGE also collapses BOTH bilinear taps to the border texel off the
+    edge — clamp each neighbour from the unclamped floor (clamping x0 then using
+    x0+1 wrongly reaches a second texel at the frame border, a 20-LSB error on
+    the top row). Brush masks mostly hid this (soft strokes); the sky's gaussian-
+    feathered edge exposed it. The fix is shared, so it tightened brush parity too.
   - **Colour masks** (type 3): a chroma-key with NO geometry — the weight comes
     from each pixel's own colour, not its position. `colorMaskWeight` projects
     the pixel and the tapped target onto the HSV **chroma plane** (hue angle ×
@@ -407,6 +420,56 @@ and NO Nikon body can channel-swap in camera. Field guide:
     hue×sat selectivity render, and a real UI flow — pick foliage on the canopy
     example → sky probes provably untouched, re-pick the sky while armed keeps
     the slider work and never fires tap-WB, undo fully unwinds.
+  - **Sky masks** (type 4): CLASSICAL sky detection, no ML (subject/background
+    segmentation genuinely needs on-device WebGPU ML and stays on the frontier
+    backlog — noted honestly, not attempted). The weight is a BITMAP the
+    heuristic (`sky.ts`) generates ONCE per image and stores in the same `brush`
+    field as a painted mask, so it rides the entire brush machinery for free —
+    packed brush texture on the GPU, `sampleBrush` on the CPU, copy-on-write +
+    `rev` undo equality, snapSig dropping `data`. Consequences: NO sky-specific
+    shader/CPU weight math (the shader change is one branch, `type==2 || type==4`),
+    GPU==CPU is automatic (both read the same baked bytes), and the bitmap MUST
+    be generated at the brush working size (BRUSH_MAX_EDGE=384) so it packs with
+    brush masks (all bitmap masks share one size). Connectivity — "sky touches
+    the top", flood down to the horizon, re-add sky through branches — CANNOT be
+    a per-pixel weight function, which is exactly why it lives in JS at
+    generation time, not in the twin pipeline.
+    THE HEURISTIC (scoped by measuring the real frames FIRST, 2026-07-06):
+    brightness is NOT a usable prior — in linear IR the sunlit foliage is the
+    brightest thing and lodge's sky is the DARKEST region in frame, so any
+    "sky is bright" rule fails. The signals that actually hold on canopy/lodge/
+    hillside: (1) SMOOTHNESS — sky luma-gradient ~0.004–0.03 vs 0.1–0.4 for
+    foliage (the strongest signal); (2) COLOUR COHERENCE — whatever the sky's
+    colour, it is one tight cluster, so the model is LEARNED from the seeds, never
+    assumed. Steps: work in an image-oriented grid at 384px on gray-world-WB ×
+    camera-matrix linear (AUTO WB, deliberately independent of the live edit so
+    the selection can't drift as you grade — the colour-mask lesson applied
+    preemptively); seed on the smooth pixels of the display-top band (only the
+    seed edge depends on rotation — adjacency and gradient are orientation-free,
+    so no resampling); learn the sky luma+chroma model ROBUSTLY (median + MAD,
+    reject outliers, refit — hillside's top edge mixes sky with dark twigs and the
+    dominant cluster must win); flood-fill down while a pixel stays near the model,
+    is continuous with its neighbour (lets slow vertical gradients pass) and does
+    not cross a hard edge (non-level horizons handled for free — no line fitting);
+    hole-fill enclosed pixels that match the model but sit no deeper than the sky
+    already reaches (sky through branches / around a horizon object — a bright
+    object like the lodge horse is a different cluster behind a hard edge, so it
+    is correctly EXCLUDED); gaussian-feather the bitmap. `Reach` (`m.reach`)
+    scales the grow tolerances, `Feather` (`m.feather`) the edge blur — BOTH
+    regenerate the bitmap (cheap at 384px; a feather change only rebuilds when it
+    actually moved, since the shared slider handler also fires for brightness/
+    sat/etc.). A ROTATION regenerates every sky mask (the display-top edge moved).
+    Seeds below a threshold → `found=false`, an all-zero (inert) bitmap and an
+    honest "No clear sky found" status pointing at Brush/Colour — never a fake
+    selection. No geometry overlay (like brush/colour). LIMITS (stated, not hidden):
+    hard-edged clouds are a second cluster the fill may stop at (Reach/brush are
+    the fallback — UNVERIFIED against real clouds, none in the examples); sky not
+    touching the top won't seed (by design); 384px softens fine twigs (same as
+    brush). Verified in headless chromium: GPU==CPU ≤1 LSB on canopy/lodge/
+    hillside across solo/inverted/(sky+radial)/(sky+colour+radial+brush)/strong-
+    adjust; rendered before→after proof (foliage untouched, treeline hugged,
+    holes filled); and a real add→grade→invert→undo UI flow (foliage Δ0, sky
+    strongly graded, invert flips the effect to the ground, undo restores exactly).
 - WB gain + exposure sliders are LOG-scale: the `<input>` stores a 0..1000
   position; `toPos`/`fromPos` in main.ts map it exponentially over
   0.02–16x (WB) / 0.1–16x (exposure) so 1.0 sits near mid-track. On a linear
