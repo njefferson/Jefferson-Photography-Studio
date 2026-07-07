@@ -269,7 +269,13 @@ async function stackSelect(frames: StackFrame[], longEdge: number, align: boolea
   // Detail-protect gradient thresholds (normalised 0..1 colour-gradient units):
   // below dpLo → fully smoothed guided depth (bokeh/rim stays clean), above dpHi
   // → fully crisp raw selection (finest petals stay sharp), smoothstep between.
-  const gd = guidedDepth(gr, gg, gb, depth, w, h, gRadius, 1e-4, sub, 0.10, 0.24);
+  // The per-pixel gradient at a given real edge is STEEPER at lower working res
+  // (the same edge spans fewer pixels), so a fixed threshold over-fires on the
+  // 2048 px preview and drags the argmax rim/grain back in — even though the
+  // native-res export is clean. Scale the thresholds inversely with res
+  // (calibrated at ~5.5k px long edge) so preview and export behave identically.
+  const dpk = 5568 / res;
+  const gd = guidedDepth(gr, gg, gb, depth, w, h, gRadius, 1e-4, sub, 0.10 * dpk, 0.24 * dpk);
   const idxF = new Int16Array(n);
   for (let i = 0; i < n; i++) { let v = Math.round(gd[i]); idxF[i] = v < 0 ? 0 : v > total - 1 ? total - 1 : v; }
 
