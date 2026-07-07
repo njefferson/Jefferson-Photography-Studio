@@ -59,8 +59,19 @@ body {
   position: relative; height: 52px; flex: 0 0 auto; border-radius: 6px; overflow: hidden;
   border: 1px solid #26262e; background: #17171c;
 }
+.filmstrip .thumb { cursor: pointer; transition: border-color .12s, opacity .12s; }
 .filmstrip .thumb img { height: 100%; display: block; }
 .filmstrip .thumb span { position: absolute; left: 3px; bottom: 2px; font-size: 0.62rem; color: #cfcfd6; text-shadow: 0 1px 2px #000; }
+/* Frame currently open in the viewer */
+.filmstrip .thumb.selected { border-color: #ff2e88; box-shadow: 0 0 0 1px #ff2e88; }
+/* Frame turned OFF (excluded from the stack) */
+.filmstrip .thumb.excluded img { opacity: 0.32; filter: grayscale(0.7); }
+.filmstrip .thumb.excluded::after {
+  content: ""; position: absolute; inset: 0;
+  background:
+    linear-gradient(to top left, transparent calc(50% - 1px), #ff5a5a calc(50% - 1px), #ff5a5a calc(50% + 1px), transparent calc(50% + 1px)),
+    linear-gradient(to bottom left, transparent calc(50% - 1px), #ff5a5a calc(50% - 1px), #ff5a5a calc(50% + 1px), transparent calc(50% + 1px));
+}
 
 .controls { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .controls button {

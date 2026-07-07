@@ -34,11 +34,60 @@ let frames: Frame[] = [];
 let result: ImageData | null = null;
 let compareImg: ImageData | null = null; // a single frame, for hold-to-compare
 
+// Filmstrip interaction: tap a frame to open it in the viewer (inspect focus);
+// tap the SAME frame again to turn it ON/OFF (exclude it from the stack). Tapping
+// a different frame just opens that one. Everything else works as before, on the
+// frames that are still ON.
+const thumbEls: HTMLDivElement[] = [];
+let shownFrameIdx: number | null = null;   // which raw frame is in the viewer (null = the stacked result)
+let shownFrameImg: ImageData | null = null; // its decoded pixels (so hold-to-compare can restore it)
+const excluded = new Set<number>();
+
+function activeFrames(): Frame[] {
+  return frames.filter((_, i) => !excluded.has(i));
+}
+function refreshThumbStates() {
+  thumbEls.forEach((el, i) => {
+    el.classList.toggle("selected", i === shownFrameIdx);
+    el.classList.toggle("excluded", excluded.has(i));
+  });
+}
+async function showFrame(i: number) {
+  shownFrameIdx = i;
+  refreshThumbStates();
+  viewHint.hidden = true;
+  // Status set synchronously so a quick follow-up toggle can't be overwritten
+  // by this decode finishing late.
+  const off = excluded.has(i);
+  status.textContent = `Frame ${i + 1} of ${frames.length}${off ? " — OFF" : ""}. Tap it again to turn ${off ? "on" : "off"}.`;
+  const img = await decodePreview(frames[i].blob);
+  if (shownFrameIdx !== i) return; // superseded by another tap mid-decode
+  shownFrameImg = img;
+  drawImageData(img);
+}
+async function onThumbTap(i: number) {
+  if (shownFrameIdx === i) {
+    // Second tap on the frame already open → toggle it in/out of the stack.
+    if (excluded.has(i)) excluded.delete(i); else excluded.add(i);
+    refreshThumbStates();
+    const on = activeFrames().length;
+    const off = excluded.has(i);
+    status.textContent = `Frame ${i + 1} turned ${off ? "off" : "on"} · ${on} frame${on === 1 ? "" : "s"} in the stack` +
+      (result ? " — tap Stack to update." : ".");
+  } else {
+    await showFrame(i);
+  }
+}
+
 function reset() {
   for (const f of frames) URL.revokeObjectURL(f.url);
   frames = [];
   result = null;
   compareImg = null;
+  thumbEls.length = 0;
+  excluded.clear();
+  shownFrameIdx = null;
+  shownFrameImg = null;
   filmstrip.replaceChildren();
   work.hidden = true;
   intake.hidden = false;
@@ -62,13 +111,14 @@ async function loadFiles(list: FileList | File[]) {
   intake.hidden = true;
   work.hidden = false;
   viewHint.hidden = false;
-  viewHint.textContent = "Tap Stack to combine the set.";
+  viewHint.textContent = "Tap Stack to combine the set. Tap a frame to inspect it; tap it again to turn it off.";
   await buildFilmstrip();
   status.textContent = `${frames.length} frames loaded.`;
 }
 
 async function buildFilmstrip() {
   filmstrip.replaceChildren();
+  thumbEls.length = 0;
   for (let i = 0; i < frames.length; i++) {
     const bmp = await createImageBitmap(frames[i].blob, { resizeHeight: 104, resizeQuality: "low" });
     const c = document.createElement("canvas");
@@ -77,13 +127,17 @@ async function buildFilmstrip() {
     bmp.close();
     const div = document.createElement("div");
     div.className = "thumb";
+    div.title = `Frame ${i + 1} — tap to view, tap again to turn off`;
     const img = document.createElement("img");
     img.src = c.toDataURL("image/jpeg", 0.7);
     const num = document.createElement("span");
     num.textContent = String(i + 1);
     div.append(img, num);
+    div.addEventListener("click", () => onThumbTap(i));
+    thumbEls.push(div);
     filmstrip.append(div);
   }
+  refreshThumbStates();
 }
 
 function drawImageData(img: ImageData) {
@@ -93,14 +147,19 @@ function drawImageData(img: ImageData) {
 }
 
 async function runStack() {
-  if (!frames.length) return;
+  const active = activeFrames();
+  if (active.length < 2) {
+    status.textContent = "Keep at least two frames on to stack.";
+    return;
+  }
   stackBtn.disabled = true;
   resetBtn.disabled = true;
   progress.hidden = false;
   viewHint.hidden = true;
+  shownFrameIdx = null; shownFrameImg = null; refreshThumbStates();
   const t0 = performance.now();
   try {
-    const res = await stackFocus(frames, {
+    const res = await stackFocus(active, {
       longEdge: PREVIEW_LONG_EDGE,
       align: true,
       onProgress: (done, total, phase) => {
@@ -113,12 +172,13 @@ async function runStack() {
     drawImageData(result);
     const moved = res.shifts.filter((s) => s.dx || s.dy).length;
     const secs = ((performance.now() - t0) / 1000).toFixed(1);
-    status.textContent = `Stacked ${frames.length} frames in ${secs}s` + (moved ? ` · aligned ${moved} frame${moved > 1 ? "s" : ""}.` : " · no alignment needed.");
+    const off = excluded.size;
+    status.textContent = `Stacked ${active.length} frames in ${secs}s` + (off ? ` (${off} off)` : "") + (moved ? ` · aligned ${moved} frame${moved > 1 ? "s" : ""}.` : " · no alignment needed.");
     compareBtn.hidden = false;
     saveBtn.hidden = false;
     markSaveNeedsRender(); // a new stack invalidates any prior full-res render
-    // Decode one frame for hold-to-compare (the first = front-focus).
-    compareImg = await decodePreview(frames[0].blob);
+    // Decode one frame for hold-to-compare (the first ON frame = front-focus).
+    compareImg = await decodePreview(active[0].blob);
   } catch (err) {
     status.textContent = "Could not stack this set: " + (err as Error).message;
   } finally {
@@ -144,7 +204,8 @@ async function decodePreview(blob: Blob): Promise<ImageData> {
 // Hold the button (or the image) to see a single frame vs. the stacked result.
 function showCompare(on: boolean) {
   if (!result) return;
-  drawImageData(on && compareImg ? compareImg : result);
+  // On release, restore whatever was on screen — an inspected frame or the result.
+  drawImageData(on && compareImg ? compareImg : (shownFrameImg ?? result));
 }
 for (const ev of ["pointerdown"] as const) {
   compareBtn.addEventListener(ev, (e) => { e.preventDefault(); showCompare(true); });
@@ -210,7 +271,7 @@ function renderFullRes(): Promise<void> {
       markSaveNeedsRender();
       finish();
     };
-    worker.postMessage({ frames: frames.map((f) => ({ blob: f.blob, name: f.name })), opts: { align: true } });
+    worker.postMessage({ frames: activeFrames().map((f) => ({ blob: f.blob, name: f.name })), opts: { align: true } });
   });
 }
 
