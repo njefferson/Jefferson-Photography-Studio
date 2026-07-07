@@ -127,7 +127,7 @@ function focusMeasure(data: Uint8ClampedArray, w: number, h: number, r: number):
  * FULL-RES guidance — so the output edges stay full-res crisp. Guidance is
  * 0..255 bytes; `eps` is in normalised (0..1)² units.
  */
-function guidedDepth(gr: Uint8Array, gg: Uint8Array, gb: Uint8Array, p: Float32Array, w: number, h: number, radius: number, eps: number, s: number): Float32Array {
+function guidedDepth(gr: Uint8Array, gg: Uint8Array, gb: Uint8Array, p: Float32Array, w: number, h: number, radius: number, eps: number, s: number, dpLo: number, dpHi: number): Float32Array {
   const lw = Math.max(1, Math.ceil(w / s)), lh = Math.max(1, Math.ceil(h / s)), ln = lw * lh;
   const lr = new Float32Array(ln), lg = new Float32Array(ln), lb = new Float32Array(ln), lp = new Float32Array(ln), cnt = new Float32Array(ln);
   // box-average downsample guidance (→0..1) and depth
@@ -159,7 +159,14 @@ function guidedDepth(gr: Uint8Array, gg: Uint8Array, gb: Uint8Array, p: Float32A
     bB[i] = mp[i] - aR[i] * mr[i] - aG[i] * mg[i] - aB[i] * mb[i];
   }
   const maR = bm(aR), maG = bm(aG), maB = bm(aB), mbB = bm(bB);
-  // apply at full res with bilinear-sampled coefficients + full-res guidance
+  // apply at full res with bilinear-sampled coefficients + full-res guidance.
+  // DETAIL-PROTECT: where the full-res guidance has genuine local structure (a
+  // real petal edge / texture — high per-pixel colour gradient), snap the depth
+  // back to the crisp raw selection `p`; only in flat regions (bokeh, blown
+  // background, and the thin ring of background just outside a petal — all low
+  // gradient) does the smoothed guided depth win. A per-pixel (unblurred)
+  // gradient separates a petal surface from the flat background one step outside
+  // it, so the finest petals stay sharp while the rim stays clean.
   const out = new Float32Array(w * h);
   const samp = (arr: Float32Array, fx: number, fy: number) => {
     const x0 = Math.min(lw - 1, Math.max(0, fx | 0)), y0 = Math.min(lh - 1, Math.max(0, fy | 0));
@@ -172,7 +179,14 @@ function guidedDepth(gr: Uint8Array, gg: Uint8Array, gb: Uint8Array, p: Float32A
     const fy = (y + 0.5) / s - 0.5;
     for (let x = 0; x < w; x++) {
       const fx = (x + 0.5) / s - 0.5, i = y * w + x;
-      out[i] = samp(maR, fx, fy) * (gr[i] / 255) + samp(maG, fx, fy) * (gg[i] / 255) + samp(maB, fx, fy) * (gb[i] / 255) + samp(mbB, fx, fy);
+      let g = samp(maR, fx, fy) * (gr[i] / 255) + samp(maG, fx, fy) * (gg[i] / 255) + samp(maB, fx, fy) * (gb[i] / 255) + samp(mbB, fx, fy);
+      if (x > 0 && x < w - 1 && y > 0 && y < h - 1) {
+        const grad = (Math.abs(gr[i + 1] - gr[i - 1]) + Math.abs(gg[i + 1] - gg[i - 1]) + Math.abs(gb[i + 1] - gb[i - 1]) +
+          Math.abs(gr[i + w] - gr[i - w]) + Math.abs(gg[i + w] - gg[i - w]) + Math.abs(gb[i + w] - gb[i - w])) / 255;
+        let t = (grad - dpLo) / (dpHi - dpLo); t = t < 0 ? 0 : t > 1 ? 1 : t; t = t * t * (3 - 2 * t);
+        g = p[i] * t + g * (1 - t);
+      }
+      out[i] = g;
     }
   }
   return out;
@@ -252,7 +266,10 @@ async function stackSelect(frames: StackFrame[], longEdge: number, align: boolea
   for (let i = 0; i < n; i++) depth[i] = idx[i];
   const gRadius = Math.max(6, Math.round(res / 200));
   const sub = Math.max(2, Math.round(res / 900));
-  const gd = guidedDepth(gr, gg, gb, depth, w, h, gRadius, 1e-4, sub);
+  // Detail-protect gradient thresholds (normalised 0..1 colour-gradient units):
+  // below dpLo → fully smoothed guided depth (bokeh/rim stays clean), above dpHi
+  // → fully crisp raw selection (finest petals stay sharp), smoothstep between.
+  const gd = guidedDepth(gr, gg, gb, depth, w, h, gRadius, 1e-4, sub, 0.10, 0.24);
   const idxF = new Int16Array(n);
   for (let i = 0; i < n; i++) { let v = Math.round(gd[i]); idxF[i] = v < 0 ? 0 : v > total - 1 ? total - 1 : v; }
 
