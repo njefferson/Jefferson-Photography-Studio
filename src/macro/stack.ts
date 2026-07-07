@@ -97,22 +97,85 @@ function estimateShift(ref: Float32Array, L: Float32Array, w: number, h: number)
   return [Math.round(best[0] / s), Math.round(best[1] / s)];
 }
 
-/** Modified-Laplacian focus measure, box-blurred by `r` so the selection is
- *  coherent before the mode filter. `r` scales with resolution (see stackSelect)
- *  so preview and full-res smooth the measure by the same image fraction — vital
- *  in flat bokeh, where too small an `r` leaves the measure noisy and the
- *  selection picks frames at random, printing the frames' subtle bokeh
- *  differences as speckle. */
-function focusMeasure(L: Float32Array, w: number, h: number, r: number): Float32Array {
+/** Modified-Laplacian focus measure over all THREE channels, box-blurred by `r`.
+ *  Per-channel (not luma) because a saturated subject over a bright background —
+ *  a magenta petal on blown cream — has strong CHROMATIC edges but weak LUMA
+ *  contrast, so a luma-only measure under-reads the subject. */
+function focusMeasure(data: Uint8ClampedArray, w: number, h: number, r: number): Float32Array {
   const e = new Float32Array(w * h);
   for (let y = 1; y < h - 1; y++) {
     for (let x = 1; x < w - 1; x++) {
-      const i = y * w + x;
-      const v = 4 * L[i] - L[i - 1] - L[i + 1] - L[i - w] - L[i + w];
-      e[i] = v * v;
+      const i = y * w + x, p = i * 4;
+      const lr = 4 * data[p] - data[p - 4] - data[p + 4] - data[p - w * 4] - data[p + w * 4];
+      const lg = 4 * data[p + 1] - data[p - 3] - data[p + 5] - data[p - w * 4 + 1] - data[p + w * 4 + 1];
+      const lb = 4 * data[p + 2] - data[p - 2] - data[p + 6] - data[p - w * 4 + 2] - data[p + w * 4 + 2];
+      e[i] = lr * lr + lg * lg + lb * lb;
     }
   }
   return boxBlur(e, w, h, r);
+}
+
+/**
+ * COLOR guided filter of a depth/selection map `p`, guided by the stacked RGB
+ * image, so the depth's transitions snap to real image edges (in ANY channel —
+ * the magenta/green chroma edges a luma guide misses). This is what kills the
+ * bright "cut-out" rim: the sharp-frame selection can no longer bleed a few px
+ * past the true petal edge (field fix IMG_5958, 2026-07-07).
+ *
+ * FAST guided filter (He & Sun 2015): the coefficients a,b are solved on a
+ * SUBSAMPLED image (cheap + memory-safe at 20 MP), then applied with the
+ * FULL-RES guidance — so the output edges stay full-res crisp. Guidance is
+ * 0..255 bytes; `eps` is in normalised (0..1)² units.
+ */
+function guidedDepth(gr: Uint8Array, gg: Uint8Array, gb: Uint8Array, p: Float32Array, w: number, h: number, radius: number, eps: number, s: number): Float32Array {
+  const lw = Math.max(1, Math.ceil(w / s)), lh = Math.max(1, Math.ceil(h / s)), ln = lw * lh;
+  const lr = new Float32Array(ln), lg = new Float32Array(ln), lb = new Float32Array(ln), lp = new Float32Array(ln), cnt = new Float32Array(ln);
+  // box-average downsample guidance (→0..1) and depth
+  for (let y = 0; y < h; y++) {
+    const ly = Math.min(lh - 1, (y / s) | 0);
+    for (let x = 0; x < w; x++) {
+      const lx = Math.min(lw - 1, (x / s) | 0), li = ly * lw + lx, i = y * w + x;
+      lr[li] += gr[i] / 255; lg[li] += gg[i] / 255; lb[li] += gb[i] / 255; lp[li] += p[i]; cnt[li]++;
+    }
+  }
+  for (let i = 0; i < ln; i++) { const c = cnt[i] || 1; lr[i] /= c; lg[i] /= c; lb[i] /= c; lp[i] /= c; }
+  const rl = Math.max(1, Math.round(radius / s));
+  const bm = (a: Float32Array) => boxBlur(a, lw, lh, rl);
+  const mr = bm(lr), mg = bm(lg), mb = bm(lb), mp = bm(lp);
+  const mul = (a: Float32Array, b: Float32Array) => { const t = new Float32Array(ln); for (let i = 0; i < ln; i++) t[i] = a[i] * b[i]; return bm(t); };
+  const crp = mul(lr, lp), cgp = mul(lg, lp), cbp = mul(lb, lp);
+  const vrr = mul(lr, lr), vrg = mul(lr, lg), vrb = mul(lr, lb), vgg = mul(lg, lg), vgb = mul(lg, lb), vbb = mul(lb, lb);
+  const aR = new Float32Array(ln), aG = new Float32Array(ln), aB = new Float32Array(ln), bB = new Float32Array(ln);
+  for (let i = 0; i < ln; i++) {
+    const covr = crp[i] - mr[i] * mp[i], covg = cgp[i] - mg[i] * mp[i], covb = cbp[i] - mb[i] * mp[i];
+    const a = vrr[i] - mr[i] * mr[i] + eps, b = vrg[i] - mr[i] * mg[i], c = vrb[i] - mr[i] * mb[i];
+    const d = vgg[i] - mg[i] * mg[i] + eps, e = vgb[i] - mg[i] * mb[i], f = vbb[i] - mb[i] * mb[i] + eps;
+    const A = d * f - e * e, B = c * e - b * f, C = b * e - c * d, D = a * f - c * c, E = b * c - a * e, Ff = a * d - b * b;
+    let det = a * A + b * B + c * C; if (det > -1e-12 && det < 1e-12) det = 1e-12;
+    const id = 1 / det;
+    aR[i] = (A * covr + B * covg + C * covb) * id;
+    aG[i] = (B * covr + D * covg + E * covb) * id;
+    aB[i] = (C * covr + E * covg + Ff * covb) * id;
+    bB[i] = mp[i] - aR[i] * mr[i] - aG[i] * mg[i] - aB[i] * mb[i];
+  }
+  const maR = bm(aR), maG = bm(aG), maB = bm(aB), mbB = bm(bB);
+  // apply at full res with bilinear-sampled coefficients + full-res guidance
+  const out = new Float32Array(w * h);
+  const samp = (arr: Float32Array, fx: number, fy: number) => {
+    const x0 = Math.min(lw - 1, Math.max(0, fx | 0)), y0 = Math.min(lh - 1, Math.max(0, fy | 0));
+    const x1 = Math.min(lw - 1, x0 + 1), y1 = Math.min(lh - 1, y0 + 1);
+    const tx = fx - (fx | 0), ty = fy - (fy | 0);
+    const a = arr[y0 * lw + x0], b = arr[y0 * lw + x1], c = arr[y1 * lw + x0], d = arr[y1 * lw + x1];
+    return (a * (1 - tx) + b * tx) * (1 - ty) + (c * (1 - tx) + d * tx) * ty;
+  };
+  for (let y = 0; y < h; y++) {
+    const fy = (y + 0.5) / s - 0.5;
+    for (let x = 0; x < w; x++) {
+      const fx = (x + 0.5) / s - 0.5, i = y * w + x;
+      out[i] = samp(maR, fx, fy) * (gr[i] / 255) + samp(maG, fx, fy) * (gg[i] / 255) + samp(maB, fx, fy) * (gb[i] / 255) + samp(mbB, fx, fy);
+    }
+  }
+  return out;
 }
 
 function boxBlur(src: Float32Array, w: number, h: number, r: number): Float32Array {
@@ -122,31 +185,6 @@ function boxBlur(src: Float32Array, w: number, h: number, r: number): Float32Arr
   for (let y = 0; y < h; y++) { let s = 0; for (let x = -r; x <= r; x++) s += src[y * w + Math.min(w - 1, Math.max(0, x))]; for (let x = 0; x < w; x++) { tmp[y * w + x] = s * inv; s += src[y * w + Math.min(w - 1, x + r + 1)] - src[y * w + Math.max(0, x - r)]; } }
   const out = new Float32Array(w * h);
   for (let x = 0; x < w; x++) { let s = 0; for (let y = -r; y <= r; y++) s += tmp[Math.min(h - 1, Math.max(0, y)) * w + x]; for (let y = 0; y < h; y++) { out[y * w + x] = s * inv; s += tmp[Math.min(h - 1, y + r + 1) * w + x] - tmp[Math.max(0, y - r) * w + x]; } }
-  return out;
-}
-
-/** Majority-vote (mode) filter of a selection-index map over a (2r+1)² window —
- *  erases isolated selection flips (the grain) while region boundaries survive.
- *  nFrames is small, so a per-pixel count array is cheap. */
-function modeFilter(idx: Int16Array, w: number, h: number, nFrames: number, r: number): Int16Array {
-  if (r < 1) return idx;
-  const out = new Int16Array(w * h);
-  const cnt = new Int32Array(nFrames);
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      cnt.fill(0);
-      let best = idx[y * w + x], bc = 0;
-      for (let dy = -r; dy <= r; dy++) {
-        const yy = Math.min(h - 1, Math.max(0, y + dy)) * w;
-        for (let dx = -r; dx <= r; dx++) {
-          const v = idx[yy + Math.min(w - 1, Math.max(0, x + dx))];
-          const c = ++cnt[v];
-          if (c > bc) { bc = c; best = v; }
-        }
-      }
-      out[y * w + x] = best;
-    }
-  }
   return out;
 }
 
@@ -171,14 +209,17 @@ async function stackSelect(frames: StackFrame[], longEdge: number, align: boolea
 
   const bestE = new Float32Array(n);
   const idx = new Int16Array(n);
+  // Running argmax-stack RGB = the guidance image for the guided filter (built
+  // free during pass 1, no extra decode). Bytes to keep it light at 20 MP.
+  const gr = new Uint8Array(n), gg = new Uint8Array(n), gb = new Uint8Array(n);
   const shifts: { name: string; dx: number; dy: number }[] = [];
   const kept: (Uint8ClampedArray | null)[] = hold ? [] : [];
-  // Smoothing scaled to the ACTUAL resolution (not the longEdge cap), so the
-  // selection field has the same coherence at preview and full-res.
   const res = Math.max(w, h);
-  const fmR = Math.max(3, Math.round((4 * res) / 2048));
+  // Measure smoothing scaled to resolution; kept modest so edges stay tight (the
+  // guided filter, not this blur, does the spatial coherence).
+  const fmR = Math.max(2, Math.round(res / 1600));
 
-  // Pass 1: selection map (+ keep frames when hold).
+  // Pass 1: selection map + guidance (+ keep frames when hold).
   for (let f = 0; f < total; f++) {
     onProgress?.(step++, steps, "analysing");
     const img = f === 0 ? first : await decodeAt(frames[f].blob, longEdge);
@@ -186,21 +227,34 @@ async function stackSelect(frames: StackFrame[], longEdge: number, align: boolea
     const [dx, dy] = f === 0 || !align ? [0, 0] : estimateShift(refL, luma(img.data, n), w, h);
     shifts.push({ name: frames[f].name, dx, dy });
     if (hold) kept.push(img.data);
-    const E = focusMeasure(luma(img.data, n), w, h, fmR);
+    const E = focusMeasure(img.data, w, h, fmR);
+    const d = img.data;
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         const o = y * w + x;
         const sx = Math.min(w - 1, Math.max(0, x + dx));
         const sy = Math.min(h - 1, Math.max(0, y + dy));
         const e = E[sy * w + sx];
-        if (f === 0 || e > bestE[o]) { bestE[o] = e; idx[o] = f; }
+        if (f === 0 || e > bestE[o]) {
+          bestE[o] = e; idx[o] = f;
+          const si = (sy * w + sx) * 4;
+          gr[o] = d[si]; gg[o] = d[si + 1]; gb[o] = d[si + 2];
+        }
       }
     }
   }
 
+  // Refine the selection with a COLOR guided filter: snaps depth transitions to
+  // real image edges so the sharp-frame selection can't bleed past a petal edge
+  // (no bright rim), while keeping the subject crisp.
   onProgress?.(step++, steps, "cleaning");
-  const r = Math.max(2, Math.min(8, Math.round((2 * res) / 2048)));
-  const idxF = modeFilter(idx, w, h, total, r);
+  const depth = new Float32Array(n);
+  for (let i = 0; i < n; i++) depth[i] = idx[i];
+  const gRadius = Math.max(6, Math.round(res / 200));
+  const sub = Math.max(2, Math.round(res / 900));
+  const gd = guidedDepth(gr, gg, gb, depth, w, h, gRadius, 1e-4, sub);
+  const idxF = new Int16Array(n);
+  for (let i = 0; i < n; i++) { let v = Math.round(gd[i]); idxF[i] = v < 0 ? 0 : v > total - 1 ? total - 1 : v; }
 
   // Pass 2: gather the selected pixels (from kept frames, or re-decode).
   const out = new ImageData(w, h);

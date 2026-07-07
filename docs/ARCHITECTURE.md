@@ -507,16 +507,26 @@ was reached by elimination (all measured on the real set / IMG_0934, 2026-07-06)
   bands OVERSHOOTS at strong edges, so thin petals over a blown background got
   bright halos (the bug Noah caught). ABANDONED; the pyramid module is gone.
 
-The keeper: per pixel, pick the frame with the highest (smoothed) focus measure
-→ a SELECTION MAP; MODE-FILTER that map (majority vote in a small window) to
-erase the isolated flips that were the grain; then GATHER the actual pixels from
-the chosen frames. Selecting whole pixels can't overshoot (no halos) and never
-averages (no veil); mode-filtering the map removes grain without softening (a
-mode filter preserves regions/edges). CRITICAL SCALING: the focus-measure blur
-AND the mode window scale with the ACTUAL resolution — at full res an unscaled
-(too-small) blur leaves the measure noisy in flat bokeh, so the selection picks
-frames at random and prints their subtle bokeh differences as SPECKLE (field
-bug, first full-res export). `fmR = 4·res/2048`, mode `r = 2·res/2048` (capped).
+A fourth try, per-pixel argmax + MODE-FILTER of the selection map, was sharp and
+grain-free but left a bright "cut-out" RIM on thin petals over the blown
+background (field bug IMG_5958): a box-blurred focus measure bleeds a strong
+edge's high value a few px OUTWARD, so the sharp frame gets selected just past
+the true edge and its crisp bright background prints a rim.
+
+The keeper — a COLOR GUIDED-FILTER DEPTH MAP (the DMap family): per pixel pick
+the sharpest frame → a selection/DEPTH map; refine it with a **guided filter
+whose guidance is the stacked RGB image** (`guidedDepth` in stack.ts), so the
+depth's transitions SNAP to real image edges and the selection can no longer
+bleed past a petal edge (rim gone) — while smoothing away the grain. Guidance is
+COLOUR, not luma: a magenta petal on cream has strong chroma edges but weak luma
+contrast, so a luma guide would soften the petals (measured — luma-guided read
+0.66× as sharp; colour-guided read SHARPER than the raw argmax). The focus
+measure is likewise per-channel R²+G²+B² Laplacian. Implementation is the FAST
+guided filter (He & Sun 2015): coefficients solved on a subsampled image (cheap
++ memory-safe at 20 MP), applied with the FULL-RES guidance so output edges stay
+crisp. The guidance is the running argmax stack, built free during pass 1 (no
+extra decode). Verified full-res on the real set: no rim (high-mag petal-edge
+crop), subject sharper than the argmax baseline, smooth bokeh, ~34 s, no OOM.
 - MEMORY: selection + gather are per-pixel (+ a tiny window), NOT spatial like a
   pyramid — so NO tiling even at full 20 MP. Two streaming passes over the
   frames (one decoded at a time); only whole-image index/energy maps (a few

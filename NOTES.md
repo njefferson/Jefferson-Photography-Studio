@@ -258,11 +258,16 @@ Second discipline:
   the ~7 KB stacking engine never loads for IR users and the 100 KB IR editor
   never loads for macro users) and a working JPEG stacker — streaming, memory-
   safe (peak RAM independent of frame count) with coarse translation align.
-  ENGINE = DEPTH-MAP SELECTION: per pixel pick the sharpest frame, mode-filter
-  the selection map to kill grain, gather whole pixels — can't halo (no band
-  mixing) or veil (no averaging). This replaced an earlier Laplacian-pyramid
-  blend that RANG at strong edges (bright halos on thin petals over the blown
-  background — Noah caught it in a full-res export, IMG_0934). Full-resolution
+  ENGINE = COLOUR GUIDED-FILTER DEPTH MAP: per pixel pick the sharpest frame
+  (per-channel RGB focus measure), then refine the selection with a guided filter
+  guided by the stacked COLOUR image so depth transitions snap to real petal
+  edges — gather whole pixels. Can't halo (no band mixing) or veil (no
+  averaging), and — unlike a plain mode-filter selection — no bright "cut-out"
+  RIM on thin petals over the blown background (Noah caught the rim in IMG_5958;
+  the mode-filter's box-blurred measure bled the selection past the edge). Colour
+  guidance is essential: luma guidance softens the magenta petals. Fast guided
+  filter (subsampled coeffs, full-res guidance) keeps it memory-safe at 20 MP.
+  Earlier dead ends on file: soft mean (veil), Laplacian pyramid (halos, IMG_0934). Full-resolution
   export SHIPPED and simplified: same per-pixel method at native 20 MP, two
   memory-bounded streaming passes, NO tiling (so no seams), in a Web Worker
   (`export.worker.ts`, UI stays responsive), two-phase Save for the iOS fresh-tap
