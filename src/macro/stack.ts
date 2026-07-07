@@ -249,7 +249,16 @@ async function stackSelect(frames: StackFrame[], longEdge: number, align: boolea
         const sy = Math.min(h - 1, Math.max(0, y + dy));
         const si = (sy * w + sx) * 4;
         sumR[o] += d[si]; sumG[o] += d[si + 1]; sumB[o] += d[si + 2];
-        const e = E[sy * w + sx];
+        // FLASH CLIP GUARD: a clipped/blown highlight (common with flash — some
+        // region is blown in nearly every frame) reads as a fake sharp EDGE to
+        // the modified-Laplacian (hard transition to 255), so argmax kept
+        // crediting whichever frame's clip boundary happened to land on this
+        // pixel — baking in streaky white slivers. Discount this frame's focus
+        // measure here by how clipped ITS OWN pixel is, so a frame with real
+        // (unclipped) data at this location wins instead, when one exists.
+        const clipT = 246, mx = Math.max(d[si], d[si + 1], d[si + 2]);
+        const cf = mx <= clipT ? 1 : Math.max(0, 1 - ((mx - clipT) / (255 - clipT)) ** 2);
+        const e = E[sy * w + sx] * cf;
         if (f === 0 || e > bestE[o]) {
           bestE[o] = e; idx[o] = f;
           gr[o] = d[si]; gg[o] = d[si + 1]; gb[o] = d[si + 2];
