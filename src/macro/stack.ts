@@ -2,27 +2,35 @@
 // one image that is sharp everywhere the stack had focus, leaving the bokeh
 // smooth. Classical DSP, no ML.
 //
-// METHOD — depth-map selection (the "PMax/DMap" family), reached after three
-// tries measured on real frames (2026-07-06):
-//   1. soft weighted MEAN — veiled the subject (the 10 defocused frames leak in).
-//   2. hard per-pixel ARGMAX — sharp, but grainy: on low-texture surfaces the
-//      focus measure is ~equal across frames, so the winner flickers per pixel.
-//   3. Laplacian-PYRAMID band merge — killed the grain but RANG: mixing bands
-//      overshoots at strong edges, so thin petals over a blown background got
-//      bright halos (field bug IMG_0934).
-// This one: pick, per pixel, the frame with the highest (smoothed) focus measure
-// — a SELECTION MAP — then MODE-FILTER that map (majority vote in a small window)
-// to erase the isolated flips that caused the grain, then GATHER the actual
-// pixels from the chosen frames. Selecting whole pixels can't overshoot (no
-// halos) and never averages (no veil); mode-filtering the map removes the grain
-// without softening detail (edges/regions survive a mode filter). Bokeh, where
-// every measure is ~0, resolves to a near-constant frame and stays smooth.
+// METHOD — depth-map selection (the "DMap" family) refined for high-contrast
+// backlit subjects, reached after several tries measured on real frames
+// (2026-07-06/07). Earlier attempts and why they failed: soft weighted MEAN
+// veiled the subject; hard per-pixel ARGMAX was grainy on low-texture surfaces;
+// a Laplacian-PYRAMID band merge rang into bright halos on thin petals; a raw
+// COLOUR GUIDED-FILTER selection map still printed a bright "cut-out" rim and
+// (with a detail-protect step) posterised the background.
 //
-// MEMORY: selection + gather are per-pixel (+ a tiny window), NOT spatial like a
-// pyramid — so NO tiling is needed even at full 20 MP. Two streaming passes over
-// the frames, one frame decoded at a time; only whole-image index/energy maps
-// (a few bytes/px) and the output stay resident. Peak RAM is independent of
-// frame count.
+// The pipeline now:
+//   1. Per-pixel focus measure (RGB modified-Laplacian) → running ARGMAX gives
+//      a selection map + a free argmax-stack guidance image; a running frame
+//      AVERAGE is accumulated in the same pass.
+//   2. A fast COLOUR guided filter refines the selection so its transitions
+//      snap to real image edges (no bleed past a petal edge).
+//   3. A CONFIDENCE weight (from the smoothed focus measure) gathers the crisp
+//      selected pixel where there is real focus signal (the subject) and fades
+//      to the frame AVERAGE where there is none (out-of-focus background). The
+//      average is halo-free and constant, so the boundary can't print a bright
+//      rim or per-frame bloom contours.
+//   4. On real edges only, a DE-HALO pulls down transient bright overshoot and
+//      a DE-FRINGE desaturates the warm/cool longitudinal-CA colour fringe.
+// LIMIT: a strongly backlit, high-contrast, high-CA edge (magenta on a blown
+// highlight) still leaves a faint soft rim — the automatic sharp-vs-clean floor;
+// that specific case wants a manual retouch brush (desktop stacker territory).
+//
+// MEMORY: per-pixel throughout (no spatial pyramid), so NO tiling even at 20 MP.
+// Two streaming passes, one frame decoded at a time; only whole-image maps
+// (index / focus / Uint16 sums / output) stay resident. Peak RAM is independent
+// of frame count.
 //
 // Alignment: coarse integer translation per frame vs frame 0 (SSD on downsampled
 // luma). Rotation / breathing-scale deferred until a set needs them.
@@ -127,7 +135,7 @@ function focusMeasure(data: Uint8ClampedArray, w: number, h: number, r: number):
  * FULL-RES guidance — so the output edges stay full-res crisp. Guidance is
  * 0..255 bytes; `eps` is in normalised (0..1)² units.
  */
-function guidedDepth(gr: Uint8Array, gg: Uint8Array, gb: Uint8Array, p: Float32Array, w: number, h: number, radius: number, eps: number, s: number, dpLo: number, dpHi: number): Float32Array {
+function guidedDepth(gr: Uint8Array, gg: Uint8Array, gb: Uint8Array, p: Float32Array, w: number, h: number, radius: number, eps: number, s: number): Float32Array {
   const lw = Math.max(1, Math.ceil(w / s)), lh = Math.max(1, Math.ceil(h / s)), ln = lw * lh;
   const lr = new Float32Array(ln), lg = new Float32Array(ln), lb = new Float32Array(ln), lp = new Float32Array(ln), cnt = new Float32Array(ln);
   // box-average downsample guidance (→0..1) and depth
@@ -159,14 +167,7 @@ function guidedDepth(gr: Uint8Array, gg: Uint8Array, gb: Uint8Array, p: Float32A
     bB[i] = mp[i] - aR[i] * mr[i] - aG[i] * mg[i] - aB[i] * mb[i];
   }
   const maR = bm(aR), maG = bm(aG), maB = bm(aB), mbB = bm(bB);
-  // apply at full res with bilinear-sampled coefficients + full-res guidance.
-  // DETAIL-PROTECT: where the full-res guidance has genuine local structure (a
-  // real petal edge / texture — high per-pixel colour gradient), snap the depth
-  // back to the crisp raw selection `p`; only in flat regions (bokeh, blown
-  // background, and the thin ring of background just outside a petal — all low
-  // gradient) does the smoothed guided depth win. A per-pixel (unblurred)
-  // gradient separates a petal surface from the flat background one step outside
-  // it, so the finest petals stay sharp while the rim stays clean.
+  // apply at full res with bilinear-sampled coefficients + full-res guidance
   const out = new Float32Array(w * h);
   const samp = (arr: Float32Array, fx: number, fy: number) => {
     const x0 = Math.min(lw - 1, Math.max(0, fx | 0)), y0 = Math.min(lh - 1, Math.max(0, fy | 0));
@@ -179,14 +180,7 @@ function guidedDepth(gr: Uint8Array, gg: Uint8Array, gb: Uint8Array, p: Float32A
     const fy = (y + 0.5) / s - 0.5;
     for (let x = 0; x < w; x++) {
       const fx = (x + 0.5) / s - 0.5, i = y * w + x;
-      let g = samp(maR, fx, fy) * (gr[i] / 255) + samp(maG, fx, fy) * (gg[i] / 255) + samp(maB, fx, fy) * (gb[i] / 255) + samp(mbB, fx, fy);
-      if (x > 0 && x < w - 1 && y > 0 && y < h - 1) {
-        const grad = (Math.abs(gr[i + 1] - gr[i - 1]) + Math.abs(gg[i + 1] - gg[i - 1]) + Math.abs(gb[i + 1] - gb[i - 1]) +
-          Math.abs(gr[i + w] - gr[i - w]) + Math.abs(gg[i + w] - gg[i - w]) + Math.abs(gb[i + w] - gb[i - w])) / 255;
-        let t = (grad - dpLo) / (dpHi - dpLo); t = t < 0 ? 0 : t > 1 ? 1 : t; t = t * t * (3 - 2 * t);
-        g = p[i] * t + g * (1 - t);
-      }
-      out[i] = g;
+      out[i] = samp(maR, fx, fy) * (gr[i] / 255) + samp(maG, fx, fy) * (gg[i] / 255) + samp(maB, fx, fy) * (gb[i] / 255) + samp(mbB, fx, fy);
     }
   }
   return out;
@@ -226,6 +220,11 @@ async function stackSelect(frames: StackFrame[], longEdge: number, align: boolea
   // Running argmax-stack RGB = the guidance image for the guided filter (built
   // free during pass 1, no extra decode). Bytes to keep it light at 20 MP.
   const gr = new Uint8Array(n), gg = new Uint8Array(n), gb = new Uint8Array(n);
+  // Running SUM of every (aligned) frame → the frame AVERAGE, used to dissolve
+  // the out-of-focus background to a stable mean (kills the selection rim + the
+  // per-frame bloom contours). Uint16 keeps it memory-light at 20 MP; 255·N
+  // stays exact up to N=257 frames, far beyond any real macro stack.
+  const sumR = new Uint16Array(n), sumG = new Uint16Array(n), sumB = new Uint16Array(n);
   const shifts: { name: string; dx: number; dy: number }[] = [];
   const kept: (Uint8ClampedArray | null)[] = hold ? [] : [];
   const res = Math.max(w, h);
@@ -248,10 +247,11 @@ async function stackSelect(frames: StackFrame[], longEdge: number, align: boolea
         const o = y * w + x;
         const sx = Math.min(w - 1, Math.max(0, x + dx));
         const sy = Math.min(h - 1, Math.max(0, y + dy));
+        const si = (sy * w + sx) * 4;
+        sumR[o] += d[si]; sumG[o] += d[si + 1]; sumB[o] += d[si + 2];
         const e = E[sy * w + sx];
         if (f === 0 || e > bestE[o]) {
           bestE[o] = e; idx[o] = f;
-          const si = (sy * w + sx) * 4;
           gr[o] = d[si]; gg[o] = d[si + 1]; gb[o] = d[si + 2];
         }
       }
@@ -266,18 +266,31 @@ async function stackSelect(frames: StackFrame[], longEdge: number, align: boolea
   for (let i = 0; i < n; i++) depth[i] = idx[i];
   const gRadius = Math.max(6, Math.round(res / 200));
   const sub = Math.max(2, Math.round(res / 900));
-  // Detail-protect gradient thresholds (normalised 0..1 colour-gradient units):
-  // below dpLo → fully smoothed guided depth (bokeh/rim stays clean), above dpHi
-  // → fully crisp raw selection (finest petals stay sharp), smoothstep between.
-  // The per-pixel gradient at a given real edge is STEEPER at lower working res
-  // (the same edge spans fewer pixels), so a fixed threshold over-fires on the
-  // 2048 px preview and drags the argmax rim/grain back in — even though the
-  // native-res export is clean. Scale the thresholds inversely with res
-  // (calibrated at ~5.5k px long edge) so preview and export behave identically.
-  const dpk = 5568 / res;
-  const gd = guidedDepth(gr, gg, gb, depth, w, h, gRadius, 1e-4, sub, 0.10 * dpk, 0.24 * dpk);
+  const gd = guidedDepth(gr, gg, gb, depth, w, h, gRadius, 1e-4, sub);
   const idxF = new Int16Array(n);
   for (let i = 0; i < n; i++) { let v = Math.round(gd[i]); idxF[i] = v < 0 ? 0 : v > total - 1 ? total - 1 : v; }
+
+  // CONFIDENCE weight: how much real focus signal a pixel has. On the subject
+  // (sharp texture / edges) the focus measure peaks high; on the flat OOF
+  // background it is ~0. We smooth bestE, then map it through a resolution-scaled
+  // percentile window to 0..1. In pass 2 we lerp the crisp selected pixel toward
+  // the frame AVERAGE by (1-conf): the subject stays fully sharp, but the
+  // background — and the thin ring just outside the subject — dissolves to a
+  // stable mean, so the selection boundary can't print a bright rim or the
+  // per-frame bloom contours. (This is what a hard depth-map selection alone
+  // could never do; verified against the field halo, 2026-07-07.)
+  const confSmR = Math.max(6, Math.round(res / 110));
+  const sm = boxBlur(bestE, w, h, confSmR);
+  const samp: number[] = [];
+  for (let i = 0; i < n; i += 17) samp.push(sm[i]);
+  samp.sort((a, b) => a - b);
+  const pct = (q: number) => samp[Math.min(samp.length - 1, Math.max(0, Math.round(q * (samp.length - 1))))];
+  const cLo = pct(0.50), cHi = pct(0.80), cInv = 1 / Math.max(1e-6, cHi - cLo);
+  // Reuse `sm` in place as the confidence buffer (its blurred values are no
+  // longer needed once mapped) — saves a full-res allocation at 20 MP.
+  for (let i = 0; i < n; i++) { let t = (sm[i] - cLo) * cInv; t = t < 0 ? 0 : t > 1 ? 1 : t; sm[i] = t * t * (3 - 2 * t); }
+  const conf = sm;
+  const inv = 1 / total;
 
   // Pass 2: gather the selected pixels (from kept frames, or re-decode).
   const out = new ImageData(w, h);
@@ -290,6 +303,11 @@ async function stackSelect(frames: StackFrame[], longEdge: number, align: boolea
       d = (await decodeAt(frames[f].blob, longEdge)).data;
     }
     const { dx, dy } = shifts[f];
+    // Edge gate scaled to resolution: the guidance gradient at a given real edge
+    // is steeper per-pixel at lower working res, so a fixed gate would treat a
+    // different band in the 2048 preview than in the native export. Scale it so
+    // the SAME edges are treated at any res → preview matches export.
+    const gGate = 40 * 5568 / res;
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         const o = y * w + x;
@@ -297,7 +315,49 @@ async function stackSelect(frames: StackFrame[], longEdge: number, align: boolea
         const sx = Math.min(w - 1, Math.max(0, x + dx));
         const sy = Math.min(h - 1, Math.max(0, y + dy));
         const si = (sy * w + sx) * 4;
-        out.data[o * 4] = d[si]; out.data[o * 4 + 1] = d[si + 1]; out.data[o * 4 + 2] = d[si + 2]; out.data[o * 4 + 3] = 255;
+        const c = conf[o], ic = 1 - c;
+        const mr = sumR[o] * inv, mg = sumG[o] * inv, mb = sumB[o] * inv;
+        let R = d[si] * c + mr * ic, G = d[si + 1] * c + mg * ic, B = d[si + 2] * c + mb * ic;
+        // EDGE TREATMENT — only on real high-contrast edges (where the amplified
+        // CA rim lives), gated by the guidance gradient so flat subject/background
+        // is never touched.
+        if (x > 0 && x < w - 1 && y > 0 && y < h - 1) {
+          const grad = Math.abs(gr[o + 1] - gr[o - 1]) + Math.abs(gg[o + 1] - gg[o - 1]) + Math.abs(gb[o + 1] - gb[o - 1]) +
+            Math.abs(gr[o + w] - gr[o - w]) + Math.abs(gg[o + w] - gg[o - w]) + Math.abs(gb[o + w] - gb[o - w]);
+          if (grad > gGate) {
+            // (1) DE-HALO: the rim is a BRIGHT OVERSHOOT vs the frame-average
+            // (the bright fringe is in only a few frames). Persistent highlights
+            // (dew) are bright in the average too, so they read as a small
+            // overshoot and survive. Pull the large transient overshoot down.
+            const ml = 0.299 * mr + 0.587 * mg + 0.114 * mb;
+            const over = (0.299 * R + 0.587 * G + 0.114 * B) - ml;
+            if (over > 12) {
+              let t = (over - 12) / 48; t = t < 0 ? 0 : t > 1 ? 1 : t; const k = (t * t * (3 - 2 * t)) * 0.95;
+              R = R * (1 - k) + mr * k; G = G * (1 - k) + mg * k; B = B * (1 - k) + mb * k;
+            }
+            // (2) DE-FRINGE: the CA rim is a FALSE WARM HUE — red-dominant with
+            // G>B (gold/orange) — belonging to neither the magenta petal (B>G)
+            // nor the neutral background. The green sepal is G-dominant, so the
+            // R≥G,R≥B gate spares it. Desaturate the warm cast toward luma.
+            if (R >= G && R >= B) {
+              const warm = G - B;
+              if (warm > 8) {
+                let t = (warm - 8) / 42; t = t < 0 ? 0 : t > 1 ? 1 : t; const k = (t * t * (3 - 2 * t)) * 0.85;
+                const lu = 0.299 * R + 0.587 * G + 0.114 * B;
+                R = R * (1 - k) + lu * k; G = G * (1 - k) + lu * k; B = B * (1 - k) + lu * k;
+              }
+            } else if (B >= G && B > R + 6) {
+              // The complementary COOL (blue/violet) CA fringe — B-dominant and
+              // clearly bluer than red, which the magenta petal (R≥B) never is.
+              const cool = B - R;
+              let t = (cool - 6) / 40; t = t < 0 ? 0 : t > 1 ? 1 : t; const k = (t * t * (3 - 2 * t)) * 0.85;
+              const lu = 0.299 * R + 0.587 * G + 0.114 * B;
+              R = R * (1 - k) + lu * k; G = G * (1 - k) + lu * k; B = B * (1 - k) + lu * k;
+            }
+          }
+        }
+        out.data[o * 4] = R; out.data[o * 4 + 1] = G; out.data[o * 4 + 2] = B;
+        out.data[o * 4 + 3] = 255;
       }
     }
   }
