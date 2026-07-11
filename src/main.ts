@@ -10,6 +10,7 @@ import { buildGlowMap } from "./glow";
 import { buildLocalMap } from "./localmap";
 import { buildSkyMask } from "./sky";
 import { drawHistogram } from "./histogram";
+import * as Hotspot from "./hotspot";
 
 // Injected at build time from git history (see vite.config.ts).
 declare const __CHANGELOG__: { hash: string; date: string; subject: string; version: string }[];
@@ -35,6 +36,15 @@ const renderer = (() => {
 })();
 let current: DecodedImage | null = null;
 let currentFile: ImportedFile | null = null;
+
+// --- Hot-spot profile correction: a SEPARATE, earlier pass from the manual
+// `hotspot`/`hotspotSize` slider above (params.hotspot). Auto-selected from
+// EXIF (or a manual lens+FL pick) and applied once to the decoded pixel
+// buffer, before white balance / channel swap / grading ever see it. Not
+// part of EditParams / the undo stack — it's a per-photo source correction,
+// not a creative edit; re-derived fresh each time a photo opens. ---
+let hotspotPristine: Uint8ClampedArray | null = null; // decoded pixels before correction
+let hotspotState: { profileKey: string | null; source: "exif" | "manual" | null; strength: number; bypass: boolean } | null = null;
 
 const params: EditParams = {
   wb: [1, 1, 1],
@@ -100,8 +110,118 @@ const ui = {
   lookHie: $("lookHie") as HTMLButtonElement,
 };
 
+const hsUi = {
+  status: $("hsStatus") as HTMLElement,
+  strength: $("hsStrength") as HTMLInputElement,
+  bypassBtn: $("hsBypassBtn") as HTMLButtonElement,
+  prompt: $("hsPrompt") as HTMLDivElement,
+  lens: $("hsLens") as HTMLSelectElement,
+  fl: $("hsFL") as HTMLSelectElement,
+  applyManualBtn: $("hsApplyManual") as HTMLButtonElement,
+};
+
+for (const short of Hotspot.lensNames()) {
+  const o = document.createElement("option");
+  o.value = short;
+  o.textContent = short + "mm";
+  hsUi.lens.append(o);
+}
+function populateFLOptions() {
+  hsUi.fl.replaceChildren();
+  for (const fl of Hotspot.flAnchors(hsUi.lens.value)) {
+    const o = document.createElement("option");
+    o.value = String(fl);
+    o.textContent = fl + "mm";
+    hsUi.fl.append(o);
+  }
+}
+populateFLOptions();
+hsUi.lens.addEventListener("change", populateFLOptions);
+
 function baseName(): string {
   return (currentFile?.name ?? "IPS-look").replace(/\.[^.]+$/, "");
+}
+
+function arrayBufferOf(u8: Uint8Array): ArrayBufferLike {
+  return u8.byteOffset === 0 && u8.byteLength === u8.buffer.byteLength
+    ? u8.buffer
+    : u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength);
+}
+
+/** Recompute `current.pixels` from the pristine decode + the active profile,
+ *  and push the result to the GPU texture. No-op when the source has no
+ *  gamma pixel buffer (RAW path — hot-spot profiles aren't supported there
+ *  yet; see hsStatus text). */
+function applyHotspotCorrection() {
+  if (!current?.pixels || !hotspotPristine || !hotspotState) return;
+  current.pixels.set(hotspotPristine);
+  if (!hotspotState.bypass && hotspotState.profileKey) {
+    Hotspot.apply({ width: current.width, height: current.height, data: current.pixels }, hotspotState.profileKey, hotspotState.strength);
+  }
+  renderer.setImage(toPreview(current));
+  updateHotspotUI();
+}
+
+function updateHotspotUI() {
+  if (!current) { hsUi.status.textContent = "No photo loaded."; hsUi.prompt.hidden = true; return; }
+  if (!current.pixels) {
+    hsUi.status.textContent = "Not available for RAW yet — profiles are calibrated from JPEG.";
+    hsUi.prompt.hidden = true;
+    hsUi.strength.disabled = true;
+    hsUi.bypassBtn.disabled = true;
+    return;
+  }
+  hsUi.strength.disabled = false;
+  hsUi.bypassBtn.disabled = false;
+  hsUi.strength.value = String(hotspotState?.strength ?? 1);
+  const bypass = hotspotState?.bypass ?? false;
+  hsUi.bypassBtn.setAttribute("aria-pressed", String(bypass));
+  hsUi.prompt.hidden = !!hotspotState?.profileKey;
+  if (!hotspotState?.profileKey) {
+    hsUi.status.textContent = "Couldn't identify the lens — pick it below.";
+  } else {
+    const src = hotspotState.source === "exif" ? "from EXIF" : "manual";
+    hsUi.status.textContent = `${hotspotState.profileKey} · ${src}${bypass ? " · bypassed" : ""}`;
+  }
+}
+
+hsUi.strength.addEventListener("input", () => {
+  if (!hotspotState) return;
+  hotspotState.strength = Number(hsUi.strength.value);
+  applyHotspotCorrection();
+});
+hsUi.bypassBtn.addEventListener("click", () => {
+  if (!hotspotState) return;
+  hotspotState.bypass = !hotspotState.bypass;
+  applyHotspotCorrection();
+});
+hsUi.applyManualBtn.addEventListener("click", () => {
+  if (!hotspotState) return;
+  const fl = Number(hsUi.fl.value);
+  if (!fl) return;
+  hotspotState.profileKey = Hotspot.keyFor(hsUi.lens.value, fl);
+  hotspotState.source = "manual";
+  applyHotspotCorrection();
+});
+
+/** Called once per newly-opened photo, right after decode. Auto-selects the
+ *  hot-spot profile from EXIF; if the lens can't be identified, surfaces the
+ *  manual picker instead of silently skipping correction (never guess). */
+function initHotspot(img: DecodedImage, imported: ImportedFile) {
+  if (!img.pixels) {
+    hotspotPristine = null;
+    hotspotState = null;
+    updateHotspotUI();
+    return;
+  }
+  hotspotPristine = img.pixels.slice();
+  const info = Hotspot.fromExif(arrayBufferOf(imported.bytes));
+  if (Hotspot.needsPrompt(info)) {
+    hotspotState = { profileKey: null, source: null, strength: 1, bypass: false };
+  } else {
+    hotspotState = { profileKey: info!.profileKey, source: "exif", strength: 1, bypass: false };
+  }
+  applyHotspotCorrection();
 }
 
 // --- Live histogram: a floating RGB + luminance readout that re-tallies the
@@ -1636,6 +1756,12 @@ async function openImported(imported: ImportedFile) {
   const img = await decode(imported);
   current = img;
   currentFile = imported;
+  // Corrects img.pixels in place (if a profile applies) before anything below
+  // reads them — the GPU texture upload, and the glow/local reference maps.
+  // (initHotspot uploads its own texture when it corrects; this call is the
+  // only one for RAW / unavailable-profile photos, and a harmless repeat
+  // upload otherwise.)
+  initHotspot(img, imported);
   renderer.setImage(toPreview(img));
   renderer.setRotation(img.rotate ?? 0);
   resetZoom();
