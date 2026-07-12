@@ -32,6 +32,10 @@
             Open image
             <input id="file" type="file" accept=".dng,.nef,.zip,image/*" hidden />
           </label>
+          <label class="bar-btn" id="batchBtn" title="Apply your look to a whole set → one .zip">
+            Process many
+            <input id="batchFiles" type="file" accept=".dng,.nef,.zip,image/*" multiple hidden />
+          </label>
         </span>
       </header>
 
@@ -287,12 +291,7 @@
           </label>
           <label id="exQualityRow">Quality <input id="exQuality" type="range" min="0.5" max="1" step="0.01" value="0.92" /></label>
           <button id="exBtn" type="button">Export &amp; Save</button>
-          <hr class="fs-rule" />
-          <label class="batch-open">
-            Process many…
-            <input id="batchFiles" type="file" accept=".dng,.nef,.zip,image/*" multiple hidden />
-          </label>
-          <small style="color:#80808a">Applies your current look to a whole set — each photo is auto-balanced on its own, then your look layers on top. Results come back as one <strong>.zip</strong> (Format &amp; Resolution above apply).</small>
+          <small style="color:#80808a">These Format &amp; Resolution settings also apply to <strong>Process many</strong> (top bar).</small>
         </fieldset>
 
         <fieldset id="fsProfiles">

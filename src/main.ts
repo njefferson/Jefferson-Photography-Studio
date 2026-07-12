@@ -2219,10 +2219,10 @@ function estimateDenoise(img: DecodedImage): number {
   if (!diffs.length) return 0;
   diffs.sort((a, b) => a - b);
   const med = diffs[Math.floor(diffs.length / 2)];
-  // Gentle auto: a low floor so clean frames get barely any smoothing, a
-  // shallow slope and a modest cap so even noisy shadows never over-smooth.
-  // (Was 0.2 + (med-0.013)*25, capped 0.8 — far too heavy by default.)
-  return clamp(0.08 + (med - 0.013) * 15, 0, 0.5);
+  // Auto position on the quadratic slider (see rangeSigma): a gentle floor so a
+  // grainy frame opens with a touch of smoothing and a starting point to nudge
+  // from, scaling up with measured shadow noise, capped well short of the top.
+  return clamp(0.2 + (med - 0.013) * 18, 0, 0.75);
 }
 
 /** Exposure so the bright end of the image (post WB + camera matrix) ~= 0.85. */

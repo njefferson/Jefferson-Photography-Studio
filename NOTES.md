@@ -126,19 +126,27 @@ See **`PLAN.md`** for the full build plan.
   existing full-res CPU export pipeline per file; results bundle into one .zip
   (new store-only writer in zip.ts, CRC32, no DEFLATE) handed to the share
   sheet in a single tap. Format/Resolution/Quality come from the Export panel.
+  Entry points: a "Process many photos…" action on the welcome screen and a
+  "Process many" button in the top bar next to Open image (both are labels for
+  the same hidden multi-file input) — deliberately NOT buried in Export, which
+  is the last accordion (owner feedback 2026-07-12).
   Verified end-to-end in headless chromium: mixed PNG + DNG set → CRC-clean zip
   of real decodable JPEGs, per-file names with collision de-dup (…-2.jpg). RAW
   frames skip the hot-spot fix (JPEG-only profiles, same as single open).
   NEEDS THE OWNER'S HANDS: real multi-file pick + share-sheet save on iPad
   Safari, and memory behaviour on a large full-res set (outputs accumulate in
   RAM until the zip is built).
-- [x] **Gentler denoise** — the slider was far too aggressive: at the top the
-  range sigma was 0.63 (near a box blur) and auto set a 0.2 floor. Recalibrated
-  to sigma = 0.05 + 0.3·strength (0.35 max) in BOTH the shader and the CPU path
-  (raw/denoise.ts — kept bit-identical for GPU==CPU parity), and auto is now
-  0.08 + (med−0.013)·15 capped at 0.5 (was 0.2 + …·25 capped 0.8). Clean frames
-  now land near 0 (a real example auto-set to 0.01); noisy frames still get a
-  solid but non-smeary ~0.2 sigma. Exact feel is the owner's on-device call.
+- [x] **Gentler denoise + usable slider** — the slider was far too aggressive
+  (top sigma 0.63, near a box blur, 0.2 auto floor). Now QUADRATIC:
+  sigma = 0.03 + 0.12·strength² (0.15 ceiling) in BOTH the shader and the CPU
+  path (raw/denoise.ts — kept bit-identical for GPU==CPU parity). The square
+  is the fix for the owner's "one pixel between too little and too much"
+  (2026-07-12): a bilateral's grain→smear transition is a narrow sigma band, so
+  a linear slider crammed it into the far left; squaring spreads the gentle
+  low-sigma zone across the bottom half of the track (0.03→0.06 over the first
+  half, 0.06→0.15 over the top). Auto = clamp(0.2 + (med−0.013)·18, 0, 0.75) so
+  a grainy frame opens around 0.12 (a touch of smoothing + a place to nudge
+  from). Exact feel is still the owner's on-device call.
 - [x] **Drag on photo to adjust** — Lightroom-style targeted adjustment (shipped
   2026-07-05): arm the tool, then drag on the photo — UP/DOWN scales that
   colour's luminance, LEFT/RIGHT shifts its hue. The colour under your finger

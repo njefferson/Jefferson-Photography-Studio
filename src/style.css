@@ -263,6 +263,17 @@ body {
 .welcome-batch-hint { max-width: 30rem; margin: 2px auto 0; font-size: 12.5px; line-height: 1.5; color: #80808a; }
 .bar-actions { display: inline-flex; align-items: center; gap: 10px; }
 .bar-btn { width: auto; padding: 8px 14px; }
+/* #batchBtn is a <label> (wraps a file input), so it misses the button base
+   styles — give it the same dark bar-button look as its siblings. */
+label.bar-btn {
+  display: inline-flex;
+  align-items: center;
+  background: #202028;
+  color: inherit;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+}
 .lesson-show {
   position: absolute;
   left: 20px;
@@ -326,21 +337,6 @@ select, button {
   padding: 8px;
 }
 button { cursor: pointer; }
-.fs-rule { border: none; border-top: 1px solid var(--line); margin: 14px 0 6px; }
-.batch-open {
-  display: block;
-  width: 100%;
-  background: #202028;
-  color: #f2f2f4;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 8px;
-  text-align: center;
-  font-size: 14px;
-  cursor: pointer;
-  margin: 6px 0;
-}
-.batch-open:active { background: #2a2a34; }
 #busy {
   position: fixed;
   inset: 0;

@@ -166,7 +166,7 @@ void main() {
   // Denoise FIRST, on linear sensor data, before the big IR gains amplify the
   // noise. Same 5x5 brightness-adaptive bilateral as raw/denoise.ts.
   if (u_denoise > 0.0 && v_uv.x >= u_split) {
-    float sigma = 0.05 + 0.3 * u_denoise; // keep in sync with raw/denoise.ts rangeSigma()
+    float sigma = 0.03 + 0.12 * u_denoise * u_denoise; // keep in sync with raw/denoise.ts rangeSigma()
     float inv2s2 = 1.0 / (2.0 * sigma * sigma);
     float lc = dot(c, LUMA_W);
     vec3 sum = vec3(0.0);

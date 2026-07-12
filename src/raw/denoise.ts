@@ -21,11 +21,13 @@ for (let dy = -R; dy <= R; dy++) {
 }
 
 /** Relative-luma range sigma for a 0..1 strength. Mirrored in the shader.
- *  Gentle by design: at full strength sigma is 0.35, not the box-blur-ish
- *  0.63 it used to be — the old curve crushed real detail long before the
- *  slider reached the top. Keep gl.ts's literal in sync with this. */
+ *  QUADRATIC on purpose: a bilateral goes from "keeps the grain" to "smears
+ *  detail" across a tiny band of sigma, so a linear slider put that whole band
+ *  in the first pixel of travel. Squaring the strength spreads the gentle
+ *  low-sigma zone — where you actually dial noise — across most of the track,
+ *  with a low 0.15 ceiling so the top is still safe. Keep gl.ts in sync. */
 export function rangeSigma(strength: number): number {
-  return 0.05 + 0.3 * strength;
+  return 0.03 + 0.12 * strength * strength;
 }
 
 export type LinearSampler = (x: number, y: number) => [number, number, number];
