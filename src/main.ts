@@ -2116,6 +2116,28 @@ let batchStopRequested = false;
 let batchRemaining: File[] = []; // input Files not yet processed after a stop
 let batchSettings: { look: SavedLook; format: ExportFormat; scale: number; quality: number } | null = null;
 let pendingSaveIsBatch = false;
+let batchRunning = false;
+
+// A long batch must not die to the screen locking (iPad suspends the tab).
+// Held while processing, released after; iOS drops it when the app is
+// backgrounded, so re-acquire on return while a batch is still running.
+type WakeLockSentinel = { release(): Promise<void> };
+let wakeLock: WakeLockSentinel | null = null;
+async function acquireWakeLock() {
+  try {
+    const wl = (navigator as { wakeLock?: { request(type: "screen"): Promise<WakeLockSentinel> } }).wakeLock;
+    wakeLock = (await wl?.request("screen")) ?? null;
+  } catch {
+    wakeLock = null; // not supported / denied — the batch still runs
+  }
+}
+function releaseWakeLock() {
+  wakeLock?.release().catch(() => {});
+  wakeLock = null;
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && batchRunning) acquireWakeLock();
+});
 
 busyStop.addEventListener("click", () => {
   batchStopRequested = true;
@@ -2146,25 +2168,36 @@ async function bundleStored(header: string): Promise<boolean> {
 async function runBatch(files: File[]) {
   const { look, format, scale, quality } = batchSettings!;
   const skipped: string[] = [];
+  let alreadyDone = 0;
   let stoppedEarly: "user" | "memory" | null = null;
   batchStopRequested = false;
+  batchRunning = true;
   busyStop.disabled = false;
   busyStop.textContent = "Stop & save what's done";
   showBusy(`Processing 0 / ${files.length}…`);
   busyStop.hidden = false;
   recoverBtn.hidden = true;
+  await acquireWakeLock();
 
   try {
     // Frames already stored (an earlier stopped part, or accepted leftovers)
-    // keep their names and count toward the budget; the final zip includes them.
+    // keep their names and count toward the budget; the final zip includes
+    // them. Their INPUT identities let a re-picked set resume seamlessly:
+    // inputs whose output is already stored just fly by as "already done".
     const taken = new Set<string>();
+    const doneInputs = new Set<string>();
     let totalBytes = 0;
-    for (const m of await frameMetas()) { taken.add(m.name); totalBytes += m.size; }
+    for (const m of await frameMetas()) {
+      taken.add(m.name);
+      totalBytes += m.size;
+      if (m.srcName !== undefined) doneInputs.add(`${m.srcName} ${m.srcSize}`);
+    }
 
     for (let i = 0; i < files.length; i++) {
       if (batchStopRequested) { stoppedEarly = "user"; batchRemaining = files.slice(i); break; }
       if (totalBytes > BATCH_BYTE_BUDGET || heapNearFull()) { stoppedEarly = "memory"; batchRemaining = files.slice(i); break; }
       const f = files[i];
+      if (doneInputs.has(`${f.name} ${f.size}`)) { alreadyDone++; continue; }
       busyText.textContent = `Processing ${i + 1} / ${files.length} — ${f.name}`;
       try {
         const imported = await importFile(f);
@@ -2181,8 +2214,12 @@ async function runBatch(files: File[]) {
         // Persist immediately (crash-safe), keep nothing in RAM. Stored in
         // small chunks — see batchstore.ts for why never one big value.
         const bytes = new Uint8Array(await result.blob.arrayBuffer());
-        await putFrame(uniqueName(result.name, taken), crc32(bytes), bytes.length, bytes);
+        await putFrame(
+          { name: uniqueName(result.name, taken), crc: crc32(bytes), size: bytes.length, srcName: f.name, srcSize: f.size },
+          bytes,
+        );
         totalBytes += bytes.length;
+        doneInputs.add(`${f.name} ${f.size}`);
       } catch (err) {
         skipped.push(`${f.name} (${(err as Error).message})`);
       }
@@ -2197,7 +2234,9 @@ async function runBatch(files: File[]) {
       return;
     }
     const n = `${count} image${count === 1 ? "" : "s"}`;
-    const note = skipped.length ? ` · ${skipped.length} skipped` : "";
+    const note =
+      (skipped.length ? ` · ${skipped.length} skipped` : "") +
+      (alreadyDone ? ` · ${alreadyDone} already done earlier` : "");
     await bundleStored(
       stoppedEarly === "user" ? `Stopped — ${n} ready in a .zip${note}`
       : stoppedEarly === "memory" ? `Stopped by the memory guard — ${n} ready in a .zip${note}. Save it, then Continue.`
@@ -2208,6 +2247,9 @@ async function runBatch(files: File[]) {
     busyStop.hidden = true;
     hideBusy();
     alert("Batch failed: " + (err as Error).message);
+  } finally {
+    batchRunning = false;
+    releaseWakeLock();
   }
 }
 
@@ -2222,7 +2264,8 @@ batchInput.addEventListener("change", async () => {
     leftovers &&
     !confirm(
       `${leftovers} finished image${leftovers === 1 ? "" : "s"} from an interrupted batch ${leftovers === 1 ? "is" : "are"} still stored.\n\n` +
-        `OK — include ${leftovers === 1 ? "it" : "them"} in this batch's .zip.\nCancel — go back and use "Recover" on the start screen first.`,
+        `OK — include ${leftovers === 1 ? "it" : "them"} in this batch's .zip (photos already done are skipped, so re-picking the whole set just finishes it).\n` +
+        `Cancel — go back and use "Recover" on the start screen first.`,
     )
   )
     return;
@@ -2346,11 +2389,12 @@ function estimateDenoise(img: DecodedImage): number {
   diffs.sort((a, b) => a - b);
   const med = diffs[Math.floor(diffs.length / 2)];
   // Work in sigma, then invert the slider's curve (sigma = 0.10·s², see
-  // rangeSigma): the range sigma that smooths grain without eating edges is
-  // a small multiple of the measured relative noise itself. Capped at 3/4 so
-  // auto always leaves headroom to push.
-  const targetSigma = 1.6 * med;
-  return clamp(Math.sqrt(targetSigma / 0.1), 0, 0.75);
+  // rangeSigma). Owner-tuned (2026-07-12): the DEFAULT should barely just
+  // clear the banding in flat areas and nothing more — so target the measured
+  // noise amplitude itself (med ≈ 1.35× the relative noise sigma; 0.75·med
+  // lands right on it), leaving all the headroom above for taste.
+  const targetSigma = 0.75 * med;
+  return clamp(Math.sqrt(targetSigma / 0.1), 0, 0.6);
 }
 
 /** Exposure so the bright end of the image (post WB + camera matrix) ~= 0.85. */

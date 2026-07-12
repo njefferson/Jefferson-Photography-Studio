@@ -144,10 +144,16 @@ See **`PLAN.md`** for the full build plan.
   per-frame chunk getAll); each frame becomes its own Blob part for the zip
   (writeZip takes {name,size,crc,data}), so RAM holds ~one frame end-to-end.
   DB is "ips-batch" v2 (meta + chunks; v1's whole-frame store is dropped on
-  upgrade). TESTING GOTCHA that burned an hour: Playwright's waitForFunction
-  does NOT await a Promise-returning predicate — a Promise object is truthy,
-  so such a poll "passes" instantly and you kill the browser before anything
-  was ever written; poll on synchronous DOM state (the progress text) instead.
+  upgrade). Meta rows also carry the INPUT identity (srcName + srcSize), so
+  re-picking a set after a crash resumes seamlessly: already-done inputs skip
+  instantly ("N already done earlier") instead of reprocessing into -2
+  duplicates. A screen Wake Lock is held while a batch runs (re-acquired on
+  visibilitychange) so the iPad doesn't sleep mid-set; unsupported browsers
+  just run without it. TESTING GOTCHA that burned an hour: Playwright's
+  waitForFunction does NOT await a Promise-returning predicate — a Promise
+  object is truthy, so such a poll "passes" instantly and you kill the browser
+  before anything was ever written; poll on synchronous DOM state (the
+  progress text) instead.
   "Stop & save what's done" (checked between frames — the frame in flight
   finishes first) → partial zip + a "Continue — N left" button that resumes the
   remaining input Files in-session (they stay alive only within the page
@@ -174,8 +180,11 @@ See **`PLAN.md`** for the full build plan.
   FLOOR (first try was 0.03 + 0.12·s²) makes 0→first-step a hard jump to
   sigma 0.03, which on a flat IR sky is already heavy — "0 is none and the
   first step is more than enough". Never re-add a floor; the curve must pass
-  through zero. Auto inverts the curve from measured noise:
-  s = clamp(sqrt(1.6·med / 0.10), 0, 0.75). Exact feel = owner's call.
+  through zero. Auto inverts the curve from measured noise; owner-tuned
+  2026-07-12 ("default should barely just get rid of the banding only"):
+  s = clamp(sqrt(0.75·med / 0.10), 0, 0.6) — targets the noise amplitude
+  itself, all headroom above is left for taste. Owner confirmed the slider
+  feel ("denoise works well now"); don't reshape without fresh feedback.
 - [x] **Drag on photo to adjust** — Lightroom-style targeted adjustment (shipped
   2026-07-05): arm the tool, then drag on the photo — UP/DOWN scales that
   colour's luminance, LEFT/RIGHT shifts its hue. The colour under your finger

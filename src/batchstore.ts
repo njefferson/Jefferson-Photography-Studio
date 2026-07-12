@@ -19,6 +19,10 @@ export interface FrameMeta {
   name: string;
   crc: number; // CRC32 of the whole frame's bytes, precomputed for the zip writer
   size: number;
+  /** Input identity (name + byte size), so re-picking a set after a crash can
+   *  skip the inputs whose output is already stored. Absent on old rows. */
+  srcName?: string;
+  srcSize?: number;
 }
 
 const DB = "ips-batch";
@@ -44,7 +48,8 @@ function open(): Promise<IDBDatabase> {
 
 /** Store one finished frame atomically (meta + chunks in one strict-durability
  *  transaction): after this resolves, the frame is really on disk. */
-export async function putFrame(name: string, crc: number, size: number, bytes: Uint8Array): Promise<void> {
+export async function putFrame(meta: FrameMeta, bytes: Uint8Array): Promise<void> {
+  const { name } = meta;
   const db = await open();
   try {
     await new Promise<void>((res, rej) => {
@@ -52,7 +57,7 @@ export async function putFrame(name: string, crc: number, size: number, bytes: U
       t.oncomplete = () => res();
       t.onabort = () => rej(t.error ?? new Error("write aborted"));
       t.onerror = () => rej(t.error ?? new Error("write failed"));
-      t.objectStore(META).add({ name, crc, size } satisfies FrameMeta);
+      t.objectStore(META).add(meta);
       const cs = t.objectStore(CHUNKS);
       for (let i = 0, idx = 0; i < bytes.length; i += CHUNK, idx++) {
         // slice() copies just this range, so the stored value is exactly one
