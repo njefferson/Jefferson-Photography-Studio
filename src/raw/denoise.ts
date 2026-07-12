@@ -20,9 +20,12 @@ for (let dy = -R; dy <= R; dy++) {
   }
 }
 
-/** Relative-luma range sigma for a 0..1 strength. Mirrored in the shader. */
+/** Relative-luma range sigma for a 0..1 strength. Mirrored in the shader.
+ *  Gentle by design: at full strength sigma is 0.35, not the box-blur-ish
+ *  0.63 it used to be — the old curve crushed real detail long before the
+ *  slider reached the top. Keep gl.ts's literal in sync with this. */
 export function rangeSigma(strength: number): number {
-  return 0.08 + 0.55 * strength;
+  return 0.05 + 0.3 * strength;
 }
 
 export type LinearSampler = (x: number, y: number) => [number, number, number];

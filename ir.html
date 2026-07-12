@@ -285,6 +285,12 @@
           </label>
           <label id="exQualityRow">Quality <input id="exQuality" type="range" min="0.5" max="1" step="0.01" value="0.92" /></label>
           <button id="exBtn" type="button">Export &amp; Save</button>
+          <hr class="fs-rule" />
+          <label class="batch-open">
+            Process many…
+            <input id="batchFiles" type="file" accept=".dng,.nef,.zip,image/*" multiple hidden />
+          </label>
+          <small style="color:#80808a">Applies your current look to a whole set — each photo is auto-balanced on its own, then your look layers on top. Results come back as one <strong>.zip</strong> (Format &amp; Resolution above apply).</small>
         </fieldset>
 
         <fieldset id="fsProfiles">
@@ -401,10 +407,21 @@
         (classic compressed; not Z8/Z9 High-Efficiency) &middot; Fujifilm X-Trans not supported.
         Tuned on an IR-converted Nikon Z50.</p>
 
+        <h3>Process many at once</h3>
+        <p>In <strong>Export</strong>, tap <strong>Process many…</strong> and pick a whole set. Each photo is
+        auto-balanced on its own (its own white balance, exposure, denoise and lens hot-spot fix), then your
+        <em>current look</em> — the creative grade you've dialled in: swap, hue, tone, mixer, clarity and so on —
+        is layered on top of every frame. The set comes back as one <strong>.zip</strong> you save in a single tap,
+        at the Format and Resolution chosen just above. (White balance is per-photo, so this is for a shoot in one
+        style; the exact frame on screen isn't copied pixel-for-pixel.)</p>
+
         <h3>Install as an app</h3>
         <p>On iPad/iPhone: tap Safari's <strong>Share</strong> button (the square with the arrow), then
         <strong>Add to Home Screen</strong>. You get a full-screen app with its own icon that works
         offline. On Android/Chrome, use the browser's <strong>Install app</strong> menu entry.</p>
+        <p>Infrared and <strong>Macro Studio</strong> are separate tools under one <strong>Studio</strong> launcher
+        (the <span aria-hidden="true">‹</span> in the top-left goes back to it). Each installs on its own, so you
+        only carry the one you use.</p>
 
         <h3>Tips</h3>
         <ul>

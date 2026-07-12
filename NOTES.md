@@ -106,6 +106,28 @@ See **`PLAN.md`** for the full build plan.
 > reliable. Editing this list updates the app on the next deploy. Both the
 > roadmap and the patch notes (last commits) refresh automatically on push.
 
+- [x] **Process many at once (batch)** — built 2026-07-12, on the branch for the
+  owner's on-device pass (not yet merged). "Process many…" in the Export panel
+  takes a whole set; each frame is auto-balanced on its own (its own WB /
+  exposure / denoise and its own EXIF-selected hot-spot correction, exactly
+  like opening it), then the CURRENT on-screen look (currentLook() creative
+  grade — no per-shot WB, no masks) layers on top of every frame. Reuses the
+  existing full-res CPU export pipeline per file; results bundle into one .zip
+  (new store-only writer in zip.ts, CRC32, no DEFLATE) handed to the share
+  sheet in a single tap. Format/Resolution/Quality come from the Export panel.
+  Verified end-to-end in headless chromium: mixed PNG + DNG set → CRC-clean zip
+  of real decodable JPEGs, per-file names with collision de-dup (…-2.jpg). RAW
+  frames skip the hot-spot fix (JPEG-only profiles, same as single open).
+  NEEDS THE OWNER'S HANDS: real multi-file pick + share-sheet save on iPad
+  Safari, and memory behaviour on a large full-res set (outputs accumulate in
+  RAM until the zip is built).
+- [x] **Gentler denoise** — the slider was far too aggressive: at the top the
+  range sigma was 0.63 (near a box blur) and auto set a 0.2 floor. Recalibrated
+  to sigma = 0.05 + 0.3·strength (0.35 max) in BOTH the shader and the CPU path
+  (raw/denoise.ts — kept bit-identical for GPU==CPU parity), and auto is now
+  0.08 + (med−0.013)·15 capped at 0.5 (was 0.2 + …·25 capped 0.8). Clean frames
+  now land near 0 (a real example auto-set to 0.01); noisy frames still get a
+  solid but non-smeary ~0.2 sigma. Exact feel is the owner's on-device call.
 - [x] **Drag on photo to adjust** — Lightroom-style targeted adjustment (shipped
   2026-07-05): arm the tool, then drag on the photo — UP/DOWN scales that
   colour's luminance, LEFT/RIGHT shifts its hue. The colour under your finger

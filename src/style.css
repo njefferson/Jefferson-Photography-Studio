@@ -313,6 +313,21 @@ select, button {
   padding: 8px;
 }
 button { cursor: pointer; }
+.fs-rule { border: none; border-top: 1px solid var(--line); margin: 14px 0 6px; }
+.batch-open {
+  display: block;
+  width: 100%;
+  background: #202028;
+  color: #f2f2f4;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px;
+  text-align: center;
+  font-size: 14px;
+  cursor: pointer;
+  margin: 6px 0;
+}
+.batch-open:active { background: #2a2a34; }
 #busy {
   position: fixed;
   inset: 0;

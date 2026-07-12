@@ -3,6 +3,7 @@ import { importFile, type ImportedFile } from "./import";
 import { decode, type DecodedImage } from "./decode";
 import { Renderer, type EditParams } from "./gl";
 import { exportImage, download, type ExportFormat } from "./export";
+import { writeZip } from "./zip";
 import { TONE_DEFAULT, TONE_X, toneEvaluator, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, chromaVec, hsv2rgb, type MaskLayer } from "./pipeline";
 import { generateCube } from "./lut";
 import { generateDcp } from "./dcp";
@@ -2017,6 +2018,125 @@ ui.exBtn.addEventListener("click", async () => {
   }
 });
 
+// --- Batch / mass processing ------------------------------------------------
+// Apply the current on-screen LOOK (creative grade only — see currentLook()) to
+// a whole set of photos at once. Each frame is auto-balanced on its own (its
+// own white balance / exposure / denoise, and its own EXIF-selected hot-spot
+// correction), exactly like opening it, then the look layers on top. Results
+// come back as a single .zip so the iPad share sheet only prompts once.
+
+/** This photo's own automatic baseline (WB/exposure/denoise) plus the given
+ *  creative look. Mirrors autoAdjust() + loadSlot(), without touching the
+ *  live on-screen edit. Masks never carry (composition-specific). */
+function batchParamsFor(img: DecodedImage, look: SavedLook): EditParams {
+  const wb = grayWorldWB(img);
+  return {
+    wb,
+    exposure: autoExposure(img, wb),
+    denoise: estimateDenoise(img),
+    swapRB: look.swapRB,
+    hue: look.hue,
+    sat: look.sat,
+    contrast: look.contrast,
+    tint: [...look.tint] as [number, number, number],
+    glow: look.glow,
+    sky: [...look.sky] as [number, number, number],
+    foliage: [...look.foliage] as [number, number, number],
+    tone: [...look.tone] as [number, number, number, number, number],
+    lum: look.lum,
+    masks: [],
+    hotspot: 0,
+    hotspotSize: 0.5,
+    vignette: 0,
+    clarity: look.clarity,
+    dehaze: look.dehaze,
+    hsl: [...look.hsl],
+  };
+}
+
+/** Bake the EXIF-selected hot-spot correction into a decoded frame's pixels,
+ *  matching initHotspot(). If the lens can't be identified from EXIF we skip
+ *  it for that frame — a bulk run can't stop to ask per photo. */
+function applyBatchHotspot(img: DecodedImage, imported: ImportedFile): boolean {
+  if (!img.pixels) return false; // RAW: profiles are JPEG-only for now
+  const info = Hotspot.fromExif(arrayBufferOf(imported.bytes));
+  if (!info || Hotspot.needsPrompt(info) || !info.profileKey) return false;
+  Hotspot.apply({ width: img.width, height: img.height, data: img.pixels }, info.profileKey, 1);
+  return true;
+}
+
+/** Ensure every entry in the zip has a unique name (…-2.jpg on collision). */
+function uniqueName(name: string, taken: Set<string>): string {
+  if (!taken.has(name)) { taken.add(name); return name; }
+  const dot = name.lastIndexOf(".");
+  const stem = dot < 0 ? name : name.slice(0, dot);
+  const ext = dot < 0 ? "" : name.slice(dot);
+  let n = 2;
+  while (taken.has(`${stem}-${n}${ext}`)) n++;
+  const out = `${stem}-${n}${ext}`;
+  taken.add(out);
+  return out;
+}
+
+const batchInput = $("batchFiles") as HTMLInputElement;
+
+batchInput.addEventListener("change", async () => {
+  const files = Array.from(batchInput.files ?? []);
+  batchInput.value = ""; // let the same set be re-picked later
+  if (!files.length) return;
+
+  const look = currentLook();
+  const format = ui.exFormat.value as ExportFormat;
+  const scale = Number(ui.exScale.value);
+  const quality = Number(ui.exQuality.value);
+
+  const outputs: { name: string; bytes: Uint8Array }[] = [];
+  const taken = new Set<string>();
+  const skipped: string[] = [];
+  showBusy(`Processing 0 / ${files.length}…`);
+
+  try {
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      busyText.textContent = `Processing ${i + 1} / ${files.length} — ${f.name}`;
+      try {
+        const imported = await importFile(f);
+        if (imported.looksTranscoded) { skipped.push(`${f.name} (arrived as flattened JPEG)`); continue; }
+        const img = await decode(imported);
+        applyBatchHotspot(img, imported);
+        const result = await exportImage(
+          imported,
+          img,
+          batchParamsFor(img, look),
+          { format, scale, quality, rotate: img.rotate ?? 0 },
+          (fr) => { busyText.textContent = `Processing ${i + 1} / ${files.length} — ${f.name} · ${Math.round(fr * 100)}%`; },
+        );
+        outputs.push({ name: uniqueName(result.name, taken), bytes: new Uint8Array(await result.blob.arrayBuffer()) });
+      } catch (err) {
+        skipped.push(`${f.name} (${(err as Error).message})`);
+      }
+    }
+
+    if (!outputs.length) {
+      hideBusy();
+      alert("Nothing could be processed.\n\n" + skipped.join("\n"));
+      return;
+    }
+
+    busyText.textContent = "Bundling…";
+    const zipBlob = writeZip(outputs, new Date());
+    pendingSave = { blob: zipBlob, name: `IR-batch-${outputs.length}.zip` };
+    const note = skipped.length ? ` · ${skipped.length} skipped` : "";
+    busyText.textContent = `Ready — ${outputs.length} image${outputs.length === 1 ? "" : "s"} in a .zip${note}`;
+    busySpinner.hidden = true;
+    busyActions.hidden = false;
+    if (skipped.length) console.warn("Batch skipped:\n" + skipped.join("\n"));
+  } catch (err) {
+    hideBusy();
+    alert("Batch failed: " + (err as Error).message);
+  }
+});
+
 // Profile / LUT export — encodes the current look for reuse elsewhere.
 ui.cubeBtn.addEventListener("click", () => {
   const text = generateCube(params, { includeWB: ui.profWB.checked, title: baseName() });
@@ -2099,7 +2219,10 @@ function estimateDenoise(img: DecodedImage): number {
   if (!diffs.length) return 0;
   diffs.sort((a, b) => a - b);
   const med = diffs[Math.floor(diffs.length / 2)];
-  return clamp(0.2 + (med - 0.013) * 25, 0, 0.8);
+  // Gentle auto: a low floor so clean frames get barely any smoothing, a
+  // shallow slope and a modest cap so even noisy shadows never over-smooth.
+  // (Was 0.2 + (med-0.013)*25, capped 0.8 — far too heavy by default.)
+  return clamp(0.08 + (med - 0.013) * 15, 0, 0.5);
 }
 
 /** Exposure so the bright end of the image (post WB + camera matrix) ~= 0.85. */
