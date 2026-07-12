@@ -107,7 +107,7 @@ See **`PLAN.md`** for the full build plan.
 - CI must check out full history (`fetch-depth: 0` in deploy.yml) or the
   commit counts — and therefore the version numbers — come out wrong.
 
-## Next capability release (owner's roadmap, 2026-07-04)
+## Next capability release (owner's roadmap, 2026-07-04; queue refreshed 2026-07-12)
 
 > SOURCE OF TRUTH for the in-app Roadmap (behind the ⓘ button). `vite.config.ts`
 > parses the `- [ ]` / `- [x]` checkbox bullets below at build time and injects
@@ -117,9 +117,30 @@ See **`PLAN.md`** for the full build plan.
 > reliable. Editing this list updates the app on the next deploy. Both the
 > roadmap and the patch notes (last commits) refresh automatically on push.
 
-- [x] **Process many at once (batch)** — built 2026-07-12, on the branch for the
-  owner's on-device pass (not yet merged). "Process many…" in the Export panel
-  takes a whole set; each frame is auto-balanced on its own (its own WB /
+- [ ] **Install as one app, two, or three** — explain and guide the three
+  install shapes: the whole Studio (launcher manifest), Infrared alone, or
+  Macro alone (each already has its own manifest/start_url). Put it where
+  users actually look: the launcher page and each app's Help (owner ask,
+  2026-07-12).
+- [ ] **A Studio icon** — the launcher/manifest still uses the old infrared
+  icon.svg; design a Studio-level icon (the umbrella brand, not one tool's)
+  and regenerate PNG touch icons from it (headless Chromium screenshot of the
+  SVG — the macro-icon-180.png pipeline). Owner ask, 2026-07-12.
+- [ ] **Storage-quota guard for batch** — QuotaExceededError from putFrame
+  currently surfaces as a cryptic per-frame skip; treat it like the memory
+  guard (stop gracefully, save what's done), and call
+  navigator.storage.persist() at batch start so iOS is less likely to evict
+  recovery data.
+- [ ] **Batch honesty nits** — count frames that skipped hot-spot correction
+  (no lens EXIF) in the summary; note in Help that masks and the
+  lens-fix/vignette sliders don't ride along in a batch look.
+- [ ] **On-device checks owed** — Safari IDB crash durability (all
+  measurements were Chromium), share-sheet with a large .zip, jetsam under
+  real memory pressure, a portrait-orientation frame through batch, and the
+  old-URL redirect from an installed old-domain PWA.
+- [x] **Process many at once (batch)** — built and SHIPPED TO PRODUCTION
+  2026-07-12 (owner-tested on staging, then promoted). "Process many" (top bar
+  + start screen) takes a whole set; each frame is auto-balanced on its own (its own WB /
   exposure / denoise and its own EXIF-selected hot-spot correction, exactly
   like opening it), then the CURRENT on-screen look (currentLook() creative
   grade — no per-shot WB, no masks) layers on top of every frame. Reuses the
