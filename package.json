@@ -1,9 +1,9 @@
 {
-  "name": "infrared-photography-studio",
+  "name": "jefferson-photo-studio",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Infrared Photography Studio (IPS) — unbounded white balance, channel swap, hue shifts for color-IR photos.",
+  "description": "Photography Studio — on-device photo tools: Infrared editing and Macro focus stacking.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

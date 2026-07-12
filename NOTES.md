@@ -75,6 +75,17 @@ See **`PLAN.md`** for the full build plan.
 - [x] `.cube` LUT export (creative look) — verified vs pipeline (mean err 0.0012)
 - [x] `.dcp` profile export — structure validated; **needs a Lightroom colour test**
 - [x] Deployed: Cloudflare Pages via GitHub Actions (auto on push)
+- [x] URL rebranded off "infrared" (branch work, 2026-07-12, awaiting deploy):
+      the Pages project is now **jefferson-photo-studio** (jefferson-photo-studio.pages.dev,
+      staging.jefferson-photo-studio.pages.dev) so the shared address matches the
+      "Photography Studio" umbrella instead of branding the macro tool "infrared".
+      The OLD project (infrared-photography-studio) is kept alive on production
+      pushes serving only a 301 -> the new home (see `redirect/`: a Cloudflare
+      `_redirects` splat plus an HTML fallback that unregisters the old service
+      worker + clears caches, then forwards, preserving the path). Old
+      Home-Screen installs / bookmarks break and must be re-added — accepted by
+      Noah. NEEDS DEPLOY + owner check: push to staging first to confirm the new
+      project builds, then main to flip production and publish the redirect.
 - [x] Camera color matrix (fixes flat IR color); exposure + Auto; punchy preset
 - [x] Review pass: preview proxy for >2800px 8-bit sources (iOS WebGL buffer
       limit), single EditParams definition, NEF white level 15520, exposure

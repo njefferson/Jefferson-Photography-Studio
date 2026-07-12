@@ -29,12 +29,23 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages project create infrared-photography-studio --production-branch=main
+          command: pages project create jefferson-photo-studio --production-branch=main
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          # staging branch -> preview URL (staging.infrared-photography-studio.pages.dev);
-          # everything else -> production.
-          command: pages deploy dist --project-name=infrared-photography-studio --branch=${{ github.ref_name == 'staging' && 'staging' || 'main' }} --commit-dirty=true
+          # staging branch -> preview URL (staging.jefferson-photo-studio.pages.dev);
+          # everything else -> production (jefferson-photo-studio.pages.dev).
+          command: pages deploy dist --project-name=jefferson-photo-studio --branch=${{ github.ref_name == 'staging' && 'staging' || 'main' }} --commit-dirty=true
+      # The app used to live at infrared-photography-studio.pages.dev. Keep that
+      # old project alive but serving only a 301 -> the new home (see redirect/),
+      # so existing links and Home-Screen installs still land somewhere useful.
+      # Production pushes only — staging must never touch the old prod domain.
+      - name: Redirect the old domain to the new one
+        if: github.ref_name == 'main'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy redirect --project-name=infrared-photography-studio --branch=main --commit-dirty=true
