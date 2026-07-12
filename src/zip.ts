@@ -84,7 +84,7 @@ async function inflateRaw(comp: Uint8Array): Promise<Uint8Array> {
 // batch export to hand back one .zip through the share sheet.
 
 let CRC_TABLE: Uint32Array | null = null;
-function crc32(bytes: Uint8Array): number {
+export function crc32(bytes: Uint8Array): number {
   if (!CRC_TABLE) {
     CRC_TABLE = new Uint32Array(256);
     for (let n = 0; n < 256; n++) {
@@ -105,9 +105,19 @@ function dosDateTime(d: Date): { time: number; date: number } {
   return { time, date };
 }
 
+/** An entry for writeZip. `data` may be a Blob — browsers keep large Blob
+ *  parts disk-backed, so a zip of Blobs never materializes fully in RAM;
+ *  that's why crc/size are passed in rather than computed here. */
+export interface ZipWriteEntry {
+  name: string;
+  size: number;
+  crc: number;
+  data: Blob | Uint8Array;
+}
+
 /** Build a .zip from a set of entries (stored, uncompressed). Names are
  *  written as UTF-8 with the language-encoding flag set. */
-export function writeZip(files: ZipEntry[], modified: Date): Blob {
+export function writeZip(files: ZipWriteEntry[], modified: Date): Blob {
   const { time, date } = dosDateTime(modified);
   const enc = new TextEncoder();
   const locals: BlobPart[] = [];
@@ -117,8 +127,7 @@ export function writeZip(files: ZipEntry[], modified: Date): Blob {
 
   for (const f of files) {
     const nameBytes = enc.encode(f.name);
-    const crc = crc32(f.bytes);
-    const size = f.bytes.length;
+    const { crc, size } = f;
 
     const local = new Uint8Array(30 + nameBytes.length);
     const lv = new DataView(local.buffer);
@@ -134,7 +143,7 @@ export function writeZip(files: ZipEntry[], modified: Date): Blob {
     lv.setUint16(26, nameBytes.length, true);
     lv.setUint16(28, 0, true); // extra len
     local.set(nameBytes, 30);
-    locals.push(local, f.bytes as unknown as BlobPart);
+    locals.push(local, f.data as unknown as BlobPart);
 
     const central = new Uint8Array(46 + nameBytes.length);
     const cv = new DataView(central.buffer);

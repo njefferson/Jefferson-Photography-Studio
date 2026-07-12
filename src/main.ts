@@ -3,7 +3,8 @@ import { importFile, type ImportedFile } from "./import";
 import { decode, type DecodedImage } from "./decode";
 import { Renderer, type EditParams } from "./gl";
 import { exportImage, download, type ExportFormat } from "./export";
-import { writeZip } from "./zip";
+import { writeZip, crc32 } from "./zip";
+import { putFrame, eachFrame, frameMetas, frameCount, clearFrames } from "./batchstore";
 import { TONE_DEFAULT, TONE_X, toneEvaluator, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, chromaVec, hsv2rgb, type MaskLayer } from "./pipeline";
 import { generateCube } from "./lut";
 import { generateDcp } from "./dcp";
@@ -1964,7 +1965,10 @@ function showBusy(text: string) {
 function hideBusy() {
   busy.hidden = true;
   pendingSave = null;
+  pendingSaveIsBatch = false;
   busyStop.hidden = true;
+  busyContinue.hidden = true;
+  busySave.hidden = false;
 }
 
 busyClose.addEventListener("click", hideBusy);
@@ -1974,17 +1978,30 @@ busySave.addEventListener("click", async () => {
   const { blob, name } = pendingSave;
   const file = new File([blob], name, { type: blob.type || "application/octet-stream" });
   const nav = navigator as Navigator & { canShare?: (d: { files: File[] }) => boolean };
+  let saved = false;
   if (nav.canShare?.({ files: [file] })) {
     try {
       await navigator.share({ files: [file] } as ShareData);
-      hideBusy();
-      return;
+      saved = true;
     } catch (err) {
       if ((err as Error).name === "AbortError") return; // user cancelled the sheet
       // Fall through to a plain download on any other failure.
     }
   }
-  download(blob, name);
+  if (!saved) download(blob, name);
+  if (pendingSaveIsBatch) {
+    // The frames are safely in the saved zip — the crash-recovery copies can go.
+    await clearFrames().catch(() => {});
+    recoverBtn.hidden = true;
+    pendingSaveIsBatch = false;
+    if (batchRemaining.length) {
+      // Stopped mid-set and saved the first part: stay open so Continue is a tap away.
+      pendingSave = null;
+      busySave.hidden = true;
+      busyText.textContent = `Saved — ${batchRemaining.length} photo${batchRemaining.length === 1 ? "" : "s"} still to process.`;
+      return;
+    }
+  }
   hideBusy();
 });
 
@@ -2081,11 +2098,13 @@ function uniqueName(name: string, taken: Set<string>): string {
 
 const batchInput = $("batchFiles") as HTMLInputElement;
 const busyStop = $("busyStop") as HTMLButtonElement;
+const busyContinue = $("busyContinue") as HTMLButtonElement;
+const recoverBtn = $("recoverBatch") as HTMLButtonElement;
 
-// Finished output held in RAM before it becomes the zip. iPad Safari kills the
-// tab well before physical RAM runs out, so stop adding frames past this and
-// hand back what's done rather than crash mid-run and lose everything.
-const BATCH_BYTE_BUDGET = 400 * 1024 * 1024;
+// Each finished frame goes straight into IndexedDB (disk-backed — see
+// batchstore.ts) and is never held in RAM, so this backstop is about the
+// final zip Blob and storage quota, not working memory.
+const BATCH_BYTE_BUDGET = 2 * 1024 * 1024 * 1024;
 
 /** Chrome exposes heap stats; Safari doesn't (the byte budget covers it). */
 function heapNearFull(): boolean {
@@ -2094,37 +2113,57 @@ function heapNearFull(): boolean {
 }
 
 let batchStopRequested = false;
+let batchRemaining: File[] = []; // input Files not yet processed after a stop
+let batchSettings: { look: SavedLook; format: ExportFormat; scale: number; quality: number } | null = null;
+let pendingSaveIsBatch = false;
+
 busyStop.addEventListener("click", () => {
   batchStopRequested = true;
   busyStop.disabled = true;
   busyStop.textContent = "Stopping — finishing this photo…";
 });
 
-batchInput.addEventListener("change", async () => {
-  const files = Array.from(batchInput.files ?? []);
-  batchInput.value = ""; // let the same set be re-picked later
-  if (!files.length) return;
+/** Zip every stored frame and present the save UI. Rows are cursor-read one
+ *  at a time and immediately wrapped in a per-frame Blob (engines spool big
+ *  Blobs to disk), so RAM holds ~one frame however large the batch. */
+async function bundleStored(header: string): Promise<boolean> {
+  busyText.textContent = "Bundling…";
+  const entries: { name: string; size: number; crc: number; data: Blob }[] = [];
+  await eachFrame((f) => entries.push({ name: f.name, size: f.size, crc: f.crc, data: new Blob(f.parts) }));
+  if (!entries.length) return false;
+  const zipBlob = writeZip(entries, new Date());
+  pendingSave = { blob: zipBlob, name: `IR-batch-${entries.length}.zip` };
+  pendingSaveIsBatch = true;
+  busyText.textContent = header;
+  busySpinner.hidden = true;
+  busySave.hidden = false;
+  busyActions.hidden = false;
+  busyContinue.hidden = batchRemaining.length === 0;
+  busyContinue.textContent = `Continue — ${batchRemaining.length} left`;
+  return true;
+}
 
-  const look = currentLook();
-  const format = ui.exFormat.value as ExportFormat;
-  const scale = Number(ui.exScale.value);
-  const quality = Number(ui.exQuality.value);
-
-  const outputs: { name: string; bytes: Uint8Array }[] = [];
-  const taken = new Set<string>();
+async function runBatch(files: File[]) {
+  const { look, format, scale, quality } = batchSettings!;
   const skipped: string[] = [];
-  let totalBytes = 0;
   let stoppedEarly: "user" | "memory" | null = null;
   batchStopRequested = false;
   busyStop.disabled = false;
   busyStop.textContent = "Stop & save what's done";
   showBusy(`Processing 0 / ${files.length}…`);
   busyStop.hidden = false;
+  recoverBtn.hidden = true;
 
   try {
+    // Frames already stored (an earlier stopped part, or accepted leftovers)
+    // keep their names and count toward the budget; the final zip includes them.
+    const taken = new Set<string>();
+    let totalBytes = 0;
+    for (const m of await frameMetas()) { taken.add(m.name); totalBytes += m.size; }
+
     for (let i = 0; i < files.length; i++) {
-      if (batchStopRequested) { stoppedEarly = "user"; break; }
-      if (totalBytes > BATCH_BYTE_BUDGET || heapNearFull()) { stoppedEarly = "memory"; break; }
+      if (batchStopRequested) { stoppedEarly = "user"; batchRemaining = files.slice(i); break; }
+      if (totalBytes > BATCH_BYTE_BUDGET || heapNearFull()) { stoppedEarly = "memory"; batchRemaining = files.slice(i); break; }
       const f = files[i];
       busyText.textContent = `Processing ${i + 1} / ${files.length} — ${f.name}`;
       try {
@@ -2139,39 +2178,90 @@ batchInput.addEventListener("change", async () => {
           { format, scale, quality, rotate: img.rotate ?? 0 },
           (fr) => { busyText.textContent = `Processing ${i + 1} / ${files.length} — ${f.name} · ${Math.round(fr * 100)}%`; },
         );
+        // Persist immediately (crash-safe), keep nothing in RAM. Stored in
+        // small chunks — see batchstore.ts for why never one big value.
         const bytes = new Uint8Array(await result.blob.arrayBuffer());
+        await putFrame(uniqueName(result.name, taken), crc32(bytes), bytes.length, bytes);
         totalBytes += bytes.length;
-        outputs.push({ name: uniqueName(result.name, taken), bytes });
       } catch (err) {
         skipped.push(`${f.name} (${(err as Error).message})`);
       }
     }
 
     busyStop.hidden = true;
-    if (!outputs.length) {
+    if (!stoppedEarly) batchRemaining = [];
+    const count = await frameCount();
+    if (!count) {
       hideBusy();
       alert(stoppedEarly ? "Stopped — nothing was finished yet." : "Nothing could be processed.\n\n" + skipped.join("\n"));
       return;
     }
-
-    busyText.textContent = "Bundling…";
-    const zipBlob = writeZip(outputs, new Date());
-    pendingSave = { blob: zipBlob, name: `IR-batch-${outputs.length}.zip` };
-    const done = `${outputs.length} of ${files.length}`;
+    const n = `${count} image${count === 1 ? "" : "s"}`;
     const note = skipped.length ? ` · ${skipped.length} skipped` : "";
-    busyText.textContent =
-      stoppedEarly === "user" ? `Stopped — ${done} in a .zip${note}`
-      : stoppedEarly === "memory" ? `Memory is nearly full — saved the first ${done} as a .zip${note}. Save it, then run the rest as a second batch.`
-      : `Ready — ${outputs.length} image${outputs.length === 1 ? "" : "s"} in a .zip${note}`;
-    busySpinner.hidden = true;
-    busyActions.hidden = false;
+    await bundleStored(
+      stoppedEarly === "user" ? `Stopped — ${n} ready in a .zip${note}`
+      : stoppedEarly === "memory" ? `Stopped by the memory guard — ${n} ready in a .zip${note}. Save it, then Continue.`
+      : `Ready — ${n} in a .zip${note}`,
+    );
     if (skipped.length) console.warn("Batch skipped:\n" + skipped.join("\n"));
   } catch (err) {
     busyStop.hidden = true;
     hideBusy();
     alert("Batch failed: " + (err as Error).message);
   }
+}
+
+batchInput.addEventListener("change", async () => {
+  const files = Array.from(batchInput.files ?? []);
+  batchInput.value = ""; // let the same set be re-picked later
+  if (!files.length) return;
+  // Leftover frames from an interrupted batch would silently mix into this
+  // zip — ask, honestly, instead of guessing.
+  const leftovers = await frameCount().catch(() => 0);
+  if (
+    leftovers &&
+    !confirm(
+      `${leftovers} finished image${leftovers === 1 ? "" : "s"} from an interrupted batch ${leftovers === 1 ? "is" : "are"} still stored.\n\n` +
+        `OK — include ${leftovers === 1 ? "it" : "them"} in this batch's .zip.\nCancel — go back and use "Recover" on the start screen first.`,
+    )
+  )
+    return;
+  batchSettings = { look: currentLook(), format: ui.exFormat.value as ExportFormat, scale: Number(ui.exScale.value), quality: Number(ui.exQuality.value) };
+  batchRemaining = [];
+  runBatch(files);
 });
+
+busyContinue.addEventListener("click", () => {
+  const files = batchRemaining;
+  batchRemaining = [];
+  busyContinue.hidden = true;
+  runBatch(files);
+});
+
+// An interrupted batch (crash, closed tab) leaves its finished frames stored —
+// offer them on the start screen instead of losing the work.
+recoverBtn.addEventListener("click", async () => {
+  batchRemaining = [];
+  showBusy("Bundling…");
+  if (await bundleStored("Recovered from the interrupted batch — ready to save.")) {
+    recoverBtn.hidden = true;
+  } else {
+    hideBusy();
+    recoverBtn.hidden = true;
+  }
+});
+
+(async () => {
+  try {
+    const n = await frameCount();
+    if (n) {
+      recoverBtn.textContent = `Recover ${n} finished image${n === 1 ? "" : "s"} from an interrupted batch`;
+      recoverBtn.hidden = false;
+    }
+  } catch {
+    /* IndexedDB unavailable — batches still run, just without crash recovery */
+  }
+})();
 
 // Profile / LUT export — encodes the current look for reuse elsewhere.
 ui.cubeBtn.addEventListener("click", () => {

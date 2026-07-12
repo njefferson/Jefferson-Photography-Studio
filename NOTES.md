@@ -129,14 +129,35 @@ See **`PLAN.md`** for the full build plan.
   Entry points: a "Process many photos…" action on the welcome screen and a
   "Process many" button in the top bar next to Open image (both are labels for
   the same hidden multi-file input) — deliberately NOT buried in Export, which
-  is the last accordion (owner feedback 2026-07-12). Graceful exit (owner ask,
-  same day): a "Stop & save what's done" button during the run (checked
-  between frames — a frame in flight finishes first), plus a self-stop when
-  finished output exceeds a 400 MB in-RAM budget or (Chrome only —
-  performance.memory doesn't exist on Safari) the JS heap passes 85%; either
-  way the finished frames come back as a partial .zip with an honest message
-  ("saved the first N of M — run the rest as a second batch"), never a crash
-  that loses everything.
+  is the last accordion (owner feedback 2026-07-12). Graceful exit + resume
+  (owner asks, same day): every finished frame is persisted to IndexedDB the
+  moment it completes (src/batchstore.ts; iOS Safari cannot silently write real
+  files, so IDB is the only honest "save as you go"). MEASURED (2026-07-12,
+  on-disk Chromium profile): IDB values ≳64 KB (100 KB tested) — Blob and
+  ArrayBuffer alike — are externalized to a lazily-flushed sidecar and never
+  appear in the LevelDB log at commit, even with durability:"strict"; values
+  ≤60 KB land in the on-disk log AT oncomplete. So frames are stored as ≤30 KB
+  chunk rows, one strict-durability transaction per frame (meta row + chunks,
+  all-or-nothing): a 1.4 MB frame measurably hit the log the moment its write
+  resolved, survived a hard browser kill mid-next-frame, and was offered for
+  recovery on relaunch. Reads materialize one frame at a time (frameMetas +
+  per-frame chunk getAll); each frame becomes its own Blob part for the zip
+  (writeZip takes {name,size,crc,data}), so RAM holds ~one frame end-to-end.
+  DB is "ips-batch" v2 (meta + chunks; v1's whole-frame store is dropped on
+  upgrade). TESTING GOTCHA that burned an hour: Playwright's waitForFunction
+  does NOT await a Promise-returning predicate — a Promise object is truthy,
+  so such a poll "passes" instantly and you kill the browser before anything
+  was ever written; poll on synchronous DOM state (the progress text) instead.
+  "Stop & save what's done" (checked between frames — the frame in flight
+  finishes first) → partial zip + a "Continue — N left" button that resumes the
+  remaining input Files in-session (they stay alive only within the page
+  session; after a reload the user must re-pick — no persistent file handles in
+  Safari). Crash/close mid-batch → the start screen offers "Recover N finished
+  images from an interrupted batch" on next launch. Stored frames are cleared
+  only after their zip is actually saved (share/download), and starting a new
+  batch with leftovers present asks (confirm) whether to include or recover
+  them first. Memory guard kept as a backstop: 2 GB stored-output budget +
+  (Chrome-only) 85% JS-heap check.
   Verified end-to-end in headless chromium: mixed PNG + DNG set → CRC-clean zip
   of real decodable JPEGs, per-file names with collision de-dup (…-2.jpg). RAW
   frames skip the hot-spot fix (JPEG-only profiles, same as single open).
