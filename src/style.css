@@ -248,6 +248,19 @@ body {
   font-size: 16px;
   padding: 10px 22px;
 }
+.welcome-batch {
+  display: inline-block;
+  margin: 10px auto 2px;
+  font-size: 15px;
+  padding: 9px 20px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #202028;
+  color: #f2f2f4;
+  cursor: pointer;
+}
+.welcome-batch:active { background: #2a2a34; }
+.welcome-batch-hint { max-width: 30rem; margin: 2px auto 0; font-size: 12.5px; line-height: 1.5; color: #80808a; }
 .bar-actions { display: inline-flex; align-items: center; gap: 10px; }
 .bar-btn { width: auto; padding: 8px 14px; }
 .lesson-show {
