@@ -1964,6 +1964,7 @@ function showBusy(text: string) {
 function hideBusy() {
   busy.hidden = true;
   pendingSave = null;
+  busyStop.hidden = true;
 }
 
 busyClose.addEventListener("click", hideBusy);
@@ -2079,6 +2080,25 @@ function uniqueName(name: string, taken: Set<string>): string {
 }
 
 const batchInput = $("batchFiles") as HTMLInputElement;
+const busyStop = $("busyStop") as HTMLButtonElement;
+
+// Finished output held in RAM before it becomes the zip. iPad Safari kills the
+// tab well before physical RAM runs out, so stop adding frames past this and
+// hand back what's done rather than crash mid-run and lose everything.
+const BATCH_BYTE_BUDGET = 400 * 1024 * 1024;
+
+/** Chrome exposes heap stats; Safari doesn't (the byte budget covers it). */
+function heapNearFull(): boolean {
+  const m = (performance as { memory?: { usedJSHeapSize: number; jsHeapSizeLimit: number } }).memory;
+  return !!m && m.usedJSHeapSize > 0.85 * m.jsHeapSizeLimit;
+}
+
+let batchStopRequested = false;
+busyStop.addEventListener("click", () => {
+  batchStopRequested = true;
+  busyStop.disabled = true;
+  busyStop.textContent = "Stopping — finishing this photo…";
+});
 
 batchInput.addEventListener("change", async () => {
   const files = Array.from(batchInput.files ?? []);
@@ -2093,10 +2113,18 @@ batchInput.addEventListener("change", async () => {
   const outputs: { name: string; bytes: Uint8Array }[] = [];
   const taken = new Set<string>();
   const skipped: string[] = [];
+  let totalBytes = 0;
+  let stoppedEarly: "user" | "memory" | null = null;
+  batchStopRequested = false;
+  busyStop.disabled = false;
+  busyStop.textContent = "Stop & save what's done";
   showBusy(`Processing 0 / ${files.length}…`);
+  busyStop.hidden = false;
 
   try {
     for (let i = 0; i < files.length; i++) {
+      if (batchStopRequested) { stoppedEarly = "user"; break; }
+      if (totalBytes > BATCH_BYTE_BUDGET || heapNearFull()) { stoppedEarly = "memory"; break; }
       const f = files[i];
       busyText.textContent = `Processing ${i + 1} / ${files.length} — ${f.name}`;
       try {
@@ -2111,27 +2139,35 @@ batchInput.addEventListener("change", async () => {
           { format, scale, quality, rotate: img.rotate ?? 0 },
           (fr) => { busyText.textContent = `Processing ${i + 1} / ${files.length} — ${f.name} · ${Math.round(fr * 100)}%`; },
         );
-        outputs.push({ name: uniqueName(result.name, taken), bytes: new Uint8Array(await result.blob.arrayBuffer()) });
+        const bytes = new Uint8Array(await result.blob.arrayBuffer());
+        totalBytes += bytes.length;
+        outputs.push({ name: uniqueName(result.name, taken), bytes });
       } catch (err) {
         skipped.push(`${f.name} (${(err as Error).message})`);
       }
     }
 
+    busyStop.hidden = true;
     if (!outputs.length) {
       hideBusy();
-      alert("Nothing could be processed.\n\n" + skipped.join("\n"));
+      alert(stoppedEarly ? "Stopped — nothing was finished yet." : "Nothing could be processed.\n\n" + skipped.join("\n"));
       return;
     }
 
     busyText.textContent = "Bundling…";
     const zipBlob = writeZip(outputs, new Date());
     pendingSave = { blob: zipBlob, name: `IR-batch-${outputs.length}.zip` };
+    const done = `${outputs.length} of ${files.length}`;
     const note = skipped.length ? ` · ${skipped.length} skipped` : "";
-    busyText.textContent = `Ready — ${outputs.length} image${outputs.length === 1 ? "" : "s"} in a .zip${note}`;
+    busyText.textContent =
+      stoppedEarly === "user" ? `Stopped — ${done} in a .zip${note}`
+      : stoppedEarly === "memory" ? `Memory is nearly full — saved the first ${done} as a .zip${note}. Save it, then run the rest as a second batch.`
+      : `Ready — ${outputs.length} image${outputs.length === 1 ? "" : "s"} in a .zip${note}`;
     busySpinner.hidden = true;
     busyActions.hidden = false;
     if (skipped.length) console.warn("Batch skipped:\n" + skipped.join("\n"));
   } catch (err) {
+    busyStop.hidden = true;
     hideBusy();
     alert("Batch failed: " + (err as Error).message);
   }
@@ -2219,10 +2255,12 @@ function estimateDenoise(img: DecodedImage): number {
   if (!diffs.length) return 0;
   diffs.sort((a, b) => a - b);
   const med = diffs[Math.floor(diffs.length / 2)];
-  // Auto position on the quadratic slider (see rangeSigma): a gentle floor so a
-  // grainy frame opens with a touch of smoothing and a starting point to nudge
-  // from, scaling up with measured shadow noise, capped well short of the top.
-  return clamp(0.2 + (med - 0.013) * 18, 0, 0.75);
+  // Work in sigma, then invert the slider's curve (sigma = 0.10·s², see
+  // rangeSigma): the range sigma that smooths grain without eating edges is
+  // a small multiple of the measured relative noise itself. Capped at 3/4 so
+  // auto always leaves headroom to push.
+  const targetSigma = 1.6 * med;
+  return clamp(Math.sqrt(targetSigma / 0.1), 0, 0.75);
 }
 
 /** Exposure so the bright end of the image (post WB + camera matrix) ~= 0.85. */

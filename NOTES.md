@@ -129,7 +129,14 @@ See **`PLAN.md`** for the full build plan.
   Entry points: a "Process many photos…" action on the welcome screen and a
   "Process many" button in the top bar next to Open image (both are labels for
   the same hidden multi-file input) — deliberately NOT buried in Export, which
-  is the last accordion (owner feedback 2026-07-12).
+  is the last accordion (owner feedback 2026-07-12). Graceful exit (owner ask,
+  same day): a "Stop & save what's done" button during the run (checked
+  between frames — a frame in flight finishes first), plus a self-stop when
+  finished output exceeds a 400 MB in-RAM budget or (Chrome only —
+  performance.memory doesn't exist on Safari) the JS heap passes 85%; either
+  way the finished frames come back as a partial .zip with an honest message
+  ("saved the first N of M — run the rest as a second batch"), never a crash
+  that loses everything.
   Verified end-to-end in headless chromium: mixed PNG + DNG set → CRC-clean zip
   of real decodable JPEGs, per-file names with collision de-dup (…-2.jpg). RAW
   frames skip the hot-spot fix (JPEG-only profiles, same as single open).
@@ -137,16 +144,17 @@ See **`PLAN.md`** for the full build plan.
   Safari, and memory behaviour on a large full-res set (outputs accumulate in
   RAM until the zip is built).
 - [x] **Gentler denoise + usable slider** — the slider was far too aggressive
-  (top sigma 0.63, near a box blur, 0.2 auto floor). Now QUADRATIC:
-  sigma = 0.03 + 0.12·strength² (0.15 ceiling) in BOTH the shader and the CPU
-  path (raw/denoise.ts — kept bit-identical for GPU==CPU parity). The square
-  is the fix for the owner's "one pixel between too little and too much"
-  (2026-07-12): a bilateral's grain→smear transition is a narrow sigma band, so
-  a linear slider crammed it into the far left; squaring spreads the gentle
-  low-sigma zone across the bottom half of the track (0.03→0.06 over the first
-  half, 0.06→0.15 over the top). Auto = clamp(0.2 + (med−0.013)·18, 0, 0.75) so
-  a grainy frame opens around 0.12 (a touch of smoothing + a place to nudge
-  from). Exact feel is still the owner's on-device call.
+  (top sigma 0.63, near a box blur, 0.2 auto floor). Now QUADRATIC AND
+  FLOORLESS: sigma = 0.10·strength², in BOTH the shader and the CPU path
+  (raw/denoise.ts — kept bit-identical for GPU==CPU parity). Two owner
+  feedback rounds (2026-07-12) shaped this; both failure modes matter:
+  (1) a LINEAR slider crams the bilateral's narrow grain→smear sigma band
+  into the first pixel of travel — the square spreads it; (2) an ADDITIVE
+  FLOOR (first try was 0.03 + 0.12·s²) makes 0→first-step a hard jump to
+  sigma 0.03, which on a flat IR sky is already heavy — "0 is none and the
+  first step is more than enough". Never re-add a floor; the curve must pass
+  through zero. Auto inverts the curve from measured noise:
+  s = clamp(sqrt(1.6·med / 0.10), 0, 0.75). Exact feel = owner's call.
 - [x] **Drag on photo to adjust** — Lightroom-style targeted adjustment (shipped
   2026-07-05): arm the tool, then drag on the photo — UP/DOWN scales that
   colour's luminance, LEFT/RIGHT shifts its hue. The colour under your finger

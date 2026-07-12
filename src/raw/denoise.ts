@@ -21,13 +21,16 @@ for (let dy = -R; dy <= R; dy++) {
 }
 
 /** Relative-luma range sigma for a 0..1 strength. Mirrored in the shader.
- *  QUADRATIC on purpose: a bilateral goes from "keeps the grain" to "smears
- *  detail" across a tiny band of sigma, so a linear slider put that whole band
- *  in the first pixel of travel. Squaring the strength spreads the gentle
- *  low-sigma zone — where you actually dial noise — across most of the track,
- *  with a low 0.15 ceiling so the top is still safe. Keep gl.ts in sync. */
+ *  QUADRATIC AND FLOORLESS on purpose. A bilateral goes from "keeps the
+ *  grain" to "smears detail" across a tiny band of sigma, so a linear slider
+ *  put that whole band in the first pixel of travel; squaring spreads the
+ *  gentle zone across the track. Any additive floor is just as bad in a
+ *  different way: it made strength 0 -> 0.01 a hard step to sigma 0.03 (on a
+ *  flat sky that's already heavy smoothing — "0 is none, the first step is
+ *  more than enough"). From zero, continuously: sigma = 0.10·s².
+ *  Keep gl.ts's literal in sync with this. */
 export function rangeSigma(strength: number): number {
-  return 0.03 + 0.12 * strength * strength;
+  return 0.1 * strength * strength;
 }
 
 export type LinearSampler = (x: number, y: number) => [number, number, number];
