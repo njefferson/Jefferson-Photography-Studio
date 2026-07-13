@@ -1738,23 +1738,53 @@ canvas.addEventListener("pointercancel", endPointer);
 
 const welcome = $("welcome") as HTMLDivElement;
 const welcomeClose = $("welcomeClose") as HTMLButtonElement;
+const welcomeBack = $("welcomeBack") as HTMLButtonElement;
 const lesson = $("lesson") as HTMLDivElement;
 const lessonShow = $("lessonShow") as HTMLButtonElement;
 
-// "Examples" in the header re-opens the welcome/example chooser at any time;
-// the ✕ (only shown once an image is loaded) returns to the photo.
-$("examplesBtn").addEventListener("click", () => {
-  welcomeClose.hidden = !current;
-  hint.hidden = !!current;
+// Navigation escape hatch. The old flows assumed the next action would always
+// carry you where you needed to go — but after Resume (or any open) the only
+// way off the photo was the session's Done, which ENDS it. Home returns to the
+// start screen WITHOUT ending anything: the photo/session stays live in memory
+// (and in storage), so the return button — or a reload's Resume — drops you
+// right back. This is also what the header's Tutorials button does (the start
+// screen is where the examples live), so both share goHome().
+function goHome() {
+  captureActiveEdit(); // park any in-flight edit before leaving the photo
   welcome.hidden = false;
-  histWrap.hidden = true; // keep the histogram from floating over the chooser
-  renderMaskOverlay(); // hide the overlay while the chooser is up
-});
-welcomeClose.addEventListener("click", () => {
+  hint.hidden = !!current; // the tagline is for a cold start, not a return
+  histWrap.hidden = true; // keep the histogram from floating over the card
+  // The session strip sits above the welcome card (z-index) — hide it while the
+  // start screen is up; returnToEditor()/an open flow bring it back.
+  sessionStrip.hidden = true;
+  stageEl.classList.remove("has-session");
+  updateWelcomeReturn();
+  updateSessionResume();
+  renderMaskOverlay(); // hide the mask overlay while the card is up
+}
+
+/** Show/label the return controls (corner ✕ + the prominent Back button) only
+ *  when there's a live photo or session to go back to. */
+function updateWelcomeReturn() {
+  const real = sessionPhotos.filter((p) => p.id !== "lone").length;
+  welcomeClose.hidden = !current;
+  welcomeBack.hidden = !current;
+  welcomeBack.textContent = real >= 2 ? `‹ Back to your session (${real} photos)` : "‹ Back to your photo";
+}
+
+/** Leave the start screen and return to the live photo/session, restoring the
+ *  session strip and stage sizing. */
+function returnToEditor() {
   welcome.hidden = true;
   updateHistVisibility();
+  updateSessionStrip(); // repaint + reshow the strip for a live session
   renderMaskOverlay();
-});
+}
+
+$("homeBtn").addEventListener("click", goHome);
+$("examplesBtn").addEventListener("click", goHome);
+welcomeClose.addEventListener("click", returnToEditor);
+welcomeBack.addEventListener("click", returnToEditor);
 
 /** Show an already-decoded image: upload it, build its reference maps and set
  *  the view. Does NOT touch the edit — callers follow with either a fresh
@@ -1856,6 +1886,7 @@ fileInput.addEventListener("change", async () => {
     welcome.hidden = false;
     hint.hidden = false;
     hint.textContent = "Could not open this file: " + (err as Error).message;
+    updateWelcomeReturn();
   }
 });
 
@@ -2152,6 +2183,7 @@ async function addToSession(files: File[], append: boolean) {
     welcome.hidden = false;
     hint.hidden = false;
     hint.textContent = "Nothing could be opened.";
+    updateWelcomeReturn();
   }
 }
 
@@ -2204,10 +2236,10 @@ async function endSession() {
   currentFile = null;
   panel.hidden = true;
   welcome.hidden = false;
-  welcomeClose.hidden = true;
   hint.hidden = false;
   hint.textContent = "Edit infrared photos — RAW (NEF / DNG) unlocks the full color magic.";
   histWrap.hidden = true;
+  updateWelcomeReturn(); // current is null now → hide the ✕ / Back controls
   renderMaskOverlay();
   updateSessionResume();
 }
@@ -2406,6 +2438,7 @@ async function keepQuickLook() {
     welcome.hidden = false;
     hint.hidden = false;
     hint.textContent = "Could not open these files: " + (err as Error).message;
+    updateWelcomeReturn();
   }
 }
 

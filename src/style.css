@@ -292,6 +292,24 @@ body {
 .welcome-batch-hint { max-width: 30rem; margin: 2px auto 0; font-size: 12.5px; line-height: 1.5; color: #80808a; }
 .welcome-open-hint { max-width: 30rem; margin: 2px auto 4px; font-size: 12.5px; line-height: 1.5; color: #9a9aa6; }
 #resumeSession { border-color: var(--accent); color: #dfe6ff; }
+/* Prominent "return to what you were doing" control at the top of the start
+   screen — shown only when a photo or session is still open behind it. */
+.welcome-back {
+  display: block;
+  width: fit-content;
+  margin: 0 auto 14px;
+  padding: 8px 18px;
+  font-size: 14px;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  background: #23283a;
+  color: #dfe6ff;
+  cursor: pointer;
+}
+.welcome-back:active { background: #2b3350; }
+/* Home button: house icon + label, aligned like the other bar buttons. */
+#homeBtn { display: inline-flex; align-items: center; gap: 6px; }
+#homeBtn svg { display: block; }
 
 /* --- Photo session strip: big tappable previews along the bottom of the
    stage. Sits over the image (never under the panel), semi-transparent so the
