@@ -2074,13 +2074,17 @@ function batchParamsFor(img: DecodedImage, look: SavedLook): EditParams {
 
 /** Bake the EXIF-selected hot-spot correction into a decoded frame's pixels,
  *  matching initHotspot(). If the lens can't be identified from EXIF we skip
- *  it for that frame — a bulk run can't stop to ask per photo. */
-function applyBatchHotspot(img: DecodedImage, imported: ImportedFile): boolean {
-  if (!img.pixels) return false; // RAW: profiles are JPEG-only for now
+ *  it for that frame — a bulk run can't stop to ask per photo.
+ *  Returns which happened so the batch summary can be honest:
+ *   - "applied": hot-spot correction was baked in;
+ *   - "no-lens": a JPEG whose EXIF didn't name a lens we have a profile for;
+ *   - "raw": RAW frame (profiles are JPEG-only for now — a known, separate skip). */
+function applyBatchHotspot(img: DecodedImage, imported: ImportedFile): "applied" | "no-lens" | "raw" {
+  if (!img.pixels) return "raw"; // RAW: profiles are JPEG-only for now
   const info = Hotspot.fromExif(arrayBufferOf(imported.bytes));
-  if (!info || Hotspot.needsPrompt(info) || !info.profileKey) return false;
+  if (!info || Hotspot.needsPrompt(info) || !info.profileKey) return "no-lens";
   Hotspot.apply({ width: img.width, height: img.height, data: img.pixels }, info.profileKey, 1);
-  return true;
+  return "applied";
 }
 
 /** Ensure every entry in the zip has a unique name (…-2.jpg on collision). */
@@ -2110,6 +2114,26 @@ const BATCH_BYTE_BUDGET = 2 * 1024 * 1024 * 1024;
 function heapNearFull(): boolean {
   const m = (performance as { memory?: { usedJSHeapSize: number; jsHeapSizeLimit: number } }).memory;
   return !!m && m.usedJSHeapSize > 0.85 * m.jsHeapSizeLimit;
+}
+
+/** Ask for persistent storage before a batch so the OS is less likely to evict
+ *  the crash-recovery data mid-run (iOS clears "best-effort" IDB under pressure).
+ *  Best-effort itself — unsupported or denied just means the batch runs without
+ *  the extra durability promise. */
+async function requestPersistentStorage(): Promise<void> {
+  try {
+    await (navigator as { storage?: { persist?(): Promise<boolean> } }).storage?.persist?.();
+  } catch {
+    /* not supported / denied — the batch still runs */
+  }
+}
+
+/** A write that failed because the device is out of storage quota (as opposed
+ *  to a decode/export error for one bad file). IndexedDB reports this as a
+ *  DOMException; match by name (code 22 is the legacy spelling). */
+function isQuotaError(err: unknown): boolean {
+  const name = (err as { name?: string } | null)?.name;
+  return name === "QuotaExceededError" || (err instanceof DOMException && err.code === 22);
 }
 
 let batchStopRequested = false;
@@ -2169,7 +2193,8 @@ async function runBatch(files: File[]) {
   const { look, format, scale, quality } = batchSettings!;
   const skipped: string[] = [];
   let alreadyDone = 0;
-  let stoppedEarly: "user" | "memory" | null = null;
+  let noHotspot = 0; // JPEG frames whose lens wasn't in EXIF → no hot-spot fix
+  let stoppedEarly: "user" | "memory" | "quota" | null = null;
   batchStopRequested = false;
   batchRunning = true;
   busyStop.disabled = false;
@@ -2178,6 +2203,7 @@ async function runBatch(files: File[]) {
   busyStop.hidden = false;
   recoverBtn.hidden = true;
   await acquireWakeLock();
+  await requestPersistentStorage();
 
   try {
     // Frames already stored (an earlier stopped part, or accepted leftovers)
@@ -2203,7 +2229,7 @@ async function runBatch(files: File[]) {
         const imported = await importFile(f);
         if (imported.looksTranscoded) { skipped.push(`${f.name} (arrived as flattened JPEG)`); continue; }
         const img = await decode(imported);
-        applyBatchHotspot(img, imported);
+        if (applyBatchHotspot(img, imported) === "no-lens") noHotspot++;
         const result = await exportImage(
           imported,
           img,
@@ -2214,10 +2240,18 @@ async function runBatch(files: File[]) {
         // Persist immediately (crash-safe), keep nothing in RAM. Stored in
         // small chunks — see batchstore.ts for why never one big value.
         const bytes = new Uint8Array(await result.blob.arrayBuffer());
-        await putFrame(
-          { name: uniqueName(result.name, taken), crc: crc32(bytes), size: bytes.length, srcName: f.name, srcSize: f.size },
-          bytes,
-        );
+        try {
+          await putFrame(
+            { name: uniqueName(result.name, taken), crc: crc32(bytes), size: bytes.length, srcName: f.name, srcSize: f.size },
+            bytes,
+          );
+        } catch (err) {
+          // Out of device storage: stop like the memory guard rather than
+          // spewing a cryptic per-frame skip. This frame isn't stored, so it
+          // stays in the remaining set to retry after the user frees space.
+          if (isQuotaError(err)) { stoppedEarly = "quota"; batchRemaining = files.slice(i); break; }
+          throw err;
+        }
         totalBytes += bytes.length;
         doneInputs.add(`${f.name} ${f.size}`);
       } catch (err) {
@@ -2236,10 +2270,12 @@ async function runBatch(files: File[]) {
     const n = `${count} image${count === 1 ? "" : "s"}`;
     const note =
       (skipped.length ? ` · ${skipped.length} skipped` : "") +
+      (noHotspot ? ` · ${noHotspot} without lens hot-spot fix` : "") +
       (alreadyDone ? ` · ${alreadyDone} already done earlier` : "");
     await bundleStored(
       stoppedEarly === "user" ? `Stopped — ${n} ready in a .zip${note}`
       : stoppedEarly === "memory" ? `Stopped by the memory guard — ${n} ready in a .zip${note}. Save it, then Continue.`
+      : stoppedEarly === "quota" ? `Storage is full — ${n} ready in a .zip${note}. Save it to free space, then Continue.`
       : `Ready — ${n} in a .zip${note}`,
     );
     if (skipped.length) console.warn("Batch skipped:\n" + skipped.join("\n"));
