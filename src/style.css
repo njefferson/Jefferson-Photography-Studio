@@ -267,6 +267,17 @@ body {
 /* --- Photo session strip: big tappable previews along the bottom of the
    stage. Sits over the image (never under the panel), semi-transparent so the
    photo breathes behind it, with the active thumbnail lit by the accent. --- */
+/* The strip reserves real room: main.ts measures it into --session-h on the
+   stage and adds .has-session, and the photo's fit box shrinks to the space
+   ABOVE it — the strip never covers the picture (owner feedback, 2026-07-13:
+   it overlapped, and pinch can't go below fit-to-frame to peek behind). */
+#stage.has-session #view {
+  bottom: calc(20px + var(--session-h, 110px));
+  max-height: calc(100% - 32px - var(--session-h, 110px));
+}
+/* The colour-pick banner also sits at the stage's bottom edge — keep it above
+   the strip while a session is open. */
+#stage.has-session #colorBanner { bottom: calc(24px + var(--session-h, 110px)); }
 #sessionStrip {
   position: absolute;
   left: 12px;

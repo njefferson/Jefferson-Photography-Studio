@@ -285,6 +285,28 @@ See **`PLAN.md`** for the full build plan.
   and Safari's sidecar behaviour is unmeasured here); the size/feel of a big
   RAW session (add-time hitch, storage headroom); and the switch latency on a
   real 25 MB NEF decode.
+  OWNER'S FIRST ON-DEVICE PASS (2026-07-13, staging — sessions themselves
+  worked; three fixes shipped same day, cache ips-v20 → ips-v21):
+  (1) The launcher showed "Share this app" in the PLAIN BROWSER (it must appear
+  only when installed/standalone). Root cause is a CSS classic worth remembering:
+  index.html's inline stylesheet had no `[hidden]{display:none !important}`
+  guard, so `.share-app{display:inline-flex}` (an author rule) overrode the UA's
+  [hidden] rule and the pill rendered despite the attribute. ir.html/style.css
+  and macro.css already carry the guard — EVERY page stylesheet must.
+  (2) The session strip COVERED the bottom of the photo, and pinch can't go
+  below fit-to-frame to peek behind — so the strip now takes real layout room:
+  updateSessionStrip() measures its height into `--session-h` + `.has-session`
+  on #stage, and CSS shrinks the photo's fit box to the space ABOVE the strip
+  (the colour-pick banner lifts above it too). The strip never covers the
+  picture; pinch behaviour left as-is (min = fit).
+  (3) NAMING: "Open image" now takes several, which collided head-on with
+  "Process many" (batch). Renames (owner suggested the first): top bar
+  "Open image(s)" (edit — one photo or a session) and "Batch export" (output —
+  develop a set unattended → one .zip); welcome buttons + hints and the Help
+  reworded to draw exactly that editing-vs-output line ("Batch export — develop
+  a whole set at once" now opens by contrasting the two; the sessions themselves
+  are documented under "The basics" step 1). The .zip filename stays
+  IR-batch-N.zip.
 - [x] **Install as one app, two, or three** — explain and guide the three
   install shapes: the whole Studio (launcher manifest), Infrared alone, or
   Macro alone (each already has its own manifest/start_url). SHIPPED 2026-07-13:
