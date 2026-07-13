@@ -1,6 +1,6 @@
 {
   "name": "Infrared Photography Studio",
-  "short_name": "IR",
+  "short_name": "Infrared",
   "description": "Infrared photo editor — unbounded white balance, channel swap, hue shifts.",
   "start_url": "./ir.html",
   "scope": "./",

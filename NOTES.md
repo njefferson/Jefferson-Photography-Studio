@@ -125,12 +125,20 @@ See **`PLAN.md`** for the full build plan.
   time. PROVE the swap trick on a real iPad EARLY (a probe page with two
   choices) before building the full picker; if iOS caches the first icon, the
   fallback is per-style install pages. Owner ask, 2026-07-13.
-- [ ] **Proper pre-filled install names** — Add to Home Screen pre-fills its
+- [x] **Proper pre-filled install names** — Add to Home Screen pre-fills its
   name field from `apple-mobile-web-app-title` (falling back to `<title>`,
-  which for the IR editor is the too-long "Infrared Photography Studio").
-  Set short, right names per page — Studio / Infrared / Macro — so the sheet
-  offers the label you'd actually keep. Check the Android side (manifest
-  short_name already covers it). Owner ask, 2026-07-13.
+  which for the IR editor was the too-long "Infrared Photography Studio").
+  SHIPPED 2026-07-13: each page now sets `apple-mobile-web-app-title` to the
+  label you'd actually keep — Studio (index.html), Infrared (ir.html), Macro
+  (macro.html) — so the Add-to-Home-Screen sheet pre-fills the short name
+  instead of the long `<title>`. Android side aligned to match: the IR
+  manifest `short_name` was "IR" (not the owner's stated "Infrared"), now
+  "Infrared"; Studio/Macro already correct. Cache bumped ips-v14 → ips-v15 so
+  installed apps pick up the new manifest (fetched cache-first). VERIFIED in
+  the built `dist/` (all three meta titles + all three short_names + the cache
+  bump). NEEDS OWNER'S HANDS: the real pre-fill only shows in the iPad Safari
+  Add-to-Home-Screen sheet — confirm each page offers Studio / Infrared /
+  Macro on device. Owner ask, 2026-07-13.
 - [ ] **See what you're opening** — photo SESSIONS (owner design, 2026-07-13):
   "Open image" takes one or several; the picked set becomes the current
   session — big tappable previews in-app, choose and switch from there, each
