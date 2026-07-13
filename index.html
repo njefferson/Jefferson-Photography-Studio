@@ -31,6 +31,16 @@
       header { padding: 2rem 1.5rem 0.5rem; text-align: center; }
       header h1 { margin: 0; font-size: 1.15rem; font-weight: 600; letter-spacing: 0.02em; color: #cfcfd6; }
       header p { margin: 0.35rem 0 0; font-size: 0.85rem; color: #80808a; }
+      .share-app {
+        margin: 0.75rem auto 0;
+        display: inline-flex; align-items: center; gap: 0.35rem;
+        padding: 0.4rem 0.85rem; border-radius: 999px;
+        background: rgba(255,255,255,0.06); color: #cfcfd6;
+        border: 1px solid rgba(255,255,255,0.12);
+        font: 600 0.82rem/1 -apple-system, system-ui, sans-serif;
+        cursor: pointer; -webkit-tap-highlight-color: transparent;
+      }
+      .share-app:active { transform: scale(0.97); }
       main {
         flex: 1;
         display: grid;
@@ -98,6 +108,7 @@
     <header>
       <h1>Photography Studio</h1>
       <p>Two focused tools under one roof. Pick one to begin.</p>
+      <button id="shareBtn" class="share-app" type="button" hidden>&#x2BAD;&#xFE0E; Share this app</button>
     </header>
     <main>
       <a class="door ir" href="./ir.html">

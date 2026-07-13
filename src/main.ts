@@ -13,6 +13,7 @@ import { buildLocalMap } from "./localmap";
 import { buildSkyMask } from "./sky";
 import { drawHistogram } from "./histogram";
 import * as Hotspot from "./hotspot";
+import { setupInstalledShare } from "./share";
 
 // Injected at build time from git history (see vite.config.ts).
 declare const __CHANGELOG__: { hash: string; date: string; subject: string; version: string }[];
@@ -2647,6 +2648,10 @@ const VENMO_URL = "https://venmo.com/u/noahjefferson";
   });
   refresh();
 }
+
+// Installed-app Share (src/share.ts): only appears when running standalone,
+// where Safari's own Share / address bar are gone.
+setupInstalledShare("shareBtn");
 
 // Offline support.
 if ("serviceWorker" in navigator) {
