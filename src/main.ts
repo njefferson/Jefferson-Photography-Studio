@@ -2229,7 +2229,7 @@ async function runBatch(files: File[]) {
         const imported = await importFile(f);
         if (imported.looksTranscoded) { skipped.push(`${f.name} (arrived as flattened JPEG)`); continue; }
         const img = await decode(imported);
-        if (applyBatchHotspot(img, imported) === "no-lens") noHotspot++;
+        const noLens = applyBatchHotspot(img, imported) === "no-lens";
         const result = await exportImage(
           imported,
           img,
@@ -2252,6 +2252,9 @@ async function runBatch(files: File[]) {
           if (isQuotaError(err)) { stoppedEarly = "quota"; batchRemaining = files.slice(i); break; }
           throw err;
         }
+        // Counted only once the frame is really stored, so the summary's
+        // numbers describe exactly the set that's in the zip.
+        if (noLens) noHotspot++;
         totalBytes += bytes.length;
         doneInputs.add(`${f.name} ${f.size}`);
       } catch (err) {
