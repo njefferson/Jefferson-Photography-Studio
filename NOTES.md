@@ -358,6 +358,35 @@ See **`PLAN.md`** for the full build plan.
   real memory pressure, and a portrait-orientation frame through batch.
   (The old-URL redirect from an installed old-domain PWA PASSED — owner
   confirmed on device, 2026-07-13.)
+- [x] **Batch process asks what goes on every photo** — owner feedback
+  2026-07-13 (his origin story: he wanted to white-balance an entire folder
+  just to SEE what files he was dealing with): batch used to silently take the
+  on-screen edit — meaningless when nothing is open — and the "Batch export"
+  name still read like a sibling of "Open image(s)". Now named **Batch
+  process** (owner's word), and tapping it opens a CHOOSER dialog before the
+  file picker: **Your current edit** (offered only when a photo is open;
+  otherwise an honest "no photo is open" note), **A saved look** (the filled
+  My-looks slots; none → a tip teaching open-a-photo → dial-it-in → save in My
+  looks), **A built-in look** (all seven, resolved PER IMAGE exactly like
+  pressing the look button — raw gets the full-strength recipe, JPEG the
+  gentler one, and the look's WB bias rides on each photo's own auto WB, which
+  the old current-edit-only batch never did for built-ins), or **Auto-balance
+  only** — no creative grade at all, each photo just properly balanced: the
+  quick-look-a-folder mode. The choice is stashed and the picker opens in the
+  same tap gesture (iOS requires it). A footer states Format/Resolution come
+  from Export and shows the current values. Both entry points (top bar +
+  start screen) became buttons feeding one dialog; the hidden multi-file input
+  stays. Cache ips-v21 → ips-v22. VERIFIED headless (37/37 total): no-photo
+  state hides "current edit" and shows both honest notes, 7 built-ins listed,
+  Cancel/outside-tap close, an Auto-balance-only batch develops 2 photos into
+  a ready .zip, and after opening a photo + saving Slot 1 both "your current
+  edit" and the saved slot appear. Dialog screenshotted in both states.
+  QUICK-LOOK note for later: an in-app no-copy preview grid (decode small
+  previews straight from the picked Files, no session storage cost) would
+  serve "see what's in a folder" without the .zip round-trip — sessions
+  already show auto-balanced thumbs but copy bytes to storage first; batch
+  Auto-balance-only + a smaller Export resolution is the zip-based answer
+  today. Owner to say if the grid is wanted.
 - [x] **Process many at once (batch)** — built and SHIPPED TO PRODUCTION
   2026-07-12 (owner-tested on staging, then promoted). "Process many" (top bar
   + start screen) takes a whole set; each frame is auto-balanced on its own (its own WB /
