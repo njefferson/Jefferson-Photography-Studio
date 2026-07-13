@@ -310,6 +310,22 @@ body {
 /* Home button: house icon + label, aligned like the other bar buttons. */
 #homeBtn { display: inline-flex; align-items: center; gap: 6px; }
 #homeBtn svg { display: block; }
+/* Tutorials entry inside the Help dialog (moved off the top bar). */
+.help-tutorials {
+  display: block;
+  width: 100%;
+  margin: 0 0 14px;
+  padding: 11px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 10px;
+  border: 1px solid var(--accent);
+  background: #23283a;
+  color: #dfe6ff;
+  cursor: pointer;
+  text-align: left;
+}
+.help-tutorials:active { background: #2b3350; }
 
 /* --- Photo session strip: big tappable previews along the bottom of the
    stage. Sits over the image (never under the panel), semi-transparent so the
