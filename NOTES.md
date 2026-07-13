@@ -84,8 +84,9 @@ See **`PLAN.md`** for the full build plan.
       `_redirects` splat plus an HTML fallback that unregisters the old service
       worker + clears caches, then forwards, preserving the path). Old
       Home-Screen installs / bookmarks break and must be re-added — accepted by
-      Noah. NEEDS DEPLOY + owner check: push to staging first to confirm the new
-      project builds, then main to flip production and publish the redirect.
+      Noah. DEPLOYED 2026-07-13 (production flipped with the Studio-icon
+      release; redirect published on the main push) and the old-URL redirect
+      CONFIRMED WORKING by Noah on device the same day.
 - [x] Camera color matrix (fixes flat IR color); exposure + Auto; punchy preset
 - [x] Review pass: preview proxy for >2800px 8-bit sources (iOS WebGL buffer
       limit), single EditParams definition, NEF white level 15520, exposure
@@ -138,7 +139,15 @@ See **`PLAN.md`** for the full build plan.
   (studio-icon-180/512.png), wired into manifest.webmanifest (svg + 180 any +
   512 maskable) and index.html (apple-touch-icon + svg icon — the launcher had
   NO icon links before, so iOS installs were falling back to the IR art).
-  Owner-previewed before staging. SHIPPED 2026-07-13.
+  Owner-previewed before staging. SHIPPED 2026-07-13. REWORKED same day after
+  owner review ("is that really how the leaves work?" — no, it wasn't): real
+  iris blades OVERLAP, so every visible seam is the straight-line CONTINUATION
+  of one edge of the opening (the blade edge sweeps in from the barrel and
+  becomes a hexagon side); v1's radial corner-to-rim seams read as a colour
+  wheel, not an iris. Plus a hairline shadow along each seam to sell the
+  blade-over-blade overlap. Icon PNGs keep their filenames, and non-hashed
+  assets are cache-first in sw.js — so any icon art change NEEDS a CACHE bump
+  or installed apps keep the old art forever.
 - [x] **Storage-quota guard for batch** — QuotaExceededError from putFrame used
   to surface as a cryptic per-frame skip; now it's caught specifically
   (isQuotaError: DOMException name/code 22) and stops the batch the same gentle
@@ -157,8 +166,9 @@ See **`PLAN.md`** for the full build plan.
   moved to the top bar + start screen). SHIPPED 2026-07-13.
 - [ ] **On-device checks owed** — Safari IDB crash durability (all
   measurements were Chromium), share-sheet with a large .zip, jetsam under
-  real memory pressure, a portrait-orientation frame through batch, and the
-  old-URL redirect from an installed old-domain PWA.
+  real memory pressure, and a portrait-orientation frame through batch.
+  (The old-URL redirect from an installed old-domain PWA PASSED — owner
+  confirmed on device, 2026-07-13.)
 - [x] **Process many at once (batch)** — built and SHIPPED TO PRODUCTION
   2026-07-12 (owner-tested on staging, then promoted). "Process many" (top bar
   + start screen) takes a whole set; each frame is auto-balanced on its own (its own WB /
