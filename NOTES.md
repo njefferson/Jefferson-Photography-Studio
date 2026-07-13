@@ -307,6 +307,31 @@ See **`PLAN.md`** for the full build plan.
   a whole set at once" now opens by contrasting the two; the sessions themselves
   are documented under "The basics" step 1). The .zip filename stays
   IR-batch-N.zip.
+  OWNER'S SECOND ON-DEVICE FINDING (2026-07-13 — navigation): after Resume (and,
+  really, any open) there was NO non-destructive way back to the start screen.
+  The editor's own start screen (#welcome, where Open/Resume/Quick look/Tutorials
+  live) was only reachable via the "Tutorials" button — unguessable — and the
+  only control ON the photo was the session's Done, which ENDS it. The old flows
+  assumed the next action would always carry you where you needed to go. Fix
+  (cache ips-v23 → ips-v24): a proper HOME affordance. A "⌂ Home" button in the
+  IR top bar (a house SVG + label) and a prominent "‹ Back to your session
+  (N photos)" / "‹ Back to your photo" pill at the top of the start screen (the
+  tiny corner ✕ stayed too) — both wired to shared goHome()/returnToEditor().
+  Home is NON-DESTRUCTIVE: it parks the live photo/session (captureActiveEdit
+  first) and returns to the start screen with everything intact in memory AND
+  storage, so Back — or a reload's Resume — drops you right back; Done stays the
+  separate, destructive "end it and free the storage." goHome() also hides the
+  session strip (it sits above the #welcome card) and returnToEditor() restores
+  it; the header's Tutorials button now routes through goHome() too, so its
+  re-opened chooser no longer lets the strip poke over the card. (The brand's
+  "‹ Studio" link is unchanged — that still leaves the IR editor for the umbrella
+  chooser; Home is the way back to the IR editor's OWN start screen.) VERIFIED
+  headless (18/18, one assertion proven to FAIL first): the owner's exact path
+  (Resume → Home → Back) works; Home leaves the session in storage (count stays
+  2) while Done frees it (count 0); Home survives a reload as Resume; the ✕ and
+  Back appear only when there's something live to return to; no page errors.
+  NEEDS THE OWNER'S HANDS on the iPad: that Home reads as "start screen" (vs the
+  ‹ Studio umbrella link) and the Back pill is obvious enough.
 - [x] **Install as one app, two, or three** — explain and guide the three
   install shapes: the whole Studio (launcher manifest), Infrared alone, or
   Macro alone (each already has its own manifest/start_url). SHIPPED 2026-07-13:
