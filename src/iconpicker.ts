@@ -10,6 +10,8 @@
 // Scope: this swaps the LAUNCHER icon only (index.html). Infrared and Macro are
 // their own installed apps with their own icons; this doesn't touch them.
 
+import { isStandaloneApp } from "./share";
+
 export type IconStyle = {
   key: string;
   name: string;
@@ -170,9 +172,24 @@ export function setupIconPicker(container: HTMLElement): void {
       if (badge) badge.textContent = on ? "Selected" : "Tap to choose";
     }
     const name = styleFor(activeKey).name;
-    live.innerHTML =
-      `Your icon: <b>${name}</b>. Add this launcher to your Home Screen ` +
-      `(Share → Add&nbsp;to&nbsp;Home&nbsp;Screen) to keep it.`;
+    // iOS bakes a tile's icon at Add-to-Home-Screen and never repaints it, so
+    // "change it later" honestly means remove-and-re-add. Say so, per surface:
+    // the installed app has no Safari Share button, so its path starts with
+    // removing the tile; the browser can just re-add.
+    if (isStandaloneApp()) {
+      live.innerHTML =
+        `Your pick — <b>${name}</b> — is saved, but this installed app keeps the ` +
+        `icon it was added with; iPad tiles can't be repainted in place. To switch: ` +
+        `touch and hold the Studio icon on your Home Screen → <b>Remove</b>, then open ` +
+        `the Studio in <b>Safari</b> and <b>Add&nbsp;to&nbsp;Home&nbsp;Screen</b> ` +
+        `again — it will come back wearing ${name}.`;
+    } else {
+      live.innerHTML =
+        `Your icon: <b>${name}</b>. Add this launcher to your Home Screen ` +
+        `(Share → Add&nbsp;to&nbsp;Home&nbsp;Screen) to keep it. Changing an ` +
+        `already-installed icon? Remove the old tile first, then add it again — ` +
+        `an installed tile keeps its icon until it's re-added.`;
+    }
   }
 
   for (const card of cards) {

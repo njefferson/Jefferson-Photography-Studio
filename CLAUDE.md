@@ -11,6 +11,15 @@ settled design decisions, and measured gotchas that must not be re-learned.
   → the owner's on-device pass → his explicit go → PR + merge to `main`.
   Never merge a product change to main without that go. Docs-only changes
   (NOTES.md, this file) may merge without the gate.
+- Push to `staging` UNPROMPTED whenever work reaches a point the owner needs
+  to test AND no other branch is already waiting for his go to `main` — don't
+  make him ask; that's what staging is for (owner rule, 2026-07-13). Staging
+  may be force-pushed: its history is disposable, but check first that every
+  staging-only commit is already contained in `main` (`git cherry`).
+- Parallel sessions happen. Before pushing anywhere, fetch and check what
+  `main` and `staging` actually contain — a roadmap item may have shipped
+  from another session mid-work (it happened 2026-07-13: two sessions built
+  the same icon probe; one had already merged the full picker).
 - Merge PRs with **rebase** — main's history is linear, and the in-app patch
   notes are the last 5 commits; a merge commit would show up in them.
 - A branch whose PR merged must be restarted from `origin/main` (same name).

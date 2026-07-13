@@ -180,7 +180,18 @@ See **`PLAN.md`** for the full build plan.
   rendering screenshotted. NEEDS THE OWNER'S HANDS: the real iOS Add-to-Home-
   Screen with each style on the iPad (the live-swap was already confirmed by the
   probe — this just confirms the three finished icons look right installed).
-- [x] **Share the app once it's installed** — an installed (standalone) PWA has
+  CHANGE-IT-LATER PASS 2026-07-13 (owner clarification: the picker read as
+  install-time only; he wants to switch icons AFTER installing): on the web an
+  installed tile's icon is BAKED at Add-to-Home-Screen — iOS never re-reads it,
+  no JS/manifest change can repaint it, so "change it later" honestly means
+  remove-the-tile-and-re-add. The picker now says exactly that, per surface
+  (reusing share.ts isStandaloneApp): in the INSTALLED launcher (which has no
+  Safari Share button) the live line explains hold → Remove → open in Safari →
+  Add again, and that the saved pick will be waiting; in the browser it notes
+  the remove-first step (the old copy said "pick a new one and add it again",
+  which skips removing and strands the stale tile). Lead copy aligned. Cache
+  bumped ips-v18 → ips-v19. TRUE in-place switching is native-only — logged in
+  Future/bigger bets (alternate app icons; needs no server or secrets). an installed (standalone) PWA has
   NO Safari chrome — no address bar, no Share, no Back — so there was no way to
   send someone the link or even see it (owner ask, 2026-07-13). SHIPPED same day:
   a Share control that appears ONLY when running standalone (in the browser
@@ -491,6 +502,15 @@ Known gap — FIXED 2026-07-05:
 Frontier (needs WebGPU + an ML model — a real departure from pure-JS/no-WASM):
 - AI denoise, AI subject/sky masking, super-resolution. Cheaper classical
   stand-in first: Lanczos super-resolution, edge-aware upscale.
+
+Native App Store build (the eventual target; carries over when it happens):
+- **True in-place icon switching** — the web picker can only re-bake a tile at
+  Add-to-Home-Screen; a native app switches its installed icon live via iOS
+  alternate app icons (`setAlternateIconName`). Owner ask 2026-07-13 ("select
+  an icon later"). NOTE for the owner's API/secrets worry (raised same day):
+  this app needs NO API keys, servers, or data secrets even as a native build —
+  everything stays on-device; the only credential involved is the Apple
+  developer signing certificate to build and submit.
 
 Second discipline:
 - **Macro (focus-stacking) mode** — a parallel mode in the same codebase.
