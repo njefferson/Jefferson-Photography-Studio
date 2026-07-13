@@ -131,13 +131,23 @@ See **`PLAN.md`** for the full build plan.
   Set short, right names per page — Studio / Infrared / Macro — so the sheet
   offers the label you'd actually keep. Check the Android side (manifest
   short_name already covers it). Owner ask, 2026-07-13.
-- [ ] **See what you're opening** — thumbnails big enough to actually see when
-  choosing a photo. Honest scope: the system Files sheet's tiny previews are
-  iOS UI we cannot touch; what we CAN do is let a pick of several files land in
-  an in-app chooser first — big tappable previews, tap one to open it (and the
-  rest stay a session filmstrip to switch between). Decide placement (Open
-  image accepts multiple? separate "Browse…"?) with the owner before building.
-  Owner ask, 2026-07-13.
+- [ ] **See what you're opening** — photo SESSIONS (owner design, 2026-07-13):
+  "Open image" takes one or several; the picked set becomes the current
+  session — big tappable previews in-app, choose and switch from there, each
+  photo keeping its own edit while you move around. Explicitly NOT a
+  library/database ("I'm not interested in building databases") — impermanent
+  by design, but "can't get lost 'too' soon". The structural consequence:
+  iPad Safari cannot re-open a picked File after a reload (proven with batch
+  Continue), so surviving a close/crash REQUIRES copying each photo's bytes
+  into the app's own storage at open — the batchstore chunked crash-safe IDB
+  pattern (bytes + per-photo edit params + a small strip thumbnail; RAM holds
+  only the active photo's decode). Lifetime: relaunch offers "Resume session —
+  N photos" (batch-recovery style); a new pick with a session present asks
+  first (batch-leftovers confirm pattern); an explicit Done ends the session
+  and frees the space. Quota guard + storage.persist() apply as-is; show an
+  honest size readout (RAW ≈25 MB/frame — a 20-photo session ≈ 500 MB).
+  Undo stacks stay in-memory per photo (edits themselves persist). Later
+  synergy: "Process many" can draw from the session set.
 - [x] **Install as one app, two, or three** — explain and guide the three
   install shapes: the whole Studio (launcher manifest), Infrared alone, or
   Macro alone (each already has its own manifest/start_url). SHIPPED 2026-07-13:
