@@ -401,5 +401,8 @@ Second discipline:
   (confirmed by Noah; ~14.5 MB / 20 MP), a TicoRAW-class codec `nef.ts` cannot
   decode; a HE-NEF decoder is a separate large effort. Macro mode is named
   **"Macro Studio"** (flower icon, `public/macro-icon.svg` + 180/512 PNGs for
-  iOS home-screen). Still open: the umbrella/chooser name (placeholder
-  "Photography Studio") and the IR-mode iOS PNG icon.
+  iOS home-screen). The IR-mode iOS PNG icon is DONE (2026-07-13:
+  `ir-icon-180/512.png` rasterized from the unchanged icon.svg, wired into
+  ir.webmanifest + ir.html — iOS ignores SVG manifest icons, so "install
+  Infrared alone" used to land a page-screenshot icon). Still open: the
+  umbrella/chooser name (placeholder "Photography Studio").
