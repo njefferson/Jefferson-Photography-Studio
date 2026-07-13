@@ -101,6 +101,32 @@
       .shape p { margin: 0; font-size: 0.82rem; line-height: 1.5; color: #9a9aa4; }
       .install .how { margin: 1.1rem auto 0; max-width: 620px; font-size: 0.82rem; line-height: 1.6; color: #9a9aa4; text-align: center; }
       .install .how strong { color: #cfcfd6; font-weight: 600; }
+      .picker { max-width: 760px; margin: 2rem auto 0; padding: 0 1.5rem; }
+      .picker h2 { text-align: center; font-size: 1rem; font-weight: 600; color: #cfcfd6; margin: 0 0 0.25rem; }
+      .picker .lead { text-align: center; font-size: 0.85rem; line-height: 1.55; color: #9a9aa4; margin: 0 auto 1.1rem; max-width: 560px; }
+      .picker .lead strong { color: #cfcfd6; font-weight: 600; }
+      .icon-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
+      @media (max-width: 620px) { .icon-grid { grid-template-columns: 1fr; } }
+      .icon-card {
+        display: flex; flex-direction: column; align-items: center; gap: 0.55rem;
+        padding: 1.1rem 0.9rem; border-radius: 16px; text-align: center;
+        background: rgba(255,255,255,0.04); color: inherit;
+        border: 2px solid rgba(255,255,255,0.08);
+        font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent;
+        transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
+      }
+      .icon-card:active { transform: scale(0.985); }
+      .icon-card.active { border-color: #5c90ff; background: rgba(92,144,255,0.12); }
+      .icon-card img { width: 72px; height: 72px; border-radius: 16px; box-shadow: 0 6px 20px rgba(0,0,0,0.5); display: block; }
+      .icon-name { font-size: 0.95rem; font-weight: 600; color: #eaeaef; }
+      .icon-blurb { font-size: 0.78rem; line-height: 1.45; color: #9a9aa4; }
+      .icon-badge {
+        margin-top: 0.15rem; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+        padding: 0.16rem 0.6rem; border-radius: 999px; color: #7a7a84; border: 1px solid rgba(255,255,255,0.14);
+      }
+      .icon-card.active .icon-badge { color: #bcd2ff; border-color: #5c90ff; background: rgba(92,144,255,0.18); }
+      .icon-live { margin: 1.1rem auto 0; max-width: 560px; text-align: center; font-size: 0.82rem; line-height: 1.55; color: #9a9aa4; }
+      .icon-live b { color: #cfcfd6; font-weight: 600; }
       footer { text-align: center; padding: 1.25rem 1rem 1.25rem; font-size: 0.75rem; color: #6a6a72; }
     </style>
   </head>
@@ -162,10 +188,16 @@
         link inside each tool always brings you back here.
       </p>
     </section>
+    <section class="picker" id="iconPicker" hidden>
+      <h2>Pick your Home-Screen icon</h2>
+      <p class="lead">
+        Choose the icon your installed <strong>Studio</strong> app will wear,
+        then Add&nbsp;to&nbsp;Home&nbsp;Screen. Already installed? Pick a new one
+        and add it again — iOS uses whichever you chose here.
+      </p>
+    </section>
     <footer>
       Free · on-device · no account · no upload
-      <br />
-      <a href="./icon-probe.html" style="color:#6a6a72;text-decoration:underline;">Home-Screen icon test</a>
     </footer>
     <script type="module" src="/src/chooser.ts"></script>
   </body>
