@@ -125,6 +125,29 @@ See **`PLAN.md`** for the full build plan.
   time. PROVE the swap trick on a real iPad EARLY (a probe page with two
   choices) before building the full picker; if iOS caches the first icon, the
   fallback is per-style install pages. Owner ask, 2026-07-13.
+  PROBE SHIPPED 2026-07-13 (stays unchecked — the full picker isn't built yet;
+  this is the "prove it first" step): a temporary `icon-probe.html` route (linked
+  discreetly from the launcher footer) with two deliberately opposite test icons
+  — A (dark, colourful aperture) and B (light, graphite), each corner-tagged A/B
+  and rasterized to 180px PNG via the headless-Chromium pipeline
+  (public/probe-icon-{a,b}.svg → probe-icon-{a,b}-180.png). It runs BOTH
+  candidate mechanisms so one on-device pass is decisive: (1) the live swap —
+  picking a card replaces the `<link rel="apple-touch-icon">` node and the
+  `apple-mobile-web-app-title` before Add-to-Home-Screen (link replaced whole,
+  not just href-mutated, since some WebKit builds only notice a fresh node);
+  (2) the fallback — two static one-icon-each pages `icon-a.html`/`icon-b.html`
+  at their own URLs. Decision tree is on the page: A-app dark + B-app light ⇒
+  swap works, build the in-flow picker; both same ⇒ iOS cached per page, ship
+  per-style pages (the fallback the static links prove). Cache bumped
+  ips-v15 → ips-v16. VERIFIED headless: swap mutates the live link/title/label/
+  active-state and reverts, both preview PNGs decode at 180px, static pages carry
+  distinct icons, no page errors. NEEDS THE OWNER'S HANDS — the actual iOS
+  Add-to-Home-Screen behaviour is the whole point and can only be read on the
+  real iPad: staging `/icon-probe` (or the launcher-footer link), add Icon A then
+  Icon B, compare the two Home-Screen icons, then also add the two static pages
+  and compare. Report which of the two outcomes happened; then we build the real
+  picker and DELETE these four probe files (icon-probe/icon-a/icon-b .html + the
+  probe PNGs/SVGs, their three vite inputs, and the footer link).
 - [x] **Proper pre-filled install names** — Add to Home Screen pre-fills its
   name field from `apple-mobile-web-app-title` (falling back to `<title>`,
   which for the IR editor was the too-long "Infrared Photography Studio").

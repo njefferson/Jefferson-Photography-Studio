@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Probe style A: "Vivid" — dark tile, saturated rainbow aperture.
+       The corner A tag exists only so the on-device icon test is unambiguous. -->
+  <defs>
+    <linearGradient id="a0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff5c9e"/><stop offset="1" stop-color="#d13272"/></linearGradient>
+    <linearGradient id="a1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ca68ff"/><stop offset="1" stop-color="#9d3ed1"/></linearGradient>
+    <linearGradient id="a2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5c90ff"/><stop offset="1" stop-color="#3265d1"/></linearGradient>
+    <linearGradient id="a3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#38c2d2"/><stop offset="1" stop-color="#0f95a5"/></linearGradient>
+    <linearGradient id="a4" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#54cd82"/><stop offset="1" stop-color="#2aa157"/></linearGradient>
+    <linearGradient id="a5" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffbd5c"/><stop offset="1" stop-color="#d19032"/></linearGradient>
+    <radialGradient id="ahole" cx="0.5" cy="0.42" r="0.65">
+      <stop offset="0" stop-color="#17171c"/>
+      <stop offset="1" stop-color="#050506"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="#0b0b0d"/>
+  <circle cx="256" cy="256" r="182" fill="#141418"/>
+  <g>
+    <path d="M 332.03 225.28 L 426.62 299.18 A 176 176 0 0 1 303.91 425.35 L 320.62 306.48 Z" fill="url(#a0)"/>
+    <path d="M 320.62 306.48 L 303.91 425.35 A 176 176 0 0 1 133.29 382.17 L 244.59 337.2 Z" fill="url(#a1)"/>
+    <path d="M 244.59 337.2 L 133.29 382.17 A 176 176 0 0 1 85.38 212.82 L 179.97 286.72 Z" fill="url(#a2)"/>
+    <path d="M 179.97 286.72 L 85.38 212.82 A 176 176 0 0 1 208.09 86.65 L 191.38 205.52 Z" fill="url(#a3)"/>
+    <path d="M 191.38 205.52 L 208.09 86.65 A 176 176 0 0 1 378.71 129.83 L 267.41 174.8 Z" fill="url(#a4)"/>
+    <path d="M 267.41 174.8 L 378.71 129.83 A 176 176 0 0 1 426.62 299.18 L 332.03 225.28 Z" fill="url(#a5)"/>
+  </g>
+  <polygon points="267.41,174.8 332.03,225.28 320.62,306.48 244.59,337.2 179.97,286.72 191.38,205.52" fill="url(#ahole)"/>
+  <!-- corner tag -->
+  <circle cx="418" cy="418" r="58" fill="#0b0b0d" stroke="#ffffff" stroke-opacity="0.85" stroke-width="6"/>
+  <text x="418" y="418" text-anchor="middle" dominant-baseline="central" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="72" font-weight="700" fill="#ffffff">A</text>
+</svg>
