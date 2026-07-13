@@ -108,7 +108,7 @@ See **`PLAN.md`** for the full build plan.
 - CI must check out full history (`fetch-depth: 0` in deploy.yml) or the
   commit counts — and therefore the version numbers — come out wrong.
 
-## Next capability release (owner's roadmap, 2026-07-04; queue refreshed 2026-07-12)
+## Next capability release (owner's roadmap, 2026-07-04; queue refreshed 2026-07-13)
 
 > SOURCE OF TRUTH for the in-app Roadmap (behind the ⓘ button). `vite.config.ts`
 > parses the `- [ ]` / `- [x]` checkbox bullets below at build time and injects
@@ -118,6 +118,26 @@ See **`PLAN.md`** for the full build plan.
 > reliable. Editing this list updates the app on the next deploy. Both the
 > roadmap and the patch notes (last commits) refresh automatically on push.
 
+- [ ] **Pick your Home-Screen icon** — offer a small set of icon styles and let
+  the user choose which one their installed app wears. Likely mechanism: a
+  picker on the launcher/install flow that swaps the `apple-touch-icon` link
+  (and manifest icons) before Add to Home Screen — iOS reads the link at add
+  time. PROVE the swap trick on a real iPad EARLY (a probe page with two
+  choices) before building the full picker; if iOS caches the first icon, the
+  fallback is per-style install pages. Owner ask, 2026-07-13.
+- [ ] **Proper pre-filled install names** — Add to Home Screen pre-fills its
+  name field from `apple-mobile-web-app-title` (falling back to `<title>`,
+  which for the IR editor is the too-long "Infrared Photography Studio").
+  Set short, right names per page — Studio / Infrared / Macro — so the sheet
+  offers the label you'd actually keep. Check the Android side (manifest
+  short_name already covers it). Owner ask, 2026-07-13.
+- [ ] **See what you're opening** — thumbnails big enough to actually see when
+  choosing a photo. Honest scope: the system Files sheet's tiny previews are
+  iOS UI we cannot touch; what we CAN do is let a pick of several files land in
+  an in-app chooser first — big tappable previews, tap one to open it (and the
+  rest stay a session filmstrip to switch between). Decide placement (Open
+  image accepts multiple? separate "Browse…"?) with the owner before building.
+  Owner ask, 2026-07-13.
 - [x] **Install as one app, two, or three** — explain and guide the three
   install shapes: the whole Studio (launcher manifest), Infrared alone, or
   Macro alone (each already has its own manifest/start_url). SHIPPED 2026-07-13:
