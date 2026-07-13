@@ -117,23 +117,44 @@ See **`PLAN.md`** for the full build plan.
 > reliable. Editing this list updates the app on the next deploy. Both the
 > roadmap and the patch notes (last commits) refresh automatically on push.
 
-- [ ] **Install as one app, two, or three** — explain and guide the three
+- [x] **Install as one app, two, or three** — explain and guide the three
   install shapes: the whole Studio (launcher manifest), Infrared alone, or
-  Macro alone (each already has its own manifest/start_url). Put it where
-  users actually look: the launcher page and each app's Help (owner ask,
-  2026-07-12).
-- [ ] **A Studio icon** — the launcher/manifest still uses the old infrared
-  icon.svg; design a Studio-level icon (the umbrella brand, not one tool's)
-  and regenerate PNG touch icons from it (headless Chromium screenshot of the
-  SVG — the macro-icon-180.png pipeline). Owner ask, 2026-07-12.
-- [ ] **Storage-quota guard for batch** — QuotaExceededError from putFrame
-  currently surfaces as a cryptic per-frame skip; treat it like the memory
-  guard (stop gracefully, save what's done), and call
-  navigator.storage.persist() at batch start so iOS is less likely to evict
-  recovery data.
-- [ ] **Batch honesty nits** — count frames that skipped hot-spot correction
-  (no lens EXIF) in the summary; note in Help that masks and the
-  lens-fix/vignette sliders don't ride along in a batch look.
+  Macro alone (each already has its own manifest/start_url). SHIPPED 2026-07-13:
+  a three-card "Install it your way" section on the launcher (index.html — one
+  app / two apps / all three, each saying what it gives you), plus a rewritten
+  "Install as an app — one, two, or three" block in the IR Help and a brand-new
+  install section in the Macro Help (macro.html had none). All iPad-first
+  (Share → Add to Home Screen), with how-to-switch-later spelled out (add/remove
+  any, ‹ Studio always goes back). Verified the launcher + both Help dialogs
+  render the new copy in headless Chromium, no page errors.
+- [x] **A Studio icon** — the launcher/manifest used the old infrared icon.svg;
+  now a distinct umbrella mark: a camera APERTURE with six iris blades carrying
+  the saturated Studio colour wheel (public/studio-icon.svg, geometry computed
+  so the blade edges are exact — circular barrel arc + straight hexagon-opening
+  edge + a pinwheel spin so it reads as an iris, not a colour wheel). Family
+  with the two children (dark rounded square, max-saturation palette, round
+  motif) but neither the IR lens-ring nor the Macro flower. PNG touch icons
+  180/512 regenerated via the headless-Chromium screenshot pipeline
+  (studio-icon-180/512.png), wired into manifest.webmanifest (svg + 180 any +
+  512 maskable) and index.html (apple-touch-icon + svg icon — the launcher had
+  NO icon links before, so iOS installs were falling back to the IR art).
+  Owner-previewed before staging. SHIPPED 2026-07-13.
+- [x] **Storage-quota guard for batch** — QuotaExceededError from putFrame used
+  to surface as a cryptic per-frame skip; now it's caught specifically
+  (isQuotaError: DOMException name/code 22) and stops the batch the same gentle
+  way as the memory guard — the frame in flight stays in batchRemaining to retry,
+  the finished set is bundled, and the banner reads "Storage is full — N ready in
+  a .zip. Save it to free space, then Continue." navigator.storage.persist() is
+  requested at batch start (requestPersistentStorage, best-effort) so iOS is less
+  likely to evict recovery data mid-run. SHIPPED 2026-07-13.
+- [x] **Batch honesty nits** — applyBatchHotspot now returns applied/no-lens/raw;
+  JPEG frames whose EXIF didn't name a known lens are counted and the finish
+  summary shows "· N without lens hot-spot fix" (RAW is a separate known skip, not
+  counted). IR Help gained a "What rides along, and what doesn't" note: masks and
+  the IR lens-fix sliders (Hot-spot/size/Vignette) are frame-specific and do NOT
+  carry into a batch — each photo gets its own EXIF hot-spot fix instead. Also
+  corrected the stale Help that still said "Process many" lives in Export (it
+  moved to the top bar + start screen). SHIPPED 2026-07-13.
 - [ ] **On-device checks owed** — Safari IDB crash durability (all
   measurements were Chromium), share-sheet with a large .zip, jetsam under
   real memory pressure, a portrait-orientation frame through batch, and the
