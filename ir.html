@@ -40,6 +40,7 @@
             Batch process
           </button>
           <input id="batchFiles" type="file" accept=".dng,.nef,.zip,image/*" multiple hidden />
+          <input id="quickFiles" type="file" accept=".dng,.nef,.zip,image/*" multiple hidden />
         </span>
       </header>
 
@@ -66,6 +67,8 @@
           <p id="hint">Edit infrared photos — RAW (NEF / DNG) unlocks the full color magic.</p>
           <label class="open-btn welcome-open" for="file">Open image(s)</label>
           <p class="welcome-open-hint">Pick one photo to edit — or several to work as a session: big previews you switch between, each keeping its own edit, all held safely until you're done.</p>
+          <label class="welcome-batch" id="welcomeQuickBtn" for="quickFiles">Quick look a folder…</label>
+          <p class="welcome-batch-hint">Just want to see what's in a folder? Pick a set for an instant grid of auto-balanced previews — nothing is saved, it's gone when you close. Tap the keepers and send them straight into a session to edit.</p>
           <button class="welcome-batch" id="welcomeBatchBtn" type="button">Batch process a set…</button>
           <p class="welcome-batch-hint">Not for editing — this develops a whole set unattended (each photo auto-balanced on its own) straight into one .zip. You choose what goes on top: a look, your current edit, or nothing at all for a quick balanced preview of a folder.</p>
           <button id="resumeSession" class="welcome-batch" type="button" hidden>Resume session</button>
@@ -345,6 +348,21 @@
       </div>
     </div>
 
+    <div id="quickLook" hidden aria-label="Quick look">
+      <div class="ql-head">
+        <div class="ql-title">
+          <strong>Quick look</strong>
+          <span id="qlCount"></span>
+        </div>
+        <div class="ql-actions">
+          <button id="qlSelectToggle" type="button" class="ql-btn" hidden>Select none</button>
+          <button id="qlKeep" type="button" class="ql-btn ql-keep" disabled>Keep in a session &rarr;</button>
+          <button id="qlClose" type="button" class="ql-btn">Close</button>
+        </div>
+      </div>
+      <div id="qlGrid" class="ql-grid"></div>
+    </div>
+
     <dialog id="batchDlg">
       <h2>Batch process — what goes on every photo?</h2>
       <p class="batch-lead">Each photo is auto-balanced on its own (white balance, exposure, denoise, lens fix) — you're choosing the <em>creative grade</em> that goes on top. The set comes back as one .zip.</p>
@@ -369,6 +387,7 @@
           <strong>Auto-balance only — no look</strong>
           <small>Just each photo properly white-balanced &amp; exposed. Perfect for a quick look at a whole folder to see what you've got.</small>
         </button>
+        <p class="batch-none">Only want to <em>see</em> the folder, not save a .zip? <button id="bcQuick" type="button" class="batch-link">Quick look instead &rarr;</button> — a live grid of previews, nothing written to disk.</p>
       </div>
       <p class="batch-note">Format &amp; Resolution come from the <strong>Export</strong> panel<span id="bcFmt"></span>.</p>
       <button id="batchCancel" type="button">Cancel</button>
@@ -402,6 +421,9 @@
           Pick several and they become a <strong>session</strong>: a strip of previews along the bottom, tap to switch,
           each photo keeping its own edit — held safely, so a closed tab offers to <em>Resume</em> right where you were.
           <strong>Done</strong> (on the strip) ends the session and frees the space.</li>
+          <li><strong>Quick look a folder</strong> (start screen) when you just want to <em>see</em> what's in a set:
+          an instant grid of auto-balanced previews, nothing saved. Tap the keepers and <strong>Keep in a session</strong>
+          sends them straight into an editable session.</li>
           <li>On open, the app <strong>automatically</strong> sets white balance, exposure and denoise from the photo itself.</li>
           <li><strong>Tap foliage</strong> in the photo to fine-tune white balance — the classic IR move.</li>
           <li>Pick a <strong>Look</strong>, adjust sliders to taste, then <strong>Export &amp; Save</strong>.</li>

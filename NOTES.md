@@ -358,7 +358,7 @@ See **`PLAN.md`** for the full build plan.
   real memory pressure, and a portrait-orientation frame through batch.
   (The old-URL redirect from an installed old-domain PWA PASSED — owner
   confirmed on device, 2026-07-13.)
-- [ ] **Quick look** — see what's in a folder without loading a session or
+- [x] **Quick look** — see what's in a folder without loading a session or
   round-tripping a .zip (owner ask 2026-07-13, GO given same day; this is the
   pure form of his origin story: "white balance an entire folder so I could
   see what files I was actually dealing with"). Design agreed: pick files →
@@ -379,6 +379,37 @@ See **`PLAN.md`** for the full build plan.
   the usual sw.js bump. Consider the Web-Worker thumbnailer here first (the
   session add-time hitch note below) since quick look decodes many frames
   back-to-back.
+  SHIPPED 2026-07-13 (staging). A full-screen grid overlay (#quickLook in
+  ir.html; new .ql-* styles in style.css) opened from a "Quick look a folder…"
+  label on the start screen (next to Open image(s)) AND a cross-link inside the
+  Batch-process chooser ("Quick look instead →", by the Auto-balance option —
+  the .zip sibling of a quick look). All logic in main.ts's Quick-look section:
+  the shared makeThumb() gained a MAX-edge param (strip keeps 260; the grid
+  uses 512), and openQuickLook() decodes each picked File in turn — importFile →
+  decode → makeThumb, only the small JPEG kept, the decode + source bytes drop
+  out of scope, so RAM stays bounded to N thumbnails — with a live "Decoding
+  k / N…" readout and a yield per file (the addToSession pattern). NOTHING is
+  written to storage (the whole distinction from sessions): previews are RAM-only
+  object URLs, revoked on close, and a generation counter (quickGen) aborts an
+  in-flight decode loop if you close or re-pick mid-run. A file that won't decode
+  gets a dashed placeholder tile (⚠︎) instead of vanishing — transcoded JPEGs are
+  NOT rejected here (that warning is for editing true RAW; a preview is still
+  useful). Every decoded tile starts selected; tap to toggle, a Select all/none
+  header toggle, and "Keep N in a session →" promotes the checked picks by
+  handing their still-alive File objects to the normal openPicked() (one file →
+  lone open, two+ → a real session) — no new copy path. VERIFIED headless (20/20,
+  the tile-count assertion proven to FAIL first at expect-5): a mixed pick (3
+  PNGs + 1 broken) → overlay raises with 4 tiles (3 previews + 1 placeholder),
+  "3 photos", all three selected, Keep enabled reading "Keep 3"; deselect drops
+  the live count + flips the toggle to "Select all"; Select all re-selects;
+  Keep hides the overlay and raises the session strip with 3 photos + 3 thumbs;
+  no page errors. Separately smoke-tested a real RAW canopy.dng through the grid
+  (decodes to one preview, "1 photo"). Grid screenshotted. NEEDS THE OWNER'S
+  HANDS on the real iPad (all Chromium so far): a real Files/Photos multi-pick,
+  the feel of decoding a big folder back-to-back (the main-thread thumbnailer
+  hitches on large RAW — the Web-Worker thumbnailer stays the obvious follow-up),
+  and that "Keep in a session" flows straight into editing. Cache bumped
+  ips-v22 → ips-v23.
 - [x] **Batch process asks what goes on every photo** — owner feedback
   2026-07-13 (his origin story: he wanted to white-balance an entire folder
   just to SEE what files he was dealing with): batch used to silently take the
