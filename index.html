@@ -10,6 +10,8 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="theme-color" content="#0b0b0d" />
     <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./studio-icon-180.png" />
+    <link rel="icon" type="image/svg+xml" href="./studio-icon.svg" />
     <title>Photography Studio</title>
     <style>
       :root { color-scheme: dark; }
@@ -76,7 +78,19 @@
       .door .go { margin-top: 0.9rem; font-size: 0.85rem; font-weight: 600; opacity: 0.95; }
       .note { max-width: 640px; margin: 0 auto; padding: 0 1.5rem; text-align: center; font-size: 0.85rem; line-height: 1.55; color: #9a9aa4; }
       .note strong { color: #cfcfd6; font-weight: 600; }
-      footer { text-align: center; padding: 1rem 1rem 1.25rem; font-size: 0.75rem; color: #6a6a72; }
+      .install { max-width: 760px; margin: 1.5rem auto 0; padding: 0 1.5rem; }
+      .install h2 { text-align: center; font-size: 1rem; font-weight: 600; color: #cfcfd6; margin: 0 0 0.25rem; }
+      .install .lead { text-align: center; font-size: 0.85rem; line-height: 1.55; color: #9a9aa4; margin: 0 auto 1.1rem; max-width: 560px; }
+      .install .lead strong { color: #cfcfd6; font-weight: 600; }
+      .shapes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
+      @media (max-width: 620px) { .shapes { grid-template-columns: 1fr; } }
+      .shape { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 0.9rem 1rem; }
+      .shape .count { font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: #80808a; }
+      .shape h3 { margin: 0.15rem 0 0.4rem; font-size: 0.95rem; font-weight: 600; color: #eaeaef; }
+      .shape p { margin: 0; font-size: 0.82rem; line-height: 1.5; color: #9a9aa4; }
+      .install .how { margin: 1.1rem auto 0; max-width: 620px; font-size: 0.82rem; line-height: 1.6; color: #9a9aa4; text-align: center; }
+      .install .how strong { color: #cfcfd6; font-weight: 600; }
+      footer { text-align: center; padding: 1.25rem 1rem 1.25rem; font-size: 0.75rem; color: #6a6a72; }
     </style>
   </head>
   <body>
@@ -98,12 +112,44 @@
         <span class="go">Open →</span>
       </a>
     </main>
-    <p class="note">
-      Each tool is its own app — open it on its own, bookmark it, or
-      <strong>Add&nbsp;to&nbsp;Home&nbsp;Screen</strong> to install just that one. They
-      share nothing but this launcher, so the Infrared editor never carries the
-      Macro engine and vice-versa.
-    </p>
+    <section class="install">
+      <h2>Install it your way — one app, two, or three</h2>
+      <p class="lead">
+        Everything runs in the browser, but you can also
+        <strong>Add&nbsp;to&nbsp;Home&nbsp;Screen</strong> to get a full-screen,
+        offline app with its own icon. Install this launcher, either tool on its
+        own, or any mix — they share nothing but this page, so an installed
+        Infrared editor never carries the Macro engine and vice-versa.
+      </p>
+      <div class="shapes">
+        <div class="shape">
+          <span class="count">One app</span>
+          <h3>The whole Studio</h3>
+          <p>Install <strong>this launcher</strong>: one icon that opens here, then you pick Infrared or Macro. Both tools, least clutter.</p>
+        </div>
+        <div class="shape">
+          <span class="count">Two apps</span>
+          <h3>Each tool on its own</h3>
+          <p>Install <strong>Infrared</strong> and <strong>Macro</strong> separately: two icons, each opening straight into its tool with no menu.</p>
+        </div>
+        <div class="shape">
+          <span class="count">Three</span>
+          <h3>All of the above</h3>
+          <p>The launcher <em>and</em> both tools — three icons. Handy if you jump between them and also want the quick single-tap doors.</p>
+        </div>
+      </div>
+      <p class="how">
+        <strong>On iPad / iPhone:</strong> open the page you want to install
+        (this launcher for the whole Studio, or open a tool below to install just
+        that one), tap Safari's <strong>Share</strong> button, then
+        <strong>Add&nbsp;to&nbsp;Home&nbsp;Screen</strong>. On Android/Chrome, use
+        the browser's <strong>Install app</strong> menu.
+        <br />
+        Changed your mind? You can add or remove any of these any time — installing
+        one never blocks the others, and the <span aria-hidden="true">‹</span>&nbsp;Studio
+        link inside each tool always brings you back here.
+      </p>
+    </section>
     <footer>Free · on-device · no account · no upload</footer>
     <script type="module" src="/src/chooser.ts"></script>
   </body>
