@@ -51,7 +51,7 @@ body {
   font: italic 600 13px/1 Georgia, serif;
   cursor: pointer;
 }
-#infoDlg, #helpDlg {
+#infoDlg, #helpDlg, #batchDlg {
   background: var(--panel);
   color: #e8e8ea;
   border: 1px solid var(--line);
@@ -59,8 +59,37 @@ body {
   padding: 18px 20px;
   max-width: min(520px, 90vw);
 }
-#infoDlg::backdrop, #helpDlg::backdrop { background: rgba(0, 0, 0, 0.55); }
-#infoDlg h2, #helpDlg h2 { margin: 0 0 10px; font-size: 16px; }
+#infoDlg::backdrop, #helpDlg::backdrop, #batchDlg::backdrop { background: rgba(0, 0, 0, 0.55); }
+#infoDlg h2, #helpDlg h2, #batchDlg h2 { margin: 0 0 10px; font-size: 16px; }
+
+/* Batch-start chooser: pick the grade that goes on every photo. */
+#batchDlg { max-height: 86vh; overflow-y: auto; }
+.batch-lead { margin: 0 0 14px; font-size: 13px; line-height: 1.5; color: #9a9aa6; }
+.batch-group { margin: 0 0 14px; }
+.batch-group-title { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: #cfcfd6; }
+.batch-group-title small { color: #80808a; font-weight: 400; }
+.batch-choices { display: flex; flex-wrap: wrap; gap: 8px; }
+.batch-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #202028;
+  color: #f2f2f4;
+  text-align: left;
+  cursor: pointer;
+}
+.batch-choice:active { background: #2a2a34; border-color: var(--accent); }
+.batch-choice strong { font-size: 14px; }
+.batch-choice small { font-size: 12px; line-height: 1.4; color: #9a9aa6; }
+.batch-choice.slim { width: auto; flex-direction: row; padding: 8px 14px; }
+.batch-none { margin: 4px 0 0; font-size: 12.5px; line-height: 1.5; color: #80808a; }
+.batch-note { margin: 2px 0 14px; font-size: 12px; color: #80808a; }
+#batchDlg button#batchCancel { width: auto; padding: 8px 16px; }
 #infoDlg ol, #infoDlg ul, #helpDlg ol, #helpDlg ul { margin: 0 0 14px; padding-left: 20px; }
 #infoDlg ul { list-style: none; padding-left: 2px; }
 #infoDlg li strong { color: #e8e8ea; font-variant-numeric: tabular-nums; }

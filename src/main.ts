@@ -2470,11 +2470,50 @@ ui.exBtn.addEventListener("click", async () => {
 // correction), exactly like opening it, then the look layers on top. Results
 // come back as a single .zip so the iPad share sheet only prompts once.
 
-/** This photo's own automatic baseline (WB/exposure/denoise) plus the given
- *  creative look. Mirrors autoAdjust() + loadSlot(), without touching the
- *  live on-screen edit. Masks never carry (composition-specific). */
-function batchParamsFor(img: DecodedImage, look: SavedLook): EditParams {
-  const wb = grayWorldWB(img);
+// What a batch lays on top of each photo's own automatic balance. Chosen in
+// the batch-start dialog (owner feedback 2026-07-13: batch must ASK, and must
+// recognize when there's no current edit to copy):
+//   look    — a concrete creative grade (the current edit, or a My-looks slot)
+//   builtin — one of the seven Looks; resolved PER IMAGE like the look button
+//             (raw sources take the full-strength recipe, JPEGs the gentler
+//             one, and the look's WB bias rides on the photo's own auto WB)
+//   auto    — no creative grade at all: just balance every photo, the
+//             quick-look-at-a-folder mode.
+type BatchGrade =
+  | { kind: "look"; look: SavedLook }
+  | { kind: "builtin"; key: keyof typeof LOOKS }
+  | { kind: "auto" };
+
+/** A no-op creative grade — auto-balance only. */
+function neutralLook(): SavedLook {
+  return {
+    swapRB: false, hue: 0, sat: 1, contrast: 1, tint: [1, 1, 1], glow: 0,
+    sky: [0, 1, 1], foliage: [0, 1, 1], tone: [...TONE_DEFAULT] as [number, number, number, number, number],
+    lum: 1, clarity: 0, dehaze: 0, hsl: hslDefault(),
+  };
+}
+
+/** This photo's own automatic baseline (WB/exposure/denoise) plus the chosen
+ *  creative grade. Mirrors autoAdjust() + loadSlot()/pressLook(), without
+ *  touching the live on-screen edit. Masks never carry (composition-specific). */
+function batchParamsFor(img: DecodedImage, grade: BatchGrade): EditParams {
+  let wb = grayWorldWB(img);
+  let look: SavedLook;
+  if (grade.kind === "builtin") {
+    // Resolve exactly like pressing the look button on this photo: strength
+    // by source kind, WB bias multiplied onto the photo's own auto WB.
+    const l = LOOKS[grade.key];
+    const strength = img.camMatrix ? l.raw : l.jpeg;
+    const bias = l.wbBias ?? [1, 1, 1];
+    wb = [
+      clamp(wb[0] * bias[0], 0.02, 16),
+      clamp(wb[1] * bias[1], 0.02, 16),
+      clamp(wb[2] * bias[2], 0.02, 16),
+    ];
+    look = { ...neutralLook(), swapRB: l.swapRB, hue: l.hue, sat: strength.sat, contrast: strength.contrast, tint: l.tint ?? [1, 1, 1], glow: l.glow ?? 0 };
+  } else {
+    look = grade.kind === "look" ? grade.look : neutralLook();
+  }
   return {
     wb,
     exposure: autoExposure(img, wb),
@@ -2565,7 +2604,7 @@ function isQuotaError(err: unknown): boolean {
 
 let batchStopRequested = false;
 let batchRemaining: File[] = []; // input Files not yet processed after a stop
-let batchSettings: { look: SavedLook; format: ExportFormat; scale: number; quality: number } | null = null;
+let batchSettings: { grade: BatchGrade; format: ExportFormat; scale: number; quality: number } | null = null;
 let pendingSaveIsBatch = false;
 let batchRunning = false;
 
@@ -2617,7 +2656,7 @@ async function bundleStored(header: string): Promise<boolean> {
 }
 
 async function runBatch(files: File[]) {
-  const { look, format, scale, quality } = batchSettings!;
+  const { grade, format, scale, quality } = batchSettings!;
   const skipped: string[] = [];
   let alreadyDone = 0;
   let noHotspot = 0; // JPEG frames whose lens wasn't in EXIF → no hot-spot fix
@@ -2660,7 +2699,7 @@ async function runBatch(files: File[]) {
         const result = await exportImage(
           imported,
           img,
-          batchParamsFor(img, look),
+          batchParamsFor(img, grade),
           { format, scale, quality, rotate: img.rotate ?? 0 },
           (fr) => { busyText.textContent = `Processing ${i + 1} / ${files.length} — ${f.name} · ${Math.round(fr * 100)}%`; },
         );
@@ -2719,10 +2758,81 @@ async function runBatch(files: File[]) {
   }
 }
 
+// --- Batch-start chooser: tapping "Batch process" first asks what grade goes
+// on every photo (owner feedback 2026-07-13 — batch used to silently take the
+// on-screen edit, which is meaningless when nothing is open). Only after a
+// choice does the file picker open; the choice rides into the change handler.
+const batchDlg = $("batchDlg") as HTMLDialogElement;
+const bcSlots = $("bcSlots") as HTMLDivElement;
+const bcLooks = $("bcLooks") as HTMLDivElement;
+let chosenGrade: BatchGrade | null = null;
+
+const BUILTIN_NAMES: Record<string, string> = {
+  aero: "Aerochrome", red: "Aero Red", goldie: "Goldie", natural: "Natural IR",
+  mono: "B&W IR", sepia: "Sepia IR", hie: "HIE B&W",
+};
+
+/** Stash the choice, close the dialog, and open the file picker (still inside
+ *  the tap's gesture, so iOS allows the picker to open). */
+function pickGrade(grade: BatchGrade) {
+  chosenGrade = grade;
+  batchDlg.close();
+  batchInput.click();
+}
+
+function openBatchDialog() {
+  // Your current edit — only real when a photo is open; otherwise say why not.
+  ($("bcCurrent") as HTMLButtonElement).hidden = !current;
+  ($("bcNoCurrent") as HTMLElement).hidden = !!current;
+  // Saved looks: one button per filled slot; none → how to make one.
+  bcSlots.replaceChildren();
+  let filled = 0;
+  for (let i = 0; i < SLOTS; i++) {
+    const look = readSlot(i);
+    if (!look) continue;
+    filled++;
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "batch-choice slim";
+    b.innerHTML = `<strong>Slot ${i + 1}</strong>`;
+    b.addEventListener("click", () => pickGrade({ kind: "look", look }));
+    bcSlots.append(b);
+  }
+  ($("bcNoSlots") as HTMLElement).hidden = filled > 0;
+  bcSlots.hidden = filled === 0;
+  // Built-in looks.
+  bcLooks.replaceChildren(
+    ...Object.keys(LOOKS).map((key) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "batch-choice slim";
+      b.innerHTML = `<strong>${BUILTIN_NAMES[key] ?? key}</strong>`;
+      b.addEventListener("click", () => pickGrade({ kind: "builtin", key }));
+      return b;
+    }),
+  );
+  ($("bcFmt") as HTMLElement).textContent =
+    ` (currently ${ui.exFormat.value === "jpeg" ? "JPEG" : "TIFF"} · ${Number(ui.exScale.value) === 1 ? "full resolution" : `${Math.round(Number(ui.exScale.value) * 100)}%`})`;
+  batchDlg.showModal();
+}
+
+$("batchBtn").addEventListener("click", openBatchDialog);
+$("welcomeBatchBtn").addEventListener("click", openBatchDialog);
+$("bcCurrent").addEventListener("click", () => pickGrade({ kind: "look", look: currentLook() }));
+$("bcAuto").addEventListener("click", () => pickGrade({ kind: "auto" }));
+$("batchCancel").addEventListener("click", () => batchDlg.close());
+batchDlg.addEventListener("click", (e) => {
+  if (e.target === batchDlg) batchDlg.close(); // tap outside to dismiss
+});
+
 batchInput.addEventListener("change", async () => {
   const files = Array.from(batchInput.files ?? []);
   batchInput.value = ""; // let the same set be re-picked later
   if (!files.length) return;
+  // The grade chosen in the dialog; a bare change event (shouldn't happen)
+  // falls back to the honest equivalents of the old behaviour.
+  const grade: BatchGrade = chosenGrade ?? (current ? { kind: "look", look: currentLook() } : { kind: "auto" });
+  chosenGrade = null;
   // Leftover frames from an interrupted batch would silently mix into this
   // zip — ask, honestly, instead of guessing.
   const leftovers = await frameCount().catch(() => 0);
@@ -2735,7 +2845,7 @@ batchInput.addEventListener("change", async () => {
     )
   )
     return;
-  batchSettings = { look: currentLook(), format: ui.exFormat.value as ExportFormat, scale: Number(ui.exScale.value), quality: Number(ui.exQuality.value) };
+  batchSettings = { grade, format: ui.exFormat.value as ExportFormat, scale: Number(ui.exScale.value), quality: Number(ui.exQuality.value) };
   batchRemaining = [];
   runBatch(files);
 });

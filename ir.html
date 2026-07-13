@@ -36,10 +36,10 @@
             Open image(s)
             <input id="file" type="file" accept=".dng,.nef,.zip,image/*" multiple hidden />
           </label>
-          <label class="bar-btn" id="batchBtn" title="Develop a whole set with your look → one .zip">
-            Batch export
-            <input id="batchFiles" type="file" accept=".dng,.nef,.zip,image/*" multiple hidden />
-          </label>
+          <button class="bar-btn" id="batchBtn" type="button" title="Develop a whole set unattended → one .zip">
+            Batch process
+          </button>
+          <input id="batchFiles" type="file" accept=".dng,.nef,.zip,image/*" multiple hidden />
         </span>
       </header>
 
@@ -66,8 +66,8 @@
           <p id="hint">Edit infrared photos — RAW (NEF / DNG) unlocks the full color magic.</p>
           <label class="open-btn welcome-open" for="file">Open image(s)</label>
           <p class="welcome-open-hint">Pick one photo to edit — or several to work as a session: big previews you switch between, each keeping its own edit, all held safely until you're done.</p>
-          <label class="welcome-batch" for="batchFiles">Batch export a set…</label>
-          <p class="welcome-batch-hint">Not for editing — this develops a whole set unattended (each photo auto-balanced, your look on top) straight into one .zip. Tip: open one photo first and dial in the look; it carries to every frame.</p>
+          <button class="welcome-batch" id="welcomeBatchBtn" type="button">Batch process a set…</button>
+          <p class="welcome-batch-hint">Not for editing — this develops a whole set unattended (each photo auto-balanced on its own) straight into one .zip. You choose what goes on top: a look, your current edit, or nothing at all for a quick balanced preview of a folder.</p>
           <button id="resumeSession" class="welcome-batch" type="button" hidden>Resume session</button>
           <button id="recoverBatch" class="welcome-batch" type="button" hidden>Recover images from an interrupted batch</button>
           <hr class="welcome-div" />
@@ -305,7 +305,7 @@
           </label>
           <label id="exQualityRow">Quality <input id="exQuality" type="range" min="0.5" max="1" step="0.01" value="0.92" /></label>
           <button id="exBtn" type="button">Export &amp; Save</button>
-          <small style="color:#80808a">These Format &amp; Resolution settings also apply to <strong>Batch export</strong> (top bar).</small>
+          <small style="color:#80808a">These Format &amp; Resolution settings also apply to <strong>Batch process</strong> (top bar).</small>
         </fieldset>
 
         <fieldset id="fsProfiles">
@@ -344,6 +344,35 @@
         </div>
       </div>
     </div>
+
+    <dialog id="batchDlg">
+      <h2>Batch process — what goes on every photo?</h2>
+      <p class="batch-lead">Each photo is auto-balanced on its own (white balance, exposure, denoise, lens fix) — you're choosing the <em>creative grade</em> that goes on top. The set comes back as one .zip.</p>
+      <div class="batch-group" id="bgCurrent">
+        <button class="batch-choice" id="bcCurrent" type="button">
+          <strong>Your current edit</strong>
+          <small>The grade dialled in on the photo that's open right now</small>
+        </button>
+        <p class="batch-none" id="bcNoCurrent" hidden>No photo is open, so there's no current edit to copy — pick a look below, or open a photo first and dial one in.</p>
+      </div>
+      <div class="batch-group">
+        <p class="batch-group-title">A saved look <small>(My looks)</small></p>
+        <div class="batch-choices" id="bcSlots"></div>
+        <p class="batch-none" id="bcNoSlots" hidden>No saved looks yet. To make one: open a photo, dial in a grade you like, then save it in the <strong>My looks</strong> panel — it'll be waiting here.</p>
+      </div>
+      <div class="batch-group">
+        <p class="batch-group-title">A built-in look</p>
+        <div class="batch-choices" id="bcLooks"></div>
+      </div>
+      <div class="batch-group">
+        <button class="batch-choice" id="bcAuto" type="button">
+          <strong>Auto-balance only — no look</strong>
+          <small>Just each photo properly white-balanced &amp; exposed. Perfect for a quick look at a whole folder to see what you've got.</small>
+        </button>
+      </div>
+      <p class="batch-note">Format &amp; Resolution come from the <strong>Export</strong> panel<span id="bcFmt"></span>.</p>
+      <button id="batchCancel" type="button">Cancel</button>
+    </dialog>
 
     <dialog id="infoDlg">
       <h2>What's new</h2>
@@ -427,13 +456,16 @@
         (classic compressed; not Z8/Z9 High-Efficiency) &middot; Fujifilm X-Trans not supported.
         Tuned on an IR-converted Nikon Z50.</p>
 
-        <h3>Batch export — develop a whole set at once</h3>
+        <h3>Batch process — develop a whole set at once</h3>
         <p><strong>Open image(s)</strong> is for <em>editing</em> (one photo, or a few as a session);
-        <strong>Batch export</strong> is for <em>output</em> — it develops a whole set unattended and hands you a .zip.
-        Tap it (in the top bar next to <em>Open image(s)</em>, or on the start screen)
-        and pick a whole set. Each photo is auto-balanced on its own (its own white balance, exposure, denoise and
-        lens hot-spot fix), then your <em>current look</em> — the creative grade you've dialled in: swap, hue, tone,
-        mixer, clarity and so on — is layered on top of every frame. The set comes back as one <strong>.zip</strong>
+        <strong>Batch process</strong> is for <em>output</em> — it develops a whole set unattended and hands you a .zip.
+        Tap it (in the top bar next to <em>Open image(s)</em>, or on the start screen) and it first asks
+        <em>what goes on every photo</em>: <strong>your current edit</strong> (the grade on screen — offered only when
+        a photo is open), <strong>a saved look</strong> from My looks, <strong>a built-in look</strong> (Aerochrome,
+        Goldie, B&amp;W IR…), or <strong>Auto-balance only</strong> — no look at all, just each photo properly
+        white-balanced and exposed, which is the quickest way to preview a whole folder and see what you've got.
+        Then pick the files. Each photo is auto-balanced on its own (its own white balance, exposure, denoise and
+        lens hot-spot fix) with the chosen grade layered on top. The set comes back as one <strong>.zip</strong>
         you save in a single tap, at the Format and Resolution set in Export. (White balance is per-photo, so this is
         for a shoot in one style; the exact frame on screen isn't copied pixel-for-pixel.)</p>
         <p><strong>What rides along, and what doesn't:</strong> a batch carries the <em>creative</em> look only.
