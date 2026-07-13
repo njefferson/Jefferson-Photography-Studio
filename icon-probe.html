@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <!-- Title is swapped by JS along with the icon so each install pre-fills a
+         distinct name (Icon A / Icon B). -->
+    <meta name="apple-mobile-web-app-title" content="Icon A" id="apptitle" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#0b0b0d" />
+    <!-- THE THING UNDER TEST: does rewriting this link before Add-to-Home-Screen
+         change the icon iOS installs? Default is A; the buttons swap it to B. -->
+    <link rel="apple-touch-icon" href="./probe-icon-a-180.png" id="touchicon" />
+    <link rel="icon" type="image/svg+xml" href="./studio-icon.svg" />
+    <title>Home-Screen icon test</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; }
+      body {
+        background: #0b0b0d;
+        color: #f2f2f4;
+        font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+      }
+      .wrap { max-width: 680px; margin: 0 auto; padding: 1.75rem 1.35rem 3rem; }
+      header { text-align: center; margin-bottom: 1.5rem; }
+      h1 { margin: 0; font-size: 1.35rem; font-weight: 700; letter-spacing: 0.01em; }
+      header p { margin: 0.5rem 0 0; font-size: 0.9rem; color: #9a9aa4; }
+      h2 { font-size: 1rem; font-weight: 600; color: #cfcfd6; margin: 2rem 0 0.6rem; }
+      .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; }
+      .card {
+        display: flex; flex-direction: column; align-items: center; gap: 0.7rem;
+        padding: 1.1rem 0.9rem; border-radius: 18px;
+        background: rgba(255,255,255,0.035);
+        border: 2px solid rgba(255,255,255,0.08);
+        transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
+        cursor: pointer; -webkit-tap-highlight-color: transparent;
+      }
+      .card:active { transform: scale(0.985); }
+      .card.active { border-color: #5c90ff; background: rgba(92,144,255,0.12); }
+      .card img { width: 96px; height: 96px; border-radius: 21px; box-shadow: 0 6px 20px rgba(0,0,0,0.5); display: block; }
+      .card .name { font-size: 0.95rem; font-weight: 600; }
+      .card .sub { font-size: 0.76rem; color: #9a9aa4; text-align: center; margin-top: -0.3rem; }
+      .card .badge {
+        font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+        padding: 0.18rem 0.6rem; border-radius: 999px;
+        color: #7a7a84; border: 1px solid rgba(255,255,255,0.14);
+      }
+      .card.active .badge { color: #bcd2ff; border-color: #5c90ff; background: rgba(92,144,255,0.18); }
+      .live {
+        margin: 1.1rem 0 0; text-align: center; font-size: 0.88rem; color: #cfcfd6;
+        padding: 0.7rem 1rem; border-radius: 12px; background: rgba(255,255,255,0.04);
+      }
+      .live b { color: #bcd2ff; }
+      ol { margin: 0.4rem 0 0; padding-left: 1.3rem; }
+      li { margin: 0.4rem 0; font-size: 0.9rem; color: #d6d6dc; }
+      li b { color: #fff; }
+      .outcome { margin-top: 0.6rem; border-radius: 14px; overflow: hidden; border: 1px solid rgba(255,255,255,0.08); }
+      .outcome > div { padding: 0.75rem 0.95rem; font-size: 0.85rem; line-height: 1.5; }
+      .outcome .yes { background: rgba(84,205,130,0.10); color: #cfeedb; }
+      .outcome .no { background: rgba(255,92,158,0.10); color: #ffd7e6; border-top: 1px solid rgba(255,255,255,0.06); }
+      .outcome b { color: #fff; }
+      .fallback { margin-top: 0.6rem; display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; }
+      .fallback a {
+        display: block; text-align: center; text-decoration: none; color: #eaeaef;
+        padding: 0.75rem; border-radius: 12px; font-size: 0.86rem; font-weight: 600;
+        background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+      }
+      .fallback a span { display: block; font-size: 0.72rem; font-weight: 400; color: #9a9aa4; margin-top: 0.15rem; }
+      .note { margin-top: 1.6rem; font-size: 0.8rem; line-height: 1.55; color: #80808a; text-align: center; }
+      .note a { color: #9ab6ff; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <h1>Home-Screen icon test</h1>
+        <p>A quick on-device check before we build the real icon picker: can we
+          change which icon your installed app wears just by choosing here first?</p>
+      </header>
+
+      <h2>1 · Choose an icon</h2>
+      <div class="cards">
+        <div class="card active" data-style="a" role="button" tabindex="0" aria-pressed="true">
+          <img src="./probe-icon-a-180.png" alt="Icon A — dark, colourful aperture" />
+          <div class="name">Icon A</div>
+          <div class="sub">Dark · colourful</div>
+          <div class="badge">Selected</div>
+        </div>
+        <div class="card" data-style="b" role="button" tabindex="0" aria-pressed="false">
+          <img src="./probe-icon-b-180.png" alt="Icon B — light, graphite aperture" />
+          <div class="name">Icon B</div>
+          <div class="sub">Light · graphite</div>
+          <div class="badge">Tap to pick</div>
+        </div>
+      </div>
+      <p class="live">Active install icon: <b id="livename">Icon A</b> — the page's
+        <code>apple-touch-icon</code> now points at it.</p>
+
+      <h2>2 · Add it to your Home Screen</h2>
+      <ol>
+        <li>With <b>Icon A</b> selected, tap Safari's <b>Share</b> button, then
+          <b>Add&nbsp;to&nbsp;Home&nbsp;Screen</b>. It should pre-fill the name
+          <b>Icon A</b> — keep it and add.</li>
+        <li>Come back here, tap <b>Icon B</b>, then <b>Add&nbsp;to&nbsp;Home&nbsp;Screen</b>
+          again (name <b>Icon B</b>).</li>
+        <li>Look at the two icons now on your Home Screen and compare.</li>
+      </ol>
+
+      <h2>3 · What it means</h2>
+      <div class="outcome">
+        <div class="yes"><b>Icon A app shows the dark icon, Icon B app shows the
+          light one</b> → the swap works. We can build the picker straight into
+          the install flow — pick a style, then Add to Home Screen.</div>
+        <div class="no"><b>Both apps show the same icon</b> (whichever you added
+          first) → iOS cached it for this page. Then we ship a separate little
+          install page per style instead. Test that fallback right below.</div>
+      </div>
+
+      <h2>Fallback check — one page per style</h2>
+      <p style="font-size:0.85rem;color:#9a9aa4;margin:0.2rem 0 0;">Each link below
+        is its own address with a fixed icon. Add both, and if <i>these</i> two
+        differ, the per-style-page fallback is good to go.</p>
+      <div class="fallback">
+        <a href="./icon-a.html">Install Icon A<span>from its own page</span></a>
+        <a href="./icon-b.html">Install Icon B<span>from its own page</span></a>
+      </div>
+
+      <p class="note">Temporary test page. Delete once the icon picker mechanism
+        is settled. &nbsp;·&nbsp; <a href="./index.html">‹ Studio</a></p>
+    </div>
+
+    <script>
+      // Swap the apple-touch-icon (and the pre-fill title) when a style is
+      // picked. iOS reads apple-touch-icon at Add-to-Home-Screen time — whether
+      // it honours a value set after load is precisely what this page tests.
+      var link = document.getElementById("touchicon");
+      var title = document.getElementById("apptitle");
+      var livename = document.getElementById("livename");
+      var cards = Array.prototype.slice.call(document.querySelectorAll(".card"));
+      var ICONS = { a: { href: "./probe-icon-a-180.png", name: "Icon A" }, b: { href: "./probe-icon-b-180.png", name: "Icon B" } };
+
+      function pick(style) {
+        var cfg = ICONS[style];
+        if (!cfg) return;
+        // Replace the link element wholesale — some WebKit builds only notice a
+        // fresh node, not an href mutation. Belt and braces for the test.
+        var fresh = document.createElement("link");
+        fresh.rel = "apple-touch-icon";
+        fresh.id = "touchicon";
+        fresh.href = cfg.href;
+        link.parentNode.replaceChild(fresh, link);
+        link = fresh;
+        title.setAttribute("content", cfg.name);
+        document.title = cfg.name + " — icon test";
+        livename.textContent = cfg.name;
+        cards.forEach(function (c) {
+          var on = c.getAttribute("data-style") === style;
+          c.classList.toggle("active", on);
+          c.setAttribute("aria-pressed", on ? "true" : "false");
+          c.querySelector(".badge").textContent = on ? "Selected" : "Tap to pick";
+        });
+      }
+
+      cards.forEach(function (c) {
+        var style = c.getAttribute("data-style");
+        c.addEventListener("click", function () { pick(style); });
+        c.addEventListener("keydown", function (e) {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(style); }
+        });
+      });
+    </script>
+  </body>
+</html>

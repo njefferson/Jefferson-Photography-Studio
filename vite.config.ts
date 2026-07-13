@@ -118,6 +118,12 @@ export default defineConfig({
         chooser: resolve(__dirname, "index.html"),
         ir: resolve(__dirname, "ir.html"),
         macro: resolve(__dirname, "macro.html"),
+        // Temporary on-device probe for the Home-Screen icon picker — proves
+        // whether iOS honours an apple-touch-icon swapped before Add-to-Home-
+        // Screen. Remove these three once the mechanism is settled.
+        iconProbe: resolve(__dirname, "icon-probe.html"),
+        iconA: resolve(__dirname, "icon-a.html"),
+        iconB: resolve(__dirname, "icon-b.html"),
       },
     },
   },
