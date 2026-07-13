@@ -332,6 +332,18 @@ See **`PLAN.md`** for the full build plan.
   Back appear only when there's something live to return to; no page errors.
   NEEDS THE OWNER'S HANDS on the iPad: that Home reads as "start screen" (vs the
   ‹ Studio umbrella link) and the Back pill is obvious enough.
+  FOLLOW-UP (2026-07-13, owner ask, cache ips-v24 → ips-v25): with Home now
+  opening the start screen, the top-bar "Tutorials" button was redundant, so it
+  was REMOVED from the IR top bar and moved INTO Help — a prominent "▶ Tutorials
+  — learn by doing…" button at the top of the Help dialog that closes Help and
+  routes through goHome() to the start screen where the lesson cards live (the
+  cards themselves stay on the start screen — single source). The in-lesson
+  "next lesson" hint (lesson-next) no longer points at the gone Tutorials button;
+  it points at Home / Help. VERIFIED headless (10/10): no Tutorials button in the
+  bar, no load-time error from the removed wiring, Help → Tutorials opens the
+  start screen with the 3 lesson cards, and a lesson launches from there; the
+  Home nav suite still 18/18. Promoted to main with the sessions + Quick look +
+  Home release.
 - [x] **Install as one app, two, or three** — explain and guide the three
   install shapes: the whole Studio (launcher manifest), Infrared alone, or
   Macro alone (each already has its own manifest/start_url). SHIPPED 2026-07-13:

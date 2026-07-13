@@ -1467,6 +1467,12 @@ $("helpClose").addEventListener("click", () => helpDlg.close());
 helpDlg.addEventListener("click", (e) => {
   if (e.target === helpDlg) helpDlg.close();
 });
+// Tutorials moved off the top bar into Help — this opens the start screen, where
+// the example lessons live (goHome keeps any live photo/session parked behind).
+$("helpTutorials").addEventListener("click", () => {
+  helpDlg.close();
+  goHome();
+});
 
 // Press-and-hold comparison with the as-imported original (auto WB/exposure/
 // denoise, no creative edits). Works from the header button or by holding the
@@ -1747,8 +1753,8 @@ const lessonShow = $("lessonShow") as HTMLButtonElement;
 // way off the photo was the session's Done, which ENDS it. Home returns to the
 // start screen WITHOUT ending anything: the photo/session stays live in memory
 // (and in storage), so the return button — or a reload's Resume — drops you
-// right back. This is also what the header's Tutorials button does (the start
-// screen is where the examples live), so both share goHome().
+// right back. The start screen is also where the tutorials live, so Help's
+// "Tutorials" button routes here too (see the helpTutorials wiring).
 function goHome() {
   captureActiveEdit(); // park any in-flight edit before leaving the photo
   welcome.hidden = false;
@@ -1782,7 +1788,6 @@ function returnToEditor() {
 }
 
 $("homeBtn").addEventListener("click", goHome);
-$("examplesBtn").addEventListener("click", goHome);
 welcomeClose.addEventListener("click", returnToEditor);
 welcomeBack.addEventListener("click", returnToEditor);
 
