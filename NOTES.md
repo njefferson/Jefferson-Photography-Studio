@@ -358,6 +358,27 @@ See **`PLAN.md`** for the full build plan.
   real memory pressure, and a portrait-orientation frame through batch.
   (The old-URL redirect from an installed old-domain PWA PASSED — owner
   confirmed on device, 2026-07-13.)
+- [ ] **Quick look** — see what's in a folder without loading a session or
+  round-tripping a .zip (owner ask 2026-07-13, GO given same day; this is the
+  pure form of his origin story: "white balance an entire folder so I could
+  see what files I was actually dealing with"). Design agreed: pick files →
+  decode a small AUTO-BALANCED preview of each straight from the picked Files
+  → a full-screen tappable grid with filenames. NOTHING is copied to storage
+  (unlike sessions) — previews live in RAM only, so it's instant to open and
+  instant to Done, and honestly ephemeral: iPad Safari can't re-read picked
+  Files after a reload, so a quick look lasts only until the tab closes —
+  which fits "what am I dealing with?" exactly. From the grid, "keep these"
+  promotes the CHECKED picks into a real session (the File objects are still
+  alive in-page, so promotion just runs the normal addToSession copy). Build
+  notes: reuse the session thumbnailer (makeThumb) at a bigger edge (~512px
+  for a grid tile; maybe tap → full-screen single preview from the same File),
+  decode sequentially with a progress readout and a yield per file (same
+  pattern as addToSession), previews-only RAM bound; entry point on the start
+  screen next to Open image(s) ("Quick look a folder…") and possibly inside
+  the batch chooser as a cross-link. No storage, no cache implications beyond
+  the usual sw.js bump. Consider the Web-Worker thumbnailer here first (the
+  session add-time hitch note below) since quick look decodes many frames
+  back-to-back.
 - [x] **Batch process asks what goes on every photo** — owner feedback
   2026-07-13 (his origin story: he wanted to white-balance an entire folder
   just to SEE what files he was dealing with): batch used to silently take the
