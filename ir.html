@@ -412,23 +412,37 @@
         Tuned on an IR-converted Nikon Z50.</p>
 
         <h3>Process many at once</h3>
-        <p>In <strong>Export</strong>, tap <strong>Process many…</strong> and pick a whole set. Each photo is
-        auto-balanced on its own (its own white balance, exposure, denoise and lens hot-spot fix), then your
-        <em>current look</em> — the creative grade you've dialled in: swap, hue, tone, mixer, clarity and so on —
-        is layered on top of every frame. The set comes back as one <strong>.zip</strong> you save in a single tap,
-        at the Format and Resolution set in Export. (White balance is per-photo, so this is for a shoot in one
-        style; the exact frame on screen isn't copied pixel-for-pixel.) Every finished photo is <strong>saved to
-        the app's own storage as it completes</strong>, so nothing is ever lost: you can <strong>stop mid-run</strong>
-        and keep what's done, tap <strong>Continue</strong> to resume the rest, and if the app ever crashes or is
-        closed mid-batch, the start screen offers to <strong>recover</strong> the finished images next time you open it.</p>
+        <p>Tap <strong>Process many</strong> (in the top bar next to <em>Open image</em>, or on the start screen)
+        and pick a whole set. Each photo is auto-balanced on its own (its own white balance, exposure, denoise and
+        lens hot-spot fix), then your <em>current look</em> — the creative grade you've dialled in: swap, hue, tone,
+        mixer, clarity and so on — is layered on top of every frame. The set comes back as one <strong>.zip</strong>
+        you save in a single tap, at the Format and Resolution set in Export. (White balance is per-photo, so this is
+        for a shoot in one style; the exact frame on screen isn't copied pixel-for-pixel.)</p>
+        <p><strong>What rides along, and what doesn't:</strong> a batch carries the <em>creative</em> look only.
+        <strong>Masks</strong> (radial, gradient, brush) and the <strong>IR lens fixes</strong> sliders —
+        Hot-spot, its size, and Vignette — are tied to one specific frame, so they do <em>not</em> carry into a
+        batch. Instead every photo gets its <em>own</em> hot-spot correction chosen from its EXIF lens; a photo whose
+        lens isn't in the EXIF is processed without that fix, and the finish summary counts how many that was
+        (RAW frames skip it too — the hot-spot profiles are JPEG-only for now).</p>
+        <p>Every finished photo is <strong>saved to the app's own storage as it completes</strong>, so nothing is
+        ever lost: you can <strong>stop mid-run</strong> and keep what's done, tap <strong>Continue</strong> to
+        resume the rest, and if the app ever crashes or is closed mid-batch, the start screen offers to
+        <strong>recover</strong> the finished images next time you open it. If the device runs out of storage
+        mid-batch, it stops the same gentle way — save the <strong>.zip</strong> to free space, then Continue.</p>
 
-        <h3>Install as an app</h3>
-        <p>On iPad/iPhone: tap Safari's <strong>Share</strong> button (the square with the arrow), then
-        <strong>Add to Home Screen</strong>. You get a full-screen app with its own icon that works
-        offline. On Android/Chrome, use the browser's <strong>Install app</strong> menu entry.</p>
+        <h3>Install as an app — one, two, or three</h3>
+        <p>On iPad/iPhone: open the page you want to install, tap Safari's <strong>Share</strong> button
+        (the square with the arrow), then <strong>Add to Home Screen</strong>. You get a full-screen app
+        with its own icon that works offline. On Android/Chrome, use the browser's <strong>Install app</strong>
+        menu entry.</p>
         <p>Infrared and <strong>Macro Studio</strong> are separate tools under one <strong>Studio</strong> launcher
-        (the <span aria-hidden="true">‹</span> in the top-left goes back to it). Each installs on its own, so you
-        only carry the one you use.</p>
+        (the <span aria-hidden="true">‹</span> in the top-left goes back to it), and you choose what to install:</p>
+        <ul>
+          <li><strong>This tool alone</strong> — install from here and its icon opens straight into the Infrared editor, no menu.</li>
+          <li><strong>The whole Studio</strong> — install from the <span aria-hidden="true">‹</span>&nbsp;Studio launcher instead: one icon, then pick Infrared or Macro each time.</li>
+          <li><strong>Both, or all three</strong> — install any mix; each is independent, so the Infrared app never carries the Macro engine and vice-versa.</li>
+        </ul>
+        <p>You can add or remove any of them later — installing one never blocks the others.</p>
 
         <h3>Tips</h3>
         <ul>

@@ -95,6 +95,10 @@ dialog#helpDlg {
 }
 dialog#helpDlg::backdrop { background: rgba(0, 0, 0, 0.6); }
 dialog#helpDlg h2 { margin: 0 0 0.7rem; }
+dialog#helpDlg h3 { margin: 1.1rem 0 0.35rem; font-size: 0.95rem; color: #eaeaef; }
 dialog#helpDlg p { color: #b6b6be; }
+dialog#helpDlg ul { margin: 0.35rem 0; padding-left: 1.2rem; color: #b6b6be; font-size: 0.9rem; line-height: 1.5; }
+dialog#helpDlg li { margin: 0.2rem 0; }
+dialog#helpDlg strong { color: #eaeaef; }
 dialog#helpDlg .muted { color: #80808a; font-size: 0.85rem; }
 dialog#helpDlg button { margin-top: 0.6rem; padding: 0.55rem 1.2rem; border-radius: 10px; border: 1px solid #33333c; background: #1c1c22; color: #fff; cursor: pointer; }
