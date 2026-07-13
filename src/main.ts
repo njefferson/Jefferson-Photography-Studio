@@ -1999,8 +1999,7 @@ async function switchToPhoto(id: string) {
 /** Build a small gamma-encoded JPEG thumbnail for the strip — auto white
  *  balanced (so RAW infrared isn't a magenta smear) but ungraded, so it just
  *  says "which photo is this". Cheap: nearest-sampled at thumb resolution. */
-async function makeThumb(img: DecodedImage): Promise<ArrayBuffer> {
-  const MAX = 260;
+async function makeThumb(img: DecodedImage, MAX = 260): Promise<ArrayBuffer> {
   const s = Math.min(1, MAX / Math.max(img.width, img.height));
   const w = Math.max(1, Math.round(img.width * s));
   const h = Math.max(1, Math.round(img.height * s));
@@ -2269,6 +2268,164 @@ async function resumeSession() {
 
 resumeBtn.addEventListener("click", resumeSession);
 updateSessionResume();
+
+// --- Quick look: preview a whole folder instantly, keep the ones you want ----
+// The pure form of the owner's origin story — "white balance a whole folder
+// just to SEE what I'm dealing with". Pick a set and get a full-screen grid of
+// auto-balanced previews, decoded straight from the picked Files. NOTHING is
+// copied to storage (unlike a session): the previews live in RAM only, so it's
+// instant to open, instant to close, and honestly ephemeral — iPad Safari can't
+// re-read picked Files after a reload, so a quick look lasts only until the tab
+// closes, which fits "what am I dealing with?" exactly. Tap the keepers and
+// "Keep in a session" promotes them into a real editable session (the File
+// objects are still alive in-page, so promotion just runs the normal open
+// path). Decoding is sequential with a yield per file; only the small preview
+// JPEGs stay in RAM, never a full decode.
+
+interface QuickItem {
+  file: File;
+  name: string;
+  thumbUrl: string; // object URL for the grid tile ("" if it couldn't decode)
+  ok: boolean;
+  selected: boolean;
+}
+
+let quickItems: QuickItem[] = [];
+let quickGen = 0; // bumped on open/close to abort an in-flight decode loop
+
+const quickInput = $("quickFiles") as HTMLInputElement;
+const quickLook = $("quickLook") as HTMLDivElement;
+const qlGrid = $("qlGrid") as HTMLDivElement;
+const qlCount = $("qlCount") as HTMLSpanElement;
+const qlKeep = $("qlKeep") as HTMLButtonElement;
+const qlSelectToggle = $("qlSelectToggle") as HTMLButtonElement;
+
+const QUICK_EDGE = 512; // grid-tile preview edge (bigger than the strip's 260)
+
+function quickSelectedCount(): number {
+  return quickItems.reduce((n, it) => n + (it.selected ? 1 : 0), 0);
+}
+
+/** Refresh the header: count/progress, the Keep button's live count, and the
+ *  select-all/none toggle. `progress` is shown while still decoding. */
+function updateQuickHeader(progress?: string) {
+  const ok = quickItems.filter((it) => it.ok).length;
+  const sel = quickSelectedCount();
+  qlCount.textContent = progress ?? `${ok} photo${ok === 1 ? "" : "s"}`;
+  qlKeep.textContent = sel ? `Keep ${sel} in a session →` : "Keep in a session →";
+  qlKeep.disabled = sel === 0;
+  const anyUnsel = quickItems.some((it) => it.ok && !it.selected);
+  qlSelectToggle.textContent = anyUnsel ? "Select all" : "Select none";
+  qlSelectToggle.hidden = ok === 0;
+}
+
+/** Append one grid tile (a preview, or a placeholder for a file that wouldn't
+ *  decode). Tapping a good tile toggles whether it's a keeper. */
+function addQuickTile(it: QuickItem) {
+  const tile = document.createElement("button");
+  tile.type = "button";
+  tile.className = "ql-tile" + (it.selected ? " selected" : "");
+  tile.title = it.name;
+  if (it.ok && it.thumbUrl) {
+    const im = document.createElement("img");
+    im.src = it.thumbUrl;
+    im.alt = it.name;
+    tile.append(im);
+    tile.append(Object.assign(document.createElement("span"), { className: "ql-check", textContent: "✓" }));
+    tile.addEventListener("click", () => {
+      it.selected = !it.selected;
+      tile.classList.toggle("selected", it.selected);
+      updateQuickHeader();
+    });
+  } else {
+    tile.classList.add("ql-bad");
+    tile.append(Object.assign(document.createElement("span"), { className: "ql-bad-mark", textContent: "⚠︎" }));
+  }
+  tile.append(Object.assign(document.createElement("span"), { className: "ql-name", textContent: it.name }));
+  qlGrid.append(tile);
+}
+
+/** Open the grid and decode a preview of each picked file in turn. A transcoded
+ *  JPEG still makes a fine preview, so — unlike a real open — we don't reject it
+ *  here (that warning is for editing true RAW, which quick look isn't). */
+async function openQuickLook(files: File[]) {
+  const gen = ++quickGen;
+  for (const it of quickItems) if (it.thumbUrl) URL.revokeObjectURL(it.thumbUrl);
+  quickItems = [];
+  qlGrid.replaceChildren();
+  quickLook.hidden = false;
+  updateQuickHeader(`Decoding 0 / ${files.length}…`);
+
+  let done = 0;
+  for (const f of files) {
+    if (gen !== quickGen) return; // closed or restarted under us
+    let thumbUrl = "";
+    let ok = false;
+    try {
+      const imported = await importFile(f);
+      const img = await decode(imported);
+      const thumb = await makeThumb(img, QUICK_EDGE);
+      if (thumb.byteLength) {
+        thumbUrl = URL.createObjectURL(new Blob([thumb], { type: "image/jpeg" }));
+        ok = true;
+      }
+      // img + the imported bytes fall out of scope here; only the small JPEG
+      // preview is retained, so RAM stays bounded to N thumbnails.
+    } catch {
+      /* couldn't open — shown as a placeholder tile so nothing goes missing */
+    }
+    if (gen !== quickGen) { if (thumbUrl) URL.revokeObjectURL(thumbUrl); return; }
+    const it: QuickItem = { file: f, name: f.name, thumbUrl, ok, selected: ok };
+    quickItems.push(it);
+    addQuickTile(it);
+    done++;
+    updateQuickHeader(done < files.length ? `Decoding ${done} / ${files.length}…` : undefined);
+    await tick(); // yield so the grid paints and taps stay responsive
+  }
+  updateQuickHeader();
+}
+
+/** Close the grid, free every preview, and abort any decode still running. */
+function closeQuickLook() {
+  quickGen++;
+  for (const it of quickItems) if (it.thumbUrl) URL.revokeObjectURL(it.thumbUrl);
+  quickItems = [];
+  qlGrid.replaceChildren();
+  quickLook.hidden = true;
+}
+
+/** Promote the selected previews into a real session (or a lone open, for one).
+ *  The picked Files are still alive, so this is just the normal open path. */
+async function keepQuickLook() {
+  const files = quickItems.filter((it) => it.ok && it.selected).map((it) => it.file);
+  if (!files.length) return;
+  closeQuickLook();
+  try {
+    await openPicked(files);
+  } catch (err) {
+    welcome.hidden = false;
+    hint.hidden = false;
+    hint.textContent = "Could not open these files: " + (err as Error).message;
+  }
+}
+
+quickInput.addEventListener("change", async () => {
+  const files = Array.from(quickInput.files ?? []);
+  quickInput.value = ""; // allow re-picking the same set later
+  if (!files.length) return;
+  await openQuickLook(files);
+});
+qlKeep.addEventListener("click", keepQuickLook);
+$("qlClose").addEventListener("click", closeQuickLook);
+qlSelectToggle.addEventListener("click", () => {
+  const target = quickItems.some((it) => it.ok && !it.selected); // any unselected → select all
+  quickItems.forEach((it, i) => {
+    if (!it.ok) return;
+    it.selected = target;
+    qlGrid.children[i]?.classList.toggle("selected", target);
+  });
+  updateQuickHeader();
+});
 
 // --- Example photos: fetched on demand, opened through the normal raw path,
 // each with a short lesson overlay showing what to try. ---
@@ -2820,6 +2977,12 @@ $("batchBtn").addEventListener("click", openBatchDialog);
 $("welcomeBatchBtn").addEventListener("click", openBatchDialog);
 $("bcCurrent").addEventListener("click", () => pickGrade({ kind: "look", look: currentLook() }));
 $("bcAuto").addEventListener("click", () => pickGrade({ kind: "auto" }));
+$("bcQuick").addEventListener("click", () => {
+  // Not developing a .zip after all — just look. Stay in the tap gesture so
+  // iOS opens the picker.
+  batchDlg.close();
+  quickInput.click();
+});
 $("batchCancel").addEventListener("click", () => batchDlg.close());
 batchDlg.addEventListener("click", (e) => {
   if (e.target === batchDlg) batchDlg.close(); // tap outside to dismiss
