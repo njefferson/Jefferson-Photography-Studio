@@ -17,6 +17,11 @@
     <style>
       :root { color-scheme: dark; }
       * { box-sizing: border-box; }
+      /* The hidden attribute must always win — without this, any class that
+         sets `display:` (e.g. .share-app) overrides the UA's [hidden] rule and
+         the element renders anyway. That exact bug showed the "Share this app"
+         pill in the plain browser, where it's meant to stay hidden. */
+      [hidden] { display: none !important; }
       html, body { margin: 0; height: 100%; }
       body {
         background: #0b0b0d;

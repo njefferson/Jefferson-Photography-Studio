@@ -1897,6 +1897,7 @@ let activePhotoId: string | null = null;
 let nextOrder = 0;
 const liveEdits = new Map<string, LiveEdit>();
 
+const stageEl = $("stage") as HTMLDivElement;
 const sessionStrip = $("sessionStrip") as HTMLDivElement;
 const sessionThumbs = $("sessionThumbs") as HTMLDivElement;
 const sessionMeta = $("sessionMeta") as HTMLSpanElement;
@@ -2155,13 +2156,17 @@ async function addToSession(files: File[], append: boolean) {
   }
 }
 
-/** Repaint the session strip (thumbnails, active highlight, size readout). */
+/** Repaint the session strip (thumbnails, active highlight, size readout).
+ *  The strip takes real layout room: it publishes its measured height on the
+ *  stage (--session-h + .has-session), and the CSS shrinks the photo's fit box
+ *  to the space ABOVE it — the strip must never cover the picture. */
 function updateSessionStrip() {
   const real = sessionPhotos.filter((p) => p.id !== "lone");
   // The strip is for switching — only meaningful from two photos up.
   if (real.length < 2) {
     sessionStrip.hidden = true;
     sessionThumbs.replaceChildren();
+    stageEl.classList.remove("has-session");
     return;
   }
   sessionStrip.hidden = false;
@@ -2187,14 +2192,15 @@ function updateSessionStrip() {
       return b;
     }),
   );
+  stageEl.classList.add("has-session");
+  stageEl.style.setProperty("--session-h", `${sessionStrip.offsetHeight}px`);
 }
 
 /** End the session: free its storage and reset all session state, returning to
  *  the start screen. */
 async function endSession() {
   await resetSessionState(true);
-  sessionStrip.hidden = true;
-  sessionThumbs.replaceChildren();
+  updateSessionStrip(); // hides the strip and gives the stage back to the photo
   current = null;
   currentFile = null;
   panel.hidden = true;
@@ -2309,8 +2315,7 @@ async function loadExample(key: string) {
   // Tutorials are an ephemeral learning path — close any session first so its
   // strip doesn't linger over the lesson and storage stays in sync.
   await resetSessionState(true);
-  sessionStrip.hidden = true;
-  sessionThumbs.replaceChildren();
+  updateSessionStrip();
   showBusy("Loading example…");
   try {
     const res = await fetch(ex.file);
