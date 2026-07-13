@@ -148,6 +148,31 @@ See **`PLAN.md`** for the full build plan.
   and compare. Report which of the two outcomes happened; then we build the real
   picker and DELETE these four probe files (icon-probe/icon-a/icon-b .html + the
   probe PNGs/SVGs, their three vite inputs, and the footer link).
+  ON-DEVICE RESULT 2026-07-13 — owner tested on the real iPad: "All worked
+  perfectly." So the LIVE SWAP mechanism is CONFIRMED on iOS: rewriting
+  `apple-touch-icon` (whole-node replace) before Add-to-Home-Screen DOES change
+  the installed icon — no per-style-page fallback needed. NEXT: build the real
+  picker (offer a small set of styles on the launcher/install flow; on pick,
+  swap the `apple-touch-icon` link + manifest icons, mirror the whole-node
+  replace the probe proved), then remove the four probe files + footer link +
+  their vite inputs. Keep the probe live until the picker ships.
+- [x] **Share the app once it's installed** — an installed (standalone) PWA has
+  NO Safari chrome — no address bar, no Share, no Back — so there was no way to
+  send someone the link or even see it (owner ask, 2026-07-13). SHIPPED same day:
+  a Share control that appears ONLY when running standalone (in the browser
+  Safari already offers this, so we stay out of the way there) on all three
+  installable surfaces — the IR top bar (next to Tutorials), the Macro top bar
+  (next to ⓘ), and the launcher header (a "Share this app" pill). Tapping it
+  opens the native share sheet for the current URL (its "Copy" is how you grab
+  the link with no address bar); falls back to copying the link with a toast,
+  then to showing it. Shared helper `src/share.ts` (isStandaloneApp via
+  display-mode:standalone + navigator.standalone; setupInstalledShare reveals +
+  wires the button) imported by all three entries; became a ~2 KB shared chunk,
+  the launcher's chooser bundle stays tiny. Cache bumped ips-v16 → ips-v17.
+  VERIFIED headless: button revealed only when standalone, hidden in-browser,
+  native share carries this page's URL on IR/Macro/launcher, copy-link fallback +
+  toast work, no page errors. NEEDS THE OWNER'S HANDS: the real iOS share sheet
+  (glyph feel, that Copy/AirDrop appear) on the installed iPad app.
 - [x] **Proper pre-filled install names** — Add to Home Screen pre-fills its
   name field from `apple-mobile-web-app-title` (falling back to `<title>`,
   which for the IR editor was the too-long "Infrared Photography Studio").

@@ -7,3 +7,8 @@ if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./sw.js").catch(() => {});
   });
 }
+
+// Installed-app Share (src/share.ts): only appears when the launcher is running
+// as a standalone app, where Safari's own Share / address bar are gone.
+import { setupInstalledShare } from "./share";
+setupInstalledShare("shareBtn");
