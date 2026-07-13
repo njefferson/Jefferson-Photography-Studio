@@ -261,6 +261,91 @@ body {
 }
 .welcome-batch:active { background: #2a2a34; }
 .welcome-batch-hint { max-width: 30rem; margin: 2px auto 0; font-size: 12.5px; line-height: 1.5; color: #80808a; }
+.welcome-open-hint { max-width: 30rem; margin: 2px auto 4px; font-size: 12.5px; line-height: 1.5; color: #9a9aa6; }
+#resumeSession { border-color: var(--accent); color: #dfe6ff; }
+
+/* --- Photo session strip: big tappable previews along the bottom of the
+   stage. Sits over the image (never under the panel), semi-transparent so the
+   photo breathes behind it, with the active thumbnail lit by the accent. --- */
+#sessionStrip {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 7;
+  padding: 8px 10px 10px;
+  border-radius: 12px;
+  background: rgba(12, 12, 16, 0.72);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+}
+.session-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 2px 8px;
+}
+#sessionMeta { font-size: 12.5px; color: #b9b9c4; letter-spacing: 0.01em; }
+.session-done {
+  flex: none;
+  width: auto;
+  padding: 5px 14px;
+  font-size: 13px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #202028;
+  color: #f2f2f4;
+  cursor: pointer;
+}
+.session-done:active { background: #2a2a34; }
+.session-thumbs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+.session-thumb {
+  flex: none;
+  width: 92px;
+  height: 66px;
+  padding: 0;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background: #17171c;
+  overflow: hidden;
+  cursor: pointer;
+  position: relative;
+  transition: border-color 0.12s ease, transform 0.12s ease;
+}
+.session-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.session-thumb-name {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 4px;
+  font-size: 10px;
+  line-height: 1.2;
+  color: #9a9aa6;
+  text-align: center;
+  word-break: break-word;
+}
+.session-thumb.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 0 14px rgba(122, 162, 255, 0.5);
+  transform: translateY(-2px);
+}
+@media (max-width: 640px) {
+  #sessionStrip { left: 8px; right: 8px; bottom: 8px; padding: 6px 8px 8px; }
+  .session-thumb { width: 76px; height: 56px; }
+}
 .bar-actions { display: inline-flex; align-items: center; gap: 10px; }
 .bar-btn { width: auto; padding: 8px 14px; }
 /* #batchBtn is a <label> (wraps a file input), so it misses the button base
