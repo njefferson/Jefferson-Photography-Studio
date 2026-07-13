@@ -222,7 +222,7 @@ See **`PLAN.md`** for the full build plan.
   bump). NEEDS OWNER'S HANDS: the real pre-fill only shows in the iPad Safari
   Add-to-Home-Screen sheet — confirm each page offers Studio / Infrared /
   Macro on device. Owner ask, 2026-07-13.
-- [ ] **See what you're opening** — photo SESSIONS (owner design, 2026-07-13):
+- [x] **See what you're opening** — photo SESSIONS (owner design, 2026-07-13):
   "Open image" takes one or several; the picked set becomes the current
   session — big tappable previews in-app, choose and switch from there, each
   photo keeping its own edit while you move around. Explicitly NOT a
@@ -239,6 +239,52 @@ See **`PLAN.md`** for the full build plan.
   honest size readout (RAW ≈25 MB/frame — a 20-photo session ≈ 500 MB).
   Undo stacks stay in-memory per photo (edits themselves persist). Later
   synergy: "Process many" can draw from the session set.
+  SHIPPED 2026-07-13 (staging). New crash-safe store `src/session.ts` (DB
+  "ips-session", the same ≤30 KB-chunk + strict-durability shape batchstore.ts
+  proved: source bytes chunked, one strict txn per photo; the tiny JPEG
+  thumbnail + edit JSON ride inline in the meta row). In main.ts: openImported
+  was split into `showDecoded` (decode-independent view/upload) +
+  `establishFreshEdit` (auto baseline) so the single-open, example and
+  session-switch paths share one core. A pick of ≥2 files becomes a session: a
+  bottom-of-stage STRIP of big tappable thumbnails (src/style.css
+  `#sessionStrip`), active one ringed in accent, size readout ("N photos ·
+  ~M MB · viewing k") + a Done pill. Switching decodes the target on demand
+  from storage (only ONE decode in RAM); the outgoing photo's edit is captured
+  to an in-memory `liveEdits` map (FULL state incl. masks + undo, for live
+  switching) and a durable masks-stripped JSON (`Session.setEdit`, for
+  reload). Relaunch shows "Resume session — N photos" on the start screen
+  (next to Recover); Done clears storage; a new pick over a live session asks
+  add-vs-replace; storage always mirrors the live session (fresh starts clear
+  leftovers, so no orphans reappear on resume). `storage.persist()` requested
+  after an add; quota during an add stops gracefully with a note.
+  SCOPING (v1, honest): a LONE open (one file) stays snappy + ephemeral exactly
+  as before — the strip/persistence/resume engage only from TWO photos up,
+  where switching and crash-survival matter; a length-1 leftover in storage is
+  treated as an orphan and cleared at launch (single edits were never persisted
+  before, and "Resume — 1 photo" reads oddly). Masks are kept in the in-memory
+  liveEdit so they survive live switching, but — like a fresh open always has —
+  they're dropped from the durable copy and reset after a reload; everything
+  else (WB/exposure/denoise/grade/looks/hot-spot/clarity/dehaze/mixer) persists.
+  Strip thumbnails are a neutral auto-WB'd ungraded render (identify the frame,
+  not preview the grade), built on the main thread as each photo is added — a
+  big RAW session hitches briefly while adding (a Web-Worker thumbnailer is the
+  obvious follow-up). Loading a Tutorial ends the current session. Cache bumped
+  ips-v19 → ips-v20.
+  VERIFIED headless (20/20, the edit-restore assertion proven to FAIL first —
+  it caught a real capture-ordering bug where seeding a photo's edit read the
+  stale active id and clobbered the outgoing photo's edit): 2-photo pick raises
+  the strip with two image thumbs + one active; a per-photo exposure edit is
+  isolated (B keeps its own auto value) and restored on switch-back; adding a
+  3rd grows the strip; RELOAD offers "Resume session — 3 photos", strip hidden
+  until resumed, resume rebuilds the strip AND restores the durably-stored
+  edit; Done frees storage (a later reload offers no resume); a single open
+  shows no strip and leaves nothing to resume; no page errors. Strip layout
+  screenshotted. NEEDS THE OWNER'S HANDS on the real iPad (all measurements are
+  Chromium): a real multi-file pick from Files/Photos; the actual Safari IDB
+  crash-durability of a mid-session close/relaunch → Resume (the whole point,
+  and Safari's sidecar behaviour is unmeasured here); the size/feel of a big
+  RAW session (add-time hitch, storage headroom); and the switch latency on a
+  real 25 MB NEF decode.
 - [x] **Install as one app, two, or three** — explain and guide the three
   install shapes: the whole Studio (launcher manifest), Infrared alone, or
   Macro alone (each already has its own manifest/start_url). SHIPPED 2026-07-13:

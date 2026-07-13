@@ -34,7 +34,7 @@
           <button id="shareBtn" class="bar-btn" type="button" hidden title="Share this app or copy its link">&#x2BAD;&#xFE0E; Share</button>
           <label class="open-btn">
             Open image
-            <input id="file" type="file" accept=".dng,.nef,.zip,image/*" hidden />
+            <input id="file" type="file" accept=".dng,.nef,.zip,image/*" multiple hidden />
           </label>
           <label class="bar-btn" id="batchBtn" title="Apply your look to a whole set → one .zip">
             Process many
@@ -65,8 +65,10 @@
           <button id="welcomeClose" class="welcome-close" type="button" hidden>&#10005;</button>
           <p id="hint">Edit infrared photos — RAW (NEF / DNG) unlocks the full color magic.</p>
           <label class="open-btn welcome-open" for="file">Open image</label>
+          <p class="welcome-open-hint">Pick one photo — or several to work them as a session: big previews you switch between, each keeping its own edit, all held safely until you're done.</p>
           <label class="welcome-batch" for="batchFiles">Process many photos…</label>
           <p class="welcome-batch-hint">Develops a whole set at once — each auto-balanced, with your look on top — into one .zip. Tip: open one photo first and dial in the look you want; it carries to every frame.</p>
+          <button id="resumeSession" class="welcome-batch" type="button" hidden>Resume session</button>
           <button id="recoverBatch" class="welcome-batch" type="button" hidden>Recover images from an interrupted batch</button>
           <hr class="welcome-div" />
           <div id="a2hs" class="a2hs" hidden>
@@ -94,6 +96,13 @@
           <button id="lessonClose" type="button">Got it</button>
         </div>
         <button id="lessonShow" class="lesson-show" type="button" hidden>?</button>
+        <div id="sessionStrip" hidden aria-label="Photo session">
+          <div class="session-head">
+            <span id="sessionMeta"></span>
+            <button id="sessionDone" type="button" class="session-done" title="End the session and free its storage">Done</button>
+          </div>
+          <div id="sessionThumbs" class="session-thumbs"></div>
+        </div>
       </div>
 
       <aside id="panel" hidden>

@@ -1,10 +1,11 @@
 import "./style.css";
-import { importFile, type ImportedFile } from "./import";
+import { importFile, type ImportedFile, type ImageKind } from "./import";
 import { decode, type DecodedImage } from "./decode";
 import { Renderer, type EditParams } from "./gl";
 import { exportImage, download, type ExportFormat } from "./export";
 import { writeZip, crc32 } from "./zip";
 import { putFrame, eachFrame, frameMetas, frameCount, clearFrames } from "./batchstore";
+import * as Session from "./session";
 import { TONE_DEFAULT, TONE_X, toneEvaluator, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, chromaVec, hsv2rgb, type MaskLayer } from "./pipeline";
 import { generateCube } from "./lut";
 import { generateDcp } from "./dcp";
@@ -1755,8 +1756,11 @@ welcomeClose.addEventListener("click", () => {
   renderMaskOverlay();
 });
 
-async function openImported(imported: ImportedFile) {
-  const img = await decode(imported);
+/** Show an already-decoded image: upload it, build its reference maps and set
+ *  the view. Does NOT touch the edit — callers follow with either a fresh
+ *  baseline (establishFreshEdit) or a restored one (restoreLiveEdit). Shared by
+ *  the single-open path, the example loader and session photo-switching. */
+function showDecoded(img: DecodedImage, imported: ImportedFile) {
   current = img;
   currentFile = imported;
   // Corrects img.pixels in place (if a profile applies) before anything below
@@ -1775,6 +1779,13 @@ async function openImported(imported: ImportedFile) {
   lesson.hidden = true;
   lessonShow.hidden = true;
   updateHistVisibility();
+}
+
+/** Reset the live edit to this photo's fresh automatic baseline (white balance,
+ *  exposure, denoise), clear masks and undo history, and record the baseline as
+ *  the Reset target. Assumes `current` is the freshly-decoded image. */
+function establishFreshEdit() {
+  const img = current!;
   // EVERY open starts from a fresh automatic baseline (white balance,
   // exposure, denoise) — raw or JPEG alike.
   autoAdjust(img);
@@ -1827,26 +1838,431 @@ async function openImported(imported: ImportedFile) {
   requestAnimationFrame(updateScrollCues);
 }
 
+/** Decode and show one image with a fresh baseline. Ephemeral — used by the
+ *  example lessons, which are not part of a saved session. */
+async function openImported(imported: ImportedFile) {
+  const img = await decode(imported);
+  showDecoded(img, imported);
+  establishFreshEdit();
+}
+
 fileInput.addEventListener("change", async () => {
-  const f = fileInput.files?.[0];
-  if (!f) return;
+  const files = Array.from(fileInput.files ?? []);
+  fileInput.value = ""; // allow re-picking the same file(s) later
+  if (!files.length) return;
   try {
-    hint.textContent = "Loading…";
-    hint.hidden = false;
-    const imported = await importFile(f);
-    if (imported.looksTranscoded) {
-      hint.textContent =
-        "That file arrived as a flattened JPEG (iOS transcoded it). For true RAW, " +
-        "import from Files — or zip the DNG first — rather than the Photo Library.";
-      return;
-    }
-    await openImported(imported);
+    await openPicked(files);
   } catch (err) {
     welcome.hidden = false;
     hint.hidden = false;
     hint.textContent = "Could not open this file: " + (err as Error).message;
   }
 });
+
+// --- Photo sessions -------------------------------------------------------
+// "Open image" takes one or several. Pick SEVERAL and the set becomes the
+// current session: a strip of big tappable previews you switch between, each
+// photo keeping its own edit while you move around. It is NOT a library — it's
+// impermanent by design, but it can't get lost too soon: each photo's SOURCE
+// bytes are copied into our own storage the moment it's opened (iPad Safari
+// can't re-open a picked File after a reload), so a close or crash offers the
+// whole session back on relaunch. An explicit Done ends it and frees the space.
+//
+// A LONE open (one file) stays snappy and ephemeral, exactly as before — the
+// session machinery (strip, persistence, resume) engages only from two photos
+// up, where switching and crash-survival actually matter.
+
+interface SessionPhoto {
+  id: string;
+  name: string;
+  kind: ImageKind;
+  size: number; // source bytes
+  edit: string | null; // stored edit JSON (from resume); once visited, liveEdits wins
+  thumbUrl: string; // object URL for the strip preview
+}
+
+/** The live, in-memory edit for one photo — kept so switching back within a
+ *  session restores its FULL state (masks included) and undo history. Lost on
+ *  reload; the durable copy (Session.setEdit, masks stripped) survives. */
+interface LiveEdit {
+  snapshot: Snapshot;
+  baseline: Snapshot;
+  settled: Snapshot;
+  undo: Snapshot[];
+  orig: EditParams | null;
+}
+
+let sessionPhotos: SessionPhoto[] = [];
+let activePhotoId: string | null = null;
+let nextOrder = 0;
+const liveEdits = new Map<string, LiveEdit>();
+
+const sessionStrip = $("sessionStrip") as HTMLDivElement;
+const sessionThumbs = $("sessionThumbs") as HTMLDivElement;
+const sessionMeta = $("sessionMeta") as HTMLSpanElement;
+const sessionDone = $("sessionDone") as HTMLButtonElement;
+
+function fmtSize(bytes: number): string {
+  if (bytes >= 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
+  return `${Math.max(1, Math.round(bytes / 1024 / 1024))} MB`;
+}
+
+/** Session-mode edits (WB / exposure / grade …) persist per photo; masks are
+ *  spatial/composition-specific, so — like a fresh open — they're dropped from
+ *  the durable copy and reset on reload. */
+function editToJson(): string {
+  const s = snapshot();
+  return JSON.stringify({ params: { ...s.params, masks: [] }, activeLook: s.activeLook, lookBias: s.lookBias });
+}
+
+/** Capture the active photo's live edit into memory and persist a durable copy
+ *  (fire-and-forget — the row is small and strict-durable). */
+function captureActiveEdit() {
+  if (!activePhotoId) return;
+  flushRecord(); // settle any in-flight slider drag first
+  const id = activePhotoId;
+  liveEdits.set(id, {
+    snapshot: snapshot(),
+    baseline: baseline ?? snapshot(),
+    settled: settled ?? snapshot(),
+    undo: [...undoStack],
+    orig: origParams,
+  });
+  const json = editToJson();
+  const view = sessionPhotos.find((p) => p.id === id);
+  if (view) view.edit = json;
+  Session.setEdit(id, json).catch(() => {});
+}
+
+/** Restore a photo's full in-memory edit state onto the live editor. */
+function restoreLiveEdit(st: LiveEdit) {
+  undoStack.length = 0;
+  undoStack.push(...st.undo);
+  baseline = st.baseline;
+  settled = st.settled;
+  origParams = st.orig;
+  clearTimeout(recordTimer);
+  recordTimer = 0;
+  applySnapshot(st.snapshot); // repaints + syncs UI
+  updateEditButtons();
+  updateSlotUI();
+  requestAnimationFrame(updateScrollCues);
+}
+
+/** Make `current` (already decoded + shown) the active photo, restoring its
+ *  live edit if we have one, else establishing a fresh baseline and layering
+ *  any durably-stored edit (from a resumed session) on top. */
+function activateCurrent(id: string) {
+  const st = liveEdits.get(id);
+  // Set the active id BEFORE any capture below, so seeding this photo's entry
+  // targets THIS photo — not the one we just switched away from.
+  activePhotoId = id;
+  if (st) {
+    restoreLiveEdit(st);
+  } else {
+    establishFreshEdit();
+    const view = sessionPhotos.find((p) => p.id === id);
+    if (view?.edit) {
+      try {
+        applySnapshot(JSON.parse(view.edit) as Snapshot);
+      } catch {
+        /* corrupt stored edit — keep the fresh baseline */
+      }
+    }
+    captureActiveEdit(); // seed liveEdits for this photo (also persists, no-op change)
+  }
+  updateSessionStrip();
+}
+
+/** Switch the editor to another session photo (decoded on demand from storage,
+ *  so only ever one photo's pixels are in RAM). */
+async function switchToPhoto(id: string) {
+  if (id === activePhotoId && current) return;
+  const view = sessionPhotos.find((p) => p.id === id);
+  if (!view) return;
+  captureActiveEdit();
+  showBusy("Loading…");
+  try {
+    const bytes = await Session.getBytes(id);
+    const imported: ImportedFile = { name: view.name, kind: view.kind, bytes, looksTranscoded: false };
+    const img = await decode(imported);
+    showDecoded(img, imported);
+    activateCurrent(id);
+  } catch (err) {
+    alert("Couldn't open that photo: " + (err as Error).message);
+  } finally {
+    hideBusy();
+  }
+}
+
+/** Build a small gamma-encoded JPEG thumbnail for the strip — auto white
+ *  balanced (so RAW infrared isn't a magenta smear) but ungraded, so it just
+ *  says "which photo is this". Cheap: nearest-sampled at thumb resolution. */
+async function makeThumb(img: DecodedImage): Promise<ArrayBuffer> {
+  const MAX = 260;
+  const s = Math.min(1, MAX / Math.max(img.width, img.height));
+  const w = Math.max(1, Math.round(img.width * s));
+  const h = Math.max(1, Math.round(img.height * s));
+  const wb = grayWorldWB(img);
+  const e = autoExposure(img, wb);
+  const cm = img.camMatrix;
+  const out = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) {
+    const sy = Math.min(img.height - 1, Math.floor(y / s));
+    for (let x = 0; x < w; x++) {
+      const sx = Math.min(img.width - 1, Math.floor(x / s));
+      let [r, g, b] = linearAt(img, sx, sy);
+      r *= wb[0] * e; g *= wb[1] * e; b *= wb[2] * e;
+      if (cm) {
+        const cr = cm[0] * r + cm[1] * g + cm[2] * b;
+        const cg = cm[3] * r + cm[4] * g + cm[5] * b;
+        const cb = cm[6] * r + cm[7] * g + cm[8] * b;
+        r = cr; g = cg; b = cb;
+      }
+      const enc = (v: number) => Math.round(255 * Math.pow(clamp(v, 0, 1), 1 / 2.2));
+      const i = (y * w + x) * 4;
+      out[i] = enc(r); out[i + 1] = enc(g); out[i + 2] = enc(b); out[i + 3] = 255;
+    }
+  }
+  const cv = document.createElement("canvas");
+  cv.width = w; cv.height = h;
+  cv.getContext("2d")!.putImageData(new ImageData(out, w, h), 0, 0);
+  const blob: Blob = await new Promise((res) => cv.toBlob((b) => res(b!), "image/jpeg", 0.72));
+  return blob.arrayBuffer();
+}
+
+const tick = () => new Promise<void>((r) => setTimeout(r, 0));
+
+/** Open a freshly-picked set. One file → ephemeral single open (unchanged).
+ *  Two or more → a persisted session with the switch strip. */
+async function openPicked(files: File[]) {
+  let append = false;
+  if (sessionPhotos.length >= 2) {
+    append = confirm(
+      `You have a session of ${sessionPhotos.length} photos open.\n\n` +
+        `OK — add ${files.length === 1 ? "this photo" : `these ${files.length} photos`} to it.\n` +
+        `Cancel — start a NEW session (the current one is closed and its storage freed).`,
+    );
+  }
+
+  // Single file, not adding to a session → the fast, ephemeral path of old.
+  if (files.length === 1 && !append) {
+    await resetSessionState(true); // drop a lone photo or un-resumed leftovers
+    hint.textContent = "Loading…";
+    hint.hidden = false;
+    const imported = await importFile(files[0]);
+    if (imported.looksTranscoded) {
+      hint.textContent =
+        "That file arrived as a flattened JPEG (iOS transcoded it). For true RAW, " +
+        "import from Files — or zip the DNG first — rather than the Photo Library.";
+      return;
+    }
+    // Track it as a (strip-less) lone photo so a follow-up multi-pick can ask
+    // sensibly; it isn't persisted (nothing to resume from a single edit).
+    const img = await decode(imported);
+    showDecoded(img, imported);
+    const id = "lone";
+    sessionPhotos = [{ id, name: imported.name, kind: imported.kind, size: imported.bytes.length, edit: null, thumbUrl: "" }];
+    nextOrder = 0;
+    liveEdits.clear();
+    activateCurrent(id);
+    updateSessionStrip();
+    return;
+  }
+
+  await addToSession(files, append);
+}
+
+/** Wipe in-memory session state (revoking thumbnails) and, unless appending,
+ *  the stored session too — so storage always mirrors the live session and no
+ *  orphaned photos linger to reappear on the next resume. */
+async function resetSessionState(clearStorage: boolean) {
+  for (const p of sessionPhotos) if (p.thumbUrl) URL.revokeObjectURL(p.thumbUrl);
+  sessionPhotos = [];
+  activePhotoId = null;
+  nextOrder = 0;
+  liveEdits.clear();
+  if (clearStorage) await Session.clearSession().catch(() => {});
+}
+
+/** Persist and append a set of files to the current session, showing the first
+ *  new photo as soon as it's ready. Decoding is sequential with yields so the
+ *  UI stays usable; only one decode is in RAM at a time. */
+async function addToSession(files: File[], append: boolean) {
+  if (!append) await resetSessionState(true); // fresh session — clear leftovers
+  const skipped: string[] = [];
+  let firstNewId: string | null = null;
+  let quotaHit = false;
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    sessionMeta.textContent = `Adding ${i + 1} / ${files.length}…`;
+    sessionStrip.hidden = false;
+    let imported: ImportedFile;
+    try {
+      imported = await importFile(f);
+    } catch (err) {
+      skipped.push(`${f.name} (${(err as Error).message})`);
+      continue;
+    }
+    if (imported.looksTranscoded) { skipped.push(`${f.name} (arrived as flattened JPEG)`); continue; }
+    let img: DecodedImage;
+    try {
+      img = await decode(imported);
+    } catch (err) {
+      skipped.push(`${f.name} (${(err as Error).message})`);
+      continue;
+    }
+    let thumb: ArrayBuffer;
+    try { thumb = await makeThumb(img); } catch { thumb = new ArrayBuffer(0); }
+    const id = crypto.randomUUID();
+    try {
+      await Session.addPhoto(
+        { id, name: imported.name, kind: imported.kind, size: imported.bytes.length, order: nextOrder++, addedAt: Date.now(), thumb, edit: null },
+        imported.bytes,
+      );
+    } catch (err) {
+      nextOrder--;
+      if (isQuotaError(err)) { quotaHit = true; break; }
+      skipped.push(`${f.name} (${(err as Error).message})`);
+      continue;
+    }
+    sessionPhotos.push({
+      id, name: imported.name, kind: imported.kind, size: imported.bytes.length, edit: null,
+      thumbUrl: thumb.byteLength ? URL.createObjectURL(new Blob([thumb], { type: "image/jpeg" })) : "",
+    });
+    // Show the first newly-added photo straight away (its decode is in hand).
+    if (!firstNewId) {
+      firstNewId = id;
+      if (!activePhotoId || activePhotoId === "lone") {
+        showDecoded(img, imported);
+        activateCurrent(id);
+      }
+    }
+    updateSessionStrip();
+    await tick(); // yield so edits on the shown photo stay responsive
+  }
+  updateSessionStrip();
+  await requestPersistentStorage(); // ask the OS to keep the session's bytes
+
+  const notes: string[] = [];
+  if (quotaHit) notes.push("Storage filled up — some photos couldn't be added. Free space, or tap Done to end the session.");
+  if (skipped.length) notes.push(`${skipped.length} couldn't be opened:\n` + skipped.join("\n"));
+  if (notes.length) alert(notes.join("\n\n"));
+  if (!sessionPhotos.length) {
+    welcome.hidden = false;
+    hint.hidden = false;
+    hint.textContent = "Nothing could be opened.";
+  }
+}
+
+/** Repaint the session strip (thumbnails, active highlight, size readout). */
+function updateSessionStrip() {
+  const real = sessionPhotos.filter((p) => p.id !== "lone");
+  // The strip is for switching — only meaningful from two photos up.
+  if (real.length < 2) {
+    sessionStrip.hidden = true;
+    sessionThumbs.replaceChildren();
+    return;
+  }
+  sessionStrip.hidden = false;
+  const total = real.reduce((s, p) => s + p.size, 0);
+  const idx = real.findIndex((p) => p.id === activePhotoId);
+  sessionMeta.textContent =
+    `${real.length} photos · ~${fmtSize(total)}` + (idx >= 0 ? ` · viewing ${idx + 1}` : "");
+  sessionThumbs.replaceChildren(
+    ...real.map((p) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "session-thumb" + (p.id === activePhotoId ? " active" : "");
+      b.title = p.name;
+      if (p.thumbUrl) {
+        const im = document.createElement("img");
+        im.src = p.thumbUrl;
+        im.alt = p.name;
+        b.append(im);
+      } else {
+        b.append(Object.assign(document.createElement("span"), { className: "session-thumb-name", textContent: p.name }));
+      }
+      b.addEventListener("click", () => { if (p.id !== activePhotoId) switchToPhoto(p.id); });
+      return b;
+    }),
+  );
+}
+
+/** End the session: free its storage and reset all session state, returning to
+ *  the start screen. */
+async function endSession() {
+  await resetSessionState(true);
+  sessionStrip.hidden = true;
+  sessionThumbs.replaceChildren();
+  current = null;
+  currentFile = null;
+  panel.hidden = true;
+  welcome.hidden = false;
+  welcomeClose.hidden = true;
+  hint.hidden = false;
+  hint.textContent = "Edit infrared photos — RAW (NEF / DNG) unlocks the full color magic.";
+  histWrap.hidden = true;
+  renderMaskOverlay();
+  updateSessionResume();
+}
+
+sessionDone.addEventListener("click", async () => {
+  const n = sessionPhotos.filter((p) => p.id !== "lone").length;
+  if (!confirm(`End this session of ${n} photos?\n\nEach photo's edit is kept only while the session is open — ending it frees the storage.`)) return;
+  await endSession();
+});
+
+// Resume a session left in storage by a previous visit (close, crash, or the
+// OS discarding the tab). Offered on the start screen, next to Recover.
+const resumeBtn = $("resumeSession") as HTMLButtonElement;
+
+async function updateSessionResume() {
+  try {
+    const metas = await Session.listPhotos();
+    if (metas.length >= 2 && !current) {
+      resumeBtn.textContent = `Resume session — ${metas.length} photos`;
+      resumeBtn.hidden = false;
+    } else {
+      resumeBtn.hidden = true;
+      // A lone leftover from a crashed single edit isn't a session — clear it
+      // so storage doesn't accumulate orphans.
+      if (metas.length === 1 && !current) await Session.clearSession().catch(() => {});
+    }
+  } catch {
+    resumeBtn.hidden = true;
+  }
+}
+
+async function resumeSession() {
+  showBusy("Resuming session…");
+  try {
+    const metas = await Session.listPhotos();
+    if (metas.length < 2) { hideBusy(); return; }
+    sessionPhotos = metas.map((m) => ({
+      id: m.id, name: m.name, kind: m.kind, size: m.size, edit: m.edit,
+      thumbUrl: m.thumb.byteLength ? URL.createObjectURL(new Blob([m.thumb], { type: "image/jpeg" })) : "",
+    }));
+    nextOrder = Math.max(...metas.map((m) => m.order)) + 1;
+    liveEdits.clear();
+    activePhotoId = null;
+    resumeBtn.hidden = true;
+    // Open the first photo (its stored edit, if any, is applied on activate).
+    const first = sessionPhotos[0];
+    const bytes = await Session.getBytes(first.id);
+    const imported: ImportedFile = { name: first.name, kind: first.kind, bytes, looksTranscoded: false };
+    const img = await decode(imported);
+    showDecoded(img, imported);
+    activateCurrent(first.id);
+  } catch (err) {
+    alert("Couldn't resume the session: " + (err as Error).message);
+  } finally {
+    hideBusy();
+  }
+}
+
+resumeBtn.addEventListener("click", resumeSession);
+updateSessionResume();
 
 // --- Example photos: fetched on demand, opened through the normal raw path,
 // each with a short lesson overlay showing what to try. ---
@@ -1890,6 +2306,11 @@ const EXAMPLES: Record<string, { file: string; title: string; steps: string[]; r
 async function loadExample(key: string) {
   const ex = EXAMPLES[key];
   if (!ex) return;
+  // Tutorials are an ephemeral learning path — close any session first so its
+  // strip doesn't linger over the lesson and storage stays in sync.
+  await resetSessionState(true);
+  sessionStrip.hidden = true;
+  sessionThumbs.replaceChildren();
   showBusy("Loading example…");
   try {
     const res = await fetch(ex.file);
