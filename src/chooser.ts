@@ -12,3 +12,13 @@ if ("serviceWorker" in navigator) {
 // as a standalone app, where Safari's own Share / address bar are gone.
 import { setupInstalledShare } from "./share";
 setupInstalledShare("shareBtn");
+
+// Home-Screen icon picker (src/iconpicker.ts): choose which icon the installed
+// Studio launcher wears, swapped before Add-to-Home-Screen. Requires JS, so the
+// section stays hidden until it's built.
+import { setupIconPicker } from "./iconpicker";
+const picker = document.getElementById("iconPicker");
+if (picker) {
+  setupIconPicker(picker);
+  picker.hidden = false;
+}

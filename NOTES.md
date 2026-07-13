@@ -118,7 +118,7 @@ See **`PLAN.md`** for the full build plan.
 > reliable. Editing this list updates the app on the next deploy. Both the
 > roadmap and the patch notes (last commits) refresh automatically on push.
 
-- [ ] **Pick your Home-Screen icon** — offer a small set of icon styles and let
+- [x] **Pick your Home-Screen icon** — offer a small set of icon styles and let
   the user choose which one their installed app wears. Likely mechanism: a
   picker on the launcher/install flow that swaps the `apple-touch-icon` link
   (and manifest icons) before Add to Home Screen — iOS reads the link at add
@@ -156,6 +156,30 @@ See **`PLAN.md`** for the full build plan.
   swap the `apple-touch-icon` link + manifest icons, mirror the whole-node
   replace the probe proved), then remove the four probe files + footer link +
   their vite inputs. Keep the probe live until the picker ships.
+  PICKER SHIPPED 2026-07-13: a "Pick your Home-Screen icon" section on the
+  launcher (index.html) offers three real Studio styles — SAME aperture
+  silhouette, different finish so they read as one family: **Spectrum** (the
+  full-colour default, studio-icon.svg), **Graphite** (light brushed-metal iris
+  on silver), **Noir** (the same iris in dark machined metal on the near-black
+  tile). Graphite/Noir are new SVGs + 180/512 PNGs rasterized via the
+  headless-Chromium pipeline (studio-icon-{graphite,noir}{,-180,-512}). On pick
+  (src/iconpicker.ts, wired from chooser.ts), it does the whole-node replace the
+  probe proved — a fresh `<link rel="apple-touch-icon">` (and the SVG tab icon) —
+  plus, for Android, swaps `<link rel="manifest">` to a generated blob manifest
+  carrying the chosen icons at ABSOLUTE URLs (the default keeps the real static
+  manifest.webmanifest; only non-default gets a blob). The choice is remembered
+  in localStorage ("studio-icon-style") and re-applied on load, so the card shows
+  the current pick and re-adding keeps the same icon. Scope is the LAUNCHER icon
+  only — Infrared/Macro keep their own. The four probe files (icon-probe/icon-a/
+  icon-b .html + probe-icon-{a,b}.svg/-180.png), their three vite inputs, and the
+  footer test link are DELETED. Cache bumped ips-v17 → ips-v18. VERIFIED headless
+  (20/20, negative-control proven): three cards, Spectrum active by default, pick
+  swaps apple-touch-icon + SVG icon + blob manifest (icons absolute, 512
+  maskable), choice persists across reload, switching back to Spectrum restores
+  the static manifest, all icon assets resolve 200, no page errors; picker
+  rendering screenshotted. NEEDS THE OWNER'S HANDS: the real iOS Add-to-Home-
+  Screen with each style on the iPad (the live-swap was already confirmed by the
+  probe — this just confirms the three finished icons look right installed).
 - [x] **Share the app once it's installed** — an installed (standalone) PWA has
   NO Safari chrome — no address bar, no Share, no Back — so there was no way to
   send someone the link or even see it (owner ask, 2026-07-13). SHIPPED same day:
