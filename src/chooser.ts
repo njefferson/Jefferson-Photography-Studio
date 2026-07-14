@@ -2,6 +2,10 @@
 // or the macro engine (route-based code-splitting — each mode's heavy bundle
 // loads only when its door is opened). All it does is register the shared
 // service worker so the whole studio works offline.
+import "./launcher.css";
+import { wireThemeToggle } from "./theme";
+wireThemeToggle(document.getElementById("themeToggle"));
+
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("./sw.js").catch(() => {});
