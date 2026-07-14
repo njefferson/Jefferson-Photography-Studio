@@ -2512,7 +2512,7 @@ const galRaw = (key: string, label: string, rotate?: number): GalleryTile => ({
   label,
   kind: "dng",
   file: `./examples/${key}.dng`,
-  thumb: `./examples/${key}.png`,
+  thumb: `./examples/${key}.jpg`,
   rotate,
 });
 const GALLERY: GalleryTile[] = [
