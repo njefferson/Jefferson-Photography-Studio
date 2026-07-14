@@ -118,6 +118,26 @@ See **`PLAN.md`** for the full build plan.
 > reliable. Editing this list updates the app on the next deploy. Both the
 > roadmap and the patch notes (last commits) refresh automatically on push.
 
+- [ ] **RAW practice photos for every lesson** — owner ask 2026-07-14, given
+  with the dust-release GO: the next release brings the RAW (binned-DNG)
+  versions of the library frames, and each practice photo opens on ITS OWN
+  lesson. The plumbing already exists from the dust release: the scratchpad
+  `bin-dng.ts` pipeline (NEF → 2×2 same-colour-binned half-res uncompressed
+  DNG, ~10 MB, under the 25 MB Pages limit), `GalleryTile.lesson` (home
+  lesson per tile), and the ONE-TILE-PER-SCENE rule (binned DNG REPLACES the
+  scene's JPEG tile — never side by side; owner called out the duplicate).
+  WAITING ON: the owner uploading the NEFs (session repo access can't add
+  files; he uploads to the chat, one or a zip at a time — full-res originals
+  never enter the repo, only the binned DNGs do).
+  OPEN DESIGN QUESTION (the owner's own words, and his own caution): decide
+  which photos are CORE to a lesson vs "just for fun", or whether a lesson
+  owns a SET of photos — "yeah, that seems to get complicated that way." Keep
+  it simple candidates to put to him: (a) every lesson names ONE ideal frame
+  (its home tile) and everything else stays a free-practice photo defaulting
+  to Lesson 1; (b) tag each tile with the lesson it opens on and let several
+  share a lesson, no "sets" machinery. Lessons stay SKILLS that work on any
+  frame either way — the mapping only decides where a tap lands you. His
+  call before building.
 - [x] **Dust & spot removal** — heal sensor dust and hot pixels, the classic IR
   pain (dust shows worst in smooth skies). Owner ask 2026-07-14; graduates the
   "Heal / clone" backlog item into the queue. Classical — no ML, no server.
