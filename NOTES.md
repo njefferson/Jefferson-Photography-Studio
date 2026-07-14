@@ -1051,6 +1051,34 @@ Classical, subscription-grade tools (fit the current architecture directly):
   snapshot system shipped 2026-07-04; no ML.
 - **Channel mixer (full 3×3)** — custom false colour beyond the R↔B swap;
   IR-native, per-pixel.
+- **UFOs in the trees — playful sticker compositing** (owner ask 2026-07-14,
+  given right after the dust-release promotion; he'll open a NEW CHAT for it —
+  next session, read this entry first). The idea: paste fun cutouts (UFOs,
+  aliens, "other such fun things fitting for the weird colors") into a photo,
+  including PEEKING FROM BEHIND things — which is the real requirement: an
+  occlusion mask per sticker so scene elements (trees, branches) render in
+  front of it, "behind or interacting with something".
+  ARCHITECTURE SKETCH (deliberately rhyming with heal): a per-photo list of
+  sticker placements (asset id + centre/scale/rotation in image-uv + an
+  optional occlusion mask). Composite in LINEAR SOURCE SPACE before the
+  pipeline — bake into the preview texture exactly like heal spots
+  (patchImage rects from the pristine decode; syncSpotsToTexture pattern) with
+  the identical math mirrored in the CPU export — so the sticker inherits the
+  channel swap / sub-2000K WB / looks and lands IN the IR palette naturally
+  (that's the owner's "fitting for the weird colors"; a display-space literal-
+  colour mode could be a later toggle). Spatial + composition-specific: stays
+  with the photo, never in saved looks / batch / .cube/.dcp — the whole
+  spatial-op rulebook applies as-is. OCCLUSION: sticker alpha × (1 − mask
+  weight), reusing the existing mask machinery — paint it with the brush-
+  bitmap pattern, or auto-seed it from a colour/sky mask (e.g. pick the
+  foliage colour and the branches occlude the saucer for free); the
+  subject/background ML mask (backlog) would slot in here too when it exists.
+  Direct manipulation placement (drag/pinch/rotate the sticker; sustained
+  mode + banner + one gesture = one undo). ASSETS: draw a small in-house set
+  (SVG → PNG with alpha, the icon-pipeline way — no third-party IP, consistent
+  with the .dcp stance) + allow importing any PNG-with-alpha as a sticker.
+  SCOPE CAUTION: this is "layers lite" — keep it stickers (no general layer
+  stack), or it eats the app.
 - **Playful warp tools — Swirl / Liquefy / Pinch** (owner ask 2026-07-14:
   "crazy tools like swirl or liquefy"). Finger-driven local GEOMETRY warps —
   a real departure from the colour pipeline, but classical and on-device:
