@@ -189,6 +189,21 @@ See **`PLAN.md`** for the full build plan.
   committed public/examples/NIR_1675.dng — the rebuilt pipeline is the
   same pipeline. STILL WITHOUT RAW: NIR_1706/1808/1825/1864/1866 + the 4
   D5300 magenta frames.
+  SIXTH WAVE (2026-07-14, after a container restart — waves 3-5 were
+  already safe on the remote; only the newest uploads survived on disk and
+  that's exactly what was still unprocessed; cache ips-v43 → ips-v44):
+  five BACKYARD scenes at last breaking the lakeside monotony —
+  NIR_0063/0102/0152/0172/0627 (oaks over a fence, bird bath, lounge
+  chair, kids' playhouse, lavender close-up), all free practice. These
+  zips held LIGHTROOM-CONVERTED DNGs (full-res 5600×3728 mosaiced
+  lossless-JPEG), NOT NEFs — all Z50. bin-dng.ts grew `binDngToDng`
+  (reads the CFA via the app's own readMosaicedCfa/LJ92 path, then the
+  identical bin+write); full-res originals still never enter the repo.
+  NIR_0627 was re-sent as "_2" — the re-send is the shipped version.
+  GALLERY = 53 tiles = 44 RAW + 9 JPEG. Uploads dir gotcha: the chat's
+  upload store did NOT survive the restart either — only re-sent zips
+  exist on disk; if a wave is uncommitted when the container dies, ask
+  the owner to re-upload it.
   PIPELINE REBUILT this session (previous scratchpad was reclaimed):
   scratchpad `bin-dng.ts` + `test-bin-dng.ts`, rebuilt from this entry's
   spec + a byte-level dump of the shipped `public/examples/NIR_1675.dng`.
