@@ -2858,7 +2858,7 @@ lessonShow.addEventListener("click", () => {
 // (.dng) tiles are the original examples — the only ones that show the true-RAW,
 // sub-2000K white-balance magic (an 8-bit JPEG can't). `file`/`thumb`/`kind`
 // default to the gallery layout; RAW tiles override them.
-type GalleryTile = { key: string; label: string; kind: ImageKind; file: string; thumb: string; rotate?: number };
+type GalleryTile = { key: string; label: string; kind: ImageKind; file: string; thumb: string; rotate?: number; lesson?: number };
 const galJpeg = (key: string, label: string): GalleryTile => ({
   key,
   label,
@@ -2879,14 +2879,14 @@ const GALLERY: GalleryTile[] = [
   galRaw("lodge", "Motor lodge · RAW", 3),
   galRaw("hillside", "Hillside & sky · RAW"),
   // 2x2-binned half-res DNG from the owner's NEF (10 MB, under the 25 MB
-  // Pages limit) — the dust-lesson frame in true RAW; orientation rides in
-  // the file, and its thumb is shared with the JPEG tile.
-  { key: "NIR_1675-raw", label: "Lakeside & dust · RAW", kind: "dng", file: "./examples/NIR_1675.dng", thumb: "./examples/gallery/thumbs/NIR_1675.jpg" },
+  // Pages limit) — the dust-lesson frame, ONE tile only (a JPEG twin briefly
+  // existed; owner called the duplication out, 2026-07-14). It opens on ITS
+  // lesson: Dust & spots. Orientation rides in the file.
+  { key: "NIR_1675-raw", label: "Lakeside & sensor dust · RAW", kind: "dng", file: "./examples/NIR_1675.dng", thumb: "./examples/gallery/thumbs/NIR_1675.jpg", lesson: 5 },
   galJpeg("NIR_1701", "White forest"),
   galJpeg("NIR_1706", "Forest & snag"),
   galJpeg("NIR_1716", "Swirling sky"),
   galJpeg("NIR_1721", "Lake & contrails"),
-  galJpeg("NIR_1675", "Lakeside & sensor dust"),
   galJpeg("NIR_1808", "Foliage close-up"),
   galJpeg("NIR_1864", "Weeping branches"),
   galJpeg("NIR_1866", "Into the canopy"),
@@ -2953,7 +2953,7 @@ const LESSONS: { title: string; tab: PanelTab; steps: string[] }[] = [
     title: "Lesson 6 · Dust & spots",
     tab: "basic",
     steps: [
-      "Tap Visualize spots (in Basic) — a high-contrast view where sensor dust jumps out of flat skies. Try it on the Lakeside & sensor dust photo: that big smudge is real.",
+      "Tap Visualize spots (in Basic) — a high-contrast view where sensor dust jumps out of flat skies. On the Lakeside & sensor dust photo the big smudge is real.",
       "Tap Find spots automatically — it heals what it finds and rings every fix for review. Tap a ring to put that one back, or the ✓ banner to keep them all.",
       "For a spot it missed: arm Heal spots, pinch in close, and tap the mote. The newest fix keeps a highlighted ring, and Spot size resizes it live until it disappears.",
       "Heals belong to this photo and ride into every export — they never sneak into saved looks or batch runs.",
@@ -3078,10 +3078,11 @@ async function openGalleryPhoto(key: string) {
       draw();
     }
     updateSessionStrip();
-    // Now raise the lesson rail and open Lesson 1 (expands its panels last, so
-    // establishFreshEdit's fold-everything doesn't undo it).
+    // Now raise the lesson rail and open the tile's home lesson — Lesson 1
+    // unless the tile names one (the dust frame opens on Dust & spots).
+    // Last, so establishFreshEdit's fold-everything doesn't undo the expand.
     setLearnMode(true);
-    showLesson(0);
+    showLesson(tile.lesson ?? 0);
   } catch {
     alert("Couldn't load that photo — it downloads on first use, so check your connection and try again. (Once loaded, everything works offline.)");
   } finally {
