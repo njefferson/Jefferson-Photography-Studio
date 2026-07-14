@@ -2837,6 +2837,7 @@ const GALLERY: GalleryTile[] = [
   galJpeg("NIR_1706", "Forest & snag"),
   galJpeg("NIR_1716", "Swirling sky"),
   galJpeg("NIR_1721", "Lake & contrails"),
+  galJpeg("NIR_1675", "Lakeside & sensor dust"),
   galJpeg("NIR_1808", "Foliage close-up"),
   galJpeg("NIR_1864", "Weeping branches"),
   galJpeg("NIR_1866", "Into the canopy"),
@@ -2891,9 +2892,22 @@ const LESSONS: { title: string; tab: PanelTab; steps: string[] }[] = [
     tab: "tone",
     steps: [
       "Denoise (in the Basic tab) is set automatically from the photo — nudge the slider to taste (0 is none).",
-      "Sensor dust in the sky? In Basic, arm Heal spots and tap the mote — or let Find spots sweep it for you.",
+      "Sensor dust in the sky? That's Lesson 6 — Dust & spots.",
       "Shape the light with the Tone curve (Blacks → Highlights) and the overall Luminance.",
       "When it's how you want it, go to Export and Export & Save — pick the resolution on the way out.",
+    ],
+  },
+  {
+    // Best practiced on "Lakeside & sensor dust" — a real frame that left the
+    // camera with a dusty sensor (one obvious smudge in the sky + several
+    // faint motes), but the skill works anywhere.
+    title: "Lesson 6 · Dust & spots",
+    tab: "basic",
+    steps: [
+      "Tap Visualize spots (in Basic) — a high-contrast view where sensor dust jumps out of flat skies. Try it on the Lakeside & sensor dust photo: that big smudge is real.",
+      "Tap Find spots automatically — every fix it makes gets a ring. Tap any ring to take that one fix back.",
+      "For a spot it missed: arm Heal spots, pinch in close, and tap the mote. The newest fix keeps a highlighted ring, and Spot size resizes it live until it disappears.",
+      "Heals belong to this photo and ride into every export — they never sneak into saved looks or batch runs.",
     ],
   },
 ];

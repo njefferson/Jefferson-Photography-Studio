@@ -296,6 +296,36 @@ See **`PLAN.md`** for the full build plan.
   NEEDS THE OWNER'S HANDS: re-run Find spots on NIR_1675 on the iPad (expect
   the big smudge ringed first + a couple of faint companions), and his verdict
   on aggressiveness across his library.
+  INTO THE LEARNING LIBRARY (owner ask 2026-07-14, same day; cache ips-v37 →
+  ips-v38): NIR_1675 is now teaching frame #15 — tile "Lakeside & sensor
+  dust" (after Lake & contrails; GALLERY is 18 tiles = 3 RAW + 15 JPEG) — and
+  **Lesson 6 · Dust & spots** was added (tab "basic": Visualize → Find spots →
+  rings → manual heal + resize → heals ride into export, never into looks/
+  batch). The chip rail is fully data-driven from LESSONS, so chip ⑥ appeared
+  with zero UI changes; Lesson 5's heal step now just points at Lesson 6.
+  The teaching JPEG was rendered from the owner's NEF with the app's OWN
+  export pipeline (generator in the session scratchpad: decode → gray-world
+  WB + auto-exposure exactly as autoAdjust computes them → no creative grade →
+  exportImage at scale 0.5 baked upright via the file's rotation → 1600px q80
+  + the corner scrim/domain/NJ-line-mark watermark family style + 400px
+  thumb). Full-res original stays out of the repo as always. VERIFIED: the
+  detector finds the real smudge as the TOP find on the teaching JPEG at
+  (457,191) upright (+6 faint real companions — this sensor needs a clean,
+  which is exactly why it teaches well); an 11-check lesson-flow suite passes
+  on the built app (tile + thumb render, 6 chips + Exit, chip ⑥ opens the
+  card on Basic, Visualize flips the render, Find spots rings land ON the
+  known smudge, honest status, no page errors); the main UI suite still
+  passes with the shifted tile order.
+  OWNER'S UPCOMING PLAN (2026-07-14): he will add RAW VERSIONS of all library
+  frames. HARD CONSTRAINT to plan around: **Cloudflare Pages refuses files
+  over 25 MB** — NIR_1675.NEF is 28.8 MB, so raw NEFs cannot deploy as-is.
+  Two honest paths: (a) Adobe DNG Converter lossy-linear output (smaller,
+  decodes natively); (b) bin the Bayer mosaic 2×2 in-house to a half-res
+  uncompressed DNG (~10 MB, Compression=1 which dngRaw.ts already reads;
+  2×2 same-colour binning preserves the CFA phase, and optical dust survives
+  binning untouched — the decoder halves again for preview, so verify
+  detection at the resulting scale before shipping). Also remember: Z50 II
+  High-Efficiency NEFs don't decode at all — his Z50 classics are fine.
 - [x] **Learn on real photos — lessons ride on the picture** — owner ask
   2026-07-14 (his framing: instead of dedicated tutorial photos, "lessons that
   can be collapsed to 1, 2, 3 on top of the photo and when you touch them shows
