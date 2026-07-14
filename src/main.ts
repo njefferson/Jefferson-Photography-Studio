@@ -3104,17 +3104,6 @@ const CORE = new Set([
   "NIR_1830", "NIR_1873", "NIR_1824", "NIR_1821", "NIR_1877",
   "NIR_0172", "NIR_0627",
 ]);
-// The full library, grouped by family. A tile missing from every group
-// still shows up — it falls into a trailing "More" section, never vanishes.
-const LIBRARY_GROUPS: [string, string[]][] = [
-  ["Skies & clouds", ["NIR_1822", "NIR_1824", "NIR_1827", "NIR_1716", "NIR_1722", "NIR_1717", "NIR_1718", "NIR_1703", "NIR_1825"]],
-  ["Lakeside forest", ["NIR_1701", "NIR_1708", "NIR_1821", "NIR_1873", "NIR_1877", "NIR_1811", "NIR_1812", "NIR_1814", "NIR_1817", "NIR_1713", "NIR_1710", "NIR_1705", "NIR_1667", "NIR_1644", "NIR_1651", "NIR_1661", "NIR_1662", "NIR_1671", "NIR_1681", "NIR_1682", "NIR_1706", "NIR_1808", "NIR_1864", "NIR_1866"]],
-  ["Campsite & shore", ["NIR_1638", "NIR_1687", "NIR_1830", "NIR_1675", "NIR_1720", "NIR_1738", "NIR_1688", "NIR_1691"]],
-  ["Backyard", ["NIR_0063", "NIR_0102", "NIR_0152", "NIR_0172", "NIR_0627"]],
-  ["The original RAW trio", ["canopy", "lodge", "hillside"]],
-  ["Full-spectrum D5300", ["magenta-woodland", "magenta-fir", "magenta-hilltown", "magenta-dusk-trees"]],
-];
-
 // Build the practice-gallery grid (tutorial set) on the start screen.
 const galleryList = $("galleryList") as HTMLDivElement;
 const makeTile = (g: GalleryTile) => {
@@ -3126,40 +3115,6 @@ const makeTile = (g: GalleryTile) => {
   return b;
 };
 GALLERY.filter((g) => CORE.has(baseKey(g.key))).forEach((g) => galleryList.appendChild(makeTile(g)));
-
-// The full example library — the COMPLETE set (tutorial tiles included, so
-// the library reads as one honest whole), grouped, collapsed by default.
-{
-  const toggle = $("libraryToggle") as HTMLButtonElement;
-  const library = $("library") as HTMLDivElement;
-  const used = new Set<string>();
-  const sections: [string, GalleryTile[]][] = [];
-  for (const [title, keys] of LIBRARY_GROUPS) {
-    const tiles = keys
-      .map((k) => GALLERY.find((t) => baseKey(t.key) === k))
-      .filter((t): t is GalleryTile => !!t);
-    tiles.forEach((t) => used.add(t.key));
-    if (tiles.length) sections.push([title, tiles]);
-  }
-  const rest = GALLERY.filter((t) => !used.has(t.key));
-  if (rest.length) sections.push(["More", rest]);
-  for (const [title, tiles] of sections) {
-    const h = document.createElement("h4");
-    h.className = "lib-group";
-    h.textContent = title;
-    const grid = document.createElement("div");
-    grid.className = "gallery-list";
-    tiles.forEach((t) => grid.appendChild(makeTile(t)));
-    library.append(h, grid);
-  }
-  const closed = `Browse the full library · ${GALLERY.length} photos`;
-  toggle.textContent = closed;
-  toggle.hidden = false;
-  toggle.addEventListener("click", () => {
-    library.hidden = !library.hidden;
-    toggle.textContent = library.hidden ? closed : "Hide the library";
-  });
-}
 
 async function openGalleryPhoto(key: string) {
   const tile = GALLERY.find((t) => t.key === key);
