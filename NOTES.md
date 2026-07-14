@@ -158,6 +158,16 @@ See **`PLAN.md`** for the full build plan.
   RAW TWINS: NIR_1665/1706/1716/1721/1808/1825/1827/1864/1866 + the four
   D5300 magenta frames (different camera — matrix/levels must come from
   those NEFs when they arrive).
+  SECOND WAVE same day (cache ips-v41 → ips-v42): five more zips
+  (NIR_1821/1824/1830/1873/1877, all Z50) — GALLERY is 27 tiles = 14 RAW +
+  13 JPEG; lessons 1-5 each gained a SECOND RAW frame, appended in lesson
+  order: ① Chairs by the lake (1830 — the white chair fabric is a natural
+  tap-WB target) ② Through the boughs (1873) ③ Pine & clouds (1824) ④
+  Shoreline forest (1821) ⑤ Glowing pine (1877). FLAGGED to the owner:
+  1824 is close kin to 1822 Lone pine (same spot, different frame — both
+  kept deliberately, one line to drop if he'd rather). Verified: the
+  built-app walk grew to 25/25 (27 tiles, all thumbs decode, each of the
+  ELEVEN RAW tiles opens on its lesson chip and renders, no page errors).
   PIPELINE REBUILT this session (previous scratchpad was reclaimed):
   scratchpad `bin-dng.ts` + `test-bin-dng.ts`, rebuilt from this entry's
   spec + a byte-level dump of the shipped `public/examples/NIR_1675.dng`.
