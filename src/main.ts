@@ -2878,7 +2878,7 @@ const galRaw = (key: string, label: string, rotate?: number): GalleryTile => ({
 // Pages limit) — one tile per scene (a JPEG twin briefly existed; owner called
 // the duplication out, 2026-07-14). Each opens on ITS home lesson; orientation
 // rides in the file.
-const galNef = (key: string, label: string, lesson: number): GalleryTile => ({
+const galNef = (key: string, label: string, lesson?: number): GalleryTile => ({
   key: `${key}-raw`,
   label,
   kind: "dng",
@@ -2904,15 +2904,44 @@ const GALLERY: GalleryTile[] = [
   galNef("NIR_1824", "Pine & clouds · RAW", 2),
   galNef("NIR_1821", "Shoreline forest · RAW", 3),
   galNef("NIR_1877", "Glowing pine · RAW", 4),
+  // Third wave (2026-07-14): Wispy sky's RAW replaces its JPEG tile; the
+  // forest-wall frames are free practice (untagged -> open on Lesson 1).
+  galNef("NIR_1827", "Wispy sky · RAW", 2),
+  galNef("NIR_1811", "Lakeshore pines · RAW"),
+  galNef("NIR_1812", "Forest wall · RAW"),
+  galNef("NIR_1814", "Forest spire · RAW"),
+  galNef("NIR_1817", "Bare snag · RAW"),
+  // Fourth wave (2026-07-14): Swirling sky's RAW replaces its JPEG tile, and
+  // Lake & contrails' tile is now the RAW of a neighbouring frame (NIR_1722,
+  // same scene — the NIR_1721 JPEG was retired). The rest are free practice.
+  galNef("NIR_1716", "Swirling sky · RAW", 2),
+  galNef("NIR_1722", "Lake & contrails · RAW", 2),
+  galNef("NIR_1717", "Frosted pine · RAW"),
+  galNef("NIR_1718", "Under swirling clouds · RAW"),
+  galNef("NIR_1703", "Spire & streaks · RAW"),
+  galNef("NIR_1720", "Sunlit shore · RAW"),
+  galNef("NIR_1738", "Kayaks on the beach · RAW"),
+  galNef("NIR_1713", "Rocky shore forest · RAW"),
+  galNef("NIR_1710", "Cove forest · RAW"),
+  // Fifth wave (2026-07-14): Framed by trees' tile is now the RAW of a
+  // neighbouring frame (NIR_1667, same scene — the NIR_1665 JPEG was
+  // retired). The rest are free practice.
+  galNef("NIR_1667", "Framed by trees · RAW"),
+  galNef("NIR_1644", "Frosted treetops · RAW"),
+  galNef("NIR_1651", "Sunlit crown · RAW"),
+  galNef("NIR_1661", "Sunlit pines · RAW"),
+  galNef("NIR_1662", "Fir & pine · RAW"),
+  galNef("NIR_1671", "Glowing pair · RAW"),
+  galNef("NIR_1681", "Foliage & trunk · RAW"),
+  galNef("NIR_1682", "Foliage towers · RAW"),
+  galNef("NIR_1688", "Sapling on the rock · RAW"),
+  galNef("NIR_1691", "Camp by the lake · RAW"),
+  galNef("NIR_1705", "Forest sentinel · RAW"),
   galJpeg("NIR_1706", "Forest & snag"),
-  galJpeg("NIR_1716", "Swirling sky"),
-  galJpeg("NIR_1721", "Lake & contrails"),
   galJpeg("NIR_1808", "Foliage close-up"),
   galJpeg("NIR_1864", "Weeping branches"),
   galJpeg("NIR_1866", "Into the canopy"),
   galJpeg("NIR_1825", "Cloudscape"),
-  galJpeg("NIR_1827", "Wispy sky"),
-  galJpeg("NIR_1665", "Framed by trees"),
   galJpeg("magenta-woodland", "Woodland (D5300)"),
   galJpeg("magenta-fir", "Dark fir (D5300)"),
   galJpeg("magenta-hilltown", "Hillside town (D5300)"),
