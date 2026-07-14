@@ -10,6 +10,7 @@ import { Tiff } from "./raw/tiff";
 import { camToSrgbLinear, NIKON_Z50_COLOR_MATRIX } from "./color";
 import { makeRowDenoiser } from "./raw/denoise";
 import { makeRowDetail } from "./raw/detail";
+import { healPatches8, healPatchesFromSampler, wrapWithPatches } from "./heal";
 import { buildGlowMap, sampleGlow, GLOW_GAIN } from "./glow";
 import { buildLocalMap } from "./localmap";
 import { SRGB_ICC, embedIccInJpeg } from "./icc";
@@ -83,17 +84,33 @@ export async function exportImage(
   // Aspect = SOURCE dims (the uv we pass below are source-space), so the lens
   // fix stays circular in pixels regardless of display rotation. The clarity/
   // dehaze maps are rebuilt from the full-res source (cheap: coarse grid).
+  // NOTE the maps (and glow below) read the UNHEALED source: the preview's
+  // maps are built from the pristine decode too, and a dust mote is invisible
+  // to a coarse blurred map — healing must not force a map rebuild per spot.
   const localMap =
     (params.clarity ?? 0) !== 0 || (params.dehaze ?? 0) !== 0
       ? buildLocalMap(rawSample, srcW, srcH)
       : undefined;
   const edit = compileEdit(params, "cfa" in src ? src.cam : undefined, srcW / srcH, localMap);
   const out = new Float32Array(3);
+  // Dust & spot heals rewrite the source BEFORE everything (mirroring the
+  // preview, which bakes them into the GPU texture): the 8-bit path reads the
+  // exact quantized bytes the preview bakes, the raw path the same f32 mix.
+  const spots = params.spots ?? [];
+  const healed = spots.length
+    ? wrapWithPatches(
+        rawSample,
+        "cfa" in src
+          ? healPatchesFromSampler(rawSample, srcW, srcH, spots)
+          : healPatches8(src.pixels, srcW, srcH, spots, toLinear8),
+        srcH,
+      )
+    : rawSample;
   // Denoise first, then sharpen/texture — the same order the shader runs them
   // (raw neighbourhood -> denoised centre -> detail gain). Both are no-ops when
   // their slider is 0, so a plain edit keeps the 1x-decode fast path.
-  const denoised = makeRowDenoiser(rawSample, srcW, srcH, params.denoise);
-  const sampleLinear = makeRowDetail(rawSample, denoised, srcW, srcH, params.sharpen ?? 0, params.texture ?? 0);
+  const denoised = makeRowDenoiser(healed, srcW, srcH, params.denoise);
+  const sampleLinear = makeRowDetail(healed, denoised, srcW, srcH, params.sharpen ?? 0, params.texture ?? 0);
   // HIE glow map at full resolution (cheap: built on a coarse grid).
   const gmap = params.glow > 0 ? buildGlowMap(rawSample, srcW, srcH) : null;
   const glowAt = (sx: number, sy: number) =>

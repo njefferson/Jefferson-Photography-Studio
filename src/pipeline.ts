@@ -2,6 +2,9 @@
 // fragment shader in gl.ts so exports match the on-screen preview exactly.
 // Order: white balance -> channel swap -> hue -> saturation -> contrast -> gamma.
 
+import type { HealSpot } from "./heal";
+export type { HealSpot };
+
 export interface EditParams {
   wb: [number, number, number];
   exposure: number;
@@ -80,6 +83,13 @@ export interface EditParams {
    *  detail blurs) — + brings out surface structure, - smooths it. Same
    *  hue-preserving, spatial, pre-pass caveats as `sharpen`. */
   texture: number;
+  /** Dust & spot heals: feathered clones that REWRITE THE SOURCE before any
+   *  other processing (see heal.ts). Not per-pixel colour math, so — like
+   *  masks — they never enter compileEdit or the .cube/.dcp LUT: the preview
+   *  bakes them into the GPU texture, the export applies the identical patch
+   *  math to the source samples. Composition-specific: reset on a new open,
+   *  never carried by saved looks or batch. */
+  spots: HealSpot[];
 }
 
 /** Per-image low-res reference maps for clarity/dehaze: blurred luminance (R)

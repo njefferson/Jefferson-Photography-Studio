@@ -118,26 +118,87 @@ See **`PLAN.md`** for the full build plan.
 > reliable. Editing this list updates the app on the next deploy. Both the
 > roadmap and the patch notes (last commits) refresh automatically on push.
 
-- [ ] **Dust & spot removal** — heal sensor dust and hot pixels, the classic IR
+- [x] **Dust & spot removal** — heal sensor dust and hot pixels, the classic IR
   pain (dust shows worst in smooth skies). Owner ask 2026-07-14; graduates the
-  "Heal / clone" backlog item into the queue. CAPABLE and classical — no ML, no
-  server — it fits the existing SPATIAL-op pattern (masks / IR hot-spot): a
-  per-photo list of heal spots applied in BOTH the GPU shader and the CPU export
-  with GPU==CPU parity, and — being spatial — skipped in the .cube/.dcp LUT like
-  masks/denoise/glow. Composition-specific like masks, so spots stay WITH their
-  photo (never carried into a saved look or another frame) and reset on a new
-  open. PLAN: tap-to-heal first — tap a spot, auto-pick the best clean SOURCE
-  patch a short search away (most-similar smooth neighbourhood), feathered clone;
-  one tap = one undo, a standing banner + obvious exit like the other sustained
-  modes. Add a "Visualize spots" high-contrast preview to surface dust in flat
-  skies (Lightroom's trick), and an optional auto-detect pass for the obvious sky
-  spots (blob detection on a luminance high-pass, restricted to smooth regions).
-  Store spots in EditParams (spatial → pre-pass, NOT compileEdit), a new spots
-  uniform array in gl.ts + a CPU mirror, verified in the headless GPU==CPU
-  harness. LATER: content-aware (gradient-domain / Poisson) blend for spots that
-  straddle an edge, and a manual clone-stamp mode (pick your own source) for
-  tricky repairs. Needs the owner's hands on the iPad for the heal FEEL and how
-  aggressive auto-detect should be.
+  "Heal / clone" backlog item into the queue. Classical — no ML, no server.
+  SHIPPED to staging 2026-07-14 (cache ips-v34 → ips-v35).
+  WHAT SHIPPED: a "Dust & spots" cluster in the Basic tab. Arm **Heal spots —
+  tap the photo** (a sustained mode: standing bottom banner tap-to-exit, like
+  colour-pick — bottom because dust lives in skies and a top banner would eat
+  those taps; pan/pinch stay LIVE so you can zoom right into a mote, unlike
+  TAT which owns the canvas). Tap a mote → heal.ts auto-picks the best clean
+  SOURCE patch from a ring search (16 angles × 3 distances; scored by
+  surround-annulus SAD — the spot itself holds the defect so it can't vote —
+  plus a smoothness penalty so an edge never gets cloned onto sky), then a
+  feathered clone (weight 1 inside 0.45·r, smoothstep to 0 at r). Dashed ring
+  markers ride the photo while armed (SVG #healOverlay, imageUvToClient like
+  the mask overlay); tapping a ring REMOVES that fix (direct manipulation);
+  one tap = one undo step; a Spot-size slider (r stored as a fraction of image
+  width, 0.002..0.035); "Clear all heals" is one undo step. **Visualize
+  spots** = a shader-only high-contrast luminance high-pass view (u_spotVis;
+  reads the healed texture so a fixed spot visibly disappears; preview-only,
+  no CPU mirror needed). **Find spots automatically** = detectSpots in heal.ts
+  (box-blur high-pass, MAD noise floor, 4-connected blobs, dust-sized +
+  compact); two field-found honesty filters matter: (1) the smooth-region test
+  must be a DENSE ring of RAW luma just outside the mote — dust floats in
+  clean sky so its ring is flat, while a twig tip's branch must CROSS the ring
+  and foliage is busy all round (a sparse ring on the BLURRED plane happily
+  "healed" twig tips — blur averages thin branches away, and a mote depresses
+  its own blur); (2) DARK blobs only unless hot-pixel tiny (rBlob ≤ 2.5px) —
+  the small bright things in a sky are cloud wisps, i.e. real content. The
+  whole auto pass is one undo step, arms heal mode so every find is a
+  reviewable ring, and says so honestly when it finds nothing. Spots live in
+  EditParams.spots ({x,y,r,dx,dy} in image-uv), reset on a new open like
+  masks, are NOT in saved looks/built-in looks/batch (currentLook/readSlot/
+  batchParamsFor never carry them), DO persist in the session's durable edit
+  JSON (tiny, unlike mask bitmaps) and ride liveEdits across session switches,
+  and are skipped in the .cube/.dcp LUT by construction (never in compileEdit).
+  ARCHITECTURE — ONE DELIBERATE DEVIATION from this entry's original sketch
+  ("a spots uniform array in gl.ts"): a shader uniform loop is WRONG here
+  because denoise (25 taps) and sharpen/texture (49 taps) sample the source
+  texture — an in-shader heal is either invisible to their taps or costs
+  taps×spots per pixel. Instead heals REWRITE THE SOURCE: main.ts bakes them
+  into the GPU texture (heal.ts bakeRgba8/bakeRgbaF32 → Renderer.patchImage
+  texSubImage2D, recomputed from the PRISTINE decode buffer on every spot
+  change — previewSrc holds the exact buffer the texture was uploaded from,
+  never mutated; syncSpotsToTexture runs in draw()'s rAF so undo/reset/
+  session-switch/hotspot-reupload all self-heal), and export.ts applies the
+  IDENTICAL patch math (healPatches8 reads back the same quantized bytes the
+  preview baked; healPatchesFromSampler mirrors the f32 mix for RAW) wrapped
+  under denoise/detail via wrapWithPatches. Zero per-frame GPU cost, unlimited
+  spots, and every consumer (denoise taps, histogram, colour picks, thumbs)
+  sees healed pixels automatically. Overlap semantics: spots always read the
+  ORIGINAL source in list order — deterministic and idempotent under partial
+  rebakes. The glow/clarity maps stay built from the UNHEALED source on BOTH
+  sides (a mote is invisible to a coarse blurred map; healing must not force
+  map rebuilds). Hold-Original note: heals are texture-baked, so — exactly
+  like the EXIF hot-spot profile correction — they do NOT revert during
+  press-and-hold compare; that's the established precedent for source fixes.
+  VERIFIED headless (Chromium; scratchpad harness, fail-first proven by
+  planting a wrong expectation which failed exactly as planted): GPU==CPU
+  parity on an 8-bit source through the REAL exportImage path with a
+  full-on edit (denoise+sharpen+texture+clarity+dehaze+glow+mask+mixer+lens):
+  healed-vs-baseline outlier counts IDENTICAL (heal adds ZERO drift; the ~316
+  >2-LSB pixels are the pre-existing map-builder asymmetry, present with heal
+  off) and strict in-rect parity clean under the established near-black
+  characterisation; RAW (canopy.dng, half-res mirror of the export chain,
+  shared maps): max 1.84 LSB whole-frame, 0 over 2. Heal effectiveness:
+  planted motes ~110–160 luma deep reduce to ≤3 residual. Auto-detect: 8/8
+  planted motes recalled on smooth regions of a real teaching frame (~100ms at
+  1600px); on the clean teaching set: dense-forest frame 0 detections,
+  sky-heavy frames 0–4 small dark specks (cloud wisps no longer flagged —
+  verified by eyeballing crop contact-sheets). Full UI walk on the built app
+  (23/23): dormant on start screen, arm→banner, tap→ring+count, tap-ring→
+  removed, undo, Visualize on/off restores exact render, auto-detect honest
+  no-find message, banner exit, TAT↔heal mutual exclusivity, Home hides rings
+  / Back restores them (spot intact), no page errors. tsc + vite build clean.
+  NEEDS THE OWNER'S HANDS on the iPad: the heal FEEL (feather 0.45, search
+  distances, default spot size 0.008), how aggressive auto-detect should be on
+  HIS frames (real Z50 dust — all tuning so far is synthetic motes + the
+  teaching JPEGs), Visualize contrast gain (×5), detectSpots RAM on a full
+  2800px preview (~70 MB transient), and tap-accuracy of small spots on
+  finger vs pointer. LATER (unchanged): content-aware gradient-domain blend
+  for spots straddling an edge; manual clone-stamp (pick your own source).
 - [x] **Learn on real photos — lessons ride on the picture** — owner ask
   2026-07-14 (his framing: instead of dedicated tutorial photos, "lessons that
   can be collapsed to 1, 2, 3 on top of the photo and when you touch them shows

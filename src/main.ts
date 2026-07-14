@@ -7,6 +7,7 @@ import { writeZip, crc32 } from "./zip";
 import { putFrame, eachFrame, frameMetas, frameCount, clearFrames } from "./batchstore";
 import * as Session from "./session";
 import { TONE_DEFAULT, TONE_X, toneEvaluator, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, chromaVec, hsv2rgb, type MaskLayer } from "./pipeline";
+import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, type HealSpot } from "./heal";
 import { generateCube } from "./lut";
 import { generateDcp } from "./dcp";
 import { buildGlowMap } from "./glow";
@@ -77,6 +78,7 @@ const params: EditParams = {
   sharpen: 0,
   texture: 0,
   hsl: hslDefault(),
+  spots: [],
 };
 
 const ui = {
@@ -170,7 +172,9 @@ function applyHotspotCorrection() {
   if (!hotspotState.bypass && hotspotState.profileKey) {
     Hotspot.apply({ width: current.width, height: current.height, data: current.pixels }, hotspotState.profileKey, hotspotState.strength);
   }
-  renderer.setImage(toPreview(current));
+  // uploadPreview (not a bare setImage): the fresh texture is pristine, so the
+  // heal spots must be re-baked onto the newly corrected pixels.
+  uploadPreview();
   updateHotspotUI();
 }
 
@@ -518,6 +522,7 @@ function cloneParams(p: EditParams): EditParams {
     sharpen: p.sharpen,
     texture: p.texture,
     hsl: [...(p.hsl ?? hslDefault())],
+    spots: (p.spots ?? []).map((s) => ({ ...s })),
   };
 }
 
@@ -559,6 +564,7 @@ function applySnapshot(s: Snapshot) {
   params.sharpen = c.sharpen ?? 0;
   params.texture = c.texture ?? 0;
   params.hsl = c.hsl?.length === 24 ? c.hsl : hslDefault();
+  params.spots = c.spots ?? [];
   activeLook = s.activeLook ?? null;
   lookBias = (s.lookBias ? [...s.lookBias] : [1, 1, 1]) as [number, number, number];
   if (selectedMask >= params.masks.length) selectedMask = params.masks.length - 1;
@@ -566,6 +572,7 @@ function applySnapshot(s: Snapshot) {
   updateLookUI();
   updateMaskUI();
   renderMaskOverlay();
+  updateHealUI();
   draw();
 }
 
@@ -791,9 +798,11 @@ function draw() {
       lastToneKey = key;
       renderer.setToneCurve(params.tone);
     }
+    syncSpotsToTexture(); // heals live in the texture; keep it matching params
     renderer.render(params);
     refreshHistogram(params);
     positionMaskOverlay();
+    positionHealOverlay();
   });
 }
 
@@ -1006,7 +1015,7 @@ let hslPickArmed = false;
 function setHslPick(on: boolean) {
   hslPickArmed = on;
   hslPickBtn.setAttribute("aria-pressed", String(on));
-  if (on) { setTat(false); setColorPick(false); } // picture tools are mutually exclusive
+  if (on) { setTat(false); setColorPick(false); setHeal(false); } // picture tools are mutually exclusive
 }
 hslPickBtn.addEventListener("click", () => setHslPick(!hslPickArmed));
 
@@ -1303,7 +1312,7 @@ function setColorPick(on: boolean) {
   colorPickArmed = on && !!m && m.type === 3;
   mUI.colorPick.setAttribute("aria-pressed", String(colorPickArmed));
   colorBanner.hidden = !colorPickArmed;
-  if (colorPickArmed) { setHslPick(false); setTat(false); } // picture tools are exclusive
+  if (colorPickArmed) { setHslPick(false); setTat(false); setHeal(false); } // picture tools are exclusive
 }
 mUI.colorPick.addEventListener("click", () => setColorPick(!colorPickArmed));
 colorBanner.addEventListener("click", () => setColorPick(false)); // tap the banner to exit
@@ -1650,7 +1659,7 @@ function setTat(on: boolean) {
   // A standing banner (not the transient drag readout) makes it obvious the
   // canvas is in adjust mode and how to hand it back to tap-WB / pan / pinch.
   tatBanner.hidden = !on;
-  if (on) { setHslPick(false); setColorPick(false); } // mutually exclusive with the other picture tools
+  if (on) { setHslPick(false); setColorPick(false); setHeal(false); } // mutually exclusive with the other picture tools
   if (!on) hideTatHud();
 }
 hslDragBtn.addEventListener("click", () => setTat(!tatArmed));
@@ -1727,6 +1736,186 @@ function endTat() {
   hideTatHud();
   flushRecord(); // one drag = one undo step
 }
+
+// --- Dust & spot healing: arm Heal, then tap a dust spot — it's patched from
+// the best clean neighbourhood nearby (heal.ts picks the source). A sustained
+// mode with a standing banner, like colour-pick; pan/pinch stay live so you
+// can zoom right into the dust. Tap a healed spot to remove that fix; one tap
+// = one undo step. Heals REWRITE THE SOURCE: they're baked into the GPU
+// texture (recomputed from the pristine decode on every change), which is why
+// there's no per-frame cost and denoise/sharpen see healed pixels too. ---
+const healBtn = $("healBtn") as HTMLButtonElement;
+const healBanner = $("healBanner") as HTMLButtonElement;
+const healOverlay = $("healOverlay") as unknown as SVGSVGElement;
+const healSize = $("healSize") as HTMLInputElement;
+const healVisBtn = $("healVis") as HTMLButtonElement;
+const healAutoBtn = $("healAuto") as HTMLButtonElement;
+const healClearBtn = $("healClear") as HTMLButtonElement;
+const healStatus = $("healStatus") as HTMLElement;
+
+/** The exact buffer the GPU texture was uploaded from (current's own pixel/
+ *  linear buffer, or the transient downscale for >MAX_PREVIEW 8-bit sources).
+ *  Heal bakes read it — it stays PRISTINE; healed pixels live only in the
+ *  texture — so keep the reference in sync with every setImage call. */
+let previewSrc: { width: number; height: number; pixels?: Uint8ClampedArray; linear?: Float32Array } | null = null;
+let bakedSpots: HealSpot[] = []; // what the texture currently has baked in
+let healArmed = false;
+
+/** Upload the current photo's preview texture (fresh = pristine, no heals)
+ *  and schedule a repaint, which re-bakes params.spots on the way. */
+function uploadPreview() {
+  if (!current) return;
+  previewSrc = toPreview(current);
+  renderer.setImage(previewSrc);
+  bakedSpots = [];
+  draw();
+}
+
+/** Re-bake the heal spots into the texture when they changed. Every affected
+ *  rect (old spots restore, new spots apply) is recomputed from the pristine
+ *  buffer with the FULL new list — deterministic, no diff bookkeeping. */
+function syncSpotsToTexture() {
+  if (!current || !previewSrc) return;
+  const cur = params.spots ?? [];
+  if (cur.length === bakedSpots.length && JSON.stringify(cur) === JSON.stringify(bakedSpots)) return;
+  const W = previewSrc.width, H = previewSrc.height;
+  for (const s of [...bakedSpots, ...cur]) {
+    const rect = spotRect(s, W, H);
+    if (rect.w <= 0 || rect.h <= 0) continue;
+    const data = previewSrc.linear
+      ? bakeRgbaF32(previewSrc.linear, W, H, cur, rect)
+      : bakeRgba8(previewSrc.pixels!, W, H, cur, rect);
+    renderer.patchImage(rect.x0, rect.y0, rect.w, rect.h, data);
+  }
+  bakedSpots = cur.map((s) => ({ ...s }));
+  updateHealUI();
+}
+
+function setHeal(on: boolean) {
+  healArmed = on && !!current;
+  healBtn.setAttribute("aria-pressed", String(healArmed));
+  healBanner.hidden = !healArmed;
+  if (healArmed) { setHslPick(false); setColorPick(false); setTat(false); } // picture tools are exclusive
+  positionHealOverlay();
+}
+healBtn.addEventListener("click", () => setHeal(!healArmed));
+healBanner.addEventListener("click", () => setHeal(false)); // tap the banner to exit
+
+function updateHealUI() {
+  const n = params.spots?.length ?? 0;
+  healClearBtn.hidden = n === 0;
+  healStatus.textContent = n
+    ? `${n} spot${n === 1 ? "" : "s"} healed — they stay with this photo (not with saved looks or batch).`
+    : "";
+}
+
+/** Ring markers over the healed spots while Heal mode is armed. */
+function positionHealOverlay() {
+  const show = healArmed && !!current && welcome.hidden && (params.spots?.length ?? 0) > 0;
+  healOverlay.toggleAttribute("hidden", !show);
+  if (!show) {
+    healOverlay.replaceChildren();
+    return;
+  }
+  const rect = healOverlay.getBoundingClientRect();
+  const kids: SVGElement[] = [];
+  for (const s of params.spots) {
+    const [cx, cy] = renderer.imageUvToClient(s.x, s.y);
+    // Client-space radius: the distance to a point one radius away in image-x
+    // (imageUvToClient soaks up rotation and zoom).
+    const [ex, ey] = renderer.imageUvToClient(s.x + s.r, s.y);
+    const c = document.createElementNS(SVGNS, "circle");
+    c.setAttribute("cx", String(cx - rect.left));
+    c.setAttribute("cy", String(cy - rect.top));
+    c.setAttribute("r", String(Math.max(4, Math.hypot(ex - cx, ey - cy))));
+    c.setAttribute("class", "heal-spot");
+    kids.push(c);
+  }
+  healOverlay.replaceChildren(...kids);
+}
+
+/** Handle an armed heal tap. Returns true when it consumed the tap. */
+function handleHealTap(clientX: number, clientY: number): boolean {
+  if (!healArmed) return false;
+  if (!current || !previewSrc) { setHeal(false); return true; }
+  const [u, v] = renderer.clientToImageUv(clientX, clientY);
+  if (u < 0 || u > 1 || v < 0 || v > 1) return true;
+  const W = previewSrc.width, H = previewSrc.height;
+  // A tap inside an existing spot removes that fix (newest first, so stacked
+  // taps unwind naturally); anywhere else heals a new spot.
+  for (let i = params.spots.length - 1; i >= 0; i--) {
+    const s = params.spots[i];
+    if (Math.hypot((u - s.x) * W, (v - s.y) * H) <= s.r * W) {
+      // The ring vanishing + the count line updating are the feedback.
+      params.spots.splice(i, 1);
+      draw();
+      flushRecord();
+      positionHealOverlay();
+      return true;
+    }
+  }
+  const r = clamp(Number(healSize.value), SPOT_R_MIN, SPOT_R_MAX);
+  const src = findHealSource(lumaAccessor(previewSrc, W), W, H, Math.round(u * W - 0.5), Math.round(v * H - 0.5), r * W);
+  if (!src) {
+    healStatus.textContent = "No clean patch found near that spot — try a smaller spot size or zoom in.";
+    return true;
+  }
+  params.spots.push({ x: u, y: v, r, dx: src.offX / W, dy: src.offY / H });
+  draw(); // the rAF pass bakes it into the texture
+  flushRecord(); // one tap = one undo step
+  positionHealOverlay();
+  return true;
+}
+
+healVisBtn.addEventListener("click", () => {
+  renderer.spotVis = !renderer.spotVis;
+  healVisBtn.setAttribute("aria-pressed", String(renderer.spotVis));
+  draw();
+});
+
+healClearBtn.addEventListener("click", () => {
+  if (!params.spots.length) return;
+  params.spots = [];
+  updateHealUI();
+  positionHealOverlay();
+  draw();
+  flushRecord(); // clearing is one undo step
+});
+
+healAutoBtn.addEventListener("click", () => {
+  if (!current || !previewSrc) return;
+  const W = previewSrc.width, H = previewSrc.height;
+  showBusy("Scanning for dust…");
+  // Let the busy note paint before the (synchronous, sub-second) scan.
+  setTimeout(() => {
+    try {
+      const luma = lumaAccessor(previewSrc!, W);
+      const found = detectSpots(luma, W, H);
+      let added = 0;
+      for (const f of found) {
+        const r = clamp(f.rPx / W, SPOT_R_MIN, SPOT_R_MAX);
+        const u = (f.x + 0.5) / W, vv = (f.y + 0.5) / H;
+        // Skip anything already healed (a re-run must not double up).
+        if (params.spots.some((s) => Math.hypot((s.x - u) * W, (s.y - vv) * H) < (s.r + r) * W * 0.8)) continue;
+        const srcOff = findHealSource(luma, W, H, Math.round(f.x), Math.round(f.y), r * W);
+        if (!srcOff) continue;
+        params.spots.push({ x: u, y: vv, r, dx: srcOff.offX / W, dy: srcOff.offY / H });
+        added++;
+      }
+      // When spots were added the count line (updateHealUI) reports them; a
+      // message here would be overwritten by it on the next repaint anyway.
+      if (!added) healStatus.textContent = "No obvious dust found. Try Visualize spots, then tap anything you see.";
+      if (added) {
+        setHeal(true); // show the rings so each find can be reviewed/removed
+        draw();
+        flushRecord(); // the whole pass is one undo step
+        positionHealOverlay();
+      }
+    } finally {
+      hideBusy();
+    }
+  }, 30);
+});
 
 canvas.addEventListener("pointerdown", (e) => {
   if (brushPaintOn()) { e.preventDefault(); startPaint(e); return; }
@@ -1839,6 +2028,7 @@ function goHome() {
   updateWelcomeReturn();
   updateSessionResume();
   renderMaskOverlay(); // hide the mask overlay while the card is up
+  positionHealOverlay(); // and the heal rings
 }
 
 /** Show/label the return controls (corner ✕ + the prominent Back button) only
@@ -1861,6 +2051,7 @@ function returnToEditor() {
     lessonChips.hidden = false;
   }
   renderMaskOverlay();
+  positionHealOverlay();
 }
 
 $("homeBtn").addEventListener("click", goHome);
@@ -1880,7 +2071,7 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
   // only one for RAW / unavailable-profile photos, and a harmless repeat
   // upload otherwise.)
   initHotspot(img, imported);
-  renderer.setImage(toPreview(img));
+  uploadPreview();
   renderer.setRotation(img.rotate ?? 0);
   resetZoom();
   renderer.setGlowMap(buildGlowMap((x, y) => linearAt(img, x, y), img.width, img.height));
@@ -1928,15 +2119,22 @@ function establishFreshEdit() {
     sharpen: 0,
     texture: 0,
     hsl: hslDefault(),
+    spots: [],
   };
   activeLook = null;
   updateLookUI();
   // Tidy the panel for the new photo: scroll the current section to the top.
   panelBody.scrollTop = 0;
-  // Masks are composition-specific — never carry them to a new photo.
+  // Masks and heal spots are composition-specific — never carry them to a new
+  // photo. (Session switches restore each photo's own via its saved snapshot.)
   params.masks = [];
   selectedMask = -1;
   setColorPick(false);
+  params.spots = [];
+  setHeal(false);
+  renderer.spotVis = false;
+  healVisBtn.setAttribute("aria-pressed", "false");
+  updateHealUI();
   updateMaskUI();
   renderMaskOverlay();
   syncFromUI();
@@ -2641,6 +2839,7 @@ const LESSONS: { title: string; tab: PanelTab; steps: string[] }[] = [
     tab: "tone",
     steps: [
       "Denoise (in the Basic tab) is set automatically from the photo — nudge the slider to taste (0 is none).",
+      "Sensor dust in the sky? In Basic, arm Heal spots and tap the mote — or let Find spots sweep it for you.",
       "Shape the light with the Tone curve (Blacks → Highlights) and the overall Luminance.",
       "When it's how you want it, go to Export and Export & Save — pick the resolution on the way out.",
     ],
@@ -2948,6 +3147,7 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade): EditParams {
     sharpen: look.sharpen,
     texture: look.texture,
     hsl: [...look.hsl],
+    spots: [], // composition-specific — a batch frame heals nothing
   };
 }
 
@@ -3321,6 +3521,7 @@ canvas.addEventListener("click", (e) => {
     return;
   }
   // Armed picks eat the tap (they must NOT also set white balance).
+  if (handleHealTap(e.clientX, e.clientY)) return;
   if (handleColorMaskPick(e.clientX, e.clientY)) return;
   if (handleHslPick(e.clientX, e.clientY)) return;
   const [pvx, pvy] = renderer.toImagePixel(e.clientX, e.clientY);
