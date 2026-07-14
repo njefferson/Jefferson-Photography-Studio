@@ -1049,6 +1049,11 @@ label.open-btn, label.bar-btn {
    hit-tests the spot list). */
 #healOverlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; overflow: visible; }
 #healOverlay .heal-spot { fill: none; stroke: rgba(255, 255, 255, 0.9); stroke-width: 1.5; stroke-dasharray: 4 3; filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.8)); }
+/* The newest heal stays ACTIVE — the Spot size slider resizes it live. */
+#healOverlay .heal-active { stroke: var(--accent); stroke-width: 2; }
+/* Transient centre ring while the size slider moves with nothing active:
+   shows how big the next tap will heal. */
+#healOverlay .heal-preview { stroke: var(--accent); stroke-dasharray: 2 3; opacity: 0.9; }
 #maskOverlay .mask-shape { fill: rgba(120, 200, 255, 0.06); stroke: rgba(130, 205, 255, 0.9); stroke-width: 1.5; stroke-dasharray: 6 4; }
 #maskOverlay .mask-line { stroke: rgba(130, 205, 255, 0.9); stroke-width: 1.5; stroke-dasharray: 6 4; }
 #maskOverlay .mask-handle { fill: rgba(12, 12, 16, 0.72); stroke: #82cdff; stroke-width: 2; pointer-events: auto; cursor: grab; touch-action: none; }

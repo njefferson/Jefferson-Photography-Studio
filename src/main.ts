@@ -1617,16 +1617,20 @@ function applyZoom() {
     panX = 0;
     panY = 0;
     canvas.style.transform = "";
-    positionMaskOverlay();
-    return;
+  } else {
+    // Keep the image from being flung entirely off-screen.
+    const maxX = (canvas.clientWidth * (zoom - 1)) / 2 + 60;
+    const maxY = (canvas.clientHeight * (zoom - 1)) / 2 + 60;
+    panX = clamp(panX, -maxX, maxX);
+    panY = clamp(panY, -maxY, maxY);
+    canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
   }
-  // Keep the image from being flung entirely off-screen.
-  const maxX = (canvas.clientWidth * (zoom - 1)) / 2 + 60;
-  const maxY = (canvas.clientHeight * (zoom - 1)) / 2 + 60;
-  panX = clamp(panX, -maxX, maxX);
-  panY = clamp(panY, -maxY, maxY);
-  canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
+  // EVERY on-photo overlay must retrace the transform — pinch/pan is a pure
+  // CSS move with no repaint, so anything skipped here visibly detaches from
+  // the picture (the heal rings did exactly that on the owner's iPad,
+  // 2026-07-14, while the baked fixes themselves moved with the photo).
   positionMaskOverlay();
+  positionHealOverlay();
 }
 
 function resetZoom() {
@@ -1760,6 +1764,14 @@ const healStatus = $("healStatus") as HTMLElement;
 let previewSrc: { width: number; height: number; pixels?: Uint8ClampedArray; linear?: Float32Array } | null = null;
 let bakedSpots: HealSpot[] = []; // what the texture currently has baked in
 let healArmed = false;
+// The most recent heal stays ACTIVE (accented ring): the Spot size slider
+// resizes it live — tap first, then dial the size until the fix looks right
+// (owner ask 2026-07-14: no way to size before the tap, none to adjust after).
+let activeSpotIdx = -1;
+// While the slider moves with no active spot, a preview ring at the middle of
+// the view shows how big the next tap will heal. Timestamp it fades at.
+let healPreviewUntil = 0;
+let healPreviewTimer = 0;
 
 /** Upload the current photo's preview texture (fresh = pristine, no heals)
  *  and schedule a repaint, which re-bakes params.spots on the way. */
@@ -1809,9 +1821,13 @@ function updateHealUI() {
     : "";
 }
 
-/** Ring markers over the healed spots while Heal mode is armed. */
+/** Ring markers over the healed spots while Heal mode is armed. The most
+ *  recent (ACTIVE) spot draws accented — the Spot size slider drives it. A
+ *  transient centre ring previews the tap size while the slider moves. */
 function positionHealOverlay() {
-  const show = healArmed && !!current && welcome.hidden && (params.spots?.length ?? 0) > 0;
+  if (activeSpotIdx >= (params.spots?.length ?? 0)) activeSpotIdx = -1; // undo can shrink the list
+  const preview = healPreviewUntil > Date.now();
+  const show = healArmed && !!current && welcome.hidden && ((params.spots?.length ?? 0) > 0 || preview);
   healOverlay.toggleAttribute("hidden", !show);
   if (!show) {
     healOverlay.replaceChildren();
@@ -1819,17 +1835,25 @@ function positionHealOverlay() {
   }
   const rect = healOverlay.getBoundingClientRect();
   const kids: SVGElement[] = [];
-  for (const s of params.spots) {
-    const [cx, cy] = renderer.imageUvToClient(s.x, s.y);
-    // Client-space radius: the distance to a point one radius away in image-x
-    // (imageUvToClient soaks up rotation and zoom).
-    const [ex, ey] = renderer.imageUvToClient(s.x + s.r, s.y);
+  // Client-space radius: the distance to a point one radius away in image-x
+  // (imageUvToClient soaks up rotation and zoom).
+  const ring = (u: number, v: number, r: number, cls: string) => {
+    const [cx, cy] = renderer.imageUvToClient(u, v);
+    const [ex, ey] = renderer.imageUvToClient(u + r, v);
     const c = document.createElementNS(SVGNS, "circle");
     c.setAttribute("cx", String(cx - rect.left));
     c.setAttribute("cy", String(cy - rect.top));
     c.setAttribute("r", String(Math.max(4, Math.hypot(ex - cx, ey - cy))));
-    c.setAttribute("class", "heal-spot");
+    c.setAttribute("class", cls);
     kids.push(c);
+  };
+  params.spots.forEach((s, i) => ring(s.x, s.y, s.r, i === activeSpotIdx ? "heal-spot heal-active" : "heal-spot"));
+  if (preview && activeSpotIdx < 0) {
+    // Preview at the middle of what's on screen (zoom-aware), sized like the
+    // next tap. Only when no spot is active — the active ring IS the preview.
+    const c = canvas.getBoundingClientRect();
+    const [u, v] = renderer.clientToImageUv(c.left + c.width / 2, c.top + c.height / 2);
+    ring(u, v, clamp(Number(healSize.value), SPOT_R_MIN, SPOT_R_MAX), "heal-spot heal-preview");
   }
   healOverlay.replaceChildren(...kids);
 }
@@ -1848,6 +1872,8 @@ function handleHealTap(clientX: number, clientY: number): boolean {
     if (Math.hypot((u - s.x) * W, (v - s.y) * H) <= s.r * W) {
       // The ring vanishing + the count line updating are the feedback.
       params.spots.splice(i, 1);
+      if (activeSpotIdx === i) activeSpotIdx = -1;
+      else if (activeSpotIdx > i) activeSpotIdx--;
       draw();
       flushRecord();
       positionHealOverlay();
@@ -1861,11 +1887,34 @@ function handleHealTap(clientX: number, clientY: number): boolean {
     return true;
   }
   params.spots.push({ x: u, y: v, r, dx: src.offX / W, dy: src.offY / H });
+  activeSpotIdx = params.spots.length - 1; // the slider now resizes this one
   draw(); // the rAF pass bakes it into the texture
   flushRecord(); // one tap = one undo step
   positionHealOverlay();
   return true;
 }
+
+// Spot size slider: with a spot active it RESIZES that heal live (the source
+// patch is re-picked for the new radius, the texture re-bakes on the next
+// frame; recordSoon coalesces the whole drag into one undo step). With none,
+// it shows the centre preview ring so the size reads before the first tap.
+healSize.addEventListener("input", () => {
+  if (!healArmed || !current || !previewSrc) return;
+  const r = clamp(Number(healSize.value), SPOT_R_MIN, SPOT_R_MAX);
+  const s = activeSpotIdx >= 0 ? params.spots[activeSpotIdx] : null;
+  if (s) {
+    const W = previewSrc.width, H = previewSrc.height;
+    const src = findHealSource(lumaAccessor(previewSrc, W), W, H, Math.round(s.x * W - 0.5), Math.round(s.y * H - 0.5), r * W);
+    if (src) { s.dx = src.offX / W; s.dy = src.offY / H; }
+    s.r = r;
+    draw();
+  } else {
+    healPreviewUntil = Date.now() + 1200;
+    clearTimeout(healPreviewTimer);
+    healPreviewTimer = window.setTimeout(positionHealOverlay, 1250); // fade it back out
+  }
+  positionHealOverlay();
+});
 
 healVisBtn.addEventListener("click", () => {
   renderer.spotVis = !renderer.spotVis;
@@ -1876,6 +1925,7 @@ healVisBtn.addEventListener("click", () => {
 healClearBtn.addEventListener("click", () => {
   if (!params.spots.length) return;
   params.spots = [];
+  activeSpotIdx = -1;
   updateHealUI();
   positionHealOverlay();
   draw();
@@ -1906,6 +1956,7 @@ healAutoBtn.addEventListener("click", () => {
       // message here would be overwritten by it on the next repaint anyway.
       if (!added) healStatus.textContent = "No obvious dust found. Try Visualize spots, then tap anything you see.";
       if (added) {
+        activeSpotIdx = -1; // finds are reviewed by ring, not slider-resized en masse
         setHeal(true); // show the rings so each find can be reviewed/removed
         draw();
         flushRecord(); // the whole pass is one undo step
@@ -2131,6 +2182,7 @@ function establishFreshEdit() {
   selectedMask = -1;
   setColorPick(false);
   params.spots = [];
+  activeSpotIdx = -1;
   setHeal(false);
   renderer.spotVis = false;
   healVisBtn.setAttribute("aria-pressed", "false");

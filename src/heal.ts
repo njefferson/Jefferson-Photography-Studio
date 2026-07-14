@@ -377,10 +377,13 @@ export interface DetectedSpot {
 }
 
 /**
- * Find dust-like blobs: small connected regions whose luminance departs from a
- * local blur, restricted to SMOOTH neighbourhoods (dust reads worst — and
- * detection stays honest — in flat skies; in busy foliage a high-pass is all
- * texture). Classical only: box-blur high-pass, MAD noise floor, flood-fill.
+ * Find dust-like blobs, TWO-SCALE: a FINE pass for small sharp motes and hot
+ * pixels, and a COARSE, dark-only pass for the big soft smudges real sensor
+ * dust makes at small apertures (the owner's obvious spot was exactly that —
+ * larger and fainter than the fine pass can see, field-found 2026-07-14).
+ * Restricted to SMOOTH neighbourhoods (dust reads worst — and detection stays
+ * honest — in flat skies; in busy foliage a high-pass is all texture).
+ * Classical only: box-blur high-pass, MAD noise floor, flood-fill.
  */
 export function detectSpots(
   luma: (x: number, y: number) => number,
@@ -389,11 +392,60 @@ export function detectSpots(
   opts: { maxSpots?: number; maxRadiusPx?: number } = {},
 ): DetectedSpot[] {
   const maxSpots = opts.maxSpots ?? 40;
-  const maxR = opts.maxRadiusPx ?? Math.max(6, Math.round(W * 0.008));
-  const blurR = Math.max(3, Math.round(maxR * 0.9));
-  // Luma plane + two-pass box blur (≈ gaussian) at a dust-sized radius.
+  const fineR = opts.maxRadiusPx ?? Math.max(6, Math.round(W * 0.008));
   const L = new Float32Array(W * H);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) L[y * W + x] = luma(x, y);
+  const out: DetectedSpot[] = [
+    ...detectPass(L, W, H, { blurR: Math.max(3, Math.round(fineR * 0.9)), maxR: fineR, floor: 0.035, sigmaK: 6, noiseQ: 0.5, darkOnly: false, minN: 3, compact: 1.1 }),
+    // Mid: faint smudges between the fine and coarse size bands (a 14px-core
+    // smudge fell through exactly this gap in testing).
+    ...detectPass(L, W, H, { blurR: Math.max(6, Math.round(fineR * 2.5)), maxR: fineR * 1.8, floor: 0.02, sigmaK: 5, noiseQ: 0.35, darkOnly: true, minN: 6, compact: 1.0 }),
+    // Coarse: a soft smudge only dips ~2-5% below the sky, so the floor sits
+    // low — the dark-only rule, the size band and the ring test carry the
+    // specificity (bright-and-big in a sky is a cloud, never dust). The blur
+    // must sit WELL ABOVE the target size (~2× the largest blob) or it tracks
+    // the smudge and erases it from its own high-pass (measured: at blurR ≈
+    // maxR the 20-24px test smudges never crossed threshold at all).
+    // noiseQ 0.25: the wide blur lets scene texture flood the |high-pass|
+    // median, so the coarse noise floor reads the SMOOTH (sky) quantile
+    // instead — the median inflated the threshold ~15x on a wooded frame and
+    // the faint smudges never crossed it.
+    ...detectPass(L, W, H, { blurR: Math.max(10, Math.round(fineR * 5)), maxR: fineR * 2.8, floor: 0.016, sigmaK: 5, noiseQ: 0.25, darkOnly: true, minN: 10, compact: 0.9 }),
+  ];
+  // Strengths are per-pass ratios over that pass's threshold, so the sort is
+  // scale-comparable. Drop near-duplicates (the same mote seen at both
+  // scales, or two blobs of one big smudge), keeping the strongest.
+  out.sort((a, b) => b.strength - a.strength);
+  let kept: DetectedSpot[] = [];
+  for (const s of out) {
+    if (kept.some((k) => Math.hypot(k.x - s.x, k.y - s.y) < (k.rPx + s.rPx) * 0.9)) continue;
+    kept.push(s);
+  }
+  // A sensor carries a handful of motes; a CROWD of similar-strength "finds"
+  // is the frame's own noise floor pretending to be dust (the magenta D5300
+  // sky mottle produced 40 of them). When the scan comes back crowded, keep
+  // only clear outliers standing well above that crowd.
+  if (kept.length > 15) {
+    const med = [...kept].sort((a, b) => a.strength - b.strength)[kept.length >> 1].strength;
+    kept = kept.filter((k) => k.strength >= med * 1.8);
+  }
+  return kept.slice(0, maxSpots);
+}
+
+interface PassOpts {
+  blurR: number;
+  maxR: number;
+  floor: number;
+  sigmaK: number;
+  /** Quantile of |high-pass| used as the noise floor (0.5 = median). */
+  noiseQ: number;
+  darkOnly: boolean;
+  minN: number;
+  compact: number;
+}
+
+function detectPass(L: Float32Array, W: number, H: number, o: PassOpts): DetectedSpot[] {
+  const { blurR, maxR, minN } = o;
   const blur = boxBlur(boxBlur(L, W, H, blurR), W, H, blurR);
   // Relative high-pass + noise floor from the median abs deviation (sampled).
   const hp = new Float32Array(W * H);
@@ -401,8 +453,8 @@ export function detectSpots(
   const sampleAbs: number[] = [];
   for (let i = 0; i < hp.length; i += 97) sampleAbs.push(Math.abs(hp[i]));
   sampleAbs.sort((a, b) => a - b);
-  const noise = sampleAbs[Math.floor(sampleAbs.length / 2)] || 1e-4;
-  const thresh = Math.max(6 * noise, 0.035);
+  const noise = sampleAbs[Math.floor(sampleAbs.length * o.noiseQ)] || 1e-4;
+  const thresh = Math.max(o.sigmaK * noise, o.floor);
   // Isolation test, applied to a finished blob: a DENSE ring of RAW luma just
   // outside the mote must be uniform. Dust floats in clean sky, so its ring is
   // flat; a twig tip's branch has to CROSS the ring somewhere (strong local
@@ -466,22 +518,16 @@ export function detectSpots(
       // DARK, unless hot-pixel tiny: sensor dust shadows the sensor, while the
       // small BRIGHT things in a sky are cloud wisps (real content — the
       // teaching cloudscapes were full of them, field-found 2026-07-14).
-      if (n < 3 || rBlob > maxR || n < rBlob * rBlob * 1.1) continue;
-      if (sign > 0 && rBlob > 2.5) continue;
+      if (n < minN || rBlob > maxR || n < rBlob * rBlob * o.compact) continue;
+      if (sign > 0 && (o.darkOnly || rBlob > 2.5)) continue;
       const cx = sx / n, cy = sy / n;
       if (!ringOk(cx, cy, rBlob)) continue;
-      out.push({ x: cx, y: cy, rPx: Math.max(2, rBlob * 1.7), strength: peak });
+      // Strength as a ratio over this pass's threshold, so the caller can
+      // rank finds from different scales against each other.
+      out.push({ x: cx, y: cy, rPx: Math.max(2, rBlob * 1.7), strength: peak / thresh });
     }
   }
-  out.sort((a, b) => b.strength - a.strength);
-  // Drop near-duplicates (two blobs of one big mote), keep the strongest.
-  const kept: DetectedSpot[] = [];
-  for (const s of out) {
-    if (kept.some((k) => Math.hypot(k.x - s.x, k.y - s.y) < (k.rPx + s.rPx) * 0.9)) continue;
-    kept.push(s);
-    if (kept.length >= maxSpots) break;
-  }
-  return kept;
+  return out;
 }
 
 function boxBlur(src: Float32Array, W: number, H: number, r: number): Float32Array {
