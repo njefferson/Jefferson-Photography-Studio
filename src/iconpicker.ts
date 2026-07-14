@@ -16,41 +16,34 @@ export type IconStyle = {
   key: string;
   name: string;
   blurb: string;
-  svg: string; // page-relative
-  png180: string;
-  png512: string;
+  tile: string; // page-relative apple-touch-icon + card preview (180px)
+  png192: string; // rel="icon" tab icon + manifest
+  png512: string; // manifest
 };
 
-// The curated set. Same aperture silhouette across all three; only the finish
-// changes, so they read as one family on the Home Screen.
+// The curated set: the "NJ" aperture brand mark in its two finishes — same
+// mark, one on the near-black tile and one on the warm light tile — so they
+// read as one family on the Home Screen.
 export const ICON_STYLES: IconStyle[] = [
   {
-    key: "spectrum",
-    name: "Spectrum",
-    blurb: "Full-colour aperture on black — the vivid default.",
-    svg: "./studio-icon.svg",
-    png180: "./studio-icon-180.png",
-    png512: "./studio-icon-512.png",
+    key: "nj-light",
+    name: "NJ Light",
+    blurb: "The NJ aperture mark on a warm light tile — the default.",
+    tile: "./icons/apple-touch-icon-light.png",
+    png192: "./icons/icon-192-light.png",
+    png512: "./icons/icon-512-light.png",
   },
   {
-    key: "graphite",
-    name: "Graphite",
-    blurb: "Brushed light-metal iris on silver — quiet and clean.",
-    svg: "./studio-icon-graphite.svg",
-    png180: "./studio-icon-graphite-180.png",
-    png512: "./studio-icon-graphite-512.png",
-  },
-  {
-    key: "noir",
-    name: "Noir",
-    blurb: "The same iris in dark machined metal — understated black.",
-    svg: "./studio-icon-noir.svg",
-    png180: "./studio-icon-noir-180.png",
-    png512: "./studio-icon-noir-512.png",
+    key: "nj-dark",
+    name: "NJ Dark",
+    blurb: "The same NJ mark on a near-black tile.",
+    tile: "./icons/apple-touch-icon.png",
+    png192: "./icons/icon-192.png",
+    png512: "./icons/icon-512.png",
   },
 ];
 
-const DEFAULT_KEY = "spectrum";
+const DEFAULT_KEY = "nj-light";
 const STORE_KEY = "studio-icon-style";
 const STATIC_MANIFEST = "./manifest.webmanifest";
 
@@ -119,9 +112,8 @@ function swapManifest(style: IconStyle): void {
     background_color: "#0b0b0d",
     theme_color: "#0b0b0d",
     icons: [
-      { src: abs(style.svg), sizes: "any", type: "image/svg+xml", purpose: "any" },
-      { src: abs(style.png180), sizes: "180x180", type: "image/png", purpose: "any" },
-      { src: abs(style.png512), sizes: "512x512", type: "image/png", purpose: "maskable" },
+      { src: abs(style.png192), sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: abs(style.png512), sizes: "512x512", type: "image/png", purpose: "any" },
     ],
   };
   const blob = new Blob([JSON.stringify(manifest)], { type: "application/manifest+json" });
@@ -133,8 +125,8 @@ function swapManifest(style: IconStyle): void {
  *  the SVG tab/desktop icon, and the manifest icons. */
 export function applyIconStyle(key: string, persist = true): void {
   const style = styleFor(key);
-  replaceLink("apple-touch-icon", { href: style.png180 });
-  replaceLink("icon", { type: "image/svg+xml", href: style.svg });
+  replaceLink("apple-touch-icon", { href: style.tile });
+  replaceLink("icon", { type: "image/png", sizes: "192x192", href: style.png192 });
   swapManifest(style);
   if (persist) writeStored(style.key);
 }
@@ -153,7 +145,7 @@ export function setupIconPicker(container: HTMLElement): void {
     card.dataset.key = style.key;
     card.setAttribute("aria-pressed", String(style.key === current));
     card.innerHTML =
-      `<img src="${style.png180}" alt="${style.name} icon" width="72" height="72" />` +
+      `<img src="${style.tile}" alt="${style.name} icon" width="72" height="72" />` +
       `<span class="icon-name">${style.name}</span>` +
       `<span class="icon-blurb">${style.blurb}</span>` +
       `<span class="icon-badge"></span>`;
