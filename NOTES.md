@@ -136,6 +136,28 @@ See **`PLAN.md`** for the full build plan.
   lesson constraint. Lessons stay SKILLS that work on any frame — the
   mapping only decides where a tap lands you. Sessions propose a sensible
   mapping for his approval as frames arrive.
+  FIRST WAVE SHIPPED to staging 2026-07-14 (cache ips-v40 → ips-v41): the
+  owner uploaded five zips (NIR_1638/1687/1701/1708/1822 NEFs, all Z50);
+  all five binned to 10.4 MB DNGs in public/examples/. GALLERY is now 22
+  tiles = 9 RAW + 13 JPEG, with a `galNef` helper and the six binned-DNG
+  tiles in LESSON ORDER so the grid reads as a curriculum — every lesson
+  now has its own RAW home frame: ① Lakeside beach (1638) ② White forest
+  (1701 — REPLACED its JPEG tile + red camera-look thumb; the RAW opens
+  neutral, so the old thumb would have lied) ③ Lone pine (1822, portrait)
+  ④ Wooded shore (1708, portrait) ⑤ Picnic still life (1687) ⑥ Lakeside &
+  sensor dust (1675, unchanged). New thumbs are app-faithful auto-balanced
+  renders (exact grayWorldWB/autoExposure mirrors over the app's own decode,
+  400px via the headless-Chromium JPEG step — the NIR_1675-thumb style).
+  VERIFIED headless: bin pipeline 14/14 (fail-first; writer byte-identical
+  to the shipped reference over header+tags+matrix) and a 15/15 built-app
+  walk (22 tiles, all thumbs decode, each of the six RAW tiles opens the
+  editor ON its lesson chip and renders, no page errors); tsc + vite clean.
+  NEEDS THE OWNER'S HANDS on the iPad: decode speed/feel of the new DNGs,
+  the thumb look, the lesson-order grid reading, and his verdict on each
+  frame↔lesson pairing (session proposal, easily re-tagged). STILL WITHOUT
+  RAW TWINS: NIR_1665/1706/1716/1721/1808/1825/1827/1864/1866 + the four
+  D5300 magenta frames (different camera — matrix/levels must come from
+  those NEFs when they arrive).
   PIPELINE REBUILT this session (previous scratchpad was reclaimed):
   scratchpad `bin-dng.ts` + `test-bin-dng.ts`, rebuilt from this entry's
   spec + a byte-level dump of the shipped `public/examples/NIR_1675.dng`.
