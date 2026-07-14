@@ -423,7 +423,8 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 }
 /* Standing "mode is on" banners — tappable to exit; accent-filled pills. */
 #tatBanner,
-#colorBanner {
+#colorBanner,
+#healBanner {
   position: absolute;
   top: 16px;
   left: 50%;
@@ -448,18 +449,19 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   cursor: pointer;
 }
 #tatBanner .tat-banner-off,
-#colorBanner .tat-banner-off {
+#colorBanner .tat-banner-off,
+#healBanner .tat-banner-off {
   font-size: 11px;
   font-weight: 500;
   opacity: 0.85;
 }
-/* The colour-pick banner sits at the BOTTOM (top taps hit the sky, a prime
-   pick target; a top banner ate those taps). */
-#colorBanner { top: auto; bottom: 16px; }
+/* The colour-pick and heal banners sit at the BOTTOM (top taps hit the sky —
+   a prime pick target AND where dust shows worst; a top banner ate those taps). */
+#colorBanner, #healBanner { top: auto; bottom: 16px; }
 @media (max-width: 760px) {
-  #tatBanner, #colorBanner { top: 10px; padding: 6px 13px; font-size: 12px; }
-  #tatBanner .tat-banner-off, #colorBanner .tat-banner-off { font-size: 10px; }
-  #colorBanner { top: auto; bottom: 10px; }
+  #tatBanner, #colorBanner, #healBanner { top: 10px; padding: 6px 13px; font-size: 12px; }
+  #tatBanner .tat-banner-off, #colorBanner .tat-banner-off, #healBanner .tat-banner-off { font-size: 10px; }
+  #colorBanner, #healBanner { top: auto; bottom: 10px; }
 }
 #hint { color: var(--txt-2); text-align: center; max-width: 40ch; margin: 0 auto; }
 #welcome {
@@ -550,7 +552,7 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   bottom: calc(20px + var(--session-h, 110px));
   max-height: calc(100% - 32px - var(--session-h, 110px));
 }
-#stage.has-session #colorBanner { bottom: calc(24px + var(--session-h, 110px)); }
+#stage.has-session #colorBanner, #stage.has-session #healBanner { bottom: calc(24px + var(--session-h, 110px)); }
 #sessionStrip {
   position: absolute;
   left: 12px;
@@ -1042,6 +1044,11 @@ label.open-btn, label.bar-btn {
 
 /* Local-mask overlay on the stage. */
 #maskOverlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; overflow: visible; }
+/* Heal rings: markers over healed spots while Heal mode is armed (tap one to
+   remove that fix — the ring itself never eats the tap; the canvas handler
+   hit-tests the spot list). */
+#healOverlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; overflow: visible; }
+#healOverlay .heal-spot { fill: none; stroke: rgba(255, 255, 255, 0.9); stroke-width: 1.5; stroke-dasharray: 4 3; filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.8)); }
 #maskOverlay .mask-shape { fill: rgba(120, 200, 255, 0.06); stroke: rgba(130, 205, 255, 0.9); stroke-width: 1.5; stroke-dasharray: 6 4; }
 #maskOverlay .mask-line { stroke: rgba(130, 205, 255, 0.9); stroke-width: 1.5; stroke-dasharray: 6 4; }
 #maskOverlay .mask-handle { fill: rgba(12, 12, 16, 0.72); stroke: #82cdff; stroke-width: 2; pointer-events: auto; cursor: grab; touch-action: none; }

@@ -77,6 +77,7 @@ uniform float u_sharpen; // 0..1 capture sharpening (high-freq) — see raw/deta
 uniform float u_texture; // -1..1 mid-freq local contrast — see raw/detail.ts
 uniform vec2 u_texel;    // 1/textureSize
 uniform float u_split;   // compare divider: denoise applies where uv.x >= split
+uniform int u_spotVis;   // 1 = "Visualize spots": amplified high-pass luma view
 
 const vec3 LUMA_W = vec3(0.2126, 0.7152, 0.0722);
 
@@ -163,6 +164,27 @@ float colorMaskWeight(int i, vec3 c){
 }
 
 void main() {
+  // "Visualize spots": a high-contrast luminance high-pass of the SOURCE (the
+  // healed texture — so a fixed spot visibly disappears), Lightroom's trick
+  // for surfacing dust in flat skies. Preview-only; never exported, so it has
+  // no CPU mirror. Same 7x7 sigma-2 blur as the texture band in detail.ts.
+  if (u_spotVis == 1) {
+    vec2 ctr = (floor(v_uv / u_texel) + 0.5) * u_texel;
+    float sum = 0.0, wsum = 0.0, Lc = 0.0;
+    for (int dy = -3; dy <= 3; dy++) {
+      for (int dx = -3; dx <= 3; dx++) {
+        float L = dot(fetchLin(ctr + vec2(float(dx), float(dy)) * u_texel), LUMA_W);
+        if (dx == 0 && dy == 0) Lc = L;
+        float w = exp(-float(dx * dx + dy * dy) / 8.0);
+        sum += L * w; wsum += w;
+      }
+    }
+    float blurT = sum / wsum;
+    float d = (Lc - blurT) / (blurT + 0.015);
+    frag = vec4(vec3(clamp(0.5 + d * 5.0, 0.0, 1.0)), 1.0);
+    return;
+  }
+
   vec3 c = fetchLin(v_uv);
 
   // Denoise FIRST, on linear sensor data, before the big IR gains amplify the
@@ -402,7 +424,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_toneTex", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_toneTex", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_spotVis"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -574,11 +596,12 @@ export class Renderer {
   /** Bind the program, every edit uniform, and the three input textures. Shared
    *  by the on-screen render and the offscreen histogram pass so they can never
    *  disagree about what the pixels are. */
-  private bindPipeline(p: EditParams, split: number, rot: number, readMode = 0) {
+  private bindPipeline(p: EditParams, split: number, rot: number, readMode = 0, spotVis = 0) {
     const gl = this.gl;
     gl.useProgram(this.prog);
     gl.uniform1i(this.loc.u_tex, 0);
     gl.uniform1i(this.loc.u_readMode, readMode);
+    gl.uniform1i(this.loc.u_spotVis, spotVis);
     gl.uniform1f(this.loc.u_denoise, p.denoise);
     gl.uniform1f(this.loc.u_sharpen, p.sharpen ?? 0);
     gl.uniform1f(this.loc.u_texture, p.texture ?? 0);
@@ -653,14 +676,34 @@ export class Renderer {
     gl.bindTexture(gl.TEXTURE_2D, this.tex);
   }
 
+  /** "Visualize spots" mode for the ON-SCREEN render only (offscreen passes —
+   *  histogram, colour picks — always see the real edit). */
+  spotVis = false;
+
   /** @param split 0..1 — denoise applies right of this fraction (0 = whole image). */
   render(p: EditParams, split = 0) {
     const gl = this.gl;
     if (!this.imgW) return;
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-    this.bindPipeline(p, split, this.rotQ);
+    this.bindPipeline(p, split, this.rotQ, 0, this.spotVis ? 1 : 0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  /** Overwrite a rect of the source texture with healed pixels (heal.ts bakes
+   *  them from the pristine decode — the texture is the only place healed
+   *  preview pixels live). `data` layout must match the upload format:
+   *  RGBA bytes for gamma sources, RGBA floats for linear raw. */
+  patchImage(x: number, y: number, w: number, h: number, data: Uint8Array | Float32Array) {
+    const gl = this.gl;
+    if (!this.imgW || w <= 0 || h <= 0) return;
+    gl.bindTexture(gl.TEXTURE_2D, this.tex);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    if (this.isLinear) {
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, x, y, w, h, gl.RGBA, gl.FLOAT, data as Float32Array);
+    } else {
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, x, y, w, h, gl.RGBA, gl.UNSIGNED_BYTE, data as Uint8Array);
+    }
   }
 
   // Longest edge of the offscreen histogram render. Small enough that the

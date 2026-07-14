@@ -57,6 +57,7 @@
       <div id="stage">
         <canvas id="view"></canvas>
         <svg id="maskOverlay" hidden aria-hidden="true"></svg>
+        <svg id="healOverlay" hidden aria-hidden="true"></svg>
         <div id="histWrap" hidden aria-label="Live RGB histogram">
           <canvas id="histogram" width="256" height="96"></canvas>
         </div>
@@ -67,6 +68,10 @@
         <button id="tatBanner" type="button" hidden>
           <span>&#10021; Drag to adjust is ON — drag a color to tune it</span>
           <span class="tat-banner-off">Tap here to turn off &amp; restore tap / pan / pinch</span>
+        </button>
+        <button id="healBanner" type="button" hidden>
+          Heal mode &mdash; tap a dust spot to fix it
+          <span class="tat-banner-off">tap a healed spot to remove its fix &middot; tap here to exit</span>
         </button>
         <button id="colorBanner" type="button" hidden>
           <span>&#127919; Colour mask — tap the photo to pick the colour to match</span>
@@ -147,6 +152,16 @@
             <label>Sharpen <input id="sharpen" type="range" min="0" max="1" step="0.01" value="0" /></label>
             <label>Texture <input id="texture" type="range" min="-1" max="1" step="0.01" value="0" /></label>
             <p class="note">Denoise is set automatically from the photo's measured noise. Sharpen crisps up fine edges; Texture brings out surface structure (pull left to smooth). Both keep colours put.</p>
+            <hr class="divider" />
+            <div class="sub-title">Dust &amp; spots</div>
+            <button id="healBtn" type="button" class="toggle" aria-pressed="false">&#8982; Heal spots &mdash; tap the photo</button>
+            <small class="note">Tap a dust spot and it's patched from clean pixels nearby &mdash; tap a healed spot to remove its fix. Pinch to zoom right in while healing.</small>
+            <label>Spot size <input id="healSize" type="range" min="0.002" max="0.035" step="0.001" value="0.008" /></label>
+            <button id="healVis" type="button" class="toggle" aria-pressed="false">Visualize spots</button>
+            <small class="note">A high-contrast view that makes dust jump out of flat skies. The photo itself is untouched.</small>
+            <button id="healAuto" type="button">Find spots automatically</button>
+            <button id="healClear" type="button" hidden>Clear all heals</button>
+            <small class="note" id="healStatus"></small>
             <p class="note footnote">White balance, exposure and denoise are set automatically when a photo opens &mdash; refine from here. No 2000K floor.</p>
           </section>
 
@@ -476,6 +491,7 @@
           <li><strong>Sharpen</strong> &amp; <strong>Texture</strong> (Basic) — Sharpen crisps fine edges; Texture works the mid-size surface structure (left smooths it). Both are luminance-only, so colors never shift.</li>
           <li><strong>Tone curve + Luminance</strong> — the curve shapes blacks through highlights; Luminance lifts or drops the whole image without clipping either end.</li>
           <li><strong>Masks</strong> — radial, gradient, or painted brush: local adjustments for one area only. Masks belong to the photo; saved looks stay portable.</li>
+          <li><strong>Dust &amp; spots</strong> (Basic) — arm <em>Heal spots</em> and tap a dust mote: it's patched from clean pixels nearby, in the preview and the export alike. <em>Visualize spots</em> makes dust jump out of flat skies; <em>Find spots automatically</em> sweeps the smooth areas for you. Heals belong to the photo — they never ride in saved looks, profiles or a batch.</li>
           <li><strong>IR lens fixes</strong> — pulls down the center hot-spot IR-converted lenses produce, and corrects (or adds) corner vignette.</li>
         </ul>
 
