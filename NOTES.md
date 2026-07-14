@@ -191,7 +191,25 @@ See **`PLAN.md`** for the full build plan.
   the remove-first step (the old copy said "pick a new one and add it again",
   which skips removing and strands the stale tile). Lead copy aligned. Cache
   bumped ips-v18 → ips-v19. TRUE in-place switching is native-only — logged in
-  Future/bigger bets (alternate app icons; needs no server or secrets). an installed (standalone) PWA has
+  Future/bigger bets (alternate app icons; needs no server or secrets).
+  NJ REBRAND 2026-07-14 (owner): the LAUNCHER now wears the new "NJ" aperture
+  brand mark (six steel leaves, spectral ring), replacing the old
+  Spectrum/Graphite/Noir aperture set. Final PNGs live in public/icons/
+  (icon-{192,512,1024}{,-light}.png + apple-touch-icon{,-light}.png, dark tile
+  #0c0d11 / light tile #f2eee6; plus nj-watermark-512 + nj-watermark-line-512,
+  transparent, reserved for photo watermarks — NOT app icons). The picker
+  (iconpicker.ts) now offers the two NJ FINISHES as the install options —
+  **NJ Light** (default) then **NJ Dark** — same mark, different tile; the old
+  studio-icon{,-graphite,-noir} files stay on disk but are no longer referenced.
+  manifests use plain purpose "any" (the mark fills ~80% and its ring rides near
+  the edge, so no maskable crop). SCOPE: LAUNCHER ONLY — Infrared (icon.svg/
+  ir-icon-*) and Macro (macro-icon*) are deliberately UNCHANGED (owner corrected
+  an over-broad first pass). No sw.js cache bump this release (owner asked for the
+  smallest diff; new icons are at fresh paths so nothing stale is served on iOS
+  AHS — the manifest is only cache-first for already-visited Android). Verified
+  headless 31/31 (Light default, order Light→Dark, Dark→blob-manifest swap,
+  switch-back restores the static manifest, IR/Macro assert NOT-NJ). Merged to
+  main after the owner's on-device pass. an installed (standalone) PWA has
   NO Safari chrome — no address bar, no Share, no Back — so there was no way to
   send someone the link or even see it (owner ask, 2026-07-13). SHIPPED same day:
   a Share control that appears ONLY when running standalone (in the browser
