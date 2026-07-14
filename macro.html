@@ -22,8 +22,9 @@
   <body>
     <div id="app">
       <header class="bar">
-        <a class="home" href="./index.html" aria-label="Back to Studio">‹ Studio</a>
+        <a class="home" href="./index.html" aria-label="Back to Studio">&#8249; Studio</a>
         <span class="brand"><span class="tool-dot" aria-hidden="true"></span>Macro Studio</span>
+        <button id="resetBtn" class="bar-btn" type="button" hidden title="Start over with a new focus-shift set">New set</button>
         <button id="shareBtn" class="info-btn" type="button" hidden aria-label="Share this app or copy its link" title="Share this app or copy its link">&#x2BAD;&#xFE0E;</button>
         <button id="helpBtn" class="info-btn" type="button" aria-label="How it works">i</button>
       </header>
@@ -32,6 +33,7 @@
         <!-- Empty state -->
         <section id="intake" class="intake">
           <div class="intake-card" id="dropZone">
+            <span class="macro-glyph" aria-hidden="true"><i></i><i></i><i></i></span>
             <h1>Stack a focus-shift set</h1>
             <p>
               Load the frames from an in-camera focus-shift burst (JPEG). They'll be
@@ -48,17 +50,17 @@
         <section id="work" hidden>
           <div id="view">
             <canvas id="result"></canvas>
-            <div id="viewHint" class="view-hint">Tap <b>Stack</b> to combine the set.</div>
+            <div id="statusPill" class="status-pill" hidden></div>
+            <div id="viewHint" class="hint-pill">Tap <b>Stack</b> to combine the set.</div>
           </div>
           <div id="filmstrip" class="filmstrip"></div>
           <div class="controls">
             <button id="stackBtn" type="button" class="primary">Stack</button>
             <button id="compareBtn" type="button" hidden>Hold to compare</button>
             <button id="saveBtn" type="button" hidden>Save image</button>
-            <button id="resetBtn" type="button" class="ghost">New set</button>
+            <span id="status" class="status-inline"></span>
           </div>
           <div id="progress" class="progress" hidden><div id="progressBar"></div><span id="progressText"></span></div>
-          <p id="status" class="status"></p>
         </section>
       </main>
 
