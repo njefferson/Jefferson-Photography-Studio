@@ -2898,6 +2898,12 @@ const GALLERY: GalleryTile[] = [
   galNef("NIR_1708", "Wooded shore · RAW", 3),
   galNef("NIR_1687", "Picnic still life · RAW", 4),
   galNef("NIR_1675", "Lakeside & sensor dust · RAW", 5),
+  // Second wave (2026-07-14): a second RAW frame for lessons 1-5.
+  galNef("NIR_1830", "Chairs by the lake · RAW", 0),
+  galNef("NIR_1873", "Through the boughs · RAW", 1),
+  galNef("NIR_1824", "Pine & clouds · RAW", 2),
+  galNef("NIR_1821", "Shoreline forest · RAW", 3),
+  galNef("NIR_1877", "Glowing pine · RAW", 4),
   galJpeg("NIR_1706", "Forest & snag"),
   galJpeg("NIR_1716", "Swirling sky"),
   galJpeg("NIR_1721", "Lake & contrails"),
