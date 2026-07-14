@@ -9,11 +9,16 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Infrared" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="theme-color" content="#0b0b0d" />
+    <meta name="theme-color" content="#0b0c0f" />
     <link rel="manifest" href="./ir.webmanifest" />
     <link rel="apple-touch-icon" href="./ir-icon-180.png" />
     <link rel="icon" type="image/svg+xml" href="./icon.svg" />
     <title>Infrared Photography Studio</title>
+    <!-- Read the saved theme before first paint so there's no flash of the
+         wrong palette (see src/theme.ts). -->
+    <script>
+      try { if (localStorage.getItem("studio-theme") === "dawn") document.documentElement.setAttribute("data-theme", "dawn"); } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="app">
@@ -407,6 +412,7 @@
         <a id="coffee" class="coffee" target="_blank" rel="noopener" hidden>PayPal</a>
         <a id="venmo" class="coffee" target="_blank" rel="noopener" hidden>Venmo</a>
       </p>
+      <p class="theme-row"><button id="themeToggle" type="button"></button></p>
       <button id="infoClose" type="button">Close</button>
     </dialog>
 

@@ -1,6 +1,7 @@
 import "./macro.css";
 import { stackFocus, type StackFrame } from "./stack";
 import { setupInstalledShare } from "../share";
+import { wireThemeToggle } from "../theme";
 
 // Macro focus-stacking mode. Loads a focus-shift JPEG set, blends it into one
 // all-in-focus frame, and lets you compare and save. The heavy engine lives in
@@ -316,6 +317,9 @@ const helpDlg = $("helpDlg") as HTMLDialogElement;
 $("helpBtn").addEventListener("click", () => helpDlg.showModal());
 $("helpClose").addEventListener("click", () => helpDlg.close());
 helpDlg.addEventListener("click", (e) => { if (e.target === helpDlg) helpDlg.close(); });
+
+// Dawn / dark theme switch (shared chrome), living in the help dialog.
+wireThemeToggle(document.getElementById("themeToggle"));
 
 // Installed-app Share (src/share.ts): only when running standalone.
 setupInstalledShare("shareBtn");
