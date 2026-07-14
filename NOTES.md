@@ -129,15 +129,25 @@ See **`PLAN.md`** for the full build plan.
   WAITING ON: the owner uploading the NEFs (session repo access can't add
   files; he uploads to the chat, one or a zip at a time — full-res originals
   never enter the repo, only the binned DNGs do).
-  OPEN DESIGN QUESTION (the owner's own words, and his own caution): decide
-  which photos are CORE to a lesson vs "just for fun", or whether a lesson
-  owns a SET of photos — "yeah, that seems to get complicated that way." Keep
-  it simple candidates to put to him: (a) every lesson names ONE ideal frame
-  (its home tile) and everything else stays a free-practice photo defaulting
-  to Lesson 1; (b) tag each tile with the lesson it opens on and let several
-  share a lesson, no "sets" machinery. Lessons stay SKILLS that work on any
-  frame either way — the mapping only decides where a tap lands you. His
-  call before building.
+  DESIGN DECIDED (owner pick, 2026-07-14): TAG TILES FREELY — each tile
+  names the lesson it opens on (`GalleryTile.lesson`), several photos may
+  share a lesson, everything untagged defaults to Lesson 1. No "sets"
+  machinery (the owner's own "gets complicated" caution), no one-frame-per-
+  lesson constraint. Lessons stay SKILLS that work on any frame — the
+  mapping only decides where a tap lands you. Sessions propose a sensible
+  mapping for his approval as frames arrive.
+  PIPELINE REBUILT this session (previous scratchpad was reclaimed):
+  scratchpad `bin-dng.ts` + `test-bin-dng.ts`, rebuilt from this entry's
+  spec + a byte-level dump of the shipped `public/examples/NIR_1675.dng`.
+  Proven 14/14 (fail-first): exact 2×2 same-colour binning, round-trip
+  through the app's OWN decoder (Tiff + readMosaicedCfa), and the writer's
+  header + 17-tag table + colour matrix BYTE-IDENTICAL to the shipped
+  reference (first 290 bytes; same total size for the same frame). Drive
+  note: the owner's Google Drive is connected but direct HTTP download is
+  proxy-blocked and the MCP tool returns base64 (unusable at 25 MB/frame) —
+  chat zip uploads remain the delivery path. The Drive "Hotspot test shots"
+  folder (NIR_1597–1619 + Archive.zip) is a DIFFERENT project, not the
+  gallery RAWs.
 - [x] **Dust & spot removal** — heal sensor dust and hot pixels, the classic IR
   pain (dust shows worst in smooth skies). Owner ask 2026-07-14; graduates the
   "Heal / clone" backlog item into the queue. Classical — no ML, no server.
