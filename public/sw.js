@@ -4,7 +4,7 @@
 // online), falling back to cache when offline. Hashed build assets are
 // cache-first (their names change every build, so this is safe and fast).
 // Bumping CACHE wipes old entries on activation.
-const CACHE = "ips-v25";
+const CACHE = "ips-v26";
 
 self.addEventListener("install", () => {
   self.skipWaiting();
