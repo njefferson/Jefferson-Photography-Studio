@@ -2937,6 +2937,14 @@ const GALLERY: GalleryTile[] = [
   galNef("NIR_1688", "Sapling on the rock · RAW"),
   galNef("NIR_1691", "Camp by the lake · RAW"),
   galNef("NIR_1705", "Forest sentinel · RAW"),
+  // Sixth wave (2026-07-14): backyard scenes — Lightroom-converted DNG
+  // sources this time (binned through the same pipeline via the app's own
+  // LJ92 CFA decode). All free practice.
+  galNef("NIR_0063", "Oaks over the fence · RAW"),
+  galNef("NIR_0102", "Bird bath · RAW"),
+  galNef("NIR_0152", "Backyard lounge · RAW"),
+  galNef("NIR_0172", "The playhouse · RAW"),
+  galNef("NIR_0627", "Lavender · RAW"),
   galJpeg("NIR_1706", "Forest & snag"),
   galJpeg("NIR_1808", "Foliage close-up"),
   galJpeg("NIR_1864", "Weeping branches"),
