@@ -118,6 +118,26 @@ See **`PLAN.md`** for the full build plan.
 > reliable. Editing this list updates the app on the next deploy. Both the
 > roadmap and the patch notes (last commits) refresh automatically on push.
 
+- [ ] **Dust & spot removal** — heal sensor dust and hot pixels, the classic IR
+  pain (dust shows worst in smooth skies). Owner ask 2026-07-14; graduates the
+  "Heal / clone" backlog item into the queue. CAPABLE and classical — no ML, no
+  server — it fits the existing SPATIAL-op pattern (masks / IR hot-spot): a
+  per-photo list of heal spots applied in BOTH the GPU shader and the CPU export
+  with GPU==CPU parity, and — being spatial — skipped in the .cube/.dcp LUT like
+  masks/denoise/glow. Composition-specific like masks, so spots stay WITH their
+  photo (never carried into a saved look or another frame) and reset on a new
+  open. PLAN: tap-to-heal first — tap a spot, auto-pick the best clean SOURCE
+  patch a short search away (most-similar smooth neighbourhood), feathered clone;
+  one tap = one undo, a standing banner + obvious exit like the other sustained
+  modes. Add a "Visualize spots" high-contrast preview to surface dust in flat
+  skies (Lightroom's trick), and an optional auto-detect pass for the obvious sky
+  spots (blob detection on a luminance high-pass, restricted to smooth regions).
+  Store spots in EditParams (spatial → pre-pass, NOT compileEdit), a new spots
+  uniform array in gl.ts + a CPU mirror, verified in the headless GPU==CPU
+  harness. LATER: content-aware (gradient-domain / Poisson) blend for spots that
+  straddle an edge, and a manual clone-stamp mode (pick your own source) for
+  tricky repairs. Needs the owner's hands on the iPad for the heal FEEL and how
+  aggressive auto-detect should be.
 - [x] **Learn on real photos — lessons ride on the picture** — owner ask
   2026-07-14 (his framing: instead of dedicated tutorial photos, "lessons that
   can be collapsed to 1, 2, 3 on top of the photo and when you touch them shows
@@ -778,7 +798,8 @@ Classical, subscription-grade tools (fit the current architecture directly):
   cost of the 7×7 taps on a big proxy, and whether Texture's mid-band radius is
   the structure he wants. Cache bumped ips-v33 → ips-v34.
 - **Heal / clone** for sensor dust & hot pixels — clone-stamp first,
-  content-aware later.
+  content-aware later. PROMOTED 2026-07-14 to the "Next capability release"
+  queue as **Dust & spot removal** (owner ask) — see that entry for the plan.
 - **Copy settings + batch apply/export** across a folder — builds on the
   snapshot system shipped 2026-07-04; no ML.
 - **Channel mixer (full 3×3)** — custom false colour beyond the R↔B swap;
