@@ -1747,6 +1747,11 @@ const welcomeClose = $("welcomeClose") as HTMLButtonElement;
 const welcomeBack = $("welcomeBack") as HTMLButtonElement;
 const lesson = $("lesson") as HTMLDivElement;
 const lessonShow = $("lessonShow") as HTMLButtonElement;
+const lessonChips = $("lessonChips") as HTMLDivElement;
+// Learn mode: the practice-gallery photos open with the numbered lesson chips
+// riding on the picture. Off for a normal open/session (chips stay out of the
+// way there). Toggled by setLearnMode (defined with the gallery wiring below).
+let learnMode = false;
 
 // Navigation escape hatch. The old flows assumed the next action would always
 // carry you where you needed to go — but after Resume (or any open) the only
@@ -1764,6 +1769,10 @@ function goHome() {
   // start screen is up; returnToEditor()/an open flow bring it back.
   sessionStrip.hidden = true;
   stageEl.classList.remove("has-session");
+  // Hide the lesson rail while the start screen is up (learnMode stays set, so
+  // returnToEditor brings the rail — and the active lesson — right back).
+  lessonChips.hidden = true;
+  stageEl.classList.remove("learn");
   updateWelcomeReturn();
   updateSessionResume();
   renderMaskOverlay(); // hide the mask overlay while the card is up
@@ -1784,6 +1793,10 @@ function returnToEditor() {
   welcome.hidden = true;
   updateHistVisibility();
   updateSessionStrip(); // repaint + reshow the strip for a live session
+  if (learnMode) {
+    stageEl.classList.add("learn");
+    lessonChips.hidden = false;
+  }
   renderMaskOverlay();
 }
 
@@ -1813,6 +1826,9 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
   welcome.hidden = true;
   lesson.hidden = true;
   lessonShow.hidden = true;
+  // Any plain open/session-switch leaves learn mode; the gallery path turns it
+  // back on after establishing the photo (see openGalleryPhoto).
+  setLearnMode(false);
   updateHistVisibility();
 }
 
@@ -1871,14 +1887,6 @@ function establishFreshEdit() {
   updateEditButtons();
   updateSlotUI();
   requestAnimationFrame(updateScrollCues);
-}
-
-/** Decode and show one image with a fresh baseline. Ephemeral — used by the
- *  example lessons, which are not part of a saved session. */
-async function openImported(imported: ImportedFile) {
-  const img = await decode(imported);
-  showDecoded(img, imported);
-  establishFreshEdit();
 }
 
 fileInput.addEventListener("change", async () => {
@@ -2465,99 +2473,244 @@ qlSelectToggle.addEventListener("click", () => {
   updateQuickHeader();
 });
 
-// --- Example photos: fetched on demand, opened through the normal raw path,
-// each with a short lesson overlay showing what to try. ---
-const EXAMPLES: Record<string, { file: string; title: string; steps: string[]; rotate?: number; expand?: string[] }> = {
-  canopy: {
-    file: "./examples/canopy.dng",
-    rotate: 3,
-    expand: ["fsLooks", "fsHueSat", "fsExport"],
-    title: "Lesson 1 · Golden canopy — the Looks",
-    steps: [
-      "Tap Aerochrome, Aero Red and Goldie to compare — press one twice to flip its R⇄B swap.",
-      "Tap different things in the photo — leaves, road, sky — each sets white balance from that point. Auto brings you back.",
-      "Slide Saturation and Contrast to taste, then Export & Save.",
-    ],
-  },
-  lodge: {
-    file: "./examples/lodge.dng",
-    rotate: 3,
-    expand: ["fsWb", "fsDenoise", "fsLooks"],
-    title: "Lesson 2 · Motor lodge — white balance & film looks",
-    steps: [
-      "Tap around the photo — trees, grass, even the sign — each tap sets white balance from that point and the colors shift. Auto brings you back.",
-      "Denoise is set automatically from the photo — fine-tune it with the slider.",
-      "Try B&W IR and HIE B&W for the classic film feel.",
-    ],
-  },
-  hillside: {
-    file: "./examples/hillside.dng",
-    expand: ["fsLooks", "fsPerColor", "fsMixer"],
-    title: "Lesson 3 · Hillside & sky — the color tools",
-    steps: [
-      "Tap Aerochrome first.",
-      "The color tools go from broad to surgical. Broadest: the R⇄B channel swap flips the whole color world; Hue shift (in Hue/Saturation/Tone) rotates every color together — use it for big moves.",
-      "In Per-color, drag the Sky hue slider — each box owns half the color wheel and follows the swap; the small text shows which colors it's holding.",
-      "Most surgical: the Color mixer. Tap “Pick color from photo”, then tap the sky — the chip owning that exact color selects itself. Now drag its Hue and Saturation: only that color moves.",
-      "A chip bends only its own neighborhood (so smooth skies can't tear into bands). Need a bigger throw? Make the move with Hue shift first, then finish with the chip.",
-    ],
-  },
-};
-
-async function loadExample(key: string) {
-  const ex = EXAMPLES[key];
-  if (!ex) return;
-  // Tutorials are an ephemeral learning path — close any session first so its
-  // strip doesn't linger over the lesson and storage stays in sync.
-  await resetSessionState(true);
-  updateSessionStrip();
-  showBusy("Loading example…");
-  try {
-    const res = await fetch(ex.file);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const bytes = new Uint8Array(await res.arrayBuffer());
-    await openImported({ name: `${key}.dng`, kind: "dng", bytes, looksTranscoded: false });
-    if (ex.rotate) {
-      renderer.setRotation(ex.rotate);
-      draw();
-    }
-    // Unfold exactly the sections this lesson teaches.
-    if (ex.expand) {
-      document.querySelectorAll<HTMLFieldSetElement>("#panel fieldset").forEach((fs) => {
-        fs.classList.toggle("collapsed", !ex.expand!.includes(fs.id));
-      });
-      panel.scrollTop = 0;
-      updateScrollCues();
-    }
-    // Show the lesson card for this example.
-    ($("lessonTitle") as HTMLElement).textContent = ex.title;
-    const ol = $("lessonSteps") as HTMLOListElement;
-    ol.replaceChildren(...ex.steps.map((s) => {
-      const li = document.createElement("li");
-      li.textContent = s;
-      return li;
-    }));
-    lesson.hidden = false;
-    lessonShow.hidden = true;
-  } catch {
-    alert("Couldn't load the example — it downloads on first use, so check your connection and try again. (Once loaded, everything works offline.)");
-  } finally {
-    hideBusy();
-  }
-}
-
-document.querySelectorAll<HTMLButtonElement>(".ex").forEach((b) => {
-  b.addEventListener("click", () => loadExample(b.dataset.ex!));
-});
-// "Got it" minimizes the lesson to a floating "?" that brings it back.
+// "Got it" — in learn mode the numbered chips are the persistent affordance, so
+// it just collapses the card (chips stay); for the classic DNG lessons it drops
+// to the floating "?" that brings the card back.
 $("lessonClose").addEventListener("click", () => {
   lesson.hidden = true;
-  lessonShow.hidden = false;
+  if (learnMode) {
+    activeLesson = -1;
+    updateChipActive();
+  } else {
+    lessonShow.hidden = false;
+  }
 });
 lessonShow.addEventListener("click", () => {
   lesson.hidden = false;
   lessonShow.hidden = true;
 });
+
+// --- Practice gallery + "lessons ride on the photo" ------------------------
+// The uploaded low-res frames (public/examples/gallery/) open with a rail of
+// numbered lesson chips. A lesson is a SKILL, not a scene — so it works on any
+// photo, and you can practice the same one across different frames. ---
+
+// A practice tile. JPEG tiles are the low-res gallery frames; the three RAW
+// (.dng) tiles are the original examples — the only ones that show the true-RAW,
+// sub-2000K white-balance magic (an 8-bit JPEG can't). `file`/`thumb`/`kind`
+// default to the gallery layout; RAW tiles override them.
+type GalleryTile = { key: string; label: string; kind: ImageKind; file: string; thumb: string; rotate?: number };
+const galJpeg = (key: string, label: string): GalleryTile => ({
+  key,
+  label,
+  kind: "jpeg",
+  file: `./examples/gallery/${key}.jpg`,
+  thumb: `./examples/gallery/thumbs/${key}.jpg`,
+});
+const galRaw = (key: string, label: string, rotate?: number): GalleryTile => ({
+  key,
+  label,
+  kind: "dng",
+  file: `./examples/${key}.dng`,
+  thumb: `./examples/${key}.png`,
+  rotate,
+});
+const GALLERY: GalleryTile[] = [
+  galRaw("canopy", "Golden canopy · RAW", 3),
+  galRaw("lodge", "Motor lodge · RAW", 3),
+  galRaw("hillside", "Hillside & sky · RAW"),
+  galJpeg("NIR_1701", "White forest"),
+  galJpeg("NIR_1706", "Forest & snag"),
+  galJpeg("NIR_1716", "Swirling sky"),
+  galJpeg("NIR_1721", "Lake & contrails"),
+  galJpeg("NIR_1808", "Foliage close-up"),
+  galJpeg("NIR_1864", "Weeping branches"),
+  galJpeg("NIR_1866", "Into the canopy"),
+  galJpeg("NIR_1825", "Cloudscape"),
+  galJpeg("NIR_1827", "Wispy sky"),
+  galJpeg("NIR_1665", "Framed by trees"),
+  galJpeg("magenta-woodland", "Woodland (D5300)"),
+  galJpeg("magenta-fir", "Dark fir (D5300)"),
+  galJpeg("magenta-hilltown", "Hillside town (D5300)"),
+  galJpeg("magenta-dusk-trees", "Dusk conifers (D5300)"),
+];
+
+const LESSONS: { title: string; expand: string[]; steps: string[] }[] = [
+  {
+    title: "Lesson 1 · White balance — the IR crux",
+    expand: ["fsWb"],
+    steps: [
+      "Tap different things in the photo — foliage, a cloud, the sky — each sets white balance from that point and the colors shift.",
+      "Auto (white balance + exposure) brings you back to the automatic starting point at any time.",
+      "For big moves, drag the Red / Green / Blue gain sliders. There's no 2000K floor here — that's the move ordinary editors can't make.",
+    ],
+  },
+  {
+    title: "Lesson 2 · Swap & Looks — the color world",
+    expand: ["fsSwap", "fsLooks"],
+    steps: [
+      "The R⇄B channel swap flips the whole color world in one tap — the classic infrared move.",
+      "Try the film Looks — Aerochrome, Aero Red, Goldie. Press a look twice to flip its built-in swap.",
+      "B&W IR and HIE B&W give the classic black-and-white infrared feel.",
+    ],
+  },
+  {
+    title: "Lesson 3 · Sky & clouds",
+    expand: ["fsMasks", "fsHueSat"],
+    steps: [
+      "In Masks, add a Sky mask — it finds the sky for you. Reach grows or tightens the selection; Feather softens the edge.",
+      "Now grade just the sky: brightness, contrast, saturation, warmth — the rest of the photo stays put.",
+      "Cloudy frame looking hazy? Dehaze (in Hue/Saturation/Tone) cuts the veil while keeping the colors honest.",
+    ],
+  },
+  {
+    title: "Lesson 4 · Color tools — broad to surgical",
+    expand: ["fsHueSat", "fsPerColor", "fsMixer"],
+    steps: [
+      "Broadest: Hue shift (in Hue/Saturation/Tone) rotates every color together — use it for big moves.",
+      "Per-color: drag the Sky hue slider — each box owns half the wheel and follows the swap.",
+      "Most surgical: the Color mixer. Tap “Pick color from photo”, tap the sky, then drag that chip's Hue and Saturation — only that color moves.",
+    ],
+  },
+  {
+    title: "Lesson 5 · Detail & finish",
+    expand: ["fsDenoise", "fsCurve", "fsExport"],
+    steps: [
+      "Denoise is set automatically from the photo — nudge the slider to taste (0 is none).",
+      "Shape the light with the Tone curve (Blacks → Highlights) and the overall Luminance.",
+      "When it's how you want it, Export & Save — pick the resolution on the way out.",
+    ],
+  },
+];
+
+let activeLesson = -1;
+
+/** Turn the on-photo lesson rail on or off. Keeps the flag so a Home round-trip
+ *  can restore the rail (and the open lesson) via returnToEditor. */
+function setLearnMode(on: boolean) {
+  learnMode = on;
+  stageEl.classList.toggle("learn", on);
+  lessonChips.hidden = !on;
+  if (on) {
+    lessonShow.hidden = true; // the chips replace the floating "?"
+  } else {
+    lesson.hidden = true;
+    lesson.style.top = ""; // restore the classic top for the DNG lessons
+    activeLesson = -1;
+    updateChipActive();
+  }
+}
+
+function updateChipActive() {
+  lessonChips.querySelectorAll<HTMLButtonElement>(".chip[data-lesson]").forEach((c) => {
+    c.classList.toggle("active", Number(c.dataset.lesson) === activeLesson);
+  });
+}
+
+/** Open (or, if already open, collapse) a lesson: fill the card, unfold exactly
+ *  the panels that lesson teaches, and light its chip. */
+function showLesson(i: number) {
+  if (activeLesson === i && !lesson.hidden) {
+    lesson.hidden = true;
+    activeLesson = -1;
+    updateChipActive();
+    return;
+  }
+  const L = LESSONS[i];
+  activeLesson = i;
+  ($("lessonTitle") as HTMLElement).textContent = L.title;
+  const ol = $("lessonSteps") as HTMLOListElement;
+  ol.replaceChildren(
+    ...L.steps.map((s) => {
+      const li = document.createElement("li");
+      li.textContent = s;
+      return li;
+    }),
+  );
+  document.querySelectorAll<HTMLFieldSetElement>("#panel fieldset").forEach((fs) => {
+    fs.classList.toggle("collapsed", !L.expand.includes(fs.id));
+  });
+  panel.scrollTop = 0;
+  updateScrollCues();
+  lesson.hidden = false;
+  lessonShow.hidden = true;
+  // Drop the card just below the chip rail (robust to the rail wrapping to two
+  // rows on a narrow screen).
+  lesson.style.top = `${lessonChips.offsetTop + lessonChips.offsetHeight + 8}px`;
+  updateChipActive();
+}
+
+// Build the chip rail once: a numbered chip per lesson + an Exit chip.
+LESSONS.forEach((L, i) => {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "chip";
+  b.dataset.lesson = String(i);
+  b.title = L.title;
+  b.innerHTML = `<span class="chip-n">${i + 1}</span>${L.title.split("·")[1]?.split("—")[0]?.trim() ?? "Lesson"}`;
+  b.addEventListener("click", () => showLesson(i));
+  lessonChips.appendChild(b);
+});
+{
+  const exit = document.createElement("button");
+  exit.type = "button";
+  exit.className = "chip chip-exit";
+  exit.textContent = "✕ Exit lessons";
+  exit.title = "Hide the lessons and edit this photo freely";
+  exit.addEventListener("click", () => setLearnMode(false));
+  lessonChips.appendChild(exit);
+}
+
+// Build the practice-gallery grid on the start screen.
+const galleryList = $("galleryList") as HTMLDivElement;
+GALLERY.forEach((g) => {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "gal";
+  b.innerHTML = `<img src="${g.thumb}" alt="" loading="lazy" /><span>${g.label}</span>`;
+  b.addEventListener("click", () => openGalleryPhoto(g.key));
+  galleryList.appendChild(b);
+});
+
+async function openGalleryPhoto(key: string) {
+  const tile = GALLERY.find((t) => t.key === key);
+  if (!tile) return;
+  // Like a tutorial, a practice photo is ephemeral — end any session first so
+  // its strip doesn't linger and storage stays in sync.
+  await resetSessionState(true);
+  updateSessionStrip();
+  showBusy("Loading photo…");
+  try {
+    const res = await fetch(tile.file);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    const ext = tile.kind === "dng" ? "dng" : "jpg";
+    const imported: ImportedFile = { name: `${key}.${ext}`, kind: tile.kind, bytes, looksTranscoded: false };
+    const img = await decode(imported);
+    showDecoded(img, imported); // sets a fresh view; clears learn mode
+    // Track it as a lone photo, matching openPicked's single-open path, so a
+    // later multi-pick can ask sensibly. activateCurrent runs establishFreshEdit.
+    sessionPhotos = [{ id: "lone", name: imported.name, kind: imported.kind, size: imported.bytes.length, edit: null, thumbUrl: "" }];
+    nextOrder = 0;
+    liveEdits.clear();
+    activateCurrent("lone");
+    // Some RAW examples need a fixed display rotation (the decoder can't infer
+    // it); apply it after the edit is established, then repaint.
+    if (tile.rotate) {
+      renderer.setRotation(tile.rotate);
+      draw();
+    }
+    updateSessionStrip();
+    // Now raise the lesson rail and open Lesson 1 (expands its panels last, so
+    // establishFreshEdit's fold-everything doesn't undo it).
+    setLearnMode(true);
+    showLesson(0);
+  } catch {
+    alert("Couldn't load that photo — it downloads on first use, so check your connection and try again. (Once loaded, everything works offline.)");
+  } finally {
+    hideBusy();
+  }
+}
 
 // Export & save to device.
 ui.exFormat.addEventListener("change", () => {

@@ -83,18 +83,8 @@
             <button id="a2hsInstall" type="button" hidden>Install app</button>
             <button id="a2hsClose" type="button" class="a2hs-close" aria-label="Dismiss">&#10005;</button>
           </div>
-          <p class="ex-title">&hellip;or learn by doing — tutorials &amp; examples:</p>
-          <div class="ex-list">
-            <button class="ex" data-ex="canopy" type="button">
-              <img src="./examples/canopy.png" alt="" /><span>Lesson 1 — Golden canopy<br /><small>Try the Looks</small></span>
-            </button>
-            <button class="ex" data-ex="lodge" type="button">
-              <img src="./examples/lodge.png" alt="" /><span>Lesson 2 — Motor lodge<br /><small>White balance &amp; denoise</small></span>
-            </button>
-            <button class="ex" data-ex="hillside" type="button">
-              <img src="./examples/hillside.png" alt="" /><span>Lesson 3 — Hillside &amp; sky<br /><small>Per-color grading</small></span>
-            </button>
-          </div>
+          <p class="ex-title">&hellip;or learn by doing — tap a practice photo and the numbered lessons ride along on the picture. The RAW ones unlock the full color magic.</p>
+          <div id="galleryList" class="gallery-list" aria-label="Practice photos"></div>
         </div>
         <div id="lesson" hidden>
           <h3 id="lessonTitle"></h3>
@@ -103,6 +93,10 @@
           <button id="lessonClose" type="button">Got it</button>
         </div>
         <button id="lessonShow" class="lesson-show" type="button" hidden>?</button>
+        <!-- Learn mode: the lessons ride on the photo as numbered chips. Tap a
+             number to open its card; the rail stays put so you can practice the
+             same lesson across different practice photos. Built in main.ts. -->
+        <div id="lessonChips" class="lesson-chips" hidden aria-label="Lessons"></div>
         <div id="sessionStrip" hidden aria-label="Photo session">
           <div class="session-head">
             <span id="sessionMeta"></span>

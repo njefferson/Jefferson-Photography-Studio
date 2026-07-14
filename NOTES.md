@@ -118,6 +118,65 @@ See **`PLAN.md`** for the full build plan.
 > reliable. Editing this list updates the app on the next deploy. Both the
 > roadmap and the patch notes (last commits) refresh automatically on push.
 
+- [x] **Learn on real photos — lessons ride on the picture** — owner ask
+  2026-07-14 (his framing: instead of dedicated tutorial photos, "lessons that
+  can be collapsed to 1, 2, 3 on top of the photo and when you touch them shows
+  lessons 1, 2, 3"). SHIPPED to staging 2026-07-14.
+  BACKSTORY: the owner had uploaded example IR frames that got stranded — 5 were
+  committed to branch `example-ir-photos` (PR #10), 15 more were only PR-body
+  attachments this session's egress policy (github.com/user-attachments → 403)
+  could not fetch. He re-uploaded the keepers directly. Teaching set started at
+  13, grew to 15, then trimmed to **14 low-res frames** in
+  `public/examples/gallery/` (1600 px long edge, q80; full-res originals never
+  enter the repo): 10 red-filter Z50 (forests, skies, a lakeside with contrails,
+  close-up foliage + two later foliage-texture adds NIR_1864/1866; 2 portrait) +
+  4 full-spectrum Nikon D5300 (lens-mounted IR filter, unknown wavelength) with a
+  magenta look and the only non-forest subject (urban hilltown; a night water
+  tower was in this set but was removed as the weakest teacher — owner call
+  2026-07-14).
+  Each carries a small bottom-right watermark (NJ mark + jefferson-photo-studio
+  .pages.dev over a scrim, corner-only, croppable) so shared frames point back
+  to the tool. PR #10 was CLOSED so its full-res originals never publish.
+  IMPLEMENTATION: a "learn mode" where a rail of numbered lesson chips ①–⑤ rides
+  on the photo (src/main.ts LESSONS/GALLERY; ir.html #lessonChips; .chip/.gallery
+  -list in style.css). A lesson is a SKILL not a scene, so it works on any frame
+  and reuses the existing #lesson card + panel-expand mechanism: 1 White balance,
+  2 Swap & Looks, 3 Sky & clouds, 4 Color tools, 5 Detail & finish. Tapping a
+  chip opens its card (positioned below the rail, robust to wrapping) and unfolds
+  exactly that lesson's panels; tapping the active chip or "Got it" collapses it,
+  chips stay. FOLLOW-UP (owner 2026-07-14): the 3 original DNG lesson cards were
+  REMOVED and FOLDED INTO the grid as three RAW tiles (Golden canopy · RAW / Motor
+  lodge · RAW / Hillside & sky · RAW, using their existing .png previews) so the
+  grid is the single teaching surface AND the true-RAW / sub-2000K crux (which an
+  8-bit JPEG can't show) is still taught. So GALLERY is 17 tiles = 3 RAW + 14
+  JPEG; openGalleryPhoto handles both (tile carries kind/file/thumb/rotate; RAW
+  tiles apply their fixed display rotation after the edit is established). The old
+  EXAMPLES map + loadExample + openImported + the .ex cards were deleted (dead).
+  "✕ Exit lessons" drops the rail to edit freely; Home hides the rail but keeps
+  learnMode so Back restores it. Gotcha fixed: the global `button { width: 100% }`
+  made the chips stack full-width — `.chip` needs `width:auto; flex:0 0 auto`.
+  WATERMARK (owner ask 2026-07-14): each low-res JPEG carries a small bottom-right
+  NJ mark + jefferson-photo-studio.pages.dev over a scrim, BAKED INTO the pixels
+  (so it survives into an exported/shared photo — an overlay wouldn't, and export-
+  stamping would be real work). It recolors with edits; owner OK'd that as the
+  cheap, correct trade (white text stays legible through swap/sat/hue). RAW tiles
+  are unwatermarked (can't bake into raw). Magenta-woodland was shot a quarter
+  turn off — corrected upright in the file (owner said teaching Rotate on a broken
+  frame was obtuse). Cache bumped ips-v26 → ips-v30 (frames added, then water tower cut).
+  VERIFIED headless (Chromium, negative-control proven — chips hidden on the
+  start screen, shown only after opening a practice photo; a wrong chip-count
+  expectation made the suite FAIL first): 13 gallery tiles; opening one raises
+  the editor + a 6-chip rail (5 lessons + Exit), auto-opens Lesson 1 with fsWb
+  expanded / fsMasks collapsed; chip 3 switches to Sky & clouds (fsMasks expands,
+  fsWb collapses, chip 3 marked active); chips sit compact and the card drops
+  below the rail; Home hides the rail, Back restores it; Exit keeps the photo but
+  drops the rail; no page errors. tsc + vite build clean; learn-mode screenshotted.
+  NEEDS THE OWNER'S HANDS on the iPad: the chip rail's feel over the photo
+  (landscape vs portrait wrap), tapping a lesson mid-edit, and whether the
+  watermark size/placement reads right. Optional gap noted: no true 720nm
+  near-monochrome frame, so the B&W IR / HIE B&W looks still teach on a colour
+  subject — add one if a white-forest frame turns up.
+
 - [x] **Pick your Home-Screen icon** — offer a small set of icon styles and let
   the user choose which one their installed app wears. Likely mechanism: a
   picker on the launcher/install flow that swaps the `apple-touch-icon` link
