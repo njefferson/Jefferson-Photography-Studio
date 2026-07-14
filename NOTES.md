@@ -204,6 +204,30 @@ See **`PLAN.md`** for the full build plan.
   upload store did NOT survive the restart either — only re-sent zips
   exist on disk; if a wave is uncommitted when the container dies, ask
   the owner to re-upload it.
+  TUTORIAL SET vs LIBRARY (owner call 2026-07-14, "cull down to a tutorial
+  set and set aside the full set as an example library"; his picks: 11
+  lesson tiles + variety extras, expander with group headers; cache
+  ips-v44 → ips-v45): the start screen now shows a 13-tile TUTORIAL SET
+  (the lesson-tagged pairs in lesson order + The playhouse + Lavender as
+  variety picks — `CORE` set in main.ts) and a "Browse the full library ·
+  53 photos" DASHED-PILL EXPANDER (#libraryToggle/#library in ir.html)
+  that unfolds the COMPLETE set — tutorial tiles included, one honest
+  whole — under six group headers (`LIBRARY_GROUPS`): Skies & clouds /
+  Lakeside forest / Campsite & shore / Backyard / The original RAW trio /
+  Full-spectrum D5300. Any tile missing from every group falls into a
+  trailing "More" section rather than vanishing (the verify suite asserts
+  "More" is EMPTY — a new tile must be added to a group or the suite
+  fails). Presentation-only: no tile data moved, openGalleryPhoto
+  unchanged, nothing deleted. Collapsed state is not remembered (fresh
+  visits start calm). GOTCHA note honoured: .library-toggle sets
+  width:auto against the global button width:100% rule (the chip-rail
+  lesson). VERIFIED headless 48/48 (fail-first re-proven): 13 tutorial
+  tiles, library hidden → opens → 53 tiles → collapses, honest count in
+  the toggle label, 6 headers, empty "More", all thumbs decode, all 13
+  tutorial tiles open on their lesson chips + render, one spot-check per
+  library group opens/renders (incl. Golden canopy proving galRaw's 3rd
+  arg is rotate, not lesson), no page errors. NEEDS THE OWNER'S HANDS:
+  whether 13 is the right cut, group naming, and the expander's feel.
   PIPELINE REBUILT this session (previous scratchpad was reclaimed):
   scratchpad `bin-dng.ts` + `test-bin-dng.ts`, rebuilt from this entry's
   spec + a byte-level dump of the shipped `public/examples/NIR_1675.dng`.
