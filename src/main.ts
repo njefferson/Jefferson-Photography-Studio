@@ -1015,7 +1015,7 @@ let hslPickArmed = false;
 function setHslPick(on: boolean) {
   hslPickArmed = on;
   hslPickBtn.setAttribute("aria-pressed", String(on));
-  if (on) { setTat(false); setColorPick(false); setHeal(false); } // picture tools are mutually exclusive
+  if (on) { setTat(false); setColorPick(false); setHeal(false); setHealReview(false); } // picture tools are mutually exclusive
 }
 hslPickBtn.addEventListener("click", () => setHslPick(!hslPickArmed));
 
@@ -1312,7 +1312,7 @@ function setColorPick(on: boolean) {
   colorPickArmed = on && !!m && m.type === 3;
   mUI.colorPick.setAttribute("aria-pressed", String(colorPickArmed));
   colorBanner.hidden = !colorPickArmed;
-  if (colorPickArmed) { setHslPick(false); setTat(false); setHeal(false); } // picture tools are exclusive
+  if (colorPickArmed) { setHslPick(false); setTat(false); setHeal(false); setHealReview(false); } // picture tools are exclusive
 }
 mUI.colorPick.addEventListener("click", () => setColorPick(!colorPickArmed));
 colorBanner.addEventListener("click", () => setColorPick(false)); // tap the banner to exit
@@ -1663,7 +1663,7 @@ function setTat(on: boolean) {
   // A standing banner (not the transient drag readout) makes it obvious the
   // canvas is in adjust mode and how to hand it back to tap-WB / pan / pinch.
   tatBanner.hidden = !on;
-  if (on) { setHslPick(false); setColorPick(false); setHeal(false); } // mutually exclusive with the other picture tools
+  if (on) { setHslPick(false); setColorPick(false); setHeal(false); setHealReview(false); } // mutually exclusive with the other picture tools
   if (!on) hideTatHud();
 }
 hslDragBtn.addEventListener("click", () => setTat(!tatArmed));
@@ -1750,6 +1750,8 @@ function endTat() {
 // there's no per-frame cost and denoise/sharpen see healed pixels too. ---
 const healBtn = $("healBtn") as HTMLButtonElement;
 const healBanner = $("healBanner") as HTMLButtonElement;
+const healReviewBanner = $("healReviewBanner") as HTMLButtonElement;
+const healReviewText = $("healReviewText") as HTMLSpanElement;
 const healOverlay = $("healOverlay") as unknown as SVGSVGElement;
 const healSize = $("healSize") as HTMLInputElement;
 const healVisBtn = $("healVis") as HTMLButtonElement;
@@ -1807,11 +1809,51 @@ function setHeal(on: boolean) {
   healArmed = on && !!current;
   healBtn.setAttribute("aria-pressed", String(healArmed));
   healBanner.hidden = !healArmed;
-  if (healArmed) { setHslPick(false); setColorPick(false); setTat(false); } // picture tools are exclusive
+  if (healArmed) { setHslPick(false); setColorPick(false); setTat(false); setHealReview(false); } // picture tools are exclusive
   positionHealOverlay();
 }
 healBtn.addEventListener("click", () => setHeal(!healArmed));
 healBanner.addEventListener("click", () => setHeal(false)); // tap the banner to exit
+
+// --- Auto-sweep REVIEW: after "Find spots automatically" the fixes are
+// ALREADY APPLIED — the rings are receipts to confirm, not a to-do list (the
+// owner read the first version as "places someone still has to touch",
+// 2026-07-14). So the sweep never arms heal mode; it shows solid rings + a ✓
+// banner: tap a ring to put that one back, tap the banner to keep them. ---
+let healReview = false;
+
+function setHealReview(on: boolean) {
+  healReview = on && !!current && (params.spots?.length ?? 0) > 0;
+  healReviewBanner.hidden = !healReview;
+  if (healReview) setHeal(false); // review is confirmation, not heal mode
+  positionHealOverlay();
+}
+healReviewBanner.addEventListener("click", () => setHealReview(false)); // keep them all
+
+/** A tap while reviewing an auto sweep: inside a ring = put that fix back;
+ *  anywhere else does nothing (never tap-WB mid-review — the banner is the
+ *  exit). Returns true when review consumed the tap. */
+function handleHealReviewTap(clientX: number, clientY: number): boolean {
+  if (!healReview) return false;
+  if (!current || !previewSrc) { setHealReview(false); return true; }
+  const [u, v] = renderer.clientToImageUv(clientX, clientY);
+  const W = previewSrc.width, H = previewSrc.height;
+  for (let i = params.spots.length - 1; i >= 0; i--) {
+    const s = params.spots[i];
+    if (Math.hypot((u - s.x) * W, (v - s.y) * H) <= s.r * W) {
+      params.spots.splice(i, 1);
+      if (activeSpotIdx === i) activeSpotIdx = -1;
+      else if (activeSpotIdx > i) activeSpotIdx--;
+      healReviewText.textContent = `${params.spots.length} spot${params.spots.length === 1 ? "" : "s"} healed`;
+      draw();
+      flushRecord(); // each put-back is one undo step
+      if (!params.spots.length) setHealReview(false);
+      positionHealOverlay();
+      return true;
+    }
+  }
+  return true;
+}
 
 function updateHealUI() {
   const n = params.spots?.length ?? 0;
@@ -1827,7 +1869,7 @@ function updateHealUI() {
 function positionHealOverlay() {
   if (activeSpotIdx >= (params.spots?.length ?? 0)) activeSpotIdx = -1; // undo can shrink the list
   const preview = healPreviewUntil > Date.now();
-  const show = healArmed && !!current && welcome.hidden && ((params.spots?.length ?? 0) > 0 || preview);
+  const show = (healArmed || healReview) && !!current && welcome.hidden && ((params.spots?.length ?? 0) > 0 || preview);
   healOverlay.toggleAttribute("hidden", !show);
   if (!show) {
     healOverlay.replaceChildren();
@@ -1847,7 +1889,7 @@ function positionHealOverlay() {
     c.setAttribute("class", cls);
     kids.push(c);
   };
-  params.spots.forEach((s, i) => ring(s.x, s.y, s.r, i === activeSpotIdx ? "heal-spot heal-active" : "heal-spot"));
+  params.spots.forEach((s, i) => ring(s.x, s.y, s.r, healReview ? "heal-spot heal-done" : i === activeSpotIdx ? "heal-spot heal-active" : "heal-spot"));
   if (preview && activeSpotIdx < 0) {
     // Preview at the middle of what's on screen (zoom-aware), sized like the
     // next tap. Only when no spot is active — the active ring IS the preview.
@@ -1926,6 +1968,7 @@ healClearBtn.addEventListener("click", () => {
   if (!params.spots.length) return;
   params.spots = [];
   activeSpotIdx = -1;
+  setHealReview(false);
   updateHealUI();
   positionHealOverlay();
   draw();
@@ -1957,7 +2000,8 @@ healAutoBtn.addEventListener("click", () => {
       if (!added) healStatus.textContent = "No obvious dust found. Try Visualize spots, then tap anything you see.";
       if (added) {
         activeSpotIdx = -1; // finds are reviewed by ring, not slider-resized en masse
-        setHeal(true); // show the rings so each find can be reviewed/removed
+        healReviewText.textContent = `${added} spot${added === 1 ? "" : "s"} healed`;
+        setHealReview(true); // fixes are DONE — rings + ✓ banner confirm them
         draw();
         flushRecord(); // the whole pass is one undo step
         positionHealOverlay();
@@ -2184,6 +2228,7 @@ function establishFreshEdit() {
   params.spots = [];
   activeSpotIdx = -1;
   setHeal(false);
+  setHealReview(false);
   renderer.spotVis = false;
   healVisBtn.setAttribute("aria-pressed", "false");
   updateHealUI();
@@ -2833,6 +2878,10 @@ const GALLERY: GalleryTile[] = [
   galRaw("canopy", "Golden canopy · RAW", 3),
   galRaw("lodge", "Motor lodge · RAW", 3),
   galRaw("hillside", "Hillside & sky · RAW"),
+  // 2x2-binned half-res DNG from the owner's NEF (10 MB, under the 25 MB
+  // Pages limit) — the dust-lesson frame in true RAW; orientation rides in
+  // the file, and its thumb is shared with the JPEG tile.
+  { key: "NIR_1675-raw", label: "Lakeside & dust · RAW", kind: "dng", file: "./examples/NIR_1675.dng", thumb: "./examples/gallery/thumbs/NIR_1675.jpg" },
   galJpeg("NIR_1701", "White forest"),
   galJpeg("NIR_1706", "Forest & snag"),
   galJpeg("NIR_1716", "Swirling sky"),
@@ -2905,7 +2954,7 @@ const LESSONS: { title: string; tab: PanelTab; steps: string[] }[] = [
     tab: "basic",
     steps: [
       "Tap Visualize spots (in Basic) — a high-contrast view where sensor dust jumps out of flat skies. Try it on the Lakeside & sensor dust photo: that big smudge is real.",
-      "Tap Find spots automatically — every fix it makes gets a ring. Tap any ring to take that one fix back.",
+      "Tap Find spots automatically — it heals what it finds and rings every fix for review. Tap a ring to put that one back, or the ✓ banner to keep them all.",
       "For a spot it missed: arm Heal spots, pinch in close, and tap the mote. The newest fix keeps a highlighted ring, and Spot size resizes it live until it disappears.",
       "Heals belong to this photo and ride into every export — they never sneak into saved looks or batch runs.",
     ],
@@ -3587,6 +3636,7 @@ canvas.addEventListener("click", (e) => {
     return;
   }
   // Armed picks eat the tap (they must NOT also set white balance).
+  if (handleHealReviewTap(e.clientX, e.clientY)) return;
   if (handleHealTap(e.clientX, e.clientY)) return;
   if (handleColorMaskPick(e.clientX, e.clientY)) return;
   if (handleHslPick(e.clientX, e.clientY)) return;

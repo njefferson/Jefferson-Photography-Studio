@@ -319,13 +319,44 @@ See **`PLAN.md`** for the full build plan.
   OWNER'S UPCOMING PLAN (2026-07-14): he will add RAW VERSIONS of all library
   frames. HARD CONSTRAINT to plan around: **Cloudflare Pages refuses files
   over 25 MB** — NIR_1675.NEF is 28.8 MB, so raw NEFs cannot deploy as-is.
-  Two honest paths: (a) Adobe DNG Converter lossy-linear output (smaller,
-  decodes natively); (b) bin the Bayer mosaic 2×2 in-house to a half-res
-  uncompressed DNG (~10 MB, Compression=1 which dngRaw.ts already reads;
-  2×2 same-colour binning preserves the CFA phase, and optical dust survives
-  binning untouched — the decoder halves again for preview, so verify
-  detection at the resulting scale before shipping). Also remember: Z50 II
-  High-Efficiency NEFs don't decode at all — his Z50 classics are fine.
+  OWNER CHOSE BINNING ("You bin it", 2026-07-14) — PIPELINE BUILT AND FIRST
+  FILE SHIPPED (cache ips-v38 → ips-v39): scratchpad `bin-dng.ts` reads the
+  NEF with the app's own decoder (readNefCfa), bins the Bayer mosaic 2×2
+  SAME-COLOUR (output phase (x&1,y&1) averages the four same-phase pixels of
+  the matching 4×4 block — CFA phase preserved, optical dust untouched, noise
+  halved), and writes a minimal little-endian uncompressed DNG (Compression 1
+  — the dngRaw.ts path our bundled examples already use; single strip, 16-bit;
+  tags 254/256/257/258/259/262/274(orientation from the NEF)/277/278/33421/
+  33422(pattern)/50706/50714(black 1008)/50717(white 15520)/50721(Z50 colour
+  matrix as SRATIONAL×10000)). NIR_1675.dng: 2800×1864, 10.4 MB. It's now the
+  4th RAW tile "Lakeside & dust · RAW" (GALLERY = 19 tiles = 4 RAW + 15 JPEG;
+  thumb shared with the JPEG tile; rotation rides in the DNG's own tag 274 so
+  the tile needs no rotate field). VERIFIED: decodes through the normal app
+  path (1400×932 preview), no CFA-phase artifacts, the real smudge is the TOP
+  find at exactly (1232,400) = the NEF coords ÷2 — binning RAISED its
+  signal-to-noise — and the in-app round trip (open tile → Find spots → rings
+  + review) passes headless. Use the same script for the rest of his RAW
+  uploads. Also remember: Z50 II High-Efficiency NEFs don't decode at all —
+  his Z50 classics are fine.
+  AUTO-SWEEP REVIEW MODE (owner feedback 2026-07-14: the rings read as
+  "places someone still has to touch", and "the tap-to-heal menu shouldn't
+  open unless someone is doing a manual tap to heal"; cache bump shared with
+  the binning ship): "Find spots automatically" no longer arms heal mode.
+  The fixes are already applied when the sweep ends, and the UI now SAYS so:
+  SOLID accent rings (class heal-done — receipts, not the dashed to-do style)
+  plus a "✓ N spots healed" banner — tap a ring to put that one fix back
+  (one undo step each, never tap-WB mid-review), tap the banner to keep them
+  all (rings retire; heals stay). Review is a state (healReview +
+  setHealReview), mutually exclusive with the picture tools, cleared by fresh
+  opens/Clear-all/arming heal manually, and dismisses itself when the last
+  ring is put back. The heal-mode banner now appears ONLY when the owner arms
+  Heal spots himself. Lesson 6 step 2 and the Help line reworded to match.
+  VERIFIED headless: lesson suite grown to 21/21 (sweep → solid rings +
+  review banner, heal button stays un-pressed and its banner closed, ring-tap
+  drops exactly one fix, banner-tap retires rings but keeps the heals, the
+  known smudge still ringed, RAW-tile round trip) + main UI suite still green
+  (its sweep found 10 faint spots on a practice frame and the review path
+  handled them).
 - [x] **Learn on real photos — lessons ride on the picture** — owner ask
   2026-07-14 (his framing: instead of dedicated tutorial photos, "lessons that
   can be collapsed to 1, 2, 3 on top of the photo and when you touch them shows

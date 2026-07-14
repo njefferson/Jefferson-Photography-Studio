@@ -424,7 +424,8 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 /* Standing "mode is on" banners — tappable to exit; accent-filled pills. */
 #tatBanner,
 #colorBanner,
-#healBanner {
+#healBanner,
+#healReviewBanner {
   position: absolute;
   top: 16px;
   left: 50%;
@@ -450,18 +451,19 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 }
 #tatBanner .tat-banner-off,
 #colorBanner .tat-banner-off,
-#healBanner .tat-banner-off {
+#healBanner .tat-banner-off,
+#healReviewBanner .tat-banner-off {
   font-size: 11px;
   font-weight: 500;
   opacity: 0.85;
 }
 /* The colour-pick and heal banners sit at the BOTTOM (top taps hit the sky —
    a prime pick target AND where dust shows worst; a top banner ate those taps). */
-#colorBanner, #healBanner { top: auto; bottom: 16px; }
+#colorBanner, #healBanner, #healReviewBanner { top: auto; bottom: 16px; }
 @media (max-width: 760px) {
-  #tatBanner, #colorBanner, #healBanner { top: 10px; padding: 6px 13px; font-size: 12px; }
-  #tatBanner .tat-banner-off, #colorBanner .tat-banner-off, #healBanner .tat-banner-off { font-size: 10px; }
-  #colorBanner, #healBanner { top: auto; bottom: 10px; }
+  #tatBanner, #colorBanner, #healBanner, #healReviewBanner { top: 10px; padding: 6px 13px; font-size: 12px; }
+  #tatBanner .tat-banner-off, #colorBanner .tat-banner-off, #healBanner .tat-banner-off, #healReviewBanner .tat-banner-off { font-size: 10px; }
+  #colorBanner, #healBanner, #healReviewBanner { top: auto; bottom: 10px; }
 }
 #hint { color: var(--txt-2); text-align: center; max-width: 40ch; margin: 0 auto; }
 #welcome {
@@ -552,7 +554,7 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   bottom: calc(20px + var(--session-h, 110px));
   max-height: calc(100% - 32px - var(--session-h, 110px));
 }
-#stage.has-session #colorBanner, #stage.has-session #healBanner { bottom: calc(24px + var(--session-h, 110px)); }
+#stage.has-session #colorBanner, #stage.has-session #healBanner, #stage.has-session #healReviewBanner { bottom: calc(24px + var(--session-h, 110px)); }
 #sessionStrip {
   position: absolute;
   left: 12px;
@@ -1054,6 +1056,9 @@ label.open-btn, label.bar-btn {
 /* Transient centre ring while the size slider moves with nothing active:
    shows how big the next tap will heal. */
 #healOverlay .heal-preview { stroke: var(--accent); stroke-dasharray: 2 3; opacity: 0.9; }
+/* Review rings after an automatic sweep: SOLID — these fixes are DONE, the
+   ring is a receipt to confirm or take back, not a to-do marker. */
+#healOverlay .heal-done { stroke: var(--accent); stroke-width: 2; stroke-dasharray: none; }
 #maskOverlay .mask-shape { fill: rgba(120, 200, 255, 0.06); stroke: rgba(130, 205, 255, 0.9); stroke-width: 1.5; stroke-dasharray: 6 4; }
 #maskOverlay .mask-line { stroke: rgba(130, 205, 255, 0.9); stroke-width: 1.5; stroke-dasharray: 6 4; }
 #maskOverlay .mask-handle { fill: rgba(12, 12, 16, 0.72); stroke: #82cdff; stroke-width: 2; pointer-events: auto; cursor: grab; touch-action: none; }

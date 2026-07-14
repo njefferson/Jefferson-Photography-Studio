@@ -73,6 +73,10 @@
           Heal mode &mdash; tap a dust spot to fix it
           <span class="tat-banner-off">tap a healed spot to remove its fix &middot; tap here to exit</span>
         </button>
+        <button id="healReviewBanner" type="button" hidden>
+          &#10003; <span id="healReviewText">Spots healed</span>
+          <span class="tat-banner-off">tap a ring to put that one back &middot; tap here to keep them</span>
+        </button>
         <button id="colorBanner" type="button" hidden>
           <span>&#127919; Colour mask — tap the photo to pick the colour to match</span>
           <span class="tat-banner-off">Tap again to re-pick &middot; tap here when done</span>
@@ -492,7 +496,7 @@
           <li><strong>Sharpen</strong> &amp; <strong>Texture</strong> (Basic) — Sharpen crisps fine edges; Texture works the mid-size surface structure (left smooths it). Both are luminance-only, so colors never shift.</li>
           <li><strong>Tone curve + Luminance</strong> — the curve shapes blacks through highlights; Luminance lifts or drops the whole image without clipping either end.</li>
           <li><strong>Masks</strong> — radial, gradient, or painted brush: local adjustments for one area only. Masks belong to the photo; saved looks stay portable.</li>
-          <li><strong>Dust &amp; spots</strong> (Basic) — arm <em>Heal spots</em> and tap a dust mote: it's patched from clean pixels nearby, in the preview and the export alike. <em>Visualize spots</em> makes dust jump out of flat skies; <em>Find spots automatically</em> sweeps the smooth areas for you. Heals belong to the photo — they never ride in saved looks, profiles or a batch.</li>
+          <li><strong>Dust &amp; spots</strong> (Basic) — arm <em>Heal spots</em> and tap a dust mote: it's patched from clean pixels nearby, in the preview and the export alike. <em>Visualize spots</em> makes dust jump out of flat skies; <em>Find spots automatically</em> sweeps the smooth areas, heals what it finds, and rings every fix for review &mdash; tap a ring to put that one back. Heals belong to the photo — they never ride in saved looks, profiles or a batch.</li>
           <li><strong>IR lens fixes</strong> — pulls down the center hot-spot IR-converted lenses produce, and corrects (or adds) corner vignette.</li>
         </ul>
 
