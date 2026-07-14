@@ -853,32 +853,6 @@ label.open-btn, label.bar-btn {
 .gal img { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; display: block; }
 .gal span { display: block; padding: 6px 8px; font-size: 12px; color: var(--txt); line-height: 1.3; }
 .gal:active { border-color: var(--accent); }
-/* Full-library expander. width:auto guards against the global button
-   width:100% rule (the chip-rail lesson). */
-.library-toggle {
-  display: block;
-  width: auto;
-  flex: 0 0 auto;
-  margin: 14px auto 0;
-  padding: 8px 16px;
-  background: none;
-  border: 1px dashed var(--line);
-  border-radius: 999px;
-  color: var(--txt);
-  opacity: 0.85;
-  font-size: 13px;
-  cursor: pointer;
-}
-.library-toggle:active { border-color: var(--accent); }
-.lib-group {
-  max-width: 760px;
-  margin: 18px auto 8px;
-  font-size: 13px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--txt);
-  opacity: 0.65;
-}
 
 /* Learn mode: numbered lesson chips pinned on the photo. */
 .lesson-chips {

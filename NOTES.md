@@ -226,8 +226,19 @@ See **`PLAN.md`** for the full build plan.
   the toggle label, 6 headers, empty "More", all thumbs decode, all 13
   tutorial tiles open on their lesson chips + render, one spot-check per
   library group opens/renders (incl. Golden canopy proving galRaw's 3rd
-  arg is rotate, not lesson), no page errors. NEEDS THE OWNER'S HANDS:
-  whether 13 is the right cut, group naming, and the expander's feel.
+  arg is rotate, not lesson), no page errors.
+  LIBRARY UI REMOVED same day (owner on-device verdict, escalating from
+  "they don't have to collapse" to "It doesn't HAVE to BE THERE" — read
+  the second message before acting on the first; cache ips-v45 → ips-v46):
+  the start screen is now ONLY the 13-tile tutorial set. The expander,
+  #library, LIBRARY_GROUPS and the group-header CSS were deleted. The 40
+  non-core GALLERY entries REMAIN in data and their DNGs REMAIN deployed
+  (~420 MB of currently-unreachable files) — "set aside as an example
+  library" pending a home the owner actually wants (options: a page of
+  its own, inside Help, or trimming the files from deploy entirely — HIS
+  call, don't rebuild unprompted). Verified 31/31 headless: 13 tiles, no
+  library element anywhere, all 13 open on their lesson chips and render,
+  no page errors.
   PIPELINE REBUILT this session (previous scratchpad was reclaimed):
   scratchpad `bin-dng.ts` + `test-bin-dng.ts`, rebuilt from this entry's
   spec + a byte-level dump of the shipped `public/examples/NIR_1675.dng`.
