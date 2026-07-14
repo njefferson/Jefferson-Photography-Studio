@@ -16,6 +16,7 @@ const work = $("work");
 const filmstrip = $("filmstrip");
 const resultCanvas = $("result") as HTMLCanvasElement;
 const viewHint = $("viewHint");
+const statusPill = $("statusPill");
 const stackBtn = $("stackBtn") as HTMLButtonElement;
 const compareBtn = $("compareBtn") as HTMLButtonElement;
 const saveBtn = $("saveBtn") as HTMLButtonElement;
@@ -95,6 +96,8 @@ function reset() {
   intake.hidden = false;
   compareBtn.hidden = true;
   saveBtn.hidden = true;
+  resetBtn.hidden = true; // "New set" lives in the top bar, only during work
+  statusPill.hidden = true;
   fullBlob = null;
   status.textContent = "";
   filesInput.value = "";
@@ -112,6 +115,8 @@ async function loadFiles(list: FileList | File[]) {
   frames = picked.map((f) => ({ blob: f, name: f.name, url: URL.createObjectURL(f) }));
   intake.hidden = true;
   work.hidden = false;
+  resetBtn.hidden = false; // reveal "New set" in the top bar while working
+  statusPill.hidden = true;
   viewHint.hidden = false;
   viewHint.textContent = "Tap Stack to combine the set. Tap a frame to inspect it; tap it again to turn it off.";
   await buildFilmstrip();
@@ -174,8 +179,12 @@ async function runStack() {
     drawImageData(result);
     const moved = res.shifts.filter((s) => s.dx || s.dy).length;
     const secs = ((performance.now() - t0) / 1000).toFixed(1);
-    const off = excluded.size;
-    status.textContent = `Stacked ${active.length} frames in ${secs}s` + (off ? ` (${off} off)` : "") + (moved ? ` · aligned ${moved} frame${moved > 1 ? "s" : ""}.` : " · no alignment needed.");
+    status.textContent = `${active.length} of ${frames.length} frames · done in ${secs}s` + (moved ? ` · aligned ${moved}` : "");
+    // Result-viewer HUD: a status pill (top-left) + a compare hint (bottom).
+    statusPill.hidden = false;
+    statusPill.textContent = `✓ Stacked · ${active.length} frames`;
+    viewHint.hidden = false;
+    viewHint.textContent = "Press & hold to compare with a single frame";
     compareBtn.hidden = false;
     saveBtn.hidden = false;
     markSaveNeedsRender(); // a new stack invalidates any prior full-res render

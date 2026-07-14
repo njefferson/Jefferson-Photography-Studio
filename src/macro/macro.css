@@ -133,6 +133,7 @@ body {
 .intake-card.drag { border-color: #ff5e7e; background: var(--accent-soft); }
 /* Nested rotated-squares glyph (CSS only), macro identity. */
 .macro-glyph {
+  display: block;
   position: relative;
   width: 64px; height: 64px;
   margin: 0 auto 1.1rem;
