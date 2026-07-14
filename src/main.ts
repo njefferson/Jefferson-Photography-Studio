@@ -27,6 +27,9 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 const canvas = $("view") as HTMLCanvasElement;
 const hint = $("hint") as HTMLParagraphElement;
 const panel = $("panel") as HTMLElement;
+const panelBody = $("panelBody") as HTMLElement;
+const cueUp = $("panelUp") as HTMLDivElement;
+const cueDown = $("panelDown") as HTMLDivElement;
 const fileInput = $("file") as HTMLInputElement;
 
 // No WebGL2 -> a clear explanation with options instead of a blank page. The
@@ -854,18 +857,53 @@ $("toneReset").addEventListener("click", () => {
   flushRecord();
 });
 
-// Collapsible panel sections: tap a title to fold/unfold. Everything starts
-// minimized so the panel reads as a tidy table of contents.
-document.querySelectorAll<HTMLFieldSetElement>("#panel fieldset").forEach((fs) => {
-  const legend = fs.querySelector("legend");
-  if (!legend) return;
-  legend.classList.add("collapsible");
-  fs.classList.add("collapsed");
-  legend.addEventListener("click", () => {
-    fs.classList.toggle("collapsed");
-    updateScrollCues();
+// --- Sectioned tab panel: six segmented tabs, one section of controls each.
+// The active tab is remembered per session so reopening lands where you left.
+const PANEL_TABS = ["basic", "ir", "color", "tone", "masks", "export"] as const;
+type PanelTab = (typeof PANEL_TABS)[number];
+const TAB_META: Record<PanelTab, { name: string; sub: string }> = {
+  basic: { name: "Basic", sub: "White balance, exposure & noise" },
+  ir: { name: "IR", sub: "Channel swap, looks & lens fixes" },
+  color: { name: "Color", sub: "Hue, per-color & the mixer" },
+  tone: { name: "Tone", sub: "Curve, luminance & bands" },
+  masks: { name: "Masks", sub: "Local, area-only adjustments" },
+  export: { name: "Export", sub: "Save, my looks & profiles" },
+};
+const panelTabsEl = $("panelTabs") as HTMLElement;
+const sectionTitleEl = $("sectionTitle") as HTMLElement;
+const sectionSubEl = $("sectionSub") as HTMLElement;
+const panelSections = Array.from(panelBody.querySelectorAll<HTMLElement>(".section"));
+const panelTabBtns = Array.from(panelTabsEl.querySelectorAll<HTMLButtonElement>(".ptab"));
+
+function setPanelTab(tab: PanelTab) {
+  if (!PANEL_TABS.includes(tab)) return;
+  panelSections.forEach((s) => (s.hidden = s.dataset.tab !== tab));
+  panelTabBtns.forEach((b) => {
+    const on = b.dataset.tab === tab;
+    b.classList.toggle("active", on);
+    b.setAttribute("aria-selected", String(on));
   });
-});
+  sectionTitleEl.textContent = TAB_META[tab].name;
+  sectionSubEl.textContent = TAB_META[tab].sub;
+  panelBody.scrollTop = 0;
+  try {
+    localStorage.setItem("ir-panel-tab", tab);
+  } catch {
+    /* private mode — tab just isn't remembered across reloads */
+  }
+  updateScrollCues();
+}
+panelTabBtns.forEach((b) => b.addEventListener("click", () => setPanelTab(b.dataset.tab as PanelTab)));
+// Restore the last-used tab (default Basic).
+{
+  let saved: string | null = null;
+  try {
+    saved = localStorage.getItem("ir-panel-tab");
+  } catch {
+    /* ignore */
+  }
+  setPanelTab((saved && (PANEL_TABS as readonly string[]).includes(saved) ? saved : "basic") as PanelTab);
+}
 
 for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.dn, ui.hue, ui.sat, ui.con, ui.glow, ui.lum,
   ui.hotspot, ui.hotspotSize, ui.vignette, ui.clarity, ui.dehaze,
@@ -1045,6 +1083,7 @@ function addMask(type: 0 | 1 | 2 | 3 | 4) {
   if (type === 4) regenerateSkyMask(m); // detect the sky now (fills m.brush)
   params.masks.push(m);
   selectedMask = params.masks.length - 1;
+  setPanelTab("masks"); // reveal the just-created mask's editor in its own tab
   updateMaskUI();
   renderMaskOverlay();
   if (type === 3) setColorPick(true); // arm the tap-to-pick target immediately
@@ -1504,19 +1543,17 @@ for (const ev of ["pointerup", "pointercancel", "pointerleave"] as const) {
 }
 
 // Panel scroll cues: arrows appear when there is more panel above/below.
-const cueUp = $("panelUp") as HTMLDivElement;
-const cueDown = $("panelDown") as HTMLDivElement;
 function updateScrollCues() {
   if (panel.hidden) {
     cueUp.hidden = true;
     cueDown.hidden = true;
     return;
   }
-  const max = panel.scrollHeight - panel.clientHeight;
-  cueUp.hidden = panel.scrollTop < 12;
-  cueDown.hidden = max <= 0 || panel.scrollTop > max - 12;
+  const max = panelBody.scrollHeight - panelBody.clientHeight;
+  cueUp.hidden = panelBody.scrollTop < 12;
+  cueDown.hidden = max <= 0 || panelBody.scrollTop > max - 12;
 }
-panel.addEventListener("scroll", updateScrollCues, { passive: true });
+panelBody.addEventListener("scroll", updateScrollCues, { passive: true });
 window.addEventListener("resize", updateScrollCues);
 window.addEventListener("resize", positionMaskOverlay);
 
@@ -1870,9 +1907,8 @@ function establishFreshEdit() {
   };
   activeLook = null;
   updateLookUI();
-  // Tidy the panel for the new photo: everything folded, scrolled to the top.
-  document.querySelectorAll<HTMLFieldSetElement>("#panel fieldset").forEach((fs) => fs.classList.add("collapsed"));
-  panel.scrollTop = 0;
+  // Tidy the panel for the new photo: scroll the current section to the top.
+  panelBody.scrollTop = 0;
   // Masks are composition-specific — never carry them to a new photo.
   params.masks = [];
   selectedMask = -1;
@@ -2539,10 +2575,10 @@ const GALLERY: GalleryTile[] = [
   galJpeg("magenta-dusk-trees", "Dusk conifers (D5300)"),
 ];
 
-const LESSONS: { title: string; expand: string[]; steps: string[] }[] = [
+const LESSONS: { title: string; tab: PanelTab; steps: string[] }[] = [
   {
     title: "Lesson 1 · White balance — the IR crux",
-    expand: ["fsWb"],
+    tab: "basic",
     steps: [
       "Tap different things in the photo — foliage, a cloud, the sky — each sets white balance from that point and the colors shift.",
       "Auto (white balance + exposure) brings you back to the automatic starting point at any time.",
@@ -2551,7 +2587,7 @@ const LESSONS: { title: string; expand: string[]; steps: string[] }[] = [
   },
   {
     title: "Lesson 2 · Swap & Looks — the color world",
-    expand: ["fsSwap", "fsLooks"],
+    tab: "ir",
     steps: [
       "The R⇄B channel swap flips the whole color world in one tap — the classic infrared move.",
       "Try the film Looks — Aerochrome, Aero Red, Goldie. Press a look twice to flip its built-in swap.",
@@ -2560,29 +2596,29 @@ const LESSONS: { title: string; expand: string[]; steps: string[] }[] = [
   },
   {
     title: "Lesson 3 · Sky & clouds",
-    expand: ["fsMasks", "fsHueSat"],
+    tab: "masks",
     steps: [
       "In Masks, add a Sky mask — it finds the sky for you. Reach grows or tightens the selection; Feather softens the edge.",
       "Now grade just the sky: brightness, contrast, saturation, warmth — the rest of the photo stays put.",
-      "Cloudy frame looking hazy? Dehaze (in Hue/Saturation/Tone) cuts the veil while keeping the colors honest.",
+      "Cloudy frame looking hazy? Dehaze (in the Color tab) cuts the veil while keeping the colors honest.",
     ],
   },
   {
     title: "Lesson 4 · Color tools — broad to surgical",
-    expand: ["fsHueSat", "fsPerColor", "fsMixer"],
+    tab: "color",
     steps: [
-      "Broadest: Hue shift (in Hue/Saturation/Tone) rotates every color together — use it for big moves.",
+      "Broadest: Hue shift (top of the Color tab) rotates every color together — use it for big moves.",
       "Per-color: drag the Sky hue slider — each box owns half the wheel and follows the swap.",
       "Most surgical: the Color mixer. Tap “Pick color from photo”, tap the sky, then drag that chip's Hue and Saturation — only that color moves.",
     ],
   },
   {
     title: "Lesson 5 · Detail & finish",
-    expand: ["fsDenoise", "fsCurve", "fsExport"],
+    tab: "tone",
     steps: [
-      "Denoise is set automatically from the photo — nudge the slider to taste (0 is none).",
+      "Denoise (in the Basic tab) is set automatically from the photo — nudge the slider to taste (0 is none).",
       "Shape the light with the Tone curve (Blacks → Highlights) and the overall Luminance.",
-      "When it's how you want it, Export & Save — pick the resolution on the way out.",
+      "When it's how you want it, go to Export and Export & Save — pick the resolution on the way out.",
     ],
   },
 ];
@@ -2631,10 +2667,9 @@ function showLesson(i: number) {
       return li;
     }),
   );
-  document.querySelectorAll<HTMLFieldSetElement>("#panel fieldset").forEach((fs) => {
-    fs.classList.toggle("collapsed", !L.expand.includes(fs.id));
-  });
-  panel.scrollTop = 0;
+  // Open the panel tab this lesson works in (the steps name where the rest
+  // lives when a lesson spans more than one section).
+  setPanelTab(L.tab);
   updateScrollCues();
   lesson.hidden = false;
   lessonShow.hidden = true;
