@@ -70,6 +70,16 @@ export interface EditParams {
    *  white-airlight renormalisation — + removes haze, - adds it. Same spatial
    *  caveats as clarity. */
   dehaze: number;
+  /** Sharpen 0..1: capture sharpening — a HIGH-frequency luminance high-pass
+   *  folded back as a hue-preserving gain, on LINEAR data after denoise. A
+   *  neighbourhood op (needs pixel taps), so it lives in the pre-pass, NOT in
+   *  compileEdit's per-pixel math (raw/detail.ts + the shader's u_sharpen
+   *  block) — and is therefore skipped in the .cube/.dcp LUT, like denoise. */
+  sharpen: number;
+  /** Texture -1..1: MID-frequency local contrast (a band-pass between the two
+   *  detail blurs) — + brings out surface structure, - smooths it. Same
+   *  hue-preserving, spatial, pre-pass caveats as `sharpen`. */
+  texture: number;
 }
 
 /** Per-image low-res reference maps for clarity/dehaze: blurred luminance (R)

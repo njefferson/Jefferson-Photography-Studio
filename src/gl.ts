@@ -73,6 +73,8 @@ uniform float u_localScale;   // linear decode scale for u_localTex
 uniform bool u_hslOn;        // 8-channel HSL mixer active
 uniform vec3 u_hsl[8];       // per band: (hueShiftDeg, satScale, lumScale)
 uniform float u_denoise; // 0..1 bilateral strength (see raw/denoise.ts)
+uniform float u_sharpen; // 0..1 capture sharpening (high-freq) — see raw/detail.ts
+uniform float u_texture; // -1..1 mid-freq local contrast — see raw/detail.ts
 uniform vec2 u_texel;    // 1/textureSize
 uniform float u_split;   // compare divider: denoise applies where uv.x >= split
 
@@ -181,6 +183,35 @@ void main() {
       }
     }
     c = sum / wsum;
+  }
+
+  // Detail: sharpen (high-freq) + texture (mid-freq) on LINEAR data, after
+  // denoise and before WB — a hue-preserving luminance gain from two Gaussian
+  // blurs of the neighbourhood luma. Same math + constants as raw/detail.ts
+  // (R=3, sigma 1.0/2.0 -> 2*sigma^2 = 2.0/8.0; KS=2.2, KT=2.4, EPS=0.05).
+  if (u_sharpen > 0.0 || u_texture != 0.0) {
+    // Snap to the exact texel CENTRE so LINEAR filtering returns whole texels —
+    // otherwise sub-texel drift in the interpolated v_uv, amplified by the
+    // unsharp gain at hard edges, breaks GPU==CPU parity (the CPU indexes
+    // integer pixels). Matches raw/detail.ts's exact-pixel neighbourhood.
+    vec2 ctr = (floor(v_uv / u_texel) + 0.5) * u_texel;
+    float sumS = 0.0, sumT = 0.0, wsumS = 0.0, wsumT = 0.0, Lc = 0.0;
+    for (int dy = -3; dy <= 3; dy++) {
+      for (int dx = -3; dx <= 3; dx++) {
+        float L = dot(fetchLin(ctr + vec2(float(dx), float(dy)) * u_texel), LUMA_W);
+        if (dx == 0 && dy == 0) Lc = L;
+        float d2 = float(dx * dx + dy * dy);
+        float wS = exp(-d2 / 2.0);
+        float wT = exp(-d2 / 8.0);
+        sumS += L * wS; wsumS += wS;
+        sumT += L * wT; wsumT += wT;
+      }
+    }
+    float blurS = sumS / wsumS;
+    float blurT = sumT / wsumT;
+    float hp = 2.2 * u_sharpen * (Lc - blurS) + 2.4 * u_texture * (blurS - blurT);
+    float gain = clamp(1.0 + hp / (Lc + 0.05), 0.25, 3.0);
+    c *= gain;
   }
 
   // Clarity / Dehaze on LINEAR source data (after denoise, before exposure/WB),
@@ -371,7 +402,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_toneTex", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_toneTex", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -549,6 +580,8 @@ export class Renderer {
     gl.uniform1i(this.loc.u_tex, 0);
     gl.uniform1i(this.loc.u_readMode, readMode);
     gl.uniform1f(this.loc.u_denoise, p.denoise);
+    gl.uniform1f(this.loc.u_sharpen, p.sharpen ?? 0);
+    gl.uniform1f(this.loc.u_texture, p.texture ?? 0);
     gl.uniform3f(this.loc.u_tint, p.tint[0], p.tint[1], p.tint[2]);
     gl.uniform3f(this.loc.u_sky, p.sky[0], p.sky[1], p.sky[2]);
     gl.uniform3f(this.loc.u_fol, p.foliage[0], p.foliage[1], p.foliage[2]);

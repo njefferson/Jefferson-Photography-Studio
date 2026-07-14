@@ -9,6 +9,7 @@ import { readNefCfa } from "./raw/nef";
 import { Tiff } from "./raw/tiff";
 import { camToSrgbLinear, NIKON_Z50_COLOR_MATRIX } from "./color";
 import { makeRowDenoiser } from "./raw/denoise";
+import { makeRowDetail } from "./raw/detail";
 import { buildGlowMap, sampleGlow, GLOW_GAIN } from "./glow";
 import { buildLocalMap } from "./localmap";
 import { SRGB_ICC, embedIccInJpeg } from "./icc";
@@ -88,7 +89,11 @@ export async function exportImage(
       : undefined;
   const edit = compileEdit(params, "cfa" in src ? src.cam : undefined, srcW / srcH, localMap);
   const out = new Float32Array(3);
-  const sampleLinear = makeRowDenoiser(rawSample, srcW, srcH, params.denoise);
+  // Denoise first, then sharpen/texture — the same order the shader runs them
+  // (raw neighbourhood -> denoised centre -> detail gain). Both are no-ops when
+  // their slider is 0, so a plain edit keeps the 1x-decode fast path.
+  const denoised = makeRowDenoiser(rawSample, srcW, srcH, params.denoise);
+  const sampleLinear = makeRowDetail(rawSample, denoised, srcW, srcH, params.sharpen ?? 0, params.texture ?? 0);
   // HIE glow map at full resolution (cheap: built on a coarse grid).
   const gmap = params.glow > 0 ? buildGlowMap(rawSample, srcW, srcH) : null;
   const glowAt = (sx: number, sy: number) =>

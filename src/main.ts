@@ -74,6 +74,8 @@ const params: EditParams = {
   vignette: 0,
   clarity: 0,
   dehaze: 0,
+  sharpen: 0,
+  texture: 0,
   hsl: hslDefault(),
 };
 
@@ -95,6 +97,8 @@ const ui = {
   vignette: $("vignette") as HTMLInputElement,
   clarity: $("clarity") as HTMLInputElement,
   dehaze: $("dehaze") as HTMLInputElement,
+  sharpen: $("sharpen") as HTMLInputElement,
+  texture: $("texture") as HTMLInputElement,
   skyHue: $("skyHue") as HTMLInputElement,
   skySat: $("skySat") as HTMLInputElement,
   skyLum: $("skyLum") as HTMLInputElement,
@@ -293,6 +297,8 @@ function syncFromUI() {
   params.vignette = Number(ui.vignette.value);
   params.clarity = Number(ui.clarity.value);
   params.dehaze = Number(ui.dehaze.value);
+  params.sharpen = Number(ui.sharpen.value);
+  params.texture = Number(ui.texture.value);
   params.denoise = Number(ui.dn.value);
   params.sky = [Number(ui.skyHue.value), Number(ui.skySat.value), Number(ui.skyLum.value)];
   params.foliage = [Number(ui.folHue.value), Number(ui.folSat.value), Number(ui.folLum.value)];
@@ -330,6 +336,8 @@ function syncToUI() {
   ui.vignette.value = String(params.vignette);
   ui.clarity.value = String(params.clarity);
   ui.dehaze.value = String(params.dehaze);
+  ui.sharpen.value = String(params.sharpen);
+  ui.texture.value = String(params.texture);
   ui.skyHue.value = String(params.sky[0]);
   ui.skySat.value = String(params.sky[1]);
   ui.skyLum.value = String(params.sky[2]);
@@ -507,6 +515,8 @@ function cloneParams(p: EditParams): EditParams {
     vignette: p.vignette,
     clarity: p.clarity,
     dehaze: p.dehaze,
+    sharpen: p.sharpen,
+    texture: p.texture,
     hsl: [...(p.hsl ?? hslDefault())],
   };
 }
@@ -546,6 +556,8 @@ function applySnapshot(s: Snapshot) {
   params.vignette = c.vignette;
   params.clarity = c.clarity ?? 0;
   params.dehaze = c.dehaze ?? 0;
+  params.sharpen = c.sharpen ?? 0;
+  params.texture = c.texture ?? 0;
   params.hsl = c.hsl?.length === 24 ? c.hsl : hslDefault();
   activeLook = s.activeLook ?? null;
   lookBias = (s.lookBias ? [...s.lookBias] : [1, 1, 1]) as [number, number, number];
@@ -623,7 +635,9 @@ const slotEls: { name: HTMLSpanElement; save: HTMLButtonElement; load: HTMLButto
 
 // A saved look is the CREATIVE grade only — no per-shot white balance, exposure
 // or denoise — so it drops onto any photo on top of that photo's own balance
-// (matching how the built-in Looks behave). Undo/Reset snapshots stay full.
+// (matching how the built-in Looks behave). Sharpen/Texture DO ride along: they
+// are user intent, not auto-measured per photo the way denoise is. Undo/Reset
+// snapshots stay full.
 type SavedLook = {
   swapRB: boolean;
   hue: number;
@@ -637,6 +651,8 @@ type SavedLook = {
   lum: number;
   clarity: number;
   dehaze: number;
+  sharpen: number;
+  texture: number;
   hsl: number[];
 };
 
@@ -654,6 +670,8 @@ function currentLook(): SavedLook {
     lum: params.lum,
     clarity: params.clarity,
     dehaze: params.dehaze,
+    sharpen: params.sharpen,
+    texture: params.texture,
     hsl: [...params.hsl],
   };
 }
@@ -686,6 +704,8 @@ function readSlot(i: number): SavedLook | null {
         lum: numOr(s.lum, 1),
         clarity: numOr(s.clarity, 0),
         dehaze: numOr(s.dehaze, 0),
+        sharpen: numOr(s.sharpen, 0),
+        texture: numOr(s.texture, 0),
         hsl: Array.isArray(s.hsl) && s.hsl.length === 24 ? s.hsl.map((x: unknown, i: number) => numOr(x, i % 3 === 0 ? 0 : 1)) : hslDefault(),
       };
     }
@@ -718,6 +738,8 @@ function loadSlot(i: number) {
   params.lum = look.lum;
   params.clarity = look.clarity;
   params.dehaze = look.dehaze;
+  params.sharpen = look.sharpen;
+  params.texture = look.texture;
   params.hsl = [...look.hsl];
   activeLook = null; // a loaded custom grade isn't one specific built-in look
   clampToneOrder();
@@ -862,7 +884,7 @@ $("toneReset").addEventListener("click", () => {
 const PANEL_TABS = ["basic", "ir", "color", "tone", "masks", "export"] as const;
 type PanelTab = (typeof PANEL_TABS)[number];
 const TAB_META: Record<PanelTab, { name: string; sub: string }> = {
-  basic: { name: "Basic", sub: "White balance, exposure & noise" },
+  basic: { name: "Basic", sub: "White balance, exposure & detail" },
   ir: { name: "IR", sub: "Channel swap, looks & lens fixes" },
   color: { name: "Color", sub: "Hue, per-color & the mixer" },
   tone: { name: "Tone", sub: "Curve, luminance & bands" },
@@ -906,7 +928,7 @@ panelTabBtns.forEach((b) => b.addEventListener("click", () => setPanelTab(b.data
 }
 
 for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.dn, ui.hue, ui.sat, ui.con, ui.glow, ui.lum,
-  ui.hotspot, ui.hotspotSize, ui.vignette, ui.clarity, ui.dehaze,
+  ui.hotspot, ui.hotspotSize, ui.vignette, ui.clarity, ui.dehaze, ui.sharpen, ui.texture,
   ui.skyHue, ui.skySat, ui.skyLum, ui.folHue, ui.folSat, ui.folLum, ...ui.tones]) {
   el.addEventListener("input", syncFromUI);
 }
@@ -1903,6 +1925,8 @@ function establishFreshEdit() {
     vignette: 0,
     clarity: 0,
     dehaze: 0,
+    sharpen: 0,
+    texture: 0,
     hsl: hslDefault(),
   };
   activeLook = null;
@@ -2876,7 +2900,7 @@ function neutralLook(): SavedLook {
   return {
     swapRB: false, hue: 0, sat: 1, contrast: 1, tint: [1, 1, 1], glow: 0,
     sky: [0, 1, 1], foliage: [0, 1, 1], tone: [...TONE_DEFAULT] as [number, number, number, number, number],
-    lum: 1, clarity: 0, dehaze: 0, hsl: hslDefault(),
+    lum: 1, clarity: 0, dehaze: 0, sharpen: 0, texture: 0, hsl: hslDefault(),
   };
 }
 
@@ -2921,6 +2945,8 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade): EditParams {
     vignette: 0,
     clarity: look.clarity,
     dehaze: look.dehaze,
+    sharpen: look.sharpen,
+    texture: look.texture,
     hsl: [...look.hsl],
   };
 }

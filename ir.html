@@ -142,9 +142,11 @@
             <label>Blue gain <input id="wbB" type="range" min="0" max="1000" step="1" value="585" /></label>
             <p class="note">Tip: tap foliage in the image to set white balance.</p>
             <hr class="divider" />
-            <div class="sub-title">Denoise</div>
-            <label>Strength <input id="dn" type="range" min="0" max="1" step="0.01" value="0" /></label>
-            <p class="note">Set automatically from the photo's measured noise; adjust to taste.</p>
+            <div class="sub-title">Detail</div>
+            <label>Denoise <input id="dn" type="range" min="0" max="1" step="0.01" value="0" /></label>
+            <label>Sharpen <input id="sharpen" type="range" min="0" max="1" step="0.01" value="0" /></label>
+            <label>Texture <input id="texture" type="range" min="-1" max="1" step="0.01" value="0" /></label>
+            <p class="note">Denoise is set automatically from the photo's measured noise. Sharpen crisps up fine edges; Texture brings out surface structure (pull left to smooth). Both keep colours put.</p>
             <p class="note footnote">White balance, exposure and denoise are set automatically when a photo opens &mdash; refine from here. No 2000K floor.</p>
           </section>
 
@@ -471,6 +473,7 @@
         <h3>Light &amp; area tools</h3>
         <ul>
           <li><strong>Clarity</strong> — punches up local structure (or softens, pulled left). <strong>Dehaze</strong> — cuts the veil that flattens distant subjects; brightness-only, so colors stay put.</li>
+          <li><strong>Sharpen</strong> &amp; <strong>Texture</strong> (Basic) — Sharpen crisps fine edges; Texture works the mid-size surface structure (left smooths it). Both are luminance-only, so colors never shift.</li>
           <li><strong>Tone curve + Luminance</strong> — the curve shapes blacks through highlights; Luminance lifts or drops the whole image without clipping either end.</li>
           <li><strong>Masks</strong> — radial, gradient, or painted brush: local adjustments for one area only. Masks belong to the photo; saved looks stay portable.</li>
           <li><strong>IR lens fixes</strong> — pulls down the center hot-spot IR-converted lenses produce, and corrects (or adds) corner vignette.</li>
@@ -478,7 +481,7 @@
 
         <h3>Profiles</h3>
         <p><strong>.cube</strong> bakes your color look for Photoshop/video apps. <strong>.dcp</strong> is a
-        Lightroom camera profile (beta). Denoise and glow are spatial effects and can't ride along in profiles.</p>
+        Lightroom camera profile (beta). Denoise, glow, sharpen and texture are spatial effects and can't ride along in profiles.</p>
 
         <h3>Works with</h3>
         <p>JPEG/PNG from any camera &middot; HEIC (in Safari) &middot; RAW from any Bayer-sensor camera converted to DNG

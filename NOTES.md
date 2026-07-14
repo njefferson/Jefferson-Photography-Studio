@@ -728,8 +728,8 @@ Classical, subscription-grade tools (fit the current architecture directly):
   Per-image low-res maps (localmap.ts): clarity = exposure-invariant ratio vs
   blurred luma; dehaze = dark-channel veil subtraction. GPU==CPU ≤1 LSB; part
   of saved looks; rebuilt at full res on export. **Texture** (fine-radius local
-  contrast) folds into the Detail-sharpening item below — it needs pixel-
-  neighbourhood taps, not a low-res map.
+  contrast) shipped folded into the Detail-sharpening item below (2026-07-14) —
+  it needs pixel-neighbourhood taps, not a low-res map.
 - [x] **8-channel HSL colour mixer** (shipped 2026-07-05; reworked twice same
   day from iPad testing: (1) saturation became a power curve s^(1/slider) so
   low-sat IR pixels move visibly, hue ±60, lum 0.3–1.7; (2) moved to DISPLAY
@@ -745,8 +745,38 @@ Classical, subscription-grade tools (fit the current architecture directly):
   independent channels; same per-pixel model.
 - **Crop / straighten / perspective (Upright)** — geometry via the vertex
   shader we already rotate in; crop is a display+export region.
-- **Detail sharpening** (unsharp / deconvolution) — mirror the existing 5×5
-  bilateral pattern (shader + CPU export).
+- [x] **Detail sharpening + Texture** (shipped 2026-07-14) — two new sliders in
+  the Basic tab's "Detail" cluster (next to Denoise): **Sharpen** 0..1
+  (high-frequency edge crisp-up) and **Texture** -1..1 (mid-frequency surface
+  structure; pull left to smooth). Both are HUE-PRESERVING — a luminance-only
+  gain from two Gaussian blurs of the neighbourhood luma (7×7, σ 1.0 / 2.0):
+  sharpen = Lc−blurS (finer than σ1), texture = blurS−blurT (the band between,
+  so it doesn't fight sharpen or Clarity's low band). Runs on LINEAR data right
+  after denoise, mirroring the bilateral pattern: the GPU does it inline in the
+  shader (u_sharpen/u_texture), the CPU export in a new `raw/detail.ts`
+  (makeRowDetail, row-cached like makeRowDenoiser). Spatial (neighbourhood taps),
+  so — like denoise/glow/masks — it is SKIPPED in the .cube/.dcp LUT and lives in
+  the pre-pass, NOT compileEdit. Sharpen/Texture DO ride in saved looks + batch
+  (unlike denoise: they're user intent, not auto-measured per photo). Shadow
+  floor EPS=0.05 in the relative high-pass both tightens GPU==CPU parity and
+  keeps sharpening from amplifying deep-shadow noise. Constants (KS=2.2, KT=2.4,
+  R/σ/EPS/clamp) are shared between detail.ts and the shader — keep in sync.
+  VERIFIED headless (Chromium): GPU==CPU parity — the detail-OFF pipeline
+  baseline is ≤2 LSB and EVERY pixel differing by >2 LSB with detail on is a
+  NEAR-BLACK channel (display-gamma amplification the pipeline already has;
+  e.g. green 0 vs 4 under R=B=255), i.e. ZERO drift outside that regime; mean
+  0.12 LSB; a negative control (GPU detail-on vs CPU detail-off) reads ~109 LSB,
+  proving the harness detects the effect (it was made to FAIL first at a ≤2
+  absolute bar before the near-black characterisation). Live UI walked from the
+  start screen: opening a practice photo raises the Basic panel with Sharpen
+  (0..1) + Texture (-1..1); moving each changes the render, and returning both to
+  0 restores the exact original pixels (idempotent); no page errors; build clean
+  (tsc + vite). Screenshotted at max — assertive but no crunchy haloing, sky
+  stays smooth. NEEDS THE OWNER'S HANDS on the iPad: the slider FEEL and where
+  the tasteful ceiling sits on real frames (KS/KT are eyeballed, not owner-tuned
+  yet — the denoise curve took two feedback rounds, expect the same), the GPU
+  cost of the 7×7 taps on a big proxy, and whether Texture's mid-band radius is
+  the structure he wants. Cache bumped ips-v33 → ips-v34.
 - **Heal / clone** for sensor dust & hot pixels — clone-stamp first,
   content-aware later.
 - **Copy settings + batch apply/export** across a folder — builds on the
