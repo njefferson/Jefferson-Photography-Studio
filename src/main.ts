@@ -15,6 +15,7 @@ import { buildSkyMask } from "./sky";
 import { drawHistogram } from "./histogram";
 import * as Hotspot from "./hotspot";
 import { setupInstalledShare } from "./share";
+import { wireThemeToggle } from "./theme";
 
 // Injected at build time from git history (see vite.config.ts).
 declare const __CHANGELOG__: { hash: string; date: string; subject: string; version: string }[];
@@ -1459,6 +1460,9 @@ mUI.clearBrush.addEventListener("click", () => {
   flushRecord();
 });
 addBrushBtn.addEventListener("click", () => addMask(2));
+
+// Dawn / dark theme switch, living in the ⓘ dialog (shared chrome).
+wireThemeToggle(document.getElementById("themeToggle"));
 
 // Help dialog (usage guide; the ⓘ dialog stays what's-new + support).
 const helpDlg = $("helpDlg") as HTMLDialogElement;

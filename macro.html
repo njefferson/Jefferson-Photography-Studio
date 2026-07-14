@@ -9,17 +9,21 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Macro" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="theme-color" content="#0b0b0d" />
+    <meta name="theme-color" content="#0b0c0f" />
     <link rel="manifest" href="./macro.webmanifest" />
     <link rel="apple-touch-icon" href="./macro-icon-180.png" />
     <link rel="icon" type="image/svg+xml" href="./macro-icon.svg" />
     <title>Macro Studio</title>
+    <!-- Read the saved theme before first paint (see src/theme.ts). -->
+    <script>
+      try { if (localStorage.getItem("studio-theme") === "dawn") document.documentElement.setAttribute("data-theme", "dawn"); } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="app">
       <header class="bar">
         <a class="home" href="./index.html" aria-label="Back to Studio">‹ Studio</a>
-        <span class="brand">Macro Studio</span>
+        <span class="brand"><span class="tool-dot" aria-hidden="true"></span>Macro Studio</span>
         <button id="shareBtn" class="info-btn" type="button" hidden aria-label="Share this app or copy its link" title="Share this app or copy its link">&#x2BAD;&#xFE0E;</button>
         <button id="helpBtn" class="info-btn" type="button" aria-label="How it works">i</button>
       </header>
@@ -91,6 +95,7 @@
         </ul>
         <p class="muted">You can add or remove any of them later — installing one never blocks the others.</p>
 
+        <p class="theme-row"><button id="themeToggle" type="button"></button></p>
         <button id="helpClose" type="button">Close</button>
       </dialog>
     </div>
