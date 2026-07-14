@@ -199,6 +199,46 @@ See **`PLAN.md`** for the full build plan.
   2800px preview (~70 MB transient), and tap-accuracy of small spots on
   finger vs pointer. LATER (unchanged): content-aware gradient-domain blend
   for spots straddling an edge; manual clone-stamp (pick your own source).
+  OWNER'S FIRST ON-DEVICE PASS (2026-07-14, staging — "works quite clever" +
+  four tweaks, all shipped same day, cache ips-v35 → ips-v36):
+  (1) NO SIZE FEEDBACK — you couldn't see the size before tapping, or adjust a
+  fix after. Now the NEWEST heal stays ACTIVE (accent ring) and the Spot size
+  slider resizes IT live — re-picking its clone source for the new radius,
+  re-baking on the next frame, the whole drag one undo step via recordSoon —
+  so the flow is tap-then-dial. With no active spot the slider shows a
+  transient dashed preview ring at the centre of the view (zoom-aware), sized
+  like the next tap. Auto-detect leaves no active spot on purpose (finds are
+  reviewed by ring, not resized en masse); Clear/undo/remove clear or remap
+  the active index.
+  (2) RINGS DETACHED ON PINCH/ZOOM (fixes stayed put — they're baked into the
+  texture — but the circles floated): applyZoom() repositioned the MASK
+  overlay only. LESSON, now a comment in applyZoom: pinch/pan is a pure CSS
+  transform with NO repaint — EVERY on-photo overlay must be retraced there,
+  not just in draw(). positionHealOverlay() added beside positionMaskOverlay().
+  (3) AUTO-DETECT picked wrong things and IGNORED HIS OBVIOUS SPOT. The
+  obvious spot was a LARGE FAINT smudge — real dust at small apertures —
+  invisible to the single-scale pass. detectSpots is now THREE-SCALE
+  (fine / mid / coarse; mid+coarse dark-only), with three measured lessons:
+  (a) the pass blur must sit ~2× ABOVE its target size or it tracks the
+  smudge and erases it from its own high-pass (at blurR≈maxR the 20-24px test
+  smudges never crossed threshold); (b) the noise floor for the wide-blur
+  passes must come from a LOW quantile of |hp| (noiseQ 0.25-0.35) — the
+  median reads foliage texture and inflated the threshold ~15× on a wooded
+  frame; (c) a CROWD RULE for the wrong-things half: >15 similar-strength
+  finds means the scan is reading the frame's own noise floor (the D5300
+  magenta sky mottle produced exactly 40), so keep only outliers ≥1.8× the
+  crowd's median strength. Verified: planted-smudge recall 2/3 (the third
+  sits right against foliage and merges with it — a manual tap covers that),
+  fine motes still 8/8, gallery sweep 0-4 finds per frame (hilltown 40 → 2).
+  Owner is uploading THE REAL DUSTY PHOTO from his pass — tune the detector
+  against it when it lands (his missed smudge becomes the regression case).
+  All verified headless again: full parity suite (heal still adds ZERO drift)
+  + UI suite grown to 32/32 (size-preview ring appears and fades, slider
+  resizes the active ring 20.5→33.8, pinch-zoom scales the ring exactly with
+  the photo 33.8→101.4 at 3×, tapSuppressed still eats the post-pinch tap).
+  Harness gotcha for the file: synthetic PointerEvents have no active pointer,
+  so setPointerCapture throws NotFoundError — stub capture in the test page
+  before dispatching a simulated pinch.
 - [x] **Learn on real photos — lessons ride on the picture** — owner ask
   2026-07-14 (his framing: instead of dedicated tutorial photos, "lessons that
   can be collapsed to 1, 2, 3 on top of the photo and when you touch them shows
