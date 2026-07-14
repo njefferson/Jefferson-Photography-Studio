@@ -2874,16 +2874,30 @@ const galRaw = (key: string, label: string, rotate?: number): GalleryTile => ({
   thumb: `./examples/${key}.jpg`,
   rotate,
 });
+// 2x2-binned half-res DNGs from the owner's NEFs (10 MB each, under the 25 MB
+// Pages limit) — one tile per scene (a JPEG twin briefly existed; owner called
+// the duplication out, 2026-07-14). Each opens on ITS home lesson; orientation
+// rides in the file.
+const galNef = (key: string, label: string, lesson: number): GalleryTile => ({
+  key: `${key}-raw`,
+  label,
+  kind: "dng",
+  file: `./examples/${key}.dng`,
+  thumb: `./examples/gallery/thumbs/${key}.jpg`,
+  lesson,
+});
 const GALLERY: GalleryTile[] = [
   galRaw("canopy", "Golden canopy · RAW", 3),
   galRaw("lodge", "Motor lodge · RAW", 3),
   galRaw("hillside", "Hillside & sky · RAW"),
-  // 2x2-binned half-res DNG from the owner's NEF (10 MB, under the 25 MB
-  // Pages limit) — the dust-lesson frame, ONE tile only (a JPEG twin briefly
-  // existed; owner called the duplication out, 2026-07-14). It opens on ITS
-  // lesson: Dust & spots. Orientation rides in the file.
-  { key: "NIR_1675-raw", label: "Lakeside & sensor dust · RAW", kind: "dng", file: "./examples/NIR_1675.dng", thumb: "./examples/gallery/thumbs/NIR_1675.jpg", lesson: 5 },
-  galJpeg("NIR_1701", "White forest"),
+  // A RAW practice photo for every lesson, in lesson order (owner ask
+  // 2026-07-14: each practice photo opens on its own lesson).
+  galNef("NIR_1638", "Lakeside beach · RAW", 0),
+  galNef("NIR_1701", "White forest · RAW", 1),
+  galNef("NIR_1822", "Lone pine · RAW", 2),
+  galNef("NIR_1708", "Wooded shore · RAW", 3),
+  galNef("NIR_1687", "Picnic still life · RAW", 4),
+  galNef("NIR_1675", "Lakeside & sensor dust · RAW", 5),
   galJpeg("NIR_1706", "Forest & snag"),
   galJpeg("NIR_1716", "Swirling sky"),
   galJpeg("NIR_1721", "Lake & contrails"),
