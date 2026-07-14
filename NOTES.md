@@ -329,9 +329,17 @@ See **`PLAN.md`** for the full build plan.
   tags 254/256/257/258/259/262/274(orientation from the NEF)/277/278/33421/
   33422(pattern)/50706/50714(black 1008)/50717(white 15520)/50721(Z50 colour
   matrix as SRATIONAL×10000)). NIR_1675.dng: 2800×1864, 10.4 MB. It's now the
-  4th RAW tile "Lakeside & dust · RAW" (GALLERY = 19 tiles = 4 RAW + 15 JPEG;
-  thumb shared with the JPEG tile; rotation rides in the DNG's own tag 274 so
-  the tile needs no rotate field). VERIFIED: decodes through the normal app
+  4th RAW tile "Lakeside & sensor dust · RAW" (rotation rides in the DNG's own
+  tag 274 so the tile needs no rotate field). DE-DUPED same day (owner: "You
+  duplicated it") — the JPEG twin tile was REMOVED, so the dust frame is ONE
+  tile, the RAW (GALLERY = 18 tiles = 4 RAW + 14 JPEG; the 1600px teaching
+  JPEG was deleted, its thumbs/NIR_1675.jpg stays as the RAW tile's thumb).
+  Lesson-wise the owner also found it opening Lesson 1 — GalleryTile grew an
+  optional `lesson` field and openGalleryPhoto opens the tile's HOME lesson
+  (default 0); the dust tile carries lesson: 5, so tapping it lands straight
+  on Dust & spots with chip ⑥ active. WHEN THE REST OF HIS RAW VERSIONS
+  ARRIVE: replace each scene's JPEG tile with its binned-DNG tile (one tile
+  per scene — the owner explicitly rejected side-by-side duplicates). VERIFIED: decodes through the normal app
   path (1400×932 preview), no CFA-phase artifacts, the real smudge is the TOP
   find at exactly (1232,400) = the NEF coords ÷2 — binning RAISED its
   signal-to-noise — and the in-app round trip (open tile → Find spots → rings
