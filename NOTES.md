@@ -239,6 +239,63 @@ See **`PLAN.md`** for the full build plan.
   Harness gotcha for the file: synthetic PointerEvents have no active pointer,
   so setPointerCapture throws NotFoundError — stub capture in the test page
   before dispatching a simulated pinch.
+  DETECTOR REBUILT ON THE OWNER'S REAL NEF (2026-07-14, same day — he uploaded
+  NIR_1675.NEF, the frame from his screenshots; cache ips-v36 → ips-v37). His
+  smudge measured rBlob 50-80 preview px at ~5% depth in open sky — and the
+  session's synthetic tuning had been wrong on every axis. detectSpots is now:
+  a 3-level PYRAMID (full/2×/4× planes; a huge faint smudge becomes a small
+  strong blob, noise averages down), the fine full-res pass for sharp motes
+  (σ-scaled threshold, tiny-bright hot pixels allowed) and dark-only smudge
+  passes at 2×/4× with FIXED floors (0.03/0.028 — just under half the real
+  smudge's depth, above the ~2% JPEG sky mottle). MEASURED LESSONS, each
+  bought with a failure:
+  (1) BOTTOM-HAT background (morphological closing, window maxR+2, separable
+  van-Herk max/min) for the dark passes — a mean blur both TRACKS a big
+  smudge out of its own high-pass (blur must sit ≳2× above the blob or the
+  blob vanishes) and, near a bright treeline, paints a whole narrow sky band
+  over-threshold (one giant connected region that swallowed every seed).
+  Closing erases any dark blob smaller than its window yet follows brightness
+  boundaries. The fine pass keeps the mean blur (its σ threshold is
+  calibrated to it).
+  (2) The OWNER'S UNIFORM-AREA RULE ("look for areas of uniform color before
+  beginning smudge detection") is load-bearing twice: a BUSY MAP (gradient-
+  magnitude outliers over the frame's calm-quartile grain, ABSOLUTE bar — the
+  sqrt-encoded luma is variance-stabilized, and a relative bar made dark sky
+  read 10× busier than bright ice) is downsampled per level into busy DENSITY,
+  and the smudge passes seed AND grow only through calm blocks (busy country
+  is a wall — stops structure bleed); post-merge, every find from every level
+  must pass a CALM RING of density windows at full resolution (ring at
+  1.3·rPx + winR + 4 — the margin matters, a sharp mote's own busy edge
+  grazing a window cost it its own ring; window small, winR=5 — wide windows
+  push the ring out of narrow sky bands). Gradient density, NOT mean
+  deviation: two 2px twigs barely move a 67px window's mean (measured 0.013,
+  "uniform") but every twig pixel is a gradient outlier; and NOT |L-blur|:
+  a strong mote depresses its own blur and paints a busy HALO on clean sky.
+  (3) Blob stats from the HALF-PEAK CORE, not the grown skirt (wide-blur
+  skirts sprawl past any size cap); eccentricity from core moments rejects
+  twig fragments/bark striations (lines, even with calm rings).
+  (4) DUST DOESN'T SWARM: >3 neighbours within W/20 = shimmering surface
+  (lake sparkle pushed ~30 blobs whose sheer count made the crowd rule
+  execute the real smudge). Swarm-prune runs on the RAW merged set BEFORE
+  other prunes (pruning first thins a swarm below its own bound). Crowd rule
+  (>15 similar-strength finds → keep only ≥1.8× the median) stays as backstop.
+  (5) A blob that FILLS its surround has no measurable background — physics,
+  not tunable: an r≥20px smudge in the teaching JPEGs' ~60px sky strips is
+  undetectable by any estimator, so the synthetic smudge-recall bar was
+  retired in favour of THE REAL REGRESSION TEST: the parity harness fetches
+  NIR_1675.NEF from the session scratchpad (skips honestly when absent — the
+  full-res original never enters the repo; re-ask the owner if needed) and
+  asserts the smudge is found at preview (2466,800) with r≥25 and ≤6 total
+  detections. Current result: found at (2465,800) r=41, 3 detections, ~0.9s.
+  VERIFIED: full parity suite green (heal still adds ZERO drift; fine-mote
+  recall 5/6 — the biggest planted mote is a known marginal; the overlap pair
+  is informational, twins busy each other's rings and a manual tap covers
+  them), UI suite 32/32, gallery sweep 0-10/frame with every surviving find a
+  faint dark round patch in smooth sky (the same class as the plausible real
+  dust the NEF surfaced — these teaching JPEGs came from the same sensor).
+  NEEDS THE OWNER'S HANDS: re-run Find spots on NIR_1675 on the iPad (expect
+  the big smudge ringed first + a couple of faint companions), and his verdict
+  on aggressiveness across his library.
 - [x] **Learn on real photos — lessons ride on the picture** — owner ask
   2026-07-14 (his framing: instead of dedicated tutorial photos, "lessons that
   can be collapsed to 1, 2, 3 on top of the photo and when you touch them shows
@@ -905,6 +962,19 @@ Classical, subscription-grade tools (fit the current architecture directly):
   snapshot system shipped 2026-07-04; no ML.
 - **Channel mixer (full 3×3)** — custom false colour beyond the R↔B swap;
   IR-native, per-pixel.
+- **Playful warp tools — Swirl / Liquefy / Pinch** (owner ask 2026-07-14:
+  "crazy tools like swirl or liquefy"). Finger-driven local GEOMETRY warps —
+  a real departure from the colour pipeline, but classical and on-device:
+  the natural architecture is a per-photo UV DISPLACEMENT FIELD at a working
+  resolution (brush-bitmap pattern — strokes push/twist/pull vectors into the
+  field), applied as a source-space remap at the very top of the shader
+  (fetchLin(uv + field(uv))) with the same remap mirrored in the CPU export
+  sampler. Spatial by definition → skipped in .cube/.dcp like masks/heal;
+  composition-specific → stays with the photo, reset on open, never in looks
+  or batch; one stroke = one undo (mask-brush pattern). Direct manipulation
+  fits the house taste; needs a sustained mode + banner like heal/TAT. Watch
+  GPU==CPU parity at the remap's bilinear taps (the brush-mask half-texel
+  lesson applies doubly to a field that MOVES samples).
 
 Known gap — FIXED 2026-07-05:
 - [x] **sRGB ICC on export, both formats.** JPEG (`canvas.toBlob`) and the
