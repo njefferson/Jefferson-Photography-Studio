@@ -168,6 +168,27 @@ See **`PLAN.md`** for the full build plan.
   kept deliberately, one line to drop if he'd rather). Verified: the
   built-app walk grew to 25/25 (27 tiles, all thumbs decode, each of the
   ELEVEN RAW tiles opens on its lesson chip and renders, no page errors).
+  WAVES 3-5 same day (one push, cache ips-v42 → ips-v43): 21 more zips
+  arrived (some duplicates — the chat re-sent a few; deduped by filename).
+  GALLERY is now 48 tiles = 39 RAW + 9 JPEG. THREE MORE JPEG SCENES went
+  RAW, two of them via NEIGHBOURING FRAMES of the same scene (the owner
+  sent adjacent shutter numbers, not the exact frame — treat "same scene,
+  same composition" as the replace test, not filename match): Wispy sky =
+  NIR_1827 (exact), Swirling sky = NIR_1716 (exact), Lake & contrails =
+  NIR_1722 (neighbour of 1721), Framed by trees = NIR_1667 (neighbour of
+  1665). Sky frames 1716/1722/1827 tag lesson 2; the 16 other new tiles are
+  free practice (untagged → Lesson 1): 1644/1651/1661/1662/1671/1681/1682/
+  1688/1691/1703/1705/1710/1713/1717/1718/1720/1738 families — treetops,
+  sunlit crowns/pines, foliage close-ups, campsite scenes, shore sweeps.
+  CURATION (flagged to owner, DNGs kept in scratchpad ready to swap):
+  NIR_1674 SKIPPED (same two-trunks beach scene as the 1638 tile);
+  NIR_1652 SKIPPED (landscape variant of 1651's subject — kept the tighter
+  portrait). NIR_1645's zip contained the camera JPG, NO NEF — owner owes a
+  re-send if he wants that scene. REGRESSION GOLD: the owner re-sent
+  NIR_1675.NEF and the rebuilt bin-dng.cjs output is BYTE-IDENTICAL to the
+  committed public/examples/NIR_1675.dng — the rebuilt pipeline is the
+  same pipeline. STILL WITHOUT RAW: NIR_1706/1808/1825/1864/1866 + the 4
+  D5300 magenta frames.
   PIPELINE REBUILT this session (previous scratchpad was reclaimed):
   scratchpad `bin-dng.ts` + `test-bin-dng.ts`, rebuilt from this entry's
   spec + a byte-level dump of the shipped `public/examples/NIR_1675.dng`.
