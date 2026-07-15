@@ -251,23 +251,83 @@ See **`PLAN.md`** for the full build plan.
   chat zip uploads remain the delivery path. The Drive "Hotspot test shots"
   folder (NIR_1597–1619 + Archive.zip) is a DIFFERENT project, not the
   gallery RAWs.
-- [ ] **Studio icon in the top bar + the wrapped corner** — owner ask
+- [x] **Studio icon in the top bar + the wrapped corner** — owner ask
   2026-07-14, given WITH the main-release GO (his screenshot: at iPad width
   the top-left "‹ Studio" link wraps onto two lines, and the brand area
-  should carry the Studio/NJ mark). NEXT RELEASE: put the Studio icon into
-  the bar's brand cluster and fix the corner wrap (white-space: nowrap on
-  .home-link at minimum; check the brand row's flex sizing against the
-  mode-aware actions row at 760-1100px). Also still queued from this
-  release's review (findings verified, fixes designed, owner aware):
-  the service-worker vs 440 MB library theme — exclude /examples DNGs from
-  cache.put or give them a version-stable cache that survives CACHE bumps,
-  request navigator.storage.persist() on the gallery path, honest decode
-  (vs connection) error message in openGalleryPhoto, a quickGen-style
-  re-entrancy guard there, aria-expanded on any future disclosure, and a
-  full-53-tile decode sweep in the harness. Plus content owed: RAW twins
-  for NIR_1706/1808/1825/1864/1866, the four D5300 magenta frames (own
-  colour matrix from their NEFs), and NIR_1645's NEF (his zip held the
-  JPG).
+  should carry the Studio/NJ mark). SHIPPED to staging 2026-07-15 (cache
+  ips-v50 → ips-v51): the NJ mark (icons/icon-192.png at 22px, rounded,
+  same asset the launcher header wears) now rides INSIDE the "‹ Studio"
+  corner link on BOTH tool bars — IR and Macro — because that link IS the
+  Studio affordance; the tools' own identities (tool-dot, their icons) are
+  deliberately untouched (the NJ-rebrand over-broad-pass lesson). The
+  corner can no longer wrap: .home-link/.brand (and macro's .bar .home)
+  are white-space:nowrap + flex:none, so the squeeze is absorbed by the
+  actions row (which already wraps/scrolls) instead of the corner text.
+  ALSO SHIPPED, the queued review fixes from the library release:
+  (1) /examples/*.dng now cache into a VERSION-STABLE service-worker
+  cache "ips-examples-v1" that activation keeps across CACHE bumps —
+  practice RAWs a user already downloaded are no longer wiped + refetched
+  (~10 MB each) on every release. The binned DNGs are immutable content;
+  if one is EVER replaced under the same filename, bump the EXAMPLES
+  version in sw.js too or installed apps keep the old bytes.
+  (2) REAL PRE-EXISTING SW BUG, found by the new harness and fixed: the
+  cache-first asset branch called res.clone() inside
+  caches.open(...).then(...) — by then respondWith can already be
+  consuming the body, clone() throws, and the silent .catch ate the cache
+  write. Measured on localhost: NOTHING from that branch was being cached
+  at all (fast connections lose the race; slow ones win it, which is why
+  it worked on device). LESSON for every SW: clone BEFORE handing the
+  response to respondWith, and put under e.waitUntil.
+  (3) openGalleryPhoto hardening: a quickGen-style generation guard
+  (double-tapping two tiles: the newer tap wins, the older aborts at every
+  await and never hides the newer one's busy overlay); the error message
+  is honest about WHICH failure happened — download failed says
+  check-your-connection, decode-after-a-good-download says the photo
+  couldn't be opened (likely low memory) instead of blaming the
+  connection; and requestPersistentStorage() is requested on the gallery
+  path (best-effort, like sessions/batch).
+  NOT IN THIS RELEASE: aria-expanded (no disclosure exists today — note
+  stands for any future one) and the content owed (RAW twins for
+  NIR_1706/1808/1825/1864/1866, the four D5300 magenta frames' NEFs,
+  NIR_1645's NEF) — still waiting on owner uploads.
+  VERIFIED headless 34/34 (fail-first proven: planted wrong tile-count,
+  wrap-height and cache-survival expectations each failed exactly as
+  planted): NJ mark loads in both bars; corner link single-line at 834px
+  and in edit mode at 900px (one line measures 34px; a wrap reads ≈48);
+  SW activation wipes an old ips-v50 but KEEPS ips-examples-v1 and its
+  entries; a fetched DNG lands ONLY in the stable cache while a PNG lands
+  in ips-v51; the FULL 53-TILE DECODE SWEEP runs every tile file through
+  the app's own decoder (44 DNG + 9 JPEG, all w/h>0, RAW decodes as true
+  raw, deployed DNGs == tile DNGs exactly — a new tile or file mismatch
+  fails the suite); the 13 tutorial tiles open on their lesson chips and
+  render; the double-tap race resolves to the newer tile with no page
+  errors. Harness lives in the session scratchpad (server.mjs +
+  sweep-entry.ts esbuild bundle + run-tests.mjs). NEEDS THE OWNER'S
+  HANDS: the corner mark's look at his sizes/themes, and that the wrap
+  from his screenshot is gone on the real iPad.
+- [ ] **Landing scroll cue + a home for the example library** — owner ask
+  2026-07-15 (his screenshot: at iPad landscape the welcome card ends
+  almost exactly at the fold, so the start screen "can sometimes look
+  like there is nothing to scroll down to" — the 13 tutorial tiles sit
+  invisible below). Same message: he wants OPTIONS for bringing the other
+  40 files back as an expanded learning library — DECISION PENDING, don't
+  build until he picks. Options presented in chat 2026-07-15 — library:
+  (a) a page/full-screen overlay of its own, one tap from a small start-
+  screen link (start screen stays the calm 13); (b) an entry inside Help;
+  (c) an always-visible grouped section below the tutorial grid (feeds
+  the scroll cue for free, but is the closest to the expander he already
+  deleted). Scroll cue: (d) let the first tile row peek above the fold
+  (size the welcome card so a sliver of the grid always shows); (e) a
+  fade + chevron at the card's bottom edge, the button-row pattern he
+  liked; (f) tighten the welcome copy so the grid title lands on screen.
+  WATERMARK FACTS recorded same day (his direct question, answered in
+  chat): the 9 teaching JPEGs carry the baked corner mark (NJ + domain);
+  the 44 practice DNGs and ALL thumbs carry NO watermark — a mark can't
+  be baked into raw sensor data without falsifying it — so anything a
+  user exports from a RAW practice photo is unwatermarked today. If he
+  wants coverage there, the honest option is stamping at EXPORT time for
+  gallery-sourced photos (export-side work, previously dodged as "real
+  work"); his call whether that matters.
 - [x] **Dust & spot removal** — heal sensor dust and hot pixels, the classic IR
   pain (dust shows worst in smooth skies). Owner ask 2026-07-14; graduates the
   "Heal / clone" backlog item into the queue. Classical — no ML, no server.
