@@ -12,6 +12,7 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 const filesInput = $("files") as HTMLInputElement;
 const dropZone = $("dropZone");
 const intake = $("intake");
+const intakeHint = $("intakeHint");
 const work = $("work");
 const filmstrip = $("filmstrip");
 const resultCanvas = $("result") as HTMLCanvasElement;
@@ -106,7 +107,11 @@ function reset() {
 async function loadFiles(list: FileList | File[]) {
   const picked = [...list].filter((f) => /image\/(jpeg|png)/.test(f.type) || /\.(jpe?g|png)$/i.test(f.name));
   if (picked.length < 2) {
-    status.textContent = "Pick at least two frames from a focus-shift set.";
+    // #status lives in the (hidden) work section — the explanation must land
+    // where the user is looking: the intake panel (review find, 2026-07-15).
+    intakeHint.textContent = picked.length === 0
+      ? "Those files aren't JPEG/PNG frames — pick the JPEGs from a focus-shift burst."
+      : "That's only one frame — stacking needs at least two from the same focus-shift set.";
     return;
   }
   // Capture order == focus order for an in-camera burst: sort by filename.

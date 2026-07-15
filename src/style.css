@@ -717,7 +717,7 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   width: auto;
   flex: 0 0 auto;
   margin: 14px auto 0;
-  padding: 8px 16px;
+  padding: 10px 16px; /* >=36px tall — the repo's tap floor */
   background: none;
   border: 1px dashed var(--line);
   border-radius: 999px;
@@ -1228,26 +1228,7 @@ label.open-btn, label.bar-btn {
 .slot-name { flex: 1; font-size: 13px; color: var(--txt-2); }
 .slot button { width: auto; padding: 6px 12px; font-size: 13px; }
 .slot button:disabled { opacity: 0.4; }
-.look-row { display: flex; flex-wrap: wrap; gap: 6px; }
-.look-row button {
-  flex: 1;
-  min-width: 30%;
-  padding: 7px 4px 5px;
-  font-size: 13px;
-  color: var(--txt);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-.look-row button.active {
-  background: var(--accent);
-  color: var(--accent-ink);
-  border-color: var(--accent);
-  font-weight: 600;
-}
 .look-sub { font: 400 9px/1.2 var(--mono); color: var(--txt-3); min-height: 11px; }
-.look-row button.active .look-sub { color: var(--accent-ink); }
 
 @media (max-width: 760px) {
   #app { grid-template-columns: 1fr; grid-template-areas: "bar" "stage" "panel"; grid-template-rows: auto 1fr auto; }
@@ -1382,8 +1363,8 @@ label.open-btn, label.bar-btn {
   color: var(--txt-3);
   background: transparent;
 }
-.look-row button.active .seg { border-color: rgba(7, 17, 31, 0.35); color: rgba(7, 17, 31, 0.65); }
-.look-row button.active .seg.on { background: var(--accent-ink); color: var(--accent); border-color: var(--accent-ink); font-weight: 600; }
+.looks-grid button.active .seg { border-color: rgba(7, 17, 31, 0.35); color: rgba(7, 17, 31, 0.65); }
+.looks-grid button.active .seg.on { background: var(--accent-ink); color: var(--accent); border-color: var(--accent-ink); font-weight: 600; }
 
 .band-title {
   text-align: center;
