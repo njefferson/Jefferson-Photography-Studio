@@ -193,19 +193,14 @@ body {
 .install .from-app p:last-child { margin-bottom: 0; }
 .install .from-app strong { color: var(--txt); font-weight: 600; }
 .from-app-links { display: flex; flex-wrap: wrap; gap: 0.6rem; }
-.from-app-links a {
-  display: inline-flex; align-items: center; padding: 0.5rem 0.9rem;
+.from-app-links button {
+  width: auto; display: inline-flex; align-items: center; padding: 0.5rem 0.9rem;
   border: 1px solid var(--line-2); border-radius: 999px;
-  color: var(--txt); text-decoration: none; font-weight: 600;
-  background: var(--surface);
+  color: var(--txt); font-weight: 600; font-size: 0.85rem;
+  background: var(--surface); cursor: pointer;
 }
+.from-app-links button:active { border-color: var(--accent); }
 .from-app .fine { font-size: 0.8rem; color: var(--txt-3); }
-.from-app .fine button {
-  width: auto; display: inline-block; margin: 0.2rem 0.25rem 0 0;
-  padding: 0.35rem 0.7rem; border-radius: 999px;
-  border: 1px solid var(--line); background: var(--surface); color: var(--txt-2);
-  font: 500 0.8rem/1 var(--ui); cursor: pointer;
-}
 
 /* ---- Icon picker (cards injected by iconpicker.ts) ---- */
 .picker { max-width: 100%; margin: 1.5rem auto 0; }
