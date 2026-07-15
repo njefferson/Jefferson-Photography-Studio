@@ -305,6 +305,35 @@ See **`PLAN.md`** for the full build plan.
   sweep-entry.ts esbuild bundle + run-tests.mjs). NEEDS THE OWNER'S
   HANDS: the corner mark's look at his sizes/themes, and that the wrap
   from his screenshot is gone on the real iPad.
+- [x] **Install the sub-apps from inside the installed Studio** — owner ask
+  2026-07-15 ("There is no way to save to Home Screen from within the studio
+  as a web app, for the two sub-apps"): the installed launcher is standalone —
+  no Safari chrome, no Share — and Add to Home Screen lives ONLY in real
+  Safari's share sheet, so Infrared/Macro opened from inside the installed
+  Studio could never be installed on their own. SHIPPED to staging 2026-07-15
+  (same release/cache as the corner mark, ips-v51): a standalone-only
+  "You're in the installed app" block (share.ts setupInstallFromApp — reveal
+  + copy-link wiring shared by all three surfaces, the setupInstalledShare
+  pattern) on the launcher's install section (#installFromApp: pill links
+  "Open Infrared/Macro in Safari ↗" as target=_blank anchors, + Copy-link
+  buttons with a paste-into-Safari toast) and inside BOTH tools' Help
+  install sections (#irInstallFromApp / #macroInstallFromApp: open-this-
+  page-in-Safari + copy). Copy is honest about the iOS unknowable: a
+  target=_blank link from a standalone iOS web app historically bounces to
+  real Safari but on newer iOS may open the small in-app browser instead —
+  the block says "tap its Safari (compass) button to hop over" and offers
+  the copy-link path that always works. Hidden in the plain browser (Safari
+  has Share there; the [hidden] guard lesson applies — all three pages'
+  stylesheets already carry it). VERIFIED headless (suite grown to 46/46;
+  T6 fail-first proven with a planted reveal-flip): blocks hidden in the
+  browser on all three pages, revealed under navigator.standalone on all
+  three (tool blocks behind Help open), links are _blank with correct
+  hrefs, copy buttons put the ABSOLUTE sub-app URL on the clipboard.
+  NEEDS THE OWNER'S HANDS on the real iPad (the whole point is iOS
+  behavior): from the installed Studio, tap "Open Infrared in Safari" —
+  does it land in real Safari or the in-app browser? — then Share → Add
+  to Home Screen, and confirm the copy-link fallback toast reads right.
+  Report which, so the copy can drop the hedge.
 - [ ] **Landing scroll cue + a home for the example library** — owner ask
   2026-07-15 (his screenshot: at iPad landscape the welcome card ends
   almost exactly at the fold, so the start screen "can sometimes look
