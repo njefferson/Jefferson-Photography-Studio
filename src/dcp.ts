@@ -161,7 +161,9 @@ function assembleTiff(entries: Entry[]): ArrayBuffer {
   const dv = new DataView(buf);
   const u8 = new Uint8Array(buf);
   dv.setUint16(0, 0x4949, true); // little-endian
-  dv.setUint16(2, 42, true);
+  // DCP magic is 0x4352 ("CR"), NOT TIFF's 42 — Adobe's dng_camera_profile
+  // rejects a profile with plain-TIFF magic outright (review find, 2026-07-15).
+  dv.setUint16(2, 0x4352, true);
   dv.setUint32(4, ifdStart, true);
   dv.setUint16(ifdStart, n, true);
 
