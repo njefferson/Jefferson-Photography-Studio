@@ -119,6 +119,20 @@ See **`PLAN.md`** for the full build plan.
 > the app on the next deploy. Both the roadmap and the patch notes (last
 > commits) refresh automatically on push.
 
+- [ ] **Learning library tile in the grid** — owner verdict 2026-07-15 (given
+  WITH the go to main): the dashed "Browse the full example library" pill is
+  "completely missable, and most people would never know it was there — it's
+  at the bottom and does not stand out." DESIGN HE WANTS: a TILE inside the
+  tutorial grid itself that looks like SEVERAL PHOTOS STACKED behind one
+  another, labeled "Learning library", opening the same full-screen library
+  overlay. Build notes: make it the grid's last tile (a .gal sibling so it
+  inherits tile sizing); the stacked-photos look can be 2-3 offset/rotated
+  layers using real thumbs from non-tutorial tiles (e.g. three library-only
+  frames — honest, they ARE in there) with the label where other tiles show
+  theirs; keep the photo count on the tile ("53 photos"); REMOVE the dashed
+  pill when the tile ships (one way in, not two). The suite's library checks
+  (opens/closes, six groups, empty "More") carry over — only the entry
+  affordance changes.
 - [ ] **Crop & straighten** — NEXT RELEASE (owner GO 2026-07-15, given with
   the review-release feedback; he called it a "quick addition" — treat it as
   one release, not a saga). The last table-stakes editing tool before the
