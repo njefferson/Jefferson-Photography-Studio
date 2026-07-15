@@ -2184,6 +2184,9 @@ welcomeBack.addEventListener("click", returnToEditor);
 function showDecoded(img: DecodedImage, imported: ImportedFile) {
   current = img;
   currentFile = imported;
+  // Every open path lands here — assume the user's own photo (no watermark);
+  // openGalleryPhoto flips this right after for the bundled practice files.
+  setBundledSource(false);
   // Corrects img.pixels in place (if a profile applies) before anything below
   // reads them — the GPU texture upload, and the glow/local reference maps.
   // (initHotspot uploads its own texture when it corrects; this call is the
@@ -3140,11 +3143,84 @@ const makeTile = (g: GalleryTile) => {
 };
 GALLERY.filter((g) => CORE.has(baseKey(g.key))).forEach((g) => galleryList.appendChild(makeTile(g)));
 
+// --- The example library: the COMPLETE practice set in its own place --------
+// (owner pick 2026-07-15: "needs its own location to go into"). A full-screen
+// overlay, one tap below the tutorial grid; tutorial tiles are included so the
+// library reads as one honest whole. Tapping any tile opens it exactly like a
+// tutorial tile (its home lesson; untagged frames start on Lesson 1).
+const LIBRARY_GROUPS: [string, string[]][] = [
+  ["Skies & clouds", ["NIR_1822", "NIR_1824", "NIR_1827", "NIR_1716", "NIR_1722", "NIR_1717", "NIR_1718", "NIR_1703", "NIR_1825"]],
+  ["Lakeside forest", ["NIR_1701", "NIR_1708", "NIR_1821", "NIR_1873", "NIR_1877", "NIR_1811", "NIR_1812", "NIR_1814", "NIR_1817", "NIR_1713", "NIR_1710", "NIR_1705", "NIR_1667", "NIR_1644", "NIR_1651", "NIR_1661", "NIR_1662", "NIR_1671", "NIR_1681", "NIR_1682", "NIR_1706", "NIR_1808", "NIR_1864", "NIR_1866"]],
+  ["Campsite & shore", ["NIR_1638", "NIR_1687", "NIR_1830", "NIR_1675", "NIR_1720", "NIR_1738", "NIR_1688", "NIR_1691"]],
+  ["Backyard", ["NIR_0063", "NIR_0102", "NIR_0152", "NIR_0172", "NIR_0627"]],
+  ["The original RAW trio", ["canopy", "lodge", "hillside"]],
+  ["Full-spectrum D5300", ["magenta-woodland", "magenta-fir", "magenta-hilltown", "magenta-dusk-trees"]],
+];
+const library = $("library") as HTMLDivElement;
+{
+  const openBtn = $("libraryOpen") as HTMLButtonElement;
+  const body = $("libBody") as HTMLDivElement;
+  const used = new Set<string>();
+  const sections: [string, GalleryTile[]][] = [];
+  for (const [title, keys] of LIBRARY_GROUPS) {
+    const tiles = keys
+      .map((k) => GALLERY.find((t) => baseKey(t.key) === k))
+      .filter((t): t is GalleryTile => !!t);
+    tiles.forEach((t) => used.add(t.key));
+    if (tiles.length) sections.push([title, tiles]);
+  }
+  // Nothing may silently vanish: a tile missing from every group lands in a
+  // trailing "More" section (and the verify suite asserts it stays EMPTY).
+  const rest = GALLERY.filter((t) => !used.has(t.key));
+  if (rest.length) sections.push(["More", rest]);
+  for (const [title, tiles] of sections) {
+    const h = document.createElement("h4");
+    h.className = "lib-group";
+    h.textContent = title;
+    const grid = document.createElement("div");
+    grid.className = "gallery-list";
+    tiles.forEach((t) => grid.appendChild(makeTile(t)));
+    body.append(h, grid);
+  }
+  ($("libCount") as HTMLSpanElement).textContent =
+    `${GALLERY.length} photos · ${GALLERY.filter((t) => t.kind === "dng").length} RAW`;
+  openBtn.textContent = `Browse the full example library · ${GALLERY.length} photos →`;
+  openBtn.addEventListener("click", () => { library.hidden = false; });
+  ($("libClose") as HTMLButtonElement).addEventListener("click", () => { library.hidden = true; });
+}
+
+// The start screen SAYS it scrolls (the button-row lesson): a chevron cue at
+// the card's bottom edge while there's more below the fold, gone at the end.
+{
+  const cue = $("welcomeCue") as HTMLDivElement;
+  cue.hidden = false; // from here on, visibility is the .on class (see style.css)
+  const update = () => {
+    const more = welcome.scrollHeight - welcome.clientHeight - welcome.scrollTop > 24;
+    cue.classList.toggle("on", more);
+  };
+  welcome.addEventListener("scroll", update, { passive: true });
+  new ResizeObserver(update).observe(welcome);
+  new ResizeObserver(update).observe(galleryList); // content growth doesn't resize the capped card
+  // Lazy thumbnails change the card's height as they arrive.
+  galleryList.querySelectorAll("img").forEach((im) => im.addEventListener("load", update));
+  update();
+}
+
+// The app's OWN practice photos (tutorial + library) export with the Studio
+// corner mark baked in — the user's photos NEVER do (owner ask 2026-07-15).
+// The Export tab says so while a practice photo is open (labels stay honest).
+let bundledSource = false;
+function setBundledSource(v: boolean) {
+  bundledSource = v;
+  ($("exWmNote") as HTMLParagraphElement).hidden = !v;
+}
+
 let galleryGen = 0; // bumped per open — a double-tap aborts the older load (the quickGen pattern)
 async function openGalleryPhoto(key: string) {
   const tile = GALLERY.find((t) => t.key === key);
   if (!tile) return;
   const gen = ++galleryGen;
+  library.hidden = true; // a library pick heads straight into the editor
   // Like a tutorial, a practice photo is ephemeral — end any session first so
   // its strip doesn't linger and storage stays in sync.
   await resetSessionState(true);
@@ -3173,6 +3249,10 @@ async function openGalleryPhoto(key: string) {
     const img = await decode(imported);
     if (gen !== galleryGen) return;
     showDecoded(img, imported); // sets a fresh view; clears learn mode
+    // RAW practice files export with the corner mark ADDED (raw can't carry
+    // one); the teaching JPEGs already have it BAKED IN — adding another
+    // would double it (measured: two domain lines in the corner).
+    setBundledSource(tile.kind === "dng");
     // Track it as a lone photo, matching openPicked's single-open path, so a
     // later multi-pick can ask sensibly. activateCurrent runs establishFreshEdit.
     sessionPhotos = [{ id: "lone", name: imported.name, kind: imported.kind, size: imported.bytes.length, edit: null, thumbUrl: "" }];
@@ -3282,6 +3362,7 @@ ui.exBtn.addEventListener("click", async () => {
         scale: Number(ui.exScale.value),
         quality: Number(ui.exQuality.value),
         rotate: renderer.rotation,
+        watermark: bundledSource, // practice photos carry the corner mark; the user's photos never do
       },
       (f) => {
         busyText.textContent = `Exporting… ${Math.round(f * 100)}%`;

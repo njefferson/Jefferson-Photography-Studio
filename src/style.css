@@ -506,6 +506,40 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   padding: 0;
   border-radius: 50%;
 }
+/* The start screen SAYS it scrolls (the button-row lesson, owner rule
+   2026-07-14; his 2026-07-15 screenshot: the card ended at the fold and the
+   tutorial grid below looked like nothing). A sticky fade + chevron rides the
+   card's bottom edge while there's more below; main.ts hides it at the end. */
+.welcome-cue {
+  position: sticky;
+  bottom: -22px; /* cancel the card's bottom padding so the fade hugs the edge */
+  margin: -26px -26px -22px; /* span the card's full width over its padding */
+  height: 40px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 3px;
+  font-size: 12px;
+  color: var(--txt-2);
+  background: linear-gradient(180deg, transparent, var(--surface) 72%);
+  pointer-events: none;
+  transition: opacity 0.15s;
+  /* Visibility is a CLASS, not [hidden] — the [hidden]{display:none !important}
+     guard would drop the sticky layout instead of just fading. */
+  opacity: 0;
+}
+.welcome-cue.on { opacity: 1; }
+/* Short screens (iPad landscape): tighter welcome chrome so the practice grid
+   peeks above the fold instead of hiding entirely below it. */
+@media (max-height: 880px) {
+  #welcome { padding: 14px 26px 22px; }
+  .welcome-open { margin: 10px auto 2px; }
+  .welcome-batch { margin: 8px auto 2px; padding: 8px 16px; }
+  .welcome-open-hint,
+  .welcome-batch-hint { font-size: 12px; line-height: 1.4; }
+  .ex-title { margin: 12px 0 8px; }
+  .welcome-div { margin: 14px 8px 2px; }
+}
 .welcome-open {
   display: inline-block;
   margin: 14px auto 4px;
@@ -649,7 +683,8 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 }
 
 /* --- Quick look: a full-screen grid of auto-balanced previews. --- */
-#quickLook {
+#quickLook,
+#library {
   position: fixed;
   inset: 0;
   z-index: 40;
@@ -657,6 +692,41 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   flex-direction: column;
   background: var(--bg);
 }
+/* The example library body: grouped grids under small uppercase headers. */
+.lib-body {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 14px 16px 24px;
+}
+.lib-body .gallery-list { margin: 0 auto; }
+.lib-group {
+  max-width: 760px;
+  margin: 18px auto 8px;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--txt);
+  opacity: 0.65;
+}
+.lib-group:first-child { margin-top: 4px; }
+/* The way into the library. width:auto guards against the global button
+   width:100% rule (the chip-rail lesson). */
+.library-link {
+  display: block;
+  width: auto;
+  flex: 0 0 auto;
+  margin: 14px auto 0;
+  padding: 8px 16px;
+  background: none;
+  border: 1px dashed var(--line);
+  border-radius: 999px;
+  color: var(--txt);
+  opacity: 0.85;
+  font-size: 13px;
+  cursor: pointer;
+}
+.library-link:active { border-color: var(--accent); }
 .ql-head {
   display: flex;
   align-items: center;
@@ -1261,6 +1331,8 @@ label.open-btn, label.bar-btn {
 .help-body .from-app a { color: var(--accent); font-weight: 600; }
 /* width:auto against the global button width:100% rule (the chip-rail lesson). */
 .inline-btn { width: auto; display: inline-block; padding: 5px 10px; border-radius: 999px; }
+/* Honest label: practice-photo exports carry the Studio corner mark. */
+.wm-note { font-size: 11.5px; line-height: 1.45; color: var(--txt-3); margin: 6px 0 8px; }
 .help-body h3 { margin: 14px 0 6px; font: 600 13px/1.3 var(--display); color: var(--txt); }
 .help-body p { margin: 6px 0; }
 
