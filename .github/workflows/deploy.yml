@@ -9,6 +9,9 @@ on:
 
 jobs:
   deploy:
+    # Only main (production) and staging may deploy — a manual dispatch from a
+    # work branch must never bypass the owner's staging gate.
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

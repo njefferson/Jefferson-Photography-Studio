@@ -1,7 +1,8 @@
 # Infrared Photography Studio (IPS) — Build Plan
 
-_Last updated: 2026-06-17. This is the authoritative plan. See `NOTES.md` for
-the original brief._
+_Written 2026-06-17 as the original build plan — kept as HISTORY. It predates
+NEF decode (which shipped), Display-P3 output (still sRGB today) and most of
+what followed; **`NOTES.md` is the source of truth**, not this file._
 
 ## One-line goal
 
