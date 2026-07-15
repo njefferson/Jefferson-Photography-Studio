@@ -182,6 +182,30 @@ body {
 .shape strong { color: var(--txt); font-weight: 600; }
 .install .how { margin: 1.2rem auto 0; max-width: 60ch; font-size: 0.85rem; line-height: 1.6; color: var(--txt-2); text-align: center; }
 .install .how strong { color: var(--txt); font-weight: 600; }
+/* Shown only inside the installed (standalone) app, where Safari's Share —
+   and with it Add to Home Screen — is out of reach. */
+.install .from-app {
+  margin: 1.2rem auto 0; max-width: 60ch;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px;
+  padding: 1rem 1.1rem; font-size: 0.85rem; line-height: 1.6; color: var(--txt-2);
+}
+.install .from-app p { margin: 0 0 0.6rem; }
+.install .from-app p:last-child { margin-bottom: 0; }
+.install .from-app strong { color: var(--txt); font-weight: 600; }
+.from-app-links { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+.from-app-links a {
+  display: inline-flex; align-items: center; padding: 0.5rem 0.9rem;
+  border: 1px solid var(--line-2); border-radius: 999px;
+  color: var(--txt); text-decoration: none; font-weight: 600;
+  background: var(--surface);
+}
+.from-app .fine { font-size: 0.8rem; color: var(--txt-3); }
+.from-app .fine button {
+  width: auto; display: inline-block; margin: 0.2rem 0.25rem 0 0;
+  padding: 0.35rem 0.7rem; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--txt-2);
+  font: 500 0.8rem/1 var(--ui); cursor: pointer;
+}
 
 /* ---- Icon picker (cards injected by iconpicker.ts) ---- */
 .picker { max-width: 100%; margin: 1.5rem auto 0; }

@@ -15,7 +15,7 @@ import { buildLocalMap } from "./localmap";
 import { buildSkyMask } from "./sky";
 import { drawHistogram } from "./histogram";
 import * as Hotspot from "./hotspot";
-import { setupInstalledShare } from "./share";
+import { setupInstalledShare, setupInstallFromApp } from "./share";
 import { wireThemeToggle } from "./theme";
 
 // Injected at build time from git history (see vite.config.ts).
@@ -4035,6 +4035,7 @@ const VENMO_URL = "https://venmo.com/u/noahjefferson";
 // Installed-app Share (src/share.ts): only appears when running standalone,
 // where Safari's own Share / address bar are gone.
 setupInstalledShare("shareBtn");
+setupInstallFromApp("irInstallFromApp");
 
 // Offline support.
 if ("serviceWorker" in navigator) {

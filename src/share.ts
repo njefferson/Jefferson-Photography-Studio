@@ -94,3 +94,26 @@ export function setupInstalledShare(btnId: string): void {
     void shareApp();
   });
 }
+
+/** Reveal an "install from inside the installed app" block and wire its
+ *  copy-link buttons — only when running standalone, where Add to Home Screen
+ *  is out of reach (no Safari Share button). The block's `button[data-copy]`
+ *  elements copy the absolute URL of the page named in data-copy, so it can be
+ *  pasted into real Safari, where Add to Home Screen lives. A no-op in the
+ *  browser and if the block isn't on the page. */
+export function setupInstallFromApp(blockId: string): void {
+  const box = document.getElementById(blockId);
+  if (!box || !isStandaloneApp()) return;
+  box.hidden = false;
+  box.querySelectorAll<HTMLButtonElement>("button[data-copy]").forEach((b) => {
+    b.addEventListener("click", async () => {
+      const url = new URL(b.dataset.copy || ".", location.href).href;
+      try {
+        await navigator.clipboard.writeText(url);
+        toast("Link copied — paste it in Safari, then Share → Add to Home Screen");
+      } catch {
+        toast(url, 6000); // last resort: show it so it can be read or typed
+      }
+    });
+  });
+}
