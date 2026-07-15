@@ -14,8 +14,9 @@ if ("serviceWorker" in navigator) {
 
 // Installed-app Share (src/share.ts): only appears when the launcher is running
 // as a standalone app, where Safari's own Share / address bar are gone.
-import { setupInstalledShare } from "./share";
+import { setupInstalledShare, setupInstallFromApp } from "./share";
 setupInstalledShare("shareBtn");
+setupInstallFromApp("installFromApp");
 
 // Home-Screen icon picker (src/iconpicker.ts): choose which icon the installed
 // Studio launcher wears, swapped before Add-to-Home-Screen. Requires JS, so the

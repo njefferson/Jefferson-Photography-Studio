@@ -1,6 +1,6 @@
 import "./macro.css";
 import { stackFocus, type StackFrame } from "./stack";
-import { setupInstalledShare } from "../share";
+import { setupInstalledShare, setupInstallFromApp } from "../share";
 import { wireThemeToggle } from "../theme";
 
 // Macro focus-stacking mode. Loads a focus-shift JPEG set, blends it into one
@@ -332,6 +332,7 @@ wireThemeToggle(document.getElementById("themeToggle"));
 
 // Installed-app Share (src/share.ts): only when running standalone.
 setupInstalledShare("shareBtn");
+setupInstallFromApp("macroInstallFromApp");
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));

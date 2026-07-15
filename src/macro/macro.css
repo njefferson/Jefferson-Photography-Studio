@@ -248,6 +248,19 @@ dialog#helpDlg ul { margin: 0.35rem 0; padding-left: 1.2rem; color: var(--txt-2)
 dialog#helpDlg li { margin: 0.2rem 0; }
 dialog#helpDlg strong { color: var(--txt); }
 dialog#helpDlg .muted { color: var(--txt-3); font-size: 0.85rem; }
+/* Shown only inside the installed (standalone) app, where Safari's Share —
+   and with it Add to Home Screen — is out of reach. */
+dialog#helpDlg .from-app {
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px;
+  padding: 0.7rem 0.8rem; margin: 0.7rem 0;
+}
+dialog#helpDlg .from-app p { margin: 0; }
+dialog#helpDlg .from-app a { color: var(--accent); font-weight: 600; }
+dialog#helpDlg .inline-btn {
+  width: auto; display: inline-block; padding: 0.3rem 0.7rem; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--txt-2);
+  font: 500 0.8rem/1 var(--ui); cursor: pointer;
+}
 dialog#helpDlg button { margin-top: 0.6rem; padding: 0.55rem 1.2rem; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); color: var(--txt); cursor: pointer; }
 /* Dawn theme toggle inside the Macro help dialog. */
 dialog#helpDlg .theme-row { display: flex; align-items: center; gap: 10px; margin-top: 1rem; padding-top: 0.9rem; border-top: 1px solid var(--line); }
