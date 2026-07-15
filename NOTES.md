@@ -227,6 +227,9 @@ See **`PLAN.md`** for the full build plan.
   tutorial tiles open on their lesson chips + render, one spot-check per
   library group opens/renders (incl. Golden canopy proving galRaw's 3rd
   arg is rotate, not lesson), no page errors.
+  [SUPERSEDED 2026-07-15: the library came BACK as its own full-screen
+  overlay — owner pick "needs its own location"; see the landing/library
+  entry below. The paragraph that follows records the 2026-07-14 state.]
   LIBRARY UI REMOVED same day (owner on-device verdict, escalating from
   "they don't have to collapse" to "It doesn't HAVE to BE THERE" — read
   the second message before acting on the first; cache ips-v45 → ips-v46):
@@ -788,7 +791,9 @@ See **`PLAN.md`** for the full build plan.
   AHS — the manifest is only cache-first for already-visited Android). Verified
   headless 31/31 (Light default, order Light→Dark, Dark→blob-manifest swap,
   switch-back restores the static manifest, IR/Macro assert NOT-NJ). Merged to
-  main after the owner's on-device pass. an installed (standalone) PWA has
+  main after the owner's on-device pass.
+- [x] **Share the app from inside the installed app** — an installed
+  (standalone) PWA has
   NO Safari chrome — no address bar, no Share, no Back — so there was no way to
   send someone the link or even see it (owner ask, 2026-07-13). SHIPPED same day:
   a Share control that appears ONLY when running standalone (in the browser
@@ -987,7 +992,8 @@ See **`PLAN.md`** for the full build plan.
   carry into a batch — each photo gets its own EXIF hot-spot fix instead. Also
   corrected the stale Help that still said "Process many" lives in Export (it
   moved to the top bar + start screen). SHIPPED 2026-07-13.
-- [ ] **On-device checks owed** — Safari IDB crash durability (all
+- (Internal QA, not a roadmap item — plain bullet so the ⓘ parser skips it.)
+  On-device checks owed: Safari IDB crash durability (all
   measurements were Chromium), share-sheet with a large .zip, jetsam under
   real memory pressure, and a portrait-orientation frame through batch.
   (The old-URL redirect from an installed old-domain PWA PASSED — owner
@@ -1228,6 +1234,130 @@ See **`PLAN.md`** for the full build plan.
 - [x] **Roadmap + patch-notes hub** — the ⓘ dialog now shows the next-release
   roadmap and the latest updates, each with a "More" link to the full history
   and notes on GitHub.
+
+## Full-app review (ultracode), 2026-07-15 — findings ledger
+
+> An 11-dimension multi-agent review over the whole repo; every problem below
+> marked FIXED was re-verified in code by hand and is covered by the verify
+> suite where a headless check exists. DEFERRED items are real but need their
+> own release (or an owner decision) — do not re-discover them.
+
+FIXED in the 2026-07-15 review release (cache ips-v52 → ips-v53):
+- SW cached NON-OK responses — one bad fetch poisoned cache-first assets
+  forever, and could poison the version-stable examples cache. Both branches
+  now cache only res.ok.
+- .dcp wrote plain-TIFF magic 42; the DCP spec magic is 0x4352 ("CR") —
+  Lightroom/ACR reject 42 outright. Almost certainly why the pending
+  "Lightroom colour test" never had a chance; re-ask the owner to test.
+- NEF lossy-branch (0x44/0x20) linearization-curve interpolation read past
+  the curve array (undefined→NaN→0): highlights decoded BLACK on
+  lossy-compressed NEFs. Upper grid index now clamped. (The owner's classic
+  Z50 files take the other branch — bit-exactness unaffected.)
+- LJ92: restart markers (DRI) never reset prediction — any DRI DNG decoded
+  to garbage. Now resets per T.81 (default at interval start, Ra across the
+  interval's first line; still UNTESTED on a real DRI file — none seen yet).
+- LJ92 + NEF truncated streams decoded to silent garbage; both now throw an
+  honest "file looks damaged or incomplete" error.
+- Mode machine: setHealReview didn't disarm TAT/colour-pick/HSL-pick; armed
+  tools + banners survived Home (floating over the start screen) AND rode
+  into freshly opened photos (Lesson 1 teaches tap-WB!); brush Paint sat
+  outside the exclusion set entirely. New disarmPictureTools() runs on every
+  open + Home; review arms exclusively; Paint⇄tools disarm each other.
+- Undo during auto-sweep review left a ZOMBIE review (banner counting spots
+  that no longer exist, every tap consumed); review now re-validates on undo
+  and on empty-spot taps. activeSpotIdx also reset per photo (the Spot-size
+  slider used to resize a spot on the NEXT photo).
+- openGalleryPhoto destroyed the live session (memory AND storage) BEFORE
+  the download/decode succeeded — a failed practice-photo open lost real
+  work. Teardown now happens only after a decodable photo is in hand, and a
+  live multi-photo session gets a confirm first (parity with openPicked).
+- Transcoded-JPEG rejection wrote its explanation into the start screen's
+  #hint even when the editor was up (invisible); now alerts in that case.
+- TIFF16 stores truncated instead of rounding (≤1 LSB16 low bias) — fixed,
+  watermark blend too. A failed watermark-mark fetch was memoized forever
+  (every later export text-only) — now retried per export.
+- Toast (copy-link etc.) rendered UNDER open <dialog>s — the top layer beats
+  any z-index; the toast now mounts inside the open dialog. LESSON for all
+  future overlays: modal dialogs paint above everything except the top layer.
+- Look buttons' norm/R⇄B mini-toggle lost its active styling when markup
+  moved .look-row → .looks-grid; selectors updated, dead .look-row CSS gone.
+- deploy.yml: a manual workflow_dispatch from ANY branch deployed that
+  branch to PRODUCTION, bypassing the staging gate — job now runs only for
+  main/staging refs.
+- Roadmap parser truncated a bold title at an inner em-dash ("Learn on real
+  photos — lessons…" rendered as "Learn on real photos"); it now prefers the
+  full **bold span**. "On-device checks owed" (internal QA) no longer renders
+  in the user-facing roadmap (plain bullet).
+- GitHub links in the ⓘ dialog pointed at the long-renamed njefferson/
+  IRstudio (404 for everyone). Slug fixed — but NOTE: the repo is PRIVATE, so
+  even correct links 404 for end users; owner call whether to expose the
+  history some other way (see suggestions).
+- Help honesty: masks list now includes Colour + Sky; profiles caveat now
+  names clarity/dehaze/masks/heals; session-resume promise now admits masks
+  reset on reload; NEF caveat covers the Z50 II's HE files; Macro Help said
+  "JPEG sets only" while accepting PNG (now says both); Macro intake errors
+  were written into the hidden work section (now land on the intake panel).
+- Dead weight: nine unreferenced pre-NJ studio-icon* files (~190 KB) removed
+  from the deploy; stale docs corrected (ARCHITECTURE.md domains + example
+  section, PLAN.md demoted from "authoritative" to history, main.ts's stale
+  "v1.0 arrives by git tag" comment).
+
+CONFIRMED but DEFERRED (each needs its own release / owner input):
+- BIGGEST: denoise/sharpen/texture run at PROXY resolution in preview but
+  NATIVE at export — every RAW export's detail character differs from what
+  was previewed (~2× kernel scale; verified 3/3, incl. that the parity
+  harness structurally can't see it — it compares equal-res mirrors). Fix =
+  scale CPU kernel tap spacing by the proxy factor at export (and the
+  detail sigmas), then re-prove parity + tune with the owner's eyes.
+- Every release still blacks out OFFLINE use until the next online visit:
+  activation wipes the old cache and nothing precaches the new shell/assets.
+  Real fix = build-time precache manifest injected into sw.js (vite plugin),
+  install-time addAll, activate-after-populate.
+- Multi-tab: two tabs of ir.html silently clobber each other's ips-session
+  store (no guard). Also: lone opens still have zero crash safety.
+- .cube/.dcp saves use a bare a[download] — silently does nothing in the
+  installed (standalone) iOS app; should ride the share-sheet path like
+  image saves. Double-tapping Save while the share sheet opens can fall into
+  the download branch and (for batch) clear crash-recovery frames early.
+- Rotate regenerates the sky mask as an UNDOABLE step (undo can restore a
+  90°-wrong sky bitmap); gradient-mask default geometry ignores rotation.
+- stampBrush uses u*(w-1) pixel convention vs the sampler's texel-centre
+  u*w-0.5 (≤half-texel paint offset at edges). Glow map: GPU samples 8-bit
+  quantized, CPU export samples f32 (small parity drift by construction).
+- parseExif throws on corrupt EXIF and fails the whole open (should degrade
+  to no-profile); a leading non-Exif APP1 (XMP) aborts the EXIF scan.
+- detectSpots transient RAM at 2800px measures ~2× the ~70 MB NOTES carries;
+  tiny heal rings are hard to tap (hit radius < drawn ring minimum); the
+  sweep's review counts pre-existing manual heals as sweep receipts;
+  re-running Find spots reports "no dust" when it re-found healed spots.
+- Uncompressed-DNG path assumes 16-bit samples (no BitsPerSample check);
+  mirrored EXIF orientations (2/4/5/7) treated upright; TIFF-based
+  third-party RAWs (CR2/ARW…) silently open as their embedded preview;
+  plain TIFF errors claim "DNG"; every NEF failure claims High-Efficiency.
+- Macro: full-res export stacks the CURRENT on/off frame set, not the set
+  that produced the on-screen result; toBlob null → "ready" with nothing to
+  save; Uint16 accumulators wrap at 258+ frames; per-frame OffscreenCanvas
+  churn in the export worker.
+- writeZip has no zip64 guard (safe only because the byte budget caps zips
+  <4 GiB today); .dcp hardcodes UniqueCameraModel "NIKON Z 50" (invisible in
+  LR for other cameras' raws — needs the source camera's name when known).
+- Shallow clones make versionFor() confidently wrong (CI uses fetch-depth:0
+  so production is fine; local/preview builds lie); no concurrency group in
+  deploy.yml (rapid pushes can leave the older build live); sourcemaps ship
+  the full TS source publicly while the repo is private (owner call).
+- ips-examples-v1 can grow to ~440 MB with no cap and no user-facing way to
+  free it — needs a "downloaded practice photos" line + clear control in the
+  app (pairs with the storage honesty rules).
+
+OPPORTUNITIES the owner may want next (all classical, on-device, buildable
+by a session; roughly by value): crop/straighten (the last table-stakes tool
+before the App Store path); Display-P3 JPEG export (recorded target, code
+ships sRGB); keep EXIF (capture date/camera) in exports; box-filtered scaled
+exports (50%/25% currently decimate nearest-neighbour); batch-from-session;
+per-channel R/G/B curves (strengthens .cube/.dcp); B&W mode for 720nm;
+Web-Worker thumbnailer (named twice in NOTES); privacy/support page (App
+Store requires one; also markets the on-device story); a public home for
+patch notes/roadmap history (the private repo 404s for users).
 
 ## Future / bigger bets (backlog, 2026-07-05)
 
