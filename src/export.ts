@@ -41,7 +41,10 @@ function loadWmMark(): Promise<ImageBitmap | null> {
   wmMarkPromise ??= fetch("./icons/nj-watermark-line-512.png")
     .then((r) => (r.ok ? r.blob() : Promise.reject(new Error("mark missing"))))
     .then((b) => createImageBitmap(b))
-    .catch(() => null); // no mark asset -> text-only watermark, never a failed export
+    .catch(() => {
+      wmMarkPromise = null; // don't memoize a failure — retry on the next export
+      return null; // this export ships a text-only mark rather than failing
+    });
   return wmMarkPromise;
 }
 
@@ -232,9 +235,9 @@ export async function exportImage(
         const [r, g, b] = sampleLinear(sx, sy);
         edit(r, g, b, out, glowAt(sx, sy), (sx + 0.5) / srcW, (sy + 0.5) / srcH);
         const o = (y * w + x) * 3;
-        rgb[o] = out[0] * 65535;
-        rgb[o + 1] = out[1] * 65535;
-        rgb[o + 2] = out[2] * 65535;
+        rgb[o] = out[0] * 65535 + 0.5; // round — truncation biased the 16-bit output low
+        rgb[o + 1] = out[1] * 65535 + 0.5;
+        rgb[o + 2] = out[2] * 65535 + 0.5;
       }
     }
     onProgress?.(1);
@@ -251,9 +254,9 @@ export async function exportImage(
             const a = ld[li + 3] / 255;
             if (a === 0) continue;
             const o = ((wm.y + y) * w + (wm.x + x)) * 3;
-            rgb[o] = rgb[o] * (1 - a) + ld[li] * 257 * a;
-            rgb[o + 1] = rgb[o + 1] * (1 - a) + ld[li + 1] * 257 * a;
-            rgb[o + 2] = rgb[o + 2] * (1 - a) + ld[li + 2] * 257 * a;
+            rgb[o] = rgb[o] * (1 - a) + ld[li] * 257 * a + 0.5;
+            rgb[o + 1] = rgb[o + 1] * (1 - a) + ld[li + 1] * 257 * a + 0.5;
+            rgb[o + 2] = rgb[o + 2] * (1 - a) + ld[li + 2] * 257 * a + 0.5;
           }
         }
       }
