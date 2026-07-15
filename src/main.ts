@@ -2107,6 +2107,7 @@ let learnMode = false;
 // (and in storage), so the return button — or a reload's Resume — drops you
 // right back. The start screen is also where the tutorials live, so Help's
 // "Tutorials" button routes here too (see the helpTutorials wiring).
+let lessonCardParked = false; // lesson card open when Home was pressed
 function goHome() {
   captureActiveEdit(); // park any in-flight edit before leaving the photo
   welcome.hidden = false;
@@ -2119,6 +2120,10 @@ function goHome() {
   // Hide the lesson rail while the start screen is up (learnMode stays set, so
   // returnToEditor brings the rail — and the active lesson — right back).
   lessonChips.hidden = true;
+  // The lesson card floats over the welcome card if left up (owner screenshot
+  // 2026-07-14) — park it and let returnToEditor restore it.
+  lessonCardParked = !lesson.hidden;
+  lesson.hidden = true;
   stageEl.classList.remove("learn");
   updateWelcomeReturn();
   updateSessionResume();
@@ -2144,7 +2149,9 @@ function returnToEditor() {
   if (learnMode) {
     stageEl.classList.add("learn");
     lessonChips.hidden = false;
+    if (lessonCardParked) lesson.hidden = false;
   }
+  lessonCardParked = false;
   renderMaskOverlay();
   positionHealOverlay();
 }

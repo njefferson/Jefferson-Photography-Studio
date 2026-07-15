@@ -771,6 +771,11 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   text-decoration: underline;
 }
 .bar-actions { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+/* The top bar reflects the MODE. While the start screen is up, the photo
+   controls park themselves — they act on a photo that isn't on screen, so
+   they read as a broken menu (owner report 2026-07-14, narrow viewport).
+   Home lives up by ‹ Studio and also parks: on the start screen you're home. */
+body:has(#welcome:not([hidden])) :is(#homeBtn, #undoBtn, #resetBtn, #origBtn, #histBtn, #rotateBtn, .bar-sep) { display: none; }
 .bar-actions .bar-sep { width: 1px; height: 22px; background: var(--line); flex: none; }
 .bar-btn {
   width: auto;
