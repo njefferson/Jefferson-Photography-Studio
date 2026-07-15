@@ -4,7 +4,7 @@
 // online), falling back to cache when offline. Hashed build assets are
 // cache-first (their names change every build, so this is safe and fast).
 // Bumping CACHE wipes old entries on activation.
-const CACHE = "ips-v52";
+const CACHE = "ips-v53";
 // The practice-library RAW files (~10 MB each) live in their own VERSION-STABLE
 // cache that survives CACHE bumps — otherwise every release wipes them and a
 // tap re-downloads megabytes the user already had. Their bytes are immutable
@@ -40,8 +40,11 @@ self.addEventListener("fetch", (e) => {
       (async () => {
         try {
           const res = await fetch(req);
-          const c = await caches.open(CACHE);
-          c.put(req, res.clone()).catch(() => {});
+          // Only cache good responses — a cached 404/500 would replay forever.
+          if (res.ok) {
+            const copy = res.clone();
+            e.waitUntil(caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {}));
+          }
           return res;
         } catch {
           return (await caches.match(req)) || (await caches.match("./")) || Response.error();
@@ -58,12 +61,17 @@ self.addEventListener("fetch", (e) => {
       const hit = await caches.match(req);
       if (hit) return hit;
       const res = await fetch(req);
-      // Clone BEFORE returning: once respondWith starts consuming the body,
-      // clone() throws and the cache write silently never happens (measured —
-      // on a fast connection this raced and lost).
-      const copy = res.clone();
-      const bucket = isExampleRaw(url) ? EXAMPLES : CACHE;
-      e.waitUntil(caches.open(bucket).then((c) => c.put(req, copy)).catch(() => {}));
+      // Only cache good responses — cache-first would replay a cached 404
+      // forever, and one bad fetch would poison the version-stable examples
+      // cache permanently (review find, 2026-07-15). Clone BEFORE returning:
+      // once respondWith starts consuming the body, clone() throws and the
+      // cache write silently never happens (measured — fast connections lost
+      // that race).
+      if (res.ok) {
+        const copy = res.clone();
+        const bucket = isExampleRaw(url) ? EXAMPLES : CACHE;
+        e.waitUntil(caches.open(bucket).then((c) => c.put(req, copy)).catch(() => {}));
+      }
       return res;
     })(),
   );
