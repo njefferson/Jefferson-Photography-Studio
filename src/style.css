@@ -549,23 +549,25 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   transform: translateX(-50%);
   z-index: 7;
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 14px;
-  border-radius: 999px;
+  flex-direction: column; /* header row over a full-width slider — room since the drawer tucks away while cropping */
+  align-items: stretch;
+  gap: 8px;
+  padding: 10px 16px 12px;
+  border-radius: 18px;
   background: var(--accent-soft); /* blue-tinted "active" glass — stands out without the solid fill the exit banner uses */
   border: 1px solid var(--accent);
   box-shadow: 0 3px 14px rgba(0, 0, 0, 0.45);
   color: var(--txt-1);
-  max-width: min(94%, 460px);
+  width: min(88%, 360px);
 }
-#cropTools label { display: flex; align-items: center; gap: 8px; margin: 0; flex: 1; font-size: 12px; color: var(--txt-1); }
+#cropTools .crop-row { display: flex; align-items: center; gap: 10px; }
+#cropTools .crop-lbl { flex: 1; font-size: 13px; font-weight: 600; color: var(--txt-1); }
 #cropTools input[type="range"] { width: 100%; margin: 0; }
-#straightenVal { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--txt-1); flex: none; min-width: 4ch; }
-#cropTools button { flex: none; width: auto; padding: 6px 10px; font-size: 12px; border-color: var(--accent); }
+#straightenVal { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--txt-1); flex: none; min-width: 4ch; text-align: right; }
+#cropTools button { flex: none; width: auto; padding: 6px 12px; font-size: 12px; border-color: var(--accent); }
 #cropTools button:disabled { opacity: 0.45; } /* honest greyed state when the crop is already identity */
 @media (max-width: 760px) {
-  #cropTools { bottom: 10px; padding: 6px 10px; gap: 6px; }
+  #cropTools { bottom: 10px; padding: 9px 12px 11px; }
 }
 #stage.has-session #cropTools { bottom: calc(24px + var(--session-h, 110px)); }
 #stage.has-session #cropBanner { bottom: calc(74px + var(--session-h, 110px)); }
@@ -983,7 +985,7 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
    controls park themselves — they act on a photo that isn't on screen, so
    they read as a broken menu (owner report 2026-07-14, narrow viewport).
    Home lives up by ‹ Studio and also parks: on the start screen you're home. */
-body:has(#welcome:not([hidden])) :is(#homeBtn, #undoBtn, #redoBtn, #resetBtn, #origBtn, #histBtn, #rotateBtn, .bar-sep) { display: none; }
+body:has(#welcome:not([hidden])) :is(#homeBtn, #undoBtn, #redoBtn, #resetBtn, #origBtn, #histBtn, .bar-sep) { display: none; }
 .bar-actions .bar-sep { width: 1px; height: 22px; background: var(--line); flex: none; }
 .bar-btn {
   width: auto;
@@ -1148,6 +1150,9 @@ label.open-btn, label.bar-btn {
   border-color: var(--accent);
   font-weight: 600;
 }
+/* The geometry tools live in their own tab, set apart as a full-width entry
+   below the six adjustment sections. */
+.ptab[data-tab="crop"] { grid-column: 1 / -1; }
 .section-head { flex: none; padding: 12px 14px 8px; }
 .section-title { margin: 0; font: 600 15px/1.2 var(--display); color: var(--txt); }
 .section-sub { margin: 2px 0 0; font-size: 12px; line-height: 1.35; color: var(--txt-3); }

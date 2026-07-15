@@ -156,6 +156,43 @@ See **`PLAN.md`** for the full build plan.
   glyph rides both the top-bar Crop button and the Straighten label. VERIFIED
   headless: computed bg == accent-soft, border == accent, ↻ present in both,
   Reset disabled at identity crop.
+  OWNER'S ON-DEVICE PASS (2026-07-15, staging, iPhone portrait — three fixes,
+  all shipped same round, cache ips-v56 → ips-v57):
+  (1) ICON CONFUSING. Root cause: the Crop button's ↻ collided with the Rotate
+  90° button RIGHT NEXT TO IT (which already leads with ↻), and ↻▣ read as two
+  mashed glyphs. Owner's call — "put crop, straighten, and rotate in one of the
+  sub menus, or a new one, instead of the main menu." DONE: a new **"Crop" panel
+  tab** (7th, full-width below the six adjustment tabs via
+  `.ptab[data-tab="crop"]{grid-column:1/-1}`); "crop" added to PANEL_TABS +
+  TAB_META (setPanelTab is generic, sections/tabs are DOM-queried, so it wires
+  up for free). #rotateBtn and #cropBtn MOVED into that tab's section — SAME ids,
+  so their handlers are unchanged; only the DOM home moved. In-tab there's no
+  adjacent ↻, so Rotate keeps a clear "↻ Rotate 90°" and Crop is now plain words
+  ("Crop & straighten"). Top bar is decluttered (both buttons gone from it).
+  (2) LOCKED OUT — "the bottom opens and covers so much." In portrait the editor
+  drawer (#panel, 45dvh) stayed open under the crop toolbar, squeezing the photo.
+  FIX: `setCropMode` now sets `panel.hidden = true` while armed (restored on
+  exit only when a photo is open, so the start-screen setCropMode(false) calls
+  never bare an empty drawer). Reuses the EXISTING `#app:has(#panel[hidden])`
+  collapse — zero new layout CSS; the stage goes full-height in both layouts.
+  Exits (the "Tap here when done" banner + the Crop tab button) are unchanged.
+  (3) BOTTOM PILL. Owner: "accent is good but the bottom pill needs work." With
+  the drawer gone there's room, so #cropTools became a COLUMN: a header row
+  (Straighten label · degree readout · Reset crop) over a full-width slider —
+  no more thumb/readout overlap. Soft-accent tint kept; ↻ dropped from the pill
+  (redundant now that Rotate is a labelled button in the tab).
+  VERIFIED headless 20/20 (Chromium, iPhone-portrait 390×844 viewport; fail-first
+  proven — planted "labels have RAW" + "drawer stays visible" both failed as
+  planted; a real test bug was caught too — a landscape photo is width-limited in
+  portrait so the CANVAS height barely moves, the STAGE is what grows): Rotate +
+  Crop are off the bar and inside #panel; Crop tab reveals the section (title
+  "Crop"); Rotate 90° swaps the canvas aspect and back; arming crop hides #panel
+  and the stage gains >100px, banner shows; pill is column + full-width slider +
+  soft-accent + Reset greyed at identity; exiting restores the drawer; prior
+  release (histogram tap-hide, undo/redo walk, no "RAW" labels) still green; no
+  page errors. NEEDS THE OWNER'S HANDS: sub-menu discoverability (Crop is now a
+  tab, Rotate is two taps away — flagged the tradeoff), the drawer-hide feel on
+  the real iPhone, and the redesigned pill's look/room.
 - [x] **Redo** — owner ask 2026-07-15: add a Redo button + function next to
   "Go back", and RENAME "Go back" to "Undo" (unless a reason surfaces not to).
   Build notes: the undo stack already exists (undoStack + settled/flushRecord);

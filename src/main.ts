@@ -931,7 +931,7 @@ $("toneReset").addEventListener("click", () => {
 
 // --- Sectioned tab panel: six segmented tabs, one section of controls each.
 // The active tab is remembered per session so reopening lands where you left.
-const PANEL_TABS = ["basic", "ir", "color", "tone", "masks", "export"] as const;
+const PANEL_TABS = ["basic", "ir", "color", "tone", "masks", "export", "crop"] as const;
 type PanelTab = (typeof PANEL_TABS)[number];
 const TAB_META: Record<PanelTab, { name: string; sub: string }> = {
   basic: { name: "Basic", sub: "White balance, exposure & detail" },
@@ -940,6 +940,7 @@ const TAB_META: Record<PanelTab, { name: string; sub: string }> = {
   tone: { name: "Tone", sub: "Curve, luminance & bands" },
   masks: { name: "Masks", sub: "Local, area-only adjustments" },
   export: { name: "Export", sub: "Save, my looks & profiles" },
+  crop: { name: "Crop", sub: "Rotate, crop & straighten" },
 };
 const panelTabsEl = $("panelTabs") as HTMLElement;
 const sectionTitleEl = $("sectionTitle") as HTMLElement;
@@ -1907,6 +1908,13 @@ function setCropMode(on: boolean) {
   // Pull the photo in from the stage edges while cropping so the corner handles
   // never sit flush in the physical screen corners (the OS eats touches there).
   stageEl.classList.toggle("cropping", cropArmed);
+  // Tuck the editor drawer away while cropping so the photo gets the full stage
+  // (portrait especially — the drawer otherwise eats the lower half). Reuses the
+  // #app:has(#panel[hidden]) collapse. Restore only with a photo open, so the
+  // defensive setCropMode(false) calls on the start screen don't bare an empty
+  // drawer.
+  if (cropArmed) panel.hidden = true;
+  else if (current) panel.hidden = false;
   straightenSlider.value = String(params.straighten);
   straightenVal.textContent = `${params.straighten.toFixed(1)}°`;
   positionCropOverlay();

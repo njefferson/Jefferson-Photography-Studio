@@ -39,8 +39,6 @@
           <button id="resetBtn" class="bar-btn" type="button" disabled title="Reset the whole edit to how the photo first opened">Reset</button>
           <button id="origBtn" class="bar-btn" type="button" title="Press and hold to compare with the original">Hold: Original</button>
           <button id="histBtn" class="bar-btn" type="button" aria-pressed="true" title="Show or hide the live histogram">Histogram</button>
-          <button id="rotateBtn" class="bar-btn" type="button" aria-label="Rotate 90 degrees clockwise">&#8635; Rotate 90&deg;</button>
-          <button id="cropBtn" class="bar-btn" type="button" aria-pressed="false" aria-label="Crop and straighten">&#8635;&#9635; Crop</button>
           <button id="helpBtn" class="bar-btn" type="button">Help</button>
           <button id="shareBtn" class="bar-btn" type="button" hidden title="Share this app or copy its link">&#x2BAD;&#xFE0E; Share</button>
           <span class="bar-sep" aria-hidden="true"></span>
@@ -69,9 +67,12 @@
           </div>
         </div>
         <div id="cropTools" hidden>
-          <label>&#8635; Straighten <input id="straighten" type="range" min="-45" max="45" step="0.1" value="0" /></label>
-          <span id="straightenVal">0.0&deg;</span>
-          <button id="cropReset" type="button">Reset crop</button>
+          <div class="crop-row">
+            <span class="crop-lbl">Straighten</span>
+            <span id="straightenVal">0.0&deg;</span>
+            <button id="cropReset" type="button">Reset crop</button>
+          </div>
+          <input id="straighten" type="range" min="-45" max="45" step="0.1" value="0" aria-label="Straighten" />
         </div>
         <div id="histWrap" hidden aria-label="Live RGB histogram">
           <canvas id="histogram" width="256" height="96" title="Tap to hide — use the Histogram button to bring it back"></canvas>
@@ -153,6 +154,7 @@
           <button class="ptab" type="button" data-tab="tone" role="tab" aria-selected="false">Tone</button>
           <button class="ptab" type="button" data-tab="masks" role="tab" aria-selected="false">Masks</button>
           <button class="ptab" type="button" data-tab="export" role="tab" aria-selected="false">Export</button>
+          <button class="ptab" type="button" data-tab="crop" role="tab" aria-selected="false">Crop</button>
         </div>
         <div class="section-head">
           <h2 id="sectionTitle" class="section-title">Basic</h2>
@@ -364,6 +366,13 @@
             <label class="check-row"><input id="profWB" type="checkbox" /> Bake current white balance in</label>
             <button id="cubeBtn" type="button">Export .cube (Photoshop / video)</button>
             <button id="dcpBtn" type="button">Export .dcp (Lightroom &mdash; beta)</button>
+          </section>
+
+          <!-- ===== CROP ===== -->
+          <section class="section" data-tab="crop" hidden>
+            <button id="rotateBtn" class="accent-outline" type="button" aria-label="Rotate 90 degrees clockwise">&#8635; Rotate 90&deg;</button>
+            <button id="cropBtn" class="toggle full-btn" type="button" aria-pressed="false" aria-label="Crop and straighten">Crop &amp; straighten</button>
+            <p class="note">Rotate turns the whole photo 90&deg;. Crop &amp; straighten opens a draggable box &mdash; level the horizon with the Straighten slider. The editor tucks away so you have room, and the photo re-frames when you tap &ldquo;done&rdquo;.</p>
           </section>
 
           <div id="panelDown" class="scroll-cue down" hidden><span>&#9660;</span></div>
