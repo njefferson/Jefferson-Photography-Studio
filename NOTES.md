@@ -118,7 +118,7 @@ See **`PLAN.md`** for the full build plan.
 > reliable. Editing this list updates the app on the next deploy. Both the
 > roadmap and the patch notes (last commits) refresh automatically on push.
 
-- [ ] **RAW practice photos for every lesson** — owner ask 2026-07-14, given
+- [x] **RAW practice photos for every lesson** — owner ask 2026-07-14, given
   with the dust-release GO: the next release brings the RAW (binned-DNG)
   versions of the library frames, and each practice photo opens on ITS OWN
   lesson. The plumbing already exists from the dust release: the scratchpad
@@ -251,6 +251,23 @@ See **`PLAN.md`** for the full build plan.
   chat zip uploads remain the delivery path. The Drive "Hotspot test shots"
   folder (NIR_1597–1619 + Archive.zip) is a DIFFERENT project, not the
   gallery RAWs.
+- [ ] **Studio icon in the top bar + the wrapped corner** — owner ask
+  2026-07-14, given WITH the main-release GO (his screenshot: at iPad width
+  the top-left "‹ Studio" link wraps onto two lines, and the brand area
+  should carry the Studio/NJ mark). NEXT RELEASE: put the Studio icon into
+  the bar's brand cluster and fix the corner wrap (white-space: nowrap on
+  .home-link at minimum; check the brand row's flex sizing against the
+  mode-aware actions row at 760-1100px). Also still queued from this
+  release's review (findings verified, fixes designed, owner aware):
+  the service-worker vs 440 MB library theme — exclude /examples DNGs from
+  cache.put or give them a version-stable cache that survives CACHE bumps,
+  request navigator.storage.persist() on the gallery path, honest decode
+  (vs connection) error message in openGalleryPhoto, a quickGen-style
+  re-entrancy guard there, aria-expanded on any future disclosure, and a
+  full-53-tile decode sweep in the harness. Plus content owed: RAW twins
+  for NIR_1706/1808/1825/1864/1866, the four D5300 magenta frames (own
+  colour matrix from their NEFs), and NIR_1645's NEF (his zip held the
+  JPG).
 - [x] **Dust & spot removal** — heal sensor dust and hot pixels, the classic IR
   pain (dust shows worst in smooth skies). Owner ask 2026-07-14; graduates the
   "Heal / clone" backlog item into the queue. Classical — no ML, no server.
