@@ -617,6 +617,7 @@ function undo() {
   const prev = undoStack.pop();
   if (!prev) return;
   applySnapshot(prev);
+  if (healReview) setHealReview(true); // re-validate: spot count changed (or hit zero) under review
   settled = snapshot(); // now == prev; don't let the repaint re-record it
   clearTimeout(recordTimer);
   recordTimer = 0;
@@ -1110,6 +1111,7 @@ function addMask(type: 0 | 1 | 2 | 3 | 4) {
     m.brush = { w: bw, h: bh, data: new Uint8Array(bw * bh) };
     mUI.paint.setAttribute("aria-pressed", "true"); // start ready to paint
     mUI.erase.setAttribute("aria-pressed", "false");
+    disarmPictureTools(); // painting owns the canvas now
   }
   if (type === 4) regenerateSkyMask(m); // detect the sky now (fills m.brush)
   params.masks.push(m);
@@ -1312,7 +1314,7 @@ function setColorPick(on: boolean) {
   colorPickArmed = on && !!m && m.type === 3;
   mUI.colorPick.setAttribute("aria-pressed", String(colorPickArmed));
   colorBanner.hidden = !colorPickArmed;
-  if (colorPickArmed) { setHslPick(false); setTat(false); setHeal(false); setHealReview(false); } // picture tools are exclusive
+  if (colorPickArmed) { setHslPick(false); setTat(false); setHeal(false); setHealReview(false); mUI.paint.setAttribute("aria-pressed", "false"); } // picture tools are exclusive
 }
 mUI.colorPick.addEventListener("click", () => setColorPick(!colorPickArmed));
 colorBanner.addEventListener("click", () => setColorPick(false)); // tap the banner to exit
@@ -1518,7 +1520,12 @@ function endPaint() {
 }
 
 const toggleAttr = (el: HTMLElement) => el.setAttribute("aria-pressed", String(el.getAttribute("aria-pressed") !== "true"));
-mUI.paint.addEventListener("click", () => toggleAttr(mUI.paint));
+mUI.paint.addEventListener("click", () => {
+  toggleAttr(mUI.paint);
+  // Painting owns the canvas exactly like the sustained tools do — arming it
+  // stands them down so a heal/TAT banner never lies over a painting tap.
+  if (brushPaintOn()) disarmPictureTools();
+});
 mUI.erase.addEventListener("click", () => toggleAttr(mUI.erase));
 mUI.clearBrush.addEventListener("click", () => {
   const m = currentMask();
@@ -1663,7 +1670,7 @@ function setTat(on: boolean) {
   // A standing banner (not the transient drag readout) makes it obvious the
   // canvas is in adjust mode and how to hand it back to tap-WB / pan / pinch.
   tatBanner.hidden = !on;
-  if (on) { setHslPick(false); setColorPick(false); setHeal(false); setHealReview(false); } // mutually exclusive with the other picture tools
+  if (on) { setHslPick(false); setColorPick(false); setHeal(false); setHealReview(false); mUI.paint.setAttribute("aria-pressed", "false"); } // mutually exclusive with the other picture tools
   if (!on) hideTatHud();
 }
 hslDragBtn.addEventListener("click", () => setTat(!tatArmed));
@@ -1809,7 +1816,7 @@ function setHeal(on: boolean) {
   healArmed = on && !!current;
   healBtn.setAttribute("aria-pressed", String(healArmed));
   healBanner.hidden = !healArmed;
-  if (healArmed) { setHslPick(false); setColorPick(false); setTat(false); setHealReview(false); } // picture tools are exclusive
+  if (healArmed) { setHslPick(false); setColorPick(false); setTat(false); setHealReview(false); mUI.paint.setAttribute("aria-pressed", "false"); } // picture tools are exclusive
   positionHealOverlay();
 }
 healBtn.addEventListener("click", () => setHeal(!healArmed));
@@ -1825,8 +1832,22 @@ let healReview = false;
 function setHealReview(on: boolean) {
   healReview = on && !!current && (params.spots?.length ?? 0) > 0;
   healReviewBanner.hidden = !healReview;
-  if (healReview) setHeal(false); // review is confirmation, not heal mode
+  // Review owns the canvas like the other picture tools — all of them are
+  // mutually exclusive, not just heal (review-mode field gap, 2026-07-15).
+  if (healReview) { setHeal(false); setHslPick(false); setColorPick(false); setTat(false); }
+  if (healReview) healReviewText.textContent = `${params.spots.length} spot${params.spots.length === 1 ? "" : "s"} healed`;
   positionHealOverlay();
+}
+
+/** Stand down every sustained picture tool and its banner. Called on every
+ *  fresh open and on Home — an armed mode must never ride silently into a new
+ *  photo (Lesson 1 teaches tap-WB) or float over the start screen. */
+function disarmPictureTools() {
+  setHslPick(false);
+  setColorPick(false);
+  setTat(false);
+  setHeal(false);
+  setHealReview(false);
 }
 healReviewBanner.addEventListener("click", () => setHealReview(false)); // keep them all
 
@@ -1835,6 +1856,7 @@ healReviewBanner.addEventListener("click", () => setHealReview(false)); // keep 
  *  exit). Returns true when review consumed the tap. */
 function handleHealReviewTap(clientX: number, clientY: number): boolean {
   if (!healReview) return false;
+  if (!(params.spots?.length)) { setHealReview(false); return false; } // undo emptied the sweep — review is over
   if (!current || !previewSrc) { setHealReview(false); return true; }
   const [u, v] = renderer.clientToImageUv(clientX, clientY);
   const W = previewSrc.width, H = previewSrc.height;
@@ -2110,6 +2132,9 @@ let learnMode = false;
 let lessonCardParked = false; // lesson card open when Home was pressed
 function goHome() {
   captureActiveEdit(); // park any in-flight edit before leaving the photo
+  // Armed picture tools (and their banners) must not float over the start
+  // screen or keep eating taps around the card (field gap, 2026-07-15).
+  disarmPictureTools();
   welcome.hidden = false;
   hint.hidden = !!current; // the tagline is for a cold start, not a return
   histWrap.hidden = true; // keep the histogram from floating over the card
@@ -2187,6 +2212,10 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
   // Every open path lands here — assume the user's own photo (no watermark);
   // openGalleryPhoto flips this right after for the bundled practice files.
   setBundledSource(false);
+  // A fresh photo never inherits an armed picture tool or a stale heal
+  // selection from the previous one (mode-leak field gap, 2026-07-15).
+  disarmPictureTools();
+  activeSpotIdx = -1;
   // Corrects img.pixels in place (if a profile applies) before anything below
   // reads them — the GPU texture upload, and the glow/local reference maps.
   // (initHotspot uploads its own texture when it corrects; this call is the
@@ -2482,9 +2511,13 @@ async function openPicked(files: File[]) {
     hint.hidden = false;
     const imported = await importFile(files[0]);
     if (imported.looksTranscoded) {
-      hint.textContent =
+      const msg =
         "That file arrived as a flattened JPEG (iOS transcoded it). For true RAW, " +
         "import from Files — or zip the DNG first — rather than the Photo Library.";
+      hint.textContent = msg;
+      // The hint lives on the start screen — invisible if the editor is up.
+      // The explanation must reach the user either way (honest failures).
+      if (welcome.hidden) alert(msg);
       return;
     }
     // Track it as a (strip-less) lone photo so a follow-up multi-pick can ask
@@ -3219,13 +3252,11 @@ let galleryGen = 0; // bumped per open — a double-tap aborts the older load (t
 async function openGalleryPhoto(key: string) {
   const tile = GALLERY.find((t) => t.key === key);
   if (!tile) return;
+  // A live multi-photo session is real work — ask before replacing it, the
+  // same courtesy every other replace path extends (review find, 2026-07-15).
+  if (sessionPhotos.length > 1 && !confirm(`Opening a practice photo ends your session (${sessionPhotos.length} photos, edits included). Continue?`)) return;
   const gen = ++galleryGen;
   library.hidden = true; // a library pick heads straight into the editor
-  // Like a tutorial, a practice photo is ephemeral — end any session first so
-  // its strip doesn't linger and storage stays in sync.
-  await resetSessionState(true);
-  if (gen !== galleryGen) return; // a newer tap took over
-  updateSessionStrip();
   showBusy("Loading photo…");
   // The RAW practice files are ~10 MB each and cached for offline use — ask the
   // OS not to evict them casually (best-effort, same as sessions and batch).
@@ -3247,6 +3278,11 @@ async function openGalleryPhoto(key: string) {
     const ext = tile.kind === "dng" ? "dng" : "jpg";
     const imported: ImportedFile = { name: `${key}.${ext}`, kind: tile.kind, bytes, looksTranscoded: false };
     const img = await decode(imported);
+    if (gen !== galleryGen) return;
+    // Only NOW — with a decodable photo in hand — end the previous session.
+    // Tearing it down before the download/decode succeeded meant a failed
+    // open destroyed the user's session (review find, 2026-07-15).
+    await resetSessionState(true);
     if (gen !== galleryGen) return;
     showDecoded(img, imported); // sets a fresh view; clears learn mode
     // RAW practice files export with the corner mark ADDED (raw can't carry
@@ -4001,7 +4037,7 @@ function grayWorldWB(img: DecodedImage): [number, number, number] {
 }
 
 // ⓘ What's new — the last 5 updates, injected at build time, each carrying
-// its real version number (v0.N = Nth update ever; v1.0 arrives by git tag)
+// its real version number (v0.N = Nth update ever; 1.0+ comes from the VERSION file — this remote refuses tag pushes)
 // and linked to its commit on GitHub.
 {
   const dlg = $("infoDlg") as HTMLDialogElement;
@@ -4012,7 +4048,7 @@ function grayWorldWB(img: DecodedImage): [number, number, number] {
     const ver = document.createElement("strong");
     ver.textContent = `v${c.version} `;
     const a = document.createElement("a");
-    a.href = `https://github.com/njefferson/IRstudio/commit/${c.hash}`;
+    a.href = `https://github.com/njefferson/Jefferson-Photography-Studio/commit/${c.hash}`;
     a.target = "_blank";
     a.rel = "noopener";
     a.textContent = c.subject;
