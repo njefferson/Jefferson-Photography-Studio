@@ -324,39 +324,73 @@ See **`PLAN.md`** for the full build plan.
   the block says "tap its Safari (compass) button to hop over" and offers
   the copy-link path that always works. Hidden in the plain browser (Safari
   has Share there; the [hidden] guard lesson applies — all three pages'
-  stylesheets already carry it). VERIFIED headless (suite grown to 46/46;
-  T6 fail-first proven with a planted reveal-flip): blocks hidden in the
-  browser on all three pages, revealed under navigator.standalone on all
-  three (tool blocks behind Help open), links are _blank with correct
-  hrefs, copy buttons put the ABSOLUTE sub-app URL on the clipboard.
-  NEEDS THE OWNER'S HANDS on the real iPad (the whole point is iOS
-  behavior): from the installed Studio, tap "Open Infrared in Safari" —
-  does it land in real Safari or the in-app browser? — then Share → Add
-  to Home Screen, and confirm the copy-link fallback toast reads right.
-  Report which, so the copy can drop the hedge.
-- [ ] **Landing scroll cue + a home for the example library** — owner ask
-  2026-07-15 (his screenshot: at iPad landscape the welcome card ends
-  almost exactly at the fold, so the start screen "can sometimes look
-  like there is nothing to scroll down to" — the 13 tutorial tiles sit
-  invisible below). Same message: he wants OPTIONS for bringing the other
-  40 files back as an expanded learning library — DECISION PENDING, don't
-  build until he picks. Options presented in chat 2026-07-15 — library:
-  (a) a page/full-screen overlay of its own, one tap from a small start-
-  screen link (start screen stays the calm 13); (b) an entry inside Help;
-  (c) an always-visible grouped section below the tutorial grid (feeds
-  the scroll cue for free, but is the closest to the expander he already
-  deleted). Scroll cue: (d) let the first tile row peek above the fold
-  (size the welcome card so a sliver of the grid always shows); (e) a
-  fade + chevron at the card's bottom edge, the button-row pattern he
-  liked; (f) tighten the welcome copy so the grid title lands on screen.
-  WATERMARK FACTS recorded same day (his direct question, answered in
-  chat): the 9 teaching JPEGs carry the baked corner mark (NJ + domain);
-  the 44 practice DNGs and ALL thumbs carry NO watermark — a mark can't
-  be baked into raw sensor data without falsifying it — so anything a
-  user exports from a RAW practice photo is unwatermarked today. If he
-  wants coverage there, the honest option is stamping at EXPORT time for
-  gallery-sourced photos (export-side work, previously dodged as "real
-  work"); his call whether that matters.
+  stylesheets already carry it). ON-DEVICE RESULT (owner 2026-07-15, same
+  day): the "Open in Safari" links DO NOT LEAVE the installed app on iPad
+  — target=_blank navigates within the web app; no Safari, no in-app-
+  browser escape hatch appeared. MEASURED iOS FACT for the file: a
+  standalone home-screen web app cannot hand a URL to Safari; the ONLY
+  working path is the clipboard. FIXED same day (cache ips-v51 → v52 with
+  the library release): the links were REMOVED on all three surfaces, the
+  blocks are copy-link-first with the exact steps (Copy link → open
+  Safari → paste in the address bar → Share → Add to Home Screen), hedge
+  copy dropped. VERIFIED headless (in the 66/66 suite): blocks hidden in
+  the browser, revealed under navigator.standalone, contain NO anchors
+  (copy buttons only), and the clipboard carries the absolute sub-app URL.
+- [x] **Landing scroll cue + a home for the example library** — owner ask
+  2026-07-15 (his screenshot: at iPad landscape the welcome card ended AT
+  the fold — "can sometimes look like there is nothing to scroll down
+  to"). OWNER PICKS same day: landing "a, b, and c seem all good" (all
+  three fold fixes); library "needs its own location to go into".
+  SHIPPED to staging 2026-07-15 (cache ips-v51 → ips-v52):
+  LIBRARY: a full-screen overlay of its own (#library in ir.html, the
+  quickLook shell reused; role=dialog), opened from a dashed-pill
+  "Browse the full example library · 53 photos →" under the tutorial
+  grid. The COMPLETE set — tutorial tiles included, one honest whole —
+  under the six scene groups recovered from the deleted expander
+  (LIBRARY_GROUPS restored in main.ts: Skies & clouds / Lakeside forest /
+  Campsite & shore / Backyard / The original RAW trio / Full-spectrum
+  D5300); anything missing from every group falls into a trailing "More"
+  section and the suite asserts it stays EMPTY. Tapping a tile closes the
+  overlay and opens the photo exactly like a tutorial tile (home lesson;
+  untagged → Lesson 1). Presentation only — the tiles are the same
+  GALLERY data, openGalleryPhoto unchanged.
+  LANDING: (a) first tile row PEEKS above the fold at iPad landscape
+  (short-screen media query ≤880px tightens welcome chrome; measured at
+  1024×768: grid heading AND first row above the card's fold); (b) a
+  sticky fade + chevron cue at the card's bottom edge while more waits
+  below (the button-row lesson; class-toggled — NOT [hidden], which the
+  display:none!important guard would kill; ResizeObserver on the card AND
+  the grid since content growth doesn't resize a capped card); (c) the
+  three welcome hints tightened without dropping a claim.
+  WATERMARK (owner: "Bake watermarks in at export for my own images
+  provided with the app"): exports of the app's own practice photos now
+  carry the corner mark — export.ts makeWatermarkLayer (scrim + domain +
+  NJ ring from icons/nj-watermark-line-512.png, sized to the image,
+  ring:text ratio 2.4 matching the baked teaching JPEGs), drawn on the
+  JPEG canvas and alpha-blended into the 16-bit TIFF buffer in display
+  space. ONLY for RAW (DNG) gallery tiles — MEASURED LESSON: the 9
+  teaching JPEGs already carry the BAKED mark, and the first pass drew a
+  SECOND one on top (two domain lines in the corner); openGalleryPhoto
+  sets the flag as tile.kind === "dng". The user's own photos are NEVER
+  marked (showDecoded clears the flag on every open; batch never sets
+  it), the .cube/.dcp LUTs untouched by construction, and the Export tab
+  says so while a practice photo is open (#exWmNote, labels stay honest).
+  VERIFIED headless 66/66 (fail-first re-proven: planted flips for the
+  cue, the standalone reveal, chip and cache expectations all failed as
+  planted; the suite also caught the .gal-selector collision when the
+  library doubled the tile count, and the busy-race on open-waits):
+  library opens/closes/reopens with exactly six groups + 53 tiles and a
+  spot-open renders (Golden canopy — the rotate-arg confusion spot); cue
+  on at top, off at end, back at top; peek measured at 1024×768;
+  watermark unit pair through the REAL exportImage (JPEG pixels differ
+  ONLY in the corner box with white text present; TIFF same-size,
+  II magic, diffs confined to tail rows) + E2E through the real UI (RAW
+  practice export carries the mark, baked-JPEG tile does NOT get a
+  second one, the user's own photo carries none, note visibility follows).
+  NEEDS THE OWNER'S HANDS: the library's feel (group order, tile size,
+  Close placement), the cue's look over his content, the peek on the
+  REAL iPad (Safari chrome heights differ from headless), and the mark's
+  size/placement taste on a real export.
 - [x] **Dust & spot removal** — heal sensor dust and hot pixels, the classic IR
   pain (dust shows worst in smooth skies). Owner ask 2026-07-14; graduates the
   "Heal / clone" backlog item into the queue. Classical — no ML, no server.
