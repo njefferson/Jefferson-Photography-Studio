@@ -86,11 +86,11 @@
           <button id="welcomeBack" class="welcome-back" type="button" hidden>&#8249; Back to your photo</button>
           <p id="hint">Edit infrared photos — RAW (NEF / DNG) unlocks the full color magic.</p>
           <label class="open-btn welcome-open" for="file">Open image(s)</label>
-          <p class="welcome-open-hint">Pick one photo to edit — or several to work as a session: big previews you switch between, each keeping its own edit, all held safely until you're done.</p>
+          <p class="welcome-open-hint">One photo to edit — or several to work as a session: big previews you switch between, each keeping its own edit, all held safely until you're done.</p>
           <label class="welcome-batch" id="welcomeQuickBtn" for="quickFiles">Quick look a folder…</label>
-          <p class="welcome-batch-hint">Just want to see what's in a folder? Pick a set for an instant grid of auto-balanced previews — nothing is saved, it's gone when you close. Tap the keepers and send them straight into a session to edit.</p>
+          <p class="welcome-batch-hint">See what's in a folder: an instant grid of auto-balanced previews, nothing saved, gone when you close. Tap the keepers to send them into a session.</p>
           <button class="welcome-batch" id="welcomeBatchBtn" type="button">Batch process a set…</button>
-          <p class="welcome-batch-hint">Not for editing — this develops a whole set unattended (each photo auto-balanced on its own) straight into one .zip. You choose what goes on top: a look, your current edit, or nothing at all for a quick balanced preview of a folder.</p>
+          <p class="welcome-batch-hint">Not for editing — develops a whole set unattended into one .zip, each photo auto-balanced, then a look, your current edit, or nothing on top.</p>
           <button id="resumeSession" class="welcome-batch" type="button" hidden>Resume session</button>
           <button id="recoverBatch" class="welcome-batch" type="button" hidden>Recover images from an interrupted batch</button>
           <hr class="welcome-div" />
@@ -101,6 +101,8 @@
           </div>
           <p class="ex-title">&hellip;or learn by doing — tap a practice photo and the numbered lessons ride along on the picture. The RAW ones unlock the full color magic.</p>
           <div id="galleryList" class="gallery-list" aria-label="Practice photos"></div>
+          <button id="libraryOpen" class="library-link" type="button" aria-haspopup="dialog"></button>
+          <div class="welcome-cue" id="welcomeCue" hidden aria-hidden="true">&#9660;</div>
         </div>
         <div id="lesson" hidden>
           <h3 id="lessonTitle"></h3>
@@ -331,6 +333,7 @@
               </select>
             </label>
             <label id="exQualityRow">Quality <input id="exQuality" type="range" min="0.5" max="1" step="0.01" value="0.92" /></label>
+            <p id="exWmNote" class="wm-note" hidden>Practice photos export with the small Studio mark in the corner — your own photos never do.</p>
             <button id="exBtn" type="button" class="primary">Export &amp; Save</button>
             <small class="note">These Format &amp; Resolution settings also apply to <strong>Batch process</strong> (top bar).</small>
             <hr class="divider" />
@@ -374,6 +377,22 @@
           <button id="busyClose" type="button">Close</button>
         </div>
       </div>
+    </div>
+
+    <!-- The example library: the COMPLETE practice set (tutorial tiles
+         included, one honest whole) in its own full-screen place, grouped by
+         scene. Sections built in main.ts from LIBRARY_GROUPS. -->
+    <div id="library" hidden role="dialog" aria-modal="true" aria-label="Example library">
+      <div class="ql-head">
+        <div class="ql-title">
+          <strong>Example library</strong>
+          <span id="libCount"></span>
+        </div>
+        <div class="ql-actions">
+          <button id="libClose" type="button" class="ql-btn">Close</button>
+        </div>
+      </div>
+      <div id="libBody" class="lib-body"></div>
     </div>
 
     <div id="quickLook" hidden aria-label="Quick look">
@@ -540,12 +559,11 @@
         with its own icon that works offline. On Android/Chrome, use the browser's <strong>Install app</strong>
         menu entry.</p>
         <div class="from-app" id="irInstallFromApp" hidden>
-          <p><strong>You're in the installed app right now</strong> — it has no Safari Share button, so
-          Add to Home Screen can't be reached from here. Open the page in Safari first:
-          <a href="./ir.html" target="_blank" rel="noopener">Open Infrared in Safari&nbsp;&#8599;</a>
-          — or copy its link and paste it into Safari:
-          <button type="button" class="inline-btn" data-copy="./ir.html">Copy Infrared link</button>.
-          If the link opens in a small in-app browser, tap its Safari (compass) button to hop over.</p>
+          <p><strong>You're in the installed app right now</strong> — it has no Safari Share button,
+          and links can't leave the app either, so Add to Home Screen can't be reached from here.
+          <button type="button" class="inline-btn" data-copy="./ir.html">Copy the Infrared link</button>
+          then open <strong>Safari</strong>, paste it in the address bar, and tap
+          <strong>Share → Add to Home Screen</strong> there.</p>
         </div>
         <p>Infrared and <strong>Macro Studio</strong> are separate tools under one <strong>Studio</strong> launcher
         (the <span aria-hidden="true">‹</span> in the top-left goes back to it), and you choose what to install:</p>
