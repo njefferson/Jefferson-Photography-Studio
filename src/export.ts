@@ -24,6 +24,67 @@ export interface ExportOptions {
   scale: number; // 1 = native
   quality: number; // JPEG quality 0..1
   rotate?: number; // display rotation, 90-degree CW steps (0..3)
+  /** Bake the Studio corner mark into the output (set ONLY for the app's own
+   *  bundled practice photos — a user's photos are never marked). */
+  watermark?: boolean;
+}
+
+// --- Corner watermark for the bundled practice photos ------------------------
+// (owner ask 2026-07-15). The teaching JPEGs carry a baked bottom-right mark;
+// the RAW practice files can't (a mark inside raw sensor data would falsify
+// it), so their EXPORTS carry it instead: scrim + domain + NJ line mark, the
+// same family style, drawn after the pipeline and before encoding.
+
+const WM_TEXT = "jefferson-photo-studio.pages.dev";
+let wmMarkPromise: Promise<ImageBitmap | null> | null = null;
+function loadWmMark(): Promise<ImageBitmap | null> {
+  wmMarkPromise ??= fetch("./icons/nj-watermark-line-512.png")
+    .then((r) => (r.ok ? r.blob() : Promise.reject(new Error("mark missing"))))
+    .then((b) => createImageBitmap(b))
+    .catch(() => null); // no mark asset -> text-only watermark, never a failed export
+  return wmMarkPromise;
+}
+
+/** The watermark as its own transparent layer (canvas + bottom-right
+ *  placement), sized relative to the image like the baked teaching JPEGs. */
+export async function makeWatermarkLayer(
+  w: number,
+  h: number,
+): Promise<{ canvas: HTMLCanvasElement; x: number; y: number } | null> {
+  const mark = await loadWmMark();
+  const fs = Math.max(10, Math.round(Math.min(w, h) * 0.022));
+  const pad = Math.round(fs * 0.9);
+  const markSize = mark ? Math.round(fs * 2.4) : 0; // the baked teaching JPEGs' ring:text ratio
+  const font = `600 ${fs}px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif`;
+  const canvas = document.createElement("canvas");
+  let ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  ctx.font = font;
+  const textW = Math.ceil(ctx.measureText(WM_TEXT).width);
+  const boxW = Math.min(w, pad + fs + textW + (markSize ? Math.round(fs * 0.55) + markSize : 0) + pad);
+  const boxH = Math.min(h, pad + Math.max(markSize, Math.round(fs * 1.25)) + pad);
+  canvas.width = boxW;
+  canvas.height = boxH;
+  ctx = canvas.getContext("2d")!; // resizing reset the state
+  // Corner scrim so the white text reads on any sky: transparent at the top,
+  // gently dark along the bottom edge (fading in from the left).
+  const gy = ctx.createLinearGradient(0, 0, 0, boxH);
+  gy.addColorStop(0, "rgba(0,0,0,0)");
+  gy.addColorStop(1, "rgba(0,0,0,0.42)");
+  ctx.fillStyle = gy;
+  ctx.fillRect(0, 0, boxW, boxH);
+  ctx.font = font;
+  ctx.fillStyle = "rgba(255,255,255,0.92)";
+  ctx.textBaseline = "middle";
+  const midY = boxH - pad - Math.max(markSize, Math.round(fs * 1.25)) / 2;
+  const textX = boxW - pad - (markSize ? markSize + Math.round(fs * 0.55) : 0) - textW;
+  ctx.fillText(WM_TEXT, textX, midY);
+  if (mark && markSize) {
+    ctx.globalAlpha = 0.92;
+    ctx.drawImage(mark, boxW - pad - markSize, midY - markSize / 2, markSize, markSize);
+    ctx.globalAlpha = 1;
+  }
+  return { canvas, x: w - boxW, y: h - boxH };
 }
 
 type Source =
@@ -145,7 +206,12 @@ export async function exportImage(
     const canvas = document.createElement("canvas");
     canvas.width = w;
     canvas.height = h;
-    canvas.getContext("2d")!.putImageData(new ImageData(data, w, h), 0, 0);
+    const cctx = canvas.getContext("2d")!;
+    cctx.putImageData(new ImageData(data, w, h), 0, 0);
+    if (opts.watermark) {
+      const wm = await makeWatermarkLayer(w, h);
+      if (wm) cctx.drawImage(wm.canvas, wm.x, wm.y);
+    }
     const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", opts.quality));
     if (!blob) throw new Error("JPEG encoding failed.");
     // canvas.toBlob emits an UNTAGGED JPEG; embed the sRGB profile so viewers
@@ -172,6 +238,26 @@ export async function exportImage(
       }
     }
     onProgress?.(1);
+    if (opts.watermark) {
+      // Same layer as the JPEG path, alpha-blended into the 16-bit buffer in
+      // display space (the canvas layer and these pixels share the same gamma).
+      const wm = await makeWatermarkLayer(w, h);
+      if (wm) {
+        const lw = wm.canvas.width, lh = wm.canvas.height;
+        const ld = wm.canvas.getContext("2d")!.getImageData(0, 0, lw, lh).data;
+        for (let y = 0; y < lh; y++) {
+          for (let x = 0; x < lw; x++) {
+            const li = (y * lw + x) * 4;
+            const a = ld[li + 3] / 255;
+            if (a === 0) continue;
+            const o = ((wm.y + y) * w + (wm.x + x)) * 3;
+            rgb[o] = rgb[o] * (1 - a) + ld[li] * 257 * a;
+            rgb[o + 1] = rgb[o + 1] * (1 - a) + ld[li + 1] * 257 * a;
+            rgb[o + 2] = rgb[o + 2] * (1 - a) + ld[li + 2] * 257 * a;
+          }
+        }
+      }
+    }
     return { blob: new Blob([writeTiff16(rgb, w, h)], { type: "image/tiff" }), name: `${baseName}.tif` };
   }
 }
