@@ -1187,6 +1187,17 @@ label.open-btn, label.bar-btn {
   }
   .bar-actions::-webkit-scrollbar { display: none; }
   .bar-actions .bar-btn { flex: none; white-space: nowrap; }
+  /* Tighter chrome all around (owner: "it could be tighter", 2026-07-14) —
+     smaller paddings, not smaller text; tap heights stay ≥36px. */
+  .bar { min-height: 44px; gap: 6px 10px; padding-left: 10px; padding-right: 10px; padding-bottom: 4px; }
+  .bar-btn { padding: 6px 10px; }
+  .panel-tabs { padding: 8px 10px 0; gap: 4px; }
+  .ptab { padding: 7px 4px; }
+  .panel-body { padding: 2px 10px 12px; }
+  #panel label { min-height: 40px; padding: 4px 0 6px; }
+  #panel .band label, #panel .subcard label { min-height: 36px; }
+  #stage { padding: 8px; }
+  #view { inset: 8px; max-width: calc(100% - 16px); max-height: calc(100% - 16px); }
 }
 
 #helpDlg { max-width: min(640px, 92vw); max-height: 82vh; overflow-y: auto; }
