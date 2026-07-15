@@ -24,6 +24,9 @@ class BitReader {
 
   bit(): number {
     if (this.bitsLeft === 0) {
+      // Past the end of the buffer with bits still wanted: the stream is
+      // truncated — fail honestly instead of feeding zeros forever.
+      if (this.pos >= this.d.length) throw new Error("This DNG's raw data ends early — the file looks damaged or incomplete.");
       let v = this.d[this.pos++];
       if (v === 0xff) {
         const next = this.d[this.pos++];
@@ -175,9 +178,20 @@ export function decodeLJ92(j: Uint8Array): Lj92Image {
 
   let mcu = 0;
   let restartCountdown = restartInterval;
+  // Restart intervals: after an RSTn the spec restarts prediction as at the
+  // beginning of the scan (T.81) — the interval's first sample takes the
+  // default, and its first LINE predicts with Ra like a first line. Without
+  // this reset every DRI-using DNG decoded to garbage (review find,
+  // 2026-07-15). Writers restart at row boundaries; a mid-row restart's
+  // pre-boundary row samples are treated as in-interval (accepted approx).
+  let intervalStartMcu = 0;
+  let intervalStartY = 0;
   for (let y = 0; y < Y; y++) {
     for (let x = 0; x < X; x++) {
       for (let c = 0; c < Nf; c++) {
+        // Zeros are being fed past an EOI with samples still to decode: the
+        // stream is truncated — fail honestly (silent-garbage review find).
+        if (br.marker === 0xd9) throw new Error("This DNG's raw data ends early — the file looks damaged or incomplete.");
         const t = huffDecode(br, huff[compTable[c]]);
         let diff: number;
         if (t === 0) diff = 0;
@@ -186,8 +200,8 @@ export function decodeLJ92(j: Uint8Array): Lj92Image {
 
         const plane = planes[c];
         let px: number;
-        if (x === 0 && y === 0) px = def;
-        else if (y === 0) px = plane[y * X + x - 1]; // first line: Ra
+        if (mcu === intervalStartMcu) px = def;
+        else if (y === intervalStartY) px = plane[y * X + x - 1]; // interval's first line: Ra
         else if (x === 0) px = plane[(y - 1) * X + x]; // line start: Rb
         else {
           const ra = plane[y * X + x - 1];
@@ -207,6 +221,10 @@ export function decodeLJ92(j: Uint8Array): Lj92Image {
       if (restartInterval > 0 && --restartCountdown === 0) {
         br.restart();
         restartCountdown = restartInterval;
+        // The NEXT sample begins a fresh interval: default prediction, and
+        // its row predicts like a first line (see the note above the loop).
+        intervalStartMcu = mcu + 1;
+        intervalStartY = Math.floor((mcu + 1) / X);
       }
       mcu++;
     }

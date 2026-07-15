@@ -138,7 +138,11 @@ function readNikonParams(bytes: Uint8Array, off: number, le: boolean, bps: numbe
     for (let i = 0; i < csize; i++) curve[i * step] = u16(p + i * 2);
     for (let i = 0; i < max; i++) {
       const r = i % step;
-      curve[i] = Math.floor((curve[i - r] * (step - r) + curve[i - r + step] * r) / step);
+      // Clamp the upper grid index: past the last grid point it would read out
+      // of bounds (undefined -> NaN -> 0), decoding highlights to BLACK on
+      // lossy-compressed NEFs (review find, 2026-07-15).
+      const hi = Math.min(i - r + step, max - 1);
+      curve[i] = Math.floor((curve[i - r] * (step - r) + curve[hi] * r) / step);
     }
     split = u16(off + 562);
   } else if (ver0 !== 0x46 && csize <= 0x4001) {
@@ -178,6 +182,9 @@ function nikonDecode(bytes: Uint8Array, dataOffset: number, width: number, heigh
     if (prm.split && row === prm.split) lut = buildHuffLut(NIKON_TREE[prm.huff + 1]);
     for (let col = 0; col < width; col++) {
       fill();
+      // Out of data with pixels still to decode: fail honestly instead of
+      // shifting garbage into the remaining rows (review find, 2026-07-15).
+      if (nbits <= 0) throw new Error("This NEF's raw data ends early — the file looks damaged or incomplete.");
       const peek = (acc >>> (nbits - lut.maxlen)) & ((1 << lut.maxlen) - 1);
       const symbol = lut.sym[peek];
       nbits -= lut.len[peek];
