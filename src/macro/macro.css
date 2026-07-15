@@ -95,8 +95,14 @@ body {
   background: var(--surface);
   border-bottom: 1px solid var(--line);
 }
-.bar .home { color: var(--txt-2); text-decoration: none; font: 500 0.85rem/1 var(--ui); padding: 0.4rem 0.1rem; }
+.bar .home {
+  color: var(--txt-2); text-decoration: none; font: 500 0.85rem/1 var(--ui); padding: 0.4rem 0.1rem;
+  display: inline-flex; align-items: center; gap: 5px;
+  white-space: nowrap; flex: none; /* the corner never wraps; actions absorb the squeeze */
+}
 .bar .home:active { color: var(--txt); }
+/* The Studio/NJ mark riding in the corner link — the way back wears the brand. */
+.bar .bar-mark { width: 22px; height: 22px; border-radius: 6px; flex: none; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35); }
 .tool-dot {
   width: 16px; height: 16px; border-radius: 50%; flex: none; display: inline-block;
   background: var(--macro); box-shadow: 0 0 10px rgba(255, 94, 126, 0.45);
