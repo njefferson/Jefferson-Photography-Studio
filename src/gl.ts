@@ -5,7 +5,7 @@
 
 // Single source of truth for edit parameters lives in pipeline.ts so the GPU
 // preview and CPU export can never drift apart.
-import { toneEvaluator, toneIsIdentity, maskIsActive, hslIsNeutral, MAX_MASKS, type EditParams, type LocalMap } from "./pipeline";
+import { toneEvaluator, toneIsIdentity, maskIsActive, hslIsNeutral, MAX_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, type EditParams, type LocalMap, type CropRect } from "./pipeline";
 export type { EditParams };
 
 // A faithful 256-entry identity ramp for the tone LUT. A 2-texel [0,255] ramp
@@ -22,12 +22,27 @@ const VERT = `#version 300 es
 in vec2 a_pos;
 out vec2 v_uv;
 uniform int u_rot; // display rotation in 90-degree CW steps (0..3)
+uniform vec4 u_crop;       // (x,y,w,h) crop rect in the STRAIGHTENED frame [0,1]
+uniform float u_straighten; // radians, applied about the frame centre
+uniform float u_dispAspect; // display-rotated frame width/height (pre-crop)
 void main() {
   vec2 uv = vec2(a_pos.x * 0.5 + 0.5, 0.5 - a_pos.y * 0.5);
   if (u_rot == 1) uv = vec2(uv.y, 1.0 - uv.x);
   else if (u_rot == 2) uv = vec2(1.0 - uv.x, 1.0 - uv.y);
   else if (u_rot == 3) uv = vec2(1.0 - uv.y, uv.x);
-  v_uv = uv;
+  // Crop + straighten: uv here is a fraction of the OUTPUT (already the crop
+  // rect's own size — see Renderer.applySize). Map it into the straightened
+  // frame, then undo the straighten rotation (aspect-corrected, so it reads
+  // as a true angle) to find where to sample in the un-straightened,
+  // display-rotated source. Kept identical to pipeline.ts's cropToDisplayUv.
+  vec2 local = u_crop.xy + uv * u_crop.zw;
+  if (u_straighten != 0.0) {
+    vec2 d = vec2((local.x - 0.5) * u_dispAspect, local.y - 0.5);
+    float cosA = cos(-u_straighten), sinA = sin(-u_straighten);
+    vec2 r = vec2(d.x * cosA - d.y * sinA, d.x * sinA + d.y * cosA);
+    local = vec2(r.x / u_dispAspect + 0.5, r.y + 0.5);
+  }
+  v_uv = local;
   gl_Position = vec4(a_pos, 0.0, 1.0);
 }`;
 
@@ -394,6 +409,8 @@ export class Renderer {
   private imgW = 0;
   private imgH = 0;
   private rotQ = 0; // display rotation, 90-degree CW steps
+  private crop: CropRect = CROP_DEFAULT; // last-applied crop, drives canvas size + inverse mapping
+  private straighten = 0; // last-applied straighten angle (degrees), for inverse mapping
   private isLinear = false;
   private camMatrix: Float32Array | null = null;
   private glowTex: WebGLTexture;
@@ -424,7 +441,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_toneTex", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_spotVis"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_spotVis"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -548,8 +565,14 @@ export class Renderer {
 
   private applySize() {
     const odd = (this.rotQ & 1) === 1;
-    this.canvas.width = odd ? this.imgH : this.imgW;
-    this.canvas.height = odd ? this.imgW : this.imgH;
+    const baseW = odd ? this.imgH : this.imgW;
+    const baseH = odd ? this.imgW : this.imgH;
+    // Crop shrinks the canvas itself, not just what's sampled — so the output
+    // aspect ratio matches the crop instead of stretching it to fill the old
+    // (uncropped) frame. See cropToDisplayUv: uv here is already a fraction
+    // of THIS size, and the vertex shader maps it through u_crop/u_straighten.
+    this.canvas.width = Math.max(1, Math.round(baseW * this.crop.w));
+    this.canvas.height = Math.max(1, Math.round(baseH * this.crop.h));
     this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
   }
 
@@ -595,11 +618,21 @@ export class Renderer {
 
   /** Bind the program, every edit uniform, and the three input textures. Shared
    *  by the on-screen render and the offscreen histogram pass so they can never
-   *  disagree about what the pixels are. */
-  private bindPipeline(p: EditParams, split: number, rot: number, readMode = 0, spotVis = 0) {
+   *  disagree about what the pixels are. `applyCrop` is OFF for every offscreen
+   *  "read" pass (histogram, tap-pick, colour-key) — those work in TRUE
+   *  image-uv (see readUvPixel's doc comment), which crop/straighten would
+   *  otherwise remap out from under callers like clientToImageUv. */
+  private bindPipeline(p: EditParams, split: number, rot: number, readMode = 0, spotVis = 0, applyCrop = true) {
     const gl = this.gl;
     gl.useProgram(this.prog);
     gl.uniform1i(this.loc.u_tex, 0);
+    const crop = applyCrop ? p.crop ?? CROP_DEFAULT : CROP_DEFAULT;
+    const straighten = applyCrop ? p.straighten ?? 0 : 0;
+    gl.uniform4f(this.loc.u_crop, crop.x, crop.y, crop.w, crop.h);
+    gl.uniform1f(this.loc.u_straighten, (straighten * Math.PI) / 180);
+    const odd = (rot & 1) === 1;
+    const dispAspect = this.imgH ? (odd ? this.imgH / this.imgW : this.imgW / this.imgH) : 1;
+    gl.uniform1f(this.loc.u_dispAspect, dispAspect);
     gl.uniform1i(this.loc.u_readMode, readMode);
     gl.uniform1i(this.loc.u_spotVis, spotVis);
     gl.uniform1f(this.loc.u_denoise, p.denoise);
@@ -684,6 +717,12 @@ export class Renderer {
   render(p: EditParams, split = 0) {
     const gl = this.gl;
     if (!this.imgW) return;
+    const crop = p.crop ?? CROP_DEFAULT;
+    if (crop.x !== this.crop.x || crop.y !== this.crop.y || crop.w !== this.crop.w || crop.h !== this.crop.h) {
+      this.crop = crop;
+      this.applySize();
+    }
+    this.straighten = p.straighten ?? 0;
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     this.bindPipeline(p, split, this.rotQ, 0, this.spotVis ? 1 : 0);
@@ -768,7 +807,7 @@ export class Renderer {
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.histFbo);
     gl.viewport(0, 0, w, h);
-    this.bindPipeline(p, 0, 0, readMode);
+    this.bindPipeline(p, 0, 0, readMode, 0, false); // uv here IS true image-uv — crop/straighten bypassed
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     return { w, h };
   }
@@ -832,6 +871,13 @@ export class Renderer {
     return [buf[0], buf[1], buf[2]];
   }
 
+  /** Display-rotated frame width/height — the aspect straighten reads a true
+   *  angle against (matches bindPipeline's u_dispAspect exactly). */
+  private dispAspect(): number {
+    if (!this.imgH) return 1;
+    return this.rotQ & 1 ? this.imgH / this.imgW : this.imgW / this.imgH;
+  }
+
   /** Image-uv [0..1] for a pointer at CLIENT coords (for placing masks). */
   clientToImageUv(clientX: number, clientY: number): [number, number] {
     const [px, py] = this.toImagePixel(clientX, clientY);
@@ -839,23 +885,29 @@ export class Renderer {
   }
 
   /** CLIENT coords for a point given in image-uv [0..1] — the inverse of
-   *  toImagePixel's rotation mapping, using the live (transformed) rect so it
-   *  tracks zoom/pan/rotation. Returns viewport pixels. */
+   *  toImagePixel's rotation + crop/straighten mapping, using the live
+   *  (transformed) rect so it tracks zoom/pan/rotation. Returns viewport
+   *  pixels. Masks/heals live in true image-uv, so this is how their overlay
+   *  rings/handles stay glued to the photo through an active crop. */
   imageUvToClient(u: number, v: number): [number, number] {
     const r = this.canvas.getBoundingClientRect();
     let du = u, dv = v;
     if (this.rotQ === 1) { du = 1 - v; dv = u; }
     else if (this.rotQ === 2) { du = 1 - u; dv = 1 - v; }
     else if (this.rotQ === 3) { du = v; dv = 1 - u; }
-    return [r.left + du * r.width, r.top + dv * r.height];
+    const [tx, ty] = displayUvToCrop(du, dv, this.crop, this.straighten, this.dispAspect());
+    return [r.left + tx * r.width, r.top + ty * r.height];
   }
 
   /** Image coordinates (px) for a pointer at CLIENT coords. Uses the live
-   *  bounding rect, so CSS zoom/pan transforms and rotation are handled. */
+   *  bounding rect, so CSS zoom/pan transforms, rotation and an active
+   *  crop/straighten are all handled — the inverse of the vertex shader's
+   *  mapping, so a tap always lands on the TRUE source pixel under it. */
   toImagePixel(clientX: number, clientY: number): [number, number] {
     const r = this.canvas.getBoundingClientRect();
-    const u = (clientX - r.left) / Math.max(1, r.width);
-    const v = (clientY - r.top) / Math.max(1, r.height);
+    const tx = (clientX - r.left) / Math.max(1, r.width);
+    const ty = (clientY - r.top) / Math.max(1, r.height);
+    const [u, v] = cropToDisplayUv(tx, ty, this.crop, this.straighten, this.dispAspect());
     let iu = u;
     let iv = v;
     if (this.rotQ === 1) { iu = v; iv = 1 - u; }

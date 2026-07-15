@@ -6,7 +6,7 @@ import { exportImage, download, type ExportFormat } from "./export";
 import { writeZip, crc32 } from "./zip";
 import { putFrame, eachFrame, frameMetas, frameCount, clearFrames } from "./batchstore";
 import * as Session from "./session";
-import { TONE_DEFAULT, TONE_X, toneEvaluator, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, chromaVec, hsv2rgb, type MaskLayer } from "./pipeline";
+import { TONE_DEFAULT, TONE_X, toneEvaluator, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, chromaVec, hsv2rgb, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, type MaskLayer, type CropRect } from "./pipeline";
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, type HealSpot } from "./heal";
 import { generateCube } from "./lut";
 import { generateDcp } from "./dcp";
@@ -79,6 +79,8 @@ const params: EditParams = {
   texture: 0,
   hsl: hslDefault(),
   spots: [],
+  crop: { ...CROP_DEFAULT },
+  straighten: 0,
 };
 
 const ui = {
@@ -523,6 +525,8 @@ function cloneParams(p: EditParams): EditParams {
     texture: p.texture,
     hsl: [...(p.hsl ?? hslDefault())],
     spots: (p.spots ?? []).map((s) => ({ ...s })),
+    crop: { ...(p.crop ?? CROP_DEFAULT) },
+    straighten: p.straighten ?? 0,
   };
 }
 
@@ -565,6 +569,8 @@ function applySnapshot(s: Snapshot) {
   params.texture = c.texture ?? 0;
   params.hsl = c.hsl?.length === 24 ? c.hsl : hslDefault();
   params.spots = c.spots ?? [];
+  params.crop = c.crop ?? { ...CROP_DEFAULT };
+  params.straighten = c.straighten ?? 0;
   activeLook = s.activeLook ?? null;
   lookBias = (s.lookBias ? [...s.lookBias] : [1, 1, 1]) as [number, number, number];
   if (selectedMask >= params.masks.length) selectedMask = params.masks.length - 1;
@@ -573,6 +579,10 @@ function applySnapshot(s: Snapshot) {
   updateMaskUI();
   renderMaskOverlay();
   updateHealUI();
+  if (cropArmed) {
+    straightenSlider.value = String(params.straighten);
+    straightenVal.textContent = `${params.straighten.toFixed(1)}°`;
+  }
   draw();
 }
 
@@ -800,10 +810,14 @@ function draw() {
       renderer.setToneCurve(params.tone);
     }
     syncSpotsToTexture(); // heals live in the texture; keep it matching params
-    renderer.render(params);
+    // While Crop & straighten is armed, show the FULL frame (straighten still
+    // live) so the box has the whole photo to work with — the actual crop only
+    // takes effect once the mode is exited. See setCropMode's doc comment.
+    renderer.render(cropArmed ? { ...params, crop: CROP_DEFAULT } : params);
     refreshHistogram(params);
     positionMaskOverlay();
     positionHealOverlay();
+    positionCropOverlay();
   });
 }
 
@@ -1016,7 +1030,7 @@ let hslPickArmed = false;
 function setHslPick(on: boolean) {
   hslPickArmed = on;
   hslPickBtn.setAttribute("aria-pressed", String(on));
-  if (on) { setTat(false); setColorPick(false); setHeal(false); setHealReview(false); } // picture tools are mutually exclusive
+  if (on) { setTat(false); setColorPick(false); setHeal(false); setHealReview(false); setCropMode(false); } // picture tools are mutually exclusive
 }
 hslPickBtn.addEventListener("click", () => setHslPick(!hslPickArmed));
 
@@ -1314,7 +1328,7 @@ function setColorPick(on: boolean) {
   colorPickArmed = on && !!m && m.type === 3;
   mUI.colorPick.setAttribute("aria-pressed", String(colorPickArmed));
   colorBanner.hidden = !colorPickArmed;
-  if (colorPickArmed) { setHslPick(false); setTat(false); setHeal(false); setHealReview(false); mUI.paint.setAttribute("aria-pressed", "false"); } // picture tools are exclusive
+  if (colorPickArmed) { setHslPick(false); setTat(false); setHeal(false); setHealReview(false); setCropMode(false); mUI.paint.setAttribute("aria-pressed", "false"); } // picture tools are exclusive
 }
 mUI.colorPick.addEventListener("click", () => setColorPick(!colorPickArmed));
 colorBanner.addEventListener("click", () => setColorPick(false)); // tap the banner to exit
@@ -1594,6 +1608,7 @@ function updateScrollCues() {
 panelBody.addEventListener("scroll", updateScrollCues, { passive: true });
 window.addEventListener("resize", updateScrollCues);
 window.addEventListener("resize", positionMaskOverlay);
+window.addEventListener("resize", positionCropOverlay);
 
 // Rotate 90° clockwise per tap. Applies to the preview and the export.
 $("rotateBtn").addEventListener("click", () => {
@@ -1638,6 +1653,7 @@ function applyZoom() {
   // 2026-07-14, while the baked fixes themselves moved with the photo).
   positionMaskOverlay();
   positionHealOverlay();
+  positionCropOverlay();
 }
 
 function resetZoom() {
@@ -1670,7 +1686,7 @@ function setTat(on: boolean) {
   // A standing banner (not the transient drag readout) makes it obvious the
   // canvas is in adjust mode and how to hand it back to tap-WB / pan / pinch.
   tatBanner.hidden = !on;
-  if (on) { setHslPick(false); setColorPick(false); setHeal(false); setHealReview(false); mUI.paint.setAttribute("aria-pressed", "false"); } // mutually exclusive with the other picture tools
+  if (on) { setHslPick(false); setColorPick(false); setHeal(false); setHealReview(false); setCropMode(false); mUI.paint.setAttribute("aria-pressed", "false"); } // mutually exclusive with the other picture tools
   if (!on) hideTatHud();
 }
 hslDragBtn.addEventListener("click", () => setTat(!tatArmed));
@@ -1816,11 +1832,164 @@ function setHeal(on: boolean) {
   healArmed = on && !!current;
   healBtn.setAttribute("aria-pressed", String(healArmed));
   healBanner.hidden = !healArmed;
-  if (healArmed) { setHslPick(false); setColorPick(false); setTat(false); setHealReview(false); mUI.paint.setAttribute("aria-pressed", "false"); } // picture tools are exclusive
+  if (healArmed) { setHslPick(false); setColorPick(false); setTat(false); setHealReview(false); setCropMode(false); mUI.paint.setAttribute("aria-pressed", "false"); } // picture tools are exclusive
   positionHealOverlay();
 }
 healBtn.addEventListener("click", () => setHeal(!healArmed));
 healBanner.addEventListener("click", () => setHeal(false)); // tap the banner to exit
+
+// --- Crop & straighten: a VIEW onto the photo, not a re-bake — geometry
+// only, so masks and healed spots stay anchored to the SOURCE pixels
+// underneath (see pipeline.ts's cropToDisplayUv). A sustained mode like
+// heal/TAT; while armed the render shows the FULL, un-cropped frame (with
+// straighten still live, so a tilt visibly levels the horizon) and the box
+// overlay marks the PENDING crop — exiting the mode is what actually crops
+// the canvas. Straighten always re-inscribes the crop to the largest
+// same-aspect rect that fits at that angle, so leveling a horizon never
+// bares an empty corner; dragging the box further is clamped to stay inside
+// that same safe bound. ---
+const cropBtn = $("cropBtn") as HTMLButtonElement;
+const cropBanner = $("cropBanner") as HTMLButtonElement;
+const cropOverlay = $("cropOverlay") as HTMLDivElement;
+const cropBox = $("cropBox") as HTMLDivElement;
+const cropTools = $("cropTools") as HTMLDivElement;
+const straightenSlider = $("straighten") as HTMLInputElement;
+const straightenVal = $("straightenVal") as HTMLSpanElement;
+const cropResetBtn = $("cropReset") as HTMLButtonElement;
+const MIN_CROP = 0.1;
+let cropArmed = false;
+
+/** The display-rotated frame's width/height — matches Renderer's own
+ *  u_dispAspect exactly (same source dims, same 90-degree swap). */
+function dispAspectNow(): number {
+  if (!current) return 1;
+  return renderer.rotation & 1 ? current.height / current.width : current.width / current.height;
+}
+
+/** The largest same-aspect crop the current straighten angle allows without
+ *  baring an empty corner. Identity {0,0,1,1} when straighten is 0. */
+function cropSafeBound(): CropRect {
+  return autoInscribedCrop(params.straighten, dispAspectNow());
+}
+
+function setCropMode(on: boolean) {
+  cropArmed = on && !!current;
+  cropBtn.setAttribute("aria-pressed", String(cropArmed));
+  cropBanner.hidden = !cropArmed;
+  cropTools.hidden = !cropArmed;
+  if (cropArmed) { setHslPick(false); setColorPick(false); setTat(false); setHeal(false); setHealReview(false); mUI.paint.setAttribute("aria-pressed", "false"); resetZoom(); } // picture tools are exclusive; crop wants the whole frame in view
+  straightenSlider.value = String(params.straighten);
+  straightenVal.textContent = `${params.straighten.toFixed(1)}°`;
+  positionCropOverlay();
+  draw();
+}
+cropBtn.addEventListener("click", () => setCropMode(!cropArmed));
+cropBanner.addEventListener("click", () => { setCropMode(false); flushRecord(); }); // tap the banner to exit (commits the pending crop as one undo step)
+
+/** Position the box overlay from params.crop — a plain fraction of the
+ *  canvas's own rendered rect (which, while armed, IS the full straightened
+ *  frame — see draw()'s cropArmed override — so no extra transform is ever
+ *  needed here, unlike the mask/heal overlays' rotation-aware placement). */
+function positionCropOverlay() {
+  const show = cropArmed && !!current && welcome.hidden;
+  cropOverlay.toggleAttribute("hidden", !show);
+  if (!show) return;
+  cropResetBtn.disabled = cropIsIdentity(params.crop, params.straighten);
+  const stageRect = cropOverlay.getBoundingClientRect();
+  const c = canvas.getBoundingClientRect();
+  const { x, y, w, h } = params.crop;
+  cropBox.style.left = `${c.left - stageRect.left + x * c.width}px`;
+  cropBox.style.top = `${c.top - stageRect.top + y * c.height}px`;
+  cropBox.style.width = `${Math.max(1, w * c.width)}px`;
+  cropBox.style.height = `${Math.max(1, h * c.height)}px`;
+}
+
+type CropDragKind = "move" | "tl" | "tr" | "bl" | "br";
+let cropDrag: { kind: CropDragKind; id: number; x0: number; y0: number; crop0: CropRect; rectW: number; rectH: number } | null = null;
+
+function startCropDrag(kind: CropDragKind, e: PointerEvent, target: HTMLElement) {
+  if (!cropArmed || !current) return;
+  e.preventDefault();
+  e.stopPropagation(); // a handle's pointerdown must not also start the box's own move-drag
+  target.setPointerCapture(e.pointerId);
+  const r = canvas.getBoundingClientRect();
+  cropDrag = { kind, id: e.pointerId, x0: e.clientX, y0: e.clientY, crop0: { ...params.crop }, rectW: Math.max(1, r.width), rectH: Math.max(1, r.height) };
+}
+
+function moveCropDrag(e: PointerEvent) {
+  if (!cropDrag || e.pointerId !== cropDrag.id) return;
+  const dx = (e.clientX - cropDrag.x0) / cropDrag.rectW;
+  const dy = (e.clientY - cropDrag.y0) / cropDrag.rectH;
+  const c0 = cropDrag.crop0;
+  const safe = cropSafeBound();
+  const oppX = c0.x + c0.w, oppY = c0.y + c0.h;
+  let x = c0.x, y = c0.y, w = c0.w, h = c0.h;
+  if (cropDrag.kind === "move") {
+    x = clamp(c0.x + dx, safe.x, safe.x + safe.w - c0.w);
+    y = clamp(c0.y + dy, safe.y, safe.y + safe.h - c0.h);
+  } else if (cropDrag.kind === "tl") {
+    x = clamp(c0.x + dx, safe.x, oppX - MIN_CROP);
+    y = clamp(c0.y + dy, safe.y, oppY - MIN_CROP);
+    w = oppX - x; h = oppY - y;
+  } else if (cropDrag.kind === "tr") {
+    const nx = clamp(oppX + dx, c0.x + MIN_CROP, safe.x + safe.w);
+    y = clamp(c0.y + dy, safe.y, oppY - MIN_CROP);
+    w = nx - c0.x; h = oppY - y;
+  } else if (cropDrag.kind === "bl") {
+    x = clamp(c0.x + dx, safe.x, oppX - MIN_CROP);
+    const ny = clamp(oppY + dy, c0.y + MIN_CROP, safe.y + safe.h);
+    w = oppX - x; h = ny - c0.y;
+  } else if (cropDrag.kind === "br") {
+    const nx = clamp(oppX + dx, c0.x + MIN_CROP, safe.x + safe.w);
+    const ny = clamp(oppY + dy, c0.y + MIN_CROP, safe.y + safe.h);
+    w = nx - c0.x; h = ny - c0.y;
+  }
+  params.crop = { x, y, w, h };
+  positionCropOverlay();
+  draw();
+}
+
+function endCropDrag() {
+  if (!cropDrag) return;
+  cropDrag = null;
+  flushRecord(); // one drag = one undo step
+}
+
+for (const handle of Array.from(cropBox.querySelectorAll<HTMLDivElement>(".crop-handle"))) {
+  const corner = handle.dataset.corner as CropDragKind;
+  handle.addEventListener("pointerdown", (e) => startCropDrag(corner, e, handle));
+  handle.addEventListener("pointermove", moveCropDrag);
+  handle.addEventListener("pointerup", endCropDrag);
+  handle.addEventListener("pointercancel", endCropDrag);
+}
+cropBox.addEventListener("pointerdown", (e) => {
+  if (e.target !== cropBox) return; // a handle's own listener (above) owns its drag
+  startCropDrag("move", e, cropBox);
+});
+cropBox.addEventListener("pointermove", moveCropDrag);
+cropBox.addEventListener("pointerup", endCropDrag);
+cropBox.addEventListener("pointercancel", endCropDrag);
+
+straightenSlider.addEventListener("input", () => {
+  if (!cropArmed) return;
+  params.straighten = Math.round(Number(straightenSlider.value) * 10) / 10;
+  straightenVal.textContent = `${params.straighten.toFixed(1)}°`;
+  params.crop = autoInscribedCrop(params.straighten, dispAspectNow());
+  positionCropOverlay();
+  draw();
+});
+straightenSlider.addEventListener("change", flushRecord); // one drag of the slider = one undo step
+
+cropResetBtn.addEventListener("click", () => {
+  if (!cropArmed) return;
+  params.straighten = 0;
+  params.crop = { ...CROP_DEFAULT };
+  straightenSlider.value = "0";
+  straightenVal.textContent = "0.0°";
+  positionCropOverlay();
+  draw();
+  flushRecord();
+});
 
 // --- Auto-sweep REVIEW: after "Find spots automatically" the fixes are
 // ALREADY APPLIED — the rings are receipts to confirm, not a to-do list (the
@@ -1848,6 +2017,7 @@ function disarmPictureTools() {
   setTat(false);
   setHeal(false);
   setHealReview(false);
+  setCropMode(false);
 }
 healReviewBanner.addEventListener("click", () => setHealReview(false)); // keep them all
 
@@ -2035,6 +2205,7 @@ healAutoBtn.addEventListener("click", () => {
 });
 
 canvas.addEventListener("pointerdown", (e) => {
+  if (cropArmed) return; // Crop & straighten owns the canvas — no tap-WB / pan / pinch while armed
   if (brushPaintOn()) { e.preventDefault(); startPaint(e); return; }
   if (tatArmed) { if (!tatDrag) { e.preventDefault(); startTat(e); } return; }
   activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -2154,6 +2325,7 @@ function goHome() {
   updateSessionResume();
   renderMaskOverlay(); // hide the mask overlay while the card is up
   positionHealOverlay(); // and the heal rings
+  positionCropOverlay(); // and the crop box
 }
 
 /** Show/label the return controls (corner ✕ + the prominent Back button) only
@@ -2179,6 +2351,7 @@ function returnToEditor() {
   lessonCardParked = false;
   renderMaskOverlay();
   positionHealOverlay();
+  positionCropOverlay();
 }
 
 $("homeBtn").addEventListener("click", goHome);
@@ -2271,19 +2444,25 @@ function establishFreshEdit() {
     texture: 0,
     hsl: hslDefault(),
     spots: [],
+    crop: { ...CROP_DEFAULT },
+    straighten: 0,
   };
   activeLook = null;
   updateLookUI();
   // Tidy the panel for the new photo: scroll the current section to the top.
   panelBody.scrollTop = 0;
-  // Masks and heal spots are composition-specific — never carry them to a new
-  // photo. (Session switches restore each photo's own via its saved snapshot.)
+  // Masks, heal spots and crop/straighten are composition-specific — never
+  // carry them to a new photo. (Session switches restore each photo's own via
+  // its saved snapshot.)
   params.masks = [];
   selectedMask = -1;
   setColorPick(false);
   params.spots = [];
   activeSpotIdx = -1;
   setHeal(false);
+  params.crop = { ...CROP_DEFAULT };
+  params.straighten = 0;
+  setCropMode(false);
   setHealReview(false);
   renderer.spotVis = false;
   healVisBtn.setAttribute("aria-pressed", "false");
@@ -3491,6 +3670,8 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade): EditParams {
     texture: look.texture,
     hsl: [...look.hsl],
     spots: [], // composition-specific — a batch frame heals nothing
+    crop: { ...CROP_DEFAULT }, // composition-specific — a batch frame crops nothing
+    straighten: 0,
   };
 }
 
@@ -3864,6 +4045,7 @@ canvas.addEventListener("click", (e) => {
     return;
   }
   // Armed picks eat the tap (they must NOT also set white balance).
+  if (cropArmed) return; // Crop & straighten owns the canvas — drag its own box/handles instead
   if (handleHealReviewTap(e.clientX, e.clientY)) return;
   if (handleHealTap(e.clientX, e.clientY)) return;
   if (handleColorMaskPick(e.clientX, e.clientY)) return;

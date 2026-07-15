@@ -90,6 +90,34 @@ export interface EditParams {
    *  math to the source samples. Composition-specific: reset on a new open,
    *  never carried by saved looks or batch. */
   spots: HealSpot[];
+  /** Crop rect in the STRAIGHTENED display frame [0,1] (x,y = top-left, w,h =
+   *  size) — a VIEW onto the source, not a re-bake. Default = the whole frame.
+   *  Composition-specific like spots: reset on a new open, never carried by
+   *  saved looks or batch. See `straighten` for the frame it's relative to. */
+  crop: CropRect;
+  /** Straighten angle in degrees, a small rotation about the frame centre
+   *  applied BEFORE crop (crop lives in the resulting straightened frame —
+   *  see autoInscribedCrop). Same composition-specific exclusions as crop. */
+  straighten: number;
+}
+
+export interface CropRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export const CROP_DEFAULT: CropRect = { x: 0, y: 0, w: 1, h: 1 };
+
+export function cropIsIdentity(c: CropRect, straighten: number): boolean {
+  return (
+    straighten === 0 &&
+    Math.abs(c.x) < 1e-6 &&
+    Math.abs(c.y) < 1e-6 &&
+    Math.abs(c.w - 1) < 1e-6 &&
+    Math.abs(c.h - 1) < 1e-6
+  );
 }
 
 /** Per-image low-res reference maps for clarity/dehaze: blurred luminance (R)
@@ -344,6 +372,74 @@ export function radialGain(hotspot: number, hotspotSize: number, vignette: numbe
   const gVig = 1 + vignette * 0.85 * smooth01(0.07, 1, r);
   const gHot = 1 - hotspot * (1 - smooth01(0, Math.max(1e-3, hotspotSize), r));
   return Math.max(0, gVig * gHot);
+}
+
+// --- Crop / straighten geometry (mirrored in the gl.ts vertex shader and
+// export.ts's toSrc — all three must stay numerically identical). `aspect` is
+// always the DISPLAY-ROTATED frame's width/height (the 90-degree u_rot already
+// applied, crop/straighten not yet), so straighten reads as a true angle and
+// crop stays proportionally honest regardless of the photo's own aspect. ---
+
+/** Final (post crop+straighten) frame uv [0,1] -> STRAIGHTENED-frame uv
+ *  [0,1] -> pre-straighten, display-rotated uv [0,1] (where to sample). Crop
+ *  is applied first (it's defined IN the straightened frame), then the
+ *  straighten rotation is undone about the frame centre to find the source. */
+export function cropToDisplayUv(
+  tx: number,
+  ty: number,
+  crop: CropRect,
+  straightenDeg: number,
+  aspect: number,
+): [number, number] {
+  const lx = crop.x + tx * crop.w;
+  const ly = crop.y + ty * crop.h;
+  if (!straightenDeg) return [lx, ly];
+  const a = (-straightenDeg * Math.PI) / 180;
+  const dx = (lx - 0.5) * aspect;
+  const dy = ly - 0.5;
+  const cosA = Math.cos(a), sinA = Math.sin(a);
+  const rx = dx * cosA - dy * sinA;
+  const ry = dx * sinA + dy * cosA;
+  return [rx / aspect + 0.5, ry + 0.5];
+}
+
+/** Inverse of cropToDisplayUv: pre-straighten display uv -> final crop-local
+ *  uv [0,1]. Used to invert taps/mask placement back through an active
+ *  crop+straighten to the true image coordinates masks/heals live in. */
+export function displayUvToCrop(
+  u: number,
+  v: number,
+  crop: CropRect,
+  straightenDeg: number,
+  aspect: number,
+): [number, number] {
+  let lx = u, ly = v;
+  if (straightenDeg) {
+    const a = (straightenDeg * Math.PI) / 180;
+    const dx = (u - 0.5) * aspect;
+    const dy = v - 0.5;
+    const cosA = Math.cos(a), sinA = Math.sin(a);
+    const rx = dx * cosA - dy * sinA;
+    const ry = dx * sinA + dy * cosA;
+    lx = rx / aspect + 0.5;
+    ly = ry + 0.5;
+  }
+  return [(lx - crop.x) / Math.max(1e-6, crop.w), (ly - crop.y) / Math.max(1e-6, crop.h)];
+}
+
+/** The largest same-aspect-ratio rect, centred in the frame, whose corners
+ *  stay inside [0,1]x[0,1] after a `straightenDeg` rotation — the crop
+ *  straighten auto-inscribes to, so leveling a horizon never bares an empty
+ *  corner. Closed form: for a frame of half-extents (aspect, 1) rotated by
+ *  angle a, the largest same-ratio inscribed rect scales the frame by
+ *  k = min(aspect/(aspect·cosA + sinA), 1/(cosA + aspect·sinA)). */
+export function autoInscribedCrop(straightenDeg: number, aspect: number): CropRect {
+  const a = Math.abs((straightenDeg * Math.PI) / 180);
+  if (a < 1e-6) return { ...CROP_DEFAULT };
+  const cosA = Math.cos(a), sinA = Math.sin(a);
+  const k = Math.min(aspect / (aspect * cosA + sinA), 1 / (cosA + aspect * sinA));
+  const half = (1 - k) / 2;
+  return { x: half, y: half, w: k, h: k };
 }
 
 // --- 8-channel HSL colour mixer (mirrored in the shader) ---

@@ -133,20 +133,80 @@ See **`PLAN.md`** for the full build plan.
   pill when the tile ships (one way in, not two). The suite's library checks
   (opens/closes, six groups, empty "More") carry over — only the entry
   affordance changes.
-- [ ] **Crop & straighten** — NEXT RELEASE (owner GO 2026-07-15, given with
-  the review-release feedback; he called it a "quick addition" — treat it as
-  one release, not a saga). The last table-stakes editing tool before the
-  App Store path. Build notes: geometry rides the vertex shader we already
-  rotate in (see Future/bigger bets); crop = a display + export REGION, so
-  exportImage needs a source-rect (and the watermark corner must anchor to
-  the CROPPED frame); straighten = small rotation + auto-inscribed crop.
-  Direct manipulation (drag corners/edges, drag outside to straighten?),
-  one gesture = one undo, honest reset. WATCH: masks/heal spots live in
-  image-uv — decide and DOCUMENT whether they stay anchored to the source
-  pixels (they should; crop is a view, not a re-bake); the lens hot-spot
-  fix is aspect-corrected from SOURCE dims and must stay circular; the
-  .cube/.dcp LUTs are unaffected (geometry is spatial by definition).
-  Batch/looks never carry crop (composition-specific, like spots/masks).
+- [x] **Crop & straighten** — owner GO 2026-07-15 ("quick addition", one
+  release not a saga). The last table-stakes editing tool before the App
+  Store path. SHIPPED to `claude/crop-straighten-jx2a0t`, not yet pushed to
+  staging (cache ips-v53 → ips-v54).
+  GEOMETRY: `EditParams` gained `crop {x,y,w,h}` (fraction of the STRAIGHTENED
+  display frame) and `straighten` (degrees). Three call sites share the exact
+  same math (pipeline.ts's `cropToDisplayUv`/`displayUvToCrop`/
+  `autoInscribedCrop`, mirrored by hand into the gl.ts VERTEX shader — crop
+  and straighten are resolved there, BEFORE the fragment shader ever runs, so
+  every spatial effect (masks, hot-spot/vignette, clarity/dehaze maps,
+  denoise/sharpen neighbourhoods) sees the crop for free with zero extra
+  code): the GPU preview, export.ts's `toSrc`, and the CPU inverse mapping in
+  Renderer (`toImagePixel`/`imageUvToClient`, used by tap-WB, mask placement,
+  heal taps). Masks/heals stay anchored to the SOURCE pixels as planned — a
+  crop is a VIEW, not a re-bake — because the inverse mapping resolves a
+  screen tap back through crop+straighten to the true image-uv before
+  anything else ever sees it. The lens hot-spot fix stays circular (aspect
+  from SOURCE dims, untouched) and the .cube/.dcp LUTs are unaffected
+  (geometry is spatial by construction, never enters compileEdit's per-pixel
+  colour math). Canvas resize IS the crop: `Renderer.applySize` sizes the
+  canvas itself to `baseDims × crop.w/h`, so the export's pixel dimensions
+  (and therefore the watermark's corner, drawn after at those exact w×h) are
+  the cropped frame for free — no separate "anchor to cropped frame" code
+  needed.
+  STRAIGHTEN auto-inscribes: a closed-form largest-same-aspect-rect formula
+  (`autoInscribedCrop`, k = min(aspect/(aspect·cosA+sinA), 1/(cosA+aspect·sinA)))
+  recomputes the crop to the biggest rect that survives the rotation with no
+  empty corner, every time the slider moves. Manual crop dragging afterward
+  is CLAMPED to that same safe bound (not just [0,1]) — so no path through
+  the UI can ever bare an empty corner.
+  UI: a `Crop` button in the top bar (beside Rotate) arms a sustained mode
+  like heal/TAT — it OWNS the canvas (no tap-WB/pan/pinch while armed; the
+  box IS the framing tool). While armed the render shows the FULL frame with
+  straighten still live (the photo visibly tilts as you drag the slider) and
+  an axis-aligned box overlay (box-shadow-as-scrim, 4 corner handles + drag-
+  the-box-to-move) marks the PENDING crop — deliberately simpler than a
+  Lightroom-style rotating viewfinder: since the photo itself already renders
+  straightened while editing, the box never needs its own CSS rotation, which
+  sidesteps a whole class of touch-drag-under-rotation math for a "quick
+  addition". Exiting the mode (tap the banner) is what actually commits the
+  crop into the live canvas size. One drag = one undo step (`flushRecord` on
+  pointerup, matching TAT/heal); Reset returns to the full, unstraightened
+  frame; a fresh photo open clears crop/straighten like masks/spots; crop
+  never rides in saved looks or a batch (excluded the same way spots are —
+  `SavedLook`/`batchParamsFor` never reference it).
+  FIELD-CAUGHT DURING VERIFICATION: the crop banner's first draft sat at the
+  TOP (matching TAT) — but the lesson-chip rail also lives at the top on any
+  practice photo, and the two overlapped, with the chips eating the banner's
+  taps. Moved the crop banner to the BOTTOM, stacked above its own Straighten
+  toolbar (same reasoning heal/colour-pick already used to duck the sky).
+  VERIFIED headless (Chromium; scratchpad harness): arm → full frame shown at
+  unchanged canvas size; drag the br handle → box shrinks; move Straighten to
+  12° → box auto-inscribes SMALLER than the full frame (safe-bound formula
+  engaging); exit → canvas ACTUALLY resizes to the committed crop; undo → one
+  step back; Reset → exact full frame restored; no page errors throughout. A
+  second run proved the EXPORT path end-to-end through the real UI (Export
+  tab → native JPEG → Save): the exported JPEG's own dimensions (read from
+  its SOF0 marker) are the SAME crop fraction as the committed preview canvas
+  at native's ~2× resolution (2120×1354 native vs 1060×677 preview — both
+  exactly 0.757×0.727 of their respective full-frame dims), proving the
+  preview and export geometry agree even though export decodes at a
+  different resolution than the live preview proxy.
+  NEEDS THE OWNER'S HANDS on the iPad: the drag feel (corner handle size,
+  whether dragging the box itself to move reads as expected on a finger vs a
+  pointer), the straighten slider's range (±45°) and step (0.1°), and his
+  verdict on the "photo tilts, box doesn't" straighten preview versus a
+  Lightroom-style tilting viewfinder box (documented above as the deliberate
+  simpler choice for this release — a candidate for a follow-up if he wants
+  the box to visually tilt instead). NOT YET DONE: no on-device pass, no
+  aspect-ratio presets (free-form only), masks/heals were NOT re-verified
+  live under an active crop in this pass (the geometry math is shared and
+  should carry them correctly by construction, per the inverse-mapping
+  argument above, but a real mask-under-crop headless check is still owed
+  before calling this fully proven).
 - [ ] **Preview-faithful exports + offline through updates** — NEXT VERSION
   (owner call 2026-07-15: after crop/straighten ships, this pair is the
   next VERSION — bump the VERSION file to 1.1 when it lands). The two big
@@ -1394,8 +1454,7 @@ CONFIRMED but DEFERRED (each needs its own release / owner input):
   app (pairs with the storage honesty rules).
 
 OPPORTUNITIES the owner may want next (all classical, on-device, buildable
-by a session; roughly by value): crop/straighten (the last table-stakes tool
-before the App Store path); Display-P3 JPEG export (recorded target, code
+by a session; roughly by value): Display-P3 JPEG export (recorded target, code
 ships sRGB); keep EXIF (capture date/camera) in exports; box-filtered scaled
 exports (50%/25% currently decimate nearest-neighbour); batch-from-session;
 per-channel R/G/B curves (strengthens .cube/.dcp); B&W mode for 720nm;
@@ -1437,8 +1496,10 @@ Classical, subscription-grade tools (fit the current architecture directly):
   mixer; saved looks carry it. Per-channel R/G/B CURVES remain open below.
 - **Per-channel R/G/B point curves** — extends the luminance tone curve to
   independent channels; same per-pixel model.
-- **Crop / straighten / perspective (Upright)** — geometry via the vertex
-  shader we already rotate in; crop is a display+export region.
+- **Perspective (Upright)** — crop/straighten shipped 2026-07-15 (see the
+  roadmap entry above); a full 4-corner perspective warp is a bigger,
+  separate follow-up (needs a homography in the vertex shader, not just the
+  rotate+crop affine this release used).
 - [x] **Detail sharpening + Texture** (shipped 2026-07-14) — two new sliders in
   the Basic tab's "Detail" cluster (next to Denoise): **Sharpen** 0..1
   (high-frequency edge crisp-up) and **Texture** -1..1 (mid-frequency surface

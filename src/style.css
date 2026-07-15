@@ -439,7 +439,8 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 #tatBanner,
 #colorBanner,
 #healBanner,
-#healReviewBanner {
+#healReviewBanner,
+#cropBanner {
   position: absolute;
   top: 16px;
   left: 50%;
@@ -466,19 +467,82 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 #tatBanner .tat-banner-off,
 #colorBanner .tat-banner-off,
 #healBanner .tat-banner-off,
-#healReviewBanner .tat-banner-off {
+#healReviewBanner .tat-banner-off,
+#cropBanner .tat-banner-off {
   font-size: 11px;
   font-weight: 500;
   opacity: 0.85;
 }
 /* The colour-pick and heal banners sit at the BOTTOM (top taps hit the sky —
-   a prime pick target AND where dust shows worst; a top banner ate those taps). */
-#colorBanner, #healBanner, #healReviewBanner { top: auto; bottom: 16px; }
+   a prime pick target AND where dust shows worst; a top banner ate those taps).
+   Crop ALSO sits at the bottom, stacked above its own Straighten toolbar — the
+   top edge is the lesson-chip rail's territory on a practice photo, and a top
+   banner sat right under the chips, eating their taps (field-caught headless). */
+#colorBanner, #healBanner, #healReviewBanner, #cropBanner { top: auto; bottom: 16px; }
+#cropBanner { bottom: 66px; } /* above #cropTools, not on top of it */
 @media (max-width: 760px) {
-  #tatBanner, #colorBanner, #healBanner, #healReviewBanner { top: 10px; padding: 6px 13px; font-size: 12px; }
-  #tatBanner .tat-banner-off, #colorBanner .tat-banner-off, #healBanner .tat-banner-off, #healReviewBanner .tat-banner-off { font-size: 10px; }
+  #tatBanner, #colorBanner, #healBanner, #healReviewBanner, #cropBanner { top: 10px; padding: 6px 13px; font-size: 12px; }
+  #tatBanner .tat-banner-off, #colorBanner .tat-banner-off, #healBanner .tat-banner-off, #healReviewBanner .tat-banner-off, #cropBanner .tat-banner-off { font-size: 10px; }
   #colorBanner, #healBanner, #healReviewBanner { top: auto; bottom: 10px; }
+  #cropBanner { top: auto; bottom: 60px; }
 }
+
+/* Crop & straighten: an axis-aligned box (drag corners to resize, drag inside
+   to move) over the FULL, un-cropped frame while the tool is armed — the
+   underlying render already shows straighten live (a rotated photo), so the
+   box itself never needs its own CSS rotation. box-shadow-as-scrim is the
+   classic one-element "darken everything outside this rect" trick. */
+#cropOverlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 6; }
+#cropBox {
+  position: absolute;
+  border: 1.5px solid #fff;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
+  pointer-events: auto;
+  cursor: move;
+  touch-action: none;
+}
+.crop-handle {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  margin: -13px;
+  border-radius: 50%;
+  background: rgba(12, 12, 16, 0.72);
+  border: 2px solid #fff;
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+}
+.crop-handle[data-corner="tl"] { top: 0; left: 0; }
+.crop-handle[data-corner="tr"] { top: 0; left: 100%; }
+.crop-handle[data-corner="bl"] { top: 100%; left: 0; }
+.crop-handle[data-corner="br"] { top: 100%; left: 100%; }
+#cropTools {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  z-index: 7;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(12, 12, 16, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.45);
+  color: var(--txt-1);
+  max-width: min(94%, 460px);
+}
+#cropTools label { display: flex; align-items: center; gap: 8px; margin: 0; flex: 1; font-size: 12px; color: var(--txt-2); }
+#cropTools input[type="range"] { width: 100%; margin: 0; }
+#straightenVal { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--txt-2); flex: none; min-width: 4ch; }
+#cropTools button { flex: none; width: auto; padding: 6px 10px; font-size: 12px; }
+@media (max-width: 760px) {
+  #cropTools { bottom: 10px; padding: 6px 10px; gap: 6px; }
+}
+#stage.has-session #cropTools { bottom: calc(24px + var(--session-h, 110px)); }
+#stage.has-session #cropBanner { bottom: calc(74px + var(--session-h, 110px)); }
 #hint { color: var(--txt-2); text-align: center; max-width: 40ch; margin: 0 auto; }
 #welcome {
   position: absolute;

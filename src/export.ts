@@ -2,7 +2,7 @@
 // uses a half-res proxy), applies the exact edit pipeline on the CPU, and saves
 // a JPEG or 16-bit TIFF to the device.
 
-import { compileEdit, toLinear8, type EditParams } from "./pipeline";
+import { compileEdit, toLinear8, cropToDisplayUv, CROP_DEFAULT, type EditParams } from "./pipeline";
 import { demosaicPixelLinear, type RawCfa } from "./raw/demosaic";
 import { readMosaicedCfa } from "./raw/dngRaw";
 import { readNefCfa } from "./raw/nef";
@@ -113,22 +113,33 @@ export async function exportImage(
   const srcW = "cfa" in src ? src.cfa.width : src.width;
   const srcH = "cfa" in src ? src.cfa.height : src.height;
   const rot = ((opts.rotate ?? 0) % 4 + 4) % 4;
-  const outW = rot & 1 ? srcH : srcW;
-  const outH = rot & 1 ? srcW : srcH;
+  const dispW = rot & 1 ? srcH : srcW;
+  const dispH = rot & 1 ? srcW : srcH;
+  // Crop shrinks the OUTPUT frame itself (a view, not a re-bake) — matching
+  // Renderer.applySize, so the export's pixel dimensions are exactly what the
+  // preview canvas shows, and the watermark (drawn after, at w×h) anchors to
+  // the CROPPED frame for free.
+  const crop = params.crop ?? CROP_DEFAULT;
+  const straighten = params.straighten ?? 0;
+  const dispAspect = dispH ? dispW / dispH : 1;
+  const outW = Math.max(1, Math.round(dispW * crop.w));
+  const outH = Math.max(1, Math.round(dispH * crop.h));
   const w = Math.max(1, Math.round(outW * opts.scale));
   const h = Math.max(1, Math.round(outH * opts.scale));
-  // Output pixel -> source pixel, applying the display rotation (same mapping
-  // as the preview shader).
+  // Output pixel -> source pixel: crop/straighten (see pipeline.ts's
+  // cropToDisplayUv, mirrored exactly), then the display rotation — same
+  // mapping as the preview's vertex shader.
   const toSrc = (x: number, y: number): [number, number] => {
-    const u = (x + 0.5) / w;
-    const v = (y + 0.5) / h;
+    const tx = (x + 0.5) / w;
+    const ty = (y + 0.5) / h;
+    const [u, v] = cropToDisplayUv(tx, ty, crop, straighten, dispAspect);
     let iu = u, iv = v;
     if (rot === 1) { iu = v; iv = 1 - u; }
     else if (rot === 2) { iu = 1 - u; iv = 1 - v; }
     else if (rot === 3) { iu = 1 - v; iv = u; }
     return [
-      Math.min(srcW - 1, Math.floor(iu * srcW)),
-      Math.min(srcH - 1, Math.floor(iv * srcH)),
+      Math.min(srcW - 1, Math.max(0, Math.floor(iu * srcW))),
+      Math.min(srcH - 1, Math.max(0, Math.floor(iv * srcH))),
     ];
   };
 
