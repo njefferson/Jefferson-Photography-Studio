@@ -268,6 +268,13 @@ histBtn.addEventListener("click", () => {
   updateHistVisibility();
   if (histEnabled) refreshHistogram(params);
 });
+// Tap the histogram itself to dismiss it — touch the thing to hide the thing.
+// It only ever hides; the Histogram button stays the one control that shows it.
+histCanvas.addEventListener("click", () => {
+  histEnabled = false;
+  localStorage.setItem("ips-hist", "0");
+  updateHistVisibility();
+});
 updateHistVisibility(); // reflect the stored preference on the toggle at startup
 
 // WB gains and exposure span 0.02–16x / 0.1–16x; on a linear track every
@@ -587,16 +594,19 @@ function applySnapshot(s: Snapshot) {
 }
 
 const undoStack: Snapshot[] = [];
+const redoStack: Snapshot[] = []; // undone states, waiting to be redone; any new edit clears it
 let settled: Snapshot | null = null; // last recorded state (advances on settle)
 let baseline: Snapshot | null = null; // fresh-open automatic baseline (Reset target)
 let recordTimer = 0;
 const HISTORY_MAX = 100;
 
 const undoBtn = $("undoBtn") as HTMLButtonElement;
+const redoBtn = $("redoBtn") as HTMLButtonElement;
 const resetBtn = $("resetBtn") as HTMLButtonElement;
 
 function updateEditButtons() {
   undoBtn.disabled = undoStack.length === 0;
+  redoBtn.disabled = redoStack.length === 0;
   resetBtn.disabled = !baseline || !current;
 }
 
@@ -611,6 +621,7 @@ function flushRecord() {
   if (snapSig(now) !== snapSig(settled)) {
     undoStack.push(settled);
     if (undoStack.length > HISTORY_MAX) undoStack.shift();
+    redoStack.length = 0; // a genuinely new edit abandons the redo future
     settled = now;
     updateEditButtons();
   }
@@ -626,9 +637,23 @@ function undo() {
   flushRecord(); // fold any in-flight edit into history first
   const prev = undoStack.pop();
   if (!prev) return;
+  redoStack.push(settled!); // remember the state we're stepping back from, so Redo can return to it
   applySnapshot(prev);
   if (healReview) setHealReview(true); // re-validate: spot count changed (or hit zero) under review
   settled = snapshot(); // now == prev; don't let the repaint re-record it
+  clearTimeout(recordTimer);
+  recordTimer = 0;
+  updateEditButtons();
+}
+
+function redo() {
+  const next = redoStack.pop(); // no flushRecord here — it would clear the redo future we're walking
+  if (!next) return;
+  undoStack.push(settled!); // the state we're leaving becomes an undo step again
+  if (undoStack.length > HISTORY_MAX) undoStack.shift();
+  applySnapshot(next);
+  if (healReview) setHealReview(true);
+  settled = snapshot(); // now == next; don't re-record the repaint
   clearTimeout(recordTimer);
   recordTimer = 0;
   updateEditButtons();
@@ -641,6 +666,7 @@ function resetEdit() {
 }
 
 undoBtn.addEventListener("click", undo);
+redoBtn.addEventListener("click", redo);
 resetBtn.addEventListener("click", resetEdit);
 
 // --- Saved-look slots: five localStorage-backed memory slots that persist
@@ -2479,6 +2505,7 @@ function establishFreshEdit() {
   baseline = snapshot();
   settled = snapshot();
   undoStack.length = 0;
+  redoStack.length = 0;
   clearTimeout(recordTimer);
   recordTimer = 0;
   updateEditButtons();
@@ -2530,6 +2557,7 @@ interface LiveEdit {
   baseline: Snapshot;
   settled: Snapshot;
   undo: Snapshot[];
+  redo: Snapshot[];
   orig: EditParams | null;
 }
 
@@ -2568,6 +2596,7 @@ function captureActiveEdit() {
     baseline: baseline ?? snapshot(),
     settled: settled ?? snapshot(),
     undo: [...undoStack],
+    redo: [...redoStack],
     orig: origParams,
   });
   const json = editToJson();
@@ -2580,6 +2609,8 @@ function captureActiveEdit() {
 function restoreLiveEdit(st: LiveEdit) {
   undoStack.length = 0;
   undoStack.push(...st.undo);
+  redoStack.length = 0;
+  redoStack.push(...(st.redo ?? []));
   baseline = st.baseline;
   settled = st.settled;
   origParams = st.orig;
@@ -3129,64 +3160,64 @@ const galNef = (key: string, label: string, lesson?: number): GalleryTile => ({
   lesson,
 });
 const GALLERY: GalleryTile[] = [
-  galRaw("canopy", "Golden canopy · RAW", 3),
-  galRaw("lodge", "Motor lodge · RAW", 3),
-  galRaw("hillside", "Hillside & sky · RAW"),
+  galRaw("canopy", "Golden canopy", 3),
+  galRaw("lodge", "Motor lodge", 3),
+  galRaw("hillside", "Hillside & sky"),
   // A RAW practice photo for every lesson, in lesson order (owner ask
   // 2026-07-14: each practice photo opens on its own lesson).
-  galNef("NIR_1638", "Lakeside beach · RAW", 0),
-  galNef("NIR_1701", "White forest · RAW", 1),
-  galNef("NIR_1822", "Lone pine · RAW", 2),
-  galNef("NIR_1708", "Wooded shore · RAW", 3),
-  galNef("NIR_1687", "Picnic still life · RAW", 4),
-  galNef("NIR_1675", "Lakeside & sensor dust · RAW", 5),
+  galNef("NIR_1638", "Lakeside beach", 0),
+  galNef("NIR_1701", "White forest", 1),
+  galNef("NIR_1822", "Lone pine", 2),
+  galNef("NIR_1708", "Wooded shore", 3),
+  galNef("NIR_1687", "Picnic still life", 4),
+  galNef("NIR_1675", "Lakeside & sensor dust", 5),
   // Second wave (2026-07-14): a second RAW frame for lessons 1-5.
-  galNef("NIR_1830", "Chairs by the lake · RAW", 0),
-  galNef("NIR_1873", "Through the boughs · RAW", 1),
-  galNef("NIR_1824", "Pine & clouds · RAW", 2),
-  galNef("NIR_1821", "Shoreline forest · RAW", 3),
-  galNef("NIR_1877", "Glowing pine · RAW", 4),
+  galNef("NIR_1830", "Chairs by the lake", 0),
+  galNef("NIR_1873", "Through the boughs", 1),
+  galNef("NIR_1824", "Pine & clouds", 2),
+  galNef("NIR_1821", "Shoreline forest", 3),
+  galNef("NIR_1877", "Glowing pine", 4),
   // Third wave (2026-07-14): Wispy sky's RAW replaces its JPEG tile; the
   // forest-wall frames are free practice (untagged -> open on Lesson 1).
-  galNef("NIR_1827", "Wispy sky · RAW", 2),
-  galNef("NIR_1811", "Lakeshore pines · RAW"),
-  galNef("NIR_1812", "Forest wall · RAW"),
-  galNef("NIR_1814", "Forest spire · RAW"),
-  galNef("NIR_1817", "Bare snag · RAW"),
+  galNef("NIR_1827", "Wispy sky", 2),
+  galNef("NIR_1811", "Lakeshore pines"),
+  galNef("NIR_1812", "Forest wall"),
+  galNef("NIR_1814", "Forest spire"),
+  galNef("NIR_1817", "Bare snag"),
   // Fourth wave (2026-07-14): Swirling sky's RAW replaces its JPEG tile, and
   // Lake & contrails' tile is now the RAW of a neighbouring frame (NIR_1722,
   // same scene — the NIR_1721 JPEG was retired). The rest are free practice.
-  galNef("NIR_1716", "Swirling sky · RAW", 2),
-  galNef("NIR_1722", "Lake & contrails · RAW", 2),
-  galNef("NIR_1717", "Frosted pine · RAW"),
-  galNef("NIR_1718", "Under swirling clouds · RAW"),
-  galNef("NIR_1703", "Spire & streaks · RAW"),
-  galNef("NIR_1720", "Sunlit shore · RAW"),
-  galNef("NIR_1738", "Kayaks on the beach · RAW"),
-  galNef("NIR_1713", "Rocky shore forest · RAW"),
-  galNef("NIR_1710", "Cove forest · RAW"),
+  galNef("NIR_1716", "Swirling sky", 2),
+  galNef("NIR_1722", "Lake & contrails", 2),
+  galNef("NIR_1717", "Frosted pine"),
+  galNef("NIR_1718", "Under swirling clouds"),
+  galNef("NIR_1703", "Spire & streaks"),
+  galNef("NIR_1720", "Sunlit shore"),
+  galNef("NIR_1738", "Kayaks on the beach"),
+  galNef("NIR_1713", "Rocky shore forest"),
+  galNef("NIR_1710", "Cove forest"),
   // Fifth wave (2026-07-14): Framed by trees' tile is now the RAW of a
   // neighbouring frame (NIR_1667, same scene — the NIR_1665 JPEG was
   // retired). The rest are free practice.
-  galNef("NIR_1667", "Framed by trees · RAW"),
-  galNef("NIR_1644", "Frosted treetops · RAW"),
-  galNef("NIR_1651", "Sunlit crown · RAW"),
-  galNef("NIR_1661", "Sunlit pines · RAW"),
-  galNef("NIR_1662", "Fir & pine · RAW"),
-  galNef("NIR_1671", "Glowing pair · RAW"),
-  galNef("NIR_1681", "Foliage & trunk · RAW"),
-  galNef("NIR_1682", "Foliage towers · RAW"),
-  galNef("NIR_1688", "Sapling on the rock · RAW"),
-  galNef("NIR_1691", "Camp by the lake · RAW"),
-  galNef("NIR_1705", "Forest sentinel · RAW"),
+  galNef("NIR_1667", "Framed by trees"),
+  galNef("NIR_1644", "Frosted treetops"),
+  galNef("NIR_1651", "Sunlit crown"),
+  galNef("NIR_1661", "Sunlit pines"),
+  galNef("NIR_1662", "Fir & pine"),
+  galNef("NIR_1671", "Glowing pair"),
+  galNef("NIR_1681", "Foliage & trunk"),
+  galNef("NIR_1682", "Foliage towers"),
+  galNef("NIR_1688", "Sapling on the rock"),
+  galNef("NIR_1691", "Camp by the lake"),
+  galNef("NIR_1705", "Forest sentinel"),
   // Sixth wave (2026-07-14): backyard scenes — Lightroom-converted DNG
   // sources this time (binned through the same pipeline via the app's own
   // LJ92 CFA decode). All free practice.
-  galNef("NIR_0063", "Oaks over the fence · RAW"),
-  galNef("NIR_0102", "Bird bath · RAW"),
-  galNef("NIR_0152", "Backyard lounge · RAW"),
-  galNef("NIR_0172", "The playhouse · RAW"),
-  galNef("NIR_0627", "Lavender · RAW"),
+  galNef("NIR_0063", "Oaks over the fence"),
+  galNef("NIR_0102", "Bird bath"),
+  galNef("NIR_0152", "Backyard lounge"),
+  galNef("NIR_0172", "The playhouse"),
+  galNef("NIR_0627", "Lavender"),
   galJpeg("NIR_1706", "Forest & snag"),
   galJpeg("NIR_1808", "Foliage close-up"),
   galJpeg("NIR_1864", "Weeping branches"),
