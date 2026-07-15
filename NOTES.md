@@ -108,15 +108,45 @@ See **`PLAN.md`** for the full build plan.
 - CI must check out full history (`fetch-depth: 0` in deploy.yml) or the
   commit counts — and therefore the version numbers — come out wrong.
 
-## Next capability release (owner's roadmap, 2026-07-04; queue refreshed 2026-07-13)
+## Next capability release (owner's roadmap, 2026-07-04; queue refreshed 2026-07-15)
 
 > SOURCE OF TRUTH for the in-app Roadmap (behind the ⓘ button). `vite.config.ts`
 > parses the `- [ ]` / `- [x]` checkbox bullets below at build time and injects
-> them as `__ROADMAP__`; the dialog renders each item's TITLE — the text up to
-> the first " — " (space em-dash space). Keep every roadmap item a single
-> top-level checkbox bullet with a short bold title so the parser stays
-> reliable. Editing this list updates the app on the next deploy. Both the
-> roadmap and the patch notes (last commits) refresh automatically on push.
+> them as `__ROADMAP__`; the dialog renders each item's TITLE — the full
+> leading **bold span** (an inner em-dash is safe), else text up to the first
+> " — ". Keep every roadmap item a single top-level checkbox bullet with a
+> short bold title so the parser stays reliable. Editing this list updates
+> the app on the next deploy. Both the roadmap and the patch notes (last
+> commits) refresh automatically on push.
+
+- [ ] **Crop & straighten** — NEXT RELEASE (owner GO 2026-07-15, given with
+  the review-release feedback; he called it a "quick addition" — treat it as
+  one release, not a saga). The last table-stakes editing tool before the
+  App Store path. Build notes: geometry rides the vertex shader we already
+  rotate in (see Future/bigger bets); crop = a display + export REGION, so
+  exportImage needs a source-rect (and the watermark corner must anchor to
+  the CROPPED frame); straighten = small rotation + auto-inscribed crop.
+  Direct manipulation (drag corners/edges, drag outside to straighten?),
+  one gesture = one undo, honest reset. WATCH: masks/heal spots live in
+  image-uv — decide and DOCUMENT whether they stay anchored to the source
+  pixels (they should; crop is a view, not a re-bake); the lens hot-spot
+  fix is aspect-corrected from SOURCE dims and must stay circular; the
+  .cube/.dcp LUTs are unaffected (geometry is spatial by definition).
+  Batch/looks never carry crop (composition-specific, like spots/masks).
+- [ ] **Preview-faithful exports + offline through updates** — NEXT VERSION
+  (owner call 2026-07-15: after crop/straighten ships, this pair is the
+  next VERSION — bump the VERSION file to 1.1 when it lands). The two big
+  CONFIRMED review findings; full detail in the "Full-app review" ledger
+  section below. (1) Denoise/sharpen/texture run at proxy resolution in
+  preview but native at export (~2× kernel scale on every mosaiced RAW and
+  >2800px 8-bit source) — scale the CPU kernels' tap spacing and the detail
+  sigmas by the proxy factor at export, then RE-PROVE GPU==CPU parity (the
+  existing harness compares equal-res mirrors and cannot see this — build a
+  cross-resolution check) and tune with the owner's eyes on real frames.
+  (2) Every release blacks out offline use until the next online visit —
+  build-time precache manifest injected into sw.js (vite plugin emits the
+  hashed asset list), install-time addAll into the NEW cache, activate only
+  after it's populated; keep the examples cache untouched.
 
 - [x] **RAW practice photos for every lesson** — owner ask 2026-07-14, given
   with the dust-release GO: the next release brings the RAW (binned-DNG)
