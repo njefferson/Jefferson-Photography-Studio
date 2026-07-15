@@ -121,6 +121,8 @@ body {
   align-items: center;
   gap: 9px;
   margin-right: auto;
+  white-space: nowrap;
+  flex: none;
 }
 /* Tool identity: a 16px circle filled with the tool's spectral gradient. */
 .tool-dot {
@@ -139,9 +141,21 @@ body {
   padding: 6px 8px 6px 0;
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 5px;
+  /* The corner must never wrap "‹ Studio" onto two lines: keep the text on
+     one line and refuse to shrink — the actions row absorbs the squeeze. */
+  white-space: nowrap;
+  flex: none;
 }
 .home-link:active { color: var(--txt); }
+/* The Studio/NJ mark riding in the corner link — the way back wears the brand. */
+.bar-mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  flex: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
 .info-btn {
   width: 26px;
   height: 26px;
