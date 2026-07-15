@@ -770,6 +770,7 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   cursor: pointer;
   text-decoration: underline;
 }
+.bar-actions-wrap { display: inline-flex; min-width: 0; }
 .bar-actions { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 /* The top bar reflects the MODE. While the start screen is up, the photo
    controls park themselves — they act on a photo that isn't on screen, so
@@ -1176,6 +1177,7 @@ label.open-btn, label.bar-btn {
      "Not enough room to do anything"): the edit actions become ONE sideways-
      scrolling row instead of stacking two or three rows tall. Labels stay
      full; the cut-off last button is the scroll affordance. */
+  .bar-actions-wrap { position: relative; width: 100%; min-width: 0; }
   .bar-actions {
     flex-wrap: nowrap;
     overflow-x: auto;
@@ -1187,6 +1189,39 @@ label.open-btn, label.bar-btn {
   }
   .bar-actions::-webkit-scrollbar { display: none; }
   .bar-actions .bar-btn { flex: none; white-space: nowrap; }
+  /* A scrolling menu SAYS it scrolls (owner rule, 2026-07-14): a fade +
+     chevron sits on whichever edge has more buttons, and follows the scroll. */
+  .bar-actions-wrap::before,
+  .bar-actions-wrap::after {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 30px;
+    display: flex;
+    align-items: center;
+    font: 700 17px/1 var(--ui);
+    color: var(--txt-2);
+    opacity: 0;
+    transition: opacity 0.15s;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .bar-actions-wrap::before {
+    content: "\2039"; /* ‹ */
+    left: 0;
+    justify-content: flex-start;
+    padding-left: 1px;
+    background: linear-gradient(90deg, var(--surface) 35%, transparent);
+  }
+  .bar-actions-wrap::after {
+    content: "\203A"; /* › */
+    right: 0;
+    justify-content: flex-end;
+    padding-right: 1px;
+    background: linear-gradient(-90deg, var(--surface) 35%, transparent);
+  }
+  .bar-actions-wrap.scroll-left::before { opacity: 1; }
+  .bar-actions-wrap.scroll-right::after { opacity: 1; }
   /* Tighter chrome all around (owner: "it could be tighter", 2026-07-14) —
      smaller paddings, not smaller text; tap heights stay ≥36px. */
   .bar { min-height: 44px; gap: 6px 10px; padding-left: 10px; padding-right: 10px; padding-bottom: 4px; }

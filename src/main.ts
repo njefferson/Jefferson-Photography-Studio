@@ -2157,6 +2157,23 @@ function returnToEditor() {
 }
 
 $("homeBtn").addEventListener("click", goHome);
+
+// Scroll indicators for the narrow-screen action row: a fade + chevron on
+// whichever edge has more buttons (the wrap's ::before/::after). Kept honest
+// on scroll, resize, AND mode flips (the start screen hides most buttons,
+// which changes scrollWidth without any scroll/resize event).
+{
+  const wrap = document.querySelector(".bar-actions-wrap") as HTMLElement;
+  const acts = document.querySelector(".bar-actions") as HTMLElement;
+  const update = () => {
+    wrap.classList.toggle("scroll-left", acts.scrollLeft > 2);
+    wrap.classList.toggle("scroll-right", acts.scrollLeft + acts.clientWidth < acts.scrollWidth - 2);
+  };
+  acts.addEventListener("scroll", update, { passive: true });
+  new ResizeObserver(update).observe(acts);
+  new MutationObserver(update).observe(welcome, { attributes: true, attributeFilter: ["hidden"] });
+  update();
+}
 welcomeClose.addEventListener("click", returnToEditor);
 welcomeBack.addEventListener("click", returnToEditor);
 

@@ -33,7 +33,7 @@
           <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M3 11l9-8 9 8" /><path d="M5 10v10h5v-6h4v6h5V10" /></svg>
           Home
         </button>
-        <span class="bar-actions">
+        <span class="bar-actions-wrap"><span class="bar-actions">
           <button id="undoBtn" class="bar-btn" type="button" disabled title="Go back one edit step">&#8630; Go back</button>
           <button id="resetBtn" class="bar-btn" type="button" disabled title="Reset the whole edit to how the photo first opened">Reset</button>
           <button id="origBtn" class="bar-btn" type="button" title="Press and hold to compare with the original">Hold: Original</button>
@@ -51,7 +51,7 @@
           </label>
           <input id="batchFiles" type="file" accept=".dng,.nef,.zip,image/*" multiple hidden />
           <input id="quickFiles" type="file" accept=".dng,.nef,.zip,image/*" multiple hidden />
-        </span>
+        </span></span>
       </header>
 
       <div id="stage">
