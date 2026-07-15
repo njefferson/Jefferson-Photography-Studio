@@ -119,6 +119,38 @@ See **`PLAN.md`** for the full build plan.
 > the app on the next deploy. Both the roadmap and the patch notes (last
 > commits) refresh automatically on push.
 
+- [ ] **Tap the histogram to hide it** — owner ask 2026-07-15 (given with the
+  crop go-to-main): tapping the histogram HUD directly should collapse/hide it
+  (it floats over the top-right of the photo); the Histogram button in the top
+  bar still brings it back as normal. Direct manipulation — touch the thing to
+  dismiss the thing. WATCH: the HUD is currently pointer-events:none (it never
+  eats taps meant for the photo) — hiding-on-tap means giving just the HUD its
+  own tap handler while keeping the canvas underneath usable, or a small close
+  affordance on it; keep the Histogram button as the single source of truth for
+  the shown/hidden state so the two never disagree.
+- [ ] **Crop controls should stand out + a rotate cue** — owner ask 2026-07-15
+  (on-device, with the crop go): the Straighten slider and Reset crop button
+  are easy to miss. He wants them to carry the "active" blue background like
+  the "tap here" pill does (open to a better suggestion). AND a circle-arrow
+  (↻) paired with the crop icon — both on the top-bar Crop button and at the
+  bottom near Straighten — so it visually reads that rotation/leveling is
+  possible. Build notes: the crop toolbar (#cropTools) is currently a neutral
+  dark glass pill; giving it (or Straighten + Reset) the accent fill is a CSS
+  change; the ↻ glyph can ride in the Crop button label and as a slider-end
+  affordance. Keep Reset crop's disabled state honest (it greys when the crop
+  is already identity).
+- [ ] **Redo** — owner ask 2026-07-15: add a Redo button + function next to
+  "Go back", and RENAME "Go back" to "Undo" (unless a reason surfaces not to).
+  Build notes: the undo stack already exists (undoStack + settled/flushRecord);
+  Redo needs a parallel redo stack that undo() pushes onto and any NEW edit
+  clears (standard redo semantics — a fresh action after an undo abandons the
+  redo future). The ⓘ patch-notes read the last commits, unaffected.
+- [ ] **Drop "· RAW" from tile labels** — owner note 2026-07-15: every practice
+  photo in the tutorial set is RAW now, so the "· RAW" suffix on the tile
+  labels is redundant noise. Remove it from the gallery tile titles (main.ts
+  GALLERY entries / galNef/galRaw label helpers). The RAW-vs-JPEG distinction
+  the suffix once carried is gone (the set is all binned DNGs); labels stay
+  honest by simply naming the scene.
 - [ ] **Learning library tile in the grid** — owner verdict 2026-07-15 (given
   WITH the go to main): the dashed "Browse the full example library" pill is
   "completely missable, and most people would never know it was there — it's
