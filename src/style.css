@@ -491,8 +491,19 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
    to move) over the FULL, un-cropped frame while the tool is armed — the
    underlying render already shows straighten live (a rotated photo), so the
    box itself never needs its own CSS rotation. box-shadow-as-scrim is the
-   classic one-element "darken everything outside this rect" trick. */
+   classic one-element "darken everything outside this rect" trick.
+   user-select/tap-highlight/touch-callout are ALL killed here: without them,
+   dragging the box or a handle on iPad Safari paints a translucent blue
+   text-selection band over the photo (owner-caught on device, 2026-07-15). */
 #cropOverlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 6; }
+#cropOverlay,
+#cropBox,
+.crop-handle {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
 #cropBox {
   position: absolute;
   border: 1.5px solid #fff;
@@ -501,17 +512,29 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   cursor: move;
   touch-action: none;
 }
+/* A 44px INVISIBLE touch target (Apple's minimum) centred on each corner —
+   the visible dot is drawn smaller via ::before. The big target is why a
+   corner is grabbable even when it sits near a screen edge; the .cropping
+   canvas inset below keeps it clear of the OS home-indicator / edge-swipe
+   zone, where the owner found the bottom-left corner unreachable until he
+   shrank the Safari window (2026-07-15). */
 .crop-handle {
   position: absolute;
-  width: 26px;
-  height: 26px;
-  margin: -13px;
-  border-radius: 50%;
-  background: rgba(12, 12, 16, 0.72);
-  border: 2px solid #fff;
+  width: 44px;
+  height: 44px;
+  margin: -22px;
+  background: transparent;
   pointer-events: auto;
   cursor: grab;
   touch-action: none;
+}
+.crop-handle::before {
+  content: "";
+  position: absolute;
+  inset: 9px; /* 44 - 2*9 = 26px visible dot, as before */
+  border-radius: 50%;
+  background: rgba(12, 12, 16, 0.72);
+  border: 2px solid #fff;
 }
 .crop-handle[data-corner="tl"] { top: 0; left: 0; }
 .crop-handle[data-corner="tr"] { top: 0; left: 100%; }
@@ -667,6 +690,39 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   max-height: calc(100% - 32px - var(--session-h, 110px));
 }
 #stage.has-session #colorBanner, #stage.has-session #healBanner, #stage.has-session #healReviewBanner { bottom: calc(24px + var(--session-h, 110px)); }
+
+/* While cropping, pull the photo IN from the stage edges so a full-frame crop
+   box's corner handles never land in the physical screen corners — iOS
+   reserves the bottom edge for the home indicator and the side edges for
+   swipe-back, and a handle sitting there can't be grabbed (the owner had to
+   shrink the Safari window to reach the bottom-left corner, 2026-07-15). The
+   generous bottom also clears the Straighten toolbar. The crop box tracks the
+   canvas rect (positionCropOverlay reads getBoundingClientRect), so insetting
+   the canvas carries the whole box + handles inward for free. Placed AFTER the
+   has-session rule so it wins during a session; env() adds the device's own
+   safe-area on top. */
+#stage.cropping #view {
+  top: 30px;
+  left: 30px;
+  right: 30px;
+  bottom: 96px; /* 30px like the sides + 66px for the Straighten toolbar / OS zone */
+  max-width: calc(100% - 60px);
+  max-height: calc(100% - 126px);
+}
+#stage.cropping.has-session #view {
+  bottom: calc(96px + var(--session-h, 110px));
+  max-height: calc(100% - 126px - var(--session-h, 110px));
+}
+@media (max-width: 760px) {
+  #stage.cropping #view {
+    top: 22px;
+    left: 22px;
+    right: 22px;
+    bottom: 88px;
+    max-width: calc(100% - 44px);
+    max-height: calc(100% - 110px);
+  }
+}
 #sessionStrip {
   position: absolute;
   left: 12px;

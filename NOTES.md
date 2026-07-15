@@ -201,12 +201,42 @@ See **`PLAN.md`** for the full build plan.
   verdict on the "photo tilts, box doesn't" straighten preview versus a
   Lightroom-style tilting viewfinder box (documented above as the deliberate
   simpler choice for this release — a candidate for a follow-up if he wants
-  the box to visually tilt instead). NOT YET DONE: no on-device pass, no
-  aspect-ratio presets (free-form only), masks/heals were NOT re-verified
-  live under an active crop in this pass (the geometry math is shared and
-  should carry them correctly by construction, per the inverse-mapping
-  argument above, but a real mask-under-crop headless check is still owed
-  before calling this fully proven).
+  the box to visually tilt instead). NOT YET DONE: no aspect-ratio presets
+  (free-form only); masks/heals were NOT re-verified live under an active
+  crop in this pass (the geometry math is shared and should carry them
+  correctly by construction, per the inverse-mapping argument above, but a
+  real mask-under-crop headless check is still owed before calling this
+  fully proven).
+  OWNER'S FIRST ON-DEVICE PASS (2026-07-15, staging — "Crop works well" +
+  two bugs, both fixed same day, cache ips-v54 → ips-v55):
+  (1) A translucent BLUE BAND (iPad Safari's text-selection highlight)
+  painted over the photo while dragging the box/handles — the crop overlay
+  subtree never got user-select:none. Fixed: #cropOverlay/#cropBox/
+  .crop-handle now all carry -webkit-user-select/user-select:none +
+  -webkit-tap-highlight-color:transparent + -webkit-touch-callout:none (the
+  same guard #view already had; the overlay's div children had been missed).
+  (2) The BOTTOM-LEFT corner handle couldn't be grabbed when the box sat in
+  the frame's bottom-left-most corner — until he SHRANK the Safari window.
+  Root cause: a full-frame crop put the handle flush in the physical screen's
+  bottom-left corner, exactly where iOS reserves the first touch for the
+  home-indicator swipe (bottom edge) and back-swipe (left edge); resizing the
+  window moved the page content off that edge, which is why it then worked.
+  Fix, two parts: (a) while cropping, #stage gets a `.cropping` class that
+  insets #view from the stage edges (30px sides, 96px bottom for the
+  Straighten toolbar + OS zone; env(safe-area) not needed since the fixed
+  inset already clears it) — the crop box tracks the canvas rect, so the whole
+  box + handles move inward for free, and the photo just renders a touch
+  smaller while framing; (b) the corner handles grew from a 26px element to a
+  44px INVISIBLE hit target (Apple's minimum) with the visible 26px dot drawn
+  via ::before, so a corner is easy to grab even near an edge. VERIFIED
+  headless: the bl-handle center now sits 31px from the stage's left edge and
+  182px from its bottom (was ~0/flush), the hit target measures 44×44, and
+  dragging the BOTTOM-LEFT handle specifically moves the crop (left edge in,
+  bottom up); the selection-highlight guard is asserted computed
+  (user-select:none on box/handle/overlay); the original end-to-end geometry
+  + export tests still pass unchanged; no page errors. STILL NEEDS THE
+  OWNER'S HANDS: confirm both are gone on the real iPad, and the "photo
+  shrinks a bit while cropping" tradeoff feels right.
 - [ ] **Preview-faithful exports + offline through updates** — NEXT VERSION
   (owner call 2026-07-15: after crop/straighten ships, this pair is the
   next VERSION — bump the VERSION file to 1.1 when it lands). The two big

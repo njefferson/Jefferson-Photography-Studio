@@ -1878,6 +1878,9 @@ function setCropMode(on: boolean) {
   cropBanner.hidden = !cropArmed;
   cropTools.hidden = !cropArmed;
   if (cropArmed) { setHslPick(false); setColorPick(false); setTat(false); setHeal(false); setHealReview(false); mUI.paint.setAttribute("aria-pressed", "false"); resetZoom(); } // picture tools are exclusive; crop wants the whole frame in view
+  // Pull the photo in from the stage edges while cropping so the corner handles
+  // never sit flush in the physical screen corners (the OS eats touches there).
+  stageEl.classList.toggle("cropping", cropArmed);
   straightenSlider.value = String(params.straighten);
   straightenVal.textContent = `${params.straighten.toFixed(1)}°`;
   positionCropOverlay();
