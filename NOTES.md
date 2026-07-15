@@ -193,6 +193,39 @@ See **`PLAN.md`** for the full build plan.
   page errors. NEEDS THE OWNER'S HANDS: sub-menu discoverability (Crop is now a
   tab, Rotate is two taps away — flagged the tradeoff), the drawer-hide feel on
   the real iPhone, and the redesigned pill's look/room.
+  SECOND ON-DEVICE PASS (2026-07-15, staging, iPhone — three fixes, cache
+  ips-v57 → ips-v58):
+  (1) STRAIGHTEN SMEARED. "Straighten doesn't work — it smears." At larger
+  angles the full-frame straighten PREVIEW didn't fill the viewport and the
+  empty corners smeared the edge texel (the source texture is CLAMP_TO_EDGE).
+  FIX: one guard at the top of the gl.ts fragment main() — if the resolved
+  sample uv is outside [0,1], output `vec4(0.0)` (transparent) and return, so
+  the dark #stage shows through cleanly (the webgl2 context is alpha:true,
+  blending off). NO-OP for normal render + export: there the crop is
+  auto-inscribed inside the image so uv never leaves [0,1]. Only the straighten
+  preview's empty corners change — smear → clean empty space.
+  (2) NO "MORE ABOVE" ARROW. The welcome card had only a down cue; the What's-new
+  (ⓘ) dialog had none. Added: a `.welcome-cue.up` mirroring the down cue (sticky
+  to the card's top, ▲, `.on` when welcome.scrollTop > 24, wired into the
+  existing card `update()`); and sticky `.dlg-cue up/down` inside #infoDlg driven
+  by a new `updateInfoCues()` on the dialog's scroll + on open (sticky resolves
+  against the dialog's own scrollport — no position:relative, which would break
+  modal centering; #infoDlg gained max-height:82vh + overflow-y:auto to match
+  #helpDlg).
+  (3) CROP TAB NAME. Owner: "'Crop' doesn't indicate what's in it; separate
+  rotate and crop." Tab renamed **"Crop & rotate"** (TAB_META.crop.name + the
+  full-width tab label; the "crop" key + saved-tab localStorage unchanged);
+  Rotate 90° and Crop & straighten stay two separate, direct controls.
+  VERIFIED headless 15/15 (Chromium, short portrait 390×720; fail-first proven —
+  planted "up cue stays hidden" + "corner still opaque/smeared" both failed as
+  planted): the straighten corner reads alpha 0 at 40° (transparent, not smear)
+  while the frame is opaque at 0° AND at the centre (straighten still transforms
+  — captured a clean-corners screenshot); welcome + dialog up/down cues toggle on
+  scroll; tab + section read "Crop & rotate" with Rotate/Crop separate; drawer
+  still hides while cropping, pill still a column, Reset greyed at identity, exit
+  restores the drawer; no page errors. NEEDS THE OWNER'S HANDS: the straighten
+  preview LOOKS clean on the real iPhone (Chromium corner-alpha is the proxy),
+  the up-arrows read right, and the "Crop & rotate" name.
 - [x] **Redo** — owner ask 2026-07-15: add a Redo button + function next to
   "Go back", and RENAME "Go back" to "Undo" (unless a reason surfaces not to).
   Build notes: the undo stack already exists (undoStack + settled/flushRecord);

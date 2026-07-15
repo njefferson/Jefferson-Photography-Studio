@@ -102,6 +102,7 @@
           <span class="tat-banner-off">Tap again to re-pick &middot; tap here when done</span>
         </button>
         <div id="welcome">
+          <div class="welcome-cue up" id="welcomeCueUp" hidden aria-hidden="true">&#9650;</div>
           <button id="welcomeClose" class="welcome-close" type="button" hidden>&#10005;</button>
           <button id="welcomeBack" class="welcome-back" type="button" hidden>&#8249; Back to your photo</button>
           <p id="hint">Edit infrared photos — RAW (NEF / DNG) unlocks the full color magic.</p>
@@ -154,7 +155,7 @@
           <button class="ptab" type="button" data-tab="tone" role="tab" aria-selected="false">Tone</button>
           <button class="ptab" type="button" data-tab="masks" role="tab" aria-selected="false">Masks</button>
           <button class="ptab" type="button" data-tab="export" role="tab" aria-selected="false">Export</button>
-          <button class="ptab" type="button" data-tab="crop" role="tab" aria-selected="false">Crop</button>
+          <button class="ptab" type="button" data-tab="crop" role="tab" aria-selected="false">Crop &amp; rotate</button>
         </div>
         <div class="section-head">
           <h2 id="sectionTitle" class="section-title">Basic</h2>
@@ -469,6 +470,7 @@
     </dialog>
 
     <dialog id="infoDlg">
+      <div class="dlg-cue up" id="infoCueUp" hidden aria-hidden="true">&#9650;</div>
       <h2>What's new</h2>
       <p id="infoVer" class="info-ver"></p>
       <ul id="changeList"></ul>
@@ -486,6 +488,7 @@
       </p>
       <p class="theme-row"><button id="themeToggle" type="button"></button></p>
       <button id="infoClose" type="button">Close</button>
+      <div class="dlg-cue down" id="infoCueDown" hidden aria-hidden="true">&#9660;</div>
     </dialog>
 
     <dialog id="helpDlg">

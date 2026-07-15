@@ -259,6 +259,27 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   box-shadow: var(--shadow);
 }
 #infoDlg::backdrop, #helpDlg::backdrop, #batchDlg::backdrop { background: rgba(0, 0, 0, 0.55); }
+/* The "What's new" dialog scrolls; sticky chevron cues at its top/bottom edges
+   say "there's more this way" (owner ask 2026-07-15). Sticky resolves against
+   the dialog's own scrollport, so no position:relative (that breaks modal
+   centering). */
+#infoDlg { max-height: 82vh; overflow-y: auto; }
+.dlg-cue {
+  position: sticky;
+  z-index: 3;
+  height: 30px;
+  margin: 0 -20px;
+  display: flex;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--txt-2);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.dlg-cue.on { opacity: 1; }
+.dlg-cue.up { top: -18px; margin-top: -18px; align-items: flex-start; padding-top: 3px; background: linear-gradient(0deg, transparent, var(--surface) 74%); }
+.dlg-cue.down { bottom: -18px; margin-bottom: -18px; align-items: flex-end; padding-bottom: 3px; background: linear-gradient(180deg, transparent, var(--surface) 74%); }
 #infoDlg h2, #helpDlg h2, #batchDlg h2 { margin: 0 0 10px; font: 600 17px/1.2 var(--display); }
 
 /* Batch-start chooser: pick the grade that goes on every photo. */
@@ -621,6 +642,16 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   opacity: 0;
 }
 .welcome-cue.on { opacity: 1; }
+/* Matching UP cue: hugs the card's TOP edge, shows once you've scrolled down so
+   it's clear there's more above (owner ask 2026-07-15). */
+.welcome-cue.up {
+  top: -22px;
+  bottom: auto;
+  margin: -22px -26px 0;
+  align-items: flex-start;
+  padding: 3px 0 0;
+  background: linear-gradient(0deg, transparent, var(--surface) 72%);
+}
 /* Short screens (iPad landscape): tighter welcome chrome so the practice grid
    peeks above the fold instead of hiding entirely below it. */
 @media (max-height: 880px) {

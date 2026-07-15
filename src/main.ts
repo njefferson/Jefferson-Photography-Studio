@@ -940,7 +940,7 @@ const TAB_META: Record<PanelTab, { name: string; sub: string }> = {
   tone: { name: "Tone", sub: "Curve, luminance & bands" },
   masks: { name: "Masks", sub: "Local, area-only adjustments" },
   export: { name: "Export", sub: "Save, my looks & profiles" },
-  crop: { name: "Crop", sub: "Rotate, crop & straighten" },
+  crop: { name: "Crop & rotate", sub: "Rotate, crop & straighten" },
 };
 const panelTabsEl = $("panelTabs") as HTMLElement;
 const sectionTitleEl = $("sectionTitle") as HTMLElement;
@@ -3447,10 +3447,13 @@ const library = $("library") as HTMLDivElement;
 // the card's bottom edge while there's more below the fold, gone at the end.
 {
   const cue = $("welcomeCue") as HTMLDivElement;
+  const cueUp = $("welcomeCueUp") as HTMLDivElement;
   cue.hidden = false; // from here on, visibility is the .on class (see style.css)
+  cueUp.hidden = false;
   const update = () => {
     const more = welcome.scrollHeight - welcome.clientHeight - welcome.scrollTop > 24;
     cue.classList.toggle("on", more);
+    cueUp.classList.toggle("on", welcome.scrollTop > 24); // more sits above
   };
   welcome.addEventListener("scroll", update, { passive: true });
   new ResizeObserver(update).observe(welcome);
@@ -4299,7 +4302,20 @@ function grayWorldWB(img: DecodedImage): [number, number, number] {
     roadmap.append(li);
   }
 
-  $("infoBtn").addEventListener("click", () => dlg.showModal());
+  // Sticky scroll cues: say "more above / below" while the dialog overflows.
+  const infoCueUp = $("infoCueUp") as HTMLDivElement;
+  const infoCueDown = $("infoCueDown") as HTMLDivElement;
+  infoCueUp.hidden = false; // visibility is the .on class (see style.css), not [hidden]
+  infoCueDown.hidden = false;
+  const updateInfoCues = () => {
+    const max = dlg.scrollHeight - dlg.clientHeight;
+    infoCueUp.classList.toggle("on", dlg.scrollTop > 8);
+    infoCueDown.classList.toggle("on", max > 8 && dlg.scrollTop < max - 8);
+  };
+  dlg.addEventListener("scroll", updateInfoCues, { passive: true });
+  const openInfo = () => { dlg.showModal(); requestAnimationFrame(updateInfoCues); };
+
+  $("infoBtn").addEventListener("click", openInfo);
   $("infoClose").addEventListener("click", () => dlg.close());
   dlg.addEventListener("click", (e) => {
     if (e.target === dlg) dlg.close(); // tap outside to dismiss
@@ -4314,7 +4330,7 @@ function grayWorldWB(img: DecodedImage): [number, number, number] {
   localStorage.setItem(SEEN_KEY, __APP_VERSION__);
   if (seen !== null && seen !== __APP_VERSION__) {
     // Let the first frame paint so the dialog opens over a live app.
-    requestAnimationFrame(() => dlg.showModal());
+    requestAnimationFrame(openInfo);
   }
 }
 
