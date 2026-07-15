@@ -84,8 +84,10 @@ function roadmap() {
       if (/^##\s/.test(lines[i])) break; // stop at the next section heading
       const m = lines[i].match(/^-\s+\[([ xX])\]\s+(.+)$/);
       if (!m) continue;
-      const title = m[2]
-        .split(" — ")[0] // title = text before the em-dash detail
+      // Title = the full **bold span** when the item leads with one (so an
+      // em-dash INSIDE the title survives); otherwise text before " — ".
+      const bold = m[2].match(/^\*\*(.+?)\*\*/);
+      const title = (bold ? bold[1] : m[2].split(" — ")[0])
         .replace(/\*\*|`|_/g, "") // drop markdown emphasis
         .trim();
       if (title) items.push({ done: m[1].toLowerCase() === "x", title });

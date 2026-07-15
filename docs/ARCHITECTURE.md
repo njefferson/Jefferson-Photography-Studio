@@ -14,8 +14,8 @@ profile generation. Deployed to Cloudflare Pages by GitHub Actions
 (`.github/workflows/deploy.yml`; needs CLOUDFLARE_API_TOKEN /
 CLOUDFLARE_ACCOUNT_ID repo secrets). Branches (renamed/cleaned 2026-07-04):
 push to `main` (the default) deploys PRODUCTION at
-https://infrared-photography-studio.pages.dev; push to `staging` deploys the
-preview at https://staging.infrared-photography-studio.pages.dev. Note the
+https://jefferson-photo-studio.pages.dev; push to `staging` deploys the
+preview at https://staging.jefferson-photo-studio.pages.dev. Note the
 lowercase branch names — GitHub Actions trigger matching is case-sensitive.
 
 ## The one sentence that explains everything
@@ -208,13 +208,15 @@ without better evidence.
 
 ## Example photos (`public/examples/`)
 
-Half-res REAL raw DNGs generated from the owner's NEFs: Bayer planes binned
-2x2, black-subtracted (BlackLevel 0, WhiteLevel 14512), uncompressed CFA,
-Z50 matrix embedded, ~10.4MB each (Cloudflare Pages limit is 25MB/file).
-canopy + lodge display with rotate=3 (set in EXAMPLES, files carry no
-orientation tag). Regeneration scripts live in the session notes/history —
-the recipe: readNefCfa -> bin planes -> writeDng(Comp 1) -> verify through
-`decodeMosaicedDng` -> render thumbs at the CURRENT Aerochrome values.
+Half-res REAL raw DNGs generated from the owner's NEFs (and, for the backyard
+wave, from his Lightroom-converted DNGs): Bayer mosaic binned 2x2 SAME-COLOUR,
+uncompressed CFA (Compression 1), black 1008 / white 15520, Z50 matrix
+embedded, ~10.4MB each (Cloudflare Pages limit is 25MB/file). The gallery is
+declared in src/main.ts GALLERY (53 tiles = 44 RAW + 9 watermarked JPEGs; the
+old EXAMPLES map is long gone — tiles carry kind/file/thumb/rotate/lesson;
+canopy + lodge use rotate=3, the binned files carry their own tag 274). The
+bin pipeline is scratchpad `bin-dng.ts` — the full spec and its measured
+lessons live in NOTES.md (the RAW-practice-photos entry).
 
 ## Graceful failure (no dead ends — added 2026-07-05)
 
