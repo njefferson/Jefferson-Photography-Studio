@@ -3140,21 +3140,38 @@ const makeTile = (g: GalleryTile) => {
 };
 GALLERY.filter((g) => CORE.has(baseKey(g.key))).forEach((g) => galleryList.appendChild(makeTile(g)));
 
+let galleryGen = 0; // bumped per open — a double-tap aborts the older load (the quickGen pattern)
 async function openGalleryPhoto(key: string) {
   const tile = GALLERY.find((t) => t.key === key);
   if (!tile) return;
+  const gen = ++galleryGen;
   // Like a tutorial, a practice photo is ephemeral — end any session first so
   // its strip doesn't linger and storage stays in sync.
   await resetSessionState(true);
+  if (gen !== galleryGen) return; // a newer tap took over
   updateSessionStrip();
   showBusy("Loading photo…");
+  // The RAW practice files are ~10 MB each and cached for offline use — ask the
+  // OS not to evict them casually (best-effort, same as sessions and batch).
+  void requestPersistentStorage();
+  let bytes: Uint8Array;
   try {
     const res = await fetch(tile.file);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const bytes = new Uint8Array(await res.arrayBuffer());
+    bytes = new Uint8Array(await res.arrayBuffer());
+  } catch {
+    if (gen === galleryGen) {
+      hideBusy();
+      alert("Couldn't download that photo — it downloads on first use, so check your connection and try again. (Once loaded, everything works offline.)");
+    }
+    return;
+  }
+  if (gen !== galleryGen) return;
+  try {
     const ext = tile.kind === "dng" ? "dng" : "jpg";
     const imported: ImportedFile = { name: `${key}.${ext}`, kind: tile.kind, bytes, looksTranscoded: false };
     const img = await decode(imported);
+    if (gen !== galleryGen) return;
     showDecoded(img, imported); // sets a fresh view; clears learn mode
     // Track it as a lone photo, matching openPicked's single-open path, so a
     // later multi-pick can ask sensibly. activateCurrent runs establishFreshEdit.
@@ -3175,9 +3192,11 @@ async function openGalleryPhoto(key: string) {
     setLearnMode(true);
     showLesson(tile.lesson ?? 0);
   } catch {
-    alert("Couldn't load that photo — it downloads on first use, so check your connection and try again. (Once loaded, everything works offline.)");
+    if (gen !== galleryGen) return;
+    // The download succeeded, so this is not a connection problem — say so.
+    alert("The photo downloaded but couldn't be opened on this device — that can happen when memory runs low. Close other tabs or apps and try again.");
   } finally {
-    hideBusy();
+    if (gen === galleryGen) hideBusy();
   }
 }
 
