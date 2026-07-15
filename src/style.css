@@ -1168,7 +1168,25 @@ label.open-btn, label.bar-btn {
   #app { grid-template-columns: 1fr; grid-template-areas: "bar" "stage" "panel"; grid-template-rows: auto 1fr auto; }
   #app:has(#panel[hidden]) { grid-template-columns: 1fr; }
   #panel { border-left: none; border-top: 1px solid var(--line); max-height: 45dvh; }
-  .bar { flex-wrap: wrap; padding-bottom: 6px; }
+  /* min-width:0 on BOTH levels: the nowrap action row's min-content would
+     otherwise propagate through .bar (a grid item, min-width:auto) and push
+     the whole bar past the viewport instead of scrolling inside it. */
+  .bar { flex-wrap: wrap; padding-bottom: 6px; min-width: 0; }
+  /* On narrow screens the photo needs the room (owner report 2026-07-14:
+     "Not enough room to do anything"): the edit actions become ONE sideways-
+     scrolling row instead of stacking two or three rows tall. Labels stay
+     full; the cut-off last button is the scroll affordance. */
+  .bar-actions {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    justify-content: flex-start;
+    width: 100%;
+    min-width: 0; /* flex min-width:auto would grow the row past the bar instead of scrolling */
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .bar-actions::-webkit-scrollbar { display: none; }
+  .bar-actions .bar-btn { flex: none; white-space: nowrap; }
 }
 
 #helpDlg { max-width: min(640px, 92vw); max-height: 82vh; overflow-y: auto; }
