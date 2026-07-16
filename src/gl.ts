@@ -179,6 +179,14 @@ float colorMaskWeight(int i, vec3 c){
 }
 
 void main() {
+  // Outside the source image, output transparent so the dark stage shows through
+  // instead of the edge texel smearing (CLAMP_TO_EDGE). Only the crop/straighten
+  // PREVIEW reaches here with v_uv beyond [0,1] (full frame + live tilt); normal
+  // render and export inscribe the crop inside the image, so this never fires.
+  if (v_uv.x < 0.0 || v_uv.x > 1.0 || v_uv.y < 0.0 || v_uv.y > 1.0) {
+    frag = vec4(0.0);
+    return;
+  }
   // "Visualize spots": a high-contrast luminance high-pass of the SOURCE (the
   // healed texture — so a fixed spot visibly disappears), Lightroom's trick
   // for surfacing dust in flat skies. Preview-only; never exported, so it has

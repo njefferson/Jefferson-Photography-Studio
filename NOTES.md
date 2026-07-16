@@ -119,7 +119,22 @@ See **`PLAN.md`** for the full build plan.
 > the app on the next deploy. Both the roadmap and the patch notes (last
 > commits) refresh automatically on push.
 
-- [ ] **Tap the histogram to hide it** — owner ask 2026-07-15 (given with the
+- [x] **Guide lines in Straighten & Crop** — owner ask 2026-07-15 (his third
+  crop pass): thin-line overlays to align against, one per geometry tool.
+  (1) STRAIGHTEN — reference lines to align a horizon or vertical bars against
+  while leveling: a set of screen-true horizontal + vertical lines that stay
+  level to gravity as the photo tilts under them, so you drag the horizon onto a
+  line. (2) CROP — a rule-of-thirds grid (two thin lines each way) inside the
+  crop box for composition. ALL THIN LINES — subtle hairlines that guide without
+  fighting the photo. Build notes: overlay-only, no pipeline/export change. The
+  two tools are already distinguished by `geoMode` ("straighten" | "crop",
+  main.ts), so each overlay shows only in its own mode. The thirds grid rides
+  the crop box (`#cropBox`) and re-lays as it's dragged (hook into
+  `positionCropOverlay`, main.ts); the straighten guide is a fixed
+  stage-aligned grid over `#cropOverlay`/the stage while straighten mode is live.
+  Keep them hairline weight + low opacity (match the app's `--line`), maybe
+  fading in only while a drag is active so they don't clutter the still preview.
+- [x] **Tap the histogram to hide it** — owner ask 2026-07-15 (given with the
   crop go-to-main): tapping the histogram HUD directly should collapse/hide it
   (it floats over the top-right of the photo); the Histogram button in the top
   bar still brings it back as normal. Direct manipulation — touch the thing to
@@ -128,7 +143,15 @@ See **`PLAN.md`** for the full build plan.
   own tap handler while keeping the canvas underneath usable, or a small close
   affordance on it; keep the Histogram button as the single source of truth for
   the shown/hidden state so the two never disagree.
-- [ ] **Crop controls should stand out + a rotate cue** — owner ask 2026-07-15
+  SHIPPED (editing-polish release, cache ips-v55 → ips-v56): only the histogram
+  CANVAS takes the tap (owner refinement "tap histogram, not whole hud") — the
+  `#histWrap` wrapper stays pointer-events:none so its padding never eats photo
+  taps; `#histogram` alone gets pointer-events:auto + cursor + a title hint. Its
+  click routes through the SAME `histEnabled`/`ips-hist`/`updateHistVisibility()`
+  path the Histogram button uses (button stays the one control that re-shows it),
+  and only ever hides. VERIFIED headless (Chromium): tap hides + persists
+  ips-hist="0" + aria-pressed flips, button brings it back.
+- [x] **Crop controls should stand out + a rotate cue** — owner ask 2026-07-15
   (on-device, with the crop go): the Straighten slider and Reset crop button
   are easy to miss. He wants them to carry the "active" blue background like
   the "tap here" pill does (open to a better suggestion). AND a circle-arrow
@@ -139,18 +162,228 @@ See **`PLAN.md`** for the full build plan.
   change; the ↻ glyph can ride in the Crop button label and as a slider-end
   affordance. Keep Reset crop's disabled state honest (it greys when the crop
   is already identity).
-- [ ] **Redo** — owner ask 2026-07-15: add a Redo button + function next to
+  SHIPPED (same release): SOFTER accent first (owner refinement "try the softer
+  accent for the bottom pill, first") — `#cropTools` now wears a blue-tinted
+  glass (`var(--accent-soft)`) + a solid `var(--accent)` border with light text,
+  reading as active but secondary to the solid-accent exit banner stacked above
+  it (solid fill is the fallback if it's too subtle on device). Reset crop keeps
+  an honest greyed disabled state (new opacity:.45 rule + accent outline). The ↻
+  glyph rides both the top-bar Crop button and the Straighten label. VERIFIED
+  headless: computed bg == accent-soft, border == accent, ↻ present in both,
+  Reset disabled at identity crop.
+  OWNER'S ON-DEVICE PASS (2026-07-15, staging, iPhone portrait — three fixes,
+  all shipped same round, cache ips-v56 → ips-v57):
+  (1) ICON CONFUSING. Root cause: the Crop button's ↻ collided with the Rotate
+  90° button RIGHT NEXT TO IT (which already leads with ↻), and ↻▣ read as two
+  mashed glyphs. Owner's call — "put crop, straighten, and rotate in one of the
+  sub menus, or a new one, instead of the main menu." DONE: a new **"Crop" panel
+  tab** (7th, full-width below the six adjustment tabs via
+  `.ptab[data-tab="crop"]{grid-column:1/-1}`); "crop" added to PANEL_TABS +
+  TAB_META (setPanelTab is generic, sections/tabs are DOM-queried, so it wires
+  up for free). #rotateBtn and #cropBtn MOVED into that tab's section — SAME ids,
+  so their handlers are unchanged; only the DOM home moved. In-tab there's no
+  adjacent ↻, so Rotate keeps a clear "↻ Rotate 90°" and Crop is now plain words
+  ("Crop & straighten"). Top bar is decluttered (both buttons gone from it).
+  (2) LOCKED OUT — "the bottom opens and covers so much." In portrait the editor
+  drawer (#panel, 45dvh) stayed open under the crop toolbar, squeezing the photo.
+  FIX: `setCropMode` now sets `panel.hidden = true` while armed (restored on
+  exit only when a photo is open, so the start-screen setCropMode(false) calls
+  never bare an empty drawer). Reuses the EXISTING `#app:has(#panel[hidden])`
+  collapse — zero new layout CSS; the stage goes full-height in both layouts.
+  Exits (the "Tap here when done" banner + the Crop tab button) are unchanged.
+  (3) BOTTOM PILL. Owner: "accent is good but the bottom pill needs work." With
+  the drawer gone there's room, so #cropTools became a COLUMN: a header row
+  (Straighten label · degree readout · Reset crop) over a full-width slider —
+  no more thumb/readout overlap. Soft-accent tint kept; ↻ dropped from the pill
+  (redundant now that Rotate is a labelled button in the tab).
+  VERIFIED headless 20/20 (Chromium, iPhone-portrait 390×844 viewport; fail-first
+  proven — planted "labels have RAW" + "drawer stays visible" both failed as
+  planted; a real test bug was caught too — a landscape photo is width-limited in
+  portrait so the CANVAS height barely moves, the STAGE is what grows): Rotate +
+  Crop are off the bar and inside #panel; Crop tab reveals the section (title
+  "Crop"); Rotate 90° swaps the canvas aspect and back; arming crop hides #panel
+  and the stage gains >100px, banner shows; pill is column + full-width slider +
+  soft-accent + Reset greyed at identity; exiting restores the drawer; prior
+  release (histogram tap-hide, undo/redo walk, no "RAW" labels) still green; no
+  page errors. NEEDS THE OWNER'S HANDS: sub-menu discoverability (Crop is now a
+  tab, Rotate is two taps away — flagged the tradeoff), the drawer-hide feel on
+  the real iPhone, and the redesigned pill's look/room.
+  SECOND ON-DEVICE PASS (2026-07-15, staging, iPhone — three fixes, cache
+  ips-v57 → ips-v58):
+  (1) STRAIGHTEN SMEARED. "Straighten doesn't work — it smears." At larger
+  angles the full-frame straighten PREVIEW didn't fill the viewport and the
+  empty corners smeared the edge texel (the source texture is CLAMP_TO_EDGE).
+  FIX: one guard at the top of the gl.ts fragment main() — if the resolved
+  sample uv is outside [0,1], output `vec4(0.0)` (transparent) and return, so
+  the dark #stage shows through cleanly (the webgl2 context is alpha:true,
+  blending off). NO-OP for normal render + export: there the crop is
+  auto-inscribed inside the image so uv never leaves [0,1]. Only the straighten
+  preview's empty corners change — smear → clean empty space.
+  (2) NO "MORE ABOVE" ARROW. The welcome card had only a down cue; the What's-new
+  (ⓘ) dialog had none. Added: a `.welcome-cue.up` mirroring the down cue (sticky
+  to the card's top, ▲, `.on` when welcome.scrollTop > 24, wired into the
+  existing card `update()`); and sticky `.dlg-cue up/down` inside #infoDlg driven
+  by a new `updateInfoCues()` on the dialog's scroll + on open (sticky resolves
+  against the dialog's own scrollport — no position:relative, which would break
+  modal centering; #infoDlg gained max-height:82vh + overflow-y:auto to match
+  #helpDlg).
+  (3) CROP TAB NAME. Owner: "'Crop' doesn't indicate what's in it; separate
+  rotate and crop." Tab renamed **"Crop & rotate"** (TAB_META.crop.name + the
+  full-width tab label; the "crop" key + saved-tab localStorage unchanged);
+  Rotate 90° and Crop & straighten stay two separate, direct controls.
+  VERIFIED headless 15/15 (Chromium, short portrait 390×720; fail-first proven —
+  planted "up cue stays hidden" + "corner still opaque/smeared" both failed as
+  planted): the straighten corner reads alpha 0 at 40° (transparent, not smear)
+  while the frame is opaque at 0° AND at the centre (straighten still transforms
+  — captured a clean-corners screenshot); welcome + dialog up/down cues toggle on
+  scroll; tab + section read "Crop & rotate" with Rotate/Crop separate; drawer
+  still hides while cropping, pill still a column, Reset greyed at identity, exit
+  restores the drawer; no page errors. NEEDS THE OWNER'S HANDS: the straighten
+  preview LOOKS clean on the real iPhone (Chromium corner-alpha is the proxy),
+  the up-arrows read right, and the "Crop & rotate" name.
+  THIRD ON-DEVICE PASS (2026-07-15, staging, iPhone — THE persistent misread,
+  cache ips-v58 → ips-v59): the owner never wanted a COMBINED crop+straighten
+  mode — he wanted THREE separate tools, each activated on its own. The old
+  single "Crop & straighten" button armed one mode showing the box AND the
+  slider at once ("fighting two controls"). FIX: split into two independent
+  modes via a new `geoMode: "crop" | "straighten" | null` (main.ts). `cropArmed`
+  stays a DERIVED `geoMode !== null` so the whole-frame render, canvas lock,
+  `.cropping` inset and drawer-hide are untouched; only the box (Crop only) and
+  slider (Straighten only) gates switch on `geoMode`. The Crop & rotate tab now
+  has THREE buttons — Rotate 90° (instant), Crop (box only), Straighten (slider
+  only). setCropMode→setGeoMode; the shared exit banner + pill relabel per mode
+  (the `.tool-crop` class hides the slider row so Crop's pill is just its Reset).
+  FLOW: tap a tool → drawer tucks away, that tool's UI appears → tap the banner
+  ("done") to apply and return to the tab (the tool BUTTONS live in the drawer,
+  so the banner is the exit — switching tools is done→tap-the-other, each opens
+  on its own). VERIFIED headless 17/17 (Chromium, portrait; fail-first proven —
+  planted "crop shows the slider" + "up cue stays hidden" both failed): Crop
+  shows the box and NOT the slider; Straighten shows the slider and NOT the box;
+  aria-pressed is mutually exclusive; the banner relabels per mode; straighten
+  still tilts with clean (transparent) corners; drawer hides while a tool is
+  live and the banner exit restores it; screenshot confirms Straighten = slider
+  only, no box, no smear. NEEDS THE OWNER'S HANDS: that Crop and Straighten now
+  feel like two separate one-tap tools on the real iPhone.
+  FOURTH ON-DEVICE PASS (2026-07-15, staging, iPhone — cache ips-v59 → ips-v60):
+  (1) CROP BOX DRIFTED OVER BLACK. Root cause: #view is the stage-shaped inset
+  box and the photo is letterboxed INSIDE it by object-fit:contain, but
+  positionCropOverlay + moveCropDrag mapped crop [0,1] across the whole ELEMENT
+  (incl. the black bars). FIX: new `viewImageRect()` returns the photo's drawn
+  sub-rect (contain math); the box places + clamps against THAT. No-op when the
+  element already matches the photo aspect (headless), confines to the photo when
+  letterboxed. (2) EXIT LOST + (3) CONTROLS COVERED. The tiny 10px "Tap here when
+  done" on the separate `#cropBanner` overlapped the taller Straighten pill. FIX:
+  removed the banner; the pill now carries a prominent accent-filled **Done**
+  button (single bottom element, no overlap, obvious exit). (4) CORNER-ROTATE.
+  Owner: "make each corner a place to rotate from" — chose IN STRAIGHTEN. So
+  Straighten now shows the box too, and dragging any corner ROTATES (angle about
+  the photo centre → params.straighten; slider stays as fine control); Crop's
+  corners still resize. `setPointerCapture` wrapped in try/catch (can throw on
+  synthetic/stale pointers). VERIFIED headless 21/21 (Chromium; fail-first proven
+  — planted up-cue + box-confinement-under-forced-letterbox + corner-rotate all
+  failed as planted): a forced 320×300 letterbox confines the box to the 213px
+  photo band (not the black); Done removes the banner + exits + restores the
+  drawer; a corner drag rotates in Straighten and resizes in Crop; smear-free;
+  screenshot shows Straighten = box + slider + Done, no overlap. NEEDS THE
+  OWNER'S HANDS: the box now hugs the photo on the real iPhone, Done is findable,
+  and corner-rotation levels in the intuitive DIRECTION (sign easy to flip).
+  FIFTH ON-DEVICE PASS (2026-07-15, staging, iPhone — cache ips-v60 → ips-v61):
+  (1) "Make Done brighter" — `#cropDone` now font-weight 700 + an accent glow
+  (`box-shadow: 0 2px 14px -2px var(--accent)`) so it pops off the accent-soft
+  pill. (2) "Remove the circles on the Straighten corners, put arrows that move
+  with the photo" — Straighten's corner grips are now thin white CURVED rotation
+  double-arrows (circular two-way arrows — owner follow-ups: "thinner, arrow head
+  both ways" then "indicate ROTATION not stretching", so a straight ↔ was wrong;
+  Crop keeps the resize dots): `setGeoMode` toggles `#cropOverlay.straightening`,
+  `positionCropOverlay` sets `--tilt = params.straighten` deg, and
+  `#cropOverlay.straightening .crop-handle::before` swaps the dot for the arrow
+  and `transform: rotate(var(--tilt))` so the arrows lean with the photo as it
+  levels (updates live via the rotate branch in moveCropDrag). 44px hit targets
+  unchanged. VERIFIED headless 25/25 (Chromium; fail-first proven — planted
+  "arrows present" flipped as planted): Done computes weight 700 + a box-shadow;
+  Crop corners stay round dots (no straightening class, no svg); Straighten
+  corners are svg arrows and `--tilt` reads 40deg after a 40° straighten;
+  screenshot shows the tilted arrows + the brighter Done. NEEDS THE OWNER'S
+  HANDS: Done reads bright enough, and the arrow glyph/tilt DIRECTION feel right
+  on the real iPhone.
+  SIXTH ON-DEVICE PASS (2026-07-15, staging, iPhone — cache ips-v63 → ips-v64):
+  the Straighten crop BOX was juting past the tilted photo into the black. ROOT
+  CAUSE (diagnosed with a headless probe): the box maps params.crop across the
+  axis-aligned full-frame rect, but `autoInscribedCrop` rotates the crop in the
+  photo's STRETCHED pixel space while the shader tilts the photo in true VISUAL
+  space — so for a non-square photo the "inscribed" box doesn't match the tilted
+  edges (at 20°, two opposite box corners sampled alpha 0 = void). Owner's call:
+  CLEAN TILT VIEW, NO BOX. FIX: in Straighten, `#cropOverlay.straightening
+  #cropBox` drops its border + scrim + pointer-events (CSS), and
+  positionCropOverlay places the rotation-arrow handles at the corners of the
+  straighten-SAFE inscribed rect (`cropSafeBound()`), inset 6% so they ride ON
+  the photo (the photo's TRUE corners rotate off-frame, so the inscribed corners
+  are the on-photo set). Crop mode is untouched (box + scrim + resize dots). Auto-
+  crop on Done unchanged (its inscribe imperfection is negligible at real leveling
+  angles and no longer shown as a box). VERIFIED headless 26/26 (Chromium; fail-
+  first proven — planted "arrows in the void" at 20° flipped): no visible box/
+  scrim in Straighten; each rotation arrow sits on OPAQUE photo pixels at 20° AND
+  8° (the 20° case used to be alpha 0); corner-drag still rotates; Crop's box
+  unchanged; screenshot at 8° shows a clean tilt with arrows on the photo. NEEDS
+  THE OWNER'S HANDS: Straighten reads as a clean tilt-to-level on the real iPhone.
+  SEVENTH PASS — SETTLED MODEL (2026-07-15, staging, cache ips-v64 → ips-v65).
+  On device the "no box / arrows on corners" tilt view read as a sheared
+  parallelogram (it was actually the rigid-rotated rectangle CLIPPED by the frame
+  — object-fit:contain, not a real shear) and gave no way to see the crop. Owner
+  settled it: ONE combined crop/straighten tool, aids per focus, repositionable —
+  a standard editor crop. IMPLEMENTED (this is the final design; ignore the
+  earlier separate/no-box attempts above):
+  • WHOLE photo shown — draw() renders an OUTSET "fit" crop while armed
+    (`fitViewCrop()`, symmetric zoom-out; the renderer accepts crop outside [0,1],
+    margins go transparent), so a tilted photo is never clipped.
+  • BOX BACK — `positionCropOverlay` maps `params.crop` through the fit-view onto
+    the tilted photo; box border + scrim (dim outside) in BOTH focuses.
+  • REPOSITION — drag anywhere on the photo pans the crop (`#cropOverlay` captures
+    it; `clampCropOnPhoto` clamps the position in SOURCE space so it stays on the
+    photo — there's slack along a rotated photo's non-binding axis, which is the
+    "slide along the length" the owner wanted).
+  • AIDS PER FOCUS (the Guide-lines roadmap item, shipped) — Straighten shows a
+    finer ALIGNMENT grid + the slider (no handles, no arrows); Crop shows the
+    RULE-OF-THIRDS grid + round resize handles. Toggled by `.focus-straighten`/
+    `.focus-crop` on the overlay — never both.
+  • Safety: `cropSafeBound()` insets the inscribe ~2.5% + `clampCropOnPhoto` a
+    hair, so the box/handles never graze the transparent edge (autoInscribedCrop
+    isn't pixel-exact vs the shader). Export unchanged (uses `params.crop`).
+  VERIFIED headless 23/23 (Chromium; fail-first proven — planted "box in the void
+  at 20°" flipped): box corners opaque (on the photo) at 20° in straighten AND in
+  crop; no arrow art anywhere; Straighten hides handles + shows the alignment grid
+  + slider; Crop shows round handles + thirds grid; a drag repositions the box and
+  it stays on the photo; a corner resizes; the slider rotates; Done exits. Screens
+  of both focuses captured. NEEDS THE OWNER'S HANDS: it now behaves like a normal
+  editor crop/straighten on the real iPhone — level against the alignment lines,
+  slide to reposition, switch to Crop for the thirds grid.
+- [x] **Redo** — owner ask 2026-07-15: add a Redo button + function next to
   "Go back", and RENAME "Go back" to "Undo" (unless a reason surfaces not to).
   Build notes: the undo stack already exists (undoStack + settled/flushRecord);
   Redo needs a parallel redo stack that undo() pushes onto and any NEW edit
   clears (standard redo semantics — a fresh action after an undo abandons the
   redo future). The ⓘ patch-notes read the last commits, unaffected.
-- [ ] **Drop "· RAW" from tile labels** — owner note 2026-07-15: every practice
+  SHIPPED (same release): a parallel `redoStack` — `undo()` pushes the state it
+  leaves onto it, `flushRecord()` clears it the moment a genuinely new edit
+  commits (undo/redo leave settled==current so their own flush no-ops and never
+  spuriously clear it), `redo()` walks it back without flushing. Cleared on a
+  fresh open; persists across in-session photo switches alongside undo (new
+  `redo` field on `LiveEdit`, `st.redo ?? []` on restore). "Go back" renamed to
+  "Undo"; new "↷ Redo" button beside it, disabled when empty. VERIFIED headless:
+  A→B, undo→undo→redo→redo walks exactly, a new edit after an undo clears the
+  redo future, buttons enable/disable correctly. (In-session-switch persistence
+  mirrors the already-proven undo path by construction; not separately driven.)
+- [x] **Drop "· RAW" from tile labels** — owner note 2026-07-15: every practice
   photo in the tutorial set is RAW now, so the "· RAW" suffix on the tile
   labels is redundant noise. Remove it from the gallery tile titles (main.ts
   GALLERY entries / galNef/galRaw label helpers). The RAW-vs-JPEG distinction
   the suffix once carried is gone (the set is all binned DNGs); labels stay
   honest by simply naming the scene.
+  SHIPPED (same release): the trailing " · RAW" dropped from all 44 galRaw/galNef
+  tile-label literals; scene names stand alone. The library-overlay count readout
+  ("53 photos · 44 RAW") is KEPT — it's an aggregate over a mixed set (44 DNG + 9
+  JPEG), a different context, and stays honest. VERIFIED headless: no tile label
+  contains "RAW"; the libCount readout still does.
 - [ ] **Learning library tile in the grid** — owner verdict 2026-07-15 (given
   WITH the go to main): the dashed "Browse the full example library" pill is
   "completely missable, and most people would never know it was there — it's

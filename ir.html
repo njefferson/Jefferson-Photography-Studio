@@ -34,12 +34,11 @@
           Home
         </button>
         <span class="bar-actions-wrap"><span class="bar-actions">
-          <button id="undoBtn" class="bar-btn" type="button" disabled title="Go back one edit step">&#8630; Go back</button>
+          <button id="undoBtn" class="bar-btn" type="button" disabled title="Undo one edit step">&#8630; Undo</button>
+          <button id="redoBtn" class="bar-btn" type="button" disabled title="Redo the last undone step">&#8631; Redo</button>
           <button id="resetBtn" class="bar-btn" type="button" disabled title="Reset the whole edit to how the photo first opened">Reset</button>
           <button id="origBtn" class="bar-btn" type="button" title="Press and hold to compare with the original">Hold: Original</button>
           <button id="histBtn" class="bar-btn" type="button" aria-pressed="true" title="Show or hide the live histogram">Histogram</button>
-          <button id="rotateBtn" class="bar-btn" type="button" aria-label="Rotate 90 degrees clockwise">&#8635; Rotate 90&deg;</button>
-          <button id="cropBtn" class="bar-btn" type="button" aria-pressed="false" aria-label="Crop and straighten">&#9635; Crop</button>
           <button id="helpBtn" class="bar-btn" type="button">Help</button>
           <button id="shareBtn" class="bar-btn" type="button" hidden title="Share this app or copy its link">&#x2BAD;&#xFE0E; Share</button>
           <span class="bar-sep" aria-hidden="true"></span>
@@ -61,6 +60,7 @@
         <svg id="healOverlay" hidden aria-hidden="true"></svg>
         <div id="cropOverlay" hidden aria-hidden="true">
           <div id="cropBox">
+            <div id="cropGuides" aria-hidden="true"></div>
             <div class="crop-handle" data-corner="tl"></div>
             <div class="crop-handle" data-corner="tr"></div>
             <div class="crop-handle" data-corner="bl"></div>
@@ -68,12 +68,16 @@
           </div>
         </div>
         <div id="cropTools" hidden>
-          <label>Straighten <input id="straighten" type="range" min="-45" max="45" step="0.1" value="0" /></label>
-          <span id="straightenVal">0.0&deg;</span>
-          <button id="cropReset" type="button">Reset crop</button>
+          <div class="crop-row">
+            <span class="crop-lbl" id="geoLbl">Straighten</span>
+            <span id="straightenVal">0.0&deg;</span>
+            <button id="cropReset" type="button">Reset</button>
+            <button id="cropDone" class="primary" type="button">Done</button>
+          </div>
+          <input id="straighten" type="range" min="-45" max="45" step="0.1" value="0" aria-label="Straighten" />
         </div>
         <div id="histWrap" hidden aria-label="Live RGB histogram">
-          <canvas id="histogram" width="256" height="96"></canvas>
+          <canvas id="histogram" width="256" height="96" title="Tap to hide — use the Histogram button to bring it back"></canvas>
         </div>
         <div id="tatHud" hidden aria-hidden="true">
           <span id="tatSwatch" class="tat-swatch"></span>
@@ -91,15 +95,12 @@
           &#10003; <span id="healReviewText">Spots healed</span>
           <span class="tat-banner-off">tap a ring to put that one back &middot; tap here to keep them</span>
         </button>
-        <button id="cropBanner" type="button" hidden>
-          <span>&#9635; Crop &amp; straighten &mdash; drag the box or its corners</span>
-          <span class="tat-banner-off">Tap here when done</span>
-        </button>
         <button id="colorBanner" type="button" hidden>
           <span>&#127919; Colour mask — tap the photo to pick the colour to match</span>
           <span class="tat-banner-off">Tap again to re-pick &middot; tap here when done</span>
         </button>
         <div id="welcome">
+          <div class="welcome-cue up" id="welcomeCueUp" hidden aria-hidden="true">&#9650;</div>
           <button id="welcomeClose" class="welcome-close" type="button" hidden>&#10005;</button>
           <button id="welcomeBack" class="welcome-back" type="button" hidden>&#8249; Back to your photo</button>
           <p id="hint">Edit infrared photos — RAW (NEF / DNG) unlocks the full color magic.</p>
@@ -152,6 +153,7 @@
           <button class="ptab" type="button" data-tab="tone" role="tab" aria-selected="false">Tone</button>
           <button class="ptab" type="button" data-tab="masks" role="tab" aria-selected="false">Masks</button>
           <button class="ptab" type="button" data-tab="export" role="tab" aria-selected="false">Export</button>
+          <button class="ptab" type="button" data-tab="crop" role="tab" aria-selected="false">Crop &amp; rotate</button>
         </div>
         <div class="section-head">
           <h2 id="sectionTitle" class="section-title">Basic</h2>
@@ -365,6 +367,14 @@
             <button id="dcpBtn" type="button">Export .dcp (Lightroom &mdash; beta)</button>
           </section>
 
+          <!-- ===== CROP & ROTATE ===== -->
+          <section class="section" data-tab="crop" hidden>
+            <button id="rotateBtn" class="accent-outline" type="button" aria-label="Rotate 90 degrees clockwise">&#8635; Rotate 90&deg;</button>
+            <button id="cropBtn" class="toggle full-btn" type="button" aria-pressed="false" aria-label="Crop">Crop</button>
+            <button id="straightenBtn" class="toggle full-btn" type="button" aria-pressed="false" aria-label="Straighten">Straighten</button>
+            <p class="note">Three separate tools. Rotate turns the whole photo 90&deg;. Crop opens a draggable box. Straighten levels the horizon with a slider. Each opens on its own &mdash; tap &ldquo;done&rdquo; to apply.</p>
+          </section>
+
           <div id="panelDown" class="scroll-cue down" hidden><span>&#9660;</span></div>
         </div>
       </aside>
@@ -459,6 +469,7 @@
     </dialog>
 
     <dialog id="infoDlg">
+      <div class="dlg-cue up" id="infoCueUp" hidden aria-hidden="true">&#9650;</div>
       <h2>What's new</h2>
       <p id="infoVer" class="info-ver"></p>
       <ul id="changeList"></ul>
@@ -476,6 +487,7 @@
       </p>
       <p class="theme-row"><button id="themeToggle" type="button"></button></p>
       <button id="infoClose" type="button">Close</button>
+      <div class="dlg-cue down" id="infoCueDown" hidden aria-hidden="true">&#9660;</div>
     </dialog>
 
     <dialog id="helpDlg">

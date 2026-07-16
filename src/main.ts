@@ -268,6 +268,13 @@ histBtn.addEventListener("click", () => {
   updateHistVisibility();
   if (histEnabled) refreshHistogram(params);
 });
+// Tap the histogram itself to dismiss it — touch the thing to hide the thing.
+// It only ever hides; the Histogram button stays the one control that shows it.
+histCanvas.addEventListener("click", () => {
+  histEnabled = false;
+  localStorage.setItem("ips-hist", "0");
+  updateHistVisibility();
+});
 updateHistVisibility(); // reflect the stored preference on the toggle at startup
 
 // WB gains and exposure span 0.02–16x / 0.1–16x; on a linear track every
@@ -587,16 +594,19 @@ function applySnapshot(s: Snapshot) {
 }
 
 const undoStack: Snapshot[] = [];
+const redoStack: Snapshot[] = []; // undone states, waiting to be redone; any new edit clears it
 let settled: Snapshot | null = null; // last recorded state (advances on settle)
 let baseline: Snapshot | null = null; // fresh-open automatic baseline (Reset target)
 let recordTimer = 0;
 const HISTORY_MAX = 100;
 
 const undoBtn = $("undoBtn") as HTMLButtonElement;
+const redoBtn = $("redoBtn") as HTMLButtonElement;
 const resetBtn = $("resetBtn") as HTMLButtonElement;
 
 function updateEditButtons() {
   undoBtn.disabled = undoStack.length === 0;
+  redoBtn.disabled = redoStack.length === 0;
   resetBtn.disabled = !baseline || !current;
 }
 
@@ -611,6 +621,7 @@ function flushRecord() {
   if (snapSig(now) !== snapSig(settled)) {
     undoStack.push(settled);
     if (undoStack.length > HISTORY_MAX) undoStack.shift();
+    redoStack.length = 0; // a genuinely new edit abandons the redo future
     settled = now;
     updateEditButtons();
   }
@@ -626,9 +637,23 @@ function undo() {
   flushRecord(); // fold any in-flight edit into history first
   const prev = undoStack.pop();
   if (!prev) return;
+  redoStack.push(settled!); // remember the state we're stepping back from, so Redo can return to it
   applySnapshot(prev);
   if (healReview) setHealReview(true); // re-validate: spot count changed (or hit zero) under review
   settled = snapshot(); // now == prev; don't let the repaint re-record it
+  clearTimeout(recordTimer);
+  recordTimer = 0;
+  updateEditButtons();
+}
+
+function redo() {
+  const next = redoStack.pop(); // no flushRecord here — it would clear the redo future we're walking
+  if (!next) return;
+  undoStack.push(settled!); // the state we're leaving becomes an undo step again
+  if (undoStack.length > HISTORY_MAX) undoStack.shift();
+  applySnapshot(next);
+  if (healReview) setHealReview(true);
+  settled = snapshot(); // now == next; don't re-record the repaint
   clearTimeout(recordTimer);
   recordTimer = 0;
   updateEditButtons();
@@ -641,6 +666,7 @@ function resetEdit() {
 }
 
 undoBtn.addEventListener("click", undo);
+redoBtn.addEventListener("click", redo);
 resetBtn.addEventListener("click", resetEdit);
 
 // --- Saved-look slots: five localStorage-backed memory slots that persist
@@ -810,10 +836,10 @@ function draw() {
       renderer.setToneCurve(params.tone);
     }
     syncSpotsToTexture(); // heals live in the texture; keep it matching params
-    // While Crop & straighten is armed, show the FULL frame (straighten still
-    // live) so the box has the whole photo to work with — the actual crop only
-    // takes effect once the mode is exited. See setCropMode's doc comment.
-    renderer.render(cropArmed ? { ...params, crop: CROP_DEFAULT } : params);
+    // While a geometry tool is armed, render the WHOLE tilted photo (an outset
+    // "fit" view so a rotated photo isn't clipped by the frame); the crop box
+    // overlays it and the real crop only takes effect on exit. See setGeoMode.
+    renderer.render(cropArmed ? { ...params, crop: fitViewCrop() } : params);
     refreshHistogram(params);
     positionMaskOverlay();
     positionHealOverlay();
@@ -905,7 +931,7 @@ $("toneReset").addEventListener("click", () => {
 
 // --- Sectioned tab panel: six segmented tabs, one section of controls each.
 // The active tab is remembered per session so reopening lands where you left.
-const PANEL_TABS = ["basic", "ir", "color", "tone", "masks", "export"] as const;
+const PANEL_TABS = ["basic", "ir", "color", "tone", "masks", "export", "crop"] as const;
 type PanelTab = (typeof PANEL_TABS)[number];
 const TAB_META: Record<PanelTab, { name: string; sub: string }> = {
   basic: { name: "Basic", sub: "White balance, exposure & detail" },
@@ -914,6 +940,7 @@ const TAB_META: Record<PanelTab, { name: string; sub: string }> = {
   tone: { name: "Tone", sub: "Curve, luminance & bands" },
   masks: { name: "Masks", sub: "Local, area-only adjustments" },
   export: { name: "Export", sub: "Save, my looks & profiles" },
+  crop: { name: "Crop & rotate", sub: "Rotate, crop & straighten" },
 };
 const panelTabsEl = $("panelTabs") as HTMLElement;
 const sectionTitleEl = $("sectionTitle") as HTMLElement;
@@ -1030,7 +1057,7 @@ let hslPickArmed = false;
 function setHslPick(on: boolean) {
   hslPickArmed = on;
   hslPickBtn.setAttribute("aria-pressed", String(on));
-  if (on) { setTat(false); setColorPick(false); setHeal(false); setHealReview(false); setCropMode(false); } // picture tools are mutually exclusive
+  if (on) { setTat(false); setColorPick(false); setHeal(false); setHealReview(false); setGeoMode(null); } // picture tools are mutually exclusive
 }
 hslPickBtn.addEventListener("click", () => setHslPick(!hslPickArmed));
 
@@ -1328,7 +1355,7 @@ function setColorPick(on: boolean) {
   colorPickArmed = on && !!m && m.type === 3;
   mUI.colorPick.setAttribute("aria-pressed", String(colorPickArmed));
   colorBanner.hidden = !colorPickArmed;
-  if (colorPickArmed) { setHslPick(false); setTat(false); setHeal(false); setHealReview(false); setCropMode(false); mUI.paint.setAttribute("aria-pressed", "false"); } // picture tools are exclusive
+  if (colorPickArmed) { setHslPick(false); setTat(false); setHeal(false); setHealReview(false); setGeoMode(null); mUI.paint.setAttribute("aria-pressed", "false"); } // picture tools are exclusive
 }
 mUI.colorPick.addEventListener("click", () => setColorPick(!colorPickArmed));
 colorBanner.addEventListener("click", () => setColorPick(false)); // tap the banner to exit
@@ -1686,7 +1713,7 @@ function setTat(on: boolean) {
   // A standing banner (not the transient drag readout) makes it obvious the
   // canvas is in adjust mode and how to hand it back to tap-WB / pan / pinch.
   tatBanner.hidden = !on;
-  if (on) { setHslPick(false); setColorPick(false); setHeal(false); setHealReview(false); setCropMode(false); mUI.paint.setAttribute("aria-pressed", "false"); } // mutually exclusive with the other picture tools
+  if (on) { setHslPick(false); setColorPick(false); setHeal(false); setHealReview(false); setGeoMode(null); mUI.paint.setAttribute("aria-pressed", "false"); } // mutually exclusive with the other picture tools
   if (!on) hideTatHud();
 }
 hslDragBtn.addEventListener("click", () => setTat(!tatArmed));
@@ -1832,7 +1859,7 @@ function setHeal(on: boolean) {
   healArmed = on && !!current;
   healBtn.setAttribute("aria-pressed", String(healArmed));
   healBanner.hidden = !healArmed;
-  if (healArmed) { setHslPick(false); setColorPick(false); setTat(false); setHealReview(false); setCropMode(false); mUI.paint.setAttribute("aria-pressed", "false"); } // picture tools are exclusive
+  if (healArmed) { setHslPick(false); setColorPick(false); setTat(false); setHealReview(false); setGeoMode(null); mUI.paint.setAttribute("aria-pressed", "false"); } // picture tools are exclusive
   positionHealOverlay();
 }
 healBtn.addEventListener("click", () => setHeal(!healArmed));
@@ -1849,14 +1876,21 @@ healBanner.addEventListener("click", () => setHeal(false)); // tap the banner to
 // bares an empty corner; dragging the box further is clamped to stay inside
 // that same safe bound. ---
 const cropBtn = $("cropBtn") as HTMLButtonElement;
-const cropBanner = $("cropBanner") as HTMLButtonElement;
+const cropDone = $("cropDone") as HTMLButtonElement;
 const cropOverlay = $("cropOverlay") as HTMLDivElement;
 const cropBox = $("cropBox") as HTMLDivElement;
 const cropTools = $("cropTools") as HTMLDivElement;
 const straightenSlider = $("straighten") as HTMLInputElement;
 const straightenVal = $("straightenVal") as HTMLSpanElement;
 const cropResetBtn = $("cropReset") as HTMLButtonElement;
+const straightenBtn = $("straightenBtn") as HTMLButtonElement;
+const geoLbl = $("geoLbl") as HTMLSpanElement;
 const MIN_CROP = 0.1;
+// Crop and Straighten are SEPARATE tools, each activated on its own (owner ask,
+// repeatedly): Crop's box corners resize, Straighten's corners rotate (+ its
+// slider). `geoMode` picks which; `cropArmed` stays the derived "a geometry tool
+// owns the frame" flag the whole-frame render / canvas-lock / drawer-hide key off.
+let geoMode: "crop" | "straighten" | null = null;
 let cropArmed = false;
 
 /** The display-rotated frame's width/height — matches Renderer's own
@@ -1867,84 +1901,184 @@ function dispAspectNow(): number {
 }
 
 /** The largest same-aspect crop the current straighten angle allows without
- *  baring an empty corner. Identity {0,0,1,1} when straighten is 0. */
+ *  baring an empty corner, minus a hair of margin (autoInscribedCrop isn't
+ *  pixel-exact against the shader's aspect-corrected rotation, so a maximal box
+ *  can graze the transparent edge). Identity when straighten is 0. */
 function cropSafeBound(): CropRect {
-  return autoInscribedCrop(params.straighten, dispAspectNow());
+  const c = autoInscribedCrop(params.straighten, dispAspectNow());
+  if (params.straighten === 0) return c;
+  const pad = 0.975; // ~1.25% inset each side — clears the edge, negligible crop
+  return { x: c.x + (c.w * (1 - pad)) / 2, y: c.y + (c.h * (1 - pad)) / 2, w: c.w * pad, h: c.h * pad };
 }
 
-function setCropMode(on: boolean) {
-  cropArmed = on && !!current;
-  cropBtn.setAttribute("aria-pressed", String(cropArmed));
-  cropBanner.hidden = !cropArmed;
+/** While a geometry tool is armed the preview renders THIS (an outset crop, so
+ *  crop [0,1] sits inside it with transparent margin) — the whole tilted photo
+ *  stays visible instead of being clipped by the frame. Symmetric about centre
+ *  so the canvas keeps the base-frame aspect (object-fit:contain undistorted). */
+function fitViewCrop(): CropRect {
+  const asp = dispAspectNow();
+  const a = Math.abs(params.straighten) * Math.PI / 180;
+  const cos = Math.cos(a), sin = Math.sin(a);
+  const scale = 2 * Math.max(0.5 * (cos + sin / asp), 0.5 * (cos + asp * sin)) * 1.06;
+  return { x: 0.5 - scale / 2, y: 0.5 - scale / 2, w: scale, h: scale };
+}
+
+// output uv <-> source uv, the aspect-corrected straighten rotation (mirrors the
+// gl.ts vertex shader). Center-relative; used to keep the crop box on the photo.
+function outToSrc(ox: number, oy: number): [number, number] {
+  const asp = dispAspectNow(), a = (params.straighten * Math.PI) / 180;
+  const cos = Math.cos(a), sin = Math.sin(a);
+  return [cos * ox + (sin / asp) * oy, -asp * sin * ox + cos * oy];
+}
+function srcToOut(sx: number, sy: number): [number, number] {
+  const asp = dispAspectNow(), a = (params.straighten * Math.PI) / 180;
+  const cos = Math.cos(a), sin = Math.sin(a);
+  return [cos * sx - (sin / asp) * sy, asp * sin * sx + cos * sy];
+}
+
+/** Clamp a crop rect's POSITION (keeping its size) so it stays entirely on the
+ *  tilted photo — the reposition/pan bound. There's slack along the non-binding
+ *  axis of a rotated photo, which is exactly what lets you slide the crop. */
+function clampCropOnPhoto(c: CropRect): CropRect {
+  const asp = dispAspectNow(), a = Math.abs(params.straighten) * Math.PI / 180;
+  const cos = Math.cos(a), sin = Math.sin(a);
+  // source half-extents of this crop rect (rotated into source space)
+  const bx = (c.w / 2) * cos + (c.h / 2) * (sin / asp);
+  const by = (c.w / 2) * (asp * sin) + (c.h / 2) * cos;
+  const m = 0.012; // keep a hair inside the photo (edge pixels read transparent)
+  const [sxo, syo] = outToSrc(c.x + c.w / 2 - 0.5, c.y + c.h / 2 - 0.5);
+  const sxc = clamp(sxo + 0.5, Math.min(bx + m, 0.5), Math.max(1 - bx - m, 0.5));
+  const syc = clamp(syo + 0.5, Math.min(by + m, 0.5), Math.max(1 - by - m, 0.5));
+  const [oxo, oyo] = srcToOut(sxc - 0.5, syc - 0.5);
+  return { x: oxo + 0.5 - c.w / 2, y: oyo + 0.5 - c.h / 2, w: c.w, h: c.h };
+}
+
+function setGeoMode(mode: "crop" | "straighten" | null) {
+  geoMode = current ? mode : null;
+  cropArmed = geoMode !== null;
+  const isCrop = geoMode === "crop";
+  cropBtn.setAttribute("aria-pressed", String(isCrop));
+  straightenBtn.setAttribute("aria-pressed", String(geoMode === "straighten"));
   cropTools.hidden = !cropArmed;
-  if (cropArmed) { setHslPick(false); setColorPick(false); setTat(false); setHeal(false); setHealReview(false); mUI.paint.setAttribute("aria-pressed", "false"); resetZoom(); } // picture tools are exclusive; crop wants the whole frame in view
-  // Pull the photo in from the stage edges while cropping so the corner handles
-  // never sit flush in the physical screen corners (the OS eats touches there).
+  // The pill is shared: Crop shows its label + Reset + Done; Straighten adds the
+  // slider (the .tool-crop class hides the slider row — see style.css).
+  cropTools.classList.toggle("tool-crop", isCrop);
+  // Per-focus aids, never both: Crop shows resize handles + a rule-of-thirds
+  // grid; Straighten hides the handles + shows the alignment grid.
+  cropOverlay.classList.toggle("focus-crop", isCrop);
+  cropOverlay.classList.toggle("focus-straighten", geoMode === "straighten");
+  geoLbl.textContent = isCrop ? "Crop" : "Straighten";
+  cropResetBtn.textContent = isCrop ? "Reset crop" : "Reset";
+  if (cropArmed) { setHslPick(false); setColorPick(false); setTat(false); setHeal(false); setHealReview(false); mUI.paint.setAttribute("aria-pressed", "false"); resetZoom(); } // picture tools are exclusive; geometry wants the whole frame in view
+  // Pull the photo in from the stage edges while a geometry tool is live so the
+  // corner handles never sit flush in the physical screen corners (the OS eats
+  // touches there).
   stageEl.classList.toggle("cropping", cropArmed);
+  // Tuck the editor drawer away while a geometry tool is live so the photo gets
+  // the full stage (portrait especially — the drawer otherwise eats the lower
+  // half). Reuses the #app:has(#panel[hidden]) collapse. Restore only with a
+  // photo open, so the defensive setGeoMode(null) calls on the start screen
+  // don't bare an empty drawer.
+  if (cropArmed) panel.hidden = true;
+  else if (current) panel.hidden = false;
   straightenSlider.value = String(params.straighten);
   straightenVal.textContent = `${params.straighten.toFixed(1)}°`;
   positionCropOverlay();
   draw();
 }
-cropBtn.addEventListener("click", () => setCropMode(!cropArmed));
-cropBanner.addEventListener("click", () => { setCropMode(false); flushRecord(); }); // tap the banner to exit (commits the pending crop as one undo step)
+// Tapping a tool arms it; tapping the active tool again exits. "Done" in the
+// pill is the primary exit (commits the pending change as one undo step).
+cropBtn.addEventListener("click", () => setGeoMode(geoMode === "crop" ? null : "crop"));
+straightenBtn.addEventListener("click", () => setGeoMode(geoMode === "straighten" ? null : "straighten"));
+cropDone.addEventListener("click", () => { setGeoMode(null); flushRecord(); });
 
-/** Position the box overlay from params.crop — a plain fraction of the
- *  canvas's own rendered rect (which, while armed, IS the full straightened
- *  frame — see draw()'s cropArmed override — so no extra transform is ever
- *  needed here, unlike the mask/heal overlays' rotation-aware placement). */
-function positionCropOverlay() {
-  const show = cropArmed && !!current && welcome.hidden;
-  cropOverlay.toggleAttribute("hidden", !show);
-  if (!show) return;
-  cropResetBtn.disabled = cropIsIdentity(params.crop, params.straighten);
-  const stageRect = cropOverlay.getBoundingClientRect();
+/** The photo's DRAWN rect inside #view (client coords). The canvas element is
+ *  sized to the stage-shaped inset region and the photo is letterboxed inside it
+ *  by object-fit:contain — so the crop [0,1] must map onto THIS sub-rect, not the
+ *  element box, or the box drifts over the black bars. Bitmap dims are the full
+ *  frame while armed, so canvas.width/height is the photo aspect. */
+function viewImageRect(): { left: number; top: number; width: number; height: number } {
   const c = canvas.getBoundingClientRect();
-  const { x, y, w, h } = params.crop;
-  cropBox.style.left = `${c.left - stageRect.left + x * c.width}px`;
-  cropBox.style.top = `${c.top - stageRect.top + y * c.height}px`;
-  cropBox.style.width = `${Math.max(1, w * c.width)}px`;
-  cropBox.style.height = `${Math.max(1, h * c.height)}px`;
+  const imgAsp = canvas.width / Math.max(1, canvas.height);
+  const boxAsp = c.width / Math.max(1, c.height);
+  let w = c.width, h = c.height;
+  if (imgAsp > boxAsp) h = c.width / imgAsp;
+  else w = c.height * imgAsp;
+  return { left: c.left + (c.width - w) / 2, top: c.top + (c.height - h) / 2, width: w, height: h };
+}
+
+/** Position the box overlay from params.crop, mapped onto the drawn photo rect
+ *  (see viewImageRect). Shown in BOTH tools: Crop drags its corners to resize,
+ *  Straighten drags them to rotate — either way the box frames the pending crop. */
+const handleEls = Array.from(cropBox.querySelectorAll<HTMLDivElement>(".crop-handle"));
+
+function positionCropOverlay() {
+  const show = !!geoMode && !!current && welcome.hidden;
+  cropOverlay.toggleAttribute("hidden", !show);
+  // Reset enablement tracks the active tool: identity ⟺ straighten 0 AND crop full.
+  cropResetBtn.disabled = cropIsIdentity(params.crop, params.straighten);
+  if (!show) return;
+  const stageRect = cropOverlay.getBoundingClientRect();
+  const r = viewImageRect();
+  // The canvas shows the fit-view (output [vc.x, vc.x+vc.w]); map the crop's
+  // output [0,1] coords into that so the upright box sits on the tilted photo.
+  const vc = fitViewCrop();
+  const fx = (params.crop.x - vc.x) / vc.w, fy = (params.crop.y - vc.y) / vc.h;
+  const fw = params.crop.w / vc.w, fh = params.crop.h / vc.h;
+  cropBox.style.left = `${r.left - stageRect.left + fx * r.width}px`;
+  cropBox.style.top = `${r.top - stageRect.top + fy * r.height}px`;
+  cropBox.style.width = `${Math.max(1, fw * r.width)}px`;
+  cropBox.style.height = `${Math.max(1, fh * r.height)}px`;
 }
 
 type CropDragKind = "move" | "tl" | "tr" | "bl" | "br";
-let cropDrag: { kind: CropDragKind; id: number; x0: number; y0: number; crop0: CropRect; rectW: number; rectH: number } | null = null;
+let cropDrag:
+  | { kind: CropDragKind; id: number; x0: number; y0: number; crop0: CropRect; rectW: number; rectH: number; vcW: number; vcH: number }
+  | null = null;
 
 function startCropDrag(kind: CropDragKind, e: PointerEvent, target: HTMLElement) {
-  if (!cropArmed || !current) return;
+  if (!geoMode || !current) return;
+  // Only the crop tool resizes; in straighten every drag repositions (pan).
+  const k: CropDragKind = geoMode === "crop" ? kind : "move";
   e.preventDefault();
-  e.stopPropagation(); // a handle's pointerdown must not also start the box's own move-drag
-  target.setPointerCapture(e.pointerId);
-  const r = canvas.getBoundingClientRect();
-  cropDrag = { kind, id: e.pointerId, x0: e.clientX, y0: e.clientY, crop0: { ...params.crop }, rectW: Math.max(1, r.width), rectH: Math.max(1, r.height) };
+  e.stopPropagation(); // a handle's pointerdown must not also start the box's own pan
+  try { target.setPointerCapture(e.pointerId); } catch { /* capture can throw for synthetic pointers — the drag still works */ }
+  const r = viewImageRect();
+  const vc = fitViewCrop();
+  cropDrag = {
+    kind: k, id: e.pointerId, x0: e.clientX, y0: e.clientY, crop0: { ...params.crop },
+    rectW: Math.max(1, r.width), rectH: Math.max(1, r.height), vcW: vc.w, vcH: vc.h,
+  };
 }
 
 function moveCropDrag(e: PointerEvent) {
   if (!cropDrag || e.pointerId !== cropDrag.id) return;
-  const dx = (e.clientX - cropDrag.x0) / cropDrag.rectW;
-  const dy = (e.clientY - cropDrag.y0) / cropDrag.rectH;
+  // Screen delta → crop-space delta (the canvas is zoomed out by the fit-view).
+  const dx = ((e.clientX - cropDrag.x0) / cropDrag.rectW) * cropDrag.vcW;
+  const dy = ((e.clientY - cropDrag.y0) / cropDrag.rectH) * cropDrag.vcH;
   const c0 = cropDrag.crop0;
+  if (cropDrag.kind === "move") {
+    // Reposition (pan): slide the crop over the photo, clamped to stay on it.
+    params.crop = clampCropOnPhoto({ x: c0.x + dx, y: c0.y + dy, w: c0.w, h: c0.h });
+    positionCropOverlay();
+    draw();
+    return;
+  }
+  // Resize (crop tool) — clamp corners to the rotation-safe inscribed bound.
   const safe = cropSafeBound();
   const oppX = c0.x + c0.w, oppY = c0.y + c0.h;
   let x = c0.x, y = c0.y, w = c0.w, h = c0.h;
-  if (cropDrag.kind === "move") {
-    x = clamp(c0.x + dx, safe.x, safe.x + safe.w - c0.w);
-    y = clamp(c0.y + dy, safe.y, safe.y + safe.h - c0.h);
-  } else if (cropDrag.kind === "tl") {
-    x = clamp(c0.x + dx, safe.x, oppX - MIN_CROP);
-    y = clamp(c0.y + dy, safe.y, oppY - MIN_CROP);
+  if (cropDrag.kind === "tl") {
+    x = clamp(c0.x + dx, safe.x, oppX - MIN_CROP); y = clamp(c0.y + dy, safe.y, oppY - MIN_CROP);
     w = oppX - x; h = oppY - y;
   } else if (cropDrag.kind === "tr") {
-    const nx = clamp(oppX + dx, c0.x + MIN_CROP, safe.x + safe.w);
-    y = clamp(c0.y + dy, safe.y, oppY - MIN_CROP);
+    const nx = clamp(oppX + dx, c0.x + MIN_CROP, safe.x + safe.w); y = clamp(c0.y + dy, safe.y, oppY - MIN_CROP);
     w = nx - c0.x; h = oppY - y;
   } else if (cropDrag.kind === "bl") {
-    x = clamp(c0.x + dx, safe.x, oppX - MIN_CROP);
-    const ny = clamp(oppY + dy, c0.y + MIN_CROP, safe.y + safe.h);
+    x = clamp(c0.x + dx, safe.x, oppX - MIN_CROP); const ny = clamp(oppY + dy, c0.y + MIN_CROP, safe.y + safe.h);
     w = oppX - x; h = ny - c0.y;
   } else if (cropDrag.kind === "br") {
-    const nx = clamp(oppX + dx, c0.x + MIN_CROP, safe.x + safe.w);
-    const ny = clamp(oppY + dy, c0.y + MIN_CROP, safe.y + safe.h);
+    const nx = clamp(oppX + dx, c0.x + MIN_CROP, safe.x + safe.w); const ny = clamp(oppY + dy, c0.y + MIN_CROP, safe.y + safe.h);
     w = nx - c0.x; h = ny - c0.y;
   }
   params.crop = { x, y, w, h };
@@ -1958,26 +2092,26 @@ function endCropDrag() {
   flushRecord(); // one drag = one undo step
 }
 
-for (const handle of Array.from(cropBox.querySelectorAll<HTMLDivElement>(".crop-handle"))) {
+for (const handle of handleEls) {
   const corner = handle.dataset.corner as CropDragKind;
   handle.addEventListener("pointerdown", (e) => startCropDrag(corner, e, handle));
   handle.addEventListener("pointermove", moveCropDrag);
   handle.addEventListener("pointerup", endCropDrag);
   handle.addEventListener("pointercancel", endCropDrag);
 }
-cropBox.addEventListener("pointerdown", (e) => {
-  if (e.target !== cropBox) return; // a handle's own listener (above) owns its drag
-  startCropDrag("move", e, cropBox);
-});
-cropBox.addEventListener("pointermove", moveCropDrag);
-cropBox.addEventListener("pointerup", endCropDrag);
-cropBox.addEventListener("pointercancel", endCropDrag);
+// Dragging anywhere on the photo repositions the crop (the box is display-only,
+// pointer-events:none — the overlay captures the pan; handles capture resize).
+cropOverlay.addEventListener("pointerdown", (e) => startCropDrag("move", e, cropOverlay));
+cropOverlay.addEventListener("pointermove", moveCropDrag);
+cropOverlay.addEventListener("pointerup", endCropDrag);
+cropOverlay.addEventListener("pointercancel", endCropDrag);
 
 straightenSlider.addEventListener("input", () => {
-  if (!cropArmed) return;
+  if (geoMode !== "straighten") return;
   params.straighten = Math.round(Number(straightenSlider.value) * 10) / 10;
   straightenVal.textContent = `${params.straighten.toFixed(1)}°`;
-  params.crop = autoInscribedCrop(params.straighten, dispAspectNow());
+  // Re-fit the crop to the new angle (safe inscribed bound, keeps it on the photo).
+  params.crop = cropSafeBound();
   positionCropOverlay();
   draw();
 });
@@ -1985,10 +2119,17 @@ straightenSlider.addEventListener("change", flushRecord); // one drag of the sli
 
 cropResetBtn.addEventListener("click", () => {
   if (!cropArmed) return;
-  params.straighten = 0;
-  params.crop = { ...CROP_DEFAULT };
-  straightenSlider.value = "0";
-  straightenVal.textContent = "0.0°";
+  if (geoMode === "crop") {
+    // Reset the box to the largest valid frame at the current angle (identity
+    // when not straightened) — leaves any straighten alone.
+    params.crop = cropSafeBound();
+  } else {
+    // Straighten reset: back to level, crop returns to full.
+    params.straighten = 0;
+    params.crop = { ...CROP_DEFAULT };
+    straightenSlider.value = "0";
+    straightenVal.textContent = "0.0°";
+  }
   positionCropOverlay();
   draw();
   flushRecord();
@@ -2020,7 +2161,7 @@ function disarmPictureTools() {
   setTat(false);
   setHeal(false);
   setHealReview(false);
-  setCropMode(false);
+  setGeoMode(null);
 }
 healReviewBanner.addEventListener("click", () => setHealReview(false)); // keep them all
 
@@ -2465,7 +2606,7 @@ function establishFreshEdit() {
   setHeal(false);
   params.crop = { ...CROP_DEFAULT };
   params.straighten = 0;
-  setCropMode(false);
+  setGeoMode(null);
   setHealReview(false);
   renderer.spotVis = false;
   healVisBtn.setAttribute("aria-pressed", "false");
@@ -2479,6 +2620,7 @@ function establishFreshEdit() {
   baseline = snapshot();
   settled = snapshot();
   undoStack.length = 0;
+  redoStack.length = 0;
   clearTimeout(recordTimer);
   recordTimer = 0;
   updateEditButtons();
@@ -2530,6 +2672,7 @@ interface LiveEdit {
   baseline: Snapshot;
   settled: Snapshot;
   undo: Snapshot[];
+  redo: Snapshot[];
   orig: EditParams | null;
 }
 
@@ -2568,6 +2711,7 @@ function captureActiveEdit() {
     baseline: baseline ?? snapshot(),
     settled: settled ?? snapshot(),
     undo: [...undoStack],
+    redo: [...redoStack],
     orig: origParams,
   });
   const json = editToJson();
@@ -2580,6 +2724,8 @@ function captureActiveEdit() {
 function restoreLiveEdit(st: LiveEdit) {
   undoStack.length = 0;
   undoStack.push(...st.undo);
+  redoStack.length = 0;
+  redoStack.push(...(st.redo ?? []));
   baseline = st.baseline;
   settled = st.settled;
   origParams = st.orig;
@@ -3129,64 +3275,64 @@ const galNef = (key: string, label: string, lesson?: number): GalleryTile => ({
   lesson,
 });
 const GALLERY: GalleryTile[] = [
-  galRaw("canopy", "Golden canopy · RAW", 3),
-  galRaw("lodge", "Motor lodge · RAW", 3),
-  galRaw("hillside", "Hillside & sky · RAW"),
+  galRaw("canopy", "Golden canopy", 3),
+  galRaw("lodge", "Motor lodge", 3),
+  galRaw("hillside", "Hillside & sky"),
   // A RAW practice photo for every lesson, in lesson order (owner ask
   // 2026-07-14: each practice photo opens on its own lesson).
-  galNef("NIR_1638", "Lakeside beach · RAW", 0),
-  galNef("NIR_1701", "White forest · RAW", 1),
-  galNef("NIR_1822", "Lone pine · RAW", 2),
-  galNef("NIR_1708", "Wooded shore · RAW", 3),
-  galNef("NIR_1687", "Picnic still life · RAW", 4),
-  galNef("NIR_1675", "Lakeside & sensor dust · RAW", 5),
+  galNef("NIR_1638", "Lakeside beach", 0),
+  galNef("NIR_1701", "White forest", 1),
+  galNef("NIR_1822", "Lone pine", 2),
+  galNef("NIR_1708", "Wooded shore", 3),
+  galNef("NIR_1687", "Picnic still life", 4),
+  galNef("NIR_1675", "Lakeside & sensor dust", 5),
   // Second wave (2026-07-14): a second RAW frame for lessons 1-5.
-  galNef("NIR_1830", "Chairs by the lake · RAW", 0),
-  galNef("NIR_1873", "Through the boughs · RAW", 1),
-  galNef("NIR_1824", "Pine & clouds · RAW", 2),
-  galNef("NIR_1821", "Shoreline forest · RAW", 3),
-  galNef("NIR_1877", "Glowing pine · RAW", 4),
+  galNef("NIR_1830", "Chairs by the lake", 0),
+  galNef("NIR_1873", "Through the boughs", 1),
+  galNef("NIR_1824", "Pine & clouds", 2),
+  galNef("NIR_1821", "Shoreline forest", 3),
+  galNef("NIR_1877", "Glowing pine", 4),
   // Third wave (2026-07-14): Wispy sky's RAW replaces its JPEG tile; the
   // forest-wall frames are free practice (untagged -> open on Lesson 1).
-  galNef("NIR_1827", "Wispy sky · RAW", 2),
-  galNef("NIR_1811", "Lakeshore pines · RAW"),
-  galNef("NIR_1812", "Forest wall · RAW"),
-  galNef("NIR_1814", "Forest spire · RAW"),
-  galNef("NIR_1817", "Bare snag · RAW"),
+  galNef("NIR_1827", "Wispy sky", 2),
+  galNef("NIR_1811", "Lakeshore pines"),
+  galNef("NIR_1812", "Forest wall"),
+  galNef("NIR_1814", "Forest spire"),
+  galNef("NIR_1817", "Bare snag"),
   // Fourth wave (2026-07-14): Swirling sky's RAW replaces its JPEG tile, and
   // Lake & contrails' tile is now the RAW of a neighbouring frame (NIR_1722,
   // same scene — the NIR_1721 JPEG was retired). The rest are free practice.
-  galNef("NIR_1716", "Swirling sky · RAW", 2),
-  galNef("NIR_1722", "Lake & contrails · RAW", 2),
-  galNef("NIR_1717", "Frosted pine · RAW"),
-  galNef("NIR_1718", "Under swirling clouds · RAW"),
-  galNef("NIR_1703", "Spire & streaks · RAW"),
-  galNef("NIR_1720", "Sunlit shore · RAW"),
-  galNef("NIR_1738", "Kayaks on the beach · RAW"),
-  galNef("NIR_1713", "Rocky shore forest · RAW"),
-  galNef("NIR_1710", "Cove forest · RAW"),
+  galNef("NIR_1716", "Swirling sky", 2),
+  galNef("NIR_1722", "Lake & contrails", 2),
+  galNef("NIR_1717", "Frosted pine"),
+  galNef("NIR_1718", "Under swirling clouds"),
+  galNef("NIR_1703", "Spire & streaks"),
+  galNef("NIR_1720", "Sunlit shore"),
+  galNef("NIR_1738", "Kayaks on the beach"),
+  galNef("NIR_1713", "Rocky shore forest"),
+  galNef("NIR_1710", "Cove forest"),
   // Fifth wave (2026-07-14): Framed by trees' tile is now the RAW of a
   // neighbouring frame (NIR_1667, same scene — the NIR_1665 JPEG was
   // retired). The rest are free practice.
-  galNef("NIR_1667", "Framed by trees · RAW"),
-  galNef("NIR_1644", "Frosted treetops · RAW"),
-  galNef("NIR_1651", "Sunlit crown · RAW"),
-  galNef("NIR_1661", "Sunlit pines · RAW"),
-  galNef("NIR_1662", "Fir & pine · RAW"),
-  galNef("NIR_1671", "Glowing pair · RAW"),
-  galNef("NIR_1681", "Foliage & trunk · RAW"),
-  galNef("NIR_1682", "Foliage towers · RAW"),
-  galNef("NIR_1688", "Sapling on the rock · RAW"),
-  galNef("NIR_1691", "Camp by the lake · RAW"),
-  galNef("NIR_1705", "Forest sentinel · RAW"),
+  galNef("NIR_1667", "Framed by trees"),
+  galNef("NIR_1644", "Frosted treetops"),
+  galNef("NIR_1651", "Sunlit crown"),
+  galNef("NIR_1661", "Sunlit pines"),
+  galNef("NIR_1662", "Fir & pine"),
+  galNef("NIR_1671", "Glowing pair"),
+  galNef("NIR_1681", "Foliage & trunk"),
+  galNef("NIR_1682", "Foliage towers"),
+  galNef("NIR_1688", "Sapling on the rock"),
+  galNef("NIR_1691", "Camp by the lake"),
+  galNef("NIR_1705", "Forest sentinel"),
   // Sixth wave (2026-07-14): backyard scenes — Lightroom-converted DNG
   // sources this time (binned through the same pipeline via the app's own
   // LJ92 CFA decode). All free practice.
-  galNef("NIR_0063", "Oaks over the fence · RAW"),
-  galNef("NIR_0102", "Bird bath · RAW"),
-  galNef("NIR_0152", "Backyard lounge · RAW"),
-  galNef("NIR_0172", "The playhouse · RAW"),
-  galNef("NIR_0627", "Lavender · RAW"),
+  galNef("NIR_0063", "Oaks over the fence"),
+  galNef("NIR_0102", "Bird bath"),
+  galNef("NIR_0152", "Backyard lounge"),
+  galNef("NIR_0172", "The playhouse"),
+  galNef("NIR_0627", "Lavender"),
   galJpeg("NIR_1706", "Forest & snag"),
   galJpeg("NIR_1808", "Foliage close-up"),
   galJpeg("NIR_1864", "Weeping branches"),
@@ -3408,10 +3554,13 @@ const library = $("library") as HTMLDivElement;
 // the card's bottom edge while there's more below the fold, gone at the end.
 {
   const cue = $("welcomeCue") as HTMLDivElement;
+  const cueUp = $("welcomeCueUp") as HTMLDivElement;
   cue.hidden = false; // from here on, visibility is the .on class (see style.css)
+  cueUp.hidden = false;
   const update = () => {
     const more = welcome.scrollHeight - welcome.clientHeight - welcome.scrollTop > 24;
     cue.classList.toggle("on", more);
+    cueUp.classList.toggle("on", welcome.scrollTop > 24); // more sits above
   };
   welcome.addEventListener("scroll", update, { passive: true });
   new ResizeObserver(update).observe(welcome);
@@ -4260,7 +4409,20 @@ function grayWorldWB(img: DecodedImage): [number, number, number] {
     roadmap.append(li);
   }
 
-  $("infoBtn").addEventListener("click", () => dlg.showModal());
+  // Sticky scroll cues: say "more above / below" while the dialog overflows.
+  const infoCueUp = $("infoCueUp") as HTMLDivElement;
+  const infoCueDown = $("infoCueDown") as HTMLDivElement;
+  infoCueUp.hidden = false; // visibility is the .on class (see style.css), not [hidden]
+  infoCueDown.hidden = false;
+  const updateInfoCues = () => {
+    const max = dlg.scrollHeight - dlg.clientHeight;
+    infoCueUp.classList.toggle("on", dlg.scrollTop > 8);
+    infoCueDown.classList.toggle("on", max > 8 && dlg.scrollTop < max - 8);
+  };
+  dlg.addEventListener("scroll", updateInfoCues, { passive: true });
+  const openInfo = () => { dlg.showModal(); requestAnimationFrame(updateInfoCues); };
+
+  $("infoBtn").addEventListener("click", openInfo);
   $("infoClose").addEventListener("click", () => dlg.close());
   dlg.addEventListener("click", (e) => {
     if (e.target === dlg) dlg.close(); // tap outside to dismiss
@@ -4275,7 +4437,7 @@ function grayWorldWB(img: DecodedImage): [number, number, number] {
   localStorage.setItem(SEEN_KEY, __APP_VERSION__);
   if (seen !== null && seen !== __APP_VERSION__) {
     // Let the first frame paint so the dialog opens over a live app.
-    requestAnimationFrame(() => dlg.showModal());
+    requestAnimationFrame(openInfo);
   }
 }
 

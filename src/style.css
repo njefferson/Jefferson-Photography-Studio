@@ -259,6 +259,27 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   box-shadow: var(--shadow);
 }
 #infoDlg::backdrop, #helpDlg::backdrop, #batchDlg::backdrop { background: rgba(0, 0, 0, 0.55); }
+/* The "What's new" dialog scrolls; sticky chevron cues at its top/bottom edges
+   say "there's more this way" (owner ask 2026-07-15). Sticky resolves against
+   the dialog's own scrollport, so no position:relative (that breaks modal
+   centering). */
+#infoDlg { max-height: 82vh; overflow-y: auto; }
+.dlg-cue {
+  position: sticky;
+  z-index: 3;
+  height: 30px;
+  margin: 0 -20px;
+  display: flex;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--txt-2);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.dlg-cue.on { opacity: 1; }
+.dlg-cue.up { top: -18px; margin-top: -18px; align-items: flex-start; padding-top: 3px; background: linear-gradient(0deg, transparent, var(--surface) 74%); }
+.dlg-cue.down { bottom: -18px; margin-bottom: -18px; align-items: flex-end; padding-bottom: 3px; background: linear-gradient(180deg, transparent, var(--surface) 74%); }
 #infoDlg h2, #helpDlg h2, #batchDlg h2 { margin: 0 0 10px; font: 600 17px/1.2 var(--display); }
 
 /* Batch-start chooser: pick the grade that goes on every photo. */
@@ -399,6 +420,8 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   width: 200px;
   height: 75px;
   opacity: 0.92;
+  pointer-events: auto; /* the wrapper stays none; only the chart itself takes a tap-to-hide */
+  cursor: pointer;
 }
 @media (max-width: 760px) {
   #histWrap { top: 12px; right: 12px; padding: 4px; }
@@ -439,8 +462,7 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 #tatBanner,
 #colorBanner,
 #healBanner,
-#healReviewBanner,
-#cropBanner {
+#healReviewBanner {
   position: absolute;
   top: 16px;
   left: 50%;
@@ -467,24 +489,19 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 #tatBanner .tat-banner-off,
 #colorBanner .tat-banner-off,
 #healBanner .tat-banner-off,
-#healReviewBanner .tat-banner-off,
-#cropBanner .tat-banner-off {
+#healReviewBanner .tat-banner-off {
   font-size: 11px;
   font-weight: 500;
   opacity: 0.85;
 }
 /* The colour-pick and heal banners sit at the BOTTOM (top taps hit the sky —
    a prime pick target AND where dust shows worst; a top banner ate those taps).
-   Crop ALSO sits at the bottom, stacked above its own Straighten toolbar — the
-   top edge is the lesson-chip rail's territory on a practice photo, and a top
-   banner sat right under the chips, eating their taps (field-caught headless). */
-#colorBanner, #healBanner, #healReviewBanner, #cropBanner { top: auto; bottom: 16px; }
-#cropBanner { bottom: 66px; } /* above #cropTools, not on top of it */
+   (top taps hit the sky / lesson chips.) */
+#colorBanner, #healBanner, #healReviewBanner { top: auto; bottom: 16px; }
 @media (max-width: 760px) {
-  #tatBanner, #colorBanner, #healBanner, #healReviewBanner, #cropBanner { top: 10px; padding: 6px 13px; font-size: 12px; }
-  #tatBanner .tat-banner-off, #colorBanner .tat-banner-off, #healBanner .tat-banner-off, #healReviewBanner .tat-banner-off, #cropBanner .tat-banner-off { font-size: 10px; }
+  #tatBanner, #colorBanner, #healBanner, #healReviewBanner { top: 10px; padding: 6px 13px; font-size: 12px; }
+  #tatBanner .tat-banner-off, #colorBanner .tat-banner-off, #healBanner .tat-banner-off, #healReviewBanner .tat-banner-off { font-size: 10px; }
   #colorBanner, #healBanner, #healReviewBanner { top: auto; bottom: 10px; }
-  #cropBanner { top: auto; bottom: 60px; }
 }
 
 /* Crop & straighten: an axis-aligned box (drag corners to resize, drag inside
@@ -496,6 +513,7 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
    dragging the box or a handle on iPad Safari paints a translucent blue
    text-selection band over the photo (owner-caught on device, 2026-07-15). */
 #cropOverlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 6; }
+#cropOverlay:not([hidden]) { pointer-events: auto; cursor: grab; touch-action: none; } /* drag the photo to reposition the crop */
 #cropOverlay,
 #cropBox,
 .crop-handle {
@@ -507,9 +525,8 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 #cropBox {
   position: absolute;
   border: 1.5px solid #fff;
-  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
-  pointer-events: auto;
-  cursor: move;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55); /* dim outside the crop */
+  pointer-events: none; /* display-only — the overlay captures the pan drag */
   touch-action: none;
 }
 /* A 44px INVISIBLE touch target (Apple's minimum) centred on each corner —
@@ -540,6 +557,21 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 .crop-handle[data-corner="tr"] { top: 0; left: 100%; }
 .crop-handle[data-corner="bl"] { top: 100%; left: 0; }
 .crop-handle[data-corner="br"] { top: 100%; left: 100%; }
+/* Per focus: Crop shows the resize handles; Straighten hides them (reposition by
+   dragging the photo, level with the slider — no arrows). */
+#cropOverlay.focus-straighten .crop-handle { display: none; }
+/* Aids inside the box — thin hairlines, ONE grid per focus (never both). */
+#cropGuides { position: absolute; inset: 0; pointer-events: none; }
+#cropOverlay.focus-crop #cropGuides { /* rule of thirds */
+  background-image:
+    repeating-linear-gradient(to right, rgba(255, 255, 255, 0.4) 0 1px, transparent 1px calc(100% / 3)),
+    repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.4) 0 1px, transparent 1px calc(100% / 3));
+}
+#cropOverlay.focus-straighten #cropGuides { /* finer alignment grid to level against */
+  background-image:
+    repeating-linear-gradient(to right, rgba(255, 255, 255, 0.28) 0 1px, transparent 1px calc(100% / 6)),
+    repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.28) 0 1px, transparent 1px calc(100% / 6));
+}
 #cropTools {
   position: absolute;
   left: 50%;
@@ -547,25 +579,34 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   transform: translateX(-50%);
   z-index: 7;
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 14px;
-  border-radius: 999px;
-  background: rgba(12, 12, 16, 0.82);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  flex-direction: column; /* header row over a full-width slider — room since the drawer tucks away while cropping */
+  align-items: stretch;
+  gap: 8px;
+  padding: 10px 16px 12px;
+  border-radius: 18px;
+  background: var(--accent-soft); /* blue-tinted "active" glass — stands out without the solid fill the exit banner uses */
+  border: 1px solid var(--accent);
   box-shadow: 0 3px 14px rgba(0, 0, 0, 0.45);
   color: var(--txt-1);
-  max-width: min(94%, 460px);
+  width: min(88%, 360px);
 }
-#cropTools label { display: flex; align-items: center; gap: 8px; margin: 0; flex: 1; font-size: 12px; color: var(--txt-2); }
+#cropTools .crop-row { display: flex; align-items: center; gap: 10px; }
+/* Crop mode reuses the pill for just its label + Reset — the straighten slider
+   and its readout belong to Straighten mode only. */
+#cropTools.tool-crop #straighten,
+#cropTools.tool-crop #straightenVal { display: none; }
+#cropTools .crop-lbl { flex: 1; font-size: 13px; font-weight: 600; color: var(--txt-1); }
 #cropTools input[type="range"] { width: 100%; margin: 0; }
-#straightenVal { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--txt-2); flex: none; min-width: 4ch; }
-#cropTools button { flex: none; width: auto; padding: 6px 10px; font-size: 12px; }
+#straightenVal { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--txt-1); flex: none; min-width: 4ch; text-align: right; }
+#cropTools button { flex: none; width: auto; padding: 6px 12px; font-size: 12px; border-color: var(--accent); }
+#cropTools button:disabled { opacity: 0.45; } /* honest greyed state when the crop is already identity */
+/* Done is the primary exit — accent-filled so it's the obvious way back out of
+   the tool (owner got lost with the old tiny "tap here" hint). */
+#cropDone { background: var(--accent); color: var(--accent-ink); font-weight: 700; padding: 7px 18px; box-shadow: 0 2px 14px -2px var(--accent); } /* accent glow so it pops off the soft pill */
 @media (max-width: 760px) {
-  #cropTools { bottom: 10px; padding: 6px 10px; gap: 6px; }
+  #cropTools { bottom: 10px; padding: 9px 12px 11px; }
 }
 #stage.has-session #cropTools { bottom: calc(24px + var(--session-h, 110px)); }
-#stage.has-session #cropBanner { bottom: calc(74px + var(--session-h, 110px)); }
 #hint { color: var(--txt-2); text-align: center; max-width: 40ch; margin: 0 auto; }
 #welcome {
   position: absolute;
@@ -616,6 +657,16 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   opacity: 0;
 }
 .welcome-cue.on { opacity: 1; }
+/* Matching UP cue: hugs the card's TOP edge, shows once you've scrolled down so
+   it's clear there's more above (owner ask 2026-07-15). */
+.welcome-cue.up {
+  top: -22px;
+  bottom: auto;
+  margin: -22px -26px 0;
+  align-items: flex-start;
+  padding: 3px 0 0;
+  background: linear-gradient(0deg, transparent, var(--surface) 72%);
+}
 /* Short screens (iPad landscape): tighter welcome chrome so the practice grid
    peeks above the fold instead of hiding entirely below it. */
 @media (max-height: 880px) {
@@ -980,7 +1031,7 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
    controls park themselves — they act on a photo that isn't on screen, so
    they read as a broken menu (owner report 2026-07-14, narrow viewport).
    Home lives up by ‹ Studio and also parks: on the start screen you're home. */
-body:has(#welcome:not([hidden])) :is(#homeBtn, #undoBtn, #resetBtn, #origBtn, #histBtn, #rotateBtn, .bar-sep) { display: none; }
+body:has(#welcome:not([hidden])) :is(#homeBtn, #undoBtn, #redoBtn, #resetBtn, #origBtn, #histBtn, .bar-sep) { display: none; }
 .bar-actions .bar-sep { width: 1px; height: 22px; background: var(--line); flex: none; }
 .bar-btn {
   width: auto;
@@ -1145,6 +1196,9 @@ label.open-btn, label.bar-btn {
   border-color: var(--accent);
   font-weight: 600;
 }
+/* The geometry tools live in their own tab, set apart as a full-width entry
+   below the six adjustment sections. */
+.ptab[data-tab="crop"] { grid-column: 1 / -1; }
 .section-head { flex: none; padding: 12px 14px 8px; }
 .section-title { margin: 0; font: 600 15px/1.2 var(--display); color: var(--txt); }
 .section-sub { margin: 2px 0 0; font-size: 12px; line-height: 1.35; color: var(--txt-3); }
