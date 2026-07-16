@@ -419,6 +419,39 @@ See **`PLAN.md`** for the full build plan.
   the photo-follows-finger pan under a now-centred box, and the resize feel. If
   the pan direction or the centred box reads wrong on device, both are a one-line
   flip / a small change here.
+- [ ] **Keep the crop box inside the photo** — owner-caught on device 2026-07-16
+  (with the crop go-to-main), a REGRESSION from the box-first/pinch release: once
+  the photo has been STRAIGHTENED or CROPPED, a resize handle (and maybe a pan)
+  can drag the crop box PAST the image edge into the black void — the box is
+  allowed larger than / outside the photo (his IMG_1007: the box's top + right run
+  off the rounded photo edge into black; also visible after a straighten). Export
+  reads `params.crop`, so a box dragged out there bakes black/transparent wedges
+  into the saved image — fix before it bites. Where to look: resize clamps to
+  `cropSafeBound()` (the straighten-inscribed rect; returns IDENTITY when
+  straighten is 0, so after a plain crop a re-crop can grow back past the photo)
+  and pan clamps to `clampCropOnPhoto()`; under the new box-centred, zoomed
+  fit-view the handle deltas map screen→crop through the live `fitViewCrop()`
+  window and the clamp bound is no longer the same frame the drag moves in. FIX:
+  clamp every corner AND the pan to the intersection of the on-photo [0,1] bound
+  and the straighten-safe inscribed rect, evaluated in the fit-view's space; then
+  extend the headless harness (it already samples corner alpha) to prove NO
+  handle or pan can reach a transparent texel — at several angles AND after a
+  prior crop. Pairs with the overflow-view idea below (that reframes what
+  "outside the image" even means).
+- [ ] **Crop view: let the photo overflow instead of boxing it** — owner design
+  question 2026-07-16: why must the photo be bound inside a "view box" (the
+  letterboxed `#view` rect) at all while cropping? Could it simply OVERFLOW — the
+  photo fills/extends behind everything, with the crop box, grid, Straighten pill
+  and Done just floating over it (no black frame around the picture while you
+  align)? Worth a future UI pass. Today the armed preview renders into the
+  contained `#view` canvas (object-fit:contain, so a tilted/zoomed photo is
+  letterboxed and `positionCropOverlay` maps the box onto that drawn rect via
+  `viewImageRect`). An overflow model lets the GL canvas bleed to the screen
+  edges behind the floating controls — the photo becomes the background, the aids
+  float. This likely SUBSUMES the clamp bug above (photo fills the screen, box
+  clamps to the photo). Non-trivial: canvas sizing, the box↔photo mapping, pinch
+  anchoring, and the OS-edge insets (`.cropping`) all assume the contained
+  `#view`. Scope as its own UI release; decide it alongside the clamp fix.
 - [ ] **More composition overlays** — owner ask 2026-07-16, optional, for anyone
   who wants them: beyond the rule-of-thirds grid, offer selectable composition
   guides while cropping — golden-ratio (phi) grid, golden spiral, the diagonal
