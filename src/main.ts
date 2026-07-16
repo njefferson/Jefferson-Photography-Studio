@@ -1876,7 +1876,7 @@ healBanner.addEventListener("click", () => setHeal(false)); // tap the banner to
 // bares an empty corner; dragging the box further is clamped to stay inside
 // that same safe bound. ---
 const cropBtn = $("cropBtn") as HTMLButtonElement;
-const cropBanner = $("cropBanner") as HTMLButtonElement;
+const cropDone = $("cropDone") as HTMLButtonElement;
 const cropOverlay = $("cropOverlay") as HTMLDivElement;
 const cropBox = $("cropBox") as HTMLDivElement;
 const cropTools = $("cropTools") as HTMLDivElement;
@@ -1885,12 +1885,11 @@ const straightenVal = $("straightenVal") as HTMLSpanElement;
 const cropResetBtn = $("cropReset") as HTMLButtonElement;
 const straightenBtn = $("straightenBtn") as HTMLButtonElement;
 const geoLbl = $("geoLbl") as HTMLSpanElement;
-const cropBannerLbl = $("cropBannerLbl") as HTMLSpanElement;
 const MIN_CROP = 0.1;
 // Crop and Straighten are SEPARATE tools, each activated on its own (owner ask,
-// repeatedly): Crop shows only the draggable box, Straighten only the slider.
-// `geoMode` picks which; `cropArmed` stays the derived "a geometry tool owns the
-// frame" flag the whole-frame render / canvas-lock / drawer-hide already key off.
+// repeatedly): Crop's box corners resize, Straighten's corners rotate (+ its
+// slider). `geoMode` picks which; `cropArmed` stays the derived "a geometry tool
+// owns the frame" flag the whole-frame render / canvas-lock / drawer-hide key off.
 let geoMode: "crop" | "straighten" | null = null;
 let cropArmed = false;
 
@@ -1913,16 +1912,12 @@ function setGeoMode(mode: "crop" | "straighten" | null) {
   const isCrop = geoMode === "crop";
   cropBtn.setAttribute("aria-pressed", String(isCrop));
   straightenBtn.setAttribute("aria-pressed", String(geoMode === "straighten"));
-  cropBanner.hidden = !cropArmed;
   cropTools.hidden = !cropArmed;
-  // The pill is shared: Crop shows only its label + Reset; Straighten adds the
+  // The pill is shared: Crop shows its label + Reset + Done; Straighten adds the
   // slider (the .tool-crop class hides the slider row — see style.css).
   cropTools.classList.toggle("tool-crop", isCrop);
   geoLbl.textContent = isCrop ? "Crop" : "Straighten";
   cropResetBtn.textContent = isCrop ? "Reset crop" : "Reset";
-  cropBannerLbl.innerHTML = isCrop
-    ? "&#9635; Crop &mdash; drag the box or its corners"
-    : "&#8622; Straighten &mdash; drag to level the horizon";
   if (cropArmed) { setHslPick(false); setColorPick(false); setTat(false); setHeal(false); setHealReview(false); mUI.paint.setAttribute("aria-pressed", "false"); resetZoom(); } // picture tools are exclusive; geometry wants the whole frame in view
   // Pull the photo in from the stage edges while a geometry tool is live so the
   // corner handles never sit flush in the physical screen corners (the OS eats
@@ -1940,46 +1935,86 @@ function setGeoMode(mode: "crop" | "straighten" | null) {
   positionCropOverlay();
   draw();
 }
-// Tapping a tool arms it; tapping the OTHER tool switches; tapping the active
-// tool (or the banner) exits.
+// Tapping a tool arms it; tapping the active tool again exits. "Done" in the
+// pill is the primary exit (commits the pending change as one undo step).
 cropBtn.addEventListener("click", () => setGeoMode(geoMode === "crop" ? null : "crop"));
 straightenBtn.addEventListener("click", () => setGeoMode(geoMode === "straighten" ? null : "straighten"));
-cropBanner.addEventListener("click", () => { setGeoMode(null); flushRecord(); }); // tap the banner to exit (commits the pending change as one undo step)
+cropDone.addEventListener("click", () => { setGeoMode(null); flushRecord(); });
 
-/** Position the box overlay from params.crop — a plain fraction of the
- *  canvas's own rendered rect (which, while armed, IS the full straightened
- *  frame — see draw()'s cropArmed override — so no extra transform is ever
- *  needed here, unlike the mask/heal overlays' rotation-aware placement). */
+/** The photo's DRAWN rect inside #view (client coords). The canvas element is
+ *  sized to the stage-shaped inset region and the photo is letterboxed inside it
+ *  by object-fit:contain — so the crop [0,1] must map onto THIS sub-rect, not the
+ *  element box, or the box drifts over the black bars. Bitmap dims are the full
+ *  frame while armed, so canvas.width/height is the photo aspect. */
+function viewImageRect(): { left: number; top: number; width: number; height: number } {
+  const c = canvas.getBoundingClientRect();
+  const imgAsp = canvas.width / Math.max(1, canvas.height);
+  const boxAsp = c.width / Math.max(1, c.height);
+  let w = c.width, h = c.height;
+  if (imgAsp > boxAsp) h = c.width / imgAsp;
+  else w = c.height * imgAsp;
+  return { left: c.left + (c.width - w) / 2, top: c.top + (c.height - h) / 2, width: w, height: h };
+}
+
+/** Position the box overlay from params.crop, mapped onto the drawn photo rect
+ *  (see viewImageRect). Shown in BOTH tools: Crop drags its corners to resize,
+ *  Straighten drags them to rotate — either way the box frames the pending crop. */
 function positionCropOverlay() {
-  const show = geoMode === "crop" && !!current && welcome.hidden; // the box belongs to Crop only
+  const show = !!geoMode && !!current && welcome.hidden;
   cropOverlay.toggleAttribute("hidden", !show);
-  // Reset enablement tracks the active tool — runs in Straighten mode too (box
-  // hidden): identity ⟺ straighten 0 AND crop full, so this covers both.
+  // Reset enablement tracks the active tool: identity ⟺ straighten 0 AND crop full.
   cropResetBtn.disabled = cropIsIdentity(params.crop, params.straighten);
   if (!show) return;
   const stageRect = cropOverlay.getBoundingClientRect();
-  const c = canvas.getBoundingClientRect();
+  const r = viewImageRect();
   const { x, y, w, h } = params.crop;
-  cropBox.style.left = `${c.left - stageRect.left + x * c.width}px`;
-  cropBox.style.top = `${c.top - stageRect.top + y * c.height}px`;
-  cropBox.style.width = `${Math.max(1, w * c.width)}px`;
-  cropBox.style.height = `${Math.max(1, h * c.height)}px`;
+  cropBox.style.left = `${r.left - stageRect.left + x * r.width}px`;
+  cropBox.style.top = `${r.top - stageRect.top + y * r.height}px`;
+  cropBox.style.width = `${Math.max(1, w * r.width)}px`;
+  cropBox.style.height = `${Math.max(1, h * r.height)}px`;
 }
 
-type CropDragKind = "move" | "tl" | "tr" | "bl" | "br";
-let cropDrag: { kind: CropDragKind; id: number; x0: number; y0: number; crop0: CropRect; rectW: number; rectH: number } | null = null;
+type CropDragKind = "move" | "tl" | "tr" | "bl" | "br" | "rotate";
+let cropDrag:
+  | { kind: CropDragKind; id: number; x0: number; y0: number; crop0: CropRect; rectW: number; rectH: number; a0: number; straighten0: number }
+  | null = null;
 
 function startCropDrag(kind: CropDragKind, e: PointerEvent, target: HTMLElement) {
-  if (geoMode !== "crop" || !current) return;
+  if (!geoMode || !current) return;
   e.preventDefault();
   e.stopPropagation(); // a handle's pointerdown must not also start the box's own move-drag
-  target.setPointerCapture(e.pointerId);
-  const r = canvas.getBoundingClientRect();
-  cropDrag = { kind, id: e.pointerId, x0: e.clientX, y0: e.clientY, crop0: { ...params.crop }, rectW: Math.max(1, r.width), rectH: Math.max(1, r.height) };
+  try { target.setPointerCapture(e.pointerId); } catch { /* capture can throw for stale/synthetic pointers — the drag still works */ }
+  const r = viewImageRect();
+  // In Straighten every grab ROTATES about the photo centre; in Crop the corners
+  // resize (the box body moves).
+  const rotate = geoMode === "straighten";
+  const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  cropDrag = {
+    kind: rotate ? "rotate" : kind, id: e.pointerId, x0: e.clientX, y0: e.clientY,
+    crop0: { ...params.crop }, rectW: Math.max(1, r.width), rectH: Math.max(1, r.height),
+    a0: Math.atan2(e.clientY - cy, e.clientX - cx), straighten0: params.straighten,
+  };
 }
 
 function moveCropDrag(e: PointerEvent) {
   if (!cropDrag || e.pointerId !== cropDrag.id) return;
+  if (cropDrag.kind === "rotate") {
+    // Straighten by swinging a corner about the photo centre — angle is
+    // scale-invariant so the letterbox never distorts it.
+    const r = viewImageRect();
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    let d = ((Math.atan2(e.clientY - cy, e.clientX - cx) - cropDrag.a0) * 180) / Math.PI;
+    while (d > 180) d -= 360;
+    while (d < -180) d += 360;
+    const deg = clamp(Math.round((cropDrag.straighten0 + d) * 10) / 10, -45, 45);
+    params.straighten = deg;
+    straightenSlider.value = String(deg);
+    straightenVal.textContent = `${deg.toFixed(1)}°`;
+    params.crop = autoInscribedCrop(params.straighten, dispAspectNow());
+    positionCropOverlay();
+    draw();
+    return;
+  }
   const dx = (e.clientX - cropDrag.x0) / cropDrag.rectW;
   const dy = (e.clientY - cropDrag.y0) / cropDrag.rectH;
   const c0 = cropDrag.crop0;

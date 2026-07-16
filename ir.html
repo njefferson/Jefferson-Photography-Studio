@@ -71,6 +71,7 @@
             <span class="crop-lbl" id="geoLbl">Straighten</span>
             <span id="straightenVal">0.0&deg;</span>
             <button id="cropReset" type="button">Reset</button>
+            <button id="cropDone" class="primary" type="button">Done</button>
           </div>
           <input id="straighten" type="range" min="-45" max="45" step="0.1" value="0" aria-label="Straighten" />
         </div>
@@ -92,10 +93,6 @@
         <button id="healReviewBanner" type="button" hidden>
           &#10003; <span id="healReviewText">Spots healed</span>
           <span class="tat-banner-off">tap a ring to put that one back &middot; tap here to keep them</span>
-        </button>
-        <button id="cropBanner" type="button" hidden>
-          <span id="cropBannerLbl">&#9635; Crop &mdash; drag the box or its corners</span>
-          <span class="tat-banner-off">Tap here when done</span>
         </button>
         <button id="colorBanner" type="button" hidden>
           <span>&#127919; Colour mask — tap the photo to pick the colour to match</span>

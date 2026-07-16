@@ -264,6 +264,29 @@ See **`PLAN.md`** for the full build plan.
   live and the banner exit restores it; screenshot confirms Straighten = slider
   only, no box, no smear. NEEDS THE OWNER'S HANDS: that Crop and Straighten now
   feel like two separate one-tap tools on the real iPhone.
+  FOURTH ON-DEVICE PASS (2026-07-15, staging, iPhone — cache ips-v59 → ips-v60):
+  (1) CROP BOX DRIFTED OVER BLACK. Root cause: #view is the stage-shaped inset
+  box and the photo is letterboxed INSIDE it by object-fit:contain, but
+  positionCropOverlay + moveCropDrag mapped crop [0,1] across the whole ELEMENT
+  (incl. the black bars). FIX: new `viewImageRect()` returns the photo's drawn
+  sub-rect (contain math); the box places + clamps against THAT. No-op when the
+  element already matches the photo aspect (headless), confines to the photo when
+  letterboxed. (2) EXIT LOST + (3) CONTROLS COVERED. The tiny 10px "Tap here when
+  done" on the separate `#cropBanner` overlapped the taller Straighten pill. FIX:
+  removed the banner; the pill now carries a prominent accent-filled **Done**
+  button (single bottom element, no overlap, obvious exit). (4) CORNER-ROTATE.
+  Owner: "make each corner a place to rotate from" — chose IN STRAIGHTEN. So
+  Straighten now shows the box too, and dragging any corner ROTATES (angle about
+  the photo centre → params.straighten; slider stays as fine control); Crop's
+  corners still resize. `setPointerCapture` wrapped in try/catch (can throw on
+  synthetic/stale pointers). VERIFIED headless 21/21 (Chromium; fail-first proven
+  — planted up-cue + box-confinement-under-forced-letterbox + corner-rotate all
+  failed as planted): a forced 320×300 letterbox confines the box to the 213px
+  photo band (not the black); Done removes the banner + exits + restores the
+  drawer; a corner drag rotates in Straighten and resizes in Crop; smear-free;
+  screenshot shows Straighten = box + slider + Done, no overlap. NEEDS THE
+  OWNER'S HANDS: the box now hugs the photo on the real iPhone, Done is findable,
+  and corner-rotation levels in the intuitive DIRECTION (sign easy to flip).
 - [x] **Redo** — owner ask 2026-07-15: add a Redo button + function next to
   "Go back", and RENAME "Go back" to "Undo" (unless a reason surfaces not to).
   Build notes: the undo stack already exists (undoStack + settled/flushRecord);
