@@ -929,16 +929,17 @@ $("toneReset").addEventListener("click", () => {
   flushRecord();
 });
 
-// --- Sectioned tab panel: six segmented tabs, one section of controls each.
+// --- Sectioned tab panel: segmented tabs, one section of controls each.
 // The active tab is remembered per session so reopening lands where you left.
-const PANEL_TABS = ["basic", "ir", "color", "tone", "masks", "export", "crop"] as const;
+const PANEL_TABS = ["basic", "ir", "color", "tone", "masks", "corrections", "export", "crop"] as const;
 type PanelTab = (typeof PANEL_TABS)[number];
 const TAB_META: Record<PanelTab, { name: string; sub: string }> = {
   basic: { name: "Basic", sub: "White balance, exposure & detail" },
-  ir: { name: "IR", sub: "Channel swap, looks & lens fixes" },
+  ir: { name: "IR", sub: "Channel swap & looks" },
   color: { name: "Color", sub: "Hue, per-color & the mixer" },
   tone: { name: "Tone", sub: "Curve, luminance & bands" },
   masks: { name: "Masks", sub: "Local, area-only adjustments" },
+  corrections: { name: "Corrections", sub: "Dust, spots & IR lens fixes" },
   export: { name: "Export", sub: "Save, my looks & profiles" },
   crop: { name: "Crop & rotate", sub: "Rotate, crop & straighten" },
 };
@@ -3396,9 +3397,9 @@ const LESSONS: { title: string; tab: PanelTab; steps: string[] }[] = [
     // camera with a dusty sensor (one obvious smudge in the sky + several
     // faint motes), but the skill works anywhere.
     title: "Lesson 6 · Dust & spots",
-    tab: "basic",
+    tab: "corrections",
     steps: [
-      "Tap Visualize spots (in Basic) — a high-contrast view where sensor dust jumps out of flat skies. On the Lakeside & sensor dust photo the big smudge is real.",
+      "Tap Visualize spots (in Corrections) — a high-contrast view where sensor dust jumps out of flat skies. On the Lakeside & sensor dust photo the big smudge is real.",
       "Tap Find spots automatically — it heals what it finds and rings every fix for review. Tap a ring to put that one back, or the ✓ banner to keep them all.",
       "For a spot it missed: arm Heal spots, pinch in close, and tap the mote. The newest fix keeps a highlighted ring, and Spot size resizes it live until it disappears.",
       "Heals belong to this photo and ride into every export — they never sneak into saved looks or batch runs.",
@@ -4377,6 +4378,14 @@ function grayWorldWB(img: DecodedImage): [number, number, number] {
   const dlg = $("infoDlg") as HTMLDialogElement;
   const list = $("changeList") as HTMLUListElement;
   ($("infoVer") as HTMLElement).textContent = `You're on v${__APP_VERSION__}`;
+  // Commit subjects are plain text but may carry HTML entities (e.g. a stray
+  // "&amp;" from a tooling round-trip); decode them so the note reads cleanly.
+  // A <textarea>'s .value decodes entities without ever interpreting tags.
+  const decodeEntities = (s: string): string => {
+    const t = document.createElement("textarea");
+    t.innerHTML = s;
+    return t.value;
+  };
   for (const c of __CHANGELOG__) {
     const li = document.createElement("li");
     const ver = document.createElement("strong");
@@ -4385,7 +4394,7 @@ function grayWorldWB(img: DecodedImage): [number, number, number] {
     a.href = `https://github.com/njefferson/Jefferson-Photography-Studio/commit/${c.hash}`;
     a.target = "_blank";
     a.rel = "noopener";
-    a.textContent = c.subject;
+    a.textContent = decodeEntities(c.subject);
     const when = document.createElement("small");
     when.textContent = ` — ${c.date}`;
     li.append(ver, a, when);
