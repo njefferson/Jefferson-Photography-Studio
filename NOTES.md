@@ -306,6 +306,26 @@ See **`PLAN.md`** for the full build plan.
   screenshot shows the tilted arrows + the brighter Done. NEEDS THE OWNER'S
   HANDS: Done reads bright enough, and the arrow glyph/tilt DIRECTION feel right
   on the real iPhone.
+  SIXTH ON-DEVICE PASS (2026-07-15, staging, iPhone — cache ips-v63 → ips-v64):
+  the Straighten crop BOX was juting past the tilted photo into the black. ROOT
+  CAUSE (diagnosed with a headless probe): the box maps params.crop across the
+  axis-aligned full-frame rect, but `autoInscribedCrop` rotates the crop in the
+  photo's STRETCHED pixel space while the shader tilts the photo in true VISUAL
+  space — so for a non-square photo the "inscribed" box doesn't match the tilted
+  edges (at 20°, two opposite box corners sampled alpha 0 = void). Owner's call:
+  CLEAN TILT VIEW, NO BOX. FIX: in Straighten, `#cropOverlay.straightening
+  #cropBox` drops its border + scrim + pointer-events (CSS), and
+  positionCropOverlay places the rotation-arrow handles at the corners of the
+  straighten-SAFE inscribed rect (`cropSafeBound()`), inset 6% so they ride ON
+  the photo (the photo's TRUE corners rotate off-frame, so the inscribed corners
+  are the on-photo set). Crop mode is untouched (box + scrim + resize dots). Auto-
+  crop on Done unchanged (its inscribe imperfection is negligible at real leveling
+  angles and no longer shown as a box). VERIFIED headless 26/26 (Chromium; fail-
+  first proven — planted "arrows in the void" at 20° flipped): no visible box/
+  scrim in Straighten; each rotation arrow sits on OPAQUE photo pixels at 20° AND
+  8° (the 20° case used to be alpha 0); corner-drag still rotates; Crop's box
+  unchanged; screenshot at 8° shows a clean tilt with arrows on the photo. NEEDS
+  THE OWNER'S HANDS: Straighten reads as a clean tilt-to-level on the real iPhone.
 - [x] **Redo** — owner ask 2026-07-15: add a Redo button + function next to
   "Go back", and RENAME "Go back" to "Undo" (unless a reason surfaces not to).
   Build notes: the undo stack already exists (undoStack + settled/flushRecord);

@@ -1961,6 +1961,8 @@ function viewImageRect(): { left: number; top: number; width: number; height: nu
 /** Position the box overlay from params.crop, mapped onto the drawn photo rect
  *  (see viewImageRect). Shown in BOTH tools: Crop drags its corners to resize,
  *  Straighten drags them to rotate — either way the box frames the pending crop. */
+const handleEls = Array.from(cropBox.querySelectorAll<HTMLDivElement>(".crop-handle"));
+
 function positionCropOverlay() {
   const show = !!geoMode && !!current && welcome.hidden;
   cropOverlay.toggleAttribute("hidden", !show);
@@ -1971,6 +1973,31 @@ function positionCropOverlay() {
   cropOverlay.style.setProperty("--tilt", `${params.straighten}deg`);
   const stageRect = cropOverlay.getBoundingClientRect();
   const r = viewImageRect();
+  if (geoMode === "straighten") {
+    // Clean tilt view: no crop box/scrim (CSS). The rotation arrows sit on the
+    // corners of the "keep" region (the straighten-safe inscribed rect, which
+    // rides ON the tilted photo) — the photo's true corners rotate off-frame, so
+    // this is the on-photo corner set. A small inset keeps them clear of the edge
+    // (autoInscribedCrop isn't pixel-exact vs the shader's visual rotation).
+    cropBox.style.left = "0px";
+    cropBox.style.top = "0px";
+    cropBox.style.width = "100%";
+    cropBox.style.height = "100%";
+    const sb = cropSafeBound();
+    const pad = 0.06;
+    const ix = sb.x + sb.w * pad, iy = sb.y + sb.h * pad;
+    const iw = sb.w * (1 - 2 * pad), ih = sb.h * (1 - 2 * pad);
+    const CO: Record<string, [number, number]> = { tl: [ix, iy], tr: [ix + iw, iy], br: [ix + iw, iy + ih], bl: [ix, iy + ih] };
+    for (const handle of handleEls) {
+      const [u, v] = CO[handle.dataset.corner!] ?? [0.5, 0.5];
+      handle.style.left = `${r.left - stageRect.left + u * r.width}px`;
+      handle.style.top = `${r.top - stageRect.top + v * r.height}px`;
+    }
+    return;
+  }
+  // Crop: the box frames params.crop; handles ride its corners (clear the inline
+  // positions the straighten branch set so the data-corner CSS takes over).
+  for (const handle of handleEls) { handle.style.left = ""; handle.style.top = ""; }
   const { x, y, w, h } = params.crop;
   cropBox.style.left = `${r.left - stageRect.left + x * r.width}px`;
   cropBox.style.top = `${r.top - stageRect.top + y * r.height}px`;
@@ -2056,7 +2083,7 @@ function endCropDrag() {
   flushRecord(); // one drag = one undo step
 }
 
-for (const handle of Array.from(cropBox.querySelectorAll<HTMLDivElement>(".crop-handle"))) {
+for (const handle of handleEls) {
   const corner = handle.dataset.corner as CropDragKind;
   handle.addEventListener("pointerdown", (e) => startCropDrag(corner, e, handle));
   handle.addEventListener("pointermove", moveCropDrag);

@@ -557,6 +557,13 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 .crop-handle[data-corner="tr"] { top: 0; left: 100%; }
 .crop-handle[data-corner="bl"] { top: 100%; left: 0; }
 .crop-handle[data-corner="br"] { top: 100%; left: 100%; }
+/* Straighten is a clean tilt view: no crop box or scrim — just the rotation
+   arrows riding the photo's tilted corners (positioned in main.ts). */
+#cropOverlay.straightening #cropBox {
+  border: none;
+  box-shadow: none;
+  pointer-events: none; /* only the corner arrows grab — no stray-tap rotation */
+}
 /* Straighten: the corners ROTATE, so drop the resize dot for a thin CURVED
    double-headed rotation arrow (a head each way = rotate either direction) that
    tilts with the photo (--tilt = the live straighten angle, main.ts). */
