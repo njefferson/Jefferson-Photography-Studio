@@ -838,7 +838,7 @@ function draw() {
     syncSpotsToTexture(); // heals live in the texture; keep it matching params
     // While Crop & straighten is armed, show the FULL frame (straighten still
     // live) so the box has the whole photo to work with — the actual crop only
-    // takes effect once the mode is exited. See setCropMode's doc comment.
+    // takes effect once the mode is exited. See setGeoMode's doc comment.
     renderer.render(cropArmed ? { ...params, crop: CROP_DEFAULT } : params);
     refreshHistogram(params);
     positionMaskOverlay();
@@ -1057,7 +1057,7 @@ let hslPickArmed = false;
 function setHslPick(on: boolean) {
   hslPickArmed = on;
   hslPickBtn.setAttribute("aria-pressed", String(on));
-  if (on) { setTat(false); setColorPick(false); setHeal(false); setHealReview(false); setCropMode(false); } // picture tools are mutually exclusive
+  if (on) { setTat(false); setColorPick(false); setHeal(false); setHealReview(false); setGeoMode(null); } // picture tools are mutually exclusive
 }
 hslPickBtn.addEventListener("click", () => setHslPick(!hslPickArmed));
 
@@ -1355,7 +1355,7 @@ function setColorPick(on: boolean) {
   colorPickArmed = on && !!m && m.type === 3;
   mUI.colorPick.setAttribute("aria-pressed", String(colorPickArmed));
   colorBanner.hidden = !colorPickArmed;
-  if (colorPickArmed) { setHslPick(false); setTat(false); setHeal(false); setHealReview(false); setCropMode(false); mUI.paint.setAttribute("aria-pressed", "false"); } // picture tools are exclusive
+  if (colorPickArmed) { setHslPick(false); setTat(false); setHeal(false); setHealReview(false); setGeoMode(null); mUI.paint.setAttribute("aria-pressed", "false"); } // picture tools are exclusive
 }
 mUI.colorPick.addEventListener("click", () => setColorPick(!colorPickArmed));
 colorBanner.addEventListener("click", () => setColorPick(false)); // tap the banner to exit
@@ -1713,7 +1713,7 @@ function setTat(on: boolean) {
   // A standing banner (not the transient drag readout) makes it obvious the
   // canvas is in adjust mode and how to hand it back to tap-WB / pan / pinch.
   tatBanner.hidden = !on;
-  if (on) { setHslPick(false); setColorPick(false); setHeal(false); setHealReview(false); setCropMode(false); mUI.paint.setAttribute("aria-pressed", "false"); } // mutually exclusive with the other picture tools
+  if (on) { setHslPick(false); setColorPick(false); setHeal(false); setHealReview(false); setGeoMode(null); mUI.paint.setAttribute("aria-pressed", "false"); } // mutually exclusive with the other picture tools
   if (!on) hideTatHud();
 }
 hslDragBtn.addEventListener("click", () => setTat(!tatArmed));
@@ -1859,7 +1859,7 @@ function setHeal(on: boolean) {
   healArmed = on && !!current;
   healBtn.setAttribute("aria-pressed", String(healArmed));
   healBanner.hidden = !healArmed;
-  if (healArmed) { setHslPick(false); setColorPick(false); setTat(false); setHealReview(false); setCropMode(false); mUI.paint.setAttribute("aria-pressed", "false"); } // picture tools are exclusive
+  if (healArmed) { setHslPick(false); setColorPick(false); setTat(false); setHealReview(false); setGeoMode(null); mUI.paint.setAttribute("aria-pressed", "false"); } // picture tools are exclusive
   positionHealOverlay();
 }
 healBtn.addEventListener("click", () => setHeal(!healArmed));
@@ -1883,7 +1883,15 @@ const cropTools = $("cropTools") as HTMLDivElement;
 const straightenSlider = $("straighten") as HTMLInputElement;
 const straightenVal = $("straightenVal") as HTMLSpanElement;
 const cropResetBtn = $("cropReset") as HTMLButtonElement;
+const straightenBtn = $("straightenBtn") as HTMLButtonElement;
+const geoLbl = $("geoLbl") as HTMLSpanElement;
+const cropBannerLbl = $("cropBannerLbl") as HTMLSpanElement;
 const MIN_CROP = 0.1;
+// Crop and Straighten are SEPARATE tools, each activated on its own (owner ask,
+// repeatedly): Crop shows only the draggable box, Straighten only the slider.
+// `geoMode` picks which; `cropArmed` stays the derived "a geometry tool owns the
+// frame" flag the whole-frame render / canvas-lock / drawer-hide already key off.
+let geoMode: "crop" | "straighten" | null = null;
 let cropArmed = false;
 
 /** The display-rotated frame's width/height — matches Renderer's own
@@ -1899,20 +1907,32 @@ function cropSafeBound(): CropRect {
   return autoInscribedCrop(params.straighten, dispAspectNow());
 }
 
-function setCropMode(on: boolean) {
-  cropArmed = on && !!current;
-  cropBtn.setAttribute("aria-pressed", String(cropArmed));
+function setGeoMode(mode: "crop" | "straighten" | null) {
+  geoMode = current ? mode : null;
+  cropArmed = geoMode !== null;
+  const isCrop = geoMode === "crop";
+  cropBtn.setAttribute("aria-pressed", String(isCrop));
+  straightenBtn.setAttribute("aria-pressed", String(geoMode === "straighten"));
   cropBanner.hidden = !cropArmed;
   cropTools.hidden = !cropArmed;
-  if (cropArmed) { setHslPick(false); setColorPick(false); setTat(false); setHeal(false); setHealReview(false); mUI.paint.setAttribute("aria-pressed", "false"); resetZoom(); } // picture tools are exclusive; crop wants the whole frame in view
-  // Pull the photo in from the stage edges while cropping so the corner handles
-  // never sit flush in the physical screen corners (the OS eats touches there).
+  // The pill is shared: Crop shows only its label + Reset; Straighten adds the
+  // slider (the .tool-crop class hides the slider row — see style.css).
+  cropTools.classList.toggle("tool-crop", isCrop);
+  geoLbl.textContent = isCrop ? "Crop" : "Straighten";
+  cropResetBtn.textContent = isCrop ? "Reset crop" : "Reset";
+  cropBannerLbl.innerHTML = isCrop
+    ? "&#9635; Crop &mdash; drag the box or its corners"
+    : "&#8622; Straighten &mdash; drag to level the horizon";
+  if (cropArmed) { setHslPick(false); setColorPick(false); setTat(false); setHeal(false); setHealReview(false); mUI.paint.setAttribute("aria-pressed", "false"); resetZoom(); } // picture tools are exclusive; geometry wants the whole frame in view
+  // Pull the photo in from the stage edges while a geometry tool is live so the
+  // corner handles never sit flush in the physical screen corners (the OS eats
+  // touches there).
   stageEl.classList.toggle("cropping", cropArmed);
-  // Tuck the editor drawer away while cropping so the photo gets the full stage
-  // (portrait especially — the drawer otherwise eats the lower half). Reuses the
-  // #app:has(#panel[hidden]) collapse. Restore only with a photo open, so the
-  // defensive setCropMode(false) calls on the start screen don't bare an empty
-  // drawer.
+  // Tuck the editor drawer away while a geometry tool is live so the photo gets
+  // the full stage (portrait especially — the drawer otherwise eats the lower
+  // half). Reuses the #app:has(#panel[hidden]) collapse. Restore only with a
+  // photo open, so the defensive setGeoMode(null) calls on the start screen
+  // don't bare an empty drawer.
   if (cropArmed) panel.hidden = true;
   else if (current) panel.hidden = false;
   straightenSlider.value = String(params.straighten);
@@ -1920,18 +1940,23 @@ function setCropMode(on: boolean) {
   positionCropOverlay();
   draw();
 }
-cropBtn.addEventListener("click", () => setCropMode(!cropArmed));
-cropBanner.addEventListener("click", () => { setCropMode(false); flushRecord(); }); // tap the banner to exit (commits the pending crop as one undo step)
+// Tapping a tool arms it; tapping the OTHER tool switches; tapping the active
+// tool (or the banner) exits.
+cropBtn.addEventListener("click", () => setGeoMode(geoMode === "crop" ? null : "crop"));
+straightenBtn.addEventListener("click", () => setGeoMode(geoMode === "straighten" ? null : "straighten"));
+cropBanner.addEventListener("click", () => { setGeoMode(null); flushRecord(); }); // tap the banner to exit (commits the pending change as one undo step)
 
 /** Position the box overlay from params.crop — a plain fraction of the
  *  canvas's own rendered rect (which, while armed, IS the full straightened
  *  frame — see draw()'s cropArmed override — so no extra transform is ever
  *  needed here, unlike the mask/heal overlays' rotation-aware placement). */
 function positionCropOverlay() {
-  const show = cropArmed && !!current && welcome.hidden;
+  const show = geoMode === "crop" && !!current && welcome.hidden; // the box belongs to Crop only
   cropOverlay.toggleAttribute("hidden", !show);
-  if (!show) return;
+  // Reset enablement tracks the active tool — runs in Straighten mode too (box
+  // hidden): identity ⟺ straighten 0 AND crop full, so this covers both.
   cropResetBtn.disabled = cropIsIdentity(params.crop, params.straighten);
+  if (!show) return;
   const stageRect = cropOverlay.getBoundingClientRect();
   const c = canvas.getBoundingClientRect();
   const { x, y, w, h } = params.crop;
@@ -1945,7 +1970,7 @@ type CropDragKind = "move" | "tl" | "tr" | "bl" | "br";
 let cropDrag: { kind: CropDragKind; id: number; x0: number; y0: number; crop0: CropRect; rectW: number; rectH: number } | null = null;
 
 function startCropDrag(kind: CropDragKind, e: PointerEvent, target: HTMLElement) {
-  if (!cropArmed || !current) return;
+  if (geoMode !== "crop" || !current) return;
   e.preventDefault();
   e.stopPropagation(); // a handle's pointerdown must not also start the box's own move-drag
   target.setPointerCapture(e.pointerId);
@@ -2008,7 +2033,7 @@ cropBox.addEventListener("pointerup", endCropDrag);
 cropBox.addEventListener("pointercancel", endCropDrag);
 
 straightenSlider.addEventListener("input", () => {
-  if (!cropArmed) return;
+  if (geoMode !== "straighten") return;
   params.straighten = Math.round(Number(straightenSlider.value) * 10) / 10;
   straightenVal.textContent = `${params.straighten.toFixed(1)}°`;
   params.crop = autoInscribedCrop(params.straighten, dispAspectNow());
@@ -2019,10 +2044,17 @@ straightenSlider.addEventListener("change", flushRecord); // one drag of the sli
 
 cropResetBtn.addEventListener("click", () => {
   if (!cropArmed) return;
-  params.straighten = 0;
-  params.crop = { ...CROP_DEFAULT };
-  straightenSlider.value = "0";
-  straightenVal.textContent = "0.0°";
+  if (geoMode === "crop") {
+    // Reset the box to the largest valid frame at the current angle (identity
+    // when not straightened) — leaves any straighten alone.
+    params.crop = cropSafeBound();
+  } else {
+    // Straighten reset: back to level, crop returns to full.
+    params.straighten = 0;
+    params.crop = { ...CROP_DEFAULT };
+    straightenSlider.value = "0";
+    straightenVal.textContent = "0.0°";
+  }
   positionCropOverlay();
   draw();
   flushRecord();
@@ -2054,7 +2086,7 @@ function disarmPictureTools() {
   setTat(false);
   setHeal(false);
   setHealReview(false);
-  setCropMode(false);
+  setGeoMode(null);
 }
 healReviewBanner.addEventListener("click", () => setHealReview(false)); // keep them all
 
@@ -2499,7 +2531,7 @@ function establishFreshEdit() {
   setHeal(false);
   params.crop = { ...CROP_DEFAULT };
   params.straighten = 0;
-  setCropMode(false);
+  setGeoMode(null);
   setHealReview(false);
   renderer.spotVis = false;
   healVisBtn.setAttribute("aria-pressed", "false");

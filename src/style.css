@@ -582,6 +582,10 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   width: min(88%, 360px);
 }
 #cropTools .crop-row { display: flex; align-items: center; gap: 10px; }
+/* Crop mode reuses the pill for just its label + Reset — the straighten slider
+   and its readout belong to Straighten mode only. */
+#cropTools.tool-crop #straighten,
+#cropTools.tool-crop #straightenVal { display: none; }
 #cropTools .crop-lbl { flex: 1; font-size: 13px; font-weight: 600; color: var(--txt-1); }
 #cropTools input[type="range"] { width: 100%; margin: 0; }
 #straightenVal { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--txt-1); flex: none; min-width: 4ch; text-align: right; }

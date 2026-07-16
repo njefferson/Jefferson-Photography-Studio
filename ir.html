@@ -68,9 +68,9 @@
         </div>
         <div id="cropTools" hidden>
           <div class="crop-row">
-            <span class="crop-lbl">Straighten</span>
+            <span class="crop-lbl" id="geoLbl">Straighten</span>
             <span id="straightenVal">0.0&deg;</span>
-            <button id="cropReset" type="button">Reset crop</button>
+            <button id="cropReset" type="button">Reset</button>
           </div>
           <input id="straighten" type="range" min="-45" max="45" step="0.1" value="0" aria-label="Straighten" />
         </div>
@@ -94,7 +94,7 @@
           <span class="tat-banner-off">tap a ring to put that one back &middot; tap here to keep them</span>
         </button>
         <button id="cropBanner" type="button" hidden>
-          <span>&#9635; Crop &amp; straighten &mdash; drag the box or its corners</span>
+          <span id="cropBannerLbl">&#9635; Crop &mdash; drag the box or its corners</span>
           <span class="tat-banner-off">Tap here when done</span>
         </button>
         <button id="colorBanner" type="button" hidden>
@@ -369,11 +369,12 @@
             <button id="dcpBtn" type="button">Export .dcp (Lightroom &mdash; beta)</button>
           </section>
 
-          <!-- ===== CROP ===== -->
+          <!-- ===== CROP & ROTATE ===== -->
           <section class="section" data-tab="crop" hidden>
             <button id="rotateBtn" class="accent-outline" type="button" aria-label="Rotate 90 degrees clockwise">&#8635; Rotate 90&deg;</button>
-            <button id="cropBtn" class="toggle full-btn" type="button" aria-pressed="false" aria-label="Crop and straighten">Crop &amp; straighten</button>
-            <p class="note">Rotate turns the whole photo 90&deg;. Crop &amp; straighten opens a draggable box &mdash; level the horizon with the Straighten slider. The editor tucks away so you have room, and the photo re-frames when you tap &ldquo;done&rdquo;.</p>
+            <button id="cropBtn" class="toggle full-btn" type="button" aria-pressed="false" aria-label="Crop">Crop</button>
+            <button id="straightenBtn" class="toggle full-btn" type="button" aria-pressed="false" aria-label="Straighten">Straighten</button>
+            <p class="note">Three separate tools. Rotate turns the whole photo 90&deg;. Crop opens a draggable box. Straighten levels the horizon with a slider. Each opens on its own &mdash; tap &ldquo;done&rdquo; to apply.</p>
           </section>
 
           <div id="panelDown" class="scroll-cue down" hidden><span>&#9660;</span></div>

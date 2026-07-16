@@ -226,6 +226,29 @@ See **`PLAN.md`** for the full build plan.
   restores the drawer; no page errors. NEEDS THE OWNER'S HANDS: the straighten
   preview LOOKS clean on the real iPhone (Chromium corner-alpha is the proxy),
   the up-arrows read right, and the "Crop & rotate" name.
+  THIRD ON-DEVICE PASS (2026-07-15, staging, iPhone — THE persistent misread,
+  cache ips-v58 → ips-v59): the owner never wanted a COMBINED crop+straighten
+  mode — he wanted THREE separate tools, each activated on its own. The old
+  single "Crop & straighten" button armed one mode showing the box AND the
+  slider at once ("fighting two controls"). FIX: split into two independent
+  modes via a new `geoMode: "crop" | "straighten" | null` (main.ts). `cropArmed`
+  stays a DERIVED `geoMode !== null` so the whole-frame render, canvas lock,
+  `.cropping` inset and drawer-hide are untouched; only the box (Crop only) and
+  slider (Straighten only) gates switch on `geoMode`. The Crop & rotate tab now
+  has THREE buttons — Rotate 90° (instant), Crop (box only), Straighten (slider
+  only). setCropMode→setGeoMode; the shared exit banner + pill relabel per mode
+  (the `.tool-crop` class hides the slider row so Crop's pill is just its Reset).
+  FLOW: tap a tool → drawer tucks away, that tool's UI appears → tap the banner
+  ("done") to apply and return to the tab (the tool BUTTONS live in the drawer,
+  so the banner is the exit — switching tools is done→tap-the-other, each opens
+  on its own). VERIFIED headless 17/17 (Chromium, portrait; fail-first proven —
+  planted "crop shows the slider" + "up cue stays hidden" both failed): Crop
+  shows the box and NOT the slider; Straighten shows the slider and NOT the box;
+  aria-pressed is mutually exclusive; the banner relabels per mode; straighten
+  still tilts with clean (transparent) corners; drawer hides while a tool is
+  live and the banner exit restores it; screenshot confirms Straighten = slider
+  only, no box, no smear. NEEDS THE OWNER'S HANDS: that Crop and Straighten now
+  feel like two separate one-tap tools on the real iPhone.
 - [x] **Redo** — owner ask 2026-07-15: add a Redo button + function next to
   "Go back", and RENAME "Go back" to "Undo" (unless a reason surfaces not to).
   Build notes: the undo stack already exists (undoStack + settled/flushRecord);
