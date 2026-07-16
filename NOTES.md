@@ -438,8 +438,29 @@ See **`PLAN.md`** for the full build plan.
   handle or pan can reach a transparent texel — at several angles AND after a
   prior crop. Pairs with the overflow-view idea below (that reframes what
   "outside the image" even means).
+- [ ] **Big image: the photo fills the app, menus float over it** — owner
+  direction 2026-07-16, given as he ended the session and moved to a new one.
+  STILL AN IDEA — he says so plainly, expect design questions. The vision: the
+  open photo is the BACKGROUND everywhere in the app, not boxed inside a stage.
+  The picture fills the screen (overflowing behind as needed) and EVERY control
+  — the top bar, the editor drawer/tabs, histogram, lesson chips, crop aids,
+  banners — FLOATS over it. One coherent feel across the WHOLE app, not just the
+  crop tool. The "let the photo overflow" crop item below is the FIRST concrete
+  instance of this pattern: build it as the pilot, learn the design answers on
+  it, then generalise outward. OPEN DESIGN QUESTIONS to settle WITH HIM as it
+  takes shape (don't guess these — they're his taste calls): do floating panels
+  sit opaque over the photo, or scrim/blur the photo behind them for legibility
+  (white controls over a bright IR sky need contrast)? how do the adjustment
+  drawer and a full-bleed photo coexist in portrait, where the drawer claims
+  ~45dvh today? is the photo always fit-to-screen, or can it pan/zoom freely
+  under the chrome? what happens to the start screen vs an open photo — does the
+  gallery also float over something? do the floating menus eat taps meant for the
+  photo, or pass through where empty? NON-GOAL: nothing here touches the pipeline
+  or export — it's a presentation/layout direction. Scope as its own design pass
+  (likely several); the crop overflow-view ships first and proves the model.
 - [ ] **Crop view: let the photo overflow instead of boxing it** — owner design
-  question 2026-07-16: why must the photo be bound inside a "view box" (the
+  question 2026-07-16 (the FIRST instance of the "big image" direction above):
+  why must the photo be bound inside a "view box" (the
   letterboxed `#view` rect) at all while cropping? Could it simply OVERFLOW — the
   photo fills/extends behind everything, with the crop box, grid, Straighten pill
   and Done just floating over it (no black frame around the picture while you
