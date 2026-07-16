@@ -419,25 +419,46 @@ See **`PLAN.md`** for the full build plan.
   the photo-follows-finger pan under a now-centred box, and the resize feel. If
   the pan direction or the centred box reads wrong on device, both are a one-line
   flip / a small change here.
-- [ ] **Keep the crop box inside the photo** — owner-caught on device 2026-07-16
+- [x] **Keep the crop box inside the photo** — owner-caught on device 2026-07-16
   (with the crop go-to-main), a REGRESSION from the box-first/pinch release: once
   the photo has been STRAIGHTENED or CROPPED, a resize handle (and maybe a pan)
   can drag the crop box PAST the image edge into the black void — the box is
   allowed larger than / outside the photo (his IMG_1007: the box's top + right run
   off the rounded photo edge into black; also visible after a straighten). Export
   reads `params.crop`, so a box dragged out there bakes black/transparent wedges
-  into the saved image — fix before it bites. Where to look: resize clamps to
-  `cropSafeBound()` (the straighten-inscribed rect; returns IDENTITY when
-  straighten is 0, so after a plain crop a re-crop can grow back past the photo)
-  and pan clamps to `clampCropOnPhoto()`; under the new box-centred, zoomed
-  fit-view the handle deltas map screen→crop through the live `fitViewCrop()`
-  window and the clamp bound is no longer the same frame the drag moves in. FIX:
-  clamp every corner AND the pan to the intersection of the on-photo [0,1] bound
-  and the straighten-safe inscribed rect, evaluated in the fit-view's space; then
-  extend the headless harness (it already samples corner alpha) to prove NO
-  handle or pan can reach a transparent texel — at several angles AND after a
-  prior crop. Pairs with the overflow-view idea below (that reframes what
-  "outside the image" even means).
+  into the saved image — fix before it bites.
+  SHIPPED (cache ips-v67 → ips-v68). ROOT CAUSE confirmed: the RESIZE path
+  clamped each moved corner to `cropSafeBound()` — a CENTRED, axis-aligned
+  inscribed rect — and never re-checked the two shared-coordinate corners. Once
+  the box is panned off-centre on a tilted photo (valid — the slide the owner
+  wanted), a centred axis-aligned bound is the wrong constraint and a corner
+  lands off-photo (and at straighten 0 that bound is identity [0,1]). PAN
+  (`clampCropOnPhoto`) was already correct. FIX: a new `clampResizeOnPhoto`
+  (main.ts) — because `outToSrc` is LINEAR, an output rect images to a
+  parallelogram and the photo (source-UV [0,1]²) is convex, so all four corners
+  on-photo ⟺ the whole box is. It slides the grabbed corner back along the drag
+  line by a single closed-form scalar t (≈6 scalar evals, no loop) to the largest
+  t keeping every corner on the photo, anchored at the fixed opposite corner.
+  Margin 0 on purpose (the full-frame box's corners sit exactly on the photo edge,
+  whose texels are opaque — any positive margin would collapse it). `moveCropDrag`
+  resize branch rewritten to use it; `cropSafeBound` stays for the straighten
+  slider re-fit + Reset (deliberate centred inscribe); pan/fitViewCrop/export
+  untouched (export reads `params.crop`, correct-by-construction once it's always
+  on-photo). The "rounded photo edge" the owner saw is a CSS border-radius on
+  `#view` — preview-only, not in the buffer/export.
+  VERIFIED headless 64/64 (Chromium, scratchpad harness driving the REAL app —
+  synthetic pointer drags on the actual handles/overlay, sampling the WebGL
+  drawing-buffer ALPHA under all four #cropBox corners; opaque ⇔ on-photo).
+  FAIL-FIRST PROVEN: on the pre-fix build the harness catches the void (a corner
+  reads alpha 0) in the shrink→pan-off-centre→grow-far-corner case at −20° and
+  −35°; the shrink is the essential step the earlier attempt missed (a maximal
+  inscribed box can't pan). Scenarios: resize each corner outward at
+  {0,±8,±30,±45}°; resize after a prior crop; SHRINK+PAN+GROW a far corner at
+  {±20,25,±35}°; pan to extremes at several angles — all four corners opaque on
+  the fixed build, no page errors. NEEDS THE OWNER'S HANDS: confirm on the real
+  iPhone/iPad that the box now stops at the photo edge on a resize/pan after a
+  straighten or crop, and that the corner "slides back to fit" feel is natural.
+  Still pairs with the overflow-view idea below (reframes "outside the image").
 - [ ] **Big image: the photo fills the app, menus float over it** — owner
   direction 2026-07-16, given as he ended the session and moved to a new one.
   STILL AN IDEA — he says so plainly, expect design questions. The vision: the

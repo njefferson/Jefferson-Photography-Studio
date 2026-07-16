@@ -1985,6 +1985,37 @@ function clampCropOnPhoto(c: CropRect): CropRect {
   return { x: oxo + 0.5 - c.w / 2, y: oyo + 0.5 - c.h / 2, w: c.w, h: c.h };
 }
 
+/** Clamp a RESIZE so the whole box stays on the photo. The anchor corner
+ *  (ax,ay) is fixed; the dragged corner wants to reach (mdx,mdy). `outToSrc` is
+ *  linear, so every corner's source coords are affine in a single shrink scalar
+ *  t and the on-photo region (source-UV [0,1]²) is convex — at t=0 all three
+ *  non-anchor corners collapse onto the (on-photo) anchor, so a valid interval
+ *  [0,t_max] always exists. We slide the dragged corner back along the drag line
+ *  to the largest t that keeps ALL corners on the photo (works at any angle and
+ *  after a prior crop/pan — the old centred axis-aligned bound did not).
+ *  Margin 0 on purpose: the full-frame box's corners sit exactly on the photo
+ *  edge (source 0/1), whose texels are opaque, so any positive margin would
+ *  wrongly collapse it (the pan clamp's 0.012 belongs only to the centre test). */
+function clampResizeOnPhoto(ax: number, ay: number, mdx: number, mdy: number): [number, number] {
+  const ex = mdx - ax, ey = mdy - ay; // the dragged corner's travel over t: 0..1
+  const [px, py] = outToSrc(ax - 0.5, ay - 0.5); // anchor in source space (t=0)
+  let t = 1;
+  // A corner at (ax + cxT·t, ay + cyT·t) has source coords p + q·t; bound t so
+  // each source axis stays in [-0.5, 0.5] (centre-relative [0,1]).
+  const bound = (cxT: number, cyT: number) => {
+    const [qx, qy] = outToSrc(cxT, cyT);
+    for (const [p, q] of [[px, qx], [py, qy]] as const) {
+      if (q > 1e-12) t = Math.min(t, (0.5 - p) / q);
+      else if (q < -1e-12) t = Math.min(t, (-0.5 - p) / q);
+    }
+  };
+  bound(ex, 0);  // corner sharing the anchor's y (the moving x)
+  bound(0, ey);  // corner sharing the anchor's x (the moving y)
+  bound(ex, ey); // the dragged corner itself
+  t = clamp(t, 0, 1);
+  return [ax + t * ex, ay + t * ey];
+}
+
 function setGeoMode(mode: "crop" | "straighten" | null) {
   geoMode = current ? mode : null;
   cropArmed = geoMode !== null;
@@ -2105,24 +2136,29 @@ function moveCropDrag(e: PointerEvent) {
     draw();
     return;
   }
-  // Resize (crop tool) — clamp corners to the rotation-safe inscribed bound.
-  const safe = cropSafeBound();
+  // Resize (crop tool): the opposite corner is the fixed anchor; the grabbed
+  // corner moves to (mdx,mdy). MIN_CROP keeps a minimum box, then
+  // clampResizeOnPhoto shrinks the grabbed corner along the drag line so EVERY
+  // corner stays on the photo — at any angle and after a prior crop/pan. (In the
+  // rare case where the box can't reach MIN_CROP without leaving a heavily tilted
+  // corner, staying on the photo wins over the minimum size.)
   const oppX = c0.x + c0.w, oppY = c0.y + c0.h;
-  let x = c0.x, y = c0.y, w = c0.w, h = c0.h;
+  let ax: number, ay: number, mdx: number, mdy: number;
   if (cropDrag.kind === "tl") {
-    x = clamp(c0.x + dx, safe.x, oppX - MIN_CROP); y = clamp(c0.y + dy, safe.y, oppY - MIN_CROP);
-    w = oppX - x; h = oppY - y;
+    ax = oppX; ay = oppY;
+    mdx = Math.min(c0.x + dx, oppX - MIN_CROP); mdy = Math.min(c0.y + dy, oppY - MIN_CROP);
   } else if (cropDrag.kind === "tr") {
-    const nx = clamp(oppX + dx, c0.x + MIN_CROP, safe.x + safe.w); y = clamp(c0.y + dy, safe.y, oppY - MIN_CROP);
-    w = nx - c0.x; h = oppY - y;
+    ax = c0.x; ay = oppY;
+    mdx = Math.max(oppX + dx, c0.x + MIN_CROP); mdy = Math.min(c0.y + dy, oppY - MIN_CROP);
   } else if (cropDrag.kind === "bl") {
-    x = clamp(c0.x + dx, safe.x, oppX - MIN_CROP); const ny = clamp(oppY + dy, c0.y + MIN_CROP, safe.y + safe.h);
-    w = oppX - x; h = ny - c0.y;
-  } else if (cropDrag.kind === "br") {
-    const nx = clamp(oppX + dx, c0.x + MIN_CROP, safe.x + safe.w); const ny = clamp(oppY + dy, c0.y + MIN_CROP, safe.y + safe.h);
-    w = nx - c0.x; h = ny - c0.y;
+    ax = oppX; ay = c0.y;
+    mdx = Math.min(c0.x + dx, oppX - MIN_CROP); mdy = Math.max(oppY + dy, c0.y + MIN_CROP);
+  } else { // br
+    ax = c0.x; ay = c0.y;
+    mdx = Math.max(oppX + dx, c0.x + MIN_CROP); mdy = Math.max(oppY + dy, c0.y + MIN_CROP);
   }
-  params.crop = { x, y, w, h };
+  const [mx, my] = clampResizeOnPhoto(ax, ay, mdx, mdy);
+  params.crop = { x: Math.min(ax, mx), y: Math.min(ay, my), w: Math.abs(mx - ax), h: Math.abs(my - ay) };
   positionCropOverlay();
   draw();
 }
