@@ -1196,8 +1196,9 @@ label.open-btn, label.bar-btn {
   border-color: var(--accent);
   font-weight: 600;
 }
-/* The geometry tools live in their own tab, set apart as a full-width entry
-   below the six adjustment sections. */
+/* Corrections (dust + IR lens fixes) and the geometry tools sit apart as
+   full-width footer rows below the six core adjustment sections. */
+.ptab[data-tab="corrections"],
 .ptab[data-tab="crop"] { grid-column: 1 / -1; }
 .section-head { flex: none; padding: 12px 14px 8px; }
 .section-title { margin: 0; font: 600 15px/1.2 var(--display); color: var(--txt); }

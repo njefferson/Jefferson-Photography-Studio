@@ -144,8 +144,9 @@
       </div>
 
       <aside id="panel" hidden>
-        <!-- Segmented tab grid (2 rows x 3 cols): each section of controls lives
-             behind one tab. Active tab is remembered per session (main.ts). -->
+        <!-- Segmented tab grid: six core adjustment tabs in a 2x3 grid, with
+             Corrections and Crop & rotate as full-width footer rows below them.
+             Active tab is remembered per session (main.ts). -->
         <div id="panelTabs" class="panel-tabs" role="tablist" aria-label="Editor sections">
           <button class="ptab active" type="button" data-tab="basic" role="tab" aria-selected="true">Basic</button>
           <button class="ptab" type="button" data-tab="ir" role="tab" aria-selected="false">IR</button>
@@ -153,6 +154,7 @@
           <button class="ptab" type="button" data-tab="tone" role="tab" aria-selected="false">Tone</button>
           <button class="ptab" type="button" data-tab="masks" role="tab" aria-selected="false">Masks</button>
           <button class="ptab" type="button" data-tab="export" role="tab" aria-selected="false">Export</button>
+          <button class="ptab" type="button" data-tab="corrections" role="tab" aria-selected="false">Corrections</button>
           <button class="ptab" type="button" data-tab="crop" role="tab" aria-selected="false">Crop &amp; rotate</button>
         </div>
         <div class="section-head">
@@ -178,17 +180,6 @@
             <label>Sharpen <input id="sharpen" type="range" min="0" max="1" step="0.01" value="0" /></label>
             <label>Texture <input id="texture" type="range" min="-1" max="1" step="0.01" value="0" /></label>
             <p class="note">Denoise is set automatically from the photo's measured noise. Sharpen crisps up fine edges; Texture brings out surface structure (pull left to smooth). Both keep colours put.</p>
-            <hr class="divider" />
-            <div class="sub-title">Dust &amp; spots</div>
-            <button id="healBtn" type="button" class="toggle" aria-pressed="false">&#8982; Heal spots &mdash; tap the photo</button>
-            <small class="note">Tap a dust spot and it's patched from clean pixels nearby &mdash; the newest fix keeps a highlighted ring, and Spot size resizes it live. Tap any healed spot to remove its fix. Pinch to zoom right in while healing.</small>
-            <label>Spot size <input id="healSize" type="range" min="0.002" max="0.035" step="0.001" value="0.008" /></label>
-            <small class="note">Move the slider before tapping to preview the size in the middle of the view.</small>
-            <button id="healVis" type="button" class="toggle" aria-pressed="false">Visualize spots</button>
-            <small class="note">A high-contrast view that makes dust jump out of flat skies. The photo itself is untouched.</small>
-            <button id="healAuto" type="button">Find spots automatically</button>
-            <button id="healClear" type="button" hidden>Clear all heals</button>
-            <small class="note" id="healStatus"></small>
             <p class="note footnote">White balance, exposure and denoise are set automatically when a photo opens &mdash; refine from here. No 2000K floor.</p>
           </section>
 
@@ -209,6 +200,20 @@
             <p class="note">Press a look again to flip its R&#8646;B channel swap &mdash; the state shows under its name.</p>
             <label>HIE glow <input id="glow" type="range" min="0" max="1" step="0.01" value="0" /></label>
             <p class="note">Film-style halation &mdash; layers onto any look, not only HIE B&amp;W.</p>
+          </section>
+
+          <!-- ===== CORRECTIONS ===== -->
+          <section class="section" data-tab="corrections" hidden>
+            <div class="sub-title">Dust &amp; spots</div>
+            <button id="healBtn" type="button" class="toggle" aria-pressed="false">&#8982; Heal spots &mdash; tap the photo</button>
+            <small class="note">Tap a dust spot and it's patched from clean pixels nearby &mdash; the newest fix keeps a highlighted ring, and Spot size resizes it live. Tap any healed spot to remove its fix. Pinch to zoom right in while healing.</small>
+            <label>Spot size <input id="healSize" type="range" min="0.002" max="0.035" step="0.001" value="0.008" /></label>
+            <small class="note">Move the slider before tapping to preview the size in the middle of the view.</small>
+            <button id="healVis" type="button" class="toggle" aria-pressed="false">Visualize spots</button>
+            <small class="note">A high-contrast view that makes dust jump out of flat skies. The photo itself is untouched.</small>
+            <button id="healAuto" type="button">Find spots automatically</button>
+            <button id="healClear" type="button" hidden>Clear all heals</button>
+            <small class="note" id="healStatus"></small>
             <hr class="divider" />
             <div class="sub-title">IR lens fixes <span>hot-spot &amp; vignette</span></div>
             <p class="note">IR-converted lenses often brighten the center (a "hot-spot"). Pull it down with Hot-spot and set its size; use Vignette to correct edge darkening (right) or add it (left).</p>
