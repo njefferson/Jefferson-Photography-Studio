@@ -291,8 +291,9 @@ See **`PLAN.md`** for the full build plan.
   (1) "Make Done brighter" — `#cropDone` now font-weight 700 + an accent glow
   (`box-shadow: 0 2px 14px -2px var(--accent)`) so it pops off the accent-soft
   pill. (2) "Remove the circles on the Straighten corners, put arrows that move
-  with the photo" — Straighten's corner grips are now thin white DOUBLE-HEADED
-  arrow SVGs (owner follow-up: "thinner lined, arrow head pointing both ways";
+  with the photo" — Straighten's corner grips are now thin white CURVED rotation
+  double-arrows (circular two-way arrows — owner follow-ups: "thinner, arrow head
+  both ways" then "indicate ROTATION not stretching", so a straight ↔ was wrong;
   Crop keeps the resize dots): `setGeoMode` toggles `#cropOverlay.straightening`,
   `positionCropOverlay` sets `--tilt = params.straighten` deg, and
   `#cropOverlay.straightening .crop-handle::before` swaps the dot for the arrow
