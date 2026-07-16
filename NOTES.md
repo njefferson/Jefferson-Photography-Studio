@@ -119,6 +119,21 @@ See **`PLAN.md`** for the full build plan.
 > the app on the next deploy. Both the roadmap and the patch notes (last
 > commits) refresh automatically on push.
 
+- [ ] **Guide lines in Straighten & Crop** — owner ask 2026-07-15 (his third
+  crop pass): thin-line overlays to align against, one per geometry tool.
+  (1) STRAIGHTEN — reference lines to align a horizon or vertical bars against
+  while leveling: a set of screen-true horizontal + vertical lines that stay
+  level to gravity as the photo tilts under them, so you drag the horizon onto a
+  line. (2) CROP — a rule-of-thirds grid (two thin lines each way) inside the
+  crop box for composition. ALL THIN LINES — subtle hairlines that guide without
+  fighting the photo. Build notes: overlay-only, no pipeline/export change. The
+  two tools are already distinguished by `geoMode` ("straighten" | "crop",
+  main.ts), so each overlay shows only in its own mode. The thirds grid rides
+  the crop box (`#cropBox`) and re-lays as it's dragged (hook into
+  `positionCropOverlay`, main.ts); the straighten guide is a fixed
+  stage-aligned grid over `#cropOverlay`/the stage while straighten mode is live.
+  Keep them hairline weight + low opacity (match the app's `--line`), maybe
+  fading in only while a drag is active so they don't clutter the still preview.
 - [x] **Tap the histogram to hide it** — owner ask 2026-07-15 (given with the
   crop go-to-main): tapping the histogram HUD directly should collapse/hide it
   (it floats over the top-right of the photo); the Histogram button in the top
