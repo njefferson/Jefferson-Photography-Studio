@@ -4,7 +4,7 @@
 // online), falling back to cache when offline. Hashed build assets are
 // cache-first (their names change every build, so this is safe and fast).
 // Bumping CACHE wipes old entries on activation.
-const CACHE = "ips-v67";
+const CACHE = "ips-v68";
 // The practice-library RAW files (~10 MB each) live in their own VERSION-STABLE
 // cache that survives CACHE bumps — otherwise every release wipes them and a
 // tap re-downloads megabytes the user already had. Their bytes are immutable
