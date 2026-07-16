@@ -119,7 +119,7 @@ See **`PLAN.md`** for the full build plan.
 > the app on the next deploy. Both the roadmap and the patch notes (last
 > commits) refresh automatically on push.
 
-- [ ] **Guide lines in Straighten & Crop** — owner ask 2026-07-15 (his third
+- [x] **Guide lines in Straighten & Crop** — owner ask 2026-07-15 (his third
   crop pass): thin-line overlays to align against, one per geometry tool.
   (1) STRAIGHTEN — reference lines to align a horizon or vertical bars against
   while leveling: a set of screen-true horizontal + vertical lines that stay
@@ -326,6 +326,37 @@ See **`PLAN.md`** for the full build plan.
   8° (the 20° case used to be alpha 0); corner-drag still rotates; Crop's box
   unchanged; screenshot at 8° shows a clean tilt with arrows on the photo. NEEDS
   THE OWNER'S HANDS: Straighten reads as a clean tilt-to-level on the real iPhone.
+  SEVENTH PASS — SETTLED MODEL (2026-07-15, staging, cache ips-v64 → ips-v65).
+  On device the "no box / arrows on corners" tilt view read as a sheared
+  parallelogram (it was actually the rigid-rotated rectangle CLIPPED by the frame
+  — object-fit:contain, not a real shear) and gave no way to see the crop. Owner
+  settled it: ONE combined crop/straighten tool, aids per focus, repositionable —
+  a standard editor crop. IMPLEMENTED (this is the final design; ignore the
+  earlier separate/no-box attempts above):
+  • WHOLE photo shown — draw() renders an OUTSET "fit" crop while armed
+    (`fitViewCrop()`, symmetric zoom-out; the renderer accepts crop outside [0,1],
+    margins go transparent), so a tilted photo is never clipped.
+  • BOX BACK — `positionCropOverlay` maps `params.crop` through the fit-view onto
+    the tilted photo; box border + scrim (dim outside) in BOTH focuses.
+  • REPOSITION — drag anywhere on the photo pans the crop (`#cropOverlay` captures
+    it; `clampCropOnPhoto` clamps the position in SOURCE space so it stays on the
+    photo — there's slack along a rotated photo's non-binding axis, which is the
+    "slide along the length" the owner wanted).
+  • AIDS PER FOCUS (the Guide-lines roadmap item, shipped) — Straighten shows a
+    finer ALIGNMENT grid + the slider (no handles, no arrows); Crop shows the
+    RULE-OF-THIRDS grid + round resize handles. Toggled by `.focus-straighten`/
+    `.focus-crop` on the overlay — never both.
+  • Safety: `cropSafeBound()` insets the inscribe ~2.5% + `clampCropOnPhoto` a
+    hair, so the box/handles never graze the transparent edge (autoInscribedCrop
+    isn't pixel-exact vs the shader). Export unchanged (uses `params.crop`).
+  VERIFIED headless 23/23 (Chromium; fail-first proven — planted "box in the void
+  at 20°" flipped): box corners opaque (on the photo) at 20° in straighten AND in
+  crop; no arrow art anywhere; Straighten hides handles + shows the alignment grid
+  + slider; Crop shows round handles + thirds grid; a drag repositions the box and
+  it stays on the photo; a corner resizes; the slider rotates; Done exits. Screens
+  of both focuses captured. NEEDS THE OWNER'S HANDS: it now behaves like a normal
+  editor crop/straighten on the real iPhone — level against the alignment lines,
+  slide to reposition, switch to Crop for the thirds grid.
 - [x] **Redo** — owner ask 2026-07-15: add a Redo button + function next to
   "Go back", and RENAME "Go back" to "Undo" (unless a reason surfaces not to).
   Build notes: the undo stack already exists (undoStack + settled/flushRecord);

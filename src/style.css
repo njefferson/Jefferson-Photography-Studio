@@ -513,6 +513,7 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
    dragging the box or a handle on iPad Safari paints a translucent blue
    text-selection band over the photo (owner-caught on device, 2026-07-15). */
 #cropOverlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 6; }
+#cropOverlay:not([hidden]) { pointer-events: auto; cursor: grab; touch-action: none; } /* drag the photo to reposition the crop */
 #cropOverlay,
 #cropBox,
 .crop-handle {
@@ -524,9 +525,8 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 #cropBox {
   position: absolute;
   border: 1.5px solid #fff;
-  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
-  pointer-events: auto;
-  cursor: move;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55); /* dim outside the crop */
+  pointer-events: none; /* display-only — the overlay captures the pan drag */
   touch-action: none;
 }
 /* A 44px INVISIBLE touch target (Apple's minimum) centred on each corner —
@@ -557,23 +557,20 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 .crop-handle[data-corner="tr"] { top: 0; left: 100%; }
 .crop-handle[data-corner="bl"] { top: 100%; left: 0; }
 .crop-handle[data-corner="br"] { top: 100%; left: 100%; }
-/* Straighten is a clean tilt view: no crop box or scrim — just the rotation
-   arrows riding the photo's tilted corners (positioned in main.ts). */
-#cropOverlay.straightening #cropBox {
-  border: none;
-  box-shadow: none;
-  pointer-events: none; /* only the corner arrows grab — no stray-tap rotation */
+/* Per focus: Crop shows the resize handles; Straighten hides them (reposition by
+   dragging the photo, level with the slider — no arrows). */
+#cropOverlay.focus-straighten .crop-handle { display: none; }
+/* Aids inside the box — thin hairlines, ONE grid per focus (never both). */
+#cropGuides { position: absolute; inset: 0; pointer-events: none; }
+#cropOverlay.focus-crop #cropGuides { /* rule of thirds */
+  background-image:
+    repeating-linear-gradient(to right, rgba(255, 255, 255, 0.4) 0 1px, transparent 1px calc(100% / 3)),
+    repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.4) 0 1px, transparent 1px calc(100% / 3));
 }
-/* Straighten: the corners ROTATE, so drop the resize dot for a thin CURVED
-   double-headed rotation arrow (a head each way = rotate either direction) that
-   tilts with the photo (--tilt = the live straighten angle, main.ts). */
-#cropOverlay.straightening .crop-handle::before {
-  inset: 5px;
-  border: none;
-  border-radius: 0;
-  background: center / contain no-repeat url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='%23fff'%20stroke-width='1.5'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='M21%2012a9%209%200%200%200-9-9%209%209%200%200%200-6.4%202.6L3%208'/%3E%3Cpath%20d='M3%203v5h5'/%3E%3Cpath%20d='M3%2012a9%209%200%200%200%209%209%209%209%200%200%200%206.4-2.6L21%2016'/%3E%3Cpath%20d='M21%2021v-5h-5'/%3E%3C/svg%3E");
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.9));
-  transform: rotate(var(--tilt, 0deg));
+#cropOverlay.focus-straighten #cropGuides { /* finer alignment grid to level against */
+  background-image:
+    repeating-linear-gradient(to right, rgba(255, 255, 255, 0.28) 0 1px, transparent 1px calc(100% / 6)),
+    repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.28) 0 1px, transparent 1px calc(100% / 6));
 }
 #cropTools {
   position: absolute;

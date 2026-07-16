@@ -836,10 +836,10 @@ function draw() {
       renderer.setToneCurve(params.tone);
     }
     syncSpotsToTexture(); // heals live in the texture; keep it matching params
-    // While Crop & straighten is armed, show the FULL frame (straighten still
-    // live) so the box has the whole photo to work with — the actual crop only
-    // takes effect once the mode is exited. See setGeoMode's doc comment.
-    renderer.render(cropArmed ? { ...params, crop: CROP_DEFAULT } : params);
+    // While a geometry tool is armed, render the WHOLE tilted photo (an outset
+    // "fit" view so a rotated photo isn't clipped by the frame); the crop box
+    // overlays it and the real crop only takes effect on exit. See setGeoMode.
+    renderer.render(cropArmed ? { ...params, crop: fitViewCrop() } : params);
     refreshHistogram(params);
     positionMaskOverlay();
     positionHealOverlay();
@@ -1901,9 +1901,56 @@ function dispAspectNow(): number {
 }
 
 /** The largest same-aspect crop the current straighten angle allows without
- *  baring an empty corner. Identity {0,0,1,1} when straighten is 0. */
+ *  baring an empty corner, minus a hair of margin (autoInscribedCrop isn't
+ *  pixel-exact against the shader's aspect-corrected rotation, so a maximal box
+ *  can graze the transparent edge). Identity when straighten is 0. */
 function cropSafeBound(): CropRect {
-  return autoInscribedCrop(params.straighten, dispAspectNow());
+  const c = autoInscribedCrop(params.straighten, dispAspectNow());
+  if (params.straighten === 0) return c;
+  const pad = 0.975; // ~1.25% inset each side — clears the edge, negligible crop
+  return { x: c.x + (c.w * (1 - pad)) / 2, y: c.y + (c.h * (1 - pad)) / 2, w: c.w * pad, h: c.h * pad };
+}
+
+/** While a geometry tool is armed the preview renders THIS (an outset crop, so
+ *  crop [0,1] sits inside it with transparent margin) — the whole tilted photo
+ *  stays visible instead of being clipped by the frame. Symmetric about centre
+ *  so the canvas keeps the base-frame aspect (object-fit:contain undistorted). */
+function fitViewCrop(): CropRect {
+  const asp = dispAspectNow();
+  const a = Math.abs(params.straighten) * Math.PI / 180;
+  const cos = Math.cos(a), sin = Math.sin(a);
+  const scale = 2 * Math.max(0.5 * (cos + sin / asp), 0.5 * (cos + asp * sin)) * 1.06;
+  return { x: 0.5 - scale / 2, y: 0.5 - scale / 2, w: scale, h: scale };
+}
+
+// output uv <-> source uv, the aspect-corrected straighten rotation (mirrors the
+// gl.ts vertex shader). Center-relative; used to keep the crop box on the photo.
+function outToSrc(ox: number, oy: number): [number, number] {
+  const asp = dispAspectNow(), a = (params.straighten * Math.PI) / 180;
+  const cos = Math.cos(a), sin = Math.sin(a);
+  return [cos * ox + (sin / asp) * oy, -asp * sin * ox + cos * oy];
+}
+function srcToOut(sx: number, sy: number): [number, number] {
+  const asp = dispAspectNow(), a = (params.straighten * Math.PI) / 180;
+  const cos = Math.cos(a), sin = Math.sin(a);
+  return [cos * sx - (sin / asp) * sy, asp * sin * sx + cos * sy];
+}
+
+/** Clamp a crop rect's POSITION (keeping its size) so it stays entirely on the
+ *  tilted photo — the reposition/pan bound. There's slack along the non-binding
+ *  axis of a rotated photo, which is exactly what lets you slide the crop. */
+function clampCropOnPhoto(c: CropRect): CropRect {
+  const asp = dispAspectNow(), a = Math.abs(params.straighten) * Math.PI / 180;
+  const cos = Math.cos(a), sin = Math.sin(a);
+  // source half-extents of this crop rect (rotated into source space)
+  const bx = (c.w / 2) * cos + (c.h / 2) * (sin / asp);
+  const by = (c.w / 2) * (asp * sin) + (c.h / 2) * cos;
+  const m = 0.012; // keep a hair inside the photo (edge pixels read transparent)
+  const [sxo, syo] = outToSrc(c.x + c.w / 2 - 0.5, c.y + c.h / 2 - 0.5);
+  const sxc = clamp(sxo + 0.5, Math.min(bx + m, 0.5), Math.max(1 - bx - m, 0.5));
+  const syc = clamp(syo + 0.5, Math.min(by + m, 0.5), Math.max(1 - by - m, 0.5));
+  const [oxo, oyo] = srcToOut(sxc - 0.5, syc - 0.5);
+  return { x: oxo + 0.5 - c.w / 2, y: oyo + 0.5 - c.h / 2, w: c.w, h: c.h };
 }
 
 function setGeoMode(mode: "crop" | "straighten" | null) {
@@ -1916,8 +1963,10 @@ function setGeoMode(mode: "crop" | "straighten" | null) {
   // The pill is shared: Crop shows its label + Reset + Done; Straighten adds the
   // slider (the .tool-crop class hides the slider row — see style.css).
   cropTools.classList.toggle("tool-crop", isCrop);
-  // Straighten's corners are rotation arrows (Crop's stay resize circles).
-  cropOverlay.classList.toggle("straightening", geoMode === "straighten");
+  // Per-focus aids, never both: Crop shows resize handles + a rule-of-thirds
+  // grid; Straighten hides the handles + shows the alignment grid.
+  cropOverlay.classList.toggle("focus-crop", isCrop);
+  cropOverlay.classList.toggle("focus-straighten", geoMode === "straighten");
   geoLbl.textContent = isCrop ? "Crop" : "Straighten";
   cropResetBtn.textContent = isCrop ? "Reset crop" : "Reset";
   if (cropArmed) { setHslPick(false); setColorPick(false); setTat(false); setHeal(false); setHealReview(false); mUI.paint.setAttribute("aria-pressed", "false"); resetZoom(); } // picture tools are exclusive; geometry wants the whole frame in view
@@ -1969,107 +2018,67 @@ function positionCropOverlay() {
   // Reset enablement tracks the active tool: identity ⟺ straighten 0 AND crop full.
   cropResetBtn.disabled = cropIsIdentity(params.crop, params.straighten);
   if (!show) return;
-  // Live tilt for the Straighten arrows to rotate with the photo (see style.css).
-  cropOverlay.style.setProperty("--tilt", `${params.straighten}deg`);
   const stageRect = cropOverlay.getBoundingClientRect();
   const r = viewImageRect();
-  if (geoMode === "straighten") {
-    // Clean tilt view: no crop box/scrim (CSS). The rotation arrows sit on the
-    // corners of the "keep" region (the straighten-safe inscribed rect, which
-    // rides ON the tilted photo) — the photo's true corners rotate off-frame, so
-    // this is the on-photo corner set. A small inset keeps them clear of the edge
-    // (autoInscribedCrop isn't pixel-exact vs the shader's visual rotation).
-    cropBox.style.left = "0px";
-    cropBox.style.top = "0px";
-    cropBox.style.width = "100%";
-    cropBox.style.height = "100%";
-    const sb = cropSafeBound();
-    const pad = 0.06;
-    const ix = sb.x + sb.w * pad, iy = sb.y + sb.h * pad;
-    const iw = sb.w * (1 - 2 * pad), ih = sb.h * (1 - 2 * pad);
-    const CO: Record<string, [number, number]> = { tl: [ix, iy], tr: [ix + iw, iy], br: [ix + iw, iy + ih], bl: [ix, iy + ih] };
-    for (const handle of handleEls) {
-      const [u, v] = CO[handle.dataset.corner!] ?? [0.5, 0.5];
-      handle.style.left = `${r.left - stageRect.left + u * r.width}px`;
-      handle.style.top = `${r.top - stageRect.top + v * r.height}px`;
-    }
-    return;
-  }
-  // Crop: the box frames params.crop; handles ride its corners (clear the inline
-  // positions the straighten branch set so the data-corner CSS takes over).
-  for (const handle of handleEls) { handle.style.left = ""; handle.style.top = ""; }
-  const { x, y, w, h } = params.crop;
-  cropBox.style.left = `${r.left - stageRect.left + x * r.width}px`;
-  cropBox.style.top = `${r.top - stageRect.top + y * r.height}px`;
-  cropBox.style.width = `${Math.max(1, w * r.width)}px`;
-  cropBox.style.height = `${Math.max(1, h * r.height)}px`;
+  // The canvas shows the fit-view (output [vc.x, vc.x+vc.w]); map the crop's
+  // output [0,1] coords into that so the upright box sits on the tilted photo.
+  const vc = fitViewCrop();
+  const fx = (params.crop.x - vc.x) / vc.w, fy = (params.crop.y - vc.y) / vc.h;
+  const fw = params.crop.w / vc.w, fh = params.crop.h / vc.h;
+  cropBox.style.left = `${r.left - stageRect.left + fx * r.width}px`;
+  cropBox.style.top = `${r.top - stageRect.top + fy * r.height}px`;
+  cropBox.style.width = `${Math.max(1, fw * r.width)}px`;
+  cropBox.style.height = `${Math.max(1, fh * r.height)}px`;
 }
 
-type CropDragKind = "move" | "tl" | "tr" | "bl" | "br" | "rotate";
+type CropDragKind = "move" | "tl" | "tr" | "bl" | "br";
 let cropDrag:
-  | { kind: CropDragKind; id: number; x0: number; y0: number; crop0: CropRect; rectW: number; rectH: number; a0: number; straighten0: number }
+  | { kind: CropDragKind; id: number; x0: number; y0: number; crop0: CropRect; rectW: number; rectH: number; vcW: number; vcH: number }
   | null = null;
 
 function startCropDrag(kind: CropDragKind, e: PointerEvent, target: HTMLElement) {
   if (!geoMode || !current) return;
+  // Only the crop tool resizes; in straighten every drag repositions (pan).
+  const k: CropDragKind = geoMode === "crop" ? kind : "move";
   e.preventDefault();
-  e.stopPropagation(); // a handle's pointerdown must not also start the box's own move-drag
-  try { target.setPointerCapture(e.pointerId); } catch { /* capture can throw for stale/synthetic pointers — the drag still works */ }
+  e.stopPropagation(); // a handle's pointerdown must not also start the box's own pan
+  try { target.setPointerCapture(e.pointerId); } catch { /* capture can throw for synthetic pointers — the drag still works */ }
   const r = viewImageRect();
-  // In Straighten every grab ROTATES about the photo centre; in Crop the corners
-  // resize (the box body moves).
-  const rotate = geoMode === "straighten";
-  const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  const vc = fitViewCrop();
   cropDrag = {
-    kind: rotate ? "rotate" : kind, id: e.pointerId, x0: e.clientX, y0: e.clientY,
-    crop0: { ...params.crop }, rectW: Math.max(1, r.width), rectH: Math.max(1, r.height),
-    a0: Math.atan2(e.clientY - cy, e.clientX - cx), straighten0: params.straighten,
+    kind: k, id: e.pointerId, x0: e.clientX, y0: e.clientY, crop0: { ...params.crop },
+    rectW: Math.max(1, r.width), rectH: Math.max(1, r.height), vcW: vc.w, vcH: vc.h,
   };
 }
 
 function moveCropDrag(e: PointerEvent) {
   if (!cropDrag || e.pointerId !== cropDrag.id) return;
-  if (cropDrag.kind === "rotate") {
-    // Straighten by swinging a corner about the photo centre — angle is
-    // scale-invariant so the letterbox never distorts it.
-    const r = viewImageRect();
-    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-    let d = ((Math.atan2(e.clientY - cy, e.clientX - cx) - cropDrag.a0) * 180) / Math.PI;
-    while (d > 180) d -= 360;
-    while (d < -180) d += 360;
-    const deg = clamp(Math.round((cropDrag.straighten0 + d) * 10) / 10, -45, 45);
-    params.straighten = deg;
-    straightenSlider.value = String(deg);
-    straightenVal.textContent = `${deg.toFixed(1)}°`;
-    params.crop = autoInscribedCrop(params.straighten, dispAspectNow());
+  // Screen delta → crop-space delta (the canvas is zoomed out by the fit-view).
+  const dx = ((e.clientX - cropDrag.x0) / cropDrag.rectW) * cropDrag.vcW;
+  const dy = ((e.clientY - cropDrag.y0) / cropDrag.rectH) * cropDrag.vcH;
+  const c0 = cropDrag.crop0;
+  if (cropDrag.kind === "move") {
+    // Reposition (pan): slide the crop over the photo, clamped to stay on it.
+    params.crop = clampCropOnPhoto({ x: c0.x + dx, y: c0.y + dy, w: c0.w, h: c0.h });
     positionCropOverlay();
     draw();
     return;
   }
-  const dx = (e.clientX - cropDrag.x0) / cropDrag.rectW;
-  const dy = (e.clientY - cropDrag.y0) / cropDrag.rectH;
-  const c0 = cropDrag.crop0;
+  // Resize (crop tool) — clamp corners to the rotation-safe inscribed bound.
   const safe = cropSafeBound();
   const oppX = c0.x + c0.w, oppY = c0.y + c0.h;
   let x = c0.x, y = c0.y, w = c0.w, h = c0.h;
-  if (cropDrag.kind === "move") {
-    x = clamp(c0.x + dx, safe.x, safe.x + safe.w - c0.w);
-    y = clamp(c0.y + dy, safe.y, safe.y + safe.h - c0.h);
-  } else if (cropDrag.kind === "tl") {
-    x = clamp(c0.x + dx, safe.x, oppX - MIN_CROP);
-    y = clamp(c0.y + dy, safe.y, oppY - MIN_CROP);
+  if (cropDrag.kind === "tl") {
+    x = clamp(c0.x + dx, safe.x, oppX - MIN_CROP); y = clamp(c0.y + dy, safe.y, oppY - MIN_CROP);
     w = oppX - x; h = oppY - y;
   } else if (cropDrag.kind === "tr") {
-    const nx = clamp(oppX + dx, c0.x + MIN_CROP, safe.x + safe.w);
-    y = clamp(c0.y + dy, safe.y, oppY - MIN_CROP);
+    const nx = clamp(oppX + dx, c0.x + MIN_CROP, safe.x + safe.w); y = clamp(c0.y + dy, safe.y, oppY - MIN_CROP);
     w = nx - c0.x; h = oppY - y;
   } else if (cropDrag.kind === "bl") {
-    x = clamp(c0.x + dx, safe.x, oppX - MIN_CROP);
-    const ny = clamp(oppY + dy, c0.y + MIN_CROP, safe.y + safe.h);
+    x = clamp(c0.x + dx, safe.x, oppX - MIN_CROP); const ny = clamp(oppY + dy, c0.y + MIN_CROP, safe.y + safe.h);
     w = oppX - x; h = ny - c0.y;
   } else if (cropDrag.kind === "br") {
-    const nx = clamp(oppX + dx, c0.x + MIN_CROP, safe.x + safe.w);
-    const ny = clamp(oppY + dy, c0.y + MIN_CROP, safe.y + safe.h);
+    const nx = clamp(oppX + dx, c0.x + MIN_CROP, safe.x + safe.w); const ny = clamp(oppY + dy, c0.y + MIN_CROP, safe.y + safe.h);
     w = nx - c0.x; h = ny - c0.y;
   }
   params.crop = { x, y, w, h };
@@ -2090,19 +2099,19 @@ for (const handle of handleEls) {
   handle.addEventListener("pointerup", endCropDrag);
   handle.addEventListener("pointercancel", endCropDrag);
 }
-cropBox.addEventListener("pointerdown", (e) => {
-  if (e.target !== cropBox) return; // a handle's own listener (above) owns its drag
-  startCropDrag("move", e, cropBox);
-});
-cropBox.addEventListener("pointermove", moveCropDrag);
-cropBox.addEventListener("pointerup", endCropDrag);
-cropBox.addEventListener("pointercancel", endCropDrag);
+// Dragging anywhere on the photo repositions the crop (the box is display-only,
+// pointer-events:none — the overlay captures the pan; handles capture resize).
+cropOverlay.addEventListener("pointerdown", (e) => startCropDrag("move", e, cropOverlay));
+cropOverlay.addEventListener("pointermove", moveCropDrag);
+cropOverlay.addEventListener("pointerup", endCropDrag);
+cropOverlay.addEventListener("pointercancel", endCropDrag);
 
 straightenSlider.addEventListener("input", () => {
   if (geoMode !== "straighten") return;
   params.straighten = Math.round(Number(straightenSlider.value) * 10) / 10;
   straightenVal.textContent = `${params.straighten.toFixed(1)}°`;
-  params.crop = autoInscribedCrop(params.straighten, dispAspectNow());
+  // Re-fit the crop to the new angle (safe inscribed bound, keeps it on the photo).
+  params.crop = cropSafeBound();
   positionCropOverlay();
   draw();
 });
