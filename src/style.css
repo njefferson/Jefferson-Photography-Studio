@@ -557,14 +557,15 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 .crop-handle[data-corner="tr"] { top: 0; left: 100%; }
 .crop-handle[data-corner="bl"] { top: 100%; left: 0; }
 .crop-handle[data-corner="br"] { top: 100%; left: 100%; }
-/* Straighten: the corners ROTATE, so drop the resize dot for a rotation arrow
-   that tilts with the photo (--tilt = the live straighten angle, set in main.ts). */
+/* Straighten: the corners ROTATE, so drop the resize dot for a thin double-headed
+   arrow that tilts with the photo (--tilt = the live straighten angle, main.ts) —
+   "drag either way to level." */
 #cropOverlay.straightening .crop-handle::before {
-  inset: 7px;
+  inset: 6px;
   border: none;
   border-radius: 0;
-  background: center / contain no-repeat url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='%23fff'%20stroke-width='2.6'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='M20.5%2012a8.5%208.5%200%201%201-2.6-6.1'/%3E%3Cpath%20d='M20.5%204.5v4h-4'/%3E%3C/svg%3E");
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.85));
+  background: center / contain no-repeat url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='%23fff'%20stroke-width='1.5'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cline%20x1='3'%20y1='12'%20x2='21'%20y2='12'/%3E%3Cpath%20d='M6.5%208.5%203%2012%206.5%2015.5'/%3E%3Cpath%20d='M17.5%208.5%2021%2012%2017.5%2015.5'/%3E%3C/svg%3E");
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.9));
   transform: rotate(var(--tilt, 0deg));
 }
 #cropTools {
