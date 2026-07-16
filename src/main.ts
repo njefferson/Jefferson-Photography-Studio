@@ -1912,16 +1912,47 @@ function cropSafeBound(): CropRect {
   return { x: c.x + (c.w * (1 - pad)) / 2, y: c.y + (c.h * (1 - pad)) / 2, w: c.w * pad, h: c.h * pad };
 }
 
-/** While a geometry tool is armed the preview renders THIS (an outset crop, so
- *  crop [0,1] sits inside it with transparent margin) — the whole tilted photo
- *  stays visible instead of being clipped by the frame. Symmetric about centre
- *  so the canvas keeps the base-frame aspect (object-fit:contain undistorted). */
-function fitViewCrop(): CropRect {
+// --- The armed preview window (fit-view). A single chokepoint: draw(),
+// positionCropOverlay() and the crop drags all re-read fitViewCrop() live, so
+// the box-first framing AND the pinch zoom both live here — nothing else does
+// view math. `viewZoom` is preview-only (1 = the whole tilted photo; larger =
+// zoomed in, box-fill and beyond); export reads params.crop and never sees it. ---
+let viewZoom = 1;
+const MIN_VIEW_SCALE = 0.08; // floor on the window side so a tiny crop keeps a usable backing store
+// Held steady during a resize drag so the grabbed corner tracks the finger
+// instead of the window sliding out from under it as the box centre shifts.
+let viewFreezeCenter: { x: number; y: number } | null = null;
+
+/** The fully-zoomed-OUT window side: the whole tilted photo with a hair of
+ *  margin (crop [0,1] sits inside it, transparent corners). This is the
+ *  pinch range's zoomed-OUT limit. */
+function outViewScale(): number {
   const asp = dispAspectNow();
   const a = Math.abs(params.straighten) * Math.PI / 180;
   const cos = Math.cos(a), sin = Math.sin(a);
-  const scale = 2 * Math.max(0.5 * (cos + sin / asp), 0.5 * (cos + asp * sin)) * 1.06;
-  return { x: 0.5 - scale / 2, y: 0.5 - scale / 2, w: scale, h: scale };
+  return 2 * Math.max(0.5 * (cos + sin / asp), 0.5 * (cos + asp * sin)) * 1.06;
+}
+
+/** The magnification at which the crop box just fills the frame — the default,
+ *  box-first view (owner ask 2026-07-16). Always >= 1 (box-fill is never more
+ *  zoomed-out than the whole tilt). The box's binding side (larger crop
+ *  fraction) touches the frame edge; the other axis shows the dimmed
+ *  continuation around it. */
+function boxFillZoom(): number {
+  const boxFill = Math.max(MIN_CROP, params.crop.w, params.crop.h);
+  return Math.max(1, outViewScale() / boxFill);
+}
+
+/** While a geometry tool is armed the preview renders THIS square window (so the
+ *  canvas keeps the base-frame aspect, object-fit:contain undistorted). Centred
+ *  on the crop box so the box-first view frames it; `viewZoom` sizes it between
+ *  the whole tilt (out) and box-fill/beyond (in). The renderer accepts a crop
+ *  outside [0,1] — the margins render transparent. */
+function fitViewCrop(): CropRect {
+  const outScale = outViewScale();
+  const scale = clamp(outScale / viewZoom, MIN_VIEW_SCALE, outScale);
+  const c = viewFreezeCenter ?? { x: params.crop.x + params.crop.w / 2, y: params.crop.y + params.crop.h / 2 };
+  return { x: c.x - scale / 2, y: c.y - scale / 2, w: scale, h: scale };
 }
 
 // output uv <-> source uv, the aspect-corrected straighten rotation (mirrors the
@@ -1984,6 +2015,10 @@ function setGeoMode(mode: "crop" | "straighten" | null) {
   else if (current) panel.hidden = false;
   straightenSlider.value = String(params.straighten);
   straightenVal.textContent = `${params.straighten.toFixed(1)}°`;
+  // Open box-first: zoom the view so the current crop box fills the frame (the
+  // whole tilt is a pinch-out away). Reset to the whole photo when disarming.
+  viewFreezeCenter = null;
+  viewZoom = cropArmed ? boxFillZoom() : 1;
   positionCropOverlay();
   draw();
 }
@@ -2044,6 +2079,9 @@ function startCropDrag(kind: CropDragKind, e: PointerEvent, target: HTMLElement)
   e.preventDefault();
   e.stopPropagation(); // a handle's pointerdown must not also start the box's own pan
   try { target.setPointerCapture(e.pointerId); } catch { /* capture can throw for synthetic pointers — the drag still works */ }
+  // Resizing recentres the box; freeze the view centre for the drag so the
+  // grabbed corner stays under the finger instead of sliding away with it.
+  viewFreezeCenter = k === "move" ? null : { x: params.crop.x + params.crop.w / 2, y: params.crop.y + params.crop.h / 2 };
   const r = viewImageRect();
   const vc = fitViewCrop();
   cropDrag = {
@@ -2059,8 +2097,10 @@ function moveCropDrag(e: PointerEvent) {
   const dy = ((e.clientY - cropDrag.y0) / cropDrag.rectH) * cropDrag.vcH;
   const c0 = cropDrag.crop0;
   if (cropDrag.kind === "move") {
-    // Reposition (pan): slide the crop over the photo, clamped to stay on it.
-    params.crop = clampCropOnPhoto({ x: c0.x + dx, y: c0.y + dy, w: c0.w, h: c0.h });
+    // Reposition (pan): the box stays centred in the view, so dragging slides
+    // the PHOTO under it — grab the photo and it follows the finger (the crop
+    // moves the opposite way in source space). Clamped to stay on the photo.
+    params.crop = clampCropOnPhoto({ x: c0.x - dx, y: c0.y - dy, w: c0.w, h: c0.h });
     positionCropOverlay();
     draw();
     return;
@@ -2089,7 +2129,9 @@ function moveCropDrag(e: PointerEvent) {
 
 function endCropDrag() {
   if (!cropDrag) return;
+  const wasResize = cropDrag.kind !== "move";
   cropDrag = null;
+  if (wasResize) { viewFreezeCenter = null; positionCropOverlay(); draw(); } // re-centre the view on the resized box
   flushRecord(); // one drag = one undo step
 }
 
@@ -2100,12 +2142,52 @@ for (const handle of handleEls) {
   handle.addEventListener("pointerup", endCropDrag);
   handle.addEventListener("pointercancel", endCropDrag);
 }
-// Dragging anywhere on the photo repositions the crop (the box is display-only,
-// pointer-events:none — the overlay captures the pan; handles capture resize).
-cropOverlay.addEventListener("pointerdown", (e) => startCropDrag("move", e, cropOverlay));
-cropOverlay.addEventListener("pointermove", moveCropDrag);
-cropOverlay.addEventListener("pointerup", endCropDrag);
-cropOverlay.addEventListener("pointercancel", endCropDrag);
+// The overlay captures pointers over the photo (the box is display-only,
+// pointer-events:none; handles capture resize). ONE finger repositions the crop;
+// TWO fingers pinch-zoom the VIEW (owner ask 2026-07-16) — box-fill in, whole
+// tilt out — by driving viewZoom + re-rendering (not a CSS magnify; the crop
+// view re-renders the GL scene). Preview-only: params.crop / export untouched.
+const cropPointers = new Map<number, { x: number; y: number }>();
+let cropPinch: { dist: number; zoom: number } | null = null;
+
+cropOverlay.addEventListener("pointerdown", (e) => {
+  if (!geoMode || !current) return;
+  cropPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (cropPointers.size === 2) {
+    // Second finger down — hand off from panning to pinch-zoom. Drop the pan
+    // silently (it never committed an undo step; the crop hasn't changed yet).
+    cropDrag = null;
+    viewFreezeCenter = null;
+    const [a, b] = [...cropPointers.values()];
+    cropPinch = { dist: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), zoom: viewZoom };
+    try { cropOverlay.setPointerCapture(e.pointerId); } catch { /* synthetic pointers can throw */ }
+  } else if (cropPointers.size === 1) {
+    startCropDrag("move", e, cropOverlay);
+  }
+});
+cropOverlay.addEventListener("pointermove", (e) => {
+  const p = cropPointers.get(e.pointerId);
+  if (p) { p.x = e.clientX; p.y = e.clientY; }
+  if (cropPinch && cropPointers.size >= 2) {
+    const [a, b] = [...cropPointers.values()];
+    const dist = Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
+    // Zoom out no further than the whole tilt; in to box-fill (Crop keeps its
+    // handles on-screen), a little past it in Straighten for precise leveling.
+    const maxZoom = boxFillZoom() * (geoMode === "straighten" ? 2.5 : 1);
+    viewZoom = clamp((cropPinch.zoom * dist) / cropPinch.dist, 1, maxZoom);
+    positionCropOverlay();
+    draw();
+    return;
+  }
+  moveCropDrag(e);
+});
+function endCropPointer(e: PointerEvent) {
+  cropPointers.delete(e.pointerId);
+  if (cropPointers.size < 2) cropPinch = null;
+  if (cropPointers.size === 0) endCropDrag();
+}
+cropOverlay.addEventListener("pointerup", endCropPointer);
+cropOverlay.addEventListener("pointercancel", endCropPointer);
 
 straightenSlider.addEventListener("input", () => {
   if (geoMode !== "straighten") return;

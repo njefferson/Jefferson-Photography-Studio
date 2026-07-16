@@ -357,7 +357,7 @@ See **`PLAN.md`** for the full build plan.
   of both focuses captured. NEEDS THE OWNER'S HANDS: it now behaves like a normal
   editor crop/straighten on the real iPhone — level against the alignment lines,
   slide to reposition, switch to Crop for the thirds grid.
-- [ ] **Pinch-zoom the crop while aligning** — owner ask 2026-07-16 (with the
+- [x] **Pinch-zoom the crop while aligning** — owner ask 2026-07-16 (with the
   crop go-to-main): during crop/straighten, two-finger pinch to zoom the view
   in/out so the box (the "square") is easier to see and align against. Build
   notes: the fit-view is a single chokepoint — `fitViewCrop()` (main.ts) is the
@@ -372,7 +372,7 @@ See **`PLAN.md`** for the full build plan.
   path's CSS transform (the crop view re-renders the GL scene, it doesn't magnify
   a letterboxed canvas). Preview-only: export reads `params.crop` and is provably
   untouched; reset `viewZoom` on arm/disarm.
-- [ ] **Box-fill default crop view** — owner ask 2026-07-16: instead of opening
+- [x] **Box-fill default crop view** — owner ask 2026-07-16: instead of opening
   zoomed-out to the whole tilted photo, default the armed view so the crop box
   (the square) FILLS the frame with the photo visible but dimmed AROUND it (to
   show it continues), and pinch-out from there to see the whole tilt. Same
@@ -382,6 +382,43 @@ See **`PLAN.md`** for the full build plan.
   undistorted as long as the window stays square (w===h). The current
   angle-driven `*1.06` outset becomes the fully-zoomed-OUT limit of the pinch
   range. Pairs naturally with the pinch item — build them together.
+  SHIPPED — BOTH ITEMS TOGETHER (cache ips-v66 → ips-v67). `fitViewCrop()` is
+  still the single chokepoint; everything routes through it:
+  • BOX-FIRST DEFAULT — the window now centres on the crop-box centre and opens
+    at `boxFillZoom()` (a preview-only `viewZoom`, set on arm), so the box's
+    binding side just fills the frame with the dimmed continuation around it.
+    Re-arming an already-cropped photo opens framed ON that crop (its main
+    payoff); a fresh full-frame crop still opens on the whole photo (box-fill of
+    a full box IS the full frame). The old `*1.06` whole-tilt outset became
+    `outViewScale()` — the pinch range's zoomed-OUT limit.
+  • PINCH — two fingers on `#cropOverlay` drive `viewZoom` + a GL re-render (not
+    a CSS magnify — the crop view re-renders the scene). Zooms out no further
+    than the whole tilt; in to box-fill in Crop (so the resize handles stay
+    on-screen), a little past it in Straighten (no handles to lose — precise
+    leveling). One finger still pans; the 2nd finger hands off pan → pinch and
+    drops the pan with no undo step.
+  • MODEL SHIFT (owner: eyes on this) — box-fill leaves no room for a movable
+    box, so the tool became the standard "centred box, photo pans under it":
+    a one-finger drag now moves the PHOTO (it follows your finger; the crop
+    slides the opposite way in source space), where before the box moved inside
+    a fixed photo view. Resize freezes the view centre for the drag so the
+    grabbed corner tracks the finger, then recentres on release.
+  • PREVIEW-ONLY — export reads `params.crop` and is provably untouched: headless
+    read `params.crop` byte-identical through a whole pinch session and the
+    committed export dims (819×548) unchanged before/after.
+  VERIFIED headless 19/19 (Chromium, iPhone-ish 430×900; fail-first PROVEN —
+  planted "box stays small like the old view", "window doesn't change under
+  pinch", and "tilted corner is opaque" all flipped to FAIL): re-arm on a ~0.59
+  crop fills the frame (fillFrac 1.0, box centred) vs the old small box; pinch-out
+  grows the window 819→1484 and shrinks the box, and is reversible; committed
+  export dims unchanged by a pinch; a one-finger drag shifts the rendered photo
+  while the box stays centred; Straighten still tilts with clean transparent
+  corners + the alignment grid + hidden handles, and pinches past box-fill.
+  NEEDS THE OWNER'S HANDS on the real iPhone/iPad: the box-first default framing,
+  the pinch range + limits (Crop vs Straighten), and ESPECIALLY the model shift —
+  the photo-follows-finger pan under a now-centred box, and the resize feel. If
+  the pan direction or the centred box reads wrong on device, both are a one-line
+  flip / a small change here.
 - [ ] **More composition overlays** — owner ask 2026-07-16, optional, for anyone
   who wants them: beyond the rule-of-thirds grid, offer selectable composition
   guides while cropping — golden-ratio (phi) grid, golden spiral, the diagonal
