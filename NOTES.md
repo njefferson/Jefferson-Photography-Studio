@@ -459,6 +459,20 @@ See **`PLAN.md`** for the full build plan.
   iPhone/iPad that the box now stops at the photo edge on a resize/pan after a
   straighten or crop, and that the corner "slides back to fit" feel is natural.
   Still pairs with the overflow-view idea below (reframes "outside the image").
+- [ ] **Tilt + zoom clips the photo in its box** — owner-caught on device
+  2026-07-16 (with the crop go-to-main; screenshot IMG_6201, Straighten @ 23.6°).
+  While a geometry tool is armed, rotating and pinch-zooming CLIPS the photo
+  inside the `#view` box: the tilted/zoomed photo is letterboxed and cut by
+  `#view`'s rounded-rect edges, so black wedges show at the rotated corners and
+  the alignment grid floats over the black margins — the picture is "boxed"
+  instead of filling the screen. Mechanism: the armed preview renders into the
+  contained `#view` canvas (`object-fit:contain`), so a tilted + `viewZoom`
+  photo doesn't fill the axis-aligned `#view`. Owner's call: this gets fixed when
+  the image is simply made completely visible below everything — i.e. it's
+  SUBSUMED by the "Crop view: let the photo overflow instead of boxing it" and
+  "Big image: the photo fills the app" items below (the photo becomes the
+  full-bleed background and the tilt/zoom view stops clipping). No fix in
+  isolation; presentation-only, nothing touches the pipeline or export.
 - [ ] **Big image: the photo fills the app, menus float over it** — owner
   direction 2026-07-16, given as he ended the session and moved to a new one.
   STILL AN IDEA — he says so plainly, expect design questions. The vision: the
