@@ -382,6 +382,20 @@ See **`PLAN.md`** for the full build plan.
   undistorted as long as the window stays square (w===h). The current
   angle-driven `*1.06` outset becomes the fully-zoomed-OUT limit of the pinch
   range. Pairs naturally with the pinch item — build them together.
+- [ ] **More composition overlays** — owner ask 2026-07-16, optional, for anyone
+  who wants them: beyond the rule-of-thirds grid, offer selectable composition
+  guides while cropping — golden-ratio (phi) grid, golden spiral, the diagonal
+  method, a finer grid, and a centre cross. Thirds stays the default. Build
+  notes: the guides are one element `#cropGuides` inside `#cropBox`, drawn as
+  hairline CSS repeating-linear-gradients and toggled per focus by
+  `.focus-crop` / `.focus-straighten` on `#cropOverlay` (main.ts `setGeoMode`,
+  positioned in `positionCropOverlay`; styles in style.css). Add a small
+  overlay-style picker (a cycle button or segmented control) in the crop tool
+  that sets a class/data-attr on `#cropGuides`; each style is its own hairline
+  background layer (the golden spiral needs an inline SVG, not a gradient). Keep
+  them subtle (match `--line`), per-focus, and remember the last choice in
+  localStorage like the panel tab. Non-goal: nothing touches the pipeline or
+  export — overlay-only, exactly like the thirds grid.
 - [x] **Redo** — owner ask 2026-07-15: add a Redo button + function next to
   "Go back", and RENAME "Go back" to "Undo" (unless a reason surfaces not to).
   Build notes: the undo stack already exists (undoStack + settled/flushRecord);
