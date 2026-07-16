@@ -1916,6 +1916,8 @@ function setGeoMode(mode: "crop" | "straighten" | null) {
   // The pill is shared: Crop shows its label + Reset + Done; Straighten adds the
   // slider (the .tool-crop class hides the slider row — see style.css).
   cropTools.classList.toggle("tool-crop", isCrop);
+  // Straighten's corners are rotation arrows (Crop's stay resize circles).
+  cropOverlay.classList.toggle("straightening", geoMode === "straighten");
   geoLbl.textContent = isCrop ? "Crop" : "Straighten";
   cropResetBtn.textContent = isCrop ? "Reset crop" : "Reset";
   if (cropArmed) { setHslPick(false); setColorPick(false); setTat(false); setHeal(false); setHealReview(false); mUI.paint.setAttribute("aria-pressed", "false"); resetZoom(); } // picture tools are exclusive; geometry wants the whole frame in view
@@ -1965,6 +1967,8 @@ function positionCropOverlay() {
   // Reset enablement tracks the active tool: identity ⟺ straighten 0 AND crop full.
   cropResetBtn.disabled = cropIsIdentity(params.crop, params.straighten);
   if (!show) return;
+  // Live tilt for the Straighten arrows to rotate with the photo (see style.css).
+  cropOverlay.style.setProperty("--tilt", `${params.straighten}deg`);
   const stageRect = cropOverlay.getBoundingClientRect();
   const r = viewImageRect();
   const { x, y, w, h } = params.crop;

@@ -287,6 +287,23 @@ See **`PLAN.md`** for the full build plan.
   screenshot shows Straighten = box + slider + Done, no overlap. NEEDS THE
   OWNER'S HANDS: the box now hugs the photo on the real iPhone, Done is findable,
   and corner-rotation levels in the intuitive DIRECTION (sign easy to flip).
+  FIFTH ON-DEVICE PASS (2026-07-15, staging, iPhone — cache ips-v60 → ips-v61):
+  (1) "Make Done brighter" — `#cropDone` now font-weight 700 + an accent glow
+  (`box-shadow: 0 2px 14px -2px var(--accent)`) so it pops off the accent-soft
+  pill. (2) "Remove the circles on the Straighten corners, put arrows that move
+  with the photo" — Straighten's corner grips are now white rotation-arrow SVGs
+  (Crop keeps the resize dots): `setGeoMode` toggles `#cropOverlay.straightening`,
+  `positionCropOverlay` sets `--tilt = params.straighten` deg, and
+  `#cropOverlay.straightening .crop-handle::before` swaps the dot for the arrow
+  and `transform: rotate(var(--tilt))` so the arrows lean with the photo as it
+  levels (updates live via the rotate branch in moveCropDrag). 44px hit targets
+  unchanged. VERIFIED headless 25/25 (Chromium; fail-first proven — planted
+  "arrows present" flipped as planted): Done computes weight 700 + a box-shadow;
+  Crop corners stay round dots (no straightening class, no svg); Straighten
+  corners are svg arrows and `--tilt` reads 40deg after a 40° straighten;
+  screenshot shows the tilted arrows + the brighter Done. NEEDS THE OWNER'S
+  HANDS: Done reads bright enough, and the arrow glyph/tilt DIRECTION feel right
+  on the real iPhone.
 - [x] **Redo** — owner ask 2026-07-15: add a Redo button + function next to
   "Go back", and RENAME "Go back" to "Undo" (unless a reason surfaces not to).
   Build notes: the undo stack already exists (undoStack + settled/flushRecord);

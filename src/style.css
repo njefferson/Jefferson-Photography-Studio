@@ -557,6 +557,16 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 .crop-handle[data-corner="tr"] { top: 0; left: 100%; }
 .crop-handle[data-corner="bl"] { top: 100%; left: 0; }
 .crop-handle[data-corner="br"] { top: 100%; left: 100%; }
+/* Straighten: the corners ROTATE, so drop the resize dot for a rotation arrow
+   that tilts with the photo (--tilt = the live straighten angle, set in main.ts). */
+#cropOverlay.straightening .crop-handle::before {
+  inset: 7px;
+  border: none;
+  border-radius: 0;
+  background: center / contain no-repeat url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='%23fff'%20stroke-width='2.6'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='M20.5%2012a8.5%208.5%200%201%201-2.6-6.1'/%3E%3Cpath%20d='M20.5%204.5v4h-4'/%3E%3C/svg%3E");
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.85));
+  transform: rotate(var(--tilt, 0deg));
+}
 #cropTools {
   position: absolute;
   left: 50%;
@@ -587,7 +597,7 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 #cropTools button:disabled { opacity: 0.45; } /* honest greyed state when the crop is already identity */
 /* Done is the primary exit — accent-filled so it's the obvious way back out of
    the tool (owner got lost with the old tiny "tap here" hint). */
-#cropDone { background: var(--accent); color: var(--accent-ink); font-weight: 600; padding: 6px 16px; }
+#cropDone { background: var(--accent); color: var(--accent-ink); font-weight: 700; padding: 7px 18px; box-shadow: 0 2px 14px -2px var(--accent); } /* accent glow so it pops off the soft pill */
 @media (max-width: 760px) {
   #cropTools { bottom: 10px; padding: 9px 12px 11px; }
 }
