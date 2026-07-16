@@ -357,6 +357,31 @@ See **`PLAN.md`** for the full build plan.
   of both focuses captured. NEEDS THE OWNER'S HANDS: it now behaves like a normal
   editor crop/straighten on the real iPhone — level against the alignment lines,
   slide to reposition, switch to Crop for the thirds grid.
+- [ ] **Pinch-zoom the crop while aligning** — owner ask 2026-07-16 (with the
+  crop go-to-main): during crop/straighten, two-finger pinch to zoom the view
+  in/out so the box (the "square") is easier to see and align against. Build
+  notes: the fit-view is a single chokepoint — `fitViewCrop()` (main.ts) is the
+  only reader of the preview window, and all three consumers (the armed render in
+  `draw()`, the box placement in `positionCropOverlay`, and the pan-delta scaling
+  in `startCropDrag`) re-call it live. So a new preview-only `viewZoom` state
+  applied INSIDE `fitViewCrop()` threads through render, overlay and pan with no
+  other math change (`positionCropOverlay`/`moveCropDrag` already divide by the
+  window's w/h). Reuse the existing two-pointer pinch recognizer that the normal
+  photo view already uses (activePointers map + pinch state + midpoint-anchored
+  clamp) for the GESTURE math, but drive `viewZoom` + `draw()` instead of that
+  path's CSS transform (the crop view re-renders the GL scene, it doesn't magnify
+  a letterboxed canvas). Preview-only: export reads `params.crop` and is provably
+  untouched; reset `viewZoom` on arm/disarm.
+- [ ] **Box-fill default crop view** — owner ask 2026-07-16: instead of opening
+  zoomed-out to the whole tilted photo, default the armed view so the crop box
+  (the square) FILLS the frame with the photo visible but dimmed AROUND it (to
+  show it continues), and pinch-out from there to see the whole tilt. Same
+  mechanism as the pinch item: `fitViewCrop()` returns a smaller window AND
+  recenters on the crop-box centre (not the hard 0.5) — the renderer accepts a
+  crop outside [0,1] (margins render transparent) and the canvas stays
+  undistorted as long as the window stays square (w===h). The current
+  angle-driven `*1.06` outset becomes the fully-zoomed-OUT limit of the pinch
+  range. Pairs naturally with the pinch item — build them together.
 - [x] **Redo** — owner ask 2026-07-15: add a Redo button + function next to
   "Go back", and RENAME "Go back" to "Undo" (unless a reason surfaces not to).
   Build notes: the undo stack already exists (undoStack + settled/flushRecord);
