@@ -155,7 +155,7 @@ function notesPage(): Plugin {
     <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192-light.png" />
     <title>What's new — Photography Studio</title>
     <style>
-      :root { --bg: #0b0c0f; --bg-2: #0f1014; --txt: #eef0f3; --txt-2: #a3a7b2; --txt-3: #6b6f79; --line: rgba(255,255,255,0.09); --accent: #6ea0ff; }
+      :root { --bg: #0b0c0f; --bg-2: #0f1014; --txt: #eef0f3; --txt-2: #a3a7b2; --txt-3: #9095a1; --line: rgba(255,255,255,0.09); --accent: #6ea0ff; }
       * { box-sizing: border-box; }
       body { margin: 0; padding: 2rem 1.2rem 4rem; background: radial-gradient(120% 90% at 50% 0%, var(--bg-2), var(--bg)); min-height: 100vh; color: var(--txt); font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
       main { max-width: 620px; margin: 0 auto; }
