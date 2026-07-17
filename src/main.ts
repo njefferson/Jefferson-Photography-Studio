@@ -233,7 +233,12 @@ function initHotspot(img: DecodedImage, imported: ImportedFile) {
     return;
   }
   hotspotPristine = img.pixels.slice();
-  const info = Hotspot.fromExif(arrayBufferOf(imported.bytes));
+  let info: Hotspot.ExifInfo | null = null;
+  try {
+    info = Hotspot.fromExif(arrayBufferOf(imported.bytes));
+  } catch {
+    // Unreadable EXIF = unknown lens: fall through to the manual prompt.
+  }
   if (Hotspot.needsPrompt(info)) {
     hotspotState = { profileKey: null, source: null, strength: 1, bypass: false };
   } else {

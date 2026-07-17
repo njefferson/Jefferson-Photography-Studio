@@ -20,6 +20,9 @@ export interface ExifInfo {
 }
 
 // --- minimal EXIF parser: LensModel 0xA434, FocalLength 0x920A, FNumber 0x829D ---
+// Wrapped in try/catch by fromExif: EXIF offsets are file-controlled, and a
+// corrupt file must degrade to "no lens info" (the manual prompt), never fail
+// the whole photo open.
 function parseExif(buf: ArrayBufferLike): { lens?: string; fl?: number; ap?: number } | null {
   const v = new DataView(buf);
   if (v.byteLength < 4 || v.getUint16(0) !== 0xffd8) return null; // not a JPEG (SOI)
@@ -28,7 +31,12 @@ function parseExif(buf: ArrayBufferLike): { lens?: string; fl?: number; ap?: num
     const marker = v.getUint16(off);
     if (marker === 0xffe1) {
       const start = off + 4;
-      if (v.getUint32(start) !== 0x45786966) return null; // "Exif"
+      if (v.getUint32(start) !== 0x45786966) {
+        // A non-Exif APP1 (usually XMP) — skip it and keep scanning; some
+        // cameras/editors write XMP first and the Exif segment after it.
+        off += 2 + v.getUint16(off + 2);
+        continue;
+      }
       const t = start + 6;
       const le = v.getUint16(t) === 0x4949;
       const g16 = (o: number) => v.getUint16(t + o, le);
@@ -68,11 +76,17 @@ function nearestFL(lensShort: string, fl: number): number {
 }
 
 /** Read EXIF straight from the imported file's bytes. Returns null when the
- *  file has no parseable EXIF (e.g. it isn't a JPEG) — the caller must treat
- *  that the same as an unrecognized lens (see needsPrompt) and ask, never
- *  guess. */
+ *  file has no parseable EXIF (e.g. it isn't a JPEG, or the EXIF block is
+ *  corrupt — offsets are file-controlled and can point past the end) — the
+ *  caller must treat that the same as an unrecognized lens (see needsPrompt)
+ *  and ask, never guess. */
 export function fromExif(arrayBuffer: ArrayBufferLike): ExifInfo | null {
-  const ex = parseExif(arrayBuffer);
+  let ex: { lens?: string; fl?: number; ap?: number } | null;
+  try {
+    ex = parseExif(arrayBuffer);
+  } catch {
+    return null; // corrupt EXIF must never fail the photo open
+  }
   if (!ex) return null;
   const short = ex.lens ? DATA.lens_map[ex.lens] : null;
   const profileKey = short && ex.fl ? short + "@" + nearestFL(short, ex.fl) : null;
