@@ -66,8 +66,19 @@ export function makeRowDetail(
   height: number,
   sharpen: number,
   texture: number,
+  step = 1,
 ): LinearSampler {
   if (sharpen <= 0 && texture === 0) return base;
+
+  // The GPU preview taps in PROXY texels (gl.ts uses `* u_texel`, and the live
+  // texture is downscaled by `step` — a half-res RAW bin, or toPreview's copy).
+  // One proxy texel spans `step` native pixels, so at export we tap the SAME
+  // 7x7 grid at `step`-pixel spacing to reproduce the previewed footprint. The
+  // WS/WT weights are in tap-index units, so they stay identical — only the
+  // sample positions widen. step === 1 leaves the sampling byte-identical.
+  const tapOff = new Int32Array(DETAIL_R * 2 + 1);
+  for (let d = -DETAIL_R; d <= DETAIL_R; d++) tapOff[d + DETAIL_R] = Math.round(d * step);
+  const rowSpan = tapOff[DETAIL_R * 2] * 2 + 4; // rows the vertical taps reach + scan margin
 
   const lumaRows = new Map<number, Float32Array>();
   const getLumaRow = (y: number): Float32Array => {
@@ -80,7 +91,7 @@ export function makeRowDetail(
         row[x] = r * REC[0] + g * REC[1] + b * REC[2];
       }
       lumaRows.set(cy, row);
-      while (lumaRows.size > DETAIL_R * 2 + 4) {
+      while (lumaRows.size > rowSpan) {
         lumaRows.delete(lumaRows.keys().next().value!);
       }
     }
@@ -93,9 +104,9 @@ export function makeRowDetail(
     let sumS = 0, sumT = 0, wsumS = 0, wsumT = 0, Lc = 0;
     let k = 0;
     for (let dy = -DETAIL_R; dy <= DETAIL_R; dy++) {
-      const row = getLumaRow(y + dy);
+      const row = getLumaRow(y + tapOff[dy + DETAIL_R]);
       for (let dx = -DETAIL_R; dx <= DETAIL_R; dx++, k++) {
-        let sx = cx + dx;
+        let sx = cx + tapOff[dx + DETAIL_R];
         if (sx < 0) sx = 0;
         else if (sx >= width) sx = width - 1;
         const L = row[sx];

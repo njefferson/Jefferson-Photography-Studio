@@ -44,10 +44,20 @@ export function makeRowDenoiser(
   width: number,
   height: number,
   strength: number,
+  step = 1,
 ): LinearSampler {
   if (strength <= 0) return sample;
   const sigma = rangeSigma(strength);
   const inv2s2 = 1 / (2 * sigma * sigma);
+
+  // Preview runs this bilateral on a downscaled proxy, tapping in proxy texels
+  // (see gl.ts). At native resolution one proxy texel spans `step` pixels, so
+  // tap the same 5x5 grid `step` pixels apart to match the previewed footprint;
+  // the SPATIAL weights are in tap-index units and stay identical. step === 1
+  // keeps the sampling byte-identical.
+  const tapOff = new Int32Array(R * 2 + 1);
+  for (let d = -R; d <= R; d++) tapOff[d + R] = Math.round(d * step);
+  const rowSpan = tapOff[R * 2] * 2 + 4;
 
   const rows = new Map<number, Float32Array>();
   const getRow = (y: number): Float32Array => {
@@ -63,7 +73,7 @@ export function makeRowDenoiser(
       }
       rows.set(cy, row);
       // Keep the cache a small ring; exports scan top-to-bottom.
-      while (rows.size > 8) {
+      while (rows.size > rowSpan) {
         rows.delete(rows.keys().next().value!);
       }
     }
@@ -83,9 +93,9 @@ export function makeRowDenoiser(
     let wsum = 0;
     let k = 0;
     for (let dy = -R; dy <= R; dy++) {
-      const row = getRow(y + dy);
+      const row = getRow(y + tapOff[dy + R]);
       for (let dx = -R; dx <= R; dx++, k++) {
-        let sx = cx + dx;
+        let sx = cx + tapOff[dx + R];
         if (sx < 0) sx = 0;
         else if (sx >= width) sx = width - 1;
         const r = row[sx * 3];

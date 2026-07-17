@@ -181,11 +181,20 @@ export async function exportImage(
         srcH,
       )
     : rawSample;
+  // The live preview runs denoise/detail on a DOWNSCALED proxy (RAW: a half-res
+  // bin; big 8-bit: toPreview's <=2800px copy) and the GPU taps in proxy texels,
+  // so at native resolution the kernels must tap `proxyFactor` native pixels
+  // apart to reproduce the footprint the user previewed and tuned — otherwise
+  // export sharpens ~2x finer structure than the preview showed. The factor is a
+  // property of the source, so single and batch exports agree. Kept in sync with
+  // main.ts MAX_PREVIEW (8-bit proxy) and demosaic.ts binning (RAW = half-res).
+  const PREVIEW_MAX = 2800;
+  const proxyFactor = "cfa" in src ? 2 : Math.max(1, Math.max(srcW, srcH) / PREVIEW_MAX);
   // Denoise first, then sharpen/texture — the same order the shader runs them
   // (raw neighbourhood -> denoised centre -> detail gain). Both are no-ops when
   // their slider is 0, so a plain edit keeps the 1x-decode fast path.
-  const denoised = makeRowDenoiser(healed, srcW, srcH, params.denoise);
-  const sampleLinear = makeRowDetail(healed, denoised, srcW, srcH, params.sharpen ?? 0, params.texture ?? 0);
+  const denoised = makeRowDenoiser(healed, srcW, srcH, params.denoise, proxyFactor);
+  const sampleLinear = makeRowDetail(healed, denoised, srcW, srcH, params.sharpen ?? 0, params.texture ?? 0, proxyFactor);
   // HIE glow map at full resolution (cheap: built on a coarse grid).
   const gmap = params.glow > 0 ? buildGlowMap(rawSample, srcW, srcH) : null;
   const glowAt = (sx: number, sy: number) =>
