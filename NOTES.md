@@ -1871,6 +1871,59 @@ See **`PLAN.md`** for the full build plan.
   roadmap and the latest updates, each with a "More" link to the full history
   and notes on GitHub.
 
+- [x] **Share-ready: honest copy, public notes page, share cards, privacy** —
+  the pre-promotion due-diligence pass (owner ask 2026-07-17, "Fable is on"
+  session; three-agent audit + this fix release, cache ips-v69 → ips-v70).
+  SHIPPED, seven commits:
+  (1) deploy.yml concurrency group (per-ref, newest wins; Pages deploys are
+  atomic so cancel-in-progress is safe). (2) .cube/.dcp exports ride the share
+  sheet via a new `saveBlob()` (export.ts) — the installed iOS app ignores a
+  bare a[download], so those buttons were silent no-ops there; busySave uses
+  the same helper (cancel = keep dialog). (3) parseExif hardened (hotspot.ts):
+  try/catch → null so corrupt EXIF degrades to the manual lens prompt instead
+  of failing the open, and a leading non-Exif APP1 (XMP) is skipped, not
+  fatal. (4) Third-party RAW honesty: `rawBrand()` (import.ts; CR2 magic +
+  extension map), `DecodedImage.previewNotice` surfaced via alert in
+  showDecoded — a CR2/ARW now opens WITH "this is the embedded preview, not
+  raw" + DNG-Converter pointer; plain-TIFF errors stop claiming DNG; NEF
+  failures claim High-Efficiency ONLY when the CFA IFD Compression tag is
+  neither 34713 nor 1 (`nefLooksHighEfficiency`). (5) Help caught up with the
+  app: Dust/lens fixes say Corrections tab, crop bullet describes the real
+  Crop & rotate tab (three separately-armed tools + guides + pinch-zoom), new
+  Top bar section (Undo/Redo/Reset/Histogram + tap-to-hide), tap-to-WB
+  softened (armed tools take the tap), American "Color" everywhere
+  user-facing, "practice library" naming unified. Static #sectionSub matches
+  TAB_META ("detail"). (6) PUBLIC NOTES PAGE: new `notesPage()` vite plugin
+  emits dist/notes.html (filtered git history ~50 + Coming next + Recently
+  shipped, launcher-dark inline CSS, no JS); `filteredLog()` drops
+  Roadmap:/Notes:/Docs:/Internal:/Chore: subjects from BOTH the page and the
+  ⓘ changelog; `checklist(headingRe)` generalizes the roadmap parser; the ⓘ
+  "More" links → ./notes.html(#roadmap); per-commit GitHub links (private
+  repo, 404 for everyone) became plain text. THIS section restructure (open
+  queue vs this archive) is what bounds the in-app roadmap to 6 real items —
+  keep queue = open only. Two open items retitled feature-shaped ("Full-bleed
+  alignment view…", "Full-bleed crop…"). gallery/README.md moved out of the
+  deploy (docs/gallery-examples.md). (7) SHARE CARDS + PRIVACY: og:/twitter:
+  meta on all three pages (index+ir card = gallery NIR_1825.jpg 1600×1067,
+  absolute prod URLs; macro = icon summary card) + meta descriptions; new
+  privacy.html (4th rollup input, launcher-dark) stating the on-device/no
+  upload/no analytics truth (verified: only fetches are same-origin), what's
+  stored locally and how to clear it, contact + tips; linked from the chooser
+  footer, ⓘ, and Macro help.
+  VERIFIED headless 49/49 (Chromium; scratchpad harnesses, fail-first where
+  new): copy/ⓘ/saveBlob walk 20/20 (dialog: 0 github links, 5 clean subjects,
+  roadmap = 6, links → notes/privacy; Help assertions; share-stub .cube/.dcp
+  incl. cancel ≠ download); offline-through-updates 8/8 re-proven at v70→v71
+  with the 37-entry shell (notes+privacy precached); export walk 5/5; kernel
+  parity 5/5; EXIF fixtures 3/3 (fail-first: pre-fix throws + misses
+  XMP-wrapped EXIF); RAW fixtures 8/8 (fail-first: pre-fix silently previews,
+  says DNG, always claims HE). NEEDS THE OWNER'S HANDS: share-sheet feel for
+  .cube/.dcp on the real iPhone/iPad; live link-preview cards (iMessage +
+  one social app; only render once merged to PROD — og:image URLs are
+  absolute to the prod origin); the notes + privacy pages' look on device;
+  and an explicit OK that privacy.html publishes noah.jefferson@gmail.com as
+  the contact (easily swapped/removed if not).
+
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 
 > An 11-dimension multi-agent review over the whole repo; every problem below
