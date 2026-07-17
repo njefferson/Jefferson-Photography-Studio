@@ -108,6 +108,45 @@ See **`PLAN.md`** for the full build plan.
 - CI must check out full history (`fetch-depth: 0` in deploy.yml) or the
   commit counts — and therefore the version numbers — come out wrong.
 
+## Accessibility standing rule (owner mandate, 2026-07-17)
+
+Accessibility is a TOP PRIORITY. Color-blind-inconsiderate design is a fail
+state. Every new UI is designed against the checklist in CLAUDE.md from the
+start; the a11y-walk harness (session scratchpad; axe-core + custom checks,
+both themes, fail-first) runs before any UI release. Full audits (structural
++ color/CVD + repo, three agents, 2026-07-17) produced these durable
+outcomes; the red baseline predating the fixes is archived in the session
+scratchpad (a11y-baseline-red.json — 32/36 failing, incl. axe cross-checks).
+
+NEVER-CHURN — patterns audited as CORRECT; keep them, don't re-fix:
+aria-pressed on every toggle; labelled role=tab tablist; native <dialog> +
+showModal() for help/info/batch; toast role=status; dynamic controls are
+real <button>s; gallery alt="" + span-label; native range sliders; 44px
+crop handles; decorative SVGs aria-hidden; lang=en incl. generated pages;
+look-button state as TEXT (norm/R⇄B) not hue; mask-row text labels; roadmap
+✓/○ glyphs; heal rings differ by LINE STYLE not hue; --txt at 17:1/11.6:1;
+no outline:none anywhere; toast avoids red/green coding. (The theme toggle
+was NOT correct — role=switch needs aria-checked, not aria-pressed; fixed
+in the a11y release. Don't re-bless the old pattern.)
+
+CALIBRATED TOKENS (2026-07-17; change only with recomputed WCAG ratios):
+--txt-3 #9095a1 dark / #6d6656 dawn (≥4.5:1 on their worst surfaces);
+--line-2 rgba(255,255,255,.35) dark / rgba(40,32,20,.50) dawn (≥3:1 rails);
+--line .18/.28 (decorative hairlines — deliberately below 3:1, never the
+sole affordance); dawn --accent #2a63c4 (≥4.5:1 as link text);
+--glass-bg rgba(10,10,14,.65) + --glass-txt #f2f3f6 are THEME-INVARIANT:
+HUDs float over the PHOTO, so dark glass + light text is correct in both
+themes (≥4.5:1 even over a pure-white IR sky). Tokens are defined in FIVE
+places that must change together: src/style.css, src/launcher.css,
+src/macro/macro.css (each :root + [data-theme="dawn"]), plus the inline
+palettes in vite.config.ts (notes.html template) and privacy.html.
+
+Known-exempt: disabled controls at opacity .4 (WCAG contrast exemption) —
+recorded so it isn't re-audited. Deferred a11y work lives in the roadmap
+queue (accessible overlays; forced-colors; manifest screenshots). Cheap
+future option if regressions ever slip: a 5-line build guard failing on
+user-scalable=no.
+
 ## Next capability release (owner's roadmap, 2026-07-04; queue refreshed 2026-07-15)
 
 > SOURCE OF TRUTH for the in-app Roadmap (behind the ⓘ button). `vite.config.ts`
@@ -205,6 +244,28 @@ See **`PLAN.md`** for the full build plan.
   segmentation needs an on-device ML model (WebGPU — the "frontier" backlog
   item); there is no classical stand-in the way sky had one. Architect as a mask
   type so it slots into the same engine when ready.
+- [ ] **Accessible overlays — Library, Quick look and Busy become real dialogs**
+  — a11y audit 2026-07-17, deferred from the a11y release because it touches
+  open/close interaction flows. #library claims aria-modal with no focus
+  trap/Escape/restore, #quickLook and #busy have no dialog role; all three
+  are `.hidden` flips (main.ts ~3276/3677/3800) leaving the background live
+  to assistive tech. Convert to native <dialog>+showModal() like #helpDlg
+  (free trap/Escape/focus-restore). Same pass: finish the panel tab pattern
+  (role=tabpanel, aria-controls, arrow keys on .ptab), migrate the remaining
+  alert()/confirm() flows (previewNotice, append-confirm) to dialogs, fix
+  the library h4 heading jump. Walk EVERY open/close path (export cancel,
+  batch resume, quick-look → session) with a11y-walk + export-walk before
+  handoff; drop the harness allowlist entries when done.
+- [ ] **High-contrast modes — forced-colors and prefers-contrast** — a11y
+  audit 2026-07-17. Low-likelihood platform (Windows High Contrast; the
+  owner is iPad-first) but cheap insurance: active/selected states are
+  bg-fill-only and vanish when forced-colors strips backgrounds. Add an
+  @media (forced-colors: active) block giving active states a visible
+  border/underline, and a prefers-contrast: more bump for --line/--txt-3.
+- [ ] **Manifest screenshots** — repo audit 2026-07-17: add real screenshots
+  to manifest.webmanifest for richer install/share sheets. Generate via the
+  headless-Chromium pipeline (same as icons) from a good open-photo state;
+  needs curated assets, so deferred from the setup pass. Bump the cache.
 
 ## Shipped (roadmap archive)
 

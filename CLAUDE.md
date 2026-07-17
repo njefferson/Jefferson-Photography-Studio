@@ -33,6 +33,25 @@ settled design decisions, and measured gotchas that must not be re-learned.
 Commit subjects/bodies are the in-app patch notes, read by end users from the
 ⓘ dialog. Write them for the END USER — what changed for them, not how.
 
+## Accessibility is a top priority (owner mandate, 2026-07-17)
+Color-blind-inconsiderate design is a FAIL STATE. Color must never be the only
+carrier of meaning — pair every color cue with text, a glyph, position, or a
+line-style/weight difference (the heal rings and quick-look badges are the
+model). Design-step checklist for ANY new or changed UI — applied at design
+time, not as an after-the-fact audit:
+- meaning survives grayscale; page zoom is never locked (no maximum-scale /
+  user-scalable=no — removed once already, don't reintroduce it);
+- text ≥ 4.5:1 and control rails/edges ≥ 3:1 in BOTH themes — use the
+  calibrated tokens (--txt-3, --line-2, --glass-*), never one-off colors;
+  HUDs floating over the photo use --glass-bg/--glass-txt (theme-invariant);
+- progress/state changes announce (aria-live regions present from parse),
+  modals are real <dialog>, tappables are real <button> with labels on
+  icon-only ones, targets ≥ 44px, prefers-reduced-motion honored.
+Run the a11y-walk harness (scratchpad; axe-core + custom checks, both themes)
+before any UI release, alongside the other walks. NOTES.md "## Accessibility
+standing rule" holds the full audit record and the NEVER-CHURN list of
+patterns already verified correct — do not "fix" those, do not regress them.
+
 ## Verify before claiming fixed
 - Headless Chromium harness: `npm install --no-save esbuild playwright-core`;
   the browser binary is the `/opt/pw-browsers/chromium` symlink.
