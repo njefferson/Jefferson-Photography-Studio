@@ -368,3 +368,24 @@ export function download(blob: Blob, name: string) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
+
+/** Save a file the way that actually works everywhere: the share sheet when
+ *  the platform offers one (the installed iOS app has no other save path — a
+ *  bare `a[download]` silently does nothing there), a plain download
+ *  otherwise. "cancelled" = the user closed the sheet on purpose; callers
+ *  should treat that as "keep waiting", not "saved". */
+export async function saveBlob(blob: Blob, name: string): Promise<"shared" | "downloaded" | "cancelled"> {
+  const file = new File([blob], name, { type: blob.type || "application/octet-stream" });
+  const nav = navigator as Navigator & { canShare?: (d: { files: File[] }) => boolean };
+  if (nav.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file] } as ShareData);
+      return "shared";
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return "cancelled"; // user closed the sheet
+      // Fall through to a plain download on any other failure.
+    }
+  }
+  download(blob, name);
+  return "downloaded";
+}

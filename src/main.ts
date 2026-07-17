@@ -2,7 +2,7 @@ import "./style.css";
 import { importFile, type ImportedFile, type ImageKind } from "./import";
 import { decode, type DecodedImage } from "./decode";
 import { Renderer, type EditParams } from "./gl";
-import { exportImage, download, type ExportFormat } from "./export";
+import { exportImage, saveBlob, type ExportFormat } from "./export";
 import { writeZip, crc32 } from "./zip";
 import { putFrame, eachFrame, frameMetas, frameCount, clearFrames } from "./batchstore";
 import * as Session from "./session";
@@ -3805,19 +3805,7 @@ busyClose.addEventListener("click", hideBusy);
 busySave.addEventListener("click", async () => {
   if (!pendingSave) return;
   const { blob, name } = pendingSave;
-  const file = new File([blob], name, { type: blob.type || "application/octet-stream" });
-  const nav = navigator as Navigator & { canShare?: (d: { files: File[] }) => boolean };
-  let saved = false;
-  if (nav.canShare?.({ files: [file] })) {
-    try {
-      await navigator.share({ files: [file] } as ShareData);
-      saved = true;
-    } catch (err) {
-      if ((err as Error).name === "AbortError") return; // user cancelled the sheet
-      // Fall through to a plain download on any other failure.
-    }
-  }
-  if (!saved) download(blob, name);
+  if ((await saveBlob(blob, name)) === "cancelled") return; // user closed the sheet — keep the dialog
   if (pendingSaveIsBatch) {
     // The frames are safely in the saved zip — the crash-recovery copies can go.
     await clearFrames().catch(() => {});
@@ -4296,15 +4284,17 @@ recoverBtn.addEventListener("click", async () => {
   }
 })();
 
-// Profile / LUT export — encodes the current look for reuse elsewhere.
+// Profile / LUT export — encodes the current look for reuse elsewhere. Saved
+// via the share sheet where one exists: the installed iOS app ignores a bare
+// a[download], so these buttons used to silently do nothing there.
 ui.cubeBtn.addEventListener("click", () => {
   const text = generateCube(params, { includeWB: ui.profWB.checked, title: baseName() });
-  download(new Blob([text], { type: "text/plain" }), `${baseName()}.cube`);
+  void saveBlob(new Blob([text], { type: "text/plain" }), `${baseName()}.cube`);
 });
 
 ui.dcpBtn.addEventListener("click", () => {
   const buf = generateDcp(params, currentFile?.bytes, `${baseName()} (IPS)`);
-  download(new Blob([new Uint8Array(buf)], { type: "application/octet-stream" }), `${baseName()}.dcp`);
+  void saveBlob(new Blob([new Uint8Array(buf)], { type: "application/octet-stream" }), `${baseName()}.dcp`);
 });
 
 // Tap-to-white-balance: neutralize the tapped point (foliage = the IR move).
