@@ -28,6 +28,10 @@ export interface DecodedImage {
   isRaw: boolean;
   /** Display rotation in 90-degree CW steps, from the file's Orientation tag. */
   rotate?: number;
+  /** Honesty note for the user when the open succeeded but NOT as raw — e.g.
+   *  a Canon CR2 opened via its embedded JPEG preview. The UI must surface
+   *  this (hint/alert), or the user believes they're editing raw data. */
+  previewNotice?: string;
 }
 
 /** TIFF/EXIF Orientation (tag 274) -> display rotation in 90-degree CW steps. */
@@ -60,14 +64,20 @@ export async function decode(file: ImportedFile): Promise<DecodedImage> {
         rotate: orientationToRotate(new Tiff(file.bytes).allIfds()),
       };
     } catch {
+      // Only claim High-Efficiency when the file's own Compression tag says
+      // so — a damaged classic NEF blamed on HE sends the user chasing the
+      // wrong fix.
       throw new Error(
-        "This NEF couldn't be decoded — newer Nikon “High Efficiency” NEFs (Z8/Z9) aren't supported. " +
-          "Convert it to DNG with the free Adobe DNG Converter and it will open here.",
+        nefLooksHighEfficiency(file.bytes)
+          ? "This NEF couldn't be decoded — it's a Nikon “High Efficiency” NEF (Z8/Z9, Z50 II HE/HE*), which isn't supported. " +
+              "Convert it to DNG with the free Adobe DNG Converter and it will open here."
+          : "This NEF couldn't be decoded — the file may be damaged or use a Nikon variant this app doesn't know yet. " +
+              "Converting it to DNG with the free Adobe DNG Converter usually works.",
       );
     }
   }
   if (file.kind === "dng" || file.kind === "tiff") {
-    return decodeDng(file.bytes);
+    return decodeDng(file.bytes, file);
   }
   // Unknown type: give the browser's own decoder one chance (Safari opens
   // HEIC this way), then fail with directions instead of a dead end.
@@ -77,8 +87,26 @@ export async function decode(file: ImportedFile): Promise<DecodedImage> {
     throw new Error(
       isHeic(file.bytes)
         ? "This is a HEIC photo, which this browser can't decode. Open this app in Safari to use it, or export the photo as JPEG from Photos first."
-        : "This file type isn't supported. Use JPEG, PNG, DNG or Nikon NEF — any other camera's RAW converts with the free Adobe DNG Converter.",
+        : file.rawBrand
+          ? `This is a ${file.rawBrand} raw file, which this app can't decode. ` +
+            "Convert it to DNG with the free Adobe DNG Converter and it will open here."
+          : "This file type isn't supported. Use JPEG, PNG, DNG or Nikon NEF — any other camera's RAW converts with the free Adobe DNG Converter.",
     );
+  }
+}
+
+/** True when a NEF's raw IFD carries a Compression tag OTHER than the classic
+ *  values this app decodes (34713 = Nikon compressed, 1 = uncompressed) — the
+ *  signature of the newer High-Efficiency (TicoRAW) files. Any parse trouble
+ *  returns false: never claim HE without the tag saying so. */
+function nefLooksHighEfficiency(bytes: Uint8Array): boolean {
+  try {
+    const ifds = new Tiff(bytes).allIfds();
+    const cfa = ifds.find((d) => d.num(262)[0] === PHOTO_CFA);
+    const comp = cfa?.num(259)[0];
+    return comp !== undefined && comp !== 34713 && comp !== 1;
+  } catch {
+    return false;
   }
 }
 
@@ -114,7 +142,7 @@ function make2d(w: number, h: number) {
   return { canvas, ctx };
 }
 
-async function decodeDng(bytes: Uint8Array): Promise<DecodedImage> {
+async function decodeDng(bytes: Uint8Array, file?: ImportedFile): Promise<DecodedImage> {
   const ifds = new Tiff(bytes).allIfds();
 
   // Lossy linear DNG (8-bit) -> native baseline-JPEG decode.
@@ -143,10 +171,27 @@ async function decodeDng(bytes: Uint8Array): Promise<DecodedImage> {
     };
   }
 
-  // Fallback: embedded preview.
+  // Fallback: embedded preview. A third-party raw (CR2/ARW/… — TIFF-based, so
+  // it sniffs as "dng") lands here: the open SUCCEEDS but the user must be
+  // told it's the baked-in JPEG preview, not their raw data.
   const preview = pickLargestPreview(bytes, ifds);
-  if (preview) return { ...(await decodeBitmap(preview)), isRaw: false };
-  throw new Error("No decodable image found in this DNG.");
+  if (preview) {
+    const decoded = await decodeBitmap(preview);
+    const notice = file?.rawBrand
+      ? `This is a ${file.rawBrand} raw file — the app opened its built-in JPEG preview, not the raw data. ` +
+        "For true raw editing, convert it to DNG with the free Adobe DNG Converter."
+      : undefined;
+    return { ...decoded, isRaw: false, previewNotice: notice };
+  }
+  const isDngByName = /\.dng$/i.test(file?.name ?? "");
+  throw new Error(
+    file?.rawBrand
+      ? `This is a ${file.rawBrand} raw file, which this app can't decode. ` +
+        "Convert it to DNG with the free Adobe DNG Converter and it will open here."
+      : isDngByName
+        ? "No decodable image found in this DNG."
+        : "No decodable image found in this TIFF file.",
+  );
 }
 
 /** ColorMatrix1 (tag 50721, 9 SRATIONAL) from any IFD that carries it. */

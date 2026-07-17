@@ -2676,6 +2676,10 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
   // back on after establishing the photo (see openGalleryPhoto).
   setLearnMode(false);
   updateHistVisibility();
+  // Honesty gate: a third-party raw (CR2/ARW/…) opens via its embedded JPEG
+  // preview — the user must know they are NOT editing raw data. The editor is
+  // up (welcome hidden), so an alert is the only surface that reaches them.
+  if (img.previewNotice) alert(img.previewNotice);
 }
 
 /** Reset the live edit to this photo's fresh automatic baseline (white balance,

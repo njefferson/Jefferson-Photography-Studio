@@ -12,6 +12,34 @@ export interface ImportedFile {
   bytes: Uint8Array;
   /** True when a RAW/DNG was expected by extension but the bytes are a JPEG. */
   looksTranscoded: boolean;
+  /** "Canon CR2", "Sony ARW", … when the file is a third-party camera RAW the
+   *  app can't truly decode. The decoder uses it to be honest about opening
+   *  only the embedded preview (see decode.ts) instead of silently passing
+   *  the preview off as the raw. */
+  rawBrand?: string;
+}
+
+// Third-party camera RAWs the app recognizes but cannot decode as raw sensor
+// data. Extension is the honest, cheap signal (these arrive named by the
+// camera); CR2 also gets a magic check since it shares the TIFF container.
+const RAW_BRANDS: Record<string, string> = {
+  cr2: "Canon CR2",
+  cr3: "Canon CR3",
+  arw: "Sony ARW",
+  nrw: "Nikon NRW",
+  orf: "Olympus ORF",
+  rw2: "Panasonic RW2",
+  pef: "Pentax PEF",
+  srw: "Samsung SRW",
+  raf: "Fujifilm RAF",
+};
+
+/** Identify a third-party RAW by extension (plus the CR2 magic, which shares
+ *  the TIFF container: "CR",2 at offset 8). Returns e.g. "Canon CR2". */
+export function rawBrand(name: string, bytes: Uint8Array): string | undefined {
+  if (bytes.length > 10 && bytes[8] === 0x43 && bytes[9] === 0x52 && bytes[10] === 0x02) return RAW_BRANDS.cr2;
+  const ext = name.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1];
+  return ext ? RAW_BRANDS[ext] : undefined;
 }
 
 /** Identify a file by its magic bytes, not its extension. */
@@ -46,6 +74,7 @@ export async function importFile(file: File): Promise<ImportedFile> {
       kind: refineKind(sniff(entry.bytes), name),
       bytes: entry.bytes,
       looksTranscoded: false,
+      rawBrand: rawBrand(name, entry.bytes),
     };
   }
 
@@ -55,7 +84,7 @@ export async function importFile(file: File): Promise<ImportedFile> {
   const expectedRaw = /\.(dng|nef|raw|arw|cr2|cr3|raf)$/i.test(lower);
   const looksTranscoded = expectedRaw && kind === "jpeg";
 
-  return { name: file.name, kind, bytes, looksTranscoded };
+  return { name: file.name, kind, bytes, looksTranscoded, rawBrand: kind === "jpeg" ? undefined : rawBrand(file.name, bytes) };
 }
 
 // NEF and DNG share the TIFF magic; the extension disambiguates.
