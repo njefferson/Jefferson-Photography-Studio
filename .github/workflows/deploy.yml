@@ -7,6 +7,14 @@ on:
       - staging
   workflow_dispatch:
 
+# One deploy at a time per branch, newest wins: without this, two quick pushes
+# can race and leave the OLDER build live. Cancelling mid-run is safe — a Pages
+# deployment is atomic (upload, then activate), so a cancelled upload never
+# goes live. Per-ref groups keep main and staging independent.
+concurrency:
+  group: pages-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   deploy:
     # Only main (production) and staging may deploy — a manual dispatch from a
