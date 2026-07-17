@@ -42,7 +42,7 @@ let compareImg: ImageData | null = null; // a single frame, for hold-to-compare
 // tap the SAME frame again to turn it ON/OFF (exclude it from the stack). Tapping
 // a different frame just opens that one. Everything else works as before, on the
 // frames that are still ON.
-const thumbEls: HTMLDivElement[] = [];
+const thumbEls: HTMLButtonElement[] = [];
 let shownFrameIdx: number | null = null;   // which raw frame is in the viewer (null = the stacked result)
 let shownFrameImg: ImageData | null = null; // its decoded pixels (so hold-to-compare can restore it)
 const excluded = new Set<number>();
@@ -54,6 +54,8 @@ function refreshThumbStates() {
   thumbEls.forEach((el, i) => {
     el.classList.toggle("selected", i === shownFrameIdx);
     el.classList.toggle("excluded", excluded.has(i));
+    // Real buttons announce their on/off state (frame included in the stack).
+    el.setAttribute("aria-pressed", String(!excluded.has(i)));
   });
 }
 async function showFrame(i: number) {
@@ -137,9 +139,11 @@ async function buildFilmstrip() {
     c.width = bmp.width; c.height = bmp.height;
     c.getContext("2d")!.drawImage(bmp, 0, 0);
     bmp.close();
-    const div = document.createElement("div");
+    const div = document.createElement("button");
+    div.type = "button";
     div.className = "thumb";
     div.title = `Frame ${i + 1} — tap to view, tap again to turn off`;
+    div.setAttribute("aria-label", `Frame ${i + 1}`);
     const img = document.createElement("img");
     img.src = c.toDataURL("image/jpeg", 0.7);
     const num = document.createElement("span");

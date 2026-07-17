@@ -208,6 +208,13 @@ body {
   padding-bottom: 2px; min-height: 56px;
 }
 .filmstrip .thumb {
+  /* Thumbs are real <button>s (keyboard + AT operable) — neutralize UA button
+     chrome so the visual stays the plain photo tile. */
+  appearance: none;
+  -webkit-appearance: none;
+  background: none;
+  font: inherit;
+  color: inherit;
   position: relative; height: 56px; flex: 0 0 auto; border-radius: 7px; overflow: hidden;
   border: 2px solid transparent; background: var(--surface-2);
   cursor: pointer; transition: border-color .12s, opacity .12s;
@@ -283,8 +290,8 @@ dialog#helpDlg .theme-row { display: flex; align-items: center; gap: 10px; margi
   position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
   background: var(--txt-2); transition: transform 0.15s ease, background 0.15s ease;
 }
-.theme-toggle[aria-pressed="true"] .tt-track { background: var(--accent); border-color: var(--accent); }
-.theme-toggle[aria-pressed="true"] .tt-knob { transform: translateX(18px); background: var(--accent-ink); }
+.theme-toggle[aria-checked="true"] .tt-track { background: var(--accent); border-color: var(--accent); }
+.theme-toggle[aria-checked="true"] .tt-knob { transform: translateX(18px); background: var(--accent-ink); }
 
 /* Keyboard focus: a strong, theme-consistent ring (accessibility standing
    rule). No outline:none exists anywhere — this only strengthens the default. */

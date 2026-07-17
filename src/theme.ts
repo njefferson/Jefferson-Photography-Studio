@@ -22,7 +22,7 @@ function apply(theme: "dark" | "dawn") {
   }
   // Keep every wired switch in sync (a page can have more than one).
   document.querySelectorAll<HTMLElement>(".theme-toggle").forEach((el) => {
-    el.setAttribute("aria-pressed", String(theme === "dawn"));
+    el.setAttribute("aria-checked", String(theme === "dawn"));
   });
 }
 
@@ -43,7 +43,9 @@ export function wireThemeToggle(btn: HTMLElement | null): void {
     btn.append(track, label);
   }
   btn.setAttribute("role", "switch");
-  btn.setAttribute("aria-pressed", String(currentTheme() === "dawn"));
+  // A switch takes aria-checked — aria-pressed is not valid on role=switch
+  // (axe finding, a11y release 2026-07-17).
+  btn.setAttribute("aria-checked", String(currentTheme() === "dawn"));
   btn.addEventListener("click", () => {
     apply(currentTheme() === "dawn" ? "dark" : "dawn");
   });

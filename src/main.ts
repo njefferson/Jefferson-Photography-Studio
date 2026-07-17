@@ -2650,6 +2650,9 @@ welcomeBack.addEventListener("click", returnToEditor);
 function showDecoded(img: DecodedImage, imported: ImportedFile) {
   current = img;
   currentFile = imported;
+  // The canvas is the page's central image — name it for assistive tech
+  // (role=img is set in the markup; the label tracks the open photo).
+  canvas.setAttribute("aria-label", `Photo: ${imported.name}`);
   // Every open path lands here — assume the user's own photo (no watermark);
   // openGalleryPhoto flips this right after for the bundled practice files.
   setBundledSource(false);

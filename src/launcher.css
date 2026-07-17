@@ -245,8 +245,8 @@ body {
   position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
   background: var(--txt-2); transition: transform 0.15s ease, background 0.15s ease;
 }
-.theme-toggle[aria-pressed="true"] .tt-track { background: var(--accent); border-color: var(--accent); }
-.theme-toggle[aria-pressed="true"] .tt-knob { transform: translateX(18px); background: var(--accent-ink); }
+.theme-toggle[aria-checked="true"] .tt-track { background: var(--accent); border-color: var(--accent); }
+.theme-toggle[aria-checked="true"] .tt-knob { transform: translateX(18px); background: var(--accent-ink); }
 
 /* Keyboard focus: a strong, theme-consistent ring (accessibility standing
    rule). No outline:none exists anywhere — this only strengthens the default. */

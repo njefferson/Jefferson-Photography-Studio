@@ -66,8 +66,9 @@
         </span></span>
       </header>
 
-      <div id="stage">
-        <canvas id="view"></canvas>
+      <main id="stage">
+        <h1 class="sr-only">Infrared photo editor</h1>
+        <canvas id="view" role="img" aria-label="Photo canvas — no photo open"></canvas>
         <svg id="maskOverlay" hidden aria-hidden="true"></svg>
         <svg id="healOverlay" hidden aria-hidden="true"></svg>
         <div id="cropOverlay" hidden aria-hidden="true">
@@ -113,9 +114,9 @@
         </button>
         <div id="welcome">
           <div class="welcome-cue up" id="welcomeCueUp" hidden aria-hidden="true">&#9650;</div>
-          <button id="welcomeClose" class="welcome-close" type="button" hidden>&#10005;</button>
+          <button id="welcomeClose" class="welcome-close" type="button" hidden aria-label="Close the welcome panel">&#10005;</button>
           <button id="welcomeBack" class="welcome-back" type="button" hidden>&#8249; Back to your photo</button>
-          <p id="hint">Edit infrared photos — RAW (NEF / DNG) unlocks the full color magic.</p>
+          <p id="hint" role="status" aria-live="polite">Edit infrared photos — RAW (NEF / DNG) unlocks the full color magic.</p>
           <label class="open-btn welcome-open" for="file">Open image(s)</label>
           <p class="welcome-open-hint">One photo to edit — or several to work as a session: big previews you switch between, each keeping its own edit, all held safely until you're done.</p>
           <label class="welcome-batch" id="welcomeQuickBtn" for="quickFiles">Quick look a folder…</label>
@@ -141,7 +142,7 @@
           <p class="lesson-next">When you're done: tap <strong>&#8962; Home</strong> up top for another lesson (they're on the start screen, and under <strong>Help</strong>), or <strong>Open image(s)</strong> to edit your own photo.</p>
           <button id="lessonClose" type="button">Got it</button>
         </div>
-        <button id="lessonShow" class="lesson-show" type="button" hidden>?</button>
+        <button id="lessonShow" class="lesson-show" type="button" hidden aria-label="Show the lesson">?</button>
         <!-- Learn mode: the lessons ride on the photo as numbered chips. Tap a
              number to open its card; the rail stays put so you can practice the
              same lesson across different practice photos. Built in main.ts. -->
@@ -153,7 +154,7 @@
           </div>
           <div id="sessionThumbs" class="session-thumbs"></div>
         </div>
-      </div>
+      </main>
 
       <aside id="panel" hidden>
         <!-- Segmented tab grid: six core adjustment tabs in a 2x3 grid, with
@@ -414,7 +415,7 @@
     <div id="busy" hidden>
       <div class="busy-card">
         <div class="spinner" id="busySpinner"></div>
-        <p id="busyText">Exporting…</p>
+        <p id="busyText" role="status" aria-live="polite" aria-atomic="true">Exporting…</p>
         <button id="busyStop" type="button" hidden>Stop &amp; save what's done</button>
         <div id="busyActions" hidden>
           <button id="busySave" type="button" class="primary">Save image</button>
