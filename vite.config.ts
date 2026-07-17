@@ -249,6 +249,7 @@ export default defineConfig({
         chooser: resolve(__dirname, "index.html"),
         ir: resolve(__dirname, "ir.html"),
         macro: resolve(__dirname, "macro.html"),
+        privacy: resolve(__dirname, "privacy.html"),
       },
     },
   },
