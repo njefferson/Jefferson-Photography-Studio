@@ -153,6 +153,7 @@ function notesPage(): Plugin {
     <meta name="theme-color" content="#0b0c0f" />
     <meta name="description" content="What's new in Photography Studio — release notes and what's coming next. Free, on-device photo tools." />
     <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192-light.png" />
+    <link rel="canonical" href="https://jefferson-photo-studio.pages.dev/notes" />
     <title>What's new — Photography Studio</title>
     <style>
       :root { --bg: #0b0c0f; --bg-2: #0f1014; --txt: #eef0f3; --txt-2: #a3a7b2; --txt-3: #9095a1; --line: rgba(255,255,255,0.09); --accent: #6ea0ff; }
@@ -218,6 +219,10 @@ function precacheManifest(): Plugin {
       const shell = rel
         .filter((p) => !p.startsWith("examples/")) // practice photos: on-demand, own cache
         .filter((p) => p !== "sw.js" && !p.endsWith(".map"))
+        // Cloudflare Pages CONFIG files are consumed by the platform, never
+        // served — precaching them would 404 during SW install and break the
+        // entire offline shell (addAll is all-or-nothing).
+        .filter((p) => p !== "_headers" && p !== "_redirects")
         .filter((p) => statSync(resolve(dist, p)).isFile()) // drop directory entries
         .map((p) => "./" + p);
       // The chooser PWA launches at "./" (start_url in manifest.webmanifest), so

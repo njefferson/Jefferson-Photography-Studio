@@ -1,0 +1,11 @@
+# Binary markers only — no text=auto, which would trigger a repo-wide
+# normalization diff on a live project for zero benefit.
+*.dng binary
+*.DNG binary
+*.nef binary
+*.NEF binary
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.ico binary
+*.woff2 binary

@@ -5,6 +5,7 @@
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
+  "categories": ["photo", "utilities"],
   "orientation": "any",
   "background_color": "#0b0b0d",
   "theme_color": "#0b0b0d",
