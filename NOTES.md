@@ -667,7 +667,7 @@ See **`PLAN.md`** for the full build plan.
   + export tests still pass unchanged; no page errors. STILL NEEDS THE
   OWNER'S HANDS: confirm both are gone on the real iPad, and the "photo
   shrinks a bit while cropping" tradeoff feels right.
-- [ ] **Preview-faithful exports + offline through updates** — NEXT VERSION
+- [x] **Preview-faithful exports + offline through updates** — NEXT VERSION
   (owner call 2026-07-15: after crop/straighten ships, this pair is the
   next VERSION — bump the VERSION file to 1.1 when it lands). The two big
   CONFIRMED review findings; full detail in the "Full-app review" ledger
@@ -681,6 +681,65 @@ See **`PLAN.md`** for the full build plan.
   build-time precache manifest injected into sw.js (vite plugin emits the
   hashed asset list), install-time addAll into the NEW cache, activate only
   after it's populated; keep the examples cache untouched.
+  SHIPPED — VERSION bumped 1.0 → 1.1 (cache ips-v68 → ips-v69). BOTH landed:
+  (1) EXPORT FIDELITY. Root cause confirmed exactly as the review called it: the
+  GPU preview kernels tap in PROXY texels (gl.ts `* u_texel`, u_texel = 1/proxy
+  dim), so each tap step covers `proxyFactor` native pixels; the CPU export
+  kernels tapped EVERY native pixel with the same sigmas, so exported detail was
+  ~proxyFactor× finer than previewed. Insight that kept the fix tiny AND fast:
+  because both the tap offsets AND the gaussian sigmas live in TAP-INDEX units,
+  scaling only the SAMPLING POSITIONS by proxyFactor (same 7×7 / 5×5 tap count,
+  same weight tables) reproduces the proxy-scale footprint at native res — no
+  extra taps, so export speed is unchanged. `makeRowDetail`/`makeRowDenoiser`
+  (raw/detail.ts, raw/denoise.ts) gained a `step` arg (default 1) that widens the
+  precomputed integer tap offsets (`Math.round(d*step)`) and the row-cache ring
+  to match; export.ts computes `proxyFactor` from the SOURCE (RAW = 2, the half-
+  res demosaicBinned proxy; 8-bit = max(1, maxDim/2800), toPreview's proxy) so
+  single AND batch agree with no threading. step===1 (a sub-2800 8-bit source,
+  previewed at native) leaves the sampling byte-identical — no regression there.
+  Clarity/dehaze/glow untouched (fixed-resolution maps, already proxy-invariant).
+  (2) OFFLINE THROUGH UPDATES. New `precache-manifest` vite plugin (the repo's
+  FIRST real Vite plugin) runs in `closeBundle` (after the publicDir copy), walks
+  `dist/`, and injects the full app-shell file list (35 entries: the root "./"
+  route, all three HTML entries, hashed JS/CSS, worker, fonts, all icons, all
+  manifests) into `dist/sw.js`'s `PRECACHE` placeholder — EXCLUDING the 442 MB
+  `examples/` tree, sourcemaps and sw.js itself. sw.js's install handler now
+  `addAll`s that list into the NEW cache BEFORE `skipWaiting`, so activation's
+  old-cache wipe no longer bares an empty shell; addAll's all-or-nothing means a
+  flaky network aborts the install and the OLD worker keeps serving (never a
+  half-empty shell). The version-stable EXAMPLES cache is never touched; the CACHE
+  bump stays a manual `ips-vN` edit per CLAUDE.md.
+  VERIFIED headless (Chromium; scratchpad harnesses, all fail-first proven):
+  • CROSS-RESOLUTION PARITY (the check the old equal-res harness structurally
+    couldn't do) drives the REAL kernels at two resolutions: detail/denoise run on
+    the proxy at step 1 == the preview (equal-res GPU==CPU parity already proven).
+    The fixed native export (step=proxyFactor), brought back to proxy size, lands
+    55–111× closer to the preview than the pre-fix (step 1) export for sharpen/
+    texture and 3.9× closer for denoise; the pre-fix column IS the fail-first
+    control (ratio ~1 would fail the bar). step=1 proven indistinguishable from
+    the old code (< 2.5e-4 of an 8-bit level — JIT float noise). 5/5.
+  • OFFLINE-THROUGH-UPDATES drives the built app over http://localhost: a fresh
+    install precaches the 35-entry shell; offline navigation to /ir.html and the
+    root "/" load from cache; a simulated NEW release (v70) precaches its cache at
+    install, activate wipes v69, and offline works IMMEDIATELY after — no blackout.
+    Two fail-first controls: a "buggy" update (old install = skipWaiting only)
+    leaves the new cache EMPTY and offline DOES black out, proving the harness
+    detects the very regression the fix removes. 8/8.
+  • PRIMARY-JOURNEY WALK on the built app: start screen → open a practice RAW
+    (preview 1400×932 while export decodes the 2800×1864 native CFA — the
+    proxyFactor-2 path) → apply denoise+sharpen+texture → native JPEG export
+    completes ("Ready — NIR_1638-raw.jpg"), no page errors. 5/5. (Caught the
+    CLAUDE.md waitForFunction-Promise trap mid-build — polls now read synchronous
+    state via awaited page.evaluate.)
+  NEEDS THE OWNER'S HANDS on the real iPad: (1) the exported detail LOOK vs the
+  on-screen preview on real frames — the fix matches the proxy FOOTPRINT, but the
+  exact sharpen/texture ceiling is still eyeballed (KS/KT), so expect a tuning
+  round like denoise took; the tap-spacing model samples native pixels at proxy
+  spacing (a hair of aliasing on extreme high-freq detail is possible — his call
+  if it ever shows). (2) Install this release, go fully offline, and confirm the
+  app still opens and edits after the update with NO online visit in between
+  (all measurements so far are Chromium + a simulated update, not iOS Safari's
+  own SW/storage behaviour).
 
 - [x] **RAW practice photos for every lesson** — owner ask 2026-07-14, given
   with the dust-release GO: the next release brings the RAW (binned-DNG)
@@ -1867,16 +1926,21 @@ FIXED in the 2026-07-15 review release (cache ips-v52 → ips-v53):
   "v1.0 arrives by git tag" comment).
 
 CONFIRMED but DEFERRED (each needs its own release / owner input):
-- BIGGEST: denoise/sharpen/texture run at PROXY resolution in preview but
-  NATIVE at export — every RAW export's detail character differs from what
-  was previewed (~2× kernel scale; verified 3/3, incl. that the parity
-  harness structurally can't see it — it compares equal-res mirrors). Fix =
-  scale CPU kernel tap spacing by the proxy factor at export (and the
-  detail sigmas), then re-prove parity + tune with the owner's eyes.
-- Every release still blacks out OFFLINE use until the next online visit:
-  activation wipes the old cache and nothing precaches the new shell/assets.
-  Real fix = build-time precache manifest injected into sw.js (vite plugin),
-  install-time addAll, activate-after-populate.
+- [FIXED v1.1, cache ips-v69] BIGGEST: denoise/sharpen/texture ran at PROXY
+  resolution in preview but NATIVE at export — every RAW export's detail
+  character differed from what was previewed (~2× kernel scale; the old parity
+  harness structurally couldn't see it — it compared equal-res mirrors). Fixed
+  by scaling the CPU kernels' tap SPACING by the proxy factor at export (same
+  tap count/weights — offsets and sigmas are both in tap-index units, so only
+  the sample positions widen); a new cross-resolution harness proves the native
+  export lands 55–111× closer to the preview. See the "Preview-faithful exports
+  + offline through updates" roadmap entry for the full record.
+- [FIXED v1.1, cache ips-v69] Every release blacked out OFFLINE use until the
+  next online visit: activation wiped the old cache and nothing precached the
+  new shell. Fixed with a build-time precache manifest (new `precache-manifest`
+  vite plugin injects the hashed asset list into sw.js), install-time addAll
+  into the new cache, activate-after-populate; examples cache untouched. Proven
+  headless incl. a fail-first buggy-install control. See the roadmap entry.
 - Multi-tab: two tabs of ir.html silently clobber each other's ips-session
   store (no guard). Also: lone opens still have zero crash safety.
 - .cube/.dcp saves use a bare a[download] — silently does nothing in the

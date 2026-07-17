@@ -3,8 +3,16 @@
 // Navigations are network-first (so a new deploy is picked up as soon as you're
 // online), falling back to cache when offline. Hashed build assets are
 // cache-first (their names change every build, so this is safe and fast).
-// Bumping CACHE wipes old entries on activation.
-const CACHE = "ips-v68";
+// Bumping CACHE wipes old entries on activation — but the new cache is fully
+// PRECACHED at install first (see below), so a fresh release works offline
+// immediately instead of blacking out until the next online visit.
+const CACHE = "ips-v69";
+// The whole app shell (HTML entries, hashed JS/CSS, fonts, icons, manifests) —
+// injected at build time by the precache-manifest plugin (vite.config.ts) into
+// the dist copy of this file. Empty in source so dev and direct reads stay
+// valid; production always ships a populated list. Deliberately EXCLUDES the
+// practice-photo examples (they load on demand into EXAMPLES, below).
+const PRECACHE = [/* __PRECACHE_MANIFEST__ */];
 // The practice-library RAW files (~10 MB each) live in their own VERSION-STABLE
 // cache that survives CACHE bumps — otherwise every release wipes them and a
 // tap re-downloads megabytes the user already had. Their bytes are immutable
@@ -13,8 +21,21 @@ const CACHE = "ips-v68";
 const EXAMPLES = "ips-examples-v1";
 const isExampleRaw = (url) => url.pathname.includes("/examples/") && url.pathname.endsWith(".dng");
 
-self.addEventListener("install", () => {
-  self.skipWaiting();
+self.addEventListener("install", (e) => {
+  // Populate the NEW cache BEFORE activating (the activate step wipes the old
+  // one). addAll is all-or-nothing: if a fetch fails the install aborts and the
+  // browser retries on the next visit while the OLD service worker keeps serving
+  // — so a flaky network can never leave a half-empty shell. skipWaiting only
+  // after the shell is in hand.
+  e.waitUntil(
+    (async () => {
+      if (PRECACHE.length) {
+        const c = await caches.open(CACHE);
+        await c.addAll(PRECACHE);
+      }
+      await self.skipWaiting();
+    })(),
+  );
 });
 
 self.addEventListener("activate", (e) => {

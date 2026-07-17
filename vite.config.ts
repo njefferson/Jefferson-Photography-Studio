@@ -1,6 +1,6 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import { execSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync, readdirSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 
 // Offline-first PWA, no framework. Relative base so it runs from any path
@@ -106,8 +106,45 @@ function appVersion() {
   }
 }
 
+/** Inject the built app-shell file list into the service worker so a new
+ *  release precaches itself at install time and works offline immediately
+ *  (see public/sw.js). Runs in `closeBundle`, after Vite has copied publicDir
+ *  into dist, so it sees BOTH the hashed bundles and the static shell (fonts,
+ *  icons, manifests). Excludes the huge practice-photo `examples/` tree and
+ *  sourcemaps — examples load on demand into their own version-stable cache. */
+function precacheManifest(): Plugin {
+  return {
+    name: "precache-manifest",
+    apply: "build",
+    enforce: "post",
+    closeBundle() {
+      const dist = resolve(__dirname, "dist");
+      const swPath = resolve(dist, "sw.js");
+      const rel = (readdirSync(dist, { recursive: true, encoding: "utf8" }) as string[]).map((p) =>
+        p.split("\\").join("/"),
+      );
+      const shell = rel
+        .filter((p) => !p.startsWith("examples/")) // practice photos: on-demand, own cache
+        .filter((p) => p !== "sw.js" && !p.endsWith(".map"))
+        .filter((p) => statSync(resolve(dist, p)).isFile()) // drop directory entries
+        .map((p) => "./" + p);
+      // The chooser PWA launches at "./" (start_url in manifest.webmanifest), so
+      // cache the root route too — "./index.html" answers "/index.html" but not "/".
+      if (shell.includes("./index.html")) shell.unshift("./");
+      const list = JSON.stringify([...new Set(shell)]);
+      const sw = readFileSync(swPath, "utf8");
+      const out = sw.replace("[/* __PRECACHE_MANIFEST__ */]", list);
+      // Fail the build loudly — a shipped-but-unpopulated SW would silently
+      // reintroduce the offline blackout this plugin exists to prevent.
+      if (out === sw) throw new Error("precache-manifest: placeholder not found in dist/sw.js");
+      writeFileSync(swPath, out);
+    },
+  };
+}
+
 export default defineConfig({
   base: "./",
+  plugins: [precacheManifest()],
   build: {
     target: "es2020",
     sourcemap: true,
