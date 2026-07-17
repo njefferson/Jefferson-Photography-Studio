@@ -5,7 +5,7 @@
 
 // Single source of truth for edit parameters lives in pipeline.ts so the GPU
 // preview and CPU export can never drift apart.
-import { toneEvaluator, toneIsIdentity, maskIsActive, hslIsNeutral, MAX_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, type EditParams, type LocalMap, type CropRect } from "./pipeline";
+import { toneEvaluator, toneIsIdentity, maskIsActive, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, type EditParams, type LocalMap, type CropRect } from "./pipeline";
 export type { EditParams };
 
 // A faithful 256-entry identity ramp for the tone LUT. A 2-texel [0,255] ramp
@@ -67,14 +67,15 @@ uniform sampler2D u_glowTex; // per-image blurred highlight map (see glow.ts)
 uniform float u_glow;        // 0..1 HIE halation strength
 uniform sampler2D u_toneTex; // 256x1 tone-curve LUT (identity when neutral)
 uniform float u_lum;         // global luminance: out = pow(out, 1/u_lum) (1 = neutral)
-// Local masks (radial/linear), max 4 — kept identical to pipeline.ts.
+// Local masks (up to MAX_MASKS = 8) — kept identical to pipeline.ts.
 uniform int u_maskCount;
-uniform int u_maskType[4];   // 0 = radial, 1 = linear
-uniform vec4 u_maskGeoA[4];  // radial (cx,cy,rx,ry) | linear (cx,cy,lx,ly)
-uniform vec2 u_maskGeoB[4];  // (feather, invert)
-uniform vec4 u_maskAdj[4];   // (brightness, contrast, saturation, warmth)
-uniform float u_maskHue[4];  // degrees
-uniform sampler2D u_maskTex; // brush masks packed 1-per-channel (rgba = mask 0..3)
+uniform int u_maskType[8];   // 0 = radial, 1 = linear, 2 = brush, 3 = colour, 4 = sky
+uniform vec4 u_maskGeoA[8];  // radial (cx,cy,rx,ry) | linear (cx,cy,lx,ly)
+uniform vec2 u_maskGeoB[8];  // (feather, invert)
+uniform vec4 u_maskAdj[8];   // (brightness, contrast, saturation, warmth)
+uniform float u_maskHue[8];  // degrees
+uniform int u_maskSlot[8];   // brush/sky: which packed channel (0..3); -1 otherwise
+uniform sampler2D u_maskTex; // brush/sky masks packed 1-per-channel (rgba = 4 max)
 uniform int u_readMode;      // 1 = output the mask-stage DISPLAY colour and stop
                              //     (lets the colour mask read its own key colour)
 uniform float u_hotspot;     // IR hot-spot correction (darken centre) 0..0.8
@@ -353,7 +354,9 @@ void main() {
       // Brush (painted) and sky (heuristic-generated) both read their weight
       // from the packed bitmap texture — the sky heuristic's connectivity work
       // is baked into the bitmap in JS, so there is no sky-specific shader math.
-      w = texture(u_maskTex, v_uv)[i]; // packed channel per mask
+      int s = u_maskSlot[i];       // packed channel for this mask (0..3)
+      if (s < 0) continue;         // beyond the 4-channel cap: mask is inactive
+      w = texture(u_maskTex, v_uv)[s];
       if (u_maskGeoB[i].y > 0.5) w = 1.0 - w; // invert
     } else if (u_maskType[i] == 3) {
       w = colorMaskWeight(i, cKey); // chroma-key on the fixed mask-stage colour
@@ -468,7 +471,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_spotVis", "u_maskViz"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_spotVis", "u_maskViz"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -540,13 +543,17 @@ export class Renderer {
   }
 
   /** Pack the active bitmap masks — brush (type 2) and sky (type 4) — into the
-   *  RGBA brush texture (channel per mask), re-uploading only when their content
-   *  changes. `masks` is the same filtered, ordered list used to set the
-   *  uniforms, so a mask's channel index matches its shader loop index. */
-  private updateBrushTexture(masks: EditParams["masks"]) {
+   *  RGBA brush texture, re-uploading only when their content changes. `slotOf`
+   *  maps each mask's loop index to its packed channel (0..3), or -1 for a
+   *  non-bitmap mask (and for any bitmap mask beyond the 4-channel cap). This
+   *  slot is decoupled from the global mask index, so a brush at index ≥4 still
+   *  packs into a valid channel — the shader reads via u_maskSlot to match. */
+  private updateBrushTexture(masks: EditParams["masks"], slotOf: number[]) {
     const gl = this.gl;
-    const brushes = masks.map((m, i) => ({ m, i })).filter((x) => (x.m.type === 2 || x.m.type === 4) && x.m.brush);
-    const sig = brushes.map((x) => `${x.i}:${x.m.brush!.w}x${x.m.brush!.h}:${x.m.rev ?? 0}`).join("|");
+    const brushes = masks
+      .map((m, i) => ({ m, i, slot: slotOf[i] }))
+      .filter((x) => (x.m.type === 2 || x.m.type === 4) && x.m.brush && x.slot >= 0);
+    const sig = brushes.map((x) => `${x.slot}:${x.m.brush!.w}x${x.m.brush!.h}:${x.m.rev ?? 0}`).join("|");
     if (sig === this.brushSig) return;
     this.brushSig = sig;
     gl.bindTexture(gl.TEXTURE_2D, this.brushTex);
@@ -557,10 +564,10 @@ export class Renderer {
     }
     const bw = brushes[0].m.brush!.w, bh = brushes[0].m.brush!.h;
     const packed = new Uint8Array(bw * bh * 4);
-    for (const { m, i } of brushes) {
+    for (const { m, slot } of brushes) {
       const b = m.brush!;
       if (b.w !== bw || b.h !== bh) continue; // all brush masks share one size
-      for (let p = 0; p < bw * bh; p++) packed[p * 4 + i] = b.data[p];
+      for (let p = 0; p < bw * bh; p++) packed[p * 4 + slot] = b.data[p];
     }
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, bw, bh, 0, gl.RGBA, gl.UNSIGNED_BYTE, packed);
   }
@@ -696,9 +703,18 @@ export class Renderer {
     gl.uniform1i(this.loc.u_localTex, 4);
     gl.activeTexture(gl.TEXTURE4);
     gl.bindTexture(gl.TEXTURE_2D, this.localTex);
-    // Local masks (up to MAX_MASKS = 4, the shader array size).
+    // Local masks (up to MAX_MASKS, the shader array size).
     const masks = (p.masks ?? []).filter(maskIsActive).slice(0, MAX_MASKS);
-    this.updateBrushTexture(masks);
+    // Slot map: brush(2)/sky(4) masks claim packed channels 0..3 in appearance
+    // order, decoupled from their global index so a bitmap mask beyond index 3
+    // still packs correctly; everything else (and any beyond 4 bitmap masks) is
+    // -1. The UI caps bitmap masks at 4, so the -1 fallthrough never fires there.
+    const slotOf: number[] = [];
+    let bitmapCount = 0;
+    for (const m of masks) {
+      slotOf.push((m.type === 2 || m.type === 4) && bitmapCount < MAX_BITMAP_MASKS ? bitmapCount++ : -1);
+    }
+    this.updateBrushTexture(masks, slotOf);
     gl.uniform1i(this.loc.u_maskCount, masks.length);
     if (masks.length) {
       const types = new Int32Array(MAX_MASKS);
@@ -706,6 +722,7 @@ export class Renderer {
       const geoB = new Float32Array(MAX_MASKS * 2);
       const adj = new Float32Array(MAX_MASKS * 4);
       const hue = new Float32Array(MAX_MASKS);
+      const slot = new Int32Array(MAX_MASKS).fill(-1);
       masks.forEach((m, i) => {
         types[i] = m.type;
         geoA.set(
@@ -717,12 +734,14 @@ export class Renderer {
         geoB.set([m.feather, m.invert ? 1 : 0], i * 2);
         adj.set([m.brightness, m.contrast, m.saturation, m.warmth], i * 4);
         hue[i] = m.hue;
+        slot[i] = slotOf[i];
       });
       gl.uniform1iv(this.loc.u_maskType, types);
       gl.uniform4fv(this.loc.u_maskGeoA, geoA);
       gl.uniform2fv(this.loc.u_maskGeoB, geoB);
       gl.uniform4fv(this.loc.u_maskAdj, adj);
       gl.uniform1fv(this.loc.u_maskHue, hue);
+      gl.uniform1iv(this.loc.u_maskSlot, slot);
     }
     gl.uniform1i(this.loc.u_glowTex, 1);
     gl.uniform1i(this.loc.u_toneTex, 2);

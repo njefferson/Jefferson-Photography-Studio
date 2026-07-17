@@ -6,7 +6,7 @@ import { exportImage, saveBlob, type ExportFormat } from "./export";
 import { writeZip, crc32 } from "./zip";
 import { putFrame, eachFrame, frameMetas, frameCount, clearFrames } from "./batchstore";
 import * as Session from "./session";
-import { TONE_DEFAULT, TONE_X, toneEvaluator, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, chromaVec, hsv2rgb, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, type MaskLayer, type CropRect } from "./pipeline";
+import { TONE_DEFAULT, TONE_X, toneEvaluator, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, type MaskLayer, type CropRect } from "./pipeline";
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, type HealSpot } from "./heal";
 import { generateCube } from "./lut";
 import { generateDcp } from "./dcp";
@@ -979,7 +979,9 @@ function setPanelTab(tab: PanelTab) {
     /* private mode — tab just isn't remembered across reloads */
   }
   updateScrollCues();
-  if (overlayReady) renderMaskOverlay(); // leaving Masks hides the outline; entering shows it
+  // re-entering the Masks tab restores the coverage tint (guarded: the overlay
+  // system — and maskAdjusting itself — only exists once overlayReady is set).
+  if (overlayReady) { maskAdjusting = false; renderMaskOverlay(); }
 }
 panelTabBtns.forEach((b) => b.addEventListener("click", () => setPanelTab(b.dataset.tab as PanelTab)));
 // Restore the last-used tab (default Basic).
@@ -1115,6 +1117,7 @@ updateHslUI();
 const SVGNS = "http://www.w3.org/2000/svg";
 const maskOverlay = $("maskOverlay") as unknown as SVGSVGElement;
 const maskList = $("maskList") as HTMLDivElement;
+const maskCount = $("maskCount") as HTMLParagraphElement;
 const maskEditor = $("maskEditor") as HTMLDivElement;
 const addRadialBtn = $("addRadial") as HTMLButtonElement;
 const addLinearBtn = $("addLinear") as HTMLButtonElement;
@@ -1153,10 +1156,32 @@ let overlayShape: SVGPolygonElement | SVGLineElement | null = null;
 // judge the masked result cleanly while the sliders are open; a fresh geometry
 // mask always turns it back on so its handles are there to place.
 let showMaskOutline = true;
+// Transient: while a mask slider is being dragged the heavy coverage TINT steps
+// aside so you can see your adjustment on the real photo. The thin handle
+// outline stays. This never touches showMaskOutline (the persistent preference)
+// — it clears the moment you re-engage: pick a mask, drag a handle, add a mask,
+// tap Show mask, or re-enter the Masks tab.
+let maskAdjusting = false;
 overlayReady = true; // the overlay's DOM + deps now exist (see setPanelTab)
 
+/** Step the coverage tint aside for hands-on slider tuning (outline stays).
+ *  Re-engagement (mask select / handle drag / add / Show mask / tab re-enter)
+ *  clears the flag directly at each site, so there is no matching end-helper. */
+function beginMaskAdjust() {
+  if (maskAdjusting) return;
+  maskAdjusting = true;
+  renderMaskOverlay();
+}
+
 mUI.outline.addEventListener("click", () => {
-  showMaskOutline = !showMaskOutline;
+  if (maskAdjusting) {
+    // The tint had stepped aside for slider tuning; the button's job now is to
+    // bring it back, not to flip the persistent preference.
+    maskAdjusting = false;
+    showMaskOutline = true;
+  } else {
+    showMaskOutline = !showMaskOutline;
+  }
   mUI.outline.setAttribute("aria-pressed", String(showMaskOutline));
   renderMaskOverlay();
 });
@@ -1165,8 +1190,17 @@ function currentMask(): MaskLayer | null {
   return selectedMask >= 0 && selectedMask < params.masks.length ? params.masks[selectedMask] : null;
 }
 
+/** Brush(2) and sky(4) masks share the 4-channel bitmap texture (see gl.ts) —
+ *  count how many exist so the UI can cap them independently of the total. */
+function bitmapMaskCount(): number {
+  return params.masks.reduce((n, m) => n + (m.type === 2 || m.type === 4 ? 1 : 0), 0);
+}
+
 function addMask(type: 0 | 1 | 2 | 3 | 4) {
   if (!current || params.masks.length >= MAX_MASKS) return;
+  // Brush/sky are limited further by the shared bitmap texture's 4 channels.
+  if ((type === 2 || type === 4) && bitmapMaskCount() >= MAX_BITMAP_MASKS) return;
+  maskAdjusting = false; // adding a mask re-engages the overlay
   const m = neutralMask(type);
   // A gentle default so a fresh mask does something. Colour and sky masks lean
   // on saturation (the owner's taste — make the matched area pop).
@@ -1242,6 +1276,7 @@ function deleteMask(i: number) {
 
 function selectMask(i: number) {
   selectedMask = i;
+  maskAdjusting = false; // re-engaging with a mask brings the coverage tint back
   setColorPick(false); // arming is per-mask; disarm when the selection changes
   updateMaskUI();
   renderMaskOverlay();
@@ -1270,12 +1305,21 @@ function updateMaskUI() {
   );
   const m = currentMask();
   maskEditor.hidden = !m;
-  const full = !current || params.masks.length >= MAX_MASKS;
+  const total = params.masks.length;
+  const full = !current || total >= MAX_MASKS;
+  const bitmapFull = bitmapMaskCount() >= MAX_BITMAP_MASKS;
   addRadialBtn.disabled = full;
   addLinearBtn.disabled = full;
-  addBrushBtn.disabled = full;
   addColorBtn.disabled = full;
-  addSkyBtn.disabled = full;
+  // Brush + Sky hit the bitmap cap first; a tooltip explains why when it does.
+  addBrushBtn.disabled = full || bitmapFull;
+  addSkyBtn.disabled = full || bitmapFull;
+  const bitmapHint = bitmapFull && !full ? `Up to ${MAX_BITMAP_MASKS} brush or sky masks` : "";
+  addBrushBtn.title = bitmapHint;
+  addSkyBtn.title = bitmapHint;
+  maskCount.textContent = current
+    ? `${total} of ${MAX_MASKS} mask${total === 1 ? "" : "s"}${full ? " — limit reached" : ""}`
+    : "";
   if (m) {
     mUI.brightness.value = String(m.brightness);
     mUI.contrast.value = String(m.contrast);
@@ -1343,7 +1387,7 @@ function syncMaskFromUI() {
 }
 
 for (const el of [mUI.brightness, mUI.contrast, mUI.sat, mUI.hue, mUI.warmth, mUI.feather, mUI.colorRange]) {
-  el.addEventListener("input", syncMaskFromUI);
+  el.addEventListener("input", () => { beginMaskAdjust(); syncMaskFromUI(); });
 }
 // Sky "Reach" scales the detection tolerances — regenerate the bitmap on drag
 // (cheap at the brush working resolution; one gesture coalesces to one undo
@@ -1351,6 +1395,7 @@ for (const el of [mUI.brightness, mUI.contrast, mUI.sat, mUI.hue, mUI.warmth, mU
 mUI.skyReach.addEventListener("input", () => {
   const m = currentMask();
   if (!m || m.type !== 4) return;
+  beginMaskAdjust();
   m.reach = Number(mUI.skyReach.value);
   regenerateSkyMask(m);
   updateSkyStatus();
@@ -1435,7 +1480,10 @@ function renderMaskOverlay() {
   // brush/colour/sky have no geometry to grab.
   const overlayOn = !!current && !panel.hidden && welcome.hidden && activePanelTab === "masks" && showMaskOutline && !!m;
   // Coverage tint: re-render with the shader overlay when what's shown changes.
-  const vizIdx = overlayOn ? selectedMask : -1;
+  // It also steps aside while a slider is being dragged (maskAdjusting) so the
+  // adjustment shows on the real photo — the handle outline below is unaffected.
+  const tintOn = overlayOn && !maskAdjusting;
+  const vizIdx = tintOn ? selectedMask : -1;
   if (renderer.maskViz !== vizIdx) {
     renderer.maskViz = vizIdx;
     draw();
@@ -1504,6 +1552,13 @@ function attachHandleDrag(el: SVGCircleElement, role: string) {
     e.preventDefault();
     e.stopPropagation();
     el.setPointerCapture(e.pointerId);
+    // Grabbing a handle re-engages: bring the coverage tint back so geometry
+    // placement stays fully visible. Set maskViz directly — renderMaskOverlay()
+    // would rebuild the SVG and destroy this very handle mid-drag.
+    if (maskAdjusting) {
+      maskAdjusting = false;
+      if (renderer.maskViz !== selectedMask) { renderer.maskViz = selectedMask; draw(); }
+    }
     const move = (ev: PointerEvent) => {
       const m = currentMask();
       if (!m) return;

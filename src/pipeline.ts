@@ -149,7 +149,12 @@ export function sampleLocalMap(m: LocalMap, u: number, v: number): [number, numb
   return [dec(bil(0)), dec(bil(1))];
 }
 
-export const MAX_MASKS = 4;
+export const MAX_MASKS = 8;
+
+/** Painted (brush) and sky masks pack into ONE RGBA texture on the GPU, so at
+ *  most this many of them can coexist — one per channel. Geometry/colour masks
+ *  have no such limit; the overall cap is MAX_MASKS. The UI enforces both. */
+export const MAX_BITMAP_MASKS = 4;
 
 /** A painted brush mask: a single-channel 0..255 weight bitmap at a small
  *  working resolution (bilinearly sampled). `rev` bumps on each stroke so undo
