@@ -954,8 +954,16 @@ const sectionSubEl = $("sectionSub") as HTMLElement;
 const panelSections = Array.from(panelBody.querySelectorAll<HTMLElement>(".section"));
 const panelTabBtns = Array.from(panelTabsEl.querySelectorAll<HTMLButtonElement>(".ptab"));
 
+// The mask handle overlay belongs to the Masks tab only — track the active tab
+// so switching away (or a lesson opening another tab) hides it. `overlayReady`
+// gates the refresh until the overlay's DOM + deps exist (the init call below
+// runs before they're declared).
+let activePanelTab: PanelTab = "basic";
+let overlayReady = false;
+
 function setPanelTab(tab: PanelTab) {
   if (!PANEL_TABS.includes(tab)) return;
+  activePanelTab = tab;
   panelSections.forEach((s) => (s.hidden = s.dataset.tab !== tab));
   panelTabBtns.forEach((b) => {
     const on = b.dataset.tab === tab;
@@ -971,6 +979,7 @@ function setPanelTab(tab: PanelTab) {
     /* private mode — tab just isn't remembered across reloads */
   }
   updateScrollCues();
+  if (overlayReady) renderMaskOverlay(); // leaving Masks hides the outline; entering shows it
 }
 panelTabBtns.forEach((b) => b.addEventListener("click", () => setPanelTab(b.dataset.tab as PanelTab)));
 // Restore the last-used tab (default Basic).
@@ -1120,6 +1129,7 @@ const mUI = {
   warmth: $("mWarmth") as HTMLInputElement,
   feather: $("mFeather") as HTMLInputElement,
   featherRow: $("mFeatherRow") as HTMLElement,
+  outline: $("mOutline") as HTMLButtonElement,
   invert: $("mInvert") as HTMLButtonElement,
   brushControls: $("brushControls") as HTMLElement,
   paint: $("mPaint") as HTMLButtonElement,
@@ -1139,6 +1149,17 @@ const BRUSH_MAX_EDGE = 384; // working resolution of the painted mask bitmap
 let selectedMask = -1;
 let overlayHandles: { el: SVGCircleElement; role: string }[] = [];
 let overlayShape: SVGPolygonElement | SVGLineElement | null = null;
+// User toggle: show the radial/linear handle outline on the photo. Lets you
+// judge the masked result cleanly while the sliders are open; a fresh geometry
+// mask always turns it back on so its handles are there to place.
+let showMaskOutline = true;
+overlayReady = true; // the overlay's DOM + deps now exist (see setPanelTab)
+
+mUI.outline.addEventListener("click", () => {
+  showMaskOutline = !showMaskOutline;
+  mUI.outline.setAttribute("aria-pressed", String(showMaskOutline));
+  renderMaskOverlay();
+});
 
 function currentMask(): MaskLayer | null {
   return selectedMask >= 0 && selectedMask < params.masks.length ? params.masks[selectedMask] : null;
@@ -1163,6 +1184,7 @@ function addMask(type: 0 | 1 | 2 | 3 | 4) {
   if (type === 4) regenerateSkyMask(m); // detect the sky now (fills m.brush)
   params.masks.push(m);
   selectedMask = params.masks.length - 1;
+  if (type === 0 || type === 1) showMaskOutline = true; // a new geometry mask shows its handles
   setPanelTab("masks"); // reveal the just-created mask's editor in its own tab
   updateMaskUI();
   renderMaskOverlay();
@@ -1263,6 +1285,9 @@ function updateMaskUI() {
     mUI.feather.value = String(m.feather);
     // Feather is the soft edge for radial, colour AND sky masks (transition width).
     mUI.featherRow.hidden = m.type !== 0 && m.type !== 3 && m.type !== 4;
+    // The overlay toggle governs the coverage tint (all types) + the handle
+    // outline (radial/linear), so it's available for every mask.
+    mUI.outline.setAttribute("aria-pressed", String(showMaskOutline));
     mUI.brushControls.hidden = m.type !== 2;
     mUI.colorControls.hidden = m.type !== 3;
     mUI.skyControls.hidden = m.type !== 4;
@@ -1404,10 +1429,18 @@ function mkHandle(role: string): SVGCircleElement {
 // which would destroy the element holding the pointer capture.
 function renderMaskOverlay() {
   const m = currentMask();
-  // Brush, colour and sky masks have no geometry handles — the paint / the
-  // colour key / the detected region itself is the feedback. Only radial (0)
-  // and linear (1) masks draw a handle overlay.
-  const showable = !!current && !panel.hidden && welcome.hidden && !!m && (m.type === 0 || m.type === 1);
+  // The mask overlay is live only while the Masks tab is open and the user
+  // hasn't hidden it. The COVERAGE tint (drawn in the shader) works for every
+  // mask type; the handle OUTLINE only exists for radial (0) / linear (1) —
+  // brush/colour/sky have no geometry to grab.
+  const overlayOn = !!current && !panel.hidden && welcome.hidden && activePanelTab === "masks" && showMaskOutline && !!m;
+  // Coverage tint: re-render with the shader overlay when what's shown changes.
+  const vizIdx = overlayOn ? selectedMask : -1;
+  if (renderer.maskViz !== vizIdx) {
+    renderer.maskViz = vizIdx;
+    draw();
+  }
+  const showable = overlayOn && !!m && (m.type === 0 || m.type === 1);
   maskOverlay.toggleAttribute("hidden", !showable);
   overlayHandles = [];
   overlayShape = null;

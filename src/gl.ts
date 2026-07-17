@@ -93,6 +93,7 @@ uniform float u_texture; // -1..1 mid-freq local contrast — see raw/detail.ts
 uniform vec2 u_texel;    // 1/textureSize
 uniform float u_split;   // compare divider: denoise applies where uv.x >= split
 uniform int u_spotVis;   // 1 = "Visualize spots": amplified high-pass luma view
+uniform int u_maskViz;   // >=0 = show that mask's coverage as a preview overlay
 
 const vec3 LUMA_W = vec3(0.2126, 0.7152, 0.0722);
 
@@ -340,6 +341,10 @@ void main() {
   // and stacking order can't shift the selection. Matches compileEdit.
   vec3 cKey = c;
 
+  // Captured weight of the mask being visualised (u_maskViz), for the coverage
+  // overlay at the end. 0 where that mask doesn't reach.
+  float vizW = 0.0;
+
   // Local masks: each adjustment weighted by the mask, in linear space before
   // global contrast/gamma. Identical math to compileEdit in pipeline.ts.
   for (int i = 0; i < u_maskCount; i++) {
@@ -355,6 +360,7 @@ void main() {
     } else {
       w = maskWeight(i, v_uv);
     }
+    if (i == u_maskViz) vizW = w; // the true post-invert coverage of the shown mask
     if (w <= 0.0) continue;
     vec4 adj = u_maskAdj[i]; // brightness, contrast, saturation, warmth
     c.r *= 1.0 + 0.5 * adj.w * w;
@@ -406,6 +412,19 @@ void main() {
   }
   // Global luminance rides on top of the tone curve (endpoints pinned).
   if (u_lum != 1.0) g = pow(clamp(g, 0.0, 1.0), vec3(1.0 / u_lum));
+
+  // Mask coverage overlay (preview only; u_maskViz = the selected mask, -1 off).
+  // Shows exactly which pixels the mask affects, feather and all, for ANY mask
+  // type (radial/linear also draw handles over this). The covered area keeps
+  // its colour under a cool tint; everything else dims + desaturates — so the
+  // region reads by SHAPE and BRIGHTNESS, not colour alone (accessibility
+  // rule), and stays visible over any content, even same-hue. Never exported.
+  if (u_maskViz >= 0) {
+    float cov = clamp(vizW, 0.0, 1.0);
+    vec3 inside = mix(g, vec3(0.20, 0.85, 1.0), 0.32);
+    vec3 outside = mix(vec3(dot(g, LUMA_W)), g, 0.5) * 0.5;
+    g = mix(outside, inside, cov);
+  }
   frag = vec4(g, 1.0);
 }`;
 
@@ -449,7 +468,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_spotVis"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_spotVis", "u_maskViz"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -630,7 +649,7 @@ export class Renderer {
    *  "read" pass (histogram, tap-pick, colour-key) — those work in TRUE
    *  image-uv (see readUvPixel's doc comment), which crop/straighten would
    *  otherwise remap out from under callers like clientToImageUv. */
-  private bindPipeline(p: EditParams, split: number, rot: number, readMode = 0, spotVis = 0, applyCrop = true) {
+  private bindPipeline(p: EditParams, split: number, rot: number, readMode = 0, spotVis = 0, applyCrop = true, maskViz = -1) {
     const gl = this.gl;
     gl.useProgram(this.prog);
     gl.uniform1i(this.loc.u_tex, 0);
@@ -643,6 +662,7 @@ export class Renderer {
     gl.uniform1f(this.loc.u_dispAspect, dispAspect);
     gl.uniform1i(this.loc.u_readMode, readMode);
     gl.uniform1i(this.loc.u_spotVis, spotVis);
+    gl.uniform1i(this.loc.u_maskViz, maskViz);
     gl.uniform1f(this.loc.u_denoise, p.denoise);
     gl.uniform1f(this.loc.u_sharpen, p.sharpen ?? 0);
     gl.uniform1f(this.loc.u_texture, p.texture ?? 0);
@@ -721,6 +741,10 @@ export class Renderer {
    *  histogram, colour picks — always see the real edit). */
   spotVis = false;
 
+  /** Index of the mask whose coverage to overlay on the ON-SCREEN render, or -1
+   *  for none (offscreen/export never see it — like spotVis). */
+  maskViz = -1;
+
   /** @param split 0..1 — denoise applies right of this fraction (0 = whole image). */
   render(p: EditParams, split = 0) {
     const gl = this.gl;
@@ -733,7 +757,7 @@ export class Renderer {
     this.straighten = p.straighten ?? 0;
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-    this.bindPipeline(p, split, this.rotQ, 0, this.spotVis ? 1 : 0);
+    this.bindPipeline(p, split, this.rotQ, 0, this.spotVis ? 1 : 0, true, this.maskViz);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 
