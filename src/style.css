@@ -641,6 +641,12 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   padding: 0;
   border-radius: 50%;
 }
+/* Invisible hit-area extension to the 44px minimum — visual dot unchanged. */
+.welcome-close::before {
+  content: "";
+  position: absolute;
+  inset: -7px;
+}
 /* The start screen SAYS it scrolls (the button-row lesson, owner rule
    2026-07-14; his 2026-07-15 screenshot: the card ended at the fold and the
    tutorial grid below looked like nothing). A sticky fade + chevron rides the
@@ -1136,6 +1142,7 @@ label.open-btn, label.bar-btn {
   z-index: 11;
 }
 .chip {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1151,6 +1158,12 @@ label.open-btn, label.bar-btn {
   cursor: pointer;
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
+}
+/* Invisible vertical hit extension to the 44px minimum (visual pill 34px). */
+.chip::before {
+  content: "";
+  position: absolute;
+  inset: -5px 0;
 }
 .chip .chip-n {
   display: inline-flex;
@@ -1191,7 +1204,7 @@ label.open-btn, label.bar-btn {
 }
 .ptab {
   width: 100%;
-  padding: 8px 4px;
+  padding: 15px 4px; /* 44px total target (accessibility standing rule) */
   border-radius: 9px;
   border: 1px solid var(--line);
   background: var(--surface-2);
@@ -1395,7 +1408,7 @@ label.open-btn, label.bar-btn {
 }
 .a2hs .share-ico { color: var(--accent); font-size: 15px; }
 .a2hs button { width: auto; padding: 5px 10px; font-size: 13px; }
-.a2hs .a2hs-close { background: none; border: none; color: var(--txt-3); font-size: 14px; cursor: pointer; }
+.a2hs .a2hs-close { background: none; border: none; color: var(--txt-3); font-size: 14px; cursor: pointer; padding: 12px; margin: -12px; }
 .hsl-chips { display: flex; gap: 8px; margin: 10px 0; flex-wrap: wrap; justify-content: center; }
 .hsl-chip {
   width: 28px;
@@ -1617,4 +1630,19 @@ label.open-btn, label.bar-btn {
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+/* Motion sensitivity: stop the infinite spinner and calm every transition
+   when the OS asks (accessibility standing rule). The busy readout's text
+   percentage remains the progress signal. */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  .spinner {
+    animation: none !important;
+    border-top-color: var(--line-2) !important;
+  }
 }

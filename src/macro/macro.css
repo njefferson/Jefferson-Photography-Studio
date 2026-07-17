@@ -299,3 +299,18 @@ dialog#helpDlg .theme-row { display: flex; align-items: center; gap: 10px; margi
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* Motion sensitivity: stop the infinite spinner and calm every transition
+   when the OS asks (accessibility standing rule). The busy readout's text
+   percentage remains the progress signal. */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  .spinner {
+    animation: none !important;
+    border-top-color: var(--line-2) !important;
+  }
+}
