@@ -49,43 +49,53 @@ function versionFor(fullHash: string, base: string, baseCommit: string): string 
   return `0.${git(`git rev-list --count ${fullHash}`)}`;
 }
 
-/** Last 5 commits, injected at build time so every deploy carries its own
- *  changelog (surfaced behind the ⓘ button in the app header), each with its
- *  real version number. */
-function changelog() {
+/** Internal housekeeping commits (planning notes, docs, CI) are real history
+ *  but not user-facing changes — they must not read as "What's new". */
+const INTERNAL_SUBJECT = /^(Roadmap|Notes|Docs|Internal|Chore):/i;
+
+/** The last `want` USER-FACING commits (internal subjects filtered out), each
+ *  with its real version number. Shared by the in-app changelog and the public
+ *  notes.html page. Reads extra history so the filter can't starve the list. */
+function filteredLog(want: number) {
   try {
     const base = versionBase();
     const baseCommit = versionCommit();
-    const out = git('git log -5 --pretty=format:"%h|%H|%ad|%s" --date=short');
+    const out = git(`git log -${want * 2 + 10} --pretty=format:"%h|%H|%ad|%s" --date=short`);
     return out
       .split("\n")
       .filter(Boolean)
       .map((line) => {
         const [hash, full, date, ...rest] = line.split("|");
         return { hash, date, subject: rest.join("|"), version: versionFor(full, base, baseCommit) };
-      });
+      })
+      .filter((c) => !INTERNAL_SUBJECT.test(c.subject))
+      .slice(0, want);
   } catch {
     return [];
   }
 }
 
-/** The in-app Roadmap, parsed from the "Next capability release" section of
- *  NOTES.md so that section stays the single source of truth (see the note at
- *  the top of it). Each `- [ ]`/`- [x]` bullet becomes one item; the shown
- *  title is the text up to the first " — ", stripped of markdown emphasis. */
-function roadmap() {
+/** Last 5 user-facing commits, injected at build time so every deploy carries
+ *  its own changelog (surfaced behind the ⓘ button in the app header). */
+function changelog() {
+  return filteredLog(5);
+}
+
+/** Checkbox bullets under a `## ` heading of NOTES.md. Each `- [ ]`/`- [x]`
+ *  bullet becomes one item; the shown title is the full **bold span** when the
+ *  item leads with one (so an inner em-dash survives), else text before " — ",
+ *  stripped of markdown emphasis. */
+function checklist(headingRe: RegExp) {
   try {
     const notes = readFileSync(new URL("./NOTES.md", import.meta.url), "utf8");
     const lines = notes.split("\n");
-    const start = lines.findIndex((l) => /^##\s+Next capability release/i.test(l));
+    const start = lines.findIndex((l) => headingRe.test(l));
     if (start < 0) return [];
     const items: { done: boolean; title: string }[] = [];
     for (let i = start + 1; i < lines.length; i++) {
       if (/^##\s/.test(lines[i])) break; // stop at the next section heading
       const m = lines[i].match(/^-\s+\[([ xX])\]\s+(.+)$/);
       if (!m) continue;
-      // Title = the full **bold span** when the item leads with one (so an
-      // em-dash INSIDE the title survives); otherwise text before " — ".
       const bold = m[2].match(/^\*\*(.+?)\*\*/);
       const title = (bold ? bold[1] : m[2].split(" — ")[0])
         .replace(/\*\*|`|_/g, "") // drop markdown emphasis
@@ -98,12 +108,94 @@ function roadmap() {
   }
 }
 
+/** The in-app Roadmap: the OPEN queue of the "Next capability release" section
+ *  (its source-of-truth note explains the format). Shipped items live in the
+ *  "## Shipped (roadmap archive)" section, rendered only on notes.html. */
+function roadmap() {
+  return checklist(/^##\s+Next capability release/i);
+}
+
 function appVersion() {
   try {
     return versionFor(git("git rev-parse HEAD"), versionBase(), versionCommit());
   } catch {
     return versionBase() || "dev";
   }
+}
+
+const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/** Emit `dist/notes.html` — the PUBLIC "What's new & roadmap" page the ⓘ
+ *  dialog's "More" links point at (the repo is private, so GitHub links 404
+ *  for everyone; this page is the shareable home for update history). All
+ *  content is build-time-derived: the filtered git log plus the two NOTES.md
+ *  checklist sections. MUST be listed before precacheManifest() in `plugins`
+ *  so the file is on disk when the precache manifest walks dist (guaranteed
+ *  anyway by that plugin's enforce:"post", but keep the order honest). */
+function notesPage(): Plugin {
+  return {
+    name: "notes-page",
+    apply: "build",
+    closeBundle() {
+      const version = appVersion();
+      const log = filteredLog(50);
+      const coming = checklist(/^##\s+Next capability release/i).filter((i) => !i.done);
+      const shipped = checklist(/^##\s+Shipped \(roadmap archive\)/i)
+        .filter((i) => i.done)
+        .reverse() // NOTES keeps newest last; readers want newest first
+        .slice(0, 12);
+      const li = (s: string) => `      <li>${s}</li>`;
+      const html = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0c0f" />
+    <meta name="description" content="What's new in Photography Studio — release notes and what's coming next. Free, on-device photo tools." />
+    <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192-light.png" />
+    <title>What's new — Photography Studio</title>
+    <style>
+      :root { --bg: #0b0c0f; --bg-2: #0f1014; --txt: #eef0f3; --txt-2: #a3a7b2; --txt-3: #6b6f79; --line: rgba(255,255,255,0.09); --accent: #6ea0ff; }
+      * { box-sizing: border-box; }
+      body { margin: 0; padding: 2rem 1.2rem 4rem; background: radial-gradient(120% 90% at 50% 0%, var(--bg-2), var(--bg)); min-height: 100vh; color: var(--txt); font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+      main { max-width: 620px; margin: 0 auto; }
+      a { color: var(--accent); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      h1 { font-size: 1.6rem; margin: 0.4rem 0 0.2rem; letter-spacing: -0.02em; }
+      h2 { font-size: 1.05rem; margin: 2.2rem 0 0.6rem; padding-top: 1.2rem; border-top: 1px solid var(--line); }
+      .ver { color: var(--txt-2); font-size: 0.9rem; margin: 0 0 1.6rem; }
+      ul { list-style: none; margin: 0; padding: 0; }
+      li { padding: 0.45rem 0; border-bottom: 1px solid var(--line); color: var(--txt); }
+      li small { display: block; color: var(--txt-3); font-variant-numeric: tabular-nums; }
+      li.coming::before { content: "→ "; color: var(--accent); }
+      li.shipped::before { content: "✓ "; color: var(--txt-3); }
+      footer { margin-top: 2.6rem; color: var(--txt-3); font-size: 0.85rem; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <a href="./index.html">&#8249; Studio</a>
+      <h1>What's new</h1>
+      <p class="ver">Photography Studio — currently version ${esc(version)}. Free, on-device photo tools: nothing you open ever leaves your device.</p>
+      <ul>
+${log.map((c) => li(`${esc(c.subject)}<small>v${esc(c.version)} · ${esc(c.date)}</small>`)).join("\n")}
+      </ul>
+      <h2 id="roadmap">Coming next</h2>
+      <ul>
+${coming.map((i) => li(`<span class="coming-t">${esc(i.title)}</span>`)).join("\n").replace(/<li>/g, '<li class="coming">')}
+      </ul>
+      <h2>Recently shipped</h2>
+      <ul>
+${shipped.map((i) => li(esc(i.title))).join("\n").replace(/<li>/g, '<li class="shipped">')}
+      </ul>
+      <footer><a href="./index.html">Open the Studio</a> · <a href="./privacy.html">Privacy — everything stays on your device</a></footer>
+    </main>
+  </body>
+</html>
+`;
+      writeFileSync(resolve(__dirname, "dist", "notes.html"), html);
+    },
+  };
 }
 
 /** Inject the built app-shell file list into the service worker so a new
@@ -144,7 +236,7 @@ function precacheManifest(): Plugin {
 
 export default defineConfig({
   base: "./",
-  plugins: [precacheManifest()],
+  plugins: [notesPage(), precacheManifest()],
   build: {
     target: "es2020",
     sourcemap: true,

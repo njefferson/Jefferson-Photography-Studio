@@ -118,6 +118,101 @@ See **`PLAN.md`** for the full build plan.
 > short bold title so the parser stays reliable. Editing this list updates
 > the app on the next deploy. Both the roadmap and the patch notes (last
 > commits) refresh automatically on push.
+> Shipped items move to the "## Shipped (roadmap archive)" section below
+> (same format, full SHIPPED records) so the in-app roadmap shows only
+> what's genuinely coming; notes.html renders the archive as "Recently
+> shipped". Keep this section to OPEN items only.
+
+- [ ] **Full-bleed alignment view — the tilted photo fills the screen** — owner-caught on device
+  2026-07-16 (with the crop go-to-main; screenshot IMG_6201, Straighten @ 23.6°).
+  While a geometry tool is armed, rotating and pinch-zooming CLIPS the photo
+  inside the `#view` box: the tilted/zoomed photo is letterboxed and cut by
+  `#view`'s rounded-rect edges, so black wedges show at the rotated corners and
+  the alignment grid floats over the black margins — the picture is "boxed"
+  instead of filling the screen. Mechanism: the armed preview renders into the
+  contained `#view` canvas (`object-fit:contain`), so a tilted + `viewZoom`
+  photo doesn't fill the axis-aligned `#view`. Owner's call: this gets fixed when
+  the image is simply made completely visible below everything — i.e. it's
+  SUBSUMED by the "Crop view: let the photo overflow instead of boxing it" and
+  "Big image: the photo fills the app" items below (the photo becomes the
+  full-bleed background and the tilt/zoom view stops clipping). No fix in
+  isolation; presentation-only, nothing touches the pipeline or export.
+- [ ] **Big image: the photo fills the app, menus float over it** — owner
+  direction 2026-07-16, given as he ended the session and moved to a new one.
+  STILL AN IDEA — he says so plainly, expect design questions. The vision: the
+  open photo is the BACKGROUND everywhere in the app, not boxed inside a stage.
+  The picture fills the screen (overflowing behind as needed) and EVERY control
+  — the top bar, the editor drawer/tabs, histogram, lesson chips, crop aids,
+  banners — FLOATS over it. One coherent feel across the WHOLE app, not just the
+  crop tool. The "let the photo overflow" crop item below is the FIRST concrete
+  instance of this pattern: build it as the pilot, learn the design answers on
+  it, then generalise outward. OPEN DESIGN QUESTIONS to settle WITH HIM as it
+  takes shape (don't guess these — they're his taste calls): do floating panels
+  sit opaque over the photo, or scrim/blur the photo behind them for legibility
+  (white controls over a bright IR sky need contrast)? how do the adjustment
+  drawer and a full-bleed photo coexist in portrait, where the drawer claims
+  ~45dvh today? is the photo always fit-to-screen, or can it pan/zoom freely
+  under the chrome? what happens to the start screen vs an open photo — does the
+  gallery also float over something? do the floating menus eat taps meant for the
+  photo, or pass through where empty? NON-GOAL: nothing here touches the pipeline
+  or export — it's a presentation/layout direction. Scope as its own design pass
+  (likely several); the crop overflow-view ships first and proves the model.
+- [ ] **Full-bleed crop — the photo flows behind the crop tools** — owner design
+  question 2026-07-16 (the FIRST instance of the "big image" direction above):
+  why must the photo be bound inside a "view box" (the
+  letterboxed `#view` rect) at all while cropping? Could it simply OVERFLOW — the
+  photo fills/extends behind everything, with the crop box, grid, Straighten pill
+  and Done just floating over it (no black frame around the picture while you
+  align)? Worth a future UI pass. Today the armed preview renders into the
+  contained `#view` canvas (object-fit:contain, so a tilted/zoomed photo is
+  letterboxed and `positionCropOverlay` maps the box onto that drawn rect via
+  `viewImageRect`). An overflow model lets the GL canvas bleed to the screen
+  edges behind the floating controls — the photo becomes the background, the aids
+  float. This likely SUBSUMES the clamp bug above (photo fills the screen, box
+  clamps to the photo). Non-trivial: canvas sizing, the box↔photo mapping, pinch
+  anchoring, and the OS-edge insets (`.cropping`) all assume the contained
+  `#view`. Scope as its own UI release; decide it alongside the clamp fix.
+- [ ] **More composition overlays** — owner ask 2026-07-16, optional, for anyone
+  who wants them: beyond the rule-of-thirds grid, offer selectable composition
+  guides while cropping — golden-ratio (phi) grid, golden spiral, the diagonal
+  method, a finer grid, and a centre cross. Thirds stays the default. Build
+  notes: the guides are one element `#cropGuides` inside `#cropBox`, drawn as
+  hairline CSS repeating-linear-gradients and toggled per focus by
+  `.focus-crop` / `.focus-straighten` on `#cropOverlay` (main.ts `setGeoMode`,
+  positioned in `positionCropOverlay`; styles in style.css). Add a small
+  overlay-style picker (a cycle button or segmented control) in the crop tool
+  that sets a class/data-attr on `#cropGuides`; each style is its own hairline
+  background layer (the golden spiral needs an inline SVG, not a gradient). Keep
+  them subtle (match `--line`), per-focus, and remember the last choice in
+  localStorage like the panel tab. Non-goal: nothing touches the pipeline or
+  export — overlay-only, exactly like the thirds grid.
+- [ ] **Learning library tile in the grid** — owner verdict 2026-07-15 (given
+  WITH the go to main): the dashed "Browse the full example library" pill is
+  "completely missable, and most people would never know it was there — it's
+  at the bottom and does not stand out." DESIGN HE WANTS: a TILE inside the
+  tutorial grid itself that looks like SEVERAL PHOTOS STACKED behind one
+  another, labeled "Learning library", opening the same full-screen library
+  overlay. Build notes: make it the grid's last tile (a .gal sibling so it
+  inherits tile sizing); the stacked-photos look can be 2-3 offset/rotated
+  layers using real thumbs from non-tutorial tiles (e.g. three library-only
+  frames — honest, they ARE in there) with the label where other tiles show
+  theirs; keep the photo count on the tile ("53 photos"); REMOVE the dashed
+  pill when the tile ships (one way in, not two). The suite's library checks
+  (opens/closes, six groups, empty "More") carry over — only the entry
+  affordance changes.
+- [ ] **Mask by subject / background** — auto-select the subject or the
+  background (owner request 2026-07-05). Honest scoping: true subject/background
+  segmentation needs an on-device ML model (WebGPU — the "frontier" backlog
+  item); there is no classical stand-in the way sky had one. Architect as a mask
+  type so it slots into the same engine when ready.
+
+## Shipped (roadmap archive)
+
+> The completed "Next capability release" items, newest last, with their
+> full SHIPPED/verification records — the project memory sessions must
+> still read. Moved out of the queue section so the in-app roadmap parser
+> (vite.config.ts, stops at the next `## `) no longer renders all of dev
+> history to end users (share-readiness audit, 2026-07-17).
 
 - [x] **Guide lines in Straighten & Crop** — owner ask 2026-07-15 (his third
   crop pass): thin-line overlays to align against, one per geometry tool.
@@ -459,69 +554,6 @@ See **`PLAN.md`** for the full build plan.
   iPhone/iPad that the box now stops at the photo edge on a resize/pan after a
   straighten or crop, and that the corner "slides back to fit" feel is natural.
   Still pairs with the overflow-view idea below (reframes "outside the image").
-- [ ] **Tilt + zoom clips the photo in its box** — owner-caught on device
-  2026-07-16 (with the crop go-to-main; screenshot IMG_6201, Straighten @ 23.6°).
-  While a geometry tool is armed, rotating and pinch-zooming CLIPS the photo
-  inside the `#view` box: the tilted/zoomed photo is letterboxed and cut by
-  `#view`'s rounded-rect edges, so black wedges show at the rotated corners and
-  the alignment grid floats over the black margins — the picture is "boxed"
-  instead of filling the screen. Mechanism: the armed preview renders into the
-  contained `#view` canvas (`object-fit:contain`), so a tilted + `viewZoom`
-  photo doesn't fill the axis-aligned `#view`. Owner's call: this gets fixed when
-  the image is simply made completely visible below everything — i.e. it's
-  SUBSUMED by the "Crop view: let the photo overflow instead of boxing it" and
-  "Big image: the photo fills the app" items below (the photo becomes the
-  full-bleed background and the tilt/zoom view stops clipping). No fix in
-  isolation; presentation-only, nothing touches the pipeline or export.
-- [ ] **Big image: the photo fills the app, menus float over it** — owner
-  direction 2026-07-16, given as he ended the session and moved to a new one.
-  STILL AN IDEA — he says so plainly, expect design questions. The vision: the
-  open photo is the BACKGROUND everywhere in the app, not boxed inside a stage.
-  The picture fills the screen (overflowing behind as needed) and EVERY control
-  — the top bar, the editor drawer/tabs, histogram, lesson chips, crop aids,
-  banners — FLOATS over it. One coherent feel across the WHOLE app, not just the
-  crop tool. The "let the photo overflow" crop item below is the FIRST concrete
-  instance of this pattern: build it as the pilot, learn the design answers on
-  it, then generalise outward. OPEN DESIGN QUESTIONS to settle WITH HIM as it
-  takes shape (don't guess these — they're his taste calls): do floating panels
-  sit opaque over the photo, or scrim/blur the photo behind them for legibility
-  (white controls over a bright IR sky need contrast)? how do the adjustment
-  drawer and a full-bleed photo coexist in portrait, where the drawer claims
-  ~45dvh today? is the photo always fit-to-screen, or can it pan/zoom freely
-  under the chrome? what happens to the start screen vs an open photo — does the
-  gallery also float over something? do the floating menus eat taps meant for the
-  photo, or pass through where empty? NON-GOAL: nothing here touches the pipeline
-  or export — it's a presentation/layout direction. Scope as its own design pass
-  (likely several); the crop overflow-view ships first and proves the model.
-- [ ] **Crop view: let the photo overflow instead of boxing it** — owner design
-  question 2026-07-16 (the FIRST instance of the "big image" direction above):
-  why must the photo be bound inside a "view box" (the
-  letterboxed `#view` rect) at all while cropping? Could it simply OVERFLOW — the
-  photo fills/extends behind everything, with the crop box, grid, Straighten pill
-  and Done just floating over it (no black frame around the picture while you
-  align)? Worth a future UI pass. Today the armed preview renders into the
-  contained `#view` canvas (object-fit:contain, so a tilted/zoomed photo is
-  letterboxed and `positionCropOverlay` maps the box onto that drawn rect via
-  `viewImageRect`). An overflow model lets the GL canvas bleed to the screen
-  edges behind the floating controls — the photo becomes the background, the aids
-  float. This likely SUBSUMES the clamp bug above (photo fills the screen, box
-  clamps to the photo). Non-trivial: canvas sizing, the box↔photo mapping, pinch
-  anchoring, and the OS-edge insets (`.cropping`) all assume the contained
-  `#view`. Scope as its own UI release; decide it alongside the clamp fix.
-- [ ] **More composition overlays** — owner ask 2026-07-16, optional, for anyone
-  who wants them: beyond the rule-of-thirds grid, offer selectable composition
-  guides while cropping — golden-ratio (phi) grid, golden spiral, the diagonal
-  method, a finer grid, and a centre cross. Thirds stays the default. Build
-  notes: the guides are one element `#cropGuides` inside `#cropBox`, drawn as
-  hairline CSS repeating-linear-gradients and toggled per focus by
-  `.focus-crop` / `.focus-straighten` on `#cropOverlay` (main.ts `setGeoMode`,
-  positioned in `positionCropOverlay`; styles in style.css). Add a small
-  overlay-style picker (a cycle button or segmented control) in the crop tool
-  that sets a class/data-attr on `#cropGuides`; each style is its own hairline
-  background layer (the golden spiral needs an inline SVG, not a gradient). Keep
-  them subtle (match `--line`), per-focus, and remember the last choice in
-  localStorage like the panel tab. Non-goal: nothing touches the pipeline or
-  export — overlay-only, exactly like the thirds grid.
 - [x] **Redo** — owner ask 2026-07-15: add a Redo button + function next to
   "Go back", and RENAME "Go back" to "Undo" (unless a reason surfaces not to).
   Build notes: the undo stack already exists (undoStack + settled/flushRecord);
@@ -549,20 +581,6 @@ See **`PLAN.md`** for the full build plan.
   ("53 photos · 44 RAW") is KEPT — it's an aggregate over a mixed set (44 DNG + 9
   JPEG), a different context, and stays honest. VERIFIED headless: no tile label
   contains "RAW"; the libCount readout still does.
-- [ ] **Learning library tile in the grid** — owner verdict 2026-07-15 (given
-  WITH the go to main): the dashed "Browse the full example library" pill is
-  "completely missable, and most people would never know it was there — it's
-  at the bottom and does not stand out." DESIGN HE WANTS: a TILE inside the
-  tutorial grid itself that looks like SEVERAL PHOTOS STACKED behind one
-  another, labeled "Learning library", opening the same full-screen library
-  overlay. Build notes: make it the grid's last tile (a .gal sibling so it
-  inherits tile sizing); the stacked-photos look can be 2-3 offset/rotated
-  layers using real thumbs from non-tutorial tiles (e.g. three library-only
-  frames — honest, they ARE in there) with the label where other tiles show
-  theirs; keep the photo count on the tile ("53 photos"); REMOVE the dashed
-  pill when the tile ships (one way in, not two). The suite's library checks
-  (opens/closes, six groups, empty "More") carry over — only the entry
-  affordance changes.
 - [x] **Crop & straighten** — owner GO 2026-07-15 ("quick addition", one
   release not a saga). The last table-stakes editing tool before the App
   Store path. SHIPPED to `claude/crop-straighten-jx2a0t`, not yet pushed to
@@ -1817,11 +1835,6 @@ See **`PLAN.md`** for the full build plan.
   like the other masks. GPU==CPU verified ≤1 LSB (solo/inverted/stacked/strong-
   adjust) on canopy/lodge/hillside, plus rendered proof and a real add→grade→
   invert→undo UI flow (foliage provably untouched).
-- [ ] **Mask by subject / background** — auto-select the subject or the
-  background (owner request 2026-07-05). Honest scoping: true subject/background
-  segmentation needs an on-device ML model (WebGPU — the "frontier" backlog
-  item); there is no classical stand-in the way sky had one. Architect as a mask
-  type so it slots into the same engine when ready.
 - [x] **Local masking** — radial + linear gradient + **brush** masks (up to 4),
   each with local brightness/contrast/saturation/hue/warmth. Radial/linear are
   dragged with handles; the brush is painted on the photo (Paint/Erase, size,

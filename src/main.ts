@@ -4488,9 +4488,11 @@ function grayWorldWB(img: DecodedImage): [number, number, number] {
   return lumNormalize([mean / r, mean / g, mean / b]);
 }
 
-// ⓘ What's new — the last 5 updates, injected at build time, each carrying
-// its real version number (v0.N = Nth update ever; 1.0+ comes from the VERSION file — this remote refuses tag pushes)
-// and linked to its commit on GitHub.
+// ⓘ What's new — the last 5 user-facing updates, injected at build time, each
+// carrying its real version number (v0.N = Nth update ever; 1.0+ comes from
+// the VERSION file — this remote refuses tag pushes). Subjects are plain text
+// — the full history lives on the public ./notes.html page (the repo is
+// private, so per-commit GitHub links would 404 for everyone).
 {
   const dlg = $("infoDlg") as HTMLDialogElement;
   const list = $("changeList") as HTMLUListElement;
@@ -4507,14 +4509,11 @@ function grayWorldWB(img: DecodedImage): [number, number, number] {
     const li = document.createElement("li");
     const ver = document.createElement("strong");
     ver.textContent = `v${c.version} `;
-    const a = document.createElement("a");
-    a.href = `https://github.com/njefferson/Jefferson-Photography-Studio/commit/${c.hash}`;
-    a.target = "_blank";
-    a.rel = "noopener";
-    a.textContent = decodeEntities(c.subject);
+    const subject = document.createElement("span");
+    subject.textContent = decodeEntities(c.subject);
     const when = document.createElement("small");
     when.textContent = ` — ${c.date}`;
-    li.append(ver, a, when);
+    li.append(ver, subject, when);
     list.append(li);
   }
 
