@@ -1205,7 +1205,7 @@ function updateSkyStatus() {
   for (let i = 0; i < d.length; i++) if (d[i] > 127) on++;
   const frac = d.length ? on / d.length : 0;
   mUI.skyStatus.textContent = frac < 0.005
-    ? "No clear sky found — try a Brush or Colour mask, or raise Reach."
+    ? "No clear sky found — try a Brush or Color mask, or raise Reach."
     : `Sky detected — ${Math.round(frac * 100)}% of the frame. Invert for everything but the sky.`;
 }
 
@@ -1233,7 +1233,7 @@ function updateMaskUI() {
       const pick = document.createElement("button");
       pick.type = "button";
       pick.className = "mask-pick" + (i === selectedMask ? " active" : "");
-      const label = m.type === 0 ? "Radial" : m.type === 1 ? "Gradient" : m.type === 2 ? "Brush" : m.type === 3 ? "Colour" : "Sky";
+      const label = m.type === 0 ? "Radial" : m.type === 1 ? "Gradient" : m.type === 2 ? "Brush" : m.type === 3 ? "Color" : "Sky";
       pick.textContent = `${label} ${i + 1}`;
       pick.addEventListener("click", () => selectMask(i));
       const del = document.createElement("button");
@@ -1294,7 +1294,7 @@ function updateColorSwatch(m: MaskLayer) {
   }
   mUI.colorSwatchText.textContent = picked
     ? `Hue ${Math.round(m.hueTarget)}° · Sat ${m.satTarget.toFixed(2)}`
-    : "Tap the photo to pick a colour";
+    : "Tap the photo to pick a color";
 }
 
 function syncMaskFromUI() {
@@ -3506,7 +3506,7 @@ const LESSONS: { title: string; tab: PanelTab; steps: string[] }[] = [
     steps: [
       "Broadest: Hue shift (top of the Color tab) rotates every color together — use it for big moves.",
       "Per-color: drag the Sky hue slider — each box owns half the wheel and follows the swap.",
-      "Most surgical: the Color mixer. Tap “Pick color from photo”, tap the sky, then drag that chip's Hue and Saturation — only that color moves.",
+      "Most surgical: the Color mixer. Tap “Pick color from photo”, tap the sky, then move that chip's Hue and Saturation sliders — only that color moves.",
     ],
   },
   {
@@ -3673,7 +3673,7 @@ const library = $("library") as HTMLDivElement;
   }
   ($("libCount") as HTMLSpanElement).textContent =
     `${GALLERY.length} photos · ${GALLERY.filter((t) => t.kind === "dng").length} RAW`;
-  openBtn.textContent = `Browse the full example library · ${GALLERY.length} photos →`;
+  openBtn.textContent = `Browse the full practice library · ${GALLERY.length} photos →`;
   openBtn.addEventListener("click", () => { library.hidden = false; });
   ($("libClose") as HTMLButtonElement).addEventListener("click", () => { library.hidden = true; });
 }

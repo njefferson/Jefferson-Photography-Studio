@@ -96,7 +96,7 @@
           <span class="tat-banner-off">tap a ring to put that one back &middot; tap here to keep them</span>
         </button>
         <button id="colorBanner" type="button" hidden>
-          <span>&#127919; Colour mask — tap the photo to pick the colour to match</span>
+          <span>&#127919; Color mask — tap the photo to pick the color to match</span>
           <span class="tat-banner-off">Tap again to re-pick &middot; tap here when done</span>
         </button>
         <div id="welcome">
@@ -159,7 +159,7 @@
         </div>
         <div class="section-head">
           <h2 id="sectionTitle" class="section-title">Basic</h2>
-          <p id="sectionSub" class="section-sub">White balance, exposure &amp; noise</p>
+          <p id="sectionSub" class="section-sub">White balance, exposure &amp; detail</p>
         </div>
         <div id="panelBody" class="panel-body">
           <div id="panelUp" class="scroll-cue up" hidden><span>&#9650;</span></div>
@@ -179,14 +179,14 @@
             <label>Denoise <input id="dn" type="range" min="0" max="1" step="0.01" value="0" /></label>
             <label>Sharpen <input id="sharpen" type="range" min="0" max="1" step="0.01" value="0" /></label>
             <label>Texture <input id="texture" type="range" min="-1" max="1" step="0.01" value="0" /></label>
-            <p class="note">Denoise is set automatically from the photo's measured noise. Sharpen crisps up fine edges; Texture brings out surface structure (pull left to smooth). Both keep colours put.</p>
+            <p class="note">Denoise is set automatically from the photo's measured noise. Sharpen crisps up fine edges; Texture brings out surface structure (pull left to smooth). Both keep colors put.</p>
             <p class="note footnote">White balance, exposure and denoise are set automatically when a photo opens &mdash; refine from here. No 2000K floor.</p>
           </section>
 
           <!-- ===== IR ===== -->
           <section class="section" data-tab="ir" hidden>
             <button id="swapBtn" type="button" class="toggle full-btn" aria-pressed="true">R &#8646; B channel swap</button>
-            <p class="note">The core false-color move &mdash; swaps the red and blue channels. Colour looks switch it on; toggle here or re-press a look to compare.</p>
+            <p class="note">The core false-color move &mdash; swaps the red and blue channels. Color looks switch it on; toggle here or re-press a look to compare.</p>
             <div class="sub-title">Looks</div>
             <div class="looks-grid">
               <button id="lookAero" type="button">Aerochrome<small class="look-sub"></small></button>
@@ -296,20 +296,20 @@
 
           <!-- ===== MASKS ===== -->
           <section class="section" data-tab="masks" hidden>
-            <p class="note">Add a radial, gradient, brush, colour or sky mask, target it on the photo, then adjust only that area. Tap a mask to select it.</p>
+            <p class="note">Add a radial, gradient, brush, color or sky mask, target it on the photo, then adjust only that area. Tap a mask to select it.</p>
             <div class="mask-add">
               <button id="addRadial" type="button">+ Radial</button>
               <button id="addLinear" type="button">+ Gradient</button>
               <button id="addBrush" type="button">+ Brush</button>
-              <button id="addColor" type="button">+ Colour</button>
+              <button id="addColor" type="button">+ Color</button>
               <button id="addSky" type="button">+ Sky</button>
             </div>
             <div id="maskList" class="mask-list"></div>
             <div id="maskEditor" hidden>
               <div id="colorControls" hidden>
-                <small class="note">With Pick on, tap the photo to choose the colour to match &mdash; tap again to re-pick. Widen Range to include more shades; Feather softens the edge. Add another Colour mask to grade a second colour.</small>
+                <small class="note">With Pick on, tap the photo to choose the color to match &mdash; tap again to re-pick. Widen Range to include more shades; Feather softens the edge. Add another Color mask to grade a second color.</small>
                 <div class="mask-editor-actions">
-                  <button id="mColorPick" type="button" class="toggle" aria-pressed="false">&#127919; Pick colour</button>
+                  <button id="mColorPick" type="button" class="toggle" aria-pressed="false">&#127919; Pick color</button>
                   <span id="mColorSwatch" class="color-swatch"></span>
                   <span id="mColorSwatchText" class="note-inline"></span>
                 </div>
@@ -415,10 +415,10 @@
     <!-- The example library: the COMPLETE practice set (tutorial tiles
          included, one honest whole) in its own full-screen place, grouped by
          scene. Sections built in main.ts from LIBRARY_GROUPS. -->
-    <div id="library" hidden role="dialog" aria-modal="true" aria-label="Example library">
+    <div id="library" hidden role="dialog" aria-modal="true" aria-label="Practice library">
       <div class="ql-head">
         <div class="ql-title">
-          <strong>Example library</strong>
+          <strong>Practice library</strong>
           <span id="libCount"></span>
         </div>
         <div class="ql-actions">
@@ -501,7 +501,7 @@
         <button id="helpTutorials" type="button" class="help-tutorials">&#9654;&#xFE0E; Tutorials — learn by doing on real infrared photos</button>
         <h3>Quick start</h3>
         <ol>
-          <li><strong>Open image(s)</strong> (or pick an example). RAW — NEF or DNG — unlocks the full color range.
+          <li><strong>Open image(s)</strong> (or pick a practice photo). RAW — NEF or DNG — unlocks the full color range.
           Pick several and they become a <strong>session</strong>: a strip of previews along the bottom, tap to switch,
           each photo keeping its own edit — held safely, so a closed tab offers to <em>Resume</em> right where you were
           (masks are the one thing a resume can't restore — they reset with a fresh open).
@@ -516,9 +516,16 @@
 
         <h3>Gestures</h3>
         <ul>
-          <li><strong>Tap</strong> the photo — set white balance from that point (aim at foliage).</li>
+          <li><strong>Tap</strong> the photo — set white balance from that point (aim at foliage). While a picture tool is armed — Heal, a color pick, brush painting or drag-to-adjust — that tool takes the tap instead.</li>
           <li><strong>Pinch</strong> — zoom (up to 8&times;); drag to pan while zoomed.</li>
           <li><strong>Press &amp; hold</strong> the photo (or the <em>Hold: Original</em> button) — compare with the original.</li>
+        </ul>
+
+        <h3>Top bar</h3>
+        <ul>
+          <li><strong>Undo / Redo</strong> — step back and forward through your edit, one gesture per step. A fresh edit after an undo starts a new path forward.</li>
+          <li><strong>Reset</strong> — the whole edit returns to how the photo first opened (the automatic balance).</li>
+          <li><strong>Histogram</strong> — a live RGB + luminance readout floating over the photo. Tap the histogram itself to tuck it away; the button brings it back.</li>
         </ul>
 
         <h3>Looks &amp; adjustments</h3>
@@ -550,10 +557,10 @@
           <li><strong>Clarity</strong> — punches up local structure (or softens, pulled left). <strong>Dehaze</strong> — cuts the veil that flattens distant subjects; brightness-only, so colors stay put.</li>
           <li><strong>Sharpen</strong> &amp; <strong>Texture</strong> (Basic) — Sharpen crisps fine edges; Texture works the mid-size surface structure (left smooths it). Both are luminance-only, so colors never shift.</li>
           <li><strong>Tone curve + Luminance</strong> — the curve shapes blacks through highlights; Luminance lifts or drops the whole image without clipping either end.</li>
-          <li><strong>Masks</strong> — radial, gradient, painted brush, tap-a-colour, or automatic sky: local adjustments for one area only. Masks belong to the photo; saved looks stay portable.</li>
-          <li><strong>Dust &amp; spots</strong> (Basic) — arm <em>Heal spots</em> and tap a dust mote: it's patched from clean pixels nearby, in the preview and the export alike. <em>Visualize spots</em> makes dust jump out of flat skies; <em>Find spots automatically</em> sweeps the smooth areas, heals what it finds, and rings every fix for review &mdash; tap a ring to put that one back. Heals belong to the photo — they never ride in saved looks, profiles or a batch.</li>
-          <li><strong>IR lens fixes</strong> — pulls down the center hot-spot IR-converted lenses produce, and corrects (or adds) corner vignette.</li>
-          <li><strong>Crop &amp; straighten</strong> (top bar) — drag the box's corners to crop, drag inside it to move it, or drag Straighten to level a horizon (the crop auto-shrinks so no empty corner shows). A view onto the photo, not a re-bake — masks and healed spots stay exactly where they are underneath. Composition-specific: never rides in saved looks, profiles or a batch.</li>
+          <li><strong>Masks</strong> — radial, gradient, painted brush, tap-a-color, or automatic sky: local adjustments for one area only. Masks belong to the photo; saved looks stay portable.</li>
+          <li><strong>Dust &amp; spots</strong> (Corrections tab) — arm <em>Heal spots</em> and tap a dust mote: it's patched from clean pixels nearby, in the preview and the export alike. <em>Visualize spots</em> makes dust jump out of flat skies; <em>Find spots automatically</em> sweeps the smooth areas, heals what it finds, and rings every fix for review &mdash; tap a ring to put that one back. Heals belong to the photo — they never ride in saved looks, profiles or a batch.</li>
+          <li><strong>IR lens fixes</strong> (Corrections tab) — pulls down the center hot-spot IR-converted lenses produce, and corrects (or adds) corner vignette.</li>
+          <li><strong>Crop &amp; rotate</strong> (panel tab) — three one-tap tools, each with its own <em>Done</em>: <strong>Rotate 90&deg;</strong> turns the whole photo; <strong>Crop</strong> shows the box with a rule-of-thirds grid — drag a corner to resize, drag the photo to slide it under the box; <strong>Straighten</strong> adds a fine alignment grid and a degree slider — line a horizon up against the grid (the crop auto-shrinks so no empty corner shows). Pinch to zoom the view while either tool is open. A view onto the photo, not a re-bake — masks and healed spots stay exactly where they are underneath. Composition-specific: never rides in saved looks, profiles or a batch.</li>
         </ul>
 
         <h3>Profiles</h3>
