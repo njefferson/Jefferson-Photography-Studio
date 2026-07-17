@@ -45,8 +45,29 @@ export function drawHistogram(canvas: HTMLCanvasElement, h: Histogram) {
   fill(ctx, h.r, x, y, H, CHANNEL_FILL.r, "lighter");
   fill(ctx, h.g, x, y, H, CHANNEL_FILL.g, "lighter");
   fill(ctx, h.b, x, y, H, CHANNEL_FILL.b, "lighter");
+  // Per-channel outline in a distinct LINE PATTERN — hue is never the only
+  // carrier of which curve is which (accessibility standing rule: the red and
+  // green mountains are the confusable pair for deutan/protan vision).
+  stroke(ctx, h.r, x, y, "rgba(255, 60, 60, 0.9)", []);
+  stroke(ctx, h.g, x, y, "rgba(60, 235, 90, 0.9)", [4, 3]);
+  stroke(ctx, h.b, x, y, "rgba(80, 120, 255, 0.9)", [1.5, 2.5]);
   // A crisp luminance outline on top ties the shape together.
   stroke(ctx, h.l, x, y, "rgba(236, 238, 246, 0.55)");
+  // Channel key, anchored top-left: R solid / G dashed / B dotted, each letter
+  // with its own dark shadow so it reads over any curve.
+  ctx.font = "700 8px 'Space Mono', monospace";
+  const KEY: [string, string][] = [
+    ["R", "rgba(255, 90, 90, 1)"],
+    ["G", "rgba(90, 235, 110, 1)"],
+    ["B", "rgba(120, 150, 255, 1)"],
+  ];
+  KEY.forEach(([ch, color], i) => {
+    const ky = 10 + i * 10;
+    ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+    ctx.fillText(ch, 5, ky + 1);
+    ctx.fillStyle = color;
+    ctx.fillText(ch, 4, ky);
+  });
 }
 
 function fill(
@@ -75,9 +96,11 @@ function stroke(
   x: (i: number) => number,
   y: (v: number) => number,
   style: string,
+  dash: number[] = [],
 ) {
   ctx.strokeStyle = style;
   ctx.lineWidth = 1;
+  ctx.setLineDash(dash);
   ctx.beginPath();
   for (let i = 0; i < 256; i++) {
     const px = x(i);
@@ -86,4 +109,5 @@ function stroke(
     else ctx.lineTo(px, py);
   }
   ctx.stroke();
+  ctx.setLineDash([]);
 }
