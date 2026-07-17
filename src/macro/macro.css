@@ -49,6 +49,13 @@
   --accent-ink: #07111f;
   --shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
   --macro: linear-gradient(135deg, #ff5e7e 0%, #ff9e45 46%, #3ecf8e 100%);
+  /* Theme-INVARIANT glass for HUDs floating over the PHOTO (not the page):
+     dark glass + light text is correct in BOTH themes, and 0.65 alpha keeps
+     the text >=4.5:1 even over a pure-white IR sky (accessibility standing
+     rule — do not override these in the dawn block). */
+  --glass-bg: rgba(10, 10, 14, 0.65);
+  --glass-txt: #f2f3f6;
+  --glass-txt-2: #c8cad2;
   --ui: "Geist", -apple-system, system-ui, sans-serif;
   --display: "Space Grotesk", -apple-system, system-ui, sans-serif;
   --mono: "Space Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
@@ -176,23 +183,23 @@ body {
 /* Status pill (top-left) + hint pill (bottom-centre) over the result. */
 .view-hint {
   position: absolute; padding: 0.5rem 0.9rem; border-radius: 999px;
-  background: rgba(10, 10, 14, 0.55); border: 1px solid rgba(150, 150, 170, 0.4);
+  background: var(--glass-bg); border: 1px solid rgba(150, 150, 170, 0.4);
   backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-  color: var(--txt); font: 0.78rem/1 var(--mono); letter-spacing: 0.02em; pointer-events: none;
+  color: var(--glass-txt); font: 0.78rem/1 var(--mono); letter-spacing: 0.02em; pointer-events: none;
 }
 .status-pill {
   position: absolute; top: 12px; left: 12px;
   padding: 0.4rem 0.8rem; border-radius: 999px;
-  background: rgba(10, 10, 14, 0.55); border: 1px solid rgba(150, 150, 170, 0.4);
+  background: var(--glass-bg); border: 1px solid rgba(150, 150, 170, 0.4);
   backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-  color: var(--txt); font: 0.72rem/1 var(--mono); letter-spacing: 0.03em; pointer-events: none;
+  color: var(--glass-txt); font: 0.72rem/1 var(--mono); letter-spacing: 0.03em; pointer-events: none;
 }
 .hint-pill {
   position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
   padding: 0.42rem 0.85rem; border-radius: 999px;
-  background: rgba(10, 10, 14, 0.55); border: 1px solid rgba(150, 150, 170, 0.4);
+  background: var(--glass-bg); border: 1px solid rgba(150, 150, 170, 0.4);
   backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-  color: var(--txt); font: 0.74rem/1 var(--mono); letter-spacing: 0.02em; pointer-events: none;
+  color: var(--glass-txt); font: 0.74rem/1 var(--mono); letter-spacing: 0.02em; pointer-events: none;
   white-space: nowrap;
 }
 
