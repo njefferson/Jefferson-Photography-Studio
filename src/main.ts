@@ -1811,6 +1811,26 @@ $("rotateBtn").addEventListener("click", () => {
   draw();
 });
 
+/** Flip (mirror) the photo as DISPLAYED. The renderer's flip bits are
+ *  source-space, so the button's meaning maps through the rotation: at
+ *  90°/270° a left–right mirror on screen is a source-Y mirror. View state
+ *  like rotation (not in the edit/undo; export takes it via opts.flip). */
+function toggleFlip(displayVertical: boolean) {
+  if (!current) return;
+  const sourceBit = ((renderer.rotation & 1) ? !displayVertical : displayVertical) ? 2 : 1;
+  renderer.setFlip(renderer.flip ^ sourceBit);
+  resetZoom();
+  if (displayVertical) {
+    // The sky moved to the other display edge — re-detect, like rotate does.
+    let rebuilt = false;
+    for (const m of params.masks) if (m.type === 4) { regenerateSkyMask(m); rebuilt = true; }
+    if (rebuilt) updateSkyStatus();
+  }
+  draw();
+}
+$("flipHBtn").addEventListener("click", () => toggleFlip(false));
+$("flipVBtn").addEventListener("click", () => toggleFlip(true));
+
 // --- Pinch to zoom, drag to pan (when zoomed). A quick tap still sets white
 // balance; any real movement suppresses the tap. ---
 let zoom = 1;
@@ -2176,6 +2196,77 @@ function clampResizeOnPhoto(ax: number, ay: number, mdx: number, mdy: number): [
   return [ax + t * ex, ay + t * ey];
 }
 
+// --- Crop aspect-ratio presets (core sweep, owner go 2026-07-18). The preset
+// is a PIXEL ratio; params.crop stores fractions of the display frame, so a
+// pixel ratio R maps to fractions via the frame's own aspect A:
+// crop.w/crop.h = R/A ("Original" is exactly 1 in fraction space). Free (the
+// default and old behaviour) leaves the resize unconstrained. The last choice
+// persists like the panel tab. ---
+const RATIOS: { key: string; label: string; r: number | null }[] = [
+  { key: "free", label: "Free", r: null },
+  { key: "orig", label: "Original", r: 0 },
+  { key: "1:1", label: "1:1", r: 1 },
+  { key: "4:5", label: "4:5", r: 4 / 5 },
+  { key: "3:2", label: "3:2", r: 3 / 2 },
+  { key: "16:9", label: "16:9", r: 16 / 9 },
+];
+let cropRatioKey = localStorage.getItem("ips-crop-ratio") ?? "free";
+if (!RATIOS.some((x) => x.key === cropRatioKey)) cropRatioKey = "free";
+
+function cropRatioFrac(): number | null {
+  const preset = RATIOS.find((x) => x.key === cropRatioKey)!;
+  if (preset.r === null) return null;
+  if (preset.r === 0) return 1;
+  return preset.r / dispAspectNow();
+}
+
+/** Largest preset-ratio box centred on the current crop, inside the
+ *  straighten-safe bound, clamped onto the photo. */
+function ratioInscribe(rf: number): CropRect {
+  const b = cropSafeBound();
+  const w = Math.min(b.w, b.h * rf);
+  const h = w / rf;
+  const cx = clamp(params.crop.x + params.crop.w / 2, b.x + w / 2, b.x + Math.max(w / 2, b.w - w / 2));
+  const cy = clamp(params.crop.y + params.crop.h / 2, b.y + h / 2, b.y + Math.max(h / 2, b.h - h / 2));
+  return clampCropOnPhoto({ x: cx - w / 2, y: cy - h / 2, w, h });
+}
+
+const cropRatiosEl = $("cropRatios") as HTMLDivElement;
+const ratioBtns = new Map<string, HTMLButtonElement>();
+for (const rdef of RATIOS) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "ratio-chip";
+  b.setAttribute("aria-label", `Crop aspect ratio ${rdef.label}`);
+  b.addEventListener("click", () => setCropRatio(rdef.key));
+  cropRatiosEl.append(b);
+  ratioBtns.set(rdef.key, b);
+}
+
+function updateRatioUI() {
+  // Selected state is aria-pressed + a TEXT check — never colour alone.
+  for (const [k, b] of ratioBtns) {
+    const on = k === cropRatioKey;
+    b.setAttribute("aria-pressed", String(on));
+    b.textContent = (on ? "✓ " : "") + RATIOS.find((x) => x.key === k)!.label;
+  }
+}
+updateRatioUI();
+
+function setCropRatio(key: string) {
+  cropRatioKey = key;
+  localStorage.setItem("ips-crop-ratio", key);
+  updateRatioUI();
+  const rf = cropRatioFrac();
+  if (rf && geoMode && current) {
+    flushRecord();
+    params.crop = ratioInscribe(rf);
+    positionCropOverlay();
+    draw();
+    flushRecord(); // one tap = one undo step
+  }
+}
+
 function setGeoMode(mode: "crop" | "straighten" | null) {
   geoMode = current ? mode : null;
   cropArmed = geoMode !== null;
@@ -2204,8 +2295,30 @@ function setGeoMode(mode: "crop" | "straighten" | null) {
   // don't bare an empty drawer.
   if (cropArmed) panel.hidden = true;
   else if (current) panel.hidden = false;
+  // The lesson-chip rail floats over the photo's top edge and EATS the top
+  // handles' taps when the crop box rides high (found by the aspect-preset
+  // harness: a 1:1 box's top-left handle sat under a chip and never moved).
+  // Same cure as the drawer: tuck the rail away while a geometry tool is
+  // live, restore it exactly as it was on exit.
+  {
+    const rail = $("lessonChips") as HTMLDivElement;
+    if (cropArmed) {
+      if (!rail.hidden) { rail.dataset.geoHid = "1"; rail.hidden = true; }
+    } else if (rail.dataset.geoHid) {
+      delete rail.dataset.geoHid;
+      rail.hidden = false;
+    }
+  }
   straightenSlider.value = String(params.straighten);
   straightenVal.textContent = `${params.straighten.toFixed(1)}°`;
+  // The remembered aspect preset applies as the tool arms — unless the box
+  // already matches it (e.g. re-arming a committed preset crop).
+  if (cropArmed) {
+    const rf = cropRatioFrac();
+    if (rf && Math.abs(params.crop.w / params.crop.h - rf) / rf > 0.01) {
+      params.crop = ratioInscribe(rf);
+    }
+  }
   // Open box-first: zoom the view so the current crop box fills the frame (the
   // whole tilt is a pinch-out away). Reset to the whole photo when disarming.
   viewFreezeCenter = null;
@@ -2317,6 +2430,19 @@ function moveCropDrag(e: PointerEvent) {
     ax = c0.x; ay = c0.y;
     mdx = Math.max(oppX + dx, c0.x + MIN_CROP); mdy = Math.max(oppY + dy, c0.y + MIN_CROP);
   }
+  const rf = cropRatioFrac();
+  if (rf) {
+    // Preset locked: the dominant drag axis wins, the other follows the ratio.
+    // clampResizeOnPhoto below slides the corner back along the anchor line,
+    // which has the ratio's slope — so the clamp preserves the ratio too.
+    const w0 = Math.abs(mdx - ax), h0 = Math.abs(mdy - ay);
+    let w = w0, h = w0 / rf;
+    if (h0 * rf > w0) { h = h0; w = h0 * rf; }
+    w = Math.max(w, MIN_CROP, MIN_CROP * rf);
+    h = w / rf;
+    mdx = ax + (mdx >= ax ? 1 : -1) * w;
+    mdy = ay + (mdy >= ay ? 1 : -1) * h;
+  }
   const [mx, my] = clampResizeOnPhoto(ax, ay, mdx, mdy);
   params.crop = { x: Math.min(ax, mx), y: Math.min(ay, my), w: Math.abs(mx - ax), h: Math.abs(my - ay) };
   positionCropOverlay();
@@ -2389,8 +2515,12 @@ straightenSlider.addEventListener("input", () => {
   if (geoMode !== "straighten") return;
   params.straighten = Math.round(Number(straightenSlider.value) * 10) / 10;
   straightenVal.textContent = `${params.straighten.toFixed(1)}°`;
-  // Re-fit the crop to the new angle (safe inscribed bound, keeps it on the photo).
-  params.crop = cropSafeBound();
+  // Re-fit the crop to the new angle (safe inscribed bound, keeps it on the
+  // photo) — preserving the preset ratio when one is locked.
+  {
+    const rf = cropRatioFrac();
+    params.crop = rf ? ratioInscribe(rf) : cropSafeBound();
+  }
   // ...and re-fit the VIEW to that new box, or the framing goes stale as the
   // angle grows: the crop shrinks toward a small square while viewZoom stays at
   // its open-time value, so the whole tilt spills past the frame as an
@@ -2408,7 +2538,9 @@ cropResetBtn.addEventListener("click", () => {
   if (!cropArmed) return;
   if (geoMode === "crop") {
     // Reset the box to the largest valid frame at the current angle (identity
-    // when not straightened) — leaves any straighten alone.
+    // when not straightened) — leaves any straighten alone. The full frame is
+    // free-form, so the ratio chip resets to Free to stay honest.
+    setCropRatio("free");
     params.crop = cropSafeBound();
   } else {
     // Straighten reset: back to level, crop returns to full.
@@ -2831,6 +2963,7 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
   initHotspot(img, imported);
   uploadPreview();
   renderer.setRotation(img.rotate ?? 0);
+  renderer.setFlip(0); // flip is view state like rotation — a new photo opens unmirrored
   resetZoom();
   renderer.setGlowMap(buildGlowMap((x, y) => linearAt(img, x, y), img.width, img.height));
   renderer.setLocalMap(buildLocalMap((x, y) => linearAt(img, x, y), img.width, img.height));
@@ -4049,6 +4182,7 @@ ui.exBtn.addEventListener("click", async () => {
         scale: Number(ui.exScale.value),
         quality: Number(ui.exQuality.value),
         rotate: renderer.rotation,
+        flip: renderer.flip,
         watermark: bundledSource, // practice photos carry the corner mark; the user's photos never do
         lookRecipe: recipeForExport(currentLook()),
       },

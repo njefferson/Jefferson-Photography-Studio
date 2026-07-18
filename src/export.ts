@@ -25,6 +25,8 @@ export interface ExportOptions {
   scale: number; // 1 = native
   quality: number; // JPEG quality 0..1
   rotate?: number; // display rotation, 90-degree CW steps (0..3)
+  /** Source-space mirror bits (1 = x, 2 = y), matching the preview's u_flip. */
+  flip?: number;
   /** Bake the Studio corner mark into the output (set ONLY for the app's own
    *  bundled practice photos — a user's photos are never marked). */
   watermark?: boolean;
@@ -118,6 +120,7 @@ export async function exportImage(
   const srcW = "cfa" in src ? src.cfa.width : src.width;
   const srcH = "cfa" in src ? src.cfa.height : src.height;
   const rot = ((opts.rotate ?? 0) % 4 + 4) % 4;
+  const flip = (opts.flip ?? 0) & 3;
   const dispW = rot & 1 ? srcH : srcW;
   const dispH = rot & 1 ? srcW : srcH;
   // Crop shrinks the OUTPUT frame itself (a view, not a re-bake) — matching
@@ -142,6 +145,9 @@ export async function exportImage(
     if (rot === 1) { iu = v; iv = 1 - u; }
     else if (rot === 2) { iu = 1 - u; iv = 1 - v; }
     else if (rot === 3) { iu = 1 - v; iv = u; }
+    // The source-space mirror — the INNERMOST op, matching the vertex shader.
+    if (flip & 1) iu = 1 - iu;
+    if (flip & 2) iv = 1 - iv;
     return [
       Math.min(srcW - 1, Math.max(0, Math.floor(iu * srcW))),
       Math.min(srcH - 1, Math.max(0, Math.floor(iv * srcH))),

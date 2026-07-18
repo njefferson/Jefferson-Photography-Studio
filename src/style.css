@@ -346,6 +346,23 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 #lookQrBox button { margin-bottom: 0; }
 .look-import-row { display: flex; gap: 8px; margin-top: 8px; }
 .look-import-row button { flex: 1; margin: 0; }
+/* Crop aspect-ratio chips on the crop pill (dark glass — --glass-* tokens are
+   theme-invariant there). Selected state = aria-pressed + the "✓ " TEXT prefix
+   set in updateRatioUI, never colour alone. */
+#cropRatios { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 8px; }
+.ratio-chip {
+  position: relative;
+  min-height: 32px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: transparent;
+  color: var(--glass-txt);
+  font: 500 12px/1.2 var(--ui);
+  cursor: pointer;
+}
+.ratio-chip::before { content: ""; position: absolute; inset: -6px; } /* 44px hit extension */
+.ratio-chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
 /* Imported .cube LUTs (Profiles & LUTs panel). The badge is TEXT — never a
    colour-only cue. */
 .lut-badge {

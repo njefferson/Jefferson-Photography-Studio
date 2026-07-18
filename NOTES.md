@@ -167,22 +167,6 @@ user-scalable=no.
 > big-image / full-bleed direction continues as the parallel design track
 > below.
 
-- [ ] **Aspect-ratio crop presets** — core sweep, owner go 2026-07-18. Locked
-  ratios while cropping: Free (default — today's behavior), Original, 1:1,
-  4:5, 3:2, 16:9. Flagged NOT-YET-DONE in the Crop & straighten shipped
-  record below. Build notes: joins the settled combined crop/straighten model
-  (SEVENTH PASS record) — constrain the resize path (`moveCropDrag` /
-  `clampResizeOnPhoto`, main.ts) to the locked ratio and re-inscribe on a
-  preset change; a small chip row or cycle control in the crop pill; remember
-  the last choice in localStorage like the panel tab. 4:5 and 1:1 matter for
-  Instagram. Geometry/overlay only — export still reads `params.crop`.
-- [ ] **Flip the photo — mirror horizontal / vertical** — core sweep, owner go
-  2026-07-18. Genuinely absent today (only Rotate 90° exists). Two labelled
-  buttons beside Rotate 90° in the Crop & rotate tab; follow the rotate
-  implementation pattern. WATCH: the deferred rotate wrinkles in the findings
-  ledger (sky-mask regeneration as an undoable step; gradient-mask default
-  geometry ignoring the transform) apply to flip identically — handle them or
-  record them as deferred.
 - [ ] **Black & white for 720nm** — core sweep; the recorded target promoted
   2026-07-18. A channel-weighted mono conversion for the near-monochrome
   720nm "white forest" frames (adjustable weights, or a few named mixes).
@@ -2238,6 +2222,55 @@ user-scalable=no.
   (headless proves the matrix, not optics/glare), an AirDrop/Files round-trip
   of a recipe-carrying JPEG, the recipe offer feel when opening shared
   photos, and the Export checkbox's discoverability.
+- [x] **Aspect-ratio crop presets + Flip the photo** — the core sweep's first
+  release (owner go 2026-07-18, "Promote to Main and continue"). SHIPPED same
+  day (cache ips-v77 → ips-v78), two queue items in one release — both live
+  in the Crop & rotate area.
+  PRESETS: a chip row on the crop pill — Free (default, old behaviour),
+  Original, 1:1, 4:5, 3:2, 16:9 — aria-pressed + a "✓ " TEXT prefix (never
+  colour-only). The preset is a PIXEL ratio mapped into crop-fraction space
+  via the display frame's aspect (crop.w/crop.h = R/A; Original ≡ 1). The
+  resize path locks by reconstructing the dragged corner (dominant axis wins)
+  BEFORE `clampResizeOnPhoto` — whose slide-along-the-anchor-line clamp then
+  PRESERVES the ratio by construction, at any straighten angle. Preset taps
+  re-inscribe about the current centre inside `cropSafeBound` (one undo step);
+  the straighten slider's re-fit keeps the ratio; arming applies the
+  remembered choice (localStorage `ips-crop-ratio`, panel-tab pattern);
+  Reset crop honestly resets the chip to Free.
+  FLIP: two labelled buttons beside Rotate 90° ("⇆ Flip horizontal",
+  "⇅ Flip vertical"). Implementation is the INNERMOST source-space mirror
+  (`u_flip` bits at the vertex shader's tail; identical composition in
+  export.ts toSrc and BOTH CPU inverse mappings), so masks/heals follow the
+  mirrored pixels through the inverse mapping exactly like rotation. The
+  buttons mean what you SEE: at 90°/270° the handler swaps the source axis.
+  View state like rotation (not in the edit/undo; export takes opts.flip;
+  fresh opens reset it; a display-vertical flip re-detects sky masks like
+  rotate does). The rotate ledger wrinkles (sky regen as an undoable step;
+  gradient-mask default geometry) apply to flip identically — recorded there.
+  FIELD-CAUGHT BY THE HARNESS (real product bug, fixed this release): the
+  lesson-chip rail floats over the photo's top edge and ATE the top handles'
+  taps whenever the crop box rode high (a 1:1 box's top-left handle sat under
+  a chip and could not be dragged). Cure: setGeoMode tucks the rail away
+  while a geometry tool is live and restores it on exit — the crop-banner
+  lesson of 2026-07-15, now applied to the rail itself.
+  VERIFIED headless 26/26 + 2 fail-first proofs (and the look-sharing R1
+  suite re-run 44/44 — no regression): every preset locks the on-screen box
+  and HOLDS through real corner drags (drags verified non-vacuous — the box
+  must actually move); committed 1:1 canvas is square ±1px and 16:9 within
+  2%; Free genuinely unlocks; the choice persists a reload and re-applies on
+  arm; a 10° straighten re-fit keeps the ratio; Reset resets the chip. Flip:
+  preview mirror verified on a sampled grid, DOUBLE flip restores BITWISE,
+  and the export proof is LOSSLESS — both orientations exported as our own
+  uncompressed 16-bit TIFF and compared pixel-exact mirrored (≥99.5% of
+  samples, watermark rows excluded; the first JPEG-based check drowned in
+  4:2:0 block asymmetry — instrument replaced, not the tolerance). Inverse
+  mapping proven by tapping the SAME photo feature at mirrored screen
+  positions → same tap-WB result. axe clean (chips + flips) in BOTH themes.
+  FAIL-FIRST: planted ratio-constraint drop flipped the held-through-drag +
+  square-commit checks; planted export-flip-ignore flipped the TIFF mirror
+  check (0.15% exact). NEEDS THE OWNER'S HANDS: the chip row's feel on the
+  real pill, whether locked-corner drags feel natural on touch, the flips'
+  direction reading right, and the hidden lesson rail returning as expected.
 
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 
