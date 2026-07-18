@@ -259,15 +259,6 @@ user-scalable=no.
   UV-displacement-field sketch lives in "Future / bigger bets" below; spatial
   → never in looks/batch/LUTs; one stroke = one undo. The biggest single item
   in the release.
-- [ ] **Looks that travel inside the JPEG + QR share** — look-sharing release
-  3 (owner go 2026-07-18): embed the look payload as an `IPSLOOK\0` APP11
-  segment at JPEG export using icc.ts's APP2 splicing precedent (coordinate
-  with "Keep EXIF in exports" — same splice point); on JPEG open, scan APPn
-  and offer the embedded recipe through the SAME receive dialog. Honest copy:
-  iOS Photos/Messages recompression strips markers; Files/AirDrop keep them.
-  Plus a small dependency-free QR encoder (byte mode, EC M; a ~600-char link
-  ≈ version 12-17) drawing the #look link to a canvas → toBlob → saveBlob.
-  Display/share only — no QR decoding (the camera app is the decoder).
 - [ ] **Full-bleed alignment view — the tilted photo fills the screen** — owner-caught on device
   2026-07-16 (with the crop go-to-main; screenshot IMG_6201, Straighten @ 23.6°).
   While a geometry tool is armed, rotating and pinch-zooming CLIPS the photo
@@ -2203,6 +2194,50 @@ user-scalable=no.
   feel, a real downloaded LUT's look on the true display, IDB persistence
   across real launches, and Batch-with-LUT output on a real set (the
   resolution path is headless-proven; a full batch zip diff was not run).
+- [x] **Looks that travel inside the JPEG + QR share** — look-sharing release
+  3 of 3 (owner go 2026-07-18: "Promote to Main and continue"). SHIPPED same
+  day (cache ips-v76 → ips-v77). Every exported JPEG can now carry the look
+  that made it, and any look can be shared as a QR code.
+  TRAVELING RECIPE (`src/lookmark.ts`): the R1 wire-format payload rides as
+  an `IPSLOOK\0` APP11 segment, spliced after the leading APPn run (icc.ts's
+  APP2 technique; ~600 bytes). export.ts gained `opts.lookRecipe` — main.ts
+  builds it via `recipeForExport(currentLook())` for single exports and once
+  per batch (concrete look grades only; builtin looks resolve per image and
+  auto has no grade — honest scope). Controlled by an HONEST Export checkbox
+  ("JPEGs carry their look recipe (anyone opening one here gets offered your
+  look)"), default ON. On JPEG open (single-open path), `extractLookFromJpeg`
+  scans header segments (stops at SOS, body capped at LOOK_JSON_MAX so a
+  hostile file can't make us decode megabytes) → the SAME receive dialog
+  offers it, named from the payload or honestly "From <filename>" (single
+  exports are unnamed). TIFF never carries a recipe. LUTs are NOT in the
+  recipe (grade only — the panel note says so). Help carries the caveat:
+  recompression (Photos edits, Messages optimization, social uploads) strips
+  the recipe; links/files/codes/QR always survive.
+  QR (`src/qr.ts`): a dependency-free byte-mode encoder written from the
+  ISO/IEC 18004 spec (no third-party IP) — EC level M, versions 1–26 (~1.5 KB
+  cap, far beyond any look link), GF(256) Reed–Solomon, BCH format/version
+  info, mask 0. "Show QR code" in the ⋯ share dialog renders the look link on
+  a WHITE card (deliberately theme-invariant — scanners want dark-on-light +
+  quiet zone) with "Save QR image" via toBlob→saveBlob. Encode-only: the
+  phone camera is the decoder.
+  VERIFIED headless 34 checks green + 2 fail-first proofs (and R1 44/44 + R2
+  33/33 re-run — no regressions): lookmark node fixtures 8/8 (round-trip,
+  placement before SOS, unmarked/not-a-JPEG nulls, oversized-body cap,
+  unicode; FAIL-FIRST: extract scanning APP10 instead of APP11 flipped both
+  round-trips); QR round-trips 5/5 through an INDEPENDENT decoder (jsQR,
+  dev-only) across v1→v25 payload sizes incl. unicode (FAIL-FIRST: dropping
+  the format-info XOR mask flipped ALL five); browser 21/21 (real export →
+  segment present → parses to the exact applied grade → re-import through the
+  real picker opens the photo AND offers the look → Try applies exactly;
+  checkbox off → no segment; markerless JPEGs offer nothing; on-page QR
+  canvas decodes via jsQR to the exact link which round-trips to the exact
+  look; Save QR downloads a real PNG; a 2-frame batch zip carries the named
+  recipe in EVERY frame (store-method zip walked byte-level); axe clean on
+  the dialog with the QR open in BOTH themes). NEEDS THE OWNER'S HANDS on the
+  real iPhone/iPad: scanning the QR off a real screen with the camera app
+  (headless proves the matrix, not optics/glare), an AirDrop/Files round-trip
+  of a recipe-carrying JPEG, the recipe offer feel when opening shared
+  photos, and the Export checkbox's discoverability.
 
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 
@@ -2471,8 +2506,9 @@ greenlit these, they're here so they aren't lost):
   round-trip back into the editor). Fits free/on-device/no-account exactly —
   community without infrastructure. OWNER GO + SHIPPED 2026-07-18 as **Share
   your look — links, files and codes** (see the shipped record); release 2
-  (**Import .cube LUTs as looks**) SHIPPED same day (see its record);
-  release 3 (JPEG-embedded recipes + QR) remains queued.
+  (**Import .cube LUTs as looks**) and release 3 (**Looks that travel inside
+  the JPEG + QR share**) SHIPPED same day — the whole look-sharing saga is
+  complete; see the three shipped records.
 - **Durable edits across reloads** — sessions admit masks reset on reload and
   lone opens have zero crash safety (findings ledger); persisting the full
   edit recipe is the "come back tomorrow" gap between an editor and a daily

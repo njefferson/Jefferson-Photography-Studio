@@ -338,6 +338,12 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 }
 .look-recv-slots { display: flex; flex-direction: column; gap: 0; margin: 0 0 6px; }
 .look-recv-slot { text-align: left; }
+/* QR of the look link: white card on purpose in BOTH themes — scanners want
+   dark-on-light with a quiet zone, so the card ignores the app palette. */
+#lookQrBox { margin: 0 0 8px; padding: 10px; background: #ffffff; border-radius: 10px; border: 1px solid var(--line-2); }
+#lookQrCanvas { display: block; width: min(100%, 320px); height: auto; margin: 0 auto; image-rendering: pixelated; }
+#lookQrBox .note { color: #3a3a3f; margin: 8px 0; }
+#lookQrBox button { margin-bottom: 0; }
 .look-import-row { display: flex; gap: 8px; margin-top: 8px; }
 .look-import-row button { flex: 1; margin: 0; }
 /* Imported .cube LUTs (Profiles & LUTs panel). The badge is TEXT — never a

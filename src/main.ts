@@ -25,11 +25,14 @@ import {
   toBase64url,
   buildLookLink,
   parseLookText,
+  parseLookPayload,
   sniffLook,
   lookFileName,
 } from "./look";
 import { parseCube, CUBE_FILE_MAX } from "./cubeimport";
 import { putLut, getLut, listLuts, deleteLut, LUT_COUNT_CAP } from "./luts";
+import { extractLookFromJpeg } from "./lookmark";
+import { encodeQr, drawQr } from "./qr";
 import { wireThemeToggle } from "./theme";
 
 // Injected at build time from git history (see vite.config.ts).
@@ -3179,6 +3182,14 @@ async function openPicked(files: File[]) {
     liveEdits.clear();
     activateCurrent(id);
     updateSessionStrip();
+    // A JPEG exported by this app can carry its own look (the traveling
+    // recipe, lookmark.ts) — offer it through the same receive dialog as
+    // links/files/codes. The photo is already open, so Try lands on it.
+    if (imported.kind === "jpeg") {
+      const json = extractLookFromJpeg(imported.bytes);
+      const p = json ? parseLookPayload(json) : null;
+      if (p) openLookReceive({ look: p.look, name: p.name ?? `From ${imported.name}` });
+    }
     return;
   }
 
@@ -4039,6 +4050,7 @@ ui.exBtn.addEventListener("click", async () => {
         quality: Number(ui.exQuality.value),
         rotate: renderer.rotation,
         watermark: bundledSource, // practice photos carry the corner mark; the user's photos never do
+        lookRecipe: recipeForExport(currentLook()),
       },
       (f) => {
         busyText.textContent = `Exporting… ${Math.round(f * 100)}%`;
@@ -4206,7 +4218,7 @@ function isQuotaError(err: unknown): boolean {
 
 let batchStopRequested = false;
 let batchRemaining: File[] = []; // input Files not yet processed after a stop
-let batchSettings: { grade: BatchGrade; format: ExportFormat; scale: number; quality: number; lut?: EditParams["lut"]; lutMissing?: boolean } | null = null;
+let batchSettings: { grade: BatchGrade; format: ExportFormat; scale: number; quality: number; lut?: EditParams["lut"]; lutMissing?: boolean; recipe?: string } | null = null;
 let pendingSaveIsBatch = false;
 let batchRunning = false;
 
@@ -4302,7 +4314,7 @@ async function runBatch(files: File[]) {
           imported,
           img,
           batchParamsFor(img, grade, batchSettings?.lut ?? null),
-          { format, scale, quality, rotate: img.rotate ?? 0 },
+          { format, scale, quality, rotate: img.rotate ?? 0, lookRecipe: batchSettings?.recipe },
           (fr) => { busyText.textContent = `Processing ${i + 1} / ${files.length} — ${f.name} · ${Math.round(fr * 100)}%`; },
         );
         // Persist immediately (crash-safe), keep nothing in RAM. Stored in
@@ -4470,7 +4482,10 @@ batchInput.addEventListener("change", async () => {
       else lutMissing = true; // stored LUT was deleted — the summary says so
     }
   }
-  batchSettings = { grade, format: ui.exFormat.value as ExportFormat, scale: Number(ui.exScale.value), quality: Number(ui.exQuality.value), lut, lutMissing };
+  // The traveling recipe for every frame in the zip: only a CONCRETE look
+  // grade is embeddable (builtin looks resolve per image; auto has no grade).
+  const recipe = grade.kind === "look" ? recipeForExport(grade.look, (grade.look as NamedLook).name) : undefined;
+  batchSettings = { grade, format: ui.exFormat.value as ExportFormat, scale: Number(ui.exScale.value), quality: Number(ui.exQuality.value), lut, lutMissing, recipe };
   batchRemaining = [];
   runBatch(files);
 });
@@ -4542,6 +4557,7 @@ function openLookDlg(i: number) {
   lookNameHint.hidden = true;
   lookCodeOut.hidden = true;
   lookCodeOut.value = "";
+  ($("lookQrBox") as HTMLDivElement).hidden = true;
   lookDlgTitle.textContent = `Slot ${i + 1} — name & share`;
   lookNameInput.value = look.name ?? "";
   // Honest note when the look carries an imported LUT: the payload formats
@@ -4572,6 +4588,13 @@ $("lookLutShare").addEventListener("click", async () => {
 lookNameInput.addEventListener("change", () => {
   if (lookDlgSlot >= 0) renameSlot(lookDlgSlot, lookNameInput.value);
 });
+
+/** The traveling-recipe payload for an export — or undefined when the user
+ *  switched it off (the Export panel checkbox; honest label, default on). */
+function recipeForExport(look: SavedLook, name?: string): string | undefined {
+  const box = $("exRecipe") as HTMLInputElement;
+  return box.checked ? encodeLookPayload(look, name) : undefined;
+}
 
 /** The dialog's slot look with the name committed from the input first. */
 function lookDlgLook(): NamedLook | null {
@@ -4631,6 +4654,30 @@ $("lookCopyCode").addEventListener("click", async () => {
     lookCodeOut.value = token;
     lookCodeOut.hidden = false;
   }
+});
+
+// QR of the look link — for workshops and in-person sharing. Encoded by our
+// own spec-implemented qr.ts (harness round-trips it through an independent
+// decoder); any phone camera reads it, the link does the rest.
+const lookQrBox = $("lookQrBox") as HTMLDivElement;
+const lookQrCanvas = $("lookQrCanvas") as HTMLCanvasElement;
+
+$("lookShowQr").addEventListener("click", () => {
+  const look = lookDlgLook();
+  if (!look || lookNameNudge()) return;
+  try {
+    drawQr(encodeQr(buildLookLink(look, look.name)), lookQrCanvas, 6, 4);
+    lookQrBox.hidden = false;
+  } catch (err) {
+    toast((err as Error).message, 3200); // only reachable if a link outgrew QR capacity
+  }
+});
+
+$("lookSaveQr").addEventListener("click", () => {
+  const look = lookDlgSlot >= 0 ? readSlot(lookDlgSlot) : null;
+  lookQrCanvas.toBlob((blob) => {
+    if (blob) void saveBlob(blob, `${(look?.name ?? "look").replace(/[/\\:*?"<>|]/g, "").trim() || "look"}-qr.png`);
+  }, "image/png");
 });
 
 $("lookDlgClose").addEventListener("click", () => lookDlg.close());

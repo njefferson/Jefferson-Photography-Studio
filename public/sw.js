@@ -6,7 +6,7 @@
 // Bumping CACHE wipes old entries on activation — but the new cache is fully
 // PRECACHED at install first (see below), so a fresh release works offline
 // immediately instead of blacking out until the next online visit.
-const CACHE = "ips-v76";
+const CACHE = "ips-v77";
 // The whole app shell (HTML entries, hashed JS/CSS, fonts, icons, manifests) —
 // injected at build time by the precache-manifest plugin (vite.config.ts) into
 // the dist copy of this file. Empty in source so dev and direct reads stay
