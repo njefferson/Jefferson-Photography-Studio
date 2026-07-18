@@ -2573,6 +2573,8 @@ user-scalable=no.
   resumed after a reload re-scans its STORED bytes, so a pre-setting
   stored copy still reports honestly, but the "cleaned on open" nuance
   doesn't survive a reload (the tip then reads as normal found-location).
+  MERGED TO MAIN 2026-07-18 (owner "Promote"; PR #31, rebase) —
+  production deploys as 1.3.
 
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 
