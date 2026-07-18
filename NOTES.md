@@ -225,20 +225,6 @@ user-scalable=no.
   the library h4 heading jump. Walk EVERY open/close path (export cancel,
   batch resume, quick-look → session) with a11y-walk + export-walk before
   handoff; drop the harness allowlist entries when done.
-- [ ] **Learning library tile in the grid** — owner verdict 2026-07-15 (given
-  WITH the go to main): the dashed "Browse the full example library" pill is
-  "completely missable, and most people would never know it was there — it's
-  at the bottom and does not stand out." DESIGN HE WANTS: a TILE inside the
-  tutorial grid itself that looks like SEVERAL PHOTOS STACKED behind one
-  another, labeled "Learning library", opening the same full-screen library
-  overlay. Build notes: make it the grid's last tile (a .gal sibling so it
-  inherits tile sizing); the stacked-photos look can be 2-3 offset/rotated
-  layers using real thumbs from non-tutorial tiles (e.g. three library-only
-  frames — honest, they ARE in there) with the label where other tiles show
-  theirs; keep the photo count on the tile ("53 photos"); REMOVE the dashed
-  pill when the tile ships (one way in, not two). The suite's library checks
-  (opens/closes, six groups, empty "More") carry over — only the entry
-  affordance changes.
 - [ ] **Color grading — shadow / midtone / highlight wheels** — CREATIVE
   RELEASE (v2.0), owner go 2026-07-18. Split-toning color wheels per tonal
   band; duotone / toned mono (completing the 720nm B&W story above); film
@@ -2477,6 +2463,43 @@ user-scalable=no.
   themes). NEEDS THE OWNER'S HANDS: the 3×3 tab-grid density on the
   iPhone, and whether "B&W" is the label he wants on the tab
   (alternatives easy: "Mono", or "Black & white" if it fits the cell).
+  MERGED TO MAIN 2026-07-18 (owner go; PR #28, rebase) — production
+  deploys as 1.2.
+
+- [x] **Learning library tile in the grid** — owner verdict 2026-07-15 (given
+  WITH the crop go to main): the dashed "Browse the full example library"
+  pill was "completely missable, and most people would never know it was
+  there — it's at the bottom and does not stand out." His design: a TILE
+  inside the tutorial grid that looks like SEVERAL PHOTOS STACKED behind one
+  another, labeled "Learning library", opening the same full-screen library
+  overlay; keep the photo count; remove the pill (one way in, not two).
+  SHIPPED (1.2.x increment — a discoverability redesign of an existing
+  entry, not new capability, so no VERSION bump): the grid's LAST tile, a
+  `.gal gal-library` sibling (inherits tile sizing exactly), built in
+  main.ts beside the library block. The stack is three REAL thumbs of
+  LIBRARY-ONLY frames (honest — they are in there), fanned as photo prints
+  (print-white borders + shadows — the stack reads in both themes and in
+  grayscale): white-forest Lakeshore pines (NIR_1811) fronts it since
+  that's what most of the library looks like, Cloudscape (NIR_1825) and
+  the magenta full-spectrum Hillside town peek behind as the variety hint
+  (first stack draft had the magenta on top — it dominated and
+  misrepresented the set; reordered). Label + "· 53 photos" count sit in
+  the standard tile span (count computed from GALLERY.length, never
+  hand-numbered); imgs are alt="" decorative per the NEVER-CHURN gallery
+  pattern; the button carries aria-label + aria-haspopup="dialog". The
+  dashed pill (#libraryOpen + .library-link CSS) is REMOVED. The library
+  overlay itself is untouched (its "accessible overlays" conversion to a
+  real <dialog> stays queued).
+  VERIFIED headless (library-walk harness, fail-first proven — planted
+  "pill still there" flipped): pill absent; 16 grid tiles with the library
+  tile LAST; label + count present; tile count == #libBody tile total ==
+  header count (53); three thumbs loaded, all library-only, distinct fan
+  transforms; tap opens the same overlay, six groups, no "More", Close
+  closes; axe clean on the grid + tile both themes; no page errors;
+  lesson-walk re-run green (its tile count now excludes .gal-library).
+  NEEDS THE OWNER'S HANDS: whether the stacked-prints look reads as "a
+  library lives here" at iPhone tile size, the three frames fronting it,
+  and the count text size.
 
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 
