@@ -2267,29 +2267,54 @@ for (const rdef of RATIOS) {
   ratioBtns.set(rdef.key, b);
 }
 
-/** "4:5" → "5:4"; "Original" → "Original ⇅". */
+/** "4:5" → "5:4"; inverted "Original" names the orientation it becomes —
+ *  Portrait/Landscape (to a photographer "flip" means MIRRORING, and the old
+ *  "Original ⇅" would collide with the ⇅ tap-again hint). Square photo (or
+ *  none open): the inverse is the original, keep the plain label. */
 function invertedLabel(def: (typeof RATIOS)[number]): string {
   const m = /^([0-9.]+):([0-9.]+)$/.exec(def.label);
-  return m ? `${m[2]}:${m[1]}` : `${def.label} ⇅`;
+  if (m) return `${m[2]}:${m[1]}`;
+  const inv = 1 / dispAspectNow();
+  return inv < 1 ? "Portrait" : inv > 1 ? "Landscape" : def.label;
 }
 
 function updateRatioUI() {
-  // Selected state is aria-pressed + a TEXT check — never colour alone.
+  // Selected state is aria-pressed + a TEXT check — never colour alone. The
+  // active chip also wears a tap-again hint badge (⇅ flips to the inverse,
+  // ✎ edits the custom pair) so it keeps reading as a live control; Free and
+  // 1:1 get none — a second tap on them genuinely does nothing.
   for (const [k, b] of ratioBtns) {
     const def = RATIOS.find((x) => x.key === k)!;
     const on = k === cropRatioKey;
     let label = def.label;
     if (k === "custom" && cropRatioCustom) label = on ? cropRatioCustom : `Custom (${cropRatioCustom})`;
     else if (on && cropRatioInv && def.invertible) label = invertedLabel(def);
-    b.textContent = (on ? "✓ " : "") + label;
+    const hint = on ? (def.invertible ? "⇅" : k === "custom" ? "✎︎" : "") : "";
+    if (hint) {
+      const span = document.createElement("span");
+      span.className = "chip-hint";
+      span.textContent = hint;
+      b.replaceChildren(document.createTextNode(`✓ ${label} `), span);
+    } else {
+      b.textContent = (on ? "✓ " : "") + label;
+    }
     b.setAttribute("aria-pressed", String(on));
+    // The aria-label must carry the tap-again action itself — it overrides the
+    // button's content, so the hint glyph is invisible to a screen reader.
     b.setAttribute(
       "aria-label",
       k === "custom"
-        ? "Custom crop aspect ratio — opens the ratio entry"
-        : `Crop aspect ratio ${label}${def.invertible ? " — tap again for the inverse" : ""}`,
+        ? `Custom crop aspect ratio${on ? " — tap again to edit the ratio" : " — opens the ratio entry"}`
+        : `Crop aspect ratio ${label}${def.invertible ? (on ? ` — tap again for ${invertedForAria(def, label)}` : " — tap again for the inverse") : ""}`,
     );
   }
+}
+
+/** What a second tap on the active invertible chip yields, for the aria-label. */
+function invertedForAria(def: (typeof RATIOS)[number], shownLabel: string): string {
+  const flipped = invertedLabel(def);
+  const target = cropRatioInv ? def.label : flipped;
+  return target === shownLabel ? "the inverse" : target === "Original" ? "the original aspect" : target;
 }
 updateRatioUI();
 
@@ -2320,10 +2345,13 @@ function commitRatioChoice() {
   if (rf && geoMode && current) {
     flushRecord();
     params.crop = ratioInscribe(rf);
-    positionCropOverlay();
-    draw();
     flushRecord(); // one tap = one undo step
   }
+  // EVERY commit relabels the chips, which can rewrap the row and change the
+  // pill's height (incl. null-rf paths — tapping Free, Reset crop) — so the
+  // measured --croptools-h reserve must refresh, not just the overlay. The
+  // synchronous offsetHeight read sees the new labels; no-op while unarmed.
+  remeasureCropTools();
 }
 
 // Custom-ratio entry: a real dialog (helpDlg pattern), W : H + swap.
@@ -2420,6 +2448,11 @@ function setGeoMode(mode: "crop" | "straighten" | null) {
     if (rf && Math.abs(params.crop.w / params.crop.h - rf) / rf > 0.01) {
       params.crop = ratioInscribe(rf);
     }
+    // Refresh the chips for THIS photo — the inverted-Original label names the
+    // orientation it flips to (Portrait/Landscape), which the startup render
+    // couldn't know. The photo can't rotate while armed (drawer is hidden),
+    // so arm-time is the one moment the labels can go stale.
+    updateRatioUI();
   }
   // The view must step back by the pill's REAL height (a fixed reserve buried
   // the bottom handles under the grown pill on portrait photos — IMG_1050).
