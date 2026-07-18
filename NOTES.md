@@ -2576,6 +2576,37 @@ user-scalable=no.
   MERGED TO MAIN 2026-07-18 (owner "Promote"; PR #31, rebase) —
   production deploys as 1.3.
 
+- [x] **Landing-page welcome — the first-visit card + the ⓘ button** — owner
+  ask 2026-07-18: the Studio landing page should pop up for NEW users
+  explaining the purpose of the app and the tool family, how to install,
+  the benefits, and that installing is OPTIONAL — and the same information
+  must stay reachable behind an information icon after dismissal.
+  SHIPPED (a 1.3.x increment — onboarding for existing surfaces, not new
+  capability): a real <dialog id="welcomeDlg"> on index.html — purpose
+  (free, entirely on-device, no account/tracking, offline), the family
+  (Infrared Editor + Macro Studio, one line each), "Installing is
+  optional" with the benefits (full-screen, own icon, opens offline,
+  "nice to have, never required"), how to install (Safari Share →
+  Add-to-Home-Screen / Install app menu) pointing at the page's existing
+  full install section, and a closing line saying exactly where to find
+  the card again. Auto-opens ONCE for new visitors
+  (localStorage studio-welcome-seen, set on ANY close path — Got it, tap
+  outside, Esc; private mode reads as seen so it never nags); a new round
+  ⓘ button (44px, aria-label, aria-haspopup) top-right of the launcher
+  reopens the SAME card forever after. chooser.ts stays tiny (a dozen
+  lines, no new imports); styles in launcher.css on the launcher's own
+  tokens, both themes.
+  VERIFIED headless (welcome-walk harness, fail-first proven — planted
+  "no pop-up for a new visitor" flipped): auto-open on a fresh context;
+  content states purpose/family/install/optional/where-to-find-again
+  (nbsp-normalised text match); Got it closes + persists; reload shows
+  nothing; ⓘ reopens; tap-outside and Esc dismiss AND count as seen (a
+  second fresh context proves Esc); doors stay live; axe clean on the
+  open card in both themes; no page errors.
+  NEEDS THE OWNER'S HANDS (iPad): the card's tone/wording, the ⓘ button's
+  corner spot vs the notch/safe-area on his devices, and whether the
+  auto-open feels welcoming rather than in-the-way on a first real visit.
+
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 
 > An 11-dimension multi-agent review over the whole repo; every problem below
