@@ -1323,7 +1323,12 @@ label.open-btn, label.bar-btn {
 #busyActions { display: flex; gap: 8px; margin-top: 16px; }
 #busyActions button { flex: 1; }
 #busyActions .primary { background: var(--accent); color: var(--accent-ink); font-weight: 600; border-color: var(--accent); }
-.coffee { color: var(--accent); text-decoration: none; font-size: 13px; }
+/* Underlined, not colour-only: these links sit inside the "Buy me a coffee:"
+   sentence, so they must be distinguishable from the surrounding text by more
+   than hue (accessibility mandate; axe link-in-text-block). The #infoDlg-scoped
+   selector is needed to beat the ID-level `#infoDlg a { text-decoration:none }`
+   rule above — plain `.coffee` loses that specificity fight. */
+#infoDlg .coffee { color: var(--accent); text-decoration: underline; font-size: 13px; }
 .coffee-row { font-size: 13px; color: var(--txt-2); }
 .coffee-row a { margin-left: 6px; }
 
