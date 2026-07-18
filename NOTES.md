@@ -191,11 +191,15 @@ user-scalable=no.
 > continues as the parallel design track below.
 
 - [ ] **Black & white for 720nm** — core sweep; the recorded target promoted
-  2026-07-18. A channel-weighted mono conversion for the near-monochrome
-  720nm "white forest" frames (adjustable weights, or a few named mixes).
-  Basic B&W lands here; toned mono / duotone deliberately arrives with the
-  creative color-grading release below. Per-pixel display-space → bakes into
-  .cube like the HSL mixer.
+  2026-07-18; owner go same day, he is starting it in a NEW CHAT — next
+  session, read this entry first. THE FIRST CAPABILITY RELEASE under the
+  new taxonomy (see "## Versioning"): it ships as **1.2** — edit the
+  VERSION file (1.1 → 1.2) in the release's own final commit so the
+  release commit reads "1.2". Scope: a channel-weighted mono conversion
+  for the near-monochrome 720nm "white forest" frames (adjustable weights,
+  or a few named mixes). Basic B&W lands here; toned mono / duotone
+  deliberately arrives with the creative color-grading release below
+  (v2.0). Per-pixel display-space → bakes into .cube like the HSL mixer.
 - [ ] **Display-P3 JPEG export** — core sweep; the recorded target promoted
   2026-07-18 (code ships sRGB today; src/icc.ts writes the profile). Needs P3
   primaries in the embedded ICC AND the pixel encode actually emitting
