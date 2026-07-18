@@ -122,6 +122,33 @@ body {
 #welcomeDlg ul { margin: 8px 0; padding-left: 20px; }
 #welcomeDlg li { margin: 6px 0; }
 #welcomeDlg .fine { color: var(--txt-3); font-size: 13px; }
+/* Install-first (owner feedback 2026-07-18: "two paragraphs before figuring
+   out how to install — they'll never make it"): the steps are the first
+   thing after one lead line, boxed in accent so the eye lands there. */
+.welcome-lead { margin-top: 4px; }
+.install-box {
+  margin: 12px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  background: var(--accent-soft);
+}
+.install-box h3 { margin: 0 0 8px; font: 600 15px/1.3 var(--display); display: flex; align-items: center; gap: 8px; }
+.opt-badge {
+  padding: 2px 8px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  font: 600 11px/1.4 var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  /* Full-contrast text: --txt-2 fell under 4.5:1 on the accent-soft box in
+     dawn (caught by the welcome walk) — the pill shape carries the "badge"
+     look, the text stays readable. */
+  color: var(--txt);
+}
+.install-steps { margin: 0; padding-left: 24px; font-size: 16px; }
+.install-steps li { margin: 6px 0; }
+.step-glyph { display: inline-block; margin-left: 2px; }
 .welcome-got-it {
   display: block;
   width: 100%;
