@@ -3,8 +3,12 @@
 // to move a RAW file through iOS untouched).
 
 import { readZip, pickImageEntry } from "./zip";
+import { sniffLook } from "./look";
 
-export type ImageKind = "dng" | "nef" | "tiff" | "jpeg" | "png" | "unknown";
+// "look" is a shared-look file (.ipslook JSON), not an image — the editor
+// intercepts it before any decode. Look-inside-zip is unsupported on purpose
+// (pickImageEntry only surfaces images).
+export type ImageKind = "dng" | "nef" | "tiff" | "jpeg" | "png" | "look" | "unknown";
 
 export interface ImportedFile {
   name: string;
@@ -51,6 +55,7 @@ export function sniff(bytes: Uint8Array): ImageKind {
   if (le || be) return "dng"; // DNG is TIFF-based; treat TIFF/DNG together, refine in decoder
   if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "jpeg";
   if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return "png";
+  if (sniffLook(bytes)) return "look";
   return "unknown";
 }
 

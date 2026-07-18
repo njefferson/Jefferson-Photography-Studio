@@ -60,10 +60,10 @@
           </button>
           <label class="open-btn bar-primary" title="Edit one photo — or several as a session">
             Open image(s)
-            <input id="file" type="file" accept=".dng,.nef,.zip,image/*" multiple hidden />
+            <input id="file" type="file" accept=".dng,.nef,.zip,.ipslook,image/*" multiple hidden />
           </label>
-          <input id="batchFiles" type="file" accept=".dng,.nef,.zip,image/*" multiple hidden />
-          <input id="quickFiles" type="file" accept=".dng,.nef,.zip,image/*" multiple hidden />
+          <input id="batchFiles" type="file" accept=".dng,.nef,.zip,.ipslook,image/*" multiple hidden />
+          <input id="quickFiles" type="file" accept=".dng,.nef,.zip,.ipslook,image/*" multiple hidden />
         </span></span>
       </header>
 
@@ -379,8 +379,13 @@
             <small class="note">These Format &amp; Resolution settings also apply to <strong>Batch process</strong> (top bar).</small>
             <hr class="divider" />
             <div class="sub-title">My looks <span>saved on this device</span></div>
-            <small class="note">Save the current edit into a slot, then load it back onto any photo later. Slots persist on this device between sessions.</small>
+            <small class="note">Save the current edit into a slot, then load it back onto any photo later. Slots persist on this device between sessions. Tap <strong>&#8943;</strong> on a slot to name it &mdash; and share it as a link, file, or code.</small>
             <div id="slotList" class="slot-list"></div>
+            <div class="look-import-row">
+              <button id="lookImportBtn" type="button">Import look file&hellip;</button>
+              <button id="lookPasteBtn" type="button">Paste look code&hellip;</button>
+            </div>
+            <input id="lookFile" type="file" accept=".ipslook,.json,application/json" hidden />
             <hr class="divider" />
             <div class="sub-title">Profiles &amp; LUTs <span>your look, reusable</span></div>
             <label class="check-row"><input id="profWB" type="checkbox" /> Bake current white balance in</label>
@@ -487,6 +492,42 @@
       </div>
       <p class="batch-note">Format &amp; Resolution come from the <strong>Export</strong> panel<span id="bcFmt"></span>.</p>
       <button id="batchCancel" type="button">Cancel</button>
+    </dialog>
+
+    <!-- Look sharing: name & share a saved look (per-slot ⋯ button). -->
+    <dialog id="lookDlg" aria-labelledby="lookDlgTitle">
+      <h2 id="lookDlgTitle">Name &amp; share</h2>
+      <p class="note">The whole grade travels in a small link, file, or code &mdash; no account, nothing uploaded. The link opens the editor with your look ready to try.</p>
+      <label class="look-name-row">Name
+        <input id="lookName" type="text" maxlength="60" autocomplete="off" placeholder="e.g. Dusk Aerochrome" />
+      </label>
+      <p id="lookNameHint" class="note look-hint" role="status" hidden>Add a name so your friend knows what it is &mdash; or tap share again to send it unnamed.</p>
+      <button id="lookShareLink" type="button" class="primary">Share link</button>
+      <button id="lookShareFile" type="button">Share as file (.ipslook)</button>
+      <button id="lookCopyCode" type="button">Copy look code</button>
+      <textarea id="lookCodeOut" class="look-code" rows="4" readonly hidden aria-label="Look code — copy it by hand"></textarea>
+      <button id="lookDlgClose" type="button">Close</button>
+    </dialog>
+
+    <!-- Look sharing: import a pasted link / code / raw look JSON. -->
+    <dialog id="lookPasteDlg">
+      <h2>Paste a look code</h2>
+      <p class="note">Paste a look link or code someone sent you.</p>
+      <textarea id="lookPasteIn" class="look-code" rows="4" aria-label="Look link or code" placeholder="Paste here&hellip;"></textarea>
+      <p id="lookPasteErr" class="note look-hint" role="status" aria-live="polite" hidden>That doesn't look like a look link or code &mdash; check it copied completely.</p>
+      <button id="lookPasteApply" type="button" class="primary">Import</button>
+      <button id="lookPasteClose" type="button">Cancel</button>
+    </dialog>
+
+    <!-- Look sharing: a look arrived (link, file, or pasted code). -->
+    <dialog id="lookRecvDlg" aria-labelledby="lookRecvTitle">
+      <h2 id="lookRecvTitle">Untitled look</h2>
+      <p class="note">Someone shared a color grade. <strong>Try</strong> puts it on your open photo &mdash; your white balance, exposure, crop, masks and spot fixes stay untouched, and one Undo removes it.</p>
+      <button id="lookRecvTry" type="button" class="primary">Try on this photo</button>
+      <p id="lookRecvNoPhoto" class="note" hidden>No photo is open, so there's nothing to try it on &mdash; save it below and load it onto any photo later.</p>
+      <button id="lookRecvSave" type="button">Save to My looks&hellip;</button>
+      <div id="lookRecvSlots" class="look-recv-slots" hidden></div>
+      <button id="lookRecvClose" type="button">Not now</button>
     </dialog>
 
     <dialog id="infoDlg">
