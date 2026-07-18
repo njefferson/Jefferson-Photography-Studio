@@ -107,6 +107,13 @@ See **`PLAN.md`** for the full build plan.
 - The ⓘ dialog shows the running version and a version per changelog entry.
 - CI must check out full history (`fetch-depth: 0` in deploy.yml) or the
   commit counts — and therefore the version numbers — come out wrong.
+- The service-worker CACHE name is NOT a version and is never hand-edited
+  (owner rule, 2026-07-18 — "tired of calling everything a version"): the
+  build stamps it as `ips-<app version>` (vite.config.ts precache plugin
+  replaces the placeholder in public/sw.js). Every deploy is a commit, so
+  the version — and with it the cache — refreshes automatically; the old
+  hand-numbered ips-v1…ips-v80 chore and its per-release bookkeeping are
+  retired. Don't mention cache stamps in release notes or to the owner.
 
 ## Accessibility standing rule (owner mandate, 2026-07-17)
 
@@ -320,7 +327,7 @@ user-scalable=no.
 - [ ] **Manifest screenshots** — repo audit 2026-07-17: add real screenshots
   to manifest.webmanifest for richer install/share sheets. Generate via the
   headless-Chromium pipeline (same as icons) from a good open-photo state;
-  needs curated assets, so deferred from the setup pass. Bump the cache.
+  needs curated assets, so deferred from the setup pass.
 
 ## Shipped (roadmap archive)
 

@@ -23,9 +23,13 @@ settled design decisions, and measured gotchas that must not be re-learned.
 - Merge PRs with **rebase** — main's history is linear, and the in-app patch
   notes are the last 5 commits; a merge commit would show up in them.
 - A branch whose PR merged must be restarted from `origin/main` (same name).
-- Bump `public/sw.js` CACHE (`ips-vN`) on EVERY behavior change — including
-  icon/asset art, which keeps its filenames and is cached cache-first, so
-  without a bump installed apps keep the old bytes forever.
+- The `public/sw.js` CACHE name stamps itself at build time from the app
+  version (vite.config.ts precache plugin) — every deploy is a commit, so
+  every deploy refreshes the cache automatically. NEVER hand-number it, never
+  bump it, and never present it as a "version" to the owner — it isn't one
+  (owner rule, 2026-07-18; ips-v1…v80 were the hand-numbered past). The only
+  cache still versioned by hand is `EXAMPLES` in sw.js, and only if a practice
+  RAW's bytes ever change under the same name.
 - Versioning: the `VERSION` file declares the base; point releases are
   automatic from commit counts. No git tags — the remote refuses tag pushes.
 
@@ -81,4 +85,5 @@ patterns already verified correct — do not "fix" those, do not regress them.
 ## Icon pipeline
 PNG touch icons are generated from the SVG via a headless-Chromium screenshot
 (the `macro-icon-180.png` pipeline; generator scripts live in the session
-scratchpad). Regenerate PNGs whenever the SVG changes — and bump the cache.
+scratchpad). Regenerate PNGs whenever the SVG changes (the cache stamp
+refreshes itself on the deploy commit).
