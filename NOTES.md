@@ -147,7 +147,7 @@ queue (accessible overlays; forced-colors; manifest screenshots). Cheap
 future option if regressions ever slip: a 5-line build guard failing on
 user-scalable=no.
 
-## Next capability release (owner's roadmap, 2026-07-04; queue refreshed 2026-07-15)
+## Next capability release (owner's roadmap, 2026-07-04; resequenced 2026-07-18)
 
 > SOURCE OF TRUTH for the in-app Roadmap (behind the ⓘ button). `vite.config.ts`
 > parses the `- [ ]` / `- [x]` checkbox bullets below at build time and injects
@@ -161,7 +161,101 @@ user-scalable=no.
 > (same format, full SHIPPED records) so the in-app roadmap shows only
 > what's genuinely coming; notes.html renders the archive as "Recently
 > shipped". Keep this section to OPEN items only.
+> QUEUE RESEQUENCED 2026-07-18 (owner decision, roadmap session): the
+> CORE-COMPLETENESS SWEEP ships first (1.1.x point releases), then the
+> CREATIVE RELEASE (bump VERSION to 1.2 when it ships to main), while the
+> big-image / full-bleed direction continues as the parallel design track
+> below.
 
+- [ ] **Aspect-ratio crop presets** — core sweep, owner go 2026-07-18. Locked
+  ratios while cropping: Free (default — today's behavior), Original, 1:1,
+  4:5, 3:2, 16:9. Flagged NOT-YET-DONE in the Crop & straighten shipped
+  record below. Build notes: joins the settled combined crop/straighten model
+  (SEVENTH PASS record) — constrain the resize path (`moveCropDrag` /
+  `clampResizeOnPhoto`, main.ts) to the locked ratio and re-inscribe on a
+  preset change; a small chip row or cycle control in the crop pill; remember
+  the last choice in localStorage like the panel tab. 4:5 and 1:1 matter for
+  Instagram. Geometry/overlay only — export still reads `params.crop`.
+- [ ] **Flip the photo — mirror horizontal / vertical** — core sweep, owner go
+  2026-07-18. Genuinely absent today (only Rotate 90° exists). Two labelled
+  buttons beside Rotate 90° in the Crop & rotate tab; follow the rotate
+  implementation pattern. WATCH: the deferred rotate wrinkles in the findings
+  ledger (sky-mask regeneration as an undoable step; gradient-mask default
+  geometry ignoring the transform) apply to flip identically — handle them or
+  record them as deferred.
+- [ ] **Black & white for 720nm** — core sweep; the recorded target promoted
+  2026-07-18. A channel-weighted mono conversion for the near-monochrome
+  720nm "white forest" frames (adjustable weights, or a few named mixes).
+  Basic B&W lands here; toned mono / duotone deliberately arrives with the
+  creative color-grading release below. Per-pixel display-space → bakes into
+  .cube like the HSL mixer.
+- [ ] **Display-P3 JPEG export** — core sweep; the recorded target promoted
+  2026-07-18 (code ships sRGB today; src/icc.ts writes the profile). Needs P3
+  primaries in the embedded ICC AND the pixel encode actually emitting
+  P3-encoded bytes — the pair must land together or colors shift.
+- [ ] **Keep EXIF in exports** — core sweep, promoted from the review
+  opportunities 2026-07-18: carry capture date/camera into exported JPEG and
+  TIFF (parseExif already reads it at open; write the honest subset back).
+- [ ] **Quality downscale on scaled exports** — core sweep, promoted from the
+  review opportunities 2026-07-18: the 50%/25% exports currently decimate
+  nearest-neighbour; box-filter them.
+- [ ] **Per-channel R/G/B curves** — core sweep, promoted from the backlog
+  2026-07-18: extends the luminance tone curve to independent channels; same
+  per-pixel model, non-spatial, so it rides saved looks and strengthens the
+  .cube/.dcp exports.
+- [ ] **Save .cube/.dcp through the share sheet** — core sweep, promoted from
+  the findings ledger 2026-07-18: the bare a[download] silently does nothing
+  in the installed (standalone) iOS app; route through the share-sheet path
+  like image saves, and close the double-tap fall-through (which can clear
+  batch crash-recovery frames early).
+- [ ] **Accessible overlays — Library, Quick look and Busy become real dialogs**
+  — a11y audit 2026-07-17, deferred from the a11y release because it touches
+  open/close interaction flows. #library claims aria-modal with no focus
+  trap/Escape/restore, #quickLook and #busy have no dialog role; all three
+  are `.hidden` flips (main.ts ~3276/3677/3800) leaving the background live
+  to assistive tech. Convert to native <dialog>+showModal() like #helpDlg
+  (free trap/Escape/focus-restore). Same pass: finish the panel tab pattern
+  (role=tabpanel, aria-controls, arrow keys on .ptab), migrate the remaining
+  alert()/confirm() flows (previewNotice, append-confirm) to dialogs, fix
+  the library h4 heading jump. Walk EVERY open/close path (export cancel,
+  batch resume, quick-look → session) with a11y-walk + export-walk before
+  handoff; drop the harness allowlist entries when done.
+- [ ] **Learning library tile in the grid** — owner verdict 2026-07-15 (given
+  WITH the go to main): the dashed "Browse the full example library" pill is
+  "completely missable, and most people would never know it was there — it's
+  at the bottom and does not stand out." DESIGN HE WANTS: a TILE inside the
+  tutorial grid itself that looks like SEVERAL PHOTOS STACKED behind one
+  another, labeled "Learning library", opening the same full-screen library
+  overlay. Build notes: make it the grid's last tile (a .gal sibling so it
+  inherits tile sizing); the stacked-photos look can be 2-3 offset/rotated
+  layers using real thumbs from non-tutorial tiles (e.g. three library-only
+  frames — honest, they ARE in there) with the label where other tiles show
+  theirs; keep the photo count on the tile ("53 photos"); REMOVE the dashed
+  pill when the tile ships (one way in, not two). The suite's library checks
+  (opens/closes, six groups, empty "More") carry over — only the entry
+  affordance changes.
+- [ ] **Color grading — shadow / midtone / highlight wheels** — CREATIVE
+  RELEASE (v1.2), owner go 2026-07-18. Split-toning color wheels per tonal
+  band; duotone / toned mono (completing the 720nm B&W story above); film
+  grain; a creative post-crop vignette. Wheels + duotone are per-pixel
+  display-space color → compileEdit + .cube like the HSL mixer; grain and
+  vignette are spatial → pre-pass, excluded from the LUTs per the spatial-op
+  rulebook (the creative vignette frames the post-CROP image, unlike the
+  source-anchored lens-vignette correction).
+- [ ] **Custom false color — full 3×3 channel mixer** — CREATIVE RELEASE
+  (v1.2), promoted from the backlog 2026-07-18: arbitrary channel mixing
+  beyond the R⇄B swap (aerochrome-style and invented palettes). IR-native,
+  per-pixel, bakes into .cube/.dcp.
+- [ ] **Stickers — UFOs in the trees** — CREATIVE RELEASE (v1.2), promoted
+  from the backlog 2026-07-18 (owner ask 2026-07-14). The full architecture
+  sketch lives in "Future / bigger bets" below — linear-source-space
+  compositing so stickers inherit the IR palette, occlusion via the existing
+  mask machinery, and the scope caution: stickers, NOT a general layer stack.
+- [ ] **Warp tools — Swirl / Liquefy / Pinch** — CREATIVE RELEASE (v1.2),
+  promoted from the backlog 2026-07-18 (owner ask 2026-07-14). The
+  UV-displacement-field sketch lives in "Future / bigger bets" below; spatial
+  → never in looks/batch/LUTs; one stroke = one undo. The biggest single item
+  in the release.
 - [ ] **Full-bleed alignment view — the tilted photo fills the screen** — owner-caught on device
   2026-07-16 (with the crop go-to-main; screenshot IMG_6201, Straighten @ 23.6°).
   While a geometry tool is armed, rotating and pinch-zooming CLIPS the photo
@@ -225,37 +319,11 @@ user-scalable=no.
   them subtle (match `--line`), per-focus, and remember the last choice in
   localStorage like the panel tab. Non-goal: nothing touches the pipeline or
   export — overlay-only, exactly like the thirds grid.
-- [ ] **Learning library tile in the grid** — owner verdict 2026-07-15 (given
-  WITH the go to main): the dashed "Browse the full example library" pill is
-  "completely missable, and most people would never know it was there — it's
-  at the bottom and does not stand out." DESIGN HE WANTS: a TILE inside the
-  tutorial grid itself that looks like SEVERAL PHOTOS STACKED behind one
-  another, labeled "Learning library", opening the same full-screen library
-  overlay. Build notes: make it the grid's last tile (a .gal sibling so it
-  inherits tile sizing); the stacked-photos look can be 2-3 offset/rotated
-  layers using real thumbs from non-tutorial tiles (e.g. three library-only
-  frames — honest, they ARE in there) with the label where other tiles show
-  theirs; keep the photo count on the tile ("53 photos"); REMOVE the dashed
-  pill when the tile ships (one way in, not two). The suite's library checks
-  (opens/closes, six groups, empty "More") carry over — only the entry
-  affordance changes.
 - [ ] **Mask by subject / background** — auto-select the subject or the
   background (owner request 2026-07-05). Honest scoping: true subject/background
   segmentation needs an on-device ML model (WebGPU — the "frontier" backlog
   item); there is no classical stand-in the way sky had one. Architect as a mask
   type so it slots into the same engine when ready.
-- [ ] **Accessible overlays — Library, Quick look and Busy become real dialogs**
-  — a11y audit 2026-07-17, deferred from the a11y release because it touches
-  open/close interaction flows. #library claims aria-modal with no focus
-  trap/Escape/restore, #quickLook and #busy have no dialog role; all three
-  are `.hidden` flips (main.ts ~3276/3677/3800) leaving the background live
-  to assistive tech. Convert to native <dialog>+showModal() like #helpDlg
-  (free trap/Escape/focus-restore). Same pass: finish the panel tab pattern
-  (role=tabpanel, aria-controls, arrow keys on .ptab), migrate the remaining
-  alert()/confirm() flows (previewNotice, append-confirm) to dialogs, fix
-  the library h4 heading jump. Walk EVERY open/close path (export cancel,
-  batch resume, quick-look → session) with a11y-walk + export-walk before
-  handoff; drop the harness allowlist entries when done.
 - [ ] **High-contrast modes — forced-colors and prefers-contrast** — a11y
   audit 2026-07-17. Low-likelihood platform (Windows High Contrast; the
   owner is iPad-first) but cheap insurance: active/selected states are
@@ -2070,7 +2138,8 @@ CONFIRMED but DEFERRED (each needs its own release / owner input):
   headless incl. a fail-first buggy-install control. See the roadmap entry.
 - Multi-tab: two tabs of ir.html silently clobber each other's ips-session
   store (no guard). Also: lone opens still have zero crash safety.
-- .cube/.dcp saves use a bare a[download] — silently does nothing in the
+- [QUEUED 2026-07-18 — "Next capability release", core sweep] .cube/.dcp saves
+  use a bare a[download] — silently does nothing in the
   installed (standalone) iOS app; should ride the share-sheet path like
   image saves. Double-tapping Save while the share sheet opens can fall into
   the download branch and (for batch) clear crash-recovery frames early.
@@ -2112,6 +2181,9 @@ per-channel R/G/B curves (strengthens .cube/.dcp); B&W mode for 720nm;
 Web-Worker thumbnailer (named twice in NOTES); privacy/support page (App
 Store requires one; also markets the on-device story); a public home for
 patch notes/roadmap history (the private repo 404s for users).
+(2026-07-18: Display-P3, keep-EXIF, box-filtered exports, per-channel curves
+and the 720nm B&W are now QUEUED in the "Next capability release" core sweep;
+batch-from-session and the Web-Worker thumbnailer remain open here.)
 
 ## Future / bigger bets (backlog, 2026-07-05)
 
@@ -2146,7 +2218,8 @@ Classical, subscription-grade tools (fit the current architecture directly):
   band isolation verified (neutral bands exactly untouched). Looks reset the
   mixer; saved looks carry it. Per-channel R/G/B CURVES remain open below.
 - **Per-channel R/G/B point curves** — extends the luminance tone curve to
-  independent channels; same per-pixel model.
+  independent channels; same per-pixel model. PROMOTED 2026-07-18 to the
+  "Next capability release" queue (core sweep) — see that entry.
 - **Perspective (Upright)** — crop/straighten shipped 2026-07-15 (see the
   roadmap entry above); a full 4-corner perspective warp is a bigger,
   separate follow-up (needs a homography in the vertex shader, not just the
@@ -2189,10 +2262,13 @@ Classical, subscription-grade tools (fit the current architecture directly):
 - **Copy settings + batch apply/export** across a folder — builds on the
   snapshot system shipped 2026-07-04; no ML.
 - **Channel mixer (full 3×3)** — custom false colour beyond the R↔B swap;
-  IR-native, per-pixel.
+  IR-native, per-pixel. PROMOTED 2026-07-18 to the "Next capability release"
+  queue (Creative release, v1.2) — see that entry.
 - **UFOs in the trees — playful sticker compositing** (owner ask 2026-07-14,
   given right after the dust-release promotion; he'll open a NEW CHAT for it —
-  next session, read this entry first). The idea: paste fun cutouts (UFOs,
+  next session, read this entry first). PROMOTED 2026-07-18 to the "Next
+  capability release" queue (Creative release, v1.2); this entry keeps the
+  architecture sketch. The idea: paste fun cutouts (UFOs,
   aliens, "other such fun things fitting for the weird colors") into a photo,
   including PEEKING FROM BEHIND things — which is the real requirement: an
   occlusion mask per sticker so scene elements (trees, branches) render in
@@ -2219,7 +2295,9 @@ Classical, subscription-grade tools (fit the current architecture directly):
   SCOPE CAUTION: this is "layers lite" — keep it stickers (no general layer
   stack), or it eats the app.
 - **Playful warp tools — Swirl / Liquefy / Pinch** (owner ask 2026-07-14:
-  "crazy tools like swirl or liquefy"). Finger-driven local GEOMETRY warps —
+  "crazy tools like swirl or liquefy"). PROMOTED 2026-07-18 to the "Next
+  capability release" queue (Creative release, v1.2); this entry keeps the
+  architecture sketch. Finger-driven local GEOMETRY warps —
   a real departure from the colour pipeline, but classical and on-device:
   the natural architecture is a per-photo UV DISPLACEMENT FIELD at a working
   resolution (brush-bitmap pattern — strokes push/twist/pull vectors into the
@@ -2231,6 +2309,21 @@ Classical, subscription-grade tools (fit the current architecture directly):
   fits the house taste; needs a sustained mode + banner like heal/TAT. Watch
   GPU==CPU parity at the remap's bilinear taps (the brush-mask half-texel
   lesson applies doubly to a field that MOVES samples).
+
+Recorded 2026-07-18 (roadmap analysis session; NOT queued — the owner hasn't
+greenlit these, they're here so they aren't lost):
+- **Share your look as a file** — export/import an app-native look file so IR
+  shooters can swap looks with no account and no server (.cube exports don't
+  round-trip back into the editor). Fits free/on-device/no-account exactly —
+  community without infrastructure.
+- **Durable edits across reloads** — sessions admit masks reset on reload and
+  lone opens have zero crash safety (findings ledger); persisting the full
+  edit recipe is the "come back tomorrow" gap between an editor and a daily
+  tool.
+- **Clipping warnings** — highlight/shadow blinkies riding the existing
+  histogram machinery, paired with a non-color cue per the a11y rule.
+- **Practice-photo storage control** — see the findings ledger (~440 MB
+  examples cache, no user-facing free control); candidate for a future sweep.
 
 Known gap — FIXED 2026-07-05:
 - [x] **sRGB ICC on export, both formats.** JPEG (`canvas.toBlob`) and the
