@@ -2606,6 +2606,20 @@ user-scalable=no.
   NEEDS THE OWNER'S HANDS (iPad): the card's tone/wording, the ⓘ button's
   corner spot vs the notch/safe-area on his devices, and whether the
   auto-open feels welcoming rather than in-the-way on a first real visit.
+  OWNER REWORK WITH THE PROMOTE (2026-07-18): "you're asking a user to
+  read two paragraphs before figuring out how to install — they'll never
+  make it." REBUILT INSTALL-FIRST: one lead line, then a boxed accent
+  install card ("Put it on your Home Screen" + an OPTIONAL badge, two
+  numbered steps: Share → Add to Home Screen, with the Android line and
+  the it's-optional sentence as fine print inside the box), THEN the
+  two-tool list, trimmed. RIDE-ALONG CONTRAST FIX (caught by the walk):
+  the badge's --txt-2 fell under 4.5:1 on the accent-soft box in dawn →
+  full --txt (the pill shape carries the badge look). Walk re-run 18/18
+  incl. a new DOM-order check (install steps BEFORE the tool list) and a
+  close-event race fix in the harness (the dialog "close" event that
+  records seen fires a task after close()).
+  MERGED TO MAIN 2026-07-18 (owner "Promote to main" with the rework
+  note; ships as a 1.3.x increment).
 
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 
