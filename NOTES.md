@@ -167,6 +167,28 @@ user-scalable=no.
 > big-image / full-bleed direction continues as the parallel design track
 > below.
 
+- [ ] **Crop ratio chips — obvious tap affordance, no side-scroll** — owner
+  feedback 2026-07-18, given WITH the promote of the aspect/flip + fix
+  releases; he is opening a NEW CHAT for this — next session, read this
+  entry first. Two asks, his words: (1) "Does the preset look slightly
+  different so it's obvious it can be tapped and reset? I just don't want it
+  to lose the functionality by becoming camouflaged as soon as it's used" —
+  the ACTIVE chip must still read as a live control (it flips to its inverse
+  on a second tap; today it wears the accent fill + "✓ ", which he fears
+  reads as inert once selected). Consider a visible affordance on the active
+  chip — e.g. the ⇅/⇄ inverse hint ON the chip, or a pressed-but-still-
+  button treatment. (2) "The tiles along the bottom under the crop menu…
+  cuts them off if they are dragged… I'd like that to be made neater, I
+  don't want to have to scroll left and right to see all of the aspect
+  ratios" — the one-row side-scroll (chosen to keep the pill height fixed
+  after the IMG_1050 fail state) cuts chips off; he wants ALL ratios visible
+  without scrolling, neater. DESIGN CONSTRAINT that must survive any rework:
+  the pill's height is MEASURED into --croptools-h and the view steps back
+  by it (the fail-state fix) — a taller multi-row layout is now SAFE as long
+  as it lays out before the rAF measure; alternatives: smaller/denser chips,
+  two tidy rows (height is fine now), or a popover ratio picker. Keep the
+  44px hit extensions, aria-pressed + text-state (never colour alone), and
+  the repeat-tap inverse.
 - [ ] **Black & white for 720nm** — core sweep; the recorded target promoted
   2026-07-18. A channel-weighted mono conversion for the near-monochrome
   720nm "white forest" frames (adjustable weights, or a few named mixes).
