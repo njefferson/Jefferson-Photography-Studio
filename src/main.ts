@@ -3,6 +3,7 @@ import { importFile, type ImportedFile, type ImageKind } from "./import";
 import { decode, type DecodedImage } from "./decode";
 import { Renderer, type EditParams } from "./gl";
 import { exportImage, saveBlob, type ExportFormat } from "./export";
+import { findLocation, stripLocation } from "./gps";
 import { writeZip, crc32 } from "./zip";
 import { putFrame, eachFrame, frameMetas, frameCount, clearFrames } from "./batchstore";
 import * as Session from "./session";
@@ -1275,6 +1276,102 @@ $("bwReset").addEventListener("click", () => {
   flushRecord();
 });
 updateBwUI();
+
+// --- Location-data guard: the 🛰 tip shows when the LOADED FILE carries GPS
+// location (src/gps.ts scans the actual bytes — EXIF GPS IFD and XMP). Tap it
+// for two honest ways out: save the file without location (same name — the
+// save sheet lets you put it back where you keep it) or save a clean copy;
+// both re-check the result before claiming clean. Settings (ⓘ): hide the tip,
+// or strip location from the app's working copy the moment a photo opens —
+// the tip then still shows, saying plainly that the ORIGINAL file keeps its
+// location until a clean version is saved (labels stay honest). ---
+const locTipBtn = $("locTip") as HTMLButtonElement;
+const locDlg = $("locDlg") as HTMLDialogElement;
+const locDlgBody = $("locDlgBody") as HTMLParagraphElement;
+const setLocTipBtn = $("setLocTip") as HTMLButtonElement;
+const setLocStripBtn = $("setLocStrip") as HTMLButtonElement;
+// Deferred: the ⓘ dialog's open function is created further down (it owns the
+// scroll cues); it registers itself here so "Open Settings" can reach it.
+let openInfoDialog: () => void = () => {};
+
+const locTipPref = () => { try { return localStorage.getItem("ips-loc-tip") !== "0"; } catch { return true; } };
+const locStripPref = () => { try { return localStorage.getItem("ips-loc-strip") === "1"; } catch { return false; } };
+
+/** Run on every imported file before it's decoded/stored: record whether the
+ *  original bytes carry location, and — with the strip-on-open setting — wipe
+ *  the app's working copy (so session/batch storage never holds it either).
+ *  A strip only counts when the re-check comes back clean. */
+function guardLocation(imported: ImportedFile): ImportedFile {
+  try {
+    imported.hadLocation = findLocation(imported.bytes);
+    imported.locationCleaned = false;
+    if (imported.hadLocation && locStripPref()) {
+      const clean = stripLocation(imported.bytes);
+      if (clean && !findLocation(clean)) {
+        imported.bytes = clean;
+        imported.locationCleaned = true;
+      }
+    }
+  } catch {
+    imported.hadLocation = false; // a scan failure must never block an open
+  }
+  return imported;
+}
+
+function updateLocTip() {
+  locTipBtn.hidden = !(current && currentFile?.hadLocation && locTipPref());
+}
+
+locTipBtn.addEventListener("click", () => {
+  locDlgBody.textContent = currentFile?.locationCleaned
+    ? "Location was removed from the app's working copy when this photo opened (your setting). The original file on your device still carries it — save a version without it below."
+    : "This file stores where the photo was taken (GPS). Save a version without it — the same name to replace the file where you keep it, or a copy to keep both.";
+  locDlg.showModal();
+});
+$("locDlgClose").addEventListener("click", () => locDlg.close());
+locDlg.addEventListener("click", (e) => {
+  if (e.target === locDlg) locDlg.close(); // tap outside to dismiss
+});
+$("locSettings").addEventListener("click", () => {
+  locDlg.close();
+  openInfoDialog();
+  // Land ON the Settings section — the ⓘ dialog opens at "What's new".
+  requestAnimationFrame(() => $("settingsHead").scrollIntoView({ block: "start" }));
+});
+
+async function saveWithoutLocation(copy: boolean) {
+  if (!currentFile) return;
+  const clean = currentFile.locationCleaned ? currentFile.bytes : stripLocation(currentFile.bytes);
+  if (!clean || findLocation(clean)) {
+    // Never hand over a file we can't PROVE is clean.
+    toast("Couldn't remove location from this file safely — nothing was saved.", 3600);
+    return;
+  }
+  const m = currentFile.name.match(/^(.*?)(\.[^.]+)?$/)!;
+  const name = copy ? `${m[1]} (no location)${m[2] ?? ""}` : currentFile.name;
+  const type = currentFile.kind === "jpeg" ? "image/jpeg" : currentFile.kind === "png" ? "image/png" : "application/octet-stream";
+  const r = await saveBlob(new Blob([arrayBufferOf(clean) as ArrayBuffer], { type }), name);
+  if (r === "cancelled") return; // sheet closed on purpose — keep the dialog
+  toast(copy ? "Copy saved without location." : "Saved without location.", 2600);
+  locDlg.close();
+}
+$("locSave").addEventListener("click", () => void saveWithoutLocation(false));
+$("locSaveCopy").addEventListener("click", () => void saveWithoutLocation(true));
+
+function syncLocSettings() {
+  setLocTipBtn.setAttribute("aria-pressed", String(locTipPref()));
+  setLocStripBtn.setAttribute("aria-pressed", String(locStripPref()));
+}
+setLocTipBtn.addEventListener("click", () => {
+  try { localStorage.setItem("ips-loc-tip", locTipPref() ? "0" : "1"); } catch { /* private mode */ }
+  syncLocSettings();
+  updateLocTip();
+});
+setLocStripBtn.addEventListener("click", () => {
+  try { localStorage.setItem("ips-loc-strip", locStripPref() ? "0" : "1"); } catch { /* private mode */ }
+  syncLocSettings();
+});
+syncLocSettings();
 
 // --- Local masks: radial / linear gradient with a few local adjustments,
 // placed by dragging handles on the photo. Geometry is in image-uv so masks
@@ -3136,6 +3233,7 @@ function goHome() {
   lessonCardParked = !lesson.hidden;
   lesson.hidden = true;
   stageEl.classList.remove("learn");
+  locTipBtn.hidden = true; // don't float over the start screen; returnToEditor restores
   updateWelcomeReturn();
   updateSessionResume();
   renderMaskOverlay(); // hide the mask overlay while the card is up
@@ -3164,6 +3262,7 @@ function returnToEditor() {
     if (lessonCardParked) lesson.hidden = false;
   }
   lessonCardParked = false;
+  updateLocTip();
   renderMaskOverlay();
   positionHealOverlay();
   positionCropOverlay();
@@ -3197,6 +3296,11 @@ welcomeBack.addEventListener("click", returnToEditor);
 function showDecoded(img: DecodedImage, imported: ImportedFile) {
   current = img;
   currentFile = imported;
+  // Location guard: paths that build ImportedFile by hand (session restore's
+  // stored bytes) haven't been scanned yet — scan here so the 🛰 tip is honest
+  // on every open path. (Stored bytes stripped on their first open scan clean.)
+  if (imported.hadLocation === undefined) guardLocation(imported);
+  updateLocTip();
   // The canvas is the page's central image — name it for assistive tech
   // (role=img is set in the markup; the label tracks the open photo).
   canvas.setAttribute("aria-label", `Photo: ${imported.name}`);
@@ -3548,7 +3652,7 @@ async function openPicked(files: File[]) {
     await resetSessionState(true); // drop a lone photo or un-resumed leftovers
     hint.textContent = "Loading…";
     hint.hidden = false;
-    const imported = await importFile(files[0]);
+    const imported = guardLocation(await importFile(files[0]));
     if (imported.looksTranscoded) {
       const msg =
         "That file arrived as a flattened JPEG (iOS transcoded it). For true RAW, " +
@@ -3609,7 +3713,7 @@ async function addToSession(files: File[], append: boolean) {
     sessionStrip.hidden = false;
     let imported: ImportedFile;
     try {
-      imported = await importFile(f);
+      imported = guardLocation(await importFile(f));
     } catch (err) {
       skipped.push(`${f.name} (${(err as Error).message})`);
       continue;
@@ -3873,7 +3977,7 @@ async function openQuickLook(files: File[]) {
     let thumbUrl = "";
     let ok = false;
     try {
-      const imported = await importFile(f);
+      const imported = guardLocation(await importFile(f));
       const img = await decode(imported);
       const thumb = await makeThumb(img, QUICK_EDGE);
       if (thumb.byteLength) {
@@ -4747,7 +4851,7 @@ async function runBatch(files: File[]) {
       if (doneInputs.has(`${f.name} ${f.size}`)) { alreadyDone++; continue; }
       busyText.textContent = `Processing ${i + 1} / ${files.length} — ${f.name}`;
       try {
-        const imported = await importFile(f);
+        const imported = guardLocation(await importFile(f));
         if (imported.looksTranscoded) { skipped.push(`${f.name} (arrived as flattened JPEG)`); continue; }
         const img = await decode(imported);
         const noLens = applyBatchHotspot(img, imported) === "no-lens";
@@ -5608,6 +5712,7 @@ function grayWorldWB(img: DecodedImage): [number, number, number] {
   };
   dlg.addEventListener("scroll", updateInfoCues, { passive: true });
   const openInfo = () => { dlg.showModal(); requestAnimationFrame(updateInfoCues); };
+  openInfoDialog = openInfo; // registered for the 🛰 dialog's "Open Settings"
 
   $("infoBtn").addEventListener("click", openInfo);
   $("infoClose").addEventListener("click", () => dlg.close());

@@ -256,7 +256,7 @@ input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.18); }
 input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 
 /* ---- Dialogs ---- */
-#infoDlg, #helpDlg, #batchDlg, #lookDlg, #lookPasteDlg, #lookRecvDlg, #ratioDlg {
+#infoDlg, #helpDlg, #batchDlg, #lookDlg, #lookPasteDlg, #lookRecvDlg, #ratioDlg, #locDlg {
   background: var(--surface);
   color: var(--txt);
   border: 1px solid var(--line);
@@ -265,7 +265,7 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   max-width: min(520px, 90vw);
   box-shadow: var(--shadow);
 }
-#infoDlg::backdrop, #helpDlg::backdrop, #batchDlg::backdrop, #lookDlg::backdrop, #lookPasteDlg::backdrop, #lookRecvDlg::backdrop, #ratioDlg::backdrop { background: rgba(0, 0, 0, 0.55); }
+#infoDlg::backdrop, #helpDlg::backdrop, #batchDlg::backdrop, #lookDlg::backdrop, #lookPasteDlg::backdrop, #lookRecvDlg::backdrop, #ratioDlg::backdrop, #locDlg::backdrop { background: rgba(0, 0, 0, 0.55); }
 /* The "What's new" dialog scrolls; sticky chevron cues at its top/bottom edges
    say "there's more this way" (owner ask 2026-07-15). Sticky resolves against
    the dialog's own scrollport, so no position:relative (that breaks modal
@@ -600,6 +600,36 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   #histWrap { top: 12px; right: 12px; padding: 4px; }
   #histogram { width: 150px; height: 58px; }
 }
+/* Location-data tip: a glass chip over the photo, shown only when the LOADED
+   FILE carries GPS location. Glyph + TEXT (never icon-only); 44px target via
+   the ::before extension; theme-invariant glass (it floats over the photo). */
+#locTip {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 7;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(150, 150, 170, 0.4);
+  border-radius: 17px;
+  background: var(--glass-bg);
+  color: var(--glass-txt);
+  font: 600 13px/1 var(--ui);
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+#locTip::before { content: ""; position: absolute; inset: -5px; } /* 44px hit extension */
+#stage.cropping #locTip { display: none; } /* the crop pill owns the bottom edge */
+#locDlg h2 { margin-top: 0; font-size: 17px; }
+/* Settings rows in the ⓘ dialog: a toggle with its one-line explanation. */
+.set-row { margin: 10px 0 12px; display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
+.set-row .toggle { width: auto; }
+
 /* Drag-to-adjust readout HUD. */
 #tatHud {
   position: absolute;

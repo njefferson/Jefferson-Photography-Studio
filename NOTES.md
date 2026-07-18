@@ -2503,6 +2503,77 @@ user-scalable=no.
   MERGED TO MAIN 2026-07-18 (owner "Promote to main"; PR #29, rebase) —
   ships as a 1.2.x increment.
 
+- [x] **Location-data guard — the 🛰 tip** — owner ask 2026-07-18, HIS WORDS:
+  "Somewhere it got lost" — the ask had never been recorded; captured and
+  built the same day as THE SECOND CAPABILITY RELEASE, ships as **1.3**
+  (VERSION in the release's final commit). The ask, in full: an icon (a
+  satellite or some other tip) shows when location data is saved with the
+  loaded file; tapping it offers removing it and re-saving the file, or
+  saving as a copy, the user choosing where; the tip can be turned off in
+  settings AND that must be clear to the user; settings also offer
+  strip-on-open, explained on the tip itself.
+  SHIPPED:
+  • DETECTION (src/gps.ts): scans the loaded file's OWN bytes — the EXIF
+    GPS IFD in JPEG APP1 and in the TIFF family (DNG/NEF/TIFF share the
+    container; SubIFDs + Exif IFD walked too), plus GPS values in JPEG XMP.
+    HONEST BY DESIGN: a GPS-version-only stamp (no coordinates) does NOT
+    count as location; unparseable/hostile structures degrade to "none
+    found" and never block an open; all offsets are file-controlled and
+    bounds-checked.
+  • STRIP: in-place surgery on a copy — the GPSInfo entry becomes a padding
+    tag and the GPS IFD + its external values are zeroed (same-size file,
+    valid for every reader); XMP GPS values blank to same-length spaces
+    (child tags intact). Every strip is RE-CHECKED before anything is
+    claimed clean; a failed re-check refuses to save and says so.
+  • THE TIP: a 🛰 "Location saved" glass chip (glyph + TEXT, 44px target)
+    bottom-left over the photo, shown only when the loaded file carries
+    location (and never over the start screen / crop tools). Tap → a real
+    <dialog>: [Save without location] (same filename — the save sheet lets
+    the user put it back where the original lives) and [Save a copy without
+    location] (" (no location)" suffix); text states both open the save
+    sheet SO THE USER CHOOSES WHERE, that the edit is untouched, that
+    editor exports never include location, and — clearly — that the tip
+    can be hidden and strip-on-open enabled in Settings, with an [Open
+    Settings] button that lands ON the Settings section.
+  • SETTINGS: the ⓘ dialog gained a real "Settings" section (theme toggle
+    moved under it): "🛰 Location tip" (default on) and "Remove location
+    when a photo opens" (default off), each with a one-line explanation.
+    Keys ips-loc-tip / ips-loc-strip.
+  • STRIP-ON-OPEN stays honest: it cleans the app's WORKING copy (so
+    session/batch storage never holds location — guardLocation wraps every
+    importFile), but the tip still shows and the dialog says plainly the
+    ORIGINAL file keeps its location until a clean version is saved.
+  • Help gained a Tips bullet; privacy.html gained a "Location data in
+    your photos" section (the check and removal run locally).
+  VERIFIED HEADLESS, fail-first proven (planted "stripped TIFF still
+  reports location" and "tip stays hidden on a GPS photo" both flipped).
+  17 node unit checks (gps.ts on synthetic fixtures): TIFF coords
+  found/stripped/re-checked clean, same length, trailing bytes intact,
+  rationals actually zeroed; version-only stamp ≠ location; JPEG EXIF
+  end-to-end; XMP attribute + element forms (rdf tags survive); empty XMP
+  values ≠ location; hostile offsets → no throw, strip refuses; real
+  practice DNG scans clean (no false positive). 24 browser checks (real
+  built app, real gallery JPEG with a genuine injected EXIF GPS block):
+  tip shows (and not on clean files); dialog wording both states; save
+  copy → downloaded bytes PROVABLY clean by node re-scan, same size,
+  honest " (no location)" name; re-save keeps the original name; the
+  cleaned file re-opens with no tip; settings toggles work, persist, and
+  hide the tip immediately; strip-on-open cleans while the tip stays
+  honest; Open Settings lands in the ⓘ dialog; axe clean on the dialog +
+  settings in both themes; no page errors.
+  NEEDS THE OWNER'S HANDS (iPad): the 🛰 glyph renders as he pictured it;
+  the chip's bottom-left home; the dialog + settings wording; the real
+  share-sheet feel of "re-save over the original" on iOS (headless proxies
+  it as a download); and a REAL SnapBridge-tagged NEF from his camera —
+  the harness GPS block is synthetic (structurally identical, but his
+  genuine file is the true test).
+  KNOWN LIMITS (recorded, deliberate): HEIC/PNG location isn't handled
+  (PNG eXIf is vanishingly rare; iOS HEIC arrives transcoded) — the strip
+  refuses rather than guesses on unknown containers; a session photo
+  resumed after a reload re-scans its STORED bytes, so a pre-setting
+  stored copy still reports honestly, but the "cleaned on open" nuance
+  doesn't survive a reload (the tip then reads as normal found-location).
+
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 
 > An 11-dimension multi-agent review over the whole repo; every problem below
