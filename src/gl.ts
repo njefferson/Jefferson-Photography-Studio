@@ -95,8 +95,33 @@ uniform vec2 u_texel;    // 1/textureSize
 uniform float u_split;   // compare divider: denoise applies where uv.x >= split
 uniform int u_spotVis;   // 1 = "Visualize spots": amplified high-pass luma view
 uniform int u_maskViz;   // >=0 = show that mask's coverage as a preview overlay
+uniform highp sampler3D u_lutTex; // imported .cube LUT lattice (unit 5, NEAREST — manual trilinear below)
+uniform int u_lutSize;            // grid N per axis (>=2; only read when strength > 0)
+uniform float u_lutStrength;      // 0..1; 0.0 = stage entirely off
 
 const vec3 LUMA_W = vec3(0.2126, 0.7152, 0.0722);
+
+// Trilinear sample of the imported LUT — the VERBATIM twin of
+// src/lut3d.ts sampleLut3d (parity harness pins them at <=2 LSB). Manual
+// interpolation on integer texelFetch coords: WebGL2 won't linearly filter
+// 32F textures, and texelFetch sidesteps texel-centre ambiguity entirely.
+vec3 sampleLut3d(vec3 c) {
+  float n1 = float(u_lutSize - 1);
+  vec3 t = clamp(c, 0.0, 1.0) * n1;
+  ivec3 i0 = min(ivec3(floor(t)), ivec3(u_lutSize - 2));
+  vec3 f = t - vec3(i0);
+  vec3 c000 = texelFetch(u_lutTex, i0,                0).rgb;
+  vec3 c100 = texelFetch(u_lutTex, i0 + ivec3(1,0,0), 0).rgb;
+  vec3 c010 = texelFetch(u_lutTex, i0 + ivec3(0,1,0), 0).rgb;
+  vec3 c110 = texelFetch(u_lutTex, i0 + ivec3(1,1,0), 0).rgb;
+  vec3 c001 = texelFetch(u_lutTex, i0 + ivec3(0,0,1), 0).rgb;
+  vec3 c101 = texelFetch(u_lutTex, i0 + ivec3(1,0,1), 0).rgb;
+  vec3 c011 = texelFetch(u_lutTex, i0 + ivec3(0,1,1), 0).rgb;
+  vec3 c111 = texelFetch(u_lutTex, i0 + ivec3(1,1,1), 0).rgb;
+  vec3 c00 = mix(c000, c100, f.x), c10 = mix(c010, c110, f.x);
+  vec3 c01 = mix(c001, c101, f.x), c11 = mix(c011, c111, f.x);
+  return mix(mix(c00, c10, f.y), mix(c01, c11, f.y), f.z);
+}
 
 vec3 toLinear(vec3 c){ return pow(c, vec3(2.2)); }
 vec3 toGamma(vec3 c){ return pow(max(c, 0.0), vec3(1.0/2.2)); }
@@ -416,6 +441,11 @@ void main() {
   // Global luminance rides on top of the tone curve (endpoints pinned).
   if (u_lum != 1.0) g = pow(clamp(g, 0.0, 1.0), vec3(1.0 / u_lum));
 
+  // Imported .cube LUT — the LAST colour stage, on the final display colour,
+  // so third-party LUTs stack on top of the whole IR grade. Identical math to
+  // pipeline.ts's compileEdit tail (via lut3d.ts).
+  if (u_lutStrength > 0.0) g = mix(g, sampleLut3d(clamp(g, 0.0, 1.0)), u_lutStrength);
+
   // Mask coverage overlay (preview only; u_maskViz = the selected mask, -1 off).
   // Shows exactly which pixels the mask affects, feather and all, for ANY mask
   // type (radial/linear also draw handles over this). The covered area keeps
@@ -449,6 +479,8 @@ export class Renderer {
   private brushSig = ""; // re-upload the packed brush texture only when it changes
   private localTex: WebGLTexture;
   private localScale = 1;
+  private lutTex: WebGLTexture;
+  private lutSig = ""; // re-upload the 3D LUT only when its identity changes
   // Small offscreen target for the live histogram: the full edit re-rendered at
   // <=HIST_MAX px so a per-frame GPU->CPU readback stays cheap on the iPad.
   private histFbo: WebGLFramebuffer | null = null;
@@ -471,7 +503,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_spotVis", "u_maskViz"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -526,6 +558,20 @@ export class Renderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG8, 1, 1, 0, gl.RG, gl.UNSIGNED_BYTE, new Uint8Array([0, 0]));
+
+    // Imported-.cube LUT lattice (unit 5): a 3D texture, NEAREST on purpose —
+    // WebGL2 won't linearly filter 32F, and the shader interpolates manually
+    // (sampleLut3d) so GPU==CPU share the exact arithmetic. Starts as a 2x2x2
+    // zero block so the sampler is complete before any LUT is imported (the
+    // stage is branch-gated on u_lutStrength anyway).
+    this.lutTex = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_3D, this.lutTex);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
+    gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGBA32F, 2, 2, 2, 0, gl.RGBA, gl.FLOAT, new Float32Array(2 * 2 * 2 * 4));
   }
 
   /** Upload the per-image clarity/dehaze maps (or clear with null). */
@@ -746,6 +792,37 @@ export class Renderer {
     gl.uniform1i(this.loc.u_glowTex, 1);
     gl.uniform1i(this.loc.u_toneTex, 2);
     gl.uniform1i(this.loc.u_maskTex, 3);
+    // Imported .cube LUT (unit 5). The sig check IS the uploader: the lattice
+    // re-uploads only when the LUT identity changes; strength-only changes are
+    // just a uniform. Data is padded RGB -> RGBA32F (RGB32F is driver-fragile).
+    {
+      const lut = p.lut && p.lut.strength > 0 ? p.lut : null;
+      gl.uniform1f(this.loc.u_lutStrength, lut ? lut.strength : 0);
+      gl.uniform1i(this.loc.u_lutSize, lut ? lut.size : 2);
+      gl.uniform1i(this.loc.u_lutTex, 5);
+      const sig = lut ? lut.id : "";
+      if (sig !== this.lutSig) {
+        this.lutSig = sig;
+        gl.activeTexture(gl.TEXTURE5);
+        gl.bindTexture(gl.TEXTURE_3D, this.lutTex);
+        gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+        if (lut) {
+          const N = lut.size;
+          const rgba = new Float32Array(N * N * N * 4);
+          for (let i = 0, j = 0; i < lut.data.length; i += 3, j += 4) {
+            rgba[j] = lut.data[i];
+            rgba[j + 1] = lut.data[i + 1];
+            rgba[j + 2] = lut.data[i + 2];
+            rgba[j + 3] = 1;
+          }
+          gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGBA32F, N, N, N, 0, gl.RGBA, gl.FLOAT, rgba);
+        } else {
+          gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGBA32F, 2, 2, 2, 0, gl.RGBA, gl.FLOAT, new Float32Array(2 * 2 * 2 * 4));
+        }
+      }
+      gl.activeTexture(gl.TEXTURE5);
+      gl.bindTexture(gl.TEXTURE_3D, this.lutTex);
+    }
     gl.activeTexture(gl.TEXTURE3);
     gl.bindTexture(gl.TEXTURE_2D, this.brushTex);
     gl.activeTexture(gl.TEXTURE2);

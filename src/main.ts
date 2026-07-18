@@ -28,6 +28,8 @@ import {
   sniffLook,
   lookFileName,
 } from "./look";
+import { parseCube, CUBE_FILE_MAX } from "./cubeimport";
+import { putLut, getLut, listLuts, deleteLut, LUT_COUNT_CAP } from "./luts";
 import { wireThemeToggle } from "./theme";
 
 // Injected at build time from git history (see vite.config.ts).
@@ -380,6 +382,7 @@ function syncToUI() {
   updateToneWidget();
   updateBandLabels();
   updateHslUI();
+  syncLutUI(); // hoisted; reflects params.lut so undo/redo/reset/loads all update the LUT row
 }
 
 // The per-color bands follow the subject through a channel swap (the swap
@@ -551,14 +554,19 @@ function cloneParams(p: EditParams): EditParams {
     spots: (p.spots ?? []).map((s) => ({ ...s })),
     crop: { ...(p.crop ?? CROP_DEFAULT) },
     straighten: p.straighten ?? 0,
+    // The LUT wrapper is cloned (a strength drag must not mutate history) but
+    // its lattice `data` is SHARED by reference — immutable once imported,
+    // same copy-on-write rationale as the brush bitmaps above.
+    lut: p.lut ? { ...p.lut } : null,
   };
 }
 
 // Snapshot signature for undo equality — cheap: skips the brush pixel buffers
-// (a stroke bumps the mask's `rev`, which IS compared) so we never serialise
-// hundreds of KB of bitmap on every frame.
+// (a stroke bumps the mask's `rev`, which IS compared) and the imported LUT's
+// Float32Array lattice (its wrapper `id`/`strength` ARE compared, and the
+// lattice is immutable per id) so we never serialise hundreds of KB per frame.
 function snapSig(s: Snapshot): string {
-  return JSON.stringify(s, (k, v) => (k === "data" && v instanceof Uint8Array ? undefined : v));
+  return JSON.stringify(s, (k, v) => (k === "data" && (v instanceof Uint8Array || v instanceof Float32Array) ? undefined : v));
 }
 
 function snapshot(): Snapshot {
@@ -595,6 +603,13 @@ function applySnapshot(s: Snapshot) {
   params.spots = c.spots ?? [];
   params.crop = c.crop ?? { ...CROP_DEFAULT };
   params.straighten = c.straighten ?? 0;
+  // Read the LUT from the SNAPSHOT directly, never from the {...params} merge
+  // above: a pre-LUT-era snapshot (or a session-resume JSON, which strips it)
+  // has NO lut key, and that must mean "no LUT" — silently inheriting the live
+  // photo's LUT would be wrong. The instanceof guard also keeps a revived JSON
+  // snapshot (whose data can't be a real Float32Array) from half-activating.
+  const sl = s.params.lut;
+  params.lut = sl && sl.data instanceof Float32Array ? { ...sl } : null;
   activeLook = s.activeLook ?? null;
   lookBias = (s.lookBias ? [...s.lookBias] : [1, 1, 1]) as [number, number, number];
   if (selectedMask >= params.masks.length) selectedMask = params.masks.length - 1;
@@ -721,10 +736,15 @@ function currentLook(): SavedLook {
   };
 }
 
+/** A slot's look may reference an imported LUT stored in IndexedDB (luts.ts).
+ *  The ref lives OUTSIDE the SavedLook wire fields — shared links/files/codes
+ *  never carry it (look.ts encodeLookPayload's fixed key list). */
+type SlotLook = NamedLook & { lutId?: string; lutStrength?: number };
+
 /** Parse a saved slot, tolerating older full-snapshot slots ({params:{…}}) and
  *  coercing every field (look.ts coerceLook) so a stale or partial slot can't
- *  corrupt the edit. Slots may carry an optional user-given name. */
-function readSlot(i: number): NamedLook | null {
+ *  corrupt the edit. Slots may carry an optional user-given name + LUT ref. */
+function readSlot(i: number): SlotLook | null {
   const raw = localStorage.getItem(slotKey(i));
   if (!raw) return null;
   try {
@@ -733,7 +753,14 @@ function readSlot(i: number): NamedLook | null {
     const look = coerceLook(s);
     if (look) {
       const name = cleanName(o?.name ?? s?.name);
-      return name ? { ...look, name } : look;
+      const out: SlotLook = name ? { ...look, name } : look;
+      const lutId = o?.lutId ?? s?.lutId;
+      if (typeof lutId === "string" && /^[A-Za-z0-9-]{1,64}$/.test(lutId)) {
+        out.lutId = lutId;
+        const st = Number(o?.lutStrength ?? s?.lutStrength);
+        out.lutStrength = isFinite(st) ? Math.min(1, Math.max(0, st)) : 1;
+      }
+      return out;
     }
   } catch {
     /* corrupt slot — treat as empty */
@@ -747,9 +774,17 @@ const slotLabel = (i: number, look: NamedLook | null) => look?.name ?? `Slot ${i
 function saveSlot(i: number) {
   if (!current) return;
   // Overwriting a slot's grade KEEPS its name — the name labels the slot until
-  // the user renames it, not the particular grade that was in it.
+  // the user renames it, not the particular grade that was in it. The current
+  // edit's imported LUT rides along as a ref (id + strength; the lattice
+  // stays in IndexedDB) — it IS part of the grade being saved.
   const name = readSlot(i)?.name;
-  localStorage.setItem(slotKey(i), JSON.stringify(name ? { ...currentLook(), name } : currentLook()));
+  const rec: Record<string, unknown> = { ...currentLook() };
+  if (name) rec.name = name;
+  if (params.lut) {
+    rec.lutId = params.lut.id;
+    rec.lutStrength = params.lut.strength;
+  }
+  localStorage.setItem(slotKey(i), JSON.stringify(rec));
   updateSlotUI();
 }
 
@@ -770,10 +805,13 @@ function renameSlot(i: number, name: string) {
 
 /** Apply a creative grade to the open photo as ONE atomic undo step — shared
  *  by slot loads and looks received via link/file/code. Keeps this photo's
- *  white balance, exposure and denoise. */
-function applySavedLook(look: SavedLook) {
+ *  white balance, exposure and denoise. `lut` is the resolved imported LUT
+ *  when the look carries one — a look WITHOUT one clears any active LUT (a
+ *  look is the whole creative grade). */
+function applySavedLook(look: SavedLook, lut: EditParams["lut"] = null) {
   if (!current) return;
   flushRecord(); // settle current edits
+  params.lut = lut;
   params.swapRB = look.swapRB;
   params.hue = look.hue;
   params.sat = look.sat;
@@ -797,23 +835,34 @@ function applySavedLook(look: SavedLook) {
   flushRecord(); // record the load as one atomic undo step
 }
 
-function loadSlot(i: number) {
+async function loadSlot(i: number) {
   const look = readSlot(i);
   if (!look || !current) return;
-  applySavedLook(look);
+  // Resolve the LUT ref BEFORE the atomic apply, so the load is still one
+  // undo step. A deleted LUT degrades honestly: grade applies without it.
+  let lut: EditParams["lut"] = null;
+  if (look.lutId) {
+    const rec = await getLut(look.lutId).catch(() => null);
+    if (rec) lut = { id: rec.id, name: rec.name, size: rec.size, data: rec.data, strength: look.lutStrength ?? 1 };
+    else toast("This look's LUT was deleted from this device — applied without it", 3200);
+  }
+  applySavedLook(look, lut);
+  syncLutUI();
 }
 
 function updateSlotUI() {
   for (let i = 0; i < SLOTS; i++) {
     const look = readSlot(i);
     const filled = !!look;
-    slotEls[i].name.textContent = filled ? `${slotLabel(i, look)} ✓` : `Slot ${i + 1}`;
+    // A TEXT badge (never colour-only) marks a look that carries an imported LUT.
+    slotEls[i].name.textContent = filled ? `${slotLabel(i, look)} ✓${look?.lutId ? " · LUT" : ""}` : `Slot ${i + 1}`;
+    const withLut = look?.lutId ? ", with imported LUT" : "";
     slotEls[i].save.disabled = !current;
     slotEls[i].save.setAttribute("aria-label", `Save current edit to ${slotLabel(i, look)}`);
     slotEls[i].load.disabled = !filled || !current;
-    slotEls[i].load.setAttribute("aria-label", `Load ${slotLabel(i, look)}`);
+    slotEls[i].load.setAttribute("aria-label", `Load ${slotLabel(i, look)}${withLut}`);
     slotEls[i].more.disabled = !filled;
-    slotEls[i].more.setAttribute("aria-label", `Name and share ${slotLabel(i, look)}`);
+    slotEls[i].more.setAttribute("aria-label", `Name and share ${slotLabel(i, look)}${withLut}`);
   }
 }
 
@@ -835,7 +884,7 @@ for (let i = 0; i < SLOTS; i++) {
   more.className = "slot-more";
   more.textContent = "⋯";
   save.addEventListener("click", () => saveSlot(i));
-  load.addEventListener("click", () => loadSlot(i));
+  load.addEventListener("click", () => void loadSlot(i));
   more.addEventListener("click", () => openLookDlg(i));
   row.append(name, save, load, more);
   slotList.append(row);
@@ -2839,7 +2888,8 @@ function establishFreshEdit() {
   panelBody.scrollTop = 0;
   // Masks, heal spots and crop/straighten are composition-specific — never
   // carry them to a new photo. (Session switches restore each photo's own via
-  // its saved snapshot.)
+  // its saved snapshot.) The imported LUT is NOT reset here on purpose: it is
+  // creative grade, exactly like sat/hue/tone, and persists across opens.
   params.masks = [];
   selectedMask = -1;
   setColorPick(false);
@@ -2939,7 +2989,9 @@ function fmtSize(bytes: number): string {
  *  the durable copy and reset on reload. */
 function editToJson(): string {
   const s = snapshot();
-  return JSON.stringify({ params: { ...s.params, masks: [] }, activeLook: s.activeLook, lookBias: s.lookBias });
+  // Masks (bitmaps) and the imported LUT (Float32Array lattice) are runtime
+  // data — stripped here; a durable resume restores neither (Help says so).
+  return JSON.stringify({ params: { ...s.params, masks: [], lut: null }, activeLook: s.activeLook, lookBias: s.lookBias });
 }
 
 /** Capture the active photo's live edit into memory and persist a durable copy
@@ -4021,7 +4073,10 @@ ui.exBtn.addEventListener("click", async () => {
 //   auto    — no creative grade at all: just balance every photo, the
 //             quick-look-at-a-folder mode.
 type BatchGrade =
-  | { kind: "look"; look: SavedLook }
+  // A look grade may carry an imported LUT: lutData when it comes from the
+  // live edit (already in RAM), or a lutId/lutStrength ref from a saved slot
+  // (resolved from IndexedDB ONCE at batch start — see the change handler).
+  | { kind: "look"; look: SavedLook; lutData?: EditParams["lut"]; lutId?: string; lutStrength?: number }
   | { kind: "builtin"; key: keyof typeof LOOKS }
   | { kind: "auto" };
 
@@ -4037,7 +4092,7 @@ function neutralLook(): SavedLook {
 /** This photo's own automatic baseline (WB/exposure/denoise) plus the chosen
  *  creative grade. Mirrors autoAdjust() + loadSlot()/pressLook(), without
  *  touching the live on-screen edit. Masks never carry (composition-specific). */
-function batchParamsFor(img: DecodedImage, grade: BatchGrade): EditParams {
+function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["lut"] = null): EditParams {
   let wb = grayWorldWB(img);
   let look: SavedLook;
   if (grade.kind === "builtin") {
@@ -4081,6 +4136,7 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade): EditParams {
     spots: [], // composition-specific — a batch frame heals nothing
     crop: { ...CROP_DEFAULT }, // composition-specific — a batch frame crops nothing
     straighten: 0,
+    lut, // resolved once at batch start; rides every frame like the grade
   };
 }
 
@@ -4150,7 +4206,7 @@ function isQuotaError(err: unknown): boolean {
 
 let batchStopRequested = false;
 let batchRemaining: File[] = []; // input Files not yet processed after a stop
-let batchSettings: { grade: BatchGrade; format: ExportFormat; scale: number; quality: number } | null = null;
+let batchSettings: { grade: BatchGrade; format: ExportFormat; scale: number; quality: number; lut?: EditParams["lut"]; lutMissing?: boolean } | null = null;
 let pendingSaveIsBatch = false;
 let batchRunning = false;
 
@@ -4245,7 +4301,7 @@ async function runBatch(files: File[]) {
         const result = await exportImage(
           imported,
           img,
-          batchParamsFor(img, grade),
+          batchParamsFor(img, grade, batchSettings?.lut ?? null),
           { format, scale, quality, rotate: img.rotate ?? 0 },
           (fr) => { busyText.textContent = `Processing ${i + 1} / ${files.length} — ${f.name} · ${Math.round(fr * 100)}%`; },
         );
@@ -4286,7 +4342,8 @@ async function runBatch(files: File[]) {
     const note =
       (skipped.length ? ` · ${skipped.length} skipped` : "") +
       (noHotspot ? ` · ${noHotspot} without lens hot-spot fix` : "") +
-      (alreadyDone ? ` · ${alreadyDone} already done earlier` : "");
+      (alreadyDone ? ` · ${alreadyDone} already done earlier` : "") +
+      (batchSettings?.lutMissing ? " · the saved LUT was deleted — grade applied without it" : "");
     await bundleStored(
       stoppedEarly === "user" ? `Stopped — ${n} ready in a .zip${note}`
       : stoppedEarly === "memory" ? `Stopped by the memory guard — ${n} ready in a .zip${note}. Save it, then Continue.`
@@ -4341,11 +4398,11 @@ function openBatchDialog() {
     b.type = "button";
     b.className = "batch-choice slim";
     // The label is user-supplied (slot names) — build it with textContent,
-    // never markup.
+    // never markup. The LUT badge is text too.
     const strong = document.createElement("strong");
-    strong.textContent = slotLabel(i, look);
+    strong.textContent = slotLabel(i, look) + (look.lutId ? " · LUT" : "");
     b.append(strong);
-    b.addEventListener("click", () => pickGrade({ kind: "look", look }));
+    b.addEventListener("click", () => pickGrade({ kind: "look", look, lutId: look.lutId, lutStrength: look.lutStrength }));
     bcSlots.append(b);
   }
   ($("bcNoSlots") as HTMLElement).hidden = filled > 0;
@@ -4368,7 +4425,7 @@ function openBatchDialog() {
 
 $("batchBtn").addEventListener("click", openBatchDialog);
 $("welcomeBatchBtn").addEventListener("click", openBatchDialog);
-$("bcCurrent").addEventListener("click", () => pickGrade({ kind: "look", look: currentLook() }));
+$("bcCurrent").addEventListener("click", () => pickGrade({ kind: "look", look: currentLook(), lutData: params.lut ?? undefined }));
 $("bcAuto").addEventListener("click", () => pickGrade({ kind: "auto" }));
 $("bcQuick").addEventListener("click", () => {
   // Not developing a .zip after all — just look. Stay in the tap gesture so
@@ -4387,7 +4444,7 @@ batchInput.addEventListener("change", async () => {
   if (!files.length) return;
   // The grade chosen in the dialog; a bare change event (shouldn't happen)
   // falls back to the honest equivalents of the old behaviour.
-  const grade: BatchGrade = chosenGrade ?? (current ? { kind: "look", look: currentLook() } : { kind: "auto" });
+  const grade: BatchGrade = chosenGrade ?? (current ? { kind: "look", look: currentLook(), lutData: params.lut ?? undefined } : { kind: "auto" });
   chosenGrade = null;
   // Leftover frames from an interrupted batch would silently mix into this
   // zip — ask, honestly, instead of guessing.
@@ -4401,7 +4458,19 @@ batchInput.addEventListener("change", async () => {
     )
   )
     return;
-  batchSettings = { grade, format: ui.exFormat.value as ExportFormat, scale: Number(ui.exScale.value), quality: Number(ui.exQuality.value) };
+  // Resolve the grade's imported LUT ONCE, before any frame runs: from RAM
+  // when it rides the live edit, from IndexedDB when it's a saved-slot ref.
+  let lut: EditParams["lut"] = null;
+  let lutMissing = false;
+  if (grade.kind === "look") {
+    if (grade.lutData) lut = grade.lutData;
+    else if (grade.lutId) {
+      const rec = await getLut(grade.lutId).catch(() => null);
+      if (rec) lut = { id: rec.id, name: rec.name, size: rec.size, data: rec.data, strength: grade.lutStrength ?? 1 };
+      else lutMissing = true; // stored LUT was deleted — the summary says so
+    }
+  }
+  batchSettings = { grade, format: ui.exFormat.value as ExportFormat, scale: Number(ui.exScale.value), quality: Number(ui.exQuality.value), lut, lutMissing };
   batchRemaining = [];
   runBatch(files);
 });
@@ -4475,8 +4544,30 @@ function openLookDlg(i: number) {
   lookCodeOut.value = "";
   lookDlgTitle.textContent = `Slot ${i + 1} — name & share`;
   lookNameInput.value = look.name ?? "";
+  // Honest note when the look carries an imported LUT: the payload formats
+  // deliberately exclude it — the LUT travels as its own .cube file.
+  const lutNote = $("lookLutNote") as HTMLParagraphElement;
+  const lutShare = $("lookLutShare") as HTMLButtonElement;
+  lutNote.hidden = !look.lutId;
+  lutShare.hidden = !look.lutId;
+  if (look.lutId) {
+    void getLut(look.lutId).then((rec) => {
+      if (!rec && lookDlgSlot === i) {
+        lutNote.textContent = "This look referenced an imported LUT that was deleted from this device — shares apply the grade without it.";
+        lutShare.hidden = true;
+      }
+    }).catch(() => {});
+  }
   lookDlg.showModal();
 }
+
+$("lookLutShare").addEventListener("click", async () => {
+  const look = lookDlgSlot >= 0 ? readSlot(lookDlgSlot) : null;
+  if (!look?.lutId) return;
+  const rec = await getLut(look.lutId).catch(() => null);
+  if (!rec) { toast("That LUT is no longer stored on this device", 2600); return; }
+  void saveBlob(new Blob([new Uint8Array(rec.cube)], { type: "text/plain" }), `${rec.name.replace(/[/\\:*?"<>|]/g, "").trim() || "lut"}.cube`);
+});
 
 lookNameInput.addEventListener("change", () => {
   if (lookDlgSlot >= 0) renameSlot(lookDlgSlot, lookNameInput.value);
@@ -4635,6 +4726,146 @@ $("lookRecvClose").addEventListener("click", () => lookRecvDlg.close());
 lookRecvDlg.addEventListener("click", (e) => {
   if (e.target === lookRecvDlg) lookRecvDlg.close();
 });
+
+// --- Imported .cube LUTs: import (Profiles & LUTs panel), an active-LUT row
+// with a strength slider, and an on-device list with share/delete (storage
+// honesty). The LUT applies as the LAST colour stage (gl.ts / pipeline.ts);
+// import, apply and remove are each ONE atomic undo step. ---
+
+const lutFileInput = $("lutFile") as HTMLInputElement;
+const lutActive = $("lutActive") as HTMLDivElement;
+const lutActiveName = $("lutActiveName") as HTMLSpanElement;
+const lutStrength = $("lutStrength") as HTMLInputElement;
+const lutStrengthVal = $("lutStrengthVal") as HTMLSpanElement;
+const lutList = $("lutList") as HTMLDivElement;
+
+/** Reflect params.lut into the panel — called from syncToUI so undo/redo,
+ *  Reset, session switches and slot loads all update the row for free. */
+function syncLutUI() {
+  const lut = params.lut ?? null;
+  lutActive.hidden = !lut;
+  if (lut) {
+    lutActiveName.textContent = `${lut.name} (${lut.size}³)`; // names come from files — textContent only
+    lutStrength.value = String(lut.strength);
+    lutStrengthVal.textContent = `${Math.round(lut.strength * 100)}%`;
+  }
+}
+
+/** Apply a stored/parsed LUT to the edit as one atomic undo step. */
+function applyLutToEdit(lut: NonNullable<EditParams["lut"]>) {
+  flushRecord();
+  params.lut = lut;
+  syncLutUI();
+  draw();
+  flushRecord();
+}
+
+$("lutImportBtn").addEventListener("click", () => lutFileInput.click());
+lutFileInput.addEventListener("change", async () => {
+  const f = lutFileInput.files?.[0];
+  lutFileInput.value = ""; // allow re-picking the same file
+  if (!f) return;
+  if (f.size > CUBE_FILE_MAX) {
+    alert("That .cube file is too large — files up to 8 MB (grid size 65) are supported.");
+    return;
+  }
+  let parsed;
+  try {
+    parsed = parseCube(await f.text());
+  } catch (err) {
+    alert((err as Error).message); // parser errors are already user-facing
+    return;
+  }
+  const existing = await listLuts().catch(() => []);
+  if (existing.length >= LUT_COUNT_CAP) {
+    const mb = (existing.reduce((s, m) => s + m.bytes, 0) / (1024 * 1024)).toFixed(1);
+    alert(`${LUT_COUNT_CAP} LUTs are stored on this device (${mb} MB) — delete one in Profiles & LUTs to add more.`);
+    return;
+  }
+  const name = cleanName(parsed.name) ?? (f.name.replace(/\.cube$/i, "").slice(0, 60) || "Imported LUT");
+  const id = typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `lut-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  try {
+    await putLut({ id, name, size: parsed.size, data: parsed.data, cube: new Uint8Array(await f.arrayBuffer()), addedAt: Date.now() });
+  } catch {
+    toast("Couldn't store the LUT on this device — it's applied to this edit only", 3200);
+  }
+  if (current) {
+    applyLutToEdit({ id, name, size: parsed.size, data: parsed.data, strength: 1 });
+    toast(`LUT applied — ${name} (${parsed.size}³)`);
+  } else {
+    // No photo open: stored for later; the list below is how it's applied.
+    toast(`LUT saved — "${name}" (${parsed.size}³). Open a photo, then Apply it below.`, 3200);
+  }
+  void renderLutList();
+});
+
+lutStrength.addEventListener("input", () => {
+  if (!params.lut) return;
+  params.lut.strength = Number(lutStrength.value);
+  lutStrengthVal.textContent = `${Math.round(params.lut.strength * 100)}%`;
+  draw();
+  recordSoon(); // history entries own their wrapper clones — safe to mutate live
+});
+
+$("lutRemoveBtn").addEventListener("click", () => {
+  if (!params.lut) return;
+  flushRecord();
+  params.lut = null;
+  syncLutUI();
+  draw();
+  flushRecord();
+});
+
+/** The on-device LUT list: name · N³ · size, with Apply / Share / Delete.
+ *  This is the honest storage control — everything stored is visible,
+ *  sized, and deletable. All names render via textContent. */
+async function renderLutList() {
+  const metas = await listLuts().catch(() => []);
+  lutList.replaceChildren(
+    ...metas.map((m) => {
+      const row = document.createElement("div");
+      row.className = "lut-row";
+      const label = document.createElement("span");
+      label.className = "lut-row-name";
+      label.textContent = `${m.name} · ${m.size}³ · ${(m.bytes / (1024 * 1024)).toFixed(1)} MB`;
+      const apply = document.createElement("button");
+      apply.type = "button";
+      apply.textContent = "Apply";
+      apply.setAttribute("aria-label", `Apply LUT ${m.name}`);
+      apply.addEventListener("click", async () => {
+        if (!current) { toast("Open a photo first — then Apply puts this LUT on it", 2600); return; }
+        const rec = await getLut(m.id).catch(() => null);
+        if (!rec) { toast("That LUT is no longer stored — re-import its .cube file", 3200); void renderLutList(); return; }
+        applyLutToEdit({ id: rec.id, name: rec.name, size: rec.size, data: rec.data, strength: 1 });
+        toast(`LUT applied — ${rec.name}`);
+      });
+      const share = document.createElement("button");
+      share.type = "button";
+      share.textContent = "Share";
+      share.setAttribute("aria-label", `Share LUT ${m.name} as a .cube file`);
+      share.addEventListener("click", async () => {
+        const rec = await getLut(m.id).catch(() => null);
+        if (!rec) { toast("That LUT is no longer stored", 2600); void renderLutList(); return; }
+        // The ORIGINAL bytes — round-trips exactly through our own importer.
+        void saveBlob(new Blob([new Uint8Array(rec.cube)], { type: "text/plain" }), `${rec.name.replace(/[/\\:*?"<>|]/g, "").trim() || "lut"}.cube`);
+      });
+      const del = document.createElement("button");
+      del.type = "button";
+      del.textContent = "Delete";
+      del.setAttribute("aria-label", `Delete LUT ${m.name} from this device`);
+      del.addEventListener("click", async () => {
+        if (!confirm(`Delete the LUT "${m.name}" from this device?\n\nAn edit or saved look using it keeps working right now, but loading that look later will apply the grade without it.`)) return;
+        await deleteLut(m.id).catch(() => {});
+        toast("LUT deleted");
+        void renderLutList();
+      });
+      row.append(label, apply, share, del);
+      return row;
+    }),
+  );
+  lutList.hidden = metas.length === 0;
+}
+void renderLutList();
 
 // A shared look arriving in the URL fragment (#look=TOKEN). The fragment
 // never reaches the network or the service worker, so links work offline.
