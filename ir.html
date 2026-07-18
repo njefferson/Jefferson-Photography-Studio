@@ -374,6 +374,7 @@
               </select>
             </label>
             <label id="exQualityRow">Quality <input id="exQuality" type="range" min="0.5" max="1" step="0.01" value="0.92" /></label>
+            <label class="check-row"><input id="exRecipe" type="checkbox" checked /> JPEGs carry their look recipe <small>(anyone opening one here gets offered your look)</small></label>
             <p id="exWmNote" class="wm-note" hidden>Practice photos export with the small Studio mark in the corner — your own photos never do.</p>
             <button id="exBtn" type="button" class="primary">Export &amp; Save</button>
             <small class="note">These Format &amp; Resolution settings also apply to <strong>Batch process</strong> (top bar).</small>
@@ -521,6 +522,12 @@
       <button id="lookShareLink" type="button" class="primary">Share link</button>
       <button id="lookShareFile" type="button">Share as file (.ipslook)</button>
       <button id="lookCopyCode" type="button">Copy look code</button>
+      <button id="lookShowQr" type="button">Show QR code</button>
+      <div id="lookQrBox" hidden>
+        <canvas id="lookQrCanvas" role="img" aria-label="QR code of this look's link"></canvas>
+        <p class="note look-hint">Scan with any phone camera &mdash; the link opens the editor with this look ready to try.</p>
+        <button id="lookSaveQr" type="button">Save QR image</button>
+      </div>
       <textarea id="lookCodeOut" class="look-code" rows="4" readonly hidden aria-label="Look code — copy it by hand"></textarea>
       <button id="lookDlgClose" type="button">Close</button>
     </dialog>
@@ -614,6 +621,12 @@
         Aerochrome, then Sky hue +40 for a deeper sky without touching the trees. The bands follow the
         subject through a channel swap (Sky keeps meaning sky); the small text under each box shows the
         colors it's grabbing right now.</p>
+        <p><strong>Share a look</strong> from any My-looks slot (the &#8943; button): a link, a small
+        .ipslook file, a paste-able code, or a <strong>QR code</strong> to scan in person — the whole grade
+        travels inside, nothing is uploaded. Exported <strong>JPEGs carry their look recipe</strong> too
+        (switch it off in Export if you prefer): anyone opening one here is offered your look. Honest
+        caveat: apps that recompress images — Photos edits, Messages optimization, social uploads — strip
+        the recipe; a link, file, code or QR always survives.</p>
 
         <h3>Which color tool when?</h3>
         <p>The color tools stack from broadest to most surgical — reach for the smallest one that does the job:</p>

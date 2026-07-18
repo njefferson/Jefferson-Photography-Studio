@@ -14,6 +14,7 @@ import { healPatches8, healPatchesFromSampler, wrapWithPatches } from "./heal";
 import { buildGlowMap, sampleGlow, GLOW_GAIN } from "./glow";
 import { buildLocalMap } from "./localmap";
 import { SRGB_ICC, embedIccInJpeg } from "./icc";
+import { embedLookInJpeg } from "./lookmark";
 import type { ImportedFile } from "./import";
 import type { DecodedImage } from "./decode";
 
@@ -27,6 +28,10 @@ export interface ExportOptions {
   /** Bake the Studio corner mark into the output (set ONLY for the app's own
    *  bundled practice photos — a user's photos are never marked). */
   watermark?: boolean;
+  /** The look.ts wire-format JSON to embed as the JPEG's traveling recipe
+   *  (lookmark.ts APP11 segment). Absent/empty = no recipe; TIFF never
+   *  carries one. Built by the caller so export stays payload-agnostic. */
+  lookRecipe?: string;
 }
 
 // --- Corner watermark for the bundled practice photos ------------------------
@@ -238,8 +243,10 @@ export async function exportImage(
     const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", opts.quality));
     if (!blob) throw new Error("JPEG encoding failed.");
     // canvas.toBlob emits an UNTAGGED JPEG; embed the sRGB profile so viewers
-    // don't have to guess the colour space.
-    const tagged = embedIccInJpeg(new Uint8Array(await blob.arrayBuffer()));
+    // don't have to guess the colour space — then the traveling recipe, when
+    // the caller asked for one.
+    let tagged = embedIccInJpeg(new Uint8Array(await blob.arrayBuffer()));
+    if (opts.lookRecipe) tagged = embedLookInJpeg(tagged, opts.lookRecipe);
     return { blob: new Blob([tagged.buffer as ArrayBuffer], { type: "image/jpeg" }), name: `${baseName}.jpg` };
   } else {
     const rgb = new Uint16Array(w * h * 3);
