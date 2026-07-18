@@ -256,7 +256,7 @@ input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.18); }
 input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 
 /* ---- Dialogs ---- */
-#infoDlg, #helpDlg, #batchDlg, #lookDlg, #lookPasteDlg, #lookRecvDlg {
+#infoDlg, #helpDlg, #batchDlg, #lookDlg, #lookPasteDlg, #lookRecvDlg, #ratioDlg {
   background: var(--surface);
   color: var(--txt);
   border: 1px solid var(--line);
@@ -265,7 +265,7 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   max-width: min(520px, 90vw);
   box-shadow: var(--shadow);
 }
-#infoDlg::backdrop, #helpDlg::backdrop, #batchDlg::backdrop, #lookDlg::backdrop, #lookPasteDlg::backdrop, #lookRecvDlg::backdrop { background: rgba(0, 0, 0, 0.55); }
+#infoDlg::backdrop, #helpDlg::backdrop, #batchDlg::backdrop, #lookDlg::backdrop, #lookPasteDlg::backdrop, #lookRecvDlg::backdrop, #ratioDlg::backdrop { background: rgba(0, 0, 0, 0.55); }
 /* The "What's new" dialog scrolls; sticky chevron cues at its top/bottom edges
    say "there's more this way" (owner ask 2026-07-15). Sticky resolves against
    the dialog's own scrollport, so no position:relative (that breaks modal
@@ -287,7 +287,28 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 .dlg-cue.on { opacity: 1; }
 .dlg-cue.up { top: -18px; margin-top: -18px; align-items: flex-start; padding-top: 3px; background: linear-gradient(0deg, transparent, var(--surface) 74%); }
 .dlg-cue.down { bottom: -18px; margin-bottom: -18px; align-items: flex-end; padding-bottom: 3px; background: linear-gradient(180deg, transparent, var(--surface) 74%); }
-#infoDlg h2, #helpDlg h2, #batchDlg h2, #lookDlg h2, #lookPasteDlg h2, #lookRecvDlg h2 { margin: 0 0 10px; font: 600 17px/1.2 var(--display); }
+#infoDlg h2, #helpDlg h2, #batchDlg h2, #lookDlg h2, #lookPasteDlg h2, #lookRecvDlg h2, #ratioDlg h2 { margin: 0 0 10px; font: 600 17px/1.2 var(--display); }
+
+/* Custom-ratio dialog: W : H entry + swap; shares the look-dialog button kit. */
+#ratioDlg .note { display: block; margin: 0 0 12px; font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+#ratioDlg button { display: block; width: 100%; min-height: 44px; margin: 0 0 8px; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--surface-2); color: var(--txt); font: 500 14px/1.2 var(--ui); cursor: pointer; }
+#ratioDlg button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+#ratioCancel { width: auto !important; padding: 8px 16px !important; display: inline-block !important; }
+.ratio-entry { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; }
+.ratio-entry input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line-2);
+  background: var(--surface-2);
+  color: var(--txt);
+  font: 500 16px/1.2 var(--ui);
+  text-align: center;
+}
+.ratio-entry span { color: var(--txt-2); font-weight: 700; }
+#ratioDlg .ratio-entry button { width: 44px !important; min-height: 44px; margin: 0; flex: none; display: block; }
 
 /* Look sharing: the name/share, paste, and receive dialogs, plus the My looks
    panel's import row and per-slot ⋯ button. */
@@ -349,7 +370,21 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 /* Crop aspect-ratio chips on the crop pill (dark glass — --glass-* tokens are
    theme-invariant there). Selected state = aria-pressed + the "✓ " TEXT prefix
    set in updateRatioUI, never colour alone. */
-#cropRatios { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 8px; }
+#cropRatios {
+  display: flex;
+  flex-wrap: nowrap; /* ONE row always — the pill's height must stay constant
+                        (a wrapped second row buried the bottom crop handles on
+                        portrait photos — owner fail-state, IMG_1050) */
+  gap: 6px;
+  justify-content: flex-start;
+  margin-top: 8px;
+  overflow-x: auto; /* a cut-off chip is the scroll affordance (bar-actions precedent) */
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+#cropRatios::-webkit-scrollbar { display: none; }
+.ratio-chip { white-space: nowrap; flex: none; }
 .ratio-chip {
   position: relative;
   min-height: 32px;
@@ -869,13 +904,17 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   top: 30px;
   left: 30px;
   right: 30px;
-  bottom: 96px; /* 30px like the sides + 66px for the Straighten toolbar / OS zone */
+  /* 30px like the sides + the crop pill's REAL height (+16px pill offset),
+     measured by setGeoMode into --croptools-h. A FIXED reserve buried the
+     bottom handles under the grown pill on portrait photos (owner fail-state,
+     IMG_1050) — the reserve must track the pill. */
+  bottom: calc(46px + var(--croptools-h, 66px));
   max-width: calc(100% - 60px);
-  max-height: calc(100% - 126px);
+  max-height: calc(100% - 76px - var(--croptools-h, 66px));
 }
 #stage.cropping.has-session #view {
-  bottom: calc(96px + var(--session-h, 110px));
-  max-height: calc(100% - 126px - var(--session-h, 110px));
+  bottom: calc(46px + var(--croptools-h, 66px) + var(--session-h, 110px));
+  max-height: calc(100% - 76px - var(--croptools-h, 66px) - var(--session-h, 110px));
 }
 @media (max-width: 760px) {
   #stage.cropping #view {

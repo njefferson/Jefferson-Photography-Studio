@@ -512,6 +512,21 @@
       <button id="batchCancel" type="button">Cancel</button>
     </dialog>
 
+    <!-- Custom crop aspect ratio entry (the Custom… chip). -->
+    <dialog id="ratioDlg">
+      <h2>Custom aspect ratio</h2>
+      <p class="note">Width to height, as the crop should come out &mdash; e.g. 7 : 5. Ratios up to 5:1 either way.</p>
+      <div class="ratio-entry">
+        <input id="ratioW" type="number" inputmode="decimal" min="0.1" max="999" step="any" aria-label="Ratio width" />
+        <span aria-hidden="true">:</span>
+        <input id="ratioH" type="number" inputmode="decimal" min="0.1" max="999" step="any" aria-label="Ratio height" />
+        <button id="ratioSwap" type="button" aria-label="Swap width and height">&#8646;</button>
+      </div>
+      <p id="ratioErr" class="note look-hint" role="status" aria-live="polite" hidden>That ratio can't be used &mdash; both numbers must be positive, and no steeper than 5:1 either way.</p>
+      <button id="ratioApply" type="button" class="primary">Apply</button>
+      <button id="ratioCancel" type="button">Cancel</button>
+    </dialog>
+
     <!-- Look sharing: name & share a saved look (per-slot ⋯ button). -->
     <dialog id="lookDlg" aria-labelledby="lookDlgTitle">
       <h2 id="lookDlgTitle">Name &amp; share</h2>

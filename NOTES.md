@@ -2271,6 +2271,39 @@ user-scalable=no.
   check (0.15% exact). NEEDS THE OWNER'S HANDS: the chip row's feel on the
   real pill, whether locked-corner drags feel natural on touch, the flips'
   direction reading right, and the hidden lesson rail returning as expected.
+  OWNER'S ON-DEVICE PASS (2026-07-18, staging iPad, screenshot IMG_1050):
+  "loads into a fail state where it can't work" on a PORTRAIT photo —
+  everything else "works great" — plus two asks: each ratio's INVERSE and a
+  CUSTOM ratio. ROOT CAUSE: `#stage.cropping #view` reserved a FIXED 96px for
+  the pill, sized for the pre-chips one-row pill; the chip row (wrapping to
+  two lines on his iPad) grew the pill to ~140px, which floated OVER the
+  photo's lower band — box bottom + grid buried, handles at the pill's edge.
+  ALL FIXED same day (cache ips-v78 → ips-v79):
+  • The view now steps back by the pill's REAL height — setGeoMode measures
+    cropTools.offsetHeight into a --croptools-h CSS var on arm (rAF, re-lays
+    the overlay) and on window resize while armed; both the bottom and
+    max-height calcs consume it (has-session variant too). The chips became a
+    single NON-wrapping side-scrolling row (bar-actions precedent) so the
+    pill's height stays constant.
+  • INVERSE ratios: repeat-tapping the ACTIVE chip flips it (4:5 ⇄ 5:4,
+    3:2 ⇄ 2:3, 16:9 ⇄ 9:16, Original ⇄ its inverse; 1:1/Free exempt) — the
+    look buttons' repeat-press pattern; the chip label shows the current
+    form, aria says "tap again for the inverse", the flag persists
+    (ips-crop-ratio-inv).
+  • CUSTOM ratio: a "Custom…" chip opens a real dialog (W : H numeric
+    inputs + a swap button); validated (positive, finite) and clamped to the
+    [1:5 … 5:1] band with an honest inline error; the chip label becomes the
+    pair ("✓ 7:5"); persists (ips-crop-ratio-custom) and re-applies on arm.
+  VERIFIED headless 27/27 new + the prior crop suite re-run 26/26; FAIL-FIRST
+  proven by restoring the original fixed geometry — the portrait gap check
+  flips (pill overlaps the box by 22px in the harness viewport; worse on the
+  iPad's wrapped pill). Portrait regression check: rotate to portrait, arm →
+  all four handles reachable via elementFromPoint AND the pill's top sits
+  strictly below the box. Inverse and custom flows walked end-to-end incl.
+  reload persistence and hostile input; axe clean on the new dialog in both
+  themes. NEEDS THE OWNER'S HANDS: the portrait arm now framing the whole
+  box above the pill on the real iPad, the repeat-tap inverse discoverability,
+  and the custom dialog's feel.
 
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 
