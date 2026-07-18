@@ -15,7 +15,19 @@ import { buildLocalMap } from "./localmap";
 import { buildSkyMask } from "./sky";
 import { drawHistogram } from "./histogram";
 import * as Hotspot from "./hotspot";
-import { setupInstalledShare, setupInstallFromApp } from "./share";
+import { setupInstalledShare, setupInstallFromApp, toast } from "./share";
+import {
+  type SavedLook,
+  type NamedLook,
+  coerceLook,
+  cleanName,
+  encodeLookPayload,
+  toBase64url,
+  buildLookLink,
+  parseLookText,
+  sniffLook,
+  lookFileName,
+} from "./look";
 import { wireThemeToggle } from "./theme";
 
 // Injected at build time from git history (see vite.config.ts).
@@ -680,30 +692,14 @@ resetBtn.addEventListener("click", resetEdit);
 const SLOTS = 5;
 const slotKey = (i: number) => `ips-look-slot-${i}`;
 const slotList = $("slotList") as HTMLDivElement;
-const slotEls: { name: HTMLSpanElement; save: HTMLButtonElement; load: HTMLButtonElement }[] = [];
+const slotEls: { name: HTMLSpanElement; save: HTMLButtonElement; load: HTMLButtonElement; more: HTMLButtonElement }[] = [];
 
 // A saved look is the CREATIVE grade only — no per-shot white balance, exposure
 // or denoise — so it drops onto any photo on top of that photo's own balance
 // (matching how the built-in Looks behave). Sharpen/Texture DO ride along: they
 // are user intent, not auto-measured per photo the way denoise is. Undo/Reset
-// snapshots stay full.
-type SavedLook = {
-  swapRB: boolean;
-  hue: number;
-  sat: number;
-  contrast: number;
-  tint: [number, number, number];
-  glow: number;
-  sky: [number, number, number];
-  foliage: [number, number, number];
-  tone: [number, number, number, number, number];
-  lum: number;
-  clarity: number;
-  dehaze: number;
-  sharpen: number;
-  texture: number;
-  hsl: number[];
-};
+// snapshots stay full. The SavedLook type and its hardened coercion live in
+// look.ts, shared with the share/import paths (links, files, codes).
 
 function currentLook(): SavedLook {
   return {
@@ -725,38 +721,19 @@ function currentLook(): SavedLook {
   };
 }
 
-const tuple3 = (a: unknown, d: [number, number, number]): [number, number, number] =>
-  Array.isArray(a) && a.length === 3 ? [+a[0], +a[1], +a[2]] : d;
-const numOr = (v: unknown, d: number): number => (typeof v === "number" && isFinite(v) ? v : d);
-
 /** Parse a saved slot, tolerating older full-snapshot slots ({params:{…}}) and
- *  coercing every field so a stale or partial slot can't corrupt the edit. */
-function readSlot(i: number): SavedLook | null {
+ *  coercing every field (look.ts coerceLook) so a stale or partial slot can't
+ *  corrupt the edit. Slots may carry an optional user-given name. */
+function readSlot(i: number): NamedLook | null {
   const raw = localStorage.getItem(slotKey(i));
   if (!raw) return null;
   try {
     const o = JSON.parse(raw);
     const s = o?.params ?? o; // accept {params:{…}} (old full snapshot) or flat
-    if (s && Array.isArray(s.tone) && typeof s.sat === "number") {
-      return {
-        swapRB: !!s.swapRB,
-        hue: numOr(s.hue, 0),
-        sat: numOr(s.sat, 1),
-        contrast: numOr(s.contrast, 1),
-        tint: tuple3(s.tint, [1, 1, 1]),
-        glow: numOr(s.glow, 0),
-        sky: tuple3(s.sky, [0, 1, 1]),
-        foliage: tuple3(s.foliage, [0, 1, 1]),
-        tone: s.tone.length === 5
-          ? [+s.tone[0], +s.tone[1], +s.tone[2], +s.tone[3], +s.tone[4]]
-          : [...TONE_DEFAULT],
-        lum: numOr(s.lum, 1),
-        clarity: numOr(s.clarity, 0),
-        dehaze: numOr(s.dehaze, 0),
-        sharpen: numOr(s.sharpen, 0),
-        texture: numOr(s.texture, 0),
-        hsl: Array.isArray(s.hsl) && s.hsl.length === 24 ? s.hsl.map((x: unknown, i: number) => numOr(x, i % 3 === 0 ? 0 : 1)) : hslDefault(),
-      };
+    const look = coerceLook(s);
+    if (look) {
+      const name = cleanName(o?.name ?? s?.name);
+      return name ? { ...look, name } : look;
     }
   } catch {
     /* corrupt slot — treat as empty */
@@ -764,26 +741,48 @@ function readSlot(i: number): SavedLook | null {
   return null;
 }
 
+/** The display label for a slot: its user-given name, else "Slot N". */
+const slotLabel = (i: number, look: NamedLook | null) => look?.name ?? `Slot ${i + 1}`;
+
 function saveSlot(i: number) {
   if (!current) return;
-  localStorage.setItem(slotKey(i), JSON.stringify(currentLook()));
+  // Overwriting a slot's grade KEEPS its name — the name labels the slot until
+  // the user renames it, not the particular grade that was in it.
+  const name = readSlot(i)?.name;
+  localStorage.setItem(slotKey(i), JSON.stringify(name ? { ...currentLook(), name } : currentLook()));
   updateSlotUI();
 }
 
-function loadSlot(i: number) {
+/** Write a look (e.g. one received via link/file/code) into a slot. */
+function writeSlot(i: number, look: SavedLook, name?: string) {
+  const clean = cleanName(name);
+  localStorage.setItem(slotKey(i), JSON.stringify(clean ? { ...look, name: clean } : { ...look }));
+  updateSlotUI();
+}
+
+/** Rename a slot in place (empty name clears it). No-op on an empty slot. */
+function renameSlot(i: number, name: string) {
   const look = readSlot(i);
-  if (!look || !current) return;
+  if (!look) return;
+  const { name: _old, ...bare } = look;
+  writeSlot(i, bare, name);
+}
+
+/** Apply a creative grade to the open photo as ONE atomic undo step — shared
+ *  by slot loads and looks received via link/file/code. Keeps this photo's
+ *  white balance, exposure and denoise. */
+function applySavedLook(look: SavedLook) {
+  if (!current) return;
   flushRecord(); // settle current edits
-  // Apply the creative grade; keep this photo's white balance, exposure, denoise.
   params.swapRB = look.swapRB;
   params.hue = look.hue;
   params.sat = look.sat;
   params.contrast = look.contrast;
-  params.tint = look.tint;
+  params.tint = [...look.tint];
   params.glow = look.glow;
-  params.sky = look.sky;
-  params.foliage = look.foliage;
-  params.tone = look.tone;
+  params.sky = [...look.sky];
+  params.foliage = [...look.foliage];
+  params.tone = [...look.tone];
   params.lum = look.lum;
   params.clarity = look.clarity;
   params.dehaze = look.dehaze;
@@ -798,12 +797,23 @@ function loadSlot(i: number) {
   flushRecord(); // record the load as one atomic undo step
 }
 
+function loadSlot(i: number) {
+  const look = readSlot(i);
+  if (!look || !current) return;
+  applySavedLook(look);
+}
+
 function updateSlotUI() {
   for (let i = 0; i < SLOTS; i++) {
-    const filled = !!readSlot(i);
-    slotEls[i].name.textContent = filled ? `Slot ${i + 1} ✓` : `Slot ${i + 1}`;
+    const look = readSlot(i);
+    const filled = !!look;
+    slotEls[i].name.textContent = filled ? `${slotLabel(i, look)} ✓` : `Slot ${i + 1}`;
     slotEls[i].save.disabled = !current;
+    slotEls[i].save.setAttribute("aria-label", `Save current edit to ${slotLabel(i, look)}`);
     slotEls[i].load.disabled = !filled || !current;
+    slotEls[i].load.setAttribute("aria-label", `Load ${slotLabel(i, look)}`);
+    slotEls[i].more.disabled = !filled;
+    slotEls[i].more.setAttribute("aria-label", `Name and share ${slotLabel(i, look)}`);
   }
 }
 
@@ -820,11 +830,16 @@ for (let i = 0; i < SLOTS; i++) {
   load.type = "button";
   load.className = "slot-load";
   load.textContent = "Load";
+  const more = document.createElement("button");
+  more.type = "button";
+  more.className = "slot-more";
+  more.textContent = "⋯";
   save.addEventListener("click", () => saveSlot(i));
   load.addEventListener("click", () => loadSlot(i));
-  row.append(name, save, load);
+  more.addEventListener("click", () => openLookDlg(i));
+  row.append(name, save, load, more);
   slotList.append(row);
-  slotEls.push({ name, save, load });
+  slotEls.push({ name, save, load, more });
 }
 updateSlotUI(); // reflect any slots saved in a previous session
 
@@ -3047,9 +3062,36 @@ async function makeThumb(img: DecodedImage, MAX = 260): Promise<ArrayBuffer> {
 
 const tick = () => new Promise<void>((r) => setTimeout(r, 0));
 
+/** A cheap head-sniff: is this picked file a shared look (.ipslook JSON)?
+ *  Reads only the first bytes; anything big is not a look. */
+async function isLookFile(f: File): Promise<boolean> {
+  if (f.size === 0 || f.size > 64 * 1024) return false;
+  const head = new Uint8Array(await f.slice(0, 32).arrayBuffer());
+  return sniffLook(head);
+}
+
+/** Route the text of a shared look (from a file, link, or pasted code) into
+ *  the receive dialog — or explain, honestly, why it couldn't be read. */
+function receiveLookText(text: string, sourceHint: string) {
+  const p = parseLookText(text);
+  if (p) openLookReceive(p);
+  else toast(`That ${sourceHint} couldn't be read — it may be damaged or cut short.`, 3200);
+}
+
 /** Open a freshly-picked set. One file → ephemeral single open (unchanged).
- *  Two or more → a persisted session with the switch strip. */
+ *  Two or more → a persisted session with the switch strip.
+ *  Shared-look files (.ipslook) are peeled off FIRST: a look is not a photo —
+ *  it must never destroy, join, or be counted against a photo session. */
 async function openPicked(files: File[]) {
+  const parts = await Promise.all(files.map(async (f) => ({ f, isLook: await isLookFile(f).catch(() => false) })));
+  const lookFiles = parts.filter((p) => p.isLook).map((p) => p.f);
+  files = parts.filter((p) => !p.isLook).map((p) => p.f);
+  if (lookFiles.length) {
+    // One receive dialog at a time; extra look files are announced honestly.
+    receiveLookText(await lookFiles[0].text(), "look file");
+    if (lookFiles.length > 1) toast(`Opened 1 of ${lookFiles.length} look files — import the others one at a time.`, 3200);
+    if (!files.length) return;
+  }
   let append = false;
   if (sessionPhotos.length >= 2) {
     append = confirm(
@@ -4298,7 +4340,11 @@ function openBatchDialog() {
     const b = document.createElement("button");
     b.type = "button";
     b.className = "batch-choice slim";
-    b.innerHTML = `<strong>Slot ${i + 1}</strong>`;
+    // The label is user-supplied (slot names) — build it with textContent,
+    // never markup.
+    const strong = document.createElement("strong");
+    strong.textContent = slotLabel(i, look);
+    b.append(strong);
     b.addEventListener("click", () => pickGrade({ kind: "look", look }));
     bcSlots.append(b);
   }
@@ -4404,6 +4450,204 @@ ui.dcpBtn.addEventListener("click", () => {
   const buf = generateDcp(params, currentFile?.bytes, `${baseName()} (IPS)`);
   void saveBlob(new Blob([new Uint8Array(buf)], { type: "application/octet-stream" }), `${baseName()}.dcp`);
 });
+
+// --- Look sharing: name a saved look and send it as a link, a file, or a
+// paste-able code — and receive looks from #look= links, .ipslook files, and
+// pasted codes. The whole grade travels in the payload itself (look.ts); no
+// server, no account. Received payloads are hostile until coerceLook clamps
+// them, and names only ever render via textContent. ---
+
+const lookDlg = $("lookDlg") as HTMLDialogElement;
+const lookDlgTitle = $("lookDlgTitle") as HTMLHeadingElement;
+const lookNameInput = $("lookName") as HTMLInputElement;
+const lookNameHint = $("lookNameHint") as HTMLParagraphElement;
+const lookCodeOut = $("lookCodeOut") as HTMLTextAreaElement;
+let lookDlgSlot = -1;
+let lookNameNudged = false;
+
+function openLookDlg(i: number) {
+  const look = readSlot(i);
+  if (!look) return;
+  lookDlgSlot = i;
+  lookNameNudged = false;
+  lookNameHint.hidden = true;
+  lookCodeOut.hidden = true;
+  lookCodeOut.value = "";
+  lookDlgTitle.textContent = `Slot ${i + 1} — name & share`;
+  lookNameInput.value = look.name ?? "";
+  lookDlg.showModal();
+}
+
+lookNameInput.addEventListener("change", () => {
+  if (lookDlgSlot >= 0) renameSlot(lookDlgSlot, lookNameInput.value);
+});
+
+/** The dialog's slot look with the name committed from the input first. */
+function lookDlgLook(): NamedLook | null {
+  if (lookDlgSlot < 0) return null;
+  renameSlot(lookDlgSlot, lookNameInput.value);
+  return readSlot(lookDlgSlot);
+}
+
+/** Nudge once toward naming before a share; a second press shares unnamed. */
+function lookNameNudge(): boolean {
+  if (lookNameInput.value.trim() || lookNameNudged) return false;
+  lookNameNudged = true;
+  lookNameHint.hidden = false;
+  lookNameInput.focus();
+  return true;
+}
+
+$("lookShareLink").addEventListener("click", async () => {
+  const look = lookDlgLook();
+  if (!look || lookNameNudge()) return;
+  const url = buildLookLink(look, look.name);
+  const title = look.name ? `“${look.name}” — a look for Photography Studio` : "A look for Photography Studio";
+  const nav = navigator as Navigator & { share?: (d: ShareData) => Promise<void> };
+  if (typeof nav.share === "function") {
+    try {
+      await nav.share({ title, url });
+      return;
+    } catch (err) {
+      if ((err as DOMException)?.name === "AbortError") return; // user closed the sheet
+      /* share unsupported for this data — fall through to copying */
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    toast("Look link copied");
+  } catch {
+    lookCodeOut.value = url; // last resort: show it so it can be copied by hand
+    lookCodeOut.hidden = false;
+  }
+});
+
+$("lookShareFile").addEventListener("click", () => {
+  const look = lookDlgLook();
+  if (!look || lookNameNudge()) return;
+  const json = encodeLookPayload(look, look.name);
+  void saveBlob(new Blob([json], { type: "application/json" }), lookFileName(look.name));
+});
+
+$("lookCopyCode").addEventListener("click", async () => {
+  const look = lookDlgLook();
+  if (!look || lookNameNudge()) return;
+  const token = toBase64url(encodeLookPayload(look, look.name));
+  try {
+    await navigator.clipboard.writeText(token);
+    toast("Look code copied — they paste it under My looks → Paste look code");
+  } catch {
+    lookCodeOut.value = token;
+    lookCodeOut.hidden = false;
+  }
+});
+
+$("lookDlgClose").addEventListener("click", () => lookDlg.close());
+lookDlg.addEventListener("click", (e) => {
+  if (e.target === lookDlg) lookDlg.close(); // tap outside to dismiss
+});
+
+// Paste a look code (or a whole link, or raw look JSON — parseLookText takes
+// all three). A textarea, deliberately: clipboard.readText is permission-gated
+// and unreliable on iOS, so the user pastes by hand.
+const lookPasteDlg = $("lookPasteDlg") as HTMLDialogElement;
+const lookPasteIn = $("lookPasteIn") as HTMLTextAreaElement;
+const lookPasteErr = $("lookPasteErr") as HTMLParagraphElement;
+
+$("lookPasteBtn").addEventListener("click", () => {
+  lookPasteIn.value = "";
+  lookPasteErr.hidden = true;
+  lookPasteDlg.showModal();
+});
+$("lookPasteApply").addEventListener("click", () => {
+  const p = parseLookText(lookPasteIn.value);
+  if (!p) {
+    lookPasteErr.hidden = false;
+    return;
+  }
+  lookPasteDlg.close();
+  openLookReceive(p);
+});
+$("lookPasteClose").addEventListener("click", () => lookPasteDlg.close());
+lookPasteDlg.addEventListener("click", (e) => {
+  if (e.target === lookPasteDlg) lookPasteDlg.close();
+});
+
+// Import a look file directly (no photo-picker detour).
+const lookFileInput = $("lookFile") as HTMLInputElement;
+$("lookImportBtn").addEventListener("click", () => lookFileInput.click());
+lookFileInput.addEventListener("change", async () => {
+  const f = lookFileInput.files?.[0];
+  lookFileInput.value = ""; // let the same file be re-picked later
+  if (f) receiveLookText(await f.text(), "look file");
+});
+
+// The receive dialog — every channel (link, file, code) lands here.
+const lookRecvDlg = $("lookRecvDlg") as HTMLDialogElement;
+const lookRecvTitle = $("lookRecvTitle") as HTMLHeadingElement;
+const lookRecvTry = $("lookRecvTry") as HTMLButtonElement;
+const lookRecvNoPhoto = $("lookRecvNoPhoto") as HTMLParagraphElement;
+const lookRecvSlots = $("lookRecvSlots") as HTMLDivElement;
+let receivedLook: { look: SavedLook; name?: string } | null = null;
+
+function openLookReceive(p: { look: SavedLook; name?: string }) {
+  receivedLook = p;
+  if (lookRecvDlg.open) lookRecvDlg.close(); // a newer look wins
+  lookRecvTitle.textContent = p.name ?? "Untitled look";
+  lookRecvTry.disabled = !current;
+  lookRecvNoPhoto.hidden = !!current;
+  lookRecvSlots.hidden = true;
+  lookRecvSlots.replaceChildren();
+  hint.textContent = `Look received: ${p.name ?? "untitled"}`; // start-screen live region
+  lookRecvDlg.showModal();
+}
+
+lookRecvTry.addEventListener("click", () => {
+  if (!receivedLook || !current) return;
+  applySavedLook(receivedLook.look);
+  lookRecvDlg.close();
+  toast("Look applied — Undo removes it");
+});
+
+$("lookRecvSave").addEventListener("click", () => {
+  if (!receivedLook) return;
+  // Five honest choices: an empty slot says so; a filled one names what it
+  // would replace. Names are user-supplied — textContent only.
+  lookRecvSlots.replaceChildren(
+    ...Array.from({ length: SLOTS }, (_, i) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "look-recv-slot";
+      const cur = readSlot(i);
+      b.textContent = cur ? `Slot ${i + 1} ✓ — replaces “${slotLabel(i, cur)}”` : `Slot ${i + 1} — empty`;
+      b.addEventListener("click", () => {
+        writeSlot(i, receivedLook!.look, receivedLook!.name);
+        lookRecvDlg.close();
+        toast("Saved to My looks");
+      });
+      return b;
+    }),
+  );
+  lookRecvSlots.hidden = false;
+});
+
+$("lookRecvClose").addEventListener("click", () => lookRecvDlg.close());
+lookRecvDlg.addEventListener("click", (e) => {
+  if (e.target === lookRecvDlg) lookRecvDlg.close();
+});
+
+// A shared look arriving in the URL fragment (#look=TOKEN). The fragment
+// never reaches the network or the service worker, so links work offline.
+function consumeLookHash() {
+  const m = /^#look=(.+)$/.exec(location.hash);
+  if (!m) return;
+  // Consume FIRST: a reload must never re-offer the look, even if parsing
+  // fails part-way.
+  history.replaceState(null, "", location.pathname + location.search);
+  receiveLookText(m[1], "look link");
+}
+consumeLookHash();
+window.addEventListener("hashchange", consumeLookHash);
 
 // Tap-to-white-balance: neutralize the tapped point (foliage = the IR move).
 // Skipped when the gesture was a pan/pinch rather than a tap.

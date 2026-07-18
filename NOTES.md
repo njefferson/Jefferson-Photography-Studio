@@ -203,11 +203,14 @@ user-scalable=no.
   2026-07-18: extends the luminance tone curve to independent channels; same
   per-pixel model, non-spatial, so it rides saved looks and strengthens the
   .cube/.dcp exports.
-- [ ] **Save .cube/.dcp through the share sheet** — core sweep, promoted from
-  the findings ledger 2026-07-18: the bare a[download] silently does nothing
-  in the installed (standalone) iOS app; route through the share-sheet path
-  like image saves, and close the double-tap fall-through (which can clear
-  batch crash-recovery frames early).
+- [ ] **Close the export double-tap fall-through** — the surviving half of the
+  2026-07-18 ".cube/.dcp share sheet" promotion, RESCOPED same day: the
+  share-sheet routing itself turned out ALREADY SHIPPED (main.ts:4398, the
+  copy-and-trust release — its shipped record covers it; the ledger line is
+  annotated). Still open: busySave (main.ts ~3955) has no re-entrancy guard —
+  double-tapping Save while the share sheet opens can call saveBlob again,
+  fall into the download branch, and (for batch) clear crash-recovery frames
+  early. Disable the button (or guard a flag) across the await.
 - [ ] **Accessible overlays — Library, Quick look and Busy become real dialogs**
   — a11y audit 2026-07-17, deferred from the a11y release because it touches
   open/close interaction flows. #library claims aria-modal with no focus
@@ -256,6 +259,28 @@ user-scalable=no.
   UV-displacement-field sketch lives in "Future / bigger bets" below; spatial
   → never in looks/batch/LUTs; one stroke = one undo. The biggest single item
   in the release.
+- [ ] **Import .cube LUTs as looks** — look-sharing release 2 (owner go
+  2026-07-18, with the look-sharing scope): apply any third-party .cube LUT
+  (the free LUT universe) inside the app. Plan: `src/cubeimport.ts` parses
+  LUT_3D_SIZE/DOMAIN/N³ floats → Float32Array (N ≤ 65, file ≤ ~8 MB); a NEW
+  final display-space stage — WebGL2 3D texture sampled after the creative
+  grade so LUTs stack on the IR channel work — with the CPU export mirroring
+  the exact trilinear arithmetic (GPU==CPU parity is the release's
+  verification centerpiece; texel-centre addressing, the brush-mask
+  half-texel lesson). Storage: IndexedDB `ips-luts` store (~430 KB per LUT —
+  unfit for localStorage slots or #look links); a slot may carry a LUT ref;
+  rows show a text "LUT" badge. Shared as the original .cube file via
+  saveBlob (round-trips once this ships); excluded from links/codes with an
+  honest disabled state.
+- [ ] **Looks that travel inside the JPEG + QR share** — look-sharing release
+  3 (owner go 2026-07-18): embed the look payload as an `IPSLOOK\0` APP11
+  segment at JPEG export using icc.ts's APP2 splicing precedent (coordinate
+  with "Keep EXIF in exports" — same splice point); on JPEG open, scan APPn
+  and offer the embedded recipe through the SAME receive dialog. Honest copy:
+  iOS Photos/Messages recompression strips markers; Files/AirDrop keep them.
+  Plus a small dependency-free QR encoder (byte mode, EC M; a ~600-char link
+  ≈ version 12-17) drawing the #look link to a canvas → toBlob → saveBlob.
+  Display/share only — no QR decoding (the camera app is the decoder).
 - [ ] **Full-bleed alignment view — the tilted photo fills the screen** — owner-caught on device
   2026-07-16 (with the crop go-to-main; screenshot IMG_6201, Straighten @ 23.6°).
   While a geometry tool is armed, rotating and pinch-zooming CLIPS the photo
@@ -2052,6 +2077,70 @@ user-scalable=no.
   absolute to the prod origin); the notes + privacy pages' look on device;
   and an explicit OK that privacy.html publishes noah.jefferson@gmail.com as
   the contact (easily swapped/removed if not).
+- [x] **Share your look — links, files and codes** — owner GO 2026-07-18 ("do
+  look sharing", with the full channel scope: core + .cube import + JPEG
+  recipes + QR — releases 2-3 are queued above). SHIPPED same day (cache
+  ips-v74 → ips-v75), release 1 of three.
+  FORMAT (new `src/look.ts`, pure/DOM-free): payload
+  `{"f":"ips-look","v":1,"name":…,"look":{…the 15 SavedLook fields…}}` with
+  `f` as the literal FIRST key so every emitted file/code/link starts with
+  the bytes `{"f":"ips-look"` — that prefix IS the import sniff magic
+  (import.ts `sniff` gained kind "look"). Numbers rounded to 4 decimals; a
+  full named link is ~550 chars. Encoding: UTF-8 → base64url (unicode-safe
+  names). SECURITY: payloads are attacker-controllable (anyone can craft a
+  link) — token capped at 12k chars and JSON at 8 KB BEFORE parsing, then
+  EVERY field is coerced AND clamped to the UI's own slider ranges
+  (`coerceLook`; a 1e308 sat lands at 3.0), names are control-stripped, ≤60
+  chars, and only ever rendered via textContent.
+  CHANNELS OUT (per-slot ⋯ button → the new name & share dialog): **link**
+  (`https://jefferson-photo-studio.pages.dev/ir.html#look=TOKEN` — hard-coded
+  PRODUCTION origin so a staging sender can't mint staging links, and the
+  ir.html path because the SW cache is URL-exact; navigator.share with
+  clipboard fallback), **file** (`.ipslook`, saveBlob → share sheet, the
+  .cube precedent), **code** (the bare token, clipboard with an in-dialog
+  readonly-textarea fallback). Slots gained optional NAMES (flat `name` key —
+  old slots parse unchanged, old app versions ignore it; overwriting a
+  slot's grade KEEPS its name; batch chooser + aria-labels show names via
+  textContent).
+  CHANNELS IN (all land in ONE receive dialog): a `#look=` link (parsed on
+  load + hashchange; the hash is consumed with history.replaceState BEFORE
+  parsing so a reload can never re-offer, and the fragment never reaches the
+  network — links work OFFLINE); a `.ipslook` file (sniffed by magic bytes
+  through ANY photo input — `openPicked` peels look files off FIRST so a look
+  never destroys or joins a photo session — plus a dedicated "Import look
+  file…" button); a pasted link/code/JSON (one parser, `parseLookText`;
+  textarea on purpose — clipboard.readText is permission-gated on iOS).
+  Receive dialog: Try on this photo (applies via the shared `applySavedLook`
+  = ONE atomic undo step, exactly like slot Load; disabled with a visible
+  explanation when no photo is open), Save to My looks (five honest choices —
+  "empty" vs "replaces 'Name'"), Not now.
+  VERIFIED headless 53/53 (Chromium, real built app; fail-first PROVEN — two
+  planted bugs each caught by exactly the right checks: skipping
+  replaceState flipped "hash consumed" + "reload does not re-offer";
+  dropping the sat clamp flipped "sat=1e308 clamped to 3"): link round-trip
+  applies ALL 15 fields exactly (verified through a real slot-save readback)
+  and ONE undo restores every pre-Try value; file round-trip via the real
+  #file input AND the dedicated importer; a mixed pick (2 photos + 1 look)
+  peels the look and sessions exactly the 2 photos; paste accepts
+  link/token/raw-JSON and rejects garbage with the inline error; names
+  survive reload/re-save and show in the batch chooser; hostile payloads
+  (50k token, junk/truncated base64, f-mismatch, markup-in-name → inert
+  TEXT, 1e308/−1e308/string values → clamped/defaulted) all handled with no
+  page errors; full-slot save shows five "replaces" labels and touches only
+  the chosen slot; OFFLINE: with the SW installed, ir.html#look=… loads and
+  offers the look with the network off; axe (color-contrast, button-name,
+  aria-dialog-name, label) clean on all three dialogs in BOTH themes (one
+  real find fixed: the primary buttons first used a one-off #fff on
+  --accent — 2.58:1 in dark — corrected to the calibrated --accent-ink);
+  regressions: classic slot Load and the .cube export button still work.
+  NEEDS THE OWNER'S HANDS on the real iPhone/iPad: the share sheet feel for
+  link/file/code, an AirDrop + Files round-trip of a .ipslook, tapping a
+  look link out of Messages (and that it opens the PWA vs a new Safari tab —
+  both work, but the feel differs), paste into the textarea, and the ⋯
+  button's discoverability. KNOWN LIMIT (flagged, acceptable for R1): the
+  "Import look file…" / "Paste look code…" buttons live in the Export panel,
+  which needs a photo open — with NO photo open, a look still arrives via
+  link or via Open image(s) picking the .ipslook.
 
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 
@@ -2138,7 +2227,10 @@ CONFIRMED but DEFERRED (each needs its own release / owner input):
   headless incl. a fail-first buggy-install control. See the roadmap entry.
 - Multi-tab: two tabs of ir.html silently clobber each other's ips-session
   store (no guard). Also: lone opens still have zero crash safety.
-- [QUEUED 2026-07-18 — "Next capability release", core sweep] .cube/.dcp saves
+- [FIRST HALF SHIPPED (copy-and-trust release, main.ts:4398) — found stale at
+  the 2026-07-18 promotion; the DOUBLE-TAP clause is still real (busySave has
+  no re-entrancy guard) and is re-queued as "Close the export double-tap
+  fall-through"] .cube/.dcp saves
   use a bare a[download] — silently does nothing in the
   installed (standalone) iOS app; should ride the share-sheet path like
   image saves. Double-tapping Save while the share sheet opens can fall into
@@ -2315,7 +2407,9 @@ greenlit these, they're here so they aren't lost):
 - **Share your look as a file** — export/import an app-native look file so IR
   shooters can swap looks with no account and no server (.cube exports don't
   round-trip back into the editor). Fits free/on-device/no-account exactly —
-  community without infrastructure.
+  community without infrastructure. OWNER GO + SHIPPED 2026-07-18 as **Share
+  your look — links, files and codes** (see the shipped record); releases 2
+  (.cube import) and 3 (JPEG-embedded recipes + QR) are queued.
 - **Durable edits across reloads** — sessions admit masks reset on reload and
   lone opens have zero crash safety (findings ledger); persisting the full
   edit recipe is the "come back tomorrow" gap between an editor and a daily

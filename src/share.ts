@@ -19,9 +19,10 @@ export function isStandaloneApp(): boolean {
 let toastEl: HTMLDivElement | null = null;
 let toastTimer = 0;
 
-/** A small, self-styled confirmation (used for the copy-link fallback), so it
- *  looks the same on every surface regardless of that page's stylesheet. */
-function toast(msg: string, ms = 2200): void {
+/** A small, self-styled confirmation (used for the copy-link fallback and the
+ *  look-sharing flows), so it looks the same on every surface regardless of
+ *  that page's stylesheet. */
+export function toast(msg: string, ms = 2200): void {
   // A modal <dialog> paints in the top layer, ABOVE any fixed element — a
   // toast confirming a copy made from inside Help was invisible (review find,
   // 2026-07-15). Mount the toast inside the open dialog when there is one.
