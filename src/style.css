@@ -1277,7 +1277,7 @@ label.open-btn, label.bar-btn {
   z-index: 10;
 }
 #lesson { color: var(--glass-txt); }
-#lesson h3 { margin: 0 0 8px; font: 600 14px/1.2 var(--display); }
+#lesson h2 { margin: 0 0 8px; font: 600 14px/1.2 var(--display); }
 #lesson ol { margin: 0 0 10px; padding-left: 18px; font-size: 13px; color: var(--glass-txt); }
 #lesson li { margin: 6px 0; line-height: 1.4; }
 #lesson button { width: auto; padding: 6px 14px; }
