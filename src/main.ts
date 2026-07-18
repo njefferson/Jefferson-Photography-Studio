@@ -2324,6 +2324,14 @@ straightenSlider.addEventListener("input", () => {
   straightenVal.textContent = `${params.straighten.toFixed(1)}°`;
   // Re-fit the crop to the new angle (safe inscribed bound, keeps it on the photo).
   params.crop = cropSafeBound();
+  // ...and re-fit the VIEW to that new box, or the framing goes stale as the
+  // angle grows: the crop shrinks toward a small square while viewZoom stays at
+  // its open-time value, so the whole tilt spills past the frame as an
+  // overflowing diamond. Re-fitting to box-fill keeps the kept crop filling the
+  // frame at every angle (the rest of the tilt sits behind it; pinch-out still
+  // reaches the whole photo). Matches setGeoMode's box-first open.
+  viewFreezeCenter = null;
+  viewZoom = boxFillZoom();
   positionCropOverlay();
   draw();
 });
