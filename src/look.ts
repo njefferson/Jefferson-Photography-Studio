@@ -28,6 +28,8 @@ export type SavedLook = {
   sharpen: number;
   texture: number;
   hsl: number[];
+  bwOn: boolean;
+  bwMix: [number, number, number];
 };
 
 export type NamedLook = SavedLook & { name?: string };
@@ -99,6 +101,8 @@ export function coerceLook(s: unknown): SavedLook | null {
     sharpen: clamped(o.sharpen, 0, 0, 1),
     texture: clamped(o.texture, 0, -1, 1),
     hsl,
+    bwOn: !!o.bwOn,
+    bwMix: clampT3(o.bwMix, [1, 1, 1], [0, 0, 0], [2, 2, 2]),
   };
 }
 
@@ -131,6 +135,8 @@ export function encodeLookPayload(look: SavedLook, name?: string): string {
     sharpen: round4(look.sharpen),
     texture: round4(look.texture),
     hsl: look.hsl.map(round4),
+    bwOn: look.bwOn,
+    bwMix: look.bwMix.map(round4),
   };
   const o: Record<string, unknown> = { f: LOOK_FORMAT, v: LOOK_VERSION };
   const n = cleanName(name);

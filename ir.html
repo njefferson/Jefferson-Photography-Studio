@@ -215,6 +215,16 @@
             <p class="note">Press a look again to flip its R&#8646;B channel swap &mdash; the state shows under its name.</p>
             <label>HIE glow <input id="glow" type="range" min="0" max="1" step="0.01" value="0" /></label>
             <p class="note">Film-style halation &mdash; layers onto any look, not only HIE B&amp;W.</p>
+            <hr class="divider" />
+            <div class="sub-title">Black &amp; white <span>channel mix</span></div>
+            <button id="bwBtn" type="button" class="toggle full-btn" aria-pressed="false">Black &amp; white</button>
+            <p class="note">Made for 720nm shots. The weights choose how much of each channel becomes brightness &mdash; only their balance matters, not the total. Moving a weight turns Black &amp; white on by itself.</p>
+            <div id="bwMixes" class="bw-mixes" role="group" aria-label="Named channel mixes"></div>
+            <label>Red weight <input id="bwR" type="range" min="0" max="2" step="0.01" value="1" /></label>
+            <label>Green weight <input id="bwG" type="range" min="0" max="2" step="0.01" value="1" /></label>
+            <label>Blue weight <input id="bwB" type="range" min="0" max="2" step="0.01" value="1" /></label>
+            <p class="note">Tip: while it's on, the Color mixer's Luminance &mdash; and &#10021; Drag on photo to adjust &mdash; brighten or darken each color's grey. Bakes into .cube exports; .dcp can't carry it.</p>
+            <button id="bwReset" type="button">Reset black &amp; white</button>
           </section>
 
           <!-- ===== CORRECTIONS ===== -->
@@ -635,6 +645,10 @@
         Looks tagged <span class="badge">R&#8646;B</span> use the <strong>red&#8646;blue channel swap</strong> —
         the move that makes IR sky blue and foliage red/gold. Toggle the swap button to see its effect on any look.
         <strong>HIE glow</strong> is film-style halation — the HIE B&amp;W look uses it, and the slider layers it onto any other look too.</p>
+        <p><strong>Black &amp; white (channel mix)</strong> — made for 720nm shots — turns the photo mono, with weight
+        sliders (or a named mix) choosing how much of each channel becomes brightness. While it's on, the Color
+        mixer's Luminance and <em>Drag on photo to adjust</em> brighten or darken each color's grey, like a classic
+        B&amp;W mix. It rides saved looks and bakes into .cube exports (.dcp can't carry it).</p>
         <p><strong>Per-color</strong> moves the Sky and Foliage color bands independently — e.g.
         Aerochrome, then Sky hue +40 for a deeper sky without touching the trees. The bands follow the
         subject through a channel swap (Sky keeps meaning sky); the small text under each box shows the
