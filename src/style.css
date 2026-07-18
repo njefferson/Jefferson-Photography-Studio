@@ -404,6 +404,31 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
    ✎ = edits the custom pair). Dark badge + inherited --accent-ink glyph stays
    ≥4.5:1 on the accent fill in BOTH themes (a white badge fails in dawn). */
 .chip-hint { display: inline-block; margin-inline-start: 5px; padding: 0 4px; border-radius: 5px; background: rgba(0, 0, 0, 0.18); color: inherit; font-weight: 600; }
+/* Black & white named-mix chips (IR tab, light panel). Selected state =
+   aria-pressed + the "✓ " TEXT prefix set in updateBwUI — never colour alone
+   (same pattern as the crop ratio chips). */
+.bw-mixes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 6px; /* row-gap 10 so the -5px hit extensions barely contest */
+  margin: 4px 0 10px;
+}
+.mix-chip {
+  position: relative;
+  width: auto; /* the generic panel button is full-width; chips wrap in a row */
+  flex: none;
+  min-height: 34px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line-2);
+  background: transparent;
+  color: var(--txt);
+  font: 500 12px/1.2 var(--ui);
+  cursor: pointer;
+}
+.mix-chip::before { content: ""; position: absolute; inset: -5px; } /* 44px hit extension */
+.mix-chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+
 /* Imported .cube LUTs (Profiles & LUTs panel). The badge is TEXT — never a
    colour-only cue. */
 .lut-badge {

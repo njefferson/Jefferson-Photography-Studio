@@ -92,7 +92,8 @@ See **`PLAN.md`** for the full build plan.
       limit), single EditParams definition, NEF white level 15520, exposure
       clamp matches slider
 - [ ] Validate/calibrate .dcp colour in Lightroom (needs ACR; user to test)
-- [ ] Display-P3 JPEG output (currently sRGB); per-color HSL; B&W mode for 720nm
+- [ ] Display-P3 JPEG output (currently sRGB); per-color HSL
+- [x] B&W mode for 720nm (shipped as 1.2 — see the roadmap archive)
 - [ ] Nice-to-have: RGBA16F preview texture (halve GPU memory); box-filtered
       downscale on scaled exports; LJ92 restart-marker path untested on real file
 
@@ -190,16 +191,6 @@ user-scalable=no.
 > different approach and mindset"). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
-- [ ] **Black & white for 720nm** — core sweep; the recorded target promoted
-  2026-07-18; owner go same day, he is starting it in a NEW CHAT — next
-  session, read this entry first. THE FIRST CAPABILITY RELEASE under the
-  new taxonomy (see "## Versioning"): it ships as **1.2** — edit the
-  VERSION file (1.1 → 1.2) in the release's own final commit so the
-  release commit reads "1.2". Scope: a channel-weighted mono conversion
-  for the near-monochrome 720nm "white forest" frames (adjustable weights,
-  or a few named mixes). Basic B&W lands here; toned mono / duotone
-  deliberately arrives with the creative color-grading release below
-  (v2.0). Per-pixel display-space → bakes into .cube like the HSL mixer.
 - [ ] **Display-P3 JPEG export** — core sweep; the recorded target promoted
   2026-07-18 (code ships sRGB today; src/icc.ts writes the profile). Needs P3
   primaries in the embedded ICC AND the pixel encode actually emitting
@@ -2385,6 +2376,58 @@ user-scalable=no.
   read neat on the real iPhone/iPad; the glow + ⇅/✎ badge reads as "still
   tappable"; the glyphs render as text (not emoji) on iOS; mis-tap feel
   between the two chip rows.
+
+- [x] **Black & white for 720nm** — THE FIRST CAPABILITY RELEASE under the
+  identity→capability→increment taxonomy: ships as **1.2** (VERSION bumped
+  1.1 → 1.2 in the release's own final commit, per "## Versioning"). Scope
+  as recorded: channel-weighted mono for the near-monochrome 720nm "white
+  forest" frames; basic B&W only — toned mono / duotone deliberately waits
+  for the creative release (2.0).
+  SHIPPED: a "Black & white — channel mix" block in the IR tab (tab sub now
+  "Channel swap, looks & B&W"): an aria-pressed toggle, five named mixes as
+  ✓-text chips (Even; Luma = Rec.709 ratio; Red/Green/Blue filter), three
+  weight sliders 0..2 and Reset. Weights are NORMALISED — only the ratio
+  matters (an all-zero mix reads black, never NaN). Moving a weight with the
+  mode off turns it ON (the drag must show its effect; the pressed toggle +
+  the photo going mono announce the mode, the toggle is the exit). Pipeline:
+  new `bwOn`/`bwMix` on EditParams, applied per-pixel in DISPLAY space AFTER
+  the HSL mixer, BEFORE global lum — identical math in compileEdit and the
+  shader (u_bwOn/u_bwMix). Deliberate ordering: the mixer's per-band
+  Luminance — and Drag on photo to adjust — shape each colour's grey like a
+  classic B&W mix (readUvPixel calls neutralise bwOn so TAT/pick classify by
+  the pre-B&W colour; pick under B&W routes through readUvPixel instead of
+  the grey drawing buffer). Rides saved looks/slots/links/files/codes
+  (SavedLook + coerceLook clamps mix to [0,2]; legacy payloads coerce to
+  off — old apps just ignore the new keys), session resume, batch, and BAKES
+  into .cube; .dcp can't carry it (Help + section note say so). Built-in
+  looks reset it (a look is the whole creative grade); the B&W IR / Sepia
+  looks keep their existing sat-0 route untouched. Help "Looks &
+  adjustments" gained a paragraph.
+  RIDE-ALONG A11Y FIX (caught by this release's a11y walk): on an ACTIVE
+  look button the unselected norm/R⇄B segment used rgba(7,17,31,…) derived
+  for the dark theme's light accent — 3.82:1 dark, 2.1:1 dawn. Both segments
+  now use --accent-ink (≥4.5:1 both themes); selected vs not stays an
+  INVERSION (filled pill vs outline), the NEVER-CHURN text-state mechanism
+  untouched.
+  VERIFIED headless (Chromium driving the REAL built app on a real practice
+  DNG, + node unit checks on the bundled sources; scratchpad harnesses).
+  FAIL-FIRST proven three ways: planted "frame stays colored with B&W on",
+  "red-only == blue-only", and ".cube stays colored" all flipped to FAIL.
+  22 walk checks: whole frame grey ≤2 LSB (was maxChroma 77 at the probe);
+  red-only vs blue-only steer the grey (167 vs 90); chips set sliders + ✓/
+  aria-pressed; Reset restores colour + mode off; weight drag auto-enables;
+  undo/redo walk the state; slot save→reset→load round-trips; a colour look
+  turns it off; the EXPORTED JPEG through the real busy-dialog Save flow is
+  mono ≤3 LSB (CPU path); mixer Luminance darkens that colour's grey under
+  B&W on the GPU; pick-from-photo under B&W picks the pre-B&W chip; axe
+  clean on the IR section in BOTH themes; 44px targets/labels/aria-pressed;
+  no page or console errors. 11 unit checks: compileEdit grey over 2000
+  random inputs; ratio-only normalisation; ordering (mixer before, lum
+  after); .cube lattice all-grey + mixes differ; look-link round-trip;
+  legacy/hostile coercion. NEEDS THE OWNER'S HANDS (iPad/iPhone): how the
+  five mixes look on real 720nm frames (filter weights are tuned by eye —
+  trivial to retune); the chip row layout in the narrow drawer; the section
+  note's wording; whether B&W belongs in the IR tab where he expects it.
 
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 

@@ -95,6 +95,8 @@ const params: EditParams = {
   sharpen: 0,
   texture: 0,
   hsl: hslDefault(),
+  bwOn: false,
+  bwMix: [1, 1, 1],
   spots: [],
   crop: { ...CROP_DEFAULT },
   straighten: 0,
@@ -385,6 +387,7 @@ function syncToUI() {
   updateToneWidget();
   updateBandLabels();
   updateHslUI();
+  updateBwUI();
   syncLutUI(); // hoisted; reflects params.lut so undo/redo/reset/loads all update the LUT row
 }
 
@@ -462,6 +465,8 @@ function applyLook(name: keyof typeof LOOKS) {
   params.tone = [...TONE_DEFAULT];
   params.lum = 1;
   params.hsl = hslDefault();
+  params.bwOn = false;
+  params.bwMix = [1, 1, 1];
   syncToUI();
   draw();
 }
@@ -554,6 +559,8 @@ function cloneParams(p: EditParams): EditParams {
     sharpen: p.sharpen,
     texture: p.texture,
     hsl: [...(p.hsl ?? hslDefault())],
+    bwOn: !!p.bwOn,
+    bwMix: [...(p.bwMix ?? [1, 1, 1])] as [number, number, number],
     spots: (p.spots ?? []).map((s) => ({ ...s })),
     crop: { ...(p.crop ?? CROP_DEFAULT) },
     straighten: p.straighten ?? 0,
@@ -603,6 +610,8 @@ function applySnapshot(s: Snapshot) {
   params.sharpen = c.sharpen ?? 0;
   params.texture = c.texture ?? 0;
   params.hsl = c.hsl?.length === 24 ? c.hsl : hslDefault();
+  params.bwOn = c.bwOn;
+  params.bwMix = c.bwMix;
   params.spots = c.spots ?? [];
   params.crop = c.crop ?? { ...CROP_DEFAULT };
   params.straighten = c.straighten ?? 0;
@@ -736,6 +745,8 @@ function currentLook(): SavedLook {
     sharpen: params.sharpen,
     texture: params.texture,
     hsl: [...params.hsl],
+    bwOn: params.bwOn,
+    bwMix: [...params.bwMix] as [number, number, number],
   };
 }
 
@@ -830,6 +841,8 @@ function applySavedLook(look: SavedLook, lut: EditParams["lut"] = null) {
   params.sharpen = look.sharpen;
   params.texture = look.texture;
   params.hsl = [...look.hsl];
+  params.bwOn = look.bwOn;
+  params.bwMix = [...look.bwMix] as [number, number, number];
   activeLook = null; // a loaded custom grade isn't one specific built-in look
   clampToneOrder();
   syncToUI();
@@ -1007,7 +1020,7 @@ const PANEL_TABS = ["basic", "ir", "color", "tone", "masks", "corrections", "exp
 type PanelTab = (typeof PANEL_TABS)[number];
 const TAB_META: Record<PanelTab, { name: string; sub: string }> = {
   basic: { name: "Basic", sub: "White balance, exposure & detail" },
-  ir: { name: "IR", sub: "Channel swap & looks" },
+  ir: { name: "IR", sub: "Channel swap, looks & B&W" },
   color: { name: "Color", sub: "Hue, per-color & the mixer" },
   tone: { name: "Tone", sub: "Curve, luminance & bands" },
   masks: { name: "Masks", sub: "Local, area-only adjustments" },
@@ -1163,7 +1176,16 @@ function chipForHue(h: number): number {
 function handleHslPick(clientX: number, clientY: number): boolean {
   if (!hslPickArmed) return false;
   setHslPick(false); // one-shot
-  const px = renderer.readDisplayedPixel(clientX, clientY);
+  // Under B&W the whole display is grey — classify by the colour the mixer
+  // sees instead (the pre-B&W render), so pick keeps choosing the chip that
+  // controls that area's grey level.
+  let px: [number, number, number] | null;
+  if (params.bwOn) {
+    const [uu, vv] = renderer.clientToImageUv(clientX, clientY);
+    px = renderer.readUvPixel({ ...params, bwOn: false }, uu, vv);
+  } else {
+    px = renderer.readDisplayedPixel(clientX, clientY);
+  }
   if (!px) return true;
   const [r, g, b] = px;
   const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
@@ -1177,6 +1199,81 @@ function handleHslPick(clientX: number, clientY: number): boolean {
   return true;
 }
 updateHslUI();
+
+// --- Black & white: channel-weighted mono for the near-mono 720nm frames.
+// A persistent mode (the toggle announces it, and is the obvious exit), five
+// named mixes, and three weight sliders feeding the same per-pixel display-
+// space stage as the mixer — so it rides looks, links and .cube exports.
+// Moving a weight slider with the mode off turns it on: the drag must show
+// its effect, and the pressed toggle + the photo going mono announce it. ---
+const BW_MIXES: { label: string; mix: [number, number, number] }[] = [
+  { label: "Even", mix: [1, 1, 1] },
+  { label: "Luma", mix: [0.59, 2, 0.2] }, // Rec.709 ratio — matches the eye
+  { label: "Red filter", mix: [2, 0.5, 0.15] },
+  { label: "Green filter", mix: [0.5, 2, 0.25] },
+  { label: "Blue filter", mix: [0.2, 0.4, 2] },
+];
+const bwBtn = $("bwBtn") as HTMLButtonElement;
+const bwMixesEl = $("bwMixes") as HTMLDivElement;
+const bwUI = {
+  r: $("bwR") as HTMLInputElement,
+  g: $("bwG") as HTMLInputElement,
+  b: $("bwB") as HTMLInputElement,
+};
+const bwMixBtns: HTMLButtonElement[] = [];
+for (const def of BW_MIXES) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "mix-chip";
+  b.addEventListener("click", () => {
+    params.bwOn = true;
+    params.bwMix = [...def.mix] as [number, number, number];
+    updateBwUI();
+    draw();
+    flushRecord();
+  });
+  bwMixesEl.append(b);
+  bwMixBtns.push(b);
+}
+
+function updateBwUI() {
+  bwBtn.setAttribute("aria-pressed", String(params.bwOn));
+  bwUI.r.value = String(params.bwMix[0]);
+  bwUI.g.value = String(params.bwMix[1]);
+  bwUI.b.value = String(params.bwMix[2]);
+  // Selected mix = aria-pressed + the "✓ " TEXT prefix (ratio-chip pattern) —
+  // never colour alone. No chip matches once the sliders leave a named mix.
+  bwMixBtns.forEach((b, i) => {
+    const def = BW_MIXES[i];
+    const on = params.bwOn && def.mix.every((v, k) => Math.abs(v - params.bwMix[k]) < 0.005);
+    b.textContent = (on ? "✓ " : "") + def.label;
+    b.setAttribute("aria-pressed", String(on));
+  });
+}
+
+function bwWeightInput() {
+  params.bwOn = true; // adjusting a weight means "show me the mono"
+  params.bwMix = [Number(bwUI.r.value), Number(bwUI.g.value), Number(bwUI.b.value)];
+  updateBwUI();
+  draw(); // undo coalesces per drag via recordSoon, like every slider
+}
+bwUI.r.addEventListener("input", bwWeightInput);
+bwUI.g.addEventListener("input", bwWeightInput);
+bwUI.b.addEventListener("input", bwWeightInput);
+bwBtn.addEventListener("click", () => {
+  params.bwOn = !params.bwOn; // weights are kept — the toggle only switches the mode
+  updateBwUI();
+  draw();
+  flushRecord();
+});
+$("bwReset").addEventListener("click", () => {
+  params.bwOn = false;
+  params.bwMix = [1, 1, 1];
+  updateBwUI();
+  draw();
+  flushRecord();
+});
+updateBwUI();
 
 // --- Local masks: radial / linear gradient with a few local adjustments,
 // placed by dragging handles on the photo. Geometry is in image-uv so masks
@@ -1921,7 +2018,11 @@ function startTat(e: PointerEvent) {
   // mixer shifts the underlying hue, so the shifted display colour would point
   // at a different, wrong chip). Near-grey has no hue -> keep the current chip.
   const [uu, vv] = renderer.clientToImageUv(e.clientX, e.clientY);
-  const px = renderer.readUvPixel({ ...params, hsl: hslDefault() }, uu, vv);
+  // B&W is also neutralised: under it every displayed pixel is grey, but the
+  // chips keep controlling each colour's GREY level — so the drag tool stays
+  // the hands-on way to shape a 720nm mono, classifying by the colour the
+  // mixer actually sees.
+  const px = renderer.readUvPixel({ ...params, hsl: hslDefault(), bwOn: false }, uu, vv);
   let chip = hslSel;
   if (px) {
     const [r, g, b] = px;
@@ -3164,6 +3265,8 @@ function establishFreshEdit() {
     sharpen: 0,
     texture: 0,
     hsl: hslDefault(),
+    bwOn: false,
+    bwMix: [1, 1, 1],
     spots: [],
     crop: { ...CROP_DEFAULT },
     straighten: 0,
@@ -4382,6 +4485,7 @@ function neutralLook(): SavedLook {
     swapRB: false, hue: 0, sat: 1, contrast: 1, tint: [1, 1, 1], glow: 0,
     sky: [0, 1, 1], foliage: [0, 1, 1], tone: [...TONE_DEFAULT] as [number, number, number, number, number],
     lum: 1, clarity: 0, dehaze: 0, sharpen: 0, texture: 0, hsl: hslDefault(),
+    bwOn: false, bwMix: [1, 1, 1],
   };
 }
 
@@ -4429,6 +4533,8 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["l
     sharpen: look.sharpen,
     texture: look.texture,
     hsl: [...look.hsl],
+    bwOn: look.bwOn,
+    bwMix: [...look.bwMix] as [number, number, number],
     spots: [], // composition-specific — a batch frame heals nothing
     crop: { ...CROP_DEFAULT }, // composition-specific — a batch frame crops nothing
     straighten: 0,

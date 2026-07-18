@@ -95,6 +95,8 @@ uniform sampler2D u_localTex; // RG8: sqrt-encoded blurred luma (R) + dark chann
 uniform float u_localScale;   // linear decode scale for u_localTex
 uniform bool u_hslOn;        // 8-channel HSL mixer active
 uniform vec3 u_hsl[8];       // per band: (hueShiftDeg, satScale, lumScale)
+uniform bool u_bwOn;         // black & white: channel-weighted mono
+uniform vec3 u_bwMix;        // B&W channel weights (normalised in-shader)
 uniform float u_denoise; // 0..1 bilateral strength (see raw/denoise.ts)
 uniform float u_sharpen; // 0..1 capture sharpening (high-freq) — see raw/detail.ts
 uniform float u_texture; // -1..1 mid-freq local contrast — see raw/detail.ts
@@ -445,6 +447,11 @@ void main() {
     float s2 = pow(clamp(hsv.y, 0.0, 1.0), 1.0 / max(0.05, adj.y));
     g = hsv2rgb(vec3(fract((h + adj.x) / 360.0), s2, min(1.0, hsv.z * adj.z)));
   }
+  // Black & white: channel-weighted mono on the near-final DISPLAY colour
+  // (after the mixer — its per-band luminance shapes the grey — and before
+  // global lum). Weights are normalised, so only their ratio matters.
+  // Identical math to compileEdit in pipeline.ts.
+  if (u_bwOn) g = vec3(dot(g, u_bwMix) / max(1e-4, u_bwMix.r + u_bwMix.g + u_bwMix.b));
   // Global luminance rides on top of the tone curve (endpoints pinned).
   if (u_lum != 1.0) g = pow(clamp(g, 0.0, 1.0), vec3(1.0 / u_lum));
 
@@ -511,7 +518,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -764,6 +771,9 @@ export class Renderer {
     const mixerOn = !hslIsNeutral(p.hsl);
     gl.uniform1i(this.loc.u_hslOn, mixerOn ? 1 : 0);
     if (mixerOn) gl.uniform3fv(this.loc.u_hsl, new Float32Array(p.hsl));
+    gl.uniform1i(this.loc.u_bwOn, p.bwOn ? 1 : 0);
+    const bwMix = p.bwMix ?? [1, 1, 1];
+    gl.uniform3f(this.loc.u_bwMix, bwMix[0], bwMix[1], bwMix[2]);
     gl.uniform1f(this.loc.u_localScale, this.localScale);
     gl.uniform1i(this.loc.u_localTex, 4);
     gl.activeTexture(gl.TEXTURE4);

@@ -65,6 +65,18 @@ export interface EditParams {
    *  (unlike Sky/Foliage). Pure per-pixel colour math -> IS baked into the
    *  .cube LUT. Neutral = hslDefault(). */
   hsl: number[];
+  /** Black & white: channel-weighted mono conversion, made for the
+   *  near-monochrome 720nm "white forest" frames. `bwOn` switches it; `bwMix`
+   *  is the per-channel weight [r,g,b] (each 0..2) choosing how much each
+   *  channel becomes brightness — the weighted sum is NORMALISED, so only the
+   *  ratio matters, not the total. Runs in DISPLAY space on the near-final
+   *  colour (after the HSL mixer, before global lum): the mixer's per-band
+   *  luminance keeps shaping the mono per colour (the classic B&W-mix
+   *  workflow), and Luminance/tone still act on the result. Pure per-pixel
+   *  colour math -> IS baked into the .cube LUT; .dcp cannot carry it (dcp.ts
+   *  doesn't run compileEdit). Neutral = off; [1,1,1] = the "Even" mix. */
+  bwOn: boolean;
+  bwMix: [number, number, number];
   /** Clarity -1..1: local contrast as a RATIO against the per-image blurred-
    *  luma map (LocalMap) — pow(L/Lblur, clarity*0.5), clamped. Ratio-based, so
    *  it is exposure- and WB-invariant. Applied on LINEAR source data before
@@ -593,6 +605,11 @@ export function compileEdit(
   const dz = p.dehaze ?? 0;
   const localOn = local && (cl !== 0 || dz !== 0);
   const mixerOn = !hslIsNeutral(p.hsl);
+  const bwOn = !!p.bwOn;
+  const bwMix = p.bwMix ?? [1, 1, 1];
+  // Normalised weights: only the ratio matters. An all-zero mix divides by the
+  // epsilon and lands at black — honest feedback, never NaN.
+  const bwDen = Math.max(1e-4, bwMix[0] + bwMix[1] + bwMix[2]);
   const lut = p.lut && p.lut.strength > 0 ? p.lut : null;
   const lutTmp = lut ? new Float32Array(3) : null;
 
@@ -762,6 +779,15 @@ export function compileEdit(
       s = Math.pow(Math.min(1, Math.max(0, s)), 1 / Math.max(0.05, ds));
       v = Math.min(1, v * dl);
       [out[0], out[1], out[2]] = hsv2rgb(h, s, v);
+    }
+    // Black & white: channel-weighted mono on the near-final DISPLAY colour
+    // (after the mixer, so its per-band luminance shapes the grey; before
+    // global lum, which then brightens/darkens the mono). Same in the shader.
+    if (bwOn) {
+      const L = (out[0] * bwMix[0] + out[1] * bwMix[1] + out[2] * bwMix[2]) / bwDen;
+      out[0] = L;
+      out[1] = L;
+      out[2] = L;
     }
     // Global luminance — the very last step of the app's own grade, matching
     // the shader's u_lum.
