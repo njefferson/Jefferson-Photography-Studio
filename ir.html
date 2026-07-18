@@ -94,6 +94,12 @@
         <div id="histWrap" hidden aria-label="Live RGB histogram">
           <canvas id="histogram" width="256" height="96" title="Tap to hide — use the Histogram button to bring it back"></canvas>
         </div>
+        <!-- Location-data tip: shows only when the LOADED FILE carries GPS
+             location (src/gps.ts). Tap for ways to save the file without it.
+             Hideable in Settings (ⓘ) — the dialog says so. -->
+        <button id="locTip" type="button" hidden aria-haspopup="dialog">
+          <span aria-hidden="true">&#128752;</span> Location saved
+        </button>
         <div id="tatHud" hidden aria-hidden="true">
           <span id="tatSwatch" class="tat-swatch"></span>
           <span id="tatText"></span>
@@ -611,9 +617,29 @@
         <a id="coffee" class="coffee" target="_blank" rel="noopener" hidden>PayPal</a>
         <a id="venmo" class="coffee" target="_blank" rel="noopener" hidden>Venmo</a>
       </p>
+      <h3 class="rm-head" id="settingsHead">Settings</h3>
       <p class="theme-row"><button id="themeToggle" type="button"></button></p>
+      <div class="set-row">
+        <button id="setLocTip" type="button" class="toggle" aria-pressed="true"><span aria-hidden="true">&#128752;</span> Location tip</button>
+        <small class="note">Shows a tip on the photo when the opened file carries location data (GPS), with one-tap ways to save the file without it.</small>
+      </div>
+      <div class="set-row">
+        <button id="setLocStrip" type="button" class="toggle" aria-pressed="false">Remove location when a photo opens</button>
+        <small class="note">Cleans the app's working copy the moment a photo opens. Your original file keeps its location until you save a clean version from the &#128752; tip.</small>
+      </div>
       <button id="infoClose" type="button">Close</button>
       <div class="dlg-cue down" id="infoCueDown" hidden aria-hidden="true">&#9660;</div>
+    </dialog>
+
+    <dialog id="locDlg" aria-labelledby="locDlgTitle">
+      <h2 id="locDlgTitle"><span aria-hidden="true">&#128752;</span> Location is saved in this photo</h2>
+      <p id="locDlgBody" class="note"></p>
+      <button id="locSave" type="button">Save without location</button>
+      <button id="locSaveCopy" type="button">Save a copy without location</button>
+      <p class="note">Both open the save sheet, so <strong>you choose where it goes</strong>. Your edit here isn't touched, and images exported from the editor never include location.</p>
+      <p class="note">In <strong>Settings</strong> (behind the &#9432; button): hide this tip, or have location removed automatically whenever a photo opens.</p>
+      <button id="locSettings" type="button">Open Settings</button>
+      <button id="locDlgClose" type="button">Close</button>
     </dialog>
 
     <dialog id="helpDlg">
@@ -758,6 +784,7 @@
           <li>Import from <strong>Files</strong>, not the Photo Library — iOS silently converts RAW to JPEG there. A zipped RAW also works.</li>
           <li>Scenes with big empty dark skies take more Contrast; scenes with shadow detail (roads, dark trees) look best gentle.</li>
           <li>720nm-filter shots are near-monochrome by nature — that's what B&amp;W IR, Sepia IR and HIE B&amp;W are for.</li>
+          <li>A <strong>&#128752; Location saved</strong> tip appears when the opened file carries GPS location — tap it to save the file (or a copy) without it. In <strong>Settings</strong> (&#9432;) you can hide the tip or have location removed automatically on open. Exports from the editor never include location.</li>
         </ul>
       </div>
       <button id="helpClose" type="button">Close</button>

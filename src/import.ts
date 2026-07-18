@@ -21,6 +21,12 @@ export interface ImportedFile {
    *  only the embedded preview (see decode.ts) instead of silently passing
    *  the preview off as the raw. */
   rawBrand?: string;
+  /** Location-data guard (set by main.ts guardLocation, from src/gps.ts):
+   *  the file's ORIGINAL bytes carried GPS location. `locationCleaned` means
+   *  the strip-on-open setting wiped the app's working copy — the user's
+   *  original file on disk still carries it (the 🛰 tip says so). */
+  hadLocation?: boolean;
+  locationCleaned?: boolean;
 }
 
 // Third-party camera RAWs the app recognizes but cannot decode as raw sensor
