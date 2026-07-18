@@ -2456,6 +2456,27 @@ user-scalable=no.
   rail's Exit chip now rides OVER the histogram HUD (chips are z-above it
   and stay tappable/legible on the dark glass; histogram hides on tap as
   ever) — fine headless, his call on the real screen.
+  OWNER FEEDBACK, staging round 3 (2026-07-18, "I love the function"):
+  B&W gets ITS OWN PANEL TAB next to IR instead of living under the IR
+  section — and he likes that a 9th tab completes the grid ("a final full
+  menu": the .panel-tabs 3-column grid now fills exactly 3×3, no orphan
+  row). DONE: "bw" added to PANEL_TABS after "ir" (TAB_META "Black &
+  white / Channel-mix mono, made for 720nm"; the IR sub reverts to
+  "Channel swap & looks"); the whole block moved into its own
+  `.section[data-tab="bw"]` with "Named mixes" / "Channel weights"
+  sub-titles (the old in-section header was redundant against the tab's
+  own section header) — SAME control ids, so every handler and harness
+  selector is unchanged; setPanelTab is generic (sections/tabs are
+  DOM-queried), so the tab wired up for free, exactly like the crop-tab
+  precedent. Lesson 7 now opens the B&W tab (step 1 reworded); Lesson 2
+  cross-links "that's Lesson 7"; Help says "its own B&W tab". The saved-
+  tab localStorage accepts "bw" with no migration (unknown values already
+  fall back to Basic). VERIFIED headless: bw-walk 23/23 + lesson-walk
+  15/15 re-run green against the tabbed build (both walks now also assert
+  the full 3×3 = 9 tabs; axe covers the IR AND B&W sections, both
+  themes). NEEDS THE OWNER'S HANDS: the 3×3 tab-grid density on the
+  iPhone, and whether "B&W" is the label he wants on the tab
+  (alternatives easy: "Mono", or "Black & white" if it fits the cell).
 
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 

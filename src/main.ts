@@ -1016,11 +1016,12 @@ $("toneReset").addEventListener("click", () => {
 
 // --- Sectioned tab panel: segmented tabs, one section of controls each.
 // The active tab is remembered per session so reopening lands where you left.
-const PANEL_TABS = ["basic", "ir", "color", "tone", "masks", "corrections", "export", "crop"] as const;
+const PANEL_TABS = ["basic", "ir", "bw", "color", "tone", "masks", "corrections", "export", "crop"] as const;
 type PanelTab = (typeof PANEL_TABS)[number];
 const TAB_META: Record<PanelTab, { name: string; sub: string }> = {
   basic: { name: "Basic", sub: "White balance, exposure & detail" },
-  ir: { name: "IR", sub: "Channel swap, looks & B&W" },
+  ir: { name: "IR", sub: "Channel swap & looks" },
+  bw: { name: "Black & white", sub: "Channel-mix mono, made for 720nm" },
   color: { name: "Color", sub: "Hue, per-color & the mixer" },
   tone: { name: "Tone", sub: "Curve, luminance & bands" },
   masks: { name: "Masks", sub: "Local, area-only adjustments" },
@@ -4080,7 +4081,7 @@ const LESSONS: { title: string; tab: PanelTab; steps: string[] }[] = [
     steps: [
       "The R⇄B channel swap flips the whole color world in one tap — the classic infrared move.",
       "Try the film Looks — Aerochrome, Aero Red, Goldie. Press a look twice to flip its built-in swap.",
-      "B&W IR and HIE B&W give the classic black-and-white infrared feel.",
+      "B&W IR and HIE B&W give the classic black-and-white infrared feel — and the B&W tab goes further, with a full channel mix (that's Lesson 7).",
     ],
   },
   {
@@ -4129,9 +4130,9 @@ const LESSONS: { title: string; tab: PanelTab; steps: string[] }[] = [
     // Frosted treetops) — near-mono frames where the channel weights really
     // steer the tones, the way a 720nm filter shoots.
     title: "Lesson 7 · Black & white — the 720nm mono",
-    tab: "ir",
+    tab: "bw",
     steps: [
-      "Switch on Black & white (bottom of the IR tab). Frames like this carry almost no color — a channel mix gives a real mono conversion with control over the tones, not just zero saturation.",
+      "Switch on Black & white (its own B&W tab). Frames like this carry almost no color — a channel mix gives a real mono conversion with control over the tones, not just zero saturation.",
       "Try the named mixes — Even, Luma, Red / Green / Blue filter — then drag the Red / Green / Blue weights yourself. Only their balance matters: watch the sky and the frosted trees trade brightness.",
       "Shape tones per color: in the Color tab, turn on Drag on photo to adjust, then pull down on the sky — just that color's grey darkens, like a classic B&W mix.",
       "Your mix rides saved looks and bakes into exported .cube LUTs, so the mono travels with the grade.",
