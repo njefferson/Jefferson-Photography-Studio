@@ -1723,7 +1723,12 @@ label.open-btn, label.bar-btn {
   color: var(--txt-3);
   background: transparent;
 }
-.looks-grid button.active .seg { border-color: rgba(7, 17, 31, 0.35); color: rgba(7, 17, 31, 0.65); }
+/* On the accent fill both segments use --accent-ink so the 8px text stays
+   ≥4.5:1 in BOTH themes (the old rgba(7,17,31,…) was derived for the dark
+   theme's light accent and fell to 2.1:1 in dawn — caught by the B&W-release
+   a11y walk). Selected vs not stays an INVERSION (filled pill vs outline),
+   never contrast-dimming. */
+.looks-grid button.active .seg { border-color: var(--accent-ink); color: var(--accent-ink); }
 .looks-grid button.active .seg.on { background: var(--accent-ink); color: var(--accent); border-color: var(--accent-ink); font-weight: 600; }
 
 .band-title {
