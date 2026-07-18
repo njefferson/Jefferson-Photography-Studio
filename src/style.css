@@ -1069,23 +1069,9 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   color: var(--txt-3);
 }
 .lib-group:first-child { margin-top: 4px; }
-/* The way into the library. width:auto guards against the global button
-   width:100% rule (the chip-rail lesson). */
-.library-link {
-  display: block;
-  width: auto;
-  flex: 0 0 auto;
-  margin: 14px auto 0;
-  padding: 10px 16px; /* >=36px tall — the repo's tap floor */
-  background: none;
-  border: 1px dashed var(--line);
-  border-radius: 999px;
-  color: var(--txt);
-  opacity: 0.85;
-  font-size: 13px;
-  cursor: pointer;
-}
-.library-link:active { border-color: var(--accent); }
+/* The way into the library is the tutorial grid's LAST tile (.gal-library,
+   styled with the gallery below) — the dashed pill it replaced was
+   "completely missable" (owner verdict 2026-07-15). */
 .ql-head {
   display: flex;
   align-items: center;
@@ -1303,6 +1289,26 @@ label.open-btn, label.bar-btn {
 .gal img { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; display: block; }
 .gal span { display: block; padding: 6px 8px; font-size: 12px; color: var(--txt); line-height: 1.3; }
 .gal:active { border-color: var(--accent); }
+/* The Learning library tile — the grid's LAST tile, reading as several photo
+   prints stacked behind one another (three real library-only thumbs). Same
+   .gal chrome so it sizes exactly like every other tile; the print-white
+   edges + drop shadows carry the "stack" in both themes and in grayscale. */
+.gal-stack { position: relative; aspect-ratio: 3 / 2; }
+.gal-stack img {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 72%;
+  height: auto;
+  aspect-ratio: 3 / 2;
+  border-radius: 5px;
+  border: 2px solid rgba(255, 255, 255, 0.92); /* print edge, theme-invariant over the thumbs */
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+}
+.gal-stack img:nth-child(1) { transform: translate(-50%, -50%) rotate(-8deg) translate(-9%, 2%); }
+.gal-stack img:nth-child(2) { transform: translate(-50%, -50%) rotate(7deg) translate(9%, -2%); }
+.gal-stack img:nth-child(3) { transform: translate(-50%, -50%) rotate(-1.5deg) scale(1.06); }
+.gal-library small { font-size: 11px; color: var(--txt-3); }
 
 /* Learn mode: numbered lesson chips pinned on the photo. */
 .lesson-chips {

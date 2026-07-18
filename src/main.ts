@@ -4255,7 +4255,6 @@ const LIBRARY_GROUPS: [string, string[]][] = [
 ];
 const library = $("library") as HTMLDivElement;
 {
-  const openBtn = $("libraryOpen") as HTMLButtonElement;
   const body = $("libBody") as HTMLDivElement;
   const used = new Set<string>();
   const sections: [string, GalleryTile[]][] = [];
@@ -4281,9 +4280,43 @@ const library = $("library") as HTMLDivElement;
   }
   ($("libCount") as HTMLSpanElement).textContent =
     `${GALLERY.length} photos · ${GALLERY.filter((t) => t.kind === "dng").length} RAW`;
-  openBtn.textContent = `Browse the full practice library · ${GALLERY.length} photos →`;
-  openBtn.addEventListener("click", () => { library.hidden = false; });
   ($("libClose") as HTMLButtonElement).addEventListener("click", () => { library.hidden = true; });
+
+  // THE WAY IN: a "Learning library" tile as the tutorial grid's LAST tile —
+  // the owner's design (2026-07-15; the old dashed pill under the grid was
+  // "completely missable"). It reads as several photos stacked behind one
+  // another: three REAL thumbs of library-only frames (honest — they are in
+  // there), fanned like prints, with the label + photo count where every
+  // other tile shows its label. One way in — the pill is gone.
+  const tile = document.createElement("button");
+  tile.type = "button";
+  tile.className = "gal gal-library";
+  tile.setAttribute("aria-haspopup", "dialog");
+  tile.setAttribute("aria-label", `Learning library — browse all ${GALLERY.length} practice photos`);
+  const stack = document.createElement("div");
+  stack.className = "gal-stack";
+  stack.setAttribute("aria-hidden", "true");
+  // Library-only frames (none is a tutorial tile), visually distinct scenes.
+  // DOM order is back->front: the classic white-forest frame fronts the stack
+  // (it's what most of the library looks like); the magenta full-spectrum
+  // frame peeks from the back as the variety hint.
+  for (const k of ["magenta-hilltown", "NIR_1825", "NIR_1811"]) {
+    const t = GALLERY.find((x) => baseKey(x.key) === k);
+    if (!t) continue;
+    const im = document.createElement("img");
+    im.src = t.thumb;
+    im.alt = "";
+    im.loading = "lazy";
+    stack.append(im);
+  }
+  const label = document.createElement("span");
+  label.append("Learning library");
+  const count = document.createElement("small");
+  count.textContent = ` · ${GALLERY.length} photos`;
+  label.append(count);
+  tile.append(stack, label);
+  tile.addEventListener("click", () => { library.hidden = false; });
+  galleryList.appendChild(tile);
 }
 
 // The start screen SAYS it scrolls (the button-row lesson): a chevron cue at
