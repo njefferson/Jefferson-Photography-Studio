@@ -340,6 +340,27 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 .look-recv-slot { text-align: left; }
 .look-import-row { display: flex; gap: 8px; margin-top: 8px; }
 .look-import-row button { flex: 1; margin: 0; }
+/* Imported .cube LUTs (Profiles & LUTs panel). The badge is TEXT — never a
+   colour-only cue. */
+.lut-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  font: 600 10px/1.4 var(--mono);
+  letter-spacing: 0.06em;
+  color: var(--txt-2);
+}
+.lut-active { margin: 8px 0 4px; padding: 10px 12px; border: 1px solid var(--line-2); border-radius: 10px; }
+.lut-active-name { font: 500 13px/1.3 var(--ui); color: var(--txt); margin-bottom: 4px; }
+.lut-strength-row { display: flex; align-items: center; gap: 8px; }
+.lut-strength-row input[type="range"] { flex: 1; min-width: 0; }
+.lut-strength-row span { font: 500 11px/1 var(--mono); color: var(--txt-2); min-width: 38px; text-align: right; }
+.lut-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.lut-row { display: flex; align-items: center; gap: 6px; }
+.lut-row-name { flex: 1; min-width: 0; font-size: 12.5px; color: var(--txt-2); overflow-wrap: anywhere; }
+.lut-row button { width: auto; padding: 6px 10px; font-size: 12.5px; margin: 0; position: relative; }
+.lut-row button::before { content: ""; position: absolute; inset: -6px; } /* 44px hit extension */
 /* The per-slot ⋯ button: compact like its Save/Load siblings, with the house
    invisible hit-area extension to the 44px minimum. */
 .slot-more { position: relative; min-width: 40px; }

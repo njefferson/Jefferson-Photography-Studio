@@ -391,6 +391,20 @@
             <label class="check-row"><input id="profWB" type="checkbox" /> Bake current white balance in</label>
             <button id="cubeBtn" type="button">Export .cube (Photoshop / video)</button>
             <button id="dcpBtn" type="button">Export .dcp (Lightroom &mdash; beta)</button>
+            <hr class="divider" />
+            <div class="sub-title">Imported LUTs <span>.cube, applied after your grade</span></div>
+            <button id="lutImportBtn" type="button">Import .cube LUT&hellip;</button>
+            <input id="lutFile" type="file" accept=".cube,text/plain" hidden />
+            <div id="lutActive" class="lut-active" hidden>
+              <div class="lut-active-name"><span class="lut-badge">LUT</span> <span id="lutActiveName"></span></div>
+              <label class="lut-strength-row">Strength
+                <input id="lutStrength" type="range" min="0" max="1" step="0.01" value="1" />
+                <span id="lutStrengthVal">100%</span>
+              </label>
+              <button id="lutRemoveBtn" type="button">Remove LUT</button>
+            </div>
+            <div id="lutList" class="lut-list"></div>
+            <small class="note">A LUT recolours the finished image on top of everything above &mdash; in the preview and every export alike. An exported <strong>.cube</strong> includes it baked in; <strong>.dcp</strong> can't carry it. LUTs are stored on this device (sizes shown) &mdash; delete any time. Links and look codes can't carry a LUT; share its .cube file instead.</small>
           </section>
 
           <!-- ===== CROP & ROTATE ===== -->
@@ -502,6 +516,8 @@
         <input id="lookName" type="text" maxlength="60" autocomplete="off" placeholder="e.g. Dusk Aerochrome" />
       </label>
       <p id="lookNameHint" class="note look-hint" role="status" hidden>Add a name so your friend knows what it is &mdash; or tap share again to send it unnamed.</p>
+      <p id="lookLutNote" class="note look-hint" hidden>This look uses an imported LUT. Links, files and codes carry the grade only &mdash; the LUT travels as its own .cube file. Share both.</p>
+      <button id="lookLutShare" type="button" hidden>Share LUT .cube file</button>
       <button id="lookShareLink" type="button" class="primary">Share link</button>
       <button id="lookShareFile" type="button">Share as file (.ipslook)</button>
       <button id="lookCopyCode" type="button">Copy look code</button>
@@ -564,7 +580,8 @@
           <li><strong>Open image(s)</strong> (or pick a practice photo). RAW — NEF or DNG — unlocks the full color range.
           Pick several and they become a <strong>session</strong>: a strip of previews along the bottom, tap to switch,
           each photo keeping its own edit — held safely, so a closed tab offers to <em>Resume</em> right where you were
-          (masks are the one thing a resume can't restore — they reset with a fresh open).
+          (masks and imported LUTs are the two things a resume can't restore — they reset with a fresh open;
+          re-apply a LUT in a tap from Profiles &amp; LUTs).
           <strong>Done</strong> (on the strip) ends the session and frees the space.</li>
           <li><strong>Quick look a folder</strong> (start screen) when you just want to <em>see</em> what's in a set:
           an instant grid of auto-balanced previews, nothing saved. Tap the keepers and <strong>Keep in a session</strong>
@@ -623,9 +640,12 @@
           <li><strong>Crop &amp; rotate</strong> (panel tab) — three one-tap tools, each with its own <em>Done</em>: <strong>Rotate 90&deg;</strong> turns the whole photo; <strong>Crop</strong> shows the box with a rule-of-thirds grid — drag a corner to resize, drag the photo to slide it under the box; <strong>Straighten</strong> adds a fine alignment grid and a degree slider — line a horizon up against the grid (the crop auto-shrinks so no empty corner shows). Pinch to zoom the view while either tool is open. A view onto the photo, not a re-bake — masks and healed spots stay exactly where they are underneath. Composition-specific: never rides in saved looks, profiles or a batch.</li>
         </ul>
 
-        <h3>Profiles</h3>
-        <p><strong>.cube</strong> bakes your color look for Photoshop/video apps. <strong>.dcp</strong> is a
-        Lightroom camera profile (beta). Denoise, glow, sharpen, texture, clarity, dehaze, masks and heals are spatial effects and can't ride along in profiles.</p>
+        <h3>Profiles &amp; LUTs</h3>
+        <p><strong>.cube</strong> bakes your color look for Photoshop/video apps &mdash; including any imported LUT,
+        so the file is your full on-screen look. You can also <strong>import</strong> any .cube LUT and blend it over
+        your grade with a strength slider; a saved look remembers its LUT, and it rides into Batch process too.
+        <strong>.dcp</strong> is a Lightroom camera profile (beta) &mdash; it can't carry imported LUTs (it's a camera
+        profile, not a look file). Denoise, glow, sharpen, texture, clarity, dehaze, masks and heals are spatial effects and can't ride along in profiles.</p>
 
         <h3>Works with</h3>
         <p>JPEG/PNG from any camera &middot; HEIC (in Safari) &middot; RAW from any Bayer-sensor camera converted to DNG

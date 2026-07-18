@@ -259,19 +259,6 @@ user-scalable=no.
   UV-displacement-field sketch lives in "Future / bigger bets" below; spatial
   → never in looks/batch/LUTs; one stroke = one undo. The biggest single item
   in the release.
-- [ ] **Import .cube LUTs as looks** — look-sharing release 2 (owner go
-  2026-07-18, with the look-sharing scope): apply any third-party .cube LUT
-  (the free LUT universe) inside the app. Plan: `src/cubeimport.ts` parses
-  LUT_3D_SIZE/DOMAIN/N³ floats → Float32Array (N ≤ 65, file ≤ ~8 MB); a NEW
-  final display-space stage — WebGL2 3D texture sampled after the creative
-  grade so LUTs stack on the IR channel work — with the CPU export mirroring
-  the exact trilinear arithmetic (GPU==CPU parity is the release's
-  verification centerpiece; texel-centre addressing, the brush-mask
-  half-texel lesson). Storage: IndexedDB `ips-luts` store (~430 KB per LUT —
-  unfit for localStorage slots or #look links); a slot may carry a LUT ref;
-  rows show a text "LUT" badge. Shared as the original .cube file via
-  saveBlob (round-trips once this ships); excluded from links/codes with an
-  honest disabled state.
 - [ ] **Looks that travel inside the JPEG + QR share** — look-sharing release
   3 (owner go 2026-07-18): embed the look payload as an `IPSLOOK\0` APP11
   segment at JPEG export using icc.ts's APP2 splicing precedent (coordinate
@@ -2141,6 +2128,81 @@ user-scalable=no.
   "Import look file…" / "Paste look code…" buttons live in the Export panel,
   which needs a photo open — with NO photo open, a look still arrives via
   link or via Open image(s) picking the .ipslook.
+- [x] **Import .cube LUTs as looks** — look-sharing release 2 (owner go
+  2026-07-18 with the full channel scope; "Continue with the next release"
+  same day). SHIPPED same day (cache ips-v75 → ips-v76): import any .cube 3D
+  LUT — the free film/cinema LUT universe — and it applies as the LAST colour
+  stage on the final display colour, stacking on top of the whole IR grade,
+  with a 0–100% Strength slider.
+  ARCHITECTURE (the decisions that must not be re-litigated):
+  • ONE trilinear formula, three homes: `src/lut3d.ts` sampleLut3d (CPU) is
+    mirrored VERBATIM as GLSL in gl.ts (manual 8-tap texelFetch trilinear on
+    a NEAREST 3D texture, unit 5) — manual on purpose: WebGL2 won't linearly
+    filter 32F textures, and integer texelFetch sidesteps texel-centre
+    ambiguity entirely, so GPU and CPU run the same arithmetic on the same
+    lattice. Data padded RGB→RGBA32F at upload (RGB32F is driver-fragile);
+    re-upload gated on the LUT id in bindPipeline, so strength drags are a
+    uniform change only, and the histogram/pick offscreen passes get the LUT
+    free (shared bindPipeline).
+  • CPU hook at the very END of compileEdit's closure (pipeline.ts) — one
+    hook covers single export, batch, AND the .cube EXPORT BAKE: an exported
+    .cube now includes the imported LUT composed onto the grade (generateCube
+    drives the same closure; proven by the before/after lattice check). .dcp
+    can't carry it (different model, dcp.ts skips compileEdit) — Help says so.
+  • Parser `src/cubeimport.ts`: TITLE/LUT_3D_SIZE (2..65)/DOMAIN_MIN/MAX,
+    comments/CRLF/vendor keys tolerated, strict float rows, N³ exactly, every
+    reject a user-facing sentence; 1D LUTs rejected honestly; ≤8 MB. Values
+    CLAMPED [0,1] at parse (the 16-bit TIFF path would WRAP on >1); non-unit
+    DOMAINs resolved at parse time by resampling onto [0,1]³ (one formula
+    everywhere, no domain uniforms; log/HDR domains can't be honoured by a
+    display-referred pipeline anyway — clamped resample is the honest best
+    effort).
+  • Lifecycle: EditParams gained runtime-only `lut` ({id,name,size,data,
+    strength}) riding like mask bitmaps. cloneParams clones the WRAPPER,
+    shares the immutable lattice by reference; snapSig's replacer now skips
+    Float32Array `data` too (else every undo check stringifies 274k floats —
+    hazard caught at design time); applySnapshot reads s.params.lut DIRECTLY
+    with an instanceof guard (the {...params,...s.params} spread would let a
+    pre-LUT snapshot silently inherit the live LUT — second design-time
+    hazard); editToJson strips it (durable resume drops the LUT, honestly —
+    Help updated); fresh photo open PERSISTS it (creative grade, like
+    sat/hue); import/apply/remove/slot-load are each ONE atomic undo step.
+  • Storage: `src/luts.ts`, IDB `ips-luts`, SINGLE-ROW per LUT on purpose
+    (LUTs are a cache of re-importable files — a lost row costs one
+    re-import; batchstore's chunking exists for irreplaceable batch frames).
+    Original file bytes stored alongside the lattice so Share re-sends the
+    EXACT file (round-trips through our own importer). Cap 25 with an honest
+    at-cap message; the panel list shows name · N³ · MB with Apply / Share /
+    Delete — the storage-honesty control.
+  • Slots/share/batch: a slot carries {lutId, lutStrength} OUTSIDE the
+    SavedLook wire fields (links/files/codes still carry the grade only — the
+    share dialog says so and offers "Share LUT .cube file" beside it); slot
+    rows + batch chooser show a TEXT "LUT" badge; loadSlot resolves the ref
+    from IDB before the atomic apply and degrades honestly when the LUT was
+    deleted; batch resolves the ref ONCE at start and the summary notes a
+    missing LUT.
+  VERIFIED headless 62 checks green + 2 fail-first proofs: parser fixtures
+  24/24 (asymmetric 2×2×2 axis-order proof, DOMAIN resample, identity 33³,
+  CRLF/vendor-key file, 13 hostile inputs all honestly rejected; FAIL-FIRST:
+  planted blue-fastest indexing flipped the asymmetric fixture); CPU parity
+  3/3 (compileEdit tail == reference mix EXACTLY at strengths 1/0.5/0.15;
+  FAIL-FIRST: planted strength-ignore flipped 0.5 and 0.15); browser 35/35
+  (Chromium, real built app): GPU within 2 LSB of the reference math at
+  strength 1.0 AND 0.5 over a non-trivial grade + channel-coupled 17³
+  sinusoid LUT; identity LUT ≤1 LSB; strength 0 BITWISE == no-LUT; exported
+  .cube before/after satisfies after(node)==LUT(before(node)) ≤2e-3; full UI
+  walk (import → strength → remove restores bitwise → undo/redo → slot badge
+  + lutId JSON → LUT re-binds from IDB on load, one undo reverses the whole
+  load → share dialog note + shared bytes EQUAL the original file → batch
+  chooser badge → device list sizes → delete → honestly degraded load);
+  hostile .cube files through the real input alert honestly, bind nothing,
+  store nothing; a 2-photo session resume after reload does NOT silently
+  re-activate the LUT; axe clean on the new panel block in BOTH themes; R1
+  look-sharing harness re-run 44/44 (no regression). NEEDS THE OWNER'S HANDS
+  on the real iPad: importing a .cube from Files/iCloud, the strength slider
+  feel, a real downloaded LUT's look on the true display, IDB persistence
+  across real launches, and Batch-with-LUT output on a real set (the
+  resolution path is headless-proven; a full batch zip diff was not run).
 
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 
@@ -2408,8 +2470,9 @@ greenlit these, they're here so they aren't lost):
   shooters can swap looks with no account and no server (.cube exports don't
   round-trip back into the editor). Fits free/on-device/no-account exactly —
   community without infrastructure. OWNER GO + SHIPPED 2026-07-18 as **Share
-  your look — links, files and codes** (see the shipped record); releases 2
-  (.cube import) and 3 (JPEG-embedded recipes + QR) are queued.
+  your look — links, files and codes** (see the shipped record); release 2
+  (**Import .cube LUTs as looks**) SHIPPED same day (see its record);
+  release 3 (JPEG-embedded recipes + QR) remains queued.
 - **Durable edits across reloads** — sessions admit masks reset on reload and
   lone opens have zero crash safety (findings ledger); persisting the full
   edit recipe is the "come back tomorrow" gap between an editor and a daily

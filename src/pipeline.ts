@@ -3,6 +3,7 @@
 // Order: white balance -> channel swap -> hue -> saturation -> contrast -> gamma.
 
 import type { HealSpot } from "./heal";
+import { sampleLut3d } from "./lut3d";
 export type { HealSpot };
 
 export interface EditParams {
@@ -99,6 +100,17 @@ export interface EditParams {
    *  applied BEFORE crop (crop lives in the resulting straightened frame —
    *  see autoInscribedCrop). Same composition-specific exclusions as crop. */
   straighten: number;
+  /** Imported .cube 3D LUT — the LAST colour stage, applied to the final
+   *  display colour (after tone/HSL/lum), mirroring the shader's u_lutTex.
+   *  RUNTIME-ONLY like masks' bitmaps: `data` is stride-3 RGB, red fastest,
+   *  unit domain, values clamped [0,1], IMMUTABLE once imported (snapshots
+   *  share it by reference; the wrapper object is what gets cloned). Stripped
+   *  at every serialization boundary (editToJson; slots store only a
+   *  {lutId, lutStrength} ref); rides params -> exportImage -> compileEdit
+   *  with no signature changes, and therefore BAKES into the exported .cube
+   *  (lut.ts drives this same closure) — deliberate. dcp.ts does not use
+   *  compileEdit, so .dcp can NOT carry it (Help says so). */
+  lut?: { id: string; name: string; size: number; data: Float32Array; strength: number } | null;
 }
 
 export interface CropRect {
@@ -581,6 +593,8 @@ export function compileEdit(
   const dz = p.dehaze ?? 0;
   const localOn = local && (cl !== 0 || dz !== 0);
   const mixerOn = !hslIsNeutral(p.hsl);
+  const lut = p.lut && p.lut.strength > 0 ? p.lut : null;
+  const lutTmp = lut ? new Float32Array(3) : null;
 
   return (r, g, b, out, glow = 0, u, v) => {
     // Clarity/dehaze act on LINEAR source data before exposure/WB, using the
@@ -749,11 +763,21 @@ export function compileEdit(
       v = Math.min(1, v * dl);
       [out[0], out[1], out[2]] = hsv2rgb(h, s, v);
     }
-    // Global luminance — the very last step, matching the shader's u_lum.
+    // Global luminance — the very last step of the app's own grade, matching
+    // the shader's u_lum.
     if (lumExp) {
       out[0] = Math.pow(out[0], lumExp);
       out[1] = Math.pow(out[1], lumExp);
       out[2] = Math.pow(out[2], lumExp);
+    }
+    // Imported .cube LUT — the LAST colour stage, on the final display
+    // colour (mirrors the shader's u_lutTex block; math in lut3d.ts).
+    if (lut && lutTmp) {
+      sampleLut3d(lut.data, lut.size, out[0], out[1], out[2], lutTmp);
+      const s = lut.strength;
+      out[0] += (lutTmp[0] - out[0]) * s;
+      out[1] += (lutTmp[1] - out[1]) * s;
+      out[2] += (lutTmp[2] - out[2]) * s;
     }
   };
 }
