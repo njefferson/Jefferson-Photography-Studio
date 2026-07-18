@@ -3,10 +3,14 @@
 // Navigations are network-first (so a new deploy is picked up as soon as you're
 // online), falling back to cache when offline. Hashed build assets are
 // cache-first (their names change every build, so this is safe and fast).
-// Bumping CACHE wipes old entries on activation — but the new cache is fully
+// A new CACHE name wipes old entries on activation — but the new cache is fully
 // PRECACHED at install first (see below), so a fresh release works offline
 // immediately instead of blacking out until the next online visit.
-const CACHE = "ips-v80";
+// The name is STAMPED AT BUILD TIME with the app's real version (vite.config.ts
+// replaces the placeholder below) — it is not a version of its own and is never
+// edited by hand. Every deploy is a new commit, so every deploy gets a fresh
+// cache automatically. (Hand-numbered ips-v1…ips-v80 are pre-stamp history.)
+const CACHE = "ips-" + "__BUILD_VERSION__";
 // The whole app shell (HTML entries, hashed JS/CSS, fonts, icons, manifests) —
 // injected at build time by the precache-manifest plugin (vite.config.ts) into
 // the dist copy of this file. Empty in source so dev and direct reads stay

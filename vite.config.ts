@@ -230,11 +230,16 @@ function precacheManifest(): Plugin {
       if (shell.includes("./index.html")) shell.unshift("./");
       const list = JSON.stringify([...new Set(shell)]);
       const sw = readFileSync(swPath, "utf8");
-      const out = sw.replace("[/* __PRECACHE_MANIFEST__ */]", list);
+      let out = sw.replace("[/* __PRECACHE_MANIFEST__ */]", list);
       // Fail the build loudly — a shipped-but-unpopulated SW would silently
       // reintroduce the offline blackout this plugin exists to prevent.
       if (out === sw) throw new Error("precache-manifest: placeholder not found in dist/sw.js");
-      writeFileSync(swPath, out);
+      // Stamp the cache name with the app's real version. Every deploy is a
+      // commit, so every deploy gets a fresh cache with no hand-numbered
+      // pseudo-version to bump (or forget).
+      const stamped = out.replace('"ips-" + "__BUILD_VERSION__"', JSON.stringify("ips-" + appVersion()));
+      if (stamped === out) throw new Error("precache-manifest: cache-stamp placeholder not found in dist/sw.js");
+      writeFileSync(swPath, stamped);
     },
   };
 }
