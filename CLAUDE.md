@@ -30,8 +30,14 @@ settled design decisions, and measured gotchas that must not be re-learned.
   (owner rule, 2026-07-18; ips-v1…v80 were the hand-numbered past). The only
   cache still versioned by hand is `EXAMPLES` in sw.js, and only if a practice
   RAW's bytes ever change under the same name.
-- Versioning: the `VERSION` file declares the base; point releases are
-  automatic from commit counts. No git tags — the remote refuses tag pushes.
+- Versioning is **identity → capability → increment** (owner rule,
+  2026-07-18): the major moves only on an owner-declared identity change
+  (the Creative release ships as 2.0); the middle number bumps with EVERY
+  capability release — edit the `VERSION` file in that release's own final
+  commit, so the release commit reads as the new base; the automatic
+  commit-count digit is for increments only (fixes/QoL — features are never
+  increments). No git tags — the remote refuses tag pushes. Full detail in
+  NOTES.md "## Versioning".
 
 ## Commit messages are the product
 Commit subjects/bodies are the in-app patch notes, read by end users from the
