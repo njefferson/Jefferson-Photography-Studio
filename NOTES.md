@@ -2428,6 +2428,34 @@ user-scalable=no.
   five mixes look on real 720nm frames (filter weights are tuned by eye —
   trivial to retune); the chip row layout in the narrow drawer; the section
   note's wording; whether B&W belongs in the IR tab where he expects it.
+  TUTORIAL FOLLOW-UP (same release, staging round 2): **Lesson 7 · Black &
+  white — the 720nm mono** (tab "ir", four steps: the switch + why a channel
+  mix beats zero saturation; named mixes then weights; per-colour grey via
+  Drag-on-photo; rides looks + .cube). The frosted "white forest" pair —
+  Frosted pine (NIR_1717) and Frosted treetops (NIR_1644), the closest
+  frames in the set to a true 720nm near-mono — are its home tiles: tagged
+  lesson 6 (opens on the B&W lesson) and PROMOTED into the tutorial-grid
+  CORE set (now 15 tiles: seven lesson pairs in lesson order + the two
+  variety picks). Library groups untouched (both frames stay in "Lakeside
+  forest"; "More" stays empty). The rail/chips/home-lesson plumbing is
+  fully generic — no lesson-count constants existed. RIDE-ALONG A11Y FIX
+  (caught by this harness): #lessonTitle was an h3 while the only heading
+  before it in DOM order is the sr-only h1 — a genuine h1→h3 skip (axe
+  heading-order), latent since the lesson card shipped; now an h2, same
+  size via CSS (the #library h4 jump remains queued in the accessible-
+  overlays roadmap item). VERIFIED headless (lesson-walk harness,
+  fail-first proven — planted "still 6 chips" flipped): 7 numbered chips +
+  Exit; both tiles in the grid; opening Frosted pine (real fetch + CFA
+  decode) lands on the Lesson 7 card with the IR tab active and the B&W
+  block reachable; chip toggle collapses/reopens; the lesson is honest on
+  its own frame (B&W → grey ≤2 LSB); library "More" absent; axe clean on
+  the rail + card over the photo in both themes; no page errors; bw-walk
+  22/22 re-run green after the change. NEEDS THE OWNER'S HANDS: the
+  lesson's wording, the frame pair choice, the rail wrapping to two rows
+  with an 8th chip on the iPhone — and at desktop widths the wrapped
+  rail's Exit chip now rides OVER the histogram HUD (chips are z-above it
+  and stay tappable/legible on the dark glass; histogram hides on tap as
+  ever) — fine headless, his call on the real screen.
 
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 

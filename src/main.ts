@@ -4019,10 +4019,11 @@ const GALLERY: GalleryTile[] = [
   galNef("NIR_1817", "Bare snag"),
   // Fourth wave (2026-07-14): Swirling sky's RAW replaces its JPEG tile, and
   // Lake & contrails' tile is now the RAW of a neighbouring frame (NIR_1722,
-  // same scene — the NIR_1721 JPEG was retired). The rest are free practice.
+  // same scene — the NIR_1721 JPEG was retired). The rest are free practice
+  // (Frosted pine promoted to the B&W lesson with the 1.2 release).
   galNef("NIR_1716", "Swirling sky", 2),
   galNef("NIR_1722", "Lake & contrails", 2),
-  galNef("NIR_1717", "Frosted pine"),
+  galNef("NIR_1717", "Frosted pine", 6),
   galNef("NIR_1718", "Under swirling clouds"),
   galNef("NIR_1703", "Spire & streaks"),
   galNef("NIR_1720", "Sunlit shore"),
@@ -4031,9 +4032,10 @@ const GALLERY: GalleryTile[] = [
   galNef("NIR_1710", "Cove forest"),
   // Fifth wave (2026-07-14): Framed by trees' tile is now the RAW of a
   // neighbouring frame (NIR_1667, same scene — the NIR_1665 JPEG was
-  // retired). The rest are free practice.
+  // retired). The rest are free practice (Frosted treetops promoted to the
+  // B&W lesson with the 1.2 release).
   galNef("NIR_1667", "Framed by trees"),
-  galNef("NIR_1644", "Frosted treetops"),
+  galNef("NIR_1644", "Frosted treetops", 6),
   galNef("NIR_1651", "Sunlit crown"),
   galNef("NIR_1661", "Sunlit pines"),
   galNef("NIR_1662", "Fir & pine"),
@@ -4122,6 +4124,19 @@ const LESSONS: { title: string; tab: PanelTab; steps: string[] }[] = [
       "Heals belong to this photo and ride into every export — they never sneak into saved looks or batch runs.",
     ],
   },
+  {
+    // Best practiced on the frosted "white forest" pair (Frosted pine,
+    // Frosted treetops) — near-mono frames where the channel weights really
+    // steer the tones, the way a 720nm filter shoots.
+    title: "Lesson 7 · Black & white — the 720nm mono",
+    tab: "ir",
+    steps: [
+      "Switch on Black & white (bottom of the IR tab). Frames like this carry almost no color — a channel mix gives a real mono conversion with control over the tones, not just zero saturation.",
+      "Try the named mixes — Even, Luma, Red / Green / Blue filter — then drag the Red / Green / Blue weights yourself. Only their balance matters: watch the sky and the frosted trees trade brightness.",
+      "Shape tones per color: in the Color tab, turn on Drag on photo to adjust, then pull down on the sky — just that color's grey darkens, like a classic B&W mix.",
+      "Your mix rides saved looks and bakes into exported .cube LUTs, so the mono travels with the grade.",
+    ],
+  },
 ];
 
 let activeLesson = -1;
@@ -4204,10 +4219,12 @@ LESSONS.forEach((L, i) => {
 // The always-visible TUTORIAL SET (owner cut, 2026-07-14): the lesson-tagged
 // pairs in lesson order, plus two variety picks showing the app isn't only
 // for forests. Everything else lives in the full library below, collapsed.
+// The frosted "white forest" pair joined with the B&W lesson (1.2 release).
 const baseKey = (k: string) => k.replace(/-raw$/, "");
 const CORE = new Set([
   "NIR_1638", "NIR_1701", "NIR_1822", "NIR_1708", "NIR_1687", "NIR_1675",
   "NIR_1830", "NIR_1873", "NIR_1824", "NIR_1821", "NIR_1877",
+  "NIR_1717", "NIR_1644",
   "NIR_0172", "NIR_0627",
 ]);
 // Build the practice-gallery grid (tutorial set) on the start screen.

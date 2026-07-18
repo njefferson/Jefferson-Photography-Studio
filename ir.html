@@ -139,7 +139,10 @@
           <div class="welcome-cue" id="welcomeCue" hidden aria-hidden="true">&#9660;</div>
         </div>
         <div id="lesson" hidden>
-          <h3 id="lessonTitle"></h3>
+          <!-- h2: the page's only heading before this is the sr-only h1, so an
+               h3 here was a genuine h1->h3 skip (axe heading-order, caught by
+               the lesson-walk harness). Same size via CSS — purely structural. -->
+          <h2 id="lessonTitle"></h2>
           <ol id="lessonSteps"></ol>
           <p class="lesson-next">When you're done: tap <strong>&#8962; Home</strong> up top for another lesson (they're on the start screen, and under <strong>Help</strong>), or <strong>Open image(s)</strong> to edit your own photo.</p>
           <button id="lessonClose" type="button">Got it</button>
