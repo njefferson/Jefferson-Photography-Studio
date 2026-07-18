@@ -2202,22 +2202,46 @@ function clampResizeOnPhoto(ax: number, ay: number, mdx: number, mdy: number): [
 // crop.w/crop.h = R/A ("Original" is exactly 1 in fraction space). Free (the
 // default and old behaviour) leaves the resize unconstrained. The last choice
 // persists like the panel tab. ---
-const RATIOS: { key: string; label: string; r: number | null }[] = [
+const RATIOS: { key: string; label: string; r: number | null; invertible?: boolean }[] = [
   { key: "free", label: "Free", r: null },
-  { key: "orig", label: "Original", r: 0 },
+  { key: "orig", label: "Original", r: 0, invertible: true },
   { key: "1:1", label: "1:1", r: 1 },
-  { key: "4:5", label: "4:5", r: 4 / 5 },
-  { key: "3:2", label: "3:2", r: 3 / 2 },
-  { key: "16:9", label: "16:9", r: 16 / 9 },
+  { key: "4:5", label: "4:5", r: 4 / 5, invertible: true },
+  { key: "3:2", label: "3:2", r: 3 / 2, invertible: true },
+  { key: "16:9", label: "16:9", r: 16 / 9, invertible: true },
+  { key: "custom", label: "Custom…", r: null },
 ];
 let cropRatioKey = localStorage.getItem("ips-crop-ratio") ?? "free";
+// Repeat-tapping the active chip flips it to its INVERSE (4:5 ⇄ 5:4) — the
+// look buttons' repeat-press R⇄B pattern (owner ask 2026-07-18, on-device).
+let cropRatioInv = localStorage.getItem("ips-crop-ratio-inv") === "1";
+// The Custom chip's W:H pair, e.g. "7:5" (owner ask, same pass).
+let cropRatioCustom = localStorage.getItem("ips-crop-ratio-custom") ?? "";
 if (!RATIOS.some((x) => x.key === cropRatioKey)) cropRatioKey = "free";
+if (cropRatioKey === "custom" && !parseCustomRatio(cropRatioCustom)) cropRatioKey = "free";
 
-function cropRatioFrac(): number | null {
+/** "7:5" → 1.4, validated + clamped to the supported [1/5, 5] band. */
+function parseCustomRatio(pair: string): number | null {
+  const m = /^([0-9]+(?:\.[0-9]+)?):([0-9]+(?:\.[0-9]+)?)$/.exec(pair);
+  if (!m) return null;
+  const w = Number(m[1]), h = Number(m[2]);
+  if (!isFinite(w) || !isFinite(h) || w <= 0 || h <= 0) return null;
+  const r = w / h;
+  return r >= 0.2 && r <= 5 ? r : null;
+}
+
+/** The active preset's PIXEL ratio (before fraction conversion), or null. */
+function cropRatioPixel(): number | null {
+  if (cropRatioKey === "custom") return parseCustomRatio(cropRatioCustom);
   const preset = RATIOS.find((x) => x.key === cropRatioKey)!;
   if (preset.r === null) return null;
-  if (preset.r === 0) return 1;
-  return preset.r / dispAspectNow();
+  const base = preset.r === 0 ? dispAspectNow() : preset.r;
+  return cropRatioInv && preset.invertible ? 1 / base : base;
+}
+
+function cropRatioFrac(): number | null {
+  const r = cropRatioPixel();
+  return r === null ? null : r / dispAspectNow();
 }
 
 /** Largest preset-ratio box centred on the current crop, inside the
@@ -2243,19 +2267,54 @@ for (const rdef of RATIOS) {
   ratioBtns.set(rdef.key, b);
 }
 
+/** "4:5" → "5:4"; "Original" → "Original ⇅". */
+function invertedLabel(def: (typeof RATIOS)[number]): string {
+  const m = /^([0-9.]+):([0-9.]+)$/.exec(def.label);
+  return m ? `${m[2]}:${m[1]}` : `${def.label} ⇅`;
+}
+
 function updateRatioUI() {
   // Selected state is aria-pressed + a TEXT check — never colour alone.
   for (const [k, b] of ratioBtns) {
+    const def = RATIOS.find((x) => x.key === k)!;
     const on = k === cropRatioKey;
+    let label = def.label;
+    if (k === "custom" && cropRatioCustom) label = on ? cropRatioCustom : `Custom (${cropRatioCustom})`;
+    else if (on && cropRatioInv && def.invertible) label = invertedLabel(def);
+    b.textContent = (on ? "✓ " : "") + label;
     b.setAttribute("aria-pressed", String(on));
-    b.textContent = (on ? "✓ " : "") + RATIOS.find((x) => x.key === k)!.label;
+    b.setAttribute(
+      "aria-label",
+      k === "custom"
+        ? "Custom crop aspect ratio — opens the ratio entry"
+        : `Crop aspect ratio ${label}${def.invertible ? " — tap again for the inverse" : ""}`,
+    );
   }
 }
 updateRatioUI();
 
 function setCropRatio(key: string) {
-  cropRatioKey = key;
-  localStorage.setItem("ips-crop-ratio", key);
+  if (key === "custom") {
+    openRatioDlg(); // Apply in the dialog commits; re-tap = edit the pair
+    return;
+  }
+  const def = RATIOS.find((x) => x.key === key);
+  if (key === cropRatioKey && def?.invertible) {
+    // Repeat-tap on the active chip flips to its inverse (the look buttons'
+    // repeat-press pattern).
+    cropRatioInv = !cropRatioInv;
+  } else {
+    cropRatioKey = key;
+    cropRatioInv = false;
+  }
+  commitRatioChoice();
+}
+
+/** Persist the current choice, refresh the chips, re-inscribe (one undo step). */
+function commitRatioChoice() {
+  localStorage.setItem("ips-crop-ratio", cropRatioKey);
+  localStorage.setItem("ips-crop-ratio-inv", cropRatioInv ? "1" : "0");
+  if (cropRatioCustom) localStorage.setItem("ips-crop-ratio-custom", cropRatioCustom);
   updateRatioUI();
   const rf = cropRatioFrac();
   if (rf && geoMode && current) {
@@ -2265,6 +2324,49 @@ function setCropRatio(key: string) {
     draw();
     flushRecord(); // one tap = one undo step
   }
+}
+
+// Custom-ratio entry: a real dialog (helpDlg pattern), W : H + swap.
+const ratioDlg = $("ratioDlg") as HTMLDialogElement;
+const ratioW = $("ratioW") as HTMLInputElement;
+const ratioH = $("ratioH") as HTMLInputElement;
+const ratioErr = $("ratioErr") as HTMLParagraphElement;
+
+function openRatioDlg() {
+  const m = /^([0-9.]+):([0-9.]+)$/.exec(cropRatioCustom);
+  ratioW.value = m ? m[1] : "";
+  ratioH.value = m ? m[2] : "";
+  ratioErr.hidden = true;
+  ratioDlg.showModal();
+}
+
+$("ratioSwap").addEventListener("click", () => {
+  const t = ratioW.value;
+  ratioW.value = ratioH.value;
+  ratioH.value = t;
+});
+$("ratioApply").addEventListener("click", () => {
+  const pair = `${ratioW.value.trim()}:${ratioH.value.trim()}`;
+  if (!parseCustomRatio(pair)) {
+    ratioErr.hidden = false; // honest inline error, dialog stays
+    return;
+  }
+  cropRatioCustom = pair;
+  cropRatioKey = "custom";
+  cropRatioInv = false;
+  ratioDlg.close();
+  commitRatioChoice();
+});
+$("ratioCancel").addEventListener("click", () => ratioDlg.close());
+ratioDlg.addEventListener("click", (e) => {
+  if (e.target === ratioDlg) ratioDlg.close();
+});
+
+function remeasureCropTools() {
+  if (!cropArmed) return;
+  stageEl.style.setProperty("--croptools-h", `${cropTools.offsetHeight}px`);
+  positionCropOverlay();
+  draw();
 }
 
 function setGeoMode(mode: "crop" | "straighten" | null) {
@@ -2318,6 +2420,21 @@ function setGeoMode(mode: "crop" | "straighten" | null) {
     if (rf && Math.abs(params.crop.w / params.crop.h - rf) / rf > 0.01) {
       params.crop = ratioInscribe(rf);
     }
+  }
+  // The view must step back by the pill's REAL height (a fixed reserve buried
+  // the bottom handles under the grown pill on portrait photos — IMG_1050).
+  // Measure after layout; re-measure while armed if the window resizes.
+  if (cropArmed) {
+    requestAnimationFrame(() => {
+      if (!cropArmed) return;
+      stageEl.style.setProperty("--croptools-h", `${cropTools.offsetHeight}px`);
+      positionCropOverlay(); // the canvas rect moved — re-lay the box on it
+      draw();
+    });
+    window.addEventListener("resize", remeasureCropTools);
+  } else {
+    window.removeEventListener("resize", remeasureCropTools);
+    stageEl.style.removeProperty("--croptools-h");
   }
   // Open box-first: zoom the view so the current crop box fills the frame (the
   // whole tilt is a pinch-out away). Reset to the whole photo when disarming.
