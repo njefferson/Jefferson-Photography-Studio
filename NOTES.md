@@ -96,14 +96,28 @@ See **`PLAN.md`** for the full build plan.
 - [ ] Nice-to-have: RGBA16F preview texture (halve GPU memory); box-filtered
       downscale on scaled exports; LJ92 restart-marker path untested on real file
 
-## Versioning (agreed 2026-07-04, promoted to 1.0 same day)
+## Versioning (agreed 2026-07-04, promoted to 1.0 same day; taxonomy agreed 2026-07-18)
 
+- THE TAXONOMY (owner rule, 2026-07-18): **identity → capability → increment**.
+  - **Identity (major, X.0)** — the product changes as a thing: a different
+    approach and mindset, a new edition. The owner declares these; he has
+    declared the CREATIVE RELEASE the first one → it ships as **2.0**.
+  - **Capability (middle number)** — a release that ADDS something: a new
+    tool, format, mode. EVERY capability release that ships to main bumps it
+    (owner decision, 2026-07-18): the core sweep goes 1.2, 1.3, … Bump the
+    VERSION file IN the release's own final commit — the commit that changes
+    VERSION displays as exactly the new base (versionFor, vite.config.ts),
+    so the release commit reads "1.2" in the changelog.
+  - **Increment (third digit, automatic)** — bug fixes and quality-of-life
+    ticks between capability releases, from the commit counter. Features are
+    NOT increments; if a shipment adds capability, bump VERSION with it.
+  - Shipped history is NOT renumbered (the crop-chips release shipped under
+    1.1.x before this rule and stays there).
 - Pre-1.0 history is retroactively **v0.N** (N = update sequence number,
   derived from git commit count at build time — no manual list needed).
 - The **VERSION file** declares the base ("1.0"); updates after it are
-  automatic point releases: 1.0.1, 1.0.2, … Bump VERSION to declare the next
-  milestone (1.1, 2.0). Git tags are NOT used — this environment's git remote
-  refuses tag pushes.
+  automatic point releases: 1.0.1, 1.0.2, … Git tags are NOT used — this
+  environment's git remote refuses tag pushes.
 - The ⓘ dialog shows the running version and a version per changelog entry.
 - CI must check out full history (`fetch-depth: 0` in deploy.yml) or the
   commit counts — and therefore the version numbers — come out wrong.
@@ -169,10 +183,12 @@ user-scalable=no.
 > what's genuinely coming; notes.html renders the archive as "Recently
 > shipped". Keep this section to OPEN items only.
 > QUEUE RESEQUENCED 2026-07-18 (owner decision, roadmap session): the
-> CORE-COMPLETENESS SWEEP ships first (1.1.x point releases), then the
-> CREATIVE RELEASE (bump VERSION to 1.2 when it ships to main), while the
-> big-image / full-bleed direction continues as the parallel design track
-> below.
+> CORE-COMPLETENESS SWEEP ships first — each capability release bumps
+> VERSION (1.2, 1.3, … per the taxonomy in "## Versioning") — then the
+> CREATIVE RELEASE, which the owner has declared an IDENTITY change: it
+> ships as **2.0**, not 1.2 (owner call, 2026-07-18 — "an entirely
+> different approach and mindset"). The big-image / full-bleed direction
+> continues as the parallel design track below.
 
 - [ ] **Black & white for 720nm** — core sweep; the recorded target promoted
   2026-07-18. A channel-weighted mono conversion for the near-monochrome
@@ -229,7 +245,7 @@ user-scalable=no.
   (opens/closes, six groups, empty "More") carry over — only the entry
   affordance changes.
 - [ ] **Color grading — shadow / midtone / highlight wheels** — CREATIVE
-  RELEASE (v1.2), owner go 2026-07-18. Split-toning color wheels per tonal
+  RELEASE (v2.0), owner go 2026-07-18. Split-toning color wheels per tonal
   band; duotone / toned mono (completing the 720nm B&W story above); film
   grain; a creative post-crop vignette. Wheels + duotone are per-pixel
   display-space color → compileEdit + .cube like the HSL mixer; grain and
@@ -237,15 +253,15 @@ user-scalable=no.
   rulebook (the creative vignette frames the post-CROP image, unlike the
   source-anchored lens-vignette correction).
 - [ ] **Custom false color — full 3×3 channel mixer** — CREATIVE RELEASE
-  (v1.2), promoted from the backlog 2026-07-18: arbitrary channel mixing
+  (v2.0), promoted from the backlog 2026-07-18: arbitrary channel mixing
   beyond the R⇄B swap (aerochrome-style and invented palettes). IR-native,
   per-pixel, bakes into .cube/.dcp.
-- [ ] **Stickers — UFOs in the trees** — CREATIVE RELEASE (v1.2), promoted
+- [ ] **Stickers — UFOs in the trees** — CREATIVE RELEASE (v2.0), promoted
   from the backlog 2026-07-18 (owner ask 2026-07-14). The full architecture
   sketch lives in "Future / bigger bets" below — linear-source-space
   compositing so stickers inherit the IR palette, occlusion via the existing
   mask machinery, and the scope caution: stickers, NOT a general layer stack.
-- [ ] **Warp tools — Swirl / Liquefy / Pinch** — CREATIVE RELEASE (v1.2),
+- [ ] **Warp tools — Swirl / Liquefy / Pinch** — CREATIVE RELEASE (v2.0),
   promoted from the backlog 2026-07-18 (owner ask 2026-07-14). The
   UV-displacement-field sketch lives in "Future / bigger bets" below; spatial
   → never in looks/batch/LUTs; one stroke = one undo. The biggest single item
@@ -2579,11 +2595,11 @@ Classical, subscription-grade tools (fit the current architecture directly):
   snapshot system shipped 2026-07-04; no ML.
 - **Channel mixer (full 3×3)** — custom false colour beyond the R↔B swap;
   IR-native, per-pixel. PROMOTED 2026-07-18 to the "Next capability release"
-  queue (Creative release, v1.2) — see that entry.
+  queue (Creative release, v2.0) — see that entry.
 - **UFOs in the trees — playful sticker compositing** (owner ask 2026-07-14,
   given right after the dust-release promotion; he'll open a NEW CHAT for it —
   next session, read this entry first). PROMOTED 2026-07-18 to the "Next
-  capability release" queue (Creative release, v1.2); this entry keeps the
+  capability release" queue (Creative release, v2.0); this entry keeps the
   architecture sketch. The idea: paste fun cutouts (UFOs,
   aliens, "other such fun things fitting for the weird colors") into a photo,
   including PEEKING FROM BEHIND things — which is the real requirement: an
@@ -2612,7 +2628,7 @@ Classical, subscription-grade tools (fit the current architecture directly):
   stack), or it eats the app.
 - **Playful warp tools — Swirl / Liquefy / Pinch** (owner ask 2026-07-14:
   "crazy tools like swirl or liquefy"). PROMOTED 2026-07-18 to the "Next
-  capability release" queue (Creative release, v1.2); this entry keeps the
+  capability release" queue (Creative release, v2.0); this entry keeps the
   architecture sketch. Finger-driven local GEOMETRY warps —
   a real departure from the colour pipeline, but classical and on-device:
   the natural architecture is a per-photo UV DISPLACEMENT FIELD at a working
