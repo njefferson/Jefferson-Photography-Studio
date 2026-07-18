@@ -2500,6 +2500,8 @@ user-scalable=no.
   NEEDS THE OWNER'S HANDS: whether the stacked-prints look reads as "a
   library lives here" at iPhone tile size, the three frames fronting it,
   and the count text size.
+  MERGED TO MAIN 2026-07-18 (owner "Promote to main"; PR #29, rebase) —
+  ships as a 1.2.x increment.
 
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 
