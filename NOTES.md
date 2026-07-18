@@ -167,28 +167,6 @@ user-scalable=no.
 > big-image / full-bleed direction continues as the parallel design track
 > below.
 
-- [ ] **Crop ratio chips — obvious tap affordance, no side-scroll** — owner
-  feedback 2026-07-18, given WITH the promote of the aspect/flip + fix
-  releases; he is opening a NEW CHAT for this — next session, read this
-  entry first. Two asks, his words: (1) "Does the preset look slightly
-  different so it's obvious it can be tapped and reset? I just don't want it
-  to lose the functionality by becoming camouflaged as soon as it's used" —
-  the ACTIVE chip must still read as a live control (it flips to its inverse
-  on a second tap; today it wears the accent fill + "✓ ", which he fears
-  reads as inert once selected). Consider a visible affordance on the active
-  chip — e.g. the ⇅/⇄ inverse hint ON the chip, or a pressed-but-still-
-  button treatment. (2) "The tiles along the bottom under the crop menu…
-  cuts them off if they are dragged… I'd like that to be made neater, I
-  don't want to have to scroll left and right to see all of the aspect
-  ratios" — the one-row side-scroll (chosen to keep the pill height fixed
-  after the IMG_1050 fail state) cuts chips off; he wants ALL ratios visible
-  without scrolling, neater. DESIGN CONSTRAINT that must survive any rework:
-  the pill's height is MEASURED into --croptools-h and the view steps back
-  by it (the fail-state fix) — a taller multi-row layout is now SAFE as long
-  as it lays out before the rAF measure; alternatives: smaller/denser chips,
-  two tidy rows (height is fine now), or a popover ratio picker. Keep the
-  44px hit extensions, aria-pressed + text-state (never colour alone), and
-  the repeat-tap inverse.
 - [ ] **Black & white for 720nm** — core sweep; the recorded target promoted
   2026-07-18. A channel-weighted mono conversion for the near-monochrome
   720nm "white forest" frames (adjustable weights, or a few named mixes).
@@ -2326,6 +2304,60 @@ user-scalable=no.
   themes. NEEDS THE OWNER'S HANDS: the portrait arm now framing the whole
   box above the pill on the real iPad, the repeat-tap inverse discoverability,
   and the custom dialog's feel.
+- [x] **Crop ratio chips — obvious tap affordance, no side-scroll** — owner
+  feedback 2026-07-18, given WITH the promote of the aspect/flip + fix
+  releases. Two asks, his words: (1) "Does the preset look slightly
+  different so it's obvious it can be tapped and reset? I just don't want it
+  to lose the functionality by becoming camouflaged as soon as it's used" —
+  the ACTIVE chip must still read as a live control (it flips to its inverse
+  on a second tap). (2) "I'd like that to be made neater, I don't want to
+  have to scroll left and right to see all of the aspect ratios."
+  SHIPPED (cache ips-v79 → ips-v80):
+  • WRAP, NOT SCROLL — #cropRatios wraps into centered rows (gap 10px/6px;
+    the wider row-gap keeps the two rows' −6px hit extensions from fighting;
+    44px targets kept); the one-row side-scroll + its plumbing removed. Two
+    tidy rows at phone width AND at the pill's 360px cap on iPad.
+  • THE SAFETY BUG THAT MADE ONE-ROW "NECESSARY" IS FIXED — the ≤760px media
+    override of `#stage.cropping #view` used a FIXED 88px bottom reserve that
+    ignored the measured --croptools-h (and won by source order at phone
+    widths), so ANY taller pill buried the bottom handles on phones — the
+    IMG_1050 geometry, still live despite the var-based wide rule. Now
+    var-based (`22px + var(--croptools-h, 66px)`), same numbers at the 66px
+    default. AND commitRatioChoice re-measures --croptools-h on EVERY ratio
+    commit (relabeling can rewrap the row — including the null-ratio paths:
+    tapping Free, Reset crop), not just repositioning the overlay.
+  • STILL-A-BUTTON TREATMENT — the active chip keeps the accent fill + "✓ "
+    TEXT state and adds the Done button's accent glow plus a tap-again hint
+    badge riding the chip: ⇅ on invertible ratios (flips to the inverse),
+    ✎ on Custom (re-opens the editor); Free and 1:1 get none — a second tap
+    on them genuinely does nothing, labels stay honest. The badge is dark
+    glass (rgba(0,0,0,.18)) with the inherited accent-ink glyph — ≥4.5:1 in
+    BOTH themes (a white badge FAILS dawn at ~4.2:1; don't "lighten" it).
+  • INVERTED ORIGINAL RENAMED — "Original ⇅" → the orientation it becomes
+    ("Portrait"/"Landscape", computed from the open photo; chips refresh as
+    the tool arms, and the photo can't rotate while armed). To a photographer
+    "flip" reads as MIRRORING, and the old ⇅ suffix collided with the new
+    hint glyph. aria-labels spell the tap-again action ("tap again for 5:4" /
+    "…for the original aspect" / "…to edit the ratio") — mandatory: the
+    button's aria-label overrides content, so the glyph is invisible to
+    VoiceOver.
+  VERIFIED headless 35/35 at BOTH 390×844 and 1024×768 (Chromium, the real
+  built app, PORTRAIT test photo — a landscape photo is width-limited in a
+  portrait viewport, so the bottom reserve never binds and can't catch a
+  reserve regression; found when the planted bug "passed"). FAIL-FIRST
+  proven three ways: planted one-row-scroll, fixed-reserve, and stripped-
+  hint each flipped their checks to FAIL (the fixed reserve collides exactly
+  in Straighten focus — the tallest pill). Checks: no side-scroll + all 7
+  chips inside at both widths; ≥2 rows; --croptools-h == pill height after
+  arming AND after every relabel path (preset tap, inverse tap, Custom
+  Apply, Reset crop); view + handles clear the pill; repeat-tap flips
+  4:5 ⇄ 5:4 with the box aspect following; inverted Original reads the
+  right orientation; aria-pressed exclusive; hint present/absent per chip;
+  contrast computed ≥4.5:1 both themes; axe-core clean on the armed UI both
+  themes; no page errors. NEEDS THE OWNER'S HANDS: the two wrapped rows
+  read neat on the real iPhone/iPad; the glow + ⇅/✎ badge reads as "still
+  tappable"; the glyphs render as text (not emoji) on iOS; mis-tap feel
+  between the two chip rows.
 
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 

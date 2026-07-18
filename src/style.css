@@ -372,18 +372,17 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
    set in updateRatioUI, never colour alone. */
 #cropRatios {
   display: flex;
-  flex-wrap: nowrap; /* ONE row always — the pill's height must stay constant
-                        (a wrapped second row buried the bottom crop handles on
-                        portrait photos — owner fail-state, IMG_1050) */
-  gap: 6px;
-  justify-content: flex-start;
+  flex-wrap: wrap; /* every ratio visible at once, no side-scroll (owner ask
+                      2026-07-18). Extra rows are SAFE: the view steps back by
+                      the pill's MEASURED height (--croptools-h) in BOTH width
+                      bands, so a taller pill can't bury the bottom handles
+                      (the IMG_1050 fail state that once forced one row). */
+  gap: 10px 6px; /* row-gap 10 so the two rows' -6px hit extensions barely
+                    contest each other; column-gap 6 keeps two tidy rows at
+                    phone widths */
+  justify-content: center;
   margin-top: 8px;
-  overflow-x: auto; /* a cut-off chip is the scroll affordance (bar-actions precedent) */
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  padding-bottom: 2px;
 }
-#cropRatios::-webkit-scrollbar { display: none; }
 .ratio-chip { white-space: nowrap; flex: none; }
 .ratio-chip {
   position: relative;
@@ -397,7 +396,14 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   cursor: pointer;
 }
 .ratio-chip::before { content: ""; position: absolute; inset: -6px; } /* 44px hit extension */
-.ratio-chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+/* Active chip stays a LIVE control (a second tap flips it to its inverse) —
+   the Done button's accent glow keeps it reading raised/tappable rather than
+   inert-selected (owner worry: "camouflaged as soon as it's used"). */
+.ratio-chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; box-shadow: 0 2px 10px -2px var(--accent); }
+/* The tap-again hint riding the active chip (⇅ = flips to the inverse,
+   ✎ = edits the custom pair). Dark badge + inherited --accent-ink glyph stays
+   ≥4.5:1 on the accent fill in BOTH themes (a white badge fails in dawn). */
+.chip-hint { display: inline-block; margin-inline-start: 5px; padding: 0 4px; border-radius: 5px; background: rgba(0, 0, 0, 0.18); color: inherit; font-weight: 600; }
 /* Imported .cube LUTs (Profiles & LUTs panel). The badge is TEXT — never a
    colour-only cue. */
 .lut-badge {
@@ -921,9 +927,13 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
     top: 22px;
     left: 22px;
     right: 22px;
-    bottom: 88px;
+    /* Var-based like the wide rule above — a FIXED phone reserve would bury the
+       bottom handles the moment the pill grows a row (the wrapped ratio chips
+       make that normal). Same numbers as the old fixed 88/110 at the 66px
+       default. */
+    bottom: calc(22px + var(--croptools-h, 66px));
     max-width: calc(100% - 44px);
-    max-height: calc(100% - 110px);
+    max-height: calc(100% - 44px - var(--croptools-h, 66px));
   }
 }
 #sessionStrip {
