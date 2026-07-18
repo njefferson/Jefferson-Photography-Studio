@@ -22,6 +22,7 @@ const VERT = `#version 300 es
 in vec2 a_pos;
 out vec2 v_uv;
 uniform int u_rot; // display rotation in 90-degree CW steps (0..3)
+uniform int u_flip; // SOURCE-space mirror: bit 1 = source-x, bit 2 = source-y
 uniform vec4 u_crop;       // (x,y,w,h) crop rect in the STRAIGHTENED frame [0,1]
 uniform float u_straighten; // radians, applied about the frame centre
 uniform float u_dispAspect; // display-rotated frame width/height (pre-crop)
@@ -42,6 +43,12 @@ void main() {
     vec2 r = vec2(d.x * cosA - d.y * sinA, d.x * sinA + d.y * cosA);
     local = vec2(r.x / u_dispAspect + 0.5, r.y + 0.5);
   }
+  // Flip is the INNERMOST op — a source-space mirror, identically composed in
+  // export.ts's toSrc and the CPU inverse mappings below. Masks/heals live in
+  // source-uv, so through the inverse mapping their rings follow the mirrored
+  // pixels, exactly like rotation.
+  if ((u_flip & 1) != 0) local.x = 1.0 - local.x;
+  if ((u_flip & 2) != 0) local.y = 1.0 - local.y;
   v_uv = local;
   gl_Position = vec4(a_pos, 0.0, 1.0);
 }`;
@@ -469,6 +476,7 @@ export class Renderer {
   private imgW = 0;
   private imgH = 0;
   private rotQ = 0; // display rotation, 90-degree CW steps
+  private flipBits = 0; // source-space mirror: bit 1 = x, bit 2 = y (see VERT u_flip)
   private crop: CropRect = CROP_DEFAULT; // last-applied crop, drives canvas size + inverse mapping
   private straighten = 0; // last-applied straighten angle (degrees), for inverse mapping
   private isLinear = false;
@@ -503,7 +511,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -639,6 +647,16 @@ export class Renderer {
     if (this.imgW) this.applySize();
   }
 
+  /** Source-space mirror bits (1 = x, 2 = y). A view transform like rotation:
+   *  not part of the edit/undo; the export takes it via opts.flip. */
+  setFlip(bits: number) {
+    this.flipBits = bits & 3;
+  }
+
+  get flip() {
+    return this.flipBits;
+  }
+
   get rotation() {
     return this.rotQ;
   }
@@ -735,6 +753,7 @@ export class Renderer {
     if (this.camMatrix) gl.uniformMatrix3fv(this.loc.u_cam, false, this.camMatrix);
     gl.uniform1f(this.loc.u_glow, p.glow);
     gl.uniform1i(this.loc.u_rot, rot);
+    gl.uniform1i(this.loc.u_flip, applyCrop ? this.flipBits : 0);
     gl.uniform1f(this.loc.u_lum, p.lum || 1);
     gl.uniform1f(this.loc.u_hotspot, p.hotspot ?? 0);
     gl.uniform1f(this.loc.u_hotspotSize, p.hotspotSize ?? 0.5);
@@ -1019,6 +1038,9 @@ export class Renderer {
    *  rings/handles stay glued to the photo through an active crop. */
   imageUvToClient(u: number, v: number): [number, number] {
     const r = this.canvas.getBoundingClientRect();
+    // Undo the source-space mirror first (self-inverse), then the rotation.
+    if (this.flipBits & 1) u = 1 - u;
+    if (this.flipBits & 2) v = 1 - v;
     let du = u, dv = v;
     if (this.rotQ === 1) { du = 1 - v; dv = u; }
     else if (this.rotQ === 2) { du = 1 - u; dv = 1 - v; }
@@ -1041,6 +1063,8 @@ export class Renderer {
     if (this.rotQ === 1) { iu = v; iv = 1 - u; }
     else if (this.rotQ === 2) { iu = 1 - u; iv = 1 - v; }
     else if (this.rotQ === 3) { iu = 1 - v; iv = u; }
+    if (this.flipBits & 1) iu = 1 - iu;
+    if (this.flipBits & 2) iv = 1 - iv;
     const x = Math.round(iu * this.imgW);
     const y = Math.round(iv * this.imgH);
     return [Math.max(0, Math.min(this.imgW - 1, x)), Math.max(0, Math.min(this.imgH - 1, y))];
