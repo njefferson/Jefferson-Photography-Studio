@@ -607,9 +607,14 @@ function cloneParams(p: EditParams): EditParams {
     vigMid: p.vigMid ?? 0.5,
     mix3: [...(p.mix3 ?? MIX3_DEFAULT)],
     spots: (p.spots ?? []).map((s) => ({ ...s })),
-    // corners is a nested array — deep-copy it so an undo snapshot doesn't share
-    // the live sticker's perspective (the mask rides by ref, copy-on-write).
-    stickers: (p.stickers ?? []).map((s) => ({ ...s, corners: s.corners ? s.corners.map((c) => [c[0], c[1]] as [number, number]) : s.corners })),
+    // corners + match arrays are nested — deep-copy so an undo snapshot doesn't
+    // share the live sticker's perspective/transfer (the mask rides by ref,
+    // copy-on-write).
+    stickers: (p.stickers ?? []).map((s) => ({
+      ...s,
+      corners: s.corners ? s.corners.map((c) => [c[0], c[1]] as [number, number]) : s.corners,
+      matchTarget: s.matchTarget ? ([...s.matchTarget] as [number, number, number]) : s.matchTarget,
+    })),
     // The warp field is SHARED by reference (copy-on-write per stroke, like the
     // brush bitmaps) — a snapshot's field is immutable once a new stroke clones.
     warp: p.warp ?? null,
@@ -1950,6 +1955,7 @@ const stkRot = $("stkRot") as HTMLInputElement;
 const stkOcclude = $("stkOcclude") as HTMLInputElement;
 const stkBehindEl = $("stkBehind") as HTMLDivElement;
 const stkClearBtn = $("stkClear") as HTMLButtonElement;
+const stkMatchStrength = $("stkMatchStrength") as HTMLInputElement;
 const stkBright = $("stkBright") as HTMLInputElement;
 const stkContrast = $("stkContrast") as HTMLInputElement;
 const stkWarmth = $("stkWarmth") as HTMLInputElement;
@@ -2148,10 +2154,21 @@ const stkAdjustInput = () => {
 };
 for (const el of [stkBright, stkContrast, stkWarmth, stkSat]) el.addEventListener("input", stkAdjustInput);
 
+// Match strength — how hard the auto-match harmonises to the scene (rescales the
+// stored target into brightness/contrast/warmth; the sliders reflect it).
+stkMatchStrength.addEventListener("input", () => {
+  const s = selSticker();
+  if (!s) return;
+  s.matchAmt = Number(stkMatchStrength.value);
+  applyMatchAmt(s);
+  updateStickerUI();
+  draw();
+});
+
 $("stkAutoMatch").addEventListener("click", () => {
   const s = selSticker();
   if (!s) return;
-  autoMatchSticker(s);
+  autoMatchSticker(s); // recompute the transfer from the scene under it now
   updateStickerUI();
   draw();
   flushRecord();
@@ -2375,9 +2392,11 @@ function endStickerPaint() {
   flushRecord();
 }
 
-/** Mean LINEAR colour of the displayed scene in a patch around image-uv (x,y),
- *  read back from the preview canvas (post-pipeline, what the eye sees). Null
- *  when off-screen. Used by auto-match. */
+/** Mean LINEAR colour of the DISPLAYED scene in a patch around image-uv (x,y),
+ *  read back from the preview canvas (post-pipeline, what the eye sees). The
+ *  match drives gentle, monotonic scalars from this, which survive the pipeline;
+ *  a per-channel source-space transfer does not (channel swap + WB). Null when
+ *  off-screen. */
 function sampleScenePatch(x: number, y: number, rUv: number): [number, number, number] | null {
   if (!canvas.width) return null;
   const [cxClient, cyClient] = renderer.imageUvToClient(x, y);
@@ -2392,8 +2411,6 @@ function sampleScenePatch(x: number, y: number, rUv: number): [number, number, n
   tmp.width = x1 - x0; tmp.height = y1 - y0;
   const g = tmp.getContext("2d");
   if (!g) return null;
-  // The WebGL canvas keeps its drawing buffer (preserveDrawingBuffer), so it
-  // can be drawn straight into a 2D canvas for readback.
   g.drawImage(canvas, x0, y0, x1 - x0, y1 - y0, 0, 0, x1 - x0, y1 - y0);
   const d = g.getImageData(0, 0, x1 - x0, y1 - y0).data;
   let r = 0, gg = 0, b = 0, n = 0;
@@ -2403,9 +2420,23 @@ function sampleScenePatch(x: number, y: number, rUv: number): [number, number, n
   return n ? [r / n, gg / n, b / n] : null;
 }
 
-/** Calibrate a freshly-added sticker to the scene under it: pull its brightness
- *  and warmth toward the local scene, and soften its contrast so it isn't
- *  crisper than the (often grainy) photo. A starting point; the user refines. */
+const MATCH_AMT_DEFAULT = 0.85; // how hard a fresh sticker matches the scene
+
+/** Push the auto-match target into the applied scalars at the current strength
+ *  (saturation stays whatever the user set — it's not auto-driven). */
+function applyMatchAmt(s: Sticker) {
+  const t = s.matchTarget ?? [0, 0, 0];
+  const amt = s.matchAmt ?? 0;
+  s.bright = amt * t[0];
+  s.contrast = amt * t[1];
+  s.warmth = amt * t[2];
+}
+
+/** "Blend to match" — harmonise the sticker to the scene under it: pull its
+ *  brightness and warmth toward the local (displayed) scene and soften its
+ *  contrast so it isn't crisper than the grainy photo. Stores the full-strength
+ *  target; matchAmt scales how much lands. Gentle + clamped so it can't blow the
+ *  sticker out; the sliders fine-tune from there. */
 function autoMatchSticker(s: Sticker) {
   const a = stickerAssets[s.asset];
   if (!a) return; // asset still loading — no match this time (rare)
@@ -2413,10 +2444,12 @@ function autoMatchSticker(s: Sticker) {
   if (!patch) return;
   const L = (c: [number, number, number]) => c[0] * 0.2126 + c[1] * 0.7152 + c[2] * 0.0722;
   const sceneL = L(patch), assetL = L(a.mean);
-  if (assetL > 1e-3) s.bright = clamp(sceneL / assetL - 1, -0.85, 0.4);
+  const bright = assetL > 1e-3 ? clamp(sceneL / assetL - 1, -0.85, 0.4) : 0;
   const rb = (c: [number, number, number]) => Math.log((c[0] + 0.01) / (c[2] + 0.01));
-  s.warmth = clamp((rb(patch) - rb(a.mean)) * 0.5, -0.7, 0.7);
-  s.contrast = -0.18; // soften — the sticker shouldn't be sharper than the grain
+  const warmth = clamp((rb(patch) - rb(a.mean)) * 0.5, -0.7, 0.7);
+  s.matchTarget = [bright, -0.18, warmth]; // soften contrast — not sharper than the grain
+  s.matchAmt = MATCH_AMT_DEFAULT;
+  applyMatchAmt(s);
 }
 
 /** Reflect the selected sticker into the controls; show/hide the panels. */
@@ -2433,6 +2466,7 @@ function updateStickerUI() {
     stkScale.value = String(s.scale);
     stkRot.value = String(s.rot);
     stkOcclude.value = String(s.occlude);
+    stkMatchStrength.value = String(s.matchAmt ?? 0);
     stkBright.value = String(s.bright ?? 0);
     stkContrast.value = String(s.contrast ?? 0);
     stkWarmth.value = String(s.warmth ?? 0);

@@ -3167,6 +3167,35 @@ user-scalable=no.
   OWNER'S HANDS: the exact category split (esp. where orbs/lights and the
   paranormal figures belong), and whether a 3-row picker (kind → category →
   stickers) is right on the iPad or wants a lighter shape once the set is full.
+- [x] **Blend to match — a strength dial on the auto-harmonise (Increment D)** —
+  owner ask 2026-07-19 ("a blend capability to make the sticker match the image
+  as best it can"). A "Blend to match the photo" button + a **Match strength**
+  slider under "Match to the photo": the sticker takes on the local scene's
+  brightness, warmth and a softened contrast, and the strength dials 0 (raw
+  asset) → 1 (full match). MODEL: `matchTarget` = the full-strength
+  [bright, contrast, warmth] computed from the scene; `matchAmt` scales it into
+  the applied scalars (`applyMatchAmt`); saturation stays purely manual. Auto-set
+  on add + on the button (matchAmt default 0.85). IMPORTANT NEGATIVE RESULT — DON'T
+  RE-TRY: I first built a per-channel statistical colour transfer (Reinhard
+  mean+std, matchGain/matchBias). It BLEW THE STICKER OUT (a saucer went magenta,
+  then near-black). Cause: stickers composite INTO the source BEFORE the camera
+  matrix + WB + channel-swap, but the asset is authored in sRGB — so any
+  per-channel source correction gets amplified by the WB gains and swapped by
+  R↔B, landing nowhere near the target. Sampling the source scene instead of the
+  display didn't help (RAW source is camera-native, a third space). The ONLY
+  thing that harmonises predictably through this pipeline is the gentle, monotonic
+  brightness/warmth/contrast scalars sampled from the DISPLAYED scene (the
+  original auto-match the owner already liked) — so the affine was reverted and
+  the deliverable is the STRENGTH CONTROL over that. On a bright IR-saturated
+  asset the red channel clips at 255 and can't be pulled down; the match still
+  improves green/blue (walk measures total channel distance, not max, for this
+  reason). VERIFIED (sticker-match-walk): auto-match sets strength>0, full match
+  pulls the composited colour toward the scene (Σ199→159) while raw doesn't,
+  strength visibly changes it, the button recomputes for a new spot, axe both
+  themes; PLANT=nomatch (strength 0==1) FAILS. adjust unit + all sticker
+  regressions green. NEEDS THE OWNER'S HANDS: whether the default 0.85 strength
+  feels right, and whether he wants saturation folded into the auto-match too
+  (left manual for now — auto-sat was too unpredictable to trust).
 
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 

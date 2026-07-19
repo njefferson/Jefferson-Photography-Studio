@@ -289,11 +289,13 @@
               <label>Size <input id="stkScale" type="range" min="0.05" max="1" step="0.005" value="0.3" /></label>
               <label>Spin <input id="stkRot" type="range" min="-180" max="180" step="1" value="0" /></label>
               <div class="sub-title">Match to the photo</div>
+              <button id="stkAutoMatch" type="button">Blend to match the photo</button>
+              <label>Match strength <input id="stkMatchStrength" type="range" min="0" max="1" step="0.01" value="0.85" /></label>
+              <p class="note">Blend to match takes on the colour and contrast of the scene right under the sticker so it sits in the photo. Turn the strength down to keep more of the sticker's own colour, or fine-tune by hand below.</p>
               <label>Brightness <input id="stkBright" type="range" min="-1" max="1" step="0.01" value="0" /></label>
               <label>Contrast <input id="stkContrast" type="range" min="-1" max="1" step="0.01" value="0" /></label>
               <label>Warmth <input id="stkWarmth" type="range" min="-1" max="1" step="0.01" value="0" /></label>
               <label>Saturation <input id="stkSat" type="range" min="-1" max="1" step="0.01" value="0" /></label>
-              <button id="stkAutoMatch" type="button">Re-match to the photo</button>
               <div class="sub-title">Tuck behind the scene</div>
               <label>Peek behind <input id="stkOcclude" type="range" min="0" max="1" step="0.01" value="0" /></label>
               <div id="stkBehind" class="bw-mixes" role="group" aria-label="What the sticker hides behind"></div>
