@@ -22,6 +22,9 @@ export type SavedLook = {
   sky: [number, number, number];
   foliage: [number, number, number];
   tone: [number, number, number, number, number];
+  toneR: [number, number, number, number, number];
+  toneG: [number, number, number, number, number];
+  toneB: [number, number, number, number, number];
   lum: number;
   clarity: number;
   dehaze: number;
@@ -75,10 +78,11 @@ export const lookHslDefault = (): number[] => Array.from({ length: 24 }, (_, i) 
 export function coerceLook(s: unknown): SavedLook | null {
   const o = s as Record<string, unknown> | null;
   if (!o || !Array.isArray(o.tone) || typeof o.sat !== "number") return null;
-  const tone =
-    o.tone.length === 5
-      ? (o.tone.map((v, i) => clamped(+v, LOOK_TONE_DEFAULT[i], Math.max(0, LOOK_TONE_DEFAULT[i] - 0.25), Math.min(1, LOOK_TONE_DEFAULT[i] + 0.25))) as [number, number, number, number, number])
+  const clampTone = (t: unknown): [number, number, number, number, number] =>
+    Array.isArray(t) && t.length === 5
+      ? (t.map((v, i) => clamped(+v, LOOK_TONE_DEFAULT[i], Math.max(0, LOOK_TONE_DEFAULT[i] - 0.25), Math.min(1, LOOK_TONE_DEFAULT[i] + 0.25))) as [number, number, number, number, number])
       : ([...LOOK_TONE_DEFAULT] as [number, number, number, number, number]);
+  const tone = clampTone(o.tone);
   const hsl =
     Array.isArray(o.hsl) && o.hsl.length === 24
       ? o.hsl.map((x: unknown, i: number) =>
@@ -95,6 +99,9 @@ export function coerceLook(s: unknown): SavedLook | null {
     sky: clampT3(o.sky, [0, 1, 1], [-60, 0, 0.5], [60, 2, 1.5]),
     foliage: clampT3(o.foliage, [0, 1, 1], [-60, 0, 0.5], [60, 2, 1.5]),
     tone,
+    toneR: clampTone(o.toneR),
+    toneG: clampTone(o.toneG),
+    toneB: clampTone(o.toneB),
     lum: clamped(o.lum, 1, 0.5, 2),
     clarity: clamped(o.clarity, 0, -1, 1),
     dehaze: clamped(o.dehaze, 0, -1, 1),
@@ -129,6 +136,9 @@ export function encodeLookPayload(look: SavedLook, name?: string): string {
     sky: look.sky.map(round4),
     foliage: look.foliage.map(round4),
     tone: look.tone.map(round4),
+    toneR: look.toneR.map(round4),
+    toneG: look.toneG.map(round4),
+    toneB: look.toneB.map(round4),
     lum: round4(look.lum),
     clarity: round4(look.clarity),
     dehaze: round4(look.dehaze),
