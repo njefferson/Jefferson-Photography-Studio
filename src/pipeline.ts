@@ -147,6 +147,13 @@ export interface EditParams {
    *  math to the source samples. Composition-specific: reset on a new open,
    *  never carried by saved looks or batch. */
   spots: HealSpot[];
+  /** Stickers (Creative): playful cutouts (UFOs, aliens…) composited INTO the
+   *  linear source before the pipeline — exactly like heal spots — so each
+   *  sticker inherits the channel swap / WB / looks / grade / grain and lands
+   *  in the IR palette. Spatial + composition-specific: baked into the preview
+   *  texture and the export sampler, never in saved looks / batch / .cube /
+   *  .dcp. See sticker.ts. Reset on a new open like spots/crop. */
+  stickers?: Sticker[];
   /** Crop rect in the STRAIGHTENED display frame [0,1] (x,y = top-left, w,h =
    *  size) — a VIEW onto the source, not a re-bake. Default = the whole frame.
    *  Composition-specific like spots: reset on a new open, never carried by
@@ -167,6 +174,23 @@ export interface EditParams {
    *  (lut.ts drives this same closure) — deliberate. dcp.ts does not use
    *  compileEdit, so .dcp can NOT carry it (Help says so). */
   lut?: { id: string; name: string; size: number; data: Float32Array; strength: number } | null;
+}
+
+/** One placed sticker. Geometry is in image-uv (like HealSpot), so it tracks
+ *  the photo through crop/rotate/zoom. `occlude` lets scene elements peek in
+ *  FRONT: at bake time, pixels whose source luminance is on the chosen side of
+ *  `occludeLuma` are held back (occludeBright = bright scene pixels occlude,
+ *  e.g. IR foliage; else dark ones, e.g. tree trunks). */
+export interface Sticker {
+  id: string;
+  asset: string; // asset key -> public/stickers/<asset>.png
+  x: number; // centre, image-uv
+  y: number;
+  scale: number; // width as a fraction of the image width
+  rot: number; // degrees, clockwise
+  occlude: number; // 0..1 occlusion strength (0 = always on top)
+  occludeLuma: number; // 0..1 luminance threshold
+  occludeBright: boolean; // true = bright pixels occlude; false = dark pixels
 }
 
 export interface CropRect {

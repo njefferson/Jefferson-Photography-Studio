@@ -1491,10 +1491,8 @@ label.open-btn, label.bar-btn {
   border-color: var(--accent);
   font-weight: 600;
 }
-/* The Creative row: Grade spans the whole 4th row of the 3-wide tab grid —
-   deliberate flagship placement until the coming Creative tabs (mixer,
-   stickers, warp) fill the grid out to 4x3 and it becomes a normal cell. */
-.ptab[data-tab="grade"] { grid-column: 1 / -1; }
+/* The Creative row (4th row of the 3-wide tab grid): Grade + Stickers, with
+   Warp to complete it to a full 4x3. */
 .section-head { flex: none; padding: 12px 14px 8px; }
 .section-title { margin: 0; font: 600 15px/1.2 var(--display); color: var(--txt); }
 .section-sub { margin: 2px 0 0; font-size: 12px; line-height: 1.35; color: var(--txt-3); }
@@ -1626,6 +1624,10 @@ label.open-btn, label.bar-btn {
 /* Review rings after an automatic sweep: SOLID — these fixes are DONE, the
    ring is a receipt to confirm or take back, not a to-do marker. */
 #healOverlay .heal-done { stroke: var(--accent); stroke-width: 2; stroke-dasharray: none; }
+/* Selected-sticker bounding box — a dashed frame that reads over any content
+   (white stroke + dark drop-shadow), no colour-only cue. */
+#stickerOverlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; overflow: visible; }
+#stickerOverlay .sticker-box { fill: none; stroke: var(--accent); stroke-width: 2; stroke-dasharray: 7 4; filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.85)); }
 #maskOverlay .mask-shape { fill: rgba(120, 200, 255, 0.06); stroke: rgba(130, 205, 255, 0.9); stroke-width: 1.5; stroke-dasharray: 6 4; }
 #maskOverlay .mask-line { stroke: rgba(130, 205, 255, 0.9); stroke-width: 1.5; stroke-dasharray: 6 4; }
 #maskOverlay .mask-handle { fill: rgba(12, 12, 16, 0.72); stroke: #82cdff; stroke-width: 2; pointer-events: auto; cursor: grab; touch-action: none; }

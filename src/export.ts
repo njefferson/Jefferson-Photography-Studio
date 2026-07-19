@@ -11,6 +11,7 @@ import { camToSrgbLinear, NIKON_Z50_COLOR_MATRIX } from "./color";
 import { makeRowDenoiser } from "./raw/denoise";
 import { makeRowDetail } from "./raw/detail";
 import { healPatches8, healPatchesFromSampler, wrapWithPatches } from "./heal";
+import { stickerPatches, type StickerAsset } from "./sticker";
 import { buildGlowMap, sampleGlow, GLOW_GAIN } from "./glow";
 import { buildLocalMap } from "./localmap";
 import { SRGB_ICC, DISPLAY_P3_ICC, srgbDisplayToP3Display, embedIccInJpeg } from "./icc";
@@ -35,6 +36,9 @@ export interface ExportOptions {
    *  (lookmark.ts APP11 segment). Absent/empty = no recipe; TIFF never
    *  carries one. Built by the caller so export stays payload-agnostic. */
   lookRecipe?: string;
+  /** Rasterised sticker assets (keyed by asset id) — needed to bake
+   *  params.stickers into the export source. Omitted = no stickers baked. */
+  stickerAssets?: Record<string, StickerAsset>;
 }
 
 // --- Corner watermark for the bundled practice photos ------------------------
@@ -206,6 +210,20 @@ export async function exportImage(
         srcH,
       )
     : rawSample;
+  // Stickers wrap OUTSIDE heal — they composite over the healed source, exactly
+  // as the preview bakes stickers on top of heals. Both samplers are LINEAR, so
+  // one path serves RAW and 8-bit. Never touched when no stickers are placed.
+  const stickers = (params.stickers ?? []).filter((s) => opts.stickerAssets?.[s.asset]);
+  // Occlusion reads DISPLAY luminance — same exposure×WB (+ camera matrix for
+  // RAW) the compileEdit start applies, so it matches the preview.
+  const stkEx = params.exposure;
+  const stkOcc = {
+    wb: [params.wb[0] * stkEx, params.wb[1] * stkEx, params.wb[2] * stkEx] as [number, number, number],
+    cam: "cfa" in src ? src.cam : null,
+  };
+  const composed = stickers.length && opts.stickerAssets
+    ? wrapWithPatches(healed, stickerPatches(healed, srcW, srcH, stickers, opts.stickerAssets, stkOcc), srcH)
+    : healed;
   // The live preview runs denoise/detail on a DOWNSCALED proxy (RAW: a half-res
   // bin; big 8-bit: toPreview's <=2800px copy) and the GPU taps in proxy texels,
   // so at native resolution the kernels must tap `proxyFactor` native pixels
@@ -218,8 +236,8 @@ export async function exportImage(
   // Denoise first, then sharpen/texture — the same order the shader runs them
   // (raw neighbourhood -> denoised centre -> detail gain). Both are no-ops when
   // their slider is 0, so a plain edit keeps the 1x-decode fast path.
-  const denoised = makeRowDenoiser(healed, srcW, srcH, params.denoise, proxyFactor);
-  const sampleLinear = makeRowDetail(healed, denoised, srcW, srcH, params.sharpen ?? 0, params.texture ?? 0, proxyFactor);
+  const denoised = makeRowDenoiser(composed, srcW, srcH, params.denoise, proxyFactor);
+  const sampleLinear = makeRowDetail(composed, denoised, srcW, srcH, params.sharpen ?? 0, params.texture ?? 0, proxyFactor);
   // Scaled exports (50% / 25%) BOX-FILTER instead of decimating: each output
   // pixel averages an ss×ss grid of source taps placed in OUTPUT space and
   // mapped through toSrcF — so the filter stays correct under crop, rotation,
