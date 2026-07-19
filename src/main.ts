@@ -1706,19 +1706,29 @@ updateMix3UI();
 // they inherit the whole IR pipeline and grain settles over them. Placement
 // lives in params.stickers → undo/session for free; excluded from looks/batch. ---
 
-// Sticker library — category-organized and DYNAMIC. Assets live at
-// public/stickers/<category>/<name>.png; a build-time manifest.json lists what's
-// present, so the owner drops a PNG into a category folder and it appears
-// (auto-precached) with no code change. The original 8 stay FLAT (no key change
-// → no broken saved sessions); their category comes from STICKER_META.
-const STICKER_CATEGORIES: { id: string; emoji: string; label: string }[] = [
-  { id: "cryptids", emoji: "👣", label: "Cryptids" },
-  { id: "ufo", emoji: "🛸", label: "UFO / UAP" },
-  { id: "aliens", emoji: "👽", label: "Aliens" },
-  { id: "paranormal", emoji: "👻", label: "Paranormal" },
-  { id: "lostworld", emoji: "🦖", label: "Lost World" },
-  { id: "oddities", emoji: "🌲", label: "Oddities" },
-  { id: "other", emoji: "✨", label: "New" }, // catch-all for un-categorized drop-ins
+// Sticker library — TWO-KIND, category-organized, and DYNAMIC (owner, 2026-07-19:
+// "split into two kinds of overlays — Creatures & craft, and Evidence"; the
+// evidence overlays read more believable because they tuck into a scene). Assets
+// live at public/stickers/<category>/<name>.png; a build-time manifest.json lists
+// what's present, so the owner drops a PNG into a category folder and it appears
+// (auto-precached) with no code change. The original 8 stay FLAT (no key change →
+// no broken saved sessions); their category comes from STICKER_META.
+const STICKER_GROUPS: { id: string; emoji: string; label: string }[] = [
+  { id: "creatures", emoji: "👣", label: "Creatures & craft" },
+  { id: "evidence", emoji: "🔍", label: "Evidence" },
+];
+const STICKER_CATEGORIES: { id: string; group: string; emoji: string; label: string }[] = [
+  // Creatures & craft — the "obvious" overlays.
+  { id: "cryptids", group: "creatures", emoji: "👣", label: "Cryptids" },
+  { id: "ufo", group: "creatures", emoji: "🛸", label: "UFOs & craft" },
+  { id: "aliens", group: "creatures", emoji: "👽", label: "Aliens" },
+  { id: "spirits", group: "creatures", emoji: "👻", label: "Spirits" },
+  { id: "beasts", group: "creatures", emoji: "🦖", label: "Beasts" },
+  // Evidence — the believable, tuck-into-the-scene overlays.
+  { id: "tracks", group: "evidence", emoji: "🐾", label: "Tracks & marks" },
+  { id: "gear", group: "evidence", emoji: "🎒", label: "Left behind" },
+  { id: "lights", group: "evidence", emoji: "✨", label: "Lights & signs" },
+  { id: "other", group: "evidence", emoji: "❓", label: "New" }, // catch-all for un-categorized drop-ins
 ];
 // Pretty labels + honesty notes (folklore/fiction, shown as TEXT so meaning
 // survives grayscale) + category for the FLAT legacy keys. Nested keys
@@ -1735,6 +1745,7 @@ const STICKER_META: Record<string, { label: string; note?: string; cat?: string 
   beam: { label: "Abduction beam", cat: "ufo" },
   saturn: { label: "Saturn", cat: "ufo" },
   alien: { label: "Alien", cat: "aliens" },
+  // — Creatures & craft —
   // Cryptids.
   "cryptids/yeti": { label: "Yeti" },
   "cryptids/skunk-ape": { label: "Skunk Ape" },
@@ -1747,7 +1758,7 @@ const STICKER_META: Record<string, { label: string; note?: string; cat?: string 
   "cryptids/fresno-nightcrawler": { label: "Fresno Nightcrawler" },
   "cryptids/flatwoods-monster": { label: "Flatwoods Monster" },
   "cryptids/loveland-frog": { label: "Loveland Frog" },
-  // UFO / UAP.
+  // UFOs & craft.
   "ufo/black-triangle": { label: "Black triangle" },
   "ufo/tic-tac": { label: "Tic Tac" },
   "ufo/metallic-orb": { label: "Metallic orb" },
@@ -1756,7 +1767,6 @@ const STICKER_META: Record<string, { label: string; note?: string; cat?: string 
   "ufo/boomerang": { label: "Boomerang craft" },
   "ufo/flying-wing": { label: "Flying wing" },
   "ufo/disc-silhouette": { label: "Disc silhouette" },
-  "ufo/light-anomaly": { label: "Light anomaly" },
   // Aliens (the fictional forms are labeled as such).
   "aliens/grey": { label: "Grey" },
   "aliens/tall-grey": { label: "Tall Grey" },
@@ -1767,32 +1777,38 @@ const STICKER_META: Record<string, { label: string; note?: string; cat?: string 
   "aliens/hand": { label: "Hand" },
   "aliens/eyes": { label: "Eyes" },
   "aliens/silhouette": { label: "Silhouette" },
-  // Paranormal.
-  "paranormal/shadow-person": { label: "Shadow person" },
-  "paranormal/hooded-figure": { label: "Hooded figure" },
-  "paranormal/ghostly-mist": { label: "Ghostly mist" },
-  "paranormal/floating-eyes": { label: "Floating eyes" },
-  "paranormal/will-o-wisp": { label: "Will-o'-the-wisp" },
-  "paranormal/apparition": { label: "Apparition" },
-  "paranormal/skeletal": { label: "Skeletal apparition" },
-  // Lost World / Adventure.
-  "lostworld/pteranodon": { label: "Pteranodon" },
-  "lostworld/raptor": { label: "Raptor" },
-  "lostworld/giant-snake": { label: "Giant snake" },
-  "lostworld/giant-spider": { label: "Giant spider" },
-  "lostworld/tentacle": { label: "Squid tentacle" },
-  "lostworld/cave-humanoid": { label: "Cave humanoid" },
-  // Environmental oddities.
-  "oddities/claw-tree": { label: "Claw-marked tree" },
-  "oddities/footprints": { label: "Oversized footprints" },
-  "oddities/snagged-hair": { label: "Snagged hair" },
-  "oddities/glowing-orb": { label: "Glowing orb" },
-  "oddities/burned-patch": { label: "Burned patch" },
-  "oddities/standing-stones": { label: "Standing stones" },
-  "oddities/backpack": { label: "Abandoned backpack" },
-  "oddities/tent": { label: "Weathered tent" },
-  "oddities/lantern": { label: "Antique lantern" },
-  "oddities/rusted-equipment": { label: "Rusted equipment" },
+  // Spirits (paranormal figures).
+  "spirits/shadow-person": { label: "Shadow person" },
+  "spirits/hooded-figure": { label: "Hooded figure" },
+  "spirits/apparition": { label: "Apparition" },
+  "spirits/skeletal": { label: "Skeletal apparition" },
+  "spirits/ghostly-mist": { label: "Ghostly mist" },
+  // Beasts (lost-world creatures).
+  "beasts/pteranodon": { label: "Pteranodon" },
+  "beasts/raptor": { label: "Raptor" },
+  "beasts/giant-snake": { label: "Giant snake" },
+  "beasts/giant-spider": { label: "Giant spider" },
+  "beasts/tentacle": { label: "Squid tentacle" },
+  "beasts/cave-humanoid": { label: "Cave humanoid" },
+  // — Evidence —
+  // Tracks & marks.
+  "tracks/footprints": { label: "Oversized footprints" },
+  "tracks/claw-tree": { label: "Claw-marked tree" },
+  "tracks/snagged-hair": { label: "Snagged hair" },
+  "tracks/feathers": { label: "Strange feathers" },
+  "tracks/scat": { label: "Odd tracks" },
+  // Left behind.
+  "gear/backpack": { label: "Abandoned backpack" },
+  "gear/tent": { label: "Weathered tent" },
+  "gear/lantern": { label: "Antique lantern" },
+  "gear/rusted-equipment": { label: "Rusted research gear" },
+  "gear/standing-stones": { label: "Standing stones" },
+  // Lights & signs.
+  "lights/will-o-wisp": { label: "Will-o'-the-wisp" },
+  "lights/glowing-orb": { label: "Glowing orb" },
+  "lights/light-anomaly": { label: "Distant light anomaly" },
+  "lights/floating-eyes": { label: "Floating eyes" },
+  "lights/burned-patch": { label: "Scorched circle" },
 };
 // Dev/offline fallback when the build manifest can't be fetched (the built app
 // always has it, precached). The original shipped set.
@@ -1943,10 +1959,13 @@ const stkBlendModeEl = $("stkBlendMode") as HTMLDivElement;
 const stkBrushSize = $("stkBrushSize") as HTMLInputElement;
 const stkBlendClearBtn = $("stkBlendClear") as HTMLButtonElement;
 
-// The add-a-sticker picker: a category chip row (#stickerCats) filters the
-// sticker grid (#stickerAdd) below it, so the library scales past a flat row.
+// The add-a-sticker picker: two kinds (#stickerGroups: Creatures & craft /
+// Evidence) → a category chip row (#stickerCats) → the sticker grid
+// (#stickerAdd), so the library scales cleanly past a flat row.
 const stickerAddEl = $("stickerAdd") as HTMLDivElement;
 const stickerCatsEl = $("stickerCats") as HTMLDivElement;
+const stickerGroupsEl = $("stickerGroups") as HTMLDivElement;
+let stickerGroup = ""; // selected kind (creatures / evidence)
 let stickerCat = ""; // selected category id
 
 /** Group the present manifest keys by resolved category. */
@@ -1960,35 +1979,44 @@ function stickerLibraryByCat(): Map<string, string[]> {
   return m;
 }
 
-/** (Re)build the category chips + the selected category's sticker chips from the
- *  manifest + metadata. Only non-empty categories show (dynamic). */
+function stickerChip(label: string, on: boolean, ariaLabel: string | null, onClick: () => void): HTMLButtonElement {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "mix-chip";
+  b.textContent = (on ? "✓ " : "") + label;
+  b.setAttribute("aria-pressed", String(on));
+  if (ariaLabel) b.setAttribute("aria-label", (on ? "selected, " : "") + ariaLabel);
+  b.addEventListener("click", onClick);
+  return b;
+}
+
+/** (Re)build the kind chips → category chips → sticker chips from the manifest +
+ *  metadata. Only non-empty kinds/categories show (dynamic). */
 function renderStickerPicker() {
   const byCat = stickerLibraryByCat();
   const cats = STICKER_CATEGORIES.filter((c) => (byCat.get(c.id)?.length ?? 0) > 0);
-  if (!cats.some((c) => c.id === stickerCat)) stickerCat = cats[0]?.id ?? "";
-  stickerCatsEl.replaceChildren();
-  for (const c of cats) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "mix-chip";
-    const on = c.id === stickerCat;
-    b.textContent = (on ? "✓ " : "") + c.emoji + " " + c.label;
-    b.setAttribute("aria-pressed", String(on));
-    b.addEventListener("click", () => { stickerCat = c.id; renderStickerPicker(); });
-    stickerCatsEl.append(b);
-  }
-  stickerCatsEl.hidden = cats.length <= 1; // no chips needed for a single category
-  stickerAddEl.replaceChildren();
-  for (const key of byCat.get(stickerCat) ?? []) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "mix-chip";
+  const groups = STICKER_GROUPS.filter((g) => cats.some((c) => c.group === g.id));
+  if (!groups.some((g) => g.id === stickerGroup)) stickerGroup = groups[0]?.id ?? "";
+  const groupCats = cats.filter((c) => c.group === stickerGroup);
+  if (!groupCats.some((c) => c.id === stickerCat)) stickerCat = groupCats[0]?.id ?? "";
+
+  stickerGroupsEl.replaceChildren(...groups.map((g) =>
+    stickerChip(g.emoji + " " + g.label, g.id === stickerGroup, `${g.label} overlays`, () => {
+      stickerGroup = g.id; stickerCat = ""; renderStickerPicker();
+    })));
+  stickerGroupsEl.hidden = groups.length <= 1;
+
+  stickerCatsEl.replaceChildren(...groupCats.map((c) =>
+    stickerChip(c.emoji + " " + c.label, c.id === stickerCat, c.label, () => {
+      stickerCat = c.id; renderStickerPicker();
+    })));
+  stickerCatsEl.hidden = groupCats.length <= 1; // no chips needed for a single category
+
+  stickerAddEl.replaceChildren(...(byCat.get(stickerCat) ?? []).map((key) => {
     const note = stickerNote(key);
-    b.textContent = stickerLabel(key) + (note ? " · " + note : "");
-    if (note) b.setAttribute("aria-label", `${stickerLabel(key)}, ${note}`);
-    b.addEventListener("click", () => { void addStickerFromKey(key); });
-    stickerAddEl.append(b);
-  }
+    return stickerChip(stickerLabel(key) + (note ? " · " + note : ""), false, note ? `${stickerLabel(key)}, ${note}` : null,
+      () => { void addStickerFromKey(key); });
+  }));
 }
 
 /** Place a sticker of `key` at the on-screen centre, auto-matched to the scene.

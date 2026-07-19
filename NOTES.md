@@ -3127,6 +3127,31 @@ user-scalable=no.
   OWNER'S HANDS: the corner-drag feel on the iPad (handle size, whether live-bake
   is smooth enough or wants a matrix3d ghost), and whether one-finger corner-drag
   vs body-drag ever fight (corner handles stop-propagation, so they shouldn't).
+- [x] **Sticker library — two kinds: Creatures & craft / Evidence (Increment C)**
+  — owner reframe 2026-07-19: "split the app into two kinds of overlays —
+  Creatures & craft, and Evidence… the evidence overlays are more believable
+  because you can tuck them into a corner or partly hide them behind real
+  objects." So the picker gained a TOP tier: `STICKER_GROUPS` (👣 Creatures &
+  craft, 🔍 Evidence) → category chips (now carrying a `group`) → the sticker
+  grid. Categories re-sliced: Creatures = Cryptids, UFOs & craft, Aliens, Spirits
+  (paranormal figures), Beasts (lost-world); Evidence = Tracks & marks
+  (footprints/claw-tree/hair/feathers), Left behind (backpack/tent/lantern/rusted
+  gear/standing stones), Lights & signs (will-o'-wisp/glowing orb/light anomaly/
+  floating eyes/scorched circle). Folders renamed to match the new category ids
+  (`spirits/ beasts/ tracks/ gear/ lights/`); the flat legacy 8 unchanged. Only
+  non-empty kinds/categories show, and a kind/category row auto-hides when there's
+  a single choice (so today, with only creature assets + one seeded evidence
+  folder, Evidence shows its stickers directly). This SUPERSEDES the Increment A
+  category list (Paranormal/Lost World/Oddities are gone as top-level cats).
+  VERIFIED (sticker-category-walk, rewritten): two kinds render, the selected kind
+  filters to its categories, category filtering within a kind holds, a seeded
+  `aliens/reptilian` reads "Reptilian · fiction", a seeded `tracks/footprints`
+  makes the Evidence kind appear dynamically, adding composites, axe both themes;
+  PLANT=nofilter FAILS. sticker-walk / lag / blend / persp regressions green (they
+  pick the UFOs category under the default Creatures kind); build clean. NEEDS THE
+  OWNER'S HANDS: the exact category split (esp. where orbs/lights and the
+  paranormal figures belong), and whether a 3-row picker (kind → category →
+  stickers) is right on the iPad or wants a lighter shape once the set is full.
 
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 
