@@ -1713,6 +1713,7 @@ const STICKER_CATALOG: { key: string; label: string }[] = [
   { key: "beam", label: "Beam" },
 ];
 const stickerAssets: Record<string, StickerAsset> = {};
+const stickerAssetUrls: Record<string, string> = {}; // for the drag ghost <img>
 let stickerAssetsPending = false;
 async function loadStickerAssets() {
   if (stickerAssetsPending) return;
@@ -1728,12 +1729,64 @@ async function loadStickerAssets() {
         g.drawImage(bmp, 0, 0);
         const rgba = g.getImageData(0, 0, bmp.width, bmp.height).data;
         stickerAssets[key] = makeStickerAsset(key, bmp.width, bmp.height, rgba);
+        stickerAssetUrls[key] = `./stickers/${key}.png`;
       } catch {
         /* asset missing/offline — the sticker just won't bake until it loads */
       }
     }),
   );
   draw(); // assets arrived — re-bake any placed stickers
+}
+
+// While a sticker is being dragged/resized, it is held OUT of the CPU bake and
+// a cheap <img> ghost tracks the gesture — so the heavy composite runs once on
+// release instead of ~60×/second (owner: stickers lagged the app, 2026-07-19).
+let liveSticker = -1; // index of the sticker held live (excluded from the bake), or -1
+const stickerGhost = $("stickerGhost") as HTMLImageElement;
+
+/** Position the ghost <img> over the live sticker's on-screen rect (centre +
+ *  rotation + size, soaking up view zoom/rotation via imageUvToClient). */
+function positionStickerGhost() {
+  const list = params.stickers ?? [];
+  const s = liveSticker >= 0 && liveSticker < list.length ? list[liveSticker] : null;
+  const a = s && stickerAssets[s.asset];
+  const url = s && stickerAssetUrls[s.asset];
+  if (!s || !a || !url || !current) { stickerGhost.hidden = true; return; }
+  const W = current.width, H = current.height;
+  const hw = (s.scale * W) / 2;
+  const ang = (s.rot * Math.PI) / 180;
+  // Centre + the rotated +hw edge midpoint, both in client space.
+  const [cx, cy] = renderer.imageUvToClient(s.x, s.y);
+  const ex = s.x + (hw * Math.cos(ang)) / W;
+  const ey = s.y + (hw * Math.sin(ang)) / H;
+  const [ecx, ecy] = renderer.imageUvToClient(ex, ey);
+  const halfW = Math.hypot(ecx - cx, ecy - cy);
+  const angleDeg = (Math.atan2(ecy - cy, ecx - cx) * 180) / Math.PI;
+  const wpx = Math.max(2, 2 * halfW);
+  if (stickerGhost.getAttribute("src") !== url) stickerGhost.src = url;
+  stickerGhost.style.width = `${wpx}px`;
+  stickerGhost.style.height = `${wpx * (a.h / a.w)}px`;
+  stickerGhost.style.left = `${cx}px`;
+  stickerGhost.style.top = `${cy}px`;
+  stickerGhost.style.transform = `translate(-50%, -50%) rotate(${angleDeg}deg)`;
+  stickerGhost.hidden = false;
+}
+
+/** Enter live mode for the selected sticker: pull it from the bake (one bake to
+ *  clear its old pixels) and show the ghost. */
+function beginStickerLive() {
+  if (selectedSticker < 0 || liveSticker === selectedSticker) return;
+  liveSticker = selectedSticker;
+  positionStickerGhost();
+  draw(); // re-bake WITHOUT the live sticker (clean background under the ghost)
+}
+
+/** Leave live mode: hide the ghost and bake the sticker in at its final state. */
+function endStickerLive() {
+  if (liveSticker < 0) return;
+  liveSticker = -1;
+  stickerGhost.hidden = true;
+  draw();
 }
 
 let stickerArmed = false;
@@ -1826,18 +1879,30 @@ function hitSticker(u: number, v: number): number {
   return -1;
 }
 
-const stkSliderInput = () => {
+// Size/Spin are pure TRANSFORMS — the ghost shows them perfectly, so hold the
+// sticker out of the bake during the drag and composite once on release.
+const stkTransformInput = () => {
   const s = selSticker();
   if (!s) return;
   s.scale = Number(stkScale.value);
   s.rot = Number(stkRot.value);
+  updateStickerUI();
+  beginStickerLive();
+  positionStickerGhost();
+};
+for (const el of [stkScale, stkRot]) {
+  el.addEventListener("input", stkTransformInput);
+  el.addEventListener("change", () => endStickerLive()); // release → bake the final state
+}
+// Peek-behind is a compositing effect the ghost can't show — bake it live (one
+// rect, no move-doubling), coalesced like any slider.
+stkOcclude.addEventListener("input", () => {
+  const s = selSticker();
+  if (!s) return;
   s.occlude = Number(stkOcclude.value);
   updateStickerUI();
-  draw(); // coalesces per drag like every slider
-};
-stkScale.addEventListener("input", stkSliderInput);
-stkRot.addEventListener("input", stkSliderInput);
-stkOcclude.addEventListener("input", stkSliderInput);
+  draw();
+});
 
 $("stkDelete").addEventListener("click", () => {
   const list = params.stickers ?? [];
@@ -1912,6 +1977,8 @@ function setStickerMode(on: boolean) {
     void loadStickerAssets();
     setHslPick(false); setColorPick(false); setTat(false); setHeal(false); setHealReview(false); setGeoMode(null);
     mUI.paint.setAttribute("aria-pressed", "false");
+  } else {
+    endStickerLive(); // leaving the tab mid-gesture must bake + drop the ghost
   }
   updateStickerUI();
 }
@@ -2981,6 +3048,7 @@ const healStatus = $("healStatus") as HTMLElement;
 let previewSrc: { width: number; height: number; pixels?: Uint8ClampedArray; linear?: Float32Array } | null = null;
 let bakedSpots: HealSpot[] = []; // what the texture currently has baked in
 let bakedStickers: Sticker[] = []; // sticker placements currently baked into the texture
+let bakedOccSig = ""; // wb×exposure signature the sticker occlusion was baked against
 let bakedWarpRev = -1; // the warp-field revision currently uploaded to the GPU
 let healArmed = false;
 
@@ -3020,10 +3088,17 @@ function uploadPreview() {
 function syncSpotsToTexture() {
   if (!current || !previewSrc) return;
   const cur = params.spots ?? [];
-  const stk = (params.stickers ?? []).filter((s) => stickerAssets[s.asset]); // only bakeable (loaded) ones
+  // A sticker held live (mid drag/resize) is excluded — its ghost <img> shows
+  // the gesture; the real composite bakes on release.
+  const liveId = liveSticker >= 0 ? (params.stickers ?? [])[liveSticker] : null;
+  const stk = (params.stickers ?? []).filter((s) => stickerAssets[s.asset] && s !== liveId); // only bakeable, non-live
   const spotsSame = cur.length === bakedSpots.length && JSON.stringify(cur) === JSON.stringify(bakedSpots);
-  const stkSame = stk.length === bakedStickers.length && JSON.stringify(stk) === JSON.stringify(bakedStickers);
+  // Occlusion reads display luminance (wb×exposure + cam), so a WB/exposure
+  // change must re-bake even when the sticker list is unchanged.
+  const occSig = `${params.wb[0]},${params.wb[1]},${params.wb[2]},${params.exposure}`;
+  const stkSame = stk.length === bakedStickers.length && JSON.stringify(stk) === JSON.stringify(bakedStickers) && occSig === bakedOccSig;
   if (spotsSame && stkSame) return;
+  bakedOccSig = occSig;
   const W = previewSrc.width, H = previewSrc.height;
   // Every affected rect — spots (old+new) AND stickers (old+new) — is re-baked
   // from the PRISTINE source with the full current lists, so vacated areas
@@ -3058,8 +3133,11 @@ function syncSpotsToTexture() {
   }
   bakedSpots = cur.map((s) => ({ ...s }));
   bakedStickers = stk.map((s) => ({ ...s }));
+  stickerBakeCount++; // instrumentation for the lag walk (counts real bakes)
   updateHealUI();
 }
+let stickerBakeCount = 0; // exposed on window in dev for the lag harness
+(window as unknown as { __stickerBakes: () => number }).__stickerBakes = () => stickerBakeCount;
 
 function setHeal(on: boolean) {
   healArmed = on && !!current;
@@ -3955,6 +4033,7 @@ canvas.addEventListener("pointerdown", (e) => {
       e.preventDefault();
       canvas.setPointerCapture(e.pointerId);
       stickerDrag = { id: e.pointerId, ou: s.x - u, ov: s.y - v };
+      beginStickerLive(); // ghost + hold it out of the bake for the drag
     }
     return; // the Stickers tab owns the canvas — no tap-WB / pan while armed
   }
@@ -4003,7 +4082,7 @@ canvas.addEventListener("pointermove", (e) => {
       s.x = Math.min(1, Math.max(0, u + stickerDrag.ou));
       s.y = Math.min(1, Math.max(0, v + stickerDrag.ov));
       positionStickerOverlay();
-      draw();
+      positionStickerGhost(); // cheap CSS move; no re-bake mid-drag
     }
     return;
   }
@@ -4036,7 +4115,7 @@ canvas.addEventListener("pointermove", (e) => {
 function endPointer(e: PointerEvent) {
   if (painting) { endPaint(); return; }
   if (tatDrag) { if (e.pointerId === tatDrag.id) endTat(); return; }
-  if (stickerDrag && e.pointerId === stickerDrag.id) { stickerDrag = null; flushRecord(); return; }
+  if (stickerDrag && e.pointerId === stickerDrag.id) { stickerDrag = null; endStickerLive(); flushRecord(); return; }
   if (warpStroke && e.pointerId === warpStroke.id) { endWarpStroke(); return; }
   activePointers.delete(e.pointerId);
   clearTimeout(holdTimer);
