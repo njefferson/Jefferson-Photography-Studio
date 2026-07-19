@@ -151,6 +151,11 @@ look-button state as TEXT (norm/R⇄B) not hue; mask-row text labels; roadmap
 no outline:none anywhere; toast avoids red/green coding. (The theme toggle
 was NOT correct — role=switch needs aria-checked, not aria-pressed; fixed
 in the a11y release. Don't re-bless the old pattern.)
+RANGE SLIDERS carry `touch-action: none` + a 22px thumb (style.css ~217) —
+they OWN the finger gesture like every other drag control. Do NOT set
+`pan-y` (it handed the drag to the panel scroller; a finger on the thumb
+scrolled instead of moving it — owner-caught on the iPad 2026-07-19). The
+panel still scrolls from label text + the gaps between rows.
 
 CALIBRATED TOKENS (2026-07-17; change only with recomputed WCAG ratios):
 --txt-3 #9095a1 dark / #6d6656 dawn (≥4.5:1 on their worst surfaces);
