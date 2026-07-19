@@ -5,7 +5,7 @@
 
 // Single source of truth for edit parameters lives in pipeline.ts so the GPU
 // preview and CPU export can never drift apart.
-import { toneEvaluator, toneIsIdentity, maskIsActive, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, type EditParams, type LocalMap, type CropRect } from "./pipeline";
+import { toneEvaluator, toneIsIdentity, maskIsActive, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, type EditParams, type LocalMap, type CropRect } from "./pipeline";
 export type { EditParams };
 
 // A faithful 256-entry identity ramp for the tone LUT. A 2-texel [0,255] ramp
@@ -33,6 +33,7 @@ function identityRgbaRamp(): Uint8Array {
 const VERT = `#version 300 es
 in vec2 a_pos;
 out vec2 v_uv;
+out vec2 v_cropUv; // fraction of the OUTPUT (cropped) frame — for grain/vignette
 uniform int u_rot; // display rotation in 90-degree CW steps (0..3)
 uniform int u_flip; // SOURCE-space mirror: bit 1 = source-x, bit 2 = source-y
 uniform vec4 u_crop;       // (x,y,w,h) crop rect in the STRAIGHTENED frame [0,1]
@@ -43,6 +44,7 @@ void main() {
   if (u_rot == 1) uv = vec2(uv.y, 1.0 - uv.x);
   else if (u_rot == 2) uv = vec2(1.0 - uv.x, 1.0 - uv.y);
   else if (u_rot == 3) uv = vec2(1.0 - uv.y, uv.x);
+  v_cropUv = uv; // the output-frame fraction, same value export.ts derives as (x+0.5)/w
   // Crop + straighten: uv here is a fraction of the OUTPUT (already the crop
   // rect's own size — see Renderer.applySize). Map it into the straightened
   // frame, then undo the straighten rotation (aspect-corrected, so it reads
@@ -68,6 +70,7 @@ void main() {
 const FRAG = `#version 300 es
 precision highp float;
 in vec2 v_uv;
+in vec2 v_cropUv;
 out vec4 frag;
 uniform sampler2D u_tex;
 uniform vec3 u_wb;
@@ -111,6 +114,18 @@ uniform bool u_hslOn;        // 8-channel HSL mixer active
 uniform vec3 u_hsl[8];       // per band: (hueShiftDeg, satScale, lumScale)
 uniform bool u_bwOn;         // black & white: channel-weighted mono
 uniform vec3 u_bwMix;        // B&W channel weights (normalised in-shader)
+uniform bool u_gradeOn;      // any wheel amount non-zero
+uniform vec3 u_gradeTintS;   // pure-chroma tint vectors, precomputed on the
+uniform vec3 u_gradeTintM;   //   CPU by pipeline.ts gradeTintVec so both
+uniform vec3 u_gradeTintH;   //   sides add IDENTICAL numbers
+uniform vec3 u_gradeAmt;     // (amtShadows, amtMids, amtHighlights) 0..1
+uniform float u_gradeBal;    // -1..1 shifts the shadow/highlight crossovers
+uniform float u_grainAmt;    // 0..1 film grain (0 = stage off)
+uniform float u_grainCell;   // grain cell size in OUTPUT pixels (grainCellPx)
+uniform float u_vigAmt;      // creative vignette -1..1 (0 = stage off)
+uniform float u_vigMid;      // vignette midpoint 0..1
+uniform float u_outAspect;   // output (cropped) frame aspect, for the vignette
+uniform vec2 u_outPx;        // output frame size in pixels, for grain coords
 uniform float u_denoise; // 0..1 bilateral strength (see raw/denoise.ts)
 uniform float u_sharpen; // 0..1 capture sharpening (high-freq) — see raw/detail.ts
 uniform float u_texture; // -1..1 mid-freq local contrast — see raw/detail.ts
@@ -167,6 +182,25 @@ float bandWeight(float hue, float center, float plateau, float edge){
   float d = abs(hue - center);
   d = min(d, 360.0 - d);
   return 1.0 - smoothstep(plateau, edge, d);
+}
+// Grain hash + value noise — the VERBATIM twin of pipeline.ts hash2d /
+// grainNoise (uint multiply wraps exactly like Math.imul; >> matches >>>).
+float hash2d(int x, int y){
+  uint h = (uint(x) * 0x27d4eb2du) ^ (uint(y) * 0x165667b1u);
+  h = (h ^ (h >> 15u)) * 0x85ebca6bu;
+  h = (h ^ (h >> 13u)) * 0xc2b2ae35u;
+  h ^= h >> 16u;
+  return float(h) / 4294967296.0;
+}
+float grainNoise(vec2 p, float cell){
+  vec2 gd = p / cell;
+  vec2 i = floor(gd);
+  vec2 f = gd - i;
+  vec2 s = f * f * (3.0 - 2.0 * f);
+  int x0 = int(i.x), y0 = int(i.y);
+  float n00 = hash2d(x0, y0),     n10 = hash2d(x0 + 1, y0);
+  float n01 = hash2d(x0, y0 + 1), n11 = hash2d(x0 + 1, y0 + 1);
+  return mix(mix(n00, n10, s.x), mix(n01, n11, s.x), s.y) * 2.0 - 1.0;
 }
 float radialGain(vec2 uv){
   // Circular in PIXELS (hot-spots are optically round): scale x by the image
@@ -475,6 +509,19 @@ void main() {
   // global lum). Weights are normalised, so only their ratio matters.
   // Identical math to compileEdit in pipeline.ts.
   if (u_bwOn) g = vec3(dot(g, u_bwMix) / max(1e-4, u_bwMix.r + u_bwMix.g + u_bwMix.b));
+  // Color grade: split-tone wheels — one pure-chroma tint per tonal band,
+  // weighted by smoothstep bands over the display luminance; balance shifts
+  // the shadow/highlight crossovers. AFTER B&W (so it tones mono too),
+  // before global lum. 0.35 = pipeline.ts GRADE_K. Matches compileEdit.
+  if (u_gradeOn) {
+    float Lg = dot(g, LUMA_W);
+    float wS = 1.0 - smoothstep(0.05, 0.6 + 0.2 * u_gradeBal, Lg);
+    float wH = smoothstep(0.4 + 0.2 * u_gradeBal, 0.95, Lg);
+    float wM = max(0.0, 1.0 - wS - wH);
+    g = clamp(g + 0.35 * (wS * u_gradeAmt.x * u_gradeTintS
+                        + wM * u_gradeAmt.y * u_gradeTintM
+                        + wH * u_gradeAmt.z * u_gradeTintH), 0.0, 1.0);
+  }
   // Global luminance rides on top of the tone curve (endpoints pinned).
   if (u_lum != 1.0) g = pow(clamp(g, 0.0, 1.0), vec3(1.0 / u_lum));
 
@@ -482,6 +529,24 @@ void main() {
   // so third-party LUTs stack on top of the whole IR grade. Identical math to
   // pipeline.ts's compileEdit tail (via lut3d.ts).
   if (u_lutStrength > 0.0) g = mix(g, sampleLut3d(clamp(g, 0.0, 1.0)), u_lutStrength);
+
+  // Creative vignette + film grain — the FINAL image ops, keyed on
+  // CROP-LOCAL coords (v_cropUv spans the visible, cropped frame; export.ts
+  // hands the same (x+0.5)/w fractions to the pipeline.ts twins). Spatial:
+  // deliberately NOT in compileEdit, so neither can bake into a .cube.
+  // Vignette first, grain on top — grain rides over the darkened corners
+  // like film. Matches applyCreativeVignette / applyGrain in pipeline.ts.
+  if (u_vigAmt != 0.0) {
+    vec2 vd = vec2((v_cropUv.x - 0.5) * u_outAspect, v_cropUv.y - 0.5);
+    float vr = 2.0 * length(vd) / sqrt(u_outAspect * u_outAspect + 1.0);
+    g = clamp(g * (1.0 + u_vigAmt * 0.85 * smoothstep(u_vigMid * 0.8, 1.0, vr)), 0.0, 1.0);
+  }
+  if (u_grainAmt > 0.0) {
+    float Ln = dot(g, LUMA_W);
+    float gw = 0.25 + 0.75 * (1.0 - abs(2.0 * Ln - 1.0));
+    float gn = grainNoise(v_cropUv * u_outPx, u_grainCell) * u_grainAmt * 0.16 * gw;
+    g = clamp(g + gn, 0.0, 1.0);
+  }
 
   // Mask coverage overlay (preview only; u_maskViz = the selected mask, -1 off).
   // Shows exactly which pixels the mask affects, feather and all, for ANY mask
@@ -542,7 +607,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -818,6 +883,34 @@ export class Renderer {
     gl.uniform1i(this.loc.u_bwOn, p.bwOn ? 1 : 0);
     const bwMix = p.bwMix ?? [1, 1, 1];
     gl.uniform3f(this.loc.u_bwMix, bwMix[0], bwMix[1], bwMix[2]);
+    // Color grade wheels: the tint vectors are precomputed HERE by the same
+    // pipeline.ts gradeTintVec the CPU path uses, so both sides add
+    // bit-identical numbers (parity by construction, not coincidence).
+    const grade = p.grade ?? GRADE_DEFAULT;
+    const gradeOn = !gradeIsNeutral(p.grade);
+    gl.uniform1i(this.loc.u_gradeOn, gradeOn ? 1 : 0);
+    if (gradeOn) {
+      const tS = gradeTintVec(grade[0] ?? 0);
+      const tM = gradeTintVec(grade[2] ?? 0);
+      const tH = gradeTintVec(grade[4] ?? 0);
+      gl.uniform3f(this.loc.u_gradeTintS, tS[0], tS[1], tS[2]);
+      gl.uniform3f(this.loc.u_gradeTintM, tM[0], tM[1], tM[2]);
+      gl.uniform3f(this.loc.u_gradeTintH, tH[0], tH[1], tH[2]);
+      gl.uniform3f(this.loc.u_gradeAmt, grade[1] ?? 0, grade[3] ?? 0, grade[5] ?? 0);
+      gl.uniform1f(this.loc.u_gradeBal, grade[6] ?? 0);
+    }
+    // Grain + creative vignette key on the OUTPUT (cropped) frame. In the
+    // preview that frame is this canvas: grain cells are sized against ITS
+    // height (resolution-proportional), so the LOOK matches the export even
+    // though the export's larger pixel grid draws its own grain instance.
+    const outW = gl.canvas.width || 1;
+    const outH = gl.canvas.height || 1;
+    gl.uniform2f(this.loc.u_outPx, outW, outH);
+    gl.uniform1f(this.loc.u_outAspect, outW / outH);
+    gl.uniform1f(this.loc.u_grainAmt, p.grainAmt ?? 0);
+    gl.uniform1f(this.loc.u_grainCell, grainCellPx(p.grainSize ?? 1.5, outH));
+    gl.uniform1f(this.loc.u_vigAmt, p.vigAmt ?? 0);
+    gl.uniform1f(this.loc.u_vigMid, p.vigMid ?? 0.5);
     gl.uniform1f(this.loc.u_localScale, this.localScale);
     gl.uniform1i(this.loc.u_localTex, 4);
     gl.activeTexture(gl.TEXTURE4);

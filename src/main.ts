@@ -7,7 +7,7 @@ import { findLocation, stripLocation } from "./gps";
 import { writeZip, crc32 } from "./zip";
 import { putFrame, eachFrame, frameMetas, frameCount, clearFrames } from "./batchstore";
 import * as Session from "./session";
-import { TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, type MaskLayer, type CropRect } from "./pipeline";
+import { TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, type MaskLayer, type CropRect } from "./pipeline";
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, type HealSpot } from "./heal";
 import { generateCube } from "./lut";
 import { generateDcp } from "./dcp";
@@ -101,6 +101,11 @@ const params: EditParams = {
   hsl: hslDefault(),
   bwOn: false,
   bwMix: [1, 1, 1],
+  grade: [...GRADE_DEFAULT],
+  grainAmt: 0,
+  grainSize: 1.5,
+  vigAmt: 0,
+  vigMid: 0.5,
   spots: [],
   crop: { ...CROP_DEFAULT },
   straighten: 0,
@@ -403,6 +408,7 @@ function syncToUI() {
   updateBandLabels();
   updateHslUI();
   updateBwUI();
+  updateGradeUI(); // hoisted; wheels/grain/vignette follow undo/redo/loads too
   syncLutUI(); // hoisted; reflects params.lut so undo/redo/reset/loads all update the LUT row
 }
 
@@ -485,6 +491,11 @@ function applyLook(name: keyof typeof LOOKS) {
   params.hsl = hslDefault();
   params.bwOn = false;
   params.bwMix = [1, 1, 1];
+  params.grade = [...GRADE_DEFAULT];
+  params.grainAmt = 0;
+  params.grainSize = 1.5;
+  params.vigAmt = 0;
+  params.vigMid = 0.5;
   syncToUI();
   draw();
 }
@@ -582,6 +593,11 @@ function cloneParams(p: EditParams): EditParams {
     hsl: [...(p.hsl ?? hslDefault())],
     bwOn: !!p.bwOn,
     bwMix: [...(p.bwMix ?? [1, 1, 1])] as [number, number, number],
+    grade: [...(p.grade ?? GRADE_DEFAULT)],
+    grainAmt: p.grainAmt ?? 0,
+    grainSize: p.grainSize ?? 1.5,
+    vigAmt: p.vigAmt ?? 0,
+    vigMid: p.vigMid ?? 0.5,
     spots: (p.spots ?? []).map((s) => ({ ...s })),
     crop: { ...(p.crop ?? CROP_DEFAULT) },
     straighten: p.straighten ?? 0,
@@ -636,6 +652,11 @@ function applySnapshot(s: Snapshot) {
   params.hsl = c.hsl?.length === 24 ? c.hsl : hslDefault();
   params.bwOn = c.bwOn;
   params.bwMix = c.bwMix;
+  params.grade = c.grade?.length === 7 ? c.grade : [...GRADE_DEFAULT];
+  params.grainAmt = c.grainAmt ?? 0;
+  params.grainSize = c.grainSize ?? 1.5;
+  params.vigAmt = c.vigAmt ?? 0;
+  params.vigMid = c.vigMid ?? 0.5;
   params.spots = c.spots ?? [];
   params.crop = c.crop ?? { ...CROP_DEFAULT };
   params.straighten = c.straighten ?? 0;
@@ -774,6 +795,11 @@ function currentLook(): SavedLook {
     hsl: [...params.hsl],
     bwOn: params.bwOn,
     bwMix: [...params.bwMix] as [number, number, number],
+    grade: [...(params.grade ?? GRADE_DEFAULT)],
+    grainAmt: params.grainAmt ?? 0,
+    grainSize: params.grainSize ?? 1.5,
+    vigAmt: params.vigAmt ?? 0,
+    vigMid: params.vigMid ?? 0.5,
   };
 }
 
@@ -873,6 +899,11 @@ function applySavedLook(look: SavedLook, lut: EditParams["lut"] = null) {
   params.hsl = [...look.hsl];
   params.bwOn = look.bwOn;
   params.bwMix = [...look.bwMix] as [number, number, number];
+  params.grade = [...look.grade];
+  params.grainAmt = look.grainAmt;
+  params.grainSize = look.grainSize;
+  params.vigAmt = look.vigAmt;
+  params.vigMid = look.vigMid;
   activeLook = null; // a loaded custom grade isn't one specific built-in look
   clampToneOrder();
   syncToUI();
@@ -1091,7 +1122,7 @@ $("toneReset").addEventListener("click", () => {
 
 // --- Sectioned tab panel: segmented tabs, one section of controls each.
 // The active tab is remembered per session so reopening lands where you left.
-const PANEL_TABS = ["basic", "ir", "bw", "color", "tone", "masks", "corrections", "export", "crop"] as const;
+const PANEL_TABS = ["basic", "ir", "bw", "color", "tone", "masks", "corrections", "export", "crop", "grade"] as const;
 type PanelTab = (typeof PANEL_TABS)[number];
 const TAB_META: Record<PanelTab, { name: string; sub: string }> = {
   basic: { name: "Basic", sub: "White balance, exposure & detail" },
@@ -1102,6 +1133,7 @@ const TAB_META: Record<PanelTab, { name: string; sub: string }> = {
   masks: { name: "Masks", sub: "Local, area-only adjustments" },
   corrections: { name: "Corrections", sub: "Dust, spots & IR lens fixes" },
   export: { name: "Export", sub: "Save, my looks & profiles" },
+  grade: { name: "Grade", sub: "Color wheels, toned mono, grain & vignette" },
   crop: { name: "Crop & rotate", sub: "Rotate, crop & straighten" },
 };
 const panelTabsEl = $("panelTabs") as HTMLElement;
@@ -1355,6 +1387,7 @@ bwUI.b.addEventListener("input", bwWeightInput);
 bwBtn.addEventListener("click", () => {
   params.bwOn = !params.bwOn; // weights are kept — the toggle only switches the mode
   updateBwUI();
+  updateGradeUI(); // the toned-mono chips key on bwOn too
   draw();
   flushRecord();
 });
@@ -1362,10 +1395,195 @@ $("bwReset").addEventListener("click", () => {
   params.bwOn = false;
   params.bwMix = [1, 1, 1];
   updateBwUI();
+  updateGradeUI();
   draw();
   flushRecord();
 });
 updateBwUI();
+
+// --- Grade tab (Creative): three tint wheels + toned mono + grain/vignette.
+// Each wheel is a pointer convenience over the ACCESSIBLE pair of native
+// sliders (Hue/Amount) — both write the same params.grade, both refresh
+// through updateGradeUI (the tone-widget pattern). Wheel drag: direction =
+// hue (0° at 12 o'clock, clockwise — matching the CSS conic ring), distance
+// = amount.
+const GRADE_BANDS = ["Shadows", "Midtones", "Highlights"] as const;
+const gradeWheelsEl = $("gradeWheels") as HTMLDivElement;
+const gradeBalEl = $("gradeBal") as HTMLInputElement;
+const gradeBandUI: { hue: HTMLInputElement; amt: HTMLInputElement; puck: HTMLSpanElement; val: HTMLSpanElement; wheel: HTMLDivElement }[] = [];
+const WHEEL_R = 44; // px — half the .grade-wheel box; puck travel radius below
+const PUCK_MAX = 33; // keep the puck's centre inside the ring
+
+for (let band = 0; band < 3; band++) {
+  const row = document.createElement("div");
+  row.className = "grade-band";
+  const box = document.createElement("div");
+  box.className = "grade-wheel-box";
+  const name = document.createElement("span");
+  name.className = "grade-band-name";
+  name.textContent = GRADE_BANDS[band];
+  const wheel = document.createElement("div");
+  wheel.className = "grade-wheel";
+  // Pointer-only redundant control (the sliders + readout are the a11y path),
+  // exactly like the tone-curve drag dots.
+  wheel.setAttribute("aria-hidden", "true");
+  const puck = document.createElement("span");
+  puck.className = "grade-puck";
+  wheel.append(puck);
+  const val = document.createElement("span");
+  val.className = "grade-band-val";
+  box.append(name, wheel, val);
+  const sliders = document.createElement("div");
+  sliders.className = "grade-band-sliders";
+  const mkSlider = (label: string, min: number, max: number, step: number) => {
+    const l = document.createElement("label");
+    l.append(label + " ");
+    const inp = document.createElement("input");
+    inp.type = "range";
+    inp.min = String(min);
+    inp.max = String(max);
+    inp.step = String(step);
+    inp.setAttribute("aria-label", `${GRADE_BANDS[band]} ${label.toLowerCase()}`);
+    l.append(inp);
+    sliders.append(l);
+    return inp;
+  };
+  const hue = mkSlider("Hue", 0, 360, 1);
+  const amt = mkSlider("Amount", 0, 100, 1);
+  row.append(box, sliders);
+  gradeWheelsEl.append(row);
+  gradeBandUI.push({ hue, amt, puck, val, wheel });
+
+  const setFromSliders = () => {
+    params.grade![band * 2] = Number(hue.value);
+    params.grade![band * 2 + 1] = Number(amt.value) / 100;
+    updateGradeUI();
+    draw(); // undo coalesces per drag via recordSoon, like every slider
+  };
+  hue.addEventListener("input", setFromSliders);
+  amt.addEventListener("input", setFromSliders);
+
+  wheel.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    wheel.setPointerCapture(e.pointerId);
+    const move = (ev: PointerEvent) => {
+      const rect = wheel.getBoundingClientRect();
+      const dx = ev.clientX - (rect.left + rect.width / 2);
+      const dy = ev.clientY - (rect.top + rect.height / 2);
+      // 0° at 12 o'clock, clockwise — the CSS conic ring's own convention.
+      const deg = (Math.atan2(dx, -dy) * 180) / Math.PI;
+      params.grade![band * 2] = Math.round(((deg % 360) + 360) % 360);
+      params.grade![band * 2 + 1] = Math.min(1, Math.sqrt(dx * dx + dy * dy) / PUCK_MAX);
+      updateGradeUI();
+      draw();
+    };
+    move(e);
+    const up = () => {
+      wheel.removeEventListener("pointermove", move);
+      wheel.removeEventListener("pointerup", up);
+      wheel.removeEventListener("pointercancel", up);
+      flushRecord(); // one drag = one undo step
+    };
+    wheel.addEventListener("pointermove", move);
+    wheel.addEventListener("pointerup", up);
+    wheel.addEventListener("pointercancel", up);
+  });
+}
+
+// Toned mono presets: bwOn + a wheel recipe — the classic darkroom tones.
+// Chip selection = "✓ " TEXT prefix + aria-pressed (never colour alone).
+const TONED_MONO: { label: string; grade: number[] }[] = [
+  { label: "Sepia", grade: [35, 0.2, 40, 0.16, 45, 0.3, 0] },
+  { label: "Selenium", grade: [265, 0.14, 270, 0.08, 280, 0.1, 0] },
+  { label: "Cyanotype", grade: [215, 0.3, 210, 0.2, 205, 0.16, 0] },
+  { label: "Gold", grade: [45, 0.1, 48, 0.14, 50, 0.32, 0] },
+  { label: "Split", grade: [220, 0.22, 0, 0, 45, 0.26, 0] },
+];
+const tonedMonoEl = $("tonedMono") as HTMLDivElement;
+const tonedMonoBtns: HTMLButtonElement[] = [];
+for (const def of TONED_MONO) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "mix-chip";
+  b.addEventListener("click", () => {
+    params.bwOn = true; // toned MONO — the preset owns the whole recipe
+    params.grade = [...def.grade];
+    updateBwUI();
+    updateGradeUI();
+    draw();
+    flushRecord();
+  });
+  tonedMonoEl.append(b);
+  tonedMonoBtns.push(b);
+}
+
+const grainAmtEl = $("grainAmt") as HTMLInputElement;
+const grainSizeEl = $("grainSize") as HTMLInputElement;
+const vigAmtEl = $("vigAmt") as HTMLInputElement;
+const vigMidEl = $("vigMid") as HTMLInputElement;
+for (const [el, key] of [
+  [grainAmtEl, "grainAmt"],
+  [grainSizeEl, "grainSize"],
+  [vigAmtEl, "vigAmt"],
+  [vigMidEl, "vigMid"],
+] as const) {
+  el.addEventListener("input", () => {
+    params[key] = Number(el.value);
+    draw();
+  });
+}
+
+/** Reflect params.grade + grain/vignette into wheels, sliders, readouts and
+ *  preset chips — called from syncToUI so undo/redo/loads refresh everything. */
+function updateGradeUI() {
+  const g = params.grade ?? (params.grade = [...GRADE_DEFAULT]);
+  for (let band = 0; band < 3; band++) {
+    const ui2 = gradeBandUI[band];
+    const hue = g[band * 2] ?? 0;
+    const amt = g[band * 2 + 1] ?? 0;
+    ui2.hue.value = String(Math.round(hue));
+    ui2.amt.value = String(Math.round(amt * 100));
+    const rad = ((hue - 90) * Math.PI) / 180; // 0° = 12 o'clock, clockwise
+    ui2.puck.style.left = `${WHEEL_R + Math.cos(rad) * amt * PUCK_MAX}px`;
+    ui2.puck.style.top = `${WHEEL_R + Math.sin(rad) * amt * PUCK_MAX}px`;
+    // Puck fill = the picked tint (redundant); the TEXT readout carries it.
+    if (amt > 0) {
+      const [r, gg, b] = hsv2rgb(hue, 1, 1);
+      ui2.puck.style.background = `rgb(${Math.round(r * 255)} ${Math.round(gg * 255)} ${Math.round(b * 255)})`;
+      ui2.val.textContent = `${Math.round(hue)}° · ${Math.round(amt * 100)}%`;
+    } else {
+      ui2.puck.style.background = "transparent";
+      ui2.val.textContent = "off";
+    }
+  }
+  gradeBalEl.value = String(g[6] ?? 0);
+  grainAmtEl.value = String(params.grainAmt ?? 0);
+  grainSizeEl.value = String(params.grainSize ?? 1.5);
+  vigAmtEl.value = String(params.vigAmt ?? 0);
+  vigMidEl.value = String(params.vigMid ?? 0.5);
+  tonedMonoBtns.forEach((b, i) => {
+    const def = TONED_MONO[i];
+    const on = params.bwOn && def.grade.every((v, k) => Math.abs(v - (g[k] ?? 0)) < 0.005);
+    b.textContent = (on ? "✓ " : "") + def.label;
+    b.setAttribute("aria-pressed", String(on));
+  });
+}
+
+gradeBalEl.addEventListener("input", () => {
+  params.grade![6] = Number(gradeBalEl.value);
+  draw();
+});
+$("gradeReset").addEventListener("click", () => {
+  params.grade = [...GRADE_DEFAULT];
+  params.grainAmt = 0;
+  params.grainSize = 1.5;
+  params.vigAmt = 0;
+  params.vigMid = 0.5;
+  updateGradeUI();
+  draw();
+  flushRecord();
+});
+updateGradeUI();
 
 // --- Location-data guard: the 🛰 tip shows when the LOADED FILE carries GPS
 // location (src/gps.ts scans the actual bytes — EXIF GPS IFD and XMP). Tap it
@@ -3508,6 +3726,11 @@ function establishFreshEdit() {
     hsl: hslDefault(),
     bwOn: false,
     bwMix: [1, 1, 1],
+    grade: [...GRADE_DEFAULT],
+    grainAmt: 0,
+    grainSize: 1.5,
+    vigAmt: 0,
+    vigMid: 0.5,
     spots: [],
     crop: { ...CROP_DEFAULT },
     straighten: 0,
@@ -4389,6 +4612,16 @@ const LESSONS: { title: string; tab: PanelTab; steps: string[] }[] = [
       "Your mix rides saved looks and bakes into exported .cube LUTs, so the mono travels with the grade.",
     ],
   },
+  {
+    title: "Lesson 8 · Grade the mood",
+    tab: "grade",
+    steps: [
+      "Open the Grade tab — three wheels tint the shadows, midtones and highlights each on their own. Drag a dot out from the centre: direction picks the colour, distance the strength.",
+      "Pull Highlights toward gold and Shadows toward blue for the classic split tone — Balance decides which wheel owns more of the picture.",
+      "On a B&W frame, tap a Toned mono preset — Sepia, Selenium, Cyanotype — the darkroom looks, ready to fine-tune.",
+      "Finish the frame: a touch of Grain and a gentle leftward Vignette draw the eye in. Both ride your saved looks and batch — the wheels even bake into .cube exports.",
+    ],
+  },
 ];
 
 let activeLesson = -1;
@@ -4808,6 +5041,7 @@ function neutralLook(): SavedLook {
     toneB: [...TONE_DEFAULT] as [number, number, number, number, number],
     lum: 1, clarity: 0, dehaze: 0, sharpen: 0, texture: 0, hsl: hslDefault(),
     bwOn: false, bwMix: [1, 1, 1],
+    grade: [0, 0, 0, 0, 0, 0, 0], grainAmt: 0, grainSize: 1.5, vigAmt: 0, vigMid: 0.5,
   };
 }
 
@@ -4860,6 +5094,11 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["l
     hsl: [...look.hsl],
     bwOn: look.bwOn,
     bwMix: [...look.bwMix] as [number, number, number],
+    grade: [...look.grade],
+    grainAmt: look.grainAmt,
+    grainSize: look.grainSize,
+    vigAmt: look.vigAmt,
+    vigMid: look.vigMid,
     spots: [], // composition-specific — a batch frame heals nothing
     crop: { ...CROP_DEFAULT }, // composition-specific — a batch frame crops nothing
     straighten: 0,

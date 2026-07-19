@@ -429,6 +429,47 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 .mix-chip::before { content: ""; position: absolute; inset: -5px; } /* 44px hit extension */
 .mix-chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
 
+/* ---- Grade tab (Creative) ------------------------------------------------
+   Three tint wheels, one per tonal band. The wheel itself is a pointer-only
+   convenience (aria-hidden, like the tone-curve dots); the ACCESSIBLE path is
+   the paired Hue/Amount sliders plus the live text readout under each wheel —
+   meaning never rides the gradient alone. */
+.grade-band { display: flex; align-items: center; gap: 12px; margin: 10px 0; }
+.grade-wheel-box { flex: none; width: 96px; text-align: center; }
+.grade-band-name { display: block; font: 500 12px/1.2 var(--ui); color: var(--txt-2); margin-bottom: 5px; }
+.grade-wheel {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  margin: 0 auto;
+  border-radius: 50%;
+  border: 1px solid var(--line-2);
+  touch-action: none; /* the wheel drag owns the gesture — no page scroll */
+  cursor: pointer;
+  /* Decorative hue ring (the readout + sliders carry the meaning): angle =
+     hue, centre desaturates toward the panel surface = zero amount. */
+  background:
+    radial-gradient(closest-side, var(--surface) 18%, rgba(0, 0, 0, 0) 72%),
+    conic-gradient(#e33333 0deg, #dddd33 60deg, #33cc33 120deg, #33cccc 180deg, #4444ee 240deg, #cc33cc 300deg, #e33333 360deg);
+}
+/* Theme-invariant glass puck: white ring + dark halo stays visible over every
+   hue in both themes (same rationale as the HUD glass tokens). */
+.grade-puck {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1.5px rgba(7, 10, 18, 0.8);
+  background: transparent;
+}
+.grade-band-val { display: block; margin-top: 5px; font: 400 11px/1.2 var(--ui); color: var(--txt-3); min-height: 13px; }
+.grade-band-sliders { flex: 1; min-width: 0; }
+
 /* Imported .cube LUTs (Profiles & LUTs panel). The badge is TEXT — never a
    colour-only cue. */
 .lut-badge {
@@ -1444,6 +1485,10 @@ label.open-btn, label.bar-btn {
   border-color: var(--accent);
   font-weight: 600;
 }
+/* The Creative row: Grade spans the whole 4th row of the 3-wide tab grid —
+   deliberate flagship placement until the coming Creative tabs (mixer,
+   stickers, warp) fill the grid out to 4x3 and it becomes a normal cell. */
+.ptab[data-tab="grade"] { grid-column: 1 / -1; }
 .section-head { flex: none; padding: 12px 14px 8px; }
 .section-title { margin: 0; font: 600 15px/1.2 var(--display); color: var(--txt); }
 .section-sub { margin: 2px 0 0; font-size: 12px; line-height: 1.35; color: var(--txt-3); }
