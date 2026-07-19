@@ -86,6 +86,32 @@ export interface EditParams {
    *  doesn't run compileEdit). Neutral = off; [1,1,1] = the "Even" mix. */
   bwOn: boolean;
   bwMix: [number, number, number];
+  /** Color grade: split-tone wheels [hueS, amtS, hueM, amtM, hueH, amtH,
+   *  balance] — one hue (deg) + amount (0..1) per tonal band, balance -1..1
+   *  shifting the shadow/highlight crossovers. Each band adds a PURE-CHROMA
+   *  offset (the tint's Rec.709 luma is subtracted out), weighted by
+   *  smoothstep bands over the display luminance — so toning never fights
+   *  the tone curve, and it tones B&W frames too (it runs AFTER bwOn; that
+   *  is the whole "toned mono" story). Per-pixel display-space colour ->
+   *  baked into .cube; .dcp cannot carry it (dcp.ts doesn't run
+   *  compileEdit). Neutral = all amounts 0 (GRADE_DEFAULT). */
+  grade?: number[];
+  /** Film grain 0..1 (amount) + size 1..3 (grain scale, resolution-
+   *  proportional: cell size = grainSize * outputHeight / 1200 px).
+   *  Deterministic value noise (hash2d/grainNoise below) added to the FINAL
+   *  display value, luma-weighted (strongest in midtones). SPATIAL and
+   *  output-anchored: applied by the shader (crop-local coords) and by
+   *  export.ts after compileEdit — never inside compileEdit, so it is
+   *  structurally excluded from the .cube/.dcp LUTs. */
+  grainAmt?: number;
+  grainSize?: number;
+  /** Creative vignette: amount -1..1 (negative darkens the corners) and
+   *  midpoint 0..1 (how far from centre the falloff starts). A radial
+   *  smoothstep over CROP-LOCAL coords — it frames the image you kept,
+   *  unlike the source-anchored lens `vignette` correction above. Same
+   *  spatial exclusions as grain (creativeVignette below). */
+  vigAmt?: number;
+  vigMid?: number;
   /** Clarity -1..1: local contrast as a RATIO against the per-image blurred-
    *  luma map (LocalMap) — pow(L/Lblur, clarity*0.5), clamped. Ratio-based, so
    *  it is exposure- and WB-invariant. Applied on LINEAR source data before
@@ -142,6 +168,17 @@ export interface CropRect {
 }
 
 export const CROP_DEFAULT: CropRect = { x: 0, y: 0, w: 1, h: 1 };
+
+/** Identity color grade: no tint in any band, balance centred. */
+export const GRADE_DEFAULT: number[] = [0, 0, 0, 0, 0, 0, 0];
+
+/** Master strength of a full-amount wheel — one number, shared verbatim by
+ *  the shader (u_grade path) so parity is a constant, not a coincidence. */
+export const GRADE_K = 0.35;
+
+export function gradeIsNeutral(g: number[] | undefined): boolean {
+  return !g || ((g[1] ?? 0) === 0 && (g[3] ?? 0) === 0 && (g[5] ?? 0) === 0);
+}
 
 export function cropIsIdentity(c: CropRect, straighten: number): boolean {
   return (
@@ -252,7 +289,7 @@ export function maskIsActive(m: MaskLayer): boolean {
   return m.brightness !== 1 || m.contrast !== 1 || m.saturation !== 1 || m.hue !== 0 || m.warmth !== 0;
 }
 
-function smooth01(edge0: number, edge1: number, x: number): number {
+export function smooth01(edge0: number, edge1: number, x: number): number {
   const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0 || 1e-4)));
   return t * t * (3 - 2 * t);
 }
@@ -564,6 +601,80 @@ function bandWeight(hue: number, center: number, plateau: number, edge: number):
 
 const REC709 = [0.2126, 0.7152, 0.0722];
 
+/** A wheel hue -> its pure-chroma tint vector: the full-saturation RGB of the
+ *  hue with its Rec.709 luma subtracted out, so adding it never moves the
+ *  pixel's luminance. Computed ONCE per frame on the CPU and handed to the
+ *  shader as uniforms (bindPipeline) — both sides add identical numbers. */
+export function gradeTintVec(hue: number): [number, number, number] {
+  const [r, g, b] = hsv2rgb(hue, 1, 1);
+  const l = r * REC709[0] + g * REC709[1] + b * REC709[2];
+  return [r - l, g - l, b - l];
+}
+
+/** Deterministic u32 hash of a grid cell -> [0,1). Math.imul + unsigned
+ *  shifts here; the shader mirrors it with uint arithmetic (wrap-around
+ *  multiply and >> are identical in both). */
+export function hash2d(x: number, y: number): number {
+  let h = Math.imul(x, 0x27d4eb2d) ^ Math.imul(y, 0x165667b1);
+  h = Math.imul(h ^ (h >>> 15), 0x85ebca6b);
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+
+/** Value noise in [-1,1): smoothstep-blended bilinear over hashed cell
+ *  corners. `px,py` are OUTPUT pixel coords, `cellPx` the grain cell size in
+ *  those pixels. Same statistics at any resolution; bit-identical to the
+ *  shader when the pixel grids match. */
+export function grainNoise(px: number, py: number, cellPx: number): number {
+  const gx = px / cellPx, gy = py / cellPx;
+  const x0 = Math.floor(gx), y0 = Math.floor(gy);
+  const fx = gx - x0, fy = gy - y0;
+  const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+  const n00 = hash2d(x0, y0), n10 = hash2d(x0 + 1, y0);
+  const n01 = hash2d(x0, y0 + 1), n11 = hash2d(x0 + 1, y0 + 1);
+  const nx0 = n00 + (n10 - n00) * sx;
+  const nx1 = n01 + (n11 - n01) * sx;
+  return (nx0 + (nx1 - nx0) * sy) * 2 - 1;
+}
+
+/** Film grain cell size in output pixels: resolution-proportional so the
+ *  LOOK survives any export scale (1200 = the reference frame height). */
+export function grainCellPx(grainSize: number, outH: number): number {
+  return Math.max(1, (grainSize * outH) / 1200);
+}
+
+/** Add monochrome grain to a display-space pixel IN PLACE. Luma-weighted:
+ *  strongest in the midtones, fading toward both ends so blacks stay black
+ *  and skies stay clean. Mirrors the shader's grain block. */
+export function applyGrain(out: Float32Array, px: number, py: number, cellPx: number, amt: number): void {
+  const L = out[0] * 0.2126 + out[1] * 0.7152 + out[2] * 0.0722;
+  const w = 0.25 + 0.75 * (1 - Math.abs(2 * L - 1));
+  const n = grainNoise(px, py, cellPx) * amt * 0.16 * w;
+  out[0] = Math.min(1, Math.max(0, out[0] + n));
+  out[1] = Math.min(1, Math.max(0, out[1] + n));
+  out[2] = Math.min(1, Math.max(0, out[2] + n));
+}
+
+/** Creative vignette gain at a CROP-LOCAL uv (0..1 across the visible,
+ *  cropped frame — NOT the source frame the lens correction uses). Radius is
+ *  normalised so 1 = the frame corner; `mid` sets where the falloff starts,
+ *  `amt` < 0 darkens the edges, > 0 lifts them. Mirrors the shader. */
+export function creativeVignette(u: number, v: number, aspect: number, amt: number, mid: number): number {
+  const dx = (u - 0.5) * aspect;
+  const dy = v - 0.5;
+  const r = (2 * Math.sqrt(dx * dx + dy * dy)) / Math.sqrt(aspect * aspect + 1);
+  return 1 + amt * 0.85 * smooth01(mid * 0.8, 1, r);
+}
+
+/** Apply the vignette gain to a display-space pixel IN PLACE. */
+export function applyCreativeVignette(out: Float32Array, u: number, v: number, aspect: number, amt: number, mid: number): void {
+  const g = creativeVignette(u, v, aspect, amt, mid);
+  out[0] = Math.min(1, Math.max(0, out[0] * g));
+  out[1] = Math.min(1, Math.max(0, out[1] * g));
+  out[2] = Math.min(1, Math.max(0, out[2] * g));
+}
+
 // (The per-pixel edit lives in compileEdit below; the GPU shader in gl.ts is
 // kept numerically identical to it.)
 
@@ -622,6 +733,13 @@ export function compileEdit(
   // Normalised weights: only the ratio matters. An all-zero mix divides by the
   // epsilon and lands at black — honest feedback, never NaN.
   const bwDen = Math.max(1e-4, bwMix[0] + bwMix[1] + bwMix[2]);
+  const grade = p.grade ?? GRADE_DEFAULT;
+  const gAmtS = grade[1] ?? 0, gAmtM = grade[3] ?? 0, gAmtH = grade[5] ?? 0;
+  const gradeOn = gAmtS !== 0 || gAmtM !== 0 || gAmtH !== 0;
+  const gBal = grade[6] ?? 0;
+  const gTintS = gradeTintVec(grade[0] ?? 0);
+  const gTintM = gradeTintVec(grade[2] ?? 0);
+  const gTintH = gradeTintVec(grade[4] ?? 0);
   const lut = p.lut && p.lut.strength > 0 ? p.lut : null;
   const lutTmp = lut ? new Float32Array(3) : null;
 
@@ -805,6 +923,20 @@ export function compileEdit(
       out[0] = L;
       out[1] = L;
       out[2] = L;
+    }
+    // Color grade: split-tone wheels. One pure-chroma tint per tonal band,
+    // weighted by smoothstep bands over the display luminance; balance
+    // shifts the shadow/highlight crossovers. Runs AFTER bwOn so it tones
+    // mono frames too (the "toned mono" story). Same in the shader.
+    if (gradeOn) {
+      const L = out[0] * 0.2126 + out[1] * 0.7152 + out[2] * 0.0722;
+      const wS = 1 - smooth01(0.05, 0.6 + 0.2 * gBal, L);
+      const wH = smooth01(0.4 + 0.2 * gBal, 0.95, L);
+      const wM = Math.max(0, 1 - wS - wH);
+      const cS = wS * gAmtS * GRADE_K, cM = wM * gAmtM * GRADE_K, cH = wH * gAmtH * GRADE_K;
+      out[0] = Math.min(1, Math.max(0, out[0] + cS * gTintS[0] + cM * gTintM[0] + cH * gTintH[0]));
+      out[1] = Math.min(1, Math.max(0, out[1] + cS * gTintS[1] + cM * gTintM[1] + cH * gTintH[1]));
+      out[2] = Math.min(1, Math.max(0, out[2] + cS * gTintS[2] + cM * gTintM[2] + cH * gTintH[2]));
     }
     // Global luminance — the very last step of the app's own grade, matching
     // the shader's u_lum.

@@ -33,6 +33,12 @@ export type SavedLook = {
   hsl: number[];
   bwOn: boolean;
   bwMix: [number, number, number];
+  /** Color grade wheels [hueS, amtS, hueM, amtM, hueH, amtH, balance]. */
+  grade: number[];
+  grainAmt: number;
+  grainSize: number;
+  vigAmt: number;
+  vigMid: number;
 };
 
 export type NamedLook = SavedLook & { name?: string };
@@ -110,6 +116,16 @@ export function coerceLook(s: unknown): SavedLook | null {
     hsl,
     bwOn: !!o.bwOn,
     bwMix: clampT3(o.bwMix, [1, 1, 1], [0, 0, 0], [2, 2, 2]),
+    grade:
+      Array.isArray(o.grade) && o.grade.length === 7
+        ? o.grade.map((x: unknown, i: number) =>
+            i === 6 ? clamped(x, 0, -1, 1) : i % 2 === 0 ? clamped(x, 0, 0, 360) : clamped(x, 0, 0, 1),
+          )
+        : [0, 0, 0, 0, 0, 0, 0],
+    grainAmt: clamped(o.grainAmt, 0, 0, 1),
+    grainSize: clamped(o.grainSize, 1.5, 1, 3),
+    vigAmt: clamped(o.vigAmt, 0, -1, 1),
+    vigMid: clamped(o.vigMid, 0.5, 0, 1),
   };
 }
 
@@ -147,6 +163,11 @@ export function encodeLookPayload(look: SavedLook, name?: string): string {
     hsl: look.hsl.map(round4),
     bwOn: look.bwOn,
     bwMix: look.bwMix.map(round4),
+    grade: look.grade.map(round4),
+    grainAmt: round4(look.grainAmt),
+    grainSize: round4(look.grainSize),
+    vigAmt: round4(look.vigAmt),
+    vigMid: round4(look.vigMid),
   };
   const o: Record<string, unknown> = { f: LOOK_FORMAT, v: LOOK_VERSION };
   const n = cleanName(name);

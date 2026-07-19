@@ -2,7 +2,7 @@
 // uses a half-res proxy), applies the exact edit pipeline on the CPU, and saves
 // a JPEG or 16-bit TIFF to the device.
 
-import { compileEdit, toLinear8, cropToDisplayUv, CROP_DEFAULT, type EditParams } from "./pipeline";
+import { compileEdit, toLinear8, cropToDisplayUv, CROP_DEFAULT, applyCreativeVignette, applyGrain, grainCellPx, type EditParams } from "./pipeline";
 import { demosaicPixelLinear, type RawCfa } from "./raw/demosaic";
 import { readMosaicedCfa } from "./raw/dngRaw";
 import { readNefCfa } from "./raw/nef";
@@ -179,6 +179,20 @@ export async function exportImage(
       : undefined;
   const edit = compileEdit(params, "cfa" in src ? src.cam : undefined, srcW / srcH, localMap);
   const out = new Float32Array(3);
+  // Creative vignette + film grain — the FINAL image ops, applied to each
+  // display-space pixel AFTER edit() and BEFORE the P3/16-bit write, on
+  // OUTPUT-frame coords ((x+0.5)/w — the same fraction the shader's
+  // v_cropUv carries). Spatial: never inside compileEdit, so they cannot
+  // bake into .cube. Vignette first, grain on top, matching the shader.
+  const vigAmt = params.vigAmt ?? 0;
+  const vigMid = params.vigMid ?? 0.5;
+  const grainAmt = params.grainAmt ?? 0;
+  const grainCell = grainCellPx(params.grainSize ?? 1.5, h);
+  const outAspect = w / h;
+  const finishPixel = (x: number, y: number) => {
+    if (vigAmt !== 0) applyCreativeVignette(out, (x + 0.5) / w, (y + 0.5) / h, outAspect, vigAmt, vigMid);
+    if (grainAmt > 0) applyGrain(out, x + 0.5, y + 0.5, grainCell, grainAmt);
+  };
   // Dust & spot heals rewrite the source BEFORE everything (mirroring the
   // preview, which bakes them into the GPU texture): the 8-bit path reads the
   // exact quantized bytes the preview bakes, the raw path the same f32 mix.
@@ -260,6 +274,7 @@ export async function exportImage(
         const [sx, sy] = toSrc(x, y);
         const [r, g, b] = sampleBox(x, y); // box-filtered when scaled (see above)
         edit(r, g, b, out, glowAt(sx, sy), (sx + 0.5) / srcW, (sy + 0.5) / srcH);
+        finishPixel(x, y); // creative vignette + grain, still in sRGB display space
         srgbDisplayToP3Display(out[0], out[1], out[2], p3);
         const o = (y * w + x) * 4;
         data[o] = p3[0] * 255;
@@ -322,6 +337,7 @@ export async function exportImage(
         const [sx, sy] = toSrc(x, y);
         const [r, g, b] = sampleBox(x, y); // box-filtered when scaled (see above)
         edit(r, g, b, out, glowAt(sx, sy), (sx + 0.5) / srcW, (sy + 0.5) / srcH);
+        finishPixel(x, y); // creative vignette + grain, same as the JPEG path
         const o = (y * w + x) * 3;
         rgb[o] = out[0] * 65535 + 0.5; // round — truncation biased the 16-bit output low
         rgb[o + 1] = out[1] * 65535 + 0.5;

@@ -193,14 +193,6 @@ user-scalable=no.
 > different approach and mindset"). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
-- [ ] **Color grading — shadow / midtone / highlight wheels** — CREATIVE
-  RELEASE (v2.0), owner go 2026-07-18. Split-toning color wheels per tonal
-  band; duotone / toned mono (completing the 720nm B&W story above); film
-  grain; a creative post-crop vignette. Wheels + duotone are per-pixel
-  display-space color → compileEdit + .cube like the HSL mixer; grain and
-  vignette are spatial → pre-pass, excluded from the LUTs per the spatial-op
-  rulebook (the creative vignette frames the post-CROP image, unlike the
-  source-anchored lens-vignette correction).
 - [ ] **Custom false color — full 3×3 channel mixer** — CREATIVE RELEASE
   (v2.0), promoted from the backlog 2026-07-18: arbitrary channel mixing
   beyond the R⇄B swap (aerochrome-style and invented palettes). IR-native,
@@ -210,6 +202,20 @@ user-scalable=no.
   sketch lives in "Future / bigger bets" below — linear-source-space
   compositing so stickers inherit the IR palette, occlusion via the existing
   mask machinery, and the scope caution: stickers, NOT a general layer stack.
+  OWNER INSPIRATION (5 screenshots, sent 2026-07-19; captured from his iPad
+  the night of 2026-07-18): the CLASSIC UFO-PHOTOGRAPH aesthetic — the
+  X-Files "I Want to Believe" poster (grainy saucer over a misty treeline),
+  saucers hovering over forest hills, a UFO "beaming up" a lone tree with a
+  light cone, aliens PEEKING FROM BEHIND tree trunks (the tree-peeker), and
+  a stipple/engraving-style B&W set (saucers, Saturn, capsule, shuttle).
+  Build notes from the boards: (1) occlusion is the heart of the joke — the
+  peeking alien / saucer behind the treeline is exactly the mask-occlusion
+  sketch; (2) believability comes from FINISH — the sticker must take the
+  photo's grain/blur/tone (the 2.0 grain stage is the tool: grain applies
+  AFTER compositing, so it rides over stickers for free); (3) two art
+  styles wanted: photo-real saucer/alien AND the engraved-stipple mono set
+  (the latter pairs naturally with toned mono); (4) a beam light-cone
+  element that brightens what it covers would sell the beam-up gag.
 - [ ] **Warp tools — Swirl / Liquefy / Pinch** — CREATIVE RELEASE (v2.0),
   promoted from the backlog 2026-07-18 (owner ask 2026-07-14). The
   UV-displacement-field sketch lives in "Future / bigger bets" below; spatial
@@ -2785,6 +2791,83 @@ user-scalable=no.
   NEEDS THE OWNER'S HANDS: VoiceOver on the real iPad — the library and
   quick look as modals (background truly silenced), the ask dialog's
   three-way feel, and that Escape/scrim behavior matches muscle memory.
+- [x] **Color grading — shadow / midtone / highlight wheels** — THE CREATIVE
+  RELEASE OPENS: ships as **2.0** (the owner's declared identity change,
+  2026-07-18; later Creative capabilities bump the middle — 2.1 mixer etc.).
+  A new full-width **Grade** tab (the 10th; `.ptab[data-tab="grade"]` spans
+  row 4 until the coming Creative tabs complete the 4×3 grid).
+  WHEELS: `grade: number[7]` = [hueS, amtS, hueM, amtM, hueH, amtH,
+  balance]. Three tint wheels (drag the puck: angle = hue matching the CSS
+  conic ring — 0° at 12 o'clock, clockwise; distance = amount), each
+  PAIRED with native Hue/Amount sliders as the accessible path (the
+  tone-widget pattern: widget pointer-only + aria-hidden, sliders + a text
+  readout "220° · 60%" carry the meaning). Pipeline: a pure-chroma offset
+  per band — gradeTintVec(hue) = hsv2rgb(h,1,1) minus its Rec.709 luma, so
+  toning NEVER moves luminance (unit-proven to 4e-3) — weighted by
+  smoothstep bands over display luminance (partition of unity;
+  balance ±1 shifts the shadow/highlight crossovers by ±0.2). Applied
+  AFTER bwOn (tones mono — that's the whole toned-mono story), before
+  global lum. GRADE_K = 0.35 (pipeline.ts) is hardcoded 0.35 in the
+  shader with a pointer comment. PARITY BY CONSTRUCTION: bindPipeline
+  computes the tint vectors with the same gradeTintVec the CPU uses and
+  hands them to the shader as uniforms (u_gradeTintS/M/H + u_gradeAmt +
+  u_gradeBal). Bakes into .cube automatically (no uv dependence); .dcp
+  CANNOT carry it (dcp.ts doesn't run compileEdit — like B&W, recorded).
+  TONED MONO: preset chips (Sepia/Selenium/Cyanotype/Gold/Split) = bwOn +
+  a wheel recipe — NOT a second pipeline stage; a true two-ink duotone
+  remains possible later if the owner asks. BW_MIXES chip pattern (✓ text
+  + aria-pressed); the B&W toggle/reset also refresh these chips.
+  FILM GRAIN: grainAmt 0..1 + grainSize 1..3. Deterministic value noise —
+  hash2d (Math.imul u32 mix) + smoothstep-bilinear corner blend, VERBATIM
+  uint twin in GLSL; cells resolution-proportional (grainCellPx = size ×
+  outH/1200) so the LOOK survives any export scale; amplitude 0.16 ×
+  luma hat (0.25 + 0.75·(1−|2L−1|)) — strongest in mids, blacks stay
+  black; monochrome push, zero-mean (walk: 24×24 mean moves ≤ 0.8 LSB
+  while per-pixel Δ hits 18). Preview draws grain on ITS canvas pixels,
+  export on the output grid — same statistics/look, different instance
+  (recorded; pixel-identical only when dims match).
+  CREATIVE VIGNETTE: vigAmt −1..1 (negative darkens) + vigMid 0..1.
+  Radial smoothstep over CROP-LOCAL uv — walk-PROVEN to follow a 1:1
+  crop — unlike the source-anchored lens vignette. Both grain + vignette
+  ride at the very END (after the imported LUT): shader uses a new
+  v_cropUv varying (the vertex shader's pre-crop output fraction — the
+  same (x+0.5)/w the export loop hands to the pipeline.ts twins
+  applyGrain/applyCreativeVignette between edit() and the P3/16-bit
+  write); batch inherits via the shared exportImage. NEVER in compileEdit
+  → structurally excluded from .cube (unit: lattice string identical with
+  them on/off; walk: two UI-exported .cubes byte-identical). Offscreen
+  read passes (histogram) see full-frame uv — a known approximation.
+  SERIALIZATION: look.ts 4-point (grade clamps per-index: hue 0..360,
+  amt 0..1, bal −1..1; hostile 1e308 clamps; legacy payloads coerce to
+  identity), slots, links/codes, session resume, batch, applyLook reset,
+  origParams, establishFreshEdit. Lesson 8 "Grade the mood" (tab:
+  "grade"); Help gained "Grade — wheels, toned mono, grain & vignette";
+  export-tab note updated in-section.
+  VERIFIED (fail-first BOTH harnesses): 24 unit checks (grade-unit,
+  esbuild+node — partition of unity, balance direction, bit-identical
+  identity, luminance invariance, band separation, sepia warms/cyanotype
+  cools, round-trip/legacy/hostile, hash determinism + zero-mean +
+  bounds, cell scaling, vignette shape ×5, .cube in/out) with PLANT=leak
+  (shadow tints highlights — FAILS healthy) and PLANT=bake (spatial in
+  the lattice — FAILS healthy); 28 walk checks (grade-walk, headless on
+  a luminance-ramp fixture — full-width tab, band structure, shadow
+  wheel dB=+37 on the dark side with the bright side Δ0, wheel DRAG
+  lands hue 90/amt 91 in the sliders, undo/redo, slot round-trip, Sepia
+  chip → mono+warm, grain on/off/exact-restore, vignette corner −20 with
+  centre Δ≤2, vignette follows the 1:1 crop (dG=45 on the cropped
+  corner), .cube exclusion + dark-lattice blue-lift, exported 320×320
+  JPEG corner 21 vs centre 134 + grain variance 54, axe clean both
+  themes, no page errors) with the walk-level PLANT=bake also flipped.
+  Instrument lesson re-learned: the first unit run "failed" 4 checks
+  because the harness's neutralParams() never spread its overrides —
+  suspect the instrument first. Regression walks re-run green: curves,
+  bw (its 9-tab pin updated to 10 — the intended change), downscale,
+  overlay, p3, exif, loc. VERSION → 2.0 in this release's own commit.
+  NEEDS THE OWNER'S HANDS: wheel-drag feel on the iPad (puck size, the
+  full-width Grade row placement he hasn't blessed yet), grain character
+  on the real panel at his usual export sizes, the five toned-mono
+  recipes against his taste (they're my calibration), and strong tints
+  through the Display-P3 JPEG path in Apple Photos.
 
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 

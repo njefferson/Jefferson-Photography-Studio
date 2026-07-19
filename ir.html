@@ -183,6 +183,9 @@
           <button id="ptab-export" aria-controls="sec-export" class="ptab" type="button" data-tab="export" role="tab" aria-selected="false">Export</button>
           <button id="ptab-corrections" aria-controls="sec-corrections" class="ptab" type="button" data-tab="corrections" role="tab" aria-selected="false">Corrections</button>
           <button id="ptab-crop" aria-controls="sec-crop" class="ptab" type="button" data-tab="crop" role="tab" aria-selected="false">Crop &amp; rotate</button>
+          <!-- The Creative row: full-width for now — it becomes a normal cell
+               as the next Creative tabs complete the 4x3 grid. -->
+          <button id="ptab-grade" aria-controls="sec-grade" class="ptab" type="button" data-tab="grade" role="tab" aria-selected="false">Grade</button>
         </div>
         <div class="section-head">
           <h2 id="sectionTitle" class="section-title">Basic</h2>
@@ -241,6 +244,25 @@
             <label>Blue weight <input id="bwB" type="range" min="0" max="2" step="0.01" value="1" /></label>
             <p class="note">Tip: while it's on, the Color mixer's Luminance &mdash; and &#10021; Drag on photo to adjust &mdash; brighten or darken each color's grey. Bakes into .cube exports; .dcp can't carry it.</p>
             <button id="bwReset" type="button">Reset black &amp; white</button>
+          </section>
+
+          <!-- ===== GRADE (Creative) ===== -->
+          <section class="section" role="tabpanel" id="sec-grade" aria-labelledby="ptab-grade" data-tab="grade" hidden>
+            <p class="note">Tint the shadows, midtones and highlights each on their own wheel &mdash; drag the dot out from the centre (direction picks the colour, distance the strength), or use the sliders. Tones color and B&amp;W photos alike.</p>
+            <div id="gradeWheels"></div>
+            <label>Balance <input id="gradeBal" type="range" min="-1" max="1" step="0.01" value="0" /></label>
+            <p class="note">Balance hands more of the picture to the shadow wheel (left) or the highlight wheel (right).</p>
+            <div class="sub-title">Toned mono</div>
+            <div id="tonedMono" class="bw-mixes" role="group" aria-label="Toned mono presets"></div>
+            <p class="note">The classic darkroom tones: each preset switches on Black &amp; white and tints it &mdash; fine-tune on the wheels after.</p>
+            <div class="sub-title">Film grain</div>
+            <label>Grain <input id="grainAmt" type="range" min="0" max="1" step="0.01" value="0" /></label>
+            <label>Grain size <input id="grainSize" type="range" min="1" max="3" step="0.05" value="1.5" /></label>
+            <div class="sub-title">Vignette</div>
+            <label>Vignette <input id="vigAmt" type="range" min="-1" max="1" step="0.01" value="0" /></label>
+            <label>Vignette size <input id="vigMid" type="range" min="0" max="1" step="0.01" value="0.5" /></label>
+            <p class="note">Pull Vignette left to darken the frame's edges, right to lift them; it follows your crop. The wheels bake into .cube exports; grain and vignette stay out (a .cube carries colour only) but do ride saved looks and batch.</p>
+            <button id="gradeReset" type="button">Reset grade</button>
           </section>
 
           <!-- ===== CORRECTIONS ===== -->
@@ -722,6 +744,22 @@
         tear into visible bands. That's why a chip's Hue reaches &plusmn;60&deg; and fades toward its
         neighbors — it's what keeps the adjustment invisible-clean. When one chip's reach isn't enough,
         make the big move with <strong>Hue shift</strong> first, then finish with the chip.</p>
+
+        <h3>Grade — wheels, toned mono, grain &amp; vignette</h3>
+        <p>The Grade tab tints the picture by brightness instead of by color: one wheel each for
+        <strong>Shadows</strong>, <strong>Midtones</strong> and <strong>Highlights</strong>. Drag a
+        wheel's dot out from the centre — direction picks the colour, distance the strength — or use
+        each wheel's Hue and Amount sliders (same control, keyboard-friendly). <strong>Balance</strong>
+        hands more of the picture to the shadow or highlight wheel. The classic move: highlights toward
+        gold, shadows toward blue.</p>
+        <p>The wheels tone Black &amp; white frames too — that's the <strong>Toned mono</strong> row:
+        Sepia, Selenium, Cyanotype, Gold and Split switch on B&amp;W and tint it like the darkroom
+        papers they're named for.</p>
+        <p><strong>Grain</strong> adds film texture (Size sets how coarse), and <strong>Vignette</strong>
+        darkens (left) or lifts (right) the frame's edges — it follows your crop, unlike the Corrections
+        vignette, which fixes the lens on the full frame. Everything here rides saved looks, sessions and
+        batch. Exports: the wheels bake into .cube files; grain and vignette don't (a .cube carries colour
+        only) — and .dcp can't carry any of it.</p>
 
         <h3>Light &amp; area tools</h3>
         <ul>
