@@ -199,6 +199,18 @@ export interface Sticker {
   occlude: number; // 0..1 occlusion strength (0 = always on top)
   occludeLuma: number; // 0..1 luminance threshold
   occludeBright: boolean; // true = bright pixels occlude; false = dark pixels
+  // Per-sticker match adjustments, applied to the asset colour BEFORE it
+  // composites into the source — so the sticker can be made to sit in the
+  // scene. All 0 = the raw asset. Auto-set on add (auto-match), user-tunable.
+  bright?: number; // -1..1 brightness
+  contrast?: number; // -1..1 contrast about mid grey
+  warmth?: number; // -1..1 R↑/B↓ (warm) vs R↓/B↑ (cool)
+  sat?: number; // -1..1 saturation (−1 = grey, +1 = ~2×)
+  /** Per-sticker erase/restore mask in ASSET-LOCAL space (paint to tuck the
+   *  sticker behind foreground). 0 = hidden, 255 = shown; absent = fully
+   *  shown. Runtime bitmap like the brush masks; `maskRev` bumps per stroke. */
+  mask?: BrushMask | null;
+  maskRev?: number;
 }
 
 export interface CropRect {
