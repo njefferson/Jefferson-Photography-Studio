@@ -80,6 +80,11 @@ patterns already verified correct — do not "fix" those, do not regress them.
 - iPad-first, often driving. One step at a time; no desktop-required steps
   unless every alternative is exhausted. No drafts or pseudo-code — iterate
   privately, deliver finished work.
+- NEVER use the pop-up question tool (AskUserQuestion) — on his iPad the
+  answers don't come back (the tool fails or the response is lost), so it just
+  stalls the work (owner rule, 2026-07-19). Ask any question as plain text in
+  chat and let him reply normally. This includes plan-mode clarifications —
+  ask in chat, don't open a picker.
 - Session repo access is fixed at session creation (source picker); it cannot
   be added from the iPad mid-session.
 - Taste: maximum saturation, gentle contrast, shadows alive; direct
