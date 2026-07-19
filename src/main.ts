@@ -9,6 +9,8 @@ import { putFrame, eachFrame, frameMetas, frameCount, clearFrames } from "./batc
 import * as Session from "./session";
 import { TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, type MaskLayer, type CropRect } from "./pipeline";
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, type HealSpot } from "./heal";
+import { makeStickerAsset, stickerRect, compositeStickersIntoRect8, compositeStickersIntoRectF32, type StickerAsset } from "./sticker";
+import type { Sticker } from "./pipeline";
 import { generateCube } from "./lut";
 import { generateDcp } from "./dcp";
 import { buildGlowMap } from "./glow";
@@ -411,6 +413,7 @@ function syncToUI() {
   updateBwUI();
   updateGradeUI(); // hoisted; wheels/grain/vignette follow undo/redo/loads too
   updateMix3UI(); // hoisted; channel mixer follows undo/redo/loads too
+  updateStickerUI(); // hoisted; sticker controls follow undo/redo/session restore
   syncLutUI(); // hoisted; reflects params.lut so undo/redo/reset/loads all update the LUT row
 }
 
@@ -603,6 +606,7 @@ function cloneParams(p: EditParams): EditParams {
     vigMid: p.vigMid ?? 0.5,
     mix3: [...(p.mix3 ?? MIX3_DEFAULT)],
     spots: (p.spots ?? []).map((s) => ({ ...s })),
+    stickers: (p.stickers ?? []).map((s) => ({ ...s })),
     crop: { ...(p.crop ?? CROP_DEFAULT) },
     straighten: p.straighten ?? 0,
     // The LUT wrapper is cloned (a strength drag must not mutate history) but
@@ -663,6 +667,7 @@ function applySnapshot(s: Snapshot) {
   params.vigMid = c.vigMid ?? 0.5;
   params.mix3 = c.mix3?.length === 9 ? c.mix3 : [...MIX3_DEFAULT];
   params.spots = c.spots ?? [];
+  params.stickers = c.stickers ?? [];
   params.crop = c.crop ?? { ...CROP_DEFAULT };
   params.straighten = c.straighten ?? 0;
   // Read the LUT from the SNAPSHOT directly, never from the {...params} merge
@@ -997,6 +1002,7 @@ function draw() {
     positionMaskOverlay();
     positionHealOverlay();
     positionCropOverlay();
+    if (stickerReady) positionStickerOverlay();
   });
 }
 
@@ -1129,7 +1135,7 @@ $("toneReset").addEventListener("click", () => {
 
 // --- Sectioned tab panel: segmented tabs, one section of controls each.
 // The active tab is remembered per session so reopening lands where you left.
-const PANEL_TABS = ["basic", "ir", "bw", "color", "tone", "masks", "corrections", "export", "crop", "grade"] as const;
+const PANEL_TABS = ["basic", "ir", "bw", "color", "tone", "masks", "corrections", "export", "crop", "grade", "stickers"] as const;
 type PanelTab = (typeof PANEL_TABS)[number];
 const TAB_META: Record<PanelTab, { name: string; sub: string }> = {
   basic: { name: "Basic", sub: "White balance, exposure & detail" },
@@ -1141,6 +1147,7 @@ const TAB_META: Record<PanelTab, { name: string; sub: string }> = {
   corrections: { name: "Corrections", sub: "Dust, spots & IR lens fixes" },
   export: { name: "Export", sub: "Save, my looks & profiles" },
   grade: { name: "Grade", sub: "Color wheels, toned mono, grain & vignette" },
+  stickers: { name: "Stickers", sub: "Drop UFOs into the trees" },
   crop: { name: "Crop & rotate", sub: "Rotate, crop & straighten" },
 };
 const panelTabsEl = $("panelTabs") as HTMLElement;
@@ -1155,6 +1162,7 @@ const panelTabBtns = Array.from(panelTabsEl.querySelectorAll<HTMLButtonElement>(
 // runs before they're declared).
 let activePanelTab: PanelTab = "basic";
 let overlayReady = false;
+let stickerReady = false; // set true once the sticker block below has run
 
 function setPanelTab(tab: PanelTab) {
   if (!PANEL_TABS.includes(tab)) return;
@@ -1178,6 +1186,10 @@ function setPanelTab(tab: PanelTab) {
   // re-entering the Masks tab restores the coverage tint (guarded: the overlay
   // system — and maskAdjusting itself — only exists once overlayReady is set).
   if (overlayReady) { maskAdjusting = false; renderMaskOverlay(); }
+  // The Stickers tab arms sticker manipulation on the canvas (drag to move);
+  // leaving it disarms. Guarded on stickerReady so the init-time setPanelTab
+  // (before the sticker block runs) is a no-op.
+  if (stickerReady) setStickerMode(activePanelTab === "stickers");
 }
 panelTabBtns.forEach((b) => b.addEventListener("click", () => setPanelTab(b.dataset.tab as PanelTab)));
 // Keyboard tab traversal: Left/Right (wrapping) and Home/End move focus AND
@@ -1672,6 +1684,226 @@ $("mix3Reset").addEventListener("click", () => {
   flushRecord();
 });
 updateMix3UI();
+
+// --- Stickers (Creative): drop a UFO into the trees. Tap an asset to add it
+// (placed at centre, selected), then DRAG it on the photo; sliders size, spin
+// and hide it behind the scene. Stickers bake INTO the source (sticker.ts) so
+// they inherit the whole IR pipeline and grain settles over them. Placement
+// lives in params.stickers → undo/session for free; excluded from looks/batch. ---
+
+// In-house sticker assets (public/stickers/<key>.png), loaded once on demand.
+// The catalog IS the picker order.
+const STICKER_CATALOG: { key: string; label: string }[] = [
+  { key: "saucer", label: "Saucer" },
+  { key: "alien", label: "Alien" },
+  { key: "saturn", label: "Saturn" },
+  { key: "beam", label: "Beam" },
+];
+const stickerAssets: Record<string, StickerAsset> = {};
+let stickerAssetsPending = false;
+async function loadStickerAssets() {
+  if (stickerAssetsPending) return;
+  stickerAssetsPending = true;
+  await Promise.all(
+    STICKER_CATALOG.map(async ({ key }) => {
+      if (stickerAssets[key]) return;
+      try {
+        const bmp = await createImageBitmap(await (await fetch(`./stickers/${key}.png`)).blob());
+        const c = document.createElement("canvas");
+        c.width = bmp.width; c.height = bmp.height;
+        const g = c.getContext("2d")!;
+        g.drawImage(bmp, 0, 0);
+        const rgba = g.getImageData(0, 0, bmp.width, bmp.height).data;
+        stickerAssets[key] = makeStickerAsset(key, bmp.width, bmp.height, rgba);
+      } catch {
+        /* asset missing/offline — the sticker just won't bake until it loads */
+      }
+    }),
+  );
+  draw(); // assets arrived — re-bake any placed stickers
+}
+
+let stickerArmed = false;
+let selectedSticker = -1;
+let stickerDrag: { id: number; ou: number; ov: number } | null = null;
+const stickerOverlay = $("stickerOverlay") as unknown as SVGSVGElement;
+const stkControls = $("stickerControls") as HTMLDivElement;
+const stkScale = $("stkScale") as HTMLInputElement;
+const stkRot = $("stkRot") as HTMLInputElement;
+const stkOcclude = $("stkOcclude") as HTMLInputElement;
+const stkBehindEl = $("stkBehind") as HTMLDivElement;
+const stkClearBtn = $("stkClear") as HTMLButtonElement;
+
+// The add-a-sticker chips (the catalog order).
+const stickerAddEl = $("stickerAdd") as HTMLDivElement;
+for (const { key, label } of STICKER_CATALOG) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "mix-chip";
+  b.textContent = label;
+  b.addEventListener("click", () => {
+    void loadStickerAssets();
+    const list = (params.stickers ??= []);
+    // Place at the centre of what's on screen (zoom-aware), a friendly size.
+    const c = canvas.getBoundingClientRect();
+    const [u, v] = renderer.clientToImageUv(c.left + c.width / 2, c.top + c.height / 2);
+    list.push({
+      id: crypto.randomUUID(),
+      asset: key,
+      x: Math.min(0.85, Math.max(0.15, u || 0.5)),
+      y: Math.min(0.85, Math.max(0.15, v || 0.5)),
+      scale: 0.3,
+      rot: 0,
+      occlude: 0,
+      occludeLuma: 0.6,
+      occludeBright: true,
+    });
+    selectedSticker = list.length - 1;
+    updateStickerUI();
+    draw();
+    flushRecord();
+  });
+  stickerAddEl.append(b);
+}
+
+// "Hide behind" direction chips (text-labelled, aria-pressed — never colour).
+const STK_BEHIND = [
+  { label: "Bright parts", bright: true },
+  { label: "Dark parts", bright: false },
+];
+const stkBehindBtns: HTMLButtonElement[] = [];
+for (const def of STK_BEHIND) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "mix-chip";
+  b.addEventListener("click", () => {
+    const s = selSticker();
+    if (!s) return;
+    s.occludeBright = def.bright;
+    updateStickerUI();
+    draw();
+    flushRecord();
+  });
+  stkBehindEl.append(b);
+  stkBehindBtns.push(b);
+}
+
+function selSticker(): Sticker | null {
+  const list = params.stickers ?? [];
+  return selectedSticker >= 0 && selectedSticker < list.length ? list[selectedSticker] : null;
+}
+
+/** Which sticker (topmost) covers image-uv (u,v), or -1. Pixel-space test so
+ *  rotation + aspect are handled the same way sticker.ts composites. */
+function hitSticker(u: number, v: number): number {
+  if (!current) return -1;
+  const W = current.width, H = current.height;
+  const list = params.stickers ?? [];
+  for (let i = list.length - 1; i >= 0; i--) {
+    const s = list[i];
+    const a = stickerAssets[s.asset];
+    if (!a) continue;
+    const hw = (s.scale * W) / 2, hh = hw * (a.h / a.w);
+    const dx = (u - s.x) * W, dy = (v - s.y) * H;
+    const ang = (-s.rot * Math.PI) / 180;
+    const lx = dx * Math.cos(ang) - dy * Math.sin(ang);
+    const ly = dx * Math.sin(ang) + dy * Math.cos(ang);
+    if (Math.abs(lx) <= hw && Math.abs(ly) <= hh) return i;
+  }
+  return -1;
+}
+
+const stkSliderInput = () => {
+  const s = selSticker();
+  if (!s) return;
+  s.scale = Number(stkScale.value);
+  s.rot = Number(stkRot.value);
+  s.occlude = Number(stkOcclude.value);
+  updateStickerUI();
+  draw(); // coalesces per drag like every slider
+};
+stkScale.addEventListener("input", stkSliderInput);
+stkRot.addEventListener("input", stkSliderInput);
+stkOcclude.addEventListener("input", stkSliderInput);
+
+$("stkDelete").addEventListener("click", () => {
+  const list = params.stickers ?? [];
+  if (selectedSticker < 0 || selectedSticker >= list.length) return;
+  list.splice(selectedSticker, 1);
+  selectedSticker = list.length ? Math.min(selectedSticker, list.length - 1) : -1;
+  updateStickerUI();
+  draw();
+  flushRecord();
+});
+stkClearBtn.addEventListener("click", () => {
+  if (!(params.stickers?.length)) return;
+  params.stickers = [];
+  selectedSticker = -1;
+  updateStickerUI();
+  draw();
+  flushRecord();
+});
+
+/** Reflect the selected sticker into the controls; show/hide the panels. */
+function updateStickerUI() {
+  const list = params.stickers ?? [];
+  if (selectedSticker >= list.length) selectedSticker = list.length - 1;
+  // After an undo/session-restore that brings stickers back with nothing
+  // selected, show the last one so its controls are reachable again.
+  if (selectedSticker < 0 && list.length) selectedSticker = list.length - 1;
+  const s = selSticker();
+  stkControls.hidden = !s;
+  stkClearBtn.hidden = list.length === 0;
+  if (s) {
+    stkScale.value = String(s.scale);
+    stkRot.value = String(s.rot);
+    stkOcclude.value = String(s.occlude);
+    stkBehindBtns.forEach((b, i) => {
+      const on = s.occludeBright === STK_BEHIND[i].bright;
+      b.textContent = (on ? "✓ " : "") + STK_BEHIND[i].label;
+      b.setAttribute("aria-pressed", String(on));
+    });
+  }
+  positionStickerOverlay();
+}
+
+/** Draw the selected sticker's bounding box (rotated) as the selection cue. */
+function positionStickerOverlay() {
+  const s = selSticker();
+  const show = stickerArmed && !!current && welcome.hidden && !!s && !!stickerAssets[s!.asset];
+  stickerOverlay.toggleAttribute("hidden", !show);
+  if (!show || !s) { stickerOverlay.replaceChildren(); return; }
+  const a = stickerAssets[s.asset];
+  const W = current!.width, H = current!.height;
+  const hw = (s.scale * W) / 2, hh = hw * (a.h / a.w);
+  const ang = (s.rot * Math.PI) / 180;
+  const cs = Math.cos(ang), sn = Math.sin(ang);
+  const rect = stickerOverlay.getBoundingClientRect();
+  const pts = [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].map(([lx, ly]) => {
+    const px = s.x * W + (lx * cs - ly * sn);
+    const py = s.y * H + (lx * sn + ly * cs);
+    const [cx, cy] = renderer.imageUvToClient(px / W, py / H);
+    return `${cx - rect.left},${cy - rect.top}`;
+  });
+  const poly = document.createElementNS(SVGNS, "polygon");
+  poly.setAttribute("points", pts.join(" "));
+  poly.setAttribute("class", "sticker-box");
+  stickerOverlay.replaceChildren(poly);
+}
+
+/** Arm/disarm sticker manipulation on the canvas. Arming loads the assets and
+ *  disarms the other exclusive picture tools (heal/crop/masks/picks). */
+function setStickerMode(on: boolean) {
+  stickerArmed = on && !!current;
+  if (stickerArmed) {
+    void loadStickerAssets();
+    setHslPick(false); setColorPick(false); setTat(false); setHeal(false); setHealReview(false); setGeoMode(null);
+    mUI.paint.setAttribute("aria-pressed", "false");
+  }
+  updateStickerUI();
+}
+stickerReady = true; // the sticker block is defined — setPanelTab may now arm it
+if ((activePanelTab as PanelTab) === "stickers") setStickerMode(true); // restored straight into the tab
 
 // --- Location-data guard: the 🛰 tip shows when the LOADED FILE carries GPS
 // location (src/gps.ts scans the actual bytes — EXIF GPS IFD and XMP). Tap it
@@ -2634,6 +2866,7 @@ const healStatus = $("healStatus") as HTMLElement;
  *  texture — so keep the reference in sync with every setImage call. */
 let previewSrc: { width: number; height: number; pixels?: Uint8ClampedArray; linear?: Float32Array } | null = null;
 let bakedSpots: HealSpot[] = []; // what the texture currently has baked in
+let bakedStickers: Sticker[] = []; // sticker placements currently baked into the texture
 let healArmed = false;
 // The most recent heal stays ACTIVE (accented ring): the Spot size slider
 // resizes it live — tap first, then dial the size until the fix looks right
@@ -2651,6 +2884,7 @@ function uploadPreview() {
   previewSrc = toPreview(current);
   renderer.setImage(previewSrc);
   bakedSpots = [];
+  bakedStickers = [];
   draw();
 }
 
@@ -2660,17 +2894,44 @@ function uploadPreview() {
 function syncSpotsToTexture() {
   if (!current || !previewSrc) return;
   const cur = params.spots ?? [];
-  if (cur.length === bakedSpots.length && JSON.stringify(cur) === JSON.stringify(bakedSpots)) return;
+  const stk = (params.stickers ?? []).filter((s) => stickerAssets[s.asset]); // only bakeable (loaded) ones
+  const spotsSame = cur.length === bakedSpots.length && JSON.stringify(cur) === JSON.stringify(bakedSpots);
+  const stkSame = stk.length === bakedStickers.length && JSON.stringify(stk) === JSON.stringify(bakedStickers);
+  if (spotsSame && stkSame) return;
   const W = previewSrc.width, H = previewSrc.height;
-  for (const s of [...bakedSpots, ...cur]) {
-    const rect = spotRect(s, W, H);
+  // Every affected rect — spots (old+new) AND stickers (old+new) — is re-baked
+  // from the PRISTINE source with the full current lists, so vacated areas
+  // restore correctly. Heal bakes first, then stickers layer ON TOP (matching
+  // the export sampler, where stickers wrap outside heal).
+  const rects: { x0: number; y0: number; w: number; h: number }[] = [];
+  for (const s of [...bakedSpots, ...cur]) rects.push(spotRect(s, W, H));
+  for (const s of [...bakedStickers, ...stk]) {
+    const a = stickerAssets[s.asset];
+    if (a) rects.push(stickerRect(s, W, H, a));
+  }
+  // Occlusion reads the DISPLAY luminance — run the base through exposure×WB
+  // (+ the camera matrix for RAW) so "bright/dark" matches what's on screen,
+  // not the dim camera-native source. 8-bit sources are already ~display, so
+  // no matrix; WB still applies (compileEdit applies it to them too).
+  const ex = params.exposure;
+  const occ = {
+    wb: [params.wb[0] * ex, params.wb[1] * ex, params.wb[2] * ex] as [number, number, number],
+    cam: previewSrc.linear ? current.camMatrix ?? null : null,
+  };
+  for (const rect of rects) {
     if (rect.w <= 0 || rect.h <= 0) continue;
-    const data = previewSrc.linear
-      ? bakeRgbaF32(previewSrc.linear, W, H, cur, rect)
-      : bakeRgba8(previewSrc.pixels!, W, H, cur, rect);
-    renderer.patchImage(rect.x0, rect.y0, rect.w, rect.h, data);
+    if (previewSrc.linear) {
+      const data = bakeRgbaF32(previewSrc.linear, W, H, cur, rect);
+      compositeStickersIntoRectF32(data, rect, W, H, stk, stickerAssets, occ);
+      renderer.patchImage(rect.x0, rect.y0, rect.w, rect.h, data);
+    } else {
+      const data = bakeRgba8(previewSrc.pixels!, W, H, cur, rect);
+      compositeStickersIntoRect8(data, rect, W, H, stk, stickerAssets, occ);
+      renderer.patchImage(rect.x0, rect.y0, rect.w, rect.h, data);
+    }
   }
   bakedSpots = cur.map((s) => ({ ...s }));
+  bakedStickers = stk.map((s) => ({ ...s }));
   updateHealUI();
 }
 
@@ -3559,6 +3820,18 @@ canvas.addEventListener("pointerdown", (e) => {
   if (cropArmed) return; // Crop & straighten owns the canvas — no tap-WB / pan / pinch while armed
   if (brushPaintOn()) { e.preventDefault(); startPaint(e); return; }
   if (tatArmed) { if (!tatDrag) { e.preventDefault(); startTat(e); } return; }
+  if (stickerArmed) {
+    const [u, v] = renderer.clientToImageUv(e.clientX, e.clientY);
+    const hit = hitSticker(u, v);
+    if (hit >= 0) { selectedSticker = hit; updateStickerUI(); }
+    const s = selSticker();
+    if (s) {
+      e.preventDefault();
+      canvas.setPointerCapture(e.pointerId);
+      stickerDrag = { id: e.pointerId, ou: s.x - u, ov: s.y - v };
+    }
+    return; // the Stickers tab owns the canvas — no tap-WB / pan while armed
+  }
   activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   canvas.setPointerCapture(e.pointerId);
   // Long-press (held still) shows the original for comparison.
@@ -3596,6 +3869,17 @@ canvas.addEventListener("pointermove", (e) => {
     return;
   }
   if (tatDrag) { moveTat(e); return; }
+  if (stickerDrag && e.pointerId === stickerDrag.id) {
+    const s = selSticker();
+    if (s) {
+      const [u, v] = renderer.clientToImageUv(e.clientX, e.clientY);
+      s.x = Math.min(1, Math.max(0, u + stickerDrag.ou));
+      s.y = Math.min(1, Math.max(0, v + stickerDrag.ov));
+      positionStickerOverlay();
+      draw();
+    }
+    return;
+  }
   const p = activePointers.get(e.pointerId);
   if (!p) return;
   if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > 8) {
@@ -3624,6 +3908,7 @@ canvas.addEventListener("pointermove", (e) => {
 function endPointer(e: PointerEvent) {
   if (painting) { endPaint(); return; }
   if (tatDrag) { if (e.pointerId === tatDrag.id) endTat(); return; }
+  if (stickerDrag && e.pointerId === stickerDrag.id) { stickerDrag = null; flushRecord(); return; }
   activePointers.delete(e.pointerId);
   clearTimeout(holdTimer);
   showOriginal(false);
@@ -3821,6 +4106,7 @@ function establishFreshEdit() {
     vigMid: 0.5,
     mix3: [...MIX3_DEFAULT],
     spots: [],
+    stickers: [],
     crop: { ...CROP_DEFAULT },
     straighten: 0,
   };
@@ -3836,6 +4122,7 @@ function establishFreshEdit() {
   selectedMask = -1;
   setColorPick(false);
   params.spots = [];
+  params.stickers = [];
   activeSpotIdx = -1;
   setHeal(false);
   params.crop = { ...CROP_DEFAULT };
@@ -4711,6 +4998,16 @@ const LESSONS: { title: string; tab: PanelTab; steps: string[] }[] = [
       "Finish the frame: a touch of Grain and a gentle leftward Vignette draw the eye in. Both ride your saved looks and batch — the wheels even bake into .cube exports.",
     ],
   },
+  {
+    title: "Lesson 9 · Stickers — UFOs in the trees",
+    tab: "stickers",
+    steps: [
+      "Open the Stickers tab and tap a Saucer or Alien — it drops onto the photo. Drag it wherever you like.",
+      "Notice it takes on the photo's colors: the channel swap and white balance reach the sticker, so it lands right in the infrared palette instead of looking pasted on.",
+      "Slide Peek behind up and pick Bright parts — the glowing foliage shows through, so the saucer tucks in behind the branches. Add a little Grain (in Grade) and it settles over the whole scene.",
+      "Size and Spin fine-tune it; Remove this sticker or Clear all start over. Stickers stay with this photo — they're not carried by saved looks or batch.",
+    ],
+  },
 ];
 
 let activeLesson = -1;
@@ -5079,6 +5376,7 @@ ui.exBtn.addEventListener("click", async () => {
         flip: renderer.flip,
         watermark: bundledSource, // practice photos carry the corner mark; the user's photos never do
         lookRecipe: recipeForExport(currentLook()),
+        stickerAssets, // bake placed stickers into the export source
       },
       (f) => {
         busyText.textContent = `Exporting… ${Math.round(f * 100)}%`;
@@ -5191,6 +5489,7 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["l
     vigMid: look.vigMid,
     mix3: [...look.mix3],
     spots: [], // composition-specific — a batch frame heals nothing
+    stickers: [], // composition-specific — stickers are placed per photo, never batched
     crop: { ...CROP_DEFAULT }, // composition-specific — a batch frame crops nothing
     straighten: 0,
     lut, // resolved once at batch start; rides every frame like the grade
@@ -5982,6 +6281,7 @@ canvas.addEventListener("click", (e) => {
   }
   // Armed picks eat the tap (they must NOT also set white balance).
   if (cropArmed) return; // Crop & straighten owns the canvas — drag its own box/handles instead
+  if (stickerArmed) return; // the Stickers tab owns the canvas
   if (handleHealReviewTap(e.clientX, e.clientY)) return;
   if (handleHealTap(e.clientX, e.clientY)) return;
   if (handleColorMaskPick(e.clientX, e.clientY)) return;

@@ -72,6 +72,7 @@
         <canvas id="view" role="img" aria-label="Photo canvas — no photo open"></canvas>
         <svg id="maskOverlay" hidden aria-hidden="true"></svg>
         <svg id="healOverlay" hidden aria-hidden="true"></svg>
+        <svg id="stickerOverlay" hidden aria-hidden="true"></svg>
         <div id="cropOverlay" hidden aria-hidden="true">
           <div id="cropBox">
             <div id="cropGuides" aria-hidden="true"></div>
@@ -183,9 +184,10 @@
           <button id="ptab-export" aria-controls="sec-export" class="ptab" type="button" data-tab="export" role="tab" aria-selected="false">Export</button>
           <button id="ptab-corrections" aria-controls="sec-corrections" class="ptab" type="button" data-tab="corrections" role="tab" aria-selected="false">Corrections</button>
           <button id="ptab-crop" aria-controls="sec-crop" class="ptab" type="button" data-tab="crop" role="tab" aria-selected="false">Crop &amp; rotate</button>
-          <!-- The Creative row: full-width for now — it becomes a normal cell
-               as the next Creative tabs complete the 4x3 grid. -->
+          <!-- The Creative row: Grade + Stickers fill row 4; the next Creative
+               tab (Warp) completes the 4x3 grid. -->
           <button id="ptab-grade" aria-controls="sec-grade" class="ptab" type="button" data-tab="grade" role="tab" aria-selected="false">Grade</button>
+          <button id="ptab-stickers" aria-controls="sec-stickers" class="ptab" type="button" data-tab="stickers" role="tab" aria-selected="false">Stickers</button>
         </div>
         <div class="section-head">
           <h2 id="sectionTitle" class="section-title">Basic</h2>
@@ -270,6 +272,22 @@
             <div id="mix3Presets" class="bw-mixes" role="group" aria-label="Channel mixer presets"></div>
             <div id="mix3Grid"></div>
             <button id="mix3Reset" type="button">Reset channel mixer</button>
+          </section>
+
+          <!-- ===== STICKERS (Creative) ===== -->
+          <section class="section" role="tabpanel" id="sec-stickers" aria-labelledby="ptab-stickers" data-tab="stickers" hidden>
+            <p class="note">Drop a UFO into the trees. Tap one to add it, then drag it on the photo. Stickers take on your photo's colors &mdash; the channel swap, white balance and grade all reach them &mdash; and grain settles over the top.</p>
+            <div id="stickerAdd" class="bw-mixes" role="group" aria-label="Add a sticker"></div>
+            <div id="stickerControls" hidden>
+              <div class="sub-title">Selected sticker</div>
+              <label>Size <input id="stkScale" type="range" min="0.05" max="1" step="0.005" value="0.3" /></label>
+              <label>Spin <input id="stkRot" type="range" min="-180" max="180" step="1" value="0" /></label>
+              <label>Peek behind <input id="stkOcclude" type="range" min="0" max="1" step="0.01" value="0" /></label>
+              <div id="stkBehind" class="bw-mixes" role="group" aria-label="What the sticker hides behind"></div>
+              <p class="note">Peek behind lets the scene show through the sticker &mdash; slide it up and pick whether it hides behind the <em>bright</em> parts (foliage glows white in infrared) or the <em>dark</em> parts (tree trunks), so the saucer tucks in behind the branches.</p>
+              <button id="stkDelete" type="button">Remove this sticker</button>
+            </div>
+            <button id="stkClear" type="button" hidden>Clear all stickers</button>
           </section>
 
           <!-- ===== CORRECTIONS ===== -->
@@ -767,6 +785,16 @@
         Aerochrome, Copper, a channel Rotate — then fine-tune the nine sliders for invented false-color
         palettes. Unlike grain and vignette, the mixer is pure color: it bakes into both .cube and .dcp
         exports.</p>
+
+        <h3>Stickers &mdash; UFOs in the trees <span class="lut-badge">Beta</span></h3>
+        <p>In the <strong>Stickers</strong> tab, tap a saucer, alien, Saturn or beam to drop it on the
+        photo, then drag it into place. Stickers composite into the picture <em>before</em> the infrared
+        processing, so they take on your photo's colors &mdash; the channel swap and white balance reach
+        them &mdash; and grain settles over the top. <strong>Peek behind</strong> lets the scene show
+        through: pick whether the sticker hides behind the bright parts (glowing foliage) or the dark
+        parts (tree trunks), so a saucer can tuck in behind the branches. Size and Spin shape it; Remove
+        or Clear all start over. Stickers stay with the one photo &mdash; they aren't carried by saved
+        looks, batch, or the .cube / .dcp exports.</p>
         <p><strong>Grain</strong> adds film texture (Size sets how coarse), and <strong>Vignette</strong>
         darkens (left) or lifts (right) the frame's edges — it follows your crop, unlike the Corrections
         vignette, which fixes the lens on the full frame. Everything here rides saved looks, sessions and

@@ -202,25 +202,6 @@ user-scalable=no.
 > different approach and mindset"). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
-- [ ] **Stickers — UFOs in the trees** — CREATIVE RELEASE (v2.0), promoted
-  from the backlog 2026-07-18 (owner ask 2026-07-14). The full architecture
-  sketch lives in "Future / bigger bets" below — linear-source-space
-  compositing so stickers inherit the IR palette, occlusion via the existing
-  mask machinery, and the scope caution: stickers, NOT a general layer stack.
-  OWNER INSPIRATION (5 screenshots, sent 2026-07-19; captured from his iPad
-  the night of 2026-07-18): the CLASSIC UFO-PHOTOGRAPH aesthetic — the
-  X-Files "I Want to Believe" poster (grainy saucer over a misty treeline),
-  saucers hovering over forest hills, a UFO "beaming up" a lone tree with a
-  light cone, aliens PEEKING FROM BEHIND tree trunks (the tree-peeker), and
-  a stipple/engraving-style B&W set (saucers, Saturn, capsule, shuttle).
-  Build notes from the boards: (1) occlusion is the heart of the joke — the
-  peeking alien / saucer behind the treeline is exactly the mask-occlusion
-  sketch; (2) believability comes from FINISH — the sticker must take the
-  photo's grain/blur/tone (the 2.0 grain stage is the tool: grain applies
-  AFTER compositing, so it rides over stickers for free); (3) two art
-  styles wanted: photo-real saucer/alien AND the engraved-stipple mono set
-  (the latter pairs naturally with toned mono); (4) a beam light-cone
-  element that brightens what it covers would sell the beam-up gag.
 - [ ] **Warp tools — Swirl / Liquefy / Pinch** — CREATIVE RELEASE (v2.0),
   promoted from the backlog 2026-07-18 (owner ask 2026-07-14). The
   UV-displacement-field sketch lives in "Future / bigger bets" below; spatial
@@ -2909,6 +2890,71 @@ user-scalable=no.
   NEEDS THE OWNER'S HANDS: the preset recipes (my calibration) and
   whether the mixer belongs in the Grade tab or wants its own home on
   the real iPad.
+- [x] **Stickers — UFOs in the trees** — CREATIVE, shipped as a BETA
+  straight to main (owner's 2026-07-19 gate exception; he's most excited
+  about this one). VERSION unchanged (still 2.1 — this is an increment on
+  the Creative line, not a new capability number; bump the middle when the
+  owner blesses stickers out of beta or the next capability lands).
+  A new **Stickers** tab (11th; row 4 = Grade + Stickers, Warp completes
+  the 4×3). Tap an asset chip (Saucer/Alien/Saturn/Beam — in-house SVG art
+  rasterised to public/stickers/*.png, precached) to drop it at screen
+  centre; DRAG it on the photo; sliders Size/Spin/Peek-behind + a
+  bright/dark chip. Remove one / Clear all.
+  ARCHITECTURE (rhymes with heal EXACTLY — src/sticker.ts): a sticker is
+  geometry in image-uv (id, asset, x, y, scale=frac of width, rot,
+  occlude, occludeLuma, occludeBright) on `params.stickers`. It composites
+  INTO the source before the pipeline — so it inherits the channel swap /
+  sub-2000K WB / grade and lands in the IR palette (the owner's "fitting
+  for the weird colors": the grey saucer's dome/eyes come out recolored),
+  and grain settles over it for free (grain is post-pipeline). Preview:
+  syncSpotsToTexture (renamed in spirit) bakes the union of heal+sticker
+  dirty rects from the PRISTINE previewSrc — heal first, stickers on top —
+  via compositeStickersIntoRect8/F32 + renderer.patchImage; bakedStickers
+  mirrors bakedSpots. Export: wrapWithPatches(healed, stickerPatches(...))
+  wraps OUTSIDE heal; both samplers are linear so one path serves RAW +
+  8-bit; parity is by construction (walk: GPU preview == exported JPEG
+  centre ≤12 LSB). Compositing is in LINEAR everywhere (8-bit lifts→
+  composites→re-gammas) so preview==export per source.
+  OCCLUSION ("peek behind" — the heart of the joke): sticker alpha ×
+  (1 − occludeStrength·w), w from a smoothstep over the scene luminance.
+  HARD-WON LESSON: the baked source for a RAW is CAMERA-NATIVE linear —
+  dim until WB + the colour matrix lift it — so keying occlusion on the
+  raw source luma had the ordering WRONG (white IR foliage isn't bright in
+  camera-native). Fixed: sticker.ts computes DISPLAY luminance
+  (exposure×WB, then the camera matrix for RAW) via an OcclusionCtx threaded
+  from main.ts (params.wb×exposure + current.camMatrix) and export.ts
+  (src.cam); a soft 1−exp(−3L) curve normalises across sources. Now the
+  bright foliage punches through the saucer — it tucks behind the branches.
+  Spatial + composition-specific: `stickers` rides cloneParams/applySnapshot
+  (undo) and editToJson (session resume — asset keys are strings, no
+  bitmaps to strip), but is EXCLUDED from looks, batch, .cube and .dcp
+  (they never touch compileEdit; walk PROVES the .cube is byte-identical
+  with a sticker present vs cleared). Reset on a new open like spots/crop.
+  Direct manipulation: the Stickers tab arms canvas drag (setStickerMode,
+  mutually exclusive with heal/crop/masks/picks); a pointerdown hit-tests
+  top-down + drags the selected sticker (one drag = one undo); a dashed
+  rotated bounding box (#stickerOverlay) is the selection cue.
+  VERIFIED, fail-first (PLANT=bake asserts a sticker moves the .cube — must
+  FAIL): 15 walk checks (structure, composite-on-add, grade reaches the
+  sticker, drag, peek-behind footprint shift mean|Δ|=36, grain-over-sticker
+  variance, GPU↔JPEG export parity, .cube exclusion, clear/undo, axe both
+  themes, no errors) + a compositor unit check (occlusion binary: white
+  sticker over bright scene vanishes). Instrument lessons: (1) a channel
+  test over a uniform-white scene can't see a white sticker change —
+  measure the coloured footprint; (2) undo didn't refresh the sticker UI
+  until updateStickerUI joined syncToUI. Regression: grade/mix3/bw/p3/
+  downscale/overlay walks re-run green (grade/bw tab-shape + count asserts
+  updated: Grade is now a normal cell, 11 tabs).
+  BETA / NEEDS THE OWNER'S HANDS: this is the FIRST sticker cut — drag/
+  scale/rotate feel on the iPad, the four art pieces against his taste, the
+  peek-behind at full strength (mottled — maybe cap it lower), and whether
+  he wants pinch-to-scale/rotate on the sticker itself (currently sliders).
+  DEFERRED (recorded, not built): PNG-with-alpha import as a custom
+  sticker; auto-seed occlusion from the sky/foliage/colour masks (the
+  richer mask-machinery route in the architecture sketch); the beam
+  light-cone that BRIGHTENS what it covers (currently a normal-alpha
+  translucent cone); the engraved-stipple mono art set. A true two-ink
+  duotone and these all remain open if the owner asks.
 
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 
