@@ -1,0 +1,79 @@
+# Manual overlay-asset generation run. Trigger from the GitHub Actions UI
+# (works from the iPad browser) — no CLI needed. It uses the IDEOGRAM_API_KEY
+# repo secret, generates a bounded batch, and uploads the images + catalog as a
+# downloadable artifact to review. It does NOT commit anything or touch the app,
+# main, or staging — promoting reviewed assets into public/stickers/ stays a
+# deliberate session step behind the normal staging gate.
+name: asset-factory
+
+on:
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: "Image provider"
+        type: choice
+        default: ideogram
+        options: [ideogram, mock]
+      category:
+        description: "Category filter (blank = all). e.g. bigfoot,ufo"
+        type: string
+        default: bigfoot
+      limit:
+        description: "Max images this run (cost guard — ideogram is ~$0.08 each)"
+        type: string
+        default: "12"
+      confirm:
+        description: "Actually spend? Unchecked = dry-run (prompts + cost only)"
+        type: boolean
+        default: false
+
+# Never run this on a push; manual only.
+concurrency: asset-factory-${{ github.ref }}
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install factory deps
+        working-directory: asset-factory
+        run: npm install
+
+      - name: Plan (counts + cost estimate)
+        working-directory: asset-factory
+        run: node cli.mjs plan --provider "${{ inputs.provider }}" ${{ inputs.category && format('--category {0}', inputs.category) || '' }}
+
+      - name: Generate
+        working-directory: asset-factory
+        env:
+          IDEOGRAM_API_KEY: ${{ secrets.IDEOGRAM_API_KEY }}
+        run: |
+          node cli.mjs generate \
+            --provider "${{ inputs.provider }}" \
+            ${{ inputs.category && format('--category {0}', inputs.category) || '' }} \
+            --limit "${{ inputs.limit }}" \
+            ${{ inputs.confirm && '--yes' || '--dry-run' }}
+
+      - name: Stats
+        if: ${{ inputs.confirm }}
+        working-directory: asset-factory
+        run: node cli.mjs stats ${{ inputs.category && format('--category {0}', inputs.category) || '' }}
+
+      - name: Upload results (images + catalog)
+        if: ${{ inputs.confirm }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: asset-factory-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            asset-factory/assets/**
+            asset-factory/rejected/**
+            asset-factory/duplicates/**
+            asset-factory/database/catalog/**
+            asset-factory/logs/**

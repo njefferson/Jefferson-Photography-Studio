@@ -1,0 +1,21 @@
+{
+  "category": "ghosts",
+  "app_category": "paranormal",
+  "template": "apparition",
+  "tags": ["ghost", "apparition", "paranormal"],
+  "note": "fiction",
+  "defaults": { "views": ["front"], "distances": ["mid"], "expressions": ["neutral"], "variants": 1 },
+  "families": [
+    { "family": "shadow-person", "subject_phrase": "a featureless dark humanoid shadow figure", "meta_label": "Shadow person", "poses": [{ "pose": "standing", "pose_phrase": "standing still and watching" }, { "pose": "in-doorway", "pose_phrase": "filling a doorway shape" }] },
+    { "family": "victorian-ghost", "subject_phrase": "the translucent apparition of a person in Victorian dress", "meta_label": "Victorian ghost", "poses": [{ "pose": "floating", "pose_phrase": "floating, lower body fading to mist" }] },
+    { "family": "child-ghost", "subject_phrase": "the faint translucent apparition of a small child", "meta_label": "Child ghost", "poses": [{ "pose": "standing", "pose_phrase": "standing quietly, semi-transparent" }] },
+    { "family": "woman-in-white", "subject_phrase": "the pale apparition of a woman in a flowing white gown", "meta_label": "Woman in white", "poses": [{ "pose": "floating", "pose_phrase": "drifting, hem dissolving into mist" }] },
+    { "family": "floating-eyes", "subject_phrase": "a pair of faintly glowing disembodied eyes in the dark", "meta_label": "Floating eyes", "poses": [{ "pose": "hovering", "pose_phrase": "hovering in darkness", "distances": ["close"] }] },
+    { "family": "will-o-wisp", "subject_phrase": "a small pale hovering ball of ghostly light", "meta_label": "Will-o'-the-wisp", "poses": [{ "pose": "hovering", "pose_phrase": "hovering, softly glowing" }] },
+    { "family": "spectral-hands", "subject_phrase": "a pair of translucent reaching spectral hands", "meta_label": "Spectral hands", "poses": [{ "pose": "reaching", "pose_phrase": "reaching outward, fading at the wrists", "distances": ["close"] }] },
+    { "family": "mist-figure", "subject_phrase": "a vaguely humanoid figure formed from drifting mist", "meta_label": "Mist figure", "poses": [{ "pose": "forming", "pose_phrase": "half-formed from swirling mist" }] },
+    { "family": "hooded-monk", "subject_phrase": "the translucent apparition of a hooded robed monk, face in shadow", "meta_label": "Hooded monk", "poses": [{ "pose": "standing", "pose_phrase": "standing motionless, hands hidden in sleeves" }] },
+    { "family": "plague-doctor", "subject_phrase": "the spectral figure of a plague doctor in a beaked mask and long coat", "meta_label": "Plague doctor", "note": "fiction", "poses": [{ "pose": "standing", "pose_phrase": "standing still, lower body fading" }] },
+    { "family": "ghost-animal", "subject_phrase": "the faint translucent apparition of a dog", "meta_label": "Ghost animal", "poses": [{ "pose": "standing", "pose_phrase": "standing alert, semi-transparent", "views": ["side"] }] }
+  ]
+}

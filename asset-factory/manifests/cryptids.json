@@ -1,0 +1,29 @@
+{
+  "category": "cryptids",
+  "app_category": "cryptids",
+  "template": "creature-photoreal",
+  "tags": ["cryptid"],
+  "defaults": { "views": ["three-quarter"], "distances": ["mid"], "expressions": ["neutral"], "variants": 1 },
+  "families": [
+    { "family": "yeti", "subject_phrase": "a yeti, a large ape-like creature covered in shaggy off-white fur", "meta_label": "Yeti", "poses": [{ "pose": "standing", "pose_phrase": "standing upright in the snow" }, { "pose": "walking", "pose_phrase": "trudging forward", "views": ["side"] }] },
+    { "family": "skunk-ape", "subject_phrase": "a skunk ape, a reddish-brown fur-covered ape-like swamp creature", "meta_label": "Skunk Ape", "poses": [{ "pose": "standing", "pose_phrase": "standing among nothing, upright" }] },
+    { "family": "dogman", "subject_phrase": "a dogman, a towering muscular wolf-headed bipedal creature with dark fur", "meta_label": "Dogman", "poses": [{ "pose": "standing", "pose_phrase": "standing upright, snarling" }, { "pose": "crouching", "pose_phrase": "crouched on all fours, ready to lunge" }] },
+    { "family": "mothman", "subject_phrase": "a mothman, a winged humanoid with large glowing red eyes and folded dark wings", "meta_label": "Mothman", "poses": [{ "pose": "perched", "pose_phrase": "perched, wings folded" }, { "pose": "wings-spread", "pose_phrase": "wings spread wide", "views": ["front"] }] },
+    { "family": "jersey-devil", "subject_phrase": "a jersey devil, a winged bipedal creature with a horse-like head, hooves and a forked tail", "meta_label": "Jersey Devil", "poses": [{ "pose": "standing", "pose_phrase": "standing on hooved legs, wings half-open" }] },
+    { "family": "goatman", "subject_phrase": "a goatman, a muscular humanoid with a goat's head and horns", "meta_label": "Goatman", "poses": [{ "pose": "standing", "pose_phrase": "standing menacingly" }] },
+    { "family": "flatwoods-monster", "subject_phrase": "a flatwoods monster, a tall dark figure with a glowing face inside a spade-shaped hood", "meta_label": "Flatwoods Monster", "poses": [{ "pose": "hovering", "pose_phrase": "hovering just above the ground", "views": ["front"] }] },
+    { "family": "fresno-nightcrawler", "subject_phrase": "a fresno nightcrawler, a small pale creature that is almost entirely two long walking legs with a tiny head", "meta_label": "Fresno Nightcrawler", "poses": [{ "pose": "walking", "pose_phrase": "walking on its two long legs", "views": ["front"] }] },
+    { "family": "hopkinsville-goblin", "subject_phrase": "a hopkinsville goblin, a small silver-skinned creature with large ears, big eyes and clawed hands", "meta_label": "Hopkinsville Goblin", "poses": [{ "pose": "standing", "pose_phrase": "standing with arms raised", "views": ["front"] }] },
+    { "family": "dover-demon", "subject_phrase": "a dover demon, a small hairless creature with a large watermelon-shaped head, huge glowing eyes and thin limbs", "meta_label": "Dover Demon", "poses": [{ "pose": "clinging", "pose_phrase": "clinging to a surface" }] },
+    { "family": "ningen", "subject_phrase": "a ningen, a huge pale smooth humanoid sea creature", "meta_label": "Ningen", "note": "folklore", "poses": [{ "pose": "surfacing", "pose_phrase": "surfacing, upper body emerging" }] },
+    { "family": "thunderbird", "subject_phrase": "a thunderbird, an enormous dark bird of prey with a vast wingspan", "meta_label": "Thunderbird", "poses": [{ "pose": "soaring", "pose_phrase": "soaring with wings fully spread", "views": ["below"] }] },
+    { "family": "owlman", "subject_phrase": "an owlman, a humanoid owl creature with feathered body, wings and glowing eyes", "meta_label": "Owlman", "poses": [{ "pose": "perched", "pose_phrase": "perched, wings partly open" }] },
+    { "family": "beast-of-bray-road", "subject_phrase": "the beast of bray road, a large wolf-like bipedal creature with brown fur", "meta_label": "Beast of Bray Road", "poses": [{ "pose": "standing", "pose_phrase": "standing upright, alert" }] },
+    { "family": "chupacabra", "subject_phrase": "a chupacabra, a hairless grey doglike creature with a spined back and fangs", "meta_label": "Chupacabra", "poses": [{ "pose": "standing", "pose_phrase": "standing on all fours, snarling", "views": ["side"] }] },
+    { "family": "gargoyle", "subject_phrase": "a living stone gargoyle with folded bat wings and clawed hands", "meta_label": "Gargoyle", "poses": [{ "pose": "crouched", "pose_phrase": "crouched, perched and watchful" }] },
+    { "family": "living-scarecrow", "subject_phrase": "a living scarecrow of burlap and straw, animate and menacing", "meta_label": "Living scarecrow", "poses": [{ "pose": "standing", "pose_phrase": "standing, head tilted" }] },
+    { "family": "giant-bat", "subject_phrase": "a giant bat with a huge leathery wingspan", "meta_label": "Giant bat", "poses": [{ "pose": "flying", "pose_phrase": "in flight, wings spread", "views": ["below"] }] },
+    { "family": "giant-owl", "subject_phrase": "an enormous owl far larger than any real owl", "meta_label": "Giant owl", "poses": [{ "pose": "perched", "pose_phrase": "perched, wings folded" }] },
+    { "family": "giant-raven", "subject_phrase": "an enormous raven far larger than any real bird", "meta_label": "Giant raven", "poses": [{ "pose": "standing", "pose_phrase": "standing, head turned", "views": ["side"] }] }
+  ]
+}

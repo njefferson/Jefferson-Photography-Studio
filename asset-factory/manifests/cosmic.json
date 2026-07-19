@@ -1,0 +1,29 @@
+{
+  "category": "cosmic",
+  "app_category": "oddities",
+  "template": "horror",
+  "tags": ["cosmic", "eldritch", "original"],
+  "note": "original",
+  "defaults": { "views": ["front"], "distances": ["mid"], "expressions": ["neutral"], "variants": 1 },
+  "families": [
+    { "family": "ancient-idol", "subject_phrase": "an ancient carved stone idol of an unknown deity, worn and moss-touched", "meta_label": "Ancient idol", "poses": [{ "pose": "upright", "pose_phrase": "standing upright" }] },
+    { "family": "cyclopean-monolith", "subject_phrase": "a single cyclopean carved monolith of dark stone covered in unfamiliar glyphs", "meta_label": "Cyclopean monolith", "poses": [{ "pose": "upright", "pose_phrase": "standing tall" }] },
+    { "family": "black-tower", "subject_phrase": "an impossible black tower of non-Euclidean angles", "meta_label": "Black tower", "poses": [{ "pose": "looming", "pose_phrase": "looming upward" }] },
+    { "family": "stone-obelisk", "subject_phrase": "a tall carved stone obelisk etched with alien symbols", "meta_label": "Stone obelisk", "poses": [{ "pose": "upright", "pose_phrase": "standing upright" }] },
+    { "family": "tentacle", "subject_phrase": "a single massive slick tentacle with rows of suckers", "meta_label": "Tentacle", "poses": [{ "pose": "rising", "pose_phrase": "rising and curling upward" }] },
+    { "family": "tentacle-hand", "subject_phrase": "a grasping hand made of writhing tentacles", "meta_label": "Tentacle hand", "poses": [{ "pose": "reaching", "pose_phrase": "reaching forward", "distances": ["close"] }] },
+    { "family": "organic-portal", "subject_phrase": "an organic fleshy portal ringed with teeth and folds", "meta_label": "Organic portal", "poses": [{ "pose": "open", "pose_phrase": "gaping open" }] },
+    { "family": "reality-tear", "subject_phrase": "a jagged tear in reality glowing with impossible light", "meta_label": "Reality tear", "poses": [{ "pose": "open", "pose_phrase": "splitting open in the air" }] },
+    { "family": "impossible-geometry", "subject_phrase": "a floating fragment of impossible non-Euclidean geometry", "meta_label": "Impossible geometry", "poses": [{ "pose": "floating", "pose_phrase": "rotating impossibly" }] },
+    { "family": "living-fungus", "subject_phrase": "a cluster of bioluminescent living fungus with pulsing caps", "meta_label": "Living fungus", "poses": [{ "pose": "clustered", "pose_phrase": "growing in a glowing cluster" }] },
+    { "family": "unknown-fossil", "subject_phrase": "the fossil of an unknown impossible creature embedded in dark rock", "meta_label": "Unknown fossil", "poses": [{ "pose": "embedded", "pose_phrase": "exposed in the rock face" }] },
+    { "family": "floating-rune", "subject_phrase": "a single glowing alien rune floating in the air", "meta_label": "Floating rune", "poses": [{ "pose": "hovering", "pose_phrase": "hovering and glowing" }] },
+    { "family": "ancient-altar", "subject_phrase": "an ancient blood-stained stone altar carved with symbols", "meta_label": "Ancient altar", "poses": [{ "pose": "standing", "pose_phrase": "standing weathered" }] },
+    { "family": "eye-cluster", "subject_phrase": "a writhing cluster of many staring eyes on fleshy stalks", "meta_label": "Eye cluster", "poses": [{ "pose": "staring", "pose_phrase": "all eyes staring outward", "distances": ["close"] }] },
+    { "family": "giant-eye", "subject_phrase": "a single enormous ancient eye with an alien iris", "meta_label": "Giant eye", "poses": [{ "pose": "open", "pose_phrase": "wide open and staring", "distances": ["close"] }] },
+    { "family": "star-spawn", "subject_phrase": "a towering winged star-spawn horror with a tentacled face", "meta_label": "Star spawn", "poses": [{ "pose": "looming", "pose_phrase": "looming, wings half-spread" }] },
+    { "family": "amorphous-horror", "subject_phrase": "an amorphous shifting mass of protoplasm studded with transient eyes and mouths", "meta_label": "Amorphous horror", "poses": [{ "pose": "oozing", "pose_phrase": "heaving and reshaping" }] },
+    { "family": "living-stone", "subject_phrase": "a lump of living stone with a half-formed face pushing out of it", "meta_label": "Living stone", "poses": [{ "pose": "emerging", "pose_phrase": "a face emerging from the rock" }] },
+    { "family": "unknown-relic", "subject_phrase": "an unknown metallic relic of impossible construction", "meta_label": "Unknown relic", "poses": [{ "pose": "floating", "pose_phrase": "hovering, faintly humming" }] }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "id": "apparition",
+  "version": 1,
+  "positive": [
+    "Photorealistic {subject_phrase}, {pose_phrase}, {view_phrase}, {distance_phrase}.",
+    "Semi-transparent, wispy and softly luminous, fading gently at its lower edge, the translucency carried in the image's own alpha.",
+    "{global.photoreal}",
+    "{global.single_subject}",
+    "{global.isolated}",
+    "{global.no_text}"
+  ],
+  "negative": ["{global_negative}"],
+  "settings": { "rendering_speed": "QUALITY", "aspect_ratio": "1x1" }
+}

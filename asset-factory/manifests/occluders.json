@@ -1,0 +1,26 @@
+{
+  "category": "occluders",
+  "app_category": "oddities",
+  "template": "effect-overlay",
+  "tags": ["occluder", "foreground"],
+  "qc": { "allowEdgeContact": true, "maxComponents": 5, "minCoverage": 0.01, "minFeatherFrac": 0.002 },
+  "defaults": { "views": ["front"], "distances": ["close"], "expressions": ["neutral"], "variants": 1 },
+  "families": [
+    { "family": "fern", "subject_phrase": "a green fern frond in sharp foreground focus", "meta_label": "Fern", "poses": [{ "pose": "frond", "pose_phrase": "arching across the foreground" }] },
+    { "family": "pine-branch", "subject_phrase": "a pine branch with dark needles in the near foreground", "meta_label": "Pine branch", "poses": [{ "pose": "bough", "pose_phrase": "reaching in from the edge" }] },
+    { "family": "oak-branch", "subject_phrase": "a bare oak branch in the near foreground", "meta_label": "Oak branch", "poses": [{ "pose": "bough", "pose_phrase": "reaching in from the edge" }] },
+    { "family": "bush", "subject_phrase": "a leafy foreground bush", "meta_label": "Bush", "poses": [{ "pose": "clump", "pose_phrase": "a dark leafy clump" }] },
+    { "family": "tall-grass", "subject_phrase": "a screen of tall grass blades in the near foreground", "meta_label": "Tall grass", "poses": [{ "pose": "blades", "pose_phrase": "blades rising across the frame" }] },
+    { "family": "tree-trunk", "subject_phrase": "a rough tree trunk at the edge of the frame", "meta_label": "Tree trunk", "poses": [{ "pose": "edge", "pose_phrase": "a trunk down one side" }] },
+    { "family": "rock", "subject_phrase": "a large mossy foreground rock", "meta_label": "Rock", "poses": [{ "pose": "boulder", "pose_phrase": "a low boulder" }] },
+    { "family": "fence-post", "subject_phrase": "a weathered wooden fence post", "meta_label": "Fence post", "poses": [{ "pose": "post", "pose_phrase": "a leaning post" }] },
+    { "family": "window-frame", "subject_phrase": "a dark window frame looked out through", "meta_label": "Window frame", "poses": [{ "pose": "frame", "pose_phrase": "a framing silhouette around the edges" }] },
+    { "family": "door-frame", "subject_phrase": "a dark door frame looked through", "meta_label": "Door frame", "poses": [{ "pose": "frame", "pose_phrase": "a doorway silhouette on one side" }] },
+    { "family": "spider-web", "subject_phrase": "a dew-beaded spider web strung across the foreground", "meta_label": "Spider web", "poses": [{ "pose": "web", "pose_phrase": "a web spanning the corner" }] },
+    { "family": "leaves", "subject_phrase": "a cluster of foreground leaves", "meta_label": "Leaves", "poses": [{ "pose": "cluster", "pose_phrase": "leaves hanging into frame" }] },
+    { "family": "snow-bank", "subject_phrase": "a foreground bank of snow", "meta_label": "Snow bank", "poses": [{ "pose": "drift", "pose_phrase": "a low snowdrift" }] },
+    { "family": "curtain", "subject_phrase": "a dark curtain edge drawn partly across", "meta_label": "Curtain", "poses": [{ "pose": "edge", "pose_phrase": "hanging down one side" }] },
+    { "family": "log", "subject_phrase": "a fallen mossy log across the foreground", "meta_label": "Log", "poses": [{ "pose": "fallen", "pose_phrase": "lying across the frame", "views": ["side"] }] },
+    { "family": "cattails", "subject_phrase": "a stand of cattails in the near foreground", "meta_label": "Cattails", "poses": [{ "pose": "stand", "pose_phrase": "rising across the frame" }] }
+  ]
+}

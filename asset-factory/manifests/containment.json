@@ -1,0 +1,24 @@
+{
+  "category": "containment",
+  "app_category": "oddities",
+  "template": "horror",
+  "tags": ["containment", "anomaly", "original"],
+  "note": "original fiction",
+  "defaults": { "views": ["front"], "distances": ["mid"], "expressions": ["neutral"], "variants": 1 },
+  "families": [
+    { "family": "containment-humanoid", "subject_phrase": "an anomalous pale humanoid figure with wrong proportions", "meta_label": "Containment humanoid", "poses": [{ "pose": "standing", "pose_phrase": "standing unnaturally still" }] },
+    { "family": "masked-entity", "subject_phrase": "a tall entity wearing a blank featureless mask", "meta_label": "Masked entity", "poses": [{ "pose": "standing", "pose_phrase": "standing and facing the viewer" }] },
+    { "family": "faceless-observer", "subject_phrase": "a suited humanoid figure with a smooth blank faceless head", "meta_label": "Faceless observer", "poses": [{ "pose": "standing", "pose_phrase": "standing and observing" }] },
+    { "family": "crawler", "subject_phrase": "a pale emaciated humanoid crawler on all fours with elongated limbs", "meta_label": "Crawler", "poses": [{ "pose": "crawling", "pose_phrase": "crawling low, head raised", "views": ["three-quarter"] }] },
+    { "family": "living-statue", "subject_phrase": "a weathered concrete statue that appears to move when unobserved", "meta_label": "Living statue", "poses": [{ "pose": "reaching", "pose_phrase": "frozen mid-reach, mouth open" }] },
+    { "family": "hazmat-operator", "subject_phrase": "a figure in a heavy sealed hazmat containment suit", "meta_label": "Hazmat operator", "poses": [{ "pose": "standing", "pose_phrase": "standing in full suit" }] },
+    { "family": "animated-mannequin", "subject_phrase": "a plastic shop mannequin that has begun to move on its own", "meta_label": "Animated mannequin", "poses": [{ "pose": "standing", "pose_phrase": "standing at an unnatural angle" }] },
+    { "family": "wire-creature", "subject_phrase": "a creature formed of tangled writhing wire and cable", "meta_label": "Wire creature", "poses": [{ "pose": "coiled", "pose_phrase": "coiled and rising" }] },
+    { "family": "bone-creature", "subject_phrase": "a creature assembled from many mismatched bones", "meta_label": "Bone creature", "poses": [{ "pose": "standing", "pose_phrase": "standing, joints clicking" }] },
+    { "family": "mirror-entity", "subject_phrase": "a reflective humanoid entity like living mirror-glass", "meta_label": "Mirror entity", "poses": [{ "pose": "standing", "pose_phrase": "standing, reflecting distorted light" }] },
+    { "family": "porcelain-humanoid", "subject_phrase": "a cracked porcelain humanoid with a doll-like face", "meta_label": "Porcelain humanoid", "poses": [{ "pose": "standing", "pose_phrase": "standing stiffly" }] },
+    { "family": "unknown-artifact", "subject_phrase": "an unidentified anomalous artifact sealed in a containment frame", "meta_label": "Unknown artifact", "poses": [{ "pose": "resting", "pose_phrase": "resting, faintly wrong to look at" }] },
+    { "family": "containment-drone", "subject_phrase": "a hovering matte containment surveillance drone bristling with sensors", "meta_label": "Containment drone", "poses": [{ "pose": "hovering", "pose_phrase": "hovering, sensors extended" }] },
+    { "family": "observation-robot", "subject_phrase": "a spindly observation robot on many articulated legs with a single lens", "meta_label": "Observation robot", "poses": [{ "pose": "standing", "pose_phrase": "standing on articulated legs, lens forward" }] }
+  ]
+}

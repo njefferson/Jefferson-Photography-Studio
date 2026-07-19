@@ -1,0 +1,20 @@
+{
+  "category": "atmosphere",
+  "app_category": "oddities",
+  "template": "effect-overlay",
+  "tags": ["atmosphere", "effect"],
+  "qc": { "allowEdgeContact": true, "maxComponents": 6, "minCoverage": 0.004, "minFeatherFrac": 0.002 },
+  "defaults": { "views": ["front"], "distances": ["full"], "expressions": ["neutral"], "variants": 1 },
+  "families": [
+    { "family": "ground-fog", "subject_phrase": "a low bank of ground fog", "meta_label": "Ground fog", "poses": [{ "pose": "rolling", "pose_phrase": "a low rolling band of fog" }] },
+    { "family": "smoke", "subject_phrase": "a column of drifting grey smoke", "meta_label": "Smoke", "poses": [{ "pose": "rising", "pose_phrase": "rising and curling" }] },
+    { "family": "steam", "subject_phrase": "a plume of white steam", "meta_label": "Steam", "poses": [{ "pose": "rising", "pose_phrase": "rising softly" }] },
+    { "family": "dust-cloud", "subject_phrase": "a kicked-up cloud of tan dust", "meta_label": "Dust cloud", "poses": [{ "pose": "billowing", "pose_phrase": "billowing outward" }] },
+    { "family": "fire-embers", "subject_phrase": "a swarm of glowing orange fire embers rising", "meta_label": "Fire embers", "poses": [{ "pose": "rising", "pose_phrase": "drifting upward" }] },
+    { "family": "light-beam", "subject_phrase": "a single soft volumetric beam of light", "meta_label": "Light beam", "poses": [{ "pose": "shaft", "pose_phrase": "a slanting shaft of light" }] },
+    { "family": "god-rays", "subject_phrase": "fanned volumetric god rays of light", "meta_label": "God rays", "poses": [{ "pose": "fanning", "pose_phrase": "fanning down in shafts" }] },
+    { "family": "floating-ash", "subject_phrase": "flakes of floating grey ash drifting in the air", "meta_label": "Floating ash", "poses": [{ "pose": "drifting", "pose_phrase": "drifting slowly" }] },
+    { "family": "cold-breath", "subject_phrase": "a puff of visible cold breath vapor", "meta_label": "Cold breath", "poses": [{ "pose": "puff", "pose_phrase": "a soft exhaled puff", "distances": ["close"] }] },
+    { "family": "moonlight-glow", "subject_phrase": "a soft cool moonlight glow bloom", "meta_label": "Moonlight glow", "poses": [{ "pose": "glow", "pose_phrase": "a gentle cool bloom" }] }
+  ]
+}

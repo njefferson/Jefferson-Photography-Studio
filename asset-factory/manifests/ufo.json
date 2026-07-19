@@ -1,0 +1,42 @@
+{
+  "category": "ufo",
+  "app_category": "ufo",
+  "template": "craft-photoreal",
+  "tags": ["ufo", "uap", "craft"],
+  "defaults": { "views": ["side"], "distances": ["mid"], "expressions": ["neutral"], "variants": 1 },
+  "families": [
+    {
+      "family": "flying-saucer",
+      "subject_phrase": "a metallic flying saucer with a domed top and smooth disc body",
+      "meta_label": "Flying saucer",
+      "poses": [
+        { "pose": "hovering", "pose_phrase": "hovering level" },
+        { "pose": "banking", "pose_phrase": "banking into a turn", "views": ["tilted"] },
+        { "pose": "underside", "pose_phrase": "seen from directly below", "views": ["bottom"] }
+      ]
+    },
+    {
+      "family": "classic-disc",
+      "subject_phrase": "a classic thin metallic disc craft",
+      "meta_label": "Classic disc",
+      "poses": [
+        { "pose": "hovering", "pose_phrase": "hovering level" },
+        { "pose": "tilted", "pose_phrase": "tilted at an angle", "views": ["tilted"] }
+      ]
+    },
+    { "family": "tic-tac", "subject_phrase": "a smooth white featureless tic-tac-shaped craft with no wings or markings", "meta_label": "Tic Tac", "poses": [{ "pose": "hovering", "pose_phrase": "hovering motionless" }] },
+    { "family": "black-triangle", "subject_phrase": "a large matte-black triangular craft with a light at each corner", "meta_label": "Black triangle", "poses": [{ "pose": "hovering", "pose_phrase": "hovering, underside toward the viewer", "views": ["bottom"] }] },
+    { "family": "boomerang", "subject_phrase": "a dark boomerang-shaped flying wing craft", "meta_label": "Boomerang", "poses": [{ "pose": "gliding", "pose_phrase": "gliding forward", "views": ["bottom"] }] },
+    { "family": "chevron", "subject_phrase": "a sharp chevron-shaped craft", "meta_label": "Chevron", "poses": [{ "pose": "gliding", "pose_phrase": "gliding forward", "views": ["bottom"] }] },
+    { "family": "bell", "subject_phrase": "a bell-shaped metallic craft, wider at the base", "meta_label": "Bell craft", "poses": [{ "pose": "hovering", "pose_phrase": "hovering upright" }] },
+    { "family": "acorn", "subject_phrase": "an acorn-shaped metallic craft", "meta_label": "Acorn", "poses": [{ "pose": "hovering", "pose_phrase": "hovering" }] },
+    { "family": "diamond", "subject_phrase": "an angular diamond-shaped craft", "meta_label": "Diamond craft", "poses": [{ "pose": "hovering", "pose_phrase": "hovering point-down" }] },
+    { "family": "cylinder", "subject_phrase": "a long seamless metallic cylinder craft", "meta_label": "Cylinder", "poses": [{ "pose": "hovering", "pose_phrase": "hovering horizontally" }] },
+    { "family": "silver-orb", "subject_phrase": "a polished reflective silver sphere", "meta_label": "Silver orb", "poses": [{ "pose": "hovering", "pose_phrase": "hovering" }] },
+    { "family": "black-orb", "subject_phrase": "a matte-black featureless sphere", "meta_label": "Black orb", "poses": [{ "pose": "hovering", "pose_phrase": "hovering" }] },
+    { "family": "ring-craft", "subject_phrase": "a ring-shaped torus craft", "meta_label": "Ring craft", "poses": [{ "pose": "hovering", "pose_phrase": "hovering", "views": ["tilted"] }] },
+    { "family": "jellyfish-uap", "subject_phrase": "a translucent jellyfish-like aerial object with trailing filaments", "meta_label": "Jellyfish UAP", "poses": [{ "pose": "drifting", "pose_phrase": "drifting slowly" }] },
+    { "family": "distant-object", "subject_phrase": "a small indistinct metallic flying object", "meta_label": "Distant object", "poses": [{ "pose": "distant", "pose_phrase": "a tiny distant object high in the air", "distances": ["far"] }] },
+    { "family": "damaged-craft", "subject_phrase": "a dented and scorched metallic disc craft, visibly damaged", "meta_label": "Damaged craft", "poses": [{ "pose": "listing", "pose_phrase": "listing at an angle, trailing thin smoke", "views": ["tilted"] }] }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "category": "bigfoot",
+  "app_category": "cryptids",
+  "template": "creature-photoreal",
+  "tags": ["bigfoot", "sasquatch", "cryptid"],
+  "defaults": { "views": ["three-quarter"], "distances": ["mid"], "expressions": ["neutral"], "variants": 1 },
+  "families": [
+    {
+      "family": "classic-sasquatch",
+      "subject_phrase": "a massive bipedal sasquatch covered in dark matted brown fur",
+      "meta_label": "Bigfoot",
+      "poses": [
+        { "pose": "standing", "pose_phrase": "standing upright and still" },
+        { "pose": "walking", "pose_phrase": "walking mid-stride", "views": ["side"] },
+        { "pose": "running", "pose_phrase": "running, arms swinging", "views": ["side"] },
+        { "pose": "crouching", "pose_phrase": "crouched low to the ground" },
+        { "pose": "sitting", "pose_phrase": "sitting on the ground" },
+        { "pose": "climbing", "pose_phrase": "climbing, reaching upward" },
+        { "pose": "pointing", "pose_phrase": "one arm raised, pointing" },
+        { "pose": "looking-back", "pose_phrase": "turning to look back over its shoulder", "views": ["back"] },
+        { "pose": "looking-up", "pose_phrase": "head tilted upward" },
+        { "pose": "aggressive-stance", "pose_phrase": "arms raised in an aggressive threat display", "views": ["front"] },
+        { "pose": "alert-stance", "pose_phrase": "standing alert, head turned to listen" },
+        { "pose": "peeking", "pose_phrase": "peeking out, only the head and one shoulder visible", "views": ["front"] },
+        { "pose": "half-body", "pose_phrase": "the upper half of the body only", "distances": ["close"] },
+        { "pose": "head", "pose_phrase": "the head and face only", "views": ["front"], "distances": ["close"] },
+        { "pose": "bust", "pose_phrase": "head and chest, a bust framing", "distances": ["close"] },
+        { "pose": "hand-reaching", "pose_phrase": "a single large hairy hand reaching forward", "distances": ["close"] },
+        { "pose": "silhouette", "pose_phrase": "a dark backlit silhouette of the whole figure" },
+        { "pose": "distant-silhouette", "pose_phrase": "a small dark distant silhouette", "distances": ["far"] }
+      ]
+    }
+  ]
+}

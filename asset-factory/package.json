@@ -1,0 +1,21 @@
+{
+  "name": "jps-asset-factory",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Manifest-driven overlay-asset factory for Jefferson Photo Studio stickers. Tool code only — never ships in the app.",
+  "scripts": {
+    "plan": "node cli.mjs plan",
+    "generate": "node cli.mjs generate",
+    "qc": "node cli.mjs qc",
+    "dedupe": "node cli.mjs dedupe",
+    "curate": "node cli.mjs curate",
+    "promote": "node cli.mjs promote",
+    "stats": "node cli.mjs stats",
+    "regen": "node cli.mjs regen",
+    "test": "node --test \"test/*.test.mjs\""
+  },
+  "dependencies": {
+    "sharp": "^0.33.4"
+  }
+}

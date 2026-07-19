@@ -1,0 +1,14 @@
+{
+  "id": "horror",
+  "version": 1,
+  "positive": [
+    "Photorealistic {subject_phrase}, {pose_phrase}, {view_phrase}, {distance_phrase}.",
+    "Unsettling but believable: weathered, aged materials and organic surface detail as captured by a real documentary camera, not stylized.",
+    "{global.photoreal}",
+    "{global.single_subject}",
+    "{global.isolated}",
+    "{global.no_text}"
+  ],
+  "negative": ["{global_negative}", "gore, blood"],
+  "settings": { "rendering_speed": "QUALITY", "aspect_ratio": "1x1" }
+}

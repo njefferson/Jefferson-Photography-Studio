@@ -1,0 +1,14 @@
+{
+  "id": "craft-photoreal",
+  "version": 1,
+  "positive": [
+    "Photorealistic {subject_phrase}, {pose_phrase}, {view_phrase}, {distance_phrase}.",
+    "{global.photoreal}",
+    "Believable machined surfaces, realistic reflections and material response, as captured by a real camera at telephoto distance.",
+    "{global.single_subject}",
+    "{global.isolated}",
+    "{global.no_text}"
+  ],
+  "negative": ["{global_negative}"],
+  "settings": { "rendering_speed": "QUALITY", "aspect_ratio": "1x1" }
+}

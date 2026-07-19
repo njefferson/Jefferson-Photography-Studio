@@ -1,0 +1,28 @@
+{
+  "category": "wildlife",
+  "app_category": "other",
+  "template": "creature-photoreal",
+  "tags": ["wildlife", "animal"],
+  "defaults": { "views": ["side"], "distances": ["mid"], "expressions": ["neutral"], "variants": 1 },
+  "families": [
+    { "family": "crow", "subject_phrase": "a black crow", "meta_label": "Crow", "poses": [{ "pose": "perched", "pose_phrase": "perched, head turned" }, { "pose": "flying", "pose_phrase": "in flight, wings spread", "views": ["below"] }] },
+    { "family": "raven", "subject_phrase": "a large glossy raven", "meta_label": "Raven", "poses": [{ "pose": "perched", "pose_phrase": "perched, alert" }] },
+    { "family": "owl", "subject_phrase": "a barn owl", "meta_label": "Owl", "poses": [{ "pose": "perched", "pose_phrase": "perched, facing forward", "views": ["front"] }, { "pose": "flying", "pose_phrase": "gliding, wings spread", "views": ["front"] }] },
+    { "family": "hawk", "subject_phrase": "a red-tailed hawk", "meta_label": "Hawk", "poses": [{ "pose": "perched", "pose_phrase": "perched, watchful" }, { "pose": "soaring", "pose_phrase": "soaring, wings spread", "views": ["below"] }] },
+    { "family": "eagle", "subject_phrase": "a bald eagle", "meta_label": "Eagle", "poses": [{ "pose": "soaring", "pose_phrase": "soaring, wings spread", "views": ["below"] }] },
+    { "family": "fox", "subject_phrase": "a red fox", "meta_label": "Fox", "poses": [{ "pose": "standing", "pose_phrase": "standing, looking to the side" }, { "pose": "trotting", "pose_phrase": "trotting" }] },
+    { "family": "bear", "subject_phrase": "a black bear", "meta_label": "Bear", "poses": [{ "pose": "standing", "pose_phrase": "standing on all fours" }, { "pose": "rearing", "pose_phrase": "reared up on hind legs", "views": ["front"] }] },
+    { "family": "wolf", "subject_phrase": "a grey wolf", "meta_label": "Wolf", "poses": [{ "pose": "standing", "pose_phrase": "standing, alert" }] },
+    { "family": "mountain-lion", "subject_phrase": "a mountain lion", "meta_label": "Mountain lion", "poses": [{ "pose": "prowling", "pose_phrase": "prowling low" }] },
+    { "family": "rabbit", "subject_phrase": "a cottontail rabbit", "meta_label": "Rabbit", "poses": [{ "pose": "sitting", "pose_phrase": "sitting, ears up" }] },
+    { "family": "squirrel", "subject_phrase": "a grey squirrel", "meta_label": "Squirrel", "poses": [{ "pose": "sitting", "pose_phrase": "sitting up, tail curled" }] },
+    { "family": "butterfly", "subject_phrase": "a monarch butterfly", "meta_label": "Butterfly", "poses": [{ "pose": "wings-open", "pose_phrase": "wings spread open", "views": ["above"] }] },
+    { "family": "dragonfly", "subject_phrase": "a dragonfly with iridescent wings", "meta_label": "Dragonfly", "poses": [{ "pose": "perched", "pose_phrase": "perched, wings out", "distances": ["close"] }] },
+    { "family": "bee", "subject_phrase": "a honeybee", "meta_label": "Bee", "poses": [{ "pose": "flying", "pose_phrase": "hovering in flight", "distances": ["close"] }] },
+    { "family": "firefly", "subject_phrase": "a firefly with a glowing abdomen", "meta_label": "Firefly", "poses": [{ "pose": "glowing", "pose_phrase": "in flight, glowing", "distances": ["close"] }] },
+    { "family": "snake", "subject_phrase": "a coiled snake", "meta_label": "Snake", "poses": [{ "pose": "coiled", "pose_phrase": "coiled, head raised", "views": ["above"] }] },
+    { "family": "lizard", "subject_phrase": "a small lizard", "meta_label": "Lizard", "poses": [{ "pose": "resting", "pose_phrase": "resting, head up" }] },
+    { "family": "frog", "subject_phrase": "a green frog", "meta_label": "Frog", "poses": [{ "pose": "sitting", "pose_phrase": "sitting" }] },
+    { "family": "turtle", "subject_phrase": "a box turtle", "meta_label": "Turtle", "poses": [{ "pose": "walking", "pose_phrase": "walking, head out" }] }
+  ]
+}

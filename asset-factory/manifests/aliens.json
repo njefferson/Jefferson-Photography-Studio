@@ -1,0 +1,88 @@
+{
+  "category": "aliens",
+  "app_category": "aliens",
+  "template": "creature-photoreal",
+  "tags": ["alien", "extraterrestrial"],
+  "defaults": { "views": ["front"], "distances": ["mid"], "expressions": ["neutral"], "variants": 1 },
+  "families": [
+    {
+      "family": "grey",
+      "subject_phrase": "a classic Grey alien with smooth grey skin, a large hairless head and huge black almond eyes",
+      "meta_label": "Grey",
+      "poses": [
+        { "pose": "standing", "pose_phrase": "standing upright, arms at its sides" },
+        { "pose": "walking", "pose_phrase": "walking forward", "views": ["three-quarter"] },
+        { "pose": "crouching", "pose_phrase": "crouched low" },
+        { "pose": "peeking", "pose_phrase": "peeking, only the head and one shoulder visible" },
+        { "pose": "looking-behind", "pose_phrase": "turning to look behind itself", "views": ["back"] },
+        { "pose": "pointing", "pose_phrase": "a slender arm raised, pointing" },
+        { "pose": "hand", "pose_phrase": "a single slender grey hand with long fingers", "distances": ["close"] },
+        { "pose": "head", "pose_phrase": "the head and face only", "distances": ["close"] },
+        { "pose": "bust", "pose_phrase": "head and narrow shoulders, a bust framing", "distances": ["close"] },
+        { "pose": "eyes", "pose_phrase": "the two huge black eyes only, extreme close view", "distances": ["close"] },
+        { "pose": "silhouette", "pose_phrase": "a dark backlit silhouette of the whole figure" },
+        { "pose": "holding-device", "pose_phrase": "holding a small unfamiliar device" }
+      ]
+    },
+    {
+      "family": "tall-grey",
+      "subject_phrase": "a tall elongated Grey alien, gaunt and slender with an oversized head",
+      "meta_label": "Tall Grey",
+      "poses": [
+        { "pose": "standing", "pose_phrase": "standing at full imposing height" },
+        { "pose": "walking", "pose_phrase": "striding forward", "views": ["three-quarter"] },
+        { "pose": "bust", "pose_phrase": "head and shoulders, a bust framing", "distances": ["close"] }
+      ]
+    },
+    {
+      "family": "short-grey",
+      "subject_phrase": "a short child-height Grey alien, stocky with a bulbous head",
+      "meta_label": "Short Grey",
+      "poses": [
+        { "pose": "standing", "pose_phrase": "standing upright" },
+        { "pose": "peeking", "pose_phrase": "peeking around cover" }
+      ]
+    },
+    {
+      "family": "reptilian",
+      "subject_phrase": "a reptilian humanoid with green scaled skin, muscular build and slit-pupil eyes",
+      "meta_label": "Reptilian",
+      "note": "fiction",
+      "poses": [
+        { "pose": "standing", "pose_phrase": "standing menacingly" },
+        { "pose": "crouching", "pose_phrase": "crouched, ready to spring" },
+        { "pose": "bust", "pose_phrase": "head and shoulders, a bust framing", "distances": ["close"] }
+      ]
+    },
+    {
+      "family": "insectoid",
+      "subject_phrase": "an insectoid alien with a chitinous exoskeleton, compound eyes and mandibles",
+      "meta_label": "Insectoid",
+      "note": "fiction",
+      "poses": [
+        { "pose": "standing", "pose_phrase": "standing on multiple jointed legs" },
+        { "pose": "bust", "pose_phrase": "head and thorax, a bust framing", "distances": ["close"] }
+      ]
+    },
+    {
+      "family": "nordic",
+      "subject_phrase": "a tall human-like Nordic alien with pale skin, fair hair and calm features",
+      "meta_label": "Nordic",
+      "note": "fiction",
+      "poses": [
+        { "pose": "standing", "pose_phrase": "standing serenely" },
+        { "pose": "bust", "pose_phrase": "head and shoulders, a bust framing", "distances": ["close"] }
+      ]
+    },
+    {
+      "family": "ancient-astronaut",
+      "subject_phrase": "an ancient-astronaut figure in a primitive-looking pressure suit and rounded helmet",
+      "meta_label": "Ancient Astronaut",
+      "note": "fiction",
+      "poses": [
+        { "pose": "standing", "pose_phrase": "standing in the suit, helmet on" },
+        { "pose": "holding-device", "pose_phrase": "holding an unidentified instrument" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "blocks": {
+    "single_subject": "Exactly one isolated subject, centered, nothing else in frame.",
+    "isolated": "Isolated on a fully transparent background, the entire subject visible and uncropped, with soft naturally feathered edges suitable for photo compositing.",
+    "isolated_overlay": "Isolated on a fully transparent background with soft naturally feathered edges, produced as an overlay element for photo compositing.",
+    "photoreal": "Photorealistic, production-quality photographic detail, natural lighting consistent with outdoor photography, realistic shadows falling only on the subject itself.",
+    "no_text": "No text, no watermark, no caption, no border, no frame, no sticker sheet, no collage."
+  },
+  "negative": "text, watermark, logo, caption, border, frame, background, scenery, sky, ground, landscape, trees, buildings, people, multiple subjects, sticker sheet, grid, collage, cartoon, illustration, drawing, painting, 3d render, cgi, plastic toy, cropped, cut off, white background, colored background"
+}
