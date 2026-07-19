@@ -1633,6 +1633,9 @@ label.open-btn, label.bar-btn {
    (white stroke + dark drop-shadow), no colour-only cue. */
 #stickerOverlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; overflow: visible; }
 #stickerOverlay .sticker-box { fill: none; stroke: var(--accent); stroke-width: 2; stroke-dasharray: 7 4; filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.85)); }
+/* Perspective corner handles — grabbable, dark fill + light ring + shadow so
+   they read on any photo (shape, not colour, is the cue). */
+#stickerOverlay .sticker-corner { fill: rgba(12, 12, 16, 0.78); stroke: #fff; stroke-width: 2.5; pointer-events: auto; cursor: grab; touch-action: none; filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.9)); }
 /* Drag/resize ghost — the raw asset shown live while a gesture is in flight, so
    the heavy pipeline bake only runs on release (kills the drag lag). */
 #stickerGhost { position: fixed; pointer-events: none; z-index: 4; opacity: 0.92; will-change: transform, left, top; }

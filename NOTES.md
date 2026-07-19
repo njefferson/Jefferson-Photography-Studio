@@ -3099,6 +3099,34 @@ user-scalable=no.
   confirming his AI-made PNGs (transparent, sized) land in the right folders.
   DELIVERY ASSUMPTION: committed PNGs in category folders (permanent, precached,
   offline), with runtime "Import a picture" kept for one-offs.
+- [x] **Sticker perspective — drag the corners to set the plane (Increment B)** —
+  owner direction 2026-07-19: "some of these need to skew by moving a corner… set
+  the perspective for the image they're putting it into" (esp. evidence — a
+  footprint laid flat on the ground, a lantern tucked behind a log reads far more
+  believable than a decal). BETA straight to main. MODEL: `Sticker.corners` = 4
+  offsets (TL,TR,BR,BL) in local half-extent units, absent = the plain scale+rot
+  rect; they PERTURB the base rect so move/scale/rot/pinch all still compose.
+  MATH (sticker.ts): from the 4 world corners, build the unit-square→quad
+  homography (Heckbert) and invert it (quad→square) ONCE per sticker per bake;
+  compositePixel takes the precomputed inverse and does one mat-vec per pixel
+  (`tx,ty = Hinv·[X,Y,1]` dehomogenized), the plain path untouched when there are
+  no corners. stickerRect → the quad's bbox; hitSticker → point-in-quad;
+  stickerLocalUv (blend paint) → the same inverse, so painting still lands on a
+  skewed sticker. Rides the export for free (stickerPatches reuses compositePixel
+  + stickerRect). UI: a "Skew the corners" toggle adds 4 draggable handles to the
+  selection overlay (reusing the mask-handle drag idiom; the overlay repositions
+  IN PLACE so a live drag keeps its capture), "Reset perspective" clears them.
+  Corner drags bake live in the bbox, rAF-coalesced, with a stkCornerLive guard
+  on recordSoon so one drag = one undo step; corners deep-copied in cloneParams.
+  VERIFIED: sticker-persp unit (homography sends the 4 world corners to the asset
+  uv corners at 2e-16, a top-in skew is a real trapezoid, bbox = quad extent,
+  identity corners == the plain rect for fast/slow parity; PLANT=flat fails) +
+  sticker-persp walk (corner handles appear, dragging warps the footprint, the
+  box reshapes, export parity ≤14 LSB, .cube excluded, undo restores, axe both
+  themes; PLANT=nodrag fails). All sticker regressions + build green. NEEDS THE
+  OWNER'S HANDS: the corner-drag feel on the iPad (handle size, whether live-bake
+  is smooth enough or wants a matrix3d ghost), and whether one-finger corner-drag
+  vs body-drag ever fight (corner handles stop-propagation, so they shouldn't).
 
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 
