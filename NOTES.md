@@ -192,21 +192,10 @@ user-scalable=no.
 > different approach and mindset"). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
-- [ ] **Quality downscale on scaled exports** — core sweep, promoted from the
-  review opportunities 2026-07-18: the 50%/25% exports currently decimate
-  nearest-neighbour; box-filter them.
 - [ ] **Per-channel R/G/B curves** — core sweep, promoted from the backlog
   2026-07-18: extends the luminance tone curve to independent channels; same
   per-pixel model, non-spatial, so it rides saved looks and strengthens the
   .cube/.dcp exports.
-- [ ] **Close the export double-tap fall-through** — the surviving half of the
-  2026-07-18 ".cube/.dcp share sheet" promotion, RESCOPED same day: the
-  share-sheet routing itself turned out ALREADY SHIPPED (main.ts:4398, the
-  copy-and-trust release — its shipped record covers it; the ledger line is
-  annotated). Still open: busySave (main.ts ~3955) has no re-entrancy guard —
-  double-tapping Save while the share sheet opens can call saveBlob again,
-  fall into the download branch, and (for batch) clear crash-recovery frames
-  early. Disable the button (or guard a flag) across the await.
 - [ ] **Accessible overlays — Library, Quick look and Busy become real dialogs**
   — a11y audit 2026-07-17, deferred from the a11y release because it touches
   open/close interaction flows. #library claims aria-modal with no focus
@@ -2710,6 +2699,31 @@ user-scalable=no.
   NEEDS THE OWNER'S HANDS: export one of HIS real NEFs and check Photos
   shows the capture date (not the export date) and the camera/lens line;
   confirm a strip-on-open cleaned file still exports with its date.
+
+- [x] **Quality downscale on scaled exports** — core sweep, shipped as a
+  1.5.x INCREMENT with the EXIF release round. The 50%/25% exports used to
+  keep every Nth source pixel (nearest-neighbour decimation — aliasing,
+  moiré, jagged edges). Now they BOX-FILTER: each output pixel averages an
+  ss×ss supersample grid (2×2 at 50%, 4×4 at 25%) placed in OUTPUT space
+  and mapped through toSrcF, so the filter stays correct under crop,
+  rotation, STRAIGHTEN and flip alike (a source-space rect would shear
+  under a straighten angle — the trap). Averaging happens on LINEAR light
+  (physically correct anti-aliasing); the edit runs once per output pixel
+  on the averaged sample, so denoise/detail/glow/mask semantics are
+  unchanged. Full-size exports keep the 1-tap fast path; scaled exports
+  now cost roughly a full-res pass (the price of the quality). VERIFIED
+  (downscale-walk, fail-first proven — planted "still patchy" flipped at
+  spread=0): a 512px ONE-PIXEL CHECKERBOARD exported at 25% comes out
+  perfectly uniform (25 probes, spread 0, mid-tone 173) where decimation
+  gave pure black/white patches; p3-walk (parity 3.99), exif-walk and
+  bw-walk (mono exact) all re-run green THROUGH the box filter.
+
+- [x] **Close the export double-tap fall-through** — shipped as a 1.5.x
+  INCREMENT same round (the queue item's rescoped remainder). busySave now
+  carries a re-entrancy guard: disabled across the await (released in
+  finally so a cancelled share sheet can try again); handler body moved to
+  saveBusyPending(). VERIFIED in downscale-walk: two synchronous taps on
+  Save produce exactly ONE download; no page errors.
 
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 
