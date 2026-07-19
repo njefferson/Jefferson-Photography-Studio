@@ -192,9 +192,6 @@ user-scalable=no.
 > different approach and mindset"). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
-- [ ] **Keep EXIF in exports** — core sweep, promoted from the review
-  opportunities 2026-07-18: carry capture date/camera into exported JPEG and
-  TIFF (parseExif already reads it at open; write the honest subset back).
 - [ ] **Quality downscale on scaled exports** — core sweep, promoted from the
   review opportunities 2026-07-18: the 50%/25% exports currently decimate
   nearest-neighbour; box-filter them.
@@ -2676,6 +2673,43 @@ user-scalable=no.
   convert tagged P3 correctly, but his pipeline is the real test).
   MERGED TO MAIN 2026-07-18 (owner "Promote"; PR #34, rebase) —
   production deploys as 1.4.
+
+- [x] **Keep EXIF in exports** — THE FOURTH CAPABILITY RELEASE, ships as
+  **1.5** (owner directive "get through these to creative"). Exported JPEG
+  and 16-bit TIFF now carry the HONEST SUBSET of the original's EXIF:
+  capture date/time (DateTimeOriginal, 0x0132 fallback), Make/Model, lens
+  (LensModel), and the exposure triangle (ExposureTime/FNumber as RAW
+  rationals so 1/320 s round-trips exactly, ISO, FocalLength) — plus
+  Software = "Photography Studio" for provenance.
+  ARCHITECTURE (the load-bearing choice): the EXIF block is FRESHLY BUILT
+  from a whitelist (src/exif.ts: readExifSubset — bounds-checked like
+  gps.ts, walks JPEG APP1 / TIFF IFD0+ExifIFD+SubIFDs — then
+  buildExifApp1 / the shared TiffEntry lists), NEVER copied wholesale. So
+  GPS structurally cannot ride (the builder has no field for it — the
+  location guard stays airtight), Orientation is never carried (export
+  pixels are already rotated; a copied flag would double-rotate), and no
+  maker notes/thumbnails bloat. Sources with no EXIF (the binned practice
+  DNGs) export with NONE — nothing fabricated. JPEG: APP1 inserted before
+  the ICC APP2 (convention); TIFF: writeTiff16 interleaves Make/Model/
+  Software/DateTime into IFD0 (ascending-tag flush) + an Exif IFD before
+  the pixel strip (dataOffset kept even for the Uint16 view). Batch
+  exports inherit (same exportImage). Help "Works with" says so.
+  VERIFIED, fail-first proven two ways (planted "built EXIF carries the
+  source's GPS" unit + planted "export carries no EXIF" walk both
+  flipped). 10 unit checks: full-subset read; build→re-read round trip
+  (our reader as structural validator); NO 0x8825/0x0112 in the built
+  block; findLocation clean; Software present; sparse (date-only)
+  round-trip; practice DNG → null; truncated/hostile → no throw. 11 walk
+  checks (real app, real photo + injected EXIF/GPS/orientation APP1):
+  location tip still fires on the fixture (both features coexist);
+  exported JPEG AND TIFF re-read with the exact subset (1/500, ISO 200,
+  the Z 50 strings); location NEVER in either export; no orientation tag;
+  the exported TIFF RE-OPENS in the app's own decoder; EXIF-less source →
+  EXIF-less export; no page errors. p3-walk re-run green (parity 3.3 —
+  the new APP1 doesn't disturb the profile pair).
+  NEEDS THE OWNER'S HANDS: export one of HIS real NEFs and check Photos
+  shows the capture date (not the export date) and the camera/lens line;
+  confirm a strip-on-open cleaned file still exports with its date.
 
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 

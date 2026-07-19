@@ -14,6 +14,7 @@ import { healPatches8, healPatchesFromSampler, wrapWithPatches } from "./heal";
 import { buildGlowMap, sampleGlow, GLOW_GAIN } from "./glow";
 import { buildLocalMap } from "./localmap";
 import { SRGB_ICC, DISPLAY_P3_ICC, srgbDisplayToP3Display, embedIccInJpeg } from "./icc";
+import { readExifSubset, buildExifApp1, embedExifInJpeg, ifd0ExtraEntries, exifIfdEntries, externSize, type ExifSubset, type TiffEntry } from "./exif";
 import { embedLookInJpeg } from "./lookmark";
 import type { ImportedFile } from "./import";
 import type { DecodedImage } from "./decode";
@@ -276,8 +277,12 @@ export async function exportImage(
     if (!blob) throw new Error("JPEG encoding failed.");
     // canvas.toBlob passes our bytes through UNTAGGED (putImageData values are
     // canvas-space, never converted); embed the Display P3 profile so viewers
-    // read them as written — then the traveling recipe, when asked for.
+    // read them as written, the honest EXIF subset (capture date, camera,
+    // lens, exposure — freshly built, never GPS or orientation), then the
+    // traveling recipe, when asked for.
     let tagged = embedIccInJpeg(new Uint8Array(await blob.arrayBuffer()), DISPLAY_P3_ICC);
+    const exif = readExifSubset(file.bytes);
+    if (exif) tagged = embedExifInJpeg(tagged, buildExifApp1(exif)); // lands BEFORE the ICC (convention)
     if (opts.lookRecipe) tagged = embedLookInJpeg(tagged, opts.lookRecipe);
     return { blob: new Blob([tagged.buffer as ArrayBuffer], { type: "image/jpeg" }), name: `${baseName}.jpg` };
   } else {
@@ -320,7 +325,7 @@ export async function exportImage(
         }
       }
     }
-    return { blob: new Blob([writeTiff16(rgb, w, h)], { type: "image/tiff" }), name: `${baseName}.tif` };
+    return { blob: new Blob([writeTiff16(rgb, w, h, SRGB_ICC, readExifSubset(file.bytes) ?? undefined)], { type: "image/tiff" }), name: `${baseName}.tif` };
   }
 }
 
@@ -343,18 +348,30 @@ function getSource(file: ImportedFile, current: DecodedImage): Source {
 }
 
 /** Minimal baseline TIFF: RGB, 16-bit/channel, uncompressed, single strip, with
- *  an embedded ICC profile (tag 34675) so the output is never untagged. */
-export function writeTiff16(rgb: Uint16Array, w: number, h: number, icc: Uint8Array = SRGB_ICC): ArrayBuffer {
-  const entries = 12;
+ *  an embedded ICC profile (tag 34675) so the output is never untagged — plus
+ *  the honest EXIF subset (capture date, camera, lens, exposure) when the
+ *  source carried one. Freshly built tags, never a copied block: GPS and
+ *  Orientation structurally cannot ride along. */
+export function writeTiff16(rgb: Uint16Array, w: number, h: number, icc: Uint8Array = SRGB_ICC, exif?: ExifSubset): ArrayBuffer {
+  const ifd0Extra: TiffEntry[] = exif ? ifd0ExtraEntries(exif) : [];
+  const exifIfd: TiffEntry[] = exif ? exifIfdEntries(exif) : [];
+  const entries = 12 + ifd0Extra.length + (exifIfd.length ? 1 : 0);
   const ifdOffset = 8;
   const ifdSize = 2 + entries * 12 + 4;
   const bitsOffset = ifdOffset + ifdSize; // 3 shorts
   const sampleFmtOffset = bitsOffset + 6; // 3 shorts
-  const dataOffset = sampleFmtOffset + 6;
+  // IFD0 external strings, then the Exif IFD + its externals, then pixels
+  // (dataOffset must stay EVEN for the Uint16Array view), then the ICC.
+  const strOffset = sampleFmtOffset + 6;
+  const strBytes = externSize(ifd0Extra);
+  const exifIfdOffset = strOffset + strBytes;
+  const exifIfdBytes = exifIfd.length ? 2 + exifIfd.length * 12 + 4 + externSize(exifIfd) : 0;
+  const dataOffset = (exifIfdOffset + exifIfdBytes + 1) & ~1;
   const dataBytes = w * h * 3 * 2;
   const iccOffset = dataOffset + dataBytes; // ICC bytes appended after pixels
   const buf = new ArrayBuffer(iccOffset + icc.length);
   const dv = new DataView(buf);
+  const u8 = new Uint8Array(buf);
   // Header (little-endian).
   dv.setUint16(0, 0x4949, true);
   dv.setUint16(2, 42, true);
@@ -362,28 +379,73 @@ export function writeTiff16(rgb: Uint16Array, w: number, h: number, icc: Uint8Ar
   dv.setUint16(ifdOffset, entries, true);
 
   let p = ifdOffset + 2;
-  const tag = (id: number, type: number, count: number, value: number) => {
-    dv.setUint16(p, id, true);
-    dv.setUint16(p + 2, type, true);
-    dv.setUint32(p + 4, count, true);
-    dv.setUint32(p + 8, value, true);
+  let ext = strOffset; // running out-of-line cursor (IFD0 strings, then Exif's)
+  const entry = (e: TiffEntry) => {
+    dv.setUint16(p, e.tag, true);
+    dv.setUint16(p + 2, e.typ, true);
+    dv.setUint32(p + 4, e.cnt, true);
+    if (e.data && e.data.length > 4) {
+      dv.setUint32(p + 8, ext, true);
+      u8.set(e.data, ext);
+      ext += e.data.length + (e.data.length % 2);
+    } else if (e.data) {
+      u8.set(e.data, p + 8); // remaining bytes stay zero
+    } else if (e.typ === 3 && e.cnt === 1) {
+      dv.setUint16(p + 8, e.inline ?? 0, true);
+    } else {
+      // LONG/UNDEFINED value, or an OFFSET (any type whose data is >4 bytes,
+      // e.g. SHORT count 3) — always a full u32 field.
+      dv.setUint32(p + 8, e.inline ?? 0, true);
+    }
     p += 12;
   };
+  const tag = (id: number, type: number, count: number, value: number) => entry({ tag: id, typ: type, cnt: count, inline: value });
   const SHORT = 3, LONG = 4, UNDEFINED = 7;
-  // Tags MUST stay in ascending ID order.
+  // Tags MUST stay in ascending ID order — the EXIF extras interleave.
+  const flush = (before: number) => {
+    while (ifd0Extra.length && ifd0Extra[0].tag < before) entry(ifd0Extra.shift()!);
+  };
   tag(256, LONG, 1, w); // ImageWidth
   tag(257, LONG, 1, h); // ImageLength
   tag(258, SHORT, 3, bitsOffset); // BitsPerSample -> [16,16,16]
   tag(259, SHORT, 1, 1); // Compression: none
   tag(262, SHORT, 1, 2); // Photometric: RGB
+  flush(273); // Make (271) / Model (272)
   tag(273, LONG, 1, dataOffset); // StripOffsets
   tag(277, SHORT, 1, 3); // SamplesPerPixel
   tag(278, LONG, 1, h); // RowsPerStrip
   tag(279, LONG, 1, dataBytes); // StripByteCounts
   tag(284, SHORT, 1, 1); // PlanarConfig: chunky
+  flush(339); // Software (305) / DateTime (306)
   tag(339, SHORT, 3, sampleFmtOffset); // SampleFormat -> [1,1,1] unsigned
+  if (exifIfd.length) tag(34665, LONG, 1, exifIfdOffset); // Exif IFD pointer
   tag(34675, UNDEFINED, icc.length, iccOffset); // ICC profile (InterColorProfile)
   dv.setUint32(p, 0, true); // next IFD = 0
+
+  // The Exif IFD block (its externals follow it directly).
+  if (exifIfd.length) {
+    dv.setUint16(exifIfdOffset, exifIfd.length, true);
+    let q = exifIfdOffset + 2;
+    let ext2 = exifIfdOffset + 2 + exifIfd.length * 12 + 4;
+    for (const e of exifIfd) {
+      dv.setUint16(q, e.tag, true);
+      dv.setUint16(q + 2, e.typ, true);
+      dv.setUint32(q + 4, e.cnt, true);
+      if (e.data && e.data.length > 4) {
+        dv.setUint32(q + 8, ext2, true);
+        u8.set(e.data, ext2);
+        ext2 += e.data.length + (e.data.length % 2);
+      } else if (e.data) {
+        u8.set(e.data, q + 8);
+      } else if (e.typ === 3) {
+        dv.setUint16(q + 8, e.inline ?? 0, true);
+      } else {
+        dv.setUint32(q + 8, e.inline ?? 0, true);
+      }
+      q += 12;
+    }
+    dv.setUint32(q, 0, true);
+  }
 
   for (let i = 0; i < 3; i++) {
     dv.setUint16(bitsOffset + i * 2, 16, true);
