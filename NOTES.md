@@ -2674,6 +2674,8 @@ user-scalable=no.
   next to the app preview in Apple Photos (they should be
   indistinguishable), and one social-upload round trip (recompressors
   convert tagged P3 correctly, but his pipeline is the real test).
+  MERGED TO MAIN 2026-07-18 (owner "Promote"; PR #34, rebase) —
+  production deploys as 1.4.
 
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 
