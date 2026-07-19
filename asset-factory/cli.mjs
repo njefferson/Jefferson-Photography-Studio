@@ -112,7 +112,7 @@ async function main() {
       provider.preflight?.(); // e.g. refuse a keyless paid run, upfront
       const concurrency = Math.min(MAX_CONCURRENCY, num(flags.concurrency, DEFAULT_CONCURRENCY));
       let done = 0;
-      const { tally, logPath } = await runGenerate({
+      const { tally, logPath, runId } = await runGenerate({
         items,
         provider,
         concurrency,
@@ -124,6 +124,13 @@ async function main() {
         },
       });
       console.log(`done: ${JSON.stringify(tally)} (log: ${logPath})`);
+      // Surface provider failures on stdout (the ephemeral catalog is otherwise
+      // the only record) so a CI run's log explains what went wrong.
+      if (tally.error) {
+        console.log(`\nerrors this run:`);
+        for (const r of allRecords())
+          if (r.run_id === runId && r.status === "error") console.log(`  ${r.id}\n    ${r.error}`);
+      }
       break;
     }
 
