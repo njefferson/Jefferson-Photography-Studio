@@ -278,15 +278,24 @@
 
           <!-- ===== STICKERS (Creative) ===== -->
           <section class="section" role="tabpanel" id="sec-stickers" aria-labelledby="ptab-stickers" data-tab="stickers" hidden>
-            <p class="note">Drop a UFO into the trees. Tap one to add it, then drag it on the photo. Stickers take on your photo's colors &mdash; the channel swap, white balance and grade all reach them &mdash; and grain settles over the top.</p>
+            <p class="note">Drop something into the scene. Tap one to add it, then drag it on the photo. New stickers are matched to your photo automatically &mdash; the channel swap, white balance and grade all reach them, and grain settles over the top &mdash; then fine-tune below.</p>
             <div id="stickerAdd" class="bw-mixes" role="group" aria-label="Add a sticker"></div>
+            <label class="welcome-batch" id="stickerImportBtn" for="stickerImport">Import a picture&hellip;</label>
+            <input id="stickerImport" type="file" accept="image/png,image/*" hidden />
             <div id="stickerControls" hidden>
               <div class="sub-title">Selected sticker</div>
               <label>Size <input id="stkScale" type="range" min="0.05" max="1" step="0.005" value="0.3" /></label>
               <label>Spin <input id="stkRot" type="range" min="-180" max="180" step="1" value="0" /></label>
+              <div class="sub-title">Match to the photo</div>
+              <label>Brightness <input id="stkBright" type="range" min="-1" max="1" step="0.01" value="0" /></label>
+              <label>Contrast <input id="stkContrast" type="range" min="-1" max="1" step="0.01" value="0" /></label>
+              <label>Warmth <input id="stkWarmth" type="range" min="-1" max="1" step="0.01" value="0" /></label>
+              <label>Saturation <input id="stkSat" type="range" min="-1" max="1" step="0.01" value="0" /></label>
+              <button id="stkAutoMatch" type="button">Re-match to the photo</button>
+              <div class="sub-title">Tuck behind the scene</div>
               <label>Peek behind <input id="stkOcclude" type="range" min="0" max="1" step="0.01" value="0" /></label>
               <div id="stkBehind" class="bw-mixes" role="group" aria-label="What the sticker hides behind"></div>
-              <p class="note">Peek behind lets the scene show through the sticker &mdash; slide it up and pick whether it hides behind the <em>bright</em> parts (foliage glows white in infrared) or the <em>dark</em> parts (tree trunks), so the saucer tucks in behind the branches.</p>
+              <p class="note">Peek behind lets the scene show through the sticker &mdash; slide it up and pick whether it hides behind the <em>bright</em> parts (foliage glows white in infrared) or the <em>dark</em> parts (tree trunks), so it tucks in behind the branches.</p>
               <button id="stkDelete" type="button">Remove this sticker</button>
             </div>
             <button id="stkClear" type="button" hidden>Clear all stickers</button>

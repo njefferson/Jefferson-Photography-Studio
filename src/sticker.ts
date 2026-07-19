@@ -45,6 +45,7 @@ export interface StickerAsset {
   w: number;
   h: number;
   lin: Float32Array; // w*h*4 — linear RGB + alpha (0..1)
+  mean: [number, number, number]; // alpha-weighted mean linear RGB (for auto-match)
 }
 
 export interface Rect {
@@ -57,13 +58,15 @@ export interface Rect {
 /** Build a StickerAsset from gamma sRGB RGBA bytes (e.g. canvas getImageData). */
 export function makeStickerAsset(key: string, w: number, h: number, rgba: Uint8ClampedArray): StickerAsset {
   const lin = new Float32Array(w * h * 4);
+  let mr = 0, mg = 0, mb = 0, aw = 0;
   for (let i = 0; i < w * h; i++) {
-    lin[i * 4] = toLin(rgba[i * 4]);
-    lin[i * 4 + 1] = toLin(rgba[i * 4 + 1]);
-    lin[i * 4 + 2] = toLin(rgba[i * 4 + 2]);
-    lin[i * 4 + 3] = rgba[i * 4 + 3] / 255;
+    const r = toLin(rgba[i * 4]), g = toLin(rgba[i * 4 + 1]), b = toLin(rgba[i * 4 + 2]);
+    const a = rgba[i * 4 + 3] / 255;
+    lin[i * 4] = r; lin[i * 4 + 1] = g; lin[i * 4 + 2] = b; lin[i * 4 + 3] = a;
+    mr += r * a; mg += g * a; mb += b * a; aw += a;
   }
-  return { key, w, h, lin };
+  const d = Math.max(1e-4, aw);
+  return { key, w, h, lin, mean: [mr / d, mg / d, mb / d] };
 }
 
 const clampI = (v: number, hi: number) => (v < 0 ? 0 : v > hi ? hi : v);
@@ -104,6 +107,39 @@ const smooth = (e0: number, e1: number, x: number) => {
   return t * t * (3 - 2 * t);
 };
 
+/** Bilinear sample of a single-channel 0..255 mask at (u,v) → 0..1, replicating
+ *  GL LINEAR + CLAMP_TO_EDGE (u*size−0.5). A verbatim twin of pipeline.ts's
+ *  sampleBrush (that one is module-private; the sticker mask is CPU-only). */
+function sampleMask(b: { w: number; h: number; data: Uint8Array }, u: number, v: number): number {
+  const fx = Math.min(1, Math.max(0, u)) * b.w - 0.5;
+  const fy = Math.min(1, Math.max(0, v)) * b.h - 0.5;
+  const ix = Math.floor(fx), iy = Math.floor(fy);
+  const tx = fx - ix, ty = fy - iy;
+  const cx = (i: number) => Math.max(0, Math.min(b.w - 1, i));
+  const cy = (i: number) => Math.max(0, Math.min(b.h - 1, i));
+  const x0 = cx(ix), x1 = cx(ix + 1), y0 = cy(iy), y1 = cy(iy + 1);
+  const s = (x: number, y: number) => b.data[y * b.w + x];
+  const top = s(x0, y0) * (1 - tx) + s(x1, y0) * tx;
+  const bot = s(x0, y1) * (1 - tx) + s(x1, y1) * tx;
+  return (top * (1 - ty) + bot * ty) / 255;
+}
+
+const MATCH_MID = 0.18; // linear mid-grey the sticker contrast pivots about
+
+/** Apply a sticker's match adjustments to its (linear) asset colour IN PLACE.
+ *  Brightness (multiply), contrast (about mid grey), warmth (R↑/B↓), saturation
+ *  (toward luma). Cheap scalars read per pixel — all-0 = the raw asset. */
+function matchAsset(c: Float32Array, s: Sticker): void {
+  const br = s.bright ?? 0, con = s.contrast ?? 0, wm = s.warmth ?? 0, sa = s.sat ?? 0;
+  if (br === 0 && con === 0 && wm === 0 && sa === 0) return;
+  let r = c[0], g = c[1], b = c[2];
+  if (br !== 0) { const k = 1 + br; r *= k; g *= k; b *= k; }
+  if (con !== 0) { const cf = 1 + con; r = (r - MATCH_MID) * cf + MATCH_MID; g = (g - MATCH_MID) * cf + MATCH_MID; b = (b - MATCH_MID) * cf + MATCH_MID; }
+  if (wm !== 0) { r *= 1 + wm * 0.4; b *= 1 - wm * 0.4; }
+  if (sa !== 0) { const L = r * 0.2126 + g * 0.7152 + b * 0.0722; const k = 1 + sa; r = L + (r - L) * k; g = L + (g - L) * k; b = L + (b - L) * k; }
+  c[0] = Math.max(0, r); c[1] = Math.max(0, g); c[2] = Math.max(0, b);
+}
+
 /** Composite the sticker list over one linear-RGB base pixel IN PLACE
  *  (`px`,`py` = source pixel centre coords; `base` = [r,g,b] linear). Painter's
  *  order (last sticker on top). Occlusion holds the sticker back where the
@@ -136,6 +172,11 @@ function compositePixel(
     sampleAsset(asset, tx, ty, tmp);
     let alpha = tmp[3];
     if (alpha <= 0) continue;
+    // Per-sticker erase/restore mask (asset-local): 0 hides, 1 shows.
+    if (s.mask) alpha *= sampleMask(s.mask, tx, ty);
+    if (alpha <= 0) continue;
+    // Match adjustments recolour the asset before it composites in.
+    matchAsset(tmp, s);
     if (s.occlude > 0) {
       // The base is the SOURCE pixel, whose scale differs by source kind
       // (camera-native linear for RAW, ~display for 8-bit). Fold it through a

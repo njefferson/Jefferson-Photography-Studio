@@ -1707,6 +1707,10 @@ updateMix3UI();
 // In-house sticker assets (public/stickers/<key>.png), loaded once on demand.
 // The catalog IS the picker order.
 const STICKER_CATALOG: { key: string; label: string }[] = [
+  { key: "bigfoot", label: "Bigfoot" },
+  { key: "bigfoot-walk", label: "Bigfoot walking" },
+  { key: "bigfoot-peek", label: "Bigfoot peeking" },
+  { key: "bigfoot-howl", label: "Bigfoot howling" },
   { key: "saucer", label: "Saucer" },
   { key: "alien", label: "Alien" },
   { key: "saturn", label: "Saturn" },
@@ -1799,6 +1803,10 @@ const stkRot = $("stkRot") as HTMLInputElement;
 const stkOcclude = $("stkOcclude") as HTMLInputElement;
 const stkBehindEl = $("stkBehind") as HTMLDivElement;
 const stkClearBtn = $("stkClear") as HTMLButtonElement;
+const stkBright = $("stkBright") as HTMLInputElement;
+const stkContrast = $("stkContrast") as HTMLInputElement;
+const stkWarmth = $("stkWarmth") as HTMLInputElement;
+const stkSat = $("stkSat") as HTMLInputElement;
 
 // The add-a-sticker chips (the catalog order).
 const stickerAddEl = $("stickerAdd") as HTMLDivElement;
@@ -1813,17 +1821,22 @@ for (const { key, label } of STICKER_CATALOG) {
     // Place at the centre of what's on screen (zoom-aware), a friendly size.
     const c = canvas.getBoundingClientRect();
     const [u, v] = renderer.clientToImageUv(c.left + c.width / 2, c.top + c.height / 2);
-    list.push({
+    const sx = Math.min(0.85, Math.max(0.15, u || 0.5));
+    const sy = Math.min(0.85, Math.max(0.15, v || 0.5));
+    const sticker: Sticker = {
       id: crypto.randomUUID(),
       asset: key,
-      x: Math.min(0.85, Math.max(0.15, u || 0.5)),
-      y: Math.min(0.85, Math.max(0.15, v || 0.5)),
+      x: sx,
+      y: sy,
       scale: 0.3,
       rot: 0,
       occlude: 0,
       occludeLuma: 0.6,
       occludeBright: true,
-    });
+      bright: 0, contrast: 0, warmth: 0, sat: 0,
+    };
+    autoMatchSticker(sticker); // calibrate to the scene under the drop point
+    list.push(sticker);
     selectedSticker = list.length - 1;
     updateStickerUI();
     draw();
@@ -1904,6 +1917,65 @@ stkOcclude.addEventListener("input", () => {
   draw();
 });
 
+// Match adjustments (brightness/contrast/warmth/saturation) — recolour the
+// asset; they bake live (one rect), coalesced like any slider.
+const stkAdjustInput = () => {
+  const s = selSticker();
+  if (!s) return;
+  s.bright = Number(stkBright.value);
+  s.contrast = Number(stkContrast.value);
+  s.warmth = Number(stkWarmth.value);
+  s.sat = Number(stkSat.value);
+  draw();
+};
+for (const el of [stkBright, stkContrast, stkWarmth, stkSat]) el.addEventListener("input", stkAdjustInput);
+
+$("stkAutoMatch").addEventListener("click", () => {
+  const s = selSticker();
+  if (!s) return;
+  autoMatchSticker(s);
+  updateStickerUI();
+  draw();
+  flushRecord();
+});
+
+// Import your own picture as a sticker (session-only runtime asset). This is
+// how a photorealistic cut-out you supply gets blended + matched like the
+// built-ins. Resets on reload (not precached), which the note explains.
+const stickerImport = $("stickerImport") as HTMLInputElement;
+stickerImport.addEventListener("change", async () => {
+  const f = stickerImport.files?.[0];
+  stickerImport.value = "";
+  if (!f || !current) return;
+  try {
+    const bmp = await createImageBitmap(f);
+    const c = document.createElement("canvas");
+    c.width = bmp.width; c.height = bmp.height;
+    const g = c.getContext("2d")!;
+    g.drawImage(bmp, 0, 0);
+    const rgba = g.getImageData(0, 0, bmp.width, bmp.height).data;
+    const key = "imp-" + crypto.randomUUID();
+    stickerAssets[key] = makeStickerAsset(key, bmp.width, bmp.height, rgba);
+    stickerAssetUrls[key] = URL.createObjectURL(f);
+    const cc = canvas.getBoundingClientRect();
+    const [u, v] = renderer.clientToImageUv(cc.left + cc.width / 2, cc.top + cc.height / 2);
+    const s: Sticker = {
+      id: crypto.randomUUID(), asset: key,
+      x: Math.min(0.85, Math.max(0.15, u || 0.5)), y: Math.min(0.85, Math.max(0.15, v || 0.5)),
+      scale: 0.3, rot: 0, occlude: 0, occludeLuma: 0.6, occludeBright: true,
+      bright: 0, contrast: 0, warmth: 0, sat: 0,
+    };
+    autoMatchSticker(s);
+    (params.stickers ??= []).push(s);
+    selectedSticker = params.stickers.length - 1;
+    updateStickerUI();
+    draw();
+    flushRecord();
+  } catch {
+    toast("That picture couldn't be read — try a PNG or JPEG.", 3000);
+  }
+});
+
 $("stkDelete").addEventListener("click", () => {
   const list = params.stickers ?? [];
   if (selectedSticker < 0 || selectedSticker >= list.length) return;
@@ -1922,6 +1994,50 @@ stkClearBtn.addEventListener("click", () => {
   flushRecord();
 });
 
+/** Mean LINEAR colour of the displayed scene in a patch around image-uv (x,y),
+ *  read back from the preview canvas (post-pipeline, what the eye sees). Null
+ *  when off-screen. Used by auto-match. */
+function sampleScenePatch(x: number, y: number, rUv: number): [number, number, number] | null {
+  if (!canvas.width) return null;
+  const [cxClient, cyClient] = renderer.imageUvToClient(x, y);
+  const rect = canvas.getBoundingClientRect();
+  const cx = ((cxClient - rect.left) / rect.width) * canvas.width;
+  const cy = ((cyClient - rect.top) / rect.height) * canvas.height;
+  const half = Math.max(4, rUv * canvas.width);
+  const x0 = Math.max(0, Math.floor(cx - half)), y0 = Math.max(0, Math.floor(cy - half));
+  const x1 = Math.min(canvas.width, Math.ceil(cx + half)), y1 = Math.min(canvas.height, Math.ceil(cy + half));
+  if (x1 - x0 < 2 || y1 - y0 < 2) return null;
+  const tmp = document.createElement("canvas");
+  tmp.width = x1 - x0; tmp.height = y1 - y0;
+  const g = tmp.getContext("2d");
+  if (!g) return null;
+  // The WebGL canvas keeps its drawing buffer (preserveDrawingBuffer), so it
+  // can be drawn straight into a 2D canvas for readback.
+  g.drawImage(canvas, x0, y0, x1 - x0, y1 - y0, 0, 0, x1 - x0, y1 - y0);
+  const d = g.getImageData(0, 0, x1 - x0, y1 - y0).data;
+  let r = 0, gg = 0, b = 0, n = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    r += Math.pow(d[i] / 255, 2.2); gg += Math.pow(d[i + 1] / 255, 2.2); b += Math.pow(d[i + 2] / 255, 2.2); n++;
+  }
+  return n ? [r / n, gg / n, b / n] : null;
+}
+
+/** Calibrate a freshly-added sticker to the scene under it: pull its brightness
+ *  and warmth toward the local scene, and soften its contrast so it isn't
+ *  crisper than the (often grainy) photo. A starting point; the user refines. */
+function autoMatchSticker(s: Sticker) {
+  const a = stickerAssets[s.asset];
+  if (!a) return; // asset still loading — no match this time (rare)
+  const patch = sampleScenePatch(s.x, s.y, s.scale * 0.5);
+  if (!patch) return;
+  const L = (c: [number, number, number]) => c[0] * 0.2126 + c[1] * 0.7152 + c[2] * 0.0722;
+  const sceneL = L(patch), assetL = L(a.mean);
+  if (assetL > 1e-3) s.bright = clamp(sceneL / assetL - 1, -0.85, 0.4);
+  const rb = (c: [number, number, number]) => Math.log((c[0] + 0.01) / (c[2] + 0.01));
+  s.warmth = clamp((rb(patch) - rb(a.mean)) * 0.5, -0.7, 0.7);
+  s.contrast = -0.18; // soften — the sticker shouldn't be sharper than the grain
+}
+
 /** Reflect the selected sticker into the controls; show/hide the panels. */
 function updateStickerUI() {
   const list = params.stickers ?? [];
@@ -1936,6 +2052,10 @@ function updateStickerUI() {
     stkScale.value = String(s.scale);
     stkRot.value = String(s.rot);
     stkOcclude.value = String(s.occlude);
+    stkBright.value = String(s.bright ?? 0);
+    stkContrast.value = String(s.contrast ?? 0);
+    stkWarmth.value = String(s.warmth ?? 0);
+    stkSat.value = String(s.sat ?? 0);
     stkBehindBtns.forEach((b, i) => {
       const on = s.occludeBright === STK_BEHIND[i].bright;
       b.textContent = (on ? "✓ " : "") + STK_BEHIND[i].label;
@@ -3096,7 +3216,11 @@ function syncSpotsToTexture() {
   // Occlusion reads display luminance (wb×exposure + cam), so a WB/exposure
   // change must re-bake even when the sticker list is unchanged.
   const occSig = `${params.wb[0]},${params.wb[1]},${params.wb[2]},${params.exposure}`;
-  const stkSame = stk.length === bakedStickers.length && JSON.stringify(stk) === JSON.stringify(bakedStickers) && occSig === bakedOccSig;
+  // Compare stickers WITHOUT stringifying the mask bitmap (a Uint8Array would
+  // serialize to a huge object every frame) — maskRev bumps on each stroke and
+  // IS compared, so mask edits are still detected.
+  const stkSig = (list: Sticker[]) => JSON.stringify(list, (k, v) => (k === "data" ? undefined : v));
+  const stkSame = stk.length === bakedStickers.length && stkSig(stk) === stkSig(bakedStickers) && occSig === bakedOccSig;
   if (spotsSame && stkSame) return;
   bakedOccSig = occSig;
   const W = previewSrc.width, H = previewSrc.height;

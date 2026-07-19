@@ -3014,6 +3014,36 @@ user-scalable=no.
   `change` to commit, like a real slider release). NEEDS THE OWNER'S HANDS:
   the drag/resize feel on the iPad, and that the grey ghost→recolored snap on
   release reads fine (a recolored ghost is a later option).
+- [x] **Stickers v2 — blend in, don't decorate (art + auto-match + adjust +
+  import)** — owner-caught on device 2026-07-19: "those aren't stickers, they're
+  bright white shapes… blend funny things into the picture that look like part
+  of it." Four moves, all BETA straight to main (Creative exception):
+  (1) ART — the in-house set redrawn with rich SVG shading (radial form
+  gradients, feTurbulence surface/fur, feDisplacementMap furry outlines, soft
+  edges) and the catalog grown 4→8: saucer, alien, Saturn, beam PLUS four
+  Bigfoot poses (stand / walk / peek / howl) as dark furred silhouettes
+  (public/stickers/*.png, auto-precached). (2) AUTO-MATCH ON ADD — a placed
+  sticker samples the preview canvas under its footprint (sampleScenePatch,
+  mean LINEAR RGB) and seeds bright (toward the scene's luma, clamped
+  −0.85..0.4), warmth (from the scene R/B log ratio), and a gentle contrast
+  −0.18 so it isn't crisper than the grainy photo (autoMatchSticker). (3)
+  PER-STICKER ADJUST — Sticker gained bright / contrast / warmth / sat
+  (identity 0); matchAsset applies them to the asset's LINEAR colour before the
+  over-blend (brightness scale, contrast about mid-grey 0.18, warmth R↑/B↓,
+  saturation toward luma). UI: a "Match to the photo" slider group + a
+  "Match to photo" button that re-runs auto-match. (4) IMPORT YOUR OWN PNG —
+  a file input → createImageBitmap → makeStickerAsset → a runtime asset keyed
+  imp-<uuid> (URL.createObjectURL), added + auto-matched; SESSION-ONLY (bytes
+  don't survive reload, like masks). makeStickerAsset now also computes an
+  alpha-weighted mean linear RGB for the match math. Adjustments/mask ride the
+  export for free (stickerPatches → compositePixel reads the fields).
+  VERIFIED: sticker-adjust unit (8 checks — mean, brightness ±, warmth ±,
+  saturation collapse, mask hide/show; PLANT=leak asserts bright 0 is a no-op →
+  fails), sticker-walk (chip count 4→8) + sticker-lag-walk green, build clean,
+  all 8 PNGs precache. NEEDS THE OWNER'S HANDS: the art taste on the real iPad
+  (are these believable-in-scene?), auto-match STRENGTH (is the seed close
+  enough, or too timid/aggressive?), and the imported-PNG session-only limit
+  (persist via IndexedDB later if he wants his cutouts to stick).
 
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 
