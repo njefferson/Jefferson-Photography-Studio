@@ -92,7 +92,8 @@ See **`PLAN.md`** for the full build plan.
       limit), single EditParams definition, NEF white level 15520, exposure
       clamp matches slider
 - [ ] Validate/calibrate .dcp colour in Lightroom (needs ACR; user to test)
-- [ ] Display-P3 JPEG output (currently sRGB); per-color HSL
+- [x] Display-P3 JPEG output (shipped as 1.4 — see the roadmap archive)
+- [x] Per-color HSL (the per-color bands + the 8-channel mixer, shipped 2026-07-05)
 - [x] B&W mode for 720nm (shipped as 1.2 — see the roadmap archive)
 - [ ] Nice-to-have: RGBA16F preview texture (halve GPU memory); box-filtered
       downscale on scaled exports; LJ92 restart-marker path untested on real file
@@ -191,10 +192,6 @@ user-scalable=no.
 > different approach and mindset"). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
-- [ ] **Display-P3 JPEG export** — core sweep; the recorded target promoted
-  2026-07-18 (code ships sRGB today; src/icc.ts writes the profile). Needs P3
-  primaries in the embedded ICC AND the pixel encode actually emitting
-  P3-encoded bytes — the pair must land together or colors shift.
 - [ ] **Keep EXIF in exports** — core sweep, promoted from the review
   opportunities 2026-07-18: carry capture date/camera into exported JPEG and
   TIFF (parseExif already reads it at open; write the honest subset back).
@@ -2620,6 +2617,63 @@ user-scalable=no.
   records seen fires a task after close()).
   MERGED TO MAIN 2026-07-18 (owner "Promote to main" with the rework
   note; ships as a 1.3.x increment).
+
+- [x] **Display-P3 JPEG export** — THE THIRD CAPABILITY RELEASE, ships as
+  **1.4** (VERSION in this release's final commit). The recorded trap —
+  "P3 primaries in the embedded ICC AND the pixel encode actually emitting
+  P3-encoded bytes — the pair must land together or colors shift" — is now
+  ENFORCED BY HARNESS, and it caught a real colorimetry bug during the
+  build (below).
+  SHIPPED: JPEG exports are Display P3 — every final display colour is
+  re-expressed through src/icc.ts srgbDisplayToP3Display (true-sRGB
+  linearize → the standard sRGB→P3 linear matrix, both D65 → true-sRGB
+  re-encode) and the file carries a REAL Display-P3 ICC v2 profile
+  (D50-adapted P3 colorants + the true sRGB TRC as a 1024-point curv
+  table — that IS Display P3's actual transfer curve). Same appearance as
+  the preview BY CONSTRUCTION (sRGB ⊂ P3; identical curve both ways, so a
+  colour-managed viewer reproduces the preview essentially bit-for-bit).
+  The practice-photo corner mark is blended into the P3 pixels directly
+  (its layer converted too — drawImage of an sRGB-intent layer onto P3
+  bytes would mislabel the mark). 16-bit TIFF deliberately STAYS sRGB
+  (the hand-off-to-other-editors format); .cube/.dcp untouched (they
+  operate on the pipeline's display RGB, which is unchanged — only the
+  file-level expression moved). Export-tab note + Help "Works with" say
+  what saves as what. NO gamut expansion in this release: the pipeline
+  still works and clamps in sRGB display space, so P3's extra range is
+  container headroom — a real wide-gamut unlock would mean a P3 preview
+  canvas (drawingBufferColorSpace) and moving the pipeline's display
+  space, which changes what every display-space tool and exported
+  .cube/.dcp means. That is a DESIGN DECISION with cross-device
+  consequences, recorded as an open question, not smuggled in here.
+  THE BUG THE HARNESS CAUGHT (recorded so it's never re-learned): the
+  first build used the pipeline's internal gamma-2.2 fiction for the
+  conversion + profile. Browsers treat canvas bytes as TRUE (piecewise)
+  sRGB, so the roundtrip mismatched — deep shadows came back ~6 LSB dark
+  and the parity walk failed at 35 (also exposing an instrument flaw:
+  drawImage DOWNSCALING filters <img> and canvas sources differently —
+  block means must be computed in JS from natural-size pixels on both
+  sides). Corollary now on record: the long-shipped "IPS sRGB (Gamma
+  2.2)" profile carries the same nuance — viewers render exported
+  TIFF/old-JPEG deep shadows a few LSB darker than the app preview.
+  Pre-existing, invisible in practice, candidate for a future increment
+  (switching the sRGB profile's TRC would subtly change every existing
+  export's rendering — owner's call, not urgent).
+  VERIFIED: fail-first proven TWO ways (planted "sRGB red unchanged by
+  the conversion" unit + the strip-the-ICC walk plant — the exact
+  pair-mismatch failure — flipped at maxDiff 9.8 vs tolerance 5). 9 unit
+  checks: neutrals identity; sRGB red → the CANONICAL P3 (0.9175,
+  0.2002, 0.1388); bounded + monotone; profile colorants are the
+  D50-adapted P3 values summing to D50 white; tabulated true-sRGB TRC
+  midpoint 0.214; sRGB profile byte-identical for TIFF; APP2 embed
+  round-trips. 6 walk checks against the real app + real RAW export
+  through the busy-dialog flow: Display-P3 profile present, sRGB tag
+  gone, PARITY preview==decoded export at maxDiff 3.3 (tolerance 5, q92
+  JPEG), TIFF still sRGB-tagged, no page errors; bw-walk 22/22 re-run
+  (mono exports stay exactly mono — neutrals are identity under P3).
+  NEEDS THE OWNER'S HANDS (iPad — the true P3 screen): an exported JPEG
+  next to the app preview in Apple Photos (they should be
+  indistinguishable), and one social-upload round trip (recompressors
+  convert tagged P3 correctly, but his pipeline is the real test).
 
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 

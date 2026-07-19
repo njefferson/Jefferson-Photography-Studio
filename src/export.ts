@@ -13,7 +13,7 @@ import { makeRowDetail } from "./raw/detail";
 import { healPatches8, healPatchesFromSampler, wrapWithPatches } from "./heal";
 import { buildGlowMap, sampleGlow, GLOW_GAIN } from "./glow";
 import { buildLocalMap } from "./localmap";
-import { SRGB_ICC, embedIccInJpeg } from "./icc";
+import { SRGB_ICC, DISPLAY_P3_ICC, srgbDisplayToP3Display, embedIccInJpeg } from "./icc";
 import { embedLookInJpeg } from "./lookmark";
 import type { ImportedFile } from "./import";
 import type { DecodedImage } from "./decode";
@@ -217,7 +217,13 @@ export async function exportImage(
   const innerN = rot & 1 ? h : w;
 
   if (opts.format === "jpeg") {
+    // JPEG saves as DISPLAY P3: every final display colour is re-expressed in
+    // P3 (srgbDisplayToP3Display) and the matching P3 profile is embedded
+    // below — the pair MUST land together or colors shift. Same appearance as
+    // the preview by construction (sRGB is a subset of P3); the wide-gamut
+    // container is what Apple devices shoot and share natively.
     const data = new Uint8ClampedArray(w * h * 4);
+    const p3 = new Float32Array(3);
     for (let oIdx = 0; oIdx < outerN; oIdx++) {
       if (oIdx % 16 === 0) {
         onProgress?.(oIdx / outerN);
@@ -229,29 +235,49 @@ export async function exportImage(
         const [sx, sy] = toSrc(x, y);
         const [r, g, b] = sampleLinear(sx, sy);
         edit(r, g, b, out, glowAt(sx, sy), (sx + 0.5) / srcW, (sy + 0.5) / srcH);
+        srgbDisplayToP3Display(out[0], out[1], out[2], p3);
         const o = (y * w + x) * 4;
-        data[o] = out[0] * 255;
-        data[o + 1] = out[1] * 255;
-        data[o + 2] = out[2] * 255;
+        data[o] = p3[0] * 255;
+        data[o + 1] = p3[1] * 255;
+        data[o + 2] = p3[2] * 255;
         data[o + 3] = 255;
       }
     }
     onProgress?.(1);
+    if (opts.watermark) {
+      // Blend the practice-photo corner mark into the P3 pixels directly
+      // (its layer colours converted to P3 too) — drawing the sRGB-intent
+      // layer onto already-P3 bytes with drawImage would mislabel the mark.
+      const wm = await makeWatermarkLayer(w, h);
+      if (wm) {
+        const lw = wm.canvas.width, lh = wm.canvas.height;
+        const ld = wm.canvas.getContext("2d")!.getImageData(0, 0, lw, lh).data;
+        const wp = new Float32Array(3);
+        for (let y = 0; y < lh; y++) {
+          for (let x = 0; x < lw; x++) {
+            const li = (y * lw + x) * 4;
+            const a = ld[li + 3] / 255;
+            if (a === 0) continue;
+            srgbDisplayToP3Display(ld[li] / 255, ld[li + 1] / 255, ld[li + 2] / 255, wp);
+            const o = ((wm.y + y) * w + (wm.x + x)) * 4;
+            data[o] = data[o] * (1 - a) + wp[0] * 255 * a;
+            data[o + 1] = data[o + 1] * (1 - a) + wp[1] * 255 * a;
+            data[o + 2] = data[o + 2] * (1 - a) + wp[2] * 255 * a;
+          }
+        }
+      }
+    }
     const canvas = document.createElement("canvas");
     canvas.width = w;
     canvas.height = h;
     const cctx = canvas.getContext("2d")!;
     cctx.putImageData(new ImageData(data, w, h), 0, 0);
-    if (opts.watermark) {
-      const wm = await makeWatermarkLayer(w, h);
-      if (wm) cctx.drawImage(wm.canvas, wm.x, wm.y);
-    }
     const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", opts.quality));
     if (!blob) throw new Error("JPEG encoding failed.");
-    // canvas.toBlob emits an UNTAGGED JPEG; embed the sRGB profile so viewers
-    // don't have to guess the colour space — then the traveling recipe, when
-    // the caller asked for one.
-    let tagged = embedIccInJpeg(new Uint8Array(await blob.arrayBuffer()));
+    // canvas.toBlob passes our bytes through UNTAGGED (putImageData values are
+    // canvas-space, never converted); embed the Display P3 profile so viewers
+    // read them as written — then the traveling recipe, when asked for.
+    let tagged = embedIccInJpeg(new Uint8Array(await blob.arrayBuffer()), DISPLAY_P3_ICC);
     if (opts.lookRecipe) tagged = embedLookInJpeg(tagged, opts.lookRecipe);
     return { blob: new Blob([tagged.buffer as ArrayBuffer], { type: "image/jpeg" }), name: `${baseName}.jpg` };
   } else {

@@ -1,11 +1,13 @@
 // Embed a colour profile in every export so files are never emitted untagged
 // (untagged JPEG/TIFF is a real-world failure: viewers guess the colour space).
 //
-// The profile is a minimal, valid ICC v2 DISPLAY profile that describes what the
-// pipeline actually writes: sRGB / Rec.709 primaries encoded at GAMMA 2.2 (the
-// pipeline's toGamma is pow(1/2.2), not the sRGB piecewise curve), PCS D50. The
-// colorant XYZ are the standard D65->D50 (Bradford) adapted sRGB values used by
-// lcms and the IEC sRGB profile, so colour-managed apps read it as sRGB.
+// The profiles are minimal, valid ICC v2 DISPLAY profiles with standard
+// D65->D50 (Bradford) adapted colorants, PCS D50. Two are built:
+// - sRGB at gamma 2.2 (TIFF — unchanged from what has always shipped);
+// - Display P3 with the TRUE sRGB transfer curve as a 1024-point table (JPEG
+//   — that IS Display P3's real TRC; the pixel bytes are converted by
+//   srgbDisplayToP3Display below, and the profile + the encode MUST travel
+//   as a pair or colors shift).
 //
 // ICC is big-endian. Built once at module load.
 
@@ -34,6 +36,28 @@ function curvGamma(gamma: number): number[] {
   return b;
 }
 
+// curveType as a sampled table: the TRUE sRGB transfer curve (device -> linear),
+// 1024 points — the standard Display-P3 TRC, and the workhorse v2 curve form
+// every CMM handles. Must stay the exact counterpart of srgbToLinear below.
+function curvTableSrgb(n = 1024): number[] {
+  const b: number[] = [];
+  pStr(b, "curv");
+  p32(b, 0);
+  p32(b, n);
+  for (let i = 0; i < n; i++) p16(b, Math.round(srgbToLinear(i / (n - 1)) * 65535));
+  return b;
+}
+
+/** The true (piecewise) sRGB transfer curve — what browsers actually use for
+ *  canvas bytes. Display P3 shares this exact curve. */
+export function srgbToLinear(v: number): number {
+  return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+}
+export function srgbFromLinear(v: number): number {
+  v = Math.min(1, Math.max(0, v));
+  return v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055;
+}
+
 function textType(s: string): number[] {
   const b: number[] = [];
   pStr(b, "text");
@@ -59,15 +83,15 @@ function descType(s: string): number[] {
   return b;
 }
 
-function buildSrgbIcc(): Uint8Array {
+function buildIcc(descText: string, colorants: [number, number, number][], trcCurve: number[]): Uint8Array {
   // Unique data blocks (rTRC/gTRC/bTRC share one curve block).
-  const desc = descType("IPS sRGB (Gamma 2.2)");
+  const desc = descType(descText);
   const cprt = textType("Public Domain");
   const wtpt = xyzType(0.9642, 1.0, 0.82491); // D50 white
-  const rXYZ = xyzType(0.43607, 0.22249, 0.01392); // sRGB colorants, D50-adapted
-  const gXYZ = xyzType(0.38515, 0.71687, 0.09708);
-  const bXYZ = xyzType(0.14307, 0.06061, 0.7141);
-  const trc = curvGamma(2.2);
+  const rXYZ = xyzType(...colorants[0]);
+  const gXYZ = xyzType(...colorants[1]);
+  const bXYZ = xyzType(...colorants[2]);
+  const trc = trcCurve;
 
   type Blk = { data: number[]; off: number; size: number };
   const blocks: Blk[] = [desc, cprt, wtpt, rXYZ, gXYZ, bXYZ, trc].map((data) => ({ data, off: 0, size: data.length }));
@@ -132,8 +156,54 @@ function writeAscii(out: Uint8Array, at: number, s: string) {
   for (let i = 0; i < s.length; i++) out[at + i] = s.charCodeAt(i);
 }
 
-/** The sRGB profile, built once. */
-export const SRGB_ICC: Uint8Array = buildSrgbIcc();
+/** The sRGB profile, built once — UNCHANGED from what has always shipped
+ *  (gamma-2.2 curve). TIFF exports carry this: 16-bit TIFF is the "edit
+ *  elsewhere" interchange format, where sRGB is the safest hand-off. */
+export const SRGB_ICC: Uint8Array = buildIcc("IPS sRGB (Gamma 2.2)", [
+  [0.43607, 0.22249, 0.01392], // sRGB colorants, D65->D50 (Bradford) adapted
+  [0.38515, 0.71687, 0.09708],
+  [0.14307, 0.06061, 0.7141],
+], curvGamma(2.2));
+
+/** Display P3 — the REAL thing: P3 colorants + the true sRGB transfer curve
+ *  (that is Display P3's actual TRC). JPEG exports carry this; the pixel
+ *  bytes are converted by srgbDisplayToP3Display below, and the profile and
+ *  the encode MUST land as a pair (either alone shifts colors). The round
+ *  trip is exact by construction: the canvas bytes the user previews are
+ *  true-sRGB to every browser, we linearize with that same curve, move to P3
+ *  primaries, and re-encode with that same curve — so a color-managed viewer
+ *  reproduces the preview bit-for-bit (a gamma-2.2 fiction here measurably
+ *  darkened deep shadows ~6 LSB — caught by the parity harness). */
+export const DISPLAY_P3_ICC: Uint8Array = buildIcc("IPS Display P3", [
+  [0.51512, 0.2412, -0.00105], // Display P3 colorants, D65->D50 (Bradford) adapted
+  [0.29198, 0.69225, 0.04189],
+  [0.1571, 0.06657, 0.78407],
+], curvTableSrgb());
+
+// sRGB -> Display P3 in LINEAR light (both are D65 — no adaptation): the
+// standard primaries-derived matrix. sRGB is a strict subset of P3, so the
+// result stays in [0,1] up to float noise. This matrix is the exact
+// counterpart of the DISPLAY_P3_ICC colorants above — change them together.
+const SRGB_TO_P3_LINEAR = [
+  0.8224621, 0.177538, 0,
+  0.0331941, 0.9668058, 0,
+  0.0170827, 0.0723974, 0.9105199,
+] as const;
+
+/** Re-express a displayed sRGB colour (a canvas byte — true-sRGB encoded, as
+ *  every browser treats it) in Display P3. Same APPEARANCE under the P3
+ *  profile — the export keeps looking exactly like the preview, just carried
+ *  in the wide-gamut container. The curve here and the profile's TRC above
+ *  are the same function — change them together. */
+export function srgbDisplayToP3Display(r: number, g: number, b: number, out: Float32Array): void {
+  const lr = srgbToLinear(r);
+  const lg = srgbToLinear(g);
+  const lb = srgbToLinear(b);
+  const m = SRGB_TO_P3_LINEAR;
+  out[0] = srgbFromLinear(m[0] * lr + m[1] * lg + m[2] * lb);
+  out[1] = srgbFromLinear(m[3] * lr + m[4] * lg + m[5] * lb);
+  out[2] = srgbFromLinear(m[6] * lr + m[7] * lg + m[8] * lb);
+}
 
 /**
  * Insert an ICC profile into a JPEG as an APP2 `ICC_PROFILE` segment. Our
