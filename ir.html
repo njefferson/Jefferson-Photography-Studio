@@ -319,6 +319,10 @@
 
           <!-- ===== TONE ===== -->
           <section class="section" data-tab="tone" hidden>
+            <!-- Channel chips retarget the SAME curve widget + sliders onto the
+                 master curve (All) or one color channel's own curve. Built in
+                 main.ts; ✓-text + aria-pressed state (the mix-chip pattern). -->
+            <div id="toneChans" class="bw-mixes" role="group" aria-label="Curve channel"></div>
             <!-- viewBox padded 8 units so the corner dots (Blacks, Highlights)
                  render whole: iOS Safari clips SVG to the viewBox no matter what
                  CSS overflow says. Keep in sync with TONE_VB in main.ts. -->
@@ -332,6 +336,7 @@
             <label>Midtones <input id="tone2" type="range" min="-25" max="25" step="0.5" value="0" /></label>
             <label>Whites <input id="tone3" type="range" min="-25" max="25" step="0.5" value="0" /></label>
             <label>Highlights <input id="tone4" type="range" min="-25" max="25" step="0.5" value="0" /></label>
+            <p class="note">The channel chips steer just one color's curve &mdash; lift Red's shadows to warm them, drop Blue's highlights to un-cool a sky. All rides every saved look and bakes into .cube exports.</p>
             <button id="toneReset" type="button">Reset tone</button>
           </section>
 

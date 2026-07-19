@@ -36,6 +36,15 @@ export interface EditParams {
    *  blacks, shadows, midtones, whites, highlights. Identity = TONE_DEFAULT.
    *  Applied per channel in display (gamma) space, after everything else. */
   tone: [number, number, number, number, number];
+  /** Per-channel R/G/B curves — the same five-point model as `tone`, applied
+   *  INDEPENDENTLY per channel in display space right AFTER the master tone
+   *  curve (master shapes the light, these steer the colour per tonal band)
+   *  and before the HSL mixer, so the mixer classifies the steered hue. Pure
+   *  per-pixel colour math -> rides saved looks and bakes into .cube/.dcp
+   *  like the mixer. Identity = TONE_DEFAULT each. */
+  toneR: [number, number, number, number, number];
+  toneG: [number, number, number, number, number];
+  toneB: [number, number, number, number, number];
   /** Global luminance: one overall lift/drop that rides ON TOP of the tone
    *  curve. Applied per channel in display (gamma) space as the very last
    *  step: out = pow(out, 1/lum). >1 brightens the body, <1 darkens; the 0/1
@@ -591,6 +600,9 @@ export function compileEdit(
   const con = p.contrast;
   const [tr, tg, tb] = p.tint;
   const toneFn = toneIsIdentity(p.tone) ? null : toneEvaluator(p.tone);
+  const toneRFn = !p.toneR || toneIsIdentity(p.toneR) ? null : toneEvaluator(p.toneR);
+  const toneGFn = !p.toneG || toneIsIdentity(p.toneG) ? null : toneEvaluator(p.toneG);
+  const toneBFn = !p.toneB || toneIsIdentity(p.toneB) ? null : toneEvaluator(p.toneB);
   // Global luminance rides on top of the tone curve: pow in display space,
   // endpoints pinned. exponent = 1/lum (lum>1 brightens). 1 = neutral.
   const lumExp = p.lum && p.lum !== 1 ? 1 / p.lum : 0;
@@ -763,6 +775,11 @@ export function compileEdit(
       out[1] = toneFn(out[1]);
       out[2] = toneFn(out[2]);
     }
+    // Per-channel curves ride ON TOP of the master tone curve, each steering
+    // its own channel — display space, before the mixer. Same in the shader.
+    if (toneRFn) out[0] = toneRFn(out[0]);
+    if (toneGFn) out[1] = toneGFn(out[1]);
+    if (toneBFn) out[2] = toneBFn(out[2]);
     // 8-channel HSL mixer in DISPLAY space, on the near-final colour (after
     // gamma + tone curve) — so the hue it classifies is EXACTLY the hue on
     // screen, and the chip you pick owns the colour you see. (It originally

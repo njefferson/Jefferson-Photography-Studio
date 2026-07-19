@@ -7,7 +7,7 @@ import { findLocation, stripLocation } from "./gps";
 import { writeZip, crc32 } from "./zip";
 import { putFrame, eachFrame, frameMetas, frameCount, clearFrames } from "./batchstore";
 import * as Session from "./session";
-import { TONE_DEFAULT, TONE_X, toneEvaluator, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, type MaskLayer, type CropRect } from "./pipeline";
+import { TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, type MaskLayer, type CropRect } from "./pipeline";
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, type HealSpot } from "./heal";
 import { generateCube } from "./lut";
 import { generateDcp } from "./dcp";
@@ -86,6 +86,9 @@ const params: EditParams = {
   sky: [0, 1, 1],
   foliage: [0, 1, 1],
   tone: [...TONE_DEFAULT],
+  toneR: [...TONE_DEFAULT],
+  toneG: [...TONE_DEFAULT],
+  toneB: [...TONE_DEFAULT],
   lum: 1,
   masks: [],
   hotspot: 0,
@@ -340,20 +343,27 @@ function syncFromUI() {
   params.denoise = Number(ui.dn.value);
   params.sky = [Number(ui.skyHue.value), Number(ui.skySat.value), Number(ui.skyLum.value)];
   params.foliage = [Number(ui.folHue.value), Number(ui.folSat.value), Number(ui.folLum.value)];
-  for (let i = 0; i < 5; i++) {
-    params.tone[i] = TONE_DEFAULT[i] + Number(ui.tones[i].value) / 100;
+  {
+    const t = activeTone();
+    for (let i = 0; i < 5; i++) {
+      t[i] = TONE_DEFAULT[i] + Number(ui.tones[i].value) / 100;
+    }
   }
   clampToneOrder();
   updateToneWidget();
+  updateToneChanUI(); // the "adjusted" badge tracks live slider drags
   updateBandLabels();
   draw();
 }
 
-/** Keep the five tone points in ascending order with a small gap. */
+/** Keep the five tone points in ascending order with a small gap — on the
+ *  master curve AND each per-channel curve (loads may arrive unordered). */
 function clampToneOrder() {
-  for (let i = 0; i < 5; i++) {
-    const lo = i === 0 ? 0 : params.tone[i - 1] + 0.01;
-    params.tone[i] = clamp(params.tone[i], Math.max(lo, TONE_DEFAULT[i] - 0.25), Math.min(1, TONE_DEFAULT[i] + 0.25));
+  for (const t of [params.tone, params.toneR, params.toneG, params.toneB]) {
+    for (let i = 0; i < 5; i++) {
+      const lo = i === 0 ? 0 : t[i - 1] + 0.01;
+      t[i] = clamp(t[i], Math.max(lo, TONE_DEFAULT[i] - 0.25), Math.min(1, TONE_DEFAULT[i] + 0.25));
+    }
   }
 }
 
@@ -382,9 +392,13 @@ function syncToUI() {
   ui.folHue.value = String(params.foliage[0]);
   ui.folSat.value = String(params.foliage[1]);
   ui.folLum.value = String(params.foliage[2]);
-  for (let i = 0; i < 5; i++) {
-    ui.tones[i].value = String((params.tone[i] - TONE_DEFAULT[i]) * 100);
+  {
+    const t = activeTone();
+    for (let i = 0; i < 5; i++) {
+      ui.tones[i].value = String((t[i] - TONE_DEFAULT[i]) * 100);
+    }
   }
+  updateToneChanUI();
   updateToneWidget();
   updateBandLabels();
   updateHslUI();
@@ -464,6 +478,9 @@ function applyLook(name: keyof typeof LOOKS) {
   params.sky = [0, 1, 1];
   params.foliage = [0, 1, 1];
   params.tone = [...TONE_DEFAULT];
+  params.toneR = [...TONE_DEFAULT];
+  params.toneG = [...TONE_DEFAULT];
+  params.toneB = [...TONE_DEFAULT];
   params.lum = 1;
   params.hsl = hslDefault();
   params.bwOn = false;
@@ -545,6 +562,9 @@ function cloneParams(p: EditParams): EditParams {
     sky: [...p.sky] as [number, number, number],
     foliage: [...p.foliage] as [number, number, number],
     tone: [...p.tone] as [number, number, number, number, number],
+    toneR: [...(p.toneR ?? TONE_DEFAULT)] as [number, number, number, number, number],
+    toneG: [...(p.toneG ?? TONE_DEFAULT)] as [number, number, number, number, number],
+    toneB: [...(p.toneB ?? TONE_DEFAULT)] as [number, number, number, number, number],
     lum: p.lum,
     // Brush bitmaps are SHARED between snapshots, not copied (copy-on-write):
     // a stroke clones the live buffer before mutating (startPaint/Clear), so a
@@ -601,6 +621,9 @@ function applySnapshot(s: Snapshot) {
   params.sky = c.sky;
   params.foliage = c.foliage;
   params.tone = c.tone;
+  params.toneR = c.toneR;
+  params.toneG = c.toneG;
+  params.toneB = c.toneB;
   params.lum = c.lum;
   params.masks = c.masks;
   params.hotspot = c.hotspot;
@@ -740,6 +763,9 @@ function currentLook(): SavedLook {
     sky: [...params.sky] as [number, number, number],
     foliage: [...params.foliage] as [number, number, number],
     tone: [...params.tone] as [number, number, number, number, number],
+    toneR: [...params.toneR] as [number, number, number, number, number],
+    toneG: [...params.toneG] as [number, number, number, number, number],
+    toneB: [...params.toneB] as [number, number, number, number, number],
     lum: params.lum,
     clarity: params.clarity,
     dehaze: params.dehaze,
@@ -836,6 +862,9 @@ function applySavedLook(look: SavedLook, lut: EditParams["lut"] = null) {
   params.sky = [...look.sky];
   params.foliage = [...look.foliage];
   params.tone = [...look.tone];
+  params.toneR = [...look.toneR];
+  params.toneG = [...look.toneG];
+  params.toneB = [...look.toneB];
   params.lum = look.lum;
   params.clarity = look.clarity;
   params.dehaze = look.dehaze;
@@ -916,10 +945,10 @@ function draw() {
   if (raf) return;
   raf = requestAnimationFrame(() => {
     raf = 0;
-    const key = params.tone.join(",");
+    const key = [params.tone, params.toneR, params.toneG, params.toneB].map((t) => t.join(",")).join(";");
     if (key !== lastToneKey) {
       lastToneKey = key;
-      renderer.setToneCurve(params.tone);
+      renderer.setToneCurve(params.tone, params.toneR, params.toneG, params.toneB);
     }
     syncSpotsToTexture(); // heals live in the texture; keep it matching params
     // While a geometry tool is armed, render the WHOLE tilted photo (an outset
@@ -931,6 +960,48 @@ function draw() {
     positionHealOverlay();
     positionCropOverlay();
   });
+}
+
+// --- Per-channel curves: the chips retarget the SAME curve widget + sliders
+// onto the master curve (All) or one color channel's own curve. State is
+// ✓-text + aria-pressed (the mix-chip pattern); a channel whose curve is
+// non-identity wears a "•" TEXT badge so it's findable at a glance. ---
+const TONE_CHANNELS = [
+  { label: "All", cls: "" },
+  { label: "Red", cls: "tone-r" },
+  { label: "Green", cls: "tone-g" },
+  { label: "Blue", cls: "tone-b" },
+] as const;
+let toneChannel: 0 | 1 | 2 | 3 = 0;
+function activeTone(): [number, number, number, number, number] {
+  return toneChannel === 1 ? params.toneR : toneChannel === 2 ? params.toneG : toneChannel === 3 ? params.toneB : params.tone;
+}
+const toneChanBtns: HTMLButtonElement[] = [];
+{
+  const row = $("toneChans") as HTMLDivElement;
+  TONE_CHANNELS.forEach((_def, i) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "mix-chip";
+    b.addEventListener("click", () => {
+      toneChannel = i as 0 | 1 | 2 | 3;
+      syncToUI(); // sliders re-read the newly active curve; chips + widget refresh
+    });
+    row.append(b);
+    toneChanBtns.push(b);
+  });
+}
+
+function updateToneChanUI() {
+  const curves = [params.tone, params.toneR, params.toneG, params.toneB];
+  toneChanBtns.forEach((b, i) => {
+    const on = i === toneChannel;
+    const tweaked = !toneIsIdentity(curves[i]);
+    b.textContent = (on ? "✓ " : "") + TONE_CHANNELS[i].label + (tweaked ? " •" : "");
+    b.setAttribute("aria-pressed", String(on));
+    b.setAttribute("aria-label", `${TONE_CHANNELS[i].label} curve${tweaked ? " — adjusted" : ""}`);
+  });
+  $("toneReset").textContent = toneChannel === 0 ? "Reset tone" : `Reset ${TONE_CHANNELS[toneChannel].label.toLowerCase()} curve`;
 }
 
 // --- Tone-curve widget: five draggable dots (blacks/shadows/mids/whites/
@@ -980,7 +1051,7 @@ let tonePath: SVGPathElement;
         const r = toneSvg.getBoundingClientRect();
         // Pointer -> padded viewBox units -> 0..100 plot -> 0..1 value.
         const vb = TONE_VB_MIN + TONE_VB_SPAN * ((ev.clientY - r.top) / Math.max(1, r.height));
-        params.tone[i] = 1 - vb / 100;
+        activeTone()[i] = 1 - vb / 100;
         clampToneOrder();
         syncToUI();
         draw();
@@ -996,20 +1067,23 @@ let tonePath: SVGPathElement;
 }
 
 function updateToneWidget() {
-  const fn = toneEvaluator(params.tone);
+  const t = activeTone();
+  const fn = toneEvaluator(t);
   let d = "";
   for (let s = 0; s <= 64; s++) {
     const x = s / 64;
     d += `${s === 0 ? "M" : "L"}${(x * 100).toFixed(1)},${((1 - fn(x)) * 100).toFixed(1)}`;
   }
   tonePath.setAttribute("d", d);
+  tonePath.setAttribute("class", "tone-path " + TONE_CHANNELS[toneChannel].cls);
   for (let i = 0; i < 5; i++) {
-    toneDots[i].setAttribute("cy", String((1 - params.tone[i]) * 100));
+    toneDots[i].setAttribute("cy", String((1 - t[i]) * 100));
   }
 }
 
 $("toneReset").addEventListener("click", () => {
-  params.tone = [...TONE_DEFAULT];
+  const t = activeTone();
+  for (let i = 0; i < 5; i++) t[i] = TONE_DEFAULT[i];
   syncToUI();
   draw();
   flushRecord();
@@ -3360,6 +3434,9 @@ function establishFreshEdit() {
     sky: [0, 1, 1],
     foliage: [0, 1, 1],
     tone: [...TONE_DEFAULT],
+    toneR: [...TONE_DEFAULT],
+    toneG: [...TONE_DEFAULT],
+    toneB: [...TONE_DEFAULT],
     lum: 1,
     masks: [],
     hotspot: 0,
@@ -4653,6 +4730,9 @@ function neutralLook(): SavedLook {
   return {
     swapRB: false, hue: 0, sat: 1, contrast: 1, tint: [1, 1, 1], glow: 0,
     sky: [0, 1, 1], foliage: [0, 1, 1], tone: [...TONE_DEFAULT] as [number, number, number, number, number],
+    toneR: [...TONE_DEFAULT] as [number, number, number, number, number],
+    toneG: [...TONE_DEFAULT] as [number, number, number, number, number],
+    toneB: [...TONE_DEFAULT] as [number, number, number, number, number],
     lum: 1, clarity: 0, dehaze: 0, sharpen: 0, texture: 0, hsl: hslDefault(),
     bwOn: false, bwMix: [1, 1, 1],
   };
@@ -4692,6 +4772,9 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["l
     sky: [...look.sky] as [number, number, number],
     foliage: [...look.foliage] as [number, number, number],
     tone: [...look.tone] as [number, number, number, number, number],
+    toneR: [...look.toneR] as [number, number, number, number, number],
+    toneG: [...look.toneG] as [number, number, number, number, number],
+    toneB: [...look.toneB] as [number, number, number, number, number],
     lum: look.lum,
     masks: [],
     hotspot: 0,

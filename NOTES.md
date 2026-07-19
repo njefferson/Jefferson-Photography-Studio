@@ -192,10 +192,6 @@ user-scalable=no.
 > different approach and mindset"). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
-- [ ] **Per-channel R/G/B curves** — core sweep, promoted from the backlog
-  2026-07-18: extends the luminance tone curve to independent channels; same
-  per-pixel model, non-spatial, so it rides saved looks and strengthens the
-  .cube/.dcp exports.
 - [ ] **Accessible overlays — Library, Quick look and Busy become real dialogs**
   — a11y audit 2026-07-17, deferred from the a11y release because it touches
   open/close interaction flows. #library claims aria-modal with no focus
@@ -2724,6 +2720,43 @@ user-scalable=no.
   finally so a cancelled share sheet can try again); handler body moved to
   saveBusyPending(). VERIFIED in downscale-walk: two synchronous taps on
   Save produce exactly ONE download; no page errors.
+
+- [x] **Per-channel R/G/B curves** — THE FIFTH CAPABILITY RELEASE, ships as
+  **1.6**. The Tone tab gained a CHANNEL CHIP row (All / Red / Green /
+  Blue — the ✓-text + aria-pressed mix-chip pattern, an adjusted channel
+  wears a "•" TEXT badge) that RETARGETS the existing curve widget and
+  five sliders onto the chosen curve — no second widget, no 15 new
+  sliders; the widget's path also re-strokes in the channel's hue
+  (redundant cue only, the chip text carries the meaning). Reset relabels
+  per channel ("Reset red curve") and resets only the active curve.
+  PIPELINE: toneR/G/B on EditParams — the same five-point monotone-cubic
+  model, applied INDEPENDENTLY per channel in display space right AFTER
+  the master tone curve (master shapes the light, channels steer the
+  colour; the mixer then classifies the steered hue). GPU: one RGBA8
+  256×1 texture (unit 6) holds all three curve LUTs; branch-gated
+  u_toneRgbOn; setToneCurve extended (draw()'s tone key covers all four
+  curves). clampToneOrder now orders all four (loads can arrive
+  unordered). Rides looks/slots/links/codes (coerceLook clamps each
+  curve; legacy payloads coerce to identity), session resume, batch, and
+  BAKES into .cube (proven: grey lattice points come out steered). .dcp
+  unchanged (its tone stays contrast-derived — recorded).
+  VERIFIED, fail-first proven two ways (planted "red curve moves green"
+  unit AND GPU-walk variants both flipped). 8 unit checks: red-only
+  channel isolation to 1e-6; identity no-op; composes AFTER master
+  (closed-form match); .cube grey point red-lifted; link round-trip;
+  legacy identity; hostile clamp. 15 walk checks on the frosted
+  near-neutral frame: chips (All default), GPU red lift dR=48 with
+  dG,dB ≤ 1; widget class re-stroke; "•" badge live during slider drags
+  (a missed updateToneChanUI in syncFromUI was caught by the walk and
+  fixed); channel-named reset; All keeps the untouched master; undo/redo;
+  slot round-trip; UI-exported .cube grey point steered; axe clean both
+  themes; no page errors. bw/p3/lesson walks re-run green (bw-walk's
+  chip-target check now measures only VISIBLE chips — the tone chips sit
+  in a hidden tab during that walk).
+  NEEDS THE OWNER'S HANDS: the channel-chip flow on the iPad (does
+  retargeting the one widget feel right vs separate curves), the three
+  stroke hues over both themes, and a real grade using Blue-highlights
+  to un-cool a sky.
 
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 

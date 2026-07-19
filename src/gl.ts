@@ -18,6 +18,18 @@ const IDENTITY_LUT = (() => {
   return a;
 })();
 
+/** Fresh RGBA identity ramps (r=g=b=i) for the per-channel curve texture. */
+function identityRgbaRamp(): Uint8Array {
+  const a = new Uint8Array(256 * 4);
+  for (let i = 0; i < 256; i++) {
+    a[i * 4] = i;
+    a[i * 4 + 1] = i;
+    a[i * 4 + 2] = i;
+    a[i * 4 + 3] = 255;
+  }
+  return a;
+}
+
 const VERT = `#version 300 es
 in vec2 a_pos;
 out vec2 v_uv;
@@ -73,6 +85,8 @@ uniform vec3 u_fol;      // foliage band [hueShiftDeg, satScale, lumScale]
 uniform sampler2D u_glowTex; // per-image blurred highlight map (see glow.ts)
 uniform float u_glow;        // 0..1 HIE halation strength
 uniform sampler2D u_toneTex; // 256x1 tone-curve LUT (identity when neutral)
+uniform sampler2D u_toneRgbTex; // 256x1 RGBA: per-channel R/G/B curve LUTs
+uniform bool u_toneRgbOn;       // any per-channel curve non-identity
 uniform float u_lum;         // global luminance: out = pow(out, 1/u_lum) (1 = neutral)
 // Local masks (up to MAX_MASKS = 8) — kept identical to pipeline.ts.
 uniform int u_maskCount;
@@ -429,6 +443,15 @@ void main() {
     texture(u_toneTex, vec2(g.g, 0.5)).r,
     texture(u_toneTex, vec2(g.b, 0.5)).r
   );
+  // Per-channel R/G/B curves ride ON TOP of the master curve, each steering
+  // its own channel (display space, before the mixer). Matches pipeline.ts.
+  if (u_toneRgbOn) {
+    g = vec3(
+      texture(u_toneRgbTex, vec2(g.r, 0.5)).r,
+      texture(u_toneRgbTex, vec2(g.g, 0.5)).g,
+      texture(u_toneRgbTex, vec2(g.b, 0.5)).b
+    );
+  }
   // 8-channel HSL mixer in DISPLAY space (after gamma + tone curve) so the
   // hue it classifies is exactly the hue on screen. Matches pipeline.ts.
   if (u_hslOn) {
@@ -490,6 +513,7 @@ export class Renderer {
   private camMatrix: Float32Array | null = null;
   private glowTex: WebGLTexture;
   private toneTex: WebGLTexture;
+  private toneRgbTex: WebGLTexture;
   private brushTex: WebGLTexture;
   private brushSig = ""; // re-upload the packed brush texture only when it changes
   private localTex: WebGLTexture;
@@ -518,7 +542,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -552,6 +576,16 @@ export class Renderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 256, 1, 0, gl.RED, gl.UNSIGNED_BYTE, IDENTITY_LUT);
+
+    // Per-channel R/G/B curve LUTs (unit 6): one RGBA row, each channel its
+    // own curve; identity ramps until set (the stage is branch-gated anyway).
+    this.toneRgbTex = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, this.toneRgbTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, identityRgbaRamp());
 
     // Brush-mask texture (unit 3): up to 4 painted masks packed one-per-channel.
     // Starts as a single transparent texel (all masks empty).
@@ -633,19 +667,29 @@ export class Renderer {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, bw, bh, 0, gl.RGBA, gl.UNSIGNED_BYTE, packed);
   }
 
-  /** Rebuild the tone LUT from the five control points (cheap; on change only). */
-  setToneCurve(tone: readonly number[]) {
+  /** Rebuild the tone LUTs from the five control points (cheap; on change
+   *  only): the master curve, plus the per-channel R/G/B curves packed into
+   *  one RGBA row. */
+  setToneCurve(tone: readonly number[], toneR?: readonly number[], toneG?: readonly number[], toneB?: readonly number[]) {
     const gl = this.gl;
     gl.bindTexture(gl.TEXTURE_2D, this.toneTex);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     if (toneIsIdentity(tone)) {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 256, 1, 0, gl.RED, gl.UNSIGNED_BYTE, IDENTITY_LUT);
-      return;
+    } else {
+      const fn = toneEvaluator(tone);
+      const lut = new Uint8Array(256);
+      for (let i = 0; i < 256; i++) lut[i] = Math.round(fn(i / 255) * 255);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 256, 1, 0, gl.RED, gl.UNSIGNED_BYTE, lut);
     }
-    const fn = toneEvaluator(tone);
-    const lut = new Uint8Array(256);
-    for (let i = 0; i < 256; i++) lut[i] = Math.round(fn(i / 255) * 255);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 256, 1, 0, gl.RED, gl.UNSIGNED_BYTE, lut);
+    gl.bindTexture(gl.TEXTURE_2D, this.toneRgbTex);
+    const rgba = identityRgbaRamp();
+    for (const [ch, curve] of [[0, toneR], [1, toneG], [2, toneB]] as const) {
+      if (!curve || toneIsIdentity(curve)) continue;
+      const fn = toneEvaluator(curve);
+      for (let i = 0; i < 256; i++) rgba[i * 4 + ch] = Math.round(fn(i / 255) * 255);
+    }
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, rgba);
   }
 
   /** Display rotation in 90-degree CW steps; swaps the canvas aspect. */
@@ -821,6 +865,12 @@ export class Renderer {
     gl.uniform1i(this.loc.u_glowTex, 1);
     gl.uniform1i(this.loc.u_toneTex, 2);
     gl.uniform1i(this.loc.u_maskTex, 3);
+    const toneRgbOn =
+      (p.toneR && !toneIsIdentity(p.toneR)) || (p.toneG && !toneIsIdentity(p.toneG)) || (p.toneB && !toneIsIdentity(p.toneB));
+    gl.uniform1i(this.loc.u_toneRgbOn, toneRgbOn ? 1 : 0);
+    gl.uniform1i(this.loc.u_toneRgbTex, 6);
+    gl.activeTexture(gl.TEXTURE6);
+    gl.bindTexture(gl.TEXTURE_2D, this.toneRgbTex);
     // Imported .cube LUT (unit 5). The sig check IS the uploader: the lattice
     // re-uploads only when the LUT identity changes; strength-only changes are
     // just a uniform. Data is padded RGB -> RGBA32F (RGB32F is driver-fragile).

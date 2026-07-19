@@ -1862,3 +1862,10 @@ label.open-btn, label.bar-btn {
     border-top-color: var(--line-2) !important;
   }
 }
+
+/* Per-channel curve strokes on the tone widget: the ACTIVE channel's curve
+   draws in its own hue. Redundant cue only — the chip's TEXT ("✓ Red •")
+   carries the meaning (accessibility rule: never color alone). */
+.tone-path.tone-r { stroke: #e05c5c; }
+.tone-path.tone-g { stroke: #3fae5a; }
+.tone-path.tone-b { stroke: #5b8def; }
