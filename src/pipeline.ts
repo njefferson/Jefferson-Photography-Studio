@@ -86,6 +86,15 @@ export interface EditParams {
    *  doesn't run compileEdit). Neutral = off; [1,1,1] = the "Even" mix. */
   bwOn: boolean;
   bwMix: [number, number, number];
+  /** Custom false color — the full 3×3 channel mixer, row-major
+   *  [rr,rg,rb, gr,gg,gb, br,bg,bb]: each output channel is a weighted sum of
+   *  the three inputs. The R⇄B swap is the one-tap special case
+   *  ([0,0,1, 0,1,0, 1,0,0]); this is arbitrary aerochrome-style and invented
+   *  palettes. Linear space, right AFTER the swap and BEFORE the hue rotation
+   *  (so swap + mix + hue compose). Pure per-pixel colour math -> bakes into
+   *  the .cube LUT, and (best-effort, via creativeLinear) the .dcp hue-sat
+   *  map. Identity = MIX3_DEFAULT. */
+  mix3?: number[];
   /** Color grade: split-tone wheels [hueS, amtS, hueM, amtM, hueH, amtH,
    *  balance] — one hue (deg) + amount (0..1) per tonal band, balance -1..1
    *  shifting the shadow/highlight crossovers. Each band adds a PURE-CHROMA
@@ -171,6 +180,15 @@ export const CROP_DEFAULT: CropRect = { x: 0, y: 0, w: 1, h: 1 };
 
 /** Identity color grade: no tint in any band, balance centred. */
 export const GRADE_DEFAULT: number[] = [0, 0, 0, 0, 0, 0, 0];
+
+/** Identity 3×3 channel mixer (row-major): output = input. */
+export const MIX3_DEFAULT: number[] = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+
+export function mix3IsIdentity(m: number[] | undefined): boolean {
+  if (!m) return true;
+  for (let i = 0; i < 9; i++) if (Math.abs((m[i] ?? MIX3_DEFAULT[i]) - MIX3_DEFAULT[i]) > 1e-6) return false;
+  return true;
+}
 
 /** Master strength of a full-amount wheel — one number, shared verbatim by
  *  the shader (u_grade path) so parity is a constant, not a coincidence. */
@@ -733,6 +751,11 @@ export function compileEdit(
   // Normalised weights: only the ratio matters. An all-zero mix divides by the
   // epsilon and lands at black — honest feedback, never NaN.
   const bwDen = Math.max(1e-4, bwMix[0] + bwMix[1] + bwMix[2]);
+  const mix3 = p.mix3 ?? MIX3_DEFAULT;
+  const mix3On = !mix3IsIdentity(p.mix3);
+  const m0 = mix3[0], m1 = mix3[1], m2 = mix3[2];
+  const m3 = mix3[3], m4 = mix3[4], m5 = mix3[5];
+  const m6 = mix3[6], m7 = mix3[7], m8 = mix3[8];
   const grade = p.grade ?? GRADE_DEFAULT;
   const gAmtS = grade[1] ?? 0, gAmtM = grade[3] ?? 0, gAmtH = grade[5] ?? 0;
   const gradeOn = gAmtS !== 0 || gAmtM !== 0 || gAmtH !== 0;
@@ -791,6 +814,14 @@ export function compileEdit(
       const t = r;
       r = b;
       b = t;
+    }
+    // Custom false-colour 3×3 mixer (after swap, before hue) — matches the
+    // shader's u_mix3. Each output channel is a weighted sum of the inputs.
+    if (mix3On) {
+      const xr = m0 * r + m1 * g + m2 * b;
+      const xg = m3 * r + m4 * g + m5 * b;
+      const xb = m6 * r + m7 * g + m8 * b;
+      r = xr; g = xg; b = xb;
     }
     let nr = c00 * r + c10 * g + c20 * b;
     let ng = c01 * r + c11 * g + c21 * b;

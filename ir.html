@@ -263,6 +263,13 @@
             <label>Vignette size <input id="vigMid" type="range" min="0" max="1" step="0.01" value="0.5" /></label>
             <p class="note">Pull Vignette left to darken the frame's edges, right to lift them; it follows your crop. The wheels bake into .cube exports; grain and vignette stay out (a .cube carries colour only) but do ride saved looks and batch.</p>
             <button id="gradeReset" type="button">Reset grade</button>
+
+            <hr class="divider" />
+            <div class="sub-title">Custom false color &mdash; channel mixer</div>
+            <p class="note">The full recipe behind the R&#8646;B swap: build each output channel from any blend of the red, green and blue inputs. Start from a preset, then fine-tune. Bakes into .cube and .dcp exports.</p>
+            <div id="mix3Presets" class="bw-mixes" role="group" aria-label="Channel mixer presets"></div>
+            <div id="mix3Grid"></div>
+            <button id="mix3Reset" type="button">Reset channel mixer</button>
           </section>
 
           <!-- ===== CORRECTIONS ===== -->
@@ -755,6 +762,11 @@
         <p>The wheels tone Black &amp; white frames too — that's the <strong>Toned mono</strong> row:
         Sepia, Selenium, Cyanotype, Gold and Split switch on B&amp;W and tint it like the darkroom
         papers they're named for.</p>
+        <p>The <strong>Channel mixer</strong> is the full recipe behind the R&#8646;B swap: build each
+        output channel (red, green, blue) from any blend of the three inputs. Start from a preset —
+        Aerochrome, Copper, a channel Rotate — then fine-tune the nine sliders for invented false-color
+        palettes. Unlike grain and vignette, the mixer is pure color: it bakes into both .cube and .dcp
+        exports.</p>
         <p><strong>Grain</strong> adds film texture (Size sets how coarse), and <strong>Vignette</strong>
         darkens (left) or lifts (right) the frame's edges — it follows your crop, unlike the Corrections
         vignette, which fixes the lens on the full frame. Everything here rides saved looks, sessions and

@@ -7,7 +7,7 @@ import { findLocation, stripLocation } from "./gps";
 import { writeZip, crc32 } from "./zip";
 import { putFrame, eachFrame, frameMetas, frameCount, clearFrames } from "./batchstore";
 import * as Session from "./session";
-import { TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, type MaskLayer, type CropRect } from "./pipeline";
+import { TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, type MaskLayer, type CropRect } from "./pipeline";
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, type HealSpot } from "./heal";
 import { generateCube } from "./lut";
 import { generateDcp } from "./dcp";
@@ -106,6 +106,7 @@ const params: EditParams = {
   grainSize: 1.5,
   vigAmt: 0,
   vigMid: 0.5,
+  mix3: [...MIX3_DEFAULT],
   spots: [],
   crop: { ...CROP_DEFAULT },
   straighten: 0,
@@ -409,6 +410,7 @@ function syncToUI() {
   updateHslUI();
   updateBwUI();
   updateGradeUI(); // hoisted; wheels/grain/vignette follow undo/redo/loads too
+  updateMix3UI(); // hoisted; channel mixer follows undo/redo/loads too
   syncLutUI(); // hoisted; reflects params.lut so undo/redo/reset/loads all update the LUT row
 }
 
@@ -496,6 +498,7 @@ function applyLook(name: keyof typeof LOOKS) {
   params.grainSize = 1.5;
   params.vigAmt = 0;
   params.vigMid = 0.5;
+  params.mix3 = [...MIX3_DEFAULT];
   syncToUI();
   draw();
 }
@@ -598,6 +601,7 @@ function cloneParams(p: EditParams): EditParams {
     grainSize: p.grainSize ?? 1.5,
     vigAmt: p.vigAmt ?? 0,
     vigMid: p.vigMid ?? 0.5,
+    mix3: [...(p.mix3 ?? MIX3_DEFAULT)],
     spots: (p.spots ?? []).map((s) => ({ ...s })),
     crop: { ...(p.crop ?? CROP_DEFAULT) },
     straighten: p.straighten ?? 0,
@@ -657,6 +661,7 @@ function applySnapshot(s: Snapshot) {
   params.grainSize = c.grainSize ?? 1.5;
   params.vigAmt = c.vigAmt ?? 0;
   params.vigMid = c.vigMid ?? 0.5;
+  params.mix3 = c.mix3?.length === 9 ? c.mix3 : [...MIX3_DEFAULT];
   params.spots = c.spots ?? [];
   params.crop = c.crop ?? { ...CROP_DEFAULT };
   params.straighten = c.straighten ?? 0;
@@ -800,6 +805,7 @@ function currentLook(): SavedLook {
     grainSize: params.grainSize ?? 1.5,
     vigAmt: params.vigAmt ?? 0,
     vigMid: params.vigMid ?? 0.5,
+    mix3: [...(params.mix3 ?? MIX3_DEFAULT)],
   };
 }
 
@@ -904,6 +910,7 @@ function applySavedLook(look: SavedLook, lut: EditParams["lut"] = null) {
   params.grainSize = look.grainSize;
   params.vigAmt = look.vigAmt;
   params.vigMid = look.vigMid;
+  params.mix3 = [...look.mix3];
   activeLook = null; // a loaded custom grade isn't one specific built-in look
   clampToneOrder();
   syncToUI();
@@ -1584,6 +1591,87 @@ $("gradeReset").addEventListener("click", () => {
   flushRecord();
 });
 updateGradeUI();
+
+// --- Custom false color: the full 3×3 channel mixer. Each OUTPUT channel
+// (R/G/B) is a weighted sum of the three inputs — nine sliders, laid out as
+// three rows. Preset chips seed classic false-colour remixes; the sliders
+// fine-tune. Same accessible-slider substrate as B&W weights. ---
+const MIX3_PRESETS: { label: string; m: number[] }[] = [
+  { label: "Identity", m: [1, 0, 0, 0, 1, 0, 0, 0, 1] },
+  { label: "R⇄B swap", m: [0, 0, 1, 0, 1, 0, 1, 0, 0] },
+  { label: "Aerochrome", m: [0, 1, 0, 0, 0, 1, 1, 0, 0] }, // red←green, green←blue, blue←red
+  { label: "Copper", m: [1.1, 0.3, 0, 0.2, 0.7, 0.1, 0, 0.2, 0.8] },
+  { label: "Rotate", m: [0, 0, 1, 1, 0, 0, 0, 1, 0] }, // the other way round
+];
+const MIX3_OUT = ["Red output", "Green output", "Blue output"];
+const MIX3_IN = ["red", "green", "blue"];
+const mix3GridEl = $("mix3Grid") as HTMLDivElement;
+const mix3Sliders: HTMLInputElement[] = [];
+for (let row = 0; row < 3; row++) {
+  const group = document.createElement("div");
+  group.className = "mix3-row";
+  const head = document.createElement("div");
+  head.className = "sub-title mix3-head";
+  head.textContent = MIX3_OUT[row];
+  group.append(head);
+  for (let col = 0; col < 3; col++) {
+    const idx = row * 3 + col;
+    const l = document.createElement("label");
+    l.append(`from ${MIX3_IN[col]} `);
+    const inp = document.createElement("input");
+    inp.type = "range";
+    inp.min = "-2";
+    inp.max = "2";
+    inp.step = "0.01";
+    inp.value = String(MIX3_DEFAULT[idx]);
+    inp.setAttribute("aria-label", `${MIX3_OUT[row]} from ${MIX3_IN[col]}`);
+    inp.addEventListener("input", () => {
+      params.mix3![idx] = Number(inp.value);
+      updateMix3UI();
+      draw(); // coalesces per drag
+    });
+    l.append(inp);
+    group.append(l);
+    mix3Sliders.push(inp);
+  }
+  mix3GridEl.append(group);
+}
+
+const mix3PresetsEl = $("mix3Presets") as HTMLDivElement;
+const mix3PresetBtns: HTMLButtonElement[] = [];
+for (const def of MIX3_PRESETS) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "mix-chip";
+  b.addEventListener("click", () => {
+    params.mix3 = [...def.m];
+    updateMix3UI();
+    draw();
+    flushRecord();
+  });
+  mix3PresetsEl.append(b);
+  mix3PresetBtns.push(b);
+}
+
+function updateMix3UI() {
+  const m = params.mix3 ?? (params.mix3 = [...MIX3_DEFAULT]);
+  mix3Sliders.forEach((s, i) => (s.value = String(m[i] ?? MIX3_DEFAULT[i])));
+  // Selected preset = ✓ text + aria-pressed (never colour alone).
+  mix3PresetBtns.forEach((b, i) => {
+    const def = MIX3_PRESETS[i];
+    const on = def.m.every((v, k) => Math.abs(v - (m[k] ?? MIX3_DEFAULT[k])) < 0.005);
+    b.textContent = (on ? "✓ " : "") + def.label;
+    b.setAttribute("aria-pressed", String(on));
+  });
+}
+
+$("mix3Reset").addEventListener("click", () => {
+  params.mix3 = [...MIX3_DEFAULT];
+  updateMix3UI();
+  draw();
+  flushRecord();
+});
+updateMix3UI();
 
 // --- Location-data guard: the 🛰 tip shows when the LOADED FILE carries GPS
 // location (src/gps.ts scans the actual bytes — EXIF GPS IFD and XMP). Tap it
@@ -3731,6 +3819,7 @@ function establishFreshEdit() {
     grainSize: 1.5,
     vigAmt: 0,
     vigMid: 0.5,
+    mix3: [...MIX3_DEFAULT],
     spots: [],
     crop: { ...CROP_DEFAULT },
     straighten: 0,
@@ -5042,6 +5131,7 @@ function neutralLook(): SavedLook {
     lum: 1, clarity: 0, dehaze: 0, sharpen: 0, texture: 0, hsl: hslDefault(),
     bwOn: false, bwMix: [1, 1, 1],
     grade: [0, 0, 0, 0, 0, 0, 0], grainAmt: 0, grainSize: 1.5, vigAmt: 0, vigMid: 0.5,
+    mix3: [1, 0, 0, 0, 1, 0, 0, 0, 1],
   };
 }
 
@@ -5099,6 +5189,7 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["l
     grainSize: look.grainSize,
     vigAmt: look.vigAmt,
     vigMid: look.vigMid,
+    mix3: [...look.mix3],
     spots: [], // composition-specific — a batch frame heals nothing
     crop: { ...CROP_DEFAULT }, // composition-specific — a batch frame crops nothing
     straighten: 0,

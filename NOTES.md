@@ -171,6 +171,15 @@ queue (forced-colors; manifest screenshots — accessible overlays SHIPPED
 future option if regressions ever slip: a 5-line build guard failing on
 user-scalable=no.
 
+> CREATIVE-RELEASE GATE EXCEPTION (owner call, 2026-07-19): the Creative
+> features (grade, mixer, stickers, warp) ship STRAIGHT TO MAIN as a beta,
+> WITHOUT the usual staging on-device-pass gate — they're brand-new
+> capabilities and the owner wants real users to see them, and he tests them
+> in production ("I will test on Main"). He's especially excited about
+> stickers. This exception is Creative-only; the hard staging gate still
+> holds for changes to existing behaviour. Each Creative item is still fully
+> headless-verified (unit + walk, fail-first) before merge.
+
 ## Next capability release (owner's roadmap, 2026-07-04; resequenced 2026-07-18)
 
 > SOURCE OF TRUTH for the in-app Roadmap (behind the ⓘ button). `vite.config.ts`
@@ -193,10 +202,6 @@ user-scalable=no.
 > different approach and mindset"). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
-- [ ] **Custom false color — full 3×3 channel mixer** — CREATIVE RELEASE
-  (v2.0), promoted from the backlog 2026-07-18: arbitrary channel mixing
-  beyond the R⇄B swap (aerochrome-style and invented palettes). IR-native,
-  per-pixel, bakes into .cube/.dcp.
 - [ ] **Stickers — UFOs in the trees** — CREATIVE RELEASE (v2.0), promoted
   from the backlog 2026-07-18 (owner ask 2026-07-14). The full architecture
   sketch lives in "Future / bigger bets" below — linear-source-space
@@ -2868,6 +2873,42 @@ user-scalable=no.
   on the real panel at his usual export sizes, the five toned-mono
   recipes against his taste (they're my calibration), and strong tints
   through the Display-P3 JPEG path in Apple Photos.
+- [x] **Custom false color — full 3×3 channel mixer** — CREATIVE, ships as
+  **2.1** (the first middle-bump within Creative). A new "Custom false
+  color — channel mixer" section at the bottom of the Grade tab: nine
+  sliders in three OUTPUT rows (Red/Green/Blue output ← from red/green/
+  blue, each −2..2) + preset chips (Identity, R⇄B swap, Aerochrome,
+  Copper, Rotate) using the BW_MIXES ✓-text + aria-pressed pattern.
+  PIPELINE: `mix3: number[9]` row-major [rr,rg,rb, gr,gg,gb, br,bg,bb],
+  applied in LINEAR space right AFTER the swap and BEFORE the hue matrix
+  (so swap + mix + hue compose) — the R⇄B swap is exactly the special
+  case [0,0,1, 0,1,0, 1,0,0] (walk-proven ≤2 LSB against the swap
+  button on the GPU). GPU: `u_mix3On` + `u_mix3` (mat3). GLSL mat3 is
+  COLUMN-major, so bindPipeline uploads the TRANSPOSE of the row-major
+  param — then `u_mix3 * c` equals the CPU's M·input (parity by
+  construction; watch this on any future matrix uniform). BAKES INTO
+  .cube (linear, no uv) AND .dcp (creativeLinear got the same after-swap
+  matrix — best-effort in a hue-sat map; a mixer that shifts luminance
+  per hue only approximates). MIX3_DEFAULT identity; mix3IsIdentity gate.
+  Threaded like grade: look.ts 4-point (per-element clamp −2..2; legacy →
+  identity; hostile 1e9 clamps), slots, links/codes, session, batch,
+  applyLook reset, origParams, establishFreshEdit, neutralLook.
+  VERIFIED, fail-first: 11 unit checks (mix3-unit — identity no-op,
+  swap-special-case to 1e-6, arbitrary remix, negative-weight invert,
+  .cube bake, .dcp differs, round-trip/legacy/hostile) with PLANT=leak;
+  14 walk checks (mix3-walk — 9-slider/3-row structure, R⇄B preset ==
+  swap button on the GPU, slider remix dR=50, GPU↔JPEG export parity
+  ≤10 LSB, undo/redo, reset, slot round-trip, .cube identity-vs-mixer
+  difference + channel-order rotation at pure-red, axe both themes) with
+  PLANT=noswap. Instrument lessons: (1) a channel ROTATION leaves grey
+  neutral (grey is permutation-invariant) — probe non-grey points; (2)
+  the practice DNG opens with the default IR swap look, so absolute cube
+  outputs are confounded — the walk compares an identity-mixer cube to
+  the Aerochrome cube (everything else identical) to isolate the mixer.
+  Regression: grade/curves/bw/p3 walks re-run green. VERSION → 2.1.
+  NEEDS THE OWNER'S HANDS: the preset recipes (my calibration) and
+  whether the mixer belongs in the Grade tab or wants its own home on
+  the real iPad.
 
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 
