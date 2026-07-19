@@ -470,6 +470,12 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 .grade-band-val { display: block; margin-top: 5px; font: 400 11px/1.2 var(--ui); color: var(--txt-3); min-height: 13px; }
 .grade-band-sliders { flex: 1; min-width: 0; }
 
+/* Channel mixer: three output-channel groups, each a labelled trio of
+   from-input sliders. A hairline groups each output visually. */
+.mix3-row { padding: 2px 0 4px; border-top: 1px solid var(--line); margin-top: 6px; }
+.mix3-row:first-of-type { border-top: none; margin-top: 0; }
+.mix3-head { margin: 4px 0 2px; }
+
 /* Imported .cube LUTs (Profiles & LUTs panel). The badge is TEXT — never a
    colour-only cue. */
 .lut-badge {

@@ -5,7 +5,7 @@
 
 // Single source of truth for edit parameters lives in pipeline.ts so the GPU
 // preview and CPU export can never drift apart.
-import { toneEvaluator, toneIsIdentity, maskIsActive, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, type EditParams, type LocalMap, type CropRect } from "./pipeline";
+import { toneEvaluator, toneIsIdentity, maskIsActive, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, type EditParams, type LocalMap, type CropRect } from "./pipeline";
 export type { EditParams };
 
 // A faithful 256-entry identity ramp for the tone LUT. A 2-texel [0,255] ramp
@@ -83,6 +83,8 @@ uniform bool u_linear; // true when the texture already holds linear values
 uniform mat3 u_cam;    // camera-native -> linear sRGB
 uniform bool u_useCam; // apply u_cam (camera-native raw only)
 uniform vec3 u_tint;     // tone tint after saturation ([1,1,1] = none)
+uniform bool u_mix3On;   // custom 3×3 channel mixer active
+uniform mat3 u_mix3;     // false-colour mixer (column-major upload; after swap, before hue)
 uniform vec3 u_sky;      // sky band [hueShiftDeg, satScale, lumScale]
 uniform vec3 u_fol;      // foliage band [hueShiftDeg, satScale, lumScale]
 uniform sampler2D u_glowTex; // per-image blurred highlight map (see glow.ts)
@@ -378,6 +380,11 @@ void main() {
   // Channel swap.
   if (u_swap) c = c.bgr;
 
+  // Custom false-colour 3×3 mixer (after swap, before hue). u_mix3 is uploaded
+  // column-major (bindPipeline transposes the row-major param) so this is the
+  // same output = M * input as pipeline.ts. Identity when off.
+  if (u_mix3On) c = u_mix3 * c;
+
   // Hue rotation in linear space via the standard YIQ-style matrix.
   float cosA = cos(u_hue), sinA = sin(u_hue);
   mat3 hueMat = mat3(
@@ -607,7 +614,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -854,6 +861,19 @@ export class Renderer {
     gl.uniform1f(this.loc.u_sharpen, p.sharpen ?? 0);
     gl.uniform1f(this.loc.u_texture, p.texture ?? 0);
     gl.uniform3f(this.loc.u_tint, p.tint[0], p.tint[1], p.tint[2]);
+    // Custom 3×3 channel mixer. The param is row-major [rr,rg,rb, gr,gg,gb,
+    // br,bg,bb]; GLSL mat3 is column-major, so upload the transpose — then
+    // `u_mix3 * c` computes the same M*input the CPU path does.
+    const mix3On = !mix3IsIdentity(p.mix3);
+    gl.uniform1i(this.loc.u_mix3On, mix3On ? 1 : 0);
+    if (mix3On) {
+      const m = p.mix3 ?? MIX3_DEFAULT;
+      gl.uniformMatrix3fv(this.loc.u_mix3, false, new Float32Array([
+        m[0], m[3], m[6],
+        m[1], m[4], m[7],
+        m[2], m[5], m[8],
+      ]));
+    }
     gl.uniform3f(this.loc.u_sky, p.sky[0], p.sky[1], p.sky[2]);
     gl.uniform3f(this.loc.u_fol, p.foliage[0], p.foliage[1], p.foliage[2]);
     gl.uniform2f(this.loc.u_texel, 1 / this.imgW, 1 / this.imgH);

@@ -9,7 +9,7 @@
 // so this is a v1 to validate in Lightroom. Structure is validated against a
 // TIFF/DNG reader.
 
-import type { EditParams } from "./pipeline";
+import { mix3IsIdentity, MIX3_DEFAULT, type EditParams } from "./pipeline";
 import { Tiff } from "./raw/tiff";
 
 // Nikon Z 50 ColorMatrix1 (D65), from the public Adobe coefficients, /10000.
@@ -59,6 +59,16 @@ function creativeLinear(r: number, g: number, b: number, p: EditParams): [number
     const t = r;
     r = b;
     b = t;
+  }
+  // Custom 3×3 mixer (after swap, before hue) — mirrors compileEdit, so the
+  // .dcp hue-sat map carries the false-colour remix too (best-effort: a mixer
+  // that changes luminance per hue only approximates in a hue-sat-value map).
+  if (!mix3IsIdentity(p.mix3)) {
+    const m = p.mix3 ?? MIX3_DEFAULT;
+    const xr = m[0] * r + m[1] * g + m[2] * b;
+    const xg = m[3] * r + m[4] * g + m[5] * b;
+    const xb = m[6] * r + m[7] * g + m[8] * b;
+    r = xr; g = xg; b = xb;
   }
   const a = (p.hue * Math.PI) / 180;
   const cos = Math.cos(a), sin = Math.sin(a);

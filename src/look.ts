@@ -39,6 +39,8 @@ export type SavedLook = {
   grainSize: number;
   vigAmt: number;
   vigMid: number;
+  /** Custom 3×3 channel mixer, row-major (identity = the R⇄B-swap-less pass). */
+  mix3: number[];
 };
 
 export type NamedLook = SavedLook & { name?: string };
@@ -126,6 +128,10 @@ export function coerceLook(s: unknown): SavedLook | null {
     grainSize: clamped(o.grainSize, 1.5, 1, 3),
     vigAmt: clamped(o.vigAmt, 0, -1, 1),
     vigMid: clamped(o.vigMid, 0.5, 0, 1),
+    mix3:
+      Array.isArray(o.mix3) && o.mix3.length === 9
+        ? o.mix3.map((x: unknown, i: number) => clamped(x, [1, 0, 0, 0, 1, 0, 0, 0, 1][i], -2, 2))
+        : [1, 0, 0, 0, 1, 0, 0, 0, 1],
   };
 }
 
@@ -168,6 +174,7 @@ export function encodeLookPayload(look: SavedLook, name?: string): string {
     grainSize: round4(look.grainSize),
     vigAmt: round4(look.vigAmt),
     vigMid: round4(look.vigMid),
+    mix3: look.mix3.map(round4),
   };
   const o: Record<string, unknown> = { f: LOOK_FORMAT, v: LOOK_VERSION };
   const n = cleanName(name);
