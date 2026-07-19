@@ -195,7 +195,8 @@ const MATCH_MID = 0.18; // linear mid-grey the sticker contrast pivots about
 
 /** Apply a sticker's match adjustments to its (linear) asset colour IN PLACE.
  *  Brightness (multiply), contrast (about mid grey), warmth (R↑/B↓), saturation
- *  (toward luma). Cheap scalars read per pixel — all-0 = the raw asset. */
+ *  (toward luma). These are the applied values — auto-match writes them scaled by
+ *  matchAmt, the user nudges from there. Cheap per pixel — all-0 = the raw asset. */
 function matchAsset(c: Float32Array, s: Sticker): void {
   const br = s.bright ?? 0, con = s.contrast ?? 0, wm = s.warmth ?? 0, sa = s.sat ?? 0;
   if (br === 0 && con === 0 && wm === 0 && sa === 0) return;

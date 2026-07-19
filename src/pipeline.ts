@@ -206,6 +206,16 @@ export interface Sticker {
   contrast?: number; // -1..1 contrast about mid grey
   warmth?: number; // -1..1 R↑/B↓ (warm) vs R↓/B↑ (cool)
   sat?: number; // -1..1 saturation (−1 = grey, +1 = ~2×)
+  /** "Blend to match" — the auto-harmonise. `matchTarget` holds the full-strength
+   *  [bright, contrast, warmth] computed from the scene under the sticker;
+   *  `matchAmt` (0..1) scales how much is applied into bright/contrast/warmth (so
+   *  bright = matchAmt·matchTarget[0], …). Saturation stays purely manual. Auto-
+   *  set on add + on the button; the scalars stay hand-tunable after. The sticker
+   *  composites BEFORE the camera matrix/WB, so only these gentle, monotonic
+   *  scalars survive the pipeline predictably — a per-channel affine gets
+   *  amplified + channel-swapped. */
+  matchTarget?: [number, number, number];
+  matchAmt?: number;
   /** Per-sticker erase/restore mask in ASSET-LOCAL space (paint to tuck the
    *  sticker behind foreground). 0 = hidden, 255 = shown; absent = fully
    *  shown. Runtime bitmap like the brush masks; `maskRev` bumps per stroke. */
