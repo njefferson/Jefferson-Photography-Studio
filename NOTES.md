@@ -166,7 +166,8 @@ palettes in vite.config.ts (notes.html template) and privacy.html.
 
 Known-exempt: disabled controls at opacity .4 (WCAG contrast exemption) —
 recorded so it isn't re-audited. Deferred a11y work lives in the roadmap
-queue (accessible overlays; forced-colors; manifest screenshots). Cheap
+queue (forced-colors; manifest screenshots — accessible overlays SHIPPED
+2026-07-19, see the archive). Cheap
 future option if regressions ever slip: a 5-line build guard failing on
 user-scalable=no.
 
@@ -192,18 +193,6 @@ user-scalable=no.
 > different approach and mindset"). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
-- [ ] **Accessible overlays — Library, Quick look and Busy become real dialogs**
-  — a11y audit 2026-07-17, deferred from the a11y release because it touches
-  open/close interaction flows. #library claims aria-modal with no focus
-  trap/Escape/restore, #quickLook and #busy have no dialog role; all three
-  are `.hidden` flips (main.ts ~3276/3677/3800) leaving the background live
-  to assistive tech. Convert to native <dialog>+showModal() like #helpDlg
-  (free trap/Escape/focus-restore). Same pass: finish the panel tab pattern
-  (role=tabpanel, aria-controls, arrow keys on .ptab), migrate the remaining
-  alert()/confirm() flows (previewNotice, append-confirm) to dialogs, fix
-  the library h4 heading jump. Walk EVERY open/close path (export cancel,
-  batch resume, quick-look → session) with a11y-walk + export-walk before
-  handoff; drop the harness allowlist entries when done.
 - [ ] **Color grading — shadow / midtone / highlight wheels** — CREATIVE
   RELEASE (v2.0), owner go 2026-07-18. Split-toning color wheels per tonal
   band; duotone / toned mono (completing the 720nm B&W story above); film
@@ -2757,6 +2746,45 @@ user-scalable=no.
   retargeting the one widget feel right vs separate curves), the three
   stroke hues over both themes, and a real grade using Blue-highlights
   to un-cool a sky.
+- [x] **Accessible overlays — Library, Quick look and Busy became real
+  dialogs** — shipped 2026-07-19 as an increment (1.6.x), closing the last
+  core-sweep queue item before Creative 2.0. The three `.hidden`-flip
+  overlays are now native `<dialog>`+showModal() (free focus trap, Escape,
+  focus restore, inert background): #library and #quickLook as full-screen
+  dialogs (transparent ::backdrop, `[open]{display:flex}`), #busy as a
+  centered card over a scrim. Quick look frees its previews on ANY close —
+  a `close` listener runs closeQuickLook() when quickItems is non-empty
+  (closeQuickLook empties it BEFORE calling close(), so programmatic closes
+  can't recurse). #busy EATS cancel (preventDefault) — Escape mid-export
+  would hide the overlay while the job runs; its buttons stay the only
+  exits. NEW SHARED ASK/NOTICE DIALOG (#askDlg, main.ts askDialog/
+  noticeDialog): askDialog(title, body, okLabel, cancelLabel) resolves
+  "ok" | "cancel" | "dismiss" — dismiss (Escape) always means CHANGE
+  NOTHING; noticeDialog is the one-button variant (hides askCancel,
+  restores it after). Migrated: the append-to-session confirm() and the
+  previewNotice alert(). Library h4 group headers → h3 (h2 dialog title,
+  no heading jump). PANEL TABS finished: ir.html ptabs carry ids +
+  aria-controls, sections are role=tabpanel + aria-labelledby; roving
+  tabindex in setPanelTab (active 0, rest -1); Arrow keys wrap, Home/End
+  jump, arrows move focus AND selection (the 1-D order matches the
+  wrapping grid).
+  VERIFIED (headless, overlay-walk.mjs, fail-first proven via PLANT=esc —
+  asserts Escape kills the busy overlay; FAILS on the healthy build): 28
+  checks — library modal open/heading/Escape; axe clean on the OPEN
+  library, ask dialog (both themes); quick look decode, Escape frees
+  previews (grid emptied), Keep → editor; ask dialog on a 3rd pick over a
+  2-photo session with honest labels, Escape changes nothing, OK grows the
+  strip to 3, Cancel starts fresh; roving tabindex, ArrowRight/Left/Home/
+  End, tab↔tabpanel ARIA wiring; busy survives Escape mid-render AND on
+  the save card, role=status announcement, Close works; a library pick
+  closes the dialog into the editor; no page errors. Regression walks
+  re-run green: downscale (busy double-tap guard), curves, bw, exif, p3,
+  loc. The old a11y-walk allowlist lived in a prior session's scratchpad
+  (gone with it) — overlay-walk.mjs is the successor and checks these
+  dialogs directly.
+  NEEDS THE OWNER'S HANDS: VoiceOver on the real iPad — the library and
+  quick look as modals (background truly silenced), the ask dialog's
+  three-way feel, and that Escape/scrim behavior matches muscle memory.
 
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 
