@@ -11,7 +11,7 @@ import { TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDe
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, type HealSpot } from "./heal";
 import { makeStickerAsset, stickerRect, compositeStickersIntoRect8, compositeStickersIntoRectF32, type StickerAsset } from "./sticker";
 import { makeWarpField, encodeWarp, paintWarp, warpIsEmpty as warpFieldEmpty, type WarpField, type WarpTool } from "./warp";
-import type { Sticker } from "./pipeline";
+import type { Sticker, BrushMask } from "./pipeline";
 import { generateCube } from "./lut";
 import { generateDcp } from "./dcp";
 import { buildGlowMap } from "./glow";
@@ -1796,6 +1796,11 @@ function endStickerLive() {
 let stickerArmed = false;
 let selectedSticker = -1;
 let stickerDrag: { id: number; ou: number; ov: number } | null = null;
+// Two-finger resize + spin on the selected sticker (the accessible sliders
+// stay). Captures the sticker's scale/rot at gesture start plus the initial
+// finger spread + angle, then tracks the ratio/delta live via the ghost.
+const stickerPointers = new Map<number, { x: number; y: number }>();
+let stkPinch: { dist: number; ang: number; scale: number; rot: number } | null = null;
 const stickerOverlay = $("stickerOverlay") as unknown as SVGSVGElement;
 const stkControls = $("stickerControls") as HTMLDivElement;
 const stkScale = $("stkScale") as HTMLInputElement;
@@ -1807,6 +1812,10 @@ const stkBright = $("stkBright") as HTMLInputElement;
 const stkContrast = $("stkContrast") as HTMLInputElement;
 const stkWarmth = $("stkWarmth") as HTMLInputElement;
 const stkSat = $("stkSat") as HTMLInputElement;
+const stkBlendBtn = $("stkBlend") as HTMLButtonElement;
+const stkBlendModeEl = $("stkBlendMode") as HTMLDivElement;
+const stkBrushSize = $("stkBrushSize") as HTMLInputElement;
+const stkBlendClearBtn = $("stkBlendClear") as HTMLButtonElement;
 
 // The add-a-sticker chips (the catalog order).
 const stickerAddEl = $("stickerAdd") as HTMLDivElement;
@@ -1994,6 +2003,143 @@ stkClearBtn.addEventListener("click", () => {
   flushRecord();
 });
 
+// --- Blend: paint on the selected sticker to rub parts away (so it tucks
+// behind a branch/foreground) or bring them back. The stroke writes an
+// asset-local erase/restore mask (sticker.ts multiplies alpha by it); one
+// stroke = one undo step (copy-on-write, like the brush masks). ---
+const STK_BLEND_EDGE = 384; // capped mask resolution, matches BRUSH_MAX_EDGE
+let stkBlendArmed = false;
+let stkBlendRestore = false; // false = hide (erase), true = bring back
+let stkPainting = false;
+let stkLastLocal: [number, number] | null = null;
+
+const STK_BLEND_MODES = [
+  { label: "Rub away", restore: false },
+  { label: "Bring back", restore: true },
+];
+const stkBlendModeBtns: HTMLButtonElement[] = [];
+for (const def of STK_BLEND_MODES) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "mix-chip";
+  b.addEventListener("click", () => { stkBlendRestore = def.restore; updateStickerUI(); });
+  stkBlendModeEl.append(b);
+  stkBlendModeBtns.push(b);
+}
+
+function setStickerBlend(on: boolean) {
+  stkBlendArmed = on && !!selSticker();
+  stkBlendBtn.setAttribute("aria-pressed", String(stkBlendArmed));
+  updateStickerUI();
+}
+stkBlendBtn.addEventListener("click", () => setStickerBlend(!stkBlendArmed));
+stkBlendClearBtn.addEventListener("click", () => {
+  const s = selSticker();
+  if (!s || !s.mask) return;
+  s.mask = null; // absent = fully shown
+  s.maskRev = (s.maskRev ?? 0) + 1;
+  draw();
+  flushRecord();
+});
+
+/** Lazily give the sticker a full-shown mask sized to the asset's aspect. */
+function ensureStickerMask(s: Sticker): BrushMask | null {
+  if (s.mask) return s.mask;
+  const a = stickerAssets[s.asset];
+  if (!a) return null;
+  const ar = a.h / a.w;
+  let w = STK_BLEND_EDGE, h = STK_BLEND_EDGE;
+  if (ar >= 1) w = Math.max(1, Math.round(STK_BLEND_EDGE / ar));
+  else h = Math.max(1, Math.round(STK_BLEND_EDGE * ar));
+  s.mask = { w, h, data: new Uint8Array(w * h).fill(255) };
+  return s.mask;
+}
+
+/** Canvas image-uv (u,v) → the sticker's asset-local uv (0..1 across the art),
+ *  inverting the same transform sticker.ts composites with. Null off-asset. */
+function stickerLocalUv(s: Sticker, u: number, v: number): [number, number] | null {
+  const a = stickerAssets[s.asset];
+  if (!a || !current) return null;
+  const W = current.width, H = current.height;
+  const hw = (s.scale * W) / 2, hh = hw * (a.h / a.w);
+  if (hw <= 0 || hh <= 0) return null;
+  const dx = u * W - s.x * W, dy = v * H - s.y * H;
+  const ang = (-s.rot * Math.PI) / 180;
+  const lx = dx * Math.cos(ang) - dy * Math.sin(ang);
+  const ly = dx * Math.sin(ang) + dy * Math.cos(ang);
+  return [lx / (2 * hw) + 0.5, ly / (2 * hh) + 0.5];
+}
+
+function stkBrushRadiusPx(b: BrushMask): number {
+  return Math.max(1, Number(stkBrushSize.value) * Math.max(b.w, b.h));
+}
+function stkStamp(s: Sticker, tx: number, ty: number) {
+  const b = s.mask;
+  if (!b) return;
+  const r = stkBrushRadiusPx(b);
+  const cx = tx * (b.w - 1), cy = ty * (b.h - 1);
+  const x0 = Math.max(0, Math.floor(cx - r)), x1 = Math.min(b.w - 1, Math.ceil(cx + r));
+  const y0 = Math.max(0, Math.floor(cy - r)), y1 = Math.min(b.h - 1, Math.ceil(cy + r));
+  const hard = 0.55;
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      const d = Math.hypot(x - cx, y - cy) / r;
+      if (d > 1) continue;
+      let fall = 1;
+      if (d > hard) { const t = (d - hard) / (1 - hard); fall = 1 - t * t * (3 - 2 * t); }
+      const idx = y * b.w + x;
+      const amt = fall * 255;
+      b.data[idx] = stkBlendRestore ? Math.min(255, Math.max(b.data[idx], amt)) : Math.max(0, b.data[idx] - amt);
+    }
+  }
+  s.maskRev = (s.maskRev ?? 0) + 1;
+}
+function stkPaintStroke(s: Sticker, tx: number, ty: number) {
+  if (stkLastLocal && s.mask) {
+    const [lu, lv] = stkLastLocal;
+    const b = s.mask;
+    const distPx = Math.hypot((tx - lu) * (b.w - 1), (ty - lv) * (b.h - 1));
+    const step = Math.max(1, stkBrushRadiusPx(b) * 0.3);
+    const n = Math.max(1, Math.ceil(distPx / step));
+    for (let k = 1; k <= n; k++) stkStamp(s, lu + (tx - lu) * (k / n), lv + (ty - lv) * (k / n));
+  } else {
+    stkStamp(s, tx, ty);
+  }
+  stkLastLocal = [tx, ty];
+  draw();
+}
+/** Begin a blend stroke at a canvas point. Returns false if it didn't consume
+ *  the pointer (e.g. off the sticker), so the caller can fall back to dragging. */
+function startStickerPaint(e: PointerEvent): boolean {
+  const s = selSticker();
+  if (!s) return false;
+  const [u, v] = renderer.clientToImageUv(e.clientX, e.clientY);
+  const loc = stickerLocalUv(s, u, v);
+  // Only start when the touch lands on the sticker itself.
+  if (!loc || loc[0] < 0 || loc[0] > 1 || loc[1] < 0 || loc[1] > 1) return false;
+  // Copy-on-write: undo snapshots share this mask buffer, so fork it first.
+  if (s.mask) s.mask = { w: s.mask.w, h: s.mask.h, data: new Uint8Array(s.mask.data) };
+  else if (!ensureStickerMask(s)) return false;
+  stkPainting = true;
+  stkLastLocal = null;
+  canvas.setPointerCapture(e.pointerId);
+  stkPaintStroke(s, loc[0], loc[1]);
+  return true;
+}
+function moveStickerPaint(e: PointerEvent) {
+  const s = selSticker();
+  if (!s) return;
+  const [u, v] = renderer.clientToImageUv(e.clientX, e.clientY);
+  const loc = stickerLocalUv(s, u, v);
+  if (loc) stkPaintStroke(s, loc[0], loc[1]);
+}
+function endStickerPaint() {
+  if (!stkPainting) return;
+  stkPainting = false;
+  stkLastLocal = null;
+  flushRecord();
+}
+
 /** Mean LINEAR colour of the displayed scene in a patch around image-uv (x,y),
  *  read back from the preview canvas (post-pipeline, what the eye sees). Null
  *  when off-screen. Used by auto-match. */
@@ -2061,7 +2207,16 @@ function updateStickerUI() {
       b.textContent = (on ? "✓ " : "") + STK_BEHIND[i].label;
       b.setAttribute("aria-pressed", String(on));
     });
+    stkBlendModeBtns.forEach((b, i) => {
+      const on = stkBlendRestore === STK_BLEND_MODES[i].restore;
+      b.textContent = (on ? "✓ " : "") + STK_BLEND_MODES[i].label;
+      b.setAttribute("aria-pressed", String(on));
+    });
+    stkBlendBtn.textContent = stkBlendArmed ? "✓ Painting on the sticker" : "Paint on the sticker";
+  } else if (stkBlendArmed) {
+    stkBlendArmed = false; // nothing selected to paint on
   }
+  stkBlendBtn.setAttribute("aria-pressed", String(stkBlendArmed));
   positionStickerOverlay();
 }
 
@@ -2099,6 +2254,10 @@ function setStickerMode(on: boolean) {
     mUI.paint.setAttribute("aria-pressed", "false");
   } else {
     endStickerLive(); // leaving the tab mid-gesture must bake + drop the ghost
+    if (stkPainting) endStickerPaint();
+    stkBlendArmed = false;
+    stkPinch = null;
+    stickerPointers.clear();
   }
   updateStickerUI();
 }
@@ -4149,13 +4308,32 @@ canvas.addEventListener("pointerdown", (e) => {
   if (brushPaintOn()) { e.preventDefault(); startPaint(e); return; }
   if (tatArmed) { if (!tatDrag) { e.preventDefault(); startTat(e); } return; }
   if (stickerArmed) {
+    e.preventDefault();
+    canvas.setPointerCapture(e.pointerId);
+    stickerPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    // A second finger starts resize + spin on the selected sticker (whatever
+    // the first finger was doing — drag or paint — stands down).
+    if (stickerPointers.size === 2 && selSticker()) {
+      stickerDrag = null;
+      if (stkPainting) endStickerPaint();
+      const [a, b] = [...stickerPointers.values()];
+      const s = selSticker()!;
+      stkPinch = {
+        dist: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)),
+        ang: Math.atan2(b.y - a.y, b.x - a.x),
+        scale: s.scale,
+        rot: s.rot,
+      };
+      beginStickerLive();
+      return;
+    }
+    // First finger: paint (blend mode, on the sticker) else select + drag.
+    if (stkBlendArmed && startStickerPaint(e)) return;
     const [u, v] = renderer.clientToImageUv(e.clientX, e.clientY);
     const hit = hitSticker(u, v);
     if (hit >= 0) { selectedSticker = hit; updateStickerUI(); }
     const s = selSticker();
-    if (s) {
-      e.preventDefault();
-      canvas.setPointerCapture(e.pointerId);
+    if (s && !stkBlendArmed) {
       stickerDrag = { id: e.pointerId, ou: s.x - u, ov: s.y - v };
       beginStickerLive(); // ghost + hold it out of the bake for the drag
     }
@@ -4199,6 +4377,26 @@ canvas.addEventListener("pointermove", (e) => {
     return;
   }
   if (tatDrag) { moveTat(e); return; }
+  if (stickerArmed) {
+    const sp = stickerPointers.get(e.pointerId);
+    if (sp) { sp.x = e.clientX; sp.y = e.clientY; }
+    if (stkPinch && stickerPointers.size >= 2) {
+      const s = selSticker();
+      if (s) {
+        const [a, b] = [...stickerPointers.values()];
+        const dist = Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
+        const ang = Math.atan2(b.y - a.y, b.x - a.x);
+        s.scale = Math.min(1, Math.max(0.05, (stkPinch.scale * dist) / stkPinch.dist));
+        let deg = stkPinch.rot + ((ang - stkPinch.ang) * 180) / Math.PI;
+        deg = ((((deg + 180) % 360) + 360) % 360) - 180; // wrap to −180..180
+        s.rot = Math.round(deg);
+        updateStickerUI(); // Size/Spin sliders follow the fingers live
+        positionStickerGhost();
+      }
+      return;
+    }
+    if (stkPainting) { moveStickerPaint(e); return; }
+  }
   if (stickerDrag && e.pointerId === stickerDrag.id) {
     const s = selSticker();
     if (s) {
@@ -4239,6 +4437,16 @@ canvas.addEventListener("pointermove", (e) => {
 function endPointer(e: PointerEvent) {
   if (painting) { endPaint(); return; }
   if (tatDrag) { if (e.pointerId === tatDrag.id) endTat(); return; }
+  if (stickerArmed && stickerPointers.has(e.pointerId)) {
+    stickerPointers.delete(e.pointerId);
+    if (stkPinch) {
+      if (stickerPointers.size < 2) { stkPinch = null; endStickerLive(); flushRecord(); }
+      return;
+    }
+    if (stkPainting) { endStickerPaint(); return; }
+    if (stickerDrag && e.pointerId === stickerDrag.id) { stickerDrag = null; endStickerLive(); flushRecord(); }
+    return;
+  }
   if (stickerDrag && e.pointerId === stickerDrag.id) { stickerDrag = null; endStickerLive(); flushRecord(); return; }
   if (warpStroke && e.pointerId === warpStroke.id) { endWarpStroke(); return; }
   activePointers.delete(e.pointerId);

@@ -296,6 +296,12 @@
               <label>Peek behind <input id="stkOcclude" type="range" min="0" max="1" step="0.01" value="0" /></label>
               <div id="stkBehind" class="bw-mixes" role="group" aria-label="What the sticker hides behind"></div>
               <p class="note">Peek behind lets the scene show through the sticker &mdash; slide it up and pick whether it hides behind the <em>bright</em> parts (foliage glows white in infrared) or the <em>dark</em> parts (tree trunks), so it tucks in behind the branches.</p>
+              <div class="sub-title">Paint to blend in</div>
+              <button id="stkBlend" type="button" aria-pressed="false">Paint on the sticker</button>
+              <div id="stkBlendMode" class="bw-mixes" role="group" aria-label="What painting does"></div>
+              <label>Brush size <input id="stkBrushSize" type="range" min="0.03" max="0.5" step="0.005" value="0.15" /></label>
+              <button id="stkBlendClear" type="button">Show the whole sticker again</button>
+              <p class="note">Turn on painting, then draw on the sticker to rub parts away so it tucks behind a branch or foreground &mdash; switch to Bring back to paint them in again. Two fingers on the photo resize and spin the selected sticker.</p>
               <button id="stkDelete" type="button">Remove this sticker</button>
             </div>
             <button id="stkClear" type="button" hidden>Clear all stickers</button>

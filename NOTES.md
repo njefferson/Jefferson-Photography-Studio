@@ -3044,6 +3044,30 @@ user-scalable=no.
   (are these believable-in-scene?), auto-match STRENGTH (is the seed close
   enough, or too timid/aggressive?), and the imported-PNG session-only limit
   (persist via IndexedDB later if he wants his cutouts to stick).
+- [x] **Stickers v2 — paint to tuck behind + two-finger resize/spin** — the
+  last of the owner's sticker rework (2026-07-19): "paint to remove portions so
+  it fits in the background… paint to restore portions." BLEND: a "Paint on the
+  sticker" toggle turns canvas strokes from move→paint; "Rub away" drives the
+  asset-local mask to 0 (the scene shows through — tuck it behind a branch),
+  "Bring back" restores to 255, and "Show the whole sticker again" drops the
+  mask. The stroke inverts the SAME transform sticker.ts composites with
+  (stickerLocalUv → asset uv), stamps a soft brush into a per-sticker BrushMask
+  (capped 384px, aspect-matched), copy-on-write per stroke = one undo step;
+  compositePixel already multiplies alpha by the mask so it rides the preview
+  AND the export for free. The bake stays cheap: draw() is rAF-coalesced, so a
+  drag paints one small-rect bake per frame (maskRev is in the stkSig guard; the
+  buffer is stripped from snapSig). PINCH: two fingers on the canvas (Stickers
+  tab) resize + spin the selected sticker — captured scale/rot × the live finger
+  spread/angle, shown on the ghost, Size/Spin sliders following live, baked once
+  on release; one finger still drags, the sliders stay the accessible path.
+  VERIFIED (sticker-blend-walk, 14 checks): rub-away reveals the background at
+  the centre, bring-back restores it, clear heals the hole, the masked hole
+  survives to the exported JPEG (≤14 LSB vs preview), two-finger spread grows
+  the sticker + twist spins it, axe clean both themes, no errors; PLANT=noerase
+  (skip the stroke) makes the reveal check FAIL. sticker-walk + sticker-lag-walk
+  regressions green. NEEDS THE OWNER'S HANDS: the brush feel + size range on the
+  iPad, whether rub-away/bring-back read clearly, and the pinch/spin feel
+  (sensitivity, whether one-finger-drag vs two-finger never fight).
 
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 
