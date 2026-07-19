@@ -207,6 +207,21 @@ user-scalable=no.
 > different approach and mindset"). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
+- [ ] **Creative — a third app for regular photos** — owner direction 2026-07-19
+  ("a separate page next to infrared and macro, called creative, for regular
+  photos, installable separately… same things we're building here… I suppose I
+  will want a whole image editor there eventually"). A NEW entry point beside the
+  IR studio and the macro tool: its own route + installable PWA (own
+  manifest.webmanifest / start_url / icons / SW cache, added to the `/` chooser),
+  aimed at ordinary visible-light photos rather than IR RAW. It REUSES the
+  creative stack built up here — stickers (the two-kind library, adjust, blend,
+  perspective), grade, channel mixer, warp — and grows "down from creative" into
+  a full image editor over time. Big build; NOT yet scoped. OPEN QUESTIONS FOR
+  THE OWNER before starting (all asked in chat, no pop-ups): (1) does it share
+  the IR pipeline/renderer or start from a trimmed visible-light pipeline (no
+  channel-swap / IR-WB); (2) is the first cut "stickers + grade on any JPEG/HEIC"
+  or the full editor; (3) name/route/icon and whether it installs from the same
+  chooser. Ships on its own once scoped — unrelated to the sticker betas.
 - [ ] **Full-bleed alignment view — the tilted photo fills the screen** — owner-caught on device
   2026-07-16 (with the crop go-to-main; screenshot IMG_6201, Straighten @ 23.6°).
   While a geometry tool is armed, rotating and pinch-zooming CLIPS the photo
