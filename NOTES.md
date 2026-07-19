@@ -3196,6 +3196,21 @@ user-scalable=no.
   regressions green. NEEDS THE OWNER'S HANDS: whether the default 0.85 strength
   feels right, and whether he wants saturation folded into the auto-match too
   (left manual for now — auto-sat was too unpredictable to trust).
+- [x] **Third sticker kind — Scene & nature (asset-factory handoff)** — owner go
+  2026-07-19 after reading the factory's `asset-factory/CATEGORIES.md` (on branch
+  `claude/jefferson-asset-pipeline-9y19wa`, which routes ~245 assets so NOTHING
+  lands in ❓ New). App-side change per that handoff: a third `STICKER_GROUPS`
+  entry `scene` (🏕️ Scene & nature) + five categories — 🦉 Wildlife (`wildlife`),
+  🌿 Foreground (`foreground`), 🎈 Sky (`sky`), 🌫️ Atmosphere & light
+  (`atmosphere`), 🧺 Everyday (`props`). These are the everyday overlays for the
+  Creative direction, but they just add folders to the EXISTING IR sticker picker
+  (the separate Creative app stays parked); the group only appears once a scene
+  asset is promoted (renderStickerPicker hides empty groups). Purely additive:
+  no META/notes needed (labels humanize from filenames; all real things). VERIFIED
+  (sticker-category-walk, extended): a seeded `wildlife/owl` makes the Scene kind
+  appear with Wildlife → "Owl"; three kinds now render and filter; PLANT=nofilter
+  fails; all sticker regressions + build green. The factory promotes reviewed
+  PNGs into public/stickers/<category>/ as its own deliberate step.
 
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 

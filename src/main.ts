@@ -1711,16 +1711,19 @@ updateMix3UI();
 // they inherit the whole IR pipeline and grain settles over them. Placement
 // lives in params.stickers → undo/session for free; excluded from looks/batch. ---
 
-// Sticker library — TWO-KIND, category-organized, and DYNAMIC (owner, 2026-07-19:
+// Sticker library — grouped, category-organized, and DYNAMIC (owner, 2026-07-19:
 // "split into two kinds of overlays — Creatures & craft, and Evidence"; the
-// evidence overlays read more believable because they tuck into a scene). Assets
-// live at public/stickers/<category>/<name>.png; a build-time manifest.json lists
-// what's present, so the owner drops a PNG into a category folder and it appears
-// (auto-precached) with no code change. The original 8 stay FLAT (no key change →
-// no broken saved sessions); their category comes from STICKER_META.
+// evidence overlays read more believable because they tuck into a scene; a third
+// "Scene & nature" group of everyday overlays added 2026-07-19 to receive the
+// asset factory's full set). Assets live at public/stickers/<category>/<name>.png;
+// a build-time manifest.json lists what's present, so the owner drops a PNG into a
+// category folder and it appears (auto-precached) with no code change. The
+// original 8 stay FLAT (no key change → no broken saved sessions); their category
+// comes from STICKER_META.
 const STICKER_GROUPS: { id: string; emoji: string; label: string }[] = [
   { id: "creatures", emoji: "👣", label: "Creatures & craft" },
   { id: "evidence", emoji: "🔍", label: "Evidence" },
+  { id: "scene", emoji: "🏕️", label: "Scene & nature" },
 ];
 const STICKER_CATEGORIES: { id: string; group: string; emoji: string; label: string }[] = [
   // Creatures & craft — the "obvious" overlays.
@@ -1733,6 +1736,12 @@ const STICKER_CATEGORIES: { id: string; group: string; emoji: string; label: str
   { id: "tracks", group: "evidence", emoji: "🐾", label: "Tracks & marks" },
   { id: "gear", group: "evidence", emoji: "🎒", label: "Left behind" },
   { id: "lights", group: "evidence", emoji: "✨", label: "Lights & signs" },
+  // Scene & nature — everyday overlays for regular photos (the Creative direction).
+  { id: "wildlife", group: "scene", emoji: "🦉", label: "Wildlife" },
+  { id: "foreground", group: "scene", emoji: "🌿", label: "Foreground" },
+  { id: "sky", group: "scene", emoji: "🎈", label: "Sky" },
+  { id: "atmosphere", group: "scene", emoji: "🌫️", label: "Atmosphere & light" },
+  { id: "props", group: "scene", emoji: "🧺", label: "Everyday" },
   { id: "other", group: "evidence", emoji: "❓", label: "New" }, // catch-all for un-categorized drop-ins
 ];
 // Pretty labels + honesty notes (folklore/fiction, shown as TEXT so meaning
