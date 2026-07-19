@@ -202,11 +202,6 @@ user-scalable=no.
 > different approach and mindset"). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
-- [ ] **Warp tools — Swirl / Liquefy / Pinch** — CREATIVE RELEASE (v2.0),
-  promoted from the backlog 2026-07-18 (owner ask 2026-07-14). The
-  UV-displacement-field sketch lives in "Future / bigger bets" below; spatial
-  → never in looks/batch/LUTs; one stroke = one undo. The biggest single item
-  in the release.
 - [ ] **Full-bleed alignment view — the tilted photo fills the screen** — owner-caught on device
   2026-07-16 (with the crop go-to-main; screenshot IMG_6201, Straighten @ 23.6°).
   While a geometry tool is armed, rotating and pinch-zooming CLIPS the photo
@@ -2955,6 +2950,46 @@ user-scalable=no.
   light-cone that BRIGHTENS what it covers (currently a normal-alpha
   translucent cone); the engraved-stipple mono art set. A true two-ink
   duotone and these all remain open if the owner asks.
+- [x] **Warp tools — Swirl / Push / Pinch / Bloat** — CREATIVE, shipped as a
+  BETA straight to main (owner's 2026-07-19 exception). THE LAST CREATIVE
+  QUEUE ITEM — the Creative sweep (grade, mixer, stickers, warp) is complete.
+  VERSION unchanged (2.1 beta increment; bump when the owner blesses the
+  Creative betas out of beta). A new **Warp** tab COMPLETES the 4×3 tab grid
+  (row 4 = Grade, Stickers, Warp — 12 tabs; the grade full-width rule is gone).
+  ARCHITECTURE (src/warp.ts): a per-photo UV DISPLACEMENT FIELD (WARP_RES=160²,
+  WARP_MAX=0.28 uv). Finger strokes paint du/dv (push = drag vector, swirl =
+  tangential, pinch/bloat = radial, aspect-corrected so brushes stay round);
+  a smoothstep brush falloff accumulates. Applied as a SOURCE-SPACE REMAP at
+  the very top: shader fetchLin reads u_tex at warpUv(uv) (unit 7, RGBA8
+  LINEAR); export.ts wraps the source sampler (warpSampler) BEFORE denoise —
+  so denoise/detail/the whole pipeline follow the moved image on both sides.
+  PARITY: both sides bilinear-sample the SAME encoded RGBA8 field and decode
+  identically. HARD-WON: the encoding centres on byte 128 = EXACTLY zero
+  (scale 127, not the ±1/255·0.5 offset) — the offset left a ~1.5px residual
+  shift in every unpainted cell the moment any warp existed (unit-caught).
+  Shader decode `(tex*255-128)/127*WARP_MAX` mirrors warp.ts; WARP_MAX is a
+  literal 0.28 in bindPipeline (kept in sync by comment). The field rides
+  undo (COPY-ON-WRITE per stroke: startWarpStroke clones du/dv/rgba, `rev`
+  bumps — snapshots share the frozen buffer, like brush bitmaps) and the
+  session (applySnapshot reads it from the snapshot; editToJson strips it —
+  so it resets on reload, like masks). EXCLUDED from looks/batch/.cube/.dcp
+  (compileEdit never sees it; walk proves the .cube is byte-identical warp vs
+  reset). Reset on a new open. Direct manipulation: setWarpMode arms the
+  canvas (mutually exclusive with heal/crop/masks/stickers/picks); a stroke
+  paints du/dv → encode → syncWarpField uploads (rev-compared) → draw.
+  VERIFIED, fail-first (unit PLANT=leak asserts an untouched cell displaces;
+  walk PLANT=bake asserts warp moves the .cube — both FAIL healthy): 10 unit
+  checks (neutral=0, push direction, encode round-trip, GL-bilinear midpoint,
+  warpSampler remap, empty) + 9 walk checks (4 tools + sliders, a swirl bends
+  the stripes mean|Δ|=101, export parity mean|Δ|=3.3 preview-vs-JPEG, .cube
+  exclusion, reset restores, undo brings the swirl back, axe both themes, no
+  errors). Regression: bw/grade/mix3/sticker/overlay/downscale walks green
+  (bw tab count → 12). Lesson 10 + Help "Warp — bend the picture" added.
+  BETA / NEEDS THE OWNER'S HANDS: warp feel on the iPad (brush size/strength,
+  the 160² field resolution — bump if smooth warps look blocky), whether the
+  four tools are the right set, and 8-bit field precision on gentle warps.
+  DEFERRED: a live brush-ring cursor; higher-res or float field; per-photo
+  session persistence of the field (currently resets on reload like masks).
 
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 

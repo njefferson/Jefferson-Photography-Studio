@@ -135,6 +135,9 @@ uniform vec2 u_texel;    // 1/textureSize
 uniform float u_split;   // compare divider: denoise applies where uv.x >= split
 uniform int u_spotVis;   // 1 = "Visualize spots": amplified high-pass luma view
 uniform int u_maskViz;   // >=0 = show that mask's coverage as a preview overlay
+uniform sampler2D u_warpTex; // RG displacement field (unit 7, LINEAR); 0.5 = no move
+uniform bool u_warpOn;       // any warp painted
+uniform float u_warpScale;   // decode scale = WARP_MAX (warp.ts)
 uniform highp sampler3D u_lutTex; // imported .cube LUT lattice (unit 5, NEAREST — manual trilinear below)
 uniform int u_lutSize;            // grid N per axis (>=2; only read when strength > 0)
 uniform float u_lutStrength;      // 0..1; 0.0 = stage entirely off
@@ -165,7 +168,16 @@ vec3 sampleLut3d(vec3 c) {
 
 vec3 toLinear(vec3 c){ return pow(c, vec3(2.2)); }
 vec3 toGamma(vec3 c){ return pow(max(c, 0.0), vec3(1.0/2.2)); }
-vec3 fetchLin(vec2 uv){ vec3 s = texture(u_tex, uv).rgb; return u_linear ? s : toLinear(s); }
+// Warp: read the displacement field (RG encoded, 0.5 = none) and remap the
+// source coordinate — every fetchLin (centre AND neighbourhood taps) warps
+// together, so denoise/detail follow the moved image. Mirrored in warp.ts.
+vec2 warpUv(vec2 uv){
+  if (!u_warpOn) return uv;
+  // Decode centred on byte 128 (= exactly zero), scale 127 — matches warp.ts.
+  vec2 d = (texture(u_warpTex, uv).xy * 255.0 - 128.0) / 127.0;
+  return uv + d * u_warpScale;
+}
+vec3 fetchLin(vec2 uv){ vec3 s = texture(u_tex, warpUv(uv)).rgb; return u_linear ? s : toLinear(s); }
 
 vec3 rgb2hsv(vec3 c){
   vec4 K = vec4(0.0, -1.0/3.0, 2.0/3.0, -1.0);
@@ -589,6 +601,8 @@ export class Renderer {
   private brushTex: WebGLTexture;
   private brushSig = ""; // re-upload the packed brush texture only when it changes
   private localTex: WebGLTexture;
+  private warpTex!: WebGLTexture;
+  private warpOn = false;
   private localScale = 1;
   private lutTex: WebGLTexture;
   private lutSig = ""; // re-upload the 3D LUT only when its identity changes
@@ -614,7 +628,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -693,6 +707,32 @@ export class Renderer {
     gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
     gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGBA32F, 2, 2, 2, 0, gl.RGBA, gl.FLOAT, new Float32Array(2 * 2 * 2 * 4));
+
+    // Warp displacement field (unit 7): RGBA8, LINEAR + CLAMP_TO_EDGE — the CPU
+    // export replicates this exact sampling (warp.ts sampleWarp). A single
+    // 0.5-grey texel = no displacement until a field is uploaded.
+    this.warpTex = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, this.warpTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 0, 255]));
+  }
+
+  /** Upload the warp displacement field (RGBA8 res×res), or clear with null. */
+  setWarpField(field: { res: number; rgba: Uint8Array } | null) {
+    const gl = this.gl;
+    gl.bindTexture(gl.TEXTURE_2D, this.warpTex);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    if (!field) {
+      this.warpOn = false;
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 0, 255]));
+      return;
+    }
+    this.warpOn = true;
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, field.res, field.res, 0, gl.RGBA, gl.UNSIGNED_BYTE, field.rgba);
   }
 
   /** Upload the per-image clarity/dehaze maps (or clear with null). */
@@ -935,6 +975,13 @@ export class Renderer {
     gl.uniform1i(this.loc.u_localTex, 4);
     gl.activeTexture(gl.TEXTURE4);
     gl.bindTexture(gl.TEXTURE_2D, this.localTex);
+    // Warp field (unit 7). WARP_MAX = 0.28 (warp.ts) — kept as a literal here so
+    // the shader decode matches; if warp.ts changes it, change this too.
+    gl.uniform1i(this.loc.u_warpTex, 7);
+    gl.uniform1i(this.loc.u_warpOn, this.warpOn ? 1 : 0);
+    gl.uniform1f(this.loc.u_warpScale, 0.28);
+    gl.activeTexture(gl.TEXTURE7);
+    gl.bindTexture(gl.TEXTURE_2D, this.warpTex);
     // Local masks (up to MAX_MASKS, the shader array size).
     const masks = (p.masks ?? []).filter(maskIsActive).slice(0, MAX_MASKS);
     // Slot map: brush(2)/sky(4) masks claim packed channels 0..3 in appearance

@@ -10,6 +10,7 @@ import * as Session from "./session";
 import { TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, type MaskLayer, type CropRect } from "./pipeline";
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, type HealSpot } from "./heal";
 import { makeStickerAsset, stickerRect, compositeStickersIntoRect8, compositeStickersIntoRectF32, type StickerAsset } from "./sticker";
+import { makeWarpField, encodeWarp, paintWarp, warpIsEmpty as warpFieldEmpty, type WarpField, type WarpTool } from "./warp";
 import type { Sticker } from "./pipeline";
 import { generateCube } from "./lut";
 import { generateDcp } from "./dcp";
@@ -607,6 +608,9 @@ function cloneParams(p: EditParams): EditParams {
     mix3: [...(p.mix3 ?? MIX3_DEFAULT)],
     spots: (p.spots ?? []).map((s) => ({ ...s })),
     stickers: (p.stickers ?? []).map((s) => ({ ...s })),
+    // The warp field is SHARED by reference (copy-on-write per stroke, like the
+    // brush bitmaps) — a snapshot's field is immutable once a new stroke clones.
+    warp: p.warp ?? null,
     crop: { ...(p.crop ?? CROP_DEFAULT) },
     straighten: p.straighten ?? 0,
     // The LUT wrapper is cloned (a strength drag must not mutate history) but
@@ -677,6 +681,10 @@ function applySnapshot(s: Snapshot) {
   // snapshot (whose data can't be a real Float32Array) from half-activating.
   const sl = s.params.lut;
   params.lut = sl && sl.data instanceof Float32Array ? { ...sl } : null;
+  // Warp from the SNAPSHOT directly (same reasoning as the LUT): a session JSON
+  // strips it, and a revived JSON warp has no real Float32Array to sample.
+  const sw = s.params.warp;
+  params.warp = sw && sw.du instanceof Float32Array ? sw : null;
   activeLook = s.activeLook ?? null;
   lookBias = (s.lookBias ? [...s.lookBias] : [1, 1, 1]) as [number, number, number];
   if (selectedMask >= params.masks.length) selectedMask = params.masks.length - 1;
@@ -994,6 +1002,7 @@ function draw() {
       renderer.setToneCurve(params.tone, params.toneR, params.toneG, params.toneB);
     }
     syncSpotsToTexture(); // heals live in the texture; keep it matching params
+    syncWarpField(); // the warp field lives in a texture too
     // While a geometry tool is armed, render the WHOLE tilted photo (an outset
     // "fit" view so a rotated photo isn't clipped by the frame); the crop box
     // overlays it and the real crop only takes effect on exit. See setGeoMode.
@@ -1135,7 +1144,7 @@ $("toneReset").addEventListener("click", () => {
 
 // --- Sectioned tab panel: segmented tabs, one section of controls each.
 // The active tab is remembered per session so reopening lands where you left.
-const PANEL_TABS = ["basic", "ir", "bw", "color", "tone", "masks", "corrections", "export", "crop", "grade", "stickers"] as const;
+const PANEL_TABS = ["basic", "ir", "bw", "color", "tone", "masks", "corrections", "export", "crop", "grade", "stickers", "warp"] as const;
 type PanelTab = (typeof PANEL_TABS)[number];
 const TAB_META: Record<PanelTab, { name: string; sub: string }> = {
   basic: { name: "Basic", sub: "White balance, exposure & detail" },
@@ -1148,6 +1157,7 @@ const TAB_META: Record<PanelTab, { name: string; sub: string }> = {
   export: { name: "Export", sub: "Save, my looks & profiles" },
   grade: { name: "Grade", sub: "Color wheels, toned mono, grain & vignette" },
   stickers: { name: "Stickers", sub: "Drop UFOs into the trees" },
+  warp: { name: "Warp", sub: "Push, swirl, pinch & bloat" },
   crop: { name: "Crop & rotate", sub: "Rotate, crop & straighten" },
 };
 const panelTabsEl = $("panelTabs") as HTMLElement;
@@ -1163,6 +1173,7 @@ const panelTabBtns = Array.from(panelTabsEl.querySelectorAll<HTMLButtonElement>(
 let activePanelTab: PanelTab = "basic";
 let overlayReady = false;
 let stickerReady = false; // set true once the sticker block below has run
+let warpReady = false; // set true once the warp block below has run
 
 function setPanelTab(tab: PanelTab) {
   if (!PANEL_TABS.includes(tab)) return;
@@ -1190,6 +1201,8 @@ function setPanelTab(tab: PanelTab) {
   // leaving it disarms. Guarded on stickerReady so the init-time setPanelTab
   // (before the sticker block runs) is a no-op.
   if (stickerReady) setStickerMode(activePanelTab === "stickers");
+  // The Warp tab arms finger-painting the displacement field. Same guard.
+  if (warpReady) setWarpMode(activePanelTab === "warp");
 }
 panelTabBtns.forEach((b) => b.addEventListener("click", () => setPanelTab(b.dataset.tab as PanelTab)));
 // Keyboard tab traversal: Left/Right (wrapping) and Home/End move focus AND
@@ -1904,6 +1917,107 @@ function setStickerMode(on: boolean) {
 }
 stickerReady = true; // the sticker block is defined — setPanelTab may now arm it
 if ((activePanelTab as PanelTab) === "stickers") setStickerMode(true); // restored straight into the tab
+
+// --- Warp (Creative): push, swirl, pinch & bloat the picture with a finger.
+// Strokes paint a UV displacement field (warp.ts) that the shader + export
+// sampler both read; the field rides undo (copy-on-write per stroke) and the
+// session, but is composition-specific — never in looks/batch/.cube. ---
+let warpArmed = false;
+let warpStroke: { id: number; lastU: number; lastV: number; started: boolean } | null = null;
+const WARP_TOOLS: { label: string; tool: WarpTool }[] = [
+  { label: "Push", tool: "push" },
+  { label: "Swirl", tool: "swirl" },
+  { label: "Pinch", tool: "pinch" },
+  { label: "Bloat", tool: "bloat" },
+];
+let warpTool: WarpTool = "push";
+const warpToolsEl = $("warpTools") as HTMLDivElement;
+const warpToolBtns: HTMLButtonElement[] = [];
+for (const def of WARP_TOOLS) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "mix-chip";
+  b.addEventListener("click", () => {
+    warpTool = def.tool;
+    updateWarpUI();
+  });
+  warpToolsEl.append(b);
+  warpToolBtns.push(b);
+}
+const warpSizeEl = $("warpSize") as HTMLInputElement;
+const warpStrengthEl = $("warpStrength") as HTMLInputElement;
+
+function updateWarpUI() {
+  warpToolBtns.forEach((b, i) => {
+    const on = warpTool === WARP_TOOLS[i].tool;
+    b.textContent = (on ? "✓ " : "") + WARP_TOOLS[i].label;
+    b.setAttribute("aria-pressed", String(on));
+  });
+}
+
+function setWarpMode(on: boolean) {
+  warpArmed = on && !!current;
+  if (warpArmed) {
+    setHslPick(false); setColorPick(false); setTat(false); setHeal(false); setHealReview(false); setGeoMode(null); setStickerMode(false);
+    mUI.paint.setAttribute("aria-pressed", "false");
+  }
+  updateWarpUI();
+}
+
+/** Begin a warp stroke: clone the field first (copy-on-write, so history keeps
+ *  the pre-stroke version), then paint the first dab. */
+function startWarpStroke(e: PointerEvent) {
+  if (!current) return;
+  const [u, v] = renderer.clientToImageUv(e.clientX, e.clientY);
+  // Copy-on-write: a fresh field object + buffers so the previous snapshot's
+  // field stays frozen for undo.
+  const prev = params.warp;
+  const f: WarpField = prev
+    ? { res: prev.res, du: Float32Array.from(prev.du), dv: Float32Array.from(prev.dv), rgba: Uint8Array.from(prev.rgba), rev: prev.rev }
+    : makeWarpField();
+  params.warp = f;
+  canvas.setPointerCapture(e.pointerId);
+  warpStroke = { id: e.pointerId, lastU: u, lastV: v, started: false };
+  paintWarpAt(u, v, [0, 0]);
+}
+
+function paintWarpAt(u: number, v: number, move: [number, number]) {
+  const f = params.warp;
+  if (!f) return;
+  const aspect = current ? current.width / current.height : 1;
+  const changed = paintWarp(f, warpTool, u, v, Number(warpSizeEl.value), Number(warpStrengthEl.value), aspect, move);
+  if (changed) {
+    f.rev++; // bump so syncWarpField re-uploads
+    encodeWarp(f);
+    warpStroke && (warpStroke.started = true);
+    draw();
+  }
+}
+
+function moveWarpStroke(e: PointerEvent) {
+  if (!warpStroke || e.pointerId !== warpStroke.id) return;
+  const [u, v] = renderer.clientToImageUv(e.clientX, e.clientY);
+  paintWarpAt(u, v, [u - warpStroke.lastU, v - warpStroke.lastV]);
+  warpStroke.lastU = u;
+  warpStroke.lastV = v;
+}
+
+function endWarpStroke() {
+  if (!warpStroke) return;
+  const started = warpStroke.started;
+  warpStroke = null;
+  if (started) flushRecord(); // one stroke = one undo step
+}
+
+$("warpReset").addEventListener("click", () => {
+  if (warpFieldEmpty(params.warp)) return;
+  params.warp = null;
+  draw();
+  flushRecord();
+});
+updateWarpUI();
+warpReady = true;
+if ((activePanelTab as PanelTab) === "warp") setWarpMode(true);
 
 // --- Location-data guard: the 🛰 tip shows when the LOADED FILE carries GPS
 // location (src/gps.ts scans the actual bytes — EXIF GPS IFD and XMP). Tap it
@@ -2867,7 +2981,18 @@ const healStatus = $("healStatus") as HTMLElement;
 let previewSrc: { width: number; height: number; pixels?: Uint8ClampedArray; linear?: Float32Array } | null = null;
 let bakedSpots: HealSpot[] = []; // what the texture currently has baked in
 let bakedStickers: Sticker[] = []; // sticker placements currently baked into the texture
+let bakedWarpRev = -1; // the warp-field revision currently uploaded to the GPU
 let healArmed = false;
+
+/** Upload the warp field to the GPU when it changed (rev-compared, like the
+ *  heal bake). Clears the texture when there's no warp. */
+function syncWarpField() {
+  const w = params.warp;
+  const rev = w && !warpFieldEmpty(w) ? w.rev : -1;
+  if (rev === bakedWarpRev) return;
+  renderer.setWarpField(w && !warpFieldEmpty(w) ? { res: w.res, rgba: w.rgba } : null);
+  bakedWarpRev = rev;
+}
 // The most recent heal stays ACTIVE (accented ring): the Spot size slider
 // resizes it live — tap first, then dial the size until the fix looks right
 // (owner ask 2026-07-14: no way to size before the tap, none to adjust after).
@@ -2885,6 +3010,7 @@ function uploadPreview() {
   renderer.setImage(previewSrc);
   bakedSpots = [];
   bakedStickers = [];
+  bakedWarpRev = -1;
   draw();
 }
 
@@ -3832,6 +3958,7 @@ canvas.addEventListener("pointerdown", (e) => {
     }
     return; // the Stickers tab owns the canvas — no tap-WB / pan while armed
   }
+  if (warpArmed) { e.preventDefault(); startWarpStroke(e); return; } // the Warp tab owns the canvas
   activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   canvas.setPointerCapture(e.pointerId);
   // Long-press (held still) shows the original for comparison.
@@ -3880,6 +4007,7 @@ canvas.addEventListener("pointermove", (e) => {
     }
     return;
   }
+  if (warpStroke) { moveWarpStroke(e); return; }
   const p = activePointers.get(e.pointerId);
   if (!p) return;
   if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > 8) {
@@ -3909,6 +4037,7 @@ function endPointer(e: PointerEvent) {
   if (painting) { endPaint(); return; }
   if (tatDrag) { if (e.pointerId === tatDrag.id) endTat(); return; }
   if (stickerDrag && e.pointerId === stickerDrag.id) { stickerDrag = null; flushRecord(); return; }
+  if (warpStroke && e.pointerId === warpStroke.id) { endWarpStroke(); return; }
   activePointers.delete(e.pointerId);
   clearTimeout(holdTimer);
   showOriginal(false);
@@ -4123,6 +4252,7 @@ function establishFreshEdit() {
   setColorPick(false);
   params.spots = [];
   params.stickers = [];
+  params.warp = null;
   activeSpotIdx = -1;
   setHeal(false);
   params.crop = { ...CROP_DEFAULT };
@@ -4220,7 +4350,7 @@ function editToJson(): string {
   const s = snapshot();
   // Masks (bitmaps) and the imported LUT (Float32Array lattice) are runtime
   // data — stripped here; a durable resume restores neither (Help says so).
-  return JSON.stringify({ params: { ...s.params, masks: [], lut: null }, activeLook: s.activeLook, lookBias: s.lookBias });
+  return JSON.stringify({ params: { ...s.params, masks: [], lut: null, warp: null }, activeLook: s.activeLook, lookBias: s.lookBias });
 }
 
 /** Capture the active photo's live edit into memory and persist a durable copy
@@ -5006,6 +5136,16 @@ const LESSONS: { title: string; tab: PanelTab; steps: string[] }[] = [
       "Notice it takes on the photo's colors: the channel swap and white balance reach the sticker, so it lands right in the infrared palette instead of looking pasted on.",
       "Slide Peek behind up and pick Bright parts — the glowing foliage shows through, so the saucer tucks in behind the branches. Add a little Grain (in Grade) and it settles over the whole scene.",
       "Size and Spin fine-tune it; Remove this sticker or Clear all start over. Stickers stay with this photo — they're not carried by saved looks or batch.",
+    ],
+  },
+  {
+    title: "Lesson 10 · Warp — bend the picture",
+    tab: "warp",
+    steps: [
+      "In the Warp tab, pick a tool and drag on the photo: Push smears pixels along your finger, Swirl twists them around, Pinch draws them in and Bloat pushes them out.",
+      "Brush size sets how much of the picture each drag grabs; Strength how hard. Build an effect up with several passes, or go bold in one.",
+      "Every drag is a single undo, so experiment freely. Reset warp returns the picture to normal.",
+      "Warp bends the picture itself — like crop and healing it stays with this photo, and it isn't carried by saved looks, batch or the .cube / .dcp exports.",
     ],
   },
 ];
@@ -6282,6 +6422,7 @@ canvas.addEventListener("click", (e) => {
   // Armed picks eat the tap (they must NOT also set white balance).
   if (cropArmed) return; // Crop & straighten owns the canvas — drag its own box/handles instead
   if (stickerArmed) return; // the Stickers tab owns the canvas
+  if (warpArmed) return; // the Warp tab owns the canvas
   if (handleHealReviewTap(e.clientX, e.clientY)) return;
   if (handleHealTap(e.clientX, e.clientY)) return;
   if (handleColorMaskPick(e.clientX, e.clientY)) return;
