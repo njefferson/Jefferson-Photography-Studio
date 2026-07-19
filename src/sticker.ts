@@ -71,8 +71,75 @@ export function makeStickerAsset(key: string, w: number, h: number, rgba: Uint8C
 
 const clampI = (v: number, hi: number) => (v < 0 ? 0 : v > hi ? hi : v);
 
-/** A sticker's destination bounding box in source pixels (covers rotation). */
+/** The 4 sticker corners in SOURCE PIXELS (order TL, TR, BR, BL), when a
+ *  perspective skew is set — base rect corner + its offset, rotated + placed.
+ *  Null when the sticker is a plain scale+rot rect. */
+export function stickerWorldCorners(s: Sticker, W: number, H: number, asset: StickerAsset): [number, number][] | null {
+  const co = s.corners;
+  if (!co || co.length !== 4) return null;
+  const hw = (s.scale * W) / 2, hh = hw * (asset.h / asset.w);
+  const a = (s.rot * Math.PI) / 180, cs = Math.cos(a), sn = Math.sin(a);
+  const cx = s.x * W, cy = s.y * H;
+  const base: [number, number][] = [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]];
+  return base.map(([bx, by], k) => {
+    const lx = bx + co[k][0] * hw, ly = by + co[k][1] * hh;
+    return [cx + lx * cs - ly * sn, cy + lx * sn + ly * cs] as [number, number];
+  });
+}
+
+/** Homography mapping the asset unit square (0,0)/(1,0)/(1,1)/(0,1) to the four
+ *  image-pixel corners P (same order), 3×3 row-major (Heckbert square→quad). */
+function squareToQuad(P: [number, number][]): number[] {
+  const [x0, y0] = P[0], [x1, y1] = P[1], [x2, y2] = P[2], [x3, y3] = P[3];
+  const dx1 = x1 - x2, dx2 = x3 - x2, dx3 = x0 - x1 + x2 - x3;
+  const dy1 = y1 - y2, dy2 = y3 - y2, dy3 = y0 - y1 + y2 - y3;
+  let a: number, b: number, d: number, e: number, g: number, h: number;
+  if (Math.abs(dx3) < 1e-9 && Math.abs(dy3) < 1e-9) {
+    a = x1 - x0; b = x3 - x0; d = y1 - y0; e = y3 - y0; g = 0; h = 0; // affine (parallelogram)
+  } else {
+    const den = dx1 * dy2 - dx2 * dy1;
+    g = (dx3 * dy2 - dx2 * dy3) / den;
+    h = (dx1 * dy3 - dx3 * dy1) / den;
+    a = x1 - x0 + g * x1; b = x3 - x0 + h * x3;
+    d = y1 - y0 + g * y1; e = y3 - y0 + h * y3;
+  }
+  return [a, b, x0, d, e, y0, g, h, 1];
+}
+
+/** Inverse of a 3×3 (row-major), or null if singular. */
+function invert3x3(m: number[]): number[] | null {
+  const [a, b, c, d, e, f, g, h, i] = m;
+  const A = e * i - f * h, B = -(d * i - f * g), C = d * h - e * g;
+  const det = a * A + b * B + c * C;
+  if (Math.abs(det) < 1e-12) return null;
+  const iv = 1 / det;
+  return [
+    A * iv, (c * h - b * i) * iv, (b * f - c * e) * iv,
+    B * iv, (a * i - c * g) * iv, (c * d - a * f) * iv,
+    C * iv, (b * g - a * h) * iv, (a * e - b * d) * iv,
+  ];
+}
+
+/** The inverse homography (image px → asset uv) for a skewed sticker, or null
+ *  for a plain rect. Precompute ONCE per sticker per bake and hand to
+ *  compositePixel so the per-pixel cost is a single mat-vec. */
+export function stickerXform(s: Sticker, W: number, H: number, asset: StickerAsset): number[] | null {
+  const P = stickerWorldCorners(s, W, H, asset);
+  if (!P) return null;
+  return invert3x3(squareToQuad(P));
+}
+
+/** A sticker's destination bounding box in source pixels (covers rotation and,
+ *  when set, the perspective quad). */
 export function stickerRect(s: Sticker, W: number, H: number, asset: StickerAsset): Rect {
+  const P = stickerWorldCorners(s, W, H, asset);
+  if (P) {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const [x, y] of P) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+    x0 = Math.max(0, Math.floor(x0)); y0 = Math.max(0, Math.floor(y0));
+    x1 = Math.min(W, Math.ceil(x1)); y1 = Math.min(H, Math.ceil(y1));
+    return { x0, y0, w: Math.max(0, x1 - x0), h: Math.max(0, y1 - y0) };
+  }
   const hw = (s.scale * W) / 2;
   const hh = hw * (asset.h / asset.w);
   const cx = s.x * W, cy = s.y * H;
@@ -154,21 +221,35 @@ function compositePixel(
   assets: Record<string, StickerAsset>,
   tmp: Float32Array,
   occ?: OcclusionCtx,
+  xforms?: (number[] | null)[], // per-sticker inverse homography (skewed), else null
 ): void {
-  for (const s of stickers) {
+  for (let si = 0; si < stickers.length; si++) {
+    const s = stickers[si];
     const asset = assets[s.asset];
     if (!asset) continue;
     const hw = (s.scale * W) / 2;
     const hh = hw * (asset.h / asset.w);
     if (hw <= 0 || hh <= 0) continue;
-    const dx = px + 0.5 - s.x * W;
-    const dy = py + 0.5 - s.y * H;
-    const a = (-s.rot * Math.PI) / 180; // inverse rotation
-    const cs = Math.cos(a), sn = Math.sin(a);
-    const lx = dx * cs - dy * sn;
-    const ly = dx * sn + dy * cs;
-    const tx = lx / (2 * hw) + 0.5;
-    const ty = ly / (2 * hh) + 0.5;
+    let tx: number, ty: number;
+    const minv = xforms ? xforms[si] : null;
+    if (minv) {
+      // Perspective: image px → asset uv via the inverse homography.
+      const X = px + 0.5, Y = py + 0.5;
+      const u = minv[0] * X + minv[1] * Y + minv[2];
+      const v = minv[3] * X + minv[4] * Y + minv[5];
+      const w = minv[6] * X + minv[7] * Y + minv[8];
+      if (w === 0) continue;
+      tx = u / w; ty = v / w;
+    } else {
+      const dx = px + 0.5 - s.x * W;
+      const dy = py + 0.5 - s.y * H;
+      const a = (-s.rot * Math.PI) / 180; // inverse rotation
+      const cs = Math.cos(a), sn = Math.sin(a);
+      const lx = dx * cs - dy * sn;
+      const ly = dx * sn + dy * cs;
+      tx = lx / (2 * hw) + 0.5;
+      ty = ly / (2 * hh) + 0.5;
+    }
     sampleAsset(asset, tx, ty, tmp);
     let alpha = tmp[3];
     if (alpha <= 0) continue;
@@ -209,12 +290,13 @@ export function compositeStickersIntoRect8(
   occ?: OcclusionCtx,
 ): void {
   if (!stickers.length) return;
+  const xforms = stickers.map((s) => { const a = assets[s.asset]; return a ? stickerXform(s, W, H, a) : null; });
   const base = new Float32Array(3), tmp = new Float32Array(4);
   for (let y = 0; y < rect.h; y++) {
     for (let x = 0; x < rect.w; x++) {
       const o = (y * rect.w + x) * 4;
       base[0] = toLin(buf[o]); base[1] = toLin(buf[o + 1]); base[2] = toLin(buf[o + 2]);
-      compositePixel(base, rect.x0 + x, rect.y0 + y, W, H, stickers, assets, tmp, occ);
+      compositePixel(base, rect.x0 + x, rect.y0 + y, W, H, stickers, assets, tmp, occ, xforms);
       buf[o] = toGam(base[0]) * 255 + 0.5;
       buf[o + 1] = toGam(base[1]) * 255 + 0.5;
       buf[o + 2] = toGam(base[2]) * 255 + 0.5;
@@ -234,12 +316,13 @@ export function compositeStickersIntoRectF32(
   occ?: OcclusionCtx,
 ): void {
   if (!stickers.length) return;
+  const xforms = stickers.map((s) => { const a = assets[s.asset]; return a ? stickerXform(s, W, H, a) : null; });
   const base = new Float32Array(3), tmp = new Float32Array(4);
   for (let y = 0; y < rect.h; y++) {
     for (let x = 0; x < rect.w; x++) {
       const o = (y * rect.w + x) * 4;
       base[0] = buf[o]; base[1] = buf[o + 1]; base[2] = buf[o + 2];
-      compositePixel(base, rect.x0 + x, rect.y0 + y, W, H, stickers, assets, tmp, occ);
+      compositePixel(base, rect.x0 + x, rect.y0 + y, W, H, stickers, assets, tmp, occ, xforms);
       buf[o] = Math.fround(base[0]);
       buf[o + 1] = Math.fround(base[1]);
       buf[o + 2] = Math.fround(base[2]);
@@ -272,13 +355,14 @@ export function stickerPatches(
     if (!asset) continue;
     const rect = stickerRect(s, W, H, asset);
     if (rect.w <= 0 || rect.h <= 0) continue;
+    const xf = [stickerXform(s, W, H, asset)];
     const data = new Float32Array(rect.w * rect.h * 3);
     for (let y = 0; y < rect.h; y++) {
       for (let x = 0; x < rect.w; x++) {
         const sx = clampI(rect.x0 + x, W - 1), sy = clampI(rect.y0 + y, H - 1);
         const b = sample(sx, sy);
         base[0] = b[0]; base[1] = b[1]; base[2] = b[2];
-        compositePixel(base, rect.x0 + x, rect.y0 + y, W, H, [s], assets, tmp, occ);
+        compositePixel(base, rect.x0 + x, rect.y0 + y, W, H, [s], assets, tmp, occ, xf);
         const o = (y * rect.w + x) * 3;
         data[o] = base[0]; data[o + 1] = base[1]; data[o + 2] = base[2];
       }

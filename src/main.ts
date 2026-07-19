@@ -9,7 +9,7 @@ import { putFrame, eachFrame, frameMetas, frameCount, clearFrames } from "./batc
 import * as Session from "./session";
 import { TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, type MaskLayer, type CropRect } from "./pipeline";
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, type HealSpot } from "./heal";
-import { makeStickerAsset, stickerRect, compositeStickersIntoRect8, compositeStickersIntoRectF32, type StickerAsset } from "./sticker";
+import { makeStickerAsset, stickerRect, stickerWorldCorners, stickerXform, compositeStickersIntoRect8, compositeStickersIntoRectF32, type StickerAsset } from "./sticker";
 import { makeWarpField, encodeWarp, paintWarp, warpIsEmpty as warpFieldEmpty, type WarpField, type WarpTool } from "./warp";
 import type { Sticker, BrushMask } from "./pipeline";
 import { generateCube } from "./lut";
@@ -607,7 +607,9 @@ function cloneParams(p: EditParams): EditParams {
     vigMid: p.vigMid ?? 0.5,
     mix3: [...(p.mix3 ?? MIX3_DEFAULT)],
     spots: (p.spots ?? []).map((s) => ({ ...s })),
-    stickers: (p.stickers ?? []).map((s) => ({ ...s })),
+    // corners is a nested array — deep-copy it so an undo snapshot doesn't share
+    // the live sticker's perspective (the mask rides by ref, copy-on-write).
+    stickers: (p.stickers ?? []).map((s) => ({ ...s, corners: s.corners ? s.corners.map((c) => [c[0], c[1]] as [number, number]) : s.corners })),
     // The warp field is SHARED by reference (copy-on-write per stroke, like the
     // brush bitmaps) — a snapshot's field is immutable once a new stroke clones.
     warp: p.warp ?? null,
@@ -735,7 +737,7 @@ function flushRecord() {
 }
 
 function recordSoon() {
-  if (!settled || painting) return; // a paint stroke commits once, on pointerup
+  if (!settled || painting || stkCornerLive) return; // a stroke/corner-drag commits once, on pointerup
   clearTimeout(recordTimer);
   recordTimer = window.setTimeout(flushRecord, 350);
 }
@@ -1923,6 +1925,8 @@ let stickerDrag: { id: number; ou: number; ov: number } | null = null;
 // finger spread + angle, then tracks the ratio/delta live via the ghost.
 const stickerPointers = new Map<number, { x: number; y: number }>();
 let stkPinch: { dist: number; ang: number; scale: number; rot: number } | null = null;
+let stkPerspArmed = false; // dragging the 4 corner handles to set perspective
+let stkCornerLive = false; // a corner drag is in progress (suppresses undo churn)
 const stickerOverlay = $("stickerOverlay") as unknown as SVGSVGElement;
 const stkControls = $("stickerControls") as HTMLDivElement;
 const stkScale = $("stkScale") as HTMLInputElement;
@@ -2045,8 +2049,19 @@ function selSticker(): Sticker | null {
   return selectedSticker >= 0 && selectedSticker < list.length ? list[selectedSticker] : null;
 }
 
+/** Even-odd point-in-quad test (px,py in the same space as the corners). */
+function pointInQuad(px: number, py: number, q: [number, number][]): boolean {
+  let inside = false;
+  for (let i = 0, j = 3; i < 4; j = i++) {
+    const [xi, yi] = q[i], [xj, yj] = q[j];
+    if ((yi > py) !== (yj > py) && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
 /** Which sticker (topmost) covers image-uv (u,v), or -1. Pixel-space test so
- *  rotation + aspect are handled the same way sticker.ts composites. */
+ *  rotation + aspect (and, when set, the perspective quad) match how
+ *  sticker.ts composites. */
 function hitSticker(u: number, v: number): number {
   if (!current) return -1;
   const W = current.width, H = current.height;
@@ -2055,6 +2070,8 @@ function hitSticker(u: number, v: number): number {
     const s = list[i];
     const a = stickerAssets[s.asset];
     if (!a) continue;
+    const quad = stickerWorldCorners(s, W, H, a);
+    if (quad) { if (pointInQuad(u * W, v * H, quad)) return i; continue; }
     const hw = (s.scale * W) / 2, hh = hw * (a.h / a.w);
     const dx = (u - s.x) * W, dy = (v - s.y) * H;
     const ang = (-s.rot * Math.PI) / 180;
@@ -2194,9 +2211,27 @@ for (const def of STK_BLEND_MODES) {
 function setStickerBlend(on: boolean) {
   stkBlendArmed = on && !!selSticker();
   stkBlendBtn.setAttribute("aria-pressed", String(stkBlendArmed));
+  if (stkBlendArmed && stkPerspArmed) setStickerPersp(false); // both own single-finger taps
   updateStickerUI();
 }
 stkBlendBtn.addEventListener("click", () => setStickerBlend(!stkBlendArmed));
+
+// Perspective: drag the 4 corners to skew the sticker onto the scene's plane.
+const stkPerspBtn = $("stkPersp") as HTMLButtonElement;
+const stkPerspResetBtn = $("stkPerspReset") as HTMLButtonElement;
+function setStickerPersp(on: boolean) {
+  stkPerspArmed = on && !!selSticker();
+  if (stkPerspArmed && stkBlendArmed) setStickerBlend(false); // mutually exclusive single-finger tools
+  updateStickerUI();
+}
+stkPerspBtn.addEventListener("click", () => setStickerPersp(!stkPerspArmed));
+stkPerspResetBtn.addEventListener("click", () => {
+  const s = selSticker();
+  if (!s || !s.corners) return;
+  s.corners = null; // back to the plain scale+rot rect
+  draw();
+  flushRecord();
+});
 stkBlendClearBtn.addEventListener("click", () => {
   const s = selSticker();
   if (!s || !s.mask) return;
@@ -2220,11 +2255,19 @@ function ensureStickerMask(s: Sticker): BrushMask | null {
 }
 
 /** Canvas image-uv (u,v) → the sticker's asset-local uv (0..1 across the art),
- *  inverting the same transform sticker.ts composites with. Null off-asset. */
+ *  inverting the same transform sticker.ts composites with (perspective too).
+ *  Null off-asset. */
 function stickerLocalUv(s: Sticker, u: number, v: number): [number, number] | null {
   const a = stickerAssets[s.asset];
   if (!a || !current) return null;
   const W = current.width, H = current.height;
+  const minv = stickerXform(s, W, H, a);
+  if (minv) {
+    const X = u * W, Y = v * H;
+    const w = minv[6] * X + minv[7] * Y + minv[8];
+    if (w === 0) return null;
+    return [(minv[0] * X + minv[1] * Y + minv[2]) / w, (minv[3] * X + minv[4] * Y + minv[5]) / w];
+  }
   const hw = (s.scale * W) / 2, hh = hw * (a.h / a.w);
   if (hw <= 0 || hh <= 0) return null;
   const dx = u * W - s.x * W, dy = v * H - s.y * H;
@@ -2377,35 +2420,111 @@ function updateStickerUI() {
       b.setAttribute("aria-pressed", String(on));
     });
     stkBlendBtn.textContent = stkBlendArmed ? "✓ Painting on the sticker" : "Paint on the sticker";
-  } else if (stkBlendArmed) {
-    stkBlendArmed = false; // nothing selected to paint on
+    stkPerspBtn.textContent = stkPerspArmed ? "✓ Dragging the corners" : "Skew the corners";
+  } else {
+    if (stkBlendArmed) stkBlendArmed = false; // nothing selected to paint on
+    if (stkPerspArmed) stkPerspArmed = false;
   }
   stkBlendBtn.setAttribute("aria-pressed", String(stkBlendArmed));
+  stkPerspBtn.setAttribute("aria-pressed", String(stkPerspArmed));
   positionStickerOverlay();
 }
 
-/** Draw the selected sticker's bounding box (rotated) as the selection cue. */
+/** The selected sticker's 4 corners in OVERLAY-CLIENT space (order TL,TR,BR,BL),
+ *  covering rotation + perspective — the selection box and the corner handles. */
+function stickerOverlayCorners(s: Sticker, a: StickerAsset): [number, number][] {
+  const W = current!.width, H = current!.height;
+  const rect = stickerOverlay.getBoundingClientRect();
+  const toClient = (px: number, py: number): [number, number] => {
+    const [cx, cy] = renderer.imageUvToClient(px / W, py / H);
+    return [cx - rect.left, cy - rect.top];
+  };
+  const quad = stickerWorldCorners(s, W, H, a);
+  if (quad) return quad.map(([px, py]) => toClient(px, py));
+  const hw = (s.scale * W) / 2, hh = hw * (a.h / a.w);
+  const ang = (s.rot * Math.PI) / 180, cs = Math.cos(ang), sn = Math.sin(ang);
+  return ([[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]] as [number, number][]).map(([lx, ly]) =>
+    toClient(s.x * W + (lx * cs - ly * sn), s.y * H + (lx * sn + ly * cs)));
+}
+
+/** Draw the selected sticker's box as the selection cue, plus the 4 draggable
+ *  corner handles when Perspective is armed. Repositions IN PLACE when the
+ *  element set is unchanged (so a live corner drag keeps its pointer capture —
+ *  a replaceChildren would destroy the handle mid-gesture). */
 function positionStickerOverlay() {
   const s = selSticker();
   const show = stickerArmed && !!current && welcome.hidden && !!s && !!stickerAssets[s!.asset];
   stickerOverlay.toggleAttribute("hidden", !show);
   if (!show || !s) { stickerOverlay.replaceChildren(); return; }
   const a = stickerAssets[s.asset];
-  const W = current!.width, H = current!.height;
-  const hw = (s.scale * W) / 2, hh = hw * (a.h / a.w);
-  const ang = (s.rot * Math.PI) / 180;
-  const cs = Math.cos(ang), sn = Math.sin(ang);
-  const rect = stickerOverlay.getBoundingClientRect();
-  const pts = [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].map(([lx, ly]) => {
-    const px = s.x * W + (lx * cs - ly * sn);
-    const py = s.y * H + (lx * sn + ly * cs);
-    const [cx, cy] = renderer.imageUvToClient(px / W, py / H);
-    return `${cx - rect.left},${cy - rect.top}`;
-  });
+  const pts = stickerOverlayCorners(s, a);
+  const wantHandles = stkPerspArmed ? 4 : 0;
+  const kids = stickerOverlay.childNodes;
+  const inPlace = kids.length === 1 + wantHandles && (kids[0] as Element)?.tagName === "polygon";
+  if (inPlace) {
+    (kids[0] as SVGPolygonElement).setAttribute("points", pts.map(([x, y]) => `${x},${y}`).join(" "));
+    for (let k = 0; k < wantHandles; k++) {
+      const c = kids[1 + k] as SVGCircleElement;
+      c.setAttribute("cx", String(pts[k][0])); c.setAttribute("cy", String(pts[k][1]));
+    }
+    return;
+  }
   const poly = document.createElementNS(SVGNS, "polygon");
-  poly.setAttribute("points", pts.join(" "));
+  poly.setAttribute("points", pts.map(([x, y]) => `${x},${y}`).join(" "));
   poly.setAttribute("class", "sticker-box");
-  stickerOverlay.replaceChildren(poly);
+  const els: SVGElement[] = [poly];
+  if (stkPerspArmed) {
+    for (let k = 0; k < 4; k++) {
+      const c = document.createElementNS(SVGNS, "circle");
+      c.setAttribute("r", "11");
+      c.setAttribute("cx", String(pts[k][0])); c.setAttribute("cy", String(pts[k][1]));
+      c.setAttribute("class", "sticker-corner");
+      attachStickerCornerDrag(c, k);
+      els.push(c);
+    }
+  }
+  stickerOverlay.replaceChildren(...els);
+}
+
+// Base local corners (order TL,TR,BR,BL) in half-extent units.
+const STK_CORNER_BASE: [number, number][] = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+
+/** Drag corner `k` to set its perspective offset. Client point → the sticker's
+ *  local frame → the offset stored in s.corners[k]. Bakes live (one bbox, rAF-
+ *  coalesced); one drag = one undo step (copy-on-write on the corners array). */
+function attachStickerCornerDrag(el: SVGCircleElement, k: number) {
+  el.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    e.stopPropagation(); // a corner grab must not also start a body drag
+    const s = selSticker();
+    if (!s || !current) return;
+    el.setPointerCapture(e.pointerId);
+    // Copy-on-write: fork the corners so undo history stays intact.
+    s.corners = (s.corners ?? [[0, 0], [0, 0], [0, 0], [0, 0]]).map((c) => [c[0], c[1]] as [number, number]);
+    stkCornerLive = true;
+    const a = stickerAssets[s.asset]!;
+    const W = current.width, H = current.height;
+    const move = (ev: PointerEvent) => {
+      const cur = selSticker();
+      if (!cur || !cur.corners) return;
+      const [u, v] = renderer.clientToImageUv(ev.clientX, ev.clientY);
+      const hw = (cur.scale * W) / 2, hh = hw * (a.h / a.w);
+      const dxp = u * W - cur.x * W, dyp = v * H - cur.y * H;
+      const ang = (cur.rot * Math.PI) / 180, cs = Math.cos(ang), sn = Math.sin(ang);
+      const lx = cs * dxp + sn * dyp; // Rot(-rot) · (world - centre)
+      const ly = -sn * dxp + cs * dyp;
+      cur.corners[k] = [clamp(lx / hw - STK_CORNER_BASE[k][0], -1.5, 1.5), clamp(ly / hh - STK_CORNER_BASE[k][1], -1.5, 1.5)];
+      draw();
+    };
+    const up = () => {
+      el.removeEventListener("pointermove", move);
+      el.removeEventListener("pointerup", up);
+      stkCornerLive = false;
+      flushRecord();
+    };
+    el.addEventListener("pointermove", move);
+    el.addEventListener("pointerup", up);
+  });
 }
 
 /** Arm/disarm sticker manipulation on the canvas. Arming loads the assets and
@@ -2420,6 +2539,8 @@ function setStickerMode(on: boolean) {
     endStickerLive(); // leaving the tab mid-gesture must bake + drop the ghost
     if (stkPainting) endStickerPaint();
     stkBlendArmed = false;
+    stkPerspArmed = false;
+    stkCornerLive = false;
     stkPinch = null;
     stickerPointers.clear();
   }

@@ -211,6 +211,12 @@ export interface Sticker {
    *  shown. Runtime bitmap like the brush masks; `maskRev` bumps per stroke. */
   mask?: BrushMask | null;
   maskRev?: number;
+  /** Perspective skew: 4 corner OFFSETS in local half-extent units, order
+   *  TL, TR, BR, BL (asset uv 0,0 / 1,0 / 1,1 / 0,1). Absent/null = the plain
+   *  scale+rot rect. Each [dx,dy] shifts that corner by dx·halfWidth, dy·
+   *  halfHeight in the sticker's own (pre-rotation) frame, so the asset is
+   *  projectively warped onto the scene's plane. */
+  corners?: [number, number][] | null;
 }
 
 export interface CropRect {
