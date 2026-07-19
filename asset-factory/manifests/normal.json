@@ -1,6 +1,6 @@
 {
   "category": "normal",
-  "app_category": "other",
+  "app_category": "props",
   "template": "evidence-prop",
   "tags": [
     "prop",
@@ -35,7 +35,8 @@
           "pose": "rising",
           "pose_phrase": "rising and drifting"
         }
-      ]
+      ],
+      "app_category": "atmosphere"
     },
     {
       "family": "campfire-embers",
@@ -53,7 +54,7 @@
           "pose_phrase": "drifting upward"
         }
       ],
-      "app_category": "lights"
+      "app_category": "atmosphere"
     },
     {
       "family": "picnic-basket",
@@ -111,7 +112,8 @@
             "far"
           ]
         }
-      ]
+      ],
+      "app_category": "sky"
     },
     {
       "family": "airplane",
@@ -128,7 +130,8 @@
             "side"
           ]
         }
-      ]
+      ],
+      "app_category": "sky"
     },
     {
       "family": "helicopter",
@@ -145,7 +148,8 @@
             "side"
           ]
         }
-      ]
+      ],
+      "app_category": "sky"
     },
     {
       "family": "kite",
@@ -159,7 +163,8 @@
             "far"
           ]
         }
-      ]
+      ],
+      "app_category": "sky"
     },
     {
       "family": "weather-balloon",
@@ -173,7 +178,8 @@
             "far"
           ]
         }
-      ]
+      ],
+      "app_category": "sky"
     },
     {
       "family": "leaves",
@@ -189,7 +195,8 @@
           "pose": "falling",
           "pose_phrase": "tumbling and falling"
         }
-      ]
+      ],
+      "app_category": "atmosphere"
     },
     {
       "family": "flowers",
@@ -218,7 +225,7 @@
           ]
         }
       ],
-      "app_category": "lights"
+      "app_category": "sky"
     },
     {
       "family": "meteor",
@@ -238,7 +245,7 @@
           ]
         }
       ],
-      "app_category": "lights"
+      "app_category": "sky"
     },
     {
       "family": "lightning",
@@ -259,7 +266,7 @@
           ]
         }
       ],
-      "app_category": "lights"
+      "app_category": "sky"
     },
     {
       "family": "cloud-wisp",
@@ -279,7 +286,7 @@
           ]
         }
       ],
-      "app_category": "lights"
+      "app_category": "sky"
     },
     {
       "family": "balloon",
@@ -290,7 +297,8 @@
           "pose": "floating",
           "pose_phrase": "floating, string dangling"
         }
-      ]
+      ],
+      "app_category": "sky"
     },
     {
       "family": "boat",

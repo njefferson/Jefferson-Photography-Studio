@@ -1,6 +1,6 @@
 {
   "category": "occluders",
-  "app_category": "other",
+  "app_category": "foreground",
   "template": "effect-overlay",
   "tags": [
     "occluder",

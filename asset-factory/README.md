@@ -79,13 +79,21 @@ the ❓ New bucket, and auto-labels honesty notes for names that match its seede
 keys). The app's build-time manifest and dynamic picker take over with no app
 code change.
 
-**App folder contract** (from `src/main.ts` `STICKER_CATEGORIES`): the valid
-`app_category` folders are the *Creatures & craft* set — `cryptids`, `ufo`,
-`aliens`, `spirits`, `beasts` — and the *Evidence* set — `tracks`, `gear`,
-`lights` — plus `other` (❓ New) for anything unmatched. `app_category` is set
-per manifest and overridable per family (e.g. cosmic entities → `beasts`, its
-ancient objects → `gear`, its glowing anomalies → `lights`), so one factory
-category can fan out across folders.
+**App folder contract** (from `src/main.ts` `STICKER_CATEGORIES`, in three
+groups):
+
+- *Creatures & craft* — `cryptids`, `ufo`, `aliens`, `spirits`, `beasts`
+- *Evidence* — `tracks`, `gear`, `lights`
+- *Scene & nature* — `wildlife`, `foreground`, `sky`, `atmosphere`, `props`
+- `other` (❓ New) — catch-all for anything unmatched (the factory currently
+  leaves it empty; every asset has a real home)
+
+`app_category` is set per manifest and overridable per family, so one factory
+category fans out across folders (cosmic entities → `beasts`, its ancient
+objects → `gear`, its glowing anomalies → `lights`; the everyday `normal` set
+splits across `sky` / `atmosphere` / `props`). The *Scene & nature* group is the
+factory's proposal for the "Creative app for regular photos" direction — see
+`CATEGORIES.md` for the exact app-side arrays to add.
 
 **Shipping promoted PNGs is a product change** → it goes through the normal
 staging gate. Before a large promoted set lands, `vite.config.ts`'s precache

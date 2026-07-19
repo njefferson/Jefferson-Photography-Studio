@@ -1,6 +1,6 @@
 {
   "category": "atmosphere",
-  "app_category": "lights",
+  "app_category": "atmosphere",
   "template": "effect-overlay",
   "tags": [
     "atmosphere",
