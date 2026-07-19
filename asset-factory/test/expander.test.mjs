@@ -23,6 +23,13 @@ test("ids and seeds derive from the axis values, not insertion order", () => {
   );
 });
 
+test("every seed is within providers' signed-int32 range", () => {
+  // Ideogram (and others) cap seed at 2147483647; a full uint32 400s on ~half.
+  for (const e of expandAll()) {
+    assert.ok(e.seed >= 0 && e.seed <= 2147483647, `${e.id} seed ${e.seed} out of range`);
+  }
+});
+
 test("the library is a meaningful size (~250 combos across 14 categories)", () => {
   const all = expandAll();
   assert.ok(all.length >= 240, `expected ~250 entries, got ${all.length}`);

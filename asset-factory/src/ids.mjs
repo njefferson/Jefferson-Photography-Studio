@@ -18,9 +18,11 @@ export function idFor(e) {
     .join("--") + `--v${e.variant}`;
 }
 
-/** uint32 seed derived from the id (first 4 bytes of sha256). */
+/** Deterministic seed derived from the id (first 4 bytes of sha256), masked to
+ *  31 bits. Providers (e.g. Ideogram) cap seed at the signed-int32 max
+ *  2147483647; a full uint32 rejects ~half of all ids with a 400. */
 export function seedFor(id) {
-  return createHash("sha256").update(id).digest().readUInt32BE(0);
+  return createHash("sha256").update(id).digest().readUInt32BE(0) & 0x7fffffff;
 }
 
 /** A fresh-but-deterministic seed for the nth retry of a rejected asset. */
