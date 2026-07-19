@@ -216,6 +216,14 @@ function precacheManifest(): Plugin {
       const rel = (readdirSync(dist, { recursive: true, encoding: "utf8" }) as string[]).map((p) =>
         p.split("\\").join("/"),
       );
+      // Sticker library manifest: the keys (paths without .png) of every sticker
+      // PNG present, so the app knows what's on disk and the picker is dynamic
+      // (drop a PNG into public/stickers/<category>/ and it appears — no code).
+      const stickerKeys = rel
+        .filter((p) => p.startsWith("stickers/") && p.endsWith(".png"))
+        .map((p) => p.slice("stickers/".length, -".png".length))
+        .sort();
+      writeFileSync(resolve(dist, "stickers/manifest.json"), JSON.stringify(stickerKeys));
       const shell = rel
         .filter((p) => !p.startsWith("examples/")) // practice photos: on-demand, own cache
         .filter((p) => p !== "sw.js" && !p.endsWith(".map"))
@@ -228,6 +236,9 @@ function precacheManifest(): Plugin {
       // The chooser PWA launches at "./" (start_url in manifest.webmanifest), so
       // cache the root route too — "./index.html" answers "/index.html" but not "/".
       if (shell.includes("./index.html")) shell.unshift("./");
+      // The sticker manifest is written above, after the dist walk, so add it by
+      // hand — the picker needs it offline.
+      shell.push("./stickers/manifest.json");
       const list = JSON.stringify([...new Set(shell)]);
       const sw = readFileSync(swPath, "utf8");
       let out = sw.replace("[/* __PRECACHE_MANIFEST__ */]", list);

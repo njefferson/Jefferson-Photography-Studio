@@ -1704,27 +1704,129 @@ updateMix3UI();
 // they inherit the whole IR pipeline and grain settles over them. Placement
 // lives in params.stickers → undo/session for free; excluded from looks/batch. ---
 
-// In-house sticker assets (public/stickers/<key>.png), loaded once on demand.
-// The catalog IS the picker order.
-const STICKER_CATALOG: { key: string; label: string }[] = [
-  { key: "bigfoot", label: "Bigfoot" },
-  { key: "bigfoot-walk", label: "Bigfoot walking" },
-  { key: "bigfoot-peek", label: "Bigfoot peeking" },
-  { key: "bigfoot-howl", label: "Bigfoot howling" },
-  { key: "saucer", label: "Saucer" },
-  { key: "alien", label: "Alien" },
-  { key: "saturn", label: "Saturn" },
-  { key: "beam", label: "Beam" },
+// Sticker library — category-organized and DYNAMIC. Assets live at
+// public/stickers/<category>/<name>.png; a build-time manifest.json lists what's
+// present, so the owner drops a PNG into a category folder and it appears
+// (auto-precached) with no code change. The original 8 stay FLAT (no key change
+// → no broken saved sessions); their category comes from STICKER_META.
+const STICKER_CATEGORIES: { id: string; emoji: string; label: string }[] = [
+  { id: "cryptids", emoji: "👣", label: "Cryptids" },
+  { id: "ufo", emoji: "🛸", label: "UFO / UAP" },
+  { id: "aliens", emoji: "👽", label: "Aliens" },
+  { id: "paranormal", emoji: "👻", label: "Paranormal" },
+  { id: "lostworld", emoji: "🦖", label: "Lost World" },
+  { id: "oddities", emoji: "🌲", label: "Oddities" },
+  { id: "other", emoji: "✨", label: "New" }, // catch-all for un-categorized drop-ins
 ];
+// Pretty labels + honesty notes (folklore/fiction, shown as TEXT so meaning
+// survives grayscale) + category for the FLAT legacy keys. Nested keys
+// (e.g. "cryptids/yeti") take their category from the folder and a humanized
+// label unless listed here. Seeded for the whole planned taxonomy so assets read
+// polished the moment they land — a key with no file on disk simply never shows.
+const STICKER_META: Record<string, { label: string; note?: string; cat?: string }> = {
+  // Legacy flat assets (filenames unchanged).
+  bigfoot: { label: "Bigfoot", cat: "cryptids" },
+  "bigfoot-walk": { label: "Bigfoot walking", cat: "cryptids" },
+  "bigfoot-peek": { label: "Bigfoot peeking", cat: "cryptids" },
+  "bigfoot-howl": { label: "Bigfoot howling", cat: "cryptids" },
+  saucer: { label: "Saucer", cat: "ufo" },
+  beam: { label: "Abduction beam", cat: "ufo" },
+  saturn: { label: "Saturn", cat: "ufo" },
+  alien: { label: "Alien", cat: "aliens" },
+  // Cryptids.
+  "cryptids/yeti": { label: "Yeti" },
+  "cryptids/skunk-ape": { label: "Skunk Ape" },
+  "cryptids/dogman": { label: "Dogman" },
+  "cryptids/mothman": { label: "Mothman" },
+  "cryptids/jersey-devil": { label: "Jersey Devil" },
+  "cryptids/chupacabra": { label: "Chupacabra" },
+  "cryptids/goatman": { label: "Goatman" },
+  "cryptids/wendigo": { label: "Wendigo", note: "folklore" },
+  "cryptids/fresno-nightcrawler": { label: "Fresno Nightcrawler" },
+  "cryptids/flatwoods-monster": { label: "Flatwoods Monster" },
+  "cryptids/loveland-frog": { label: "Loveland Frog" },
+  // UFO / UAP.
+  "ufo/black-triangle": { label: "Black triangle" },
+  "ufo/tic-tac": { label: "Tic Tac" },
+  "ufo/metallic-orb": { label: "Metallic orb" },
+  "ufo/black-sphere": { label: "Black sphere" },
+  "ufo/cigar": { label: "Cigar craft" },
+  "ufo/boomerang": { label: "Boomerang craft" },
+  "ufo/flying-wing": { label: "Flying wing" },
+  "ufo/disc-silhouette": { label: "Disc silhouette" },
+  "ufo/light-anomaly": { label: "Light anomaly" },
+  // Aliens (the fictional forms are labeled as such).
+  "aliens/grey": { label: "Grey" },
+  "aliens/tall-grey": { label: "Tall Grey" },
+  "aliens/reptilian": { label: "Reptilian", note: "fiction" },
+  "aliens/insectoid": { label: "Insectoid", note: "fiction" },
+  "aliens/nordic": { label: "Nordic", note: "fiction" },
+  "aliens/child-grey": { label: "Child-sized Grey" },
+  "aliens/hand": { label: "Hand" },
+  "aliens/eyes": { label: "Eyes" },
+  "aliens/silhouette": { label: "Silhouette" },
+  // Paranormal.
+  "paranormal/shadow-person": { label: "Shadow person" },
+  "paranormal/hooded-figure": { label: "Hooded figure" },
+  "paranormal/ghostly-mist": { label: "Ghostly mist" },
+  "paranormal/floating-eyes": { label: "Floating eyes" },
+  "paranormal/will-o-wisp": { label: "Will-o'-the-wisp" },
+  "paranormal/apparition": { label: "Apparition" },
+  "paranormal/skeletal": { label: "Skeletal apparition" },
+  // Lost World / Adventure.
+  "lostworld/pteranodon": { label: "Pteranodon" },
+  "lostworld/raptor": { label: "Raptor" },
+  "lostworld/giant-snake": { label: "Giant snake" },
+  "lostworld/giant-spider": { label: "Giant spider" },
+  "lostworld/tentacle": { label: "Squid tentacle" },
+  "lostworld/cave-humanoid": { label: "Cave humanoid" },
+  // Environmental oddities.
+  "oddities/claw-tree": { label: "Claw-marked tree" },
+  "oddities/footprints": { label: "Oversized footprints" },
+  "oddities/snagged-hair": { label: "Snagged hair" },
+  "oddities/glowing-orb": { label: "Glowing orb" },
+  "oddities/burned-patch": { label: "Burned patch" },
+  "oddities/standing-stones": { label: "Standing stones" },
+  "oddities/backpack": { label: "Abandoned backpack" },
+  "oddities/tent": { label: "Weathered tent" },
+  "oddities/lantern": { label: "Antique lantern" },
+  "oddities/rusted-equipment": { label: "Rusted equipment" },
+};
+// Dev/offline fallback when the build manifest can't be fetched (the built app
+// always has it, precached). The original shipped set.
+const LEGACY_STICKER_KEYS = ["bigfoot", "bigfoot-walk", "bigfoot-peek", "bigfoot-howl", "saucer", "alien", "saturn", "beam"];
+
 const stickerAssets: Record<string, StickerAsset> = {};
 const stickerAssetUrls: Record<string, string> = {}; // for the drag ghost <img>
-let stickerAssetsPending = false;
-async function loadStickerAssets() {
-  if (stickerAssetsPending) return;
-  stickerAssetsPending = true;
-  await Promise.all(
-    STICKER_CATALOG.map(async ({ key }) => {
-      if (stickerAssets[key]) return;
+let stickerManifest: string[] = []; // keys present on disk (from the build manifest)
+let stickerLibraryPending = false;
+const stickerAssetPending = new Map<string, Promise<void>>();
+
+function stickerLabel(key: string): string {
+  const m = STICKER_META[key];
+  if (m) return m.label;
+  const stem = key.split("/").pop() ?? key;
+  return stem.replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+function stickerNote(key: string): string | undefined {
+  return STICKER_META[key]?.note;
+}
+function stickerCatOf(key: string): string {
+  if (key.startsWith("imp-")) return "other"; // runtime imports
+  if (key.includes("/")) {
+    const folder = key.slice(0, key.indexOf("/"));
+    return STICKER_CATEGORIES.some((c) => c.id === folder) ? folder : "other";
+  }
+  return STICKER_META[key]?.cat ?? "other";
+}
+
+/** Rasterize ONE asset on demand (placement / session restore) — not the whole
+ *  library, which can be 50+ PNGs. Cached + de-duped by key. */
+function ensureStickerAsset(key: string): Promise<void> {
+  if (stickerAssets[key]) return Promise.resolve();
+  let p = stickerAssetPending.get(key);
+  if (!p) {
+    p = (async () => {
       try {
         const bmp = await createImageBitmap(await (await fetch(`./stickers/${key}.png`)).blob());
         const c = document.createElement("canvas");
@@ -1737,8 +1839,28 @@ async function loadStickerAssets() {
       } catch {
         /* asset missing/offline — the sticker just won't bake until it loads */
       }
-    }),
-  );
+    })();
+    stickerAssetPending.set(key, p);
+  }
+  return p;
+}
+
+/** Load the manifest (what's on disk), build the picker, and make sure any
+ *  already-placed stickers have their assets so a restored session bakes.
+ *  (Named loadStickerAssets for its callers; it no longer bulk-rasterizes.) */
+async function loadStickerAssets() {
+  if (!stickerLibraryPending) {
+    stickerLibraryPending = true;
+    try {
+      const r = await fetch("./stickers/manifest.json");
+      stickerManifest = r.ok ? await r.json() : LEGACY_STICKER_KEYS.slice();
+    } catch {
+      stickerManifest = LEGACY_STICKER_KEYS.slice();
+    }
+    renderStickerPicker();
+  }
+  const placed = new Set((params.stickers ?? []).map((s) => s.asset));
+  await Promise.all([...placed].map((k) => ensureStickerAsset(k)));
   draw(); // assets arrived — re-bake any placed stickers
 }
 
@@ -1817,41 +1939,83 @@ const stkBlendModeEl = $("stkBlendMode") as HTMLDivElement;
 const stkBrushSize = $("stkBrushSize") as HTMLInputElement;
 const stkBlendClearBtn = $("stkBlendClear") as HTMLButtonElement;
 
-// The add-a-sticker chips (the catalog order).
+// The add-a-sticker picker: a category chip row (#stickerCats) filters the
+// sticker grid (#stickerAdd) below it, so the library scales past a flat row.
 const stickerAddEl = $("stickerAdd") as HTMLDivElement;
-for (const { key, label } of STICKER_CATALOG) {
-  const b = document.createElement("button");
-  b.type = "button";
-  b.className = "mix-chip";
-  b.textContent = label;
-  b.addEventListener("click", () => {
-    void loadStickerAssets();
-    const list = (params.stickers ??= []);
-    // Place at the centre of what's on screen (zoom-aware), a friendly size.
-    const c = canvas.getBoundingClientRect();
-    const [u, v] = renderer.clientToImageUv(c.left + c.width / 2, c.top + c.height / 2);
-    const sx = Math.min(0.85, Math.max(0.15, u || 0.5));
-    const sy = Math.min(0.85, Math.max(0.15, v || 0.5));
-    const sticker: Sticker = {
-      id: crypto.randomUUID(),
-      asset: key,
-      x: sx,
-      y: sy,
-      scale: 0.3,
-      rot: 0,
-      occlude: 0,
-      occludeLuma: 0.6,
-      occludeBright: true,
-      bright: 0, contrast: 0, warmth: 0, sat: 0,
-    };
-    autoMatchSticker(sticker); // calibrate to the scene under the drop point
-    list.push(sticker);
-    selectedSticker = list.length - 1;
-    updateStickerUI();
-    draw();
-    flushRecord();
-  });
-  stickerAddEl.append(b);
+const stickerCatsEl = $("stickerCats") as HTMLDivElement;
+let stickerCat = ""; // selected category id
+
+/** Group the present manifest keys by resolved category. */
+function stickerLibraryByCat(): Map<string, string[]> {
+  const m = new Map<string, string[]>();
+  for (const key of stickerManifest) {
+    const cat = stickerCatOf(key);
+    const arr = m.get(cat) ?? (m.set(cat, []), m.get(cat)!);
+    arr.push(key);
+  }
+  return m;
+}
+
+/** (Re)build the category chips + the selected category's sticker chips from the
+ *  manifest + metadata. Only non-empty categories show (dynamic). */
+function renderStickerPicker() {
+  const byCat = stickerLibraryByCat();
+  const cats = STICKER_CATEGORIES.filter((c) => (byCat.get(c.id)?.length ?? 0) > 0);
+  if (!cats.some((c) => c.id === stickerCat)) stickerCat = cats[0]?.id ?? "";
+  stickerCatsEl.replaceChildren();
+  for (const c of cats) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "mix-chip";
+    const on = c.id === stickerCat;
+    b.textContent = (on ? "✓ " : "") + c.emoji + " " + c.label;
+    b.setAttribute("aria-pressed", String(on));
+    b.addEventListener("click", () => { stickerCat = c.id; renderStickerPicker(); });
+    stickerCatsEl.append(b);
+  }
+  stickerCatsEl.hidden = cats.length <= 1; // no chips needed for a single category
+  stickerAddEl.replaceChildren();
+  for (const key of byCat.get(stickerCat) ?? []) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "mix-chip";
+    const note = stickerNote(key);
+    b.textContent = stickerLabel(key) + (note ? " · " + note : "");
+    if (note) b.setAttribute("aria-label", `${stickerLabel(key)}, ${note}`);
+    b.addEventListener("click", () => { void addStickerFromKey(key); });
+    stickerAddEl.append(b);
+  }
+}
+
+/** Place a sticker of `key` at the on-screen centre, auto-matched to the scene.
+ *  Ensures the asset is rasterized first (lazy per-asset load). */
+async function addStickerFromKey(key: string) {
+  await ensureStickerAsset(key);
+  if (!stickerAssets[key]) { toast("That sticker couldn't load — try again.", 2500); return; }
+  const list = (params.stickers ??= []);
+  // Place at the centre of what's on screen (zoom-aware), a friendly size.
+  const c = canvas.getBoundingClientRect();
+  const [u, v] = renderer.clientToImageUv(c.left + c.width / 2, c.top + c.height / 2);
+  const sx = Math.min(0.85, Math.max(0.15, u || 0.5));
+  const sy = Math.min(0.85, Math.max(0.15, v || 0.5));
+  const sticker: Sticker = {
+    id: crypto.randomUUID(),
+    asset: key,
+    x: sx,
+    y: sy,
+    scale: 0.3,
+    rot: 0,
+    occlude: 0,
+    occludeLuma: 0.6,
+    occludeBright: true,
+    bright: 0, contrast: 0, warmth: 0, sat: 0,
+  };
+  autoMatchSticker(sticker); // calibrate to the scene under the drop point
+  list.push(sticker);
+  selectedSticker = list.length - 1;
+  updateStickerUI();
+  draw();
+  flushRecord();
 }
 
 // "Hide behind" direction chips (text-labelled, aria-pressed — never colour).
