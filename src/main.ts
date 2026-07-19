@@ -1125,6 +1125,7 @@ function setPanelTab(tab: PanelTab) {
     const on = b.dataset.tab === tab;
     b.classList.toggle("active", on);
     b.setAttribute("aria-selected", String(on));
+    b.tabIndex = on ? 0 : -1; // roving tabindex — one Tab stop, arrows move within
   });
   sectionTitleEl.textContent = TAB_META[tab].name;
   sectionSubEl.textContent = TAB_META[tab].sub;
@@ -1140,6 +1141,21 @@ function setPanelTab(tab: PanelTab) {
   if (overlayReady) { maskAdjusting = false; renderMaskOverlay(); }
 }
 panelTabBtns.forEach((b) => b.addEventListener("click", () => setPanelTab(b.dataset.tab as PanelTab)));
+// Keyboard tab traversal: Left/Right (wrapping) and Home/End move focus AND
+// select — the tab grid wraps visually, so a 1-D order is what fingers expect.
+panelTabsEl.addEventListener("keydown", (e) => {
+  const i = panelTabBtns.findIndex((b) => b === document.activeElement);
+  if (i < 0) return;
+  let to = -1;
+  if (e.key === "ArrowRight" || e.key === "ArrowDown") to = (i + 1) % panelTabBtns.length;
+  else if (e.key === "ArrowLeft" || e.key === "ArrowUp") to = (i - 1 + panelTabBtns.length) % panelTabBtns.length;
+  else if (e.key === "Home") to = 0;
+  else if (e.key === "End") to = panelTabBtns.length - 1;
+  if (to < 0) return;
+  e.preventDefault();
+  panelTabBtns[to].focus();
+  setPanelTab(panelTabBtns[to].dataset.tab as PanelTab);
+});
 // Restore the last-used tab (default Basic).
 {
   let saved: string | null = null;
@@ -1431,6 +1447,49 @@ async function saveWithoutLocation(copy: boolean) {
 }
 $("locSave").addEventListener("click", () => void saveWithoutLocation(false));
 $("locSaveCopy").addEventListener("click", () => void saveWithoutLocation(true));
+
+// ---- Shared ask/notice dialog ---------------------------------------------
+// One reusable modal for the app's questions and simple notices — a real
+// <dialog>, so Escape, focus containment, and screen-reader announcement all
+// come from the platform instead of window.confirm/alert.
+const askDlg = $("askDlg") as HTMLDialogElement;
+const askTitleEl = $("askTitle");
+const askBodyEl = $("askBody");
+const askOkBtn = $("askOk") as HTMLButtonElement;
+const askCancelBtn = $("askCancel") as HTMLButtonElement;
+
+/** Ask a two-way question. Resolves "ok" or "cancel" for the buttons, or
+ *  "dismiss" when the dialog closes any other way (Escape) — callers treat
+ *  dismiss as "change nothing", never as either answer. */
+function askDialog(title: string, body: string, okLabel: string, cancelLabel: string): Promise<"ok" | "cancel" | "dismiss"> {
+  askTitleEl.textContent = title;
+  askBodyEl.textContent = body;
+  askOkBtn.textContent = okLabel;
+  askCancelBtn.textContent = cancelLabel;
+  askCancelBtn.hidden = false;
+  return new Promise((resolve) => {
+    let answer: "ok" | "cancel" | "dismiss" = "dismiss";
+    const onOk = () => { answer = "ok"; askDlg.close(); };
+    const onCancel = () => { answer = "cancel"; askDlg.close(); };
+    const onClose = () => {
+      askOkBtn.removeEventListener("click", onOk);
+      askCancelBtn.removeEventListener("click", onCancel);
+      askDlg.removeEventListener("close", onClose);
+      resolve(answer);
+    };
+    askOkBtn.addEventListener("click", onOk);
+    askCancelBtn.addEventListener("click", onCancel);
+    askDlg.addEventListener("close", onClose);
+    askDlg.showModal();
+  });
+}
+
+/** A one-button notice — alert(), but accessible, dismissable, and in-theme. */
+function noticeDialog(title: string, body: string): Promise<void> {
+  const done = askDialog(title, body, "OK", "");
+  askCancelBtn.hidden = true; // askDialog just un-hid it — a notice has no second answer
+  return done.then(() => { askCancelBtn.hidden = false; });
+}
 
 function syncLocSettings() {
   setLocTipBtn.setAttribute("aria-pressed", String(locTipPref()));
@@ -3408,7 +3467,7 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
   // Honesty gate: a third-party raw (CR2/ARW/…) opens via its embedded JPEG
   // preview — the user must know they are NOT editing raw data. The editor is
   // up (welcome hidden), so an alert is the only surface that reaches them.
-  if (img.previewNotice) alert(img.previewNotice);
+  if (img.previewNotice) noticeDialog("Preview only", img.previewNotice);
 }
 
 /** Reset the live edit to this photo's fresh automatic baseline (white balance,
@@ -3717,11 +3776,16 @@ async function openPicked(files: File[]) {
   }
   let append = false;
   if (sessionPhotos.length >= 2) {
-    append = confirm(
-      `You have a session of ${sessionPhotos.length} photos open.\n\n` +
-        `OK — add ${files.length === 1 ? "this photo" : `these ${files.length} photos`} to it.\n` +
-        `Cancel — start a NEW session (the current one is closed and its storage freed).`,
+    const ans = await askDialog(
+      `A session of ${sessionPhotos.length} photos is open`,
+      files.length === 1
+        ? "Add this photo to the session, or start a new one? Starting new closes the current session and frees its storage."
+        : `Add these ${files.length} photos to the session, or start a new one? Starting new closes the current session and frees its storage.`,
+      "Add to this session",
+      "Start a new session",
     );
+    if (ans === "dismiss") return; // Escape — change nothing (an exit confirm() never offered)
+    append = ans === "ok";
   }
 
   // Single file, not adding to a session → the fast, ephemeral path of old.
@@ -3986,7 +4050,13 @@ let quickItems: QuickItem[] = [];
 let quickGen = 0; // bumped on open/close to abort an in-flight decode loop
 
 const quickInput = $("quickFiles") as HTMLInputElement;
-const quickLook = $("quickLook") as HTMLDivElement;
+const quickLook = $("quickLook") as HTMLDialogElement;
+// Escape (native dialog cancel -> close) must free previews exactly like the
+// Close button; closeQuickLook empties quickItems BEFORE calling close(), so
+// this listener no-ops for programmatic closes (no recursion).
+quickLook.addEventListener("close", () => {
+  if (quickItems.length) closeQuickLook();
+});
 const qlGrid = $("qlGrid") as HTMLDivElement;
 const qlCount = $("qlCount") as HTMLSpanElement;
 const qlKeep = $("qlKeep") as HTMLButtonElement;
@@ -4045,7 +4115,7 @@ async function openQuickLook(files: File[]) {
   for (const it of quickItems) if (it.thumbUrl) URL.revokeObjectURL(it.thumbUrl);
   quickItems = [];
   qlGrid.replaceChildren();
-  quickLook.hidden = false;
+  if (!quickLook.open) quickLook.showModal();
   updateQuickHeader(`Decoding 0 / ${files.length}…`);
 
   let done = 0;
@@ -4083,7 +4153,7 @@ function closeQuickLook() {
   for (const it of quickItems) if (it.thumbUrl) URL.revokeObjectURL(it.thumbUrl);
   quickItems = [];
   qlGrid.replaceChildren();
-  quickLook.hidden = true;
+  if (quickLook.open) quickLook.close();
 }
 
 /** Promote the selected previews into a real session (or a lone open, for one).
@@ -4434,7 +4504,7 @@ const LIBRARY_GROUPS: [string, string[]][] = [
   ["The original RAW trio", ["canopy", "lodge", "hillside"]],
   ["Full-spectrum D5300", ["magenta-woodland", "magenta-fir", "magenta-hilltown", "magenta-dusk-trees"]],
 ];
-const library = $("library") as HTMLDivElement;
+const library = $("library") as HTMLDialogElement;
 {
   const body = $("libBody") as HTMLDivElement;
   const used = new Set<string>();
@@ -4451,7 +4521,7 @@ const library = $("library") as HTMLDivElement;
   const rest = GALLERY.filter((t) => !used.has(t.key));
   if (rest.length) sections.push(["More", rest]);
   for (const [title, tiles] of sections) {
-    const h = document.createElement("h4");
+    const h = document.createElement("h3"); // h2 dialog title -> h3 groups (no heading jump)
     h.className = "lib-group";
     h.textContent = title;
     const grid = document.createElement("div");
@@ -4461,7 +4531,7 @@ const library = $("library") as HTMLDivElement;
   }
   ($("libCount") as HTMLSpanElement).textContent =
     `${GALLERY.length} photos · ${GALLERY.filter((t) => t.kind === "dng").length} RAW`;
-  ($("libClose") as HTMLButtonElement).addEventListener("click", () => { library.hidden = true; });
+  ($("libClose") as HTMLButtonElement).addEventListener("click", () => library.close());
 
   // THE WAY IN: a "Learning library" tile as the tutorial grid's LAST tile —
   // the owner's design (2026-07-15; the old dashed pill under the grid was
@@ -4496,7 +4566,7 @@ const library = $("library") as HTMLDivElement;
   count.textContent = ` · ${GALLERY.length} photos`;
   label.append(count);
   tile.append(stack, label);
-  tile.addEventListener("click", () => { library.hidden = false; });
+  tile.addEventListener("click", () => library.showModal());
   galleryList.appendChild(tile);
 }
 
@@ -4537,7 +4607,7 @@ async function openGalleryPhoto(key: string) {
   // same courtesy every other replace path extends (review find, 2026-07-15).
   if (sessionPhotos.length > 1 && !confirm(`Opening a practice photo ends your session (${sessionPhotos.length} photos, edits included). Continue?`)) return;
   const gen = ++galleryGen;
-  library.hidden = true; // a library pick heads straight into the editor
+  if (library.open) library.close(); // a library pick heads straight into the editor
   showBusy("Loading photo…");
   // The RAW practice files are ~10 MB each and cached for offline use — ask the
   // OS not to evict them casually (best-effort, same as sessions and batch).
@@ -4607,7 +4677,10 @@ ui.exFormat.addEventListener("change", () => {
 // Export flow: progress overlay while rendering, then a "Save image" button.
 // The save happens on its own tap so iOS lets us open the native share sheet
 // ("Save Image" -> Photos) and the app never navigates away.
-const busy = $("busy") as HTMLDivElement;
+const busy = $("busy") as HTMLDialogElement;
+// The card's own buttons are the only exits: an Escape mid-export would hide
+// the overlay while the job keeps running (stuck state), so cancel is eaten.
+busy.addEventListener("cancel", (e) => e.preventDefault());
 const busyText = $("busyText") as HTMLParagraphElement;
 const busySpinner = $("busySpinner") as HTMLDivElement;
 const busyActions = $("busyActions") as HTMLDivElement;
@@ -4619,11 +4692,11 @@ function showBusy(text: string) {
   busyText.textContent = text;
   busySpinner.hidden = false;
   busyActions.hidden = true;
-  busy.hidden = false;
+  if (!busy.open) busy.showModal();
 }
 
 function hideBusy() {
-  busy.hidden = true;
+  if (busy.open) busy.close();
   pendingSave = null;
   pendingSaveIsBatch = false;
   busyStop.hidden = true;

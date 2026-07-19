@@ -174,15 +174,15 @@
              Corrections and Crop & rotate as full-width footer rows below them.
              Active tab is remembered per session (main.ts). -->
         <div id="panelTabs" class="panel-tabs" role="tablist" aria-label="Editor sections">
-          <button class="ptab active" type="button" data-tab="basic" role="tab" aria-selected="true">Basic</button>
-          <button class="ptab" type="button" data-tab="ir" role="tab" aria-selected="false">IR</button>
-          <button class="ptab" type="button" data-tab="bw" role="tab" aria-selected="false">B&amp;W</button>
-          <button class="ptab" type="button" data-tab="color" role="tab" aria-selected="false">Color</button>
-          <button class="ptab" type="button" data-tab="tone" role="tab" aria-selected="false">Tone</button>
-          <button class="ptab" type="button" data-tab="masks" role="tab" aria-selected="false">Masks</button>
-          <button class="ptab" type="button" data-tab="export" role="tab" aria-selected="false">Export</button>
-          <button class="ptab" type="button" data-tab="corrections" role="tab" aria-selected="false">Corrections</button>
-          <button class="ptab" type="button" data-tab="crop" role="tab" aria-selected="false">Crop &amp; rotate</button>
+          <button id="ptab-basic" aria-controls="sec-basic" class="ptab active" type="button" data-tab="basic" role="tab" aria-selected="true">Basic</button>
+          <button id="ptab-ir" aria-controls="sec-ir" class="ptab" type="button" data-tab="ir" role="tab" aria-selected="false">IR</button>
+          <button id="ptab-bw" aria-controls="sec-bw" class="ptab" type="button" data-tab="bw" role="tab" aria-selected="false">B&amp;W</button>
+          <button id="ptab-color" aria-controls="sec-color" class="ptab" type="button" data-tab="color" role="tab" aria-selected="false">Color</button>
+          <button id="ptab-tone" aria-controls="sec-tone" class="ptab" type="button" data-tab="tone" role="tab" aria-selected="false">Tone</button>
+          <button id="ptab-masks" aria-controls="sec-masks" class="ptab" type="button" data-tab="masks" role="tab" aria-selected="false">Masks</button>
+          <button id="ptab-export" aria-controls="sec-export" class="ptab" type="button" data-tab="export" role="tab" aria-selected="false">Export</button>
+          <button id="ptab-corrections" aria-controls="sec-corrections" class="ptab" type="button" data-tab="corrections" role="tab" aria-selected="false">Corrections</button>
+          <button id="ptab-crop" aria-controls="sec-crop" class="ptab" type="button" data-tab="crop" role="tab" aria-selected="false">Crop &amp; rotate</button>
         </div>
         <div class="section-head">
           <h2 id="sectionTitle" class="section-title">Basic</h2>
@@ -192,7 +192,7 @@
           <div id="panelUp" class="scroll-cue up" hidden><span>&#9650;</span></div>
 
           <!-- ===== BASIC ===== -->
-          <section class="section" data-tab="basic">
+          <section class="section" role="tabpanel" id="sec-basic" aria-labelledby="ptab-basic" data-tab="basic">
             <button id="autoBtn" class="accent-outline" type="button">Auto &mdash; white balance + exposure</button>
             <!-- Log-scale tracks: the input stores a 0..1000 position; main.ts
                  maps it exponentially so 1x sits near mid-track (values below = 1.0). -->
@@ -211,7 +211,7 @@
           </section>
 
           <!-- ===== IR ===== -->
-          <section class="section" data-tab="ir" hidden>
+          <section class="section" role="tabpanel" id="sec-ir" aria-labelledby="ptab-ir" data-tab="ir" hidden>
             <button id="swapBtn" type="button" class="toggle full-btn" aria-pressed="true">R &#8646; B channel swap</button>
             <p class="note">The core false-color move &mdash; swaps the red and blue channels. Color looks switch it on; toggle here or re-press a look to compare.</p>
             <div class="sub-title">Looks</div>
@@ -230,7 +230,7 @@
           </section>
 
           <!-- ===== B&W ===== -->
-          <section class="section" data-tab="bw" hidden>
+          <section class="section" role="tabpanel" id="sec-bw" aria-labelledby="ptab-bw" data-tab="bw" hidden>
             <button id="bwBtn" type="button" class="toggle full-btn" aria-pressed="false">Black &amp; white</button>
             <p class="note">Made for 720nm shots. The weights choose how much of each channel becomes brightness &mdash; only their balance matters, not the total. Moving a weight turns Black &amp; white on by itself.</p>
             <div class="sub-title">Named mixes</div>
@@ -244,7 +244,7 @@
           </section>
 
           <!-- ===== CORRECTIONS ===== -->
-          <section class="section" data-tab="corrections" hidden>
+          <section class="section" role="tabpanel" id="sec-corrections" aria-labelledby="ptab-corrections" data-tab="corrections" hidden>
             <div class="sub-title">Dust &amp; spots</div>
             <button id="healBtn" type="button" class="toggle" aria-pressed="false">&#8982; Heal spots &mdash; tap the photo</button>
             <small class="note">Tap a dust spot and it's patched from clean pixels nearby &mdash; the newest fix keeps a highlighted ring, and Spot size resizes it live. Tap any healed spot to remove its fix. Pinch to zoom right in while healing.</small>
@@ -280,7 +280,7 @@
           </section>
 
           <!-- ===== COLOR ===== -->
-          <section class="section" data-tab="color" hidden>
+          <section class="section" role="tabpanel" id="sec-color" aria-labelledby="ptab-color" data-tab="color" hidden>
             <label>Hue shift <input id="hue" type="range" min="-180" max="180" step="1" value="0" /></label>
             <label>Saturation <input id="sat" type="range" min="0" max="3" step="0.01" value="1" /></label>
             <label>Contrast <input id="con" type="range" min="0.5" max="2" step="0.01" value="1" /></label>
@@ -318,7 +318,7 @@
           </section>
 
           <!-- ===== TONE ===== -->
-          <section class="section" data-tab="tone" hidden>
+          <section class="section" role="tabpanel" id="sec-tone" aria-labelledby="ptab-tone" data-tab="tone" hidden>
             <!-- Channel chips retarget the SAME curve widget + sliders onto the
                  master curve (All) or one color channel's own curve. Built in
                  main.ts; ✓-text + aria-pressed state (the mix-chip pattern). -->
@@ -341,7 +341,7 @@
           </section>
 
           <!-- ===== MASKS ===== -->
-          <section class="section" data-tab="masks" hidden>
+          <section class="section" role="tabpanel" id="sec-masks" aria-labelledby="ptab-masks" data-tab="masks" hidden>
             <p class="note">Add a radial, gradient, brush, color or sky mask, target it on the photo, then adjust only that area. Tap a mask to select it.</p>
             <div class="mask-add">
               <button id="addRadial" type="button">+ Radial</button>
@@ -391,7 +391,7 @@
           </section>
 
           <!-- ===== EXPORT ===== -->
-          <section class="section" data-tab="export" hidden>
+          <section class="section" role="tabpanel" id="sec-export" aria-labelledby="ptab-export" data-tab="export" hidden>
             <label>Format
               <select id="exFormat">
                 <option value="jpeg">JPEG</option>
@@ -442,7 +442,7 @@
           </section>
 
           <!-- ===== CROP & ROTATE ===== -->
-          <section class="section" data-tab="crop" hidden>
+          <section class="section" role="tabpanel" id="sec-crop" aria-labelledby="ptab-crop" data-tab="crop" hidden>
             <button id="rotateBtn" class="accent-outline" type="button" aria-label="Rotate 90 degrees clockwise">&#8635; Rotate 90&deg;</button>
             <button id="flipHBtn" class="accent-outline" type="button" aria-label="Flip horizontal — mirror left and right">&#8646; Flip horizontal</button>
             <button id="flipVBtn" class="accent-outline" type="button" aria-label="Flip vertical — mirror top and bottom">&#8645; Flip vertical</button>
@@ -470,7 +470,7 @@
       </div>
     </div>
 
-    <div id="busy" hidden>
+    <dialog id="busy" aria-label="Working">
       <div class="busy-card">
         <div class="spinner" id="busySpinner"></div>
         <p id="busyText" role="status" aria-live="polite" aria-atomic="true">Exporting…</p>
@@ -481,15 +481,15 @@
           <button id="busyClose" type="button">Close</button>
         </div>
       </div>
-    </div>
+    </dialog>
 
     <!-- The example library: the COMPLETE practice set (tutorial tiles
          included, one honest whole) in its own full-screen place, grouped by
          scene. Sections built in main.ts from LIBRARY_GROUPS. -->
-    <div id="library" hidden role="dialog" aria-modal="true" aria-label="Practice library">
+    <dialog id="library" aria-label="Practice library">
       <div class="ql-head">
         <div class="ql-title">
-          <strong>Practice library</strong>
+          <h2 class="ql-h">Practice library</h2>
           <span id="libCount"></span>
         </div>
         <div class="ql-actions">
@@ -497,12 +497,12 @@
         </div>
       </div>
       <div id="libBody" class="lib-body"></div>
-    </div>
+    </dialog>
 
-    <div id="quickLook" hidden aria-label="Quick look">
+    <dialog id="quickLook" aria-label="Quick look">
       <div class="ql-head">
         <div class="ql-title">
-          <strong>Quick look</strong>
+          <h2 class="ql-h">Quick look</h2>
           <span id="qlCount"></span>
         </div>
         <div class="ql-actions">
@@ -512,7 +512,7 @@
         </div>
       </div>
       <div id="qlGrid" class="ql-grid"></div>
-    </div>
+    </dialog>
 
     <dialog id="batchDlg">
       <h2>Batch process — what goes on every photo?</h2>
@@ -635,6 +635,13 @@
       </div>
       <button id="infoClose" type="button">Close</button>
       <div class="dlg-cue down" id="infoCueDown" hidden aria-hidden="true">&#9660;</div>
+    </dialog>
+
+    <dialog id="askDlg" aria-labelledby="askTitle">
+      <h2 id="askTitle"></h2>
+      <p id="askBody" class="note ask-body"></p>
+      <button id="askOk" type="button" class="primary"></button>
+      <button id="askCancel" type="button"></button>
     </dialog>
 
     <dialog id="locDlg" aria-labelledby="locDlgTitle">

@@ -1071,15 +1071,31 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 }
 
 /* --- Quick look: a full-screen grid of auto-balanced previews. --- */
+/* Native dialogs now (accessible-overlays release): showModal() gives the
+   focus trap, Escape and focus-restore for free — the fixed-overlay look is
+   recreated by pinning the dialog to the full viewport. display:flex would
+   force a CLOSED dialog visible, so it only applies while [open]. */
 #quickLook,
 #library {
   position: fixed;
   inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  max-width: 100vw;
+  max-height: 100dvh;
+  margin: 0;
+  padding: 0;
+  border: none;
   z-index: 40;
-  display: flex;
   flex-direction: column;
   background: var(--bg);
+  color: var(--txt);
 }
+#quickLook[open],
+#library[open] { display: flex; }
+#quickLook::backdrop,
+#library::backdrop { background: transparent; } /* the dialog itself fills the screen */
+.ql-h { margin: 0; font: 600 16px/1.3 var(--display); display: inline; }
 /* The example library body: grouped grids under small uppercase headers. */
 .lib-body {
   flex: 1;
@@ -1502,14 +1518,16 @@ label.open-btn, label.bar-btn {
 #panel section > button { margin: 6px 0; }
 #panel .mask-add button, #panel .mask-editor-actions button, #panel .slot button, #panel .looks-grid button { margin: 0; }
 
+/* A native dialog: the dialog IS the centred card slot (auto-centred by the
+   UA), the scrim moved to ::backdrop. Escape is prevented in main.ts — the
+   card's own buttons are the only exits, so Esc can't strand a running job. */
 #busy {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.55);
-  display: grid;
-  place-items: center;
+  background: transparent;
+  border: none;
+  padding: 0;
   z-index: 20;
 }
+#busy::backdrop { background: rgba(0, 0, 0, 0.55); }
 .busy-card {
   background: var(--surface);
   border: 1px solid var(--line);
