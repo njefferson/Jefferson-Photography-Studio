@@ -2995,6 +2995,25 @@ user-scalable=no.
   four tools are the right set, and 8-bit field precision on gentle warps.
   DEFERRED: a live brush-ring cursor; higher-res or float field; per-photo
   session persistence of the field (currently resets on reload like masks).
+- [x] **Sticker drag lag — ghost during the gesture, bake on release** —
+  owner-caught on device 2026-07-19 ("stickers add a ton of lag once added").
+  Cause: `syncSpotsToTexture` re-baked the CPU composite EVERY drag frame, and
+  baked BOTH the old and new rects — ~4.7M px × (heal bake + composite) ≈
+  200–300M ops/frame for one scale-0.55 sticker. Fix: a `liveSticker` index is
+  held OUT of the bake during a drag/size/spin gesture; a cheap `<img>` ghost
+  (`#stickerGhost`, raw asset positioned via imageUvToClient — centre + rotation
+  + on-screen width) tracks the gesture, and the real composite bakes ONCE on
+  release (drag `endPointer`; sliders' `change` event — Size/Spin ghost, while
+  Peek-behind bakes live since a static ghost can't show occlusion). Also
+  folded a wb×exposure occ-signature into the `stkSame` guard so a WB change
+  re-bakes occlusion (was a latent staleness bug). Instrumented
+  `window.__stickerBakes()` for the harness. VERIFIED (sticker-lag-walk): a
+  24-move drag bakes ONCE mid-drag (the remove) + once on release (total ≤3,
+  was ~24), ghost visible during / hidden after, the composite lands at the
+  drop point; sticker-walk re-runs green (its programmatic scale set now fires
+  `change` to commit, like a real slider release). NEEDS THE OWNER'S HANDS:
+  the drag/resize feel on the iPad, and that the grey ghost→recolored snap on
+  release reads fine (a recolored ghost is a later option).
 
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 
