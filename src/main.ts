@@ -4557,6 +4557,20 @@ function hideBusy() {
 busyClose.addEventListener("click", hideBusy);
 
 busySave.addEventListener("click", async () => {
+  if (!pendingSave || busySave.disabled) return;
+  // Re-entrancy guard: a double-tap while the share sheet opens used to run
+  // this handler twice — falling into the download branch a second time and,
+  // for a batch, clearing the crash-recovery frames early. Disabled across
+  // the await; released in finally so a cancelled sheet can try again.
+  busySave.disabled = true;
+  try {
+    await saveBusyPending();
+  } finally {
+    busySave.disabled = false;
+  }
+});
+
+async function saveBusyPending() {
   if (!pendingSave) return;
   const { blob, name } = pendingSave;
   if ((await saveBlob(blob, name)) === "cancelled") return; // user closed the sheet — keep the dialog
@@ -4574,7 +4588,7 @@ busySave.addEventListener("click", async () => {
     }
   }
   hideBusy();
-});
+}
 
 ui.exBtn.addEventListener("click", async () => {
   if (!current || !currentFile) return;
