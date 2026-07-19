@@ -3068,6 +3068,37 @@ user-scalable=no.
   regressions green. NEEDS THE OWNER'S HANDS: the brush feel + size range on the
   iPad, whether rub-away/bring-back read clearly, and the pinch/spin feel
   (sensitivity, whether one-finger-drag vs two-finger never fight).
+- [x] **Sticker library v3 — categorized + dynamic (Increment A)** — the owner
+  is generating a large themed set with another AI ("of all drop in soon") and
+  wants a MANAGED library, not one flat unmanaged row. Direction baked in
+  (2026-07-19), BETA straight to main. STRUCTURE: assets live at
+  `public/stickers/<category>/<name>.png` (cryptids/ ufo/ aliens/ paranormal/
+  lostworld/ oddities/); the recursive dist-walk precache already covers nested
+  folders. A build-time Vite step (in the precache plugin) writes
+  `dist/stickers/manifest.json` = the keys of every sticker PNG present, and it's
+  precached too — so the library is DYNAMIC: drop a PNG into a category folder,
+  it appears next deploy with zero code. The original 8 stay FLAT (no key change
+  → old saved sessions unbroken); their category comes from `STICKER_META`.
+  META: pretty labels + HONESTY notes shown as TEXT ("folklore" for Wendigo,
+  "fiction" for Reptilian/Insectoid/Nordic — survives grayscale), seeded for the
+  whole planned taxonomy so drop-ins read polished (a key with no file never
+  shows; an un-metadata'd file gets a humanized label + the "✨ New" bucket).
+  LOADING: `loadStickerAssets` now fetches the manifest + builds the picker and
+  rasterizes assets LAZILY per-placement (`ensureStickerAsset`) instead of bulk-
+  loading all 50+. UI: a `#stickerCats` chip row (emoji + label, aria-pressed,
+  ✓-text) filters the `#stickerAdd` grid; only non-empty categories show; add is
+  now `addStickerFromKey` (awaits the asset, then auto-matches as before).
+  VERIFIED (sticker-category-walk): category chips render for non-empty cats only,
+  filtering shows just the selected category, a seeded `aliens/reptilian.png`
+  reads "Reptilian · fiction" (text + aria-label), a seeded `paranormal/…`
+  category appears dynamically, adding composites, axe both themes; PLANT=nofilter
+  (assert a filtered-out chip still shows) FAILS. sticker-walk / lag / blend
+  regressions updated (pick the UFO category before Saucer) + green; build clean,
+  manifest present + precached. NEEDS THE OWNER'S HANDS: the picker's feel with a
+  real 50+ set (filter-by-chip vs a scrollable sheet), the category split, and
+  confirming his AI-made PNGs (transparent, sized) land in the right folders.
+  DELIVERY ASSUMPTION: committed PNGs in category folders (permanent, precached,
+  offline), with runtime "Import a picture" kept for one-offs.
 
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 
