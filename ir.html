@@ -184,10 +184,11 @@
           <button id="ptab-export" aria-controls="sec-export" class="ptab" type="button" data-tab="export" role="tab" aria-selected="false">Export</button>
           <button id="ptab-corrections" aria-controls="sec-corrections" class="ptab" type="button" data-tab="corrections" role="tab" aria-selected="false">Corrections</button>
           <button id="ptab-crop" aria-controls="sec-crop" class="ptab" type="button" data-tab="crop" role="tab" aria-selected="false">Crop &amp; rotate</button>
-          <!-- The Creative row: Grade + Stickers fill row 4; the next Creative
-               tab (Warp) completes the 4x3 grid. -->
+          <!-- The Creative row (row 4): Grade + Stickers + Warp complete the
+               4x3 tab grid. -->
           <button id="ptab-grade" aria-controls="sec-grade" class="ptab" type="button" data-tab="grade" role="tab" aria-selected="false">Grade</button>
           <button id="ptab-stickers" aria-controls="sec-stickers" class="ptab" type="button" data-tab="stickers" role="tab" aria-selected="false">Stickers</button>
+          <button id="ptab-warp" aria-controls="sec-warp" class="ptab" type="button" data-tab="warp" role="tab" aria-selected="false">Warp</button>
         </div>
         <div class="section-head">
           <h2 id="sectionTitle" class="section-title">Basic</h2>
@@ -288,6 +289,16 @@
               <button id="stkDelete" type="button">Remove this sticker</button>
             </div>
             <button id="stkClear" type="button" hidden>Clear all stickers</button>
+          </section>
+
+          <!-- ===== WARP (Creative) ===== -->
+          <section class="section" role="tabpanel" id="sec-warp" aria-labelledby="ptab-warp" data-tab="warp" hidden>
+            <p class="note">Push the picture around with your finger. Pick a tool, then drag on the photo &mdash; Push smears, Swirl twists, Pinch draws in and Bloat pushes out. Each drag is one undo.</p>
+            <div id="warpTools" class="bw-mixes" role="group" aria-label="Warp tool"></div>
+            <label>Brush size <input id="warpSize" type="range" min="0.05" max="0.6" step="0.005" value="0.22" /></label>
+            <label>Strength <input id="warpStrength" type="range" min="0.1" max="1" step="0.01" value="0.5" /></label>
+            <p class="note">Warp bends the picture itself, so &mdash; like crop and healing &mdash; it stays with this photo and isn't carried by saved looks, batch or the .cube / .dcp exports.</p>
+            <button id="warpReset" type="button">Reset warp</button>
           </section>
 
           <!-- ===== CORRECTIONS ===== -->
@@ -800,6 +811,15 @@
         vignette, which fixes the lens on the full frame. Everything here rides saved looks, sessions and
         batch. Exports: the wheels bake into .cube files; grain and vignette don't (a .cube carries colour
         only) — and .dcp can't carry any of it.</p>
+
+        <h3>Warp &mdash; bend the picture <span class="lut-badge">Beta</span></h3>
+        <p>The <strong>Warp</strong> tab pushes the picture around with your finger. Pick a tool and
+        drag on the photo: <strong>Push</strong> smears pixels along your stroke, <strong>Swirl</strong>
+        twists them, <strong>Pinch</strong> draws them inward and <strong>Bloat</strong> pushes them out.
+        Brush size sets how much each drag grabs, Strength how hard; every drag is one undo, so
+        experiment freely and Reset warp when you want the picture back. Like crop and healing, warp
+        bends the picture itself, so it stays with this photo &mdash; it isn't carried by saved looks,
+        batch or the .cube / .dcp exports.</p>
 
         <h3>Light &amp; area tools</h3>
         <ul>

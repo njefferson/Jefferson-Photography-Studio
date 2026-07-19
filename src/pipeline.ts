@@ -3,6 +3,7 @@
 // Order: white balance -> channel swap -> hue -> saturation -> contrast -> gamma.
 
 import type { HealSpot } from "./heal";
+import type { WarpField } from "./warp";
 import { sampleLut3d } from "./lut3d";
 export type { HealSpot };
 
@@ -163,6 +164,13 @@ export interface EditParams {
    *  applied BEFORE crop (crop lives in the resulting straightened frame —
    *  see autoInscribedCrop). Same composition-specific exclusions as crop. */
   straighten: number;
+  /** Warp (Creative): a UV displacement field remapping the source before the
+   *  pipeline — in the shader (fetchLin) and the export sampler (warp.ts).
+   *  RUNTIME-ONLY like the brush bitmaps: `rgba` is the sampled form, shared by
+   *  reference across snapshots (copy-on-write per stroke, `rev` compared).
+   *  Spatial + composition-specific: never in looks / batch / .cube / .dcp;
+   *  reset on a new open. */
+  warp?: WarpField | null;
   /** Imported .cube 3D LUT — the LAST colour stage, applied to the final
    *  display colour (after tone/HSL/lum), mirroring the shader's u_lutTex.
    *  RUNTIME-ONLY like masks' bitmaps: `data` is stride-3 RGB, red fastest,

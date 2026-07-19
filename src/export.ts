@@ -12,6 +12,7 @@ import { makeRowDenoiser } from "./raw/denoise";
 import { makeRowDetail } from "./raw/detail";
 import { healPatches8, healPatchesFromSampler, wrapWithPatches } from "./heal";
 import { stickerPatches, type StickerAsset } from "./sticker";
+import { warpSampler, warpIsEmpty } from "./warp";
 import { buildGlowMap, sampleGlow, GLOW_GAIN } from "./glow";
 import { buildLocalMap } from "./localmap";
 import { SRGB_ICC, DISPLAY_P3_ICC, srgbDisplayToP3Display, embedIccInJpeg } from "./icc";
@@ -224,6 +225,11 @@ export async function exportImage(
   const composed = stickers.length && opts.stickerAssets
     ? wrapWithPatches(healed, stickerPatches(healed, srcW, srcH, stickers, opts.stickerAssets, stkOcc), srcH)
     : healed;
+  // Warp remaps the source at the VERY TOP (before denoise), mirroring the
+  // shader's fetchLin warp — both bilinear-sample the same encoded field.
+  const warped = params.warp && !warpIsEmpty(params.warp)
+    ? warpSampler(composed, params.warp, srcW, srcH)
+    : composed;
   // The live preview runs denoise/detail on a DOWNSCALED proxy (RAW: a half-res
   // bin; big 8-bit: toPreview's <=2800px copy) and the GPU taps in proxy texels,
   // so at native resolution the kernels must tap `proxyFactor` native pixels
@@ -236,8 +242,8 @@ export async function exportImage(
   // Denoise first, then sharpen/texture — the same order the shader runs them
   // (raw neighbourhood -> denoised centre -> detail gain). Both are no-ops when
   // their slider is 0, so a plain edit keeps the 1x-decode fast path.
-  const denoised = makeRowDenoiser(composed, srcW, srcH, params.denoise, proxyFactor);
-  const sampleLinear = makeRowDetail(composed, denoised, srcW, srcH, params.sharpen ?? 0, params.texture ?? 0, proxyFactor);
+  const denoised = makeRowDenoiser(warped, srcW, srcH, params.denoise, proxyFactor);
+  const sampleLinear = makeRowDetail(warped, denoised, srcW, srcH, params.sharpen ?? 0, params.texture ?? 0, proxyFactor);
   // Scaled exports (50% / 25%) BOX-FILTER instead of decimating: each output
   // pixel averages an ss×ss grid of source taps placed in OUTPUT space and
   // mapped through toSrcF — so the filter stays correct under crop, rotation,
