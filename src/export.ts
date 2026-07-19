@@ -138,9 +138,7 @@ export async function exportImage(
   // Output pixel -> source pixel: crop/straighten (see pipeline.ts's
   // cropToDisplayUv, mirrored exactly), then the display rotation — same
   // mapping as the preview's vertex shader.
-  const toSrc = (x: number, y: number): [number, number] => {
-    const tx = (x + 0.5) / w;
-    const ty = (y + 0.5) / h;
+  const toSrcF = (tx: number, ty: number): [number, number] => {
     const [u, v] = cropToDisplayUv(tx, ty, crop, straighten, dispAspect);
     let iu = u, iv = v;
     if (rot === 1) { iu = v; iv = 1 - u; }
@@ -154,6 +152,7 @@ export async function exportImage(
       Math.min(srcH - 1, Math.max(0, Math.floor(iv * srcH))),
     ];
   };
+  const toSrc = (x: number, y: number): [number, number] => toSrcF((x + 0.5) / w, (y + 0.5) / h);
 
   // The matrix is applied inside the edit (after white balance), matching the
   // shader exactly so the export matches the preview.
@@ -207,6 +206,31 @@ export async function exportImage(
   // their slider is 0, so a plain edit keeps the 1x-decode fast path.
   const denoised = makeRowDenoiser(healed, srcW, srcH, params.denoise, proxyFactor);
   const sampleLinear = makeRowDetail(healed, denoised, srcW, srcH, params.sharpen ?? 0, params.texture ?? 0, proxyFactor);
+  // Scaled exports (50% / 25%) BOX-FILTER instead of decimating: each output
+  // pixel averages an ss×ss grid of source taps placed in OUTPUT space and
+  // mapped through toSrcF — so the filter stays correct under crop, rotation,
+  // straighten and flip alike (a source-space rect would shear under a
+  // straighten angle). Averaging happens on LINEAR light, which is the
+  // physically correct anti-aliasing; the edit then runs once per OUTPUT
+  // pixel on the averaged sample. Full-size exports keep the 1-tap fast path.
+  const ss = opts.scale < 1 ? Math.max(2, Math.min(4, Math.round(1 / opts.scale))) : 1;
+  const boxN = ss * ss;
+  const sampleBox = (x: number, y: number): [number, number, number] => {
+    if (ss === 1) {
+      const [sx, sy] = toSrc(x, y);
+      return sampleLinear(sx, sy);
+    }
+    let r = 0, g = 0, b = 0;
+    for (let j = 0; j < ss; j++) {
+      for (let i = 0; i < ss; i++) {
+        const [sx, sy] = toSrcF((x + (i + 0.5) / ss) / w, (y + (j + 0.5) / ss) / h);
+        const s = sampleLinear(sx, sy);
+        r += s[0]; g += s[1]; b += s[2];
+      }
+    }
+    return [r / boxN, g / boxN, b / boxN];
+  };
+
   // HIE glow map at full resolution (cheap: built on a coarse grid).
   const gmap = params.glow > 0 ? buildGlowMap(rawSample, srcW, srcH) : null;
   const glowAt = (sx: number, sy: number) =>
@@ -234,7 +258,7 @@ export async function exportImage(
         const x = rot & 1 ? oIdx : iIdx;
         const y = rot & 1 ? iIdx : oIdx;
         const [sx, sy] = toSrc(x, y);
-        const [r, g, b] = sampleLinear(sx, sy);
+        const [r, g, b] = sampleBox(x, y); // box-filtered when scaled (see above)
         edit(r, g, b, out, glowAt(sx, sy), (sx + 0.5) / srcW, (sy + 0.5) / srcH);
         srgbDisplayToP3Display(out[0], out[1], out[2], p3);
         const o = (y * w + x) * 4;
@@ -296,7 +320,7 @@ export async function exportImage(
         const x = rot & 1 ? oIdx : iIdx;
         const y = rot & 1 ? iIdx : oIdx;
         const [sx, sy] = toSrc(x, y);
-        const [r, g, b] = sampleLinear(sx, sy);
+        const [r, g, b] = sampleBox(x, y); // box-filtered when scaled (see above)
         edit(r, g, b, out, glowAt(sx, sy), (sx + 0.5) / srcW, (sy + 0.5) / srcH);
         const o = (y * w + x) * 3;
         rgb[o] = out[0] * 65535 + 0.5; // round — truncation biased the 16-bit output low
