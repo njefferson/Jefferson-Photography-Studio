@@ -2,29 +2,340 @@
   "category": "normal",
   "app_category": "other",
   "template": "evidence-prop",
-  "tags": ["prop", "everyday"],
-  "defaults": { "views": ["three-quarter"], "distances": ["mid"], "expressions": ["neutral"], "variants": 1 },
+  "tags": [
+    "prop",
+    "everyday"
+  ],
+  "defaults": {
+    "views": [
+      "three-quarter"
+    ],
+    "distances": [
+      "mid"
+    ],
+    "expressions": [
+      "neutral"
+    ],
+    "variants": 1
+  },
   "families": [
-    { "family": "campfire-smoke", "subject_phrase": "a plume of campfire smoke", "meta_label": "Campfire smoke", "template_hint": "effect", "qc": { "allowEdgeContact": true, "minCoverage": 0.004, "minFeatherFrac": 0.002, "maxComponents": 4 }, "poses": [{ "pose": "rising", "pose_phrase": "rising and drifting" }] },
-    { "family": "campfire-embers", "subject_phrase": "a shower of glowing campfire embers", "meta_label": "Campfire embers", "qc": { "allowEdgeContact": true, "minCoverage": 0.004, "minFeatherFrac": 0.002, "maxComponents": 8 }, "poses": [{ "pose": "rising", "pose_phrase": "drifting upward" }] },
-    { "family": "picnic-basket", "subject_phrase": "a woven picnic basket", "meta_label": "Picnic basket", "poses": [{ "pose": "resting", "pose_phrase": "closed, handle up" }] },
-    { "family": "camp-tent", "subject_phrase": "a small dome camping tent", "meta_label": "Tent", "poses": [{ "pose": "pitched", "pose_phrase": "pitched, flap closed" }] },
-    { "family": "camping-chair", "subject_phrase": "a folding camping chair", "meta_label": "Camping chair", "poses": [{ "pose": "open", "pose_phrase": "set up and empty" }] },
-    { "family": "lantern", "subject_phrase": "a glowing camping lantern", "meta_label": "Lantern", "poses": [{ "pose": "lit", "pose_phrase": "lit and glowing" }] },
-    { "family": "hot-air-balloon", "subject_phrase": "a colorful hot air balloon aloft", "meta_label": "Hot air balloon", "poses": [{ "pose": "aloft", "pose_phrase": "floating high", "distances": ["far"] }] },
-    { "family": "airplane", "subject_phrase": "a small propeller airplane in flight", "meta_label": "Airplane", "poses": [{ "pose": "flying", "pose_phrase": "banking across the sky", "distances": ["far"], "views": ["side"] }] },
-    { "family": "helicopter", "subject_phrase": "a helicopter in flight", "meta_label": "Helicopter", "poses": [{ "pose": "flying", "pose_phrase": "hovering", "distances": ["far"], "views": ["side"] }] },
-    { "family": "kite", "subject_phrase": "a diamond kite aloft", "meta_label": "Kite", "poses": [{ "pose": "flying", "pose_phrase": "flying high", "distances": ["far"] }] },
-    { "family": "weather-balloon", "subject_phrase": "a white weather balloon with a small instrument package", "meta_label": "Weather balloon", "poses": [{ "pose": "aloft", "pose_phrase": "drifting high", "distances": ["far"] }] },
-    { "family": "leaves", "subject_phrase": "a scatter of autumn leaves in mid-air", "meta_label": "Falling leaves", "qc": { "allowEdgeContact": true, "maxComponents": 8, "minCoverage": 0.006 }, "poses": [{ "pose": "falling", "pose_phrase": "tumbling and falling" }] },
-    { "family": "flowers", "subject_phrase": "a small bouquet of wildflowers", "meta_label": "Flowers", "poses": [{ "pose": "bunch", "pose_phrase": "a gathered bunch" }] },
-    { "family": "moon", "subject_phrase": "a full moon", "meta_label": "Moon", "poses": [{ "pose": "full", "pose_phrase": "round and bright", "views": ["front"], "distances": ["far"] }] },
-    { "family": "meteor", "subject_phrase": "a bright meteor with a glowing tail", "meta_label": "Meteor", "qc": { "allowEdgeContact": true, "minCoverage": 0.004, "minFeatherFrac": 0.002 }, "poses": [{ "pose": "streaking", "pose_phrase": "streaking across", "distances": ["far"] }] },
-    { "family": "lightning", "subject_phrase": "a forked bolt of lightning", "meta_label": "Lightning", "qc": { "allowEdgeContact": true, "minCoverage": 0.003, "minFeatherFrac": 0.001, "maxComponents": 4 }, "poses": [{ "pose": "bolt", "pose_phrase": "a jagged bolt", "views": ["front"] }] },
-    { "family": "cloud-wisp", "subject_phrase": "a soft wisp of white cloud", "meta_label": "Cloud wisp", "qc": { "allowEdgeContact": true, "minCoverage": 0.004, "minFeatherFrac": 0.002 }, "poses": [{ "pose": "drifting", "pose_phrase": "a drifting wisp", "distances": ["far"] }] },
-    { "family": "balloon", "subject_phrase": "a single red party balloon", "meta_label": "Balloon", "poses": [{ "pose": "floating", "pose_phrase": "floating, string dangling" }] },
-    { "family": "boat", "subject_phrase": "a small rowboat", "meta_label": "Rowboat", "poses": [{ "pose": "afloat", "pose_phrase": "afloat, empty", "views": ["side"] }] },
-    { "family": "kayak", "subject_phrase": "a single kayak", "meta_label": "Kayak", "poses": [{ "pose": "afloat", "pose_phrase": "afloat, empty", "views": ["side"] }] },
-    { "family": "sailboat", "subject_phrase": "a small sailboat with a white sail", "meta_label": "Sailboat", "poses": [{ "pose": "sailing", "pose_phrase": "under sail", "views": ["side"], "distances": ["far"] }] }
+    {
+      "family": "campfire-smoke",
+      "subject_phrase": "a plume of campfire smoke",
+      "meta_label": "Campfire smoke",
+      "template_hint": "effect",
+      "qc": {
+        "allowEdgeContact": true,
+        "minCoverage": 0.004,
+        "minFeatherFrac": 0.002,
+        "maxComponents": 4
+      },
+      "poses": [
+        {
+          "pose": "rising",
+          "pose_phrase": "rising and drifting"
+        }
+      ]
+    },
+    {
+      "family": "campfire-embers",
+      "subject_phrase": "a shower of glowing campfire embers",
+      "meta_label": "Campfire embers",
+      "qc": {
+        "allowEdgeContact": true,
+        "minCoverage": 0.004,
+        "minFeatherFrac": 0.002,
+        "maxComponents": 8
+      },
+      "poses": [
+        {
+          "pose": "rising",
+          "pose_phrase": "drifting upward"
+        }
+      ],
+      "app_category": "lights"
+    },
+    {
+      "family": "picnic-basket",
+      "subject_phrase": "a woven picnic basket",
+      "meta_label": "Picnic basket",
+      "poses": [
+        {
+          "pose": "resting",
+          "pose_phrase": "closed, handle up"
+        }
+      ]
+    },
+    {
+      "family": "camp-tent",
+      "subject_phrase": "a small dome camping tent",
+      "meta_label": "Tent",
+      "poses": [
+        {
+          "pose": "pitched",
+          "pose_phrase": "pitched, flap closed"
+        }
+      ]
+    },
+    {
+      "family": "camping-chair",
+      "subject_phrase": "a folding camping chair",
+      "meta_label": "Camping chair",
+      "poses": [
+        {
+          "pose": "open",
+          "pose_phrase": "set up and empty"
+        }
+      ]
+    },
+    {
+      "family": "lantern",
+      "subject_phrase": "a glowing camping lantern",
+      "meta_label": "Lantern",
+      "poses": [
+        {
+          "pose": "lit",
+          "pose_phrase": "lit and glowing"
+        }
+      ]
+    },
+    {
+      "family": "hot-air-balloon",
+      "subject_phrase": "a colorful hot air balloon aloft",
+      "meta_label": "Hot air balloon",
+      "poses": [
+        {
+          "pose": "aloft",
+          "pose_phrase": "floating high",
+          "distances": [
+            "far"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "airplane",
+      "subject_phrase": "a small propeller airplane in flight",
+      "meta_label": "Airplane",
+      "poses": [
+        {
+          "pose": "flying",
+          "pose_phrase": "banking across the sky",
+          "distances": [
+            "far"
+          ],
+          "views": [
+            "side"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "helicopter",
+      "subject_phrase": "a helicopter in flight",
+      "meta_label": "Helicopter",
+      "poses": [
+        {
+          "pose": "flying",
+          "pose_phrase": "hovering",
+          "distances": [
+            "far"
+          ],
+          "views": [
+            "side"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "kite",
+      "subject_phrase": "a diamond kite aloft",
+      "meta_label": "Kite",
+      "poses": [
+        {
+          "pose": "flying",
+          "pose_phrase": "flying high",
+          "distances": [
+            "far"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "weather-balloon",
+      "subject_phrase": "a white weather balloon with a small instrument package",
+      "meta_label": "Weather balloon",
+      "poses": [
+        {
+          "pose": "aloft",
+          "pose_phrase": "drifting high",
+          "distances": [
+            "far"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "leaves",
+      "subject_phrase": "a scatter of autumn leaves in mid-air",
+      "meta_label": "Falling leaves",
+      "qc": {
+        "allowEdgeContact": true,
+        "maxComponents": 8,
+        "minCoverage": 0.006
+      },
+      "poses": [
+        {
+          "pose": "falling",
+          "pose_phrase": "tumbling and falling"
+        }
+      ]
+    },
+    {
+      "family": "flowers",
+      "subject_phrase": "a small bouquet of wildflowers",
+      "meta_label": "Flowers",
+      "poses": [
+        {
+          "pose": "bunch",
+          "pose_phrase": "a gathered bunch"
+        }
+      ]
+    },
+    {
+      "family": "moon",
+      "subject_phrase": "a full moon",
+      "meta_label": "Moon",
+      "poses": [
+        {
+          "pose": "full",
+          "pose_phrase": "round and bright",
+          "views": [
+            "front"
+          ],
+          "distances": [
+            "far"
+          ]
+        }
+      ],
+      "app_category": "lights"
+    },
+    {
+      "family": "meteor",
+      "subject_phrase": "a bright meteor with a glowing tail",
+      "meta_label": "Meteor",
+      "qc": {
+        "allowEdgeContact": true,
+        "minCoverage": 0.004,
+        "minFeatherFrac": 0.002
+      },
+      "poses": [
+        {
+          "pose": "streaking",
+          "pose_phrase": "streaking across",
+          "distances": [
+            "far"
+          ]
+        }
+      ],
+      "app_category": "lights"
+    },
+    {
+      "family": "lightning",
+      "subject_phrase": "a forked bolt of lightning",
+      "meta_label": "Lightning",
+      "qc": {
+        "allowEdgeContact": true,
+        "minCoverage": 0.003,
+        "minFeatherFrac": 0.001,
+        "maxComponents": 4
+      },
+      "poses": [
+        {
+          "pose": "bolt",
+          "pose_phrase": "a jagged bolt",
+          "views": [
+            "front"
+          ]
+        }
+      ],
+      "app_category": "lights"
+    },
+    {
+      "family": "cloud-wisp",
+      "subject_phrase": "a soft wisp of white cloud",
+      "meta_label": "Cloud wisp",
+      "qc": {
+        "allowEdgeContact": true,
+        "minCoverage": 0.004,
+        "minFeatherFrac": 0.002
+      },
+      "poses": [
+        {
+          "pose": "drifting",
+          "pose_phrase": "a drifting wisp",
+          "distances": [
+            "far"
+          ]
+        }
+      ],
+      "app_category": "lights"
+    },
+    {
+      "family": "balloon",
+      "subject_phrase": "a single red party balloon",
+      "meta_label": "Balloon",
+      "poses": [
+        {
+          "pose": "floating",
+          "pose_phrase": "floating, string dangling"
+        }
+      ]
+    },
+    {
+      "family": "boat",
+      "subject_phrase": "a small rowboat",
+      "meta_label": "Rowboat",
+      "poses": [
+        {
+          "pose": "afloat",
+          "pose_phrase": "afloat, empty",
+          "views": [
+            "side"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "kayak",
+      "subject_phrase": "a single kayak",
+      "meta_label": "Kayak",
+      "poses": [
+        {
+          "pose": "afloat",
+          "pose_phrase": "afloat, empty",
+          "views": [
+            "side"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "sailboat",
+      "subject_phrase": "a small sailboat with a white sail",
+      "meta_label": "Sailboat",
+      "poses": [
+        {
+          "pose": "sailing",
+          "pose_phrase": "under sail",
+          "views": [
+            "side"
+          ],
+          "distances": [
+            "far"
+          ]
+        }
+      ]
+    }
   ]
 }

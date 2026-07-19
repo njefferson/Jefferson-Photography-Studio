@@ -1,25 +1,195 @@
 {
   "category": "camera",
-  "app_category": "oddities",
+  "app_category": "lights",
   "template": "effect-overlay",
-  "tags": ["camera", "optical", "effect"],
-  "qc": { "allowEdgeContact": true, "maxComponents": 6, "minCoverage": 0.004, "minFeatherFrac": 0.002 },
-  "defaults": { "views": ["front"], "distances": ["full"], "expressions": ["neutral"], "variants": 1 },
+  "tags": [
+    "camera",
+    "optical",
+    "effect"
+  ],
+  "qc": {
+    "allowEdgeContact": true,
+    "maxComponents": 6,
+    "minCoverage": 0.004,
+    "minFeatherFrac": 0.002
+  },
+  "defaults": {
+    "views": [
+      "front"
+    ],
+    "distances": [
+      "full"
+    ],
+    "expressions": [
+      "neutral"
+    ],
+    "variants": 1
+  },
   "families": [
-    { "family": "lens-flare", "subject_phrase": "a bright anamorphic lens flare with a streak and ghosted circles", "meta_label": "Lens flare", "poses": [{ "pose": "streak", "pose_phrase": "a diagonal flare streak" }] },
-    { "family": "dust-orb", "subject_phrase": "a soft translucent circular dust orb, a photographic backscatter artifact", "meta_label": "Dust orb", "poses": [{ "pose": "floating", "pose_phrase": "a faint glowing orb" }] },
-    { "family": "light-leak", "subject_phrase": "a warm film light leak of orange and red", "meta_label": "Light leak", "poses": [{ "pose": "wash", "pose_phrase": "a soft light wash" }] },
-    { "family": "film-burn", "subject_phrase": "a film burn effect of scorched glowing edges", "meta_label": "Film burn", "poses": [{ "pose": "burn", "pose_phrase": "a burning frame edge" }] },
-    { "family": "fog-wisp", "subject_phrase": "a thin wisp of fog catching the light", "meta_label": "Fog wisp", "poses": [{ "pose": "drifting", "pose_phrase": "a drifting wisp" }] },
-    { "family": "mist-ribbon", "subject_phrase": "a delicate ribbon of mist", "meta_label": "Mist ribbon", "poses": [{ "pose": "curling", "pose_phrase": "a curling ribbon" }] },
-    { "family": "rain-streak", "subject_phrase": "streaks of falling rain caught by the flash", "meta_label": "Rain streaks", "poses": [{ "pose": "falling", "pose_phrase": "bright diagonal streaks" }] },
-    { "family": "snow-streak", "subject_phrase": "streaks and specks of falling snow lit by the flash", "meta_label": "Snow streaks", "poses": [{ "pose": "falling", "pose_phrase": "soft falling flecks" }] },
-    { "family": "heat-shimmer", "subject_phrase": "a band of rippling heat-shimmer distortion", "meta_label": "Heat shimmer", "poses": [{ "pose": "rippling", "pose_phrase": "a rippling distortion" }] },
-    { "family": "compression-artifact", "subject_phrase": "a blocky digital compression artifact glitch", "meta_label": "Compression glitch", "poses": [{ "pose": "block", "pose_phrase": "a burst of blocky artifacts" }] },
-    { "family": "sensor-bloom", "subject_phrase": "an overexposed sensor bloom of blown-out light", "meta_label": "Sensor bloom", "poses": [{ "pose": "bloom", "pose_phrase": "a blooming glare" }] },
-    { "family": "chromatic-aberration", "subject_phrase": "a fringe of red and blue chromatic aberration", "meta_label": "Chromatic fringe", "poses": [{ "pose": "fringe", "pose_phrase": "a colored fringe streak" }] },
-    { "family": "flash-reflection", "subject_phrase": "a bright hard flash reflection hotspot", "meta_label": "Flash reflection", "poses": [{ "pose": "hotspot", "pose_phrase": "a bright reflected spot" }] },
-    { "family": "infrared-glow", "subject_phrase": "a soft infrared glow bloom", "meta_label": "Infrared glow", "poses": [{ "pose": "glow", "pose_phrase": "a soft warm bloom" }] },
-    { "family": "optical-ghosting", "subject_phrase": "a faint optical ghost double-image reflection", "meta_label": "Optical ghost", "poses": [{ "pose": "ghost", "pose_phrase": "a translucent ghosted shape" }] }
+    {
+      "family": "lens-flare",
+      "subject_phrase": "a bright anamorphic lens flare with a streak and ghosted circles",
+      "meta_label": "Lens flare",
+      "poses": [
+        {
+          "pose": "streak",
+          "pose_phrase": "a diagonal flare streak"
+        }
+      ]
+    },
+    {
+      "family": "dust-orb",
+      "subject_phrase": "a soft translucent circular dust orb, a photographic backscatter artifact",
+      "meta_label": "Dust orb",
+      "poses": [
+        {
+          "pose": "floating",
+          "pose_phrase": "a faint glowing orb"
+        }
+      ]
+    },
+    {
+      "family": "light-leak",
+      "subject_phrase": "a warm film light leak of orange and red",
+      "meta_label": "Light leak",
+      "poses": [
+        {
+          "pose": "wash",
+          "pose_phrase": "a soft light wash"
+        }
+      ]
+    },
+    {
+      "family": "film-burn",
+      "subject_phrase": "a film burn effect of scorched glowing edges",
+      "meta_label": "Film burn",
+      "poses": [
+        {
+          "pose": "burn",
+          "pose_phrase": "a burning frame edge"
+        }
+      ]
+    },
+    {
+      "family": "fog-wisp",
+      "subject_phrase": "a thin wisp of fog catching the light",
+      "meta_label": "Fog wisp",
+      "poses": [
+        {
+          "pose": "drifting",
+          "pose_phrase": "a drifting wisp"
+        }
+      ]
+    },
+    {
+      "family": "mist-ribbon",
+      "subject_phrase": "a delicate ribbon of mist",
+      "meta_label": "Mist ribbon",
+      "poses": [
+        {
+          "pose": "curling",
+          "pose_phrase": "a curling ribbon"
+        }
+      ]
+    },
+    {
+      "family": "rain-streak",
+      "subject_phrase": "streaks of falling rain caught by the flash",
+      "meta_label": "Rain streaks",
+      "poses": [
+        {
+          "pose": "falling",
+          "pose_phrase": "bright diagonal streaks"
+        }
+      ]
+    },
+    {
+      "family": "snow-streak",
+      "subject_phrase": "streaks and specks of falling snow lit by the flash",
+      "meta_label": "Snow streaks",
+      "poses": [
+        {
+          "pose": "falling",
+          "pose_phrase": "soft falling flecks"
+        }
+      ]
+    },
+    {
+      "family": "heat-shimmer",
+      "subject_phrase": "a band of rippling heat-shimmer distortion",
+      "meta_label": "Heat shimmer",
+      "poses": [
+        {
+          "pose": "rippling",
+          "pose_phrase": "a rippling distortion"
+        }
+      ]
+    },
+    {
+      "family": "compression-artifact",
+      "subject_phrase": "a blocky digital compression artifact glitch",
+      "meta_label": "Compression glitch",
+      "poses": [
+        {
+          "pose": "block",
+          "pose_phrase": "a burst of blocky artifacts"
+        }
+      ]
+    },
+    {
+      "family": "sensor-bloom",
+      "subject_phrase": "an overexposed sensor bloom of blown-out light",
+      "meta_label": "Sensor bloom",
+      "poses": [
+        {
+          "pose": "bloom",
+          "pose_phrase": "a blooming glare"
+        }
+      ]
+    },
+    {
+      "family": "chromatic-aberration",
+      "subject_phrase": "a fringe of red and blue chromatic aberration",
+      "meta_label": "Chromatic fringe",
+      "poses": [
+        {
+          "pose": "fringe",
+          "pose_phrase": "a colored fringe streak"
+        }
+      ]
+    },
+    {
+      "family": "flash-reflection",
+      "subject_phrase": "a bright hard flash reflection hotspot",
+      "meta_label": "Flash reflection",
+      "poses": [
+        {
+          "pose": "hotspot",
+          "pose_phrase": "a bright reflected spot"
+        }
+      ]
+    },
+    {
+      "family": "infrared-glow",
+      "subject_phrase": "a soft infrared glow bloom",
+      "meta_label": "Infrared glow",
+      "poses": [
+        {
+          "pose": "glow",
+          "pose_phrase": "a soft warm bloom"
+        }
+      ]
+    },
+    {
+      "family": "optical-ghosting",
+      "subject_phrase": "a faint optical ghost double-image reflection",
+      "meta_label": "Optical ghost",
+      "poses": [
+        {
+          "pose": "ghost",
+          "pose_phrase": "a translucent ghosted shape"
+        }
+      ]
+    }
   ]
 }

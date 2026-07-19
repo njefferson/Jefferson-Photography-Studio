@@ -225,7 +225,7 @@ async function main() {
         categories,
         favoritesOnly: Boolean(flags["favorites-only"]),
         ids: flags.ids ? String(flags.ids).split(",") : null,
-        maxEdge: num(flags["max-edge"], 1280),
+        maxEdge: num(flags["max-edge"], 512),
         out: flags.out ? resolve(String(flags.out)) : undefined,
         dryRun: Boolean(flags["dry-run"]),
       });

@@ -71,11 +71,21 @@ spends by accident. Set `AF_DATA_DIR=/some/dir` to run against a scratch area
 ## Promote → app
 
 `promote` selects approved (and curated) assets, optimizes them (long edge
-≤1280, alpha preserved), copies them to `public/stickers/<app-category>/` using
-each manifest's `app_category` mapping, and prints a ready-to-paste
-`STICKER_META` snippet for `src/main.ts` (optional — the app humanizes unknown
-filenames and drops them in the "New" bucket). The app's build-time manifest and
-dynamic picker take over from there with no app code change.
+≤512 — a few hundred px composites best with the app's auto-match + occlusion,
+alpha preserved), copies them to `public/stickers/<app-category>/` using each
+entry's `app_category`, and prints a ready-to-paste `STICKER_META` snippet for
+`src/main.ts` (optional — the app humanizes unknown filenames and drops them in
+the ❓ New bucket, and auto-labels honesty notes for names that match its seeded
+keys). The app's build-time manifest and dynamic picker take over with no app
+code change.
+
+**App folder contract** (from `src/main.ts` `STICKER_CATEGORIES`): the valid
+`app_category` folders are the *Creatures & craft* set — `cryptids`, `ufo`,
+`aliens`, `spirits`, `beasts` — and the *Evidence* set — `tracks`, `gear`,
+`lights` — plus `other` (❓ New) for anything unmatched. `app_category` is set
+per manifest and overridable per family (e.g. cosmic entities → `beasts`, its
+ancient objects → `gear`, its glowing anomalies → `lights`), so one factory
+category can fan out across folders.
 
 **Shipping promoted PNGs is a product change** → it goes through the normal
 staging gate. Before a large promoted set lands, `vite.config.ts`'s precache

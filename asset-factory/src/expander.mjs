@@ -70,7 +70,10 @@ export function expandSpec(spec) {
                 id,
                 seed: seedFor(id),
                 template: spec.template,
-                app_category: spec.app_category,
+                // App sticker folder (public/stickers/<app_category>/). A
+                // factory category can split across app folders, so pose >
+                // family > category, defaulting to the "other" (❓ New) bucket.
+                app_category: p.app_category ?? fam.app_category ?? spec.app_category ?? "other",
                 qc: { ...QC_DEFAULTS, ...(spec.qc ?? {}), ...(fam.qc ?? {}), ...(p.qc ?? {}) },
                 tags: [...(spec.tags ?? []), ...(fam.tags ?? []), ...(p.tags ?? [])],
                 meta_label: fam.meta_label ?? humanize(fam.family),

@@ -1,31 +1,319 @@
 {
   "category": "environment",
-  "app_category": "oddities",
+  "app_category": "tracks",
   "template": "evidence-prop",
-  "tags": ["evidence", "prop"],
-  "qc": { "minCoverage": 0.015 },
-  "defaults": { "views": ["three-quarter"], "distances": ["mid"], "expressions": ["neutral"], "variants": 1 },
+  "tags": [
+    "evidence",
+    "prop"
+  ],
+  "qc": {
+    "minCoverage": 0.015
+  },
+  "defaults": {
+    "views": [
+      "three-quarter"
+    ],
+    "distances": [
+      "mid"
+    ],
+    "expressions": [
+      "neutral"
+    ],
+    "variants": 1
+  },
   "families": [
-    { "family": "footprint", "subject_phrase": "a single large fresh footprint pressed into mud", "meta_label": "Footprint", "qc": { "allowEdgeContact": true }, "poses": [{ "pose": "in-mud", "pose_phrase": "a crisp deep impression", "views": ["above"] }] },
-    { "family": "old-footprint", "subject_phrase": "an old weathered footprint impression, partly eroded", "meta_label": "Old footprint", "qc": { "allowEdgeContact": true }, "poses": [{ "pose": "in-dirt", "pose_phrase": "a faint aged impression", "views": ["above"] }] },
-    { "family": "hair-sample", "subject_phrase": "a small tuft of coarse unidentified animal hair", "meta_label": "Hair sample", "poses": [{ "pose": "tuft", "pose_phrase": "a caught tuft of hair", "distances": ["close"] }] },
-    { "family": "black-feather", "subject_phrase": "a single large glossy black feather", "meta_label": "Black feather", "poses": [{ "pose": "resting", "pose_phrase": "lying flat" }] },
-    { "family": "broken-branch", "subject_phrase": "a thick tree branch freshly snapped in two", "meta_label": "Broken branch", "poses": [{ "pose": "snapped", "pose_phrase": "cleanly snapped, splintered end" }] },
-    { "family": "tree-claw-marks", "subject_phrase": "deep parallel claw gouges torn into tree bark", "meta_label": "Claw marks", "qc": { "allowEdgeContact": true }, "poses": [{ "pose": "on-bark", "pose_phrase": "raked deep into the bark", "distances": ["close"] }] },
-    { "family": "blood-smear", "subject_phrase": "a dark red blood smear", "meta_label": "Blood smear", "poses": [{ "pose": "smear", "pose_phrase": "a streaked smear" }] },
-    { "family": "burn-circle", "subject_phrase": "a scorched circular burn mark on the ground", "meta_label": "Burn circle", "qc": { "allowEdgeContact": true }, "poses": [{ "pose": "on-ground", "pose_phrase": "a blackened ring", "views": ["above"] }] },
-    { "family": "crop-damage", "subject_phrase": "a patch of flattened swirled crop stalks", "meta_label": "Crop damage", "qc": { "allowEdgeContact": true }, "poses": [{ "pose": "flattened", "pose_phrase": "swirled and pressed flat", "views": ["above"] }] },
-    { "family": "metal-fragment", "subject_phrase": "a twisted fragment of unknown metallic debris", "meta_label": "Metal fragment", "poses": [{ "pose": "resting", "pose_phrase": "a jagged shard" }] },
-    { "family": "compass", "subject_phrase": "an old brass compass with a spinning needle", "meta_label": "Compass", "poses": [{ "pose": "resting", "pose_phrase": "lying open", "views": ["above"] }] },
-    { "family": "notebook", "subject_phrase": "a weathered open field notebook with hurried sketches", "meta_label": "Field notebook", "poses": [{ "pose": "open", "pose_phrase": "lying open" }] },
-    { "family": "lantern", "subject_phrase": "an old dented oil lantern", "meta_label": "Lantern", "poses": [{ "pose": "resting", "pose_phrase": "standing, glass sooted" }] },
-    { "family": "backpack", "subject_phrase": "a weathered abandoned hiking backpack", "meta_label": "Abandoned backpack", "poses": [{ "pose": "resting", "pose_phrase": "slumped and empty" }] },
-    { "family": "tent", "subject_phrase": "a small weathered dome camping tent", "meta_label": "Tent", "poses": [{ "pose": "pitched", "pose_phrase": "pitched, flap open" }] },
-    { "family": "trail-camera", "subject_phrase": "a camouflaged trail camera strapped to nothing", "meta_label": "Trail camera", "poses": [{ "pose": "mounted", "pose_phrase": "facing forward", "distances": ["close"] }] },
-    { "family": "research-equipment", "subject_phrase": "a rugged case of field research equipment with dials and antennas", "meta_label": "Research equipment", "poses": [{ "pose": "resting", "pose_phrase": "open and running" }] },
-    { "family": "broken-drone", "subject_phrase": "a crashed and broken quadcopter drone", "meta_label": "Broken drone", "poses": [{ "pose": "crashed", "pose_phrase": "on its side, a rotor snapped" }] },
-    { "family": "bone-pile", "subject_phrase": "a small pile of bleached animal bones", "meta_label": "Bone pile", "qc": { "maxComponents": 4 }, "poses": [{ "pose": "piled", "pose_phrase": "heaped together", "views": ["above"] }] },
-    { "family": "mysterious-symbol", "subject_phrase": "a mysterious symbol scratched into a flat surface", "meta_label": "Mysterious symbol", "qc": { "allowEdgeContact": true }, "poses": [{ "pose": "carved", "pose_phrase": "freshly scratched", "distances": ["close"] }] },
-    { "family": "stone-cairn", "subject_phrase": "a small stacked stone cairn", "meta_label": "Stone cairn", "poses": [{ "pose": "stacked", "pose_phrase": "balanced in a stack" }] }
+    {
+      "family": "footprint",
+      "subject_phrase": "a single large fresh footprint pressed into mud",
+      "meta_label": "Footprint",
+      "qc": {
+        "allowEdgeContact": true
+      },
+      "poses": [
+        {
+          "pose": "in-mud",
+          "pose_phrase": "a crisp deep impression",
+          "views": [
+            "above"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "old-footprint",
+      "subject_phrase": "an old weathered footprint impression, partly eroded",
+      "meta_label": "Old footprint",
+      "qc": {
+        "allowEdgeContact": true
+      },
+      "poses": [
+        {
+          "pose": "in-dirt",
+          "pose_phrase": "a faint aged impression",
+          "views": [
+            "above"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "hair-sample",
+      "subject_phrase": "a small tuft of coarse unidentified animal hair",
+      "meta_label": "Hair sample",
+      "poses": [
+        {
+          "pose": "tuft",
+          "pose_phrase": "a caught tuft of hair",
+          "distances": [
+            "close"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "black-feather",
+      "subject_phrase": "a single large glossy black feather",
+      "meta_label": "Black feather",
+      "poses": [
+        {
+          "pose": "resting",
+          "pose_phrase": "lying flat"
+        }
+      ]
+    },
+    {
+      "family": "broken-branch",
+      "subject_phrase": "a thick tree branch freshly snapped in two",
+      "meta_label": "Broken branch",
+      "poses": [
+        {
+          "pose": "snapped",
+          "pose_phrase": "cleanly snapped, splintered end"
+        }
+      ]
+    },
+    {
+      "family": "tree-claw-marks",
+      "subject_phrase": "deep parallel claw gouges torn into tree bark",
+      "meta_label": "Claw marks",
+      "qc": {
+        "allowEdgeContact": true
+      },
+      "poses": [
+        {
+          "pose": "on-bark",
+          "pose_phrase": "raked deep into the bark",
+          "distances": [
+            "close"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "blood-smear",
+      "subject_phrase": "a dark red blood smear",
+      "meta_label": "Blood smear",
+      "poses": [
+        {
+          "pose": "smear",
+          "pose_phrase": "a streaked smear"
+        }
+      ]
+    },
+    {
+      "family": "burn-circle",
+      "subject_phrase": "a scorched circular burn mark on the ground",
+      "meta_label": "Burn circle",
+      "qc": {
+        "allowEdgeContact": true
+      },
+      "poses": [
+        {
+          "pose": "on-ground",
+          "pose_phrase": "a blackened ring",
+          "views": [
+            "above"
+          ]
+        }
+      ],
+      "app_category": "lights"
+    },
+    {
+      "family": "crop-damage",
+      "subject_phrase": "a patch of flattened swirled crop stalks",
+      "meta_label": "Crop damage",
+      "qc": {
+        "allowEdgeContact": true
+      },
+      "poses": [
+        {
+          "pose": "flattened",
+          "pose_phrase": "swirled and pressed flat",
+          "views": [
+            "above"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "metal-fragment",
+      "subject_phrase": "a twisted fragment of unknown metallic debris",
+      "meta_label": "Metal fragment",
+      "poses": [
+        {
+          "pose": "resting",
+          "pose_phrase": "a jagged shard"
+        }
+      ],
+      "app_category": "gear"
+    },
+    {
+      "family": "compass",
+      "subject_phrase": "an old brass compass with a spinning needle",
+      "meta_label": "Compass",
+      "poses": [
+        {
+          "pose": "resting",
+          "pose_phrase": "lying open",
+          "views": [
+            "above"
+          ]
+        }
+      ],
+      "app_category": "gear"
+    },
+    {
+      "family": "notebook",
+      "subject_phrase": "a weathered open field notebook with hurried sketches",
+      "meta_label": "Field notebook",
+      "poses": [
+        {
+          "pose": "open",
+          "pose_phrase": "lying open"
+        }
+      ],
+      "app_category": "gear"
+    },
+    {
+      "family": "lantern",
+      "subject_phrase": "an old dented oil lantern",
+      "meta_label": "Lantern",
+      "poses": [
+        {
+          "pose": "resting",
+          "pose_phrase": "standing, glass sooted"
+        }
+      ],
+      "app_category": "gear"
+    },
+    {
+      "family": "backpack",
+      "subject_phrase": "a weathered abandoned hiking backpack",
+      "meta_label": "Abandoned backpack",
+      "poses": [
+        {
+          "pose": "resting",
+          "pose_phrase": "slumped and empty"
+        }
+      ],
+      "app_category": "gear"
+    },
+    {
+      "family": "tent",
+      "subject_phrase": "a small weathered dome camping tent",
+      "meta_label": "Tent",
+      "poses": [
+        {
+          "pose": "pitched",
+          "pose_phrase": "pitched, flap open"
+        }
+      ],
+      "app_category": "gear"
+    },
+    {
+      "family": "trail-camera",
+      "subject_phrase": "a camouflaged trail camera strapped to nothing",
+      "meta_label": "Trail camera",
+      "poses": [
+        {
+          "pose": "mounted",
+          "pose_phrase": "facing forward",
+          "distances": [
+            "close"
+          ]
+        }
+      ],
+      "app_category": "gear"
+    },
+    {
+      "family": "research-equipment",
+      "subject_phrase": "a rugged case of field research equipment with dials and antennas",
+      "meta_label": "Research equipment",
+      "poses": [
+        {
+          "pose": "resting",
+          "pose_phrase": "open and running"
+        }
+      ],
+      "app_category": "gear"
+    },
+    {
+      "family": "broken-drone",
+      "subject_phrase": "a crashed and broken quadcopter drone",
+      "meta_label": "Broken drone",
+      "poses": [
+        {
+          "pose": "crashed",
+          "pose_phrase": "on its side, a rotor snapped"
+        }
+      ],
+      "app_category": "gear"
+    },
+    {
+      "family": "bone-pile",
+      "subject_phrase": "a small pile of bleached animal bones",
+      "meta_label": "Bone pile",
+      "qc": {
+        "maxComponents": 4
+      },
+      "poses": [
+        {
+          "pose": "piled",
+          "pose_phrase": "heaped together",
+          "views": [
+            "above"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "mysterious-symbol",
+      "subject_phrase": "a mysterious symbol scratched into a flat surface",
+      "meta_label": "Mysterious symbol",
+      "qc": {
+        "allowEdgeContact": true
+      },
+      "poses": [
+        {
+          "pose": "carved",
+          "pose_phrase": "freshly scratched",
+          "distances": [
+            "close"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "stone-cairn",
+      "subject_phrase": "a small stacked stone cairn",
+      "meta_label": "Stone cairn",
+      "poses": [
+        {
+          "pose": "stacked",
+          "pose_phrase": "balanced in a stack"
+        }
+      ],
+      "app_category": "gear"
+    }
   ]
 }

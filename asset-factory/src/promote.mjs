@@ -14,11 +14,11 @@ import { expandAll } from "./expander.mjs";
 import { slug } from "./ids.mjs";
 
 /**
- * Options: { categories, favoritesOnly, ids, maxEdge = 1280, out = DIRS.stickers, dryRun }
+ * Options: { categories, favoritesOnly, ids, maxEdge = 512, out = DIRS.stickers, dryRun }
  * Returns { promoted: [{id, name, path, appCategory}], metaSnippet }
  */
 export async function promote(opts = {}) {
-  const { categories = null, favoritesOnly = false, ids = null, maxEdge = 1280, out = DIRS.stickers, dryRun = false } = opts;
+  const { categories = null, favoritesOnly = false, ids = null, maxEdge = 512, out = DIRS.stickers, dryRun = false } = opts;
   const cur = readCuration();
   const entriesById = new Map(expandAll(DIRS.manifests, categories).map((e) => [e.id, e]));
 
