@@ -2,6 +2,7 @@ import "./macro.css";
 import { stackFocus, type StackFrame } from "./stack";
 import { setupInstalledShare, setupInstallFromApp } from "../share";
 import { wireThemeToggle } from "../theme";
+import { wireForceUpdate } from "../swupdate";
 
 // Macro focus-stacking mode. Loads a focus-shift JPEG set, blends it into one
 // all-in-focus frame, and lets you compare and save. The heavy engine lives in
@@ -345,4 +346,10 @@ setupInstallFromApp("macroInstallFromApp");
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
+}
+
+{
+  const btn = document.getElementById("forceUpdate") as HTMLButtonElement | null;
+  const note = document.getElementById("forceUpdateNote");
+  if (btn && note) wireForceUpdate(btn, note);
 }

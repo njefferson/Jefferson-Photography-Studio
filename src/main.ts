@@ -1,5 +1,6 @@
 import "./style.css";
 import { importFile, type ImportedFile, type ImageKind } from "./import";
+import { wireForceUpdate } from "./swupdate";
 import { decode, type DecodedImage } from "./decode";
 import { Renderer, type EditParams } from "./gl";
 import { exportImage, saveBlob, type ExportFormat } from "./export";
@@ -2875,55 +2876,7 @@ syncLocSettings();
 // message the SW listens for), then reloads — navigations are network-first, so
 // the reload pulls the fresh shell + its new hashed assets even if the SW check
 // finds nothing.
-const forceUpdateBtn = $("forceUpdate") as HTMLButtonElement;
-const forceUpdateNote = $("forceUpdateNote") as HTMLElement;
-let forcingUpdate = false;
-forceUpdateBtn.addEventListener("click", async () => {
-  if (forcingUpdate) return;
-  forcingUpdate = true;
-  forceUpdateBtn.disabled = true;
-  forceUpdateNote.textContent = "Checking for a new version…";
-
-  // Reload ONLY once the new worker has actually taken control — reloading on a
-  // blind timer (the old bug) drops you back onto the old cached code, because
-  // over a phone connection the new app shell hasn't finished downloading yet.
-  // The SW self-activates (skipWaiting) once its precache completes, which fires
-  // controllerchange; that's our signal that fresh code is live.
-  let reloaded = false;
-  const reloadOnce = () => { if (!reloaded) { reloaded = true; location.reload(); } };
-
-  try {
-    if (!("serviceWorker" in navigator)) { reloadOnce(); return; }
-    const reg = await navigator.serviceWorker.getRegistration();
-    if (!reg) { reloadOnce(); return; }
-
-    navigator.serviceWorker.addEventListener("controllerchange", reloadOnce, { once: true });
-    await reg.update(); // fetch the newest sw.js (served no-store, so never stale)
-
-    // The worker that update() turned up — installing now, or already waiting.
-    const incoming = reg.installing || reg.waiting;
-    if (!incoming) {
-      // Server has nothing newer than what's already running.
-      forceUpdateNote.textContent = `You're already on the latest version (v${__APP_VERSION__}).`;
-      forcingUpdate = false;
-      forceUpdateBtn.disabled = false;
-      navigator.serviceWorker.removeEventListener("controllerchange", reloadOnce);
-      return;
-    }
-
-    forceUpdateNote.textContent = "Downloading the update… this can take a moment on cellular.";
-    const nudge = (w: ServiceWorker) => w.postMessage({ type: "SKIP_WAITING" });
-    if (incoming.state === "installed") nudge(incoming);
-    else incoming.addEventListener("statechange", () => {
-      if (incoming.state === "installed") nudge(incoming);
-    });
-    // Safety net: if the handover never fires (some iOS builds are stubborn),
-    // reload anyway after a generous wait so the button is never a dead end.
-    setTimeout(reloadOnce, 20000);
-  } catch {
-    reloadOnce(); // offline / no SW — a plain reload still refetches network-first
-  }
-});
+wireForceUpdate($("forceUpdate") as HTMLButtonElement, $("forceUpdateNote") as HTMLElement);
 
 // --- Local masks: radial / linear gradient with a few local adjustments,
 // placed by dragging handles on the photo. Geometry is in image-uv so masks
