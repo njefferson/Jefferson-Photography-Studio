@@ -1,13 +1,15 @@
 {
   "id": "craft-photoreal",
-  "version": 2,
+  "version": 3,
   "positive": [
     "{global.photo}",
-    "A photograph of {subject_phrase}, {pose_phrase}, {view_phrase}, {distance_phrase}.",
-    "Believable machined metal surfaces with realistic reflections and material response, as caught by a real camera at telephoto distance against the light.",
-    "{global.photoreal}",
+    "A clear, real photograph of {subject_phrase}, {pose_phrase}, {view_phrase}, {distance_phrase}.",
+    "Believable machined metal surfaces with realistic reflections and material response, as caught by an ordinary camera.",
+    "Framed with clear empty space around the whole craft — it sits comfortably within the frame and does NOT touch or run off any edge.",
+    "{global.neutral_light}",
     "{global.single_subject}",
     "{global.isolated}",
+    "{global.no_baked_fx}",
     "{global.no_text}"
   ],
   "negative": ["{global_negative}"],
