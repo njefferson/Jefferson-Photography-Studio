@@ -126,8 +126,8 @@ function appVersion() {
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 /** Emit `dist/notes.html` — the PUBLIC "What's new & roadmap" page the ⓘ
- *  dialog's "More" links point at (the repo is private, so GitHub links 404
- *  for everyone; this page is the shareable home for update history). All
+ *  dialog's "More" links point at (a self-contained, shareable home for the
+ *  update history — no GitHub account or repo browsing needed). All
  *  content is build-time-derived: the filtered git log plus the two NOTES.md
  *  checklist sections. MUST be listed before precacheManifest() in `plugins`
  *  so the file is on disk when the precache manifest walks dist (guaranteed
