@@ -434,6 +434,15 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 .mix-chip::before { content: ""; position: absolute; inset: -5px; } /* 44px hit extension */
 .mix-chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
 
+/* Sticker picker hierarchy — the three tiers must read as distinct levels (owner,
+   2026-07-20: "menu and submenus are indistinguishable"). KIND = biggest, solid
+   selected fill + a divider under it; CATEGORY = medium, soft/outlined selected;
+   STICKER = plain (add-only, never a persistent selected state). The ✓ text
+   prefix carries selection independent of colour (grayscale-safe). */
+#stickerGroups { border-bottom: 1px solid var(--line); padding-bottom: 10px; margin-bottom: 8px; }
+#stickerGroups .mix-chip { min-height: 40px; padding: 8px 15px; font-size: 13px; font-weight: 600; }
+#stickerCats .mix-chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--txt); }
+
 /* ---- Grade tab (Creative) ------------------------------------------------
    Three tint wheels, one per tonal band. The wheel itself is a pointer-only
    convenience (aria-hidden, like the tone-curve dots); the ACCESSIBLE path is
@@ -1843,13 +1852,15 @@ label.open-btn, label.bar-btn {
 .scroll-cue span {
   display: inline-block;
   background: var(--surface-3);
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-2);
   border-radius: 999px;
   padding: 4px 0;
   width: 44px;
   text-align: center;
   font-size: 12px;
-  color: var(--accent);
+  /* NOT --accent: the selected chips are --accent, so the cue used to vanish
+     against them (owner, 2026-07-20). Neutral high-contrast text instead. */
+  color: var(--txt);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
   white-space: nowrap;
 }
