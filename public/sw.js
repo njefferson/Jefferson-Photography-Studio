@@ -52,6 +52,14 @@ self.addEventListener("activate", (e) => {
   );
 });
 
+// Let the page force a waiting worker to take over immediately (the "Update to
+// the latest version" button in Settings). Without this, a freshly-installed SW
+// waits until every tab closes, so a new deploy needs a double force-close to
+// appear — the exact thing the button exists to avoid.
+self.addEventListener("message", (e) => {
+  if (e.data && e.data.type === "SKIP_WAITING") self.skipWaiting();
+});
+
 self.addEventListener("fetch", (e) => {
   const req = e.request;
   if (req.method !== "GET") return;
