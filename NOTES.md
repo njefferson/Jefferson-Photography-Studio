@@ -3196,6 +3196,42 @@ user-scalable=no.
   regressions green. NEEDS THE OWNER'S HANDS: whether the default 0.85 strength
   feels right, and whether he wants saturation folded into the auto-match too
   (left manual for now — auto-sat was too unpredictable to trust).
+- [x] **Blend to match REWORKED — actually works now, and on iOS (2026-07-20)** —
+  owner on device: "the blend is not working in any sort of way" (a blown-white
+  UFO craft, identical at Match strength 0 and max). TWO bugs: (1) auto-match
+  sampled the scene by reading the WebGL canvas back through a 2D canvas — works
+  in Chromium, SILENTLY FAILS on iOS Safari, so no match ever computed and the
+  strength slider was inert (the "all my measurements are Chromium" gap, for
+  real); (2) even when it ran, the gentle brightness/warmth heuristic (Increment
+  D) barely dented a bright IR-clipped asset. FIX — match in SOURCE space with a
+  per-channel gain `matchGain = sceneSourceMean / assetSourceMean` (from
+  previewSrc, NO canvas readback): it lands the sticker's average source colour on
+  the scene's, so after the identical pipeline (WB, camera matrix, R↔B swap) the
+  sticker displays as the scene does — a blown craft's source is pulled DOWN
+  before the pipeline can clip it, so it tones right in (practice saucer centre
+  255,78,87 → 111,88,89 over a 144,125,128 forest; Σ199→109; visibly a muted craft
+  vs a glowing red decal). matchAmt lerps the gain toward the raw asset (0=raw,
+  0.85 default); the bright/contrast/warmth/sat sliders ride on top. This is the
+  clean MEAN gain that Increment D's std+bias affine got wrong (that one went
+  magenta). Rides export (matchAsset in compositePixel). VERIFIED
+  (sticker-match-walk): full match pulls toward the scene (Σ199→109) while raw
+  doesn't, strength changes it, the button recomputes, AND a spy proves the add
+  triggers ZERO WebGL-canvas readbacks (the iOS-safe property; the old code did
+  one per match). All sticker regressions green (sticker-walk's "grade reaches"
+  now pushes all 3 bands since a matched sticker is dark, not a highlight).
+  NEEDS THE OWNER'S HANDS: confirm on the real iPad that the match now bites, and
+  the default 0.85 strength; a strongly-coloured asset keeps some of its own hue
+  (the gain shifts the mean, not per-pixel saturation) — the Saturation slider is
+  the manual lever there.
+- [x] **Force-update button + picker legibility (2026-07-20 device fixes)** — (a)
+  Settings gained "Update to the latest version": a `SKIP_WAITING` message the SW
+  now listens for + `reg.update()` → skipWaiting → reload, so a new deploy shows
+  without the double force-close (owner: "my kids will never get them"). (b) The
+  sticker picker's three tiers were indistinguishable — kind chips are now larger
+  above a divider, the selected category is a lighter outlined highlight, stickers
+  stay plain; and the "more below" scroll arrow moved off --accent (it matched the
+  selected chips and vanished). Both verified (force-update-walk stubs the SW +
+  catches the reload; sticker-category-walk + a screenshot for the tiers).
 - [x] **Third sticker kind — Scene & nature (asset-factory handoff)** — owner go
   2026-07-19 after reading the factory's `asset-factory/CATEGORIES.md` (on branch
   `claude/jefferson-asset-pipeline-9y19wa`, which routes ~245 assets so NOTHING
