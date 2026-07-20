@@ -7,7 +7,7 @@
 // the first keyed run; isolated here so any drift is a one-file fix.
 import { env } from "../config.mjs";
 
-const ENDPOINT = "https://api.ideogram.ai/v1/ideogram-v3/remove-background";
+const ENDPOINT = "https://api.ideogram.ai/v1/remove-background";
 
 /** @param {Buffer} png opaque image → Promise<Buffer> transparent PNG */
 export async function extractAlpha(png) {
