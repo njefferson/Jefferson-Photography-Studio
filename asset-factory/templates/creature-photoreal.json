@@ -1,14 +1,16 @@
 {
   "id": "creature-photoreal",
-  "version": 1,
+  "version": 2,
   "positive": [
-    "Photorealistic {subject_phrase}, {pose_phrase}, {view_phrase}, {distance_phrase}{expression_clause}.",
+    "{global.photo}",
+    "A photograph of {subject_phrase}, {pose_phrase}, {view_phrase}, {distance_phrase}{expression_clause}.",
+    "{framing_clause}",
+    "Believable living anatomy, natural fur, skin and surface texture caught by a real camera.",
     "{global.photoreal}",
-    "Believable anatomy, natural fur, skin and surface texture as captured by a real camera.",
     "{global.single_subject}",
     "{global.isolated}",
     "{global.no_text}"
   ],
   "negative": ["{global_negative}"],
-  "settings": { "rendering_speed": "QUALITY", "aspect_ratio": "1x1" }
+  "settings": { "rendering_speed": "QUALITY", "aspect_ratio": "1x1", "style_type": "REALISTIC" }
 }

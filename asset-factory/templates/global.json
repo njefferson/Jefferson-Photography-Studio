@@ -1,11 +1,12 @@
 {
-  "version": 1,
+  "version": 2,
   "blocks": {
-    "single_subject": "Exactly one isolated subject, centered, nothing else in frame.",
-    "isolated": "Isolated on a fully transparent background, the entire subject visible and uncropped, with soft naturally feathered edges suitable for photo compositing.",
-    "isolated_overlay": "Isolated on a fully transparent background with soft naturally feathered edges, produced as an overlay element for photo compositing.",
-    "photoreal": "Photorealistic, production-quality photographic detail, natural lighting consistent with outdoor photography, realistic shadows falling only on the subject itself.",
+    "photo": "A real photograph — shot on a DSLR with a telephoto lens in soft natural daylight, candid documentary wildlife photography, true-to-life skin/fur/surface texture, realistic depth of field and film grain. It must look like an actual photo taken outdoors, NOT an illustration, drawing, render, or artwork.",
+    "single_subject": "Exactly one subject, centered, nothing else in frame.",
+    "isolated": "Isolated on a fully transparent background, the entire subject visible and uncropped, with soft naturally feathered edges suitable for dropping into another photograph.",
+    "isolated_overlay": "Isolated on a fully transparent background with soft naturally feathered edges, produced as an overlay element to composite into a real photograph.",
+    "photoreal": "Photorealistic and believable as a real photograph, even neutral daylight so it can be relit to match any scene, natural (not dramatic) shadows only on the subject itself.",
     "no_text": "No text, no watermark, no caption, no border, no frame, no sticker sheet, no collage."
   },
-  "negative": "text, watermark, logo, caption, border, frame, background, scenery, sky, ground, landscape, trees, buildings, people, multiple subjects, sticker sheet, grid, collage, cartoon, illustration, drawing, painting, 3d render, cgi, plastic toy, cropped, cut off, white background, colored background"
+  "negative": "illustration, drawing, sketch, line art, comic, cartoon, anime, painting, digital painting, concept art, poster, sticker, vector art, cel shaded, 3d render, cgi, octane render, sculpture, statue, figurine, clay, toy, plastic, stylized, cartoonish, text, watermark, logo, caption, border, frame, background, scenery, sky, ground, landscape, buildings, people, multiple subjects, sticker sheet, grid, collage, cropped, cut off, white background, colored background"
 }

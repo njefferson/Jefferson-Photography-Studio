@@ -146,6 +146,7 @@ export async function runGenerate({ items, provider, concurrency = 2, hamming = 
         seed,
         aspectRatio: built.settings.aspect_ratio ?? "1x1",
         renderingSpeed: built.settings.rendering_speed,
+        styleType: built.settings.style_type,
       }));
     } catch (e) {
       record.status = "error";

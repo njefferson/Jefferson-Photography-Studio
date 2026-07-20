@@ -1,14 +1,14 @@
 {
   "id": "effect-overlay",
-  "version": 1,
+  "version": 2,
   "positive": [
-    "Photorealistic {subject_phrase}, {pose_phrase}, {view_phrase}, {distance_phrase}.",
-    "A natural photographic overlay element with realistic optics and density, its transparency carried in the alpha channel.",
-    "{global.photoreal}",
+    "{global.photo}",
+    "A photograph of {subject_phrase}, {pose_phrase}, {view_phrase}, {distance_phrase}.",
+    "A natural photographic overlay element with realistic optics and density, exactly as it would appear caught in a real camera frame, its transparency carried in the alpha channel.",
     "{global.single_subject}",
     "{global.isolated_overlay}",
     "{global.no_text}"
   ],
   "negative": ["{global_negative}"],
-  "settings": { "rendering_speed": "QUALITY", "aspect_ratio": "1x1" }
+  "settings": { "rendering_speed": "QUALITY", "aspect_ratio": "1x1", "style_type": "REALISTIC" }
 }

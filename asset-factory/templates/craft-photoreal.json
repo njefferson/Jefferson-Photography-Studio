@@ -1,14 +1,15 @@
 {
   "id": "craft-photoreal",
-  "version": 1,
+  "version": 2,
   "positive": [
-    "Photorealistic {subject_phrase}, {pose_phrase}, {view_phrase}, {distance_phrase}.",
+    "{global.photo}",
+    "A photograph of {subject_phrase}, {pose_phrase}, {view_phrase}, {distance_phrase}.",
+    "Believable machined metal surfaces with realistic reflections and material response, as caught by a real camera at telephoto distance against the light.",
     "{global.photoreal}",
-    "Believable machined surfaces, realistic reflections and material response, as captured by a real camera at telephoto distance.",
     "{global.single_subject}",
     "{global.isolated}",
     "{global.no_text}"
   ],
   "negative": ["{global_negative}"],
-  "settings": { "rendering_speed": "QUALITY", "aspect_ratio": "1x1" }
+  "settings": { "rendering_speed": "QUALITY", "aspect_ratio": "1x1", "style_type": "REALISTIC" }
 }

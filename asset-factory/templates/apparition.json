@@ -1,14 +1,15 @@
 {
   "id": "apparition",
-  "version": 1,
+  "version": 2,
   "positive": [
-    "Photorealistic {subject_phrase}, {pose_phrase}, {view_phrase}, {distance_phrase}.",
-    "Semi-transparent, wispy and softly luminous, fading gently at its lower edge, the translucency carried in the image's own alpha.",
-    "{global.photoreal}",
+    "{global.photo}",
+    "A photograph of {subject_phrase}, {pose_phrase}, {view_phrase}, {distance_phrase}.",
+    "{framing_clause}",
+    "Semi-transparent and faintly luminous as if caught on a real camera at night with a long exposure — a believable photographic apparition, its lower edge fading softly, the translucency carried in the image's own alpha.",
     "{global.single_subject}",
     "{global.isolated}",
     "{global.no_text}"
   ],
   "negative": ["{global_negative}"],
-  "settings": { "rendering_speed": "QUALITY", "aspect_ratio": "1x1" }
+  "settings": { "rendering_speed": "QUALITY", "aspect_ratio": "1x1", "style_type": "REALISTIC" }
 }

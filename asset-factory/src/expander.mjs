@@ -89,12 +89,25 @@ export function expandSpec(spec) {
                   // Neutral is the silent default; anything else becomes a clause.
                   expression_clause:
                     expression === "neutral" ? "" : `, with a ${humanize(expression)} expression`,
+                  // Force whole-figure framing unless the pose is deliberately a
+                  // bust/head/hand/partial crop — Ideogram otherwise defaults a
+                  // "walking"/"standing" subject to a centered portrait.
+                  framing_clause: framingClause(p),
                 },
               });
             }
     }
   }
   return out;
+}
+
+// Poses that are intentionally NOT a whole figure (a bust, a head, a hand, a
+// footprint, a peek). Everything else must show the full body head-to-toe.
+const PARTIAL_POSE = /(head|bust|eyes?|hand|half|face|foot|print|peek|silhouette|shadow|track|hair|feather|sample)/i;
+function framingClause(p) {
+  const pose = `${p.pose} ${p.pose_phrase ?? ""}`;
+  if (PARTIAL_POSE.test(pose)) return "";
+  return "The entire subject is shown in full within the frame, head to toe and top to bottom, complete and uncropped — NOT a bust, headshot, or close portrait.";
 }
 
 function buildName(fam, p, view, distance, variant, variants) {

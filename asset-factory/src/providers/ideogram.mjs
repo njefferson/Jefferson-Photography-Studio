@@ -31,7 +31,7 @@ export const ideogramProvider = {
     if (!env.ideogramKey())
       throw new Error("IDEOGRAM_API_KEY is not set — export it in this session (or use --provider mock).");
   },
-  async generate({ prompt, negativePrompt, seed, aspectRatio, renderingSpeed }) {
+  async generate({ prompt, negativePrompt, seed, aspectRatio, renderingSpeed, styleType }) {
     const key = env.ideogramKey();
     if (!key) {
       throw new Error(
@@ -49,6 +49,9 @@ export const ideogramProvider = {
         form.set("seed", String(seed));
         form.set("aspect_ratio", aspectRatio ?? "1x1");
         form.set("rendering_speed", renderingSpeed ?? "QUALITY");
+        // Push the model toward photographs, not illustration/3d (the default
+        // lean). REALISTIC is the v3 style; template-driven so it stays tunable.
+        if (styleType) form.set("style_type", styleType);
         form.set("num_images", "1");
         const res = await fetch(ENDPOINT, { method: "POST", headers: { "Api-Key": key }, body: form });
         if (res.status === 429 || res.status >= 500) {
