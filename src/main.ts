@@ -1930,7 +1930,9 @@ function positionStickerGhost() {
   if (!s || !a || !url || !current) { stickerGhost.hidden = true; return; }
   const W = current.width, H = current.height;
   const hw = (s.scale * W) / 2;
-  const ang = (s.rot * Math.PI) / 180;
+  // Counter the photo's display rotation so the ghost previews upright too —
+  // imageUvToClient re-applies that rotation, netting the sticker's own rot.
+  const ang = ((s.rot - renderer.rotation * 90) * Math.PI) / 180;
   // Centre + the rotated +hw edge midpoint, both in client space.
   const [cx, cy] = renderer.imageUvToClient(s.x, s.y);
   const ex = s.x + (hw * Math.cos(ang)) / W;
@@ -2126,16 +2128,17 @@ function pointInQuad(px: number, py: number, q: [number, number][]): boolean {
 function hitSticker(u: number, v: number): number {
   if (!current) return -1;
   const W = current.width, H = current.height;
+  const dispRot = renderer.rotation * 90; // match the baked (display-oriented) sticker
   const list = params.stickers ?? [];
   for (let i = list.length - 1; i >= 0; i--) {
     const s = list[i];
     const a = stickerAssets[s.asset];
     if (!a) continue;
-    const quad = stickerWorldCorners(s, W, H, a);
+    const quad = stickerWorldCorners(s, W, H, a, dispRot);
     if (quad) { if (pointInQuad(u * W, v * H, quad)) return i; continue; }
     const hw = (s.scale * W) / 2, hh = hw * (a.h / a.w);
     const dx = (u - s.x) * W, dy = (v - s.y) * H;
-    const ang = (-s.rot * Math.PI) / 180;
+    const ang = (-(s.rot - dispRot) * Math.PI) / 180;
     const lx = dx * Math.cos(ang) - dy * Math.sin(ang);
     const ly = dx * Math.sin(ang) + dy * Math.cos(ang);
     if (Math.abs(lx) <= hw && Math.abs(ly) <= hh) return i;
@@ -2337,7 +2340,8 @@ function stickerLocalUv(s: Sticker, u: number, v: number): [number, number] | nu
   const a = stickerAssets[s.asset];
   if (!a || !current) return null;
   const W = current.width, H = current.height;
-  const minv = stickerXform(s, W, H, a);
+  const dispRot = renderer.rotation * 90; // match the baked (display-oriented) sticker
+  const minv = stickerXform(s, W, H, a, dispRot);
   if (minv) {
     const X = u * W, Y = v * H;
     const w = minv[6] * X + minv[7] * Y + minv[8];
@@ -2347,7 +2351,7 @@ function stickerLocalUv(s: Sticker, u: number, v: number): [number, number] | nu
   const hw = (s.scale * W) / 2, hh = hw * (a.h / a.w);
   if (hw <= 0 || hh <= 0) return null;
   const dx = u * W - s.x * W, dy = v * H - s.y * H;
-  const ang = (-s.rot * Math.PI) / 180;
+  const ang = (-(s.rot - dispRot) * Math.PI) / 180;
   const lx = dx * Math.cos(ang) - dy * Math.sin(ang);
   const ly = dx * Math.sin(ang) + dy * Math.cos(ang);
   return [lx / (2 * hw) + 0.5, ly / (2 * hh) + 0.5];
@@ -2519,10 +2523,11 @@ function stickerOverlayCorners(s: Sticker, a: StickerAsset): [number, number][] 
     const [cx, cy] = renderer.imageUvToClient(px / W, py / H);
     return [cx - rect.left, cy - rect.top];
   };
-  const quad = stickerWorldCorners(s, W, H, a);
+  const dispRot = renderer.rotation * 90; // match the baked (display-oriented) sticker
+  const quad = stickerWorldCorners(s, W, H, a, dispRot);
   if (quad) return quad.map(([px, py]) => toClient(px, py));
   const hw = (s.scale * W) / 2, hh = hw * (a.h / a.w);
-  const ang = (s.rot * Math.PI) / 180, cs = Math.cos(ang), sn = Math.sin(ang);
+  const ang = ((s.rot - dispRot) * Math.PI) / 180, cs = Math.cos(ang), sn = Math.sin(ang);
   return ([[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]] as [number, number][]).map(([lx, ly]) =>
     toClient(s.x * W + (lx * cs - ly * sn), s.y * H + (lx * sn + ly * cs)));
 }
@@ -3761,11 +3766,15 @@ function syncSpotsToTexture() {
   // from the PRISTINE source with the full current lists, so vacated areas
   // restore correctly. Heal bakes first, then stickers layer ON TOP (matching
   // the export sampler, where stickers wrap outside heal).
+  // The photo's display rotation (EXIF orientation, 90° steps). Stickers place +
+  // bake in the un-rotated sensor buffer, so they must be counter-rotated by it
+  // to read upright on the DISPLAYED photo (portrait/orientation-8 fix).
+  const dispRot = renderer.rotation * 90;
   const rects: { x0: number; y0: number; w: number; h: number }[] = [];
   for (const s of [...bakedSpots, ...cur]) rects.push(spotRect(s, W, H));
   for (const s of [...bakedStickers, ...stk]) {
     const a = stickerAssets[s.asset];
-    if (a) rects.push(stickerRect(s, W, H, a));
+    if (a) rects.push(stickerRect(s, W, H, a, dispRot));
   }
   // Occlusion reads the DISPLAY luminance — run the base through exposure×WB
   // (+ the camera matrix for RAW) so "bright/dark" matches what's on screen,
@@ -3780,11 +3789,11 @@ function syncSpotsToTexture() {
     if (rect.w <= 0 || rect.h <= 0) continue;
     if (previewSrc.linear) {
       const data = bakeRgbaF32(previewSrc.linear, W, H, cur, rect);
-      compositeStickersIntoRectF32(data, rect, W, H, stk, stickerAssets, occ);
+      compositeStickersIntoRectF32(data, rect, W, H, stk, stickerAssets, occ, dispRot);
       renderer.patchImage(rect.x0, rect.y0, rect.w, rect.h, data);
     } else {
       const data = bakeRgba8(previewSrc.pixels!, W, H, cur, rect);
-      compositeStickersIntoRect8(data, rect, W, H, stk, stickerAssets, occ);
+      compositeStickersIntoRect8(data, rect, W, H, stk, stickerAssets, occ, dispRot);
       renderer.patchImage(rect.x0, rect.y0, rect.w, rect.h, data);
     }
   }

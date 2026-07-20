@@ -74,11 +74,11 @@ const clampI = (v: number, hi: number) => (v < 0 ? 0 : v > hi ? hi : v);
 /** The 4 sticker corners in SOURCE PIXELS (order TL, TR, BR, BL), when a
  *  perspective skew is set — base rect corner + its offset, rotated + placed.
  *  Null when the sticker is a plain scale+rot rect. */
-export function stickerWorldCorners(s: Sticker, W: number, H: number, asset: StickerAsset): [number, number][] | null {
+export function stickerWorldCorners(s: Sticker, W: number, H: number, asset: StickerAsset, dispRotDeg = 0): [number, number][] | null {
   const co = s.corners;
   if (!co || co.length !== 4) return null;
   const hw = (s.scale * W) / 2, hh = hw * (asset.h / asset.w);
-  const a = (s.rot * Math.PI) / 180, cs = Math.cos(a), sn = Math.sin(a);
+  const a = ((s.rot - dispRotDeg) * Math.PI) / 180, cs = Math.cos(a), sn = Math.sin(a);
   const cx = s.x * W, cy = s.y * H;
   const base: [number, number][] = [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]];
   return base.map(([bx, by], k) => {
@@ -123,16 +123,16 @@ function invert3x3(m: number[]): number[] | null {
 /** The inverse homography (image px → asset uv) for a skewed sticker, or null
  *  for a plain rect. Precompute ONCE per sticker per bake and hand to
  *  compositePixel so the per-pixel cost is a single mat-vec. */
-export function stickerXform(s: Sticker, W: number, H: number, asset: StickerAsset): number[] | null {
-  const P = stickerWorldCorners(s, W, H, asset);
+export function stickerXform(s: Sticker, W: number, H: number, asset: StickerAsset, dispRotDeg = 0): number[] | null {
+  const P = stickerWorldCorners(s, W, H, asset, dispRotDeg);
   if (!P) return null;
   return invert3x3(squareToQuad(P));
 }
 
 /** A sticker's destination bounding box in source pixels (covers rotation and,
  *  when set, the perspective quad). */
-export function stickerRect(s: Sticker, W: number, H: number, asset: StickerAsset): Rect {
-  const P = stickerWorldCorners(s, W, H, asset);
+export function stickerRect(s: Sticker, W: number, H: number, asset: StickerAsset, dispRotDeg = 0): Rect {
+  const P = stickerWorldCorners(s, W, H, asset, dispRotDeg);
   if (P) {
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     for (const [x, y] of P) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
@@ -143,7 +143,7 @@ export function stickerRect(s: Sticker, W: number, H: number, asset: StickerAsse
   const hw = (s.scale * W) / 2;
   const hh = hw * (asset.h / asset.w);
   const cx = s.x * W, cy = s.y * H;
-  const a = (s.rot * Math.PI) / 180;
+  const a = ((s.rot - dispRotDeg) * Math.PI) / 180;
   const c = Math.abs(Math.cos(a)), sn = Math.abs(Math.sin(a));
   const bw = hw * c + hh * sn, bh = hw * sn + hh * c;
   const x0 = Math.max(0, Math.floor(cx - bw));
@@ -227,6 +227,7 @@ function compositePixel(
   tmp: Float32Array,
   occ?: OcclusionCtx,
   xforms?: (number[] | null)[], // per-sticker inverse homography (skewed), else null
+  dispRotDeg = 0, // photo's display rotation (EXIF orientation), so the sticker reads upright on screen
 ): void {
   for (let si = 0; si < stickers.length; si++) {
     const s = stickers[si];
@@ -248,7 +249,11 @@ function compositePixel(
     } else {
       const dx = px + 0.5 - s.x * W;
       const dy = py + 0.5 - s.y * H;
-      const a = (-s.rot * Math.PI) / 180; // inverse rotation
+      // Counter the photo's display rotation (dispRotDeg = EXIF orientation, in
+      // 90° steps) so the sticker reads upright on the DISPLAYED photo, not on
+      // the un-rotated sensor buffer it bakes into (owner-caught: stickers came
+      // out rotated on portrait/orientation-8 practice photos, 2026-07-20).
+      const a = (-(s.rot - dispRotDeg) * Math.PI) / 180; // inverse rotation
       const cs = Math.cos(a), sn = Math.sin(a);
       const lx = dx * cs - dy * sn;
       const ly = dx * sn + dy * cs;
@@ -293,15 +298,16 @@ export function compositeStickersIntoRect8(
   stickers: Sticker[],
   assets: Record<string, StickerAsset>,
   occ?: OcclusionCtx,
+  dispRotDeg = 0,
 ): void {
   if (!stickers.length) return;
-  const xforms = stickers.map((s) => { const a = assets[s.asset]; return a ? stickerXform(s, W, H, a) : null; });
+  const xforms = stickers.map((s) => { const a = assets[s.asset]; return a ? stickerXform(s, W, H, a, dispRotDeg) : null; });
   const base = new Float32Array(3), tmp = new Float32Array(4);
   for (let y = 0; y < rect.h; y++) {
     for (let x = 0; x < rect.w; x++) {
       const o = (y * rect.w + x) * 4;
       base[0] = toLin(buf[o]); base[1] = toLin(buf[o + 1]); base[2] = toLin(buf[o + 2]);
-      compositePixel(base, rect.x0 + x, rect.y0 + y, W, H, stickers, assets, tmp, occ, xforms);
+      compositePixel(base, rect.x0 + x, rect.y0 + y, W, H, stickers, assets, tmp, occ, xforms, dispRotDeg);
       buf[o] = toGam(base[0]) * 255 + 0.5;
       buf[o + 1] = toGam(base[1]) * 255 + 0.5;
       buf[o + 2] = toGam(base[2]) * 255 + 0.5;
@@ -319,15 +325,16 @@ export function compositeStickersIntoRectF32(
   stickers: Sticker[],
   assets: Record<string, StickerAsset>,
   occ?: OcclusionCtx,
+  dispRotDeg = 0,
 ): void {
   if (!stickers.length) return;
-  const xforms = stickers.map((s) => { const a = assets[s.asset]; return a ? stickerXform(s, W, H, a) : null; });
+  const xforms = stickers.map((s) => { const a = assets[s.asset]; return a ? stickerXform(s, W, H, a, dispRotDeg) : null; });
   const base = new Float32Array(3), tmp = new Float32Array(4);
   for (let y = 0; y < rect.h; y++) {
     for (let x = 0; x < rect.w; x++) {
       const o = (y * rect.w + x) * 4;
       base[0] = buf[o]; base[1] = buf[o + 1]; base[2] = buf[o + 2];
-      compositePixel(base, rect.x0 + x, rect.y0 + y, W, H, stickers, assets, tmp, occ, xforms);
+      compositePixel(base, rect.x0 + x, rect.y0 + y, W, H, stickers, assets, tmp, occ, xforms, dispRotDeg);
       buf[o] = Math.fround(base[0]);
       buf[o + 1] = Math.fround(base[1]);
       buf[o + 2] = Math.fround(base[2]);
@@ -352,22 +359,23 @@ export function stickerPatches(
   stickers: Sticker[],
   assets: Record<string, StickerAsset>,
   occ?: OcclusionCtx,
+  dispRotDeg = 0,
 ): StickerPatch[] {
   const patches: StickerPatch[] = [];
   const base = new Float32Array(3), tmp = new Float32Array(4);
   for (const s of stickers) {
     const asset = assets[s.asset];
     if (!asset) continue;
-    const rect = stickerRect(s, W, H, asset);
+    const rect = stickerRect(s, W, H, asset, dispRotDeg);
     if (rect.w <= 0 || rect.h <= 0) continue;
-    const xf = [stickerXform(s, W, H, asset)];
+    const xf = [stickerXform(s, W, H, asset, dispRotDeg)];
     const data = new Float32Array(rect.w * rect.h * 3);
     for (let y = 0; y < rect.h; y++) {
       for (let x = 0; x < rect.w; x++) {
         const sx = clampI(rect.x0 + x, W - 1), sy = clampI(rect.y0 + y, H - 1);
         const b = sample(sx, sy);
         base[0] = b[0]; base[1] = b[1]; base[2] = b[2];
-        compositePixel(base, rect.x0 + x, rect.y0 + y, W, H, [s], assets, tmp, occ, xf);
+        compositePixel(base, rect.x0 + x, rect.y0 + y, W, H, [s], assets, tmp, occ, xf, dispRotDeg);
         const o = (y * rect.w + x) * 3;
         data[o] = base[0]; data[o + 1] = base[1]; data[o + 2] = base[2];
       }
