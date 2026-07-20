@@ -2,10 +2,10 @@
   "id": "creature-photoreal",
   "version": 2,
   "positive": [
-    "{global.photo}",
-    "A photograph of {subject_phrase}, {pose_phrase}, {view_phrase}, {distance_phrase}{expression_clause}.",
+    "{global.photo_found}",
+    "A grainy real photograph of {subject_phrase}, {pose_phrase}, {view_phrase}, {distance_phrase}{expression_clause}.",
     "{framing_clause}",
-    "Believable living anatomy, natural fur, skin and surface texture caught by a real camera.",
+    "Believable living anatomy and real skin/fur texture, but captured imperfectly by an ordinary camera — soft, grainy and a little blurry, not sharp or rendered.",
     "{global.photoreal}",
     "{global.single_subject}",
     "{global.isolated}",

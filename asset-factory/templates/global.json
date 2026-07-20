@@ -2,6 +2,7 @@
   "version": 2,
   "blocks": {
     "photo": "A real photograph — shot on a DSLR with a telephoto lens in soft natural daylight, candid documentary wildlife photography, true-to-life skin/fur/surface texture, realistic depth of field and film grain. It must look like an actual photo taken outdoors, NOT an illustration, drawing, render, or artwork.",
+    "photo_found": "A real amateur photograph caught by surprise — an ordinary cameraphone or trail-camera snapshot of eyewitness footage: visible sensor grain and high-ISO noise, slightly soft focus with a touch of motion blur, imperfect exposure, harsh direct on-camera flash at night or dim overcast light. It looks like genuine grainy leaked footage of a real living creature, an unremarkable imperfect photo — absolutely NOT a clean render, NOT CGI, NOT a smooth sculpture or statue, NOT crisp, polished, or studio-lit.",
     "single_subject": "Exactly one subject, centered, nothing else in frame.",
     "isolated": "Isolated on a fully transparent background, the entire subject visible and uncropped, with soft naturally feathered edges suitable for dropping into another photograph.",
     "isolated_overlay": "Isolated on a fully transparent background with soft naturally feathered edges, produced as an overlay element to composite into a real photograph.",
