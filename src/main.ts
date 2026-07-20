@@ -1860,14 +1860,23 @@ function ensureStickerAsset(key: string): Promise<void> {
   if (!p) {
     p = (async () => {
       try {
-        const bmp = await createImageBitmap(await (await fetch(`./stickers/${key}.png`)).blob());
+        // Decode via <img> + decode(), NOT createImageBitmap: iOS Safari's
+        // createImageBitmap rotates the bitmap 90° where <img> (and the file, and
+        // Chromium) do not — so baked stickers came out sideways on iPad while the
+        // <img> drag-ghost stayed upright (owner-caught 2026-07-20). This matches
+        // the ghost's decode path exactly.
+        const url = `./stickers/${key}.png`;
+        const img = new Image();
+        img.decoding = "async";
+        img.src = url;
+        await img.decode();
         const c = document.createElement("canvas");
-        c.width = bmp.width; c.height = bmp.height;
+        c.width = img.naturalWidth; c.height = img.naturalHeight;
         const g = c.getContext("2d")!;
-        g.drawImage(bmp, 0, 0);
-        const rgba = g.getImageData(0, 0, bmp.width, bmp.height).data;
-        stickerAssets[key] = makeStickerAsset(key, bmp.width, bmp.height, rgba);
-        stickerAssetUrls[key] = `./stickers/${key}.png`;
+        g.drawImage(img, 0, 0);
+        const rgba = g.getImageData(0, 0, c.width, c.height).data;
+        stickerAssets[key] = makeStickerAsset(key, c.width, c.height, rgba);
+        stickerAssetUrls[key] = url;
       } catch {
         /* asset missing/offline — the sticker just won't bake until it loads */
       }
@@ -2190,15 +2199,21 @@ stickerImport.addEventListener("change", async () => {
   stickerImport.value = "";
   if (!f || !current) return;
   try {
-    const bmp = await createImageBitmap(f);
+    // <img> + decode(), not createImageBitmap — iOS Safari rotates the latter 90°
+    // (see ensureStickerAsset). Decode from the same object URL the ghost uses.
+    const objUrl = URL.createObjectURL(f);
+    const img = new Image();
+    img.decoding = "async";
+    img.src = objUrl;
+    await img.decode();
     const c = document.createElement("canvas");
-    c.width = bmp.width; c.height = bmp.height;
+    c.width = img.naturalWidth; c.height = img.naturalHeight;
     const g = c.getContext("2d")!;
-    g.drawImage(bmp, 0, 0);
-    const rgba = g.getImageData(0, 0, bmp.width, bmp.height).data;
+    g.drawImage(img, 0, 0);
+    const rgba = g.getImageData(0, 0, c.width, c.height).data;
     const key = "imp-" + crypto.randomUUID();
-    stickerAssets[key] = makeStickerAsset(key, bmp.width, bmp.height, rgba);
-    stickerAssetUrls[key] = URL.createObjectURL(f);
+    stickerAssets[key] = makeStickerAsset(key, c.width, c.height, rgba);
+    stickerAssetUrls[key] = objUrl;
     const cc = canvas.getBoundingClientRect();
     const [u, v] = renderer.clientToImageUv(cc.left + cc.width / 2, cc.top + cc.height / 2);
     const s: Sticker = {

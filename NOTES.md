@@ -3232,6 +3232,24 @@ user-scalable=no.
   stay plain; and the "more below" scroll arrow moved off --accent (it matched the
   selected chips and vanished). Both verified (force-update-walk stubs the SW +
   catches the reload; sticker-category-walk + a screenshot for the tiers).
+- [x] **Sticker rotation on iOS — decode via <img>, not createImageBitmap
+  (2026-07-20)** — sticker-factory chat diagnosed: placed stickers rendered 90°
+  CCW on iOS Safari (correct in Chromium + the raw PNGs). Ruled out files (no
+  EXIF, pixel-upright), the CPU composite math, and makeStickerAsset (row-major)
+  — it's the DECODE. `ensureStickerAsset` + the "import your own" path rasterized
+  via `createImageBitmap(blob)`, which iOS rotates where an `<img>` element does
+  NOT (that's why the drag-ghost, a plain `<img>`, stayed upright while the baked
+  pixels were sideways). FIX: decode both sites through `new Image()` +
+  `img.decode()` → drawImage → getImageData (naturalWidth/Height), matching the
+  ghost's path exactly. No createImageBitmap left in main.ts. VERIFIED: all
+  sticker walks green (no Chromium regression); the iOS-upright proof is the
+  owner's 30-second iPad check (a raw `<img src="./stickers/…">` renders upright).
+  COORDINATION (important): the deployed factory stickers were PRE-ROTATED 90° CW
+  to cancel this bug. With the fix landed, that pre-rotation now over-rotates —
+  the factory must STRIP it and re-promote upright, or stickers double-rotate.
+  So this fix + the factory's strip must go together; staging was left at its
+  pre-fix reconcile (old decode + pre-rotation = upright there) until the factory
+  re-promotes onto main-with-fix.
 - [x] **Third sticker kind — Scene & nature (asset-factory handoff)** — owner go
   2026-07-19 after reading the factory's `asset-factory/CATEGORIES.md` (on branch
   `claude/jefferson-asset-pipeline-9y19wa`, which routes ~245 assets so NOTHING
