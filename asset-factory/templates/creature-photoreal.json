@@ -5,6 +5,7 @@
     "{global.photo}",
     "A clear, real photograph of {subject_phrase}, {pose_phrase}, {view_phrase}, {distance_phrase}{expression_clause}.",
     "{framing_clause}",
+    "Framed with clear empty space around the entire creature — the whole body sits comfortably within the frame and does NOT touch or run off any edge.",
     "Believable living anatomy with real skin and fur texture, sharp and in focus like an ordinary wildlife photo.",
     "{global.neutral_light}",
     "{global.single_subject}",

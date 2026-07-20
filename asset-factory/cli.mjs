@@ -135,12 +135,19 @@ async function main() {
         },
       });
       console.log(`done: ${JSON.stringify(tally)} (log: ${logPath})`);
-      // Surface provider failures on stdout (the ephemeral catalog is otherwise
-      // the only record) so a CI run's log explains what went wrong.
+      // Surface provider failures AND QC rejections on stdout (the ephemeral
+      // catalog is otherwise the only record) so a CI run's log explains what
+      // went wrong and why an asset didn't make it to review.
       if (tally.error) {
         console.log(`\nerrors this run:`);
         for (const r of allRecords())
           if (r.run_id === runId && r.status === "error") console.log(`  ${r.id}\n    ${r.error}`);
+      }
+      if (tally.rejected) {
+        console.log(`\nrejected this run (tier-a QC):`);
+        for (const r of allRecords())
+          if (r.run_id === runId && r.status === "rejected")
+            console.log(`  ${r.id}\n    ${(r.qc?.reject_reasons ?? []).join(", ") || "(no reason recorded)"}`);
       }
       break;
     }
