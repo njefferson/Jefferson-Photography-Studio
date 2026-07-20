@@ -86,6 +86,18 @@ async function main() {
         console.error("regen requires --stale (that's the only regeneration it does)");
         process.exit(1);
       }
+      // Breadth-first: cap how many entries per category are taken this run, so
+      // one run seeds every folder instead of exhausting the first category.
+      const perCat = num(flags["per-category"], Infinity);
+      if (Number.isFinite(perCat)) {
+        const seen = new Map();
+        items = items.filter(({ entry }) => {
+          const n = seen.get(entry.category) ?? 0;
+          if (n >= perCat) return false;
+          seen.set(entry.category, n + 1);
+          return true;
+        });
+      }
       const limit = num(flags.limit, Infinity);
       items = items.slice(0, limit);
       if (!items.length) {

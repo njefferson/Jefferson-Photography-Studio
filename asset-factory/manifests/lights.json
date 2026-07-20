@@ -1,0 +1,81 @@
+{
+  "category": "lights",
+  "app_category": "lights",
+  "template": "effect-overlay",
+  "tags": [
+    "lights",
+    "uap"
+  ],
+  "defaults": {
+    "views": [
+      "front"
+    ],
+    "distances": [
+      "mid"
+    ],
+    "expressions": [
+      "neutral"
+    ],
+    "variants": 1
+  },
+  "families": [
+    {
+      "family": "orb",
+      "subject_phrase": "a single glowing luminous orb of light",
+      "meta_label": "Orb",
+      "poses": [
+        {
+          "pose": "floating",
+          "pose_phrase": "floating, glowing softly"
+        }
+      ]
+    },
+    {
+      "family": "light-streak",
+      "subject_phrase": "a bright streak of glowing light",
+      "meta_label": "Light streak",
+      "poses": [
+        {
+          "pose": "streaking",
+          "pose_phrase": "a fast light streak"
+        }
+      ]
+    },
+    {
+      "family": "ball-lightning",
+      "subject_phrase": "a crackling ball of electrical lightning",
+      "meta_label": "Ball lightning",
+      "poses": [
+        {
+          "pose": "floating",
+          "pose_phrase": "hovering and crackling"
+        }
+      ]
+    },
+    {
+      "family": "will-o-wisp",
+      "subject_phrase": "a pale flickering will-o-the-wisp flame",
+      "meta_label": "Will-o-wisp",
+      "poses": [
+        {
+          "pose": "floating",
+          "pose_phrase": "drifting and flickering"
+        }
+      ]
+    },
+    {
+      "family": "distant-glow",
+      "subject_phrase": "a small faint distant glowing light",
+      "meta_label": "Distant glow",
+      "poses": [
+        {
+          "pose": "distant",
+          "pose_phrase": "a faint distant glow",
+          "distances": [
+            "far"
+          ]
+        }
+      ]
+    }
+  ]
+}

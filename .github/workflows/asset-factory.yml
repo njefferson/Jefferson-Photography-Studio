@@ -26,6 +26,10 @@ on:
         description: "Category filter (blank = all). e.g. cryptids,ufo"
         type: string
         default: cryptids
+      per_category:
+        description: "Breadth-first: max entries PER category this run (blank = no cap)"
+        type: string
+        default: ""
       limit:
         description: "Max images this run (cost guard — ideogram is ~$0.08 each)"
         type: string
@@ -71,6 +75,7 @@ jobs:
           node cli.mjs generate \
             --provider "${{ inputs.provider }}" \
             ${{ inputs.category && format('--category {0}', inputs.category) || '' }} \
+            ${{ inputs.per_category && format('--per-category {0}', inputs.per_category) || '' }} \
             --limit "${{ inputs.limit }}" \
             ${{ inputs.confirm && '--yes' || '--dry-run' }}
 

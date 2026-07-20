@@ -2,15 +2,111 @@
   "category": "folklore",
   "app_category": "spirits",
   "template": "creature-photoreal",
-  "tags": ["folklore", "legend"],
+  "tags": [
+    "folklore",
+    "legend"
+  ],
   "note": "folklore",
-  "defaults": { "views": ["three-quarter"], "distances": ["mid"], "expressions": ["neutral"], "variants": 1 },
+  "defaults": {
+    "views": [
+      "front"
+    ],
+    "distances": [
+      "mid"
+    ],
+    "expressions": [
+      "neutral"
+    ],
+    "variants": 1
+  },
   "families": [
-    { "family": "wendigo", "app_category": "cryptids", "subject_phrase": "a wendigo, a gaunt emaciated antlered humanoid with ashen skin stretched over bone", "meta_label": "Wendigo", "poses": [{ "pose": "standing", "pose_phrase": "standing tall and skeletal" }, { "pose": "crouching", "pose_phrase": "hunched and crouched", "views": ["front"] }] },
-    { "family": "black-shuck", "subject_phrase": "black shuck, an enormous spectral black dog with glowing eyes", "meta_label": "Black Shuck", "poses": [{ "pose": "standing", "pose_phrase": "standing, eyes glowing", "views": ["side"] }] },
-    { "family": "banshee", "subject_phrase": "a banshee, a pale wailing spectral woman with wild hair and a ragged shroud", "meta_label": "Banshee", "poses": [{ "pose": "wailing", "pose_phrase": "wailing, hair streaming", "views": ["front"] }] },
-    { "family": "kelpie", "app_category": "beasts", "subject_phrase": "a kelpie, a dark water horse with dripping mane and weed-tangled hide", "meta_label": "Kelpie", "poses": [{ "pose": "standing", "pose_phrase": "standing, water streaming off it", "views": ["side"] }] },
-    { "family": "redcap", "app_category": "beasts", "subject_phrase": "a redcap, a squat vicious goblin in a blood-dyed cap with iron boots", "meta_label": "Redcap", "poses": [{ "pose": "standing", "pose_phrase": "standing with a wicked grin" }] },
-    { "family": "spring-heeled-jack", "subject_phrase": "spring-heeled jack, a caped leaping figure with glowing eyes and clawed hands", "meta_label": "Spring-heeled Jack", "poses": [{ "pose": "leaping", "pose_phrase": "mid-leap, cape flaring", "views": ["side"] }] }
+    {
+      "family": "wendigo",
+      "app_category": "cryptids",
+      "subject_phrase": "a wendigo, a gaunt emaciated antlered humanoid with ashen skin stretched over bone",
+      "meta_label": "Wendigo",
+      "poses": [
+        {
+          "pose": "standing",
+          "pose_phrase": "standing tall and skeletal"
+        },
+        {
+          "pose": "crouching",
+          "pose_phrase": "hunched and crouched",
+          "views": [
+            "front"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "black-shuck",
+      "subject_phrase": "black shuck, an enormous spectral black dog with glowing eyes",
+      "meta_label": "Black Shuck",
+      "poses": [
+        {
+          "pose": "standing",
+          "pose_phrase": "standing, eyes glowing",
+          "views": [
+            "side"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "banshee",
+      "subject_phrase": "a banshee, a pale wailing spectral woman with wild hair and a ragged shroud",
+      "meta_label": "Banshee",
+      "poses": [
+        {
+          "pose": "wailing",
+          "pose_phrase": "wailing, hair streaming",
+          "views": [
+            "front"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "kelpie",
+      "app_category": "beasts",
+      "subject_phrase": "a kelpie, a dark water horse with dripping mane and weed-tangled hide",
+      "meta_label": "Kelpie",
+      "poses": [
+        {
+          "pose": "standing",
+          "pose_phrase": "standing, water streaming off it",
+          "views": [
+            "side"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "redcap",
+      "app_category": "beasts",
+      "subject_phrase": "a redcap, a squat vicious goblin in a blood-dyed cap with iron boots",
+      "meta_label": "Redcap",
+      "poses": [
+        {
+          "pose": "standing",
+          "pose_phrase": "standing with a wicked grin"
+        }
+      ]
+    },
+    {
+      "family": "spring-heeled-jack",
+      "subject_phrase": "spring-heeled jack, a caped leaping figure with glowing eyes and clawed hands",
+      "meta_label": "Spring-heeled Jack",
+      "poses": [
+        {
+          "pose": "leaping",
+          "pose_phrase": "mid-leap, cape flaring",
+          "views": [
+            "side"
+          ]
+        }
+      ]
+    }
   ]
 }
