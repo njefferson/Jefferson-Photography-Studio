@@ -2883,23 +2883,46 @@ forceUpdateBtn.addEventListener("click", async () => {
   forcingUpdate = true;
   forceUpdateBtn.disabled = true;
   forceUpdateNote.textContent = "Checking for a new version…";
+
+  // Reload ONLY once the new worker has actually taken control — reloading on a
+  // blind timer (the old bug) drops you back onto the old cached code, because
+  // over a phone connection the new app shell hasn't finished downloading yet.
+  // The SW self-activates (skipWaiting) once its precache completes, which fires
+  // controllerchange; that's our signal that fresh code is live.
+  let reloaded = false;
+  const reloadOnce = () => { if (!reloaded) { reloaded = true; location.reload(); } };
+
   try {
-    if ("serviceWorker" in navigator) {
-      const reg = await navigator.serviceWorker.getRegistration();
-      if (reg) {
-        await reg.update(); // ask the server for the newest sw.js
-        const sw = reg.waiting || reg.installing;
-        if (sw) {
-          await new Promise<void>((res) => {
-            navigator.serviceWorker.addEventListener("controllerchange", () => res(), { once: true });
-            sw.postMessage({ type: "SKIP_WAITING" });
-            setTimeout(res, 2500); // never hang if it doesn't hand over
-          });
-        }
-      }
+    if (!("serviceWorker" in navigator)) { reloadOnce(); return; }
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (!reg) { reloadOnce(); return; }
+
+    navigator.serviceWorker.addEventListener("controllerchange", reloadOnce, { once: true });
+    await reg.update(); // fetch the newest sw.js (served no-store, so never stale)
+
+    // The worker that update() turned up — installing now, or already waiting.
+    const incoming = reg.installing || reg.waiting;
+    if (!incoming) {
+      // Server has nothing newer than what's already running.
+      forceUpdateNote.textContent = `You're already on the latest version (v${__APP_VERSION__}).`;
+      forcingUpdate = false;
+      forceUpdateBtn.disabled = false;
+      navigator.serviceWorker.removeEventListener("controllerchange", reloadOnce);
+      return;
     }
-  } catch { /* offline / no SW — the reload still refetches the shell network-first */ }
-  location.reload();
+
+    forceUpdateNote.textContent = "Downloading the update… this can take a moment on cellular.";
+    const nudge = (w: ServiceWorker) => w.postMessage({ type: "SKIP_WAITING" });
+    if (incoming.state === "installed") nudge(incoming);
+    else incoming.addEventListener("statechange", () => {
+      if (incoming.state === "installed") nudge(incoming);
+    });
+    // Safety net: if the handover never fires (some iOS builds are stubborn),
+    // reload anyway after a generous wait so the button is never a dead end.
+    setTimeout(reloadOnce, 20000);
+  } catch {
+    reloadOnce(); // offline / no SW — a plain reload still refetches network-first
+  }
 });
 
 // --- Local masks: radial / linear gradient with a few local adjustments,
