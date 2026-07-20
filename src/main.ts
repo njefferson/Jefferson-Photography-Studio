@@ -2455,21 +2455,22 @@ function sampleSceneSrcMean(x: number, y: number, rUv: number): [number, number,
 
 const MATCH_AMT_DEFAULT = 0.85; // how hard a fresh sticker matches the scene
 
-/** "Blend to match" — land the sticker on the scene's ACTUAL on-screen colour by
- *  matching in SOURCE space: a per-channel gain = sceneSourceMean / assetSourceMean
- *  moves the sticker's average source colour onto the scene's, so after the
- *  identical IR pipeline (WB, camera matrix, channel swap) it displays as the
- *  scene does — a blown-out craft tones right in, no canvas readback (so it works
- *  on iOS). Clamped per channel so a near-black asset channel can't explode; the
- *  strength slider lerps it toward the raw asset, the sliders fine-tune. */
+/** "Blend to match" — make the sticker take on the scene's COLOUR while keeping
+ *  its own brightness, all in SOURCE space (so it survives the identical IR
+ *  pipeline and needs no canvas readback → iOS-safe). We store the scene's
+ *  CHROMA — its source mean normalised to unit luma — and matchAsset lerps each
+ *  sticker pixel toward luma(pixel) × that chroma. A ratio-gain can't turn a
+ *  teal channel pink and an absolute shift toward the dim camera-native mean
+ *  crushes the sticker to black (both measured); chroma-match changes hue while
+ *  preserving brightness, so a teal creature actually takes on a pink scene. The
+ *  strength slider lerps it in; the manual sliders fine-tune on top. */
 function autoMatchSticker(s: Sticker) {
   const a = stickerAssets[s.asset];
   if (!a) return; // asset still loading — no match this time (rare)
   const src = sampleSceneSrcMean(s.x, s.y, s.scale * 0.5);
   if (!src) return;
-  const gain: [number, number, number] = [1, 1, 1];
-  for (let k = 0; k < 3; k++) gain[k] = clamp(src[k] / Math.max(1e-3, a.mean[k]), 0.12, 6);
-  s.matchGain = gain;
+  const luma = Math.max(1e-4, src[0] * 0.2126 + src[1] * 0.7152 + src[2] * 0.0722);
+  s.matchGain = [src[0] / luma, src[1] / luma, src[2] / luma]; // scene chroma (unit luma)
   s.matchAmt = MATCH_AMT_DEFAULT;
   s.bright = 0; s.contrast = 0; s.warmth = 0; s.sat = 0; // the gain carries the match; sliders start neutral
 }
