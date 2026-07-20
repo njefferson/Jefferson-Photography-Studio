@@ -613,7 +613,7 @@ function cloneParams(p: EditParams): EditParams {
     stickers: (p.stickers ?? []).map((s) => ({
       ...s,
       corners: s.corners ? s.corners.map((c) => [c[0], c[1]] as [number, number]) : s.corners,
-      matchTarget: s.matchTarget ? ([...s.matchTarget] as [number, number, number]) : s.matchTarget,
+      matchGain: s.matchGain ? ([...s.matchGain] as [number, number, number]) : s.matchGain,
     })),
     // The warp field is SHARED by reference (copy-on-write per stroke, like the
     // brush bitmaps) — a snapshot's field is immutable once a new stroke clones.
@@ -2163,14 +2163,12 @@ const stkAdjustInput = () => {
 };
 for (const el of [stkBright, stkContrast, stkWarmth, stkSat]) el.addEventListener("input", stkAdjustInput);
 
-// Match strength — how hard the auto-match harmonises to the scene (rescales the
-// stored target into brightness/contrast/warmth; the sliders reflect it).
+// Match strength — how hard the auto-match harmonises to the scene (lerps the
+// per-channel gain toward the raw asset; baked live like any slider).
 stkMatchStrength.addEventListener("input", () => {
   const s = selSticker();
   if (!s) return;
   s.matchAmt = Number(stkMatchStrength.value);
-  applyMatchAmt(s);
-  updateStickerUI();
   draw();
 });
 
@@ -2401,64 +2399,51 @@ function endStickerPaint() {
   flushRecord();
 }
 
-/** Mean LINEAR colour of the DISPLAYED scene in a patch around image-uv (x,y),
- *  read back from the preview canvas (post-pipeline, what the eye sees). The
- *  match drives gentle, monotonic scalars from this, which survive the pipeline;
- *  a per-channel source-space transfer does not (channel swap + WB). Null when
- *  off-screen. */
-function sampleScenePatch(x: number, y: number, rUv: number): [number, number, number] | null {
-  if (!canvas.width) return null;
-  const [cxClient, cyClient] = renderer.imageUvToClient(x, y);
-  const rect = canvas.getBoundingClientRect();
-  const cx = ((cxClient - rect.left) / rect.width) * canvas.width;
-  const cy = ((cyClient - rect.top) / rect.height) * canvas.height;
-  const half = Math.max(4, rUv * canvas.width);
-  const x0 = Math.max(0, Math.floor(cx - half)), y0 = Math.max(0, Math.floor(cy - half));
-  const x1 = Math.min(canvas.width, Math.ceil(cx + half)), y1 = Math.min(canvas.height, Math.ceil(cy + half));
+/** Mean SOURCE-linear colour of the pristine scene in a patch around image-uv
+ *  (x,y) — read from previewSrc, NOT the canvas. The old version read the WebGL
+ *  canvas back through a 2D canvas; that works in Chromium but SILENTLY FAILS on
+ *  iOS Safari, so the match never computed and the strength slider did nothing
+ *  (owner, 2026-07-20). Null before an image is loaded. */
+function sampleSceneSrcMean(x: number, y: number, rUv: number): [number, number, number] | null {
+  const ps = previewSrc;
+  if (!ps) return null;
+  const W = ps.width, H = ps.height;
+  const half = Math.max(2, rUv * W);
+  const x0 = Math.max(0, Math.floor(x * W - half)), y0 = Math.max(0, Math.floor(y * H - half));
+  const x1 = Math.min(W, Math.ceil(x * W + half)), y1 = Math.min(H, Math.ceil(y * H + half));
   if (x1 - x0 < 2 || y1 - y0 < 2) return null;
-  const tmp = document.createElement("canvas");
-  tmp.width = x1 - x0; tmp.height = y1 - y0;
-  const g = tmp.getContext("2d");
-  if (!g) return null;
-  g.drawImage(canvas, x0, y0, x1 - x0, y1 - y0, 0, 0, x1 - x0, y1 - y0);
-  const d = g.getImageData(0, 0, x1 - x0, y1 - y0).data;
-  let r = 0, gg = 0, b = 0, n = 0;
-  for (let i = 0; i < d.length; i += 4) {
-    r += Math.pow(d[i] / 255, 2.2); gg += Math.pow(d[i + 1] / 255, 2.2); b += Math.pow(d[i + 2] / 255, 2.2); n++;
+  const lin = ps.linear, px = ps.pixels;
+  let r = 0, g = 0, b = 0, n = 0;
+  for (let yy = y0; yy < y1; yy++) {
+    for (let xx = x0; xx < x1; xx++) {
+      const o = (yy * W + xx) * 4;
+      if (lin) { r += lin[o]; g += lin[o + 1]; b += lin[o + 2]; }
+      else { r += Math.pow(px![o] / 255, 2.2); g += Math.pow(px![o + 1] / 255, 2.2); b += Math.pow(px![o + 2] / 255, 2.2); }
+      n++;
+    }
   }
-  return n ? [r / n, gg / n, b / n] : null;
+  return n ? [r / n, g / n, b / n] : null;
 }
 
 const MATCH_AMT_DEFAULT = 0.85; // how hard a fresh sticker matches the scene
 
-/** Push the auto-match target into the applied scalars at the current strength
- *  (saturation stays whatever the user set — it's not auto-driven). */
-function applyMatchAmt(s: Sticker) {
-  const t = s.matchTarget ?? [0, 0, 0];
-  const amt = s.matchAmt ?? 0;
-  s.bright = amt * t[0];
-  s.contrast = amt * t[1];
-  s.warmth = amt * t[2];
-}
-
-/** "Blend to match" — harmonise the sticker to the scene under it: pull its
- *  brightness and warmth toward the local (displayed) scene and soften its
- *  contrast so it isn't crisper than the grainy photo. Stores the full-strength
- *  target; matchAmt scales how much lands. Gentle + clamped so it can't blow the
- *  sticker out; the sliders fine-tune from there. */
+/** "Blend to match" — land the sticker on the scene's ACTUAL on-screen colour by
+ *  matching in SOURCE space: a per-channel gain = sceneSourceMean / assetSourceMean
+ *  moves the sticker's average source colour onto the scene's, so after the
+ *  identical IR pipeline (WB, camera matrix, channel swap) it displays as the
+ *  scene does — a blown-out craft tones right in, no canvas readback (so it works
+ *  on iOS). Clamped per channel so a near-black asset channel can't explode; the
+ *  strength slider lerps it toward the raw asset, the sliders fine-tune. */
 function autoMatchSticker(s: Sticker) {
   const a = stickerAssets[s.asset];
   if (!a) return; // asset still loading — no match this time (rare)
-  const patch = sampleScenePatch(s.x, s.y, s.scale * 0.5);
-  if (!patch) return;
-  const L = (c: [number, number, number]) => c[0] * 0.2126 + c[1] * 0.7152 + c[2] * 0.0722;
-  const sceneL = L(patch), assetL = L(a.mean);
-  const bright = assetL > 1e-3 ? clamp(sceneL / assetL - 1, -0.85, 0.4) : 0;
-  const rb = (c: [number, number, number]) => Math.log((c[0] + 0.01) / (c[2] + 0.01));
-  const warmth = clamp((rb(patch) - rb(a.mean)) * 0.5, -0.7, 0.7);
-  s.matchTarget = [bright, -0.18, warmth]; // soften contrast — not sharper than the grain
+  const src = sampleSceneSrcMean(s.x, s.y, s.scale * 0.5);
+  if (!src) return;
+  const gain: [number, number, number] = [1, 1, 1];
+  for (let k = 0; k < 3; k++) gain[k] = clamp(src[k] / Math.max(1e-3, a.mean[k]), 0.12, 6);
+  s.matchGain = gain;
   s.matchAmt = MATCH_AMT_DEFAULT;
-  applyMatchAmt(s);
+  s.bright = 0; s.contrast = 0; s.warmth = 0; s.sat = 0; // the gain carries the match; sliders start neutral
 }
 
 /** Reflect the selected sticker into the controls; show/hide the panels. */

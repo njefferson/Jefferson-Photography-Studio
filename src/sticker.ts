@@ -194,13 +194,17 @@ function sampleMask(b: { w: number; h: number; data: Uint8Array }, u: number, v:
 const MATCH_MID = 0.18; // linear mid-grey the sticker contrast pivots about
 
 /** Apply a sticker's match adjustments to its (linear) asset colour IN PLACE.
- *  Brightness (multiply), contrast (about mid grey), warmth (R↑/B↓), saturation
- *  (toward luma). These are the applied values — auto-match writes them scaled by
- *  matchAmt, the user nudges from there. Cheap per pixel — all-0 = the raw asset. */
+ *  First the "blend to match" per-channel SOURCE gain (matchGain × matchAmt,
+ *  which lands the sticker on the scene's colour after the pipeline), THEN the
+ *  manual scalars: brightness, contrast (about mid grey), warmth (R↑/B↓),
+ *  saturation (toward luma). Cheap per pixel — nothing set = the raw asset. */
 function matchAsset(c: Float32Array, s: Sticker): void {
+  const amt = s.matchAmt ?? 0;
+  const gain = amt > 0 ? s.matchGain : null;
   const br = s.bright ?? 0, con = s.contrast ?? 0, wm = s.warmth ?? 0, sa = s.sat ?? 0;
-  if (br === 0 && con === 0 && wm === 0 && sa === 0) return;
+  if (!gain && br === 0 && con === 0 && wm === 0 && sa === 0) return;
   let r = c[0], g = c[1], b = c[2];
+  if (gain) { r *= 1 + amt * (gain[0] - 1); g *= 1 + amt * (gain[1] - 1); b *= 1 + amt * (gain[2] - 1); }
   if (br !== 0) { const k = 1 + br; r *= k; g *= k; b *= k; }
   if (con !== 0) { const cf = 1 + con; r = (r - MATCH_MID) * cf + MATCH_MID; g = (g - MATCH_MID) * cf + MATCH_MID; b = (b - MATCH_MID) * cf + MATCH_MID; }
   if (wm !== 0) { r *= 1 + wm * 0.4; b *= 1 - wm * 0.4; }
