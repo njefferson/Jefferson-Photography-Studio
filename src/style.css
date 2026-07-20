@@ -176,6 +176,16 @@ body {
   flex: none;
 }
 .info-btn:active { background: var(--surface-3); }
+/* Discrete build stamp beside the tool name — small and muted, but always on
+   screen so a troubleshooting screenshot records which build it came from. */
+.ver-tag {
+  font: 500 11px/1 var(--mono, ui-monospace, monospace);
+  color: var(--txt-3);
+  letter-spacing: 0.02em;
+  margin-left: 2px;
+  flex: none;
+  user-select: text;
+}
 
 /* ---- Buttons ---- */
 button { cursor: pointer; font-family: var(--ui); }
