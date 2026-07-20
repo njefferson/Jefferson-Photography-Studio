@@ -2860,6 +2860,40 @@ setLocStripBtn.addEventListener("click", () => {
 });
 syncLocSettings();
 
+// "Update to the latest version" — a PWA hard-refresh so a new deploy shows
+// without force-closing the app (owner, 2026-07-20: "I don't like having to
+// force close twice… my kids will never get them"). Asks the SW to fetch the
+// newest sw.js, tells any waiting worker to take over now (the SKIP_WAITING
+// message the SW listens for), then reloads — navigations are network-first, so
+// the reload pulls the fresh shell + its new hashed assets even if the SW check
+// finds nothing.
+const forceUpdateBtn = $("forceUpdate") as HTMLButtonElement;
+const forceUpdateNote = $("forceUpdateNote") as HTMLElement;
+let forcingUpdate = false;
+forceUpdateBtn.addEventListener("click", async () => {
+  if (forcingUpdate) return;
+  forcingUpdate = true;
+  forceUpdateBtn.disabled = true;
+  forceUpdateNote.textContent = "Checking for a new version…";
+  try {
+    if ("serviceWorker" in navigator) {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg) {
+        await reg.update(); // ask the server for the newest sw.js
+        const sw = reg.waiting || reg.installing;
+        if (sw) {
+          await new Promise<void>((res) => {
+            navigator.serviceWorker.addEventListener("controllerchange", () => res(), { once: true });
+            sw.postMessage({ type: "SKIP_WAITING" });
+            setTimeout(res, 2500); // never hang if it doesn't hand over
+          });
+        }
+      }
+    }
+  } catch { /* offline / no SW — the reload still refetches the shell network-first */ }
+  location.reload();
+});
+
 // --- Local masks: radial / linear gradient with a few local adjustments,
 // placed by dragging handles on the photo. Geometry is in image-uv so masks
 // stay glued to the subject through zoom/pan/rotation. ---
