@@ -7,7 +7,7 @@
   ],
   "defaults": {
     "views": [
-      "three-quarter"
+      "front"
     ],
     "distances": [
       "mid"

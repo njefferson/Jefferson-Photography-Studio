@@ -1,14 +1,15 @@
 {
   "id": "creature-photoreal",
-  "version": 2,
+  "version": 3,
   "positive": [
-    "{global.photo_found}",
-    "A grainy real photograph of {subject_phrase}, {pose_phrase}, {view_phrase}, {distance_phrase}{expression_clause}.",
+    "{global.photo}",
+    "A clear, real photograph of {subject_phrase}, {pose_phrase}, {view_phrase}, {distance_phrase}{expression_clause}.",
     "{framing_clause}",
-    "Believable living anatomy and real skin/fur texture, but captured imperfectly by an ordinary camera — soft, grainy and a little blurry, not sharp or rendered.",
-    "{global.photoreal}",
+    "Believable living anatomy with real skin and fur texture, sharp and in focus like an ordinary wildlife photo.",
+    "{global.neutral_light}",
     "{global.single_subject}",
     "{global.isolated}",
+    "{global.no_baked_fx}",
     "{global.no_text}"
   ],
   "negative": ["{global_negative}"],
