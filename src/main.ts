@@ -46,6 +46,14 @@ declare const __APP_VERSION__: string;
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
+// Discrete build stamp in the header — so a troubleshooting screenshot always
+// says which build it came from (a stale PWA cache can otherwise hide which
+// code is actually running on the device).
+{
+  const verTag = document.getElementById("verTag");
+  if (verTag) verTag.textContent = `v${__APP_VERSION__}`;
+}
+
 const canvas = $("view") as HTMLCanvasElement;
 const hint = $("hint") as HTMLParagraphElement;
 const panel = $("panel") as HTMLElement;
