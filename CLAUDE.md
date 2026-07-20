@@ -76,17 +76,16 @@ patterns already verified correct — do not "fix" those, do not regress them.
   NEEDS THE OWNER'S HANDS on the real iPad (share sheet, pinch feel, install
   flows, Safari-only storage behavior — all measurements so far are Chromium).
 
-## The owner
-- iPad-first, often driving. One step at a time; no desktop-required steps
-  unless every alternative is exhausted. No drafts or pseudo-code — iterate
-  privately, deliver finished work.
-- NEVER use the pop-up question tool (AskUserQuestion) — on his iPad the
-  answers don't come back (the tool fails or the response is lost), so it just
-  stalls the work (owner rule, 2026-07-19). Ask any question as plain text in
-  chat and let him reply normally. This includes plan-mode clarifications —
-  ask in chat, don't open a picker.
+## Working preferences
+- Mobile-first: one step at a time; avoid desktop-required steps unless every
+  alternative is exhausted. No drafts or pseudo-code — iterate privately,
+  deliver finished work.
+- NEVER use the pop-up question tool (AskUserQuestion) — the answers don't come
+  back reliably on the target device, so it stalls the work. Ask any question
+  as plain text in chat. This includes plan-mode clarifications — ask in chat,
+  don't open a picker.
 - Session repo access is fixed at session creation (source picker); it cannot
-  be added from the iPad mid-session.
+  be added mid-session.
 - Taste: maximum saturation, gentle contrast, shadows alive; direct
   manipulation; modes announce themselves and offer an obvious exit; one
   gesture = one undo step; labels stay honest; every failure explains itself

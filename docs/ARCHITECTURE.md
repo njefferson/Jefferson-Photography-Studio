@@ -195,16 +195,19 @@ without better evidence.
 - `.cube` (`lut.ts`): bakes the color pipeline (verified vs compileEdit to
   rounding). Spatial features (denoise/glow) CANNOT be in a LUT.
 - `.dcp` (`dcp.ts`): TIFF-based, embeds ColorMatrix1 + ProfileHueSatMap.
-  Structure validated with tifffile; COLOR NEVER VALIDATED IN LIGHTROOM (beta).
+  Structure validated with tifffile; color output not yet validated in
+  Lightroom — shipped as beta.
 - Lightroom .xmp presets in `presets/` (Temperature floor 2000 + Calibration
   faux swap; a true swap is impossible in Lightroom without a profile).
-- Image exports embed an **sRGB ICC profile** (`src/icc.ts`, `SRGB_ICC`) so files
-  are never untagged: JPEG gets an APP2 `ICC_PROFILE` segment (`embedIccInJpeg`,
-  inserted after SOI/APP0), the 16-bit TIFF gets tag 34675 (`writeTiff16`). The
-  profile is a minimal valid ICC v2 display profile — sRGB/Rec.709 primaries,
-  gamma-2.2 TRC (what `toGamma` writes, not the sRGB piecewise curve), D50 PCS
-  with the standard D65→D50-adapted colorants. If the pipeline's encode ever
-  changes to true sRGB piecewise, swap the TRC to a `para` curve to match.
+- Image exports embed an ICC profile (`src/icc.ts`) so files are never untagged.
+  The **16-bit TIFF** carries an sRGB/Rec.709-primaries profile (`SRGB_ICC`, tag
+  34675 via `writeTiff16`); the **JPEG** carries a Display-P3 profile with the
+  sRGB gamma-2.2 transfer curve, matching the P3-encoded pixels (APP2
+  `ICC_PROFILE` segment via `embedIccInJpeg`, inserted after SOI/APP0). Both are
+  minimal valid ICC v2 display profiles with a gamma-2.2 TRC (what `toGamma`
+  writes, not the sRGB piecewise curve) and D50 PCS with D65→D50-adapted
+  colorants. If the pipeline's encode ever changes to true sRGB piecewise, swap
+  the TRC to a `para` curve to match.
 
 ## Example photos (`public/examples/`)
 
