@@ -25,7 +25,7 @@ on:
       category:
         description: "Category filter (blank = all). e.g. cryptids,ufo"
         type: string
-        default: cryptids
+        default: ""
       per_category:
         description: "Breadth-first: max entries PER category this run (blank = no cap)"
         type: string
