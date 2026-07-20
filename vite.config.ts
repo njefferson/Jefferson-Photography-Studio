@@ -231,6 +231,9 @@ function precacheManifest(): Plugin {
         // served — precaching them would 404 during SW install and break the
         // entire offline shell (addAll is all-or-nothing).
         .filter((p) => p !== "_headers" && p !== "_redirects")
+        // Social-share images are fetched by link scrapers (GitHub/Cloudflare/
+        // OpenGraph), never by the app itself — no reason to precache the bytes.
+        .filter((p) => p !== "ir-social.jpg")
         .filter((p) => statSync(resolve(dist, p)).isFile()) // drop directory entries
         .map((p) => "./" + p);
       // The chooser PWA launches at "./" (start_url in manifest.webmanifest), so
