@@ -38,6 +38,10 @@ on:
 # Never run this on a push; manual only.
 concurrency: asset-factory-${{ github.ref }}
 
+# Needs write access to push the review batch to its throwaway branch.
+permissions:
+  contents: write
+
 jobs:
   generate:
     runs-on: ubuntu-latest
@@ -73,6 +77,25 @@ jobs:
         if: ${{ inputs.confirm }}
         working-directory: asset-factory
         run: node cli.mjs stats ${{ inputs.category && format('--category {0}', inputs.category) || '' }}
+
+      # Publish the approved batch as viewable PNGs + a contact sheet, then push
+      # them to a throwaway branch. A session reads them back over the GitHub API
+      # (the artifact blob host is egress-blocked) and hands them to the owner.
+      - name: Publish review batch
+        if: ${{ inputs.confirm }}
+        working-directory: asset-factory
+        run: node cli.mjs publish-review ${{ inputs.category && format('--category {0}', inputs.category) || '' }}
+
+      - name: Push review batch to the review branch
+        if: ${{ inputs.confirm }}
+        run: |
+          git config user.name "asset-factory-bot"
+          git config user.email "noreply@anthropic.com"
+          git checkout --orphan review-tmp
+          git reset
+          git add -f asset-factory/review
+          git commit -m "Review batch: ${{ inputs.category }} (run ${{ github.run_id }})"
+          git push -f origin review-tmp:claude/asset-factory-review
 
       - name: Upload results (images + catalog)
         if: ${{ inputs.confirm }}

@@ -12,6 +12,7 @@ import { expandAll } from "./src/expander.mjs";
 import { qcCheck } from "./src/qc.mjs";
 import { dhash, findDuplicate } from "./src/dedupe.mjs";
 import { promote } from "./src/promote.mjs";
+import { publishReview } from "./src/review.mjs";
 
 const HELP = `asset-factory — manifest-driven overlay-asset pipeline
 
@@ -23,6 +24,7 @@ const HELP = `asset-factory — manifest-driven overlay-asset pipeline
   dedupe    [--category X] [--hamming N]                    recompute hashes + re-cluster
   curate    (--approve|--reject|--favorite|--unfavorite) --ids a,b,c   owner-taste overrides
   promote   [--category X] [--favorites-only] [--ids a,b] [--max-edge 1280] [--out DIR] [--dry-run]
+  publish-review [--category X]                             copy approved PNGs + a contact sheet into review/
   stats     [--category X]                                  per-category status table
 
 The image library (assets/ etc.) is gitignored and regenerable; the committed
@@ -239,6 +241,12 @@ async function main() {
       for (const p of res.promoted) console.log(`${flags["dry-run"] ? "would promote" : "promoted"} ${p.id} -> ${p.appCategory}/${p.name}.png`);
       if (res.metaSnippet) console.log(`\n${res.metaSnippet}`);
       console.log(`\n${res.promoted.length} asset(s). Shipping public/stickers/ changes is a product release (staging gate).`);
+      break;
+    }
+
+    case "publish-review": {
+      const res = await publishReview({ categories });
+      console.log(`published ${res.items.length} asset(s) to review/${res.sheet ? " + contact-sheet.png" : ""}`);
       break;
     }
 

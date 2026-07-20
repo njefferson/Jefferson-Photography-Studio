@@ -11,3 +11,6 @@ asset-factory/generated/
 asset-factory/rejected/
 asset-factory/duplicates/
 asset-factory/logs/
+# review/ is a throwaway batch preview; the workflow force-adds it to the
+# disposable review branch, but it must never ride the pipeline branch.
+asset-factory/review/
