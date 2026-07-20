@@ -22,6 +22,7 @@ import { qcCheck } from "./qc.mjs";
 import { dhash, findDuplicate } from "./dedupe.mjs";
 import { retrySeed } from "./ids.mjs";
 import { extractAlpha } from "./providers/matting.mjs";
+import { cleanMatte, normalizeMargin } from "./matte.mjs";
 
 /**
  * Classify every expanded entry against the catalog.
@@ -157,19 +158,22 @@ export async function runGenerate({ items, provider, concurrency = 2, hamming = 
       log({ id, stage: "generate", ok: false, ms: Date.now() - t0, detail: record.error });
       return;
     }
-    // Providers that render opaque (e.g. Flux) route through matting to get a
-    // clean transparent cutout before QC ever sees the image. A matting failure
-    // is a per-asset error, not a crash — the record is marked and the run
-    // continues, exactly like a generate failure.
+    // Matte. Providers that render opaque (e.g. Flux) route through matting for a
+    // transparent cutout, then get the matte cleaned (edge decontaminated,
+    // speckle/interior firmed). This runs BEFORE QC so QC judges true colour —
+    // but reframing to a consistent margin waits until AFTER QC (below), so the
+    // cropped-subject check still sees whether the render ran off-frame. A
+    // failure here is a per-asset error, not a crash, like a generate failure.
     if (provider.supportsAlpha === false) {
       const tMat = Date.now();
       try {
         png = await extractAlpha(png);
+        png = await cleanMatte(png);
         record.matted = true;
         log({ id, stage: "matte", ok: true, ms: Date.now() - tMat, detail: `${png.length}b` });
       } catch (e) {
         record.status = "error";
-        record.error = `matting: ${String(e.message ?? e)}`;
+        record.error = `matte: ${String(e.message ?? e)}`;
         writeRecord(record);
         tally.error++;
         log({ id, stage: "matte", ok: false, ms: Date.now() - tMat, detail: record.error });
@@ -198,6 +202,19 @@ export async function runGenerate({ items, provider, concurrency = 2, hamming = 
         return;
       }
       record.transparent = true;
+      // Passed QC on the true frame — now reframe to a consistent centered
+      // margin (contract) and re-sync the on-disk file before dedupe/placement.
+      try {
+        png = await normalizeMargin(png);
+        writeFileSync(genPath, png);
+      } catch (e) {
+        record.status = "error";
+        record.error = `reframe: ${String(e.message ?? e)}`;
+        writeRecord(record);
+        tally.error++;
+        log({ id, stage: "reframe", ok: false, detail: record.error });
+        return;
+      }
       const h = await dhash(png);
       record.dhash = h;
       const dupOf = findDuplicate(h, hashIndex, hamming);

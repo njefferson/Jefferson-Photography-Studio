@@ -55,6 +55,16 @@ export const QC_DEFAULTS = {
 // Dedupe: dHash Hamming distance at or below this = duplicate composition.
 export const DEDUPE_HAMMING = 6;
 
+// Matte finishing (src/matte.mjs). Alpha at/below SPECKLE_MAX is snapped to a
+// fully-clear background; at/above SOLID_MIN is snapped to a fully-solid subject;
+// the band between is the feathered edge that gets colour-decontaminated.
+export const MATTE_SPECKLE_MAX = 15;
+export const MATTE_SOLID_MIN = 250;
+// Framing: a square asset with this fraction of transparent margin on every side
+// (contract: ~8–12%), rendered at this canvas size.
+export const ASSET_MARGIN_FRAC = 0.1;
+export const ASSET_SIZE = 1024;
+
 export const env = {
   ideogramKey: () => process.env.IDEOGRAM_API_KEY ?? "",
   anthropicKey: () => process.env.ANTHROPIC_API_KEY ?? "",
