@@ -4,12 +4,19 @@
 // service worker so the whole studio works offline.
 import "./launcher.css";
 import { wireThemeToggle } from "./theme";
+import { wireForceUpdate } from "./swupdate";
 wireThemeToggle(document.getElementById("themeToggle"));
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("./sw.js").catch(() => {});
   });
+}
+
+{
+  const btn = document.getElementById("forceUpdate") as HTMLButtonElement | null;
+  const note = document.getElementById("forceUpdateNote");
+  if (btn && note) wireForceUpdate(btn, note);
 }
 
 // Installed-app Share (src/share.ts): only appears when the launcher is running
