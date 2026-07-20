@@ -3265,6 +3265,29 @@ user-scalable=no.
   appear with Wildlife → "Owl"; three kinds now render and filter; PLANT=nofilter
   fails; all sticker regressions + build green. The factory promotes reviewed
   PNGs into public/stickers/<category>/ as its own deliberate step.
+- [x] **New Infrared app icon + social tile (Bigfoot IR forest)** — owner ask
+  2026-07-20, from a ChatGPT-made color-IR forest he liked (a Bigfoot subtly
+  placed in the trees; source in session uploads). Three deliverables, all cut
+  from that one square image via the headless-Chromium canvas pipeline
+  (`gen-brand.mjs`, scratchpad): (1) **IR icon** — `public/icon.svg` now embeds
+  a 384px JPEG of the photo, center-square, clipped to the same rx=96 squircle
+  (favicon `<link rel=icon>` + manifest "any"); `ir-icon-180.png` (apple-touch)
+  and `ir-icon-512.png` (maskable) are the full-square crop. Bigfoot sits
+  center-right, inside the maskable safe zone. The old generated ring-glyph SVG
+  is gone. (2) **Social tile** — `public/ir-social.jpg`, 1280×640 (GitHub's 2:1,
+  under its 1 MB limit at 222 KB), photo cover-cropped + bottom scrim + title
+  "Infrared Photography Studio" and the values tagline + the IR channel-swap
+  glyph mark; wired as `og:image`/`twitter:image` in ir.html (was a bare sample
+  photo). EXCLUDED from precache (vite.config.ts) — scrapers fetch it, the app
+  never does. (3) Instagram announcement copy for the sticker/creature release —
+  delivered in chat (not committed). VERIFIED headless: icon.svg decodes as an
+  `<img>` and renders the squircle photo; build clean; dist serves all four
+  assets; ir-social.jpg absent from sw.js precache, icons + icon.svg present;
+  og:image points at the tile. NEEDS OWNER'S HANDS (iPad): how the icon looks
+  installed on the iOS home screen (maskable crop / Safari re-add), and the
+  GitHub **Settings → Social preview** upload is a manual UI step (Cloudflare
+  picks the og:image up automatically). Not a capability — ships as an increment
+  (no VERSION bump).
 
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 
