@@ -1,12 +1,14 @@
 {
-  "version": 3,
+  "version": 4,
   "blocks": {
     "photo": "A real, natural-light photograph of a real subject — shot outdoors in soft, even daylight with a full tonal range from clean shadows to bright highlights, true-to-life skin, fur, and surface texture, sharp and in focus. It looks like an ordinary, believable photo, absolutely NOT an illustration, drawing, painting, sketch, comic, 3D render, CGI, sculpture, statue, figurine, or toy.",
+    "photo_plain": "A real, natural-light photograph — shot outdoors in soft, even daylight, true-to-life detail, texture and colour, sharp and in focus, exactly as it looks in a real photo. Absolutely NOT an illustration, drawing, painting, sketch, comic, 3D render, CGI, or artwork, and NOT an animal or creature unless explicitly described.",
     "single_subject": "Exactly one subject, centered, nothing else in frame.",
     "isolated": "Isolated on a fully transparent background, the entire subject visible and uncropped, with soft naturally feathered edges suitable for dropping into another photograph.",
     "isolated_overlay": "Isolated on a fully transparent background with soft naturally feathered edges, produced as an overlay element to composite into a real photograph.",
     "photoreal": "Photorealistic and believable as a real photograph, evenly lit in neutral daylight so it can be relit to match any scene, natural (not dramatic) shadows only on the subject itself.",
     "neutral_light": "Evenly and naturally lit in soft daylight so it can be relit to match any scene — no dramatic or hard directional light, no strong coloured light, no night flash.",
+    "framing_space": "Framed with clear empty space all around it — the whole thing sits comfortably within the frame and does NOT touch or run off any edge.",
     "no_baked_fx": "No baked-in effects of any kind — no vignette, no border or frame, no drop shadow, no glow or rim light, no film grain, no colour grade or filter. A plain, un-stylised subject; the app adds its own tone and grain.",
     "no_text": "No text, no watermark, no caption, no border, no frame, no sticker sheet, no collage."
   },

@@ -1,9 +1,9 @@
 {
   "id": "effect-overlay",
-  "version": 2,
+  "version": 3,
   "positive": [
-    "{global.photo}",
-    "A photograph of {subject_phrase}, {pose_phrase}, {view_phrase}, {distance_phrase}.",
+    "{global.photo_plain}",
+    "A real photograph of {subject_phrase}, {pose_phrase}, {view_phrase}, {distance_phrase}.",
     "A natural photographic overlay element with realistic optics and density, exactly as it would appear caught in a real camera frame, its transparency carried in the alpha channel.",
     "{global.single_subject}",
     "{global.isolated_overlay}",

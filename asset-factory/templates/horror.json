@@ -1,10 +1,11 @@
 {
   "id": "horror",
-  "version": 2,
+  "version": 3,
   "positive": [
     "{global.photo}",
     "A photograph of {subject_phrase}, {pose_phrase}, {view_phrase}, {distance_phrase}.",
     "{framing_clause}",
+    "{global.framing_space}",
     "Unsettling but wholly believable as a real photo: weathered aged materials and organic surface detail caught by a documentary camera, not stylized.",
     "{global.single_subject}",
     "{global.isolated}",

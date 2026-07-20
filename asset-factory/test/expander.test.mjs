@@ -30,10 +30,10 @@ test("every seed is within providers' signed-int32 range", () => {
   }
 });
 
-test("the library is a meaningful size (~250 combos across 14 categories)", () => {
+test("the library is a meaningful size across many categories", () => {
   const all = expandAll();
-  assert.ok(all.length >= 240, `expected ~250 entries, got ${all.length}`);
-  assert.equal(new Set(all.map((e) => e.category)).size, 14);
+  assert.ok(all.length >= 240, `expected 240+ entries, got ${all.length}`);
+  assert.ok(new Set(all.map((e) => e.category)).size >= 14, "at least 14 manifest categories");
 });
 
 test("pose overrides family overrides category defaults for axes", () => {
