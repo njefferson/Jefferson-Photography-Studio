@@ -223,7 +223,7 @@ export async function exportImage(
     cam: "cfa" in src ? src.cam : null,
   };
   const composed = stickers.length && opts.stickerAssets
-    ? wrapWithPatches(healed, stickerPatches(healed, srcW, srcH, stickers, opts.stickerAssets, stkOcc), srcH)
+    ? wrapWithPatches(healed, stickerPatches(healed, srcW, srcH, stickers, opts.stickerAssets, stkOcc, rot * 90), srcH)
     : healed;
   // Warp remaps the source at the VERY TOP (before denoise), mirroring the
   // shader's fetchLin warp — both bilinear-sample the same encoded field.
