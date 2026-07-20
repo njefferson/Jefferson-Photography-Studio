@@ -13,6 +13,7 @@ import { qcCheck } from "./src/qc.mjs";
 import { dhash, findDuplicate } from "./src/dedupe.mjs";
 import { promote } from "./src/promote.mjs";
 import { publishReview } from "./src/review.mjs";
+import { mattingAvailable } from "./src/providers/matting.mjs";
 
 const HELP = `asset-factory — manifest-driven overlay-asset pipeline
 
@@ -112,6 +113,14 @@ async function main() {
         process.exit(1);
       }
       provider.preflight?.(); // e.g. refuse a keyless paid run, upfront
+      // Opaque providers (Flux) need the Ideogram cutout downstream — fail fast
+      // if that key is missing rather than burning the render budget first.
+      if (provider.supportsAlpha === false && !mattingAvailable()) {
+        console.error(
+          `${provider.name} renders opaque and needs the Ideogram cutout, but IDEOGRAM_API_KEY is not set.`,
+        );
+        process.exit(1);
+      }
       const concurrency = Math.min(MAX_CONCURRENCY, num(flags.concurrency, DEFAULT_CONCURRENCY));
       let done = 0;
       const { tally, logPath, runId } = await runGenerate({

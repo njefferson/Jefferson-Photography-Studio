@@ -21,6 +21,7 @@ import { readRecord, writeRecord, allRecords } from "./catalog.mjs";
 import { qcCheck } from "./qc.mjs";
 import { dhash, findDuplicate } from "./dedupe.mjs";
 import { retrySeed } from "./ids.mjs";
+import { extractAlpha } from "./providers/matting.mjs";
 
 /**
  * Classify every expanded entry against the catalog.
@@ -155,6 +156,25 @@ export async function runGenerate({ items, provider, concurrency = 2, hamming = 
       tally.error++;
       log({ id, stage: "generate", ok: false, ms: Date.now() - t0, detail: record.error });
       return;
+    }
+    // Providers that render opaque (e.g. Flux) route through matting to get a
+    // clean transparent cutout before QC ever sees the image. A matting failure
+    // is a per-asset error, not a crash — the record is marked and the run
+    // continues, exactly like a generate failure.
+    if (provider.supportsAlpha === false) {
+      const tMat = Date.now();
+      try {
+        png = await extractAlpha(png);
+        record.matted = true;
+        log({ id, stage: "matte", ok: true, ms: Date.now() - tMat, detail: `${png.length}b` });
+      } catch (e) {
+        record.status = "error";
+        record.error = `matting: ${String(e.message ?? e)}`;
+        writeRecord(record);
+        tally.error++;
+        log({ id, stage: "matte", ok: false, ms: Date.now() - tMat, detail: record.error });
+        return;
+      }
     }
     const genPath = resolve(DIRS.generated, `${id}.png`);
     writeFileSync(genPath, png);

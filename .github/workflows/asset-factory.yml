@@ -18,10 +18,10 @@ on:
         type: string
         default: claude/jefferson-asset-pipeline-9y19wa
       provider:
-        description: "Image provider"
+        description: "Image provider (flux = photoreal render + Ideogram cutout)"
         type: choice
-        default: ideogram
-        options: [ideogram, mock]
+        default: flux
+        options: [flux, ideogram, mock]
       category:
         description: "Category filter (blank = all). e.g. cryptids,ufo"
         type: string
@@ -66,6 +66,7 @@ jobs:
         working-directory: asset-factory
         env:
           IDEOGRAM_API_KEY: ${{ secrets.IDEOGRAM_API_KEY }}
+          FAL_KEY: ${{ secrets.FAL_KEY }}
         run: |
           node cli.mjs generate \
             --provider "${{ inputs.provider }}" \

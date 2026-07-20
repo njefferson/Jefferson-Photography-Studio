@@ -11,10 +11,12 @@
 //            Promise<{png:Buffer, seed:number, model:string, providerMeta?:any}>} generate
 import { mockProvider } from "./mock.mjs";
 import { ideogramProvider } from "./ideogram.mjs";
+import { fluxProvider } from "./flux.mjs";
 
 const PROVIDERS = {
   mock: mockProvider,
   ideogram: ideogramProvider,
+  flux: fluxProvider,
 };
 
 export function getProvider(name) {
