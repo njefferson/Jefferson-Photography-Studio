@@ -1,0 +1,79 @@
+{
+  "category": "beams",
+  "app_category": "ufo",
+  "template": "effect-overlay",
+  "tags": [
+    "ufo",
+    "beam",
+    "light"
+  ],
+  "defaults": {
+    "views": [
+      "front"
+    ],
+    "distances": [
+      "mid"
+    ],
+    "expressions": [
+      "neutral"
+    ],
+    "variants": 1
+  },
+  "families": [
+    {
+      "family": "tractor-beam",
+      "subject_phrase": "a glowing cone of light beaming straight down, a classic UFO tractor beam, brightest at the top",
+      "meta_label": "Tractor beam",
+      "poses": [
+        {
+          "pose": "beaming",
+          "pose_phrase": "a vertical cone of light"
+        }
+      ]
+    },
+    {
+      "family": "abduction-beam",
+      "subject_phrase": "a tall bright vertical beam of light with a soft swirling glow",
+      "meta_label": "Abduction beam",
+      "poses": [
+        {
+          "pose": "beaming",
+          "pose_phrase": "a straight vertical beam"
+        }
+      ]
+    },
+    {
+      "family": "craft-underglow",
+      "subject_phrase": "a soft circular glow of coloured underlighting, as if cast from the underside of a craft",
+      "meta_label": "Craft underglow",
+      "poses": [
+        {
+          "pose": "glowing",
+          "pose_phrase": "a round glow"
+        }
+      ]
+    },
+    {
+      "family": "spotlight-cone",
+      "subject_phrase": "a cone-shaped shaft of bright light",
+      "meta_label": "Spotlight cone",
+      "poses": [
+        {
+          "pose": "shining",
+          "pose_phrase": "a light cone"
+        }
+      ]
+    },
+    {
+      "family": "search-beam",
+      "subject_phrase": "a long sweeping searchlight beam of light",
+      "meta_label": "Search beam",
+      "poses": [
+        {
+          "pose": "sweeping",
+          "pose_phrase": "a raking beam"
+        }
+      ]
+    }
+  ]
+}
