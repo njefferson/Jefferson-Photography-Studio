@@ -1866,6 +1866,12 @@ function stickerCatOf(key: string): string {
   }
   return STICKER_META[key]?.cat ?? "other";
 }
+/** A glowing light asset — composites with SCREEN (adds light) instead of sitting
+ *  on top. Everything in the Lights & signs category, plus any beam/glow/flare/
+ *  aura/portal/wisp/orb/halo/ember named asset anywhere. */
+function isScreenAsset(key: string): boolean {
+  return stickerCatOf(key) === "lights" || /beam|glow|flare|aura|portal|wisp|will-o|halo|ember|eldritch|rune/i.test(key);
+}
 
 /** Rasterize ONE asset on demand (placement / session restore) — not the whole
  *  library, which can be 50+ PNGs. Cached + de-duped by key. */
@@ -2178,7 +2184,8 @@ async function addStickerFromKey(key: string) {
     occludeBright: true,
     bright: 0, contrast: 0, warmth: 0, sat: 0,
   };
-  computeSceneMatch(sticker); // take on the scene's palette (its own layer, not the pipeline)
+  if (isScreenAsset(key)) sticker.screen = true; // a glow: SCREEN blend, keep its own light (no scene match)
+  else computeSceneMatch(sticker); // take on the scene's palette (its own layer, not the pipeline)
   list.push(sticker);
   selectedSticker = list.length - 1;
   updateStickerUI();
@@ -3982,7 +3989,8 @@ const healStatus = $("healStatus") as HTMLElement;
 let previewSrc: { width: number; height: number; pixels?: Uint8ClampedArray; linear?: Float32Array } | null = null;
 let bakedSpots: HealSpot[] = []; // what the texture currently has baked in
 let bakedStickers: Sticker[] = []; // IN-LOOK stickers baked INTO the source texture
-let bakedOnTop: Sticker[] = []; // ON-TOP stickers built into the overlay texture
+let bakedNormal: Sticker[] = []; // ON-TOP (over-blend) stickers in the overlay texture
+let bakedScreen: Sticker[] = []; // SCREEN-blend (glow) stickers in the screen overlay
 let bakedOccSig = ""; // wb×exposure signature the sticker occlusion was baked against
 
 /** A sticker sits ON TOP of the look (keeps its own colours) unless explicitly
@@ -4015,10 +4023,11 @@ function uploadPreview() {
   if (!current) return;
   previewSrc = toPreview(current);
   renderer.setImage(previewSrc);
-  renderer.setOverlaySize(previewSrc.width, previewSrc.height); // on-top overlay tracks the source size
+  renderer.setOverlaySize(previewSrc.width, previewSrc.height); // on-top overlays track the source size
   bakedSpots = [];
   bakedStickers = [];
-  bakedOnTop = [];
+  bakedNormal = [];
+  bakedScreen = [];
   bakedWarpRev = -1;
   draw();
 }
@@ -4038,6 +4047,10 @@ function syncSpotsToTexture() {
   // blended AFTER the pipeline, so they keep their own colours (owner, 2026-07-21).
   const inLook = stk.filter((s) => !isOnTop(s));
   const onTop = stk.filter(isOnTop);
+  // On-top splits by blend: glows SCREEN (add light), everything else (incl. black
+  // shadows) OVER. Two overlay textures, blended in their own mode in the shader.
+  const normalStk = onTop.filter((s) => !s.screen);
+  const screenStk = onTop.filter((s) => s.screen);
   const spotsSame = cur.length === bakedSpots.length && JSON.stringify(cur) === JSON.stringify(bakedSpots);
   // Occlusion reads display luminance (wb×exposure + cam), so a WB/exposure
   // change must re-bake even when the sticker list is unchanged.
@@ -4048,8 +4061,9 @@ function syncSpotsToTexture() {
   // IS compared, so mask edits are still detected.
   const stkSig = (list: Sticker[]) => JSON.stringify(list, (k, v) => (k === "data" ? undefined : v));
   const inLookSame = !occChanged && inLook.length === bakedStickers.length && stkSig(inLook) === stkSig(bakedStickers);
-  const onTopSame = !occChanged && onTop.length === bakedOnTop.length && stkSig(onTop) === stkSig(bakedOnTop);
-  if (spotsSame && inLookSame && onTopSame) return;
+  const normalSame = !occChanged && normalStk.length === bakedNormal.length && stkSig(normalStk) === stkSig(bakedNormal);
+  const screenSame = !occChanged && screenStk.length === bakedScreen.length && stkSig(screenStk) === stkSig(bakedScreen);
+  if (spotsSame && inLookSame && normalSame && screenSame) return;
   bakedOccSig = occSig;
   const W = previewSrc.width, H = previewSrc.height;
   // The photo's display rotation (EXIF orientation, 90° steps). Stickers place +
@@ -4097,25 +4111,35 @@ function syncSpotsToTexture() {
   // (old+new) from scratch, so a vacated rect writes back transparent. The scene
   // under a pixel (for peek-behind luma) is read straight from the pristine
   // source, matching the export sampler's occ base.
-  if (!onTopSame) {
+  if (!normalSame || !screenSame) {
     const occBaseAt = (sx: number, sy: number, into: Float32Array) => {
       const o = (sy * W + sx) * 4;
       if (previewSrc!.linear) { into[0] = previewSrc!.linear[o]; into[1] = previewSrc!.linear[o + 1]; into[2] = previewSrc!.linear[o + 2]; }
       else { const p = previewSrc!.pixels!; into[0] = Math.pow(p[o] / 255, 2.2); into[1] = Math.pow(p[o + 1] / 255, 2.2); into[2] = Math.pow(p[o + 2] / 255, 2.2); }
     };
-    const oRects: { x0: number; y0: number; w: number; h: number }[] = [];
-    for (const s of [...bakedOnTop, ...onTop]) {
-      const a = stickerAssets[s.asset];
-      if (a) oRects.push(stickerRect(s, W, H, a, dispRot));
+    // Rebuild every affected rect (old+new) of a group into its overlay texture,
+    // transparent where uncovered. Returns the new baked snapshot (corners deep-
+    // copied, like the artifact fix).
+    const bakeGroup = (group: Sticker[], baked: Sticker[], patch: (x: number, y: number, w: number, h: number, d: Uint8Array) => void): Sticker[] => {
+      for (const s of [...baked, ...group]) {
+        const a = stickerAssets[s.asset];
+        if (!a) continue;
+        const rect = stickerRect(s, W, H, a, dispRot);
+        if (rect.w <= 0 || rect.h <= 0) continue;
+        const buf = new Uint8Array(rect.w * rect.h * 4);
+        compositeStickersOverlay8(buf, rect, W, H, group, stickerAssets, occ, dispRot, occBaseAt);
+        patch(rect.x0, rect.y0, rect.w, rect.h, buf);
+      }
+      return group.map((s) => ({ ...s, corners: s.corners ? s.corners.map((c) => [c[0], c[1]] as [number, number]) : s.corners }));
+    };
+    if (!normalSame) {
+      bakedNormal = bakeGroup(normalStk, bakedNormal, (x, y, w, h, d) => renderer.patchOverlay(x, y, w, h, d));
+      renderer.setOverlayOn(normalStk.length > 0);
     }
-    for (const rect of oRects) {
-      if (rect.w <= 0 || rect.h <= 0) continue;
-      const buf = new Uint8Array(rect.w * rect.h * 4);
-      compositeStickersOverlay8(buf, rect, W, H, onTop, stickerAssets, occ, dispRot, occBaseAt);
-      renderer.patchOverlay(rect.x0, rect.y0, rect.w, rect.h, buf);
+    if (!screenSame) {
+      bakedScreen = bakeGroup(screenStk, bakedScreen, (x, y, w, h, d) => renderer.patchOverlayScreen(x, y, w, h, d));
+      renderer.setOverlayScreenOn(screenStk.length > 0);
     }
-    renderer.setOverlayOn(onTop.length > 0);
-    bakedOnTop = onTop.map((s) => ({ ...s, corners: s.corners ? s.corners.map((c) => [c[0], c[1]] as [number, number]) : s.corners }));
   }
 
   stickerBakeCount++; // instrumentation for the lag walk (counts real bakes)

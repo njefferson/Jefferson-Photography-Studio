@@ -139,6 +139,8 @@ uniform sampler2D u_warpTex; // RG displacement field (unit 7, LINEAR); 0.5 = no
 uniform bool u_warpOn;       // any warp painted
 uniform sampler2D u_overlayTex; // on-top sticker overlay (unit 8): gamma sRGB + coverage alpha
 uniform bool u_overlayOn;       // any on-top sticker placed
+uniform sampler2D u_overlayScreenTex; // SCREEN-blend overlay (unit 9): glowing lights
+uniform bool u_overlayScreenOn;        // any screen-blend (glow) sticker placed
 uniform float u_warpScale;   // decode scale = WARP_MAX (warp.ts)
 uniform highp sampler3D u_lutTex; // imported .cube LUT lattice (unit 5, NEAREST — manual trilinear below)
 uniform int u_lutSize;            // grid N per axis (>=2; only read when strength > 0)
@@ -561,6 +563,13 @@ void main() {
     vec4 ov = texture(u_overlayTex, v_uv);
     g = mix(g, ov.rgb, ov.a);
   }
+  // Glowing lights composite with SCREEN (they ADD light instead of sitting on
+  // top), so a beam/aura/orb brightens the scene like real light. Same source-uv
+  // sampling + display-space blend as the over layer, mirrored in export.ts.
+  if (u_overlayScreenOn) {
+    vec4 sv = texture(u_overlayScreenTex, v_uv);
+    g = 1.0 - (1.0 - g) * (1.0 - sv.rgb * sv.a);
+  }
 
   // Creative vignette + film grain — the FINAL image ops, keyed on
   // CROP-LOCAL coords (v_cropUv spans the visible, cropped frame; export.ts
@@ -618,6 +627,8 @@ export class Renderer {
   private warpOn = false;
   private overlayTex!: WebGLTexture; // on-top sticker overlay (unit 8)
   private overlayOn = false;
+  private overlayScreenTex!: WebGLTexture; // screen-blend (glow) overlay (unit 9)
+  private overlayScreenOn = false;
   private localScale = 1;
   private lutTex: WebGLTexture;
   private lutSig = ""; // re-upload the 3D LUT only when its identity changes
@@ -643,7 +654,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -746,6 +757,16 @@ export class Renderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
+
+    // Screen-blend overlay (unit 9) — same shape as the over overlay, for glows.
+    this.overlayScreenTex = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, this.overlayScreenTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
   }
 
   /** (Re)allocate the on-top overlay to the source size, cleared to transparent.
@@ -754,19 +775,30 @@ export class Renderer {
   setOverlaySize(width: number, height: number) {
     const gl = this.gl;
     this.overlayOn = false;
-    gl.bindTexture(gl.TEXTURE_2D, this.overlayTex);
-    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(width * height * 4));
+    this.overlayScreenOn = false;
+    for (const tex of [this.overlayTex, this.overlayScreenTex]) {
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(width * height * 4));
+    }
   }
 
-  /** Whether any on-top sticker is currently uploaded (the shader blend is on). */
+  /** Whether any on-top / screen sticker is currently uploaded (the blend is on). */
   setOverlayOn(on: boolean) { this.overlayOn = on; }
+  setOverlayScreenOn(on: boolean) { this.overlayScreenOn = on; }
 
-  /** Patch an RGBA8 sub-rect of the overlay (gamma sRGB + alpha), like patchImage. */
+  /** Patch an RGBA8 sub-rect of the over overlay (gamma sRGB + alpha). */
   patchOverlay(x: number, y: number, w: number, h: number, data: Uint8Array) {
+    this.patchTex(this.overlayTex, x, y, w, h, data);
+  }
+  /** Patch an RGBA8 sub-rect of the screen (glow) overlay. */
+  patchOverlayScreen(x: number, y: number, w: number, h: number, data: Uint8Array) {
+    this.patchTex(this.overlayScreenTex, x, y, w, h, data);
+  }
+  private patchTex(tex: WebGLTexture, x: number, y: number, w: number, h: number, data: Uint8Array) {
     if (w <= 0 || h <= 0) return;
     const gl = this.gl;
-    gl.bindTexture(gl.TEXTURE_2D, this.overlayTex);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.texSubImage2D(gl.TEXTURE_2D, 0, x, y, w, h, gl.RGBA, gl.UNSIGNED_BYTE, data);
   }
@@ -1038,6 +1070,10 @@ export class Renderer {
     gl.uniform1i(this.loc.u_overlayOn, this.overlayOn && readMode === 0 ? 1 : 0);
     gl.activeTexture(gl.TEXTURE8);
     gl.bindTexture(gl.TEXTURE_2D, this.overlayTex);
+    gl.uniform1i(this.loc.u_overlayScreenTex, 9);
+    gl.uniform1i(this.loc.u_overlayScreenOn, this.overlayScreenOn && readMode === 0 ? 1 : 0);
+    gl.activeTexture(gl.TEXTURE9);
+    gl.bindTexture(gl.TEXTURE_2D, this.overlayScreenTex);
     // Local masks (up to MAX_MASKS, the shader array size).
     const masks = (p.masks ?? []).filter(maskIsActive).slice(0, MAX_MASKS);
     // Slot map: brush(2)/sky(4) masks claim packed channels 0..3 in appearance
