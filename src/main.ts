@@ -1734,6 +1734,7 @@ const STICKER_GROUPS: { id: string; emoji: string; label: string }[] = [
   { id: "creatures", emoji: "👣", label: "Creatures & craft" },
   { id: "evidence", emoji: "🔍", label: "Evidence" },
   { id: "scene", emoji: "🏕️", label: "Scene & nature" },
+  { id: "toolkit", emoji: "🎬", label: "Scene toolkit" }, // shadows + light textures (asset factory)
 ];
 const STICKER_CATEGORIES: { id: string; group: string; emoji: string; label: string }[] = [
   // Creatures & craft — the "obvious" overlays.
@@ -1742,6 +1743,7 @@ const STICKER_CATEGORIES: { id: string; group: string; emoji: string; label: str
   { id: "aliens", group: "creatures", emoji: "👽", label: "Aliens" },
   { id: "spirits", group: "creatures", emoji: "👻", label: "Spirits" },
   { id: "beasts", group: "creatures", emoji: "🦖", label: "Beasts" },
+  { id: "illustrated", group: "creatures", emoji: "🖊️", label: "Illustrated cryptids" }, // hand-drawn set (asset factory)
   // Evidence — the believable, tuck-into-the-scene overlays.
   { id: "tracks", group: "evidence", emoji: "🐾", label: "Tracks & marks" },
   { id: "gear", group: "evidence", emoji: "🎒", label: "Left behind" },
@@ -1752,6 +1754,9 @@ const STICKER_CATEGORIES: { id: string; group: string; emoji: string; label: str
   { id: "sky", group: "scene", emoji: "🎈", label: "Sky" },
   { id: "atmosphere", group: "scene", emoji: "🌫️", label: "Atmosphere & light" },
   { id: "props", group: "scene", emoji: "🧺", label: "Everyday" },
+  // Scene toolkit — grounding shadows + broken-light textures (composite fine as
+  // dark "over" = Multiply; a per-sticker Screen mode for glows is a later step).
+  { id: "shadows", group: "toolkit", emoji: "🌑", label: "Shadows" },
   { id: "other", group: "evidence", emoji: "❓", label: "New" }, // catch-all for un-categorized drop-ins
 ];
 // Pretty labels + honesty notes (folklore/fiction, shown as TEXT so meaning
