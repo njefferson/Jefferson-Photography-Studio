@@ -2136,6 +2136,7 @@ function castShadow(creature: Sticker) {
     bright: 0, contrast: 0, warmth: 0, sat: 0,
     shadow: true, shadowOpacity: 0.45,
     reMatch: false, matchAmt: 0,
+    linkTo: creature.id, // glued to the creature — follows it until you drag the shadow itself
     corners: [[0, topY], [0, topY], [0, botY], [0, botY]],
   };
   const list = (params.stickers ??= []);
@@ -2145,6 +2146,24 @@ function castShadow(creature: Sticker) {
   updateStickerUI();
   draw();
   flushRecord();
+}
+
+/** Glue linked shadows to their creatures: copy each still-linked shadow's
+ *  position/scale/spin from the sticker it shadows, so moving/resizing/spinning
+ *  the creature carries its shadow along. Runs once per frame BEFORE the bake's
+ *  change-detection, so a followed shadow re-bakes at its new spot. A shadow the
+ *  user has dragged has its `linkTo` cleared (detached) and is left alone; a
+ *  shadow whose creature was deleted also just stays put. */
+function syncLinkedShadows() {
+  const list = params.stickers;
+  if (!list || list.length < 2) return;
+  const byId = new Map(list.map((s) => [s.id, s]));
+  for (const sh of list) {
+    if (!sh.shadow || !sh.linkTo) continue;
+    const c = byId.get(sh.linkTo);
+    if (!c || c === sh) continue;
+    sh.x = c.x; sh.y = c.y; sh.scale = c.scale; sh.rot = c.rot;
+  }
 }
 
 /** "Match the photo's colours" — the RIGHT way. Read the DISPLAYED scene colour
@@ -2275,6 +2294,7 @@ const stkTransformInput = () => {
   if (!s) return;
   s.scale = Number(stkScale.value);
   s.rot = Number(stkRot.value);
+  if (s.shadow) s.linkTo = undefined; // hand-sized/spun shadow detaches from its creature
   updateStickerUI();
   beginStickerLive();
   positionStickerGhost();
@@ -2797,6 +2817,7 @@ function attachStickerSizeDrag(el: SVGCircleElement) {
       const [u, v] = renderer.clientToImageUv(ev.clientX, ev.clientY);
       const d = Math.hypot(u * W - cur.x * W, v * H - cur.y * H);
       cur.scale = clamp(d / diag, 0.05, 1);
+      if (cur.shadow) cur.linkTo = undefined; // hand-resized shadow detaches
       updateStickerUI(); // Size slider follows the finger
       positionStickerGhost();
     };
@@ -2837,6 +2858,7 @@ function attachStickerRotateDrag(el: SVGCircleElement) {
       let deg = (Math.atan2(dx, -dy) * 180) / Math.PI + dispRot; // top-edge points at the finger
       deg = ((((deg + 180) % 360) + 360) % 360) - 180; // wrap to −180..180
       cur.rot = Math.round(deg);
+      if (cur.shadow) cur.linkTo = undefined; // hand-spun shadow detaches
       updateStickerUI(); // Spin slider follows
       positionStickerGhost();
     };
@@ -4055,6 +4077,7 @@ function uploadPreview() {
  *  buffer with the FULL new list — deterministic, no diff bookkeeping. */
 function syncSpotsToTexture() {
   if (!current || !previewSrc) return;
+  syncLinkedShadows(); // glue shadows to their creatures BEFORE change-detection so a followed shadow re-bakes
   const cur = params.spots ?? [];
   // A sticker held live (mid drag/resize) is excluded — its ghost <img> shows
   // the gesture; the real composite bakes on release.
@@ -4165,6 +4188,11 @@ function syncSpotsToTexture() {
 }
 let stickerBakeCount = 0; // exposed on window in dev for the lag harness
 (window as unknown as { __stickerBakes: () => number }).__stickerBakes = () => stickerBakeCount;
+// Sticker-state snapshot for headless walks (transform + shadow linkage). Read-only.
+(window as unknown as { __stickers: () => unknown }).__stickers = () =>
+  (params.stickers ?? []).map((s) => ({ id: s.id, x: s.x, y: s.y, scale: s.scale, rot: s.rot, shadow: !!s.shadow, linkTo: s.linkTo ?? null, asset: s.asset }));
+// Select the i-th placed sticker (headless walks — exercises paths z-order hides from a tap).
+(window as unknown as { __select: (i: number) => void }).__select = (i: number) => { selectedSticker = i; updateStickerUI(); };
 
 function setHeal(on: boolean) {
   healArmed = on && !!current;
@@ -5136,6 +5164,7 @@ canvas.addEventListener("pointermove", (e) => {
         let deg = stkPinch.rot + ((ang - stkPinch.ang) * 180) / Math.PI;
         deg = ((((deg + 180) % 360) + 360) % 360) - 180; // wrap to −180..180
         s.rot = Math.round(deg);
+        if (s.shadow) s.linkTo = undefined; // pinched shadow detaches from its creature
         updateStickerUI(); // Size/Spin sliders follow the fingers live
         positionStickerGhost();
       }
@@ -5149,6 +5178,7 @@ canvas.addEventListener("pointermove", (e) => {
       const [u, v] = renderer.clientToImageUv(e.clientX, e.clientY);
       s.x = Math.min(1, Math.max(0, u + stickerDrag.ou));
       s.y = Math.min(1, Math.max(0, v + stickerDrag.ov));
+      if (s.shadow) s.linkTo = undefined; // dragged shadow detaches — it stays where you put it
       positionStickerOverlay();
       positionStickerGhost(); // cheap CSS move; no re-bake mid-drag
     }

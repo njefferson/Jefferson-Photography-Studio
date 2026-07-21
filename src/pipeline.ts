@@ -239,6 +239,13 @@ export interface Sticker {
    *  squash/skew onto the ground is carried by `corners` (owner, 2026-07-21). */
   shadow?: boolean;
   shadowOpacity?: number;
+  /** A cast shadow GLUED to its creature: the id of the sticker it shadows. While
+   *  set, the shadow follows the creature's position/scale/spin on every settle so
+   *  the two stay lined up. Dragging (or resizing/spinning) the shadow itself
+   *  clears this — it detaches and stays where you put it, which doubles as the
+   *  light-direction control: offset the shadow to place the light (owner,
+   *  2026-07-21). */
+  linkTo?: string;
   /** A glowing light — composites with SCREEN (adds light to the scene) instead
    *  of sitting on top, so a beam/aura/orb reads as real light. Set once at
    *  placement from the asset (owner, 2026-07-21). */
