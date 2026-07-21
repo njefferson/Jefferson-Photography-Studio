@@ -751,7 +751,7 @@ function flushRecord() {
 }
 
 function recordSoon() {
-  if (!settled || painting || stkCornerLive) return; // a stroke/corner-drag commits once, on pointerup
+  if (!settled || painting || stkCornerLive || stkHandleLive) return; // a stroke/corner/handle-drag commits once, on pointerup
   clearTimeout(recordTimer);
   recordTimer = window.setTimeout(flushRecord, 350);
 }
@@ -1977,6 +1977,7 @@ const stickerPointers = new Map<number, { x: number; y: number }>();
 let stkPinch: { dist: number; ang: number; scale: number; rot: number } | null = null;
 let stkPerspArmed = false; // dragging the 4 corner handles to set perspective
 let stkCornerLive = false; // a corner drag is in progress (suppresses undo churn)
+let stkHandleLive = false; // a resize/rotate handle drag is in progress (suppresses undo churn)
 const stickerOverlay = $("stickerOverlay") as unknown as SVGSVGElement;
 const stkControls = $("stickerControls") as HTMLDivElement;
 const stkScale = $("stkScale") as HTMLInputElement;
@@ -2014,6 +2015,37 @@ function stickerLibraryByCat(): Map<string, string[]> {
   return m;
 }
 
+/** An add-a-sticker tile: a little thumbnail of the art with its label beneath,
+ *  so you can see what each one is before dropping it (owner ask, 2026-07-21).
+ *  The PNG is loaded straight as an <img> (precached, no rasterization) — the
+ *  full StickerAsset only builds lazily on placement. */
+function stickerTile(key: string): HTMLButtonElement {
+  const label = stickerLabel(key);
+  const note = stickerNote(key);
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "mix-chip sticker-tile";
+  b.setAttribute("aria-label", "Add " + label + (note ? ", " + note : ""));
+  const img = document.createElement("img");
+  img.className = "sticker-thumb";
+  img.src = `./stickers/${key}.png`;
+  img.alt = "";
+  img.loading = "lazy";
+  img.decoding = "async";
+  const cap = document.createElement("span");
+  cap.className = "sticker-tile-label";
+  cap.textContent = label;
+  b.append(img, cap);
+  if (note) {
+    const n = document.createElement("span");
+    n.className = "sticker-tile-note";
+    n.textContent = note;
+    b.append(n);
+  }
+  b.addEventListener("click", () => { void addStickerFromKey(key); });
+  return b;
+}
+
 function stickerChip(label: string, on: boolean, ariaLabel: string | null, onClick: () => void): HTMLButtonElement {
   const b = document.createElement("button");
   b.type = "button";
@@ -2047,11 +2079,7 @@ function renderStickerPicker() {
     })));
   stickerCatsEl.hidden = groupCats.length <= 1; // no chips needed for a single category
 
-  stickerAddEl.replaceChildren(...(byCat.get(stickerCat) ?? []).map((key) => {
-    const note = stickerNote(key);
-    return stickerChip(stickerLabel(key) + (note ? " · " + note : ""), false, note ? `${stickerLabel(key)}, ${note}` : null,
-      () => { void addStickerFromKey(key); });
-  }));
+  stickerAddEl.replaceChildren(...(byCat.get(stickerCat) ?? []).map((key) => stickerTile(key)));
 }
 
 /** Place a sticker of `key` at the on-screen centre, auto-matched to the scene.
@@ -2193,10 +2221,29 @@ stkMatchStrength.addEventListener("input", () => {
   draw();
 });
 
-$("stkAutoMatch").addEventListener("click", () => {
+const stkAutoMatch = $("stkAutoMatch") as HTMLButtonElement;
+stkAutoMatch.addEventListener("click", () => {
   const s = selSticker();
   if (!s) return;
   autoMatchSticker(s); // recompute the transfer from the scene under it now
+  updateStickerUI();
+  draw();
+  flushRecord();
+});
+
+// Blend on/off — the plain "some of these work better without it" switch (owner,
+// 2026-07-21). ON restores the full-strength match (computing the gain if the
+// sticker never had one); OFF drops matchAmt to 0 so the raw asset colour shows.
+const stkBlendToggle = $("stkBlendToggle") as HTMLButtonElement;
+stkBlendToggle.addEventListener("click", () => {
+  const s = selSticker();
+  if (!s) return;
+  if ((s.matchAmt ?? 0) > 0) {
+    s.matchAmt = 0; // off — the sticker keeps its own colours
+  } else {
+    if (!s.matchGain) autoMatchSticker(s); // never matched — sample the scene now
+    s.matchAmt = MATCH_AMT_DEFAULT; // on — full-strength harmonise
+  }
   updateStickerUI();
   draw();
   flushRecord();
@@ -2248,6 +2295,7 @@ stickerImport.addEventListener("change", async () => {
 $("stkDelete").addEventListener("click", () => {
   const list = params.stickers ?? [];
   if (selectedSticker < 0 || selectedSticker >= list.length) return;
+  liveSticker = -1; stickerGhost.hidden = true; // drop any live ghost so it can't linger
   list.splice(selectedSticker, 1);
   selectedSticker = list.length ? Math.min(selectedSticker, list.length - 1) : -1;
   updateStickerUI();
@@ -2256,6 +2304,7 @@ $("stkDelete").addEventListener("click", () => {
 });
 stkClearBtn.addEventListener("click", () => {
   if (!(params.stickers?.length)) return;
+  liveSticker = -1; stickerGhost.hidden = true; // no held-out sticker to reinstate
   params.stickers = [];
   selectedSticker = -1;
   updateStickerUI();
@@ -2505,6 +2554,13 @@ function updateStickerUI() {
     });
     stkBlendBtn.textContent = stkBlendArmed ? "✓ Painting on the sticker" : "Paint on the sticker";
     stkPerspBtn.textContent = stkPerspArmed ? "✓ Dragging the corners" : "Skew the corners";
+    // Blend on/off: the toggle carries the state as text (grayscale-safe); the
+    // strength/re-match controls dim when it's off, since they'd do nothing.
+    const blendOn = (s.matchAmt ?? 0) > 0;
+    stkBlendToggle.textContent = blendOn ? "✓ Blending into the photo" : "Blend into the photo";
+    stkBlendToggle.setAttribute("aria-pressed", String(blendOn));
+    stkMatchStrength.disabled = !blendOn;
+    stkAutoMatch.disabled = !blendOn;
   } else {
     if (stkBlendArmed) stkBlendArmed = false; // nothing selected to paint on
     if (stkPerspArmed) stkPerspArmed = false;
@@ -2532,33 +2588,64 @@ function stickerOverlayCorners(s: Sticker, a: StickerAsset): [number, number][] 
     toClient(s.x * W + (lx * cs - ly * sn), s.y * H + (lx * sn + ly * cs)));
 }
 
-/** Draw the selected sticker's box as the selection cue, plus the 4 draggable
- *  corner handles when Perspective is armed. Repositions IN PLACE when the
- *  element set is unchanged (so a live corner drag keeps its pointer capture —
- *  a replaceChildren would destroy the handle mid-gesture). */
+/** The rotate handle sits just past the top-edge midpoint, along the box's own
+ *  "up" direction (so it follows rotation, view spin and perspective). Returns
+ *  the top-edge midpoint (stem start) and the handle centre, in overlay-client
+ *  space, from the 4 box corners (TL,TR,BR,BL). */
+function stickerRotateHandle(pts: [number, number][]): { mid: [number, number]; knob: [number, number] } {
+  const mid: [number, number] = [(pts[0][0] + pts[1][0]) / 2, (pts[0][1] + pts[1][1]) / 2];
+  const ctr: [number, number] = [(pts[0][0] + pts[2][0]) / 2, (pts[0][1] + pts[2][1]) / 2];
+  let ux = mid[0] - ctr[0], uy = mid[1] - ctr[1];
+  const ul = Math.hypot(ux, uy) || 1;
+  ux /= ul; uy /= ul;
+  return { mid, knob: [mid[0] + ux * 30, mid[1] + uy * 30] };
+}
+
+/** Draw the selected sticker's box as the selection cue, plus draggable handles:
+ *  when Perspective is armed, the 4 corner-skew handles; otherwise 4 resize
+ *  corners + a rotate knob on a stem (so resize/rotate are right there on the
+ *  photo, not only in the sliders — owner, 2026-07-21). Repositions IN PLACE
+ *  when the handle set is unchanged, so a live drag keeps its pointer capture
+ *  (a replaceChildren would destroy the handle mid-gesture). */
 function positionStickerOverlay() {
   const s = selSticker();
   const show = stickerArmed && !!current && welcome.hidden && !!s && !!stickerAssets[s!.asset];
   stickerOverlay.toggleAttribute("hidden", !show);
-  if (!show || !s) { stickerOverlay.replaceChildren(); return; }
+  if (!show || !s) { stickerOverlay.replaceChildren(); stickerOverlay.removeAttribute("data-mode"); return; }
   const a = stickerAssets[s.asset];
   const pts = stickerOverlayCorners(s, a);
-  const wantHandles = stkPerspArmed ? 4 : 0;
+  // "persp" = skew corners; "xform" = resize corners + rotate knob; "box" = just
+  // the selection outline (while painting on the sticker, so handles don't fight
+  // the brush).
+  const mode = stkPerspArmed ? "persp" : (stkBlendArmed ? "box" : "xform");
+  const pointsStr = pts.map(([x, y]) => `${x},${y}`).join(" ");
+  const rot = mode === "xform" ? stickerRotateHandle(pts) : null;
   const kids = stickerOverlay.childNodes;
-  const inPlace = kids.length === 1 + wantHandles && (kids[0] as Element)?.tagName === "polygon";
-  if (inPlace) {
-    (kids[0] as SVGPolygonElement).setAttribute("points", pts.map(([x, y]) => `${x},${y}`).join(" "));
-    for (let k = 0; k < wantHandles; k++) {
-      const c = kids[1 + k] as SVGCircleElement;
-      c.setAttribute("cx", String(pts[k][0])); c.setAttribute("cy", String(pts[k][1]));
+  if (stickerOverlay.getAttribute("data-mode") === mode && (kids[0] as Element)?.tagName === "polygon") {
+    (kids[0] as SVGPolygonElement).setAttribute("points", pointsStr);
+    if (mode === "persp") {
+      for (let k = 0; k < 4; k++) {
+        const c = kids[1 + k] as SVGCircleElement;
+        c.setAttribute("cx", String(pts[k][0])); c.setAttribute("cy", String(pts[k][1]));
+      }
+    } else if (mode === "xform" && rot) {
+      for (let k = 0; k < 4; k++) {
+        const c = kids[1 + k] as SVGCircleElement;
+        c.setAttribute("cx", String(pts[k][0])); c.setAttribute("cy", String(pts[k][1]));
+      }
+      const stem = kids[5] as SVGLineElement;
+      stem.setAttribute("x1", String(rot.mid[0])); stem.setAttribute("y1", String(rot.mid[1]));
+      stem.setAttribute("x2", String(rot.knob[0])); stem.setAttribute("y2", String(rot.knob[1]));
+      const knob = kids[6] as SVGCircleElement;
+      knob.setAttribute("cx", String(rot.knob[0])); knob.setAttribute("cy", String(rot.knob[1]));
     }
     return;
   }
   const poly = document.createElementNS(SVGNS, "polygon");
-  poly.setAttribute("points", pts.map(([x, y]) => `${x},${y}`).join(" "));
+  poly.setAttribute("points", pointsStr);
   poly.setAttribute("class", "sticker-box");
   const els: SVGElement[] = [poly];
-  if (stkPerspArmed) {
+  if (mode === "persp") {
     for (let k = 0; k < 4; k++) {
       const c = document.createElementNS(SVGNS, "circle");
       c.setAttribute("r", "11");
@@ -2567,7 +2654,30 @@ function positionStickerOverlay() {
       attachStickerCornerDrag(c, k);
       els.push(c);
     }
+  } else if (mode === "xform" && rot) {
+    for (let k = 0; k < 4; k++) {
+      const c = document.createElementNS(SVGNS, "circle");
+      c.setAttribute("r", "11");
+      c.setAttribute("cx", String(pts[k][0])); c.setAttribute("cy", String(pts[k][1]));
+      c.setAttribute("class", "sticker-size");
+      c.setAttribute("aria-label", "Resize the sticker");
+      attachStickerSizeDrag(c);
+      els.push(c);
+    }
+    const stem = document.createElementNS(SVGNS, "line");
+    stem.setAttribute("x1", String(rot.mid[0])); stem.setAttribute("y1", String(rot.mid[1]));
+    stem.setAttribute("x2", String(rot.knob[0])); stem.setAttribute("y2", String(rot.knob[1]));
+    stem.setAttribute("class", "sticker-stem");
+    els.push(stem);
+    const knob = document.createElementNS(SVGNS, "circle");
+    knob.setAttribute("r", "11");
+    knob.setAttribute("cx", String(rot.knob[0])); knob.setAttribute("cy", String(rot.knob[1]));
+    knob.setAttribute("class", "sticker-rotate");
+    knob.setAttribute("aria-label", "Rotate the sticker");
+    attachStickerRotateDrag(knob);
+    els.push(knob);
   }
+  stickerOverlay.setAttribute("data-mode", mode);
   stickerOverlay.replaceChildren(...els);
 }
 
@@ -2612,6 +2722,85 @@ function attachStickerCornerDrag(el: SVGCircleElement, k: number) {
   });
 }
 
+/** Drag a corner handle to RESIZE: the corner follows the finger, so scale =
+ *  finger-distance-from-centre ÷ the base half-diagonal. Held live like the Size
+ *  slider (ghost tracks it, one bake on release, one undo). */
+function attachStickerSizeDrag(el: SVGCircleElement) {
+  el.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    e.stopPropagation(); // a handle grab must not also start a body drag / pinch
+    const s = selSticker();
+    if (!s || !current) return;
+    const a = stickerAssets[s.asset];
+    if (!a) return;
+    el.setPointerCapture(e.pointerId);
+    stkHandleLive = true;
+    beginStickerLive();
+    const W = current.width, H = current.height;
+    const diag = (W / 2) * Math.hypot(1, a.h / a.w); // centre → corner at scale 1
+    const move = (ev: PointerEvent) => {
+      const cur = selSticker();
+      if (!cur) return;
+      const [u, v] = renderer.clientToImageUv(ev.clientX, ev.clientY);
+      const d = Math.hypot(u * W - cur.x * W, v * H - cur.y * H);
+      cur.scale = clamp(d / diag, 0.05, 1);
+      updateStickerUI(); // Size slider follows the finger
+      positionStickerGhost();
+    };
+    const up = () => {
+      el.removeEventListener("pointermove", move);
+      el.removeEventListener("pointerup", up);
+      el.removeEventListener("pointercancel", up);
+      stkHandleLive = false;
+      endStickerLive(); // bake the final size in
+      flushRecord();
+    };
+    el.addEventListener("pointermove", move);
+    el.addEventListener("pointerup", up);
+    el.addEventListener("pointercancel", up);
+  });
+}
+
+/** Drag the rotate knob to SPIN: the sticker's top points at the finger. Solves
+ *  s.rot from the finger's angle about the centre, countering the photo's display
+ *  rotation so it reads upright on screen. Held live like the Spin slider. */
+function attachStickerRotateDrag(el: SVGCircleElement) {
+  el.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const s = selSticker();
+    if (!s || !current) return;
+    el.setPointerCapture(e.pointerId);
+    stkHandleLive = true;
+    beginStickerLive();
+    const W = current.width, H = current.height;
+    const dispRot = renderer.rotation * 90;
+    const move = (ev: PointerEvent) => {
+      const cur = selSticker();
+      if (!cur) return;
+      const [u, v] = renderer.clientToImageUv(ev.clientX, ev.clientY);
+      const dx = u * W - cur.x * W, dy = v * H - cur.y * H;
+      if (dx === 0 && dy === 0) return;
+      let deg = (Math.atan2(dx, -dy) * 180) / Math.PI + dispRot; // top-edge points at the finger
+      deg = ((((deg + 180) % 360) + 360) % 360) - 180; // wrap to −180..180
+      cur.rot = Math.round(deg);
+      updateStickerUI(); // Spin slider follows
+      positionStickerGhost();
+    };
+    const up = () => {
+      el.removeEventListener("pointermove", move);
+      el.removeEventListener("pointerup", up);
+      el.removeEventListener("pointercancel", up);
+      stkHandleLive = false;
+      endStickerLive();
+      flushRecord();
+    };
+    el.addEventListener("pointermove", move);
+    el.addEventListener("pointerup", up);
+    el.addEventListener("pointercancel", up);
+  });
+}
+
 /** Arm/disarm sticker manipulation on the canvas. Arming loads the assets and
  *  disarms the other exclusive picture tools (heal/crop/masks/picks). */
 function setStickerMode(on: boolean) {
@@ -2626,6 +2815,7 @@ function setStickerMode(on: boolean) {
     stkBlendArmed = false;
     stkPerspArmed = false;
     stkCornerLive = false;
+    stkHandleLive = false;
     stkPinch = null;
     stickerPointers.clear();
   }
@@ -3541,6 +3731,7 @@ $("flipVBtn").addEventListener("click", () => toggleFlip(true));
 let zoom = 1;
 let panX = 0;
 let panY = 0;
+let zoomReady = false; // the zoom-control block is wired (guards applyZoom's early calls)
 let tapSuppressed = false;
 const activePointers = new Map<number, { x: number; y: number }>();
 let pinch: { dist: number; zoom: number; midX: number; midY: number; panX: number; panY: number } | null = null;
@@ -3567,12 +3758,69 @@ function applyZoom() {
   positionMaskOverlay();
   positionHealOverlay();
   positionCropOverlay();
+  if (zoomReady) updateZoomCtl(); // keep the %/buttons synced through pinch + pan too
 }
 
 function resetZoom() {
   zoom = 1;
   applyZoom();
 }
+
+// --- Zoom controls that need neither a mouse wheel nor pinch. The buttons and
+// the cursor-anchored wheel both drive the SAME zoom/pan the pinch uses, so a
+// desktop without a touchscreen (or a laptop with no scroll wheel) can still
+// magnify to brush up close — and they work while a brush tool owns the canvas
+// gestures (owner, 2026-07-21). ---
+const zoomCtl = $("zoomCtl") as HTMLDivElement;
+const zoomPctEl = $("zoomPct") as HTMLSpanElement;
+const zoomInBtn = $("zoomIn") as HTMLButtonElement;
+const zoomOutBtn = $("zoomOut") as HTMLButtonElement;
+const zoomFitBtn = $("zoomFit") as HTMLButtonElement;
+
+/** Zoom by `factor` about a client point (keeps the image point under it fixed —
+ *  the same anchor math the pinch uses, expressed relative to the stage centre). */
+function zoomAt(clientX: number, clientY: number, factor: number) {
+  const next = clamp(zoom * factor, 1, 8);
+  if (next === zoom) return;
+  const k = next / zoom;
+  const stageRect = canvas.parentElement!.getBoundingClientRect();
+  const mx = clientX - (stageRect.left + stageRect.width / 2);
+  const my = clientY - (stageRect.top + stageRect.height / 2);
+  panX = mx - (mx - panX) * k;
+  panY = my - (my - panY) * k;
+  zoom = next;
+  applyZoom();
+}
+
+/** Zoom about the stage centre (what the +/− buttons do). */
+function zoomByCentre(factor: number) {
+  const r = canvas.parentElement!.getBoundingClientRect();
+  zoomAt(r.left + r.width / 2, r.top + r.height / 2, factor);
+}
+
+/** Show the zoom controls whenever a photo is open (and not mid-crop), and keep
+ *  the % readout + the enabled/disabled states current. */
+function updateZoomCtl() {
+  const show = !!current && welcome.hidden && !cropArmed;
+  zoomCtl.hidden = !show;
+  zoomPctEl.textContent = `${Math.round(zoom * 100)}%`;
+  zoomInBtn.disabled = zoom >= 8 - 1e-3;
+  zoomOutBtn.disabled = zoom <= 1 + 1e-3;
+  zoomFitBtn.disabled = zoom <= 1 + 1e-3;
+}
+zoomInBtn.addEventListener("click", () => { zoomByCentre(1.5); updateZoomCtl(); });
+zoomOutBtn.addEventListener("click", () => { zoomByCentre(1 / 1.5); updateZoomCtl(); });
+zoomFitBtn.addEventListener("click", () => { resetZoom(); updateZoomCtl(); });
+// Cursor-anchored wheel zoom — the natural desktop gesture, and it works even
+// while a picture tool owns pointer events (wheel isn't a pointer). Ctrl/⌘+wheel
+// (trackpad pinch) lands here too. Passive:false so we can stop the page scroll.
+canvas.addEventListener("wheel", (e) => {
+  if (!current || !welcome.hidden || cropArmed) return;
+  e.preventDefault();
+  zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.0015));
+  updateZoomCtl();
+}, { passive: false });
+zoomReady = true; // applyZoom may now refresh the control
 
 canvas.style.transformOrigin = "center center";
 
@@ -3798,7 +4046,15 @@ function syncSpotsToTexture() {
     }
   }
   bakedSpots = cur.map((s) => ({ ...s }));
-  bakedStickers = stk.map((s) => ({ ...s }));
+  // Deep-copy `corners` — a shallow spread would SHARE the array with the live
+  // sticker, so a later in-place corner drag would silently mutate what we think
+  // was baked. That defeats the change-detection (stkSig) AND makes the restore
+  // rect track the live geometry, not the geometry actually in the texture —
+  // leaving stale pixels behind that survive even Clear all (owner, 2026-07-21).
+  bakedStickers = stk.map((s) => ({
+    ...s,
+    corners: s.corners ? s.corners.map((c) => [c[0], c[1]] as [number, number]) : s.corners,
+  }));
   stickerBakeCount++; // instrumentation for the lag walk (counts real bakes)
   updateHealUI();
 }
@@ -4243,6 +4499,7 @@ function setGeoMode(mode: "crop" | "straighten" | null) {
   viewFreezeCenter = null;
   viewZoom = cropArmed ? boxFillZoom() : 1;
   positionCropOverlay();
+  updateZoomCtl(); // crop hides the zoom control; exiting brings it back
   draw();
 }
 // Tapping a tool arms it; tapping the active tool again exits. "Done" in the
@@ -4500,6 +4757,7 @@ function disarmPictureTools() {
   setHeal(false);
   setHealReview(false);
   setGeoMode(null);
+  endStickerLive(); // bake in any held sticker + drop the ghost, so it can't float over the start screen
 }
 healReviewBanner.addEventListener("click", () => setHealReview(false)); // keep them all
 
@@ -4886,6 +5144,7 @@ function goHome() {
   renderMaskOverlay(); // hide the mask overlay while the card is up
   positionHealOverlay(); // and the heal rings
   positionCropOverlay(); // and the crop box
+  updateZoomCtl(); // and the zoom control (welcome is up now)
 }
 
 /** Show/label the return controls (corner ✕ + the prominent Back button) only
@@ -4913,6 +5172,7 @@ function returnToEditor() {
   renderMaskOverlay();
   positionHealOverlay();
   positionCropOverlay();
+  updateZoomCtl(); // the photo's back in view — restore the zoom control
 }
 
 $("homeBtn").addEventListener("click", goHome);
@@ -4978,6 +5238,7 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
   // back on after establishing the photo (see openGalleryPhoto).
   setLearnMode(false);
   updateHistVisibility();
+  updateZoomCtl(); // a photo is open (welcome now hidden) — show the zoom control
   // Honesty gate: a third-party raw (CR2/ARW/…) opens via its embedded JPEG
   // preview — the user must know they are NOT editing raw data. The editor is
   // up (welcome hidden), so an alert is the only surface that reaches them.
@@ -5929,7 +6190,7 @@ const LESSONS: { title: string; tab: PanelTab; steps: string[] }[] = [
       "Open the Stickers tab and tap a Saucer or Alien — it drops onto the photo. Drag it wherever you like.",
       "Notice it takes on the photo's colors: the channel swap and white balance reach the sticker, so it lands right in the infrared palette instead of looking pasted on.",
       "Slide Peek behind up and pick Bright parts — the glowing foliage shows through, so the saucer tucks in behind the branches. Add a little Grain (in Grade) and it settles over the whole scene.",
-      "Size and Spin fine-tune it; Remove this sticker or Clear all start over. Stickers stay with this photo — they're not carried by saved looks or batch.",
+      "Resize and spin it right on the photo: drag a corner handle to resize, or the round knob above it to rotate (the Size and Spin sliders and two-finger pinch work too). Turn Blend into the photo off for stickers that look better in their own colours. Remove this sticker or Clear all start over — stickers stay with this photo, not carried by saved looks or batch.",
     ],
   },
   {
