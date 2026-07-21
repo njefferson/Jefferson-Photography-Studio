@@ -46,6 +46,10 @@ export interface StickerAsset {
   h: number;
   lin: Float32Array; // w*h*4 — linear RGB + alpha (0..1)
   mean: [number, number, number]; // alpha-weighted mean linear RGB (for auto-match)
+  /** Bounding box of the OPAQUE content in asset-uv [0,1] (u0,v0 = top-left,
+   *  u1,v1 = bottom-right). Lets a cast shadow pivot on the real feet, not the
+   *  transparent padding around them. Full [0,0,1,1] if the asset has no alpha. */
+  opaque: { u0: number; v0: number; u1: number; v1: number };
 }
 
 export interface Rect {
@@ -59,14 +63,22 @@ export interface Rect {
 export function makeStickerAsset(key: string, w: number, h: number, rgba: Uint8ClampedArray): StickerAsset {
   const lin = new Float32Array(w * h * 4);
   let mr = 0, mg = 0, mb = 0, aw = 0;
-  for (let i = 0; i < w * h; i++) {
-    const r = toLin(rgba[i * 4]), g = toLin(rgba[i * 4 + 1]), b = toLin(rgba[i * 4 + 2]);
-    const a = rgba[i * 4 + 3] / 255;
-    lin[i * 4] = r; lin[i * 4 + 1] = g; lin[i * 4 + 2] = b; lin[i * 4 + 3] = a;
-    mr += r * a; mg += g * a; mb += b * a; aw += a;
+  let x0 = w, y0 = h, x1 = -1, y1 = -1; // opaque bbox in pixels
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      const r = toLin(rgba[i * 4]), g = toLin(rgba[i * 4 + 1]), b = toLin(rgba[i * 4 + 2]);
+      const a = rgba[i * 4 + 3] / 255;
+      lin[i * 4] = r; lin[i * 4 + 1] = g; lin[i * 4 + 2] = b; lin[i * 4 + 3] = a;
+      mr += r * a; mg += g * a; mb += b * a; aw += a;
+      if (a > 0.05) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    }
   }
   const d = Math.max(1e-4, aw);
-  return { key, w, h, lin, mean: [mr / d, mg / d, mb / d] };
+  const opaque = x1 < x0
+    ? { u0: 0, v0: 0, u1: 1, v1: 1 }
+    : { u0: x0 / w, v0: y0 / h, u1: (x1 + 1) / w, v1: (y1 + 1) / h };
+  return { key, w, h, lin, mean: [mr / d, mg / d, mb / d], opaque };
 }
 
 const clampI = (v: number, hi: number) => (v < 0 ? 0 : v > hi ? hi : v);
