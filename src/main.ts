@@ -2090,6 +2090,42 @@ function renderStickerPicker() {
 /** Place a sticker of `key` at the on-screen centre, auto-matched to the scene.
  *  Ensures the asset is rasterized first (lazy per-asset load). */
 const SCENE_MATCH_AMT = 0.85; // default strength of the palette match
+// Auto-shadow projection (light from the upper-left → shadow falls down + right):
+// the silhouette's TOP corners collapse toward the feet (DOWN) and shear (SKEW),
+// leaving a flat, sheared ground shadow. Half-extent units, fed to `corners`.
+const SHADOW_DOWN = 1.25;
+const SHADOW_SKEW = 0.7;
+
+/** Cast a shadow of a sticker from its OWN silhouette: a flat near-black copy at
+ *  its feet, squashed + skewed onto the ground (matches the exact shape, beats a
+ *  pre-made blob). Inserted BELOW the sticker so it reads as underneath. */
+function castShadow(creature: Sticker) {
+  if (creature.shadow) return; // no shadow of a shadow
+  const a = stickerAssets[creature.asset];
+  if (!a || !current) return;
+  const ar = a.h / a.w;
+  const halfHuv = (creature.scale * (current.width / 2) * ar) / current.height; // its half-height in image-uv
+  const shadow: Sticker = {
+    id: crypto.randomUUID(),
+    asset: creature.asset,
+    x: Math.min(1, Math.max(0, creature.x + 0.015)),
+    y: Math.min(1, Math.max(0, creature.y + halfHuv * 0.5)), // drop toward the feet
+    scale: creature.scale,
+    rot: creature.rot,
+    occlude: 0, occludeLuma: 0.6, occludeBright: true,
+    bright: 0, contrast: 0, warmth: 0, sat: 0,
+    shadow: true, shadowOpacity: 0.45,
+    reMatch: false, matchAmt: 0,
+    corners: [[SHADOW_SKEW, SHADOW_DOWN], [SHADOW_SKEW, SHADOW_DOWN], [0, 0], [0, 0]],
+  };
+  const list = (params.stickers ??= []);
+  const idx = list.indexOf(creature);
+  list.splice(idx < 0 ? list.length : idx, 0, shadow); // earlier in the list = drawn under
+  selectedSticker = list.indexOf(creature); // keep the creature selected, not its shadow
+  updateStickerUI();
+  draw();
+  flushRecord();
+}
 
 /** "Match the photo's colours" — the RIGHT way. Read the DISPLAYED scene colour
  *  under the sticker (offscreen GL read = iOS-safe, no canvas readback) and store
@@ -2283,6 +2319,12 @@ stkReMatch.addEventListener("click", () => {
   if (!s) return;
   s.reMatch = s.reMatch === false ? true : false; // toggle
   updateStickerUI();
+});
+
+const stkShadow = $("stkShadow") as HTMLButtonElement;
+stkShadow.addEventListener("click", () => {
+  const s = selSticker();
+  if (s && !s.shadow) castShadow(s);
 });
 
 // Import your own picture as a sticker (session-only runtime asset). This is

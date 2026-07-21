@@ -227,6 +227,12 @@ export interface Sticker {
    *  new spot (default on; undefined = on). Off locks the current match so moving
    *  it won't recolour it (owner, 2026-07-21). */
   reMatch?: boolean;
+  /** A cast SHADOW of another sticker: same asset, rendered as a flat near-black
+   *  silhouette so it darkens the ground like a real shadow (black over the scene
+   *  == Multiply). `shadowOpacity` is its strength. Skips the colour match. The
+   *  squash/skew onto the ground is carried by `corners` (owner, 2026-07-21). */
+  shadow?: boolean;
+  shadowOpacity?: number;
   /** Per-sticker erase/restore mask in ASSET-LOCAL space (paint to tuck the
    *  sticker behind foreground). 0 = hidden, 255 = shown; absent = fully
    *  shown. Runtime bitmap like the brush masks; `maskRev` bumps per stroke. */
