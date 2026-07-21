@@ -2613,20 +2613,24 @@ function startStickerPaint(e: PointerEvent): boolean {
   if (!s) return false;
   const [u, v] = renderer.clientToImageUv(e.clientX, e.clientY);
   const loc = stickerLocalUv(s, u, v);
-  // Only start when the touch lands on the sticker itself.
-  if (!loc || loc[0] < 0 || loc[0] > 1 || loc[1] < 0 || loc[1] > 1) return false;
+  if (!loc) return false; // no geometry (degenerate sticker)
+  // Begin the stroke wherever you press — even STARTING OFF the sticker — so you
+  // can brush inward across its edge to trim it. A stamp that lands outside the
+  // mask is a harmless no-op; the interpolated stroke fills in once it crosses in.
   // Copy-on-write: undo snapshots share this mask buffer, so fork it first.
   if (s.mask) s.mask = { w: s.mask.w, h: s.mask.h, data: new Uint8Array(s.mask.data) };
   else if (!ensureStickerMask(s)) return false;
   stkPainting = true;
   stkLastLocal = null;
   canvas.setPointerCapture(e.pointerId);
+  showStkBrush(e.clientX, e.clientY);
   stkPaintStroke(s, loc[0], loc[1]);
   return true;
 }
 function moveStickerPaint(e: PointerEvent) {
   const s = selSticker();
   if (!s) return;
+  showStkBrush(e.clientX, e.clientY);
   const [u, v] = renderer.clientToImageUv(e.clientX, e.clientY);
   const loc = stickerLocalUv(s, u, v);
   if (loc) stkPaintStroke(s, loc[0], loc[1]);
@@ -2635,8 +2639,55 @@ function endStickerPaint() {
   if (!stkPainting) return;
   stkPainting = false;
   stkLastLocal = null;
+  hideStkBrush();
   flushRecord();
 }
+
+// --- Brush-size cursor: a ring showing the sticker brush's real footprint, so
+// the Brush size slider (and each stroke) has something to show. Floats over the
+// photo, so it's styled theme-invariant (light ring + dark halo, visible on any
+// scene). Shown live while painting and briefly when the size slider moves. ---
+const stkBrushCursor = $("stkBrush") as HTMLDivElement;
+Object.assign(stkBrushCursor.style, {
+  position: "absolute", borderRadius: "50%", boxSizing: "border-box",
+  border: "2px solid rgba(255,255,255,.92)",
+  boxShadow: "0 0 0 1.5px rgba(0,0,0,.6), inset 0 0 0 1.5px rgba(0,0,0,.4)",
+  pointerEvents: "none", transform: "translate(-50%, -50%)", zIndex: "6",
+});
+let stkBrushHideTimer = 0;
+/** Brush radius in client px for the selected sticker at the current slider value. */
+function stkBrushClientRadius(s: Sticker): number | null {
+  const a = stickerAssets[s.asset];
+  if (!a || !current) return null;
+  // Mask radius is val·max(mask.w, mask.h); as a fraction of the sticker's WIDTH
+  // that's val·max(1, a.h/a.w). The sticker's width is s.scale of the image width.
+  const rUv = Number(stkBrushSize.value) * Math.max(1, a.h / a.w) * s.scale;
+  const [cx, cy] = renderer.imageUvToClient(s.x, s.y);
+  const [ex, ey] = renderer.imageUvToClient(s.x + rUv, s.y);
+  return Math.max(4, Math.hypot(ex - cx, ey - cy));
+}
+/** Show the brush ring. Pass a client point to place it (while painting); omit to
+ *  centre it on the selected sticker (the size-slider preview). */
+function showStkBrush(clientX?: number, clientY?: number) {
+  const s = selSticker();
+  const r = s && stkBrushClientRadius(s);
+  if (!s || !r) { hideStkBrush(); return; }
+  let px = clientX, py = clientY;
+  if (px === undefined || py === undefined) { [px, py] = renderer.imageUvToClient(s.x, s.y); }
+  const stage = stkBrushCursor.parentElement!.getBoundingClientRect();
+  stkBrushCursor.style.width = stkBrushCursor.style.height = `${2 * r}px`;
+  stkBrushCursor.style.left = `${px - stage.left}px`;
+  stkBrushCursor.style.top = `${py - stage.top}px`;
+  stkBrushCursor.hidden = false;
+}
+function hideStkBrush() { stkBrushCursor.hidden = true; }
+// Moving the Brush size slider flashes the ring at the sticker's centre so its
+// size is visible; it lingers ~1.2s (stays put while actively painting).
+stkBrushSize.addEventListener("input", () => {
+  showStkBrush();
+  clearTimeout(stkBrushHideTimer);
+  stkBrushHideTimer = window.setTimeout(() => { if (!stkPainting) hideStkBrush(); }, 1200);
+});
 
 /** Reflect the selected sticker into the controls; show/hide the panels. */
 function updateStickerUI() {
@@ -4230,7 +4281,7 @@ let stickerBakeCount = 0; // exposed on window in dev for the lag harness
 (window as unknown as { __stickerBakes: () => number }).__stickerBakes = () => stickerBakeCount;
 // Sticker-state snapshot for headless walks (transform + shadow linkage). Read-only.
 (window as unknown as { __stickers: () => unknown }).__stickers = () =>
-  (params.stickers ?? []).map((s) => ({ id: s.id, x: s.x, y: s.y, scale: s.scale, rot: s.rot, shadow: !!s.shadow, linkTo: s.linkTo ?? null, asset: s.asset }));
+  (params.stickers ?? []).map((s) => ({ id: s.id, x: s.x, y: s.y, scale: s.scale, rot: s.rot, shadow: !!s.shadow, linkTo: s.linkTo ?? null, asset: s.asset, maskRev: s.maskRev ?? 0, hasMask: !!s.mask }));
 // Select the i-th placed sticker (headless walks — exercises paths z-order hides from a tap).
 (window as unknown as { __select: (i: number) => void }).__select = (i: number) => { selectedSticker = i; updateStickerUI(); };
 

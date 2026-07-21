@@ -3265,6 +3265,28 @@ user-scalable=no.
   appear with Wildlife → "Owl"; three kinds now render and filter; PLANT=nofilter
   fails; all sticker regressions + build green. The factory promotes reviewed
   PNGs into public/stickers/<category>/ as its own deliberate step.
+- [x] **Sticker brush QoL: start off-edge + a brush-size ring (2026-07-21, owner:
+  "brushing only works if you start within the transparent background… near the
+  edge is hard" + "brush size slider has nothing to show that effect")** — two
+  fixes, increments. (a) EDGE BRUSHING: `startStickerPaint` used to bail (return
+  false → fall through to drag) unless the press landed inside the sticker's local
+  [0,1] rect, so a stroke had to BEGIN on the sticker and trimming the very edge
+  was fiddly. Now, while Paint mode is armed, a press anywhere BEGINS the stroke
+  (pointer captured); a stamp that lands off the mask is a harmless no-op (stkStamp
+  already clamps), and the interpolated stroke fills in once it crosses the edge —
+  so you start just outside and brush inward. NOTE: in Paint mode a press no longer
+  falls through to select a different sticker (the mode is per-selected-sticker;
+  exit via the toggle). (b) BRUSH-SIZE RING: new `#stkBrush` div cursor (theme-
+  invariant light ring + dark halo, floats over the photo, aria-hidden, z-index 6,
+  absolute in #stage like the heal overlay) shows the brush's real footprint —
+  live at the pointer while painting, and flashed at the sticker's centre for
+  ~1.2s whenever the Brush size slider moves. Radius: `val·max(1,a.h/a.w)·s.scale`
+  in image-uv → client via imageUvToClient. VERIFIED (sticker-brush-walk, 8 checks):
+  the ring shows on slider move and SCALES with it (79→236 px) then fades; a stroke
+  STARTING off the sticker trims it (maskRev 0→21); ring visible while painting,
+  hidden after. a11y clean both themes; controls 14/14, follow 14/14, rotate-ghost
+  7/7, sticker-fixes 39/39, parity 0 LSB. `__stickers()` snapshot gained maskRev/
+  hasMask for the walk.
 - [x] **Sticker placement QoL: smaller min, pan while armed, reachable delete +
   Delete key (2026-07-21, owner batch)** — four usability fixes, all increments
   (no VERSION bump). (a) MIN SIZE: Size floor dropped 0.05 → 0.015 (slider min +
