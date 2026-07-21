@@ -453,6 +453,43 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 #stickerGroups .mix-chip { min-height: 40px; padding: 8px 15px; font-size: 13px; font-weight: 600; }
 #stickerCats .mix-chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--txt); }
 
+/* The add-a-sticker grid: a thumbnail of each piece with its label beneath, so
+   you can tell a Bigfoot from a Mothman before you drop it (owner, 2026-07-21).
+   A soft checker sits behind each thumb so both dark and pale art stay visible
+   in either theme (theme-invariant, so it survives grayscale). */
+#stickerAdd { align-items: flex-start; }
+.sticker-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 78px;
+  padding: 7px 5px 8px;
+  text-align: center;
+}
+.sticker-tile .sticker-thumb {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  border-radius: 6px;
+  background-color: #8a8f99;
+  background-image:
+    linear-gradient(45deg, rgba(0, 0, 0, 0.16) 25%, transparent 25%, transparent 75%, rgba(0, 0, 0, 0.16) 75%),
+    linear-gradient(45deg, rgba(0, 0, 0, 0.16) 25%, transparent 25%, transparent 75%, rgba(0, 0, 0, 0.16) 75%);
+  background-size: 12px 12px;
+  background-position: 0 0, 6px 6px;
+}
+.sticker-tile .sticker-tile-label {
+  font: 600 11px/1.25 var(--ui);
+  color: var(--txt);
+  word-break: break-word;
+}
+.sticker-tile .sticker-tile-note {
+  font: 500 10px/1.2 var(--ui);
+  color: var(--txt-2);
+  letter-spacing: 0.02em;
+}
+
 /* ---- Grade tab (Creative) ------------------------------------------------
    Three tint wheels, one per tonal band. The wheel itself is a pointer-only
    convenience (aria-hidden, like the tone-curve dots); the ACCESSIBLE path is
@@ -696,6 +733,45 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 }
 #locTip::before { content: ""; position: absolute; inset: -5px; } /* 44px hit extension */
 #stage.cropping #locTip { display: none; } /* the crop pill owns the bottom edge */
+
+/* Zoom controls — a glass stack over the photo's bottom-right. Theme-invariant
+   glass (floats over the picture); real buttons with 44px targets; the % readout
+   is text so the state survives grayscale. Works with no wheel and no pinch, and
+   stays reachable while a brush tool owns the canvas gestures. */
+#zoomCtl {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 5px;
+  border: 1px solid rgba(150, 150, 170, 0.4);
+  border-radius: 14px;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+#zoomCtl button {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid rgba(150, 150, 170, 0.35);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--glass-txt);
+  font: 600 20px/1 var(--ui);
+  cursor: pointer;
+}
+#zoomCtl #zoomFit { font-size: 13px; }
+#zoomCtl button:disabled { opacity: 0.4; cursor: default; }
+#zoomCtl button::before { content: ""; position: absolute; inset: -3px; } /* 44px hit */
+#zoomCtl #zoomPct { text-align: center; font: 600 11px/1 var(--ui); color: var(--glass-txt); padding: 1px 0; }
+#stage.cropping #zoomCtl { display: none; } /* the crop view owns the frame */
+#stage.has-session #zoomCtl { bottom: calc(20px + var(--session-h, 110px)); }
 #locDlg h2 { margin-top: 0; font-size: 17px; }
 /* Settings rows in the ⓘ dialog: a toggle with its one-line explanation. */
 .set-row { margin: 10px 0 12px; display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
@@ -1655,6 +1731,13 @@ label.open-btn, label.bar-btn {
 /* Perspective corner handles — grabbable, dark fill + light ring + shadow so
    they read on any photo (shape, not colour, is the cue). */
 #stickerOverlay .sticker-corner { fill: rgba(12, 12, 16, 0.78); stroke: #fff; stroke-width: 2.5; pointer-events: auto; cursor: grab; touch-action: none; filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.9)); }
+/* Resize corners (white fill) + rotate knob (accent fill, on a dashed stem) —
+   always on a selected sticker so resize/rotate are discoverable right on the
+   photo. Shape + position (a knob on a stem vs. a corner) carry the meaning, not
+   colour alone. */
+#stickerOverlay .sticker-size { fill: #fff; stroke: var(--accent); stroke-width: 2.5; pointer-events: auto; cursor: nwse-resize; touch-action: none; filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.9)); }
+#stickerOverlay .sticker-rotate { fill: var(--accent); stroke: #fff; stroke-width: 2.5; pointer-events: auto; cursor: grab; touch-action: none; filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.9)); }
+#stickerOverlay .sticker-stem { stroke: #fff; stroke-width: 2; stroke-dasharray: 3 3; filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.85)); }
 /* Drag/resize ghost — the raw asset shown live while a gesture is in flight, so
    the heavy pipeline bake only runs on release (kills the drag lag). */
 #stickerGhost { position: fixed; pointer-events: none; z-index: 4; opacity: 0.92; will-change: transform, left, top; }
