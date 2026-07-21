@@ -623,6 +623,7 @@ function cloneParams(p: EditParams): EditParams {
       ...s,
       corners: s.corners ? s.corners.map((c) => [c[0], c[1]] as [number, number]) : s.corners,
       matchGain: s.matchGain ? ([...s.matchGain] as [number, number, number]) : s.matchGain,
+      matchScene: s.matchScene ? ([...s.matchScene] as [number, number, number]) : s.matchScene,
     })),
     // The warp field is SHARED by reference (copy-on-write per stroke, like the
     // brush bitmaps) — a snapshot's field is immutable once a new stroke clones.
@@ -2083,6 +2084,36 @@ function renderStickerPicker() {
 
 /** Place a sticker of `key` at the on-screen centre, auto-matched to the scene.
  *  Ensures the asset is rasterized first (lazy per-asset load). */
+const SCENE_MATCH_AMT = 0.85; // default strength of the palette match
+
+/** "Match the photo's colours" — the RIGHT way. Read the DISPLAYED scene colour
+ *  under the sticker (offscreen GL read = iOS-safe, no canvas readback) and store
+ *  it as the sticker's match target. The compositor then shifts the sticker's own
+ *  mean toward it, in the sticker's own display layer, so it takes on the infrared
+ *  palette WITHOUT being forced through the sensor pipeline (which just cooks it).
+ *  Reads with the sticker overlay OFF so it samples the scene, not the sticker. */
+function computeSceneMatch(s: Sticker) {
+  const a = stickerAssets[s.asset];
+  if (!a || !current) return;
+  const ar = a.h / a.w;
+  renderer.setOverlayOn(false); // sample the scene, not the sticker sitting on it
+  let r = 0, g = 0, b = 0, n = 0;
+  for (let gy = 0; gy < 3; gy++) {
+    for (let gx = 0; gx < 3; gx++) {
+      const u = s.x + (gx / 2 - 0.5) * s.scale;
+      const v = s.y + (gy / 2 - 0.5) * s.scale * ar;
+      if (u < 0 || u > 1 || v < 0 || v > 1) continue;
+      const px = renderer.readUvPixel(params, u, v);
+      if (px) { r += px[0]; g += px[1]; b += px[2]; n++; }
+    }
+  }
+  renderer.setOverlayOn((params.stickers ?? []).some((k) => stickerAssets[k.asset]));
+  if (!n) return;
+  const toLin = (x: number) => Math.pow(x / 255, 2.2);
+  s.matchScene = [toLin(r / n), toLin(g / n), toLin(b / n)];
+  s.matchAmt = SCENE_MATCH_AMT;
+}
+
 async function addStickerFromKey(key: string) {
   await ensureStickerAsset(key);
   if (!stickerAssets[key]) { toast("That sticker couldn't load — try again.", 2500); return; }
@@ -2104,8 +2135,7 @@ async function addStickerFromKey(key: string) {
     occludeBright: true,
     bright: 0, contrast: 0, warmth: 0, sat: 0,
   };
-  // A fresh sticker sits ON TOP in its own colours — no scene match (that only
-  // ever confused things and cooked the sticker into the scene).
+  computeSceneMatch(sticker); // take on the scene's palette (its own layer, not the pipeline)
   list.push(sticker);
   selectedSticker = list.length - 1;
   updateStickerUI();
@@ -2212,16 +2242,21 @@ const stkAdjustInput = () => {
 };
 for (const el of [stkBright, stkContrast, stkWarmth, stkSat]) el.addEventListener("input", stkAdjustInput);
 
-// "Make it look infrared" — the ONLY blend control now. Off = the sticker sits on
-// top in its own colours (the default everyone wants). On = it's baked into the
-// source and run through the whole infrared pipeline, so a creature takes on the
-// false-colour palette. The old auto-match / "blend into the photo" pile is gone:
-// it darkened stickers into the scene and was, in the owner's words, "just wrong."
-const stkInLook = $("stkInLook") as HTMLButtonElement;
-stkInLook.addEventListener("click", () => {
+// "Match the photo's colours" — the sticker takes on the scene's infrared palette
+// in ITS OWN layer (a mean shift toward the scene colour under it), never by
+// running it through the sensor pipeline. Button re-samples the scene where the
+// sticker sits now; the strength slider dials it 0 (raw) → 1 (full).
+const stkMatchStrength = $("stkMatchStrength") as HTMLInputElement;
+stkMatchStrength.addEventListener("input", () => {
   const s = selSticker();
   if (!s) return;
-  s.onTop = s.onTop === false ? true : false; // toggle: on-top <-> in-look
+  s.matchAmt = Number(stkMatchStrength.value);
+  draw();
+});
+$("stkMatchPhoto").addEventListener("click", () => {
+  const s = selSticker();
+  if (!s) return;
+  computeSceneMatch(s); // re-read the scene under the sticker's current spot
   updateStickerUI();
   draw();
   flushRecord();
@@ -2259,7 +2294,8 @@ stickerImport.addEventListener("change", async () => {
       scale: 0.3, rot: 0, occlude: 0, occludeLuma: 0.6, occludeBright: true,
       bright: 0, contrast: 0, warmth: 0, sat: 0,
     };
-    (params.stickers ??= []).push(s); // on top in its own colours — no scene match
+    computeSceneMatch(s); // take on the scene's palette, in its own layer
+    (params.stickers ??= []).push(s);
 
     selectedSticker = params.stickers.length - 1;
     updateStickerUI();
@@ -2484,11 +2520,7 @@ function updateStickerUI() {
     });
     stkBlendBtn.textContent = stkBlendArmed ? "✓ Painting on the sticker" : "Paint on the sticker";
     stkPerspBtn.textContent = stkPerspArmed ? "✓ Dragging the corners" : "Skew the corners";
-    // "Make it look infrared" — on top (own colours) by default; on = pushed
-    // through the pipeline. The only blend control that remains.
-    const inLook = s.onTop === false;
-    stkInLook.textContent = inLook ? "✓ Pushing it through the infrared look" : "Push it through the infrared look";
-    stkInLook.setAttribute("aria-pressed", String(inLook));
+    stkMatchStrength.value = String(s.matchAmt ?? 0);
   } else {
     if (stkBlendArmed) stkBlendArmed = false; // nothing selected to paint on
     if (stkPerspArmed) stkPerspArmed = false;
@@ -6151,7 +6183,7 @@ const LESSONS: { title: string; tab: PanelTab; steps: string[] }[] = [
     tab: "stickers",
     steps: [
       "Open the Stickers tab and tap a Saucer or Alien — it drops onto the photo. Drag it wherever you like.",
-      "By default it sits on top of the photo with its own colours — a sticker is a different kind of picture, so it isn't run through the infrared processing. Want a creature to look infrared instead? Turn on 'Push it through the infrared look'.",
+      "It sits on top of the photo in its own colours — a sticker is a different kind of picture, so it's never run through the infrared processing (that just cooks it). To help it belong, 'Match the photo's colours' shifts the sticker into the scene's infrared palette in its own layer; the strength slider dials how far.",
       "Slide Peek behind up and pick Bright parts — the glowing foliage shows through, so the saucer tucks in behind the branches. Add a little Grain (in Grade) and it settles over the whole scene.",
       "Resize and spin it right on the photo: drag a corner handle to resize, or the round knob above it to rotate (the Size and Spin sliders and two-finger pinch work too). Turn Blend into the photo off for stickers that look better in their own colours. Remove this sticker or Clear all start over — stickers stay with this photo, not carried by saved looks or batch.",
     ],

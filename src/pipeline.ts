@@ -215,6 +215,14 @@ export interface Sticker {
    *  on the button; the bright/contrast/warmth/sat sliders ride ON TOP. */
   matchGain?: [number, number, number];
   matchAmt?: number;
+  /** "Match the photo's colours" done RIGHT: `matchScene` is the DISPLAYED scene's
+   *  mean colour under the sticker (LINEAR), sampled from the finished photo — NOT
+   *  the raw sensor pipeline. The sticker's own mean is shifted toward it (by
+   *  `matchAmt`) in its own display-space layer, so it takes on the scene's
+   *  infrared palette without being cooked. A sticker is a different kind of
+   *  picture; this mimics the look instead of forcing it through the same filters
+   *  (owner, 2026-07-21). */
+  matchScene?: [number, number, number];
   /** Per-sticker erase/restore mask in ASSET-LOCAL space (paint to tuck the
    *  sticker behind foreground). 0 = hidden, 255 = shown; absent = fully
    *  shown. Runtime bitmap like the brush masks; `maskRev` bumps per stroke. */
