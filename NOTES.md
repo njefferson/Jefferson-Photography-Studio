@@ -3265,6 +3265,30 @@ user-scalable=no.
   appear with Wildlife → "Owl"; three kinds now render and filter; PLANT=nofilter
   fails; all sticker regressions + build green. The factory promotes reviewed
   PNGs into public/stickers/<category>/ as its own deliberate step.
+- [x] **Sticker placement QoL: smaller min, pan while armed, reachable delete +
+  Delete key (2026-07-21, owner batch)** — four usability fixes, all increments
+  (no VERSION bump). (a) MIN SIZE: Size floor dropped 0.05 → 0.015 (slider min +
+  the resize-handle and two-finger-pinch clamps) so a distant/tiny creature is
+  possible. (b) PAN WHILE ARMED: the Stickers tab used to dead-own the canvas
+  ("no pan while armed") so you could only zoom-to-centre; now a one-finger/mouse
+  drag on EMPTY canvas pans the zoomed photo (new `stickerPan` state in the armed
+  pointer handlers; a drag that HITS a sticker still moves it; empty-drag only
+  pans when zoom > 1). NOTE: an empty tap no longer re-grabs the selected sticker
+  — you grab a sticker by its own body now (needed to free empty-drag for pan).
+  (c) DELETE BUTTON moved from the BOTTOM of the menu to the TOP of the Selected-
+  sticker controls (above Size). (d) DELETE KEY: Delete/Backspace removes the
+  selected sticker (same `deleteSelectedSticker()` as the button), guarded off
+  when focus is in an input/textarea/select/contentEditable. Bonus correctness:
+  deleting a creature now also removes its still-LINKED shadow (no orphan puddle);
+  a DETACHED shadow (linkTo cleared) survives on its own. VERIFIED (sticker-
+  controls-walk, 14 checks): min 0.015 + a 0.02 sticker; delete button above Size;
+  empty-drag pans (view transform moves) without moving the sticker; on-sticker
+  drag still moves it; Delete + Backspace remove the selection; Delete ignored in
+  a field; creature-delete takes its glued shadow but not a detached one. a11y
+  clean both themes; follow 14/14, rotate-ghost 7/7, sticker-fixes 39/39, parity
+  0 LSB. NEEDS THE OWNER'S HANDS: grabbing a very small sticker by body is a small
+  target — the Size slider + handles still work, but a tap-to-select-nearest could
+  be a follow-up if it feels fiddly.
 - [x] **Cast shadows auto-follow their creature (2026-07-21, owner "a toggle
   that makes the sticker auto-update when dropped in a new location" applied to
   the shadow's placement pain)** — a cast shadow is now GLUED to the creature it
