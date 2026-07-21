@@ -206,6 +206,12 @@ export interface Sticker {
   contrast?: number; // -1..1 contrast about mid grey
   warmth?: number; // -1..1 R↑/B↓ (warm) vs R↓/B↑ (cool)
   sat?: number; // -1..1 saturation (−1 = grey, +1 = ~2×)
+  /** Overall opacity 0..1 (1 = solid). Multiplies the sticker's coverage so it
+   *  can be faded into the scene (owner, 2026-07-21). */
+  opacity?: number;
+  /** Luminance: a gamma-style lightness, out = c^(1/lum). >1 lifts, <1 darkens —
+   *  gentler than the linear Brightness, won't blow out. 1 = neutral. */
+  lum?: number;
   /** "Blend to match" — the auto-harmonise. `matchGain` is a per-channel SOURCE
    *  gain that moves the sticker's average colour onto the scene's: computed as
    *  sceneSourceMean / assetSourceMean, so after the identical IR pipeline (WB,
