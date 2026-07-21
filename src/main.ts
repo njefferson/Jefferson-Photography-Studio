@@ -1985,7 +1985,6 @@ const stkRot = $("stkRot") as HTMLInputElement;
 const stkOcclude = $("stkOcclude") as HTMLInputElement;
 const stkBehindEl = $("stkBehind") as HTMLDivElement;
 const stkClearBtn = $("stkClear") as HTMLButtonElement;
-const stkMatchStrength = $("stkMatchStrength") as HTMLInputElement;
 const stkBright = $("stkBright") as HTMLInputElement;
 const stkContrast = $("stkContrast") as HTMLInputElement;
 const stkWarmth = $("stkWarmth") as HTMLInputElement;
@@ -2105,7 +2104,8 @@ async function addStickerFromKey(key: string) {
     occludeBright: true,
     bright: 0, contrast: 0, warmth: 0, sat: 0,
   };
-  autoMatchSticker(sticker); // calibrate to the scene under the drop point
+  // A fresh sticker sits ON TOP in its own colours — no scene match (that only
+  // ever confused things and cooked the sticker into the scene).
   list.push(sticker);
   selectedSticker = list.length - 1;
   updateStickerUI();
@@ -2212,52 +2212,16 @@ const stkAdjustInput = () => {
 };
 for (const el of [stkBright, stkContrast, stkWarmth, stkSat]) el.addEventListener("input", stkAdjustInput);
 
-// Match strength — how hard the auto-match harmonises to the scene (lerps the
-// per-channel gain toward the raw asset; baked live like any slider).
-stkMatchStrength.addEventListener("input", () => {
-  const s = selSticker();
-  if (!s) return;
-  s.matchAmt = Number(stkMatchStrength.value);
-  draw();
-});
-
-const stkAutoMatch = $("stkAutoMatch") as HTMLButtonElement;
-stkAutoMatch.addEventListener("click", () => {
-  const s = selSticker();
-  if (!s) return;
-  autoMatchSticker(s); // recompute the transfer from the scene under it now
-  updateStickerUI();
-  draw();
-  flushRecord();
-});
-
-// On top of the look (default) vs blended INTO the infrared look. A sticker is a
-// different kind of picture, so by default it lays over the finished photo with
-// its own colours; this opts it into the pipeline instead (owner, 2026-07-21).
+// "Make it look infrared" — the ONLY blend control now. Off = the sticker sits on
+// top in its own colours (the default everyone wants). On = it's baked into the
+// source and run through the whole infrared pipeline, so a creature takes on the
+// false-colour palette. The old auto-match / "blend into the photo" pile is gone:
+// it darkened stickers into the scene and was, in the owner's words, "just wrong."
 const stkInLook = $("stkInLook") as HTMLButtonElement;
 stkInLook.addEventListener("click", () => {
   const s = selSticker();
   if (!s) return;
   s.onTop = s.onTop === false ? true : false; // toggle: on-top <-> in-look
-  if (s.onTop === false && !s.matchGain) autoMatchSticker(s); // in-look wants a scene match
-  updateStickerUI();
-  draw();
-  flushRecord();
-});
-
-// Blend on/off — the plain "some of these work better without it" switch (owner,
-// 2026-07-21). ON restores the full-strength match (computing the gain if the
-// sticker never had one); OFF drops matchAmt to 0 so the raw asset colour shows.
-const stkBlendToggle = $("stkBlendToggle") as HTMLButtonElement;
-stkBlendToggle.addEventListener("click", () => {
-  const s = selSticker();
-  if (!s) return;
-  if ((s.matchAmt ?? 0) > 0) {
-    s.matchAmt = 0; // off — the sticker keeps its own colours
-  } else {
-    if (!s.matchGain) autoMatchSticker(s); // never matched — sample the scene now
-    s.matchAmt = MATCH_AMT_DEFAULT; // on — full-strength harmonise
-  }
   updateStickerUI();
   draw();
   flushRecord();
@@ -2295,8 +2259,8 @@ stickerImport.addEventListener("change", async () => {
       scale: 0.3, rot: 0, occlude: 0, occludeLuma: 0.6, occludeBright: true,
       bright: 0, contrast: 0, warmth: 0, sat: 0,
     };
-    autoMatchSticker(s);
-    (params.stickers ??= []).push(s);
+    (params.stickers ??= []).push(s); // on top in its own colours — no scene match
+
     selectedSticker = params.stickers.length - 1;
     updateStickerUI();
     draw();
@@ -2490,53 +2454,6 @@ function endStickerPaint() {
   flushRecord();
 }
 
-/** Mean SOURCE-linear colour of the pristine scene in a patch around image-uv
- *  (x,y) — read from previewSrc, NOT the canvas. The old version read the WebGL
- *  canvas back through a 2D canvas; that works in Chromium but SILENTLY FAILS on
- *  iOS Safari, so the match never computed and the strength slider did nothing
- *  (owner, 2026-07-20). Null before an image is loaded. */
-function sampleSceneSrcMean(x: number, y: number, rUv: number): [number, number, number] | null {
-  const ps = previewSrc;
-  if (!ps) return null;
-  const W = ps.width, H = ps.height;
-  const half = Math.max(2, rUv * W);
-  const x0 = Math.max(0, Math.floor(x * W - half)), y0 = Math.max(0, Math.floor(y * H - half));
-  const x1 = Math.min(W, Math.ceil(x * W + half)), y1 = Math.min(H, Math.ceil(y * H + half));
-  if (x1 - x0 < 2 || y1 - y0 < 2) return null;
-  const lin = ps.linear, px = ps.pixels;
-  let r = 0, g = 0, b = 0, n = 0;
-  for (let yy = y0; yy < y1; yy++) {
-    for (let xx = x0; xx < x1; xx++) {
-      const o = (yy * W + xx) * 4;
-      if (lin) { r += lin[o]; g += lin[o + 1]; b += lin[o + 2]; }
-      else { r += Math.pow(px![o] / 255, 2.2); g += Math.pow(px![o + 1] / 255, 2.2); b += Math.pow(px![o + 2] / 255, 2.2); }
-      n++;
-    }
-  }
-  return n ? [r / n, g / n, b / n] : null;
-}
-
-const MATCH_AMT_DEFAULT = 0.85; // how hard a fresh sticker matches the scene
-
-/** "Blend to match" — land the sticker on the scene's ACTUAL on-screen colour by
- *  matching in SOURCE space: a per-channel gain = sceneSourceMean / assetSourceMean
- *  moves the sticker's average source colour onto the scene's, so after the
- *  identical IR pipeline (WB, camera matrix, channel swap) it displays as the
- *  scene does — a blown-out craft tones right in, no canvas readback (so it works
- *  on iOS). Clamped per channel so a near-black asset channel can't explode; the
- *  strength slider lerps it toward the raw asset, the sliders fine-tune. */
-function autoMatchSticker(s: Sticker) {
-  const a = stickerAssets[s.asset];
-  if (!a) return; // asset still loading — no match this time (rare)
-  const src = sampleSceneSrcMean(s.x, s.y, s.scale * 0.5);
-  if (!src) return;
-  const gain: [number, number, number] = [1, 1, 1];
-  for (let k = 0; k < 3; k++) gain[k] = clamp(src[k] / Math.max(1e-3, a.mean[k]), 0.12, 6);
-  s.matchGain = gain;
-  s.matchAmt = MATCH_AMT_DEFAULT;
-  s.bright = 0; s.contrast = 0; s.warmth = 0; s.sat = 0; // the gain carries the match; sliders start neutral
-}
-
 /** Reflect the selected sticker into the controls; show/hide the panels. */
 function updateStickerUI() {
   const list = params.stickers ?? [];
@@ -2551,7 +2468,6 @@ function updateStickerUI() {
     stkScale.value = String(s.scale);
     stkRot.value = String(s.rot);
     stkOcclude.value = String(s.occlude);
-    stkMatchStrength.value = String(s.matchAmt ?? 0);
     stkBright.value = String(s.bright ?? 0);
     stkContrast.value = String(s.contrast ?? 0);
     stkWarmth.value = String(s.warmth ?? 0);
@@ -2568,20 +2484,11 @@ function updateStickerUI() {
     });
     stkBlendBtn.textContent = stkBlendArmed ? "✓ Painting on the sticker" : "Paint on the sticker";
     stkPerspBtn.textContent = stkPerspArmed ? "✓ Dragging the corners" : "Skew the corners";
-    // On top vs in the infrared look (default on top). The whole "Match to the
-    // photo" group is only meaningful for an in-look sticker (matching so it
-    // survives the pipeline), so it dims when the sticker sits on top.
+    // "Make it look infrared" — on top (own colours) by default; on = pushed
+    // through the pipeline. The only blend control that remains.
     const inLook = s.onTop === false;
-    stkInLook.textContent = inLook ? "✓ Blending into the infrared look" : "Blend into the infrared look";
+    stkInLook.textContent = inLook ? "✓ Pushing it through the infrared look" : "Push it through the infrared look";
     stkInLook.setAttribute("aria-pressed", String(inLook));
-    // Blend on/off: the toggle carries the state as text (grayscale-safe); the
-    // strength/re-match controls dim when it's off, since they'd do nothing.
-    const blendOn = (s.matchAmt ?? 0) > 0;
-    stkBlendToggle.textContent = blendOn ? "✓ Blending into the photo" : "Blend into the photo";
-    stkBlendToggle.setAttribute("aria-pressed", String(blendOn));
-    stkBlendToggle.disabled = !inLook;
-    stkMatchStrength.disabled = !inLook || !blendOn;
-    stkAutoMatch.disabled = !inLook || !blendOn;
   } else {
     if (stkBlendArmed) stkBlendArmed = false; // nothing selected to paint on
     if (stkPerspArmed) stkPerspArmed = false;
@@ -6244,7 +6151,7 @@ const LESSONS: { title: string; tab: PanelTab; steps: string[] }[] = [
     tab: "stickers",
     steps: [
       "Open the Stickers tab and tap a Saucer or Alien — it drops onto the photo. Drag it wherever you like.",
-      "By default it sits on top of the photo with its own colours — a sticker is a different kind of picture, so it isn't run through the infrared processing. Want a creature to look infrared instead? Turn on 'Blend into the infrared look'.",
+      "By default it sits on top of the photo with its own colours — a sticker is a different kind of picture, so it isn't run through the infrared processing. Want a creature to look infrared instead? Turn on 'Push it through the infrared look'.",
       "Slide Peek behind up and pick Bright parts — the glowing foliage shows through, so the saucer tucks in behind the branches. Add a little Grain (in Grade) and it settles over the whole scene.",
       "Resize and spin it right on the photo: drag a corner handle to resize, or the round knob above it to rotate (the Size and Spin sliders and two-finger pinch work too). Turn Blend into the photo off for stickers that look better in their own colours. Remove this sticker or Clear all start over — stickers stay with this photo, not carried by saved looks or batch.",
     ],
