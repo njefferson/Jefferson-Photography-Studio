@@ -21,22 +21,34 @@
   "template": "craft-photoreal",
   "template_version": 3,
   "prompt_hash": "sha256:f910f1102248d1c863498a9c824cf8fafd0554b966ae44a72512cca02acae83f",
-  "created": "2026-07-21T01:57:37.056Z",
-  "run_id": "20260721014920-plhq",
-  "status": "error",
+  "created": "2026-07-21T02:05:12.478Z",
+  "run_id": "20260721020328-e49c",
+  "status": "rejected",
   "transparent": false,
   "approved": false,
   "favorite": false,
   "retry_count": 0,
   "qc": {
-    "tier_a": null,
+    "tier_a": {
+      "width": 1024,
+      "height": 1024,
+      "coverage": 0.0844,
+      "transparentFrac": 0.9016,
+      "featherFrac": 0.0566,
+      "edgeContact": 0.0195,
+      "components": 2
+    },
     "tier_b": null,
-    "reject_reasons": []
+    "reject_reasons": [
+      "cropped-subject",
+      "multiple-subjects"
+    ],
+    "warnings": []
   },
   "dhash": null,
   "duplicate_of": null,
-  "file": null,
+  "file": "rejected/ufo--flying-saucer--hovering--side--mid--neutral--v1.png",
   "promoted": null,
   "history": [],
-  "error": "flux 403 (permanent): {\"detail\": \"User is locked. Reason: Exhausted balance. Top up your balance at fal.ai/dashboard/billing.\"}"
+  "matted": true
 }
