@@ -3265,6 +3265,29 @@ user-scalable=no.
   appear with Wildlife → "Owl"; three kinds now render and filter; PLANT=nofilter
   fails; all sticker regressions + build green. The factory promotes reviewed
   PNGs into public/stickers/<category>/ as its own deliberate step.
+- [x] **Killed the confusing "blend/match" pile (2026-07-21, owner: "it's not
+  blending, it's just wrong")** — after on-top shipped, the owner turned on the
+  "Blend into the infrared look" toggle (sounds like nice blending) and got a
+  cooked sticker, then fought the "Match to the photo → Blending into the photo →
+  Match strength" controls that darken a sticker into the scene under it. Root
+  cause was NAMING + a leftover feature: on-top already keeps the sticker's own
+  colours, so the whole source-space match machinery was obsolete AND misleadingly
+  labelled. REMOVED entirely: `stkBlendToggle` ("Blend into the photo"),
+  `stkAutoMatch` ("Blend to match"), `stkMatchStrength`, `autoMatchSticker`,
+  `sampleSceneSrcMean`, `MATCH_AMT_DEFAULT`, and the auto-match-on-add/import
+  (a fresh sticker is now purely its own colours — matchAmt 0). The `matchGain`/
+  `matchAmt` model fields stay (dormant, ride cloneParams/session) so matchAsset's
+  manual bright/contrast/warmth/sat still work. RENAMED the one remaining blend
+  control honestly: the on-top/in-look toggle is now **"Push it through the
+  infrared look"** (off by default), moved to the BOTTOM under a "Make it look
+  infrared" heading with a note that it WILL change colour — no more implying it
+  makes the sticker blend nicely. Intro + Help + Lesson 9 rewritten to drop the
+  "matched to your photo automatically" language. VERIFIED (sticker-fixes-walk, 28
+  checks): the three removed controls are absent, the single infrared toggle
+  remains, on-top still keeps its own colour vs in-look recolours, all handle/
+  artifact/zoom checks green, axe clean both themes, build clean. NOTE FOR NEXT
+  SESSION: the earlier "Sticker usability sweep" entry's `stkBlendToggle` blend-on/
+  off is SUPERSEDED by this removal — don't reintroduce it.
 - [x] **Stickers lay ON TOP of the look now, not under it (2026-07-21, owner
   emphatic)** — THE big one. The owner: "a sticker is a different kind of picture,
   it can't lay under the same filters" — a colourful cutout composited INTO the

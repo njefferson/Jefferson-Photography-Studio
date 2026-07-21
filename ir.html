@@ -290,7 +290,7 @@
 
           <!-- ===== STICKERS (Creative) ===== -->
           <section class="section" role="tabpanel" id="sec-stickers" aria-labelledby="ptab-stickers" data-tab="stickers" hidden>
-            <p class="note">Drop something into the scene. Pick a category, tap one to add it, then drag it on the photo. New stickers are matched to your photo automatically &mdash; the channel swap, white balance and grade all reach them, and grain settles over the top &mdash; then fine-tune below.</p>
+            <p class="note">Drop something into the scene. Pick a category, tap one to add it, then drag it on the photo. Your sticker sits <strong>on top</strong> of the photo in its own colours &mdash; it's a different kind of picture, so it is not run through the infrared processing (grain still settles over it). Resize and spin it with the handles on the photo, then fine-tune below.</p>
             <div id="stickerGroups" class="bw-mixes" role="group" aria-label="Kind of overlay" hidden></div>
             <div id="stickerCats" class="bw-mixes" role="group" aria-label="Sticker category" hidden></div>
             <div id="stickerAdd" class="bw-mixes" role="group" aria-label="Add a sticker"></div>
@@ -298,15 +298,9 @@
             <input id="stickerImport" type="file" accept="image/png,image/*" hidden />
             <div id="stickerControls" hidden>
               <div class="sub-title">Selected sticker</div>
-              <button id="stkInLook" type="button" aria-pressed="false">Blend into the infrared look</button>
-              <p class="note">Your sticker sits <strong>on top</strong> of the photo with its own colours &mdash; it's a different kind of picture, so it isn't run through the infrared processing. Turn this on only if you want it pushed through the false-colour look too (for a creature meant to look infrared).</p>
               <label>Size <input id="stkScale" type="range" min="0.05" max="1" step="0.005" value="0.3" /></label>
               <label>Spin <input id="stkRot" type="range" min="-180" max="180" step="1" value="0" /></label>
-              <div class="sub-title">Match to the photo</div>
-              <button id="stkBlendToggle" type="button" aria-pressed="true">Blend into the photo</button>
-              <button id="stkAutoMatch" type="button">Blend to match the photo</button>
-              <label>Match strength <input id="stkMatchStrength" type="range" min="0" max="1" step="0.01" value="0.85" /></label>
-              <p class="note">Blend to match takes on the colour and contrast of the scene right under the sticker so it sits in the photo. Turn blending off to drop the sticker in with its own colours untouched &mdash; some read better that way. Turn the strength down to keep more of the sticker's own colour, or fine-tune by hand below.</p>
+              <div class="sub-title">Fine-tune its own look</div>
               <label>Brightness <input id="stkBright" type="range" min="-1" max="1" step="0.01" value="0" /></label>
               <label>Contrast <input id="stkContrast" type="range" min="-1" max="1" step="0.01" value="0" /></label>
               <label>Warmth <input id="stkWarmth" type="range" min="-1" max="1" step="0.01" value="0" /></label>
@@ -325,6 +319,9 @@
               <button id="stkPersp" type="button" aria-pressed="false">Skew the corners</button>
               <button id="stkPerspReset" type="button">Reset perspective</button>
               <p class="note">Turn this on, then drag the sticker's four corners on the photo to set its perspective &mdash; lay it flat on the ground or tilt it so it matches the scene you're dropping it into.</p>
+              <div class="sub-title">Make it look infrared</div>
+              <button id="stkInLook" type="button" aria-pressed="false">Push it through the infrared look</button>
+              <p class="note">Off by default &mdash; your sticker keeps its own colours on top of the photo. Turn this on <em>only</em> if you want a creature run through the false-colour infrared processing so it takes on the weird palette. It will change colour.</p>
               <button id="stkDelete" type="button">Remove this sticker</button>
             </div>
             <button id="stkClear" type="button" hidden>Clear all stickers</button>
@@ -843,7 +840,7 @@
         <p>In the <strong>Stickers</strong> tab, tap a sticker to drop it on the photo, then drag it into
         place. A sticker sits <strong>on top</strong> of the picture with its own colours &mdash; it's a
         different kind of image, so it is <em>not</em> pushed through the infrared processing (grain still
-        settles over the top). If you want a creature to look infrared, turn on <strong>Blend into the
+        settles over the top). If you want a creature to look infrared, turn on <strong>Push it through the
         infrared look</strong> and it will take on the false-colour palette instead. <strong>Peek behind</strong> lets the scene show
         through: pick whether the sticker hides behind the bright parts (glowing foliage) or the dark
         parts (tree trunks), so a saucer can tuck in behind the branches. <strong>Resize and rotate right
