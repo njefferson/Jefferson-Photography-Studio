@@ -3292,6 +3292,19 @@ user-scalable=no.
   shadow strip below the creature is an easy enough tap-target to grab for a manual
   offset (auto-follow means most placements never need it; if he wants a dedicated
   nudge/direction control that's a clean follow-up).
+  - FOLLOW-UP FIX (2026-07-21, owner: "rotating the shadow makes the whole image
+    show again, not the rotating shadow"): the live ghost is a plain rotated
+    `<img>` of the asset — it CANNOT reproduce a shadow's flatten (a corner
+    homography), so ghosting a shadow during a transform showed the un-flattened
+    full creature. GOTCHA to keep: shadows must never be ghosted. Fix: shadows are
+    excluded from the ghost path — `beginStickerLive` leaves a shadow IN the bake
+    (liveSticker stays −1) and `previewStickerTransform` re-bakes it live each
+    frame (cheap, one small rect, like the Peek/occlusion slider) so you see the
+    real flattened silhouette move/scale/spin. Creatures still ghost. VERIFIED
+    (shadow-rotate-ghost-walk, 7 checks): rotating the shadow keeps the ghost
+    hidden and the region stays dark (flattened, not the bright creature) while it
+    re-bakes; creature rotation still ghosts; follow 14/14, sticker-fixes 39/39,
+    parity 0 LSB, no console errors.
 - [x] **Scene toolkit: auto-shadow + Screen-for-lights (2026-07-21, asset-factory
   handoff + owner "auto-shadow, then screen-for-lights")** — polish on the new
   toolkit assets. (a) REGISTERED the factory's new folders: `illustrated/` (10

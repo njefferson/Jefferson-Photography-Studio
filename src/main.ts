@@ -1962,10 +1962,25 @@ function positionStickerGhost() {
   stickerGhost.hidden = false;
 }
 
+/** Live preview during a transform gesture. A ghostable sticker rides the CSS
+ *  ghost <img>; a SHADOW re-bakes live instead — its flatten is a corner
+ *  homography the flat ghost can't reproduce, so ghosting it would show the
+ *  un-flattened creature ("the whole image"). Re-baking shows the real flattened
+ *  silhouette move / scale / spin (cheap: one small rect, like the Peek slider). */
+function previewStickerTransform() {
+  const s = selSticker();
+  if (s && s.shadow) draw();
+  else positionStickerGhost();
+}
+
 /** Enter live mode for the selected sticker: pull it from the bake (one bake to
- *  clear its old pixels) and show the ghost. */
+ *  clear its old pixels) and show the ghost. Shadows are NOT ghosted — they stay
+ *  baked and re-bake live (see previewStickerTransform). */
 function beginStickerLive() {
-  if (selectedSticker < 0 || liveSticker === selectedSticker) return;
+  if (selectedSticker < 0) return;
+  const s = (params.stickers ?? [])[selectedSticker];
+  if (s && s.shadow) { liveSticker = -1; stickerGhost.hidden = true; return; } // shadow rides the bake, not the ghost
+  if (liveSticker === selectedSticker) return;
   liveSticker = selectedSticker;
   positionStickerGhost();
   draw(); // re-bake WITHOUT the live sticker (clean background under the ghost)
@@ -2297,7 +2312,7 @@ const stkTransformInput = () => {
   if (s.shadow) s.linkTo = undefined; // hand-sized/spun shadow detaches from its creature
   updateStickerUI();
   beginStickerLive();
-  positionStickerGhost();
+  previewStickerTransform();
 };
 for (const el of [stkScale, stkRot]) {
   el.addEventListener("input", stkTransformInput);
@@ -2819,7 +2834,7 @@ function attachStickerSizeDrag(el: SVGCircleElement) {
       cur.scale = clamp(d / diag, 0.05, 1);
       if (cur.shadow) cur.linkTo = undefined; // hand-resized shadow detaches
       updateStickerUI(); // Size slider follows the finger
-      positionStickerGhost();
+      previewStickerTransform();
     };
     const up = () => {
       el.removeEventListener("pointermove", move);
@@ -2860,7 +2875,7 @@ function attachStickerRotateDrag(el: SVGCircleElement) {
       cur.rot = Math.round(deg);
       if (cur.shadow) cur.linkTo = undefined; // hand-spun shadow detaches
       updateStickerUI(); // Spin slider follows
-      positionStickerGhost();
+      previewStickerTransform();
     };
     const up = () => {
       el.removeEventListener("pointermove", move);
@@ -5166,7 +5181,7 @@ canvas.addEventListener("pointermove", (e) => {
         s.rot = Math.round(deg);
         if (s.shadow) s.linkTo = undefined; // pinched shadow detaches from its creature
         updateStickerUI(); // Size/Spin sliders follow the fingers live
-        positionStickerGhost();
+        previewStickerTransform();
       }
       return;
     }
@@ -5180,7 +5195,7 @@ canvas.addEventListener("pointermove", (e) => {
       s.y = Math.min(1, Math.max(0, v + stickerDrag.ov));
       if (s.shadow) s.linkTo = undefined; // dragged shadow detaches — it stays where you put it
       positionStickerOverlay();
-      positionStickerGhost(); // cheap CSS move; no re-bake mid-drag
+      previewStickerTransform(); // ghost for creatures; live re-bake for a shadow (no ghostable flatten)
     }
     return;
   }
