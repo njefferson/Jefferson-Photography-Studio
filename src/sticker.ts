@@ -50,6 +50,10 @@ export interface StickerAsset {
    *  u1,v1 = bottom-right). Lets a cast shadow pivot on the real feet, not the
    *  transparent padding around them. Full [0,0,1,1] if the asset has no alpha. */
   opaque: { u0: number; v0: number; u1: number; v1: number };
+  /** The FOOT point in asset-uv: the horizontal centre of the opaque pixels in the
+   *  bottom band (u) at the opaque bottom (v). Where a cast shadow should anchor —
+   *  a leaning creature's feet aren't at the box centre. */
+  foot: { u: number; v: number };
 }
 
 export interface Rect {
@@ -78,7 +82,21 @@ export function makeStickerAsset(key: string, w: number, h: number, rgba: Uint8C
   const opaque = x1 < x0
     ? { u0: 0, v0: 0, u1: 1, v1: 1 }
     : { u0: x0 / w, v0: y0 / h, u1: (x1 + 1) / w, v1: (y1 + 1) / h };
-  return { key, w, h, lin, mean: [mr / d, mg / d, mb / d], opaque };
+  // Foot point: the alpha-weighted horizontal centre of the opaque pixels in the
+  // bottom band (~last 12% of the opaque height) — the actual base of the figure.
+  let foot = { u: 0.5, v: opaque.v1 };
+  if (x1 >= x0) {
+    const bandTop = Math.max(y0, Math.floor(y1 - (y1 - y0) * 0.12));
+    let sx = 0, sw = 0;
+    for (let y = bandTop; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        const a = lin[(y * w + x) * 4 + 3];
+        if (a > 0.05) { sx += x * a; sw += a; }
+      }
+    }
+    if (sw > 0) foot = { u: (sx / sw + 0.5) / w, v: opaque.v1 };
+  }
+  return { key, w, h, lin, mean: [mr / d, mg / d, mb / d], opaque, foot };
 }
 
 const clampI = (v: number, hi: number) => (v < 0 ? 0 : v > hi ? hi : v);

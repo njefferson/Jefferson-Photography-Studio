@@ -2100,8 +2100,8 @@ const SCENE_MATCH_AMT = 0.85; // default strength of the palette match
 // bottom of its OPAQUE content, not the transparent padding), and the silhouette
 // folds down onto the ground from there: SPREAD = how far it stretches past the
 // feet, SKEW = the light-direction shear. Half-extent units, fed to `corners`.
-const SHADOW_SPREAD = 0.75;
-const SHADOW_SKEW = 0.55;
+const SHADOW_SPREAD = 0.4;
+const SHADOW_SKEW = 0.3;
 
 /** Cast a shadow of a sticker from its OWN silhouette: a flat near-black copy that
  *  folds onto the ground FROM THE FEET (the opaque bottom, ignoring the sticker's
@@ -2113,7 +2113,11 @@ function castShadow(creature: Sticker) {
   // Feet = bottom of the opaque content in local half-extent units (y: −1 top … +1
   // bottom). The top corners fold DOWN to feet+SPREAD (+ shear); the bottom corners
   // (empty padding) collapse UP to the feet, so the shadow starts at the real feet.
-  const footHalf = 2 * a.opaque.v1 - 1;
+  // Pivot on the FEET: the shadow shares the creature's transform (so the black
+  // silhouette's feet already sit exactly under the creature's feet), and the fold
+  // hinges on the opaque bottom. The bottom padding collapses UP to the feet, the
+  // body folds DOWN past them, skewed by the light direction — anchored at the feet.
+  const footHalf = 2 * a.foot.v - 1;
   const topY = footHalf + SHADOW_SPREAD + 1; // offset added to the top corners (base −1)
   const botY = footHalf - 1;                 // offset added to the bottom corners (base +1)
   const shadow: Sticker = {
