@@ -75,6 +75,7 @@
         <svg id="healOverlay" hidden aria-hidden="true"></svg>
         <svg id="stickerOverlay" hidden aria-hidden="true"></svg>
         <img id="stickerGhost" alt="" aria-hidden="true" hidden />
+        <div id="stkBrush" aria-hidden="true" hidden></div>
         <div id="cropOverlay" hidden aria-hidden="true">
           <div id="cropBox">
             <div id="cropGuides" aria-hidden="true"></div>
@@ -322,7 +323,7 @@
               <div id="stkBlendMode" class="bw-mixes" role="group" aria-label="What painting does"></div>
               <label>Brush size <input id="stkBrushSize" type="range" min="0.03" max="0.5" step="0.005" value="0.15" /></label>
               <button id="stkBlendClear" type="button">Show the whole sticker again</button>
-              <p class="note">Turn on painting, then draw on the sticker to rub parts away so it tucks behind a branch or foreground &mdash; switch to Bring back to paint them in again. Two fingers on the photo resize and spin the selected sticker.</p>
+              <p class="note">Turn on painting, then draw on the sticker to rub parts away so it tucks behind a branch or foreground &mdash; switch to Bring back to paint them in again. You can start the stroke just <em>outside</em> the edge and brush inward, so trimming the very edge is easy. The ring shows your brush size. Two fingers on the photo resize and spin the selected sticker.</p>
               <div class="sub-title">Perspective</div>
               <button id="stkPersp" type="button" aria-pressed="false">Skew the corners</button>
               <button id="stkPerspReset" type="button">Reset perspective</button>
