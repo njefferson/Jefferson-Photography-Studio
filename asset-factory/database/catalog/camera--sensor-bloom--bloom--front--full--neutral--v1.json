@@ -1,0 +1,50 @@
+{
+  "id": "camera--sensor-bloom--bloom--front--full--neutral--v1",
+  "name": "Sensor bloom bloom (front, full)",
+  "category": "camera",
+  "subcategory": "sensor-bloom",
+  "tags": [
+    "camera",
+    "optical",
+    "effect"
+  ],
+  "prompt": "A real, natural-light photograph — shot outdoors in soft, even daylight, true-to-life detail, texture and colour, sharp and in focus, exactly as it looks in a real photo. Absolutely NOT an illustration, drawing, painting, sketch, comic, 3D render, CGI, or artwork, and NOT an animal or creature unless explicitly described.\nA real photograph of an overexposed sensor bloom of blown-out light, a blooming glare, seen directly from the front, the entire subject filling the frame.\nA natural photographic overlay element with realistic optics and density, exactly as it would appear caught in a real camera frame, its transparency carried in the alpha channel.\nExactly one subject, centered, nothing else in frame.\nIsolated on a fully transparent background with soft naturally feathered edges, produced as an overlay element to composite into a real photograph.\nNo text, no watermark, no caption, no border, no frame, no sticker sheet, no collage.",
+  "negative_prompt": "illustration, drawing, sketch, line art, comic, cartoon, anime, painting, digital painting, concept art, poster, sticker, vector art, cel shaded, 3d render, cgi, octane render, sculpture, statue, figurine, clay, toy, plastic, stylized, cartoonish, film grain, heavy noise, motion blur, vignette, drop shadow, glow, rim light, text, watermark, logo, caption, border, frame, background, scenery, sky, ground, landscape, buildings, people, multiple subjects, sticker sheet, grid, collage, cropped, cut off, white background, colored background",
+  "seed": 131126170,
+  "provider": "ideogram",
+  "model": "ideogram-v3",
+  "settings": {
+    "rendering_speed": "QUALITY",
+    "aspect_ratio": "1x1",
+    "style_type": "REALISTIC"
+  },
+  "template": "effect-overlay",
+  "template_version": 3,
+  "prompt_hash": "sha256:38402d585d7901ada454d548a1c459b431965affaa83eb7a4efde24074df2cc7",
+  "created": "2026-07-21T02:56:29.052Z",
+  "run_id": "20260721025559-pq9l",
+  "status": "approved",
+  "transparent": true,
+  "approved": true,
+  "favorite": false,
+  "retry_count": 0,
+  "qc": {
+    "tier_a": {
+      "width": 1024,
+      "height": 1024,
+      "coverage": 0.3808,
+      "transparentFrac": 0.6181,
+      "featherFrac": 0.0739,
+      "edgeContact": 0,
+      "components": 1
+    },
+    "tier_b": null,
+    "reject_reasons": [],
+    "warnings": []
+  },
+  "dhash": "5c47070f0f3f1cc4",
+  "duplicate_of": null,
+  "file": "assets/camera/camera--sensor-bloom--bloom--front--full--neutral--v1.png",
+  "promoted": null,
+  "history": []
+}

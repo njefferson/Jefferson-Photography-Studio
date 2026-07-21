@@ -1,0 +1,53 @@
+{
+  "id": "dapple--reed-shadow--streaked--front--full--neutral--v1",
+  "name": "Reed shadows streaked (front, full)",
+  "category": "dapple",
+  "subcategory": "reed-shadow",
+  "tags": [
+    "shadow",
+    "dapple",
+    "overlay"
+  ],
+  "prompt": "A soft, natural pattern of dappled shade — the mottled shadow that sunlight casts through overhead tall grass and reeds onto a flat, plain surface.\nmany fine near-vertical streaks of shade.\nOnly the cast shadow itself: soft-edged dark, semi-transparent blotches with gaps of open light between them, organic and irregular, exactly the way real dappled sunlight falls on the ground.\nNOT the tall grass and reeds themselves and no objects at all — only the shadow they cast, carried in the alpha channel on a fully transparent background so it can be laid over any photo.\nNo text, no watermark, no caption, no border, no frame, no sticker sheet, no collage.",
+  "negative_prompt": "leaves, branches, twigs, foliage, plants, tree, grass blades themselves, objects, subject, creature, animal, person, bright, glowing, light source, sunbeam, sky, lens flare, colorful, saturated, green, scenery, landscape, photograph of a forest, text, watermark, border, frame, white background, grey background, opaque background, solid background",
+  "seed": 1039666317,
+  "provider": "ideogram",
+  "model": "ideogram-v3",
+  "settings": {
+    "rendering_speed": "QUALITY",
+    "aspect_ratio": "1x1",
+    "style_type": "REALISTIC"
+  },
+  "template": "shadow-overlay",
+  "template_version": 1,
+  "prompt_hash": "sha256:e1e90235ca53e5051bb13836729cf74ebf90e397bfb0105e417c14d22316c783",
+  "created": "2026-07-21T13:27:27.759Z",
+  "run_id": "20260721132655-0x5x",
+  "status": "rejected",
+  "transparent": false,
+  "approved": false,
+  "favorite": false,
+  "retry_count": 0,
+  "qc": {
+    "tier_a": {
+      "width": 1024,
+      "height": 1024,
+      "coverage": 0.9961,
+      "transparentFrac": 0.0039,
+      "featherFrac": 0.0031,
+      "edgeContact": 0,
+      "components": 1
+    },
+    "tier_b": null,
+    "reject_reasons": [
+      "opaque-background",
+      "coverage-out-of-range"
+    ],
+    "warnings": []
+  },
+  "dhash": null,
+  "duplicate_of": null,
+  "file": "rejected/dapple--reed-shadow--streaked--front--full--neutral--v1.png",
+  "promoted": null,
+  "history": []
+}

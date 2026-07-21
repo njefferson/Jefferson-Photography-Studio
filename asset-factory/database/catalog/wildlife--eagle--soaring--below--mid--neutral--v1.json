@@ -1,0 +1,41 @@
+{
+  "id": "wildlife--eagle--soaring--below--mid--neutral--v1",
+  "name": "Eagle soaring (below, mid)",
+  "category": "wildlife",
+  "subcategory": "eagle",
+  "tags": [
+    "wildlife",
+    "animal"
+  ],
+  "prompt": "A real, natural-light photograph of a real subject — shot outdoors in soft, even daylight with a full tonal range from clean shadows to bright highlights, true-to-life skin, fur, and surface texture, sharp and in focus. It looks like an ordinary, believable photo, absolutely NOT an illustration, drawing, painting, sketch, comic, 3D render, CGI, sculpture, statue, figurine, or toy.\nA clear, real photograph of a bald eagle, soaring, wings spread, seen from slightly below, photographed from a moderate distance.\nThe entire subject is shown in full within the frame, head to toe and top to bottom, complete and uncropped — NOT a bust, headshot, or close portrait.\nFramed with clear empty space around the entire creature — the whole body sits comfortably within the frame and does NOT touch or run off any edge.\nBelievable living anatomy with real skin and fur texture, sharp and in focus like an ordinary wildlife photo.\nEvenly and naturally lit in soft daylight so it can be relit to match any scene — no dramatic or hard directional light, no strong coloured light, no night flash.\nExactly one subject, centered, nothing else in frame.\nIsolated on a fully transparent background, the entire subject visible and uncropped, with soft naturally feathered edges suitable for dropping into another photograph.\nNo baked-in effects of any kind — no vignette, no border or frame, no drop shadow, no glow or rim light, no film grain, no colour grade or filter. A plain, un-stylised subject; the app adds its own tone and grain.\nNo text, no watermark, no caption, no border, no frame, no sticker sheet, no collage.",
+  "negative_prompt": "illustration, drawing, sketch, line art, comic, cartoon, anime, painting, digital painting, concept art, poster, sticker, vector art, cel shaded, 3d render, cgi, octane render, sculpture, statue, figurine, clay, toy, plastic, stylized, cartoonish, film grain, heavy noise, motion blur, vignette, drop shadow, glow, rim light, text, watermark, logo, caption, border, frame, background, scenery, sky, ground, landscape, buildings, people, multiple subjects, sticker sheet, grid, collage, cropped, cut off, white background, colored background",
+  "seed": 1668210036,
+  "provider": "flux",
+  "model": "flux-pro-1.1",
+  "settings": {
+    "rendering_speed": "QUALITY",
+    "aspect_ratio": "1x1",
+    "style_type": "REALISTIC"
+  },
+  "template": "creature-photoreal",
+  "template_version": 3,
+  "prompt_hash": "sha256:775e13727ed647a59fed678e7ee6c1ae3c2d4f097e42d1650c545e34400c4110",
+  "created": "2026-07-21T01:57:49.964Z",
+  "run_id": "20260721014920-plhq",
+  "status": "error",
+  "transparent": false,
+  "approved": false,
+  "favorite": false,
+  "retry_count": 0,
+  "qc": {
+    "tier_a": null,
+    "tier_b": null,
+    "reject_reasons": []
+  },
+  "dhash": null,
+  "duplicate_of": null,
+  "file": null,
+  "promoted": null,
+  "history": [],
+  "error": "flux 403 (permanent): {\"detail\": \"User is locked. Reason: Exhausted balance. Top up your balance at fal.ai/dashboard/billing.\"}"
+}

@@ -1,0 +1,50 @@
+{
+  "id": "dapple--branch-shadow--raking--front--full--neutral--v1",
+  "name": "Branch shadows raking (front, full)",
+  "category": "dapple",
+  "subcategory": "branch-shadow",
+  "tags": [
+    "shadow",
+    "dapple",
+    "overlay"
+  ],
+  "prompt": "A soft, natural pattern of dappled shade — the mottled shadow that sunlight casts through overhead bare branches onto a flat, plain surface.\nlong thin crossing shadow lines raking across the surface.\nOnly the cast shadow itself: soft-edged dark, semi-transparent blotches with gaps of open light between them, organic and irregular, exactly the way real dappled sunlight falls on the ground.\nNOT the bare branches themselves and no objects at all — only the shadow they cast, carried in the alpha channel on a fully transparent background so it can be laid over any photo.\nNo text, no watermark, no caption, no border, no frame, no sticker sheet, no collage.",
+  "negative_prompt": "leaves, branches, twigs, foliage, plants, tree, grass blades themselves, objects, subject, creature, animal, person, bright, glowing, light source, sunbeam, sky, lens flare, colorful, saturated, green, scenery, landscape, photograph of a forest, text, watermark, border, frame, white background, grey background, opaque background, solid background",
+  "seed": 614808937,
+  "provider": "ideogram",
+  "model": "ideogram-v3",
+  "settings": {
+    "rendering_speed": "QUALITY",
+    "aspect_ratio": "1x1",
+    "style_type": "REALISTIC"
+  },
+  "template": "shadow-overlay",
+  "template_version": 1,
+  "prompt_hash": "sha256:9b8a0e72f62365278f677f6b995ddb89193834f49c3ee183e0880b6416a37908",
+  "created": "2026-07-21T13:27:09.963Z",
+  "run_id": "20260721132655-0x5x",
+  "status": "approved",
+  "transparent": true,
+  "approved": true,
+  "favorite": false,
+  "retry_count": 0,
+  "qc": {
+    "tier_a": {
+      "width": 1024,
+      "height": 1024,
+      "coverage": 0.7828,
+      "transparentFrac": 0.2157,
+      "featherFrac": 0.0033,
+      "edgeContact": 0,
+      "components": 1
+    },
+    "tier_b": null,
+    "reject_reasons": [],
+    "warnings": []
+  },
+  "dhash": "0a57554d35273737",
+  "duplicate_of": null,
+  "file": "assets/dapple/dapple--branch-shadow--raking--front--full--neutral--v1.png",
+  "promoted": null,
+  "history": []
+}

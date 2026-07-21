@@ -1,0 +1,50 @@
+{
+  "id": "dapple--fern-dapple--feathery--front--full--neutral--v1",
+  "name": "Fern dapple feathery (front, full)",
+  "category": "dapple",
+  "subcategory": "fern-dapple",
+  "tags": [
+    "shadow",
+    "dapple",
+    "overlay"
+  ],
+  "prompt": "A soft, natural pattern of dappled shade — the mottled shadow that sunlight casts through overhead feathery fern fronds onto a flat, plain surface.\ndelicate feathered fingers of shade.\nOnly the cast shadow itself: soft-edged dark, semi-transparent blotches with gaps of open light between them, organic and irregular, exactly the way real dappled sunlight falls on the ground.\nNOT the feathery fern fronds themselves and no objects at all — only the shadow they cast, carried in the alpha channel on a fully transparent background so it can be laid over any photo.\nNo text, no watermark, no caption, no border, no frame, no sticker sheet, no collage.",
+  "negative_prompt": "leaves, branches, twigs, foliage, plants, tree, grass blades themselves, objects, subject, creature, animal, person, bright, glowing, light source, sunbeam, sky, lens flare, colorful, saturated, green, scenery, landscape, photograph of a forest, text, watermark, border, frame, white background, grey background, opaque background, solid background",
+  "seed": 182016413,
+  "provider": "ideogram",
+  "model": "ideogram-v3",
+  "settings": {
+    "rendering_speed": "QUALITY",
+    "aspect_ratio": "1x1",
+    "style_type": "REALISTIC"
+  },
+  "template": "shadow-overlay",
+  "template_version": 1,
+  "prompt_hash": "sha256:09c88ab279b63350cb4330dcfe7454c532b06f7c4170531176430efbf0339318",
+  "created": "2026-07-21T13:27:12.456Z",
+  "run_id": "20260721132655-0x5x",
+  "status": "approved",
+  "transparent": true,
+  "approved": true,
+  "favorite": false,
+  "retry_count": 0,
+  "qc": {
+    "tier_a": {
+      "width": 1024,
+      "height": 1024,
+      "coverage": 0.3605,
+      "transparentFrac": 0.6339,
+      "featherFrac": 0.0212,
+      "edgeContact": 0,
+      "components": 4
+    },
+    "tier_b": null,
+    "reject_reasons": [],
+    "warnings": []
+  },
+  "dhash": "58272b17555d1122",
+  "duplicate_of": null,
+  "file": "assets/dapple/dapple--fern-dapple--feathery--front--full--neutral--v1.png",
+  "promoted": null,
+  "history": []
+}

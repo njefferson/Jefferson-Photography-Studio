@@ -1,0 +1,45 @@
+{
+  "id": "cryptid-art--owlman--standing--front--mid--neutral--v1",
+  "name": "Owlman standing (front, mid)",
+  "category": "cryptid-art",
+  "subcategory": "owlman",
+  "tags": [
+    "cryptid",
+    "illustration"
+  ],
+  "prompt": "A clean vintage cryptozoology field-guide illustration of the Owlman, a winged owl-faced humanoid cryptid, standing upright, seen directly from the front.\nBold confident ink linework with flat, limited muted colour and subtle cross-hatching, in the style of a classic engraving or naturalist plate.\nThe entire subject is shown in full within the frame, head to toe and top to bottom, complete and uncropped — NOT a bust, headshot, or close portrait.\nExactly one subject, centered, nothing else in frame.\nIsolated on a fully transparent background with clean, crisp, hard-cut edges — the entire subject visible and uncropped, nothing else in the frame.\nFlat on empty transparency: absolutely NO background glow, aura, halo, backlight, rim light, mist, smoke, coloured haze, drop shadow, or outline of any kind — nothing around the creature but empty transparent space.\nNo ground, floor, base line, groundline, or cast shadow beneath it — the feet sit directly on empty transparency, nothing under or around the subject.\nA crisp hand-drawn illustration — absolutely NO text, letters, words, caption, label, signature, border, or frame anywhere.",
+  "negative_prompt": "photograph, photo, realistic, 3d render, cgi, glow, halo, aura, backlight, rim light, drop shadow, shadow, outline, sticker outline, die-cut border, neon, glowing edges, coloured glow, mist, smoke, haze, gradient background, ground, floor, groundline, base line, cast shadow, shadow beneath, standing surface, text, letters, words, caption, label, signature, watermark, border, frame, background, scenery, multiple subjects, cropped, cut off",
+  "seed": 908003028,
+  "provider": "ideogram",
+  "model": "ideogram-v3",
+  "settings": {
+    "rendering_speed": "QUALITY",
+    "aspect_ratio": "1x1",
+    "style_type": "DESIGN"
+  },
+  "template": "illustrated",
+  "template_version": 2,
+  "prompt_hash": "sha256:0418eae7fed9bb237c4a887f58c59ce37fd7b3785fd3558b151246544fec91a8",
+  "created": "2026-07-21T05:47:28.566Z",
+  "run_id": "adopted",
+  "status": "promoted",
+  "transparent": true,
+  "approved": true,
+  "favorite": false,
+  "retry_count": 0,
+  "qc": {
+    "tier_a": null,
+    "tier_b": null,
+    "reject_reasons": []
+  },
+  "dhash": "32b2696960b1b172",
+  "duplicate_of": null,
+  "file": "assets/cryptid-art/cryptid-art--owlman--standing--front--mid--neutral--v1.png",
+  "promoted": {
+    "app_category": "illustrated",
+    "name": "owlman",
+    "path": "public/stickers/illustrated/owlman.png",
+    "date": "2026-07-21T05:47:28.566Z"
+  },
+  "history": []
+}
