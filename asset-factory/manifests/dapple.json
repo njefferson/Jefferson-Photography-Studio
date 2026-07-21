@@ -1,0 +1,56 @@
+{
+  "category": "dapple",
+  "app_category": "shadows",
+  "template": "shadow-overlay",
+  "tags": ["shadow", "dapple", "overlay"],
+  "qc": {
+    "allowEdgeContact": true,
+    "maxComponents": 600,
+    "minCoverage": 0.02,
+    "minFeatherFrac": 0.001
+  },
+  "defaults": {
+    "views": ["front"],
+    "distances": ["full"],
+    "expressions": ["neutral"],
+    "variants": 1
+  },
+  "families": [
+    {
+      "family": "leaf-dapple",
+      "subject_phrase": "broad tree leaves",
+      "meta_label": "Leaf dapple",
+      "poses": [{ "pose": "scattered", "pose_phrase": "loose scattered patches of soft shade with plenty of open light between them" }]
+    },
+    {
+      "family": "canopy-shade",
+      "subject_phrase": "a dense forest canopy",
+      "meta_label": "Canopy shade",
+      "poses": [{ "pose": "dense", "pose_phrase": "a dense, finely broken mottle of shade with small bright gaps" }]
+    },
+    {
+      "family": "branch-shadow",
+      "subject_phrase": "bare branches",
+      "meta_label": "Branch shadows",
+      "poses": [{ "pose": "raking", "pose_phrase": "long thin crossing shadow lines raking across the surface" }]
+    },
+    {
+      "family": "fern-dapple",
+      "subject_phrase": "feathery fern fronds",
+      "meta_label": "Fern dapple",
+      "poses": [{ "pose": "feathery", "pose_phrase": "delicate feathered fingers of shade" }]
+    },
+    {
+      "family": "reed-shadow",
+      "subject_phrase": "tall grass and reeds",
+      "meta_label": "Reed shadows",
+      "poses": [{ "pose": "streaked", "pose_phrase": "many fine near-vertical streaks of shade" }]
+    },
+    {
+      "family": "palm-dapple",
+      "subject_phrase": "large palm fronds",
+      "meta_label": "Palm dapple",
+      "poses": [{ "pose": "bold", "pose_phrase": "a few bold, long blades of shade fanning across" }]
+    }
+  ]
+}
