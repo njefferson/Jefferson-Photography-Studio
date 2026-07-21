@@ -235,13 +235,15 @@ function matchAsset(c: Float32Array, s: Sticker, skipGain = false): void {
   // its gain is skipped — only the manual bright/contrast/warmth/sat apply.
   const gain = !skipGain && amt > 0 ? s.matchGain : null;
   const br = s.bright ?? 0, con = s.contrast ?? 0, wm = s.warmth ?? 0, sa = s.sat ?? 0;
-  if (!gain && br === 0 && con === 0 && wm === 0 && sa === 0) return;
+  if (!gain && br === 0 && con === 0 && wm === 0 && sa === 0 && (s.lum ?? 1) === 1) return;
   let r = c[0], g = c[1], b = c[2];
   if (gain) { r *= 1 + amt * (gain[0] - 1); g *= 1 + amt * (gain[1] - 1); b *= 1 + amt * (gain[2] - 1); }
   if (br !== 0) { const k = 1 + br; r *= k; g *= k; b *= k; }
   if (con !== 0) { const cf = 1 + con; r = (r - MATCH_MID) * cf + MATCH_MID; g = (g - MATCH_MID) * cf + MATCH_MID; b = (b - MATCH_MID) * cf + MATCH_MID; }
   if (wm !== 0) { r *= 1 + wm * 0.4; b *= 1 - wm * 0.4; }
   if (sa !== 0) { const L = r * 0.2126 + g * 0.7152 + b * 0.0722; const k = 1 + sa; r = L + (r - L) * k; g = L + (g - L) * k; b = L + (b - L) * k; }
+  const lm = s.lum ?? 1; // gamma-style luminance (>1 lifts, <1 darkens)
+  if (lm !== 1 && lm > 0) { const e = 1 / lm; r = Math.pow(Math.max(0, r), e); g = Math.pow(Math.max(0, g), e); b = Math.pow(Math.max(0, b), e); }
   c[0] = Math.max(0, r); c[1] = Math.max(0, g); c[2] = Math.max(0, b);
 }
 
@@ -495,8 +497,9 @@ function overlayPixel(
         tmp[1] = Math.max(0, tmp[1] + mAmt * (mScene[1] - asset.mean[1]));
         tmp[2] = Math.max(0, tmp[2] + mAmt * (mScene[2] - asset.mean[2]));
       }
-      matchAsset(tmp, s, true); // manual bright/contrast/warmth/sat on top (source gain skipped)
+      matchAsset(tmp, s, true); // manual bright/contrast/warmth/sat/luminance (source gain skipped)
     }
+    if (s.opacity !== undefined && s.opacity < 1) alpha *= Math.max(0, s.opacity); // overall transparency
     if (s.occlude > 0) {
       const b = occBase ?? tmp; // caller may pass the scene under the pixel
       const Lb = occBase ? displayLuma(b[0], b[1], b[2], occ) : 0;

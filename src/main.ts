@@ -1997,6 +1997,8 @@ const stkRot = $("stkRot") as HTMLInputElement;
 const stkOcclude = $("stkOcclude") as HTMLInputElement;
 const stkBehindEl = $("stkBehind") as HTMLDivElement;
 const stkClearBtn = $("stkClear") as HTMLButtonElement;
+const stkTransp = $("stkTransp") as HTMLInputElement;
+const stkLum = $("stkLum") as HTMLInputElement;
 const stkBright = $("stkBright") as HTMLInputElement;
 const stkContrast = $("stkContrast") as HTMLInputElement;
 const stkWarmth = $("stkWarmth") as HTMLInputElement;
@@ -2296,13 +2298,15 @@ stkOcclude.addEventListener("input", () => {
 const stkAdjustInput = () => {
   const s = selSticker();
   if (!s) return;
+  s.opacity = 1 - Number(stkTransp.value); // slider is transparency (0 = solid)
+  s.lum = Number(stkLum.value);
   s.bright = Number(stkBright.value);
   s.contrast = Number(stkContrast.value);
   s.warmth = Number(stkWarmth.value);
   s.sat = Number(stkSat.value);
   draw();
 };
-for (const el of [stkBright, stkContrast, stkWarmth, stkSat]) el.addEventListener("input", stkAdjustInput);
+for (const el of [stkTransp, stkLum, stkBright, stkContrast, stkWarmth, stkSat]) el.addEventListener("input", stkAdjustInput);
 
 // "Match the photo's colours" — the sticker takes on the scene's infrared palette
 // in ITS OWN layer (a mean shift toward the scene colour under it), never by
@@ -2588,6 +2592,8 @@ function updateStickerUI() {
     stkScale.value = String(s.scale);
     stkRot.value = String(s.rot);
     stkOcclude.value = String(s.occlude);
+    stkTransp.value = String(1 - (s.opacity ?? 1));
+    stkLum.value = String(s.lum ?? 1);
     stkBright.value = String(s.bright ?? 0);
     stkContrast.value = String(s.contrast ?? 0);
     stkWarmth.value = String(s.warmth ?? 0);
