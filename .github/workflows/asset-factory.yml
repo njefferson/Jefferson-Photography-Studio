@@ -1,9 +1,9 @@
 # Manual overlay-asset generation run. Trigger from the GitHub Actions UI
-# (works from the iPad browser) — no CLI needed. It renders on the chosen
-# provider (Flux photoreal by default, cut out via Ideogram remove-background),
-# generates a bounded batch, and publishes the images for review. It does NOT
-# commit anything or touch the app, main, or staging — promoting reviewed assets
-# into public/stickers/ stays a deliberate session step behind the staging gate.
+# (works from the iPad browser) — no CLI needed. It uses the IDEOGRAM_API_KEY
+# repo secret, generates a bounded batch, and uploads the images + catalog as a
+# downloadable artifact to review. It does NOT commit anything or touch the app,
+# main, or staging — promoting reviewed assets into public/stickers/ stays a
+# deliberate session step behind the normal staging gate.
 #
 # Only this file lives on main (so the manual trigger is available); the factory
 # code it runs is checked out from `ref` (the asset-pipeline branch by default),
@@ -28,6 +28,10 @@ on:
         default: ""
       per_category:
         description: "Breadth-first: max entries PER category this run (blank = no cap)"
+        type: string
+        default: ""
+      ids:
+        description: "Targeted re-roll: only these entry ids (comma-separated, blank = all)"
         type: string
         default: ""
       limit:
@@ -76,6 +80,7 @@ jobs:
             --provider "${{ inputs.provider }}" \
             ${{ inputs.category && format('--category {0}', inputs.category) || '' }} \
             ${{ inputs.per_category && format('--per-category {0}', inputs.per_category) || '' }} \
+            ${{ inputs.ids && format('--ids {0}', inputs.ids) || '' }} \
             --limit "${{ inputs.limit }}" \
             ${{ inputs.confirm && '--yes' || '--dry-run' }}
 
@@ -85,8 +90,8 @@ jobs:
         run: node cli.mjs stats ${{ inputs.category && format('--category {0}', inputs.category) || '' }}
 
       # Publish the approved batch as viewable PNGs + a contact sheet, then push
-      # them (and the updated catalog) to a throwaway branch. A session reads them
-      # back over the GitHub API (the artifact blob host is egress-blocked).
+      # them to a throwaway branch. A session reads them back over the GitHub API
+      # (the artifact blob host is egress-blocked) and hands them to the owner.
       - name: Publish review batch
         if: ${{ inputs.confirm }}
         working-directory: asset-factory
