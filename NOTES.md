@@ -3265,6 +3265,33 @@ user-scalable=no.
   appear with Wildlife → "Owl"; three kinds now render and filter; PLANT=nofilter
   fails; all sticker regressions + build green. The factory promotes reviewed
   PNGs into public/stickers/<category>/ as its own deliberate step.
+- [x] **Cast shadows auto-follow their creature (2026-07-21, owner "a toggle
+  that makes the sticker auto-update when dropped in a new location" applied to
+  the shadow's placement pain)** — a cast shadow is now GLUED to the creature it
+  came from and tracks its position / scale / spin on every settle, so you place
+  the creature once and the contact puddle rides along — no more casting a shadow
+  and then hand-lining-it-up (the exact friction he hit: "impossible to place").
+  MODEL: `Sticker.linkTo` = the creature's `id`; castShadow stamps it. `syncLinked
+  Shadows()` runs at the TOP of syncSpotsToTexture (before the bake change-
+  detection, so a followed shadow re-bakes at its new spot) and copies x/y/scale/
+  rot from the creature to every still-linked shadow. It's derived state — one
+  insertion covers EVERY transform path (body drag, two-finger pinch, Size/Spin
+  sliders, corner + rotate handles). DETACH: touching the shadow ITSELF (drag /
+  pinch / resize / spin) clears `linkTo`, so it stays where you put it — which
+  doubles as the manual light-direction control the auto-shadow entry flagged as
+  "next polish" (offset the shadow = place the light). A shadow whose creature is
+  deleted simply stops following. One gesture = one undo step (sync happens inside
+  the drop's draw(), before flushRecord). VERIFIED (shadow-follow-walk, 14 checks):
+  cast links the shadow to the creature and sits it on its position; moving/
+  spinning/resizing the creature carries the shadow (x/y/scale/rot all track);
+  adjusting the shadow itself clears the link and it then ignores creature moves;
+  existing sticker-fixes-walk still 39/39, overlay parity still 0 LSB, no console
+  errors. No DOM/UI added (behaviour only), so the a11y surface is unchanged.
+  Dev hooks `__stickers()` (read-only snapshot) + `__select(i)` added for the walk,
+  alongside the existing `__stickerBakes`. NEEDS THE OWNER'S HANDS: whether the
+  shadow strip below the creature is an easy enough tap-target to grab for a manual
+  offset (auto-follow means most placements never need it; if he wants a dedicated
+  nudge/direction control that's a clean follow-up).
 - [x] **Scene toolkit: auto-shadow + Screen-for-lights (2026-07-21, asset-factory
   handoff + owner "auto-shadow, then screen-for-lights")** — polish on the new
   toolkit assets. (a) REGISTERED the factory's new folders: `illustrated/` (10
