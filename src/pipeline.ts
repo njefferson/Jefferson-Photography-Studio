@@ -223,6 +223,10 @@ export interface Sticker {
    *  picture; this mimics the look instead of forcing it through the same filters
    *  (owner, 2026-07-21). */
   matchScene?: [number, number, number];
+  /** Re-run the colour match automatically whenever the sticker is dropped in a
+   *  new spot (default on; undefined = on). Off locks the current match so moving
+   *  it won't recolour it (owner, 2026-07-21). */
+  reMatch?: boolean;
   /** Per-sticker erase/restore mask in ASSET-LOCAL space (paint to tuck the
    *  sticker behind foreground). 0 = hidden, 255 = shown; absent = fully
    *  shown. Runtime bitmap like the brush masks; `maskRev` bumps per stroke. */

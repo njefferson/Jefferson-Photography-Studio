@@ -302,8 +302,9 @@
               <label>Spin <input id="stkRot" type="range" min="-180" max="180" step="1" value="0" /></label>
               <div class="sub-title">Match the photo</div>
               <button id="stkMatchPhoto" type="button">Match the photo's colours</button>
+              <button id="stkReMatch" type="button" aria-pressed="true">Re-match as I move it</button>
               <label>Match strength <input id="stkMatchStrength" type="range" min="0" max="1" step="0.01" value="0.85" /></label>
-              <p class="note">Takes on the colour of the scene right under the sticker &mdash; the sticker keeps its own shading but shifts into the photo's infrared palette, so it looks like it belongs. This is done to the sticker itself, never by running it through the infrared processing (that just cooks it). Slide to 0 for the sticker's raw colours; tap the button after moving it to re-match.</p>
+              <p class="note">Takes on the colour of the scene right under the sticker &mdash; the sticker keeps its own shading but shifts into the photo's infrared palette, so it looks like it belongs. This is done to the sticker itself, never by running it through the infrared processing (that just cooks it). It re-matches automatically each time you drop it somewhere new; turn that off to lock the colour. Slide strength to 0 for the sticker's raw colours.</p>
               <div class="sub-title">Fine-tune its own look</div>
               <label>Brightness <input id="stkBright" type="range" min="-1" max="1" step="0.01" value="0" /></label>
               <label>Contrast <input id="stkContrast" type="range" min="-1" max="1" step="0.01" value="0" /></label>
