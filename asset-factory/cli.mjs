@@ -98,6 +98,12 @@ async function main() {
           return true;
         });
       }
+      // Targeted regeneration: --ids a,b limits the run to specific entries
+      // (e.g. re-roll one subject that came back with a baked shadow).
+      if (flags.ids) {
+        const want = new Set(String(flags.ids).split(",").map((s) => s.trim()).filter(Boolean));
+        items = items.filter(({ entry }) => want.has(entry.id));
+      }
       const limit = num(flags.limit, Infinity);
       items = items.slice(0, limit);
       if (!items.length) {
