@@ -1997,6 +1997,10 @@ function endStickerLive() {
 let stickerArmed = false;
 let selectedSticker = -1;
 let stickerDrag: { id: number; ou: number; ov: number } | null = null;
+// Pan the zoomed photo with a one-finger drag on EMPTY canvas while the Stickers
+// tab is armed (a drag ON a sticker still moves it). Lets you reach a corner of a
+// zoomed-in photo to place a sticker there, instead of being stuck at centre.
+let stickerPan: { id: number; x: number; y: number; panX: number; panY: number } | null = null;
 // Two-finger resize + spin on the selected sticker (the accessible sliders
 // stay). Captures the sticker's scale/rot at gesture start plus the initial
 // finger spread + angle, then tracks the ratio/delta live via the ghost.
@@ -2429,15 +2433,36 @@ stickerImport.addEventListener("change", async () => {
   }
 });
 
-$("stkDelete").addEventListener("click", () => {
+function deleteSelectedSticker() {
   const list = params.stickers ?? [];
   if (selectedSticker < 0 || selectedSticker >= list.length) return;
   liveSticker = -1; stickerGhost.hidden = true; // drop any live ghost so it can't linger
+  const removed = list[selectedSticker];
+  // Deleting a creature orphans its shadow — drop that too so no black puddle lingers.
+  const orphanShadowIdx = removed && !removed.shadow
+    ? list.findIndex((s) => s.shadow && s.linkTo === removed.id)
+    : -1;
   list.splice(selectedSticker, 1);
+  if (orphanShadowIdx >= 0) {
+    const adj = orphanShadowIdx > selectedSticker ? orphanShadowIdx - 1 : orphanShadowIdx;
+    list.splice(adj, 1);
+  }
   selectedSticker = list.length ? Math.min(selectedSticker, list.length - 1) : -1;
   updateStickerUI();
   draw();
   flushRecord();
+}
+$("stkDelete").addEventListener("click", deleteSelectedSticker);
+// Keyboard Delete / Backspace removes the selected sticker — same as the button —
+// but never while typing in a field or on a control that owns those keys.
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Delete" && e.key !== "Backspace") return;
+  if (!stickerArmed || selectedSticker < 0) return;
+  const el = document.activeElement as HTMLElement | null;
+  const tag = el?.tagName;
+  if (el?.isContentEditable || tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+  e.preventDefault();
+  deleteSelectedSticker();
 });
 stkClearBtn.addEventListener("click", () => {
   if (!(params.stickers?.length)) return;
@@ -2831,7 +2856,7 @@ function attachStickerSizeDrag(el: SVGCircleElement) {
       if (!cur) return;
       const [u, v] = renderer.clientToImageUv(ev.clientX, ev.clientY);
       const d = Math.hypot(u * W - cur.x * W, v * H - cur.y * H);
-      cur.scale = clamp(d / diag, 0.05, 1);
+      cur.scale = clamp(d / diag, 0.015, 1);
       if (cur.shadow) cur.linkTo = undefined; // hand-resized shadow detaches
       updateStickerUI(); // Size slider follows the finger
       previewStickerTransform();
@@ -5104,6 +5129,7 @@ canvas.addEventListener("pointerdown", (e) => {
     // the first finger was doing — drag or paint — stands down).
     if (stickerPointers.size === 2 && selSticker()) {
       stickerDrag = null;
+      stickerPan = null;
       if (stkPainting) endStickerPaint();
       const [a, b] = [...stickerPointers.values()];
       const s = selSticker()!;
@@ -5120,13 +5146,19 @@ canvas.addEventListener("pointerdown", (e) => {
     if (stkBlendArmed && startStickerPaint(e)) return;
     const [u, v] = renderer.clientToImageUv(e.clientX, e.clientY);
     const hit = hitSticker(u, v);
-    if (hit >= 0) { selectedSticker = hit; updateStickerUI(); }
-    const s = selSticker();
-    if (s && !stkBlendArmed) {
-      stickerDrag = { id: e.pointerId, ou: s.x - u, ov: s.y - v };
-      beginStickerLive(); // ghost + hold it out of the bake for the drag
+    if (hit >= 0) {
+      selectedSticker = hit; updateStickerUI();
+      const s = selSticker();
+      if (s && !stkBlendArmed) {
+        stickerDrag = { id: e.pointerId, ou: s.x - u, ov: s.y - v };
+        beginStickerLive(); // ghost + hold it out of the bake for the drag
+      }
+      return;
     }
-    return; // the Stickers tab owns the canvas — no tap-WB / pan while armed
+    // Empty canvas: pan the zoomed photo (so you can place a sticker off-centre)
+    // rather than dead-owning the canvas. Only meaningful once zoomed in.
+    if (!stkBlendArmed && zoom > 1) { stickerPan = { id: e.pointerId, x: e.clientX, y: e.clientY, panX, panY }; }
+    return;
   }
   if (warpArmed) { e.preventDefault(); startWarpStroke(e); return; } // the Warp tab owns the canvas
   activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -5169,13 +5201,19 @@ canvas.addEventListener("pointermove", (e) => {
   if (stickerArmed) {
     const sp = stickerPointers.get(e.pointerId);
     if (sp) { sp.x = e.clientX; sp.y = e.clientY; }
+    if (stickerPan && e.pointerId === stickerPan.id) {
+      panX = stickerPan.panX + (e.clientX - stickerPan.x);
+      panY = stickerPan.panY + (e.clientY - stickerPan.y);
+      applyZoom();
+      return;
+    }
     if (stkPinch && stickerPointers.size >= 2) {
       const s = selSticker();
       if (s) {
         const [a, b] = [...stickerPointers.values()];
         const dist = Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
         const ang = Math.atan2(b.y - a.y, b.x - a.x);
-        s.scale = Math.min(1, Math.max(0.05, (stkPinch.scale * dist) / stkPinch.dist));
+        s.scale = Math.min(1, Math.max(0.015, (stkPinch.scale * dist) / stkPinch.dist));
         let deg = stkPinch.rot + ((ang - stkPinch.ang) * 180) / Math.PI;
         deg = ((((deg + 180) % 360) + 360) % 360) - 180; // wrap to −180..180
         s.rot = Math.round(deg);
@@ -5230,6 +5268,7 @@ function endPointer(e: PointerEvent) {
   if (tatDrag) { if (e.pointerId === tatDrag.id) endTat(); return; }
   if (stickerArmed && stickerPointers.has(e.pointerId)) {
     stickerPointers.delete(e.pointerId);
+    if (stickerPan && e.pointerId === stickerPan.id) { stickerPan = null; return; }
     if (stkPinch) {
       if (stickerPointers.size < 2) { stkPinch = null; endStickerLive(); flushRecord(); }
       return;
