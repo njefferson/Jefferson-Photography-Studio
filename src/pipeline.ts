@@ -226,6 +226,13 @@ export interface Sticker {
    *  halfHeight in the sticker's own (pre-rotation) frame, so the asset is
    *  projectively warped onto the scene's plane. */
   corners?: [number, number][] | null;
+  /** ON TOP of the infrared look (the default). A sticker is a DIFFERENT kind of
+   *  picture than the IR photo, so by default it is composited AFTER the whole
+   *  pipeline — it keeps its own colours instead of being channel-swapped,
+   *  white-balanced and saturated into neon (owner, 2026-07-21). Set false to
+   *  bake it INTO the source before the pipeline so it takes on the IR palette
+   *  (the old "creature in infrared" effect). Undefined = on top. */
+  onTop?: boolean;
 }
 
 export interface CropRect {

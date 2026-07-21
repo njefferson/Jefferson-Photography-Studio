@@ -137,6 +137,8 @@ uniform int u_spotVis;   // 1 = "Visualize spots": amplified high-pass luma view
 uniform int u_maskViz;   // >=0 = show that mask's coverage as a preview overlay
 uniform sampler2D u_warpTex; // RG displacement field (unit 7, LINEAR); 0.5 = no move
 uniform bool u_warpOn;       // any warp painted
+uniform sampler2D u_overlayTex; // on-top sticker overlay (unit 8): gamma sRGB + coverage alpha
+uniform bool u_overlayOn;       // any on-top sticker placed
 uniform float u_warpScale;   // decode scale = WARP_MAX (warp.ts)
 uniform highp sampler3D u_lutTex; // imported .cube LUT lattice (unit 5, NEAREST — manual trilinear below)
 uniform int u_lutSize;            // grid N per axis (>=2; only read when strength > 0)
@@ -549,6 +551,17 @@ void main() {
   // pipeline.ts's compileEdit tail (via lut3d.ts).
   if (u_lutStrength > 0.0) g = mix(g, sampleLut3d(clamp(g, 0.0, 1.0)), u_lutStrength);
 
+  // ON-TOP stickers — laid over the FINISHED look (after every colour stage,
+  // before grain), so they keep their OWN colours instead of being cooked by the
+  // infrared pipeline. The overlay is a source-space RGBA8 texture (gamma sRGB +
+  // straight coverage alpha) sampled at the same v_uv as the photo; export.ts
+  // blends the identical value into its finished pixel (parity). Grain then
+  // settles over the sticker, as before.
+  if (u_overlayOn) {
+    vec4 ov = texture(u_overlayTex, v_uv);
+    g = mix(g, ov.rgb, ov.a);
+  }
+
   // Creative vignette + film grain — the FINAL image ops, keyed on
   // CROP-LOCAL coords (v_cropUv spans the visible, cropped frame; export.ts
   // hands the same (x+0.5)/w fractions to the pipeline.ts twins). Spatial:
@@ -603,6 +616,8 @@ export class Renderer {
   private localTex: WebGLTexture;
   private warpTex!: WebGLTexture;
   private warpOn = false;
+  private overlayTex!: WebGLTexture; // on-top sticker overlay (unit 8)
+  private overlayOn = false;
   private localScale = 1;
   private lutTex: WebGLTexture;
   private lutSig = ""; // re-upload the 3D LUT only when its identity changes
@@ -628,7 +643,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -719,6 +734,41 @@ export class Renderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 0, 255]));
+
+    // On-top sticker overlay (unit 8): RGBA8, LINEAR + CLAMP_TO_EDGE, matched to
+    // the source size. gamma sRGB colour + straight coverage alpha; the CPU
+    // export replicates the exact same values (makeStickerOverlaySampler).
+    this.overlayTex = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, this.overlayTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
+  }
+
+  /** (Re)allocate the on-top overlay to the source size, cleared to transparent.
+   *  Call whenever the source (previewSrc) changes; keeps the overlay 1:1 with
+   *  the photo so the shader can sample it at the same v_uv. */
+  setOverlaySize(width: number, height: number) {
+    const gl = this.gl;
+    this.overlayOn = false;
+    gl.bindTexture(gl.TEXTURE_2D, this.overlayTex);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(width * height * 4));
+  }
+
+  /** Whether any on-top sticker is currently uploaded (the shader blend is on). */
+  setOverlayOn(on: boolean) { this.overlayOn = on; }
+
+  /** Patch an RGBA8 sub-rect of the overlay (gamma sRGB + alpha), like patchImage. */
+  patchOverlay(x: number, y: number, w: number, h: number, data: Uint8Array) {
+    if (w <= 0 || h <= 0) return;
+    const gl = this.gl;
+    gl.bindTexture(gl.TEXTURE_2D, this.overlayTex);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, x, y, w, h, gl.RGBA, gl.UNSIGNED_BYTE, data);
   }
 
   /** Upload the warp displacement field (RGBA8 res×res), or clear with null. */
@@ -982,6 +1032,12 @@ export class Renderer {
     gl.uniform1f(this.loc.u_warpScale, 0.28);
     gl.activeTexture(gl.TEXTURE7);
     gl.bindTexture(gl.TEXTURE_2D, this.warpTex);
+    // On-top sticker overlay (unit 8): blended over the finished look, off in the
+    // read/spot/mask-viz diagnostic passes (readMode) so it never taints a probe.
+    gl.uniform1i(this.loc.u_overlayTex, 8);
+    gl.uniform1i(this.loc.u_overlayOn, this.overlayOn && readMode === 0 ? 1 : 0);
+    gl.activeTexture(gl.TEXTURE8);
+    gl.bindTexture(gl.TEXTURE_2D, this.overlayTex);
     // Local masks (up to MAX_MASKS, the shader array size).
     const masks = (p.masks ?? []).filter(maskIsActive).slice(0, MAX_MASKS);
     // Slot map: brush(2)/sky(4) masks claim packed channels 0..3 in appearance

@@ -3265,6 +3265,41 @@ user-scalable=no.
   appear with Wildlife → "Owl"; three kinds now render and filter; PLANT=nofilter
   fails; all sticker regressions + build green. The factory promotes reviewed
   PNGs into public/stickers/<category>/ as its own deliberate step.
+- [x] **Stickers lay ON TOP of the look now, not under it (2026-07-21, owner
+  emphatic)** — THE big one. The owner: "a sticker is a different kind of picture,
+  it can't lay under the same filters" — a colourful cutout composited INTO the
+  source (pre-pipeline) got channel-swapped + WB'd + saturated into neon (his
+  alien/figure screenshots). Fixed by compositing on-top stickers AFTER the whole
+  pipeline, so they keep their OWN colours. ARCHITECTURE — a source-space "overlay"
+  (`Sticker.onTop`, default true; undefined = on top): the sticker's gamma-sRGB
+  colour + straight coverage alpha, built with the SAME geometry/perspective/mask/
+  occlusion math as before (sticker.ts `overlayPixel` / `compositeStickersOverlay8`
+  / `makeStickerOverlaySampler`), only WITHOUT the source-match gain (that was a
+  survive-the-pipeline trick; on-top keeps its own colour). PREVIEW: a new RGBA8
+  overlay TEXTURE (gl.ts unit 8, sized to previewSrc), sampled at the same v_uv as
+  the photo and blended `g = mix(g, ov.rgb, ov.a)` AFTER the last colour stage
+  (the LUT) and BEFORE grain — so the look never touches it and grain still
+  settles over it. syncSpotsToTexture now splits `inLook` (baked into the source,
+  as before) from `onTop` (built into the overlay via patchOverlay, its own dirty-
+  rect + `bakedOnTop` tracking, deep-copied corners like the artifact fix). EXPORT:
+  export.ts splits the same way — in-look wraps the source sampler (unchanged);
+  on-top runs `makeStickerOverlaySampler` and blends into the finished display
+  pixel after edit(), before finishPixel (grain/vignette), in BOTH the JPEG and
+  16-bit loops. Peek-behind reads the pristine source under the pixel on both
+  sides. Occlusion/paint-mask/perspective/the bright-contrast-warmth-sat sliders
+  all still apply; the "Match to the photo" group (source-space gain) is disabled
+  while on top (it's meaningless there) and re-enables under "Blend into the
+  infrared look". UI: a `#stkInLook` toggle at the top of the sticker controls
+  (default off = on top). Bonus: the drag-ghost (raw asset) now MATCHES the baked
+  on-top result, so the old grey→recolour snap is gone. VERIFIED: sticker-fixes-walk
+  (30 checks) — on-top centre stays its own dark colour (31,24,24) while flipping
+  to in-look recolours it (64,49,61) and flipping back restores it exactly; on-top
+  is the default; all handle/blend/artifact/zoom checks green, no console errors —
+  PLUS an overlay-parity unit proving the preview texture bytes == the export
+  sampler values at 0 LSB (max delta 0 over 2545 covered px). axe clean both
+  themes. Help + Lesson 9 rewritten. NEEDS THE OWNER'S HANDS: confirm on the iPad
+  that on-top stickers now read as their own picture (and export the same), and the
+  in-look opt-in still gives the cryptid-in-infrared effect when he wants it.
 - [x] **Sticker usability sweep + zoom-with-no-wheel (2026-07-21 device asks)** —
   owner on device, five things at once (branch
   `claude/sticker-blending-resize-rotate-tr3hrl`, BETA straight to main via

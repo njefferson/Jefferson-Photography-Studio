@@ -11,7 +11,7 @@ import { camToSrgbLinear, NIKON_Z50_COLOR_MATRIX } from "./color";
 import { makeRowDenoiser } from "./raw/denoise";
 import { makeRowDetail } from "./raw/detail";
 import { healPatches8, healPatchesFromSampler, wrapWithPatches } from "./heal";
-import { stickerPatches, type StickerAsset } from "./sticker";
+import { stickerPatches, makeStickerOverlaySampler, type StickerAsset } from "./sticker";
 import { warpSampler, warpIsEmpty } from "./warp";
 import { buildGlowMap, sampleGlow, GLOW_GAIN } from "./glow";
 import { buildLocalMap } from "./localmap";
@@ -211,10 +211,14 @@ export async function exportImage(
         srcH,
       )
     : rawSample;
-  // Stickers wrap OUTSIDE heal — they composite over the healed source, exactly
-  // as the preview bakes stickers on top of heals. Both samplers are LINEAR, so
-  // one path serves RAW and 8-bit. Never touched when no stickers are placed.
-  const stickers = (params.stickers ?? []).filter((s) => opts.stickerAssets?.[s.asset]);
+  // Stickers split into two kinds. IN-LOOK stickers wrap OUTSIDE heal — they
+  // composite over the healed source and then run THROUGH the pipeline (they take
+  // on the IR palette). ON-TOP stickers (the default) are composited AFTER the
+  // whole pipeline via an overlay sampler, so they keep their own colours (owner,
+  // 2026-07-21). Both samplers are LINEAR; never touched when no stickers exist.
+  const allStickers = (params.stickers ?? []).filter((s) => opts.stickerAssets?.[s.asset]);
+  const inLookStickers = allStickers.filter((s) => s.onTop === false);
+  const onTopStickers = allStickers.filter((s) => s.onTop !== false);
   // Occlusion reads DISPLAY luminance — same exposure×WB (+ camera matrix for
   // RAW) the compileEdit start applies, so it matches the preview.
   const stkEx = params.exposure;
@@ -222,9 +226,27 @@ export async function exportImage(
     wb: [params.wb[0] * stkEx, params.wb[1] * stkEx, params.wb[2] * stkEx] as [number, number, number],
     cam: "cfa" in src ? src.cam : null,
   };
-  const composed = stickers.length && opts.stickerAssets
-    ? wrapWithPatches(healed, stickerPatches(healed, srcW, srcH, stickers, opts.stickerAssets, stkOcc, rot * 90), srcH)
+  const composed = inLookStickers.length && opts.stickerAssets
+    ? wrapWithPatches(healed, stickerPatches(healed, srcW, srcH, inLookStickers, opts.stickerAssets, stkOcc, rot * 90), srcH)
     : healed;
+  // The on-top overlay sampler: (sx,sy) -> [r,g,b,a] gamma sRGB, blended into the
+  // FINISHED display pixel (after edit(), before grain), mirroring the shader.
+  // Peek-behind reads the pristine source under the pixel, same as the preview.
+  const onTopOverlay = onTopStickers.length && opts.stickerAssets
+    ? makeStickerOverlaySampler(srcW, srcH, onTopStickers, opts.stickerAssets, stkOcc, rot * 90,
+        (sx, sy, into) => { const b = rawSample(sx, sy); into[0] = b[0]; into[1] = b[1]; into[2] = b[2]; })
+    : null;
+  const ovTmp = new Float32Array(4);
+  /** Blend the on-top sticker overlay into the finished display pixel `out`. */
+  const applyOnTop = (sx: number, sy: number) => {
+    if (!onTopOverlay) return;
+    onTopOverlay(sx, sy, ovTmp);
+    const a = ovTmp[3];
+    if (a <= 0) return;
+    out[0] = out[0] * (1 - a) + ovTmp[0] * a;
+    out[1] = out[1] * (1 - a) + ovTmp[1] * a;
+    out[2] = out[2] * (1 - a) + ovTmp[2] * a;
+  };
   // Warp remaps the source at the VERY TOP (before denoise), mirroring the
   // shader's fetchLin warp — both bilinear-sample the same encoded field.
   const warped = params.warp && !warpIsEmpty(params.warp)
@@ -298,6 +320,7 @@ export async function exportImage(
         const [sx, sy] = toSrc(x, y);
         const [r, g, b] = sampleBox(x, y); // box-filtered when scaled (see above)
         edit(r, g, b, out, glowAt(sx, sy), (sx + 0.5) / srcW, (sy + 0.5) / srcH);
+        applyOnTop(sx, sy); // on-top stickers over the finished look, before grain (matches the shader)
         finishPixel(x, y); // creative vignette + grain, still in sRGB display space
         srgbDisplayToP3Display(out[0], out[1], out[2], p3);
         const o = (y * w + x) * 4;
@@ -361,6 +384,7 @@ export async function exportImage(
         const [sx, sy] = toSrc(x, y);
         const [r, g, b] = sampleBox(x, y); // box-filtered when scaled (see above)
         edit(r, g, b, out, glowAt(sx, sy), (sx + 0.5) / srcW, (sy + 0.5) / srcH);
+        applyOnTop(sx, sy); // on-top stickers over the finished look, before grain (matches the shader)
         finishPixel(x, y); // creative vignette + grain, same as the JPEG path
         const o = (y * w + x) * 3;
         rgb[o] = out[0] * 65535 + 0.5; // round — truncation biased the 16-bit output low

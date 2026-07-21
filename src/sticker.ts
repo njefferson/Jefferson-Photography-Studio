@@ -198,9 +198,12 @@ const MATCH_MID = 0.18; // linear mid-grey the sticker contrast pivots about
  *  which lands the sticker on the scene's colour after the pipeline), THEN the
  *  manual scalars: brightness, contrast (about mid grey), warmth (R↑/B↓),
  *  saturation (toward luma). Cheap per pixel — nothing set = the raw asset. */
-function matchAsset(c: Float32Array, s: Sticker): void {
+function matchAsset(c: Float32Array, s: Sticker, skipGain = false): void {
   const amt = s.matchAmt ?? 0;
-  const gain = amt > 0 ? s.matchGain : null;
+  // The source-space match gain only makes sense for a sticker that then goes
+  // THROUGH the pipeline (in-look). An on-top sticker keeps its own colour, so
+  // its gain is skipped — only the manual bright/contrast/warmth/sat apply.
+  const gain = !skipGain && amt > 0 ? s.matchGain : null;
   const br = s.bright ?? 0, con = s.contrast ?? 0, wm = s.warmth ?? 0, sa = s.sat ?? 0;
   if (!gain && br === 0 && con === 0 && wm === 0 && sa === 0) return;
   let r = c[0], g = c[1], b = c[2];
@@ -383,4 +386,138 @@ export function stickerPatches(
     patches.push({ ...rect, data });
   }
   return patches;
+}
+
+// ============================================================================
+// ON-TOP stickers — composited AFTER the whole pipeline, so they keep their own
+// colours (owner: a sticker is a different kind of picture; it can't sit under
+// the infrared filters). Both the preview (a source-space overlay TEXTURE the
+// shader blends over the finished pixel) and the export (a per-pixel sampler
+// blended into the finished pixel) run this SAME math, so they stay in parity.
+// Occlusion + mask + perspective + the manual adjust sliders all still apply;
+// only the source-space match gain is dropped (it was a pre-pipeline trick).
+// ============================================================================
+
+/** Composite the on-top sticker stack at one source pixel into a STRAIGHT-alpha
+ *  GAMMA sRGB result `out` = [r,g,b,a] (0..1). Transparent (a=0) where no sticker
+ *  covers it. Painter's order (last sticker on top), premultiplied-linear accum
+ *  then un-premultiplied + gamma-encoded, so the shader/export can `mix(pixel,
+ *  rgb, a)` in display space. */
+function overlayPixel(
+  px: number,
+  py: number,
+  W: number,
+  H: number,
+  stickers: Sticker[],
+  assets: Record<string, StickerAsset>,
+  tmp: Float32Array,
+  out: Float32Array,
+  occ: OcclusionCtx | undefined,
+  xforms: (number[] | null)[],
+  dispRotDeg: number,
+  occBase?: Float32Array, // linear scene RGB under this pixel, for peek-behind luma
+): void {
+  let ar = 0, ag = 0, ab = 0, aa = 0; // premultiplied linear
+  for (let si = 0; si < stickers.length; si++) {
+    const s = stickers[si];
+    const asset = assets[s.asset];
+    if (!asset) continue;
+    const hw = (s.scale * W) / 2;
+    const hh = hw * (asset.h / asset.w);
+    if (hw <= 0 || hh <= 0) continue;
+    let tx: number, ty: number;
+    const minv = xforms[si];
+    if (minv) {
+      const X = px + 0.5, Y = py + 0.5;
+      const u = minv[0] * X + minv[1] * Y + minv[2];
+      const v = minv[3] * X + minv[4] * Y + minv[5];
+      const w = minv[6] * X + minv[7] * Y + minv[8];
+      if (w === 0) continue;
+      tx = u / w; ty = v / w;
+    } else {
+      const dx = px + 0.5 - s.x * W;
+      const dy = py + 0.5 - s.y * H;
+      const a = (-(s.rot - dispRotDeg) * Math.PI) / 180;
+      const cs = Math.cos(a), sn = Math.sin(a);
+      const lx = dx * cs - dy * sn;
+      const ly = dx * sn + dy * cs;
+      tx = lx / (2 * hw) + 0.5;
+      ty = ly / (2 * hh) + 0.5;
+    }
+    sampleAsset(asset, tx, ty, tmp);
+    let alpha = tmp[3];
+    if (alpha <= 0) continue;
+    if (s.mask) alpha *= sampleMask(s.mask, tx, ty);
+    if (alpha <= 0) continue;
+    matchAsset(tmp, s, true); // skip the source-space gain — on-top keeps its own colour
+    if (s.occlude > 0) {
+      const b = occBase ?? tmp; // caller may pass the scene under the pixel
+      const Lb = occBase ? displayLuma(b[0], b[1], b[2], occ) : 0;
+      const norm = 1 - Math.exp(-3 * Math.max(0, Lb));
+      const w = s.occludeBright
+        ? smooth(s.occludeLuma - 0.15, s.occludeLuma + 0.15, norm)
+        : 1 - smooth(s.occludeLuma - 0.15, s.occludeLuma + 0.15, norm);
+      alpha *= 1 - s.occlude * w;
+    }
+    // 'over' — this sticker on top of the accumulated stack (premultiplied).
+    ar = tmp[0] * alpha + ar * (1 - alpha);
+    ag = tmp[1] * alpha + ag * (1 - alpha);
+    ab = tmp[2] * alpha + ab * (1 - alpha);
+    aa = alpha + aa * (1 - alpha);
+  }
+  if (aa <= 1e-6) { out[3] = 0; return; }
+  out[0] = toGam(ar / aa); out[1] = toGam(ag / aa); out[2] = toGam(ab / aa); out[3] = aa;
+}
+
+/** Build the on-top overlay for a rect into an RGBA8 buffer (gamma sRGB colour +
+ *  straight coverage alpha) — the preview uploads it as a texture the shader
+ *  blends over the finished pixel. `occBaseAt` supplies the LINEAR scene colour
+ *  under a source pixel (for peek-behind luma); pass null to skip occlusion. */
+export function compositeStickersOverlay8(
+  buf: Uint8Array,
+  rect: Rect,
+  W: number,
+  H: number,
+  stickers: Sticker[],
+  assets: Record<string, StickerAsset>,
+  occ: OcclusionCtx | undefined,
+  dispRotDeg: number,
+  occBaseAt?: (sx: number, sy: number, into: Float32Array) => void,
+): void {
+  const xforms = stickers.map((s) => { const a = assets[s.asset]; return a ? stickerXform(s, W, H, a, dispRotDeg) : null; });
+  const tmp = new Float32Array(4), out = new Float32Array(4), base = new Float32Array(3);
+  for (let y = 0; y < rect.h; y++) {
+    for (let x = 0; x < rect.w; x++) {
+      const sx = rect.x0 + x, sy = rect.y0 + y;
+      if (occBaseAt) occBaseAt(sx, sy, base);
+      overlayPixel(sx, sy, W, H, stickers, assets, tmp, out, occ, xforms, dispRotDeg, occBaseAt ? base : undefined);
+      const o = (y * rect.w + x) * 4;
+      if (out[3] <= 0) { buf[o] = 0; buf[o + 1] = 0; buf[o + 2] = 0; buf[o + 3] = 0; continue; }
+      buf[o] = out[0] * 255 + 0.5;
+      buf[o + 1] = out[1] * 255 + 0.5;
+      buf[o + 2] = out[2] * 255 + 0.5;
+      buf[o + 3] = out[3] * 255 + 0.5;
+    }
+  }
+}
+
+/** A per-pixel on-top overlay sampler for export: `(sx,sy,out)` fills `out` with
+ *  [r,g,b,a] gamma sRGB (a=0 where clear). Precomputes each sticker's inverse
+ *  homography once. `occBaseAt` supplies the linear scene under a source pixel
+ *  for peek-behind (matching the preview's occ), or null to skip. */
+export function makeStickerOverlaySampler(
+  W: number,
+  H: number,
+  stickers: Sticker[],
+  assets: Record<string, StickerAsset>,
+  occ: OcclusionCtx | undefined,
+  dispRotDeg: number,
+  occBaseAt?: (sx: number, sy: number, into: Float32Array) => void,
+): (sx: number, sy: number, out: Float32Array) => void {
+  const xforms = stickers.map((s) => { const a = assets[s.asset]; return a ? stickerXform(s, W, H, a, dispRotDeg) : null; });
+  const tmp = new Float32Array(4), base = new Float32Array(3);
+  return (sx: number, sy: number, out: Float32Array) => {
+    if (occBaseAt) occBaseAt(sx, sy, base);
+    overlayPixel(sx, sy, W, H, stickers, assets, tmp, out, occ, xforms, dispRotDeg, occBaseAt ? base : undefined);
+  };
 }
