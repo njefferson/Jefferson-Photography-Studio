@@ -10,7 +10,7 @@ import { putFrame, eachFrame, frameMetas, frameCount, clearFrames } from "./batc
 import * as Session from "./session";
 import { TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, type MaskLayer, type CropRect } from "./pipeline";
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, type HealSpot } from "./heal";
-import { makeStickerAsset, stickerRect, stickerWorldCorners, stickerXform, compositeStickersIntoRect8, compositeStickersIntoRectF32, type StickerAsset } from "./sticker";
+import { makeStickerAsset, stickerRect, stickerWorldCorners, stickerXform, compositeStickersIntoRect8, compositeStickersIntoRectF32, compositeStickersOverlay8, type StickerAsset } from "./sticker";
 import { makeWarpField, encodeWarp, paintWarp, warpIsEmpty as warpFieldEmpty, type WarpField, type WarpTool } from "./warp";
 import type { Sticker, BrushMask } from "./pipeline";
 import { generateCube } from "./lut";
@@ -2231,6 +2231,20 @@ stkAutoMatch.addEventListener("click", () => {
   flushRecord();
 });
 
+// On top of the look (default) vs blended INTO the infrared look. A sticker is a
+// different kind of picture, so by default it lays over the finished photo with
+// its own colours; this opts it into the pipeline instead (owner, 2026-07-21).
+const stkInLook = $("stkInLook") as HTMLButtonElement;
+stkInLook.addEventListener("click", () => {
+  const s = selSticker();
+  if (!s) return;
+  s.onTop = s.onTop === false ? true : false; // toggle: on-top <-> in-look
+  if (s.onTop === false && !s.matchGain) autoMatchSticker(s); // in-look wants a scene match
+  updateStickerUI();
+  draw();
+  flushRecord();
+});
+
 // Blend on/off — the plain "some of these work better without it" switch (owner,
 // 2026-07-21). ON restores the full-strength match (computing the gain if the
 // sticker never had one); OFF drops matchAmt to 0 so the raw asset colour shows.
@@ -2554,13 +2568,20 @@ function updateStickerUI() {
     });
     stkBlendBtn.textContent = stkBlendArmed ? "✓ Painting on the sticker" : "Paint on the sticker";
     stkPerspBtn.textContent = stkPerspArmed ? "✓ Dragging the corners" : "Skew the corners";
+    // On top vs in the infrared look (default on top). The whole "Match to the
+    // photo" group is only meaningful for an in-look sticker (matching so it
+    // survives the pipeline), so it dims when the sticker sits on top.
+    const inLook = s.onTop === false;
+    stkInLook.textContent = inLook ? "✓ Blending into the infrared look" : "Blend into the infrared look";
+    stkInLook.setAttribute("aria-pressed", String(inLook));
     // Blend on/off: the toggle carries the state as text (grayscale-safe); the
     // strength/re-match controls dim when it's off, since they'd do nothing.
     const blendOn = (s.matchAmt ?? 0) > 0;
     stkBlendToggle.textContent = blendOn ? "✓ Blending into the photo" : "Blend into the photo";
     stkBlendToggle.setAttribute("aria-pressed", String(blendOn));
-    stkMatchStrength.disabled = !blendOn;
-    stkAutoMatch.disabled = !blendOn;
+    stkBlendToggle.disabled = !inLook;
+    stkMatchStrength.disabled = !inLook || !blendOn;
+    stkAutoMatch.disabled = !inLook || !blendOn;
   } else {
     if (stkBlendArmed) stkBlendArmed = false; // nothing selected to paint on
     if (stkPerspArmed) stkPerspArmed = false;
@@ -3953,8 +3974,13 @@ const healStatus = $("healStatus") as HTMLElement;
  *  texture — so keep the reference in sync with every setImage call. */
 let previewSrc: { width: number; height: number; pixels?: Uint8ClampedArray; linear?: Float32Array } | null = null;
 let bakedSpots: HealSpot[] = []; // what the texture currently has baked in
-let bakedStickers: Sticker[] = []; // sticker placements currently baked into the texture
+let bakedStickers: Sticker[] = []; // IN-LOOK stickers baked INTO the source texture
+let bakedOnTop: Sticker[] = []; // ON-TOP stickers built into the overlay texture
 let bakedOccSig = ""; // wb×exposure signature the sticker occlusion was baked against
+
+/** A sticker sits ON TOP of the look (keeps its own colours) unless explicitly
+ *  set to blend into it. Undefined = on top (the default). */
+const isOnTop = (s: Sticker) => s.onTop !== false;
 let bakedWarpRev = -1; // the warp-field revision currently uploaded to the GPU
 let healArmed = false;
 
@@ -3982,8 +4008,10 @@ function uploadPreview() {
   if (!current) return;
   previewSrc = toPreview(current);
   renderer.setImage(previewSrc);
+  renderer.setOverlaySize(previewSrc.width, previewSrc.height); // on-top overlay tracks the source size
   bakedSpots = [];
   bakedStickers = [];
+  bakedOnTop = [];
   bakedWarpRev = -1;
   draw();
 }
@@ -3998,32 +4026,29 @@ function syncSpotsToTexture() {
   // the gesture; the real composite bakes on release.
   const liveId = liveSticker >= 0 ? (params.stickers ?? [])[liveSticker] : null;
   const stk = (params.stickers ?? []).filter((s) => stickerAssets[s.asset] && s !== liveId); // only bakeable, non-live
+  // Two kinds now: IN-LOOK stickers bake INTO the source (they take on the IR
+  // palette); ON-TOP stickers (the default) go into a separate overlay texture
+  // blended AFTER the pipeline, so they keep their own colours (owner, 2026-07-21).
+  const inLook = stk.filter((s) => !isOnTop(s));
+  const onTop = stk.filter(isOnTop);
   const spotsSame = cur.length === bakedSpots.length && JSON.stringify(cur) === JSON.stringify(bakedSpots);
   // Occlusion reads display luminance (wb×exposure + cam), so a WB/exposure
   // change must re-bake even when the sticker list is unchanged.
   const occSig = `${params.wb[0]},${params.wb[1]},${params.wb[2]},${params.exposure}`;
+  const occChanged = occSig !== bakedOccSig;
   // Compare stickers WITHOUT stringifying the mask bitmap (a Uint8Array would
   // serialize to a huge object every frame) — maskRev bumps on each stroke and
   // IS compared, so mask edits are still detected.
   const stkSig = (list: Sticker[]) => JSON.stringify(list, (k, v) => (k === "data" ? undefined : v));
-  const stkSame = stk.length === bakedStickers.length && stkSig(stk) === stkSig(bakedStickers) && occSig === bakedOccSig;
-  if (spotsSame && stkSame) return;
+  const inLookSame = !occChanged && inLook.length === bakedStickers.length && stkSig(inLook) === stkSig(bakedStickers);
+  const onTopSame = !occChanged && onTop.length === bakedOnTop.length && stkSig(onTop) === stkSig(bakedOnTop);
+  if (spotsSame && inLookSame && onTopSame) return;
   bakedOccSig = occSig;
   const W = previewSrc.width, H = previewSrc.height;
-  // Every affected rect — spots (old+new) AND stickers (old+new) — is re-baked
-  // from the PRISTINE source with the full current lists, so vacated areas
-  // restore correctly. Heal bakes first, then stickers layer ON TOP (matching
-  // the export sampler, where stickers wrap outside heal).
   // The photo's display rotation (EXIF orientation, 90° steps). Stickers place +
   // bake in the un-rotated sensor buffer, so they must be counter-rotated by it
   // to read upright on the DISPLAYED photo (portrait/orientation-8 fix).
   const dispRot = renderer.rotation * 90;
-  const rects: { x0: number; y0: number; w: number; h: number }[] = [];
-  for (const s of [...bakedSpots, ...cur]) rects.push(spotRect(s, W, H));
-  for (const s of [...bakedStickers, ...stk]) {
-    const a = stickerAssets[s.asset];
-    if (a) rects.push(stickerRect(s, W, H, a, dispRot));
-  }
   // Occlusion reads the DISPLAY luminance — run the base through exposure×WB
   // (+ the camera matrix for RAW) so "bright/dark" matches what's on screen,
   // not the dim camera-native source. 8-bit sources are already ~display, so
@@ -4033,28 +4058,59 @@ function syncSpotsToTexture() {
     wb: [params.wb[0] * ex, params.wb[1] * ex, params.wb[2] * ex] as [number, number, number],
     cam: previewSrc.linear ? current.camMatrix ?? null : null,
   };
-  for (const rect of rects) {
-    if (rect.w <= 0 || rect.h <= 0) continue;
-    if (previewSrc.linear) {
-      const data = bakeRgbaF32(previewSrc.linear, W, H, cur, rect);
-      compositeStickersIntoRectF32(data, rect, W, H, stk, stickerAssets, occ, dispRot);
-      renderer.patchImage(rect.x0, rect.y0, rect.w, rect.h, data);
-    } else {
-      const data = bakeRgba8(previewSrc.pixels!, W, H, cur, rect);
-      compositeStickersIntoRect8(data, rect, W, H, stk, stickerAssets, occ, dispRot);
-      renderer.patchImage(rect.x0, rect.y0, rect.w, rect.h, data);
+
+  // (1) SOURCE bake — heals + IN-LOOK stickers. Every affected rect (old+new) is
+  // recomputed from the PRISTINE source with the full current lists, so vacated
+  // areas restore correctly. Heal first, then in-look stickers on top.
+  if (!spotsSame || !inLookSame) {
+    const rects: { x0: number; y0: number; w: number; h: number }[] = [];
+    for (const s of [...bakedSpots, ...cur]) rects.push(spotRect(s, W, H));
+    for (const s of [...bakedStickers, ...inLook]) {
+      const a = stickerAssets[s.asset];
+      if (a) rects.push(stickerRect(s, W, H, a, dispRot));
     }
+    for (const rect of rects) {
+      if (rect.w <= 0 || rect.h <= 0) continue;
+      if (previewSrc.linear) {
+        const data = bakeRgbaF32(previewSrc.linear, W, H, cur, rect);
+        compositeStickersIntoRectF32(data, rect, W, H, inLook, stickerAssets, occ, dispRot);
+        renderer.patchImage(rect.x0, rect.y0, rect.w, rect.h, data);
+      } else {
+        const data = bakeRgba8(previewSrc.pixels!, W, H, cur, rect);
+        compositeStickersIntoRect8(data, rect, W, H, inLook, stickerAssets, occ, dispRot);
+        renderer.patchImage(rect.x0, rect.y0, rect.w, rect.h, data);
+      }
+    }
+    bakedSpots = cur.map((s) => ({ ...s }));
+    bakedStickers = inLook.map((s) => ({ ...s, corners: s.corners ? s.corners.map((c) => [c[0], c[1]] as [number, number]) : s.corners }));
   }
-  bakedSpots = cur.map((s) => ({ ...s }));
-  // Deep-copy `corners` — a shallow spread would SHARE the array with the live
-  // sticker, so a later in-place corner drag would silently mutate what we think
-  // was baked. That defeats the change-detection (stkSig) AND makes the restore
-  // rect track the live geometry, not the geometry actually in the texture —
-  // leaving stale pixels behind that survive even Clear all (owner, 2026-07-21).
-  bakedStickers = stk.map((s) => ({
-    ...s,
-    corners: s.corners ? s.corners.map((c) => [c[0], c[1]] as [number, number]) : s.corners,
-  }));
+
+  // (2) OVERLAY bake — ON-TOP stickers into the overlay texture (gamma sRGB +
+  // coverage alpha). Same dirty-rect discipline: rebuild every affected rect
+  // (old+new) from scratch, so a vacated rect writes back transparent. The scene
+  // under a pixel (for peek-behind luma) is read straight from the pristine
+  // source, matching the export sampler's occ base.
+  if (!onTopSame) {
+    const occBaseAt = (sx: number, sy: number, into: Float32Array) => {
+      const o = (sy * W + sx) * 4;
+      if (previewSrc!.linear) { into[0] = previewSrc!.linear[o]; into[1] = previewSrc!.linear[o + 1]; into[2] = previewSrc!.linear[o + 2]; }
+      else { const p = previewSrc!.pixels!; into[0] = Math.pow(p[o] / 255, 2.2); into[1] = Math.pow(p[o + 1] / 255, 2.2); into[2] = Math.pow(p[o + 2] / 255, 2.2); }
+    };
+    const oRects: { x0: number; y0: number; w: number; h: number }[] = [];
+    for (const s of [...bakedOnTop, ...onTop]) {
+      const a = stickerAssets[s.asset];
+      if (a) oRects.push(stickerRect(s, W, H, a, dispRot));
+    }
+    for (const rect of oRects) {
+      if (rect.w <= 0 || rect.h <= 0) continue;
+      const buf = new Uint8Array(rect.w * rect.h * 4);
+      compositeStickersOverlay8(buf, rect, W, H, onTop, stickerAssets, occ, dispRot, occBaseAt);
+      renderer.patchOverlay(rect.x0, rect.y0, rect.w, rect.h, buf);
+    }
+    renderer.setOverlayOn(onTop.length > 0);
+    bakedOnTop = onTop.map((s) => ({ ...s, corners: s.corners ? s.corners.map((c) => [c[0], c[1]] as [number, number]) : s.corners }));
+  }
+
   stickerBakeCount++; // instrumentation for the lag walk (counts real bakes)
   updateHealUI();
 }
@@ -6188,7 +6244,7 @@ const LESSONS: { title: string; tab: PanelTab; steps: string[] }[] = [
     tab: "stickers",
     steps: [
       "Open the Stickers tab and tap a Saucer or Alien — it drops onto the photo. Drag it wherever you like.",
-      "Notice it takes on the photo's colors: the channel swap and white balance reach the sticker, so it lands right in the infrared palette instead of looking pasted on.",
+      "By default it sits on top of the photo with its own colours — a sticker is a different kind of picture, so it isn't run through the infrared processing. Want a creature to look infrared instead? Turn on 'Blend into the infrared look'.",
       "Slide Peek behind up and pick Bright parts — the glowing foliage shows through, so the saucer tucks in behind the branches. Add a little Grain (in Grade) and it settles over the whole scene.",
       "Resize and spin it right on the photo: drag a corner handle to resize, or the round knob above it to rotate (the Size and Spin sliders and two-finger pinch work too). Turn Blend into the photo off for stickers that look better in their own colours. Remove this sticker or Clear all start over — stickers stay with this photo, not carried by saved looks or batch.",
     ],

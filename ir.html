@@ -298,6 +298,8 @@
             <input id="stickerImport" type="file" accept="image/png,image/*" hidden />
             <div id="stickerControls" hidden>
               <div class="sub-title">Selected sticker</div>
+              <button id="stkInLook" type="button" aria-pressed="false">Blend into the infrared look</button>
+              <p class="note">Your sticker sits <strong>on top</strong> of the photo with its own colours &mdash; it's a different kind of picture, so it isn't run through the infrared processing. Turn this on only if you want it pushed through the false-colour look too (for a creature meant to look infrared).</p>
               <label>Size <input id="stkScale" type="range" min="0.05" max="1" step="0.005" value="0.3" /></label>
               <label>Spin <input id="stkRot" type="range" min="-180" max="180" step="1" value="0" /></label>
               <div class="sub-title">Match to the photo</div>
@@ -838,10 +840,11 @@
         exports.</p>
 
         <h3>Stickers &mdash; UFOs in the trees <span class="lut-badge">Beta</span></h3>
-        <p>In the <strong>Stickers</strong> tab, tap a saucer, alien, Saturn or beam to drop it on the
-        photo, then drag it into place. Stickers composite into the picture <em>before</em> the infrared
-        processing, so they take on your photo's colors &mdash; the channel swap and white balance reach
-        them &mdash; and grain settles over the top. <strong>Peek behind</strong> lets the scene show
+        <p>In the <strong>Stickers</strong> tab, tap a sticker to drop it on the photo, then drag it into
+        place. A sticker sits <strong>on top</strong> of the picture with its own colours &mdash; it's a
+        different kind of image, so it is <em>not</em> pushed through the infrared processing (grain still
+        settles over the top). If you want a creature to look infrared, turn on <strong>Blend into the
+        infrared look</strong> and it will take on the false-colour palette instead. <strong>Peek behind</strong> lets the scene show
         through: pick whether the sticker hides behind the bright parts (glowing foliage) or the dark
         parts (tree trunks), so a saucer can tuck in behind the branches. <strong>Resize and rotate right
         on the photo:</strong> a selected sticker shows corner handles (drag to resize) and a round knob on
