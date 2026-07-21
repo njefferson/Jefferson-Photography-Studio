@@ -2096,33 +2096,38 @@ function renderStickerPicker() {
 /** Place a sticker of `key` at the on-screen centre, auto-matched to the scene.
  *  Ensures the asset is rasterized first (lazy per-asset load). */
 const SCENE_MATCH_AMT = 0.85; // default strength of the palette match
-// Auto-shadow projection (light from the upper-left → shadow falls down + right):
-// the silhouette's TOP corners collapse toward the feet (DOWN) and shear (SKEW),
-// leaving a flat, sheared ground shadow. Half-extent units, fed to `corners`.
-const SHADOW_DOWN = 1.25;
-const SHADOW_SKEW = 0.7;
+// Auto-shadow projection. The shadow pivots on the creature's real FEET (the
+// bottom of its OPAQUE content, not the transparent padding), and the silhouette
+// folds down onto the ground from there: SPREAD = how far it stretches past the
+// feet, SKEW = the light-direction shear. Half-extent units, fed to `corners`.
+const SHADOW_SPREAD = 0.75;
+const SHADOW_SKEW = 0.55;
 
-/** Cast a shadow of a sticker from its OWN silhouette: a flat near-black copy at
- *  its feet, squashed + skewed onto the ground (matches the exact shape, beats a
- *  pre-made blob). Inserted BELOW the sticker so it reads as underneath. */
+/** Cast a shadow of a sticker from its OWN silhouette: a flat near-black copy that
+ *  folds onto the ground FROM THE FEET (the opaque bottom, ignoring the sticker's
+ *  transparent padding), squashed + skewed. Inserted BELOW the sticker. */
 function castShadow(creature: Sticker) {
   if (creature.shadow) return; // no shadow of a shadow
   const a = stickerAssets[creature.asset];
   if (!a || !current) return;
-  const ar = a.h / a.w;
-  const halfHuv = (creature.scale * (current.width / 2) * ar) / current.height; // its half-height in image-uv
+  // Feet = bottom of the opaque content in local half-extent units (y: −1 top … +1
+  // bottom). The top corners fold DOWN to feet+SPREAD (+ shear); the bottom corners
+  // (empty padding) collapse UP to the feet, so the shadow starts at the real feet.
+  const footHalf = 2 * a.opaque.v1 - 1;
+  const topY = footHalf + SHADOW_SPREAD + 1; // offset added to the top corners (base −1)
+  const botY = footHalf - 1;                 // offset added to the bottom corners (base +1)
   const shadow: Sticker = {
     id: crypto.randomUUID(),
     asset: creature.asset,
-    x: Math.min(1, Math.max(0, creature.x + 0.015)),
-    y: Math.min(1, Math.max(0, creature.y + halfHuv * 0.5)), // drop toward the feet
+    x: creature.x,
+    y: creature.y,
     scale: creature.scale,
     rot: creature.rot,
     occlude: 0, occludeLuma: 0.6, occludeBright: true,
     bright: 0, contrast: 0, warmth: 0, sat: 0,
     shadow: true, shadowOpacity: 0.45,
     reMatch: false, matchAmt: 0,
-    corners: [[SHADOW_SKEW, SHADOW_DOWN], [SHADOW_SKEW, SHADOW_DOWN], [0, 0], [0, 0]],
+    corners: [[SHADOW_SKEW, topY], [SHADOW_SKEW, topY], [0, botY], [0, botY]],
   };
   const list = (params.stickers ??= []);
   const idx = list.indexOf(creature);
