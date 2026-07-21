@@ -3265,6 +3265,64 @@ user-scalable=no.
   appear with Wildlife → "Owl"; three kinds now render and filter; PLANT=nofilter
   fails; all sticker regressions + build green. The factory promotes reviewed
   PNGs into public/stickers/<category>/ as its own deliberate step.
+- [x] **Sticker usability sweep + zoom-with-no-wheel (2026-07-21 device asks)** —
+  owner on device, five things at once (branch
+  `claude/sticker-blending-resize-rotate-tr3hrl`, BETA straight to main via
+  staging). (1) **Blend on/off** — a `#stkBlendToggle` at the top of "Match to
+  the photo": ON restores the full-strength match (computes matchGain via
+  autoMatchSticker if the sticker never had one) → matchAmt = MATCH_AMT_DEFAULT;
+  OFF sets matchAmt 0 so the raw asset colours show ("some work better without
+  it"). updateStickerUI mirrors it as ✓-text + aria-pressed and disables the
+  strength slider + "Blend to match" button when off. (2) **Resize/rotate right on
+  the photo** — the owner "didn't see how" (only sliders/pinch + the persp corner
+  handles, which skew, confused him). positionStickerOverlay now has three modes
+  by data-mode: `persp` (4 skew handles, unchanged), `xform` (4 `.sticker-size`
+  resize corners + a `.sticker-rotate` knob on a `.sticker-stem`, shown when a
+  sticker is selected and neither perspective nor blend-paint is armed), and `box`
+  (outline only, while blend-painting so handles don't fight the brush). Resize =
+  finger-distance-from-centre ÷ base half-diagonal; rotate solves s.rot from the
+  finger angle (atan2(dx,−dy)+dispRot). Both held live (ghost + one bake on
+  release, `stkHandleLive` suppresses undo churn like `stkCornerLive`), sliders
+  follow live. Handles stopPropagation so a grab never starts a body drag. (3)
+  **Left-behind artifact** — `bakedStickers` was a SHALLOW copy, so its `corners`
+  array ALIASED the live sticker; a perspective corner drag then mutated the
+  "baked" geometry in place, defeating the stkSig change-detection (second corner
+  move never re-baked) AND making the restore rect track live-not-baked geometry
+  → stale pixels that survived even Clear all. Fix: deep-copy corners in the bake
+  snapshot (mirrors cloneParams). Also drop the live ghost defensively on
+  delete/clear and in disarmPictureTools (so it can't float over the start
+  screen). (4) **Picker thumbnails** — the add grid was text-only chips; now each
+  is a `.sticker-tile` with a `<img src=./stickers/KEY.png>` thumbnail (loaded
+  straight, no rasterization — precached) + label beneath + the honesty note
+  (folklore/fiction) at --txt-2. (5) **Zoom with no wheel and no pinch** — a
+  desktop/laptop had NO way to magnify (pinch needs touch; there was never a wheel
+  handler), so brushing up close was impossible. New `#zoomCtl` glass stack
+  (bottom-right, --glass tokens, hidden while cropping, lifts above the session
+  strip): + / − / Fit buttons zoom about the stage centre; a cursor-anchored
+  canvas `wheel` handler (passive:false) is the desktop gesture. BOTH work while a
+  picture tool owns the canvas gestures (they're buttons / a wheel event, not
+  pointers) — that's the whole point. zoomAt/zoomByCentre reuse the pinch anchor
+  math; updateZoomCtl syncs the %/enabled state and rides applyZoom + the open/
+  home/return/crop transitions. VERIFIED (sticker-fixes-walk, 25 checks, headless
+  Chromium on a practice JPEG): thumbnails render with imgs+labels; 4 resize + 1
+  rotate handle present; rotate drag 0→90, resize 0.3→0.8; blend toggle off
+  disables strength + zeroes matchAmt, on restores 0.85; **artifact ROOT CAUSE
+  fail-first** — a second corner move must re-bake (bakes far→near): FAILS with the
+  shallow copy (far=11 near=11), PASSES with the fix (far=16 near=22), and the
+  cleared canvas matches the no-sticker baseline at diff=0; zoom + button 100→225%,
+  Fit→100%, wheel zooms to 246% WHILE the brush is armed; no console errors. axe
+  clean (0 serious/contrast) on #sec-stickers + #zoomCtl in BOTH themes. Help +
+  Lesson 9 + the Gestures list updated. VERSION unchanged (Creative beta
+  increment). NEEDS THE OWNER'S HANDS: the resize/rotate handle feel + size on the
+  iPad, the zoom button placement, and whether Fit should also frame a crop.
+  DEFERRED — **the "double blend" the owner flagged next**: stickers composite
+  INTO the source (pre-pipeline), so the IR look (WB, camera matrix, R↔B swap,
+  saturation, grade) re-cooks even a matched sticker — a colourful alien blows to
+  neon (his screenshot). Blend-off helps but the look still processes it. The real
+  cure is a per-sticker "lay it on top / keep its own look" mode that composites
+  AFTER the pipeline (a new display-space stage in BOTH preview + export, with
+  occlusion/mask/perspective in display space) — a real architectural fork; parked
+  for owner direction before building (asked in chat, per the no-picker rule).
 - [x] **New Infrared app icon + social tile (Bigfoot IR forest)** — owner ask
   2026-07-20, from a ChatGPT-made color-IR forest he liked (a Bigfoot subtly
   placed in the trees; source in session uploads). Three deliverables, all cut
