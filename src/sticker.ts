@@ -449,17 +449,24 @@ function overlayPixel(
     if (alpha <= 0) continue;
     if (s.mask) alpha *= sampleMask(s.mask, tx, ty);
     if (alpha <= 0) continue;
-    // "Match the photo's colours": shift the sticker's own mean toward the scene's
-    // displayed mean (both LINEAR), keeping the sticker's internal variation — so
-    // it takes on the infrared palette without being cooked by the pipeline.
-    const mAmt = s.matchAmt ?? 0;
-    const mScene = s.matchScene;
-    if (mAmt > 0 && mScene) {
-      tmp[0] = Math.max(0, tmp[0] + mAmt * (mScene[0] - asset.mean[0]));
-      tmp[1] = Math.max(0, tmp[1] + mAmt * (mScene[1] - asset.mean[1]));
-      tmp[2] = Math.max(0, tmp[2] + mAmt * (mScene[2] - asset.mean[2]));
+    if (s.shadow) {
+      // A cast shadow: flat near-black silhouette. Black over the scene == Multiply,
+      // so it darkens the ground like a real shadow. No colour match, no adjust.
+      tmp[0] = 0; tmp[1] = 0; tmp[2] = 0;
+      alpha *= s.shadowOpacity ?? 0.45;
+    } else {
+      // "Match the photo's colours": shift the sticker's own mean toward the scene's
+      // displayed mean (both LINEAR), keeping the sticker's internal variation — so
+      // it takes on the infrared palette without being cooked by the pipeline.
+      const mAmt = s.matchAmt ?? 0;
+      const mScene = s.matchScene;
+      if (mAmt > 0 && mScene) {
+        tmp[0] = Math.max(0, tmp[0] + mAmt * (mScene[0] - asset.mean[0]));
+        tmp[1] = Math.max(0, tmp[1] + mAmt * (mScene[1] - asset.mean[1]));
+        tmp[2] = Math.max(0, tmp[2] + mAmt * (mScene[2] - asset.mean[2]));
+      }
+      matchAsset(tmp, s, true); // manual bright/contrast/warmth/sat on top (source gain skipped)
     }
-    matchAsset(tmp, s, true); // manual bright/contrast/warmth/sat on top (source gain skipped)
     if (s.occlude > 0) {
       const b = occBase ?? tmp; // caller may pass the scene under the pixel
       const Lb = occBase ? displayLuma(b[0], b[1], b[2], occ) : 0;
