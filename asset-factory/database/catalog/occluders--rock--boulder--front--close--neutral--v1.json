@@ -1,0 +1,50 @@
+{
+  "id": "occluders--rock--boulder--front--close--neutral--v1",
+  "name": "Rock boulder (front, close)",
+  "category": "occluders",
+  "subcategory": "rock",
+  "tags": [
+    "occluder",
+    "foreground"
+  ],
+  "prompt": "A real, natural-light photograph — shot outdoors in soft, even daylight, true-to-life detail, texture and colour, sharp and in focus, exactly as it looks in a real photo. Absolutely NOT an illustration, drawing, painting, sketch, comic, 3D render, CGI, or artwork, and NOT an animal or creature unless explicitly described.\nA real photograph of a large mossy foreground rock, a low boulder, seen directly from the front, photographed close up.\nA natural photographic overlay element with realistic optics and density, exactly as it would appear caught in a real camera frame, its transparency carried in the alpha channel.\nExactly one subject, centered, nothing else in frame.\nIsolated on a fully transparent background with soft naturally feathered edges, produced as an overlay element to composite into a real photograph.\nNo text, no watermark, no caption, no border, no frame, no sticker sheet, no collage.",
+  "negative_prompt": "illustration, drawing, sketch, line art, comic, cartoon, anime, painting, digital painting, concept art, poster, sticker, vector art, cel shaded, 3d render, cgi, octane render, sculpture, statue, figurine, clay, toy, plastic, stylized, cartoonish, film grain, heavy noise, motion blur, vignette, drop shadow, glow, rim light, text, watermark, logo, caption, border, frame, background, scenery, sky, ground, landscape, buildings, people, multiple subjects, sticker sheet, grid, collage, cropped, cut off, white background, colored background",
+  "seed": 493981156,
+  "provider": "flux",
+  "model": "flux-pro-1.1",
+  "settings": {
+    "rendering_speed": "QUALITY",
+    "aspect_ratio": "1x1",
+    "style_type": "REALISTIC"
+  },
+  "template": "effect-overlay",
+  "template_version": 3,
+  "prompt_hash": "sha256:d2be6f65e442926cc28c1ee8cc074355fcfbfaace53fa60ec3b3e781dd1c423c",
+  "created": "2026-07-21T01:56:49.226Z",
+  "run_id": "20260721014920-plhq",
+  "status": "approved",
+  "transparent": true,
+  "approved": true,
+  "favorite": false,
+  "retry_count": 0,
+  "qc": {
+    "tier_a": {
+      "width": 1024,
+      "height": 1024,
+      "coverage": 0.4642,
+      "transparentFrac": 0.5322,
+      "featherFrac": 0.0182,
+      "edgeContact": 0,
+      "components": 1
+    },
+    "tier_b": null,
+    "reject_reasons": [],
+    "warnings": []
+  },
+  "dhash": "50871c3ce6c87906",
+  "duplicate_of": null,
+  "file": "assets/occluders/occluders--rock--boulder--front--close--neutral--v1.png",
+  "promoted": null,
+  "history": [],
+  "matted": true
+}
