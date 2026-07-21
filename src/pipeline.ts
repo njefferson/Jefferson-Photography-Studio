@@ -233,6 +233,10 @@ export interface Sticker {
    *  squash/skew onto the ground is carried by `corners` (owner, 2026-07-21). */
   shadow?: boolean;
   shadowOpacity?: number;
+  /** A glowing light — composites with SCREEN (adds light to the scene) instead
+   *  of sitting on top, so a beam/aura/orb reads as real light. Set once at
+   *  placement from the asset (owner, 2026-07-21). */
+  screen?: boolean;
   /** Per-sticker erase/restore mask in ASSET-LOCAL space (paint to tuck the
    *  sticker behind foreground). 0 = hidden, 255 = shown; absent = fully
    *  shown. Runtime bitmap like the brush masks; `maskRev` bumps per stroke. */

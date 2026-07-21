@@ -229,23 +229,31 @@ export async function exportImage(
   const composed = inLookStickers.length && opts.stickerAssets
     ? wrapWithPatches(healed, stickerPatches(healed, srcW, srcH, inLookStickers, opts.stickerAssets, stkOcc, rot * 90), srcH)
     : healed;
-  // The on-top overlay sampler: (sx,sy) -> [r,g,b,a] gamma sRGB, blended into the
-  // FINISHED display pixel (after edit(), before grain), mirroring the shader.
-  // Peek-behind reads the pristine source under the pixel, same as the preview.
-  const onTopOverlay = onTopStickers.length && opts.stickerAssets
-    ? makeStickerOverlaySampler(srcW, srcH, onTopStickers, opts.stickerAssets, stkOcc, rot * 90,
-        (sx, sy, into) => { const b = rawSample(sx, sy); into[0] = b[0]; into[1] = b[1]; into[2] = b[2]; })
-    : null;
+  // On-top splits by blend, mirroring the preview's two overlay textures: glows
+  // SCREEN (add light), everything else OVER. Both sample (sx,sy) -> [r,g,b,a]
+  // gamma sRGB and blend into the FINISHED display pixel (after edit(), before
+  // grain). Peek-behind reads the pristine source, same as the preview.
+  const normalOnTop = onTopStickers.filter((s) => !s.screen);
+  const screenOnTop = onTopStickers.filter((s) => s.screen);
+  const occBase = (sx: number, sy: number, into: Float32Array) => { const b = rawSample(sx, sy); into[0] = b[0]; into[1] = b[1]; into[2] = b[2]; };
+  const overOverlay = normalOnTop.length && opts.stickerAssets
+    ? makeStickerOverlaySampler(srcW, srcH, normalOnTop, opts.stickerAssets, stkOcc, rot * 90, occBase) : null;
+  const screenOverlay = screenOnTop.length && opts.stickerAssets
+    ? makeStickerOverlaySampler(srcW, srcH, screenOnTop, opts.stickerAssets, stkOcc, rot * 90, occBase) : null;
   const ovTmp = new Float32Array(4);
-  /** Blend the on-top sticker overlay into the finished display pixel `out`. */
+  /** Blend both on-top overlays into the finished display pixel `out` (over, then
+   *  screen), identical to the shader's two overlay passes. */
   const applyOnTop = (sx: number, sy: number) => {
-    if (!onTopOverlay) return;
-    onTopOverlay(sx, sy, ovTmp);
-    const a = ovTmp[3];
-    if (a <= 0) return;
-    out[0] = out[0] * (1 - a) + ovTmp[0] * a;
-    out[1] = out[1] * (1 - a) + ovTmp[1] * a;
-    out[2] = out[2] * (1 - a) + ovTmp[2] * a;
+    if (overOverlay) {
+      overOverlay(sx, sy, ovTmp);
+      const a = ovTmp[3];
+      if (a > 0) { out[0] = out[0] * (1 - a) + ovTmp[0] * a; out[1] = out[1] * (1 - a) + ovTmp[1] * a; out[2] = out[2] * (1 - a) + ovTmp[2] * a; }
+    }
+    if (screenOverlay) {
+      screenOverlay(sx, sy, ovTmp);
+      const a = ovTmp[3];
+      if (a > 0) { out[0] = 1 - (1 - out[0]) * (1 - ovTmp[0] * a); out[1] = 1 - (1 - out[1]) * (1 - ovTmp[1] * a); out[2] = 1 - (1 - out[2]) * (1 - ovTmp[2] * a); }
+    }
   };
   // Warp remaps the source at the VERY TOP (before denoise), mirroring the
   // shader's fetchLin warp — both bilinear-sample the same encoded field.

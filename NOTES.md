@@ -3265,6 +3265,32 @@ user-scalable=no.
   appear with Wildlife → "Owl"; three kinds now render and filter; PLANT=nofilter
   fails; all sticker regressions + build green. The factory promotes reviewed
   PNGs into public/stickers/<category>/ as its own deliberate step.
+- [x] **Scene toolkit: auto-shadow + Screen-for-lights (2026-07-21, asset-factory
+  handoff + owner "auto-shadow, then screen-for-lights")** — polish on the new
+  toolkit assets. (a) REGISTERED the factory's new folders: `illustrated/` (10
+  hand-drawn cryptids) under Creatures → Illustrated cryptids, and `shadows/`
+  (grounding + dapple) under a new `toolkit` group (🎬 Scene toolkit) → Shadows.
+  (b) AUTO-SHADOW: a "Cast a shadow" button spawns a companion sticker from the
+  creature's OWN silhouette — same asset, `shadow:true` (compositor renders it flat
+  near-black × `shadowOpacity` 0.45; black-over-scene == Multiply, so it darkens
+  the ground), squashed+skewed onto the ground via `corners` (SHADOW_DOWN 1.25 /
+  SHADOW_SKEW 0.7), dropped to the feet, inserted BELOW the creature. Move/delete
+  like any sticker; no shadow-of-a-shadow. (c) SCREEN-FOR-LIGHTS: glows now
+  composite with SCREEN (add light) instead of over. Architecture: a SECOND
+  source-space overlay texture (gl.ts unit 9, `overlayScreenTex`) blended
+  `g = 1-(1-g)(1-sv.rgb·sv.a)` after the over overlay; syncSpotsToTexture splits
+  on-top into `normalStk` (over) and `screenStk` (screen) via `isScreenAsset`
+  (Lights category or beam/glow/flare/aura/portal/wisp/orb/… name), each its own
+  overlay + baked-tracking; export.ts mirrors with two samplers (over then screen)
+  into the finished pixel. Glows skip the scene-match (keep their own light).
+  Shadows via black-over need NO Multiply mode (black-over already == Multiply).
+  VERIFIED (sticker-fixes-walk, 37 checks): the new groups/categories render;
+  casting a shadow darkens the ground below a creature (max −30.8 luma); an
+  aura-glowing Lights sticker BRIGHTENS the scene 159.7→192.2 (screen add) and
+  isn't blown out; overlay preview-vs-export parity still 0 LSB; axe clean both
+  themes; build clean. NEEDS THE OWNER'S HANDS: shadow direction/strength feel
+  (currently a fixed light dir; a light-direction knob + the silhouette blur are
+  the next polish), and which assets should count as "glows" for Screen.
 - [x] **Sticker "match the photo" done RIGHT — its own adjustment, not the
   pipeline (2026-07-21, owner: "it has to have ITS OWN adjustments that mimic the
   photo underneath… it will NEVER work by treating it the same as the photo")** —
