@@ -2096,12 +2096,12 @@ function renderStickerPicker() {
 /** Place a sticker of `key` at the on-screen centre, auto-matched to the scene.
  *  Ensures the asset is rasterized first (lazy per-asset load). */
 const SCENE_MATCH_AMT = 0.85; // default strength of the palette match
-// Auto-shadow projection. The shadow pivots on the creature's real FEET (the
-// bottom of its OPAQUE content, not the transparent padding), and the silhouette
-// folds down onto the ground from there: SPREAD = how far it stretches past the
-// feet, SKEW = the light-direction shear. Half-extent units, fed to `corners`.
-const SHADOW_SPREAD = 0.4;
-const SHADOW_SKEW = 0.3;
+// Auto-shadow: a CONTACT PUDDLE at the feet. The silhouette flattens into a thin
+// band starting at the creature's real feet (opaque bottom, not the transparent
+// padding) and extending a little below — centred, NO skew, so it can't sprawl
+// off to the side and reads as grounded on any pose or photo orientation. (A
+// directional cast shadow via skew is a future light-direction knob.)
+const SHADOW_BAND = 0.5;
 
 /** Cast a shadow of a sticker from its OWN silhouette: a flat near-black copy that
  *  folds onto the ground FROM THE FEET (the opaque bottom, ignoring the sticker's
@@ -2117,9 +2117,12 @@ function castShadow(creature: Sticker) {
   // silhouette's feet already sit exactly under the creature's feet), and the fold
   // hinges on the opaque bottom. The bottom padding collapses UP to the feet, the
   // body folds DOWN past them, skewed by the light direction — anchored at the feet.
+  // Flatten the whole silhouette into a thin band [feet … feet+BAND] just below
+  // the feet: top corners (v=0) map to the feet line, bottom corners (v=1) to
+  // feet+BAND. No x-offset → centred under the feet, no sideways sprawl.
   const footHalf = 2 * a.foot.v - 1;
-  const topY = footHalf + SHADOW_SPREAD + 1; // offset added to the top corners (base −1)
-  const botY = footHalf - 1;                 // offset added to the bottom corners (base +1)
+  const topY = footHalf + 1;              // base −1 → footHalf (the feet line)
+  const botY = footHalf + SHADOW_BAND - 1; // base +1 → footHalf + BAND (just below)
   const shadow: Sticker = {
     id: crypto.randomUUID(),
     asset: creature.asset,
@@ -2131,7 +2134,7 @@ function castShadow(creature: Sticker) {
     bright: 0, contrast: 0, warmth: 0, sat: 0,
     shadow: true, shadowOpacity: 0.45,
     reMatch: false, matchAmt: 0,
-    corners: [[SHADOW_SKEW, topY], [SHADOW_SKEW, topY], [0, botY], [0, botY]],
+    corners: [[0, topY], [0, topY], [0, botY], [0, botY]],
   };
   const list = (params.stickers ??= []);
   const idx = list.indexOf(creature);
