@@ -2111,7 +2111,9 @@ function computeSceneMatch(s: Sticker) {
   if (!n) return;
   const toLin = (x: number) => Math.pow(x / 255, 2.2);
   s.matchScene = [toLin(r / n), toLin(g / n), toLin(b / n)];
-  s.matchAmt = SCENE_MATCH_AMT;
+  // Keep the strength the user already dialed (re-matching on a move shouldn't
+  // yank it back to full); default it on a first match.
+  s.matchAmt = s.matchAmt ?? SCENE_MATCH_AMT;
 }
 
 async function addStickerFromKey(key: string) {
@@ -2256,10 +2258,26 @@ stkMatchStrength.addEventListener("input", () => {
 $("stkMatchPhoto").addEventListener("click", () => {
   const s = selSticker();
   if (!s) return;
+  if ((s.matchAmt ?? 0) <= 0) s.matchAmt = SCENE_MATCH_AMT; // a manual match should DO something
   computeSceneMatch(s); // re-read the scene under the sticker's current spot
   updateStickerUI();
   draw();
   flushRecord();
+});
+
+// Auto re-match on move — re-sample the scene whenever a sticker is dropped in a
+// new spot, so it stays matched as you move it (owner ask, 2026-07-21). Default
+// on; the toggle locks the current match.
+function reMatchOnDrop() {
+  const s = selSticker();
+  if (s && s.reMatch !== false && s.matchScene) computeSceneMatch(s);
+}
+const stkReMatch = $("stkReMatch") as HTMLButtonElement;
+stkReMatch.addEventListener("click", () => {
+  const s = selSticker();
+  if (!s) return;
+  s.reMatch = s.reMatch === false ? true : false; // toggle
+  updateStickerUI();
 });
 
 // Import your own picture as a sticker (session-only runtime asset). This is
@@ -2521,6 +2539,9 @@ function updateStickerUI() {
     stkBlendBtn.textContent = stkBlendArmed ? "✓ Painting on the sticker" : "Paint on the sticker";
     stkPerspBtn.textContent = stkPerspArmed ? "✓ Dragging the corners" : "Skew the corners";
     stkMatchStrength.value = String(s.matchAmt ?? 0);
+    const reOn = s.reMatch !== false;
+    stkReMatch.textContent = reOn ? "✓ Re-matching as I move it" : "Re-match as I move it";
+    stkReMatch.setAttribute("aria-pressed", String(reOn));
   } else {
     if (stkBlendArmed) stkBlendArmed = false; // nothing selected to paint on
     if (stkPerspArmed) stkPerspArmed = false;
@@ -5080,10 +5101,10 @@ function endPointer(e: PointerEvent) {
       return;
     }
     if (stkPainting) { endStickerPaint(); return; }
-    if (stickerDrag && e.pointerId === stickerDrag.id) { stickerDrag = null; endStickerLive(); flushRecord(); }
+    if (stickerDrag && e.pointerId === stickerDrag.id) { stickerDrag = null; reMatchOnDrop(); endStickerLive(); flushRecord(); }
     return;
   }
-  if (stickerDrag && e.pointerId === stickerDrag.id) { stickerDrag = null; endStickerLive(); flushRecord(); return; }
+  if (stickerDrag && e.pointerId === stickerDrag.id) { stickerDrag = null; reMatchOnDrop(); endStickerLive(); flushRecord(); return; }
   if (warpStroke && e.pointerId === warpStroke.id) { endWarpStroke(); return; }
   activePointers.delete(e.pointerId);
   clearTimeout(holdTimer);
