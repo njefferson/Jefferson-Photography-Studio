@@ -3265,6 +3265,30 @@ user-scalable=no.
   appear with Wildlife → "Owl"; three kinds now render and filter; PLANT=nofilter
   fails; all sticker regressions + build green. The factory promotes reviewed
   PNGs into public/stickers/<category>/ as its own deliberate step.
+- [x] **Sticker "match the photo" done RIGHT — its own adjustment, not the
+  pipeline (2026-07-21, owner: "it has to have ITS OWN adjustments that mimic the
+  photo underneath… it will NEVER work by treating it the same as the photo")** —
+  the "push it through the infrared look" (in-look) path is fundamentally broken:
+  the IR pipeline is calibrated for RAW SENSOR data, so an sRGB sticker forced
+  through it blows to neon (owner's screenshot: a figure gone yellow/red/green).
+  REMOVED the in-look toggle entirely. REPLACED with a DISPLAY-space palette match:
+  `computeSceneMatch` reads the DISPLAYED scene colour under the sticker via
+  `renderer.readUvPixel` (offscreen GL read, iOS-safe — the tap-WB path, NOT a
+  canvas readback) with the overlay toggled OFF so it samples the scene not the
+  sticker; stores the linear mean as `Sticker.matchScene`. The overlay compositor
+  (`overlayPixel`) then shifts the sticker's own mean toward it by `matchAmt`
+  (`tmp += amt·(matchScene − asset.mean)`), keeping the sticker's internal shading
+  — so it takes on the scene's infrared palette IN ITS OWN LAYER, never cooked.
+  Auto-runs on add/import; a "Match the photo's colours" button re-samples at the
+  sticker's current spot; a Match-strength slider dials 0 (raw) → 1 (full).
+  `matchScene` rides cloneParams/session (deep-copied). VERIFIED (sticker-fixes-
+  walk, 28 checks): a dark sticker (31,24,24) auto-matches to 115,108,109 over a
+  142,130,131 scene — distance to the scene's palette drops 323→70, and it is NOT
+  neon; strength 0 restores the raw colour; the in-look toggle is gone, the match
+  button+slider present; overlay preview-vs-export parity still 0 LSB WITH the
+  match applied; axe clean both themes; build clean. This is the real answer to
+  the owner's ask from the very start — a sticker mimics the photo instead of
+  being run through the same filters.
 - [x] **Killed the confusing "blend/match" pile (2026-07-21, owner: "it's not
   blending, it's just wrong")** — after on-top shipped, the owner turned on the
   "Blend into the infrared look" toggle (sounds like nice blending) and got a
