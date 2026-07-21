@@ -1,0 +1,14 @@
+{
+  "id": "illustrated",
+  "version": 1,
+  "positive": [
+    "A clean vintage cryptozoology field-guide illustration of {subject_phrase}, {pose_phrase}, {view_phrase}.",
+    "Bold confident ink linework with flat, limited muted colour and subtle cross-hatching, in the style of a classic engraving or naturalist plate.",
+    "{framing_clause}",
+    "{global.single_subject}",
+    "{global.isolated}",
+    "A crisp hand-drawn illustration — absolutely NO text, letters, words, caption, label, signature, border, or frame anywhere."
+  ],
+  "negative": ["photograph, photo, realistic, 3d render, cgi, text, letters, words, caption, label, signature, watermark, border, frame, background, scenery, multiple subjects, cropped, cut off"],
+  "settings": { "rendering_speed": "QUALITY", "aspect_ratio": "1x1", "style_type": "DESIGN" }
+}
