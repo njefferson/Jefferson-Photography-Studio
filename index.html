@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Studio" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#0b0c0f" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon-light.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192-light.png" />
+    <title>Photography Studio</title>
+    <meta name="description" content="Two free photo tools that run entirely on your device — an infrared photo editor and a macro focus stacker. No upload, no account, works offline." />
+    <meta property="og:title" content="Photography Studio — free, on-device photo tools" />
+    <meta property="og:description" content="Two free photo tools that run entirely on your device — an infrared photo editor and a macro focus stacker. No upload, no account, works offline." />
+    <meta property="og:type" content="website" />
+    <link rel="canonical" href="https://jefferson-photo-studio.pages.dev/" />
+    <meta property="og:url" content="https://jefferson-photo-studio.pages.dev/" />
+    <meta property="og:image" content="https://jefferson-photo-studio.pages.dev/studio-social.jpg" />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="640" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Photography Studio — free, on-device photo tools" />
+    <meta name="twitter:description" content="Two free photo tools that run entirely on your device — an infrared photo editor and a macro focus stacker. No upload, no account, works offline." />
+    <meta name="twitter:image" content="https://jefferson-photo-studio.pages.dev/studio-social.jpg" />
+    <!-- Read the saved theme before first paint so there's no flash (see src/theme.ts). -->
+    <script>
+      try { if (localStorage.getItem("studio-theme") === "dawn") document.documentElement.setAttribute("data-theme", "dawn"); } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div class="wrap">
+      <!-- About / welcome: auto-opens ONCE for new visitors (chooser.ts);
+           this button keeps the same information reachable forever after. -->
+      <button id="infoBtn" class="lc-info" type="button" aria-haspopup="dialog" aria-label="About Photography Studio — what it is and how to install it">&#9432;</button>
+      <header class="lc-header">
+        <img class="brandmark" src="./icons/icon-192.png" alt="Studio icon" width="34" height="34" />
+        <p class="kicker">Noah Jefferson</p>
+        <h1>Photography Studio</h1>
+        <p class="sub">Two focused tools, one roof. Everything runs on your device.</p>
+        <button id="shareBtn" class="share-app" type="button" hidden>&#x2BAD;&#xFE0E; Share this app</button>
+      </header>
+
+      <main class="doors">
+        <a class="door ir" href="./ir.html">
+          <span class="door-glyph iris" aria-hidden="true"></span>
+          <span class="kicker">Infrared</span>
+          <h2>Infrared Editor</h2>
+          <p>Unbounded white balance, channel swap and false-color looks for IR-converted frames.</p>
+          <span class="go">Open &rarr;</span>
+        </a>
+        <a class="door macro" href="./macro.html">
+          <span class="door-glyph nest" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="kicker">Macro</span>
+          <h2>Macro Studio</h2>
+          <p>Merge a focus-shift burst into one frame that's sharp front to back.</p>
+          <span class="go">Open &rarr;</span>
+        </a>
+      </main>
+
+      <section class="install">
+        <h2>Add to Home Screen — one app, two, or three</h2>
+        <p class="lead">
+          Everything runs in the browser, but you can also
+          <strong>Add&nbsp;to&nbsp;Home&nbsp;Screen</strong> for a full-screen,
+          offline app with its own icon. Install this launcher, either tool on
+          its own, or any mix — they share nothing but this page.
+        </p>
+        <div class="shapes">
+          <div class="shape">
+            <span class="count">One app</span>
+            <h3>The whole Studio</h3>
+            <p>Install <strong>this launcher</strong>: one icon that opens here, then you pick Infrared or Macro.</p>
+          </div>
+          <div class="shape">
+            <span class="count">Two apps</span>
+            <h3>Each tool on its own</h3>
+            <p>Install <strong>Infrared</strong> and <strong>Macro</strong> separately: two icons, each opening straight into its tool.</p>
+          </div>
+          <div class="shape">
+            <span class="count">Three</span>
+            <h3>All of the above</h3>
+            <p>The launcher <em>and</em> both tools — three icons, if you jump between them and want the quick doors too.</p>
+          </div>
+        </div>
+        <p class="how">
+          <strong>On iPad / iPhone:</strong> open the page you want to install,
+          tap Safari's <strong>Share</strong> button, then
+          <strong>Add&nbsp;to&nbsp;Home&nbsp;Screen</strong>. On Android / Chrome,
+          use the browser's <strong>Install app</strong> menu. You can add or
+          remove any of these any time — installing one never blocks the others,
+          and the <span aria-hidden="true">‹</span>&nbsp;Studio link inside each
+          tool always brings you back here.
+        </p>
+        <div class="from-app" id="installFromApp" hidden>
+          <p>
+            <strong>You're in the installed Studio app</strong> — it has no
+            Safari Share button, and links can't leave the app either, so
+            Add&nbsp;to&nbsp;Home&nbsp;Screen can't be reached from here. To
+            install <strong>Infrared</strong> or <strong>Macro</strong> as its
+            own app, copy its link:
+          </p>
+          <p class="from-app-links">
+            <button type="button" data-copy="./ir.html">Copy Infrared link</button>
+            <button type="button" data-copy="./macro.html">Copy Macro link</button>
+          </p>
+          <p class="fine">
+            Then open <strong>Safari</strong>, paste the link in the address
+            bar, and tap <strong>Share → Add to Home Screen</strong> there.
+          </p>
+        </div>
+      </section>
+
+      <section class="picker" id="iconPicker" hidden>
+        <h2>Pick your Home-Screen icon</h2>
+        <p class="lead">
+          Choose the icon your installed <strong>Studio</strong> app will wear,
+          then Add&nbsp;to&nbsp;Home&nbsp;Screen. You can change it any time:
+          pick a new style here, remove the old tile, and add the launcher again —
+          an installed tile keeps its icon until it's re-added.
+        </p>
+      </section>
+
+      <footer class="lc-footer">
+        <p class="foot-line">Free &middot; on-device &middot; no account &middot; no upload &middot; <a href="./privacy.html">privacy</a></p>
+        <button id="themeToggle" type="button"></button>
+      </footer>
+    </div>
+    <!-- First-visit welcome. The SAME card opens from the ⓘ button any time,
+         so dismissing it never loses the information (it says so itself). -->
+    <dialog id="welcomeDlg" aria-labelledby="welcomeTitle">
+      <h2 id="welcomeTitle">Welcome — this is Photography Studio</h2>
+      <p class="welcome-lead"><strong>Free photo tools that run entirely on your device</strong>
+      — nothing is uploaded, and it works offline.</p>
+      <div class="install-box">
+        <h3>Put it on your Home Screen <span class="opt-badge">optional</span></h3>
+        <ol class="install-steps">
+          <li>Tap Safari's <strong>Share</strong> button <span class="step-glyph" aria-hidden="true">&#x2BAD;&#xFE0E;</span></li>
+          <li>Tap <strong>Add to Home Screen</strong></li>
+        </ol>
+        <p class="fine">Android / Chrome: the browser's <strong>Install app</strong> menu.
+        Installing gets you a full-screen app with its own icon that opens even offline —
+        but it's <strong>optional</strong>: everything works right here in the browser.</p>
+      </div>
+      <p>Two tools under one roof:</p>
+      <ul>
+        <li><strong>Infrared Editor</strong> — develop infrared photos: unbounded white balance,
+        the red&#8646;blue swap, looks, black &amp; white, RAW, and practice photos to learn on.</li>
+        <li><strong>Macro Studio</strong> — merge a focus burst into one photo, sharp front to
+        back.</li>
+      </ul>
+      <p class="fine">Find this card again any time behind the &#9432; button at the top of the
+      page.</p>
+      <div class="update-row">
+        <button id="forceUpdate" type="button">Update to the latest version</button>
+        <small class="fine" id="forceUpdateNote">Checks for a new version and reloads &mdash; use this if a new feature or fix hasn&rsquo;t shown up yet. No need to close the app.</small>
+      </div>
+      <button id="welcomeClose" class="welcome-got-it" type="button">Got it</button>
+    </dialog>
+
+    <script type="module" src="/src/chooser.ts"></script>
+  </body>
+</html>

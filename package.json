@@ -1,0 +1,16 @@
+{
+  "name": "jefferson-photo-studio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Photography Studio — on-device photo tools: Infrared editing and Macro focus stacking.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "vite": "^5.4.2"
+  }
+}

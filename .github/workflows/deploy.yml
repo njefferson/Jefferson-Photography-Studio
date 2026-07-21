@@ -1,0 +1,62 @@
+name: Deploy to Cloudflare Pages
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+  workflow_dispatch:
+
+# One deploy at a time per branch, newest wins: without this, two quick pushes
+# can race and leave the OLDER build live. Cancelling mid-run is safe — a Pages
+# deployment is atomic (upload, then activate), so a cancelled upload never
+# goes live. Per-ref groups keep main and staging independent.
+concurrency:
+  group: pages-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    # Only main (production) and staging may deploy — a manual dispatch from a
+    # work branch must never bypass the owner's staging gate.
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history + tags: the build derives real version numbers from
+          # the commit count (v0.N) and shows an exact tag (v1.0+) when present.
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      # Create the Pages project on first run; harmless (and ignored) afterwards.
+      - name: Ensure Cloudflare Pages project exists
+        continue-on-error: true
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages project create jefferson-photo-studio --production-branch=main
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # staging branch -> preview URL (staging.jefferson-photo-studio.pages.dev);
+          # everything else -> production (jefferson-photo-studio.pages.dev).
+          command: pages deploy dist --project-name=jefferson-photo-studio --branch=${{ github.ref_name == 'staging' && 'staging' || 'main' }} --commit-dirty=true
+      # The app used to live at infrared-photography-studio.pages.dev. Keep that
+      # old project alive but serving only a 301 -> the new home (see redirect/),
+      # so existing links and Home-Screen installs still land somewhere useful.
+      # Production pushes only — staging must never touch the old prod domain.
+      - name: Redirect the old domain to the new one
+        if: github.ref_name == 'main'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy redirect --project-name=infrared-photography-studio --branch=main --commit-dirty=true

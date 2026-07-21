@@ -1,0 +1,1974 @@
+/* ============================================================================
+   Studio design system — self-hosted fonts (offline-first, no CDN).
+   Geist  = UI text · Space Grotesk = headings/tool names · Space Mono = readouts
+   ========================================================================== */
+@font-face {
+  font-family: "Geist";
+  src: url("/fonts/geist.woff2") format("woff2");
+  font-weight: 400 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("/fonts/space-grotesk.woff2") format("woff2");
+  font-weight: 500 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Space Mono";
+  src: url("/fonts/space-mono-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Space Mono";
+  src: url("/fonts/space-mono-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: dark;
+  --bg: #0b0c0f;
+  --bg-2: #0f1014;
+  --surface: #15171c;
+  --surface-2: #1c1f26;
+  --surface-3: #252932;
+  --line: rgba(255, 255, 255, 0.18);
+  --line-2: rgba(255, 255, 255, 0.35);
+  --txt: #eef0f3;
+  --txt-2: #a3a7b2;
+  --txt-3: #9095a1;
+  --accent: #6ea0ff;
+  --accent-soft: rgba(110, 160, 255, 0.15);
+  --accent-ink: #07111f;
+  --shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
+  --ir: linear-gradient(135deg, #ff2fb0 0%, #8b40ff 48%, #12b6ff 100%);
+  --macro: linear-gradient(135deg, #ff5e7e 0%, #ff9e45 46%, #3ecf8e 100%);
+  /* Theme-INVARIANT glass for HUDs floating over the PHOTO (not the page):
+     dark glass + light text is correct in BOTH themes, and 0.65 alpha keeps
+     the text >=4.5:1 even over a pure-white IR sky (accessibility standing
+     rule — do not override these in the dawn block). */
+  --glass-bg: rgba(10, 10, 14, 0.65);
+  --glass-txt: #f2f3f6;
+  --glass-txt-2: #c8cad2;
+  --ui: "Geist", -apple-system, system-ui, sans-serif;
+  --display: "Space Grotesk", -apple-system, system-ui, sans-serif;
+  --mono: "Space Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+[data-theme="dawn"] {
+  color-scheme: light;
+  --bg: #e7e0d3;
+  --bg-2: #efe9dd;
+  --surface: #f6f1e8;
+  --surface-2: #ede6d8;
+  --surface-3: #e2dac9;
+  --line: rgba(40, 32, 20, 0.28);
+  --line-2: rgba(40, 32, 20, 0.5);
+  --txt: #2a251c;
+  --txt-2: #6a6353;
+  --txt-3: #625c4d;
+  --accent: #2558b2;
+  --accent-soft: rgba(37, 88, 178, 0.12);
+  --accent-ink: #ffffff;
+  --shadow: 0 10px 34px rgba(80, 64, 40, 0.18), 0 2px 6px rgba(80, 64, 40, 0.14);
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+/* The hidden attribute must always win, even over ID display rules. */
+[hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; overscroll-behavior: none; }
+body {
+  font: 15px/1.4 var(--ui);
+  background: var(--bg);
+  color: var(--txt);
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Thin scrollbars everywhere: line-2 thumb, transparent track. */
+* { scrollbar-width: thin; scrollbar-color: var(--line-2) transparent; }
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+
+#app {
+  display: grid;
+  grid-template-columns: 1fr 352px;
+  grid-template-rows: auto 1fr;
+  grid-template-areas: "bar bar" "stage panel";
+  height: 100dvh;
+}
+/* No image yet -> panel hidden -> give the stage the full width. */
+#app:has(#panel[hidden]) {
+  grid-template-columns: 1fr 0;
+}
+
+/* ---- Top bar: 56px, surface, tool identity dot + name, actions right ---- */
+.bar {
+  grid-area: bar;
+  display: flex;
+  align-items: center;
+  gap: 10px 14px;
+  min-height: 56px;
+  padding: 0 16px;
+  padding-top: env(safe-area-inset-top);
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.brand {
+  font: 600 15px/1 var(--display);
+  letter-spacing: 0.01em;
+  color: var(--txt);
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-right: auto;
+  white-space: nowrap;
+  flex: none;
+}
+/* Tool identity: a 16px circle filled with the tool's spectral gradient. */
+.tool-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex: none;
+  display: inline-block;
+}
+.tool-dot.ir { background: var(--ir); box-shadow: 0 0 10px rgba(139, 64, 255, 0.5); }
+.tool-dot.macro { background: var(--macro); box-shadow: 0 0 10px rgba(255, 94, 126, 0.45); }
+.home-link {
+  color: var(--txt-2);
+  text-decoration: none;
+  font: 500 14px/1 var(--ui);
+  padding: 6px 8px 6px 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  /* The corner must never wrap "‹ Studio" onto two lines: keep the text on
+     one line and refuse to shrink — the actions row absorbs the squeeze. */
+  white-space: nowrap;
+  flex: none;
+}
+.home-link:active { color: var(--txt); }
+/* The Studio/NJ mark riding in the corner link — the way back wears the brand. */
+.bar-mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  flex: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+.info-btn {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--txt-2);
+  font: italic 600 13px/1 Georgia, serif;
+  cursor: pointer;
+  flex: none;
+}
+.info-btn:active { background: var(--surface-3); }
+/* Discrete build stamp beside the tool name — small and muted, but always on
+   screen so a troubleshooting screenshot records which build it came from. */
+.ver-tag {
+  font: 500 11px/1 var(--mono, ui-monospace, monospace);
+  color: var(--txt-3);
+  letter-spacing: 0.02em;
+  margin-left: 2px;
+  flex: none;
+  user-select: text;
+}
+
+/* ---- Buttons ---- */
+button { cursor: pointer; font-family: var(--ui); }
+select, button {
+  width: 100%;
+  background: var(--surface-2);
+  color: var(--txt-2);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 8px;
+  font: 13px/1.2 var(--ui);
+}
+button:active { background: var(--surface-3); }
+/* Toggled-on controls (looks, swap, toggles, pressed bar buttons). */
+.bar-btn[aria-pressed="true"],
+.toggle[aria-pressed="true"],
+button.primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+  border-color: var(--accent);
+}
+
+/* ---- Selects: surface-3 bg, custom chevron ---- */
+select {
+  background: var(--surface-3);
+  color: var(--txt);
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: 30px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--txt-2) 50%),
+    linear-gradient(135deg, var(--txt-2) 50%, transparent 50%);
+  background-position: calc(100% - 15px) 50%, calc(100% - 10px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+/* ---- Range inputs: 4px track, round accent thumb with soft halo ---- */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 28px;
+  background: transparent;
+  cursor: pointer;
+  /* The slider OWNS the gesture — matches every other drag control in the app
+     (.grade-wheel, crop/mask handles, the canvas). `pan-y` here handed vertical
+     drags to the panel scroller, so a finger on the thumb scrolled instead of
+     moving it (owner: sliders felt finicky, 2026-07-19). The panel still
+     scrolls from the label text and the gaps between rows. */
+  touch-action: none;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--line-2);
+}
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--line-2);
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  margin-top: -9px; /* -(22-4)/2 — centred on the 4px track */
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+  transition: transform 0.1s ease;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.18); }
+input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
+
+/* ---- Dialogs ---- */
+#infoDlg, #helpDlg, #batchDlg, #lookDlg, #lookPasteDlg, #lookRecvDlg, #ratioDlg, #locDlg {
+  background: var(--surface);
+  color: var(--txt);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px 20px;
+  max-width: min(520px, 90vw);
+  box-shadow: var(--shadow);
+}
+#infoDlg::backdrop, #helpDlg::backdrop, #batchDlg::backdrop, #lookDlg::backdrop, #lookPasteDlg::backdrop, #lookRecvDlg::backdrop, #ratioDlg::backdrop, #locDlg::backdrop { background: rgba(0, 0, 0, 0.55); }
+/* The "What's new" dialog scrolls; sticky chevron cues at its top/bottom edges
+   say "there's more this way" (owner ask 2026-07-15). Sticky resolves against
+   the dialog's own scrollport, so no position:relative (that breaks modal
+   centering). */
+#infoDlg { max-height: 82vh; overflow-y: auto; }
+.dlg-cue {
+  position: sticky;
+  z-index: 3;
+  height: 30px;
+  margin: 0 -20px;
+  display: flex;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--txt-2);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.dlg-cue.on { opacity: 1; }
+.dlg-cue.up { top: -18px; margin-top: -18px; align-items: flex-start; padding-top: 3px; background: linear-gradient(0deg, transparent, var(--surface) 74%); }
+.dlg-cue.down { bottom: -18px; margin-bottom: -18px; align-items: flex-end; padding-bottom: 3px; background: linear-gradient(180deg, transparent, var(--surface) 74%); }
+#infoDlg h2, #helpDlg h2, #batchDlg h2, #lookDlg h2, #lookPasteDlg h2, #lookRecvDlg h2, #ratioDlg h2 { margin: 0 0 10px; font: 600 17px/1.2 var(--display); }
+
+/* Custom-ratio dialog: W : H entry + swap; shares the look-dialog button kit. */
+#ratioDlg .note { display: block; margin: 0 0 12px; font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+#ratioDlg button { display: block; width: 100%; min-height: 44px; margin: 0 0 8px; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--surface-2); color: var(--txt); font: 500 14px/1.2 var(--ui); cursor: pointer; }
+#ratioDlg button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+#ratioCancel { width: auto !important; padding: 8px 16px !important; display: inline-block !important; }
+.ratio-entry { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; }
+.ratio-entry input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line-2);
+  background: var(--surface-2);
+  color: var(--txt);
+  font: 500 16px/1.2 var(--ui);
+  text-align: center;
+}
+.ratio-entry span { color: var(--txt-2); font-weight: 700; }
+#ratioDlg .ratio-entry button { width: 44px !important; min-height: 44px; margin: 0; flex: none; display: block; }
+
+/* Look sharing: the name/share, paste, and receive dialogs, plus the My looks
+   panel's import row and per-slot ⋯ button. */
+#lookDlg .note, #lookPasteDlg .note, #lookRecvDlg .note { display: block; margin: 0 0 12px; font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+#lookDlg button, #lookPasteDlg button, #lookRecvDlg button {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  margin: 0 0 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line-2);
+  background: var(--surface-2);
+  color: var(--txt);
+  font: 500 14px/1.2 var(--ui);
+  cursor: pointer;
+}
+#lookDlg button.primary, #lookPasteDlg button.primary, #lookRecvDlg button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+#lookDlg button:active, #lookPasteDlg button:active, #lookRecvDlg button:active { border-color: var(--accent); }
+#lookRecvDlg button:disabled { opacity: 0.4; cursor: default; }
+#lookDlgClose, #lookPasteClose, #lookRecvClose { width: auto !important; padding: 8px 16px !important; display: inline-block !important; }
+.look-name-row { display: block; margin: 0 0 12px; font: 500 12.5px/1.3 var(--ui); color: var(--txt-2); }
+.look-name-row input {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line-2);
+  background: var(--surface-2);
+  color: var(--txt);
+  font: 500 15px/1.2 var(--ui);
+}
+.look-hint { color: var(--txt-2); }
+.look-code {
+  display: block;
+  width: 100%;
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line-2);
+  background: var(--surface-2);
+  color: var(--txt);
+  font: 12px/1.45 var(--mono);
+  word-break: break-all;
+  resize: vertical;
+}
+.look-recv-slots { display: flex; flex-direction: column; gap: 0; margin: 0 0 6px; }
+.look-recv-slot { text-align: left; }
+/* QR of the look link: white card on purpose in BOTH themes — scanners want
+   dark-on-light with a quiet zone, so the card ignores the app palette. */
+#lookQrBox { margin: 0 0 8px; padding: 10px; background: #ffffff; border-radius: 10px; border: 1px solid var(--line-2); }
+#lookQrCanvas { display: block; width: min(100%, 320px); height: auto; margin: 0 auto; image-rendering: pixelated; }
+#lookQrBox .note { color: #3a3a3f; margin: 8px 0; }
+#lookQrBox button { margin-bottom: 0; }
+.look-import-row { display: flex; gap: 8px; margin-top: 8px; }
+.look-import-row button { flex: 1; margin: 0; }
+/* Crop aspect-ratio chips on the crop pill (dark glass — --glass-* tokens are
+   theme-invariant there). Selected state = aria-pressed + the "✓ " TEXT prefix
+   set in updateRatioUI, never colour alone. */
+#cropRatios {
+  display: flex;
+  flex-wrap: wrap; /* every ratio visible at once, no side-scroll (owner ask
+                      2026-07-18). Extra rows are SAFE: the view steps back by
+                      the pill's MEASURED height (--croptools-h) in BOTH width
+                      bands, so a taller pill can't bury the bottom handles
+                      (the IMG_1050 fail state that once forced one row). */
+  gap: 10px 6px; /* row-gap 10 so the two rows' -6px hit extensions barely
+                    contest each other; column-gap 6 keeps two tidy rows at
+                    phone widths */
+  justify-content: center;
+  margin-top: 8px;
+}
+.ratio-chip { white-space: nowrap; flex: none; }
+.ratio-chip {
+  position: relative;
+  min-height: 32px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: transparent;
+  color: var(--glass-txt);
+  font: 500 12px/1.2 var(--ui);
+  cursor: pointer;
+}
+.ratio-chip::before { content: ""; position: absolute; inset: -6px; } /* 44px hit extension */
+/* Active chip stays a LIVE control (a second tap flips it to its inverse) —
+   the Done button's accent glow keeps it reading raised/tappable rather than
+   inert-selected (owner worry: "camouflaged as soon as it's used"). */
+.ratio-chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; box-shadow: 0 2px 10px -2px var(--accent); }
+/* The tap-again hint riding the active chip (⇅ = flips to the inverse,
+   ✎ = edits the custom pair). Dark badge + inherited --accent-ink glyph stays
+   ≥4.5:1 on the accent fill in BOTH themes (a white badge fails in dawn). */
+.chip-hint { display: inline-block; margin-inline-start: 5px; padding: 0 4px; border-radius: 5px; background: rgba(0, 0, 0, 0.18); color: inherit; font-weight: 600; }
+/* Black & white named-mix chips (IR tab, light panel). Selected state =
+   aria-pressed + the "✓ " TEXT prefix set in updateBwUI — never colour alone
+   (same pattern as the crop ratio chips). */
+.bw-mixes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 6px; /* row-gap 10 so the -5px hit extensions barely contest */
+  margin: 4px 0 10px;
+}
+.mix-chip {
+  position: relative;
+  width: auto; /* the generic panel button is full-width; chips wrap in a row */
+  flex: none;
+  min-height: 34px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line-2);
+  background: transparent;
+  color: var(--txt);
+  font: 500 12px/1.2 var(--ui);
+  cursor: pointer;
+}
+.mix-chip::before { content: ""; position: absolute; inset: -5px; } /* 44px hit extension */
+.mix-chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+
+/* Sticker picker hierarchy — the three tiers must read as distinct levels (owner,
+   2026-07-20: "menu and submenus are indistinguishable"). KIND = biggest, solid
+   selected fill + a divider under it; CATEGORY = medium, soft/outlined selected;
+   STICKER = plain (add-only, never a persistent selected state). The ✓ text
+   prefix carries selection independent of colour (grayscale-safe). */
+#stickerGroups { border-bottom: 1px solid var(--line); padding-bottom: 10px; margin-bottom: 8px; }
+#stickerGroups .mix-chip { min-height: 40px; padding: 8px 15px; font-size: 13px; font-weight: 600; }
+#stickerCats .mix-chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--txt); }
+
+/* ---- Grade tab (Creative) ------------------------------------------------
+   Three tint wheels, one per tonal band. The wheel itself is a pointer-only
+   convenience (aria-hidden, like the tone-curve dots); the ACCESSIBLE path is
+   the paired Hue/Amount sliders plus the live text readout under each wheel —
+   meaning never rides the gradient alone. */
+.grade-band { display: flex; align-items: center; gap: 12px; margin: 10px 0; }
+.grade-wheel-box { flex: none; width: 96px; text-align: center; }
+.grade-band-name { display: block; font: 500 12px/1.2 var(--ui); color: var(--txt-2); margin-bottom: 5px; }
+.grade-wheel {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  margin: 0 auto;
+  border-radius: 50%;
+  border: 1px solid var(--line-2);
+  touch-action: none; /* the wheel drag owns the gesture — no page scroll */
+  cursor: pointer;
+  /* Decorative hue ring (the readout + sliders carry the meaning): angle =
+     hue, centre desaturates toward the panel surface = zero amount. */
+  background:
+    radial-gradient(closest-side, var(--surface) 18%, rgba(0, 0, 0, 0) 72%),
+    conic-gradient(#e33333 0deg, #dddd33 60deg, #33cc33 120deg, #33cccc 180deg, #4444ee 240deg, #cc33cc 300deg, #e33333 360deg);
+}
+/* Theme-invariant glass puck: white ring + dark halo stays visible over every
+   hue in both themes (same rationale as the HUD glass tokens). */
+.grade-puck {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1.5px rgba(7, 10, 18, 0.8);
+  background: transparent;
+}
+.grade-band-val { display: block; margin-top: 5px; font: 400 11px/1.2 var(--ui); color: var(--txt-3); min-height: 13px; }
+.grade-band-sliders { flex: 1; min-width: 0; }
+
+/* Channel mixer: three output-channel groups, each a labelled trio of
+   from-input sliders. A hairline groups each output visually. */
+.mix3-row { padding: 2px 0 4px; border-top: 1px solid var(--line); margin-top: 6px; }
+.mix3-row:first-of-type { border-top: none; margin-top: 0; }
+.mix3-head { margin: 4px 0 2px; }
+
+/* Imported .cube LUTs (Profiles & LUTs panel). The badge is TEXT — never a
+   colour-only cue. */
+.lut-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  font: 600 10px/1.4 var(--mono);
+  letter-spacing: 0.06em;
+  color: var(--txt-2);
+}
+.lut-active { margin: 8px 0 4px; padding: 10px 12px; border: 1px solid var(--line-2); border-radius: 10px; }
+.lut-active-name { font: 500 13px/1.3 var(--ui); color: var(--txt); margin-bottom: 4px; }
+.lut-strength-row { display: flex; align-items: center; gap: 8px; }
+.lut-strength-row input[type="range"] { flex: 1; min-width: 0; }
+.lut-strength-row span { font: 500 11px/1 var(--mono); color: var(--txt-2); min-width: 38px; text-align: right; }
+.lut-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.lut-row { display: flex; align-items: center; gap: 6px; }
+.lut-row-name { flex: 1; min-width: 0; font-size: 12.5px; color: var(--txt-2); overflow-wrap: anywhere; }
+.lut-row button { width: auto; padding: 6px 10px; font-size: 12.5px; margin: 0; position: relative; }
+.lut-row button::before { content: ""; position: absolute; inset: -6px; } /* 44px hit extension */
+/* The per-slot ⋯ button: compact like its Save/Load siblings, with the house
+   invisible hit-area extension to the 44px minimum. */
+.slot-more { position: relative; min-width: 40px; }
+.slot-more::before { content: ""; position: absolute; inset: -6px; }
+
+/* Batch-start chooser: pick the grade that goes on every photo. */
+#batchDlg { max-height: 86vh; overflow-y: auto; }
+.batch-lead { margin: 0 0 14px; font-size: 13px; line-height: 1.5; color: var(--txt-2); }
+.batch-group { margin: 0 0 14px; }
+.batch-group-title { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--txt); }
+.batch-group-title small { color: var(--txt-3); font-weight: 400; }
+.batch-choices { display: flex; flex-wrap: wrap; gap: 8px; }
+.batch-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--txt);
+  text-align: left;
+  cursor: pointer;
+}
+.batch-choice:active { background: var(--surface-3); border-color: var(--accent); }
+.batch-choice strong { font-size: 14px; }
+.batch-choice small { font-size: 12px; line-height: 1.4; color: var(--txt-2); }
+.batch-choice.slim { width: auto; flex-direction: row; padding: 8px 14px; }
+.batch-none { margin: 4px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--txt-3); }
+.batch-note { margin: 2px 0 14px; font-size: 12px; color: var(--txt-3); }
+#batchDlg button#batchCancel { width: auto; padding: 8px 16px; }
+#infoDlg ol, #infoDlg ul, #helpDlg ol, #helpDlg ul { margin: 0 0 14px; padding-left: 20px; }
+#infoDlg ul { list-style: none; padding-left: 2px; }
+#infoDlg li strong { color: var(--txt); font-variant-numeric: tabular-nums; }
+.info-ver { margin: -6px 0 10px; font: 11px/1.4 var(--mono); letter-spacing: 0.04em; color: var(--txt-3); }
+#infoDlg h3.rm-head { margin: 4px 0 8px; font: 600 14px/1.2 var(--display); }
+.more-row { margin: -8px 0 16px; font-size: 12px; }
+.more-row a { color: var(--accent); text-decoration: none; }
+.more-row a:active { text-decoration: underline; }
+.roadmap li { display: flex; gap: 8px; align-items: baseline; }
+.roadmap .rm-mark { flex: none; width: 12px; color: var(--accent); font-size: 12px; }
+.roadmap li.done { color: var(--txt-3); }
+.roadmap li.done .rm-mark { color: #4a7a4a; }
+#infoDlg li, #helpDlg li { margin: 8px 0; font-size: 13px; line-height: 1.45; }
+#infoDlg a, #helpDlg a { color: var(--accent); text-decoration: none; }
+#infoDlg a:active, #helpDlg a:active { text-decoration: underline; }
+#infoDlg small, #helpDlg small { color: var(--txt-3); }
+#infoDlg button, #helpDlg button { width: auto; padding: 8px 16px; }
+
+/* Dawn theme toggle: a small labelled switch (launcher footer + info dialogs). */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  width: auto;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: none;
+  color: var(--txt-2);
+  font: 500 13px/1 var(--ui);
+  cursor: pointer;
+}
+.theme-toggle .tt-track {
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  border: 1px solid var(--line);
+  position: relative;
+  flex: none;
+  transition: background 0.15s ease;
+}
+.theme-toggle .tt-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--txt-2);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.theme-toggle[aria-checked="true"] .tt-track { background: var(--accent); border-color: var(--accent); }
+.theme-toggle[aria-checked="true"] .tt-knob { transform: translateX(18px); background: var(--accent-ink); }
+.theme-row { display: flex; align-items: center; margin: 4px 0 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+
+.open-btn {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+/* ---- Stage ---- */
+#stage {
+  grid-area: stage;
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: 12px;
+  background: radial-gradient(120% 120% at 50% 30%, var(--bg-2), var(--bg));
+}
+#view {
+  /* Absolute centering: max sizes resolve against the stage itself, so both
+     landscape and portrait (rotated) images fit — grid track sizing does not. */
+  position: absolute;
+  inset: 12px;
+  margin: auto;
+  max-width: calc(100% - 24px);
+  max-height: calc(100% - 24px);
+  object-fit: contain;
+  border-radius: 8px;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+/* Floating histogram HUD: near-black glass, never intercepts taps. */
+#histWrap {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 6;
+  padding: 6px;
+  border-radius: 10px;
+  background: var(--glass-bg);
+  border: 1px solid rgba(150, 150, 170, 0.4);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+#histogram {
+  display: block;
+  width: 200px;
+  height: 75px;
+  opacity: 0.92;
+  pointer-events: auto; /* the wrapper stays none; only the chart itself takes a tap-to-hide */
+  cursor: pointer;
+}
+@media (max-width: 760px) {
+  #histWrap { top: 12px; right: 12px; padding: 4px; }
+  #histogram { width: 150px; height: 58px; }
+}
+/* Location-data tip: a glass chip over the photo, shown only when the LOADED
+   FILE carries GPS location. Glyph + TEXT (never icon-only); 44px target via
+   the ::before extension; theme-invariant glass (it floats over the photo). */
+#locTip {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 7;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(150, 150, 170, 0.4);
+  border-radius: 17px;
+  background: var(--glass-bg);
+  color: var(--glass-txt);
+  font: 600 13px/1 var(--ui);
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+#locTip::before { content: ""; position: absolute; inset: -5px; } /* 44px hit extension */
+#stage.cropping #locTip { display: none; } /* the crop pill owns the bottom edge */
+#locDlg h2 { margin-top: 0; font-size: 17px; }
+/* Settings rows in the ⓘ dialog: a toggle with its one-line explanation. */
+.set-row { margin: 10px 0 12px; display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
+.set-row .toggle { width: auto; }
+
+/* Drag-to-adjust readout HUD. */
+#tatHud {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 11px;
+  border-radius: 10px;
+  font: 700 12px/1 var(--mono);
+  letter-spacing: 0.02em;
+  color: var(--glass-txt);
+  background: var(--glass-bg);
+  border: 1px solid rgba(150, 150, 170, 0.4);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+.tat-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  flex: none;
+}
+@media (max-width: 760px) {
+  #tatHud { top: 12px; left: 12px; padding: 5px 9px; }
+}
+/* Standing "mode is on" banners — tappable to exit; accent-filled pills. */
+#tatBanner,
+#colorBanner,
+#healBanner,
+#healReviewBanner {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 7;
+  width: auto;
+  max-width: min(90%, 520px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 7px 16px;
+  border-radius: 999px;
+  text-align: center;
+  line-height: 1.25;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-ink);
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+}
+#tatBanner .tat-banner-off,
+#colorBanner .tat-banner-off,
+#healBanner .tat-banner-off,
+#healReviewBanner .tat-banner-off {
+  font-size: 11px;
+  font-weight: 500;
+  opacity: 0.85;
+}
+/* The colour-pick and heal banners sit at the BOTTOM (top taps hit the sky —
+   a prime pick target AND where dust shows worst; a top banner ate those taps).
+   (top taps hit the sky / lesson chips.) */
+#colorBanner, #healBanner, #healReviewBanner { top: auto; bottom: 16px; }
+@media (max-width: 760px) {
+  #tatBanner, #colorBanner, #healBanner, #healReviewBanner { top: 10px; padding: 6px 13px; font-size: 12px; }
+  #tatBanner .tat-banner-off, #colorBanner .tat-banner-off, #healBanner .tat-banner-off, #healReviewBanner .tat-banner-off { font-size: 10px; }
+  #colorBanner, #healBanner, #healReviewBanner { top: auto; bottom: 10px; }
+}
+
+/* Crop & straighten: an axis-aligned box (drag corners to resize, drag inside
+   to move) over the FULL, un-cropped frame while the tool is armed — the
+   underlying render already shows straighten live (a rotated photo), so the
+   box itself never needs its own CSS rotation. box-shadow-as-scrim is the
+   classic one-element "darken everything outside this rect" trick.
+   user-select/tap-highlight/touch-callout are ALL killed here: without them,
+   dragging the box or a handle on iPad Safari paints a translucent blue
+   text-selection band over the photo (owner-caught on device, 2026-07-15). */
+#cropOverlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 6; }
+#cropOverlay:not([hidden]) { pointer-events: auto; cursor: grab; touch-action: none; } /* drag the photo to reposition the crop */
+#cropOverlay,
+#cropBox,
+.crop-handle {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+#cropBox {
+  position: absolute;
+  border: 1.5px solid #fff;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55); /* dim outside the crop */
+  pointer-events: none; /* display-only — the overlay captures the pan drag */
+  touch-action: none;
+}
+/* A 44px INVISIBLE touch target (Apple's minimum) centred on each corner —
+   the visible dot is drawn smaller via ::before. The big target is why a
+   corner is grabbable even when it sits near a screen edge; the .cropping
+   canvas inset below keeps it clear of the OS home-indicator / edge-swipe
+   zone, where the owner found the bottom-left corner unreachable until he
+   shrank the Safari window (2026-07-15). */
+.crop-handle {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  margin: -22px;
+  background: transparent;
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+}
+.crop-handle::before {
+  content: "";
+  position: absolute;
+  inset: 9px; /* 44 - 2*9 = 26px visible dot, as before */
+  border-radius: 50%;
+  background: rgba(12, 12, 16, 0.72);
+  border: 2px solid #fff;
+}
+.crop-handle[data-corner="tl"] { top: 0; left: 0; }
+.crop-handle[data-corner="tr"] { top: 0; left: 100%; }
+.crop-handle[data-corner="bl"] { top: 100%; left: 0; }
+.crop-handle[data-corner="br"] { top: 100%; left: 100%; }
+/* Per focus: Crop shows the resize handles; Straighten hides them (reposition by
+   dragging the photo, level with the slider — no arrows). */
+#cropOverlay.focus-straighten .crop-handle { display: none; }
+/* Aids inside the box — thin hairlines, ONE grid per focus (never both). */
+#cropGuides { position: absolute; inset: 0; pointer-events: none; filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.7)); }
+#cropOverlay.focus-crop #cropGuides { /* rule of thirds */
+  background-image:
+    repeating-linear-gradient(to right, rgba(255, 255, 255, 0.4) 0 1px, transparent 1px calc(100% / 3)),
+    repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.4) 0 1px, transparent 1px calc(100% / 3));
+}
+#cropOverlay.focus-straighten #cropGuides { /* finer alignment grid to level against */
+  background-image:
+    repeating-linear-gradient(to right, rgba(255, 255, 255, 0.28) 0 1px, transparent 1px calc(100% / 6)),
+    repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.28) 0 1px, transparent 1px calc(100% / 6));
+}
+#cropTools {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  z-index: 7;
+  display: flex;
+  flex-direction: column; /* header row over a full-width slider — room since the drawer tucks away while cropping */
+  align-items: stretch;
+  gap: 8px;
+  padding: 10px 16px 12px;
+  border-radius: 18px;
+  background: var(--accent-soft); /* blue-tinted "active" glass — stands out without the solid fill the exit banner uses */
+  border: 1px solid var(--accent);
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.45);
+  color: var(--txt-1);
+  width: min(88%, 360px);
+}
+#cropTools .crop-row { display: flex; align-items: center; gap: 10px; }
+/* Crop mode reuses the pill for just its label + Reset — the straighten slider
+   and its readout belong to Straighten mode only. */
+#cropTools.tool-crop #straighten,
+#cropTools.tool-crop #straightenVal { display: none; }
+#cropTools .crop-lbl { flex: 1; font-size: 13px; font-weight: 600; color: var(--txt-1); }
+#cropTools input[type="range"] { width: 100%; margin: 0; }
+#straightenVal { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--txt-1); flex: none; min-width: 4ch; text-align: right; }
+#cropTools button { flex: none; width: auto; padding: 6px 12px; font-size: 12px; border-color: var(--accent); }
+#cropTools button:disabled { opacity: 0.45; } /* honest greyed state when the crop is already identity */
+/* Done is the primary exit — accent-filled so it's the obvious way back out of
+   the tool (owner got lost with the old tiny "tap here" hint). */
+#cropDone { background: var(--accent); color: var(--accent-ink); font-weight: 700; padding: 7px 18px; box-shadow: 0 2px 14px -2px var(--accent); } /* accent glow so it pops off the soft pill */
+@media (max-width: 760px) {
+  #cropTools { bottom: 10px; padding: 9px 12px 11px; }
+}
+#stage.has-session #cropTools { bottom: calc(24px + var(--session-h, 110px)); }
+#hint { color: var(--txt-2); text-align: center; max-width: 40ch; margin: 0 auto; }
+#welcome {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  padding: 22px 26px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  z-index: 5;
+  max-width: min(620px, 94%);
+  max-height: 92%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.welcome-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 50%;
+}
+/* Invisible hit-area extension to the 44px minimum — visual dot unchanged. */
+.welcome-close::before {
+  content: "";
+  position: absolute;
+  inset: -7px;
+}
+/* The start screen SAYS it scrolls (the button-row lesson, owner rule
+   2026-07-14; his 2026-07-15 screenshot: the card ended at the fold and the
+   tutorial grid below looked like nothing). A sticky fade + chevron rides the
+   card's bottom edge while there's more below; main.ts hides it at the end. */
+.welcome-cue {
+  position: sticky;
+  bottom: -22px; /* cancel the card's bottom padding so the fade hugs the edge */
+  margin: -26px -26px -22px; /* span the card's full width over its padding */
+  height: 40px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 3px;
+  font-size: 12px;
+  color: var(--txt-2);
+  background: linear-gradient(180deg, transparent, var(--surface) 72%);
+  pointer-events: none;
+  transition: opacity 0.15s;
+  /* Visibility is a CLASS, not [hidden] — the [hidden]{display:none !important}
+     guard would drop the sticky layout instead of just fading. */
+  opacity: 0;
+}
+.welcome-cue.on { opacity: 1; }
+/* Matching UP cue: hugs the card's TOP edge, shows once you've scrolled down so
+   it's clear there's more above (owner ask 2026-07-15). */
+.welcome-cue.up {
+  top: -22px;
+  bottom: auto;
+  margin: -22px -26px 0;
+  align-items: flex-start;
+  padding: 3px 0 0;
+  background: linear-gradient(0deg, transparent, var(--surface) 72%);
+}
+/* Short screens (iPad landscape): tighter welcome chrome so the practice grid
+   peeks above the fold instead of hiding entirely below it. */
+@media (max-height: 880px) {
+  #welcome { padding: 14px 26px 22px; }
+  .welcome-open { margin: 10px auto 2px; }
+  .welcome-batch { margin: 8px auto 2px; padding: 8px 16px; }
+  .welcome-open-hint,
+  .welcome-batch-hint { font-size: 12px; line-height: 1.4; }
+  .ex-title { margin: 12px 0 8px; }
+  .welcome-div { margin: 14px 8px 2px; }
+}
+.welcome-open {
+  display: inline-block;
+  margin: 14px auto 4px;
+  font-size: 16px;
+  padding: 10px 22px;
+}
+.welcome-batch {
+  display: inline-block;
+  margin: 10px auto 2px;
+  font-size: 15px;
+  padding: 9px 20px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--txt);
+  cursor: pointer;
+  width: auto;
+}
+.welcome-batch:active { background: var(--surface-3); }
+.welcome-batch-hint { max-width: 30rem; margin: 2px auto 0; font-size: 12.5px; line-height: 1.5; color: var(--txt-3); }
+.welcome-open-hint { max-width: 30rem; margin: 2px auto 4px; font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+#resumeSession { border-color: var(--accent); color: var(--accent); }
+/* Prominent "return to what you were doing" control at the top of the start
+   screen — shown only when a photo or session is still open behind it. */
+.welcome-back {
+  display: block;
+  width: fit-content;
+  margin: 0 auto 14px;
+  padding: 8px 18px;
+  font-size: 14px;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  cursor: pointer;
+}
+.welcome-back:active { background: var(--surface-3); }
+/* Home button: house icon + label. */
+#homeBtn { display: inline-flex; align-items: center; gap: 6px; }
+#homeBtn svg { display: block; }
+/* Tutorials entry inside the Help dialog. */
+.help-tutorials {
+  display: block;
+  width: 100%;
+  margin: 0 0 14px;
+  padding: 11px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 10px;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  cursor: pointer;
+  text-align: left;
+}
+.help-tutorials:active { background: var(--surface-3); }
+
+/* --- Photo session strip: floating glass HUD of tappable previews. --- */
+#stage.has-session #view {
+  bottom: calc(20px + var(--session-h, 110px));
+  max-height: calc(100% - 32px - var(--session-h, 110px));
+}
+#stage.has-session #colorBanner, #stage.has-session #healBanner, #stage.has-session #healReviewBanner { bottom: calc(24px + var(--session-h, 110px)); }
+
+/* While cropping, pull the photo IN from the stage edges so a full-frame crop
+   box's corner handles never land in the physical screen corners — iOS
+   reserves the bottom edge for the home indicator and the side edges for
+   swipe-back, and a handle sitting there can't be grabbed (the owner had to
+   shrink the Safari window to reach the bottom-left corner, 2026-07-15). The
+   generous bottom also clears the Straighten toolbar. The crop box tracks the
+   canvas rect (positionCropOverlay reads getBoundingClientRect), so insetting
+   the canvas carries the whole box + handles inward for free. Placed AFTER the
+   has-session rule so it wins during a session; env() adds the device's own
+   safe-area on top. */
+#stage.cropping #view {
+  top: 30px;
+  left: 30px;
+  right: 30px;
+  /* 30px like the sides + the crop pill's REAL height (+16px pill offset),
+     measured by setGeoMode into --croptools-h. A FIXED reserve buried the
+     bottom handles under the grown pill on portrait photos (owner fail-state,
+     IMG_1050) — the reserve must track the pill. */
+  bottom: calc(46px + var(--croptools-h, 66px));
+  max-width: calc(100% - 60px);
+  max-height: calc(100% - 76px - var(--croptools-h, 66px));
+}
+#stage.cropping.has-session #view {
+  bottom: calc(46px + var(--croptools-h, 66px) + var(--session-h, 110px));
+  max-height: calc(100% - 76px - var(--croptools-h, 66px) - var(--session-h, 110px));
+}
+@media (max-width: 760px) {
+  #stage.cropping #view {
+    top: 22px;
+    left: 22px;
+    right: 22px;
+    /* Var-based like the wide rule above — a FIXED phone reserve would bury the
+       bottom handles the moment the pill grows a row (the wrapped ratio chips
+       make that normal). Same numbers as the old fixed 88/110 at the 66px
+       default. */
+    bottom: calc(22px + var(--croptools-h, 66px));
+    max-width: calc(100% - 44px);
+    max-height: calc(100% - 44px - var(--croptools-h, 66px));
+  }
+}
+#sessionStrip {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 7;
+  padding: 8px 10px 10px;
+  border-radius: 12px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(150, 150, 170, 0.4);
+  box-shadow: var(--shadow);
+}
+.session-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 2px 8px;
+}
+#sessionMeta { font: 11px/1.3 var(--mono); letter-spacing: 0.02em; color: var(--glass-txt-2); }
+.session-done {
+  flex: none;
+  width: auto;
+  padding: 5px 14px;
+  font-size: 13px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--txt);
+  cursor: pointer;
+}
+.session-done:active { background: var(--surface-3); }
+.session-thumbs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior: contain;
+  padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
+}
+.session-thumb {
+  flex: none;
+  width: 92px;
+  height: 66px;
+  padding: 0;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background: var(--surface-2);
+  overflow: hidden;
+  cursor: pointer;
+  position: relative;
+  transition: border-color 0.12s ease, transform 0.12s ease;
+}
+.session-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.session-thumb-name {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 4px;
+  font: 10px/1.2 var(--mono);
+  color: var(--glass-txt-2);
+  text-align: center;
+  word-break: break-word;
+}
+.session-thumb.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 0 14px var(--accent-soft);
+  transform: translateY(-2px);
+}
+@media (max-width: 640px) {
+  #sessionStrip { left: 8px; right: 8px; bottom: 8px; padding: 6px 8px 8px; }
+  .session-thumb { width: 76px; height: 56px; }
+}
+
+/* --- Quick look: a full-screen grid of auto-balanced previews. --- */
+/* Native dialogs now (accessible-overlays release): showModal() gives the
+   focus trap, Escape and focus-restore for free — the fixed-overlay look is
+   recreated by pinning the dialog to the full viewport. display:flex would
+   force a CLOSED dialog visible, so it only applies while [open]. */
+#quickLook,
+#library {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  max-width: 100vw;
+  max-height: 100dvh;
+  margin: 0;
+  padding: 0;
+  border: none;
+  z-index: 40;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--txt);
+}
+#quickLook[open],
+#library[open] { display: flex; }
+#quickLook::backdrop,
+#library::backdrop { background: transparent; } /* the dialog itself fills the screen */
+.ql-h { margin: 0; font: 600 16px/1.3 var(--display); display: inline; }
+/* The example library body: grouped grids under small uppercase headers. */
+.lib-body {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 14px 16px 24px;
+}
+.lib-body .gallery-list { margin: 0 auto; }
+.lib-group {
+  max-width: 760px;
+  margin: 18px auto 8px;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  /* The calibrated muted token, not opacity-dimmed --txt — an opacity trick
+     fell below 4.5:1 in dawn (accessibility standing rule). */
+  color: var(--txt-3);
+}
+.lib-group:first-child { margin-top: 4px; }
+/* The way into the library is the tutorial grid's LAST tile (.gal-library,
+   styled with the gallery below) — the dashed pill it replaced was
+   "completely missable" (owner verdict 2026-07-15). */
+.ql-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+.ql-title { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.ql-title strong { font: 600 16px/1.2 var(--display); }
+#qlCount { font: 11px/1.3 var(--mono); color: var(--txt-2); }
+.ql-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ql-btn {
+  width: auto;
+  padding: 8px 14px;
+  font-size: 13px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--txt);
+  cursor: pointer;
+}
+.ql-btn:active { background: var(--surface-3); }
+.ql-btn:disabled { opacity: 0.45; cursor: default; }
+.ql-keep { border-color: var(--accent); color: var(--accent); }
+.ql-keep:not(:disabled) { background: var(--accent-soft); }
+.ql-grid {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 14px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+  align-content: start;
+}
+.ql-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  min-width: 0;
+}
+.ql-tile img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: contain;
+  background: var(--surface-2);
+  border-radius: 10px;
+  border: 2px solid transparent;
+  display: block;
+}
+.ql-tile.selected img {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 0 16px var(--accent-soft);
+}
+.ql-check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: #fff;
+  background: var(--glass-bg);
+  border: 1.5px solid rgba(255, 255, 255, 0.5);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.ql-tile.selected .ql-check {
+  opacity: 1;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.ql-name {
+  font: 11px/1.3 var(--mono);
+  color: var(--txt-2);
+  text-align: center;
+  word-break: break-word;
+}
+.ql-tile.ql-bad {
+  cursor: default;
+  align-items: center;
+  justify-content: center;
+}
+.ql-tile.ql-bad::before {
+  content: "";
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: var(--surface-2);
+  border: 2px dashed rgba(255, 120, 120, 0.4);
+  border-radius: 10px;
+}
+.ql-bad-mark {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(100% - 24px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  color: rgba(255, 140, 140, 0.75);
+}
+.batch-link {
+  width: auto;
+  display: inline;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.bar-actions-wrap { display: inline-flex; min-width: 0; }
+.bar-actions { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+/* The top bar reflects the MODE. While the start screen is up, the photo
+   controls park themselves — they act on a photo that isn't on screen, so
+   they read as a broken menu (owner report 2026-07-14, narrow viewport).
+   Home lives up by ‹ Studio and also parks: on the start screen you're home. */
+body:has(#welcome:not([hidden])) :is(#homeBtn, #undoBtn, #redoBtn, #resetBtn, #origBtn, #histBtn, .bar-sep) { display: none; }
+.bar-actions .bar-sep { width: 1px; height: 22px; background: var(--line); flex: none; }
+.bar-btn {
+  width: auto;
+  padding: 8px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--txt-2);
+  font: 13px/1.2 var(--ui);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.bar-btn:active { background: var(--surface-3); }
+.bar-btn:disabled { opacity: 0.4; }
+.bar-btn.primary, .open-btn {
+  display: inline-flex;
+  align-items: center;
+}
+/* #batchBtn / the Open label wrap a file input; give the label the button look. */
+label.open-btn, label.bar-btn {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+.lesson-show {
+  position: absolute;
+  left: 20px;
+  top: 20px;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 50%;
+  font: 600 17px/1 var(--ui);
+  background: var(--glass-bg);
+  border: 1px solid rgba(150, 150, 170, 0.4);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: var(--glass-txt);
+  z-index: 10;
+}
+.ex-title { color: var(--txt-2); margin: 20px 0 12px; font-size: 14px; }
+#lesson {
+  position: absolute;
+  left: 20px;
+  top: 20px;
+  max-width: 280px;
+  background: var(--glass-bg);
+  border: 1px solid rgba(150, 150, 170, 0.4);
+  border-radius: 12px;
+  padding: 14px 16px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: var(--shadow);
+  z-index: 10;
+}
+#lesson { color: var(--glass-txt); }
+#lesson h2 { margin: 0 0 8px; font: 600 14px/1.2 var(--display); }
+#lesson ol { margin: 0 0 10px; padding-left: 18px; font-size: 13px; color: var(--glass-txt); }
+#lesson li { margin: 6px 0; line-height: 1.4; }
+#lesson button { width: auto; padding: 6px 14px; }
+
+/* Practice gallery on the start screen — a responsive grid of low-res photos. */
+.gallery-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  max-width: 760px;
+  margin: 0 auto;
+}
+.gal {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0;
+  overflow: hidden;
+  cursor: pointer;
+  color: inherit;
+  text-align: left;
+}
+.gal img { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; display: block; }
+.gal span { display: block; padding: 6px 8px; font-size: 12px; color: var(--txt); line-height: 1.3; }
+.gal:active { border-color: var(--accent); }
+/* The Learning library tile — the grid's LAST tile, reading as several photo
+   prints stacked behind one another (three real library-only thumbs). Same
+   .gal chrome so it sizes exactly like every other tile; the print-white
+   edges + drop shadows carry the "stack" in both themes and in grayscale. */
+.gal-stack { position: relative; aspect-ratio: 3 / 2; }
+.gal-stack img {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 72%;
+  height: auto;
+  aspect-ratio: 3 / 2;
+  border-radius: 5px;
+  border: 2px solid rgba(255, 255, 255, 0.92); /* print edge, theme-invariant over the thumbs */
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+}
+.gal-stack img:nth-child(1) { transform: translate(-50%, -50%) rotate(-8deg) translate(-9%, 2%); }
+.gal-stack img:nth-child(2) { transform: translate(-50%, -50%) rotate(7deg) translate(9%, -2%); }
+.gal-stack img:nth-child(3) { transform: translate(-50%, -50%) rotate(-1.5deg) scale(1.06); }
+.gal-library small { font-size: 11px; color: var(--txt-3); }
+
+/* Learn mode: numbered lesson chips pinned on the photo. */
+.lesson-chips {
+  position: absolute;
+  left: 16px;
+  top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  max-width: calc(100% - 32px);
+  z-index: 11;
+}
+.chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto; /* override the global button { width: 100% } */
+  flex: 0 0 auto;
+  height: 34px;
+  padding: 0 12px 0 9px;
+  border: 1px solid rgba(150, 150, 170, 0.4);
+  border-radius: 17px;
+  background: var(--glass-bg);
+  color: var(--glass-txt);
+  font: 600 13px/1 var(--ui);
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+/* Invisible vertical hit extension to the 44px minimum (visual pill 34px). */
+.chip::before {
+  content: "";
+  position: absolute;
+  inset: -5px 0;
+}
+.chip .chip-n {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--surface-3);
+  color: var(--txt);
+  font: 700 12px/1 var(--mono);
+}
+.chip.active { border-color: var(--accent); color: var(--txt); }
+.chip.active .chip-n { background: var(--accent); color: var(--accent-ink); }
+.chip-exit { padding: 0 12px; color: var(--txt-2); }
+/* When the rail is up, the lesson card drops below it so both are visible. */
+#stage.learn #lesson { top: 58px; }
+@media (max-width: 640px) {
+  #stage.learn #lesson { top: 92px; max-width: calc(100% - 32px); }
+}
+
+/* ---- Right panel: pinned tab grid + section head, then a scrolling body ---- */
+#panel {
+  grid-area: panel;
+  background: var(--surface);
+  border-left: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.panel-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  padding: 12px 12px 0;
+  flex: none;
+}
+.ptab {
+  width: 100%;
+  padding: 15px 4px; /* 44px total target (accessibility standing rule) */
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--txt-2);
+  font: 500 12px/1 var(--ui);
+  cursor: pointer;
+}
+.ptab.active {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+/* The Creative row (4th row of the 3-wide tab grid): Grade + Stickers, with
+   Warp to complete it to a full 4x3. */
+.section-head { flex: none; padding: 12px 14px 8px; }
+.section-title { margin: 0; font: 600 15px/1.2 var(--display); color: var(--txt); }
+.section-sub { margin: 2px 0 0; font-size: 12px; line-height: 1.35; color: var(--txt-3); }
+.panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 14px 16px;
+}
+.section > *:first-child { margin-top: 0; }
+.divider { border: none; border-top: 1px solid var(--line); margin: 14px 0; }
+.sub-title {
+  font: 600 13px/1.3 var(--display);
+  color: var(--txt);
+  margin: 12px 0 6px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.sub-title span { font: 400 9px/1.3 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--txt-3); }
+.note { display: block; margin: 6px 0; font-size: 12px; line-height: 1.45; color: var(--txt-3); text-align: left; }
+.note.footnote { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.note-inline { font-size: 11px; color: var(--txt-3); }
+.accent-outline {
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+  padding: 10px;
+  border-radius: 9px;
+}
+.accent-outline:active { background: var(--surface-3); }
+.full-btn { width: 100%; }
+.looks-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 4px 0; }
+.looks-grid button {
+  padding: 8px 6px 6px;
+  font-size: 12.5px;
+  color: var(--txt);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  border-radius: 9px;
+}
+.looks-grid button.active {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+.looks-grid button.active .look-sub { color: var(--accent-ink); }
+.subcard {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 4px 12px 12px;
+  margin: 10px 0 0;
+}
+.subcard .sub-title { margin-top: 10px; }
+.band-sq { width: 14px; height: 14px; border-radius: 4px; flex: none; display: inline-block; vertical-align: -2px; margin-right: 2px; }
+.band-sq-sky { background: linear-gradient(135deg, #12b6ff, #2f6fd6); }
+.band-sq-fol { background: linear-gradient(135deg, #ff5e7e, #ff9e45); }
+.check-row { display: flex; align-items: center; gap: 8px; text-align: left; }
+.check-row input { width: auto; }
+
+/* Slider / control rows in the panel: label left, comfortable touch height. */
+#panel label { display: block; margin: 0; padding: 6px 0 8px; min-height: 44px; font: 500 12.5px/1.3 var(--ui); color: var(--txt-2); text-align: left; }
+#panel label input[type="range"] { margin-top: 4px; }
+#panel label small { color: var(--txt-3); font-weight: 400; }
+#panel .band label, #panel .subcard label { min-height: 40px; }
+#panel section > button { margin: 6px 0; }
+#panel .mask-add button, #panel .mask-editor-actions button, #panel .slot button, #panel .looks-grid button { margin: 0; }
+
+/* A native dialog: the dialog IS the centred card slot (auto-centred by the
+   UA), the scrim moved to ::backdrop. Escape is prevented in main.ts — the
+   card's own buttons are the only exits, so Esc can't strand a running job. */
+#busy {
+  background: transparent;
+  border: none;
+  padding: 0;
+  z-index: 20;
+}
+#busy::backdrop { background: rgba(0, 0, 0, 0.55); }
+.busy-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 22px 28px;
+  text-align: center;
+  min-width: 220px;
+  box-shadow: var(--shadow);
+}
+.busy-card p { margin: 12px 0 0; color: var(--txt); }
+.spinner {
+  width: 28px;
+  height: 28px;
+  margin: 0 auto;
+  border: 3px solid var(--line-2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+#busyActions { display: flex; gap: 8px; margin-top: 16px; }
+#busyActions button { flex: 1; }
+#busyActions .primary { background: var(--accent); color: var(--accent-ink); font-weight: 600; border-color: var(--accent); }
+/* Underlined, not colour-only: these links sit inside the "Buy me a coffee:"
+   sentence, so they must be distinguishable from the surrounding text by more
+   than hue (accessibility mandate; axe link-in-text-block). The #infoDlg-scoped
+   selector is needed to beat the ID-level `#infoDlg a { text-decoration:none }`
+   rule above — plain `.coffee` loses that specificity fight. */
+#infoDlg .coffee { color: var(--accent); text-decoration: underline; font-size: 13px; }
+.coffee-row { font-size: 13px; color: var(--txt-2); }
+.coffee-row a { margin-left: 6px; }
+
+/* Local-mask overlay on the stage. */
+#maskOverlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; overflow: visible; }
+/* Heal rings: markers over healed spots while Heal mode is armed (tap one to
+   remove that fix — the ring itself never eats the tap; the canvas handler
+   hit-tests the spot list). */
+#healOverlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; overflow: visible; }
+#healOverlay .heal-spot { fill: none; stroke: rgba(255, 255, 255, 0.9); stroke-width: 1.5; stroke-dasharray: 4 3; filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.8)); }
+/* The newest heal stays ACTIVE — the Spot size slider resizes it live. */
+#healOverlay .heal-active { stroke: var(--accent); stroke-width: 2; }
+/* Transient centre ring while the size slider moves with nothing active:
+   shows how big the next tap will heal. */
+#healOverlay .heal-preview { stroke: var(--accent); stroke-dasharray: 2 3; opacity: 0.9; }
+/* Review rings after an automatic sweep: SOLID — these fixes are DONE, the
+   ring is a receipt to confirm or take back, not a to-do marker. */
+#healOverlay .heal-done { stroke: var(--accent); stroke-width: 2; stroke-dasharray: none; }
+/* Selected-sticker bounding box — a dashed frame that reads over any content
+   (white stroke + dark drop-shadow), no colour-only cue. */
+#stickerOverlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; overflow: visible; }
+#stickerOverlay .sticker-box { fill: none; stroke: var(--accent); stroke-width: 2; stroke-dasharray: 7 4; filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.85)); }
+/* Perspective corner handles — grabbable, dark fill + light ring + shadow so
+   they read on any photo (shape, not colour, is the cue). */
+#stickerOverlay .sticker-corner { fill: rgba(12, 12, 16, 0.78); stroke: #fff; stroke-width: 2.5; pointer-events: auto; cursor: grab; touch-action: none; filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.9)); }
+/* Drag/resize ghost — the raw asset shown live while a gesture is in flight, so
+   the heavy pipeline bake only runs on release (kills the drag lag). */
+#stickerGhost { position: fixed; pointer-events: none; z-index: 4; opacity: 0.92; will-change: transform, left, top; }
+#maskOverlay .mask-shape { fill: rgba(120, 200, 255, 0.06); stroke: rgba(130, 205, 255, 0.9); stroke-width: 1.5; stroke-dasharray: 6 4; }
+#maskOverlay .mask-line { stroke: rgba(130, 205, 255, 0.9); stroke-width: 1.5; stroke-dasharray: 6 4; }
+#maskOverlay .mask-handle { fill: rgba(12, 12, 16, 0.72); stroke: #82cdff; stroke-width: 2; pointer-events: auto; cursor: grab; touch-action: none; }
+.mask-add { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.mask-add button { width: auto; padding: 6px 12px; font-size: 13px; }
+.color-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  background: var(--surface-3);
+  flex: none;
+  align-self: center;
+}
+.mask-list { display: flex; flex-direction: column; gap: 4px; }
+.mask-row { display: flex; align-items: center; gap: 6px; }
+.mask-row .mask-pick { flex: 1; text-align: left; padding: 6px 10px; font-size: 13px; color: var(--txt); }
+.mask-row .mask-pick.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.mask-row .mask-del { width: auto; padding: 6px 10px; font-size: 13px; }
+#maskEditor { margin-top: 10px; }
+.mask-editor-actions { display: flex; gap: 6px; margin-top: 8px; }
+.mask-editor-actions button { width: auto; padding: 6px 12px; font-size: 13px; }
+
+#unsupported {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  padding: 24px;
+}
+.unsupported-card {
+  max-width: 480px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 22px 26px;
+  color: var(--txt);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.unsupported-card h2 { margin: 0 0 10px; font: 600 17px/1.2 var(--display); }
+.unsupported-card ul { margin: 6px 0 12px; padding-left: 20px; }
+.unsupported-card li { margin: 6px 0; }
+.a2hs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  margin: 14px auto 0;
+  max-width: 560px;
+  padding: 8px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: var(--accent-soft);
+  font-size: 13px;
+  color: var(--txt);
+}
+.a2hs .share-ico { color: var(--accent); font-size: 15px; }
+.a2hs button { width: auto; padding: 5px 10px; font-size: 13px; }
+.a2hs .a2hs-close { background: none; border: none; color: var(--txt-3); font-size: 14px; cursor: pointer; padding: 12px; margin: -12px; }
+.hsl-chips { display: flex; gap: 8px; margin: 10px 0; flex-wrap: wrap; justify-content: center; }
+.hsl-chip {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  padding: 0;
+  cursor: pointer;
+}
+.hsl-chip.active { border-color: #fff; box-shadow: 0 0 0 2px var(--accent); }
+.hsl-chip.tweaked { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); position: relative; }
+/* Second channel for "this chip carries an adjustment" — a dot below the chip,
+   so the state survives grayscale (accessibility standing rule). */
+.hsl-chip.tweaked::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  background: var(--txt);
+}
+.slot-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.slot { display: flex; align-items: center; gap: 8px; }
+.slot-name { flex: 1; font-size: 13px; color: var(--txt-2); }
+.slot button { width: auto; padding: 6px 12px; font-size: 13px; }
+.slot button:disabled { opacity: 0.4; }
+.look-sub { font: 400 9px/1.2 var(--mono); color: var(--txt-3); min-height: 11px; }
+
+@media (max-width: 760px) {
+  #app { grid-template-columns: 1fr; grid-template-areas: "bar" "stage" "panel"; grid-template-rows: auto 1fr auto; }
+  #app:has(#panel[hidden]) { grid-template-columns: 1fr; }
+  #panel { border-left: none; border-top: 1px solid var(--line); max-height: 45dvh; }
+  /* min-width:0 on BOTH levels: the nowrap action row's min-content would
+     otherwise propagate through .bar (a grid item, min-width:auto) and push
+     the whole bar past the viewport instead of scrolling inside it. */
+  .bar { flex-wrap: wrap; padding-bottom: 6px; min-width: 0; }
+  /* On narrow screens the photo needs the room (owner report 2026-07-14:
+     "Not enough room to do anything"): the edit actions become ONE sideways-
+     scrolling row instead of stacking two or three rows tall. Labels stay
+     full; the cut-off last button is the scroll affordance. */
+  .bar-actions-wrap { position: relative; width: 100%; min-width: 0; }
+  .bar-actions {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    justify-content: flex-start;
+    width: 100%;
+    min-width: 0; /* flex min-width:auto would grow the row past the bar instead of scrolling */
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .bar-actions::-webkit-scrollbar { display: none; }
+  .bar-actions .bar-btn { flex: none; white-space: nowrap; }
+  /* A scrolling menu SAYS it scrolls (owner rule, 2026-07-14): a fade +
+     chevron sits on whichever edge has more buttons, and follows the scroll. */
+  .bar-actions-wrap::before,
+  .bar-actions-wrap::after {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 30px;
+    display: flex;
+    align-items: center;
+    font: 700 17px/1 var(--ui);
+    color: var(--txt-2);
+    opacity: 0;
+    transition: opacity 0.15s;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .bar-actions-wrap::before {
+    content: "\2039"; /* ‹ */
+    left: 0;
+    justify-content: flex-start;
+    padding-left: 1px;
+    background: linear-gradient(90deg, var(--surface) 35%, transparent);
+  }
+  .bar-actions-wrap::after {
+    content: "\203A"; /* › */
+    right: 0;
+    justify-content: flex-end;
+    padding-right: 1px;
+    background: linear-gradient(-90deg, var(--surface) 35%, transparent);
+  }
+  .bar-actions-wrap.scroll-left::before { opacity: 1; }
+  .bar-actions-wrap.scroll-right::after { opacity: 1; }
+  /* Tighter chrome all around (owner: "it could be tighter", 2026-07-14) —
+     smaller paddings, not smaller text; tap heights stay ≥36px. */
+  .bar { min-height: 44px; gap: 6px 10px; padding-left: 10px; padding-right: 10px; padding-bottom: 4px; }
+  .bar-btn { padding: 6px 10px; }
+  .panel-tabs { padding: 8px 10px 0; gap: 4px; }
+  .ptab { padding: 7px 4px; }
+  .panel-body { padding: 2px 10px 12px; }
+  #panel label { min-height: 40px; padding: 4px 0 6px; }
+  #panel .band label, #panel .subcard label { min-height: 36px; }
+  #stage { padding: 8px; }
+  #view { inset: 8px; max-width: calc(100% - 16px); max-height: calc(100% - 16px); }
+}
+
+#helpDlg { max-width: min(640px, 92vw); max-height: 82vh; overflow-y: auto; }
+.help-body { font-size: 13px; color: var(--txt); line-height: 1.5; }
+/* Shown only inside the installed (standalone) app, where Safari's Share —
+   and with it Add to Home Screen — is out of reach. */
+.help-body .from-app {
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 12px; margin: 10px 0;
+}
+.help-body .from-app p { margin: 0; }
+.help-body .from-app a { color: var(--accent); font-weight: 600; }
+/* width:auto against the global button width:100% rule (the chip-rail lesson). */
+.inline-btn { width: auto; display: inline-block; padding: 5px 10px; border-radius: 999px; }
+/* Honest label: practice-photo exports carry the Studio corner mark. */
+.wm-note { font-size: 11.5px; line-height: 1.45; color: var(--txt-3); margin: 6px 0 8px; }
+.help-body h3 { margin: 14px 0 6px; font: 600 13px/1.3 var(--display); color: var(--txt); }
+.help-body p { margin: 6px 0; }
+
+.badge {
+  font: 700 9px/1.3 var(--mono);
+  background: var(--surface-3);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1px 4px;
+  color: var(--accent);
+  vertical-align: 1px;
+  white-space: nowrap;
+}
+
+.scroll-cue {
+  position: sticky;
+  display: flex;
+  justify-content: center;
+  height: 0;
+  overflow: visible;
+  z-index: 6;
+  pointer-events: none;
+}
+.scroll-cue span {
+  display: inline-block;
+  background: var(--surface-3);
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  padding: 4px 0;
+  width: 44px;
+  text-align: center;
+  font-size: 12px;
+  /* NOT --accent: the selected chips are --accent, so the cue used to vanish
+     against them (owner, 2026-07-20). Neutral high-contrast text instead. */
+  color: var(--txt);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
+}
+.scroll-cue.up { top: 4px; }
+.scroll-cue.down { bottom: 10px; }
+.scroll-cue.down span { transform: translateY(-100%); }
+
+.look-sub { display: flex; gap: 3px; align-items: center; }
+.seg {
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 0 4px;
+  font: 8px/12px var(--mono);
+  color: var(--txt-3);
+  background: transparent;
+}
+/* On the accent fill both segments use --accent-ink so the 8px text stays
+   ≥4.5:1 in BOTH themes (the old rgba(7,17,31,…) was derived for the dark
+   theme's light accent and fell to 2.1:1 in dawn — caught by the B&W-release
+   a11y walk). Selected vs not stays an INVERSION (filled pill vs outline),
+   never contrast-dimming. */
+.looks-grid button.active .seg { border-color: var(--accent-ink); color: var(--accent-ink); }
+.looks-grid button.active .seg.on { background: var(--accent-ink); color: var(--accent); border-color: var(--accent-ink); font-weight: 600; }
+
+.band-title {
+  text-align: center;
+  margin: 12px 0 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--txt);
+}
+.band-title small { color: var(--txt-3); font-weight: 400; }
+#pcReset { margin-top: 8px; }
+
+.welcome-div { border: none; border-top: 1px solid var(--line); margin: 20px 8px 4px; }
+
+#toneSvg {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  height: auto;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  touch-action: none;
+  display: block;
+  overflow: visible;
+  margin: 8px 2px;
+}
+.tone-grid { stroke: var(--line); stroke-width: 0.6; }
+.tone-diag { stroke: var(--line-2); stroke-width: 0.8; stroke-dasharray: 3 3; }
+.tone-path { stroke: var(--accent); stroke-width: 1.6; fill: none; vector-effect: non-scaling-stroke; }
+.tone-dot { fill: var(--txt); stroke: var(--accent); stroke-width: 1.4; cursor: ns-resize; }
+
+.band { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 2px 10px 8px; margin: 8px 0; }
+
+/* Inside the theme-invariant dark-glass lesson card, so use the glass text
+   tokens (var(--txt-2) is dark in dawn = dark-on-dark). */
+.lesson-next { font-size: 12px; color: var(--glass-txt-2); margin: 0 0 10px; line-height: 1.45; border-top: 1px solid var(--line-2); padding-top: 8px; }
+.lesson-next strong { color: var(--glass-txt); }
+
+/* Keyboard focus: a strong, theme-consistent ring (accessibility standing
+   rule). No outline:none exists anywhere — this only strengthens the default. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Visually hidden, present to assistive tech (headings, live regions). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Motion sensitivity: stop the infinite spinner and calm every transition
+   when the OS asks (accessibility standing rule). The busy readout's text
+   percentage remains the progress signal. */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  .spinner {
+    animation: none !important;
+    border-top-color: var(--line-2) !important;
+  }
+}
+
+/* Per-channel curve strokes on the tone widget: the ACTIVE channel's curve
+   draws in its own hue. Redundant cue only — the chip's TEXT ("✓ Red •")
+   carries the meaning (accessibility rule: never color alone). */
+.tone-path.tone-r { stroke: #e05c5c; }
+.tone-path.tone-g { stroke: #3fae5a; }
+.tone-path.tone-b { stroke: #5b8def; }

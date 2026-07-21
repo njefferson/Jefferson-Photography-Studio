@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Macro" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#0b0c0f" />
+    <link rel="manifest" href="./macro.webmanifest" />
+    <link rel="apple-touch-icon" href="./macro-icon-180.png" />
+    <link rel="icon" type="image/svg+xml" href="./macro-icon.svg" />
+    <title>Macro Studio</title>
+    <meta name="description" content="Merge a focus-shift burst into one macro frame that's sharp front to back — free, on-device, offline." />
+    <meta property="og:title" content="Macro Studio — free focus stacking, on-device" />
+    <meta property="og:description" content="Merge a focus-shift burst into one macro frame that's sharp front to back — free, on-device, offline." />
+    <meta property="og:type" content="website" />
+    <link rel="canonical" href="https://jefferson-photo-studio.pages.dev/macro" />
+    <meta property="og:url" content="https://jefferson-photo-studio.pages.dev/macro" />
+    <meta property="og:image" content="https://jefferson-photo-studio.pages.dev/macro-icon-512.png" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Macro Studio — free focus stacking, on-device" />
+    <meta name="twitter:description" content="Merge a focus-shift burst into one macro frame that's sharp front to back — free, on-device, offline." />
+    <meta name="twitter:image" content="https://jefferson-photo-studio.pages.dev/macro-icon-512.png" />
+    <!-- Read the saved theme before first paint (see src/theme.ts). -->
+    <script>
+      try { if (localStorage.getItem("studio-theme") === "dawn") document.documentElement.setAttribute("data-theme", "dawn"); } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="app">
+      <header class="bar">
+        <a class="home" href="./index.html" aria-label="Back to Studio">&#8249;<img class="bar-mark" src="./icons/icon-192.png" alt="" width="22" height="22" />Studio</a>
+        <span class="brand"><span class="tool-dot" aria-hidden="true"></span>Macro Studio</span>
+        <button id="resetBtn" class="bar-btn" type="button" hidden title="Start over with a new focus-shift set">New set</button>
+        <button id="shareBtn" class="info-btn" type="button" hidden aria-label="Share this app or copy its link" title="Share this app or copy its link">&#x2BAD;&#xFE0E;</button>
+        <button id="helpBtn" class="info-btn" type="button" aria-label="How it works">i</button>
+      </header>
+
+      <main id="stage">
+        <!-- Empty state -->
+        <section id="intake" class="intake">
+          <div class="intake-card" id="dropZone">
+            <span class="macro-glyph" aria-hidden="true"><i></i><i></i><i></i></span>
+            <h1>Stack a focus-shift set</h1>
+            <p>
+              Load the frames from an in-camera focus-shift burst (JPEG or PNG). They'll be
+              combined into one frame that's sharp from front to back, with the
+              background left soft.
+            </p>
+            <label class="open-btn" for="files">Choose frames</label>
+            <input id="files" type="file" accept="image/jpeg,image/png" multiple hidden />
+            <p class="hint" id="intakeHint">…or drag the set onto this panel.</p>
+          </div>
+        </section>
+
+        <!-- Working view (hidden until frames load) -->
+        <section id="work" hidden>
+          <div id="view">
+            <canvas id="result"></canvas>
+            <div id="statusPill" class="status-pill" hidden></div>
+            <div id="viewHint" class="hint-pill">Tap <b>Stack</b> to combine the set.</div>
+          </div>
+          <div id="filmstrip" class="filmstrip"></div>
+          <div class="controls">
+            <button id="stackBtn" type="button" class="primary">Stack</button>
+            <button id="compareBtn" type="button" hidden>Hold to compare</button>
+            <button id="saveBtn" type="button" hidden>Save image</button>
+            <span id="status" class="status-inline" role="status" aria-live="polite" aria-atomic="true"></span>
+          </div>
+          <div id="progress" class="progress" hidden><div id="progressBar"></div><span id="progressText" role="status" aria-live="polite" aria-atomic="true"></span></div>
+        </section>
+      </main>
+
+      <dialog id="helpDlg">
+        <h2>Macro focus stacking</h2>
+        <p>
+          A macro shot has paper-thin depth of field, so a single frame is only
+          sharp in one slice. A focus-shift burst walks the focus through the
+          subject; this tool measures where each frame is sharpest and blends
+          those regions into one fully-sharp image, keeping the background bokeh
+          smooth.
+        </p>
+        <p class="muted">
+          JPEG or PNG sets for now. Everything runs on your device — nothing is
+          uploaded (<a href="./privacy.html" target="_blank" rel="noopener">privacy</a>).
+        </p>
+
+        <h3>Install as an app — one, two, or three</h3>
+        <p>
+          On iPad/iPhone: open the page you want to install, tap Safari's
+          <strong>Share</strong> button, then <strong>Add to Home Screen</strong>
+          for a full-screen, offline app with its own icon. On Android/Chrome, use
+          the browser's <strong>Install app</strong> menu.
+        </p>
+        <div class="from-app" id="macroInstallFromApp" hidden>
+          <p><strong>You're in the installed app right now</strong> — it has no Safari Share button,
+          and links can't leave the app either, so Add to Home Screen can't be reached from here.
+          <button type="button" class="inline-btn" data-copy="./macro.html">Copy the Macro link</button>
+          then open <strong>Safari</strong>, paste it in the address bar, and tap
+          <strong>Share → Add to Home Screen</strong> there.</p>
+        </div>
+        <p>
+          Macro and <strong>Infrared</strong> are separate tools under one
+          <strong>Studio</strong> launcher (the <span aria-hidden="true">‹&nbsp;Studio</span>
+          link up top goes back to it). You pick what to install:
+        </p>
+        <ul>
+          <li><strong>This tool alone</strong> — install from here; its icon opens straight into Macro Studio.</li>
+          <li><strong>The whole Studio</strong> — install from the launcher: one icon, then pick Macro or Infrared each time.</li>
+          <li><strong>Both, or all three</strong> — install any mix; each is independent, so Macro never carries the Infrared editor and vice-versa.</li>
+        </ul>
+        <p class="muted">You can add or remove any of them later — installing one never blocks the others.</p>
+
+        <div class="update-row">
+          <button id="forceUpdate" type="button">Update to the latest version</button>
+          <small class="muted" id="forceUpdateNote">Checks for a new version and reloads &mdash; use this if a new feature or fix hasn&rsquo;t shown up yet. No need to close the app.</small>
+        </div>
+        <p class="theme-row"><button id="themeToggle" type="button"></button></p>
+        <button id="helpClose" type="button">Close</button>
+      </dialog>
+    </div>
+    <script type="module" src="/src/macro/main.ts"></script>
+  </body>
+</html>

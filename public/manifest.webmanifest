@@ -1,0 +1,16 @@
+{
+  "name": "Photography Studio",
+  "short_name": "Studio",
+  "description": "On-device photo tools — infrared editing and macro focus stacking.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "categories": ["photo", "utilities"],
+  "orientation": "any",
+  "background_color": "#0b0b0d",
+  "theme_color": "#0b0b0d",
+  "icons": [
+    { "src": "./icons/icon-192-light.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-512-light.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

@@ -1,0 +1,936 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Infrared" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#0b0c0f" />
+    <link rel="manifest" href="./ir.webmanifest" />
+    <link rel="apple-touch-icon" href="./ir-icon-180.png" />
+    <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+    <title>Infrared Photography Studio</title>
+    <meta name="description" content="Edit infrared photos free, on your device: unbounded white balance, channel swap, false-color looks, masks, healing, RAW (NEF/DNG). Works offline." />
+    <meta property="og:title" content="Infrared Photography Studio — free IR photo editor" />
+    <meta property="og:description" content="Edit infrared photos free, on your device: unbounded white balance, channel swap, false-color looks, masks, healing, RAW (NEF/DNG). Works offline." />
+    <meta property="og:type" content="website" />
+    <link rel="canonical" href="https://jefferson-photo-studio.pages.dev/ir" />
+    <meta property="og:url" content="https://jefferson-photo-studio.pages.dev/ir" />
+    <meta property="og:image" content="https://jefferson-photo-studio.pages.dev/ir-social.jpg" />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="640" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Infrared Photography Studio — free IR photo editor" />
+    <meta name="twitter:description" content="Edit infrared photos free, on your device: unbounded white balance, channel swap, false-color looks, masks, healing, RAW (NEF/DNG). Works offline." />
+    <meta name="twitter:image" content="https://jefferson-photo-studio.pages.dev/ir-social.jpg" />
+    <!-- Read the saved theme before first paint so there's no flash of the
+         wrong palette (see src/theme.ts). -->
+    <script>
+      try { if (localStorage.getItem("studio-theme") === "dawn") document.documentElement.setAttribute("data-theme", "dawn"); } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="app">
+      <header class="bar">
+        <a class="home-link" href="./index.html" aria-label="Back to Studio" title="Back to Studio">&#8249;<img class="bar-mark" src="./icons/icon-192.png" alt="" width="22" height="22" />Studio</a>
+        <span class="brand">
+          <span class="tool-dot ir" aria-hidden="true"></span>
+          Infrared
+          <button id="infoBtn" class="info-btn" type="button" aria-label="What's new">i</button>
+          <span id="verTag" class="ver-tag" title="Build version (for troubleshooting)"></span>
+        </span>
+        <button id="homeBtn" class="bar-btn" type="button" title="Back to the start screen (keeps your session open)" aria-label="Home">
+          <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M3 11l9-8 9 8" /><path d="M5 10v10h5v-6h4v6h5V10" /></svg>
+          Home
+        </button>
+        <span class="bar-actions-wrap"><span class="bar-actions">
+          <button id="undoBtn" class="bar-btn" type="button" disabled title="Undo one edit step">&#8630; Undo</button>
+          <button id="redoBtn" class="bar-btn" type="button" disabled title="Redo the last undone step">&#8631; Redo</button>
+          <button id="resetBtn" class="bar-btn" type="button" disabled title="Reset the whole edit to how the photo first opened">Reset</button>
+          <button id="origBtn" class="bar-btn" type="button" title="Press and hold to compare with the original">Hold: Original</button>
+          <button id="histBtn" class="bar-btn" type="button" aria-pressed="true" title="Show or hide the live histogram">Histogram</button>
+          <button id="helpBtn" class="bar-btn" type="button">Help</button>
+          <button id="shareBtn" class="bar-btn" type="button" hidden title="Share this app or copy its link">&#x2BAD;&#xFE0E; Share</button>
+          <span class="bar-sep" aria-hidden="true"></span>
+          <button class="bar-btn" id="batchBtn" type="button" title="Develop a whole set unattended → one .zip">
+            Batch process
+          </button>
+          <label class="open-btn bar-primary" title="Edit one photo — or several as a session">
+            Open image(s)
+            <input id="file" type="file" accept=".dng,.nef,.zip,.ipslook,image/*" multiple hidden />
+          </label>
+          <input id="batchFiles" type="file" accept=".dng,.nef,.zip,.ipslook,image/*" multiple hidden />
+          <input id="quickFiles" type="file" accept=".dng,.nef,.zip,.ipslook,image/*" multiple hidden />
+        </span></span>
+      </header>
+
+      <main id="stage">
+        <h1 class="sr-only">Infrared photo editor</h1>
+        <canvas id="view" role="img" aria-label="Photo canvas — no photo open"></canvas>
+        <svg id="maskOverlay" hidden aria-hidden="true"></svg>
+        <svg id="healOverlay" hidden aria-hidden="true"></svg>
+        <svg id="stickerOverlay" hidden aria-hidden="true"></svg>
+        <img id="stickerGhost" alt="" aria-hidden="true" hidden />
+        <div id="cropOverlay" hidden aria-hidden="true">
+          <div id="cropBox">
+            <div id="cropGuides" aria-hidden="true"></div>
+            <div class="crop-handle" data-corner="tl"></div>
+            <div class="crop-handle" data-corner="tr"></div>
+            <div class="crop-handle" data-corner="bl"></div>
+            <div class="crop-handle" data-corner="br"></div>
+          </div>
+        </div>
+        <div id="cropTools" hidden>
+          <div class="crop-row">
+            <span class="crop-lbl" id="geoLbl">Straighten</span>
+            <span id="straightenVal">0.0&deg;</span>
+            <button id="cropReset" type="button">Reset</button>
+            <button id="cropDone" class="primary" type="button">Done</button>
+          </div>
+          <input id="straighten" type="range" min="-45" max="45" step="0.1" value="0" aria-label="Straighten" />
+          <div id="cropRatios" role="group" aria-label="Crop aspect ratio"></div>
+        </div>
+        <div id="histWrap" hidden aria-label="Live RGB histogram">
+          <canvas id="histogram" width="256" height="96" title="Tap to hide — use the Histogram button to bring it back"></canvas>
+        </div>
+        <!-- Location-data tip: shows only when the LOADED FILE carries GPS
+             location (src/gps.ts). Tap for ways to save the file without it.
+             Hideable in Settings (ⓘ) — the dialog says so. -->
+        <button id="locTip" type="button" hidden aria-haspopup="dialog">
+          <span aria-hidden="true">&#128752;</span> Location saved
+        </button>
+        <div id="tatHud" hidden aria-hidden="true">
+          <span id="tatSwatch" class="tat-swatch"></span>
+          <span id="tatText"></span>
+        </div>
+        <button id="tatBanner" type="button" hidden>
+          <span>&#10021; Drag to adjust is ON — drag a color to tune it</span>
+          <span class="tat-banner-off">Tap here to turn off &amp; restore tap / pan / pinch</span>
+        </button>
+        <button id="healBanner" type="button" hidden>
+          Heal mode &mdash; tap a dust spot to fix it
+          <span class="tat-banner-off">tap a healed spot to remove its fix &middot; tap here to exit</span>
+        </button>
+        <button id="healReviewBanner" type="button" hidden>
+          &#10003; <span id="healReviewText">Spots healed</span>
+          <span class="tat-banner-off">tap a ring to put that one back &middot; tap here to keep them</span>
+        </button>
+        <button id="colorBanner" type="button" hidden>
+          <span>&#127919; Color mask — tap the photo to pick the color to match</span>
+          <span class="tat-banner-off">Tap again to re-pick &middot; tap here when done</span>
+        </button>
+        <div id="welcome">
+          <div class="welcome-cue up" id="welcomeCueUp" hidden aria-hidden="true">&#9650;</div>
+          <button id="welcomeClose" class="welcome-close" type="button" hidden aria-label="Close the welcome panel">&#10005;</button>
+          <button id="welcomeBack" class="welcome-back" type="button" hidden>&#8249; Back to your photo</button>
+          <p id="hint" role="status" aria-live="polite">Edit infrared photos — RAW (NEF / DNG) unlocks the full color magic.</p>
+          <label class="open-btn welcome-open" for="file">Open image(s)</label>
+          <p class="welcome-open-hint">One photo to edit — or several to work as a session: big previews you switch between, each keeping its own edit, all held safely until you're done.</p>
+          <label class="welcome-batch" id="welcomeQuickBtn" for="quickFiles">Quick look a folder…</label>
+          <p class="welcome-batch-hint">See what's in a folder: an instant grid of auto-balanced previews, nothing saved, gone when you close. Tap the keepers to send them into a session.</p>
+          <button class="welcome-batch" id="welcomeBatchBtn" type="button">Batch process a set…</button>
+          <p class="welcome-batch-hint">Not for editing — develops a whole set unattended into one .zip, each photo auto-balanced, then a look, your current edit, or nothing on top.</p>
+          <button id="resumeSession" class="welcome-batch" type="button" hidden>Resume session</button>
+          <button id="recoverBatch" class="welcome-batch" type="button" hidden>Recover images from an interrupted batch</button>
+          <hr class="welcome-div" />
+          <div id="a2hs" class="a2hs" hidden>
+            <span id="a2hsText">Use it like an app: tap <span class="share-ico" aria-label="Share">&#x2BAD;</span> Share, then <strong>Add to Home Screen</strong> — full screen, works offline.</span>
+            <button id="a2hsInstall" type="button" hidden>Install app</button>
+            <button id="a2hsClose" type="button" class="a2hs-close" aria-label="Dismiss">&#10005;</button>
+          </div>
+          <p class="ex-title">&hellip;or learn by doing — tap a practice photo and the numbered lessons ride along on the picture. The RAW ones unlock the full color magic.</p>
+          <!-- The way into the full library is the grid's LAST tile (the
+               stacked-photos "Learning library" tile, built in main.ts) —
+               the old dashed pill here was "completely missable" (owner). -->
+          <div id="galleryList" class="gallery-list" aria-label="Practice photos"></div>
+          <div class="welcome-cue" id="welcomeCue" hidden aria-hidden="true">&#9660;</div>
+        </div>
+        <div id="lesson" hidden>
+          <!-- h2: the page's only heading before this is the sr-only h1, so an
+               h3 here was a genuine h1->h3 skip (axe heading-order, caught by
+               the lesson-walk harness). Same size via CSS — purely structural. -->
+          <h2 id="lessonTitle"></h2>
+          <ol id="lessonSteps"></ol>
+          <p class="lesson-next">When you're done: tap <strong>&#8962; Home</strong> up top for another lesson (they're on the start screen, and under <strong>Help</strong>), or <strong>Open image(s)</strong> to edit your own photo.</p>
+          <button id="lessonClose" type="button">Got it</button>
+        </div>
+        <button id="lessonShow" class="lesson-show" type="button" hidden aria-label="Show the lesson">?</button>
+        <!-- Learn mode: the lessons ride on the photo as numbered chips. Tap a
+             number to open its card; the rail stays put so you can practice the
+             same lesson across different practice photos. Built in main.ts. -->
+        <div id="lessonChips" class="lesson-chips" hidden aria-label="Lessons"></div>
+        <div id="sessionStrip" hidden aria-label="Photo session">
+          <div class="session-head">
+            <span id="sessionMeta"></span>
+            <button id="sessionDone" type="button" class="session-done" title="End the session and free its storage">Done</button>
+          </div>
+          <div id="sessionThumbs" class="session-thumbs"></div>
+        </div>
+      </main>
+
+      <aside id="panel" hidden>
+        <!-- Segmented tab grid: six core adjustment tabs in a 2x3 grid, with
+             Corrections and Crop & rotate as full-width footer rows below them.
+             Active tab is remembered per session (main.ts). -->
+        <div id="panelTabs" class="panel-tabs" role="tablist" aria-label="Editor sections">
+          <button id="ptab-basic" aria-controls="sec-basic" class="ptab active" type="button" data-tab="basic" role="tab" aria-selected="true">Basic</button>
+          <button id="ptab-ir" aria-controls="sec-ir" class="ptab" type="button" data-tab="ir" role="tab" aria-selected="false">IR</button>
+          <button id="ptab-bw" aria-controls="sec-bw" class="ptab" type="button" data-tab="bw" role="tab" aria-selected="false">B&amp;W</button>
+          <button id="ptab-color" aria-controls="sec-color" class="ptab" type="button" data-tab="color" role="tab" aria-selected="false">Color</button>
+          <button id="ptab-tone" aria-controls="sec-tone" class="ptab" type="button" data-tab="tone" role="tab" aria-selected="false">Tone</button>
+          <button id="ptab-masks" aria-controls="sec-masks" class="ptab" type="button" data-tab="masks" role="tab" aria-selected="false">Masks</button>
+          <button id="ptab-export" aria-controls="sec-export" class="ptab" type="button" data-tab="export" role="tab" aria-selected="false">Export</button>
+          <button id="ptab-corrections" aria-controls="sec-corrections" class="ptab" type="button" data-tab="corrections" role="tab" aria-selected="false">Corrections</button>
+          <button id="ptab-crop" aria-controls="sec-crop" class="ptab" type="button" data-tab="crop" role="tab" aria-selected="false">Crop &amp; rotate</button>
+          <!-- The Creative row (row 4): Grade + Stickers + Warp complete the
+               4x3 tab grid. -->
+          <button id="ptab-grade" aria-controls="sec-grade" class="ptab" type="button" data-tab="grade" role="tab" aria-selected="false">Grade</button>
+          <button id="ptab-stickers" aria-controls="sec-stickers" class="ptab" type="button" data-tab="stickers" role="tab" aria-selected="false">Stickers</button>
+          <button id="ptab-warp" aria-controls="sec-warp" class="ptab" type="button" data-tab="warp" role="tab" aria-selected="false">Warp</button>
+        </div>
+        <div class="section-head">
+          <h2 id="sectionTitle" class="section-title">Basic</h2>
+          <p id="sectionSub" class="section-sub">White balance, exposure &amp; detail</p>
+        </div>
+        <div id="panelBody" class="panel-body">
+          <div id="panelUp" class="scroll-cue up" hidden><span>&#9650;</span></div>
+
+          <!-- ===== BASIC ===== -->
+          <section class="section" role="tabpanel" id="sec-basic" aria-labelledby="ptab-basic" data-tab="basic">
+            <button id="autoBtn" class="accent-outline" type="button">Auto &mdash; white balance + exposure</button>
+            <!-- Log-scale tracks: the input stores a 0..1000 position; main.ts
+                 maps it exponentially so 1x sits near mid-track (values below = 1.0). -->
+            <label>Exposure <input id="expo" type="range" min="0" max="1000" step="1" value="454" /></label>
+            <label>Red gain <input id="wbR" type="range" min="0" max="1000" step="1" value="585" /></label>
+            <label>Green gain <input id="wbG" type="range" min="0" max="1000" step="1" value="585" /></label>
+            <label>Blue gain <input id="wbB" type="range" min="0" max="1000" step="1" value="585" /></label>
+            <p class="note">Tip: tap foliage in the image to set white balance.</p>
+            <hr class="divider" />
+            <div class="sub-title">Detail</div>
+            <label>Denoise <input id="dn" type="range" min="0" max="1" step="0.01" value="0" /></label>
+            <label>Sharpen <input id="sharpen" type="range" min="0" max="1" step="0.01" value="0" /></label>
+            <label>Texture <input id="texture" type="range" min="-1" max="1" step="0.01" value="0" /></label>
+            <p class="note">Denoise is set automatically from the photo's measured noise. Sharpen crisps up fine edges; Texture brings out surface structure (pull left to smooth). Both keep colors put.</p>
+            <p class="note footnote">White balance, exposure and denoise are set automatically when a photo opens &mdash; refine from here. No 2000K floor.</p>
+          </section>
+
+          <!-- ===== IR ===== -->
+          <section class="section" role="tabpanel" id="sec-ir" aria-labelledby="ptab-ir" data-tab="ir" hidden>
+            <button id="swapBtn" type="button" class="toggle full-btn" aria-pressed="true">R &#8646; B channel swap</button>
+            <p class="note">The core false-color move &mdash; swaps the red and blue channels. Color looks switch it on; toggle here or re-press a look to compare.</p>
+            <div class="sub-title">Looks</div>
+            <div class="looks-grid">
+              <button id="lookAero" type="button">Aerochrome<small class="look-sub"></small></button>
+              <button id="lookRed" type="button">Aero Red<small class="look-sub"></small></button>
+              <button id="lookGoldie" type="button">Goldie<small class="look-sub"></small></button>
+              <button id="lookNatural" type="button">Natural IR<small class="look-sub"></small></button>
+              <button id="lookMono" type="button">B&amp;W IR<small class="look-sub"></small></button>
+              <button id="lookSepia" type="button">Sepia IR<small class="look-sub"></small></button>
+              <button id="lookHie" type="button">HIE B&amp;W<small class="look-sub"></small></button>
+            </div>
+            <p class="note">Press a look again to flip its R&#8646;B channel swap &mdash; the state shows under its name.</p>
+            <label>HIE glow <input id="glow" type="range" min="0" max="1" step="0.01" value="0" /></label>
+            <p class="note">Film-style halation &mdash; layers onto any look, not only HIE B&amp;W.</p>
+          </section>
+
+          <!-- ===== B&W ===== -->
+          <section class="section" role="tabpanel" id="sec-bw" aria-labelledby="ptab-bw" data-tab="bw" hidden>
+            <button id="bwBtn" type="button" class="toggle full-btn" aria-pressed="false">Black &amp; white</button>
+            <p class="note">Made for 720nm shots. The weights choose how much of each channel becomes brightness &mdash; only their balance matters, not the total. Moving a weight turns Black &amp; white on by itself.</p>
+            <div class="sub-title">Named mixes</div>
+            <div id="bwMixes" class="bw-mixes" role="group" aria-label="Named channel mixes"></div>
+            <div class="sub-title">Channel weights</div>
+            <label>Red weight <input id="bwR" type="range" min="0" max="2" step="0.01" value="1" /></label>
+            <label>Green weight <input id="bwG" type="range" min="0" max="2" step="0.01" value="1" /></label>
+            <label>Blue weight <input id="bwB" type="range" min="0" max="2" step="0.01" value="1" /></label>
+            <p class="note">Tip: while it's on, the Color mixer's Luminance &mdash; and &#10021; Drag on photo to adjust &mdash; brighten or darken each color's grey. Bakes into .cube exports; .dcp can't carry it.</p>
+            <button id="bwReset" type="button">Reset black &amp; white</button>
+          </section>
+
+          <!-- ===== GRADE (Creative) ===== -->
+          <section class="section" role="tabpanel" id="sec-grade" aria-labelledby="ptab-grade" data-tab="grade" hidden>
+            <p class="note">Tint the shadows, midtones and highlights each on their own wheel &mdash; drag the dot out from the centre (direction picks the colour, distance the strength), or use the sliders. Tones color and B&amp;W photos alike.</p>
+            <div id="gradeWheels"></div>
+            <label>Balance <input id="gradeBal" type="range" min="-1" max="1" step="0.01" value="0" /></label>
+            <p class="note">Balance hands more of the picture to the shadow wheel (left) or the highlight wheel (right).</p>
+            <div class="sub-title">Toned mono</div>
+            <div id="tonedMono" class="bw-mixes" role="group" aria-label="Toned mono presets"></div>
+            <p class="note">The classic darkroom tones: each preset switches on Black &amp; white and tints it &mdash; fine-tune on the wheels after.</p>
+            <div class="sub-title">Film grain</div>
+            <label>Grain <input id="grainAmt" type="range" min="0" max="1" step="0.01" value="0" /></label>
+            <label>Grain size <input id="grainSize" type="range" min="1" max="3" step="0.05" value="1.5" /></label>
+            <div class="sub-title">Vignette</div>
+            <label>Vignette <input id="vigAmt" type="range" min="-1" max="1" step="0.01" value="0" /></label>
+            <label>Vignette size <input id="vigMid" type="range" min="0" max="1" step="0.01" value="0.5" /></label>
+            <p class="note">Pull Vignette left to darken the frame's edges, right to lift them; it follows your crop. The wheels bake into .cube exports; grain and vignette stay out (a .cube carries colour only) but do ride saved looks and batch.</p>
+            <button id="gradeReset" type="button">Reset grade</button>
+
+            <hr class="divider" />
+            <div class="sub-title">Custom false color &mdash; channel mixer</div>
+            <p class="note">The full recipe behind the R&#8646;B swap: build each output channel from any blend of the red, green and blue inputs. Start from a preset, then fine-tune. Bakes into .cube and .dcp exports.</p>
+            <div id="mix3Presets" class="bw-mixes" role="group" aria-label="Channel mixer presets"></div>
+            <div id="mix3Grid"></div>
+            <button id="mix3Reset" type="button">Reset channel mixer</button>
+          </section>
+
+          <!-- ===== STICKERS (Creative) ===== -->
+          <section class="section" role="tabpanel" id="sec-stickers" aria-labelledby="ptab-stickers" data-tab="stickers" hidden>
+            <p class="note">Drop something into the scene. Pick a category, tap one to add it, then drag it on the photo. New stickers are matched to your photo automatically &mdash; the channel swap, white balance and grade all reach them, and grain settles over the top &mdash; then fine-tune below.</p>
+            <div id="stickerGroups" class="bw-mixes" role="group" aria-label="Kind of overlay" hidden></div>
+            <div id="stickerCats" class="bw-mixes" role="group" aria-label="Sticker category" hidden></div>
+            <div id="stickerAdd" class="bw-mixes" role="group" aria-label="Add a sticker"></div>
+            <label class="welcome-batch" id="stickerImportBtn" for="stickerImport">Import a picture&hellip;</label>
+            <input id="stickerImport" type="file" accept="image/png,image/*" hidden />
+            <div id="stickerControls" hidden>
+              <div class="sub-title">Selected sticker</div>
+              <label>Size <input id="stkScale" type="range" min="0.05" max="1" step="0.005" value="0.3" /></label>
+              <label>Spin <input id="stkRot" type="range" min="-180" max="180" step="1" value="0" /></label>
+              <div class="sub-title">Match to the photo</div>
+              <button id="stkAutoMatch" type="button">Blend to match the photo</button>
+              <label>Match strength <input id="stkMatchStrength" type="range" min="0" max="1" step="0.01" value="0.85" /></label>
+              <p class="note">Blend to match takes on the colour and contrast of the scene right under the sticker so it sits in the photo. Turn the strength down to keep more of the sticker's own colour, or fine-tune by hand below.</p>
+              <label>Brightness <input id="stkBright" type="range" min="-1" max="1" step="0.01" value="0" /></label>
+              <label>Contrast <input id="stkContrast" type="range" min="-1" max="1" step="0.01" value="0" /></label>
+              <label>Warmth <input id="stkWarmth" type="range" min="-1" max="1" step="0.01" value="0" /></label>
+              <label>Saturation <input id="stkSat" type="range" min="-1" max="1" step="0.01" value="0" /></label>
+              <div class="sub-title">Tuck behind the scene</div>
+              <label>Peek behind <input id="stkOcclude" type="range" min="0" max="1" step="0.01" value="0" /></label>
+              <div id="stkBehind" class="bw-mixes" role="group" aria-label="What the sticker hides behind"></div>
+              <p class="note">Peek behind lets the scene show through the sticker &mdash; slide it up and pick whether it hides behind the <em>bright</em> parts (foliage glows white in infrared) or the <em>dark</em> parts (tree trunks), so it tucks in behind the branches.</p>
+              <div class="sub-title">Paint to blend in</div>
+              <button id="stkBlend" type="button" aria-pressed="false">Paint on the sticker</button>
+              <div id="stkBlendMode" class="bw-mixes" role="group" aria-label="What painting does"></div>
+              <label>Brush size <input id="stkBrushSize" type="range" min="0.03" max="0.5" step="0.005" value="0.15" /></label>
+              <button id="stkBlendClear" type="button">Show the whole sticker again</button>
+              <p class="note">Turn on painting, then draw on the sticker to rub parts away so it tucks behind a branch or foreground &mdash; switch to Bring back to paint them in again. Two fingers on the photo resize and spin the selected sticker.</p>
+              <div class="sub-title">Perspective</div>
+              <button id="stkPersp" type="button" aria-pressed="false">Skew the corners</button>
+              <button id="stkPerspReset" type="button">Reset perspective</button>
+              <p class="note">Turn this on, then drag the sticker's four corners on the photo to set its perspective &mdash; lay it flat on the ground or tilt it so it matches the scene you're dropping it into.</p>
+              <button id="stkDelete" type="button">Remove this sticker</button>
+            </div>
+            <button id="stkClear" type="button" hidden>Clear all stickers</button>
+          </section>
+
+          <!-- ===== WARP (Creative) ===== -->
+          <section class="section" role="tabpanel" id="sec-warp" aria-labelledby="ptab-warp" data-tab="warp" hidden>
+            <p class="note">Push the picture around with your finger. Pick a tool, then drag on the photo &mdash; Push smears, Swirl twists, Pinch draws in and Bloat pushes out. Each drag is one undo.</p>
+            <div id="warpTools" class="bw-mixes" role="group" aria-label="Warp tool"></div>
+            <label>Brush size <input id="warpSize" type="range" min="0.05" max="0.6" step="0.005" value="0.22" /></label>
+            <label>Strength <input id="warpStrength" type="range" min="0.1" max="1" step="0.01" value="0.5" /></label>
+            <p class="note">Warp bends the picture itself, so &mdash; like crop and healing &mdash; it stays with this photo and isn't carried by saved looks, batch or the .cube / .dcp exports.</p>
+            <button id="warpReset" type="button">Reset warp</button>
+          </section>
+
+          <!-- ===== CORRECTIONS ===== -->
+          <section class="section" role="tabpanel" id="sec-corrections" aria-labelledby="ptab-corrections" data-tab="corrections" hidden>
+            <div class="sub-title">Dust &amp; spots</div>
+            <button id="healBtn" type="button" class="toggle" aria-pressed="false">&#8982; Heal spots &mdash; tap the photo</button>
+            <small class="note">Tap a dust spot and it's patched from clean pixels nearby &mdash; the newest fix keeps a highlighted ring, and Spot size resizes it live. Tap any healed spot to remove its fix. Pinch to zoom right in while healing.</small>
+            <label>Spot size <input id="healSize" type="range" min="0.002" max="0.035" step="0.001" value="0.008" /></label>
+            <small class="note">Move the slider before tapping to preview the size in the middle of the view.</small>
+            <button id="healVis" type="button" class="toggle" aria-pressed="false">Visualize spots</button>
+            <small class="note">A high-contrast view that makes dust jump out of flat skies. The photo itself is untouched.</small>
+            <button id="healAuto" type="button">Find spots automatically</button>
+            <button id="healClear" type="button" hidden>Clear all heals</button>
+            <small class="note" id="healStatus"></small>
+            <hr class="divider" />
+            <div class="sub-title">IR lens fixes <span>hot-spot &amp; vignette</span></div>
+            <p class="note">IR-converted lenses often brighten the center (a "hot-spot"). Pull it down with Hot-spot and set its size; use Vignette to correct edge darkening (right) or add it (left).</p>
+            <label>Hot-spot <input id="hotspot" type="range" min="0" max="0.8" step="0.01" value="0" /></label>
+            <label>Hot-spot size <input id="hotspotSize" type="range" min="0.15" max="1" step="0.01" value="0.5" /></label>
+            <label>Vignette <input id="vignette" type="range" min="-1" max="1" step="0.01" value="0" /></label>
+            <div class="subcard">
+              <div class="sub-title">Matched lens profile <span>measured, per-lens</span></div>
+              <small class="note" id="hsStatus">No photo loaded.</small>
+              <label>Strength <input id="hsStrength" type="range" min="0" max="1.5" step="0.01" value="1" /></label>
+              <button id="hsBypassBtn" type="button" class="toggle" aria-pressed="false">Bypass</button>
+              <div id="hsPrompt" hidden>
+                <small class="note">Couldn't identify the lens from EXIF &mdash; pick it so the correction isn't skipped:</small>
+                <label>Lens
+                  <select id="hsLens"></select>
+                </label>
+                <label>Focal length
+                  <select id="hsFL"></select>
+                </label>
+                <button id="hsApplyManual" type="button">Use this lens</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- ===== COLOR ===== -->
+          <section class="section" role="tabpanel" id="sec-color" aria-labelledby="ptab-color" data-tab="color" hidden>
+            <label>Hue shift <input id="hue" type="range" min="-180" max="180" step="1" value="0" /></label>
+            <label>Saturation <input id="sat" type="range" min="0" max="3" step="0.01" value="1" /></label>
+            <label>Contrast <input id="con" type="range" min="0.5" max="2" step="0.01" value="1" /></label>
+            <label>Clarity <input id="clarity" type="range" min="-1" max="1" step="0.01" value="0" /></label>
+            <label>Dehaze <input id="dehaze" type="range" min="-1" max="1" step="0.01" value="0" /></label>
+            <p class="note">Clarity punches up local contrast (midtone structure); Dehaze cuts atmospheric haze (left adds it back for mood).</p>
+            <hr class="divider" />
+            <div class="sub-title">Per-color</div>
+            <p class="note">The boxes follow the subject through a channel swap &mdash; Sky keeps meaning sky. The small text shows the colors each box is grabbing right now.</p>
+            <div class="band">
+              <div class="band-title"><span class="band-sq band-sq-sky" aria-hidden="true"></span>Sky <small id="skyBandSub">(teals &amp; blues)</small></div>
+              <label>Hue <input id="skyHue" type="range" min="-60" max="60" step="1" value="0" /></label>
+              <label>Saturation <input id="skySat" type="range" min="0" max="2" step="0.01" value="1" /></label>
+              <label>Luminance <input id="skyLum" type="range" min="0.5" max="1.5" step="0.01" value="1" /></label>
+            </div>
+            <div class="band">
+              <div class="band-title"><span class="band-sq band-sq-fol" aria-hidden="true"></span>Foliage <small id="folBandSub">(reds &amp; golds)</small></div>
+              <label>Hue <input id="folHue" type="range" min="-60" max="60" step="1" value="0" /></label>
+              <label>Saturation <input id="folSat" type="range" min="0" max="2" step="0.01" value="1" /></label>
+              <label>Luminance <input id="folLum" type="range" min="0.5" max="1.5" step="0.01" value="1" /></label>
+            </div>
+            <button id="pcReset" type="button">Reset per-color</button>
+            <hr class="divider" />
+            <div class="sub-title">Color mixer <span>8 colors</span></div>
+            <p class="note">Pick a color chip, then move just that color. Unlike Sky/Foliage these target the colors as displayed, so they don't follow the channel swap.</p>
+            <div id="hslChips" class="hsl-chips"></div>
+            <button id="hslPick" type="button" class="toggle" aria-pressed="false">&#127919; Pick color from photo</button>
+            <small class="note">Tap the photo and the chip that owns that exact on-screen color selects itself.</small>
+            <button id="hslDrag" type="button" class="toggle" aria-pressed="false">&#10021; Drag on photo to adjust</button>
+            <small class="note">Turn on, then drag on the photo: up/down changes that color's brightness, left/right shifts its hue.</small>
+            <label>Hue <input id="hslHue" type="range" min="-60" max="60" step="1" value="0" /></label>
+            <label>Saturation <input id="hslSat" type="range" min="0" max="2" step="0.01" value="1" /></label>
+            <label>Luminance <input id="hslLum" type="range" min="0.3" max="1.7" step="0.01" value="1" /></label>
+            <button id="hslReset" type="button">Reset color mixer</button>
+          </section>
+
+          <!-- ===== TONE ===== -->
+          <section class="section" role="tabpanel" id="sec-tone" aria-labelledby="ptab-tone" data-tab="tone" hidden>
+            <!-- Channel chips retarget the SAME curve widget + sliders onto the
+                 master curve (All) or one color channel's own curve. Built in
+                 main.ts; ✓-text + aria-pressed state (the mix-chip pattern). -->
+            <div id="toneChans" class="bw-mixes" role="group" aria-label="Curve channel"></div>
+            <!-- viewBox padded 8 units so the corner dots (Blacks, Highlights)
+                 render whole: iOS Safari clips SVG to the viewBox no matter what
+                 CSS overflow says. Keep in sync with TONE_VB in main.ts. -->
+            <svg id="toneSvg" viewBox="-8 -8 116 116" preserveAspectRatio="none" aria-label="Tone curve"></svg>
+            <!-- Global luminance rides on top of the five-point curve: a log-scale
+                 track (0.5–2x) storing a 0..1000 position, neutral 1.0 at 500. -->
+            <label>Luminance <small>(overall)</small> <input id="lum" type="range" min="0" max="1000" step="1" value="500" /></label>
+            <hr class="divider" />
+            <label>Blacks <input id="tone0" type="range" min="-25" max="25" step="0.5" value="0" /></label>
+            <label>Shadows <input id="tone1" type="range" min="-25" max="25" step="0.5" value="0" /></label>
+            <label>Midtones <input id="tone2" type="range" min="-25" max="25" step="0.5" value="0" /></label>
+            <label>Whites <input id="tone3" type="range" min="-25" max="25" step="0.5" value="0" /></label>
+            <label>Highlights <input id="tone4" type="range" min="-25" max="25" step="0.5" value="0" /></label>
+            <p class="note">The channel chips steer just one color's curve &mdash; lift Red's shadows to warm them, drop Blue's highlights to un-cool a sky. All rides every saved look and bakes into .cube exports.</p>
+            <button id="toneReset" type="button">Reset tone</button>
+          </section>
+
+          <!-- ===== MASKS ===== -->
+          <section class="section" role="tabpanel" id="sec-masks" aria-labelledby="ptab-masks" data-tab="masks" hidden>
+            <p class="note">Add a radial, gradient, brush, color or sky mask, target it on the photo, then adjust only that area. Tap a mask to select it.</p>
+            <div class="mask-add">
+              <button id="addRadial" type="button">+ Radial</button>
+              <button id="addLinear" type="button">+ Gradient</button>
+              <button id="addBrush" type="button">+ Brush</button>
+              <button id="addColor" type="button">+ Color</button>
+              <button id="addSky" type="button">+ Sky</button>
+            </div>
+            <p id="maskCount" class="note" aria-live="polite"></p>
+            <div id="maskList" class="mask-list"></div>
+            <div id="maskEditor" hidden>
+              <div id="colorControls" hidden>
+                <small class="note">With Pick on, tap the photo to choose the color to match &mdash; tap again to re-pick. Widen Range to include more shades; Feather softens the edge. Add another Color mask to grade a second color.</small>
+                <div class="mask-editor-actions">
+                  <button id="mColorPick" type="button" class="toggle" aria-pressed="false">&#127919; Pick color</button>
+                  <span id="mColorSwatch" class="color-swatch"></span>
+                  <span id="mColorSwatchText" class="note-inline"></span>
+                </div>
+                <label>Range <input id="mColorRange" type="range" min="0.05" max="1.5" step="0.01" value="0.5" /></label>
+              </div>
+              <div id="brushControls" hidden>
+                <small class="note">Paint on the photo to build the mask. Turn Paint off to pan/zoom.</small>
+                <div class="mask-editor-actions">
+                  <button id="mPaint" type="button" class="toggle" aria-pressed="true">Paint</button>
+                  <button id="mErase" type="button" class="toggle" aria-pressed="false">Erase</button>
+                  <button id="mClearBrush" type="button">Clear paint</button>
+                </div>
+                <label>Brush size <input id="mBrushSize" type="range" min="0.03" max="0.4" step="0.01" value="0.14" /></label>
+              </div>
+              <div id="skyControls" hidden>
+                <small class="note">The sky is found automatically from the top of the photo &mdash; no tapping needed. Reach grows or tightens the selection; Feather softens its edge. Invert to grade everything <em>but</em> the sky.</small>
+                <p id="mSkyStatus" class="note"></p>
+                <label>Reach <input id="mSkyReach" type="range" min="0.5" max="2" step="0.01" value="1" /></label>
+              </div>
+              <label>Brightness <input id="mBrightness" type="range" min="0.3" max="2" step="0.01" value="1" /></label>
+              <label>Contrast <input id="mContrast" type="range" min="0.5" max="2" step="0.01" value="1" /></label>
+              <label>Saturation <input id="mSat" type="range" min="0" max="2" step="0.01" value="1" /></label>
+              <label>Hue <input id="mHue" type="range" min="-60" max="60" step="1" value="0" /></label>
+              <label>Warmth <input id="mWarmth" type="range" min="-1" max="1" step="0.01" value="0" /></label>
+              <label id="mFeatherRow">Feather <input id="mFeather" type="range" min="0.02" max="1" step="0.01" value="0.5" /></label>
+              <div class="mask-editor-actions">
+                <button id="mOutline" type="button" class="toggle" aria-pressed="true" title="Show or hide the mask overlay on the photo">Show mask</button>
+                <button id="mInvert" type="button" class="toggle" aria-pressed="false">Invert</button>
+                <button id="mDelete" type="button">Delete mask</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- ===== EXPORT ===== -->
+          <section class="section" role="tabpanel" id="sec-export" aria-labelledby="ptab-export" data-tab="export" hidden>
+            <label>Format
+              <select id="exFormat">
+                <option value="jpeg">JPEG</option>
+                <option value="tiff">16-bit TIFF</option>
+              </select>
+            </label>
+            <label>Resolution
+              <select id="exScale">
+                <option value="1">Full (native)</option>
+                <option value="0.5">50%</option>
+                <option value="0.25">25%</option>
+              </select>
+            </label>
+            <label id="exQualityRow">Quality <input id="exQuality" type="range" min="0.5" max="1" step="0.01" value="0.92" /></label>
+            <label class="check-row"><input id="exRecipe" type="checkbox" checked /> JPEGs carry their look recipe <small>(anyone opening one here gets offered your look)</small></label>
+            <p id="exWmNote" class="wm-note" hidden>Practice photos export with the small Studio mark in the corner — your own photos never do.</p>
+            <button id="exBtn" type="button" class="primary">Export &amp; Save</button>
+            <small class="note">These Format &amp; Resolution settings also apply to <strong>Batch process</strong> (top bar).</small>
+            <small class="note">JPEGs save as <strong>Display&nbsp;P3</strong> — the exact colors you see here, carried in the wide-gamut container Apple devices use natively. TIFF stays sRGB, the safest hand-off into other editors.</small>
+            <hr class="divider" />
+            <div class="sub-title">My looks <span>saved on this device</span></div>
+            <small class="note">Save the current edit into a slot, then load it back onto any photo later. Slots persist on this device between sessions. Tap <strong>&#8943;</strong> on a slot to name it &mdash; and share it as a link, file, or code.</small>
+            <div id="slotList" class="slot-list"></div>
+            <div class="look-import-row">
+              <button id="lookImportBtn" type="button">Import look file&hellip;</button>
+              <button id="lookPasteBtn" type="button">Paste look code&hellip;</button>
+            </div>
+            <input id="lookFile" type="file" accept=".ipslook,.json,application/json" hidden />
+            <hr class="divider" />
+            <div class="sub-title">Profiles &amp; LUTs <span>your look, reusable</span></div>
+            <label class="check-row"><input id="profWB" type="checkbox" /> Bake current white balance in</label>
+            <button id="cubeBtn" type="button">Export .cube (Photoshop / video)</button>
+            <button id="dcpBtn" type="button">Export .dcp (Lightroom &mdash; beta)</button>
+            <hr class="divider" />
+            <div class="sub-title">Imported LUTs <span>.cube, applied after your grade</span></div>
+            <button id="lutImportBtn" type="button">Import .cube LUT&hellip;</button>
+            <input id="lutFile" type="file" accept=".cube,text/plain" hidden />
+            <div id="lutActive" class="lut-active" hidden>
+              <div class="lut-active-name"><span class="lut-badge">LUT</span> <span id="lutActiveName"></span></div>
+              <label class="lut-strength-row">Strength
+                <input id="lutStrength" type="range" min="0" max="1" step="0.01" value="1" />
+                <span id="lutStrengthVal">100%</span>
+              </label>
+              <button id="lutRemoveBtn" type="button">Remove LUT</button>
+            </div>
+            <div id="lutList" class="lut-list"></div>
+            <small class="note">A LUT recolours the finished image on top of everything above &mdash; in the preview and every export alike. An exported <strong>.cube</strong> includes it baked in; <strong>.dcp</strong> can't carry it. LUTs are stored on this device (sizes shown) &mdash; delete any time. Links and look codes can't carry a LUT; share its .cube file instead.</small>
+          </section>
+
+          <!-- ===== CROP & ROTATE ===== -->
+          <section class="section" role="tabpanel" id="sec-crop" aria-labelledby="ptab-crop" data-tab="crop" hidden>
+            <button id="rotateBtn" class="accent-outline" type="button" aria-label="Rotate 90 degrees clockwise">&#8635; Rotate 90&deg;</button>
+            <button id="flipHBtn" class="accent-outline" type="button" aria-label="Flip horizontal — mirror left and right">&#8646; Flip horizontal</button>
+            <button id="flipVBtn" class="accent-outline" type="button" aria-label="Flip vertical — mirror top and bottom">&#8645; Flip vertical</button>
+            <button id="cropBtn" class="toggle full-btn" type="button" aria-pressed="false" aria-label="Crop">Crop</button>
+            <button id="straightenBtn" class="toggle full-btn" type="button" aria-pressed="false" aria-label="Straighten">Straighten</button>
+            <p class="note">Rotate turns the whole photo 90&deg;; the flips mirror it as you see it. Crop opens a draggable box &mdash; with aspect presets (1:1, 4:5&hellip;) on the bottom pill. Straighten levels the horizon with a slider. Crop and Straighten each open on their own &mdash; tap &ldquo;Done&rdquo; to apply.</p>
+          </section>
+
+          <div id="panelDown" class="scroll-cue down" hidden><span>&#9660;</span></div>
+        </div>
+      </aside>
+    </div>
+
+    <div id="unsupported" hidden>
+      <div class="unsupported-card">
+        <h2>This browser can't run the editor</h2>
+        <p>The live photo preview needs <strong>WebGL2</strong>, which this browser doesn't provide.</p>
+        <p><strong>Options:</strong></p>
+        <ul>
+          <li>On iPhone/iPad: update to <strong>iOS 15 or later</strong> and use Safari.</li>
+          <li>On a computer or Android: use a current <strong>Chrome, Edge, Firefox or Safari</strong>.</li>
+          <li>Opened from inside another app (Instagram, a chat)? Use its <strong>&#8943; menu &rarr; Open in browser</strong>.</li>
+        </ul>
+        <p>Nothing to install and no account — it just needs a current browser.</p>
+      </div>
+    </div>
+
+    <dialog id="busy" aria-label="Working">
+      <div class="busy-card">
+        <div class="spinner" id="busySpinner"></div>
+        <p id="busyText" role="status" aria-live="polite" aria-atomic="true">Exporting…</p>
+        <button id="busyStop" type="button" hidden>Stop &amp; save what's done</button>
+        <div id="busyActions" hidden>
+          <button id="busySave" type="button" class="primary">Save image</button>
+          <button id="busyContinue" type="button" hidden>Continue</button>
+          <button id="busyClose" type="button">Close</button>
+        </div>
+      </div>
+    </dialog>
+
+    <!-- The example library: the COMPLETE practice set (tutorial tiles
+         included, one honest whole) in its own full-screen place, grouped by
+         scene. Sections built in main.ts from LIBRARY_GROUPS. -->
+    <dialog id="library" aria-label="Practice library">
+      <div class="ql-head">
+        <div class="ql-title">
+          <h2 class="ql-h">Practice library</h2>
+          <span id="libCount"></span>
+        </div>
+        <div class="ql-actions">
+          <button id="libClose" type="button" class="ql-btn">Close</button>
+        </div>
+      </div>
+      <div id="libBody" class="lib-body"></div>
+    </dialog>
+
+    <dialog id="quickLook" aria-label="Quick look">
+      <div class="ql-head">
+        <div class="ql-title">
+          <h2 class="ql-h">Quick look</h2>
+          <span id="qlCount"></span>
+        </div>
+        <div class="ql-actions">
+          <button id="qlSelectToggle" type="button" class="ql-btn" hidden>Select none</button>
+          <button id="qlKeep" type="button" class="ql-btn ql-keep" disabled>Keep in a session &rarr;</button>
+          <button id="qlClose" type="button" class="ql-btn">Close</button>
+        </div>
+      </div>
+      <div id="qlGrid" class="ql-grid"></div>
+    </dialog>
+
+    <dialog id="batchDlg">
+      <h2>Batch process — what goes on every photo?</h2>
+      <p class="batch-lead">Each photo is auto-balanced on its own (white balance, exposure, denoise, lens fix) — you're choosing the <em>creative grade</em> that goes on top. The set comes back as one .zip.</p>
+      <div class="batch-group" id="bgCurrent">
+        <button class="batch-choice" id="bcCurrent" type="button">
+          <strong>Your current edit</strong>
+          <small>The grade dialled in on the photo that's open right now</small>
+        </button>
+        <p class="batch-none" id="bcNoCurrent" hidden>No photo is open, so there's no current edit to copy — pick a look below, or open a photo first and dial one in.</p>
+      </div>
+      <div class="batch-group">
+        <p class="batch-group-title">A saved look <small>(My looks)</small></p>
+        <div class="batch-choices" id="bcSlots"></div>
+        <p class="batch-none" id="bcNoSlots" hidden>No saved looks yet. To make one: open a photo, dial in a grade you like, then save it in the <strong>My looks</strong> panel — it'll be waiting here.</p>
+      </div>
+      <div class="batch-group">
+        <p class="batch-group-title">A built-in look</p>
+        <div class="batch-choices" id="bcLooks"></div>
+      </div>
+      <div class="batch-group">
+        <button class="batch-choice" id="bcAuto" type="button">
+          <strong>Auto-balance only — no look</strong>
+          <small>Just each photo properly white-balanced &amp; exposed. Perfect for a quick look at a whole folder to see what you've got.</small>
+        </button>
+        <p class="batch-none">Only want to <em>see</em> the folder, not save a .zip? <button id="bcQuick" type="button" class="batch-link">Quick look instead &rarr;</button> — a live grid of previews, nothing written to disk.</p>
+      </div>
+      <p class="batch-note">Format &amp; Resolution come from the <strong>Export</strong> panel<span id="bcFmt"></span>.</p>
+      <button id="batchCancel" type="button">Cancel</button>
+    </dialog>
+
+    <!-- Custom crop aspect ratio entry (the Custom… chip). -->
+    <dialog id="ratioDlg">
+      <h2>Custom aspect ratio</h2>
+      <p class="note">Width to height, as the crop should come out &mdash; e.g. 7 : 5. Ratios up to 5:1 either way.</p>
+      <div class="ratio-entry">
+        <input id="ratioW" type="number" inputmode="decimal" min="0.1" max="999" step="any" aria-label="Ratio width" />
+        <span aria-hidden="true">:</span>
+        <input id="ratioH" type="number" inputmode="decimal" min="0.1" max="999" step="any" aria-label="Ratio height" />
+        <button id="ratioSwap" type="button" aria-label="Swap width and height">&#8646;</button>
+      </div>
+      <p id="ratioErr" class="note look-hint" role="status" aria-live="polite" hidden>That ratio can't be used &mdash; both numbers must be positive, and no steeper than 5:1 either way.</p>
+      <button id="ratioApply" type="button" class="primary">Apply</button>
+      <button id="ratioCancel" type="button">Cancel</button>
+    </dialog>
+
+    <!-- Look sharing: name & share a saved look (per-slot ⋯ button). -->
+    <dialog id="lookDlg" aria-labelledby="lookDlgTitle">
+      <h2 id="lookDlgTitle">Name &amp; share</h2>
+      <p class="note">The whole grade travels in a small link, file, or code &mdash; no account, nothing uploaded. The link opens the editor with your look ready to try.</p>
+      <label class="look-name-row">Name
+        <input id="lookName" type="text" maxlength="60" autocomplete="off" placeholder="e.g. Dusk Aerochrome" />
+      </label>
+      <p id="lookNameHint" class="note look-hint" role="status" hidden>Add a name so your friend knows what it is &mdash; or tap share again to send it unnamed.</p>
+      <p id="lookLutNote" class="note look-hint" hidden>This look uses an imported LUT. Links, files and codes carry the grade only &mdash; the LUT travels as its own .cube file. Share both.</p>
+      <button id="lookLutShare" type="button" hidden>Share LUT .cube file</button>
+      <button id="lookShareLink" type="button" class="primary">Share link</button>
+      <button id="lookShareFile" type="button">Share as file (.ipslook)</button>
+      <button id="lookCopyCode" type="button">Copy look code</button>
+      <button id="lookShowQr" type="button">Show QR code</button>
+      <div id="lookQrBox" hidden>
+        <canvas id="lookQrCanvas" role="img" aria-label="QR code of this look's link"></canvas>
+        <p class="note look-hint">Scan with any phone camera &mdash; the link opens the editor with this look ready to try.</p>
+        <button id="lookSaveQr" type="button">Save QR image</button>
+      </div>
+      <textarea id="lookCodeOut" class="look-code" rows="4" readonly hidden aria-label="Look code — copy it by hand"></textarea>
+      <button id="lookDlgClose" type="button">Close</button>
+    </dialog>
+
+    <!-- Look sharing: import a pasted link / code / raw look JSON. -->
+    <dialog id="lookPasteDlg">
+      <h2>Paste a look code</h2>
+      <p class="note">Paste a look link or code someone sent you.</p>
+      <textarea id="lookPasteIn" class="look-code" rows="4" aria-label="Look link or code" placeholder="Paste here&hellip;"></textarea>
+      <p id="lookPasteErr" class="note look-hint" role="status" aria-live="polite" hidden>That doesn't look like a look link or code &mdash; check it copied completely.</p>
+      <button id="lookPasteApply" type="button" class="primary">Import</button>
+      <button id="lookPasteClose" type="button">Cancel</button>
+    </dialog>
+
+    <!-- Look sharing: a look arrived (link, file, or pasted code). -->
+    <dialog id="lookRecvDlg" aria-labelledby="lookRecvTitle">
+      <h2 id="lookRecvTitle">Untitled look</h2>
+      <p class="note">Someone shared a color grade. <strong>Try</strong> puts it on your open photo &mdash; your white balance, exposure, crop, masks and spot fixes stay untouched, and one Undo removes it.</p>
+      <button id="lookRecvTry" type="button" class="primary">Try on this photo</button>
+      <p id="lookRecvNoPhoto" class="note" hidden>No photo is open, so there's nothing to try it on &mdash; save it below and load it onto any photo later.</p>
+      <button id="lookRecvSave" type="button">Save to My looks&hellip;</button>
+      <div id="lookRecvSlots" class="look-recv-slots" hidden></div>
+      <button id="lookRecvClose" type="button">Not now</button>
+    </dialog>
+
+    <dialog id="infoDlg">
+      <div class="dlg-cue up" id="infoCueUp" hidden aria-hidden="true">&#9650;</div>
+      <h2>What's new</h2>
+      <p id="infoVer" class="info-ver"></p>
+      <ul id="changeList"></ul>
+      <p class="more-row">
+        <a href="./notes.html" target="_blank" rel="noopener">More &mdash; earlier versions &rarr;</a>
+      </p>
+      <h3 class="rm-head">Roadmap</h3>
+      <ul id="roadmapList" class="roadmap"></ul>
+      <p class="more-row">
+        <a href="./notes.html#roadmap" target="_blank" rel="noopener">More &mdash; the full roadmap &rarr;</a>
+      </p>
+      <p class="more-row">
+        <a href="./privacy.html" target="_blank" rel="noopener">Privacy &mdash; everything stays on your device &rarr;</a>
+      </p>
+      <p class="coffee-row">&#9749; Enjoying this? Leave a tip:
+        <a id="venmo" class="coffee" target="_blank" rel="noopener" hidden>Venmo</a>
+      </p>
+      <h3 class="rm-head" id="settingsHead">Settings</h3>
+      <div class="set-row">
+        <button id="forceUpdate" type="button">Update to the latest version</button>
+        <small class="note" id="forceUpdateNote">Checks for a new version and reloads &mdash; use this if a new feature or fix hasn&rsquo;t shown up yet. No need to close the app.</small>
+      </div>
+      <p class="theme-row"><button id="themeToggle" type="button"></button></p>
+      <div class="set-row">
+        <button id="setLocTip" type="button" class="toggle" aria-pressed="true"><span aria-hidden="true">&#128752;</span> Location tip</button>
+        <small class="note">Shows a tip on the photo when the opened file carries location data (GPS), with one-tap ways to save the file without it.</small>
+      </div>
+      <div class="set-row">
+        <button id="setLocStrip" type="button" class="toggle" aria-pressed="false">Remove location when a photo opens</button>
+        <small class="note">Cleans the app's working copy the moment a photo opens. Your original file keeps its location until you save a clean version from the &#128752; tip.</small>
+      </div>
+      <button id="infoClose" type="button">Close</button>
+      <div class="dlg-cue down" id="infoCueDown" hidden aria-hidden="true">&#9660;</div>
+    </dialog>
+
+    <dialog id="askDlg" aria-labelledby="askTitle">
+      <h2 id="askTitle"></h2>
+      <p id="askBody" class="note ask-body"></p>
+      <button id="askOk" type="button" class="primary"></button>
+      <button id="askCancel" type="button"></button>
+    </dialog>
+
+    <dialog id="locDlg" aria-labelledby="locDlgTitle">
+      <h2 id="locDlgTitle"><span aria-hidden="true">&#128752;</span> Location is saved in this photo</h2>
+      <p id="locDlgBody" class="note"></p>
+      <button id="locSave" type="button">Save without location</button>
+      <button id="locSaveCopy" type="button">Save a copy without location</button>
+      <p class="note">Both open the save sheet, so <strong>you choose where it goes</strong>. Your edit here isn't touched, and images exported from the editor never include location.</p>
+      <p class="note">In <strong>Settings</strong> (behind the &#9432; button): hide this tip, or have location removed automatically whenever a photo opens.</p>
+      <button id="locSettings" type="button">Open Settings</button>
+      <button id="locDlgClose" type="button">Close</button>
+    </dialog>
+
+    <dialog id="helpDlg">
+      <h2>How to use Infrared Photography Studio</h2>
+      <div class="help-body">
+        <button id="helpTutorials" type="button" class="help-tutorials">&#9654;&#xFE0E; Tutorials — learn by doing on real infrared photos</button>
+        <h3>Quick start</h3>
+        <ol>
+          <li><strong>Open image(s)</strong> (or pick a practice photo). RAW — NEF or DNG — unlocks the full color range.
+          Pick several and they become a <strong>session</strong>: a strip of previews along the bottom, tap to switch,
+          each photo keeping its own edit — held safely, so a closed tab offers to <em>Resume</em> right where you were
+          (masks and imported LUTs are the two things a resume can't restore — they reset with a fresh open;
+          re-apply a LUT in a tap from Profiles &amp; LUTs).
+          <strong>Done</strong> (on the strip) ends the session and frees the space.</li>
+          <li><strong>Quick look a folder</strong> (start screen) when you just want to <em>see</em> what's in a set:
+          an instant grid of auto-balanced previews, nothing saved. Tap the keepers and <strong>Keep in a session</strong>
+          sends them straight into an editable session.</li>
+          <li>On open, the app <strong>automatically</strong> sets white balance, exposure and denoise from the photo itself.</li>
+          <li><strong>Tap foliage</strong> in the photo to fine-tune white balance — the classic IR move.</li>
+          <li>Pick a <strong>Look</strong>, adjust sliders to taste, then <strong>Export &amp; Save</strong>.</li>
+        </ol>
+
+        <h3>Gestures</h3>
+        <ul>
+          <li><strong>Tap</strong> the photo — set white balance from that point (aim at foliage). While a picture tool is armed — Heal, a color pick, brush painting or drag-to-adjust — that tool takes the tap instead.</li>
+          <li><strong>Pinch</strong> — zoom (up to 8&times;); drag to pan while zoomed.</li>
+          <li><strong>Press &amp; hold</strong> the photo (or the <em>Hold: Original</em> button) — compare with the original.</li>
+        </ul>
+
+        <h3>Top bar</h3>
+        <ul>
+          <li><strong>Undo / Redo</strong> — step back and forward through your edit, one gesture per step. A fresh edit after an undo starts a new path forward.</li>
+          <li><strong>Reset</strong> — the whole edit returns to how the photo first opened (the automatic balance).</li>
+          <li><strong>Histogram</strong> — a live RGB + luminance readout floating over the photo. Tap the histogram itself to tuck it away; the button brings it back.</li>
+        </ul>
+
+        <h3>Looks &amp; adjustments</h3>
+        <p>Looks are one-tap recipes; every slider stays live afterwards so you can push further.
+        Looks tagged <span class="badge">R&#8646;B</span> use the <strong>red&#8646;blue channel swap</strong> —
+        the move that makes IR sky blue and foliage red/gold. Toggle the swap button to see its effect on any look.
+        <strong>HIE glow</strong> is film-style halation — the HIE B&amp;W look uses it, and the slider layers it onto any other look too.</p>
+        <p><strong>Black &amp; white</strong> (its own B&amp;W tab) — made for 720nm shots — turns the photo mono, with
+        weight sliders (or a named mix) choosing how much of each channel becomes brightness. While it's on, the Color
+        mixer's Luminance and <em>Drag on photo to adjust</em> brighten or darken each color's grey, like a classic
+        B&amp;W mix. It rides saved looks and bakes into .cube exports (.dcp can't carry it).</p>
+        <p><strong>Per-color</strong> moves the Sky and Foliage color bands independently — e.g.
+        Aerochrome, then Sky hue +40 for a deeper sky without touching the trees. The bands follow the
+        subject through a channel swap (Sky keeps meaning sky); the small text under each box shows the
+        colors it's grabbing right now.</p>
+        <p><strong>Share a look</strong> from any My-looks slot (the &#8943; button): a link, a small
+        .ipslook file, a paste-able code, or a <strong>QR code</strong> to scan in person — the whole grade
+        travels inside, nothing is uploaded. Exported <strong>JPEGs carry their look recipe</strong> too
+        (switch it off in Export if you prefer): anyone opening one here is offered your look. Honest
+        caveat: apps that recompress images — Photos edits, Messages optimization, social uploads — strip
+        the recipe; a link, file, code or QR always survives.</p>
+
+        <h3>Which color tool when?</h3>
+        <p>The color tools stack from broadest to most surgical — reach for the smallest one that does the job:</p>
+        <ul>
+          <li><strong>Channel swap</strong> — flips the whole color world at once (red&#8646;blue). The IR move.</li>
+          <li><strong>Hue shift</strong> — rotates <em>every</em> color together, as far as you like. Use this for big moves: getting a color family into the right neighborhood.</li>
+          <li><strong>Per-color (Sky / Foliage)</strong> — each box owns half the color wheel, and they follow the swap.</li>
+          <li><strong>Color mixer</strong> — eight chips for surgery on one color. Use <em>Pick color from photo</em>: tap the button, tap the photo, and the chip owning that exact on-screen color selects itself.</li>
+        </ul>
+        <p>A mixer chip bends only its own neighborhood on purpose: photos hold smooth color gradients
+        (a sky drifts from cyan to blue), and nearby colors must land near each other or those gradients
+        tear into visible bands. That's why a chip's Hue reaches &plusmn;60&deg; and fades toward its
+        neighbors — it's what keeps the adjustment invisible-clean. When one chip's reach isn't enough,
+        make the big move with <strong>Hue shift</strong> first, then finish with the chip.</p>
+
+        <h3>Grade — wheels, toned mono, grain &amp; vignette</h3>
+        <p>The Grade tab tints the picture by brightness instead of by color: one wheel each for
+        <strong>Shadows</strong>, <strong>Midtones</strong> and <strong>Highlights</strong>. Drag a
+        wheel's dot out from the centre — direction picks the colour, distance the strength — or use
+        each wheel's Hue and Amount sliders (same control, keyboard-friendly). <strong>Balance</strong>
+        hands more of the picture to the shadow or highlight wheel. The classic move: highlights toward
+        gold, shadows toward blue.</p>
+        <p>The wheels tone Black &amp; white frames too — that's the <strong>Toned mono</strong> row:
+        Sepia, Selenium, Cyanotype, Gold and Split switch on B&amp;W and tint it like the darkroom
+        papers they're named for.</p>
+        <p>The <strong>Channel mixer</strong> is the full recipe behind the R&#8646;B swap: build each
+        output channel (red, green, blue) from any blend of the three inputs. Start from a preset —
+        Aerochrome, Copper, a channel Rotate — then fine-tune the nine sliders for invented false-color
+        palettes. Unlike grain and vignette, the mixer is pure color: it bakes into both .cube and .dcp
+        exports.</p>
+
+        <h3>Stickers &mdash; UFOs in the trees <span class="lut-badge">Beta</span></h3>
+        <p>In the <strong>Stickers</strong> tab, tap a saucer, alien, Saturn or beam to drop it on the
+        photo, then drag it into place. Stickers composite into the picture <em>before</em> the infrared
+        processing, so they take on your photo's colors &mdash; the channel swap and white balance reach
+        them &mdash; and grain settles over the top. <strong>Peek behind</strong> lets the scene show
+        through: pick whether the sticker hides behind the bright parts (glowing foliage) or the dark
+        parts (tree trunks), so a saucer can tuck in behind the branches. Size and Spin shape it; Remove
+        or Clear all start over. Stickers stay with the one photo &mdash; they aren't carried by saved
+        looks, batch, or the .cube / .dcp exports.</p>
+        <p><strong>Grain</strong> adds film texture (Size sets how coarse), and <strong>Vignette</strong>
+        darkens (left) or lifts (right) the frame's edges — it follows your crop, unlike the Corrections
+        vignette, which fixes the lens on the full frame. Everything here rides saved looks, sessions and
+        batch. Exports: the wheels bake into .cube files; grain and vignette don't (a .cube carries colour
+        only) — and .dcp can't carry any of it.</p>
+
+        <h3>Warp &mdash; bend the picture <span class="lut-badge">Beta</span></h3>
+        <p>The <strong>Warp</strong> tab pushes the picture around with your finger. Pick a tool and
+        drag on the photo: <strong>Push</strong> smears pixels along your stroke, <strong>Swirl</strong>
+        twists them, <strong>Pinch</strong> draws them inward and <strong>Bloat</strong> pushes them out.
+        Brush size sets how much each drag grabs, Strength how hard; every drag is one undo, so
+        experiment freely and Reset warp when you want the picture back. Like crop and healing, warp
+        bends the picture itself, so it stays with this photo &mdash; it isn't carried by saved looks,
+        batch or the .cube / .dcp exports.</p>
+
+        <h3>Light &amp; area tools</h3>
+        <ul>
+          <li><strong>Clarity</strong> — punches up local structure (or softens, pulled left). <strong>Dehaze</strong> — cuts the veil that flattens distant subjects; brightness-only, so colors stay put.</li>
+          <li><strong>Sharpen</strong> &amp; <strong>Texture</strong> (Basic) — Sharpen crisps fine edges; Texture works the mid-size surface structure (left smooths it). Both are luminance-only, so colors never shift.</li>
+          <li><strong>Tone curve + Luminance</strong> — the curve shapes blacks through highlights; Luminance lifts or drops the whole image without clipping either end.</li>
+          <li><strong>Masks</strong> — radial, gradient, painted brush, tap-a-color, or automatic sky: local adjustments for one area only. Masks belong to the photo; saved looks stay portable.</li>
+          <li><strong>Dust &amp; spots</strong> (Corrections tab) — arm <em>Heal spots</em> and tap a dust mote: it's patched from clean pixels nearby, in the preview and the export alike. <em>Visualize spots</em> makes dust jump out of flat skies; <em>Find spots automatically</em> sweeps the smooth areas, heals what it finds, and rings every fix for review &mdash; tap a ring to put that one back. Heals belong to the photo — they never ride in saved looks, profiles or a batch.</li>
+          <li><strong>IR lens fixes</strong> (Corrections tab) — pulls down the center hot-spot IR-converted lenses produce, and corrects (or adds) corner vignette.</li>
+          <li><strong>Crop &amp; rotate</strong> (panel tab) — three one-tap tools, each with its own <em>Done</em>: <strong>Rotate 90&deg;</strong> turns the whole photo; <strong>Crop</strong> shows the box with a rule-of-thirds grid — drag a corner to resize, drag the photo to slide it under the box; <strong>Straighten</strong> adds a fine alignment grid and a degree slider — line a horizon up against the grid (the crop auto-shrinks so no empty corner shows). Pinch to zoom the view while either tool is open. A view onto the photo, not a re-bake — masks and healed spots stay exactly where they are underneath. Composition-specific: never rides in saved looks, profiles or a batch.</li>
+        </ul>
+
+        <h3>Profiles &amp; LUTs</h3>
+        <p><strong>.cube</strong> bakes your color look for Photoshop/video apps &mdash; including any imported LUT,
+        so the file is your full on-screen look. You can also <strong>import</strong> any .cube LUT and blend it over
+        your grade with a strength slider; a saved look remembers its LUT, and it rides into Batch process too.
+        <strong>.dcp</strong> is a Lightroom camera profile (beta) &mdash; it can't carry imported LUTs (it's a camera
+        profile, not a look file). Denoise, glow, sharpen, texture, clarity, dehaze, masks and heals are spatial effects and can't ride along in profiles.</p>
+
+        <h3>Works with</h3>
+        <p>JPEG/PNG from any camera &middot; HEIC (in Safari) &middot; RAW from any Bayer-sensor camera converted to DNG
+        (free Adobe DNG Converter, or Lightroom's Convert to DNG) &middot; Nikon NEF natively
+        (classic compressed; not High-Efficiency — Z8/Z9 and the Z50&nbsp;II's HE&#8202;/&#8202;HE* files need converting to DNG first) &middot; Fujifilm X-Trans not supported.
+        Tuned on an IR-converted Nikon Z50.
+        Saves: <strong>JPEG in Display&nbsp;P3</strong> (the exact colors you see, wide-gamut tagged) and <strong>16-bit TIFF in sRGB</strong> (the safest hand-off into other editors).
+        Exports keep the photo's <strong>capture date, camera, lens and exposure</strong> (when the original carries them) — never its location.</p>
+
+        <h3>Batch process — develop a whole set at once</h3>
+        <p><strong>Open image(s)</strong> is for <em>editing</em> (one photo, or a few as a session);
+        <strong>Batch process</strong> is for <em>output</em> — it develops a whole set unattended and hands you a .zip.
+        Tap it (in the top bar next to <em>Open image(s)</em>, or on the start screen) and it first asks
+        <em>what goes on every photo</em>: <strong>your current edit</strong> (the grade on screen — offered only when
+        a photo is open), <strong>a saved look</strong> from My looks, <strong>a built-in look</strong> (Aerochrome,
+        Goldie, B&amp;W IR…), or <strong>Auto-balance only</strong> — no look at all, just each photo properly
+        white-balanced and exposed, which is the quickest way to preview a whole folder and see what you've got.
+        Then pick the files. Each photo is auto-balanced on its own (its own white balance, exposure, denoise and
+        lens hot-spot fix) with the chosen grade layered on top. The set comes back as one <strong>.zip</strong>
+        you save in a single tap, at the Format and Resolution set in Export. (White balance is per-photo, so this is
+        for a shoot in one style; the exact frame on screen isn't copied pixel-for-pixel.)</p>
+        <p><strong>What rides along, and what doesn't:</strong> a batch carries the <em>creative</em> look only.
+        <strong>Masks</strong> (radial, gradient, brush) and the <strong>IR lens fixes</strong> sliders —
+        Hot-spot, its size, and Vignette — are tied to one specific frame, so they do <em>not</em> carry into a
+        batch. Instead every photo gets its <em>own</em> hot-spot correction chosen from its EXIF lens; a photo whose
+        lens isn't in the EXIF is processed without that fix, and the finish summary counts how many that was
+        (RAW frames skip it too — the hot-spot profiles are JPEG-only for now).</p>
+        <p>Every finished photo is <strong>saved to the app's own storage as it completes</strong>, so nothing is
+        ever lost: you can <strong>stop mid-run</strong> and keep what's done, tap <strong>Continue</strong> to
+        resume the rest, and if the app ever crashes or is closed mid-batch, the start screen offers to
+        <strong>recover</strong> the finished images next time you open it. If the device runs out of storage
+        mid-batch, it stops the same gentle way — save the <strong>.zip</strong> to free space, then Continue.</p>
+
+        <h3>Install as an app — one, two, or three</h3>
+        <p>On iPad/iPhone: open the page you want to install, tap Safari's <strong>Share</strong> button
+        (the square with the arrow), then <strong>Add to Home Screen</strong>. You get a full-screen app
+        with its own icon that works offline. On Android/Chrome, use the browser's <strong>Install app</strong>
+        menu entry.</p>
+        <div class="from-app" id="irInstallFromApp" hidden>
+          <p><strong>You're in the installed app right now</strong> — it has no Safari Share button,
+          and links can't leave the app either, so Add to Home Screen can't be reached from here.
+          <button type="button" class="inline-btn" data-copy="./ir.html">Copy the Infrared link</button>
+          then open <strong>Safari</strong>, paste it in the address bar, and tap
+          <strong>Share → Add to Home Screen</strong> there.</p>
+        </div>
+        <p>Infrared and <strong>Macro Studio</strong> are separate tools under one <strong>Studio</strong> launcher
+        (the <span aria-hidden="true">‹</span> in the top-left goes back to it), and you choose what to install:</p>
+        <ul>
+          <li><strong>This tool alone</strong> — install from here and its icon opens straight into the Infrared editor, no menu.</li>
+          <li><strong>The whole Studio</strong> — install from the <span aria-hidden="true">‹</span>&nbsp;Studio launcher instead: one icon, then pick Infrared or Macro each time.</li>
+          <li><strong>Both, or all three</strong> — install any mix; each is independent, so the Infrared app never carries the Macro engine and vice-versa.</li>
+        </ul>
+        <p>You can add or remove any of them later — installing one never blocks the others.</p>
+
+        <h3>Tips</h3>
+        <ul>
+          <li>Import from <strong>Files</strong>, not the Photo Library — iOS silently converts RAW to JPEG there. A zipped RAW also works.</li>
+          <li>Scenes with big empty dark skies take more Contrast; scenes with shadow detail (roads, dark trees) look best gentle.</li>
+          <li>720nm-filter shots are near-monochrome by nature — that's what B&amp;W IR, Sepia IR and HIE B&amp;W are for.</li>
+          <li>A <strong>&#128752; Location saved</strong> tip appears when the opened file carries GPS location — tap it to save the file (or a copy) without it. In <strong>Settings</strong> (&#9432;) you can hide the tip or have location removed automatically on open. Exports from the editor never include location.</li>
+        </ul>
+      </div>
+      <button id="helpClose" type="button">Close</button>
+    </dialog>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
