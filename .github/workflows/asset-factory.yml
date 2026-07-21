@@ -99,7 +99,7 @@ jobs:
           git config user.email "noreply@anthropic.com"
           git checkout --orphan review-tmp
           git reset
-          git add -f asset-factory/review
+          git add -f asset-factory/review asset-factory/database/catalog
           git commit -m "Review batch: ${{ inputs.category }} (run ${{ github.run_id }})"
           git push -f origin review-tmp:claude/asset-factory-review
 
