@@ -85,8 +85,8 @@ jobs:
         run: node cli.mjs stats ${{ inputs.category && format('--category {0}', inputs.category) || '' }}
 
       # Publish the approved batch as viewable PNGs + a contact sheet, then push
-      # them to a throwaway branch. A session reads them back over the GitHub API
-      # (the artifact blob host is egress-blocked) and hands them to the owner.
+      # them (and the updated catalog) to a throwaway branch. A session reads them
+      # back over the GitHub API (the artifact blob host is egress-blocked).
       - name: Publish review batch
         if: ${{ inputs.confirm }}
         working-directory: asset-factory
@@ -99,7 +99,7 @@ jobs:
           git config user.email "noreply@anthropic.com"
           git checkout --orphan review-tmp
           git reset
-          git add -f asset-factory/review
+          git add -f asset-factory/review asset-factory/database/catalog
           git commit -m "Review batch: ${{ inputs.category }} (run ${{ github.run_id }})"
           git push -f origin review-tmp:claude/asset-factory-review
 
