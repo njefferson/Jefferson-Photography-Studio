@@ -1,3 +1,20 @@
+# CLAUDE.md — Jefferson-Photography-Studio
+
+> **Inherits the [Universal App Doctrine](https://github.com/njefferson/noahjefferson/blob/main/DOCTRINE.md)**
+> (canonical copy: `DOCTRINE.md` in the noahjefferson hub). Single source of truth
+> for the rules shared across all of Noah's apps — product values, taste,
+> accessibility, honesty, verification, release discipline & taxonomy, licensing
+> (PolyForm Noncommercial), privacy, and the permanent **AskUserQuestion ban** (§0).
+> **Where anything below overlaps the Doctrine, the Doctrine wins.** The rest of
+> this file is repo-specific.
+>
+> **Repo metadata is a manual step — call it out and confirm** (Doctrine §10):
+> GitHub description / website / topics / social-preview cannot be set by the
+> session token. List the exact values, ask Noah to confirm each is done, and
+> never report the repo "set up" while any is unconfirmed.
+
+---
+
 # Standing rules for Claude sessions on this repo
 
 Auto-loaded into every session. **Read `NOTES.md` before doing anything** — it
