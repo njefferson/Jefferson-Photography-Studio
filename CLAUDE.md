@@ -79,6 +79,26 @@ before any UI release, alongside the other walks. NOTES.md "## Accessibility
 standing rule" holds the full audit record and the NEVER-CHURN list of
 patterns already verified correct — do not "fix" those, do not regress them.
 
+## INFRARED first — never reason from visible-light defaults (owner, 2026-07-25)
+This app processes INFRARED and full-spectrum photography ONLY. Every
+processing judgment starts from IR physics: red-channel flood, white balance
+far beyond visible norms, daylight-only shooting, hotspots, false-color
+pipelines. A frame that looks wrong by ordinary-photo intuition — "too dark",
+"too red", an alien histogram — is IR-NORMAL until proven otherwise;
+diagnose against IR references and the file's own metadata, never against
+visible-light expectations. (A bright IR daytime frame was misdiagnosed as
+"a twilight scene" from exactly this error; the real bug was a decode level.)
+
+## Known things first — mine the references before implementing (owner, 2026-07-25)
+Raw processing is a solved field; the owner is not the discovery mechanism
+for lessons it learned twenty years ago. Before implementing ANY raw
+behavior (levels, curves, matrices, highlight handling, metadata), find what
+dcraw/LibRaw and the DNG spec do and what the FILE ITSELF carries — black
+lives in NEF MakerNote 0x003D, white in the linearization curve, Adobe's
+levels in DNG tags 50714/50717. Deviating from reference behavior requires a
+written reason in NOTES. Every lesson in this file was paid for on-device;
+do not buy any of them twice.
+
 ## What opens applies (owner ruling, 2026-07-25 rev. 2 — supersedes "nothing")
 The blanket "nothing at open" was a stabilization measure, not the product.
 The product: open applies an automatic, VISIBLE, UNDOABLE baseline of edit
