@@ -79,6 +79,20 @@ before any UI release, alongside the other walks. NOTES.md "## Accessibility
 standing rule" holds the full audit record and the NEVER-CHURN list of
 patterns already verified correct — do not "fix" those, do not regress them.
 
+## Nothing is applied at photo open (owner ruling, 2026-07-25 — FINAL)
+A photo opens exactly as decoded: WB [1,1,1], exposure 1, denoise 0, no
+automatic repairs of any kind. Every adjustment is an explicit control,
+default neutral (Auto, Auto WB, tap-WB, the Recover-highlights slider). Never
+reintroduce an automatic at-open adjustment, however helpful. Doctrine §14
+has the full rule and the history that earned it; NOTES.md holds the ledger.
+
+## Adding an EditParams field — FIVE places or undo silently breaks
+cloneParams, applySnapshot, syncFromUI, syncToUI, AND the input-listener
+array in main.ts. applySnapshot restores fields INDIVIDUALLY — a field
+missing there is silently dropped by Undo/Reset (bit us on `recover`,
+2026-07-25). Also decide explicitly whether the field rides SavedLook
+(creative grade) or is per-shot corrective (excluded, like WB).
+
 ## Verify before claiming fixed
 - Headless Chromium harness: `npm install --no-save esbuild playwright-core`;
   the browser binary is the `/opt/pw-browsers/chromium` symlink.
@@ -89,6 +103,12 @@ patterns already verified correct — do not "fix" those, do not regress them.
 - Make a new test FAIL once before trusting it.
 - When a result looks absurd, suspect the instrument first.
 - Walk the primary user journey from the start screen before any handoff.
+- FULL-FRAME renders on EVERY verification round of any pixel-pipeline change
+  — crops hid the orange sky (2026-07-25). Decode changes additionally sweep
+  ALL 44 practice DNGs (harness pattern in NOTES).
+- Doctrine §14 (debugging discipline) applies with full force here: two
+  strikes on the frame, the guessing test, the owner is never the test bench,
+  claims name their test.
 - State plainly what was VERIFIED (headless, request inspection) versus what
   NEEDS THE OWNER'S HANDS on the real iPad (share sheet, pinch feel, install
   flows, Safari-only storage behavior — all measurements so far are Chromium).
