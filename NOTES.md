@@ -3548,6 +3548,201 @@ user-scalable=no.
 > suite where a headless check exists. DEFERRED items are real but need their
 > own release (or an owner decision) — do not re-discover them.
 
+OWNER RULING 2026-07-25 — NOTHING HAPPENS TO A PHOTO AT OPEN. FINAL.
+His words: "Stop doing ANYTHING to the photo at fucking open." A photo opens
+exactly as decoded: WB [1,1,1], exposure 1, denoise 0, and NO automatic
+highlight repair. Every automatic adjustment is now an EXPLICIT press: Auto
+(Basic: WB + exposure + denoise), Auto WB (top of IR tab: WB only), tap-WB.
+The entire highlight-recovery subsystem (src/raw/highlights.ts and its two
+decode-stage call sites) was REMOVED under this ruling — after three
+owner-caught artifact regressions (desat flattening, lawn squares, leaf
+square) the automatic-repair approach is dead. The final audited version of
+the code survives at commit bf5fe0a if repair ever returns AS AN EXPLICIT
+USER CONTROL — never automatic, and read the audit ledger below first. The
+white-level fix (reading each NEF's own saturation) STAYS: that is correct
+decoding of file metadata, not modification of the photo. Consequence
+accepted by the code (documented, not hidden): heavily clipped IR frames
+(e.g. D5300 full-spectrum) show green fringes at blown edges again, because
+that is what the sensor data contains; the user edits from the truth.
+The entries below this line record the removed subsystem's history and its
+audit — kept as the gotcha ledger, NOT as live documentation.
+
+FIXED 2026-07-24 (native NEF highlights on non-Z50 bodies — the "other
+users can't use it" report; owner's D5300 full-spectrum frame DSC_4940):
+- The native-NEF white level was HARDCODED to 15520, which is the Nikon Z 50's
+  saturation point. NEFs carry no DNG level tags, so every OTHER camera got the
+  Z 50's ceiling too. A D5300 saturates at 16383 — feeding it 15520 pushed the
+  whole frame ~6% over and pinned ~14% of it (all the sky + IR-lit foliage) past
+  white with NO headroom to recover. Noah never saw it because he feeds the app
+  DNGs (Adobe DNG Converter writes real per-file black/white/ColorMatrix, and the
+  DNG path already reads them); the hardcode only bites on native NEF opens.
+- FIX: white is now read from the FILE'S OWN linearization curve
+  (`curve[curveMax-1]` in readNikonParams — the largest value the decoder can
+  emit, which IS the saturation point; dcraw/LibRaw take the maximum the same
+  way). Camera-agnostic and exact for LOSSY NEFs (real curve in the file):
+  D5300 → 16383, verified on DSC_4940.NEF (white 16383, over-range pixels
+  3.36M → 0, max linear 1.0595 → 1.0000; tsc clean). AUDIT CORRECTION
+  (2026-07-25, blocker): LOSSLESS NEFs (ver0 0x46 — Z 50/Z 6/Z 7/D850) carry
+  NO linearization table, so the identity-curve top (16383) silently replaced
+  the Z 50's calibrated 15520 and disabled recovery for them. Fixed: a
+  hasCurve flag now gates the curve-derived white; no-curve files fall back to
+  15520 at 14-bit (the pre-branch behavior), 12-bit no-curve → 4095 with black
+  252 (pedestal scaled by bit depth). Also fixed same audit: the lossy-branch
+  grid write at index (csize-1)*step could land exactly at `max`, silently
+  dropping the LAST grid value so the curve tail ramped toward identity —
+  write index now clamped so the top grid value anchors the tail (dcraw's 64K
+  buffer equivalent). Verified with synthetic MakerNote blocks: 0x46 14-bit →
+  15520, tail-OOB lossy grid → grid top (was ~16369), 12-bit → 4095, real
+  D5300 unchanged 1008/16383. NO real Z 50 NEF exists in any session so far —
+  the lossless path is synthetic-verified only; first real Z 50 native-NEF
+  open still needs eyes.
+- NOT touched (measured, low value here): the NEF path still applies the Z 50
+  ColorMatrix1 to every body and defaults black to 1008. After the pipeline's
+  row-normalization + tap-WB, swapping in a D5300 matrix was visually ~nil on IR
+  frames (rendered both — near-identical), and I had only dcraw's D65-convention
+  matrix, not a convention-matched Adobe ColorMatrix1, so guessing it in was
+  higher risk than value. Black 1008 errs high (crushes a little shadow) which is
+  safer than a milky lift; both are candidates for a real per-model table later.
+
+FIXED 2026-07-24 (IR highlight fringe + blown-sky flattening — the "D5300
+doesn't come out as CLEAN as my Z 50" report, DSC_4940 + the owner's five
+staging screenshots; TWO attempts, the first REJECTED — read both):
+- SYMPTOM: lurid lime-green (and magenta) fringes on every high-contrast edge
+  (bare branches against bright sky), plus a wide green band around thick
+  branches. Present in BOTH the binned proxy and the native export, so it's in
+  the channel data, not the demosaic.
+- ROOT CAUSE (measured on edge scanlines, raw camera-native values): infrared
+  floods RED, so red saturates (pins at the white level) long before green and
+  blue. At a bright edge red is stuck at 1.0 while G/B still fall off; the
+  camera matrix turns that lopsided ratio into bright green. The WIDE band is
+  the same physics one step deeper: sky regions where R AND G are both truly
+  clipped while B still carries real gradient (B 0.55–0.99) — two pinned
+  channels + one falling channel = green through the matrix. Worse on the
+  D5300 (hotter conversion, more IR in red) than the Z 50.
+- ATTEMPT 1 — REJECTED BY THE OWNER, DO NOT REBUILD IT: per-pixel desaturation
+  toward max(r,g,b) via smoothstep(0.9,1.0) in both renderers. It killed the
+  fringe but OVERWROTE THE UNCLIPPED CHANNELS — the blue channel carrying the
+  sky's real cloud gradient got averaged up into the clipped garbage, and every
+  near-clip region (0.9–1.0 = genuine bright detail, not clip) collapsed to one
+  flat tone. Owner's screenshots: whole skies as flat salmon/magenta slabs.
+  His words: "you drop every channel to the least common denominator." OWNER
+  RULE (standing, non-negotiable): NEVER discard captured channel data to hide
+  a broken channel — rebuild the broken channel from evidence instead, and
+  never touch a value the sensor actually resolved.
+- ATTEMPT 2 (global bright-hue prior for deep regions) — OWNER-REJECTED on
+  device (IMG_1246): square blotches on the lawn. The prior was foliage-hued
+  and wrong for grass, and where its aggressive rebuild met the local tier's
+  honest "barely clipped, leave it," the disagreement drew the search radius
+  itself — Chebyshev balls are squares — as visible blocks. GOTCHA for any
+  future spatial repair: any hard accept/reject boundary in a rebuild WILL
+  print its own geometry onto smooth image regions; every spatial influence
+  must fade smoothly to zero.
+- ATTEMPT 3 (local ring hue extended to deep 2-channel regions) — caught in
+  harness full-frame render before shipping: painted the open sky near the
+  canopy in canopy hue at 4x intensity (blazing orange, blocky). Root lesson:
+  when R AND G are both pinned, NO neighbourhood testifies to the true hue —
+  borrowed hue is a category error in both directions (canopy hue → orange;
+  even true sky hue still renders green because a pinned G contradicts it).
+  Also: render the FULL FRAME every verification round, not just crops — the
+  orange sky sat exactly where no crop was looking.
+- SHIPPED: src/raw/highlights.ts, recoverCfaHighlights(), run ONCE on the
+  decoded CFA inside readNefCfa (nef.ts) and readMosaicedCfa (dngRaw.ts) — the
+  two chokepoints every raw pixel flows through — so proxy, live shader and
+  native export all see the same repaired data; gl.ts and pipeline.ts carry NO
+  recovery code. Quad resolution, summed-area table for clean-quad lookup:
+  (1) only sites >= 99% of white are ever written, and only ever RAISED (a
+  clipped value is a floor — truth is at least white; raise-only also makes
+  overlapping writes compose as max, so order can't matter);
+  (2) R-only clipped near clean data: rebuild along the nearest DENSE clean
+  ring's hue (>= ~1/8 ring occupancy — a lone clean quad is usually a stray
+  object of another material and must not steer; owner-caught halo), fading
+  smoothly to zero over RSOLID=10 → RMAX=20 quads;
+  (3) R-only clipped anywhere: warm fallback R = 1.5 x the pixel's OWN green
+  (WARM_RG), gated by low-blue severity smooth01(0.1,0.3,1-B) — with B near
+  white the pixel already renders pale and is left alone;
+  (4) R+G both clipped (blown sky, bright pockets): fixed WARM_RG targets,
+  same severity gate, ZERO spatial evidence — so zero seams; the surviving B
+  is untouched and keeps carrying the real cloud texture;
+  (5) noise ramp smooth01(1.05,1.25) on target/measured everywhere — targets
+  within noise of white do nothing (this is what keeps noisy near-clip grass
+  from speckling); LIN_CAP=4; fully blown quads and non-(R,G) double-clips
+  stay exactly as decoded.
+- VERIFIED (real compileEdit path, DSC_4940, fail-first proven): green-fringe
+  metric 8492 → 0 with recovery, 8492 with recovery stubbed; bit-level CFA
+  diff across all 24,160,256 sites: 0 unclipped sites changed, 0 sites
+  lowered, ~1.15M truly-clipped sites rebuilt (4.8%); deep-sky unclipped B
+  (the gradient) bit-identical; full-frame render smooth (no seams, no
+  orange, cloud structure restored). ~1.0-1.5s recovery on a 24MP NEF in node
+  (~2.4s Safari est.) — PAID PER DECODE, not once: open, export (re-decodes),
+  twice per batch file, once per quick-look NEF (audit correction 2026-07-25;
+  the earlier "one-time per open" note was wrong). Practice-library churn,
+  measured across ALL 44 DNGs (not just lodge.dng — the earlier "library
+  BIT-IDENTICAL" claim was an overreach from one file): 38/44 bit-identical;
+  6 files change only truly-clipped specular sites, at most 228 sites
+  (hillside.dng, 0.004%), zero lowered, zero unclipped touched, invisible at
+  normal exposure. NEEDS THE OWNER'S HANDS: live view + export on the real
+  iPad from staging (all measurements are node/CPU-pipeline; the GPU path
+  consumes the same repaired data so it should match, but that's inference,
+  not measurement).
+- AUDIT 2026-07-25 (owner demanded "find ALL of it"; 55-agent adversarial
+  audit: 44-DNG sweep, synthetic property tests, correctness/integration/perf
+  reviews, headless app walk, copy sweep; every finding independently
+  refuted-or-confirmed). CONFIRMED + FIXED same day:
+  (1) BLOCKER — the ring-density gate accepted tiny clean islands (a leaf on
+  the blown lawn) and the RSOLID fade is identically 1 for r<=RSOLID, so an
+  11x9-quad FULL-STRENGTH rectangle printed around the leaf on DSC_4940
+  (max render delta 119/255). Fix: evidence strength is now smooth in ring
+  occupancy (smooth01(need, 3*need, onRing)) AND in total clean mass within
+  the search disc (smooth01(24, 96, discMass) — a stray island is ~11 quads,
+  real structure is hundreds), mass gating ONLY the evidence branch (the
+  evidence-free warm fallback must keep working in deep pockets). Verified:
+  audit square zone max delta 119 → 2/255; lawn >40-delta pixels 6650 → 275,
+  ALL remaining diffs confined to genuinely-clipped tiny objects rendering
+  less lurid (no geometry); hillside speckle amplitude maxDeltaLin 1.62 → 0.5,
+  strip renders identical.
+  (2) BLOCKER — lossless-NEF white regression (see white-level entry above).
+  (3) MAJORS — stale copy everywhere claiming auto-WB at open: Help Quick
+  start + Reset bullet (ir.html), Lesson 1 step 2, Lesson 2 (now starts
+  "balance first"), Lesson 7 "carries almost no color" (→ "once balanced"),
+  docs/ARCHITECTURE.md baseline note. All rewritten to the as-shot truth.
+  (4) Write-closure hoist in highlights.ts (~10% of recovery, output
+  bit-identical — audit-measured). (5) VERSION 2.2 → 2.3 (capability release
+  per the taxonomy). Commit messages rewritten to drop false absolutes
+  ("any Nikon", "down to the last bit", "photo's own evidence" for the
+  constant-ratio path).
+  CONFIRMED, NOT CHANGED (owner calls, flagged in chat): batch still
+  auto-balances each frame (its dialog says so — but "Your current edit"
+  output now diverges from an as-shot screen by default); strip/quick-look
+  thumbnails stay gray-world balanced while opening shows as-shot red;
+  creative grade (sat/swap/tint/hue) persists into the NEXT opened photo and
+  its Reset baseline (PRE-EXISTING mechanism, measured identical on
+  origin/main — but it now contradicts an "opens untouched" reading; owner
+  ruling needed); IR-tab Auto WB deliberately does not re-meter exposure
+  (measured ~0.21 stops darker than Basic Auto on the test frame); lessons
+  open practice tiles as-shot mid-curriculum (copy updated to teach
+  balance-first; a teaching-mode auto-balance carve-out is an owner call).
+  KNOWN LIMITS (measured, documented): recovery is a silent no-op when
+  white=65535 (dngRaw default when WhiteLevel absent — every rebuild clamps
+  into the ceiling); recovery is NOT idempotent if ever re-applied to already
+  -recovered data (never happens today — every decode is from file bytes;
+  do not cache-and-rerun RawCfa through it); odd-dimension last row/col sits
+  outside the quad grid (untouched, matches demosaicBinned); D5300 12-bit and
+  other-body curves/matrices still approximations (Z 50 ColorMatrix1 applied
+  to all NEF bodies — measured ~nil on IR frames after row-norm + tap-WB).
+
+OWNER RULE 2026-07-24 (same session as the highlight work): WHITE BALANCE
+OPENS AS SHOT — no automatic gray-world WB at import, ever. The photographer
+sees the true starting point and chooses. Auto exposure and auto denoise still
+run at open (only WB is exempt). Auto WB is explicit: the Basic tab's Auto
+(WB + exposure, unchanged) and the "Auto white balance" button at the TOP of
+the IR tab (WB only — rebalances to the photo's own neutral and clears any
+look wbBias via lookBias reset; touches nothing else). Its purpose is backing
+OUT of a look's color cast without losing the rest of the look. Verified
+headless in the built app (2026-07-24): practice RAW opens with WB sliders
+neutral + exposure auto-set; IR Auto WB rebalances; one Undo returns to
+neutral; button matches the audited accent-outline pattern (same rendered
+height as the Basic Auto button).
+
 FIXED in the 2026-07-15 review release (cache ips-v52 → ips-v53):
 - SW cached NON-OK responses — one bad fetch poisoned cache-first assets
   forever, and could poison the version-stable examples cache. Both branches
