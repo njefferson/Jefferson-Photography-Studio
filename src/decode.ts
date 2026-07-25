@@ -11,7 +11,7 @@ import type { ImportedFile } from "./import";
 import { Tiff, type Ifd } from "./raw/tiff";
 import { decodeMosaicedDng } from "./raw/dngRaw";
 import { decodeNef } from "./raw/nef";
-import { camToSrgbLinear, NIKON_Z50_COLOR_MATRIX } from "./color";
+import { camToSrgbLinear, nikonColorMatrix } from "./color";
 
 export interface DecodedImage {
   width: number;
@@ -55,13 +55,14 @@ export async function decode(file: ImportedFile): Promise<DecodedImage> {
   if (file.kind === "nef") {
     try {
       const img = decodeNef(file.bytes);
+      const ifds = new Tiff(file.bytes).allIfds();
       return {
         width: img.width,
         height: img.height,
         linear: img.linear,
-        camMatrix: camToSrgbLinear(NIKON_Z50_COLOR_MATRIX),
+        camMatrix: camToSrgbLinear(nikonColorMatrix(cameraModel(ifds))),
         isRaw: true,
-        rotate: orientationToRotate(new Tiff(file.bytes).allIfds()),
+        rotate: orientationToRotate(ifds),
       };
     } catch {
       // Only claim High-Efficiency when the file's own Compression tag says
@@ -160,7 +161,7 @@ async function decodeDng(bytes: Uint8Array, file?: ImportedFile): Promise<Decode
   );
   if (cfaRaw) {
     const img = decodeMosaicedDng(bytes, cfaRaw);
-    const cm = readColorMatrix1(ifds) ?? NIKON_Z50_COLOR_MATRIX;
+    const cm = readCameraMatrix(ifds) ?? nikonColorMatrix(cameraModel(ifds));
     return {
       width: img.width,
       height: img.height,
@@ -194,13 +195,43 @@ async function decodeDng(bytes: Uint8Array, file?: ImportedFile): Promise<Decode
   );
 }
 
-/** ColorMatrix1 (tag 50721, 9 SRATIONAL) from any IFD that carries it. */
-function readColorMatrix1(ifds: Ifd[]): number[] | undefined {
+/** Camera Model string (tag 272) from any IFD that carries it. */
+export function cameraModel(ifds: Ifd[]): string | undefined {
   for (const d of ifds) {
-    const cm = d.num(50721);
-    if (cm.length === 9) return cm;
+    const m = d.str(272);
+    if (m) return m;
   }
   return undefined;
+}
+
+/** Camera ColorMatrix (XYZ -> camera), preferring the daylight calibration.
+ *  Adobe DNGs carry two: ColorMatrix1 for CalibrationIlluminant1 (often
+ *  Illuminant A / tungsten) and ColorMatrix2 for CalibrationIlluminant2
+ *  (usually D65). IR shooting is daylight-only and dcraw/LibRaw likewise
+ *  render from the D65 matrix — picking the tungsten one bends every color
+ *  (the D5300 twins mismatched exactly this way, 2026-07-25). */
+export function readCameraMatrix(ifds: Ifd[]): number[] | undefined {
+  // EXIF LightSource ranking, best first: D65, D55, D75, D50, daylight/fine
+  // weather, untagged, then anything else (tungsten et al).
+  const rank = (ill: number | undefined) =>
+    ill === 21 ? 0 : ill === 20 ? 1 : ill === 22 ? 2 : ill === 23 ? 3 : ill === 1 || ill === 9 ? 4 : ill === undefined ? 5 : 6;
+  let best: number[] | undefined;
+  let bestRank = Infinity;
+  for (const d of ifds) {
+    for (const [mTag, iTag] of [
+      [50722, 50779],
+      [50721, 50778],
+    ] as const) {
+      const cm = d.num(mTag);
+      if (cm.length !== 9) continue;
+      const r = rank(d.num(iTag)[0]);
+      if (r < bestRank) {
+        bestRank = r;
+        best = cm;
+      }
+    }
+  }
+  return best;
 }
 
 function isJpegComp(c: number | undefined) {

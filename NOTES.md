@@ -3560,6 +3560,56 @@ user-scalable=no.
 > suite where a headless check exists. DEFERRED items are real but need their
 > own release (or an owner decision) — do not re-discover them.
 
+FIXED 2026-07-25, later session ("the pairs are not matching still" — the
+owner's NEF + Lightroom-DNG twins of the same shot: the DSC_4940 pair + the
+DSC_4776 NEF, all D5300 full-spectrum). THREE decode bugs made a NEF and its
+DNG twin render as different photos:
+(1) The DNG path IGNORED LinearizationTable (tag 50712). Lightroom's DNG of
+a LOSSY-compressed NEF (what the D5300 shoots) stores the CFA in the
+companded curve domain (stored 0..3084; the 3085-entry table maps to linear
+0..16383); treating those values as linear rendered the twin ~5.4x dark
+(p99.5 at 0.16), with its REAL 28% clipping reading as 0.000% — so Recover
+never armed and WB/exposure were computed on companded data. Fix in
+dngRaw.ts finish(): map the CFA through the table before black/white (the
+DNG spec order). The Z 50 practice DNGs carry no table (lossless source),
+which is why 44 frames never showed this. CORRECTS THE LEDGER BELOW:
+DSC_1709's "residual NEF-vs-DNG ~3x scale difference (Adobe's conversion
+headroom)" was THIS bug, not headroom.
+(2) The DNG path took ColorMatrix1 (50721), which in a two-matrix Adobe DNG
+is the ILLUMINANT-A (tungsten) calibration (50778=17); the daylight D65
+matrix lives in ColorMatrix2 (50722, 50779=21). decode.ts readCameraMatrix()
+now prefers the daylight calibration (D65 > D55 > D75 > D50 > daylight >
+untagged > rest), matching dcraw/LibRaw reference behavior. The bundled
+practice DNGs carry only 50721 — their pick is unchanged.
+(3) The NEF path hardcoded the Z 50 matrix for EVERY body (the deferred
+"per-model table" item). color.ts nikonColorMatrix(model) now keys off the
+file's own Model tag (272, via the new Ifd.str()): D5300 → Adobe's D5300
+ColorMatrix2, taken VERBATIM from the owner's own DNG twin of DSC_4940;
+anything else → Z 50 exactly as before. export.ts getSource() shares the
+same helpers, so preview and native export agree by construction.
+VERIFIED (scratchpad harnesses; every check fail-first proven):
+• Decode-level: the 4940 twins now agree — same camMatrix both sides,
+  normalized channel means within 2.6% (the WhiteLevel residual: Adobe
+  writes 15892, the NEF curve tops at 16383 — absorbed by auto exposure),
+  gray-world gains equal to 3 decimals, clip 28.3% vs 29.4%.
+• App-level (built app, real #file input, headless Chromium): both twins
+  land on the IDENTICAL auto-open baseline (wbR 505, wbB 668, recover 0.7)
+  and the full-frame canvas diff is mean 0.34/255. CONTROL: the pre-fix
+  build through the same walk diverges (recover 0 vs 0.7, wbR 529 vs 505;
+  diff mean 31.6/255). Zero page errors.
+• Regression: all 44 practice DNGs decode BIT-IDENTICAL before vs after
+  (MD5 over the linear buffer + camMatrix), and the practice-tile app walk
+  is unchanged.
+NEEDS THE OWNER'S HANDS / STILL OPEN: (a) on-device pass — D5300 NEFs now
+render through Adobe's real D5300 matrix, so their open look CHANGES from
+the old Z 50-matrix look (the LR-familiar rendering, more color
+separation); (b) the DSC_4776 DNG twin never arrived (its zip was too big
+for the chat upload; Drive delivery to a session is hard-capped at
+10 MB/file) — its NEF decodes clean on the same path, but that pair itself
+is unverified until he re-sends a smaller zip; (c) the ~3% white-level
+residual (curve top vs Adobe's true saturation point) stays a candidate for
+a per-model saturation table, absorbed by auto exposure today.
+
 FIXED 2026-07-25 (the "dark daytime frame" — DSC_1709 NEF vs its DNG twin,
 owner-supplied ground truth): the NEF path's black pedestal was the Z-series
 1008 for every body, but the D5300's true pedestal is 600 — the NEF file SAYS
@@ -3574,7 +3624,9 @@ the black fallback (DNG-tag 50714 still wins if present; then 0x003D; then
 the bit-depth default). Verified: DSC_1709 NEF at the app's auto baseline now
 renders the correct bright daytime scene; twin-vs-twin CFA alignment
 confirmed at (0,0); the residual NEF-vs-DNG scale difference (~3x) is
-Adobe's conversion headroom and is absorbed by auto exposure. DSC_4940 black
+Adobe's conversion headroom and is absorbed by auto exposure. [CORRECTED
+same day, twin-matching entry above: that "~3x headroom" was the ignored
+DNG LinearizationTable — real, and fixed.] DSC_4940 black
 1008 → 600: full battery re-run clean (decode pure, invariants hold,
 recover slider cleans from 0.5; auto 0.7 keeps margin). GOTCHA: never assume
 one Nikon body's levels for another — the NEF carries black (0x003D) and

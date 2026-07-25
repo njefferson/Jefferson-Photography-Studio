@@ -18,6 +18,18 @@ export class Ifd {
   has(tag: number): boolean {
     return this.entries.has(tag);
   }
+  /** ASCII value for a tag (e.g. Make/Model), cut at the first NUL. */
+  str(tag: number): string | undefined {
+    const e = this.entries.get(tag);
+    if (!e || e[0] !== 2) return undefined;
+    const codes = this.tiff.readNumbers(e[0], e[1], e[2]);
+    let s = "";
+    for (const c of codes) {
+      if (!c) break;
+      s += String.fromCharCode(c);
+    }
+    return s.trim() || undefined;
+  }
   subIfdOffsets(): number[] {
     return this.num(330);
   }

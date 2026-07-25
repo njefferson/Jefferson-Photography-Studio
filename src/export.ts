@@ -7,7 +7,8 @@ import { demosaicPixelLinear, type RawCfa } from "./raw/demosaic";
 import { readMosaicedCfa } from "./raw/dngRaw";
 import { readNefCfa } from "./raw/nef";
 import { Tiff } from "./raw/tiff";
-import { camToSrgbLinear, NIKON_Z50_COLOR_MATRIX } from "./color";
+import { camToSrgbLinear, nikonColorMatrix } from "./color";
+import { cameraModel, readCameraMatrix } from "./decode";
 import { makeRowDenoiser } from "./raw/denoise";
 import { makeRowDetail } from "./raw/detail";
 import { healPatches8, healPatchesFromSampler, wrapWithPatches } from "./heal";
@@ -427,13 +428,14 @@ export async function exportImage(
 
 function getSource(file: ImportedFile, current: DecodedImage): Source {
   if (file.kind === "nef") {
-    return { cfa: readNefCfa(file.bytes), cam: camToSrgbLinear(NIKON_Z50_COLOR_MATRIX) };
+    const ifds = new Tiff(file.bytes).allIfds();
+    return { cfa: readNefCfa(file.bytes), cam: camToSrgbLinear(nikonColorMatrix(cameraModel(ifds))) };
   }
   if (file.kind === "dng") {
     const ifds = new Tiff(file.bytes).allIfds();
     const raw = ifds.find((d) => d.num(254)[0] === 0 && d.num(262)[0] === 32803 && (d.num(259)[0] === 7 || d.num(259)[0] === 1));
     if (raw) {
-      const cm = ifds.map((d) => d.num(50721)).find((v) => v.length === 9) ?? NIKON_Z50_COLOR_MATRIX;
+      const cm = readCameraMatrix(ifds) ?? nikonColorMatrix(cameraModel(ifds));
       return { cfa: readMosaicedCfa(file.bytes, raw), cam: camToSrgbLinear(cm) };
     }
   }
