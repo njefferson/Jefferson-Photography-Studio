@@ -88,6 +88,7 @@ let hotspotState: { profileKey: string | null; source: "exif" | "manual" | null;
 const params: EditParams = {
   wb: [1, 1, 1],
   exposure: 1,
+  recover: 0,
   swapRB: true,
   hue: 0,
   sat: 1,
@@ -130,6 +131,7 @@ const ui = {
   wbB: $("wbB") as HTMLInputElement,
   expo: $("expo") as HTMLInputElement,
   dn: $("dn") as HTMLInputElement,
+  recover: $("recover") as HTMLInputElement,
   autoBtn: $("autoBtn") as HTMLButtonElement,
   irAutoWb: $("irAutoWb") as HTMLButtonElement,
   swapBtn: $("swapBtn") as HTMLButtonElement,
@@ -360,6 +362,7 @@ function syncFromUI() {
   params.sharpen = Number(ui.sharpen.value);
   params.texture = Number(ui.texture.value);
   params.denoise = Number(ui.dn.value);
+  params.recover = Number(ui.recover.value);
   params.sky = [Number(ui.skyHue.value), Number(ui.skySat.value), Number(ui.skyLum.value)];
   params.foliage = [Number(ui.folHue.value), Number(ui.folSat.value), Number(ui.folLum.value)];
   {
@@ -392,6 +395,7 @@ function syncToUI() {
   ui.wbB.value = String(toPos(params.wb[2], WB_LO, WB_HI));
   ui.expo.value = String(toPos(params.exposure, EX_LO, EX_HI));
   ui.dn.value = String(params.denoise);
+  ui.recover.value = String(params.recover ?? 0);
   ui.swapBtn.setAttribute("aria-pressed", String(params.swapRB));
   ui.hue.value = String(params.hue);
   ui.sat.value = String(params.sat);
@@ -606,6 +610,7 @@ function cloneParams(p: EditParams): EditParams {
     toneG: [...(p.toneG ?? TONE_DEFAULT)] as [number, number, number, number, number],
     toneB: [...(p.toneB ?? TONE_DEFAULT)] as [number, number, number, number, number],
     lum: p.lum,
+    recover: p.recover ?? 0,
     // Brush bitmaps are SHARED between snapshots, not copied (copy-on-write):
     // a stroke clones the live buffer before mutating (startPaint/Clear), so a
     // history entry's pixels can never change under it. Without this, every
@@ -669,6 +674,7 @@ function applySnapshot(s: Snapshot) {
   const c = cloneParams({ ...params, ...s.params, lum: s.params.lum ?? 1 });
   params.wb = c.wb;
   params.exposure = c.exposure;
+  params.recover = c.recover ?? 0;
   params.swapRB = c.swapRB;
   params.hue = c.hue;
   params.sat = c.sat;
@@ -1261,7 +1267,7 @@ panelTabsEl.addEventListener("keydown", (e) => {
   setPanelTab((saved && (PANEL_TABS as readonly string[]).includes(saved) ? saved : "basic") as PanelTab);
 }
 
-for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.dn, ui.hue, ui.sat, ui.con, ui.glow, ui.lum,
+for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.dn, ui.recover, ui.hue, ui.sat, ui.con, ui.glow, ui.lum,
   ui.hotspot, ui.hotspotSize, ui.vignette, ui.clarity, ui.dehaze, ui.sharpen, ui.texture,
   ui.skyHue, ui.skySat, ui.skyLum, ui.folHue, ui.folSat, ui.folLum, ...ui.tones]) {
   el.addEventListener("input", syncFromUI);
@@ -5509,6 +5515,7 @@ function establishFreshEdit() {
   params.wb = [1, 1, 1];
   params.exposure = 1;
   params.denoise = 0;
+  params.recover = 0;
   lookBias = [1, 1, 1];
   syncToUI();
   // Snapshot the as-imported baseline for press-and-hold comparison.
@@ -5516,6 +5523,7 @@ function establishFreshEdit() {
     wb: [...params.wb] as [number, number, number],
     exposure: params.exposure,
     denoise: params.denoise,
+    recover: 0,
     swapRB: false,
     hue: 0,
     sat: 1,
