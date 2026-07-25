@@ -8,8 +8,16 @@ export const NIKON_Z50_COLOR_MATRIX = [
   1.1853, -0.4189, -0.1024, -0.4292, 1.2041, 0.2569, -0.1336, 0.2599, 0.5824,
 ];
 
-// Nikon D5300 ColorMatrix2 (XYZ -> camera, D65) — Adobe's calibration, read
-// verbatim from the Adobe DNG twin of the owner's DSC_4940.NEF (2026-07-25).
+// Nikon D5300 ColorMatrix2 (XYZ -> camera, D65) as the owner's own Lightroom
+// DNG exports carry it (DSC_4940/DSC_4776, 2026-07-25). NOT Adobe's stock
+// D5300 calibration: Lightroom bakes the photo's ASSIGNED camera profile into
+// each DNG, and these carry Rob Shea's "Infrared Temp -100" IR profile — the
+// owner's standard for this full-spectrum body. A native NEF names no profile
+// at all, so this is the deliberate NEF default (deviation from dcraw's stock
+// matrix, reasoned in NOTES: stock matches none of the owner's real files).
+// A DNG exported with a DIFFERENT profile (e.g. "Infrared Temp -50" on
+// DSC_1709) renders per its own embedded matrix — an intentional difference,
+// not a decode bug (NOTES, 2026-07-25 twin ledger).
 export const NIKON_D5300_COLOR_MATRIX = [
   1.2101, -0.1453, -0.0262, -0.9751, 1.4074, 0.0899, -0.2572, 0.2313, 0.2688,
 ];
