@@ -91,10 +91,17 @@ export function readNefCfa(bytes: Uint8Array): RawCfa {
 
   const pat = raw.num(33422);
   const pattern = pat.length === 4 ? pat : [0, 1, 1, 2];
-  // NEF has no DNG level tags; these are the Z-series values LibRaw reports for
-  // these files (black 1008, white 15520 at 14-bit). Tap-WB absorbs the rest.
-  const black = raw.num(50714)[0] ?? 1008;
-  const white = raw.num(50717)[0] ?? (bps === 14 ? 15520 : (1 << bps) - 1);
+  // White (sensor saturation): the top of the file's own linearization curve
+  // when one exists (lossy NEFs — exact per body: Z 50 ~15520, D5300 16383).
+  // Lossless NEFs (0x46) carry NO curve, so the identity top would be the
+  // bit-depth ceiling, NOT saturation — for those fall back to the Z-series
+  // value LibRaw reports (15520 at 14-bit), the pre-branch behavior. The
+  // black pedestal scales with bit depth (1008 is the 14-bit convention).
+  const curveWhite = params.curve[params.curveMax - 1] || 0;
+  const black = raw.num(50714)[0] ?? (bps === 14 ? 1008 : bps === 12 ? 252 : 0);
+  const white =
+    raw.num(50717)[0] ??
+    (params.hasCurve && curveWhite > black ? curveWhite : bps === 14 ? 15520 : (1 << bps) - 1);
   return { cfa, width, height, pattern, black, white };
 }
 
@@ -104,6 +111,13 @@ interface NikonParams {
   curveMax: number;
   split: number;
   huff: number;
+  /** True only when a real linearization table was read from the file. When
+   *  false the curve is the identity DEFAULT (lossless 0x46 NEFs carry no
+   *  table) and its top is (1<<bps)-1 — NOT the sensor's saturation, so it
+   *  must never be used as the white level (audit find, 2026-07-25: doing so
+   *  regressed the Z 50's calibrated 15520 to 16383 on lossless files and
+   *  silently disabled highlight recovery for them). */
+  hasCurve: boolean;
 }
 
 function readNikonParams(bytes: Uint8Array, off: number, le: boolean, bps: number): NikonParams {
@@ -133,9 +147,14 @@ function readNikonParams(bytes: Uint8Array, off: number, le: boolean, bps: numbe
   for (let i = 0; i < max; i++) curve[i] = i; // identity default
   let curveMax = max;
   let split = 0;
+  let hasCurve = false;
 
   if (ver0 === 0x44 && ver1 === 0x20 && step > 0) {
-    for (let i = 0; i < csize; i++) curve[i * step] = u16(p + i * 2);
+    // The last grid index (csize-1)*step can equal `max` — clamp the WRITE so
+    // the final grid VALUE anchors the top of the curve instead of being
+    // silently dropped, which left the tail ramping toward identity (dcraw
+    // uses a 64K buffer for the same reason; audit find, 2026-07-25).
+    for (let i = 0; i < csize; i++) curve[Math.min(i * step, max - 1)] = u16(p + i * 2);
     for (let i = 0; i < max; i++) {
       const r = i % step;
       // Clamp the upper grid index: past the last grid point it would read out
@@ -145,13 +164,15 @@ function readNikonParams(bytes: Uint8Array, off: number, le: boolean, bps: numbe
       curve[i] = Math.floor((curve[i - r] * (step - r) + curve[hi] * r) / step);
     }
     split = u16(off + 562);
+    hasCurve = true;
   } else if (ver0 !== 0x46 && csize <= 0x4001) {
     for (let i = 0; i < csize; i++) curve[i] = u16(p + i * 2);
     curveMax = csize;
+    hasCurve = true;
   }
   while (curveMax > 2 && curve[curveMax - 2] === curve[curveMax - 1]) curveMax--;
 
-  return { vpred, curve, curveMax, split, huff };
+  return { vpred, curve, curveMax, split, huff, hasCurve };
 }
 
 function nikonDecode(bytes: Uint8Array, dataOffset: number, width: number, height: number, prm: NikonParams): Uint16Array {
