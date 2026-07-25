@@ -3548,6 +3548,37 @@ user-scalable=no.
 > suite where a headless check exists. DEFERRED items are real but need their
 > own release (or an owner decision) — do not re-discover them.
 
+FIXED 2026-07-25 (the "dark daytime frame" — DSC_1709 NEF vs its DNG twin,
+owner-supplied ground truth): the NEF path's black pedestal was the Z-series
+1008 for every body, but the D5300's true pedestal is 600 — the NEF file SAYS
+SO in MakerNote tag 0x003D (four u16, one per CFA site), and the Adobe DNG
+twin carries BlackLevel 600. On normal exposures the 400-count error is a
+~2.6% shadow shift; on a deeply underexposed frame (CFA mean 1035!) it
+destroyed nearly the whole signal — a bright-daytime shot rendered as dark
+neon garbage, which was earlier MISDIAGNOSED as a genuinely dark scene (the
++6-stop exposure-range widening that came from that misdiagnosis is kept —
+generic headroom, harmless). FIX: readNefCfa now reads 0x003D and uses it as
+the black fallback (DNG-tag 50714 still wins if present; then 0x003D; then
+the bit-depth default). Verified: DSC_1709 NEF at the app's auto baseline now
+renders the correct bright daytime scene; twin-vs-twin CFA alignment
+confirmed at (0,0); the residual NEF-vs-DNG scale difference (~3x) is
+Adobe's conversion headroom and is absorbed by auto exposure. DSC_4940 black
+1008 → 600: full battery re-run clean (decode pure, invariants hold,
+recover slider cleans from 0.5; auto 0.7 keeps margin). GOTCHA: never assume
+one Nikon body's levels for another — the NEF carries black (0x003D) and
+white (curve top); read the file.
+
+FIXED same day (quick-look/session thumbnails didn't match what opening
+shows, owner IMG_1255/1256): makeThumb rendered bare WB+matrix, but OPENING
+also applies the persisted creative grade (swap/sat/tint carry across opens
+by design) — with a look active, thumbs were a different color world (yellow/
+blue vs teal/orange). makeThumb now renders through the REAL compileEdit with
+the live creative params plus each photo's own auto baseline (WB, exposure,
+auto-recover; spatial extras cleared — masks/glow/clarity/LUT/grain need maps
+a thumb doesn't have). Thumbs now match their opens at generation time.
+NEEDS OWNER'S EYES: thumbnail appearance on device (harness covers code path
++ build only).
+
 OWNER RULING 2026-07-25 REV. 2 — AUTO BASELINE AT OPEN, PER FILE TYPE.
 The blanket "nothing at open" below was a STABILIZATION MEASURE ("only
 because I could not get you to stop fucking up so I could even get a
