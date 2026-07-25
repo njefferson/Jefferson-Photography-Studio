@@ -226,12 +226,14 @@
             <label>Denoise <input id="dn" type="range" min="0" max="1" step="0.01" value="0" /></label>
             <label>Sharpen <input id="sharpen" type="range" min="0" max="1" step="0.01" value="0" /></label>
             <label>Texture <input id="texture" type="range" min="-1" max="1" step="0.01" value="0" /></label>
-            <p class="note">Denoise is set automatically from the photo's measured noise. Sharpen crisps up fine edges; Texture brings out surface structure (pull left to smooth). Both keep colors put.</p>
-            <p class="note footnote">White balance, exposure and denoise are set automatically when a photo opens &mdash; refine from here. No 2000K floor.</p>
+            <p class="note">Auto sets Denoise from the photo's measured noise. Sharpen crisps up fine edges; Texture brings out surface structure (pull left to smooth). Both keep colors put.</p>
+            <p class="note footnote">Nothing is applied when a photo opens &mdash; you see it exactly as decoded. Tap foliage or press Auto to balance. No 2000K floor.</p>
           </section>
 
           <!-- ===== IR ===== -->
           <section class="section" role="tabpanel" id="sec-ir" aria-labelledby="ptab-ir" data-tab="ir" hidden>
+            <button id="irAutoWb" class="accent-outline" type="button">Auto white balance</button>
+            <p class="note">Rebalances to this photo's own neutral &mdash; the quick way back out of a look's color cast. Touches nothing else.</p>
             <button id="swapBtn" type="button" class="toggle full-btn" aria-pressed="true">R &#8646; B channel swap</button>
             <p class="note">The core false-color move &mdash; swaps the red and blue channels. Color looks switch it on; toggle here or re-press a look to compare.</p>
             <div class="sub-title">Looks</div>
@@ -781,7 +783,7 @@
           <li><strong>Quick look a folder</strong> (start screen) when you just want to <em>see</em> what's in a set:
           an instant grid of auto-balanced previews, nothing saved. Tap the keepers and <strong>Keep in a session</strong>
           sends them straight into an editable session.</li>
-          <li>On open, the app <strong>automatically</strong> sets white balance, exposure and denoise from the photo itself.</li>
+          <li>On open, <strong>nothing is applied</strong> — you see the photo exactly as the sensor recorded it (deep red for infrared RAW). Tap foliage or press <strong>Auto</strong> (white balance + exposure) to balance it.</li>
           <li><strong>Tap foliage</strong> in the photo to fine-tune white balance — the classic IR move.</li>
           <li>Pick a <strong>Look</strong>, adjust sliders to taste, then <strong>Export &amp; Save</strong>.</li>
         </ol>
@@ -796,7 +798,7 @@
         <h3>Top bar</h3>
         <ul>
           <li><strong>Undo / Redo</strong> — step back and forward through your edit, one gesture per step. A fresh edit after an undo starts a new path forward.</li>
-          <li><strong>Reset</strong> — the whole edit returns to how the photo first opened (the automatic balance).</li>
+          <li><strong>Reset</strong> — the whole edit returns to how the photo first opened, untouched.</li>
           <li><strong>Histogram</strong> — a live RGB + luminance readout floating over the photo. Tap the histogram itself to tuck it away; the button brings it back.</li>
         </ul>
 

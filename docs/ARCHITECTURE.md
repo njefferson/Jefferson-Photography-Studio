@@ -330,8 +330,9 @@ and NO Nikon body can channel-swap in camera. Field guide:
     coalesces into ONE undo entry; discrete actions (look, swap, Auto, tap-WB,
     per-color/tone reset, slot load) call `flushRecord()` to be atomic. The
     debounce records the PREVIOUS settled state, so Undo lands on pre-edit.
-  - `baseline` is snapshotted at the end of `openImported` (after the automatic
-    WB/exposure/denoise) — that's the Reset target. Reset settles current edits
+  - `baseline` is snapshotted at the end of `openImported` (fully neutral:
+    WB [1,1,1], exposure 1, denoise 0 — NOTHING is applied at open, owner
+    rule 2026-07-25) — that's the Reset target. Reset settles current edits
     first, so Reset is itself undoable.
   - **Save/Load looks**: five `localStorage` slots (`ips-look-slot-N`). A slot
     stores the CREATIVE grade only (`SavedLook` — swap/hue/sat/contrast/tint/
