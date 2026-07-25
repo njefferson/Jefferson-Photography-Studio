@@ -6169,6 +6169,7 @@ const qlGrid = $("qlGrid") as HTMLDivElement;
 const qlCount = $("qlCount") as HTMLSpanElement;
 const qlKeep = $("qlKeep") as HTMLButtonElement;
 const qlSelectToggle = $("qlSelectToggle") as HTMLButtonElement;
+const qlPos = $("qlPos") as HTMLDivElement;
 
 const QUICK_EDGE = 512; // grid-tile preview edge (bigger than the strip's 260)
 
@@ -6190,8 +6191,10 @@ function updateQuickHeader(progress?: string) {
 }
 
 /** Append one grid tile (a preview, or a placeholder for a file that wouldn't
- *  decode). Tapping a good tile toggles whether it's a keeper. */
-function addQuickTile(it: QuickItem) {
+ *  decode). Tapping a good tile toggles whether it's a keeper. `n` is the
+ *  photo's 1-based position in the grid — shown on the tile so a big set
+ *  stays countable ("what number am I on?"). */
+function addQuickTile(it: QuickItem, n: number) {
   const tile = document.createElement("button");
   tile.type = "button";
   tile.className = "ql-tile" + (it.selected ? " selected" : "");
@@ -6211,9 +6214,50 @@ function addQuickTile(it: QuickItem) {
     tile.classList.add("ql-bad");
     tile.append(Object.assign(document.createElement("span"), { className: "ql-bad-mark", textContent: "⚠︎" }));
   }
-  tile.append(Object.assign(document.createElement("span"), { className: "ql-name", textContent: it.name }));
+  tile.append(Object.assign(document.createElement("span"), { className: "ql-name", textContent: `${n} · ${it.name}` }));
   qlGrid.append(tile);
 }
+
+// --- Scroll-position pill: with a big set the grid is a long scroll and the
+// thin overlay scrollbar says nothing, so while the grid scrolls a glass pill
+// floats up showing which photo numbers are on screen ("31–45 of 77") and
+// fades once the scroll settles. Purely visual and transient (aria-hidden):
+// the same numbers sit permanently on every tile and the header carries the
+// total, so nothing is lost without it.
+let qlPosRaf = 0;
+let qlPosHide = 0;
+
+function updateQuickPos() {
+  const total = quickItems.length;
+  if (!total || qlGrid.scrollHeight <= qlGrid.clientHeight + 1) return;
+  const view = qlGrid.getBoundingClientRect();
+  const tiles = qlGrid.children;
+  let first = 0;
+  let last = 0;
+  for (let i = 0; i < tiles.length; i++) {
+    if (tiles[i].getBoundingClientRect().bottom > view.top) { first = i; break; }
+  }
+  for (let i = first; i < tiles.length; i++) {
+    if (tiles[i].getBoundingClientRect().top >= view.bottom) break;
+    last = i;
+  }
+  qlPos.textContent = first === last ? `${first + 1} of ${total}` : `${first + 1}–${last + 1} of ${total}`;
+  qlPos.classList.add("show");
+  clearTimeout(qlPosHide);
+  qlPosHide = window.setTimeout(() => qlPos.classList.remove("show"), 1200);
+}
+
+qlGrid.addEventListener(
+  "scroll",
+  () => {
+    if (qlPosRaf) return;
+    qlPosRaf = requestAnimationFrame(() => {
+      qlPosRaf = 0;
+      updateQuickPos();
+    });
+  },
+  { passive: true },
+);
 
 /** Open the grid and decode a preview of each picked file in turn. A transcoded
  *  JPEG still makes a fine preview, so — unlike a real open — we don't reject it
@@ -6251,7 +6295,7 @@ async function openQuickLook(files: File[]) {
     if (gen !== quickGen) { if (thumbUrl) URL.revokeObjectURL(thumbUrl); return; }
     const it: QuickItem = { file: f, name: f.name, thumbUrl, ok, selected: ok };
     quickItems.push(it);
-    addQuickTile(it);
+    addQuickTile(it, quickItems.length);
     done++;
     updateQuickHeader(done < files.length ? `Decoding ${done} / ${files.length}…` : undefined);
     await tick(); // yield so the grid paints and taps stay responsive
@@ -6265,6 +6309,8 @@ function closeQuickLook() {
   for (const it of quickItems) if (it.thumbUrl) URL.revokeObjectURL(it.thumbUrl);
   quickItems = [];
   qlGrid.replaceChildren();
+  clearTimeout(qlPosHide);
+  qlPos.classList.remove("show");
   if (quickLook.open) quickLook.close();
 }
 
