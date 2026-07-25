@@ -131,6 +131,7 @@ const ui = {
   expo: $("expo") as HTMLInputElement,
   dn: $("dn") as HTMLInputElement,
   autoBtn: $("autoBtn") as HTMLButtonElement,
+  irAutoWb: $("irAutoWb") as HTMLButtonElement,
   swapBtn: $("swapBtn") as HTMLButtonElement,
   hue: $("hue") as HTMLInputElement,
   sat: $("sat") as HTMLInputElement,
@@ -442,6 +443,18 @@ function updateBandLabels() {
 ui.autoBtn.addEventListener("click", () => {
   if (!current) return;
   autoAdjust(current);
+  syncToUI();
+  draw();
+  flushRecord();
+});
+
+// IR-tab Auto WB: rebalance to this photo's own neutral, clearing any WB bias
+// a look baked in — the quick way back OUT of a look choice. WB only: it never
+// touches exposure, swap, saturation or the rest of the look.
+ui.irAutoWb.addEventListener("click", () => {
+  if (!current) return;
+  params.wb = grayWorldWB(current);
+  lookBias = [1, 1, 1];
   syncToUI();
   draw();
   flushRecord();
@@ -5485,14 +5498,18 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
   if (img.previewNotice) noticeDialog("Preview only", img.previewNotice);
 }
 
-/** Reset the live edit to this photo's fresh automatic baseline (white balance,
- *  exposure, denoise), clear masks and undo history, and record the baseline as
- *  the Reset target. Assumes `current` is the freshly-decoded image. */
+/** Reset the live edit to this photo's fresh baseline (as-shot white balance,
+ *  auto exposure, auto denoise), clear masks and undo history, and record the
+ *  baseline as the Reset target. Assumes `current` is the freshly-decoded image. */
 function establishFreshEdit() {
-  const img = current!;
-  // EVERY open starts from a fresh automatic baseline (white balance,
-  // exposure, denoise) — raw or JPEG alike.
-  autoAdjust(img);
+  // NOTHING is applied at open (owner rule, 2026-07-25: "stop doing ANYTHING
+  // to the photo at open"). The photo appears exactly as decoded — no white
+  // balance, no auto exposure, no auto denoise. Auto (Basic tab), Auto WB
+  // (IR tab) and tap-WB are all one explicit press away.
+  params.wb = [1, 1, 1];
+  params.exposure = 1;
+  params.denoise = 0;
+  lookBias = [1, 1, 1];
   syncToUI();
   // Snapshot the as-imported baseline for press-and-hold comparison.
   origParams = {
@@ -6345,8 +6362,8 @@ const LESSONS: { title: string; tab: PanelTab; steps: string[] }[] = [
     title: "Lesson 1 · White balance — the IR crux",
     tab: "basic",
     steps: [
-      "Tap different things in the photo — foliage, a cloud, the sky — each sets white balance from that point and the colors shift.",
-      "Auto (white balance + exposure) brings you back to the automatic starting point at any time.",
+      "Photos open exactly as the sensor saw them — deep red for infrared. Tap different things in the photo — foliage, a cloud, the sky — each sets white balance from that point and the colors shift.",
+      "Auto (white balance + exposure) balances the photo to its own neutral in one press; Reset returns to the unbalanced opening state at any time.",
       "For big moves, drag the Red / Green / Blue gain sliders. There's no 2000K floor here — that's the move ordinary editors can't make.",
     ],
   },
@@ -6354,6 +6371,7 @@ const LESSONS: { title: string; tab: PanelTab; steps: string[] }[] = [
     title: "Lesson 2 · Swap & Looks — the color world",
     tab: "ir",
     steps: [
+      "First balance the photo — press Auto white balance at the top of this tab (or tap foliage). Looks are tuned to sit on a balanced photo.",
       "The R⇄B channel swap flips the whole color world in one tap — the classic infrared move.",
       "Try the film Looks — Aerochrome, Aero Red, Goldie. Press a look twice to flip its built-in swap.",
       "B&W IR and HIE B&W give the classic black-and-white infrared feel — and the B&W tab goes further, with a full channel mix (that's Lesson 7).",
@@ -6381,7 +6399,7 @@ const LESSONS: { title: string; tab: PanelTab; steps: string[] }[] = [
     title: "Lesson 5 · Detail & finish",
     tab: "tone",
     steps: [
-      "Denoise (in the Basic tab) is set automatically from the photo — nudge the slider to taste (0 is none).",
+      "Denoise (in the Basic tab) starts at 0 — press Auto to set it from the photo's measured noise, then nudge to taste.",
       "Sensor dust in the sky? That's Lesson 6 — Dust & spots.",
       "Shape the light with the Tone curve (Blacks → Highlights) and the overall Luminance.",
       "When it's how you want it, go to Export and Export & Save — pick the resolution on the way out.",
@@ -6407,7 +6425,7 @@ const LESSONS: { title: string; tab: PanelTab; steps: string[] }[] = [
     title: "Lesson 7 · Black & white — the 720nm mono",
     tab: "bw",
     steps: [
-      "Switch on Black & white (its own B&W tab). Frames like this carry almost no color — a channel mix gives a real mono conversion with control over the tones, not just zero saturation.",
+      "Switch on Black & white (its own B&W tab). Once balanced, frames like this carry almost no color — a channel mix gives a real mono conversion with control over the tones, not just zero saturation.",
       "Try the named mixes — Even, Luma, Red / Green / Blue filter — then drag the Red / Green / Blue weights yourself. Only their balance matters: watch the sky and the frosted trees trade brightness.",
       "Shape tones per color: in the Color tab, turn on Drag on photo to adjust, then pull down on the sky — just that color's grey darkens, like a classic B&W mix.",
       "Your mix rides saved looks and bakes into exported .cube LUTs, so the mono travels with the grade.",
