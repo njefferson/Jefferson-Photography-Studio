@@ -3616,6 +3616,27 @@ for the chat upload; Drive delivery to a session is hard-capped at
 is unverified until he re-sends a smaller zip; (c) the ~3% white-level
 residual (curve top vs Adobe's true saturation point) stays a candidate for
 a per-model saturation table, absorbed by auto exposure today.
+RESOLVED same night — the "1709 still mismatched / channels swapped" report
+(owner's Quick-look screenshot on the fixed build; DSC_1709 pair re-sent):
+NOT a decode bug. His Lightroom-iOS DNGs embed a Rob Shea IR camera
+profile, and it differs per photo: DSC_4940 (and, per the matching
+screenshot tiles, 4776) carry ProfileName (50936) "Infrared Temp -100",
+DSC_1709 carries "Infrared Temp -50" (both ProfileCopyright "Rob Shea").
+LR bakes the ASSIGNED profile's ColorMatrix1/2 into each DNG (the two
+files' ForwardMatrices are identical — only the CMs differ), so each DNG
+legitimately renders per its own profile and the app is RIGHT to honor it.
+The NEF-side hardcode (read from 4940's DNG) is therefore the "-100"
+PROFILE matrix, not Adobe stock — color.ts now says so (deliberate
+deviation from dcraw's stock D5300 matrix: stock matches NONE of the
+owner's real files; -100 is his standard). PROOF the profile is the whole
+story: rendering the 1709 NEF through the -50 matrix from its own DNG twin
+matches that DNG at mean 0.61/255 (max 4); through the default -100 matrix
+the diff is 13.5/255 — exactly the owner's screenshot. The linearization
+fix holds on this pair too (NEF/DNG normalized means agree within ~2%).
+If a pair with a non-"-100" profile should match exactly: re-export that
+DNG with the -100 profile, or the owner names a different NEF default
+(one-line change). Profile-aware NEF defaults beyond one per model are
+impossible — the NEF simply doesn't say which profile the user assigned.
 
 FIXED 2026-07-25 (the "dark daytime frame" — DSC_1709 NEF vs its DNG twin,
 owner-supplied ground truth): the NEF path's black pedestal was the Z-series
