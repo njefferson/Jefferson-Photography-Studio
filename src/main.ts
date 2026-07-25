@@ -8,7 +8,7 @@ import { findLocation, stripLocation } from "./gps";
 import { writeZip, crc32 } from "./zip";
 import { putFrame, eachFrame, frameMetas, frameCount, clearFrames } from "./batchstore";
 import * as Session from "./session";
-import { TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, type MaskLayer, type CropRect } from "./pipeline";
+import { TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, type MaskLayer, type CropRect } from "./pipeline";
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, type HealSpot } from "./heal";
 import { makeStickerAsset, stickerRect, stickerWorldCorners, stickerXform, compositeStickersIntoRect8, compositeStickersIntoRectF32, compositeStickersOverlay8, type StickerAsset } from "./sticker";
 import { makeWarpField, encodeWarp, paintWarp, warpIsEmpty as warpFieldEmpty, type WarpField, type WarpTool } from "./warp";
@@ -5800,25 +5800,47 @@ async function makeThumb(img: DecodedImage, MAX = 260): Promise<ArrayBuffer> {
   const s = Math.min(1, MAX / Math.max(img.width, img.height));
   const w = Math.max(1, Math.round(img.width * s));
   const h = Math.max(1, Math.round(img.height * s));
+  // Render the thumb through the REAL pipeline with the photo's own auto
+  // baseline PLUS the live creative state (swap/looks/grade persist across
+  // opens), so a thumbnail matches what tapping it will show — a bare
+  // WB+matrix render diverged the moment a look was active (owner-caught,
+  // IMG_1256: yellow/blue thumb vs the teal/orange it opened into).
+  // Spatial/per-image extras (masks, glow, clarity, LUT, grain) are cleared —
+  // they need maps or textures a thumb doesn't have.
   const wb = grayWorldWB(img);
-  const e = autoExposure(img, wb);
-  const cm = img.camMatrix;
+  const p: EditParams = {
+    ...cloneParams(params),
+    wb,
+    exposure: autoExposure(img, wb),
+    denoise: 0,
+    recover: img.camMatrix ? autoRecover(img) : 0,
+    masks: [],
+    spots: [],
+    glow: 0,
+    clarity: 0,
+    dehaze: 0,
+    sharpen: 0,
+    texture: 0,
+    grainAmt: 0,
+    vigAmt: 0,
+    lut: null,
+    crop: { ...CROP_DEFAULT },
+    straighten: 0,
+  };
+  const edit = compileEdit(p, img.camMatrix, w / h);
+  const px = new Float32Array(3);
   const out = new Uint8ClampedArray(w * h * 4);
   for (let y = 0; y < h; y++) {
     const sy = Math.min(img.height - 1, Math.floor(y / s));
     for (let x = 0; x < w; x++) {
       const sx = Math.min(img.width - 1, Math.floor(x / s));
-      let [r, g, b] = linearAt(img, sx, sy);
-      r *= wb[0] * e; g *= wb[1] * e; b *= wb[2] * e;
-      if (cm) {
-        const cr = cm[0] * r + cm[1] * g + cm[2] * b;
-        const cg = cm[3] * r + cm[4] * g + cm[5] * b;
-        const cb = cm[6] * r + cm[7] * g + cm[8] * b;
-        r = cr; g = cg; b = cb;
-      }
-      const enc = (v: number) => Math.round(255 * Math.pow(clamp(v, 0, 1), 1 / 2.2));
+      const [r, g, b] = linearAt(img, sx, sy);
+      edit(r, g, b, px, 0, undefined, undefined);
       const i = (y * w + x) * 4;
-      out[i] = enc(r); out[i + 1] = enc(g); out[i + 2] = enc(b); out[i + 3] = 255;
+      out[i] = Math.round(255 * clamp(px[0], 0, 1));
+      out[i + 1] = Math.round(255 * clamp(px[1], 0, 1));
+      out[i + 2] = Math.round(255 * clamp(px[2], 0, 1));
+      out[i + 3] = 255;
     }
   }
   const cv = document.createElement("canvas");

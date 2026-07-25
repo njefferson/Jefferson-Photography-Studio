@@ -98,7 +98,7 @@ export function readNefCfa(bytes: Uint8Array): RawCfa {
   // value LibRaw reports (15520 at 14-bit), the pre-branch behavior. The
   // black pedestal scales with bit depth (1008 is the 14-bit convention).
   const curveWhite = params.curve[params.curveMax - 1] || 0;
-  const black = raw.num(50714)[0] ?? (bps === 14 ? 1008 : bps === 12 ? 252 : 0);
+  const black = raw.num(50714)[0] ?? meta.black ?? (bps === 14 ? 1008 : bps === 12 ? 252 : 0);
   const white =
     raw.num(50717)[0] ??
     (params.hasCurve && curveWhite > black ? curveWhite : bps === 14 ? 15520 : (1 << bps) - 1);
@@ -231,8 +231,13 @@ function nikonDecode(bytes: Uint8Array, dataOffset: number, width: number, heigh
   return cfa;
 }
 
-/** Walk IFD0 -> EXIF IFD -> MakerNote -> LinearizationTable (0x0096). */
-function findLinearizationTable(bytes: Uint8Array, main: Reader): { offset: number; le: boolean } {
+/** Walk IFD0 -> EXIF IFD -> MakerNote -> LinearizationTable (0x0096), also
+ *  collecting the MakerNote BlackLevel (0x003D, four u16 — one per CFA site)
+ *  when present. That tag is the FILE'S OWN pedestal and varies per body:
+ *  D5300 = 600, Z-series = 1008. Assuming the Z value crushed a deeply
+ *  underexposed D5300 frame to near-black (owner's DSC_1709, 2026-07-25 —
+ *  its Adobe DNG twin carried BlackLevel 600 and rendered fine). */
+function findLinearizationTable(bytes: Uint8Array, main: Reader): { offset: number; le: boolean; black?: number } {
   const u32 = (o: number) => main.u32(o);
   const u16 = (o: number) => main.u16(o);
   const tagVal = (ifd: number, tag: number): number | undefined => {
@@ -263,11 +268,18 @@ function findLinearizationTable(bytes: Uint8Array, main: Reader): { offset: numb
   const mn = new Reader(new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength), mnLe);
   const mnIfd = base + mn.u32(base + 4);
   const mc = mn.u16(mnIfd);
+  let linOff: number | undefined;
+  let black: number | undefined;
   for (let i = 0; i < mc; i++) {
     const e = mnIfd + 2 + i * 12;
-    if (mn.u16(e) === 0x0096) {
-      return { offset: base + mn.u32(e + 8), le: mnLe };
+    const tag = mn.u16(e);
+    if (tag === 0x0096) linOff = base + mn.u32(e + 8);
+    if (tag === 0x003d && mn.u16(e + 2) === 3 && mn.u32(e + 4) === 4) {
+      // Four per-CFA-site shorts (equal in practice); average to one level.
+      const vo = base + mn.u32(e + 8);
+      black = Math.round((mn.u16(vo) + mn.u16(vo + 2) + mn.u16(vo + 4) + mn.u16(vo + 6)) / 4);
     }
   }
-  throw new Error("NEF: no LinearizationTable (0x0096).");
+  if (linOff === undefined) throw new Error("NEF: no LinearizationTable (0x0096).");
+  return { offset: linOff, le: mnLe, black };
 }
