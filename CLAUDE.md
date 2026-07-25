@@ -79,12 +79,19 @@ before any UI release, alongside the other walks. NOTES.md "## Accessibility
 standing rule" holds the full audit record and the NEVER-CHURN list of
 patterns already verified correct — do not "fix" those, do not regress them.
 
-## Nothing is applied at photo open (owner ruling, 2026-07-25 — FINAL)
-A photo opens exactly as decoded: WB [1,1,1], exposure 1, denoise 0, no
-automatic repairs of any kind. Every adjustment is an explicit control,
-default neutral (Auto, Auto WB, tap-WB, the Recover-highlights slider). Never
-reintroduce an automatic at-open adjustment, however helpful. Doctrine §14
-has the full rule and the history that earned it; NOTES.md holds the ledger.
+## What opens applies (owner ruling, 2026-07-25 rev. 2 — supersedes "nothing")
+The blanket "nothing at open" was a stabilization measure, not the product.
+The product: open applies an automatic, VISIBLE, UNDOABLE baseline of edit
+parameters, per file type — RAW (NEF/DNG): gray-world WB + auto exposure +
+measured denoise (owner-tuned 2026-07-12: barely clears the grain, nothing
+more) + Recover-highlights 0.7 iff the frame has real clipping (calibrated;
+industry-normal per LR-class default rendering). CAMERA-RENDERED (JPEG/HEIC/
+PNG/previews): as the camera made them, measured denoise ONLY (lighter touch,
+owner call 2026-07-25). Reset returns to this baseline; Hold: Untouched shows
+the bare decode. What stays banned FOREVER (Doctrine §14): silent PIXEL
+mutation — every automatic lands on a visible slider, is undoable, and the
+untouched decode stays one press away. Never add an at-open automatic that
+fails any of those three tests.
 
 ## Adding an EditParams field — FIVE places or undo silently breaks
 cloneParams, applySnapshot, syncFromUI, syncToUI, AND the input-listener
