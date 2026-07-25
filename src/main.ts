@@ -6219,6 +6219,10 @@ function addQuickTile(it: QuickItem) {
  *  JPEG still makes a fine preview, so — unlike a real open — we don't reject it
  *  here (that warning is for editing true RAW, which quick look isn't). */
 async function openQuickLook(files: File[]) {
+  // The picker hands files over in tap order (arbitrary). Sort by filename,
+  // numeric-aware, so the grid reads in shutter order and same-shot pairs
+  // (DSC_1709.dng / DSC_1709 2.NEF) sit next to each other.
+  files = [...files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
   const gen = ++quickGen;
   for (const it of quickItems) if (it.thumbUrl) URL.revokeObjectURL(it.thumbUrl);
   quickItems = [];
