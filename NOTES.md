@@ -3567,6 +3567,37 @@ that is what the sensor data contains; the user edits from the truth.
 The entries below this line record the removed subsystem's history and its
 audit — kept as the gotcha ledger, NOT as live documentation.
 
+SHIPPED 2026-07-25, same session — "Recover highlights" slider (Basic tab,
+id `recover`, EditParams.recover, DEFAULT 0): the RIGHT construction, after
+the owner demanded it be figured out properly. Why every decode-stage repair
+failed: before white balance, "what colour should a blown pixel be" has no
+answer — every version had to GUESS hues (neighbour, global prior, fixed
+ratio) and every guess painted artifacts. The answer exists only AFTER WB:
+a blown highlight is NEUTRAL in the white-balanced image, by definition —
+and camToSrgbLinear row-normalizes the camera matrix precisely so neutral is
+preserved, so a post-WB-neutral reconstruction CANNOT shift colour through
+the matrix. Mechanics (identical in gl.ts shader and pipeline.ts
+compileEdit): clip severity from the SOURCE sample at the sensor pin
+(smoothstep 0.985–0.995 native — data below the pin is mathematically
+untouchable), applied after WB / before the camera matrix as
+mix(c, vec3(luma(c)), recover*sev) — the pull is toward the pixel's OWN
+post-WB luminance, so surviving channels keep driving texture (skies don't
+flatten), and it is scale-invariant (exposure-folding safe) and re-aims
+LIVE as the user rebalances. Per-pixel only — no neighbourhoods, no search:
+structurally incapable of squares/seams. Raw sources only (u_useCam/cam).
+Excluded from SavedLook (per-shot corrective, like WB). VERIFIED: fringe
+metric 8492 at recover=0 (untouched, the ruling holds) → 0 at recover=1;
+zero below-pin pixels altered (all 694 changed pixels in the building probe
+individually confirmed >= 0.985 native); full-frame at 0.8 = clean textured
+white sky, no artifacts; headless in the built app on hillside.dng: default
+0, live GPU render responds, Undo → 0, Reset → 0 with render hash equal to
+the original, zero page errors.
+GOTCHA (bit us here): applySnapshot() restores EditParams FIELDS
+INDIVIDUALLY — a new field must be added in FIVE places or undo/reset
+silently drop it: cloneParams, applySnapshot, syncFromUI, syncToUI, and the
+input-listener array. `recover` initially missed applySnapshot and
+Undo/Reset ignored the slider.
+
 FIXED 2026-07-24 (native NEF highlights on non-Z50 bodies — the "other
 users can't use it" report; owner's D5300 full-spectrum frame DSC_4940):
 - The native-NEF white level was HARDCODED to 15520, which is the Nikon Z 50's

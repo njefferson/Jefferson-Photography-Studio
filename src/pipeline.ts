@@ -17,6 +17,18 @@ export interface EditParams {
   /** 0..1 bilateral strength, applied to LINEAR data BEFORE everything else
    *  (see raw/denoise.ts) — not part of compileEdit's per-pixel math. */
   denoise: number;
+  /** 0..1 highlight recovery — pulls genuinely sensor-clipped pixels toward
+   *  post-white-balance NEUTRAL, scaled by clip severity. Runs AFTER WB and
+   *  BEFORE the camera matrix, where "blown = neutral" is actually defined —
+   *  and the row-normalized matrix preserves neutral, so a recovered pixel
+   *  can never turn green/orange (the failure of every decode-stage repair;
+   *  see NOTES.md 2026-07-24/25 ledger). Per-pixel only: no neighbourhoods,
+   *  no spatial search — structurally incapable of seams or squares. Clip is
+   *  detected on the SOURCE value at the sensor pin (>=98.5% of white), so
+   *  real data below the pin is never touched. Raw sources only. DEFAULT 0 —
+   *  a photo opens untouched (owner rule 2026-07-25); this is an explicit
+   *  per-shot control, excluded from saved looks like WB. */
+  recover?: number;
   /** Per-channel tone tint applied after saturation (e.g. sepia over mono).
    *  [1,1,1] = none. */
   tint: [number, number, number];
@@ -822,9 +834,11 @@ export function compileEdit(
   const c20 = 0.299 - 0.3 * cos + 1.25 * sin;
   const c21 = 0.587 - 0.588 * cos - 1.05 * sin;
   const c22 = 0.114 + 0.886 * cos - 0.203 * sin;
-  // Fold exposure into the WB gains (both linear; order commutes).
+  // Fold exposure into the WB gains (both linear; order commutes). The
+  // neutral-pull below is scale-invariant, so folding exposure in is safe.
   const ex = p.exposure;
   const wr = p.wb[0] * ex, wg = p.wb[1] * ex, wb = p.wb[2] * ex;
+  const recover = p.recover ?? 0;
   const swap = p.swapRB;
   const sat = p.sat;
   const con = p.contrast;
@@ -868,6 +882,12 @@ export function compileEdit(
   const lutTmp = lut ? new Float32Array(3) : null;
 
   return (r, g, b, out, glow = 0, u, v) => {
+    // Clip severity from the SOURCE values, before anything modifies them —
+    // the sensor pin lives in native space (matches the shader's srcClip).
+    const sev =
+      cam && recover > 0
+        ? Math.max(smooth01(0.985, 0.995, r), smooth01(0.985, 0.995, g), smooth01(0.985, 0.995, b))
+        : 0;
     // Clarity/dehaze act on LINEAR source data before exposure/WB, using the
     // per-image maps — matching the shader (which runs them after denoise).
     if (localOn && u !== undefined && v !== undefined) {
@@ -896,6 +916,16 @@ export function compileEdit(
     r *= wr;
     g *= wg;
     b *= wb;
+    // Highlight recovery: blown pixels move toward post-WB neutral at their
+    // own luminance — the survivor channels keep driving the texture. Matches
+    // the shader exactly.
+    if (sev > 0) {
+      const F = recover * sev;
+      const Y = r * REC709[0] + g * REC709[1] + b * REC709[2];
+      r += (Y - r) * F;
+      g += (Y - g) * F;
+      b += (Y - b) * F;
+    }
     // IR lens correction: radial luminance gain after WB (spatial -> skipped in
     // the LUT bake where u/v are absent), matching the shader.
     if (lensOn && u !== undefined && v !== undefined) {
