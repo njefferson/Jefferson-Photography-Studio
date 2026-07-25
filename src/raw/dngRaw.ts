@@ -16,6 +16,7 @@ const T_TILE_WIDTH = 322;
 const T_TILE_LENGTH = 323;
 const T_TILE_OFFSETS = 324;
 const T_TILE_BYTECOUNTS = 325;
+const T_LINEARIZATION_TABLE = 50712;
 const T_BLACK_LEVEL = 50714;
 const T_WHITE_LEVEL = 50717;
 
@@ -75,6 +76,17 @@ function finish(cfa: Uint16Array, width: number, height: number, raw: Ifd): RawC
   // CFAPattern: 4 bytes (0=R,1=G,2=B); default RGGB.
   const pat = raw.num(T_CFA_PATTERN);
   const pattern = pat.length === 4 ? pat : [0, 1, 1, 2];
+
+  // DNG spec order: the LinearizationTable maps stored (companded) values to
+  // linear BEFORE BlackLevel/WhiteLevel apply. Adobe writes one when the
+  // source NEF was lossy-compressed (e.g. D5300); its stored values top out
+  // near the table length, so skipping it renders the frame several stops
+  // dark with its real clipping invisible.
+  const table = raw.num(T_LINEARIZATION_TABLE);
+  if (table.length > 1) {
+    const top = table.length - 1;
+    for (let i = 0; i < cfa.length; i++) cfa[i] = table[Math.min(cfa[i], top)];
+  }
 
   const black = raw.num(T_BLACK_LEVEL)[0] ?? 0;
   const white = raw.num(T_WHITE_LEVEL)[0] ?? 65535;
