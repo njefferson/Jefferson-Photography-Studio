@@ -331,7 +331,11 @@ updateHistVisibility(); // reflect the stored preference on the toggle at startu
 // sliders "falling to the floor" even when the balance is correct. The track
 // therefore stores a 0..1000 position mapped exponentially, putting 1.0 near
 // mid-track with fine control around it.
-const WB_LO = 0.02, WB_HI = 16, EX_LO = 0.1, EX_HI = 16;
+// Exposure slider spans 0.05..64x (about -4.3 to +6 stops): auto stops at
+// 16x (below) but a dark frame must stay PUSHABLE past where auto gives up —
+// the owner's twilight D5300 frame opened with auto railed at the old 16x
+// ceiling and nowhere left to go (IMG_1253, 2026-07-25).
+const WB_LO = 0.02, WB_HI = 16, EX_LO = 0.05, EX_HI = 64;
 // Global luminance spans 0.5–2x on the same kind of log track; 1.0 (neutral)
 // lands dead centre so brighten/darken are symmetric around it.
 const LUM_LO = 0.5, LUM_HI = 2;
@@ -7900,7 +7904,10 @@ function autoExposure(img: DecodedImage, wb: [number, number, number]): number {
   }
   lums.sort((a, b) => a - b);
   const p = lums[Math.floor(lums.length * 0.97)] || 1e-4;
-  // Clamp to the exposure slider's range so the value round-trips exactly.
+  // Auto deliberately tops out at 16x — brightening a genuinely dark frame
+  // beyond that is a taste call, so the slider keeps going (to EX_HI) but
+  // auto doesn't. Both bounds sit inside the slider range, so the value
+  // round-trips exactly.
   return clamp(0.85 / Math.max(p, 1e-4), 0.1, 16);
 }
 
