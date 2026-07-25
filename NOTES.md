@@ -1798,6 +1798,13 @@ user-scalable=no.
   hitches on large RAW — the Web-Worker thumbnailer stays the obvious follow-up),
   and that "Keep in a session" flows straight into editing. Cache bumped
   ips-v22 → ips-v23.
+  ORDER FIX 2026-07-25 (owner: "they load on that tray out of order?"): the
+  grid decoded in FileList order — the picker's tap order, which reads as
+  random. openQuickLook now sorts by filename first (localeCompare
+  numeric-aware), so tiles read in shutter order and same-shot NEF/DNG
+  twins sit adjacent. VERIFIED headless (real #quickFiles input, scrambled
+  3-DNG pick comes out sorted; fail-first: the unsorted build fails the
+  same walk; no page errors).
 - [x] **Batch process asks what goes on every photo** — owner feedback
   2026-07-13 (his origin story: he wanted to white-balance an entire folder
   just to SEE what files he was dealing with): batch used to silently take the
