@@ -8,6 +8,20 @@ export const NIKON_Z50_COLOR_MATRIX = [
   1.1853, -0.4189, -0.1024, -0.4292, 1.2041, 0.2569, -0.1336, 0.2599, 0.5824,
 ];
 
+// Nikon D5300 ColorMatrix2 (XYZ -> camera, D65) — Adobe's calibration, read
+// verbatim from the Adobe DNG twin of the owner's DSC_4940.NEF (2026-07-25).
+export const NIKON_D5300_COLOR_MATRIX = [
+  1.2101, -0.1453, -0.0262, -0.9751, 1.4074, 0.0899, -0.2572, 0.2313, 0.2688,
+];
+
+/** Matrix for a native NEF, which carries no ColorMatrix tags — chosen by the
+ *  file's own Model string so a NEF and its Adobe DNG twin render alike.
+ *  Fallback: Z 50, the owner's primary body. */
+export function nikonColorMatrix(model?: string): number[] {
+  if (model && /D5300/i.test(model)) return NIKON_D5300_COLOR_MATRIX;
+  return NIKON_Z50_COLOR_MATRIX;
+}
+
 const XYZ_TO_SRGB = [
   3.2406, -1.5372, -0.4986, -0.9689, 1.8758, 0.0415, 0.0557, -0.204, 1.057,
 ];
