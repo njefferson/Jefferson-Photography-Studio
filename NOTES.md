@@ -303,6 +303,18 @@ user-scalable=no.
 
 ## Shipped (roadmap archive)
 
+- [x] **2.3 — D5300 & full-spectrum support** — SHIPPED 2026-07-25 (PR #68,
+  rebase-merged; owner on-device pass on staging). Per-file NEF decode levels
+  (white from the linearization curve, black from MakerNote 0x003D — D5300
+  600 vs Z-series 1008), per-type auto open baseline (raw: WB/exposure/
+  denoise/auto-recover; JPEG/HEIC: denoise only), the Recover-highlights
+  slider (post-WB neutral pull, per-pixel, auto 0.7 on clipped raw),
+  Hold: Untouched, exposure to +6 stops, pipeline-true thumbnails.
+  Implementation facts a later session needs: the 2026-07-24/25 ledger above
+  (three rejected highlight-repair attempts + audit), the five-places
+  EditParams rule, the per-file-levels gotcha, and the two new standing rules
+  in CLAUDE.md (INFRARED-first reasoning; known-things-first references).
+
 > The completed "Next capability release" items, newest last, with their
 > full SHIPPED/verification records — the project memory sessions must
 > still read. Moved out of the queue section so the in-app roadmap parser
