@@ -51,7 +51,8 @@
           <button id="undoBtn" class="bar-btn" type="button" disabled title="Undo one edit step">&#8630; Undo</button>
           <button id="redoBtn" class="bar-btn" type="button" disabled title="Redo the last undone step">&#8631; Redo</button>
           <button id="resetBtn" class="bar-btn" type="button" disabled title="Reset the whole edit to how the photo first opened">Reset</button>
-          <button id="origBtn" class="bar-btn" type="button" title="Press and hold to compare with the original">Hold: Original</button>
+          <button id="origBtn" class="bar-btn" type="button" title="Press and hold to compare with how the photo opened">Hold: Original</button>
+          <button id="untouchedBtn" class="bar-btn" type="button" title="Press and hold to see the photo exactly as decoded, nothing applied">Hold: Untouched</button>
           <button id="histBtn" class="bar-btn" type="button" aria-pressed="true" title="Show or hide the live histogram">Histogram</button>
           <button id="helpBtn" class="bar-btn" type="button">Help</button>
           <button id="shareBtn" class="bar-btn" type="button" hidden title="Share this app or copy its link">&#x2BAD;&#xFE0E; Share</button>
@@ -222,14 +223,14 @@
             <label>Blue gain <input id="wbB" type="range" min="0" max="1000" step="1" value="585" /></label>
             <p class="note">Tip: tap foliage in the image to set white balance.</p>
             <label>Recover highlights <input id="recover" type="range" min="0" max="1" step="0.01" value="0" /></label>
-            <p class="note">Pulls genuinely blown (sensor-clipped) areas toward clean neutral for your current white balance &mdash; it re-aims live as you rebalance. 0 = untouched.</p>
+            <p class="note">Pulls genuinely blown (sensor-clipped) areas toward clean neutral for your current white balance &mdash; it re-aims live as you rebalance. Set automatically at open when the frame has clipping; 0 = untouched.</p>
             <hr class="divider" />
             <div class="sub-title">Detail</div>
             <label>Denoise <input id="dn" type="range" min="0" max="1" step="0.01" value="0" /></label>
             <label>Sharpen <input id="sharpen" type="range" min="0" max="1" step="0.01" value="0" /></label>
             <label>Texture <input id="texture" type="range" min="-1" max="1" step="0.01" value="0" /></label>
-            <p class="note">Auto sets Denoise from the photo's measured noise. Sharpen crisps up fine edges; Texture brings out surface structure (pull left to smooth). Both keep colors put.</p>
-            <p class="note footnote">Nothing is applied when a photo opens &mdash; you see it exactly as decoded. Tap foliage or press Auto to balance. No 2000K floor.</p>
+            <p class="note">Denoise is set automatically from the photo's measured noise. Sharpen crisps up fine edges; Texture brings out surface structure (pull left to smooth). Both keep colors put.</p>
+            <p class="note footnote">Raw photos open auto-balanced (white balance, exposure, denoise &mdash; and blown-highlight recovery when needed); camera-rendered photos (JPEG/HEIC) open as the camera made them, denoise only. Hold: Untouched shows the bare decode. No 2000K floor.</p>
           </section>
 
           <!-- ===== IR ===== -->
@@ -785,7 +786,7 @@
           <li><strong>Quick look a folder</strong> (start screen) when you just want to <em>see</em> what's in a set:
           an instant grid of auto-balanced previews, nothing saved. Tap the keepers and <strong>Keep in a session</strong>
           sends them straight into an editable session.</li>
-          <li>On open, <strong>nothing is applied</strong> — you see the photo exactly as the sensor recorded it (deep red for infrared RAW). Tap foliage or press <strong>Auto</strong> (white balance + exposure) to balance it.</li>
+          <li>On open, <strong>raw photos are auto-balanced</strong> (white balance, exposure, denoise, and blown-highlight recovery when the frame needs it); JPEG/HEIC open as the camera rendered them, with measured denoise only. <strong>Hold: Untouched</strong> shows the bare decode any time.</li>
           <li><strong>Tap foliage</strong> in the photo to fine-tune white balance — the classic IR move.</li>
           <li>Pick a <strong>Look</strong>, adjust sliders to taste, then <strong>Export &amp; Save</strong>.</li>
         </ol>
@@ -794,13 +795,13 @@
         <ul>
           <li><strong>Tap</strong> the photo — set white balance from that point (aim at foliage). While a picture tool is armed — Heal, a color pick, brush painting or drag-to-adjust — that tool takes the tap instead.</li>
           <li><strong>Pinch</strong> — zoom (up to 8&times;); drag to pan while zoomed. No touchscreen? Use the <strong>+ / &minus; / Fit</strong> buttons in the photo's bottom-right corner, or the mouse wheel over the photo — both work even while you're brushing, so you can zoom right in to edit up close.</li>
-          <li><strong>Press &amp; hold</strong> the photo (or the <em>Hold: Original</em> button) — compare with the original.</li>
+          <li><strong>Press &amp; hold</strong> the photo (or the <em>Hold: Original</em> button) — compare with how the photo opened. <em>Hold: Untouched</em> shows the bare decode with nothing applied.</li>
         </ul>
 
         <h3>Top bar</h3>
         <ul>
           <li><strong>Undo / Redo</strong> — step back and forward through your edit, one gesture per step. A fresh edit after an undo starts a new path forward.</li>
-          <li><strong>Reset</strong> — the whole edit returns to how the photo first opened, untouched.</li>
+          <li><strong>Reset</strong> — the whole edit returns to how the photo first opened (the auto baseline).</li>
           <li><strong>Histogram</strong> — a live RGB + luminance readout floating over the photo. Tap the histogram itself to tuck it away; the button brings it back.</li>
         </ul>
 
