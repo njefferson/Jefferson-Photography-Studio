@@ -3850,17 +3850,34 @@ function showOriginal(on: boolean) {
   refreshHistogram(p);
 }
 
-const origBtn = $("origBtn") as HTMLButtonElement;
-for (const ev of ["pointerdown"] as const) {
-  origBtn.addEventListener(ev, (e) => {
+/** The true as-decoded state: every parameter neutral. Built from origParams
+ *  so the non-tonal fields (masks empty, crop identity, ...) stay valid. */
+function showUntouched(on: boolean) {
+  if (!current || !origParams) return;
+  const p = on
+    ? { ...origParams, wb: [1, 1, 1] as [number, number, number], exposure: 1, denoise: 0, recover: 0 }
+    : params;
+  renderer.render(p);
+  refreshHistogram(p);
+}
+
+function wireHold(btn: HTMLButtonElement, show: (on: boolean) => void) {
+  btn.addEventListener("pointerdown", (e) => {
     e.preventDefault();
-    origBtn.setPointerCapture((e as PointerEvent).pointerId);
-    showOriginal(true);
+    try {
+      btn.setPointerCapture((e as PointerEvent).pointerId);
+    } catch {
+      /* capture is best-effort — the hold must still work without it */
+    }
+    show(true);
   });
+  for (const ev of ["pointerup", "pointercancel", "pointerleave"] as const) {
+    btn.addEventListener(ev, () => show(false));
+  }
 }
-for (const ev of ["pointerup", "pointercancel", "pointerleave"] as const) {
-  origBtn.addEventListener(ev, () => showOriginal(false));
-}
+const origBtn = $("origBtn") as HTMLButtonElement;
+wireHold(origBtn, showOriginal);
+wireHold($("untouchedBtn") as HTMLButtonElement, showUntouched);
 
 // Panel scroll cues: arrows appear when there is more panel above/below.
 function updateScrollCues() {
@@ -5504,18 +5521,34 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
   if (img.previewNotice) noticeDialog("Preview only", img.previewNotice);
 }
 
-/** Reset the live edit to this photo's fresh baseline (as-shot white balance,
- *  auto exposure, auto denoise), clear masks and undo history, and record the
- *  baseline as the Reset target. Assumes `current` is the freshly-decoded image. */
+/** Reset the live edit to this photo's opening baseline, clear masks and undo
+ *  history, and record the baseline as the Reset target. Assumes `current` is
+ *  the freshly-decoded image.
+ *
+ *  The baseline is an automatic, VISIBLE, undoable set of edit parameters,
+ *  applied PER FILE TYPE (owner ruling 2026-07-25, second revision — the
+ *  earlier blanket "nothing at open" was a stabilization measure, not the
+ *  product): RAW sensor data (NEF, mosaiced or linear DNG) gets the full
+ *  balance — gray-world WB, auto exposure, measured denoise, and (camera-
+ *  native raw only) highlight recovery when the frame actually has clipping,
+ *  the same default rendering Lightroom-class raw apps ship. Camera-rendered
+ *  photos (JPEG / HEIC / PNG / third-party-raw previews) are already
+ *  balanced by the camera, so they open as rendered with only measured
+ *  denoise — the LIGHTER TOUCH. Pixel data is never mutated; every value
+ *  lands on a slider, and the true untouched state is one press away
+ *  (Hold: Untouched) or reachable by zeroing the sliders. */
 function establishFreshEdit() {
-  // NOTHING is applied at open (owner rule, 2026-07-25: "stop doing ANYTHING
-  // to the photo at open"). The photo appears exactly as decoded — no white
-  // balance, no auto exposure, no auto denoise. Auto (Basic tab), Auto WB
-  // (IR tab) and tap-WB are all one explicit press away.
-  params.wb = [1, 1, 1];
-  params.exposure = 1;
-  params.denoise = 0;
-  params.recover = 0;
+  const src = current!;
+  if (src.isRaw) {
+    params.wb = grayWorldWB(src);
+    params.exposure = autoExposure(src, params.wb);
+    params.recover = src.camMatrix ? autoRecover(src) : 0;
+  } else {
+    params.wb = [1, 1, 1];
+    params.exposure = 1;
+    params.recover = 0;
+  }
+  params.denoise = estimateDenoise(src);
   lookBias = [1, 1, 1];
   syncToUI();
   // Snapshot the as-imported baseline for press-and-hold comparison.
@@ -5523,7 +5556,7 @@ function establishFreshEdit() {
     wb: [...params.wb] as [number, number, number],
     exposure: params.exposure,
     denoise: params.denoise,
-    recover: 0,
+    recover: params.recover ?? 0,
     swapRB: false,
     hue: 0,
     sat: 1,
@@ -6370,8 +6403,8 @@ const LESSONS: { title: string; tab: PanelTab; steps: string[] }[] = [
     title: "Lesson 1 · White balance — the IR crux",
     tab: "basic",
     steps: [
-      "Photos open exactly as the sensor saw them — deep red for infrared. Tap different things in the photo — foliage, a cloud, the sky — each sets white balance from that point and the colors shift.",
-      "Auto (white balance + exposure) balances the photo to its own neutral in one press; Reset returns to the unbalanced opening state at any time.",
+      "Tap different things in the photo — foliage, a cloud, the sky — each sets white balance from that point and the colors shift.",
+      "Raw photos open auto-balanced; Auto (white balance + exposure) or Reset brings you back to that starting point at any time. Hold: Untouched shows the raw, unbalanced truth.",
       "For big moves, drag the Red / Green / Blue gain sliders. There's no 2000K floor here — that's the move ordinary editors can't make.",
     ],
   },
@@ -6379,7 +6412,6 @@ const LESSONS: { title: string; tab: PanelTab; steps: string[] }[] = [
     title: "Lesson 2 · Swap & Looks — the color world",
     tab: "ir",
     steps: [
-      "First balance the photo — press Auto white balance at the top of this tab (or tap foliage). Looks are tuned to sit on a balanced photo.",
       "The R⇄B channel swap flips the whole color world in one tap — the classic infrared move.",
       "Try the film Looks — Aerochrome, Aero Red, Goldie. Press a look twice to flip its built-in swap.",
       "B&W IR and HIE B&W give the classic black-and-white infrared feel — and the B&W tab goes further, with a full channel mix (that's Lesson 7).",
@@ -6407,7 +6439,7 @@ const LESSONS: { title: string; tab: PanelTab; steps: string[] }[] = [
     title: "Lesson 5 · Detail & finish",
     tab: "tone",
     steps: [
-      "Denoise (in the Basic tab) starts at 0 — press Auto to set it from the photo's measured noise, then nudge to taste.",
+      "Denoise (in the Basic tab) is set automatically from the photo's measured noise — just enough to clear the grain in flat areas — nudge the slider to taste (0 is none).",
       "Sensor dust in the sky? That's Lesson 6 — Dust & spots.",
       "Shape the light with the Tone curve (Blacks → Highlights) and the overall Luminance.",
       "When it's how you want it, go to Export and Export & Save — pick the resolution on the way out.",
@@ -6433,7 +6465,7 @@ const LESSONS: { title: string; tab: PanelTab; steps: string[] }[] = [
     title: "Lesson 7 · Black & white — the 720nm mono",
     tab: "bw",
     steps: [
-      "Switch on Black & white (its own B&W tab). Once balanced, frames like this carry almost no color — a channel mix gives a real mono conversion with control over the tones, not just zero saturation.",
+      "Switch on Black & white (its own B&W tab). Frames like this carry almost no color — a channel mix gives a real mono conversion with control over the tones, not just zero saturation.",
       "Try the named mixes — Even, Luma, Red / Green / Blue filter — then drag the Red / Green / Blue weights yourself. Only their balance matters: watch the sky and the frosted trees trade brightness.",
       "Shape tones per color: in the Color tab, turn on Drag on photo to adjust, then pull down on the sky — just that color's grey darkens, like a classic B&W mix.",
       "Your mix rides saved looks and bakes into exported .cube LUTs, so the mono travels with the grade.",
@@ -7768,12 +7800,40 @@ function lumNormalize(g: number[]): [number, number, number] {
   return [clamp(g[0] / l, 0.02, 16), clamp(g[1] / l, 0.02, 16), clamp(g[2] / l, 0.02, 16)];
 }
 
-/** White balance + exposure + noise-matched denoise in one shot. */
+/** White balance + exposure + noise-matched denoise (+ highlight recovery on
+ *  clipped camera-native raw) in one shot — the same baseline open applies. */
 function autoAdjust(img: DecodedImage) {
   params.wb = grayWorldWB(img);
   params.exposure = autoExposure(img, params.wb);
   params.denoise = estimateDenoise(img);
+  params.recover = img.camMatrix ? autoRecover(img) : 0;
   lookBias = [1, 1, 1]; // fresh neutral WB — no look bias baked in
+}
+
+/** Auto position for the Recover-highlights slider: 0.7 when the frame has
+ *  real sensor clipping, 0 when it doesn't. 0.7 is calibrated on the D5300
+ *  full-spectrum reference frame — the lowest clean value there is 0.6 (green
+ *  edge artifacts fully gone), plus margin; Lightroom-class raw apps apply
+ *  their (stronger) reconstruction unconditionally, so a measured 0.7 is the
+ *  conservative version of industry-normal. Clipping test: >0.1% of sampled
+ *  pixels with a channel at >=98.5% of white — the same pin the slider keys on. */
+function autoRecover(img: DecodedImage): number {
+  if (!img.linear) return 0;
+  const { width, height, linear } = img;
+  const step = Math.max(1, Math.floor(Math.min(width, height) / 256));
+  let clipped = 0;
+  let n = 0;
+  for (let y = 0; y < height; y += step) {
+    for (let x = 0; x < width; x += step) {
+      const o = (y * width + x) * 4;
+      if (Math.max(linear[o], linear[o + 1], linear[o + 2]) >= 0.985) clipped++;
+      n++;
+    }
+  }
+  // 0.05% of the frame: catches any visually meaningful blown area (the
+  // D5300 reference frame is ~13% clipped) while ignoring single specular
+  // glints and border slivers (hillside.dng's 5-row edge strip stays 0).
+  return n && clipped / n > 0.0005 ? 0.7 : 0;
 }
 
 /**

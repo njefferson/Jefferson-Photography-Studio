@@ -3548,6 +3548,44 @@ user-scalable=no.
 > suite where a headless check exists. DEFERRED items are real but need their
 > own release (or an owner decision) — do not re-discover them.
 
+OWNER RULING 2026-07-25 REV. 2 — AUTO BASELINE AT OPEN, PER FILE TYPE.
+The blanket "nothing at open" below was a STABILIZATION MEASURE ("only
+because I could not get you to stop fucking up so I could even get a
+testable version"), not the product. The product, settled by Q&A in chat
+(his answers verbatim: 1 "Lighter touch good call", 2 "No infrared photos
+will be in dark", 3 "What is normally done in apps?", 4 "Autobaseline.
+'Hold original' should have an 'original' option somehow"):
+- RAW (isRaw: NEF, mosaiced DNG, lossy-linear DNG): gray-world WB + auto
+  exposure (bright-end 0.85 — no dark-scene special case, per answer 2) +
+  measured denoise (owner-tuned 2026-07-12: barely clears the grain) +
+  Recover-highlights 0.7 iff sampled clip fraction > 0.05% (camMatrix
+  sources only — recovery renders only there). 0.7 calibrated: lowest
+  fully-clean value on DSC_4940 is 0.6, plus margin; industry-normal —
+  LR/ACR/C1 apply (stronger) reconstruction unconditionally in default raw
+  rendering (the answer to his Q3).
+- CAMERA-RENDERED (JPEG/HEIC/PNG/third-party previews): as the camera made
+  them + measured denoise ONLY (lighter touch, answer 1).
+- Reset returns to this baseline (answer 4). NEW "Hold: Untouched" button
+  beside Hold: Original renders the bare decode (all params neutral) while
+  held — the "original option" of answer 4. Hold: Original = the opened
+  baseline, as before.
+- Baseline values are VISIBLE on sliders, undoable, and never mutate pixels
+  — the three tests any future at-open automatic must pass (CLAUDE.md).
+autoAdjust (Basic Auto button) now also sets recover on clipped camMatrix
+raw, so Auto reproduces the open baseline exactly.
+VERIFIED (built app, headless Chromium, real mouse input): RAW opens
+balanced (wb split, exposure set, denoise>0, recover 0 on a clean file);
+clipped-raw path proven by D5300 clip fraction 28.76% >> 0.05% bar (walk
+covers the below-bar side: hillside's 0.004% edge strip stays 0 — by
+design); JPEG opens WB/exposure untouched + denoise measured + recover 0;
+Hold: Untouched shows the bare decode and restores on release; Hold:
+Original shows the baseline after edits; Reset returns to baseline; zero
+page errors; tsc + vite build clean. Full-frame auto-open render of
+DSC_4940 (wb 0.56/1.05/1.83, expo 0.67, recover 0.7): clean, no artifacts.
+setPointerCapture in the hold wiring is now try/catch-guarded (synthetic
+pointers have no id; capture is best-effort).
+
+(SUPERSEDED by rev. 2 above — kept for the ledger:)
 OWNER RULING 2026-07-25 — NOTHING HAPPENS TO A PHOTO AT OPEN. FINAL.
 His words: "Stop doing ANYTHING to the photo at fucking open." A photo opens
 exactly as decoded: WB [1,1,1], exposure 1, denoise 0, and NO automatic
