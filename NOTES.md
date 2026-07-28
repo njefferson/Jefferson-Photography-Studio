@@ -141,6 +141,21 @@ both themes, fail-first) runs before any UI release. Full audits (structural
 outcomes; the red baseline predating the fixes is archived in the session
 scratchpad (a11y-baseline-red.json — 32/36 failing, incl. axe cross-checks).
 
+SUB-11px TEXT FLOOR (2026-07-28, applied from Frame's A10 register): informational
+text is >= 11px; only a glyph that labels nothing on its own (chevron, single-letter
+pin, a "?" affordance beside its own full-size label) may go smaller, and it must be
+recorded as exempt. Eleven rules were raised here, ALL of them informational, none
+decorative: .sticker-tile-note, .lut-badge, .tat-banner-off (the mode EXIT
+instruction — the smallest text on a phone), .session-thumb-name, .sub-title span
+(9px uppercase mono at .1em tracking, the worst of them), .look-sub, .badge,
+.filmstrip .thumb span, .shape .count, .icon-badge, and **.seg at 8px**.
+.seg IS THE ONE THAT MATTERS: norm / R⇄B is the look-button's state-as-TEXT, which
+the never-churn list above blesses precisely BECAUSE it is text and not hue. That
+entry blesses the PATTERN, not the SIZE — it shipped at 8px, which undercut the very
+fix it records. Raising it does not churn the pattern, it finishes it. VERIFIED
+headless across index/ir/macro/notes/privacy: ZERO rendered text below 11px, no
+horizontal overflow at a 16px OR a 20px browser default, 0 pageerrors, build clean.
+
 NEVER-CHURN — patterns audited as CORRECT; keep them, don't re-fix:
 aria-pressed on every toggle; labelled role=tab tablist; native <dialog> +
 showModal() for help/info/batch; toast role=status; dynamic controls are

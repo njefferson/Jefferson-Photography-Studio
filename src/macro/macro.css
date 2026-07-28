@@ -220,7 +220,7 @@ body {
   cursor: pointer; transition: border-color .12s, opacity .12s;
 }
 .filmstrip .thumb img { height: 100%; display: block; }
-.filmstrip .thumb span { position: absolute; left: 4px; bottom: 2px; font: 0.6rem/1 var(--mono); color: #fff; text-shadow: 0 1px 2px #000; }
+.filmstrip .thumb span { position: absolute; left: 4px; bottom: 2px; font: 0.6875rem/1 var(--mono); color: #fff; text-shadow: 0 1px 2px #000; }
 /* Frame currently open in the viewer */
 .filmstrip .thumb.selected { border-color: #ff2e88; box-shadow: 0 0 0 1px #ff2e88, inset 0 0 0 2px rgba(255, 255, 255, 0.85); }
 /* Frame turned OFF (excluded from the stack) */

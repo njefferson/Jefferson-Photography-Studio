@@ -255,7 +255,7 @@ body {
 .install .lead strong { color: var(--txt); font-weight: 600; }
 .shapes { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; }
 .shape { background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; padding: 1rem 1.1rem; }
-.shape .count { font: 700 0.625rem/1.4 var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent); }
+.shape .count { font: 700 0.6875rem/1.4 var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent); }
 .shape h3 { margin: 0.2rem 0 0.4rem; font: 600 0.98rem/1.2 var(--display); color: var(--txt); }
 .shape p { margin: 0; font-size: 0.85rem; line-height: 1.5; color: var(--txt-2); }
 .shape strong { color: var(--txt); font-weight: 600; }
@@ -301,7 +301,7 @@ body {
 .icon-name { font: 600 0.95rem/1.2 var(--display); color: var(--txt); }
 .icon-blurb { font-size: 0.8rem; line-height: 1.45; color: var(--txt-2); }
 .icon-badge {
-  margin-top: 0.15rem; font: 700 0.625rem/1.4 var(--mono); letter-spacing: 0.08em; text-transform: uppercase;
+  margin-top: 0.15rem; font: 700 0.6875rem/1.4 var(--mono); letter-spacing: 0.08em; text-transform: uppercase;
   padding: 0.16rem 0.6rem; border-radius: 999px; color: var(--txt-3); border: 1px solid var(--line);
 }
 .icon-card.active .icon-badge { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
