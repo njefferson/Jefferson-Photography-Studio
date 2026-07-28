@@ -1,0 +1,16 @@
+{
+  "category": "misc",
+  "app_category": "misc",
+  "template": "creature-photoreal",
+  "tags": ["misc"],
+  "defaults": { "views": ["front"], "distances": ["mid"], "expressions": ["neutral"], "variants": 2 },
+  "families": [
+    {
+      "family": "nordic",
+      "subject_phrase": "a Nordic alien — a tall, slender HUMAN-LIKE humanoid person with smooth pale human skin, long straight platinum-blonde hair, calm serene human facial features, two arms and two legs and a human body plan, wearing a simple plain pale bodysuit; a person, absolutely NOT an ape, monkey, gorilla, or any furry animal",
+      "meta_label": "Nordic",
+      "note": "fiction",
+      "poses": [{ "pose": "standing", "pose_phrase": "standing serenely, upright, arms at its sides" }]
+    }
+  ]
+}

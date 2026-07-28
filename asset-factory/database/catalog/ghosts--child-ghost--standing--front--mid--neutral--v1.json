@@ -1,0 +1,50 @@
+{
+  "id": "ghosts--child-ghost--standing--front--mid--neutral--v1",
+  "name": "Child ghost standing (front, mid)",
+  "category": "ghosts",
+  "subcategory": "child-ghost",
+  "tags": [
+    "ghost",
+    "apparition",
+    "paranormal"
+  ],
+  "prompt": "A real, natural-light photograph of a real subject — shot outdoors in soft, even daylight with a full tonal range from clean shadows to bright highlights, true-to-life skin, fur, and surface texture, sharp and in focus. It looks like an ordinary, believable photo, absolutely NOT an illustration, drawing, painting, sketch, comic, 3D render, CGI, sculpture, statue, figurine, or toy.\nA photograph of the faint translucent apparition of a small child, standing quietly, semi-transparent, seen directly from the front, photographed from a moderate distance.\nThe entire subject is shown in full within the frame, head to toe and top to bottom, complete and uncropped — NOT a bust, headshot, or close portrait.\nFramed with clear empty space all around it — the whole thing sits comfortably within the frame and does NOT touch or run off any edge.\nSemi-transparent and faintly luminous as if caught on a real camera at night with a long exposure — a believable photographic apparition, its lower edge fading softly, the translucency carried in the image's own alpha.\nExactly one subject, centered, nothing else in frame.\nIsolated on a fully transparent background, the entire subject visible and uncropped, with soft naturally feathered edges suitable for dropping into another photograph.\nNo text, no watermark, no caption, no border, no frame, no sticker sheet, no collage.",
+  "negative_prompt": "illustration, drawing, sketch, line art, comic, cartoon, anime, painting, digital painting, concept art, poster, sticker, vector art, cel shaded, 3d render, cgi, octane render, sculpture, statue, figurine, clay, toy, plastic, stylized, cartoonish, film grain, heavy noise, motion blur, vignette, drop shadow, glow, rim light, text, watermark, logo, caption, border, frame, background, scenery, sky, ground, landscape, buildings, people, multiple subjects, sticker sheet, grid, collage, cropped, cut off, white background, colored background",
+  "seed": 997741214,
+  "provider": "ideogram",
+  "model": "ideogram-v3",
+  "settings": {
+    "rendering_speed": "QUALITY",
+    "aspect_ratio": "1x1",
+    "style_type": "REALISTIC"
+  },
+  "template": "apparition",
+  "template_version": 3,
+  "prompt_hash": "sha256:56b05bbd064abaa4153803b2865d90057656916205e6560ce1aa03d562dcf81b",
+  "created": "2026-07-21T02:57:27.972Z",
+  "run_id": "20260721025559-pq9l",
+  "status": "approved",
+  "transparent": true,
+  "approved": true,
+  "favorite": false,
+  "retry_count": 0,
+  "qc": {
+    "tier_a": {
+      "width": 1024,
+      "height": 1024,
+      "coverage": 0.2588,
+      "transparentFrac": 0.7384,
+      "featherFrac": 0.013,
+      "edgeContact": 0,
+      "components": 1
+    },
+    "tier_b": null,
+    "reject_reasons": [],
+    "warnings": []
+  },
+  "dhash": "082da4664449e933",
+  "duplicate_of": null,
+  "file": "assets/ghosts/ghosts--child-ghost--standing--front--mid--neutral--v1.png",
+  "promoted": null,
+  "history": []
+}

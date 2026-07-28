@@ -1,0 +1,16 @@
+{
+  "id": "apparition",
+  "version": 3,
+  "positive": [
+    "{global.photo}",
+    "A photograph of {subject_phrase}, {pose_phrase}, {view_phrase}, {distance_phrase}.",
+    "{framing_clause}",
+    "{global.framing_space}",
+    "Semi-transparent and faintly luminous as if caught on a real camera at night with a long exposure — a believable photographic apparition, its lower edge fading softly, the translucency carried in the image's own alpha.",
+    "{global.single_subject}",
+    "{global.isolated}",
+    "{global.no_text}"
+  ],
+  "negative": ["{global_negative}"],
+  "settings": { "rendering_speed": "QUALITY", "aspect_ratio": "1x1", "style_type": "REALISTIC" }
+}

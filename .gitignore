@@ -2,3 +2,15 @@ node_modules/
 dist/
 *.local
 .DS_Store
+
+# Asset factory: images are regenerable build products — the committed truth is
+# manifests/ + templates/ + database/ (see asset-factory/README.md).
+asset-factory/node_modules/
+asset-factory/assets/
+asset-factory/generated/
+asset-factory/rejected/
+asset-factory/duplicates/
+asset-factory/logs/
+# review/ is a throwaway batch preview; the workflow force-adds it to the
+# disposable review branch, but it must never ride main.
+asset-factory/review/
