@@ -1,0 +1,52 @@
+{
+  "id": "environment--crop-damage--flattened--above--mid--neutral--v1",
+  "name": "Crop damage flattened (above, mid)",
+  "category": "environment",
+  "subcategory": "crop-damage",
+  "tags": [
+    "evidence",
+    "prop"
+  ],
+  "prompt": "A real, natural-light photograph of a real subject — shot outdoors in soft, even daylight with a full tonal range from clean shadows to bright highlights, true-to-life skin, fur, and surface texture, sharp and in focus. It looks like an ordinary, believable photo, absolutely NOT an illustration, drawing, painting, sketch, comic, 3D render, CGI, sculpture, statue, figurine, or toy.\nA photograph of a patch of flattened swirled crop stalks, swirled and pressed flat, seen from slightly above, photographed from a moderate distance.\nA real physical object photographed in natural light with true-to-life scale, materials and wear.\nExactly one subject, centered, nothing else in frame.\nIsolated on a fully transparent background, the entire subject visible and uncropped, with soft naturally feathered edges suitable for dropping into another photograph.\nNo text, no watermark, no caption, no border, no frame, no sticker sheet, no collage.",
+  "negative_prompt": "illustration, drawing, sketch, line art, comic, cartoon, anime, painting, digital painting, concept art, poster, sticker, vector art, cel shaded, 3d render, cgi, octane render, sculpture, statue, figurine, clay, toy, plastic, stylized, cartoonish, film grain, heavy noise, motion blur, vignette, drop shadow, glow, rim light, text, watermark, logo, caption, border, frame, background, scenery, sky, ground, landscape, buildings, people, multiple subjects, sticker sheet, grid, collage, cropped, cut off, white background, colored background",
+  "seed": 692775958,
+  "provider": "flux",
+  "model": "flux-pro-1.1",
+  "settings": {
+    "rendering_speed": "QUALITY",
+    "aspect_ratio": "1x1",
+    "style_type": "REALISTIC"
+  },
+  "template": "evidence-prop",
+  "template_version": 2,
+  "prompt_hash": "sha256:d359e36bdec189086c49bdd45d63e844ddbc8af6cd9ceff5c75f626b6104df59",
+  "created": "2026-07-21T01:54:20.650Z",
+  "run_id": "20260721014920-plhq",
+  "status": "rejected",
+  "transparent": false,
+  "approved": false,
+  "favorite": false,
+  "retry_count": 0,
+  "qc": {
+    "tier_a": {
+      "width": 1024,
+      "height": 1024,
+      "coverage": 0.0839,
+      "transparentFrac": 0.8995,
+      "featherFrac": 0.0421,
+      "edgeContact": 0,
+      "components": 3
+    },
+    "tier_b": null,
+    "reject_reasons": [
+      "multiple-subjects"
+    ],
+    "warnings": []
+  },
+  "dhash": null,
+  "duplicate_of": null,
+  "file": "rejected/environment--crop-damage--flattened--above--mid--neutral--v1.png",
+  "promoted": null,
+  "history": [],
+  "matted": true
+}

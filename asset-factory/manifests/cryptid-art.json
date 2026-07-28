@@ -1,0 +1,133 @@
+{
+  "category": "cryptid-art",
+  "app_category": "illustrated",
+  "template": "illustrated",
+  "tags": [
+    "cryptid",
+    "illustration"
+  ],
+  "defaults": {
+    "views": [
+      "front"
+    ],
+    "distances": [
+      "mid"
+    ],
+    "expressions": [
+      "neutral"
+    ],
+    "variants": 1
+  },
+  "families": [
+    {
+      "family": "bigfoot",
+      "subject_phrase": "Bigfoot, a huge hairy ape-like cryptid",
+      "meta_label": "Bigfoot",
+      "poses": [
+        {
+          "pose": "standing",
+          "pose_phrase": "standing upright"
+        }
+      ]
+    },
+    {
+      "family": "mothman",
+      "subject_phrase": "the Mothman, a winged humanoid cryptid with large glowing eyes",
+      "meta_label": "Mothman",
+      "poses": [
+        {
+          "pose": "standing",
+          "pose_phrase": "standing upright"
+        }
+      ]
+    },
+    {
+      "family": "chupacabra",
+      "subject_phrase": "the Chupacabra, a spiny reptilian dog-like cryptid",
+      "meta_label": "Chupacabra",
+      "poses": [
+        {
+          "pose": "standing",
+          "pose_phrase": "standing upright"
+        }
+      ]
+    },
+    {
+      "family": "jersey-devil",
+      "subject_phrase": "the Jersey Devil, a winged horse-headed bipedal cryptid",
+      "meta_label": "Jersey Devil",
+      "poses": [
+        {
+          "pose": "standing",
+          "pose_phrase": "standing upright"
+        }
+      ]
+    },
+    {
+      "family": "loch-ness",
+      "subject_phrase": "the Loch Ness Monster, a long-necked plesiosaur-like lake cryptid",
+      "meta_label": "Loch Ness Monster",
+      "poses": [
+        {
+          "pose": "surfacing",
+          "pose_phrase": "rising from the water"
+        }
+      ]
+    },
+    {
+      "family": "thunderbird",
+      "subject_phrase": "the Thunderbird, a giant eagle-like cryptid bird with vast wings",
+      "meta_label": "Thunderbird",
+      "poses": [
+        {
+          "pose": "soaring",
+          "pose_phrase": "wings spread in flight"
+        }
+      ]
+    },
+    {
+      "family": "wendigo",
+      "subject_phrase": "the Wendigo, a gaunt antlered emaciated humanoid cryptid",
+      "meta_label": "Wendigo",
+      "poses": [
+        {
+          "pose": "standing",
+          "pose_phrase": "standing upright"
+        }
+      ]
+    },
+    {
+      "family": "dogman",
+      "subject_phrase": "the Dogman, a muscular wolf-headed bipedal cryptid",
+      "meta_label": "Dogman",
+      "poses": [
+        {
+          "pose": "standing",
+          "pose_phrase": "standing upright"
+        }
+      ]
+    },
+    {
+      "family": "jackalope",
+      "subject_phrase": "the Jackalope, a horned jackrabbit cryptid",
+      "meta_label": "Jackalope",
+      "poses": [
+        {
+          "pose": "sitting",
+          "pose_phrase": "sitting alert"
+        }
+      ]
+    },
+    {
+      "family": "owlman",
+      "subject_phrase": "the Owlman, a winged owl-faced humanoid cryptid",
+      "meta_label": "Owlman",
+      "poses": [
+        {
+          "pose": "standing",
+          "pose_phrase": "standing upright"
+        }
+      ]
+    }
+  ]
+}

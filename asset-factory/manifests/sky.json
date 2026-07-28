@@ -1,0 +1,77 @@
+{
+  "category": "sky",
+  "app_category": "sky",
+  "template": "effect-overlay",
+  "tags": [
+    "sky"
+  ],
+  "defaults": {
+    "views": [
+      "front"
+    ],
+    "distances": [
+      "mid"
+    ],
+    "expressions": [
+      "neutral"
+    ],
+    "variants": 1
+  },
+  "families": [
+    {
+      "family": "full-moon",
+      "subject_phrase": "a bright, detailed full moon disc",
+      "meta_label": "Full moon",
+      "poses": [
+        {
+          "pose": "disc",
+          "pose_phrase": "a round full moon"
+        }
+      ]
+    },
+    {
+      "family": "crescent-moon",
+      "subject_phrase": "a thin bright crescent moon",
+      "meta_label": "Crescent moon",
+      "poses": [
+        {
+          "pose": "crescent",
+          "pose_phrase": "a crescent moon"
+        }
+      ]
+    },
+    {
+      "family": "cloud",
+      "subject_phrase": "a single fluffy white cumulus cloud",
+      "meta_label": "Cloud",
+      "poses": [
+        {
+          "pose": "drifting",
+          "pose_phrase": "a lone drifting cloud"
+        }
+      ]
+    },
+    {
+      "family": "storm-cloud",
+      "subject_phrase": "a dark, dense, heavy storm cloud",
+      "meta_label": "Storm cloud",
+      "poses": [
+        {
+          "pose": "looming",
+          "pose_phrase": "a looming storm cloud"
+        }
+      ]
+    },
+    {
+      "family": "sun",
+      "subject_phrase": "a bright glowing sun",
+      "meta_label": "Sun",
+      "poses": [
+        {
+          "pose": "disc",
+          "pose_phrase": "the sun as a bright disc"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,89 @@
+{
+  "category": "energy",
+  "app_category": "lights",
+  "template": "effect-overlay",
+  "tags": [
+    "energy",
+    "light"
+  ],
+  "defaults": {
+    "views": [
+      "front"
+    ],
+    "distances": [
+      "mid"
+    ],
+    "expressions": [
+      "neutral"
+    ],
+    "variants": 1
+  },
+  "families": [
+    {
+      "family": "vortex",
+      "subject_phrase": "a swirling vortex of glowing energy",
+      "meta_label": "Vortex",
+      "poses": [
+        {
+          "pose": "swirling",
+          "pose_phrase": "a spiral of energy"
+        }
+      ]
+    },
+    {
+      "family": "energy-field",
+      "subject_phrase": "a crackling field of electric blue energy",
+      "meta_label": "Energy field",
+      "poses": [
+        {
+          "pose": "crackling",
+          "pose_phrase": "a field of arcs"
+        }
+      ]
+    },
+    {
+      "family": "plasma-arc",
+      "subject_phrase": "a bright arc of glowing plasma electricity",
+      "meta_label": "Plasma arc",
+      "poses": [
+        {
+          "pose": "arcing",
+          "pose_phrase": "an electric arc"
+        }
+      ]
+    },
+    {
+      "family": "aura-glow",
+      "subject_phrase": "a soft glowing aura halo of coloured light",
+      "meta_label": "Aura",
+      "poses": [
+        {
+          "pose": "glowing",
+          "pose_phrase": "a halo glow"
+        }
+      ]
+    },
+    {
+      "family": "rift",
+      "subject_phrase": "a glowing tear or rift in the air with brightly lit edges",
+      "meta_label": "Rift",
+      "poses": [
+        {
+          "pose": "opening",
+          "pose_phrase": "a lit rift"
+        }
+      ]
+    },
+    {
+      "family": "portal-swirl",
+      "subject_phrase": "a swirling luminous portal ring of light",
+      "meta_label": "Portal",
+      "poses": [
+        {
+          "pose": "swirling",
+          "pose_phrase": "a glowing ring portal"
+        }
+      ]
+    }
+  ]
+}

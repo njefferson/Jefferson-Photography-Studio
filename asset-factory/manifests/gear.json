@@ -1,0 +1,89 @@
+{
+  "category": "gear",
+  "app_category": "gear",
+  "template": "evidence-prop",
+  "tags": [
+    "gear",
+    "evidence"
+  ],
+  "defaults": {
+    "views": [
+      "front"
+    ],
+    "distances": [
+      "mid"
+    ],
+    "expressions": [
+      "neutral"
+    ],
+    "variants": 1
+  },
+  "families": [
+    {
+      "family": "flashlight",
+      "subject_phrase": "a rugged heavy-duty flashlight, switched off",
+      "meta_label": "Flashlight",
+      "poses": [
+        {
+          "pose": "upright",
+          "pose_phrase": "standing upright"
+        }
+      ]
+    },
+    {
+      "family": "emf-meter",
+      "subject_phrase": "a handheld EMF meter with a small readout and a stubby antenna",
+      "meta_label": "EMF meter",
+      "poses": [
+        {
+          "pose": "upright",
+          "pose_phrase": "held upright"
+        }
+      ]
+    },
+    {
+      "family": "trail-camera",
+      "subject_phrase": "a camouflaged trail camera",
+      "meta_label": "Trail camera",
+      "poses": [
+        {
+          "pose": "front",
+          "pose_phrase": "seen from the front"
+        }
+      ]
+    },
+    {
+      "family": "binoculars",
+      "subject_phrase": "a pair of black binoculars",
+      "meta_label": "Binoculars",
+      "poses": [
+        {
+          "pose": "upright",
+          "pose_phrase": "resting upright"
+        }
+      ]
+    },
+    {
+      "family": "compass",
+      "subject_phrase": "a brass pocket compass with the lid open",
+      "meta_label": "Compass",
+      "poses": [
+        {
+          "pose": "flat",
+          "pose_phrase": "lying flat, face up"
+        }
+      ]
+    },
+    {
+      "family": "lantern",
+      "subject_phrase": "an old metal camping lantern, unlit",
+      "meta_label": "Lantern",
+      "poses": [
+        {
+          "pose": "upright",
+          "pose_phrase": "standing upright"
+        }
+      ]
+    }
+  ]
+}

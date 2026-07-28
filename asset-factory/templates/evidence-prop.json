@@ -1,0 +1,14 @@
+{
+  "id": "evidence-prop",
+  "version": 2,
+  "positive": [
+    "{global.photo}",
+    "A photograph of {subject_phrase}, {pose_phrase}, {view_phrase}, {distance_phrase}.",
+    "A real physical object photographed in natural light with true-to-life scale, materials and wear.",
+    "{global.single_subject}",
+    "{global.isolated}",
+    "{global.no_text}"
+  ],
+  "negative": ["{global_negative}"],
+  "settings": { "rendering_speed": "QUALITY", "aspect_ratio": "1x1", "style_type": "REALISTIC" }
+}

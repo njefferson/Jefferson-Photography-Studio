@@ -1,0 +1,16 @@
+{
+  "id": "horror",
+  "version": 3,
+  "positive": [
+    "{global.photo}",
+    "A photograph of {subject_phrase}, {pose_phrase}, {view_phrase}, {distance_phrase}.",
+    "{framing_clause}",
+    "{global.framing_space}",
+    "Unsettling but wholly believable as a real photo: weathered aged materials and organic surface detail caught by a documentary camera, not stylized.",
+    "{global.single_subject}",
+    "{global.isolated}",
+    "{global.no_text}"
+  ],
+  "negative": ["{global_negative}", "gore, blood"],
+  "settings": { "rendering_speed": "QUALITY", "aspect_ratio": "1x1", "style_type": "REALISTIC" }
+}

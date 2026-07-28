@@ -1,0 +1,13 @@
+{
+  "id": "shadow-overlay",
+  "version": 1,
+  "positive": [
+    "A soft, natural pattern of dappled shade — the mottled shadow that sunlight casts through overhead {subject_phrase} onto a flat, plain surface.",
+    "{pose_phrase}.",
+    "Only the cast shadow itself: soft-edged dark, semi-transparent blotches with gaps of open light between them, organic and irregular, exactly the way real dappled sunlight falls on the ground.",
+    "NOT the {subject_phrase} themselves and no objects at all — only the shadow they cast, carried in the alpha channel on a fully transparent background so it can be laid over any photo.",
+    "{global.no_text}"
+  ],
+  "negative": ["leaves, branches, twigs, foliage, plants, tree, grass blades themselves, objects, subject, creature, animal, person, bright, glowing, light source, sunbeam, sky, lens flare, colorful, saturated, green, scenery, landscape, photograph of a forest, text, watermark, border, frame, white background, grey background, opaque background, solid background"],
+  "settings": { "rendering_speed": "QUALITY", "aspect_ratio": "1x1", "style_type": "REALISTIC" }
+}
