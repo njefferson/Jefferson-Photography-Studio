@@ -168,8 +168,12 @@ body {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 .info-btn {
-  width: 26px;
-  height: 26px;
+  /* Doctrine §4: a real 44px target. An overlay was tried first and is the
+     wrong tool in a dense bar — the expanded ring covers the neighbouring
+     buttons, so it either loses the hit test or steals their taps. The bar is
+     56px, so the honest box fits. */
+  width: 44px;
+  height: 44px;
   padding: 0;
   border-radius: 50%;
   border: 1px solid var(--line);
@@ -601,7 +605,15 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 .info-ver { margin: -6px 0 10px; font: 0.6875rem/1.4 var(--mono); letter-spacing: 0.04em; color: var(--txt-3); }
 #infoDlg h3.rm-head { margin: 4px 0 8px; font: 600 0.875rem/1.2 var(--display); }
 .more-row { margin: -8px 0 16px; font-size: 0.75rem; }
-.more-row a { color: var(--accent); text-decoration: none; }
+.more-row a {
+  color: var(--accent);
+  text-decoration: none;
+  /* Own-row link: the inline exception does not apply. inline-flex grows the
+     hit area without moving the text (same fix as the hub's footer links). */
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
 .more-row a:active { text-decoration: underline; }
 /* The way out to the personal hub. It used to be a fourth grey line among the
    .more-row links and nobody could find it; as a bordered row wearing the hub's
@@ -1456,6 +1468,9 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 body:has(#welcome:not([hidden])) :is(#homeBtn, #undoBtn, #redoBtn, #resetBtn, #origBtn, #histBtn, .bar-sep) { display: none; }
 .bar-actions .bar-sep { width: 1px; height: 22px; background: var(--line); flex: none; }
 .bar-btn {
+  /* Doctrine §4: 44px touch target. The bar is 56px, so these fit without it
+     growing — they were 30px, reachable only by a steady hand. */
+  min-height: 44px;
   width: auto;
   padding: 8px 12px;
   border-radius: 9px;
@@ -2114,3 +2129,28 @@ label.open-btn, label.bar-btn {
 .tone-path.tone-r { stroke: #e05c5c; }
 .tone-path.tone-g { stroke: #3fae5a; }
 .tone-path.tone-b { stroke: #5b8def; }
+
+
+/* ---- Touch-target floor (Doctrine §4, audited 2026-07-30) ----
+   Every standalone control clears 44px. Targets inline in a sentence are
+   exempt by the 2026-07-29 ruling and are deliberately NOT covered here. */
+#infoDlg button,
+#helpDlg button,
+#infoDlg .set-row button,
+#infoDlg .theme-row button { min-height: 44px; }
+.coffee-row a { display: inline-flex; align-items: center; min-height: 44px; }
+
+/* Sub-11px floor (NOTES 2026-07-28). <small> carries a 0.8em UA default that
+   compounds against an already-reduced container — pin it rather than relying
+   on the container's size. rem, so it still scales with the reader's setting. */
+
+
+/* <small> is 0.8em of its CONTAINER, so inside an already-reduced box it
+   compounds below the 11px floor (NOTES 2026-07-28). Two of these were panel
+   labels, not dialog text, which is why a dialog-scoped rule missed them.
+   max() keeps the relative sizing wherever it already clears 11px and lifts
+   only the ones that fell under; rem, so the reader's setting still scales it. */
+small { font-size: max(0.6875rem, 0.8em); }
+.welcome-batch { min-height: 44px; }
+/* The bar's back link owns its corner — not inline in a sentence. */
+.home-link { min-height: 44px; }

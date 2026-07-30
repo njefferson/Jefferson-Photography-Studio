@@ -39,7 +39,7 @@
            the way back is a visible control on every screen rather than a line
            inside a dialog. Right: About / welcome, which auto-opens ONCE for
            new visitors (chooser.ts) and stays reachable here forever after. -->
-      <div class="lc-bar">
+      <nav class="lc-bar" aria-label="Site">
         <a class="lc-home" href="https://noahjefferson.pages.dev" target="_blank" rel="noopener"
            title="Noah Jefferson — his photography accounts and all the free apps"
            aria-label="Noah Jefferson — his photography accounts and all the free apps">
@@ -48,7 +48,7 @@
           Noah Jefferson
         </a>
         <button id="infoBtn" class="lc-info" type="button" aria-haspopup="dialog" aria-label="About Photography Studio — what it is and how to install it">&#9432;</button>
-      </div>
+      </nav>
       <header class="lc-header">
         <img class="brandmark" src="./icons/icon-192.png" alt="Studio icon" width="34" height="34" />
         <p class="kicker">Noah Jefferson</p>
@@ -57,7 +57,8 @@
         <button id="shareBtn" class="share-app" type="button" hidden>&#x2BAD;&#xFE0E; Share this app</button>
       </header>
 
-      <main class="doors">
+      <main>
+        <div class="doors">
         <a class="door ir" href="./ir.html">
           <span class="door-glyph iris" aria-hidden="true"></span>
           <span class="kicker">Infrared</span>
@@ -72,7 +73,7 @@
           <p>Merge a focus-shift burst into one frame that's sharp front to back.</p>
           <span class="go">Open &rarr;</span>
         </a>
-      </main>
+        </div>
 
       <section class="install">
         <h2>Add to Home Screen — one app, two, or three</h2>
@@ -136,6 +137,7 @@
           an installed tile keeps its icon until it's re-added.
         </p>
       </section>
+      </main>
 
       <footer class="lc-footer">
         <p class="foot-line">Free &middot; on-device &middot; no account &middot; no upload &middot; <a href="./privacy.html">privacy</a></p>

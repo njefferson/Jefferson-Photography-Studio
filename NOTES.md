@@ -211,6 +211,47 @@ they OWN the finger gesture like every other drag control. Do NOT set
 scrolled instead of moving it — owner-caught on the iPad 2026-07-19). The
 panel still scrolls from label text + the gaps between rows.
 
+FULL A11Y AUDIT 2026-07-30 (owner: "it's all placeholder while I get
+accessibility right — everything is subject to audit"). axe-core 4.12 (wcag2a/
+aa, wcag21, wcag22aa, best-practice) plus the checks axe cannot make, over
+EVERY page in BOTH repos, both themes, resting AND with each dialog open —
+because most of this app's controls only exist inside a dialog, and a
+resting-state-only sweep reports a clean bill of health it has not earned.
+
+FOUND AND FIXED:
+- 27 touch targets under 44px, across the IR bar, both help/info dialogs, the
+  welcome dialog, privacy and notes. Not scattered — they collapsed to ~8 CSS
+  rules (.bar-btn, .info-btn, .more-row a, dialog buttons, .backlink/footer a).
+- 5 rendered text runs under the 11px floor. Two were PANEL LABELS, not dialog
+  text, which is why a dialog-scoped rule missed them on the first pass. Cause:
+  <small> is 0.8em of its CONTAINER, so inside an already-reduced box it
+  compounds under the floor. Fixed with `small { font-size: max(0.6875rem, 0.8em) }`
+  — keeps relative sizing where it already clears, lifts only what fell under.
+- 1 axe `region` violation: the launcher's <main> wrapped ONLY the two door
+  tiles, so the install section, the icon picker AND the new top bar sat outside
+  every landmark and were skipped by landmark navigation. <main> now covers the
+  page's content; the bar is a <nav aria-label="Site">. (The bar half was
+  introduced by the hub-link work earlier the same day — the audit caught it.)
+
+EXEMPT AND NAMED (Doctrine §4, the 2026-07-29 inline ruling — the exception is
+applied, never silently): 5 links inline in a sentence — "privacy" ×2, "Venmo"
+×2, and two mailto addresses. Their height is constrained by the line box and
+forcing 44px mid-paragraph would break the text flow.
+
+AN OVERLAY IS THE WRONG TOOL FOR A DENSE BAR. First attempt at the 26px ⓘ
+buttons kept the box small and expanded the target with a centred 44px ::after.
+It does not work: at ±21px the ring lands on the NEIGHBOURING bar controls,
+which win elementFromPoint — so the target never grew, and had it won the hit
+test it would have stolen those buttons' taps. The box was grown for real (the
+bar is 56px, so 44px fits). VISUAL NOTE: the ⓘ is now a 44px circle beside the
+wordmark and reads heavier than before — accessible and correct, but an
+open aesthetic question for the owner.
+
+MEASURE THE EFFECTIVE HIT AREA, NOT THE BOX. The audit now probes
+elementFromPoint at the four corners of a 44px box around each control's
+centre, because a legitimate hit-expanding overlay would otherwise be reported
+as a failure. That check is also what proved the overlay above did NOT work.
+
 SURFACE SEPARATION 2026-07-30 (owner: "address the surface fills"). Fills now
 carry elevation, not just the rail: dusk page→card 1.09 → 1.30:1, dawn 1.17 →
 1.27:1, and the dusk ladder is a real ladder at 1.30/1.43/1.65.
