@@ -603,6 +603,34 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 .more-row { margin: -8px 0 16px; font-size: 0.75rem; }
 .more-row a { color: var(--accent); text-decoration: none; }
 .more-row a:active { text-decoration: underline; }
+/* The way out to the personal hub. It used to be a fourth grey line among the
+   .more-row links and nobody could find it; as a bordered row wearing the hub's
+   mark it reads as a destination, which is what it is. */
+.hub-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 2px 0 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--txt);
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.hub-row:active { border-color: var(--accent); }
+.hub-row .hub-mark {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+.hub-row .hub-txt { min-width: 0; flex: 1; }
+.hub-row strong { display: block; font: 600 0.875rem/1.25 var(--ui); color: var(--txt); }
+.hub-row small { display: block; margin-top: 2px; font-size: 0.75rem; line-height: 1.35; color: var(--txt-2); }
+.hub-row .hub-go { flex: none; color: var(--accent); font-size: 0.9375rem; }
 .roadmap li { display: flex; gap: 8px; align-items: baseline; }
 .roadmap .rm-mark { flex: none; width: 12px; color: var(--accent); font-size: 0.75rem; }
 .roadmap li.done { color: var(--txt-3); }

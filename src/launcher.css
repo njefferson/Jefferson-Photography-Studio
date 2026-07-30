@@ -86,17 +86,57 @@ body {
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 .wrap {
-  position: relative; /* anchors the ⓘ About button in the top corner */
+  position: relative;
   max-width: 940px;
   margin: 0 auto;
-  padding: 2.5rem 1.5rem 1.5rem;
+  padding: 1rem 1.5rem 1.5rem;
+}
+
+/* ---- Top bar: the way up, and About ----
+   The Studio is the middle rung of a chain — Infrared and Macro sit under it
+   wearing "‹ Studio", and it sits under the personal hub. This bar carries the
+   next rung out, "‹ Noah Jefferson", as a real bordered control at the top of
+   the page: the way back has to be visible without scrolling or opening
+   anything, or it may as well not exist. */
+.lc-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+.lc-home {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  /* Doctrine §4: 44px touch target. */
+  min-height: 44px;
+  padding: 0 0.9rem 0 0.65rem;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--txt);
+  text-decoration: none;
+  font: 500 0.875rem/1 var(--ui);
+  /* The corner must never wrap the name onto two lines. */
+  white-space: nowrap;
+  min-width: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.lc-home:active { border-color: var(--accent); }
+.lc-home .chev { font-size: 1.125rem; color: var(--txt-2); }
+/* The hub's mark riding in the corner link — the way back wears the brand. */
+.lc-home .bar-mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  flex: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 
 /* ---- About / first-visit welcome ---- */
 .lc-info {
-  position: absolute;
-  top: 10px;
-  right: 14px;
+  flex: none;
   width: 44px;
   height: 44px;
   border-radius: 50%;
