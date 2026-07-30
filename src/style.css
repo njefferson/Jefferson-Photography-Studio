@@ -2188,3 +2188,54 @@ small { font-size: max(0.6875rem, 0.8em); }
 
 /* ---- selection: was browser default, i.e. unverified in every palette ---- */
 ::selection { background: var(--accent-soft); color: var(--txt); }
+
+/* ---- Palette swatch: a night | day miniature of the real UI ----
+   Left half is what the family looks like at night, right half by day: page
+   colour as the field, a card on it with its rail, a text bar and the accent
+   dot. That shows the thing that actually separates these palettes — how far a
+   card stands off the page, and how warm or neutral the chrome is — which no
+   amount of naming conveys. Both halves because the families differ MOST at
+   night; previewing only the current mode made all four look identical in day.
+   Decorative by design: aria-hidden, with the family's name as the real label. */
+.pal-opt { display: flex; align-items: center; gap: 12px; }
+.pal-sw {
+  flex: none;
+  display: flex;
+  width: 76px;
+  height: 46px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+.pal-sw-half {
+  flex: 1;
+  display: grid;
+  place-items: center;
+}
+.pal-sw-half[data-mode="night"] { background: var(--sw-n-page); }
+.pal-sw-half[data-mode="day"] { background: var(--sw-d-page); }
+.pal-sw-card {
+  position: relative;
+  width: 26px;
+  height: 20px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+}
+.pal-sw-half[data-mode="night"] .pal-sw-card { background: var(--sw-n-surface); border: 1px solid var(--sw-n-rail); }
+.pal-sw-half[data-mode="day"] .pal-sw-card { background: var(--sw-d-surface); border: 1px solid var(--sw-d-rail); }
+.pal-sw-card i { display: block; width: 11px; height: 3px; border-radius: 2px; }
+.pal-sw-half[data-mode="night"] .pal-sw-card i { background: var(--sw-n-txt); }
+.pal-sw-half[data-mode="day"] .pal-sw-card i { background: var(--sw-d-txt); }
+.pal-sw-card b {
+  position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+  width: 6px; height: 6px; border-radius: 50%;
+}
+.pal-sw-half[data-mode="night"] .pal-sw-card b { background: var(--sw-n-accent); }
+.pal-sw-half[data-mode="day"] .pal-sw-card b { background: var(--sw-d-accent); }
+.pal-sw[data-pal="instrument"] { --sw-n-page: var(--pal-instrument-night-page); --sw-n-surface: var(--pal-instrument-night-surface); --sw-n-rail: var(--pal-instrument-night-rail); --sw-n-txt: var(--pal-instrument-night-txt); --sw-n-accent: var(--pal-instrument-night-accent); --sw-d-page: var(--pal-instrument-day-page); --sw-d-surface: var(--pal-instrument-day-surface); --sw-d-rail: var(--pal-instrument-day-rail); --sw-d-txt: var(--pal-instrument-day-txt); --sw-d-accent: var(--pal-instrument-day-accent); }
+.pal-sw[data-pal="paper"] { --sw-n-page: var(--pal-paper-night-page); --sw-n-surface: var(--pal-paper-night-surface); --sw-n-rail: var(--pal-paper-night-rail); --sw-n-txt: var(--pal-paper-night-txt); --sw-n-accent: var(--pal-paper-night-accent); --sw-d-page: var(--pal-paper-day-page); --sw-d-surface: var(--pal-paper-day-surface); --sw-d-rail: var(--pal-paper-day-rail); --sw-d-txt: var(--pal-paper-day-txt); --sw-d-accent: var(--pal-paper-day-accent); }
+.pal-sw[data-pal="mono"] { --sw-n-page: var(--pal-mono-night-page); --sw-n-surface: var(--pal-mono-night-surface); --sw-n-rail: var(--pal-mono-night-rail); --sw-n-txt: var(--pal-mono-night-txt); --sw-n-accent: var(--pal-mono-night-accent); --sw-d-page: var(--pal-mono-day-page); --sw-d-surface: var(--pal-mono-day-surface); --sw-d-rail: var(--pal-mono-day-rail); --sw-d-txt: var(--pal-mono-day-txt); --sw-d-accent: var(--pal-mono-day-accent); }
+.pal-sw[data-pal="soft"] { --sw-n-page: var(--pal-soft-night-page); --sw-n-surface: var(--pal-soft-night-surface); --sw-n-rail: var(--pal-soft-night-rail); --sw-n-txt: var(--pal-soft-night-txt); --sw-n-accent: var(--pal-soft-night-accent); --sw-d-page: var(--pal-soft-day-page); --sw-d-surface: var(--pal-soft-day-surface); --sw-d-rail: var(--pal-soft-day-rail); --sw-d-txt: var(--pal-soft-day-txt); --sw-d-accent: var(--pal-soft-day-accent); }
+.pal-txt { min-width: 0; flex: 1; }

@@ -281,6 +281,23 @@ bundle). VERIFIED picker-walk.mjs 36/36 across all three pages: applies,
 persists, survives reload, moves aria-checked, restamps theme-color, and
 clears both attribute and key when Instrument is reselected.
 
+EACH OPTION SHOWS A NIGHT|DAY MINIATURE (owner, 2026-07-30: a text-only list
+"doesn't show shit" — correct, you cannot choose a look you cannot see). The
+swatch is a small mock of the real UI: page colour as the field, a card on it
+with its rail, a text bar and the accent dot. It shows the thing that actually
+separates these palettes — how far a card stands off the page, and how warm or
+neutral the chrome is.
+
+FIRST ATTEMPT PREVIEWED ONLY THE CURRENT MODE and was nearly useless in day:
+the families diverge most at NIGHT, so four warm light swatches looked
+identical. Both halves are shown instead, which needed the preview tokens to
+stop being mode-scoped — they are now `--pal-<family>-<night|day>-<role>`, all
+48 in :root, generated from families.json.
+
+The swatch is aria-hidden with the family NAME as the label. The doctrine rule
+is "colour is never the SOLE carrier", which was misread here as "do not show
+the colour at all" — the correct reading is name AND swatch.
+
 FULL A11Y AUDIT 2026-07-30 (owner: "it's all placeholder while I get
 accessibility right — everything is subject to audit"). axe-core 4.12 (wcag2a/
 aa, wcag21, wcag22aa, best-practice) plus the checks axe cannot make, over

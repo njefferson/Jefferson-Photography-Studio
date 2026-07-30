@@ -76,13 +76,40 @@ export function wirePalettePicker(host: HTMLElement | null): void {
     btn.setAttribute("role", "radio");
     btn.setAttribute("aria-checked", String(f.id === active));
 
+    // A real miniature of the UI — page, card, rail, both text weights and the
+    // accent — because four rows of text show you nothing about a palette and
+    // you cannot choose a look you cannot see. It is DECORATIVE (aria-hidden):
+    // the name beside it is the label, so the option still reads without
+    // colour. "Never colour ALONE" was never "never show the colour".
+    const sw = document.createElement("span");
+    sw.className = "pal-sw";
+    sw.dataset.pal = f.id;
+    sw.setAttribute("aria-hidden", "true");
+    // Two halves, night | day. The families diverge most at night, so a
+    // preview of only the current mode made all four look the same in day.
+    for (const half of ["night", "day"]) {
+      const h = document.createElement("span");
+      h.className = "pal-sw-half";
+      h.dataset.mode = half;
+      const card = document.createElement("span");
+      card.className = "pal-sw-card";
+      const l1 = document.createElement("i");
+      const dot = document.createElement("b");
+      card.append(l1, dot);
+      h.appendChild(card);
+      sw.appendChild(h);
+    }
+
+    const txt = document.createElement("span");
+    txt.className = "pal-txt";
     const name = document.createElement("span");
     name.className = "pal-name";
     name.textContent = f.name;
     const note = document.createElement("small");
     note.className = "pal-note";
     note.textContent = f.note;
-    btn.append(name, note);
+    txt.append(name, note);
+    btn.append(sw, txt);
 
     btn.addEventListener("click", () => apply(f.id));
     host.appendChild(btn);
