@@ -1,7 +1,9 @@
 /* ============================================================================
-   Macro Studio — Studio design system. Tokens + fonts are declared in the
-   shared style.css only for the IR page; this route ships on its own bundle,
-   so the design tokens, fonts and reset are declared here too (kept in sync).
+   Macro Studio — Studio design system. This route ships on its own bundle, so
+   the fonts and reset are declared here too. COLOUR TOKENS ARE NOT: they live in
+   public/palette.css, linked by every page, so there is nothing left to keep in
+   sync — the palette used to be declared in five places that had to move
+   together, which is exactly the drift this repo has been bitten by before.
    ========================================================================== */
 @font-face {
   font-family: "Geist";
@@ -33,21 +35,9 @@
 }
 
 :root {
-  color-scheme: dark;
-  --bg: #08080b;
-  --bg-2: #0b0b0e;
-  --surface: #23252a;
-  --surface-2: #2a2c33;
-  --surface-3: #32363e;
-  --line: rgba(255, 255, 255, 0.18);
-  --line-2: rgba(255, 255, 255, 0.45);
-  --txt: #eef0f3;
-  --txt-2: #a3a7b2;
-  --txt-3: #9ba0aa;
-  --accent: #6ea0ff;
-  --accent-soft: rgba(110, 160, 255, 0.15);
-  --accent-ink: #07111f;
-  --shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
+  /* Colour tokens live in public/palette.css — the ONE source, linked by
+     every page. What stays here is NOT palette: type, the identity
+     gradients, and the theme-invariant glass. */
   --macro: linear-gradient(135deg, #ff5e7e 0%, #ff9e45 46%, #3ecf8e 100%);
   /* Theme-INVARIANT glass for HUDs floating over the PHOTO (not the page):
      dark glass + light text is correct in BOTH themes, and 0.65 alpha keeps
@@ -59,23 +49,6 @@
   --ui: "Geist", -apple-system, system-ui, sans-serif;
   --display: "Space Grotesk", -apple-system, system-ui, sans-serif;
   --mono: "Space Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
-}
-[data-theme="dawn"] {
-  color-scheme: light;
-  --bg: #ded7cb;
-  --bg-2: #e5e0d4;
-  --surface: #f6f1e8;
-  --surface-2: #ede6d8;
-  --surface-3: #e2dac9;
-  --line: rgba(40, 32, 20, 0.28);
-  --line-2: rgba(40, 32, 20, 0.58);
-  --txt: #2a251c;
-  --txt-2: #5f5849;
-  --txt-3: #625c4d;
-  --accent: #2558b2;
-  --accent-soft: rgba(37, 88, 178, 0.12);
-  --accent-ink: #ffffff;
-  --shadow: 0 10px 34px rgba(80, 64, 40, 0.18), 0 2px 6px rgba(80, 64, 40, 0.14);
 }
 
 * { box-sizing: border-box; }

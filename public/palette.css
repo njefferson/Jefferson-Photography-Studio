@@ -1,0 +1,184 @@
+/* palette.css — THE one place colour tokens are declared.
+ *
+ * Every page links this file. src/style.css, src/launcher.css and
+ * src/macro/macro.css declare NO colour tokens; privacy.html and the generated
+ * notes.html declare none either. Before this file the palette lived in five
+ * places that had to change together, and this repo has a history of exactly
+ * that kind of drift. One source, five consumers.
+ *
+ * It lives in public/ rather than src/ on purpose: notes.html is written
+ * straight to dist/ by the vite plugin, so it cannot reference a hashed asset.
+ * A stable path serves all five pages uniformly. Cache-busting comes from the
+ * service worker, whose cache name is stamped with the app version on every
+ * deploy.
+ *
+ * TWO INDEPENDENT AXES:
+ *   data-theme="dawn"          day/night, the toggle that already existed
+ *   data-palette="paper|mono|soft"   which family (absent = Instrument)
+ * Both are set before first paint by the inline script in each page's <head>,
+ * so there is no flash of the wrong palette.
+ *
+ * CASCADE ORDER MATTERS AND IS DELIBERATE:
+ *   1. :root                              Instrument night (the default)
+ *   2. [data-palette="X"]                 other families, night
+ *      -- equal specificity to :root, so these win by SOURCE ORDER
+ *   3. [data-theme="dawn"]                Instrument day
+ *   4. [data-palette="X"][data-theme=…]   other families, day
+ *      -- higher specificity, so these beat step 3
+ * Moving a block between these groups silently changes which palette wins.
+ *
+ * Values are the four families verified in the hub's PALETTES.md, generated
+ * from palettes/families.json. Change them THERE and re-run:
+ *   node palette-check.mjs palettes/families.json
+ *
+ * NOT here (deliberately): --ui/--display/--mono (type), --ir/--macro (identity
+ * gradients) and --glass-* (theme-INVARIANT HUD colours that float over the
+ * photo). Those are not palette and must not vary by family.
+ */
+
+/* ---- 1. default: Instrument, night ---- */
+:root {
+  color-scheme: dark;
+  --bg: #1a1a1a;
+  --bg-2: #232323;
+  --surface: #3a3a3a;
+  --surface-2: #414141;
+  --surface-3: #484848;
+  --line: rgba(255,255,255,.17);
+  --line-2: rgba(255,255,255,.62);
+  --txt: #eaeaea;
+  --txt-2: #d2d2d2;
+  --txt-3: #c1c1c1;
+  --accent: #9fc2f5;
+  --accent-soft: rgba(159, 194, 245, 0.15);
+  --accent-ink: #1a1a1a;
+  --shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* ---- 2. the other families, night ---- */
+/* Paper — cool night, warm paper day — the most character. */
+[data-palette="paper"] {
+  color-scheme: dark;
+  --bg: #141519;
+  --bg-2: #191a1e;
+  --surface: #35373c;
+  --surface-2: #3e4045;
+  --surface-3: #484a4f;
+  --line: rgba(255,255,255,.16);
+  --line-2: rgba(255,255,255,.64);
+  --txt: #e6e8ec;
+  --txt-2: #c9ccd2;
+  --txt-3: #babec6;
+  --accent: #a3c4ff;
+  --accent-soft: rgba(163, 196, 255, 0.15);
+  --accent-ink: #141519;
+  --shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+/* Mono — neutral in BOTH modes; the purist instrument. */
+[data-palette="mono"] {
+  color-scheme: dark;
+  --bg: #131313;
+  --bg-2: #1c1c1c;
+  --surface: #363636;
+  --surface-2: #3e3e3e;
+  --surface-3: #454545;
+  --line: rgba(255,255,255,.14);
+  --line-2: rgba(255,255,255,.62);
+  --txt: #e6e6e6;
+  --txt-2: #cfcfcf;
+  --txt-3: #bcbcbc;
+  --accent: #93b9ea;
+  --accent-soft: rgba(147, 185, 234, 0.15);
+  --accent-ink: #131313;
+  --shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+/* Soft — lowest glare, contrast deliberately capped for long sessions. */
+[data-palette="soft"] {
+  color-scheme: dark;
+  --bg: #15161a;
+  --bg-2: #1b1c21;
+  --surface: #36373c;
+  --surface-2: #3c3d43;
+  --surface-3: #43444a;
+  --line: rgba(255,255,255,.17);
+  --line-2: #9da1a9;
+  --txt: #e0e2e7;
+  --txt-2: #c9cbd1;
+  --txt-3: #babdc4;
+  --accent: #97b8ec;
+  --accent-soft: rgba(151, 184, 236, 0.15);
+  --accent-ink: #15161a;
+  --shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* ---- 3. day: Instrument (the default) ---- */
+[data-theme="dawn"] {
+  color-scheme: light;
+  --bg: #c4bcab;
+  --bg-2: #ccc4b3;
+  --surface: #eee6d6;
+  --surface-2: #f4ecdd;
+  --surface-3: #faf3e5;
+  --line: rgba(39,33,25,.22);
+  --line-2: rgba(39,33,25,.68);
+  --txt: #272119;
+  --txt-2: #363026;
+  --txt-3: #4a4436;
+  --accent: #17458f;
+  --accent-soft: rgba(23, 69, 143, 0.12);
+  --accent-ink: #ffffff;
+  --shadow: 0 10px 34px rgba(80, 64, 40, 0.18), 0 2px 6px rgba(80, 64, 40, 0.14);
+}
+
+/* ---- 4. the other families, day ---- */
+[data-palette="paper"][data-theme="dawn"] {
+  color-scheme: light;
+  --bg: #c8c1b0;
+  --bg-2: #cfc9ba;
+  --surface: #f2eee3;
+  --surface-2: #f6f3ea;
+  --surface-3: #fbf9f3;
+  --line: rgba(43,36,24,.24);
+  --line-2: rgba(43,36,24,.66);
+  --txt: #322e25;
+  --txt-2: #433d30;
+  --txt-3: #4e493d;
+  --accent: #164493;
+  --accent-soft: rgba(22, 68, 147, 0.12);
+  --accent-ink: #ffffff;
+  --shadow: 0 10px 34px rgba(80, 64, 40, 0.18), 0 2px 6px rgba(80, 64, 40, 0.14);
+}
+[data-palette="mono"][data-theme="dawn"] {
+  color-scheme: light;
+  --bg: #c5c5c5;
+  --bg-2: #cdcdcd;
+  --surface: #efefef;
+  --surface-2: #f5f5f5;
+  --surface-3: #fbfbfb;
+  --line: rgba(20,20,20,.24);
+  --line-2: rgba(20,20,20,.60);
+  --txt: #252525;
+  --txt-2: #353535;
+  --txt-3: #494949;
+  --accent: #274b86;
+  --accent-soft: rgba(39, 75, 134, 0.12);
+  --accent-ink: #ffffff;
+  --shadow: 0 10px 34px rgba(40, 40, 44, 0.18), 0 2px 6px rgba(40, 40, 44, 0.14);
+}
+[data-palette="soft"][data-theme="dawn"] {
+  color-scheme: light;
+  --bg: #bfbab0;
+  --bg-2: #c7c2b8;
+  --surface: #e8e4da;
+  --surface-2: #eeebe2;
+  --surface-3: #f5f2ea;
+  --line: rgba(46,41,33,.28);
+  --line-2: #5f594c;
+  --txt: #2e2921;
+  --txt-2: #3e392f;
+  --txt-3: #4a4438;
+  --accent: #204478;
+  --accent-soft: rgba(32, 68, 120, 0.12);
+  --accent-ink: #ffffff;
+  --shadow: 0 10px 34px rgba(80, 64, 40, 0.18), 0 2px 6px rgba(80, 64, 40, 0.14);
+}

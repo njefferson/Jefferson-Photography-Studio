@@ -211,6 +211,51 @@ they OWN the finger gesture like every other drag control. Do NOT set
 scrolled instead of moving it — owner-caught on the iPad 2026-07-19). The
 panel still scrolls from label text + the gaps between rows.
 
+PALETTE CONSOLIDATED TO ONE SOURCE + FOUR FAMILIES (2026-07-30). Colour tokens
+now live ONLY in `public/palette.css`. src/style.css, src/launcher.css and
+src/macro/macro.css declare none; privacy.html and the generated notes.html
+declare none. That kills the five-places-must-change-together hazard this repo
+has been bitten by repeatedly — and it was a PRECONDITION, not a tidy-up: four
+families x two modes across five sites would have been 40 blocks that must never
+drift.
+
+WHY public/ AND NOT src/: notes.html is written straight to dist/ by the
+notesPage vite plugin, so it cannot reference a content-hashed asset. A stable
+path serves all five pages uniformly. Cache-busting therefore comes from the
+service worker, whose cache name is stamped with the app version every deploy —
+palette.css is in the precache manifest, so offline gets the new colours too.
+
+TWO INDEPENDENT AXES: `data-theme="dawn"` (the day/night toggle, unchanged) and
+`data-palette="paper|mono|soft"` (absent = Instrument, the default). Both are set
+before first paint by the inline script in every page's <head>. That script now
+also stamps `theme-color` from the resolved `--bg`, which closes the long-standing
+gap where the iOS status bar kept one static colour and was wrong in the other
+mode. The palette value is VALIDATED against a fixed set — a junk localStorage
+entry must not be able to set an arbitrary attribute (verified by a negative
+control in the harness).
+
+CASCADE ORDER IN palette.css IS LOAD-BEARING: (1) `:root` Instrument night,
+(2) `[data-palette="X"]` other families night — equal specificity to :root, so
+these win by SOURCE ORDER, (3) `[data-theme="dawn"]` Instrument day, (4)
+`[data-palette="X"][data-theme="dawn"]` — higher specificity, beats (3). Moving a
+block between those groups silently changes which palette wins. The file says so
+at the top.
+
+VALUES ARE NOT OURS TO INVENT: they are generated from the hub's
+`palettes/families.json` and governed by `PALETTES.md` + `palette-check.mjs`
+(exits non-zero). Change them THERE, regenerate, re-run the gate. Instrument is
+the recommended default — the only family whose worst text pairing is >=4.87
+across all four palettes, with AAA primary text on every fill and an exact-neutral
+night chrome (Oklch C 0.0000), which is what an IR editor's surround owes.
+
+VERIFIED: palette-apply.mjs (scratchpad) 361/361 — every one of 4 palettes x 2
+modes x 5 pages resolves every token, matches the source-of-truth hex, carries the
+right color-scheme, stamps theme-color from its own --bg, and rejects a junk
+palette value. Plus axe clean, nav walk 63/63, all rails >=3:1.
+
+NOT YET SHIPPED: the picker. The families exist and are reachable only by setting
+localStorage by hand until the Settings row lands.
+
 FULL A11Y AUDIT 2026-07-30 (owner: "it's all placeholder while I get
 accessibility right — everything is subject to audit"). axe-core 4.12 (wcag2a/
 aa, wcag21, wcag22aa, best-practice) plus the checks axe cannot make, over
