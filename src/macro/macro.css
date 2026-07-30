@@ -360,3 +360,10 @@ small { font-size: max(0.6875rem, 0.8em); }
   color: var(--txt-2);
 }
 .pal-note { display: block; margin-top: 2px; font-size: 0.75rem; line-height: 1.35; color: var(--txt-2); }
+
+/* WCAG 1.4.1 — prose links underlined at rest (see style.css for the measurement). */
+dialog#helpDlg a:not(.hub-row) { text-decoration: underline; text-underline-offset: 2px; }
+@media (prefers-contrast: more) {
+  :root { --txt-3: var(--txt-2); --line: var(--line-2); }
+}
+::selection { background: var(--accent-soft); color: var(--txt); }

@@ -401,3 +401,10 @@ body {
   color: var(--txt-2);
 }
 .pal-note { display: block; margin-top: 2px; font-size: 0.75rem; line-height: 1.35; color: var(--txt-2); }
+
+/* WCAG 1.4.1 — prose links underlined at rest (see style.css for the measurement). */
+#welcomeDlg a { text-decoration: underline; text-underline-offset: 2px; }
+@media (prefers-contrast: more) {
+  :root { --txt-3: var(--txt-2); --line: var(--line-2); }
+}
+::selection { background: var(--accent-soft); color: var(--txt); }

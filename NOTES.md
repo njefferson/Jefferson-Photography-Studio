@@ -211,6 +211,23 @@ they OWN the finger gesture like every other drag control. Do NOT set
 scrolled instead of moving it — owner-caught on the iPad 2026-07-19). The
 panel still scrolls from label text + the gaps between rows.
 
+AUDIT ITEMS CLOSED WITH THE PALETTE RELEASE (2026-07-30):
+- LINKS ARE UNDERLINED AT REST. This was a real WCAG 1.4.1 failure, not a
+  nicety: the accent is luminance-IDENTICAL to the body text it sits in
+  (measured 1.01:1 against --txt-3 on Instrument night, 1.05 on day), so colour
+  was the only link cue and an invisible one. Unfixable by colour — two tokens
+  that each clear 4.6:1 on the same surfaces cannot also differ 3:1 from each
+  other; all four council designers proved this independently. Prose links only:
+  the bordered .hub-row and the .backlink chrome control are their own boundary,
+  not text-in-a-paragraph, and stay unadorned (verified per-element).
+- prefers-contrast: more now exists in the Studio (the hub already had one).
+  Deliberately PALETTE-INDEPENDENT — it promotes --txt-3 to --txt-2 and --line to
+  --line-2 rather than pinning colours that would only suit one family.
+- ::selection was browser default, i.e. unverified in every palette; now
+  --accent-soft under --txt.
+VERSION -> 2.4 in this release's final commit (capability release: the palette
+picker is a feature, not an increment).
+
 PALETTE CONSOLIDATED TO ONE SOURCE + FOUR FAMILIES (2026-07-30). Colour tokens
 now live ONLY in `public/palette.css`. src/style.css, src/launcher.css and
 src/macro/macro.css declare none; privacy.html and the generated notes.html
