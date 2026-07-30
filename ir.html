@@ -27,10 +27,25 @@
     <meta name="twitter:title" content="Infrared Photography Studio — free IR photo editor" />
     <meta name="twitter:description" content="Edit infrared photos free, on your device: unbounded white balance, channel swap, false-color looks, masks, healing, RAW (NEF/DNG). Works offline." />
     <meta name="twitter:image" content="https://jefferson-photo-studio.pages.dev/ir-social.jpg" />
-    <!-- Read the saved theme before first paint so there's no flash of the
-         wrong palette (see src/theme.ts). -->
+    <link rel="stylesheet" href="./palette.css" />
+    <!-- Read theme AND palette before first paint, so there is no flash of the
+         wrong colours. Two independent axes: data-theme is day/night,
+         data-palette picks the family (absent = Instrument, the default).
+         The palette value is validated against a fixed set — a junk
+         localStorage entry must not be able to set an arbitrary attribute.
+         Also stamps theme-color from the resolved --bg, so the iOS status bar
+         matches whichever palette and mode are actually showing (it used to be
+         one static value and was wrong in the other mode). -->
     <script>
-      try { if (localStorage.getItem("studio-theme") === "dawn") document.documentElement.setAttribute("data-theme", "dawn"); } catch (e) {}
+      try {
+        var d = document.documentElement, s = localStorage;
+        if (s.getItem("studio-theme") === "dawn") d.setAttribute("data-theme", "dawn");
+        var p = s.getItem("studio-palette");
+        if (p && /^(paper|mono|soft)$/.test(p)) d.setAttribute("data-palette", p);
+        var m = document.querySelector('meta[name=theme-color]');
+        var bg = getComputedStyle(d).getPropertyValue("--bg").trim();
+        if (m && bg) m.setAttribute("content", bg);
+      } catch (e) {}
     </script>
   </head>
   <body>

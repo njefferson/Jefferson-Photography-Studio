@@ -156,10 +156,6 @@ function notesPage(): Plugin {
     <link rel="canonical" href="https://jefferson-photo-studio.pages.dev/notes" />
     <title>What's new — Photography Studio</title>
     <style>
-      :root { --bg: #08080b; --bg-2: #0b0b0e; --txt: #eef0f3; --txt-2: #a3a7b2; --txt-3: #9ba0aa; --line: rgba(255,255,255,0.09); --accent: #6ea0ff; }
-      /* This page follows the app's Dawn/Dusk choice like every other screen.
-         Same tokens as src/style.css — keep the two in step. */
-      [data-theme="dawn"] { --bg: #ded7cb; --bg-2: #e5e0d4; --txt: #2a251c; --txt-2: #5f5849; --txt-3: #625c4d; --line: rgba(40,32,20,0.14); --accent: #2558b2; }
       * { box-sizing: border-box; }
       body { margin: 0; padding: 2rem 1.2rem 4rem; background: radial-gradient(120% 90% at 50% 0%, var(--bg-2), var(--bg)); min-height: 100vh; color: var(--txt); font: 1rem/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
       main { max-width: 620px; margin: 0 auto; }
@@ -179,10 +175,25 @@ function notesPage(): Plugin {
       .backlink, footer a { display: inline-flex; align-items: center; min-height: 44px; }
       footer { margin-top: 2.6rem; color: var(--txt-3); font-size: 0.85rem; }
     </style>
-    <!-- Read the saved theme before first paint so there's no flash of the
-         wrong palette (same one-liner as index/ir/macro). -->
+    <link rel="stylesheet" href="./palette.css" />
+    <!-- Read theme AND palette before first paint, so there is no flash of the
+         wrong colours. Two independent axes: data-theme is day/night,
+         data-palette picks the family (absent = Instrument, the default).
+         The palette value is validated against a fixed set — a junk
+         localStorage entry must not be able to set an arbitrary attribute.
+         Also stamps theme-color from the resolved --bg, so the iOS status bar
+         matches whichever palette and mode are actually showing (it used to be
+         one static value and was wrong in the other mode). -->
     <script>
-      try { if (localStorage.getItem("studio-theme") === "dawn") document.documentElement.setAttribute("data-theme", "dawn"); } catch (e) {}
+      try {
+        var d = document.documentElement, s = localStorage;
+        if (s.getItem("studio-theme") === "dawn") d.setAttribute("data-theme", "dawn");
+        var p = s.getItem("studio-palette");
+        if (p && /^(paper|mono|soft)$/.test(p)) d.setAttribute("data-palette", p);
+        var m = document.querySelector('meta[name=theme-color]');
+        var bg = getComputedStyle(d).getPropertyValue("--bg").trim();
+        if (m && bg) m.setAttribute("content", bg);
+      } catch (e) {}
     </script>
   </head>
   <body>
