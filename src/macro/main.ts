@@ -2,6 +2,7 @@ import "./macro.css";
 import { stackFocus, type StackFrame } from "./stack";
 import { setupInstalledShare, setupInstallFromApp } from "../share";
 import { wireThemeToggle } from "../theme";
+import { wirePalettePicker } from "../palette";
 import { wireForceUpdate } from "../swupdate";
 
 // Macro focus-stacking mode. Loads a focus-shift JPEG set, blends it into one
@@ -339,6 +340,7 @@ helpDlg.addEventListener("click", (e) => { if (e.target === helpDlg) helpDlg.clo
 
 // Dawn / dark theme switch (shared chrome), living in the help dialog.
 wireThemeToggle(document.getElementById("themeToggle"));
+wirePalettePicker(document.getElementById("palettePicker"));
 
 // Installed-app Share (src/share.ts): only when running standalone.
 setupInstalledShare("shareBtn");
