@@ -211,19 +211,50 @@ they OWN the finger gesture like every other drag control. Do NOT set
 scrolled instead of moving it — owner-caught on the iPad 2026-07-19). The
 panel still scrolls from label text + the gaps between rows.
 
-FINDING — the --line-2 rail falls short on the LAUNCHER's light-theme gradient
-(measured 2026-07-30, NOT fixed, NOT introduced by that session's nav work).
-The token is calibrated against the --surface family; index.html's controls sit
-directly on the body radial-gradient, whose dawn top-of-page is lighter than any
-surface (rgb(238,232,219)). Measured off painted pixels at 390x844: the hub pill
-2.87:1 and the SHIPPED ⓘ button 2.68:1 — both under the 3:1 rail, ⓘ worse, so
-this predates the nav change. Dusk is fine (3.40 / 3.20). Fixing it means
-recomputing dawn --line-2 across all FIVE definition sites plus a full a11y walk;
-it was deliberately not churned inside a navigation change. Owner's call.
+RECALIBRATED 2026-07-30 — --line-2 raised, dawn .50 -> .58, dusk .35 -> .40.
+The rails were under the 3:1 rule and had been recorded as meeting it. The first
+diagnosis in this file was WRONG and is corrected here: it blamed the launcher's
+light-theme GRADIENT for being lighter than the calibration surfaces. It isn't
+the gradient. Solving contrast(rail-over-B, B) across every backdrop in the dawn
+palette shows .50 failing on ALL of them, and the worst case is --surface-3
+(#e2dac9), not the gradient:
+
+  dawn ink rgb(40,32,20)   --bg 2.98  --bg-2 3.04  --surface 3.10
+                           --surface-2 3.02  --surface-3 2.93  gradient-top 3.04
+  at .58                   --bg 3.69  --bg-2 3.80  --surface 3.90
+                           --surface-2 3.77  --surface-3 3.62  gradient-top 3.80
+  dusk ink rgb(255,255,255) at .35: worst 3.11 (--surface-3); at .40: worst 3.61
+
+Dusk was raised too, and that one is a JUDGMENT CALL, not a failure: .35 clears
+3:1 arithmetically (3.11 worst) and the three dusk rails on screen measured
+3.20-3.50. But a 1px border antialiases ~0.15 off the arithmetic, so a dusk rail
+sitting on --surface-3 renders around 2.96 — under the line, in a spot none of
+the sampled rails happened to occupy. .40 buys margin that survives the paint.
+Revert to .35 if the lighter dark-theme hairline is preferred; dawn .58 is not
+optional.
+
+VERIFIED by measuring painted pixels (rail-audit.mjs, session scratchpad): all
+6 detectable rails across index/ir/macro/notes/privacy in both themes clear 3:1
+— dawn worst 3.28 (was 2.67), dusk worst 3.73 (was 3.20). Coverage caveat: the
+sweep only reaches rails that are VISIBLE without opening a dialog or loading a
+photo, hence 6. The arithmetic table above is the exhaustive part; the pixel
+sweep confirms the paint matches it.
+
+AUDIT-HARNESS GOTCHAS (each returned a confident wrong answer first):
+- getComputedStyle serializes `.35` as `0.35`, so string-matching a border
+  color against the authored token matched NOTHING and the audit reported a
+  clean sweep of zero rails. Compare numerically.
+- border-radius comes back AUTHORED ("999px", "50%"), not used. A corner guard
+  built on it skipped every pill and circle — i.e. precisely the controls being
+  investigated. Clamp to min(radius, w/2, h/2).
+- One sample column through a DASHED rail lands in a gap and reports ~1.1:1.
+  Scan across the edge and take the strongest reading; for a dash, the dash IS
+  the rail.
 
 CALIBRATED TOKENS (2026-07-17; change only with recomputed WCAG ratios):
 --txt-3 #9095a1 dark / #6d6656 dawn (≥4.5:1 on their worst surfaces);
---line-2 rgba(255,255,255,.35) dark / rgba(40,32,20,.50) dawn (≥3:1 rails);
+--line-2 rgba(255,255,255,.40) dark / rgba(40,32,20,.58) dawn (≥3:1 rails) —
+RAISED 2026-07-30 from .35/.50, which did NOT meet that rule; see RECALIBRATED;
 --line .18/.28 (decorative hairlines — deliberately below 3:1, never the
 sole affordance); dawn --accent #2a63c4 (≥4.5:1 as link text);
 --glass-bg rgba(10,10,14,.65) + --glass-txt #f2f3f6 are THEME-INVARIANT:
