@@ -122,7 +122,9 @@ body {
 }
 .bar-btn:active { background: var(--surface-3); }
 .info-btn {
-  width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--line);
+  /* Doctrine §4: a real 44px target — see style.css for why the overlay
+     approach was dropped. */
+  width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line);
   background: var(--surface-2); color: var(--txt-2); font-style: italic; font-weight: 700; cursor: pointer;
 }
 .info-btn:active { background: var(--surface-3); }
@@ -342,3 +344,11 @@ dialog#helpDlg .theme-row { display: flex; align-items: center; gap: 10px; margi
     border-top-color: var(--line-2) !important;
   }
 }
+
+
+/* ---- Touch-target floor (Doctrine §4, audited 2026-07-30) ---- */
+dialog#helpDlg button { min-height: 44px; }
+dialog#helpDlg .hub-row { min-height: 44px; }
+
+small { font-size: max(0.6875rem, 0.8em); }
+.bar .home { min-height: 44px; }

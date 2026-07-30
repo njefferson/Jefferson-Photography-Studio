@@ -388,3 +388,9 @@ body {
     border-top-color: var(--line-2) !important;
   }
 }
+
+
+/* ---- Touch-target floor (Doctrine §4, audited 2026-07-30) ---- */
+#welcomeDlg button,
+#welcomeDlg .update-row button { min-height: 44px; }
+.lc-footer button { min-height: 44px; }

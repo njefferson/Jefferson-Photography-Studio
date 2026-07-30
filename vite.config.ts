@@ -173,6 +173,10 @@ function notesPage(): Plugin {
       li small { display: block; color: var(--txt-3); font-variant-numeric: tabular-nums; }
       li.coming::before { content: "→ "; color: var(--accent); }
       li.shipped::before { content: "✓ "; color: var(--txt-3); }
+      /* Doctrine §4: standalone links clear 44px. inline-flex grows the hit
+         area without moving the text. Links inline in a sentence are exempt
+         (2026-07-29 ruling) and deliberately not covered. */
+      .backlink, footer a { display: inline-flex; align-items: center; min-height: 44px; }
       footer { margin-top: 2.6rem; color: var(--txt-3); font-size: 0.85rem; }
     </style>
     <!-- Read the saved theme before first paint so there's no flash of the
@@ -183,7 +187,7 @@ function notesPage(): Plugin {
   </head>
   <body>
     <main>
-      <a href="./index.html">&#8249; Studio</a>
+      <a class="backlink" href="./index.html">&#8249; Studio</a>
       <h1>What's new</h1>
       <p class="ver">Photography Studio — currently version ${esc(version)}. Free, on-device photo tools: nothing you open ever leaves your device.</p>
       <ul>
