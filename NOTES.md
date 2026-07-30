@@ -211,6 +211,25 @@ they OWN the finger gesture like every other drag control. Do NOT set
 scrolled instead of moving it — owner-caught on the iPad 2026-07-19). The
 panel still scrolls from label text + the gaps between rows.
 
+FULL PALETTE MATRIX 2026-07-30 (owner: "I'd prefer no problems"; backgrounds
+were explicitly on the table). Every foreground token was solved against every
+background it can land on, in all FOUR palettes — Studio dusk/dawn and the hub's
+dark/light — rather than sampling what happened to be on screen. Result after
+the two fixes below: every text and rail pairing meets its threshold, all four
+palettes. THE BACKGROUNDS WERE NOT THE PROBLEM and were not touched — both
+failures were foreground tokens. The hub's palette passed outright with nothing
+changed (its worst pairings: dark --magenta on --surface-hi 4.68:1, light
+--amber on --surface-hi 4.52:1 — thin, watch them if those values ever move).
+
+OBSERVED, NOT FIXED: surface fills barely separate from the page in every
+palette (1.03–1.34:1 dusk, 1.03–1.17:1 dawn, 1.03–1.23:1 hub). That is not a
+WCAG failure — the rails now carry the boundary at ≥3:1 — but it does mean the
+rail is load-bearing everywhere: a card is told from the page by its edge alone,
+never by its fill. Anything that weakens a rail therefore removes the ONLY cue.
+ALSO OBSERVED: privacy.html and the generated notes.html carry their own inline
+DARK-ONLY palettes with no [data-theme="dawn"] block, so they stay dark when the
+app is in dawn. Not a contrast failure; a theme-consistency gap. Owner's call.
+
 RECALIBRATED 2026-07-30 — --line-2 raised, dawn .50 -> .58, dusk .35 -> .40.
 The rails were under the 3:1 rule and had been recorded as meeting it. The first
 diagnosis in this file was WRONG and is corrected here: it blamed the launcher's
@@ -253,6 +272,10 @@ AUDIT-HARNESS GOTCHAS (each returned a confident wrong answer first):
 
 CALIBRATED TOKENS (2026-07-17; change only with recomputed WCAG ratios):
 --txt-3 #9095a1 dark / #6d6656 dawn (≥4.5:1 on their worst surfaces);
+--txt-2 #a3a7b2 dark / #5f5849 dawn — dawn CORRECTED 2026-07-30 from #6a6353,
+which was 4.29:1 on --surface-3 (its worst surface) and, worse, QUIETER than
+--txt-3: the secondary token had less contrast than the tertiary one. #5f5849
+is 5.07:1 worst and restores the ordering (secondary stronger than tertiary);
 --line-2 rgba(255,255,255,.40) dark / rgba(40,32,20,.58) dawn (≥3:1 rails) —
 RAISED 2026-07-30 from .35/.50, which did NOT meet that rule; see RECALIBRATED;
 --line .18/.28 (decorative hairlines — deliberately below 3:1, never the
