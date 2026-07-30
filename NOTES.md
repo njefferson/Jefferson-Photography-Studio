@@ -211,6 +211,48 @@ they OWN the finger gesture like every other drag control. Do NOT set
 scrolled instead of moving it — owner-caught on the iPad 2026-07-19). The
 panel still scrolls from label text + the gaps between rows.
 
+SURFACE SEPARATION 2026-07-30 (owner: "address the surface fills"). Fills now
+carry elevation, not just the rail: dusk page→card 1.09 → 1.30:1, dawn 1.17 →
+1.27:1, and the dusk ladder is a real ladder at 1.30/1.43/1.65.
+
+  dusk  --bg #0b0c0f→#08080b  --bg-2 #0f1014→#0b0b0e  --surface #15171c→#23252a
+        --surface-2 #1c1f26→#2a2c33  --surface-3 #252932→#32363e
+        --txt-3 #9095a1→#9ba0aa  --line-2 alpha .45
+  dawn  --bg #e7e0d3→#ded7cb  --bg-2 #efe9dd→#e5e0d4   (nothing else moved)
+
+HOW IT WAS DERIVED, because the obvious approaches are all wrong:
+- The knobs are COUPLED. Spreading surfaces pushes --surface-3 (the pressed
+  state) away from the page, which is the same direction as the text, so
+  text-on-pressed loses contrast. Every naive spread broke --txt-3 on
+  --surface-3. Surfaces and text tokens must be solved together.
+- Buying dusk separation by DARKENING THE PAGE does not work: --bg was already
+  at the luminance floor, so 55% darker moved page→card 1.09 → 1.13. The +0.05
+  term in the contrast formula dominates down there. Dusk separation can only
+  come from lifting surfaces. (Dawn is the opposite — deepening its page is the
+  whole fix and costs nothing else.)
+- Lifting dusk surfaces ALSO lowers rail contrast (a white rail on a lighter
+  surface), which is why --line-2 went to .45 in the same move.
+- The ceiling is real. A search over (surface lift × page move × rail alpha ×
+  text tokens), constrained to text ≥4.6 and rail ≥3.4 (thresholds plus the
+  ~0.15 a 1px rail loses to antialiasing), maxes out at 1.30:1 dusk / 1.27:1
+  dawn. Past that something correct breaks. Do not chase a bigger number.
+- COST, stated plainly: dusk text hierarchy (--txt vs --txt-3) compressed 12%,
+  2.63x → 2.31x, and the panels went from near-black to dark grey. #23252a is
+  industry-normal for a photo editor (Lightroom sits near #262626), but it IS a
+  visible identity change. Dawn cost nothing.
+
+PRIVACY + NOTES PAGES NOW FOLLOW THE THEME (2026-07-30). Both carried their own
+inline DARK-ONLY palettes and stayed dark while the app was in dawn. Each now
+has a [data-theme="dawn"] block and the same pre-paint script as index/ir/macro,
+so there is no flash of the wrong palette. Their tokens are COPIES of
+src/style.css — a sixth and seventh place the palette lives; change them
+together. VERIFIED (theme-pages.mjs): both paint measurably different pages per
+theme (14.4:1 apart) and body text clears 4.5:1 in both.
+
+STILL DARK-ONLY: the theme-color meta tag is a single static value per page
+(#08080b), so the iOS status bar stays dark-tinted in dawn. Pre-existing across
+every page; fixing it means having the pre-paint script rewrite the tag.
+
 FULL PALETTE MATRIX 2026-07-30 (owner: "I'd prefer no problems"; backgrounds
 were explicitly on the table). Every foreground token was solved against every
 background it can land on, in all FOUR palettes — Studio dusk/dawn and the hub's
@@ -271,13 +313,14 @@ AUDIT-HARNESS GOTCHAS (each returned a confident wrong answer first):
   the rail.
 
 CALIBRATED TOKENS (2026-07-17; change only with recomputed WCAG ratios):
---txt-3 #9095a1 dark / #6d6656 dawn (≥4.5:1 on their worst surfaces);
+--txt-3 #9ba0aa dark (raised with the surfaces 2026-07-30) / #625c4d dawn;
 --txt-2 #a3a7b2 dark / #5f5849 dawn — dawn CORRECTED 2026-07-30 from #6a6353,
 which was 4.29:1 on --surface-3 (its worst surface) and, worse, QUIETER than
 --txt-3: the secondary token had less contrast than the tertiary one. #5f5849
 is 5.07:1 worst and restores the ordering (secondary stronger than tertiary);
---line-2 rgba(255,255,255,.40) dark / rgba(40,32,20,.58) dawn (≥3:1 rails) —
-RAISED 2026-07-30 from .35/.50, which did NOT meet that rule; see RECALIBRATED;
+--line-2 rgba(255,255,255,.45) dark / rgba(40,32,20,.58) dawn (≥3:1 rails) —
+raised 2026-07-30 from .35/.50 (did NOT meet the rule), dusk again to .45 when
+the surfaces lifted; see RECALIBRATED and SURFACE SEPARATION;
 --line .18/.28 (decorative hairlines — deliberately below 3:1, never the
 sole affordance); dawn --accent #2a63c4 (≥4.5:1 as link text);
 --glass-bg rgba(10,10,14,.65) + --glass-txt #f2f3f6 are THEME-INVARIANT:

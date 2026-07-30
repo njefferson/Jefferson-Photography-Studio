@@ -150,13 +150,16 @@ function notesPage(): Plugin {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#0b0c0f" />
+    <meta name="theme-color" content="#08080b" />
     <meta name="description" content="What's new in Photography Studio — release notes and what's coming next. Free, on-device photo tools." />
     <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192-light.png" />
     <link rel="canonical" href="https://jefferson-photo-studio.pages.dev/notes" />
     <title>What's new — Photography Studio</title>
     <style>
-      :root { --bg: #0b0c0f; --bg-2: #0f1014; --txt: #eef0f3; --txt-2: #a3a7b2; --txt-3: #9095a1; --line: rgba(255,255,255,0.09); --accent: #6ea0ff; }
+      :root { --bg: #08080b; --bg-2: #0b0b0e; --txt: #eef0f3; --txt-2: #a3a7b2; --txt-3: #9ba0aa; --line: rgba(255,255,255,0.09); --accent: #6ea0ff; }
+      /* This page follows the app's Dawn/Dusk choice like every other screen.
+         Same tokens as src/style.css — keep the two in step. */
+      [data-theme="dawn"] { --bg: #ded7cb; --bg-2: #e5e0d4; --txt: #2a251c; --txt-2: #5f5849; --txt-3: #625c4d; --line: rgba(40,32,20,0.14); --accent: #2558b2; }
       * { box-sizing: border-box; }
       body { margin: 0; padding: 2rem 1.2rem 4rem; background: radial-gradient(120% 90% at 50% 0%, var(--bg-2), var(--bg)); min-height: 100vh; color: var(--txt); font: 1rem/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
       main { max-width: 620px; margin: 0 auto; }
@@ -172,6 +175,11 @@ function notesPage(): Plugin {
       li.shipped::before { content: "✓ "; color: var(--txt-3); }
       footer { margin-top: 2.6rem; color: var(--txt-3); font-size: 0.85rem; }
     </style>
+    <!-- Read the saved theme before first paint so there's no flash of the
+         wrong palette (same one-liner as index/ir/macro). -->
+    <script>
+      try { if (localStorage.getItem("studio-theme") === "dawn") document.documentElement.setAttribute("data-theme", "dawn"); } catch (e) {}
+    </script>
   </head>
   <body>
     <main>
