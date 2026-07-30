@@ -131,6 +131,45 @@ See **`PLAN.md`** for the full build plan.
   hand-numbered ips-v1…ips-v80 chore and its per-release bookkeeping are
   retired. Don't mention cache stamps in release notes or to the owner.
 
+## Getting back OUT — the hub chain (2026-07-30)
+The apps point down cleanly (hub → Studio → tool) but the way back up had a
+missing rung: ir.html/macro.html each carried "‹ Studio" in the bar, and then
+index.html carried NOTHING to the hub. The only hub link in the whole app was
+the FOURTH of five identical grey text links inside the IR ⓘ dialog, worded
+"More free tools by Noah Jefferson" — which doesn't read as "the way back", and
+which the owner could not find on device ("nearly buried — barely an actual
+usable thing for a user"). Macro had no hub link at all.
+
+The chain is now one visible control per level, no dialogs on the path:
+tool "‹ Studio" (bar) → index "‹ Noah Jefferson" (bar) → hub. The launcher's ⓘ
+lost its absolute corner positioning and became the right-hand item of a real
+.lc-bar flex row, with the hub link as the left-hand item. Both tools also carry
+a bordered .hub-row in their info dialog for direct access, wearing the hub's
+own mark (public/icons/hub-nj.svg, copied from the hub repo's public/icon.svg —
+re-copy it if the hub's mark changes).
+
+Cross-origin hub links keep target="_blank" rel="noopener", matching the
+existing convention: an installed PWA can't navigate off-scope in place, and a
+back-link that strands the app is worse than no back-link.
+
+MEASUREMENT GOTCHAS from that session's walk (all three produced confident
+WRONG answers before they were caught — the instrument was the bug each time):
+- Computed-style background walks return BLACK on these pages. body paints a
+  `background:` shorthand holding only a gradient, so background-COLOR is
+  transparent all the way up and a naive walk hits its fallback. It reported a
+  LIGHT page at 1.11:1 — an absurd number, so the instrument was suspect first,
+  per the standing rule. Read real pixels off a screenshot instead.
+- Sample a rail on a STRAIGHT edge. Scanning across the end of a 999px-radius
+  pill crosses pure curve, where every pixel is antialiased; it under-read by
+  ~0.5 and accused a correctly-calibrated token of failing.
+- The page gradient means the backdrop CHANGES with position — compare a rail
+  against the pixel immediately adjacent to it, not a convenient patch elsewhere.
+- :focus-visible does NOT match on a scripted .focus() in Chromium. The global
+  ring in launcher.css was fine; the harness reported "outline 0px none" until
+  it pressed a real Tab. Drive keyboard checks from the keyboard.
+- Every fresh browser context is a first-time visitor, so #welcomeDlg auto-opens
+  and covers the launcher — dismiss it before measuring anything underneath.
+
 ## Accessibility standing rule (owner mandate, 2026-07-17)
 
 Accessibility is a TOP PRIORITY. Color-blind-inconsiderate design is a fail
@@ -171,6 +210,16 @@ they OWN the finger gesture like every other drag control. Do NOT set
 `pan-y` (it handed the drag to the panel scroller; a finger on the thumb
 scrolled instead of moving it — owner-caught on the iPad 2026-07-19). The
 panel still scrolls from label text + the gaps between rows.
+
+FINDING — the --line-2 rail falls short on the LAUNCHER's light-theme gradient
+(measured 2026-07-30, NOT fixed, NOT introduced by that session's nav work).
+The token is calibrated against the --surface family; index.html's controls sit
+directly on the body radial-gradient, whose dawn top-of-page is lighter than any
+surface (rgb(238,232,219)). Measured off painted pixels at 390x844: the hub pill
+2.87:1 and the SHIPPED ⓘ button 2.68:1 — both under the 3:1 rail, ⓘ worse, so
+this predates the nav change. Dusk is fine (3.40 / 3.20). Fixing it means
+recomputing dawn --line-2 across all FIVE definition sites plus a full a11y walk;
+it was deliberately not churned inside a navigation change. Owner's call.
 
 CALIBRATED TOKENS (2026-07-17; change only with recomputed WCAG ratios):
 --txt-3 #9095a1 dark / #6d6656 dawn (≥4.5:1 on their worst surfaces);

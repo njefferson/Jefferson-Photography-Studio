@@ -275,6 +275,34 @@ dialog#helpDlg .inline-btn {
   border: 1px solid var(--line); background: var(--surface); color: var(--txt-2);
   font: 500 0.8rem/1 var(--ui); cursor: pointer;
 }
+/* The way out to the personal hub — a bordered row wearing the hub's mark, so
+   it reads as a destination instead of disappearing into the body copy. */
+.hub-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 1rem 0 0.2rem;
+  padding: 10px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--txt);
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.hub-row:active { border-color: var(--accent); }
+.hub-row .hub-mark {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+.hub-row .hub-txt { min-width: 0; flex: 1; }
+dialog#helpDlg .hub-row strong { display: block; font: 600 0.875rem/1.25 var(--ui); color: var(--txt); }
+.hub-row small { display: block; margin-top: 2px; font-size: 0.75rem; line-height: 1.35; color: var(--txt-2); }
+.hub-row .hub-go { flex: none; color: var(--accent); font-size: 0.9375rem; }
+
 dialog#helpDlg button { margin-top: 0.6rem; padding: 0.55rem 1.2rem; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); color: var(--txt); cursor: pointer; }
 /* Dawn theme toggle inside the Macro help dialog. */
 dialog#helpDlg .theme-row { display: flex; align-items: center; gap: 10px; margin-top: 1rem; padding-top: 0.9rem; border-top: 1px solid var(--line); }

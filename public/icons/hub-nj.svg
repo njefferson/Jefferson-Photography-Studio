@@ -1,0 +1,21 @@
+<!-- The personal-hub mark, worn by the "‹ Noah Jefferson" link that leads back
+     out to noahjefferson.pages.dev. Copied from that site's public/icon.svg —
+     if the hub's mark changes, re-copy it here. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="30%" r="82%">
+      <stop offset="0%" stop-color="#1c2a55"/>
+      <stop offset="60%" stop-color="#0E1428"/>
+      <stop offset="100%" stop-color="#0B1020"/>
+    </radialGradient>
+    <linearGradient id="ink" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F2A65A"/>
+      <stop offset="50%" stop-color="#E0619E"/>
+      <stop offset="100%" stop-color="#58C6E0"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <text x="258" y="264" text-anchor="middle" dominant-baseline="central"
+        font-family="Arial, Helvetica, sans-serif" font-weight="800"
+        font-size="286" letter-spacing="-16" fill="url(#ink)">NJ</text>
+</svg>

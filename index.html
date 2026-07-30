@@ -34,9 +34,21 @@
   </head>
   <body>
     <div class="wrap">
-      <!-- About / welcome: auto-opens ONCE for new visitors (chooser.ts);
-           this button keeps the same information reachable forever after. -->
-      <button id="infoBtn" class="lc-info" type="button" aria-haspopup="dialog" aria-label="About Photography Studio — what it is and how to install it">&#9432;</button>
+      <!-- Top bar. Left: the way UP — each tool's bar carries "‹ Studio" back
+           to this page, and this page carries the next rung out to the hub, so
+           the way back is a visible control on every screen rather than a line
+           inside a dialog. Right: About / welcome, which auto-opens ONCE for
+           new visitors (chooser.ts) and stays reachable here forever after. -->
+      <div class="lc-bar">
+        <a class="lc-home" href="https://noahjefferson.pages.dev" target="_blank" rel="noopener"
+           title="Noah Jefferson — his photography accounts and all the free apps"
+           aria-label="Noah Jefferson — his photography accounts and all the free apps">
+          <span class="chev" aria-hidden="true">&#8249;</span>
+          <img class="bar-mark" src="./icons/hub-nj.svg" alt="" width="22" height="22" />
+          Noah Jefferson
+        </a>
+        <button id="infoBtn" class="lc-info" type="button" aria-haspopup="dialog" aria-label="About Photography Studio — what it is and how to install it">&#9432;</button>
+      </div>
       <header class="lc-header">
         <img class="brandmark" src="./icons/icon-192.png" alt="Studio icon" width="34" height="34" />
         <p class="kicker">Noah Jefferson</p>
