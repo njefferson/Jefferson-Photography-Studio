@@ -39,6 +39,7 @@ import { putLut, getLut, listLuts, deleteLut, LUT_COUNT_CAP } from "./luts";
 import { extractLookFromJpeg } from "./lookmark";
 import { encodeQr, drawQr } from "./qr";
 import { wireThemeToggle } from "./theme";
+import { wirePalettePicker } from "./palette";
 
 // Injected at build time from git history (see vite.config.ts).
 declare const __CHANGELOG__: { hash: string; date: string; subject: string; version: string }[];
@@ -3826,6 +3827,7 @@ addBrushBtn.addEventListener("click", () => addMask(2));
 
 // Dawn / dark theme switch, living in the ⓘ dialog (shared chrome).
 wireThemeToggle(document.getElementById("themeToggle"));
+wirePalettePicker(document.getElementById("palettePicker"));
 
 // Help dialog (usage guide; the ⓘ dialog stays what's-new + support).
 const helpDlg = $("helpDlg") as HTMLDialogElement;

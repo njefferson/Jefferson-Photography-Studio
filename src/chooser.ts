@@ -4,8 +4,10 @@
 // service worker so the whole studio works offline.
 import "./launcher.css";
 import { wireThemeToggle } from "./theme";
+import { wirePalettePicker } from "./palette";
 import { wireForceUpdate } from "./swupdate";
 wireThemeToggle(document.getElementById("themeToggle"));
+wirePalettePicker(document.getElementById("palettePicker"));
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {

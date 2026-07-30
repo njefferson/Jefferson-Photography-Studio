@@ -253,8 +253,16 @@ modes x 5 pages resolves every token, matches the source-of-truth hex, carries t
 right color-scheme, stamps theme-color from its own --bg, and rejects a junk
 palette value. Plus axe clean, nav walk 63/63, all rails >=3:1.
 
-NOT YET SHIPPED: the picker. The families exist and are reachable only by setting
-localStorage by hand until the Settings row lands.
+THE PICKER (src/palette.ts) is a radiogroup of real buttons in the ⓘ Settings
+row on ir.html, the macro help dialog and the launcher's About card. Each option
+carries its NAME as text and the selected one appends "— in use": a swatch alone
+would make colour the sole carrier of meaning, which is exactly what this whole
+exercise is about, and selection marked by hue+weight alone would repeat the
+mistake one level up. Instrument = the ABSENCE of the attribute, so the CSS
+default is what ships if the module never runs (private mode, JS error, stale
+bundle). VERIFIED picker-walk.mjs 36/36 across all three pages: applies,
+persists, survives reload, moves aria-checked, restamps theme-color, and
+clears both attribute and key when Instrument is reselected.
 
 FULL A11Y AUDIT 2026-07-30 (owner: "it's all placeholder while I get
 accessibility right — everything is subject to audit"). axe-core 4.12 (wcag2a/
