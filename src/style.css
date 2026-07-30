@@ -2162,3 +2162,29 @@ small { font-size: max(0.6875rem, 0.8em); }
   color: var(--txt-2);
 }
 .pal-note { display: block; margin-top: 2px; font-size: 0.75rem; line-height: 1.35; color: var(--txt-2); }
+
+/* ---- WCAG 1.4.1: links inside prose are UNDERLINED at rest ----
+   The accent is luminance-identical to the body text it sits in (measured
+   1.01:1 against --txt-3), so colour was not merely a weak link cue, it was an
+   invisible one. No palette can fix this: two tokens that each clear 4.6:1 on
+   the same surfaces cannot also differ 3:1 from each other. The underline is
+   the second channel. Chrome links that are their own control — the bordered
+   hub row, the bar's back link, the door tiles — are NOT prose links and keep
+   their own boundary instead. */
+#infoDlg a:not(.hub-row), #helpDlg a:not(.hub-row) {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.more-row a { text-decoration: underline; text-underline-offset: 2px; }
+.coffee-row a { text-decoration: underline; text-underline-offset: 2px; }
+
+/* ---- prefers-contrast: more (the hub already had one; parity, Doctrine §4) ----
+   Promote the quiet text to the secondary value and strengthen the rail. Values
+   are palette-independent on purpose: they scale whatever family is active
+   rather than pinning a colour that only suits one. */
+@media (prefers-contrast: more) {
+  :root { --txt-3: var(--txt-2); --line: var(--line-2); }
+}
+
+/* ---- selection: was browser default, i.e. unverified in every palette ---- */
+::selection { background: var(--accent-soft); color: var(--txt); }
