@@ -182,3 +182,65 @@
   --accent-ink: #ffffff;
   --shadow: 0 10px 34px rgba(80, 64, 40, 0.18), 0 2px 6px rgba(80, 64, 40, 0.14);
 }
+
+/* ============================================================================
+   PREVIEW TOKENS — every family's colours for BOTH modes, always readable no
+   matter which family or mode is active, so the picker can show each option as
+   a real night|day miniature.
+
+   Deliberately NOT mode-scoped: the families differ most at night, so a
+   preview that only showed the current mode made all four look nearly
+   identical in day. Showing both halves is what makes the choice legible.
+
+   Generated from the hub's palettes/families.json alongside the blocks above.
+   ========================================================================== */
+:root {
+  --pal-instrument-night-page: #1a1a1a;
+  --pal-instrument-night-surface: #3a3a3a;
+  --pal-instrument-night-rail: rgba(255,255,255,.62);
+  --pal-instrument-night-txt: #eaeaea;
+  --pal-instrument-night-txt2: #d2d2d2;
+  --pal-instrument-night-accent: #9fc2f5;
+  --pal-instrument-day-page: #c4bcab;
+  --pal-instrument-day-surface: #eee6d6;
+  --pal-instrument-day-rail: rgba(39,33,25,.68);
+  --pal-instrument-day-txt: #272119;
+  --pal-instrument-day-txt2: #363026;
+  --pal-instrument-day-accent: #17458f;
+  --pal-paper-night-page: #141519;
+  --pal-paper-night-surface: #35373c;
+  --pal-paper-night-rail: rgba(255,255,255,.64);
+  --pal-paper-night-txt: #e6e8ec;
+  --pal-paper-night-txt2: #c9ccd2;
+  --pal-paper-night-accent: #a3c4ff;
+  --pal-paper-day-page: #c8c1b0;
+  --pal-paper-day-surface: #f2eee3;
+  --pal-paper-day-rail: rgba(43,36,24,.66);
+  --pal-paper-day-txt: #322e25;
+  --pal-paper-day-txt2: #433d30;
+  --pal-paper-day-accent: #164493;
+  --pal-mono-night-page: #131313;
+  --pal-mono-night-surface: #363636;
+  --pal-mono-night-rail: rgba(255,255,255,.62);
+  --pal-mono-night-txt: #e6e6e6;
+  --pal-mono-night-txt2: #cfcfcf;
+  --pal-mono-night-accent: #93b9ea;
+  --pal-mono-day-page: #c5c5c5;
+  --pal-mono-day-surface: #efefef;
+  --pal-mono-day-rail: rgba(20,20,20,.60);
+  --pal-mono-day-txt: #252525;
+  --pal-mono-day-txt2: #353535;
+  --pal-mono-day-accent: #274b86;
+  --pal-soft-night-page: #15161a;
+  --pal-soft-night-surface: #36373c;
+  --pal-soft-night-rail: #9da1a9;
+  --pal-soft-night-txt: #e0e2e7;
+  --pal-soft-night-txt2: #c9cbd1;
+  --pal-soft-night-accent: #97b8ec;
+  --pal-soft-day-page: #bfbab0;
+  --pal-soft-day-surface: #e8e4da;
+  --pal-soft-day-rail: #5f594c;
+  --pal-soft-day-txt: #2e2921;
+  --pal-soft-day-txt2: #3e392f;
+  --pal-soft-day-accent: #204478;
+}
