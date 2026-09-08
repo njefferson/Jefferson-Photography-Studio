@@ -1274,6 +1274,25 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   text-align: center;
   word-break: break-word;
 }
+/* A tile whose picture is the CAMERA's own preview, not this app's rendering —
+   on an infrared frame those are different colour worlds, so it says so rather
+   than quietly showing the wrong one. The tag is text, never colour alone. */
+.session-thumb-tag {
+  position: absolute;
+  left: 3px;
+  bottom: 3px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font: 600 0.5625rem/1.4 var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: var(--glass-bg);
+  color: var(--glass-txt-2);
+  border: 1px solid var(--line-2);
+  pointer-events: none;
+}
+.session-thumb.provisional img { opacity: 0.82; }
+
 /* A photo that is on screen but whose copy has not finished going to disk.
    Dimmed and not switchable — switching to it would have nothing to decode
    from — with a dotted edge so the state reads without relying on colour. */

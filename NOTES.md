@@ -3976,6 +3976,86 @@ the set survives a reload, a crash or the OS discarding the tab, and each photo
 keeps its own edit. That copy is the 72% above. Batch process is the third thing
 and edits nothing: it develops a whole set unattended into one .zip.
 
+## Opening a set: decode off the main thread, and the strip up front, 2026-09-08
+
+Follow-on from the picker work. Everything below is measured in the built app
+under headless Chromium; none of it has been on the iPad.
+
+**FILES OPENED IN WHATEVER ORDER THE PICKER RETURNED THEM.** Quick look sorted
+its picks numeric-aware from the day it was written, with a comment saying the
+picker hands files over in tap order. The session path never sorted at all, so a
+set opened for editing carried an arbitrary order — and because the strip's
+`order` is assigned in add sequence and Resume sorts by it, the wrong order was
+persisted and faithfully restored. One shared `inShutterOrder()` now, called by
+both, so they cannot drift apart again. Verified: four files picked
+1638/0063/0627/0152 come back 0063/0152/0627/1638, and the order survives a
+reload and Resume.
+
+**DECODE NOW RUNS IN A WORKER, AND IT IS THE SAME DECODER.** The only thing
+standing in the way was a single `document.createElement("canvas")` in
+decode.ts's make2d, now environment-sniffed to OffscreenCanvas — so there is one
+decoder, not two, and no way for a copy to drift. Equivalence is asserted, not
+argued: all 44 practice DNGs decoded BOTH ways with the buffers compared byte for
+byte, 44/44 identical, and the comparison was shown able to see a planted
+one-value difference. Measured over a six-file open, stalls above 100 ms on the
+main thread fell from 8 to 2. The worker is slightly SLOWER in wall clock (5.5 s
+against 4.3 s for 44 decodes) because the source bytes are copied in rather than
+transferred — the caller still needs them for storage — and that is the trade:
+the point is a main thread that stays free, not a faster decode. Any failure to
+construct or run the worker drops every decode back onto the main thread, which
+is exactly the old behaviour; a decode that fails INSIDE the worker is a damaged
+file and its message reaches the reader unchanged.
+
+**THE BIGGEST COST IN A SET OPEN WAS THE HISTOGRAM, NOT THE DECODES.** Profiled:
+`readPixels` was 991 ms, a quarter of all main-thread time, and the single
+longest task. refreshHistogram runs on every draw and each run is an offscreen
+render plus a SYNCHRONOUS readback that stalls until the GPU pipeline flushes.
+Its own comment says the readback is a fraction of a millisecond, and per call
+that is true — the cost is the call count and the flush. It is skipped while a
+set is loading and paid once at the end; the photo on screen is not changing
+while the REST of the set loads, so there was nothing to redraw. readPixels fell
+to 266 ms. NOTE FOR THE IPAD: a synchronous readback is typically far worse on
+real tile-based GPU hardware than on the software renderer this was measured on,
+so the win there is likely larger, not smaller.
+
+**WHAT REMAINS, AND IS NOT ADDRESSED:** one ~800 ms main-thread task at the first
+photo of a page, present before and after all of this, which the profiler
+attributes to native `(program)` — GL program setup and the first texture upload.
+It is once per page, not per photo, and unrelated to set size.
+
+**THE STRIP NOW APPEARS BEFORE ANYTHING IS READ.** The picker has already given
+the name and size of every file, so all N tiles are drawn immediately — named,
+numbered, in order, not switchable until their bytes land. Measured on eight
+files: every tile on screen in 0.05 s, against the old behaviour of one tile
+appearing roughly every 600 ms. Only the photo being SHOWN is decoded in the
+open path; the rest are stored as bytes, which needs no decode, and their real
+thumbnails are rendered by a background pass that runs BESIDE the storage loop
+rather than after it (running it after put the last picture at 7.5 s against
+storage finishing at 4.8 s; beside, the first picture lands at 3.9 s). That pass
+re-reads each photo's bytes out of storage one at a time, which is what keeps RAM
+bounded to a single decoded frame — a decoded 20 MP frame is a couple of hundred
+megabytes and two or three of them at once is not survivable on an iPad.
+Storage itself is unchanged at ~4.8 s for eight files; it is the crash-safety
+copy and nothing here makes it cheaper.
+
+**THE PROVISIONAL PREVIEW IS BUILT AND CANNOT BE VERIFIED HERE.** Every NEF and
+most DNGs carry the camera's own JPEG preview, and pickLargestPreview already
+existed in decode.ts for third-party raws; it returns JPEG bytes, so the tile can
+show one with no decode and no re-encode at all. It is marked in the tile as
+"cam" — text, not colour — because a camera preview of an infrared frame is a
+magenta smear and does NOT match what opening the photo shows, which is a defect
+found and fixed once before. **NOT ONE of the 44 bundled practice DNGs carries a
+preview** — 0 of 6 sampled have tag 513, and the code path is a no-op on every
+file in this repo. It was therefore tested against a TIFF built for the purpose
+carrying a 31-byte JPEG at a known offset: the extractor returns exactly those
+bytes, returns null on a real practice DNG, and returns a different answer when
+the file's preview offset is moved. That verifies the CODE. Whether a Z50 NEF's
+preview appears in the strip on the device is unverified and needs the owner's
+files. Two instrument errors were made proving this and are worth remembering:
+an over-long length was clamped correctly (so the sabotage did nothing and
+looked like blindness), and a null return IS a changed answer (the assertion
+could not express it).
+
 ## The Files-picker stall is iOS, not the app, 2026-09-08
 
 Reported from the iPad as sitting at the document picker with nothing saying why,

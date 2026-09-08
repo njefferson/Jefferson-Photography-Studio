@@ -1,7 +1,8 @@
 import "./style.css";
 import { importFile, type ImportedFile, type ImageKind } from "./import";
 import { wireForceUpdate } from "./swupdate";
-import { decode, type DecodedImage } from "./decode";
+import { type DecodedImage, pickLargestPreview } from "./decode";
+import { decodeOffThread } from "./decodeClient";
 import { Renderer, type EditParams } from "./gl";
 import { exportImage, saveBlob, type ExportFormat } from "./export";
 import { findLocation, stripLocation } from "./gps";
@@ -18,6 +19,7 @@ import { generateDcp } from "./dcp";
 import { buildGlowMap } from "./glow";
 import { buildLocalMap } from "./localmap";
 import { buildSkyMask } from "./sky";
+import { Tiff } from "./raw/tiff";
 import { drawHistogram } from "./histogram";
 import * as Hotspot from "./hotspot";
 import { setupInstalledShare, setupInstallFromApp, toast } from "./share";
@@ -306,11 +308,30 @@ function updateHistVisibility() {
   histWrap.hidden = !current || !histEnabled;
 }
 
-/** Recompute + repaint the histogram for a param set (skipped when hidden). */
+/** Recompute + repaint the histogram for a param set (skipped when hidden).
+ *
+ *  It runs on every draw, and each run is an offscreen render plus a
+ *  SYNCHRONOUS gl.readPixels — which stalls the main thread until the GPU
+ *  pipeline has flushed. That is fine for one photo being graded (the readback
+ *  is 220px on its longest edge) and it is not fine while a set is coming in:
+ *  profiled over a six-file open, readPixels was 991 ms, a quarter of all
+ *  main-thread time and the single biggest cost in the whole open — larger than
+ *  the decodes it now shares the machine with. So it is skipped for the
+ *  duration and refreshed once at the end. The histogram describes the photo on
+ *  screen; that photo is not changing while the REST of the set loads, so there
+ *  is nothing to redraw. */
 function refreshHistogram(p: EditParams) {
   if (!current || !histEnabled) return;
+  if (adding) { histStale = true; return; }
+  histStale = false;
   const h = renderer.histogram(p);
   if (h) drawHistogram(histCanvas, h);
+}
+
+/** A refresh was skipped while a set was loading; catch it up when that ends. */
+let histStale = false;
+function settleHistogram() {
+  if (histStale) refreshHistogram(params);
 }
 
 histBtn.addEventListener("click", () => {
@@ -5642,13 +5663,21 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
   // (initHotspot uploads its own texture when it corrects; this call is the
   // only one for RAW / unavailable-profile photos, and a harmless repeat
   // upload otherwise.)
+  const __a = performance.now();
   initHotspot(img, imported);
+  const __b = performance.now();
   uploadPreview();
+  const __c = performance.now();
   renderer.setRotation(img.rotate ?? 0);
   renderer.setFlip(0); // flip is view state like rotation — a new photo opens unmirrored
   resetZoom();
+  const __d = performance.now();
   renderer.setGlowMap(buildGlowMap((x, y) => linearAt(img, x, y), img.width, img.height));
+  const __e = performance.now();
   renderer.setLocalMap(buildLocalMap((x, y) => linearAt(img, x, y), img.width, img.height));
+  const __f = performance.now();
+  ((window as unknown as Record<string, unknown>).__show ??= []) as number[];
+  ((window as unknown as Record<string, unknown>).__show as unknown[]).push({ hotspot: __b - __a, upload: __c - __b, zoom: __d - __c, glow: __e - __d, local: __f - __e, px: img.width * img.height });
   panel.hidden = false;
   welcome.hidden = true;
   lesson.hidden = true;
@@ -5809,6 +5838,12 @@ interface SessionPhoto {
   size: number; // source bytes
   edit: string | null; // stored edit JSON (from resume); once visited, liveEdits wins
   thumbUrl: string; // object URL for the strip preview
+  /** Which picture the tile is showing. "waiting" — the file has not been read
+   *  yet, so there is nothing but a name. "preview" — the camera's own embedded
+   *  JPEG, which for an infrared frame is a magenta smear but answers "which
+   *  photo is this" instantly and for free. "real" — rendered through this
+   *  app's own pipeline, so it matches what tapping it opens into. */
+  thumbState: "waiting" | "preview" | "real";
 }
 
 /** The live, in-memory edit for one photo — kept so switching back within a
@@ -5947,7 +5982,7 @@ async function switchToPhoto(id: string) {
   try {
     const bytes = await Session.getBytes(id);
     const imported: ImportedFile = { name: view.name, kind: view.kind, bytes, looksTranscoded: false };
-    const img = await decode(imported);
+    const img = await decodeOffThread(imported);
     showDecoded(img, imported);
     activateCurrent(id);
   } catch (err) {
@@ -6015,6 +6050,26 @@ async function makeThumb(img: DecodedImage, MAX = 260): Promise<ArrayBuffer> {
 }
 
 const tick = () => new Promise<void>((r) => setTimeout(r, 0));
+
+/** The camera's own embedded JPEG preview, lifted straight out of a raw file's
+ *  TIFF directory — a header walk and a slice, no decode, no re-encode. Every
+ *  NEF and DNG carries one, and it is already JPEG bytes, so it goes straight
+ *  into an object URL.
+ *
+ *  It is NOT the strip's final answer. A camera preview of an infrared frame is
+ *  a magenta smear and does not match what opening the photo shows, which is a
+ *  defect that was found and fixed once already (thumbnails rendering a
+ *  different colour world from their opens). So this is provisional and
+ *  marked as such, and the real pipeline-rendered thumbnail replaces it. What
+ *  it buys is the composition, instantly, which is what a strip is for. */
+function embeddedPreview(bytes: Uint8Array, kind: ImageKind): Uint8Array | null {
+  if (kind !== "dng" && kind !== "nef" && kind !== "tiff") return null;
+  try {
+    return pickLargestPreview(bytes, new Tiff(bytes).allIfds()) ?? null;
+  } catch {
+    return null; // a preview is a bonus; never let its absence fail an open
+  }
+}
 
 /** A cheap head-sniff: is this picked file a shared look (.ipslook JSON)?
  *  Reads only the first bytes; anything big is not a look. */
@@ -6110,11 +6165,11 @@ async function openSingle(file: File) {
   }
   // Track it as a (strip-less) lone photo so a follow-up multi-pick can ask
   // sensibly; it isn't persisted (nothing to resume from a single edit).
-  const img = await decode(imported);
+  const img = await decodeOffThread(imported);
   showDecoded(img, imported);
   hideBusy(); // there is a photo on screen now — nothing left to wait for
   const id = "lone";
-  sessionPhotos = [{ id, name: imported.name, kind: imported.kind, size: imported.bytes.length, edit: null, thumbUrl: "" }];
+  sessionPhotos = [{ id, name: imported.name, kind: imported.kind, size: imported.bytes.length, edit: null, thumbUrl: "", thumbState: "real" }];
   nextOrder = 0;
   liveEdits.clear();
   activateCurrent(id);
@@ -6150,49 +6205,74 @@ async function addToSession(files: File[], append: boolean) {
   const skipped: string[] = [];
   let firstNewId: string | null = null;
   let quotaHit = false;
+
+  // --- Every tile, up front. The picker has already told us the name and size
+  // of each file, so the whole set can be on screen before a single byte is
+  // read: named, numbered, in order. The old loop appended one tile per photo
+  // as its decode finished, so a set of forty accreted at roughly one tile a
+  // second and you could not see what you had picked until it was done. These
+  // are not switchable yet — there is nothing stored to switch to — and each
+  // becomes so as its bytes land.
+  const planned = files.map((f) => ({
+    id: crypto.randomUUID(),
+    name: f.name,
+    kind: "unknown" as ImageKind, // the real kind comes from the bytes, not the name
+    size: f.size,
+    edit: null,
+    thumbUrl: "",
+    thumbState: "waiting" as SessionPhoto["thumbState"],
+  }));
+  for (const p of planned) { sessionPhotos.push(p); pendingStore.add(p.id); }
   adding = { done: 0, total: files.length, index: 1, name: files[0]?.name ?? "" };
-  // The first decode is the longest wait in the app and it used to happen
-  // behind an untouched welcome screen. Hold the modal only until there is a
-  // photo to look at, then drop it — the rest streams in behind the strip,
-  // whose meta line and bar carry the count, and the first photo stays
-  // editable while they do (which is why this loop yields).
+  updateSessionStrip();
   showBusy(`Opening ${files.length} photo${files.length === 1 ? "" : "s"}…`);
 
-  // One storage write is allowed to be in flight while the NEXT photo is read
-  // and decoded. Measured on six practice DNGs: read+decode+thumbnail came to
-  // 130-270 ms a photo and the strict-durability commit to 310-560 ms, of
-  // which only ~30-130 ms was main-thread work — so the old serial loop spent
-  // most of its time with the processor idle, waiting on the disk. Exactly one
-  // is kept in flight: two photos' source bytes in RAM is the ceiling, and a
-  // set of forty must never hold forty.
-  let inFlight: { p: Promise<void>; id: string; name: string } | null = null;
-  async function land(): Promise<void> {
-    if (!inFlight) return;
-    const w = inFlight;
-    inFlight = null;
-    try {
-      await w.p;
-      pendingStore.delete(w.id);
-    } catch (err) {
-      // The write failed, so this photo is NOT in the session — take it back
-      // out of the strip rather than leaving a tile that opens nothing.
-      pendingStore.delete(w.id);
-      const at = sessionPhotos.findIndex((p) => p.id === w.id);
-      if (at >= 0) {
-        if (sessionPhotos[at].thumbUrl) URL.revokeObjectURL(sessionPhotos[at].thumbUrl);
-        sessionPhotos.splice(at, 1);
-      }
-      nextOrder--;
-      if (isQuotaError(err)) quotaHit = true;
-      else skipped.push(`${w.name} (${(err as Error).message})`);
+  /** Drop a planned tile that never became a photo. */
+  const dropPlanned = (id: string) => {
+    pendingStore.delete(id);
+    const at = sessionPhotos.findIndex((p) => p.id === id);
+    if (at >= 0) {
+      if (sessionPhotos[at].thumbUrl) URL.revokeObjectURL(sessionPhotos[at].thumbUrl);
+      sessionPhotos.splice(at, 1);
     }
-    updateSessionStrip();
+  };
+
+  // Storage is now the whole cost of this loop. The strict-durability commit is
+  // 310-560 ms a photo, of which only ~30-130 ms is main-thread work — the rest
+  // is waiting on the disk. That used to be hidden behind each photo's decode;
+  // with the decodes moved out, the loop went straight back to being serial on
+  // IndexedDB and got SLOWER than the version it replaced (measured: 4.7 s to
+  // 7.4 s for eight files). So several writes are allowed in flight at once.
+  // IndexedDB serialises overlapping readwrite transactions on the same stores
+  // itself, so this does not fight the database; what it removes is the
+  // main-thread round trip between one commit finishing and the next starting.
+  // The ceiling is what it costs in RAM: STORE_LANES photos' source bytes, and
+  // nothing decoded, so three is ~75 MB of Z50 NEFs rather than a set of forty.
+  const STORE_LANES = 3;
+  const inFlight = new Map<string, { p: Promise<void>; name: string }>();
+  /** Wait until fewer than `n` writes are outstanding, settling each as it lands. */
+  async function drainTo(n: number): Promise<void> {
+    while (inFlight.size > n) {
+      const entries = [...inFlight.entries()];
+      await Promise.race(entries.map(([id, w]) => w.p.then(
+        () => { inFlight.delete(id); pendingStore.delete(id); },
+        (err) => {
+          inFlight.delete(id);
+          dropPlanned(id);
+          nextOrder--;
+          if (isQuotaError(err)) quotaHit = true;
+          else skipped.push(`${w.name} (${(err as Error).message})`);
+        },
+      )));
+      updateSessionStrip();
+    }
   }
 
   try {
     for (let i = 0; i < files.length; i++) {
-      if (quotaHit) break;
+      if (quotaHit) { for (const p of planned.slice(i)) dropPlanned(p.id); break; }
       const f = files[i];
+      const slot = planned[i];
       adding = { done: i, total: files.length, index: i + 1, name: f.name };
       if (busy.open) busyText.textContent = `Opening ${files.length} photos — reading ${i + 1} of ${files.length}: ${f.name}`;
       updateSessionStrip();
@@ -6201,58 +6281,65 @@ async function addToSession(files: File[], append: boolean) {
         imported = guardLocation(await importFile(f));
       } catch (err) {
         skipped.push(`${f.name} (${(err as Error).message})`);
+        dropPlanned(slot.id);
         continue;
       }
-      if (imported.looksTranscoded) { skipped.push(`${f.name} (arrived as flattened JPEG)`); continue; }
-      let img: DecodedImage;
-      try {
-        img = await decode(imported);
-      } catch (err) {
-        skipped.push(`${f.name} (${(err as Error).message})`);
-        continue;
+      if (imported.looksTranscoded) { skipped.push(`${f.name} (arrived as flattened JPEG)`); dropPlanned(slot.id); continue; }
+
+      // The camera's own preview, free, from bytes already in hand — so the
+      // tile has a picture in it long before anything is decoded.
+      const prev = embeddedPreview(imported.bytes, imported.kind);
+      if (prev) {
+        slot.thumbUrl = URL.createObjectURL(new Blob([prev.slice()], { type: "image/jpeg" }));
+        slot.thumbState = "preview";
       }
-      let thumb: ArrayBuffer;
-      try { thumb = await makeThumb(img); } catch { thumb = new ArrayBuffer(0); }
-      // The previous photo's commit has had this photo's whole decode to
-      // finish in; collect it before starting another.
-      await land();
-      if (quotaHit) break;
-      const id = crypto.randomUUID();
-      pendingStore.add(id);
-      inFlight = {
-        id,
+      slot.name = imported.name;
+      slot.kind = imported.kind;
+      slot.size = imported.bytes.length;
+
+      // Only the photo actually being SHOWN is decoded here. The rest are
+      // stored as bytes — storage needs no decode — and get their real
+      // thumbnails from the background pass below. That is the difference
+      // between one decode before you can work and forty.
+      let firstImg: DecodedImage | null = null;
+      if (!firstNewId && (!activePhotoId || activePhotoId === "lone")) {
+        try {
+          firstImg = await decodeOffThread(imported);
+        } catch (err) {
+          skipped.push(`${f.name} (${(err as Error).message})`);
+          dropPlanned(slot.id);
+          continue;
+        }
+      }
+
+      await drainTo(STORE_LANES - 1); // make room in the write lanes
+      if (quotaHit) { for (const p of planned.slice(i)) dropPlanned(p.id); break; }
+      inFlight.set(slot.id, {
         name: f.name,
         p: Session.addPhoto(
-          { id, name: imported.name, kind: imported.kind, size: imported.bytes.length, order: nextOrder++, addedAt: Date.now(), thumb, edit: null },
+          { id: slot.id, name: imported.name, kind: imported.kind, size: imported.bytes.length, order: nextOrder++, addedAt: Date.now(), thumb: new ArrayBuffer(0), edit: null },
           imported.bytes,
         ),
-      };
-      sessionPhotos.push({
-        id, name: imported.name, kind: imported.kind, size: imported.bytes.length, edit: null,
-        thumbUrl: thumb.byteLength ? URL.createObjectURL(new Blob([thumb], { type: "image/jpeg" })) : "",
       });
-      // Show the first newly-added photo straight away — it is decoded, and
-      // nothing about looking at it waits on the copy going to disk. Then give
-      // the screen back: everything after this has something to look at.
       if (!firstNewId) {
-        firstNewId = id;
-        if (!activePhotoId || activePhotoId === "lone") {
-          showDecoded(img, imported);
-          activateCurrent(id);
+        firstNewId = slot.id;
+        if (firstImg) {
+          showDecoded(firstImg, imported);
+          activateCurrent(slot.id);
         }
-        hideBusy();
+        hideBusy(); // there is a photo on screen — nothing left to wait for
+        void realThumbnails(); // from here it runs beside the loop, not after it
       }
-      // The bar advances; the label keeps naming the file that just landed
-      // until the next one starts, so the two never disagree.
       adding = { done: i + 1, total: files.length, index: i + 1, name: f.name };
       updateSessionStrip();
       await tick(); // yield so edits on the shown photo stay responsive
     }
-    await land(); // the last write
+    await drainTo(0); // the last writes
   } finally {
-    await land(); // a throw must not strand a write (or a tile) mid-flight
+    await drainTo(0); // a throw must not strand a write (or a tile) mid-flight
     adding = null;
     hideBusy();
+    settleHistogram(); // the refreshes skipped during the load, paid once
   }
   updateSessionStrip();
   await requestPersistentStorage(); // ask the OS to keep the session's bytes
@@ -6266,6 +6353,58 @@ async function addToSession(files: File[], append: boolean) {
     hint.hidden = false;
     hint.textContent = "Nothing could be opened.";
     updateWelcomeReturn();
+  }
+}
+
+// --- The real thumbnails, in the background ---------------------------------
+// A tile's provisional picture is the camera's, which on an infrared frame is
+// the wrong colour world; the real one is rendered through this app's own
+// pipeline so it matches what tapping it opens into. That costs a decode each,
+// which is why it happens HERE — after the set is open, editable and safely
+// stored — rather than in the path you are waiting on. Bytes come back out of
+// storage one at a time, so RAM stays bounded to a single photo, and the decode
+// runs off the main thread (decodeClient) so the editor keeps its frame rate.
+let thumbPass = 0;
+
+async function realThumbnails(): Promise<void> {
+  const gen = ++thumbPass;
+  // Runs ALONGSIDE the storage loop, not after it. The two want different
+  // machines — storage is waiting on the disk, this is decoding in a worker —
+  // so serialising them just made the pictures arrive later than they needed
+  // to (measured: last picture at 7.5 s when this waited for the loop, against
+  // storage itself finishing at 4.8 s). A photo whose bytes have not landed yet
+  // is not skipped, it is come back to.
+  for (let guard = 0; guard < 10000; guard++) {
+    if (gen !== thumbPass) return; // session torn down or restarted under us
+    const view = sessionPhotos.find((v) => v.id !== "lone" && v.thumbState !== "real" && !pendingStore.has(v.id));
+    if (!view) {
+      // Nothing ready. If anything is still on its way in, wait for it;
+      // otherwise every thumbnail that can be made has been.
+      const waiting = sessionPhotos.some((v) => v.id !== "lone" && v.thumbState !== "real" && pendingStore.has(v.id));
+      if (!waiting) return;
+      await new Promise((r) => setTimeout(r, 120));
+      continue;
+    }
+    try {
+      const bytes = await Session.getBytes(view.id);
+      const img = await decodeOffThread({ name: view.name, kind: view.kind, bytes, looksTranscoded: false });
+      const thumb = await makeThumb(img);
+      if (gen !== thumbPass) return;
+      if (!sessionPhotos.some((p) => p.id === view.id)) continue; // dropped while we worked
+      if (thumb.byteLength) {
+        if (view.thumbUrl) URL.revokeObjectURL(view.thumbUrl);
+        view.thumbUrl = URL.createObjectURL(new Blob([thumb], { type: "image/jpeg" }));
+        await Session.setThumb(view.id, thumb).catch(() => {});
+      }
+      view.thumbState = "real"; // done either way — never picked up again
+      updateSessionStrip();
+    } catch {
+      // A thumbnail is not worth failing an open over — the tile keeps the
+      // camera preview, or its name, and the photo still opens. Mark it done
+      // either way so a file that will never render cannot spin this loop.
+      view.thumbState = "real";
+    }
+    await tick();
   }
 }
 
@@ -6303,8 +6442,16 @@ function updateSessionStrip() {
       const b = document.createElement("button");
       b.type = "button";
       const saving = pendingStore.has(p.id);
-      b.className = "session-thumb" + (p.id === activePhotoId ? " active" : "") + (saving ? " saving" : "");
-      b.title = saving ? `${p.name} — still saving` : p.name;
+      b.className =
+        "session-thumb" +
+        (p.id === activePhotoId ? " active" : "") +
+        (saving ? " saving" : "") +
+        (p.thumbState === "preview" ? " provisional" : "");
+      b.title = saving
+        ? `${p.name} — still saving`
+        : p.thumbState === "preview"
+          ? `${p.name} — showing the camera's own preview until this app has rendered its own`
+          : p.name;
       b.disabled = saving;
       if (p.thumbUrl) {
         const im = document.createElement("img");
@@ -6313,6 +6460,11 @@ function updateSessionStrip() {
         b.append(im);
       } else {
         b.append(Object.assign(document.createElement("span"), { className: "session-thumb-name", textContent: p.name }));
+      }
+      // A provisional tile says so in text, not by colour alone: the picture in
+      // it is the camera's rendering, not this app's.
+      if (p.thumbState === "preview" && !saving) {
+        b.append(Object.assign(document.createElement("span"), { className: "session-thumb-tag", textContent: "cam" }));
       }
       b.addEventListener("click", () => {
         if (stripDragged) return; // that press was a scroll, not a choice
@@ -6488,6 +6640,11 @@ async function resumeSession() {
     if (metas.length < 2) { hideBusy(); return; }
     sessionPhotos = metas.map((m) => ({
       id: m.id, name: m.name, kind: m.kind, size: m.size, edit: m.edit,
+      // Only the background pass ever writes a stored thumbnail, so one that is
+      // there is the real thing; one that is missing means the pass had not
+      // reached that photo before the session was left, and re-running it below
+      // finishes the job rather than leaving a permanently nameless tile.
+      thumbState: (m.thumb.byteLength ? "real" : "waiting") as SessionPhoto["thumbState"],
       thumbUrl: m.thumb.byteLength ? URL.createObjectURL(new Blob([m.thumb], { type: "image/jpeg" })) : "",
     }));
     nextOrder = Math.max(...metas.map((m) => m.order)) + 1;
@@ -6498,9 +6655,10 @@ async function resumeSession() {
     const first = sessionPhotos[0];
     const bytes = await Session.getBytes(first.id);
     const imported: ImportedFile = { name: first.name, kind: first.kind, bytes, looksTranscoded: false };
-    const img = await decode(imported);
+    const img = await decodeOffThread(imported);
     showDecoded(img, imported);
     activateCurrent(first.id);
+    void realThumbnails(); // finish any thumbnails the last visit never reached
   } catch (err) {
     alert("Couldn't resume the session: " + (err as Error).message);
   } finally {
@@ -6656,7 +6814,7 @@ async function openQuickLook(files: File[]) {
     let ok = false;
     try {
       const imported = guardLocation(await importFile(f));
-      const img = await decode(imported);
+      const img = await decodeOffThread(imported);
       const thumb = await makeThumb(img, QUICK_EDGE);
       if (thumb.byteLength) {
         thumbUrl = URL.createObjectURL(new Blob([thumb], { type: "image/jpeg" }));
@@ -7191,7 +7349,7 @@ async function openGalleryPhoto(key: string) {
   try {
     const ext = tile.kind === "dng" ? "dng" : "jpg";
     const imported: ImportedFile = { name: `${key}.${ext}`, kind: tile.kind, bytes, looksTranscoded: false };
-    const img = await decode(imported);
+    const img = await decodeOffThread(imported);
     if (gen !== galleryGen) return;
     // Only NOW — with a decodable photo in hand — end the previous session.
     // Tearing it down before the download/decode succeeded meant a failed
@@ -7205,7 +7363,7 @@ async function openGalleryPhoto(key: string) {
     setBundledSource(tile.kind === "dng");
     // Track it as a lone photo, matching openPicked's single-open path, so a
     // later multi-pick can ask sensibly. activateCurrent runs establishFreshEdit.
-    sessionPhotos = [{ id: "lone", name: imported.name, kind: imported.kind, size: imported.bytes.length, edit: null, thumbUrl: "" }];
+    sessionPhotos = [{ id: "lone", name: imported.name, kind: imported.kind, size: imported.bytes.length, edit: null, thumbUrl: "", thumbState: "real" }];
     nextOrder = 0;
     liveEdits.clear();
     activateCurrent("lone");
@@ -7622,7 +7780,7 @@ async function runBatch(files: File[]) {
       try {
         const imported = guardLocation(await importFile(f));
         if (imported.looksTranscoded) { skipped.push(`${f.name} (arrived as flattened JPEG)`); continue; }
-        const img = await decode(imported);
+        const img = await decodeOffThread(imported);
         const noLens = applyBatchHotspot(img, imported) === "no-lens";
         const result = await exportImage(
           imported,
