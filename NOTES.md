@@ -3976,6 +3976,75 @@ the set survives a reload, a crash or the OS discarding the tab, and each photo
 keeps its own edit. That copy is the 72% above. Batch process is the third thing
 and edits nothing: it develops a whole set unattended into one .zip.
 
+## Adapt flat frames became automatic, 2026-09-08
+
+Owner direction, same day: photos should open the best they can, without a
+control anyone has to remember. So the measured lift that shipped as a button
+became an at-open automatic with a toggle beside it — default on, pressed means
+this frame is adapted, shaped after the R/B swap.
+
+**WHERE IT RUNS.** In establishFreshEdit, BEFORE origParams and the Reset
+snapshot are taken, so Hold: Original and Reset both still mean "the photo as it
+opened" and this is now part of how it opened. Again at the end of applyLook,
+because a look replaces the whole creative state including everything the lift
+wrote — which is what makes Aerochrome land like Aerochrome on a frame with no
+sky, first press.
+
+**THE COLOUR HALF ONLY RUNS WHERE A LOOK IS ON THE FRAME.** The sky and foliage
+bands are hue-defined, and it is a look — the channel swap above all — that puts
+a frame's materials into them; the references were measured on frames wearing
+one. Solved against a bare opened frame instead, nothing clears them and the
+boost fires on everything: measured, 44 of 44 practice frames "adapted" at open
+with no look, which is not a correction, it is a new default rendering. The tonal
+half has no such dependency and runs always. After the split: 38 of 44 adapted,
+6 left alone, medians moved from 0.518 to 0.443 against a 0.44 target, and the
+darkest frame in the set (0.366) was not touched.
+
+**TWO BUGS THE CARRIED-OVER CREATIVE GRADE CAUSED, both worth remembering
+because they only appear across a SEQUENCE of opens and neither shows up on one
+photo.** The creative grade persists across opens by design, tone included, so
+`params.tone` on a fresh open is whatever the last photo ended with. Measuring
+that as the starting point and then deciding "already dark enough" left the
+previous photo's curve sitting on this one, and a chain of opens ratcheted the
+whole set down — medians reaching 0.167 against a 0.44 target. The solve now
+always measures from the DEFAULT curve, which also makes it idempotent: the same
+frame gives the same answer however many times it runs. The second was the
+mirror of it — the toggle's revert restored the carried-over curve rather than
+the neutral one, so turning it off put ANOTHER photo's tone on this one, and the
+two states could not be compared at all. That one was caught only because an
+on/off pair of renders looked wrong in a way the numbers had not shown. Solving
+and reverting have to agree on what "without a lift" means.
+
+**A NO-OP HAS TO CLEAR AN INHERITED LIFT, not just decline to add one.** A frame
+that needs nothing still gets handed the neutral curve, or it wears the last
+photo's correction.
+
+**COST.** The solve is a fixed sampling grid, so it is resolution-independent —
+the grid size IS the cost, whatever the megapixels. Dropped from 128 divisions
+to 64 and the bisection from 8 steps to 6, since it now runs on every open
+rather than on a press. Whole-open wall clock across the practice set: 215 ms
+minimum, 218 ms median.
+
+**VERIFIED:** the toggle is a true round trip (on/off/on returns the identical
+tone and band values), off really neutralises rather than half-reverting, the
+pressed state tracks, and the preference survives a reload. Two frames rendered
+on and off, at open and with Aerochrome, and looked at: the flat frame gains
+real shadow depth and visible magenta where it was near-white, and the brightest
+frame in the set gains contrast and saturation without being crushed. axe clean
+in both themes; the toggle is 48px.
+
+**NOT VERIFIED, and it is the calibration:** the references (median 0.44, warm
+0.35, cool 0.50) come from frames that looked right WITH a look on. Whether they
+are the right targets for the owner's own files, on the device, is unmeasured
+here — and they are the one part of this that is taste rather than measurement.
+
+**KNOWN CONFLICT, unresolved:** a tone curve set by hand carries across opens as
+part of the creative grade, and the automatic now also owns tone at open. The
+solve ignores the carried curve, so a hand-set curve is replaced on the next
+open when Adapt is on. Turning Adapt off leaves hand-set values alone (the
+revert only touches values it still recognises as its own), but the interaction
+deserves the owner's ruling.
+
 ## Opening a set: decode off the main thread, and the strip up front, 2026-09-08
 
 Follow-on from the picker work. Everything below is measured in the built app

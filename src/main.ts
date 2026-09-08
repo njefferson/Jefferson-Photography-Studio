@@ -556,6 +556,12 @@ function applyLook(name: keyof typeof LOOKS) {
   params.vigAmt = 0;
   params.vigMid = 0.5;
   params.mix3 = [...MIX3_DEFAULT];
+  // A look replaces the whole creative state, including everything the lift
+  // wrote — so re-solve against the look that is now on the frame. This is what
+  // makes Aerochrome look like Aerochrome on a frame with no sky in it without
+  // a second press.
+  liftApplied = null;
+  if (autoLift) applyLift(true); // a look IS on the frame now
   syncToUI();
   draw();
 }
@@ -1328,8 +1334,20 @@ const FLAT_TONE_MAX = 0.22; // the tone points clamp at ±0.25 of their default
 // purpose — an absolute floor stops dead on a frame that already contains real
 // black (a shaded wood at midday: its 5th percentile is 0.000 before anything
 // is done to it) and would refuse the pull its midtones plainly need.
+// On by default, and remembered — the point of it is that a photo opens the
+// best it can without anyone having to press anything. It is a STATE, not an
+// action, so it reads and behaves like the R<->B swap: pressed means the frame
+// is adapted, and pressing it again puts it back.
+let autoLift = localStorage.getItem("ips-autolift") !== "0";
 const FLAT_SHADOW_KEEP = 0.5;
 const FLAT_SHADOW_FLOOR = 0.02;
+// Divisions along the short edge of the sampling grid. It runs on every open
+// now, not on a button press, so its cost is paid on every photo — and it is
+// resolution-independent (a fixed grid, not a fraction of the pixels), so this
+// number IS the cost. 64 was checked against 128 across the practice set before
+// it was lowered: see the calibration note in NOTES.
+const LIFT_GRID = 64;
+const LIFT_BISECT = 6;
 const FLAT_BAND_MAX = 2; // the sky/foliage saturation sliders' own ceiling
 
 /** Median luminance and per-band saturation of the frame as the given params
@@ -1337,9 +1355,9 @@ const FLAT_BAND_MAX = 2; // the sky/foliage saturation sliders' own ceiling
  *  preview and the export use, so what is measured is what is shown. Bands are
  *  weighted by the pipeline's own bandWeight, never a second definition of
  *  "cool". */
-function measureFrame(p: EditParams): { lumP50: number; lumP25: number; warmSat: number; coolSat: number } {
+function measureFrame(p: EditParams, divisions = LIFT_GRID): { lumP50: number; lumP25: number; warmSat: number; coolSat: number } {
   const img = current!;
-  const step = Math.max(1, Math.floor(Math.min(img.width, img.height) / 128));
+  const step = Math.max(1, Math.floor(Math.min(img.width, img.height) / divisions));
   const edit = compileEdit(p, img.camMatrix, img.width / Math.max(1, img.height));
   const px = new Float32Array(3);
   const lums: number[] = [];
@@ -1372,27 +1390,49 @@ function flatTone(k: number): [number, number, number, number, number] {
   return [0, TONE_DEFAULT[1] - k, TONE_DEFAULT[2] - k * 0.55, TONE_DEFAULT[3] - k * 0.2, 1];
 }
 
-ui.irLift.addEventListener("click", () => {
-  if (!current) return;
-  const before = measureFrame(params);
+/** Solve the lift for the CURRENT photo as it is currently rendered, and return
+ *  the values to apply — or null when the frame already measures where a frame
+ *  with open sky lands, which is the no-op case and must stay one. Pure: it
+ *  changes nothing, so open, applyLook and the toggle can all use it. */
+function solveLift(withColour: boolean): { tone: [number, number, number, number, number]; foliage: [number, number, number]; sky: [number, number, number]; pull: number } | null {
+  if (!current) return null;
+  // Measure the frame WITHOUT a lift on it. The creative grade — tone included
+  // — carries across opens by design, so `params.tone` on a fresh open is
+  // whatever the last photo ended with; measuring that and then deciding
+  // "already dark enough" left the previous photo's curve sitting on this one,
+  // and a chain of opens ratcheted the whole set down (measured: medians
+  // reaching 0.167 against a 0.44 target). Solving from the default curve every
+  // time makes it idempotent: the same frame gives the same answer however many
+  // times this runs, and pressing the toggle twice is a round trip.
+  const base = cloneParams(params);
+  base.tone = [...TONE_DEFAULT] as typeof base.tone;
+  const before = measureFrame(base);
   // Only ever pull DOWN and push UP: a frame already at or past the reference
   // is left exactly as it is rather than being dragged to the average.
+  //
+  // The COLOUR half runs only when a look is on the frame. The sky and foliage
+  // bands are defined by hue, and it is a look — the channel swap above all —
+  // that puts a frame's materials into those bands in the first place; the
+  // references were measured on frames wearing one. Solved against a bare
+  // opened frame instead, nothing clears them and the boost fires on
+  // everything: measured, 44 of 44 practice frames "adapted" at open with no
+  // look, which is not a correction, it is a new default. The tonal half has no
+  // such dependency — a frame opens too bright or it does not.
   const needsTone = before.lumP50 > FLAT_LUM_REF + 0.01;
-  const needsWarm = before.warmSat < FLAT_WARM_REF - 0.01;
-  const needsCool = before.coolSat < FLAT_COOL_REF - 0.01;
+  const needsWarm = withColour && before.warmSat < FLAT_WARM_REF - 0.01;
+  const needsCool = withColour && before.coolSat < FLAT_COOL_REF - 0.01;
   if (!needsTone && !needsWarm && !needsCool) {
-    toast("This frame is already there — its contrast and colour measure where a frame with open sky lands.", 3400);
-    return;
+    // Nothing to do for THIS frame — but the tone it inherited may be a lift
+    // solved for a different one, so hand back the neutral curve rather than
+    // leaving that in place.
+    return { tone: [...TONE_DEFAULT] as [number, number, number, number, number], foliage: [...base.foliage] as [number, number, number], sky: [...base.sky] as [number, number, number], pull: 0 };
   }
-  const trial = cloneParams(params);
+  const trial = cloneParams(base);
   const shadowFloor = Math.max(FLAT_SHADOW_FLOOR, before.lumP25 * FLAT_SHADOW_KEEP);
-  // 1. Black point, by bisection: the median falls monotonically as the pull
-  //    grows, so eight halvings put it within ~0.001 of the reference or at
-  //    the clamp, whichever comes first.
   let k = 0;
   if (needsTone) {
     let lo = 0, hi = FLAT_TONE_MAX;
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < LIFT_BISECT; i++) {
       const mid = (lo + hi) / 2;
       trial.tone = flatTone(mid);
       const m = measureFrame(trial);
@@ -1404,29 +1444,91 @@ ui.irLift.addEventListener("click", () => {
     k = lo;
   }
   trial.tone = flatTone(k);
-  // 2. Band saturation. The band scale multiplies HSV saturation and clips at
-  //    1, so the analytic ratio overshoots on the pixels that are already
-  //    saturated — one measured refinement closes that, and the ceiling is the
-  //    slider's own.
   const after = measureFrame(trial);
   const solve = (measured: number, ref: number) => (measured > 1e-4 ? clamp(ref / measured, 1, FLAT_BAND_MAX) : 1);
-  trial.foliage = [params.foliage[0], solve(after.warmSat, FLAT_WARM_REF), params.foliage[2]];
-  trial.sky = [params.sky[0], solve(after.coolSat, FLAT_COOL_REF), params.sky[2]];
-  const check = measureFrame(trial);
-  trial.foliage[1] = clamp(trial.foliage[1] * solve(check.warmSat, FLAT_WARM_REF), 1, FLAT_BAND_MAX);
-  trial.sky[1] = clamp(trial.sky[1] * solve(check.coolSat, FLAT_COOL_REF), 1, FLAT_BAND_MAX);
+  if (withColour) {
+    trial.foliage = [base.foliage[0], solve(after.warmSat, FLAT_WARM_REF), base.foliage[2]];
+    trial.sky = [base.sky[0], solve(after.coolSat, FLAT_COOL_REF), base.sky[2]];
+    const check = measureFrame(trial);
+    trial.foliage[1] = clamp(trial.foliage[1] * solve(check.warmSat, FLAT_WARM_REF), 1, FLAT_BAND_MAX);
+    trial.sky[1] = clamp(trial.sky[1] * solve(check.coolSat, FLAT_COOL_REF), 1, FLAT_BAND_MAX);
+  }
+  return {
+    tone: trial.tone as [number, number, number, number, number],
+    foliage: trial.foliage as [number, number, number],
+    sky: trial.sky as [number, number, number],
+    pull: k,
+  };
+}
 
-  params.tone = trial.tone;
-  params.foliage = trial.foliage;
-  params.sky = trial.sky;
+/** What the lift last wrote, so turning it off can put back what it replaced —
+ *  and so a value the reader has since changed BY HAND is left alone. */
+let liftApplied: { tone: string; foliage: string; sky: string; prevTone: number[]; prevFoliage: number[]; prevSky: number[] } | null = null;
+
+/** Run the lift on the current photo. Returns what it did, for the caller to
+ *  report (or not — at open it is silent; the sliders show it). */
+function applyLift(withColour: boolean): { pull: number; foliage: number; sky: number } | null {
+  const r = solveLift(withColour);
+  if (!r) { liftApplied = null; return null; }
+  const noop = r.pull === 0 && r.foliage[1] === 1 && r.sky[1] === 1;
+  liftApplied = {
+    // What the frame is WITHOUT a lift, which is what turning it off should
+    // give back — not whatever curve the previous photo happened to leave
+    // behind. Solving and reverting have to agree on that, or the toggle is not
+    // a round trip (it was not: turning it off put another photo's curve on
+    // this one, and the two states could not be compared).
+    prevTone: [...TONE_DEFAULT], prevFoliage: [...params.foliage], prevSky: [...params.sky],
+    tone: r.tone.join(","), foliage: r.foliage.join(","), sky: r.sky.join(","),
+  };
+  params.tone = r.tone;
+  params.foliage = r.foliage;
+  params.sky = r.sky;
+  if (noop) { liftApplied = null; return null; }
+  return { pull: r.pull, foliage: r.foliage[1], sky: r.sky[1] };
+}
+
+/** Undo the lift, but only where its own values are still in place — anything
+ *  the reader has moved since is theirs and stays. */
+function removeLift(): void {
+  const a = liftApplied;
+  liftApplied = null;
+  if (!a) return;
+  if (params.tone.join(",") === a.tone) params.tone = [...a.prevTone] as typeof params.tone;
+  if (params.foliage.join(",") === a.foliage) params.foliage = [...a.prevFoliage] as typeof params.foliage;
+  if (params.sky.join(",") === a.sky) params.sky = [...a.prevSky] as typeof params.sky;
+}
+
+// The toggle. Pressed = this frame is adapted; press again and it is not — the
+// same shape as the R<->B swap, and on by default so nothing has to be
+// remembered to get a usable photo.
+function updateLiftUI() {
+  ui.irLift.setAttribute("aria-pressed", String(autoLift));
+  const sub = ui.irLift.querySelector(".look-sub") as HTMLElement | null;
+  if (sub) sub.innerHTML = `<span class="seg${autoLift ? "" : " on"}">off</span><span class="seg${autoLift ? " on" : ""}">on</span>`;
+}
+
+ui.irLift.addEventListener("click", () => {
+  autoLift = !autoLift;
+  localStorage.setItem("ips-autolift", autoLift ? "1" : "0");
+  updateLiftUI();
+  if (!current) return;
+  if (autoLift) {
+    const did = applyLift(activeLook !== null);
+    toast(
+      did
+        ? `Adapted: shadows down ${(did.pull * 100).toFixed(0)}%, foliage colour ×${did.foliage.toFixed(2)}, cool colour ×${did.sky.toFixed(2)}.`
+        : "This frame is already there — its contrast and colour measure where a frame with open sky lands.",
+      3600,
+    );
+  } else {
+    removeLift();
+    toast("Adapt is off — photos open exactly as the automatic balance and exposure leave them.", 3600);
+  }
   syncToUI();
   draw();
   flushRecord(); // one press = one undo step
-  toast(
-    `Lifted: shadows down ${(k * 100).toFixed(0)}%, foliage colour ×${params.foliage[1].toFixed(2)}, cool colour ×${params.sky[1].toFixed(2)}. Every move is on a slider — Go back undoes it.`,
-    4200,
-  );
 });
+updateLiftUI();
 
 ui.swapBtn.addEventListener("click", () => {
   params.swapRB = !params.swapRB;
@@ -5722,6 +5824,13 @@ function establishFreshEdit() {
   }
   params.denoise = estimateDenoise(src);
   lookBias = [1, 1, 1];
+  // Part of the opened baseline, so it runs BEFORE origParams and the Reset
+  // snapshot below are taken: Hold: Original and Reset both mean "the photo as
+  // it opened", and this is now part of how it opened. Visible on the Tone and
+  // Sky/Foliage sliders, undoable, no pixels touched — the three tests any
+  // at-open automatic has to pass.
+  liftApplied = null;
+  if (autoLift) applyLift(activeLook !== null); // colour only where a look is already on
   syncToUI();
   // Snapshot the as-imported baseline for press-and-hold comparison.
   origParams = {
@@ -5735,9 +5844,9 @@ function establishFreshEdit() {
     contrast: 1,
     tint: [1, 1, 1],
     glow: 0,
-    sky: [0, 1, 1],
-    foliage: [0, 1, 1],
-    tone: [...TONE_DEFAULT],
+    sky: [...params.sky] as [number, number, number],
+    foliage: [...params.foliage] as [number, number, number],
+    tone: [...params.tone] as typeof params.tone,
     toneR: [...TONE_DEFAULT],
     toneG: [...TONE_DEFAULT],
     toneB: [...TONE_DEFAULT],
