@@ -158,6 +158,7 @@
           <p id="hint" role="status" aria-live="polite">Edit infrared photos — RAW (NEF / DNG) unlocks the full color magic.</p>
           <label class="open-btn welcome-open" for="file">Open image(s)</label>
           <p class="welcome-open-hint">One photo to edit — or several to work as a session: big previews you switch between, each keeping its own edit, all held safely until you're done.</p>
+          <p class="welcome-open-hint"><strong>If the Files picker sits there after you tap Open:</strong> that wait is iOS fetching your photos out of iCloud, before this app is handed anything. A file with a cloud badge, or one that says &ldquo;Waiting&hellip;&rdquo;, is not on the iPad yet. Download the folder in Files first and it opens straight away — see <strong>Help &rarr; Why the Files picker hangs</strong>.</p>
           <label class="welcome-batch" id="welcomeQuickBtn" for="quickFiles">Quick look a folder…</label>
           <p class="welcome-batch-hint">See what's in a folder: an instant grid of auto-balanced previews, nothing saved, gone when you close. Tap the keepers to send them into a session.</p>
           <button class="welcome-batch" id="welcomeBatchBtn" type="button">Batch process a set…</button>
@@ -945,6 +946,40 @@
         Tuned on an IR-converted Nikon Z50.
         Saves: <strong>JPEG in Display&nbsp;P3</strong> (the exact colors you see, wide-gamut tagged) and <strong>16-bit TIFF in sRGB</strong> (the safest hand-off into other editors).
         Exports keep the photo's <strong>capture date, camera, lens and exposure</strong> (when the original carries them) — never its location.</p>
+
+        <h3>Why the Files picker hangs</h3>
+        <p>You pick a folder of raw files, tap <strong>Open</strong>, and nothing happens for a long time with
+        nothing on screen to say why. <strong>That wait is not this app.</strong> Everything you see until the
+        picker closes belongs to iOS: this app is not running, has not been handed a single file, and has no way
+        to draw anything over Apple's picker. The first moment it can say anything is the spinner that appears
+        once the picker closes.</p>
+        <p>What iOS is doing is fetching your selection out of iCloud Drive. When storage runs short, iOS evicts
+        the local copy of a file and keeps only a stub; the picker has to pull the real bytes back down before it
+        can hand them over, and it does that for <em>every</em> file you selected before it returns even one. A
+        folder of 40 raw files is a gigabyte or more over whatever connection you are on.</p>
+        <p>How to tell, and what to do:</p>
+        <ul>
+          <li>In the picker, a file with a <strong>cloud badge</strong> beside its name is not on the iPad. One
+          with no badge is local and opens immediately. The picker cannot sort or filter by this — the badge is
+          the only signal Apple gives you.</li>
+          <li><strong>Download the folder before you open it.</strong> In the Files app, touch and hold the
+          folder (or the selected files) and choose <strong>Download Now</strong>. Wait for the badges to
+          disappear, then come back here.</li>
+          <li><strong>Keep it local.</strong> iCloud Drive&rsquo;s settings carry an <strong>Optimize iPad
+          Storage</strong> switch — that is the one doing the evicting. Turning it off keeps shoots on the
+          device. (Apple has moved where it sits more than once, so look for it under iCloud in Settings rather
+          than a fixed path.)</li>
+          <li><strong>Pick fewer at a time.</strong> The picker fetches every selected file before it returns
+          anything, so six files start editing far sooner than sixty.</li>
+          <li><strong>&ldquo;Waiting&hellip;&rdquo; with an up arrow</strong> means the opposite — that file is
+          queued to <em>upload</em> to iCloud, so a local copy does exist. The picker can still be slow to release
+          it while iCloud is mid-transfer. Letting the upload finish clears it.</li>
+        </ul>
+        <p><strong>You only pay it once per set.</strong> As a session opens, this app copies each photo&rsquo;s
+        original bytes into its own storage on the iPad — that is what lets a session survive a reload, a crash,
+        or the tab being discarded. So going back to those photos later is <strong>Resume session</strong> on the
+        start screen, which touches neither iCloud nor the picker. Ending a session with <strong>Done</strong> is
+        what throws that copy away.</p>
 
         <h3>Batch process — develop a whole set at once</h3>
         <p><strong>Open image(s)</strong> is for <em>editing</em> (one photo, or a few as a session);
