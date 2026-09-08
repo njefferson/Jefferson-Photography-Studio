@@ -135,7 +135,17 @@ async function decodeBitmap(bytes: Uint8Array): Promise<{ width: number; height:
   return { width, height, pixels: data };
 }
 
-function make2d(w: number, h: number) {
+/** The one place this module touches a canvas — and therefore the one thing
+ *  that stopped it running in a worker. A worker has no `document`, but it does
+ *  have OffscreenCanvas, and both give the same 2D context and the same
+ *  getImageData bytes. Environment-sniffed rather than split into two modules,
+ *  so the worker and the main thread run the SAME decoder and the equivalence
+ *  is by construction, not by review. */
+function make2d(w: number, h: number): { canvas: { width: number; height: number }; ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D } {
+  if (typeof document === "undefined") {
+    const canvas = new OffscreenCanvas(w, h);
+    return { canvas, ctx: canvas.getContext("2d", { willReadFrequently: true })! };
+  }
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
@@ -273,7 +283,7 @@ function slice(bytes: Uint8Array, offset: number, length: number) {
   return bytes.subarray(offset, offset + length);
 }
 
-function pickLargestPreview(bytes: Uint8Array, ifds: Ifd[]): Uint8Array | undefined {
+export function pickLargestPreview(bytes: Uint8Array, ifds: Ifd[]): Uint8Array | undefined {
   const cands: { off: number; len: number; area: number }[] = [];
   for (const d of ifds) {
     const w = d.num(256)[0] ?? 0;

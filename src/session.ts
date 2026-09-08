@@ -129,6 +129,31 @@ export async function photoCount(): Promise<number> {
   }
 }
 
+/** Replace one photo's stored thumbnail. The strip shows the camera's own
+ *  embedded preview the moment a photo's bytes are read — the real one, drawn
+ *  through this app's pipeline, arrives later from the background pass and
+ *  lands here so a resumed session comes back with the right picture. Small
+ *  inline value, same as the meta row it rides in. */
+export async function setThumb(id: string, thumb: ArrayBuffer): Promise<void> {
+  const db = await open();
+  try {
+    await new Promise<void>((res, rej) => {
+      const t = db.transaction(META, "readwrite", { durability: "strict" } as IDBTransactionOptions);
+      t.oncomplete = () => res();
+      t.onabort = () => rej(t.error ?? new Error("write aborted"));
+      t.onerror = () => rej(t.error ?? new Error("write failed"));
+      const store = t.objectStore(META);
+      const rq = store.get(id);
+      rq.onsuccess = () => {
+        const meta = rq.result as PhotoMeta | undefined;
+        if (meta) store.put({ ...meta, thumb });
+      };
+    });
+  } finally {
+    db.close();
+  }
+}
+
 /** Materialise one photo's source bytes (its chunks, in order). Only ever one
  *  photo's bytes are in RAM at a time — the caller decodes then drops them. */
 export async function getBytes(id: string): Promise<Uint8Array> {
