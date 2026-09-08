@@ -532,7 +532,11 @@
                 <option value="0.25">25%</option>
               </select>
             </label>
-            <label id="exQualityRow">Quality <input id="exQuality" type="range" min="0.5" max="1" step="0.01" value="0.92" /></label>
+            <label id="exQualityRow" class="value-row">Quality
+              <input id="exQuality" type="range" min="50" max="100" step="1" value="92" aria-describedby="exQualityNote" />
+              <span id="exQualityVal">92 · high</span>
+            </label>
+            <small id="exQualityNote" class="note">How hard the JPEG is squeezed. Lower makes a smaller file and starts smudging fine detail &mdash; foliage texture and grain go first, which is most of an infrared frame. <strong>92</strong> is the default and is visually clean; go to 100 only for a print master, and below 80 only when a file has to be small. TIFF has no quality setting &mdash; it keeps every bit.</small>
             <label class="check-row"><input id="exRecipe" type="checkbox" checked /> JPEGs carry their look recipe <small>(anyone opening one here gets offered your look)</small></label>
             <p id="exWmNote" class="wm-note" hidden>Practice photos export with the small Studio mark in the corner — your own photos never do.</p>
             <button id="exBtn" type="button" class="primary">Export &amp; Save</button>

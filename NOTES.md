@@ -3849,6 +3849,133 @@ user-scalable=no.
   picks the og:image up automatically). Not a capability — ships as an increment
   (no VERSION bump).
 
+## Desktop-mouse round + the flat-frame finding, 2026-09-08
+
+Eight reports from a session driven with a MOUSE rather than a finger. Six were
+real defects, one was a question, and one turned out to be a measurable property
+of the open baseline rather than a bug. Everything below was measured in the
+built app under headless Chromium with real pointer input; nothing here has had
+the owner's hands on it on the iPad.
+
+**THE CROP HANDLES WERE DEAD WHENEVER AN ASPECT RATIO WAS LOCKED.** With Free
+selected everything worked, which is why this survived. With 1:1, 4:5 or 16:9
+locked, a straight horizontal or straight vertical drag on a corner handle moved
+the box NOT AT ALL — six of twelve measured drags produced a zero change — and
+every diagonal drag followed the SMALLER component: 90px across and 30px down
+resized by the 30. The rule was "the dominant drag axis wins", implemented by
+comparing the box's own EXTENTS after the drag. That can never work: the axis
+you did not move is by construction already exactly on the ratio, so it wins
+every comparison and the solver re-derives the box you started from. It now
+compares the POINTER's own components (dy scaled by the ratio, since dx is a
+fraction of the frame's width and dy of its height). Re-measured: 0 of 12 dead,
+the ratio held to four decimals in every case, and the diagonal drags now match
+their dominant single-axis equivalents exactly. A touch drag wanders on both
+axes, which is why this was invisible for the tool's whole life.
+
+**NOTHING IN THE SESSION STRIP ANSWERED A MOUSE.** It is a native
+`overflow-x` scroller: a finger flicks it and a trackpad swipes it, but Safari
+does not turn a vertical wheel into horizontal scroll and no browser drag-scrolls
+a container. Three routes added — wheel (either axis), press-and-pull with a 6px
+threshold so a tap is still a tap, and Left/Right arrows, which move BETWEEN
+photos rather than scrolling, since that is the thing actually wanted. The arrow
+handler is scoped to the photo and the strip so the range sliders, text fields
+and the panel's tab list keep their own arrows (asserted: a focused slider still
+takes its arrow key). Two smaller things the same reports exposed: the strip is
+rebuilt on every add and every switch, and the rebuild reset its scroll position,
+so the far end of a long set was unreachable; and nothing ever scrolled the
+ACTIVE thumbnail into view, so in a set of forty it was usually off the end.
+
+**WHERE THE TIME ACTUALLY GOES WHEN A SET OPENS — IT IS NOT THE THUMBNAILS.**
+Instrumented over six practice DNGs: decode 16%, thumbnail 12%, and the durable
+copy into IndexedDB 72%. Of that copy, only ~30-130ms per photo is main-thread
+work (structured-cloning the 30KB chunks); the remaining ~300-450ms is waiting on
+the strict-durability commit, which is what lets a session survive a reload. So
+the old serial loop spent most of its wall clock with the processor idle waiting
+on the disk. One write is now allowed in flight while the NEXT photo is read and
+decoded — exactly one, because two photos' source bytes in RAM is the ceiling and
+a set of forty must never hold forty. A photo whose write has not landed is in
+the strip but not switchable (dimmed, dotted edge, disabled) since there would be
+nothing to decode from, and a failed write takes its tile back out. Measured over
+four runs each on eight DNGs: first photo on screen 0.67-0.74s to 0.39-0.44s, the
+whole set 5.16-5.84s to 4.47-5.00s. The chunking and the strict durability were
+NOT touched — they are the reason a session survives a crash.
+
+**AND NOTHING SAID IT WAS HAPPENING.** The strip carried an "Adding i / N" line,
+but it was overwritten by the strip's own summary at the end of the same
+iteration, and the strip was hidden entirely until two photos existed — so
+opening a set showed an untouched welcome screen for the first two decodes and a
+flickering strip after that. Now: the spinner names the file until there is a
+photo to look at, then hands the screen back; the strip stays up for the whole
+load with a determinate bar and a live count; Done is disabled while it runs.
+Done itself used to spend the storage wipe looking like nothing had been pressed
+— it now says what it is freeing and confirms afterwards. Ending a session throws
+work away, and silence is the wrong confirmation for that.
+
+**A FLAT FRAME IS THE OPEN BASELINE BEHAVING AS SPECIFIED, NOT A BUG.** Rendered
+all 44 bundled practice frames at their open baseline with Aerochrome on. The
+frames with an open sky land at a median luminance near 0.44, warm-half
+saturation near 0.35 and cool-half near 0.50. The frames without land at
+0.50-0.67 median luminance and 0.16-0.24 warm saturation — a full stop of lift
+and half the colour. Both automatics are correct as written: auto exposure
+anchors the 97th percentile at 0.85 (dcraw's auto-bright shape), so a histogram
+with no dark region gets lifted whole; and gray-world balance makes the frame's
+own average neutral, which in an infrared frame that is nine tenths foliage means
+neutralising the foliage — the one material the false-colour looks need a cast
+on. THERE IS NO WHITE BALANCE THAT BOTH NEUTRALISES THE DOMINANT MATERIAL AND
+LEAVES IT COLOURED. So the colour has to come from the creative layer, and the
+ruled open baseline (2026-07-25 rev. 2) was left alone.
+What shipped instead is "Lift a flat frame" in the IR tab, pressed after a look.
+It measures the frame through the same compileEdit the preview and the export
+use, bisects a black-point pull until the median reaches the reference or the
+shadows would be crushed to get there (the lower quartile may not fall below half
+of where it started — "shadows alive" as a measurement, not a taste guess), then
+solves the two band-saturation sliders to the warm and cool references with one
+measured refinement, capped at the sliders' own ceiling. Measured: the flat
+frames move to warm 0.30-0.43 and median 0.39-0.57; a frame that already measures
+at the reference is a NO-OP and says so. Everything lands on the Tone points and
+the Sky/Foliage sliders and one Go back undoes it, so it passes all three of
+Doctrine §14's tests.
+STILL OPEN, and an owner call: whether this belongs inside the looks (so
+Aerochrome looks like Aerochrome on any frame without a second press), or in the
+open baseline, or stays an explicit press. Also unresolved: on a frame whose
+foliage renders near-white, scaling HSV saturation has little to scale — that
+case improves but does not transform.
+
+**THE QUALITY SLIDER SAID NOTHING.** A bare 0.5-1 rail with no readout, no
+units and nothing about which end was better. It now reads 50-100 — the number
+every other photo app calls JPEG quality — with a word for what the number costs
+(what a JPEG gives up first is fine texture, which on an infrared frame is most
+of the picture), and the export's Ready line carries the file's MEASURED size, so
+the slider has something to be judged against. On a practice frame: 50 gives
+292KB, 82 gives 557KB, 92 gives 919KB, 100 gives 5.3MB — which is the argument
+for the note saying 100 is a print master.
+
+**TWO TARGET-SIZE FINDINGS FROM THE SAME PASS.** The session strip's Done button
+rendered 28px tall, and all six `.accent-outline` buttons (Basic Auto, IR Auto
+white balance, Rotate 90, both flips, and the new Lift) rendered 38px. The
+2026-07-29 sweep covered the IR bar, both help dialogs, the welcome card, privacy
+and notes — the panel's own buttons and the strip were never in its scope, the
+same way that pass's dialog-scoped text rule missed the panel LABELS. All seven
+are 44px now. axe (wcag2a/aa, wcag21a/aa) is clean in both themes on the editor
+with a session open.
+
+**OBSERVED, NOT CHANGED:** `.lut-strength-row` is authored as a flex row with a
+38px value column, but it is a `<label>` inside `#panel`, and `#panel label`
+sets `display: block` — an id selector beats a class, so it has never actually
+laid out as a row. The new quality row is scoped through `#panel` for exactly
+this reason. Left alone rather than churned: it is a live surface and its current
+appearance may be the accepted one.
+
+**ANSWERED, NOT A DEFECT:** whether "Quick look a folder" differs from picking
+several photos through "Open image(s)". It does, and the difference is storage.
+Quick look decodes each picked file to a preview held in RAM only, writes nothing
+to the device, and is gone when the tab closes — it exists to answer "what have I
+got?"; the keepers you tap go into a real session through the normal open path.
+Opening several photos COPIES each one's source bytes into on-device storage so
+the set survives a reload, a crash or the OS discarding the tab, and each photo
+keeps its own edit. That copy is the 72% above. Batch process is the third thing
+and edits nothing: it develops a whole set unattended into one .zip.
+
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 
 > An 11-dimension multi-agent review over the whole repo; every problem below

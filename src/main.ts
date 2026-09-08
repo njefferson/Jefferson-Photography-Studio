@@ -5851,6 +5851,13 @@ let adding: { done: number; total: number; index: number; name: string } | null 
 // the bytes on disk, switching to it has nothing to decode from.
 const pendingStore = new Set<string>();
 
+/** Export sizes span 300 KB to 60 MB, so unlike the session's fmtSize (whole
+ *  megabytes, for a set's rough footprint) this keeps one decimal and drops to
+ *  KB below a megabyte — a 640 KB export must not read as "1 MB". */
+function fmtExportSize(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
 
 function fmtSize(bytes: number): string {
   if (bytes >= 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
@@ -7216,9 +7223,32 @@ async function openGalleryPhoto(key: string) {
 // Export & save to device.
 ui.exFormat.addEventListener("change", () => {
   // Quality only applies to JPEG.
-  document.getElementById("exQualityRow")!.style.display =
-    ui.exFormat.value === "jpeg" ? "" : "none";
+  const show = ui.exFormat.value === "jpeg";
+  document.getElementById("exQualityRow")!.style.display = show ? "" : "none";
+  document.getElementById("exQualityNote")!.hidden = !show;
 });
+
+// The Quality slider reads 50-100 (the number every other photo app calls
+// "JPEG quality"), not the encoder's 0.5-1 fraction, and says in words what the
+// number means — a bare unlabelled 0.5-1 rail told you nothing about which end
+// was better or what any position cost. exportImage still takes the fraction.
+const exQualityVal = $("exQualityVal") as HTMLSpanElement;
+
+/** The encoder fraction the slider currently stands for. */
+function exportQuality(): number {
+  return Number(ui.exQuality.value) / 100;
+}
+
+function updateQualityReadout() {
+  const q = Number(ui.exQuality.value);
+  // The word names what the number COSTS, not just how big it is: what a JPEG
+  // gives up first is fine texture, which on an infrared frame is most of the
+  // picture (foliage and grain).
+  const word = q >= 98 ? "maximum" : q >= 88 ? "high" : q >= 78 ? "good" : q >= 65 ? "soft" : "softest";
+  exQualityVal.textContent = `${q} · ${word}`;
+}
+ui.exQuality.addEventListener("input", updateQualityReadout);
+updateQualityReadout();
 
 // Export flow: progress overlay while rendering, then a "Save image" button.
 // The save happens on its own tap so iOS lets us open the native share sheet
@@ -7298,7 +7328,7 @@ ui.exBtn.addEventListener("click", async () => {
       {
         format: ui.exFormat.value as ExportFormat,
         scale: Number(ui.exScale.value),
-        quality: Number(ui.exQuality.value),
+        quality: exportQuality(),
         rotate: renderer.rotation,
         flip: renderer.flip,
         watermark: bundledSource, // practice photos carry the corner mark; the user's photos never do
@@ -7310,7 +7340,10 @@ ui.exBtn.addEventListener("click", async () => {
       },
     );
     pendingSave = result;
-    busyText.textContent = `Ready — ${result.name}`;
+    // The measured size, so the Quality slider has something to be judged
+    // against: change it, export, watch this number move. Measured, never
+    // estimated — the file is already made by the time this is written.
+    busyText.textContent = `Ready — ${result.name} · ${fmtExportSize(result.blob.size)}`;
     busySpinner.hidden = true;
     busyActions.hidden = false;
   } catch (err) {
@@ -7756,7 +7789,7 @@ batchInput.addEventListener("change", async () => {
   // The traveling recipe for every frame in the zip: only a CONCRETE look
   // grade is embeddable (builtin looks resolve per image; auto has no grade).
   const recipe = grade.kind === "look" ? recipeForExport(grade.look, (grade.look as NamedLook).name) : undefined;
-  batchSettings = { grade, format: ui.exFormat.value as ExportFormat, scale: Number(ui.exScale.value), quality: Number(ui.exQuality.value), lut, lutMissing, recipe };
+  batchSettings = { grade, format: ui.exFormat.value as ExportFormat, scale: Number(ui.exScale.value), quality: exportQuality(), lut, lutMissing, recipe };
   batchRemaining = [];
   runBatch(files);
 });
