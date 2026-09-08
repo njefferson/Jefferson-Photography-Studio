@@ -193,8 +193,11 @@
         <div id="lessonChips" class="lesson-chips" hidden aria-label="Lessons"></div>
         <div id="sessionStrip" hidden aria-label="Photo session">
           <div class="session-head">
-            <span id="sessionMeta"></span>
+            <span id="sessionMeta" role="status" aria-live="polite" aria-atomic="true"></span>
             <button id="sessionDone" type="button" class="session-done" title="End the session and free its storage">Done</button>
+          </div>
+          <div id="sessionProgress" class="session-progress" hidden>
+            <div id="sessionProgressBar" class="session-progress-bar"></div>
           </div>
           <div id="sessionThumbs" class="session-thumbs"></div>
         </div>
