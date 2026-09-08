@@ -6032,11 +6032,24 @@ function receiveLookText(text: string, sourceHint: string) {
   else toast(`That ${sourceHint} couldn't be read — it may be damaged or cut short.`, 3200);
 }
 
+/** The picker hands files over in TAP ORDER, which is arbitrary — so every path
+ *  that takes a picked set sorts here, numeric-aware, and none of them sorts on
+ *  its own. Quick look had this from the start and the session path did not, so
+ *  a set opened for editing carried whatever order iOS happened to return; and
+ *  because the strip's `order` is assigned in add sequence and Resume sorts by
+ *  it, the wrong order was persisted and faithfully restored. Same-shot pairs
+ *  (DSC_1709.dng / DSC_1709 2.NEF) sit next to each other under this comparison.
+ *  ONE function, so the two callers cannot drift apart again. */
+function inShutterOrder(files: File[]): File[] {
+  return [...files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
+}
+
 /** Open a freshly-picked set. One file → ephemeral single open (unchanged).
  *  Two or more → a persisted session with the switch strip.
  *  Shared-look files (.ipslook) are peeled off FIRST: a look is not a photo —
  *  it must never destroy, join, or be counted against a photo session. */
 async function openPicked(files: File[]) {
+  files = inShutterOrder(files);
   const parts = await Promise.all(files.map(async (f) => ({ f, isLook: await isLookFile(f).catch(() => false) })));
   const lookFiles = parts.filter((p) => p.isLook).map((p) => p.f);
   files = parts.filter((p) => !p.isLook).map((p) => p.f);
@@ -6628,10 +6641,7 @@ qlGrid.addEventListener(
  *  JPEG still makes a fine preview, so — unlike a real open — we don't reject it
  *  here (that warning is for editing true RAW, which quick look isn't). */
 async function openQuickLook(files: File[]) {
-  // The picker hands files over in tap order (arbitrary). Sort by filename,
-  // numeric-aware, so the grid reads in shutter order and same-shot pairs
-  // (DSC_1709.dng / DSC_1709 2.NEF) sit next to each other.
-  files = [...files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
+  files = inShutterOrder(files); // see inShutterOrder — the picker's order is arbitrary
   const gen = ++quickGen;
   for (const it of quickItems) if (it.thumbUrl) URL.revokeObjectURL(it.thumbUrl);
   quickItems = [];
