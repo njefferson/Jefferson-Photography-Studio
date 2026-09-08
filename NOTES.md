@@ -3976,6 +3976,52 @@ the set survives a reload, a crash or the OS discarding the tab, and each photo
 keeps its own edit. That copy is the 72% above. Batch process is the third thing
 and edits nothing: it develops a whole set unattended into one .zip.
 
+## The Files-picker stall is iOS, not the app, 2026-09-08
+
+Reported from the iPad as sitting at the document picker with nothing saying why,
+with the guess that the app was downloading the files first. It is not: nothing
+in this app has run at that point. The only entry point is the `change` handler
+on `#file`, and the picker is Apple's — no event reaches the page until it
+closes, so there is nothing the app can draw over it and nothing it can measure
+about the wait.
+
+WHAT IS ACTUALLY HAPPENING. iOS evicts the local copy of an iCloud Drive file
+when storage runs short and keeps a stub. The picker pulls the real bytes back
+for EVERY selected file before it returns any of them, so a folder of forty
+Z50 NEFs is a gigabyte or more fetched before this app is handed a thing. The
+screenshot's files each carried a cloud badge and an "↑ Waiting…" line — and
+those two are DIFFERENT states: the badge means not on the device, the up arrow
+means queued to upload, so a local copy exists and the picker is merely slow to
+release it mid-transfer. From a session there is no way to tell which one a given
+frame is in, and the remedies differ, so the copy names both.
+
+WHAT WAS RULED OUT, and why none of it is offerable. Showing progress during the
+pick — the app is not running. Opening files as they arrive — the picker returns
+the whole selection at once. Skipping the picker for a folder already seen —
+iPad Safari has no persistent file handles, which is the same lesson that put
+the session store in IndexedDB in the first place (see session.ts's header);
+re-offering it would be offering a capability already recorded as impossible.
+Sorting the picker by downloaded state — the picker is Apple's, and it does not
+sort by that; the cloud badge is the only signal it gives.
+
+SO WHAT SHIPPED IS THE EXPLANATION, plus the pointer to the mitigation the app
+already has. Under Open image(s), one line saying the wait belongs to iOS and
+what a cloud badge means. In Help, a "Why the Files picker hangs" section with
+the two badge states, Download Now in Files, the Optimize iPad Storage switch
+(named as a setting, not a menu path — Apple has moved it more than once), and
+picking fewer at a time, since the picker fetches all of them before returning
+one. And the part worth knowing: the wait is once per SET, not per edit — a
+session copies each original into the app's own storage, so going back to those
+photos is Resume session, which touches neither iCloud nor the picker, and Done
+is what throws that copy away.
+
+NOT VERIFIED ON DEVICE: everything above about the picker's behaviour is read
+off the screenshot and the platform's documented eviction behaviour, not
+measured here — a headless Chromium harness has no iOS document picker. What
+WAS verified: the copy renders above the fold at 1100x850 and at 834x1112, the
+Help section is present and rendered, axe is clean, and the note reuses
+`.welcome-open-hint` rather than introducing a colour.
+
 ## Full-app review (ultracode), 2026-07-15 — findings ledger
 
 > An 11-dimension multi-agent review over the whole repo; every problem below
