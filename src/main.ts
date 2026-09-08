@@ -8,7 +8,7 @@ import { findLocation, stripLocation } from "./gps";
 import { writeZip, crc32 } from "./zip";
 import { putFrame, eachFrame, frameMetas, frameCount, clearFrames } from "./batchstore";
 import * as Session from "./session";
-import { TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, type MaskLayer, type CropRect } from "./pipeline";
+import { TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, bandWeight, rgb2hsv, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, type MaskLayer, type CropRect } from "./pipeline";
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, type HealSpot } from "./heal";
 import { makeStickerAsset, stickerRect, stickerWorldCorners, stickerXform, compositeStickersIntoRect8, compositeStickersIntoRectF32, compositeStickersOverlay8, type StickerAsset } from "./sticker";
 import { makeWarpField, encodeWarp, paintWarp, warpIsEmpty as warpFieldEmpty, type WarpField, type WarpTool } from "./warp";
@@ -135,6 +135,7 @@ const ui = {
   recover: $("recover") as HTMLInputElement,
   autoBtn: $("autoBtn") as HTMLButtonElement,
   irAutoWb: $("irAutoWb") as HTMLButtonElement,
+  irLift: $("irLift") as HTMLButtonElement,
   swapBtn: $("swapBtn") as HTMLButtonElement,
   hue: $("hue") as HTMLInputElement,
   sat: $("sat") as HTMLInputElement,
@@ -1277,6 +1278,134 @@ for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.dn, ui.recover, ui.hue, ui
   ui.skyHue, ui.skySat, ui.skyLum, ui.folHue, ui.folSat, ui.folLum, ...ui.tones]) {
   el.addEventListener("input", syncFromUI);
 }
+
+// --- Lift a flat frame ------------------------------------------------------
+// The complaint this answers: an infrared frame with no open sky in it opens
+// pale and grey however it is graded. Measured across the 44 bundled practice
+// frames at their open baseline with Aerochrome on — the ones WITH sky land at
+// a median luminance near 0.44, warm-half (foliage, ground, bark) saturation
+// near 0.35 and cool-half near 0.50; the ones WITHOUT land at 0.50–0.67 median
+// luminance and 0.16–0.24 warm saturation. That gap is what "drab" is, and it
+// is a full stop of lift and half the colour.
+//
+// Neither automatic is wrong. Auto exposure anchors the 97th percentile at
+// 0.85 (dcraw's auto-bright shape), so a histogram with no dark region gets
+// lifted whole. Gray-world balance makes the frame's own average neutral —
+// and in an infrared frame that is nine tenths foliage, the average IS the
+// foliage, so the balance neutralises the one material the false-colour looks
+// need a cast on. There is no white balance that both neutralises the dominant
+// material and leaves it coloured, so the colour has to come from the creative
+// layer. That is what this is: an explicit press, landing on the tone points
+// and the two band sliders, one undo step, and a no-op on a frame that already
+// measures where it should be.
+const FLAT_LUM_REF = 0.44;
+const FLAT_WARM_REF = 0.35;
+const FLAT_COOL_REF = 0.5;
+const FLAT_TONE_MAX = 0.22; // the tone points clamp at ±0.25 of their default
+// "Shadows alive", as a measurement rather than a taste guess: the pull may not
+// take the frame's lower quartile below half of where it started. Relative on
+// purpose — an absolute floor stops dead on a frame that already contains real
+// black (a shaded wood at midday: its 5th percentile is 0.000 before anything
+// is done to it) and would refuse the pull its midtones plainly need.
+const FLAT_SHADOW_KEEP = 0.5;
+const FLAT_SHADOW_FLOOR = 0.02;
+const FLAT_BAND_MAX = 2; // the sky/foliage saturation sliders' own ceiling
+
+/** Median luminance and per-band saturation of the frame as the given params
+ *  render it — sampled on a coarse grid through the SAME compileEdit the
+ *  preview and the export use, so what is measured is what is shown. Bands are
+ *  weighted by the pipeline's own bandWeight, never a second definition of
+ *  "cool". */
+function measureFrame(p: EditParams): { lumP50: number; lumP25: number; warmSat: number; coolSat: number } {
+  const img = current!;
+  const step = Math.max(1, Math.floor(Math.min(img.width, img.height) / 128));
+  const edit = compileEdit(p, img.camMatrix, img.width / Math.max(1, img.height));
+  const px = new Float32Array(3);
+  const lums: number[] = [];
+  let warmW = 0, warmS = 0, coolW = 0, coolS = 0;
+  for (let y = 0; y < img.height; y += step) {
+    for (let x = 0; x < img.width; x += step) {
+      const [r, g, b] = linearAt(img, x, y);
+      edit(r, g, b, px, 0, undefined, undefined);
+      const cr = clamp(px[0], 0, 1), cg = clamp(px[1], 0, 1), cb = clamp(px[2], 0, 1);
+      lums.push(0.2126 * cr + 0.7152 * cg + 0.0722 * cb);
+      const [h, sat] = rgb2hsv(cr, cg, cb);
+      const wS = bandWeight(h, p.swapRB ? 30 : 210, 55, 105);
+      coolW += wS; coolS += sat * wS;
+      warmW += 1 - wS; warmS += sat * (1 - wS);
+    }
+  }
+  lums.sort((a, b) => a - b);
+  return {
+    lumP50: lums[lums.length >> 1] ?? 0,
+    lumP25: lums[Math.floor(lums.length * 0.25)] ?? 0,
+    warmSat: warmW > 0 ? warmS / warmW : 0,
+    coolSat: coolW > 0 ? coolS / coolW : 0,
+  };
+}
+
+/** The tone curve for a black-point pull of `k`: the shadow point moves the
+ *  full distance, the mid and three-quarter points progressively less, so the
+ *  highlights stay where the exposure put them. k = 0 is the identity. */
+function flatTone(k: number): [number, number, number, number, number] {
+  return [0, TONE_DEFAULT[1] - k, TONE_DEFAULT[2] - k * 0.55, TONE_DEFAULT[3] - k * 0.2, 1];
+}
+
+ui.irLift.addEventListener("click", () => {
+  if (!current) return;
+  const before = measureFrame(params);
+  // Only ever pull DOWN and push UP: a frame already at or past the reference
+  // is left exactly as it is rather than being dragged to the average.
+  const needsTone = before.lumP50 > FLAT_LUM_REF + 0.01;
+  const needsWarm = before.warmSat < FLAT_WARM_REF - 0.01;
+  const needsCool = before.coolSat < FLAT_COOL_REF - 0.01;
+  if (!needsTone && !needsWarm && !needsCool) {
+    toast("This frame is already there — its contrast and colour measure where a frame with open sky lands.", 3400);
+    return;
+  }
+  const trial = cloneParams(params);
+  const shadowFloor = Math.max(FLAT_SHADOW_FLOOR, before.lumP25 * FLAT_SHADOW_KEEP);
+  // 1. Black point, by bisection: the median falls monotonically as the pull
+  //    grows, so eight halvings put it within ~0.001 of the reference or at
+  //    the clamp, whichever comes first.
+  let k = 0;
+  if (needsTone) {
+    let lo = 0, hi = FLAT_TONE_MAX;
+    for (let i = 0; i < 8; i++) {
+      const mid = (lo + hi) / 2;
+      trial.tone = flatTone(mid);
+      const m = measureFrame(trial);
+      // Two stopping conditions: the median reaching the reference, and the
+      // shadows not being crushed to get there — whichever binds first.
+      if (m.lumP50 > FLAT_LUM_REF && m.lumP25 > shadowFloor) lo = mid;
+      else hi = mid;
+    }
+    k = lo;
+  }
+  trial.tone = flatTone(k);
+  // 2. Band saturation. The band scale multiplies HSV saturation and clips at
+  //    1, so the analytic ratio overshoots on the pixels that are already
+  //    saturated — one measured refinement closes that, and the ceiling is the
+  //    slider's own.
+  const after = measureFrame(trial);
+  const solve = (measured: number, ref: number) => (measured > 1e-4 ? clamp(ref / measured, 1, FLAT_BAND_MAX) : 1);
+  trial.foliage = [params.foliage[0], solve(after.warmSat, FLAT_WARM_REF), params.foliage[2]];
+  trial.sky = [params.sky[0], solve(after.coolSat, FLAT_COOL_REF), params.sky[2]];
+  const check = measureFrame(trial);
+  trial.foliage[1] = clamp(trial.foliage[1] * solve(check.warmSat, FLAT_WARM_REF), 1, FLAT_BAND_MAX);
+  trial.sky[1] = clamp(trial.sky[1] * solve(check.coolSat, FLAT_COOL_REF), 1, FLAT_BAND_MAX);
+
+  params.tone = trial.tone;
+  params.foliage = trial.foliage;
+  params.sky = trial.sky;
+  syncToUI();
+  draw();
+  flushRecord(); // one press = one undo step
+  toast(
+    `Lifted: shadows down ${(k * 100).toFixed(0)}%, foliage colour ×${params.foliage[1].toFixed(2)}, cool colour ×${params.sky[1].toFixed(2)}. Every move is on a slider — Go back undoes it.`,
+    4200,
+  );
+});
 
 ui.swapBtn.addEventListener("click", () => {
   params.swapRB = !params.swapRB;
