@@ -534,6 +534,16 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 .lut-strength-row { display: flex; align-items: center; gap: 8px; }
 .lut-strength-row input[type="range"] { flex: 1; min-width: 0; }
 .lut-strength-row span { font: 500 0.6875rem/1 var(--mono); color: var(--txt-2); min-width: 38px; text-align: right; }
+/* A slider with its value beside it. Scoped through #panel because
+   `#panel label` sets display:block and an id beats a class. */
+#panel label.value-row { display: flex; align-items: center; gap: 8px; }
+#panel label.value-row input[type="range"] { flex: 1; min-width: 0; margin-top: 0; }
+#panel label.value-row span {
+  font: 500 0.6875rem/1 var(--mono);
+  color: var(--txt-2);
+  text-align: right;
+  min-width: 84px; /* fits "100 · maximum", so the rail never resizes mid-drag */
+}
 .lut-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
 .lut-row { display: flex; align-items: center; gap: 6px; }
 .lut-row-name { flex: 1; min-width: 0; font-size: 0.78125rem; color: var(--txt-2); overflow-wrap: anywhere; }
@@ -1726,6 +1736,11 @@ label.open-btn, label.bar-btn {
   font-weight: 600;
   padding: 10px;
   border-radius: 9px;
+  /* All six of these rendered 38px tall. The 2026-07-29 target sweep covered
+     the IR bar, the dialogs, the welcome card, privacy and notes — the panel's
+     own buttons were never in its scope, the same way panel LABELS were missed
+     by that pass's dialog-scoped text rule. */
+  min-height: 44px;
 }
 .accent-outline:active { background: var(--surface-3); }
 .full-btn { width: 100%; }
