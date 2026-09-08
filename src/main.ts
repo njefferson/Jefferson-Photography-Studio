@@ -5704,6 +5704,24 @@ const sessionStrip = $("sessionStrip") as HTMLDivElement;
 const sessionThumbs = $("sessionThumbs") as HTMLDivElement;
 const sessionMeta = $("sessionMeta") as HTMLSpanElement;
 const sessionDone = $("sessionDone") as HTMLButtonElement;
+const sessionProgress = $("sessionProgress") as HTMLDivElement;
+const sessionProgressBar = $("sessionProgressBar") as HTMLDivElement;
+
+// While a set is being opened the strip must stay up and SAY SO. Before this,
+// the meta line was written once per file and then overwritten by
+// updateSessionStrip's summary at the end of the same iteration, and the strip
+// itself was hidden again until two photos existed — so opening forty photos
+// showed the untouched welcome screen for the first two decodes and a
+// flickering strip after that. `adding` makes the progress the strip's subject
+// for as long as it lasts.
+let adding: { done: number; total: number; index: number; name: string } | null = null;
+// Photos whose bytes are still being written to storage. They are in the strip
+// and on screen already — measured, the strict-durability commit is ~70% of the
+// time it takes to open a set, and it does not have to be waited on before the
+// photo can be looked at. Until it lands the tile is not switchable: without
+// the bytes on disk, switching to it has nothing to decode from.
+const pendingStore = new Set<string>();
+
 
 function fmtSize(bytes: number): string {
   if (bytes >= 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
@@ -5911,39 +5929,55 @@ async function openPicked(files: File[]) {
     await resetSessionState(true); // drop a lone photo or un-resumed leftovers
     hint.textContent = "Loading…";
     hint.hidden = false;
-    const imported = guardLocation(await importFile(files[0]));
-    if (imported.looksTranscoded) {
-      const msg =
-        "That file arrived as a flattened JPEG (iOS transcoded it). For true RAW, " +
-        "import from Files — or zip the DNG first — rather than the Photo Library.";
-      hint.textContent = msg;
-      // The hint lives on the start screen — invisible if the editor is up.
-      // The explanation must reach the user either way (honest failures).
-      if (welcome.hidden) alert(msg);
-      return;
+    // A 20-megapixel RAW takes seconds to decode; the welcome screen looked
+    // untouched for all of them. The spinner names the file so it is obvious
+    // WHICH photo is being read, not just that something is.
+    showBusy(`Opening ${files[0].name}…`);
+    try {
+      return await openSingle(files[0]);
+    } finally {
+      hideBusy();
     }
-    // Track it as a (strip-less) lone photo so a follow-up multi-pick can ask
-    // sensibly; it isn't persisted (nothing to resume from a single edit).
-    const img = await decode(imported);
-    showDecoded(img, imported);
-    const id = "lone";
-    sessionPhotos = [{ id, name: imported.name, kind: imported.kind, size: imported.bytes.length, edit: null, thumbUrl: "" }];
-    nextOrder = 0;
-    liveEdits.clear();
-    activateCurrent(id);
-    updateSessionStrip();
-    // A JPEG exported by this app can carry its own look (the traveling
-    // recipe, lookmark.ts) — offer it through the same receive dialog as
-    // links/files/codes. The photo is already open, so Try lands on it.
-    if (imported.kind === "jpeg") {
-      const json = extractLookFromJpeg(imported.bytes);
-      const p = json ? parseLookPayload(json) : null;
-      if (p) openLookReceive({ look: p.look, name: p.name ?? `From ${imported.name}` });
-    }
-    return;
   }
 
   await addToSession(files, append);
+}
+
+/** The lone-photo open: ephemeral, not persisted (there is nothing to resume
+ *  from a single edit). Split out of openPicked so the spinner around it has
+ *  one exit rather than five. */
+async function openSingle(file: File) {
+  const imported = guardLocation(await importFile(file));
+  if (imported.looksTranscoded) {
+    hideBusy(); // the explanation must not land behind a spinner
+    const msg =
+      "That file arrived as a flattened JPEG (iOS transcoded it). For true RAW, " +
+      "import from Files — or zip the DNG first — rather than the Photo Library.";
+    hint.textContent = msg;
+    // The hint lives on the start screen — invisible if the editor is up.
+    // The explanation must reach the user either way (honest failures).
+    if (welcome.hidden) alert(msg);
+    return;
+  }
+  // Track it as a (strip-less) lone photo so a follow-up multi-pick can ask
+  // sensibly; it isn't persisted (nothing to resume from a single edit).
+  const img = await decode(imported);
+  showDecoded(img, imported);
+  hideBusy(); // there is a photo on screen now — nothing left to wait for
+  const id = "lone";
+  sessionPhotos = [{ id, name: imported.name, kind: imported.kind, size: imported.bytes.length, edit: null, thumbUrl: "" }];
+  nextOrder = 0;
+  liveEdits.clear();
+  activateCurrent(id);
+  updateSessionStrip();
+  // A JPEG exported by this app can carry its own look (the traveling
+  // recipe, lookmark.ts) — offer it through the same receive dialog as
+  // links/files/codes. The photo is already open, so Try lands on it.
+  if (imported.kind === "jpeg") {
+    const json = extractLookFromJpeg(imported.bytes);
+    const p = json ? parseLookPayload(json) : null;
+    if (p) openLookReceive({ look: p.look, name: p.name ?? `From ${imported.name}` });
+  }
 }
 
 /** Wipe in-memory session state (revoking thumbnails) and, unless appending,
@@ -5955,6 +5989,7 @@ async function resetSessionState(clearStorage: boolean) {
   activePhotoId = null;
   nextOrder = 0;
   liveEdits.clear();
+  pendingStore.clear();
   if (clearStorage) await Session.clearSession().catch(() => {});
 }
 
@@ -5966,53 +6001,109 @@ async function addToSession(files: File[], append: boolean) {
   const skipped: string[] = [];
   let firstNewId: string | null = null;
   let quotaHit = false;
-  for (let i = 0; i < files.length; i++) {
-    const f = files[i];
-    sessionMeta.textContent = `Adding ${i + 1} / ${files.length}…`;
-    sessionStrip.hidden = false;
-    let imported: ImportedFile;
+  adding = { done: 0, total: files.length, index: 1, name: files[0]?.name ?? "" };
+  // The first decode is the longest wait in the app and it used to happen
+  // behind an untouched welcome screen. Hold the modal only until there is a
+  // photo to look at, then drop it — the rest streams in behind the strip,
+  // whose meta line and bar carry the count, and the first photo stays
+  // editable while they do (which is why this loop yields).
+  showBusy(`Opening ${files.length} photo${files.length === 1 ? "" : "s"}…`);
+
+  // One storage write is allowed to be in flight while the NEXT photo is read
+  // and decoded. Measured on six practice DNGs: read+decode+thumbnail came to
+  // 130-270 ms a photo and the strict-durability commit to 310-560 ms, of
+  // which only ~30-130 ms was main-thread work — so the old serial loop spent
+  // most of its time with the processor idle, waiting on the disk. Exactly one
+  // is kept in flight: two photos' source bytes in RAM is the ceiling, and a
+  // set of forty must never hold forty.
+  let inFlight: { p: Promise<void>; id: string; name: string } | null = null;
+  async function land(): Promise<void> {
+    if (!inFlight) return;
+    const w = inFlight;
+    inFlight = null;
     try {
-      imported = guardLocation(await importFile(f));
+      await w.p;
+      pendingStore.delete(w.id);
     } catch (err) {
-      skipped.push(`${f.name} (${(err as Error).message})`);
-      continue;
-    }
-    if (imported.looksTranscoded) { skipped.push(`${f.name} (arrived as flattened JPEG)`); continue; }
-    let img: DecodedImage;
-    try {
-      img = await decode(imported);
-    } catch (err) {
-      skipped.push(`${f.name} (${(err as Error).message})`);
-      continue;
-    }
-    let thumb: ArrayBuffer;
-    try { thumb = await makeThumb(img); } catch { thumb = new ArrayBuffer(0); }
-    const id = crypto.randomUUID();
-    try {
-      await Session.addPhoto(
-        { id, name: imported.name, kind: imported.kind, size: imported.bytes.length, order: nextOrder++, addedAt: Date.now(), thumb, edit: null },
-        imported.bytes,
-      );
-    } catch (err) {
-      nextOrder--;
-      if (isQuotaError(err)) { quotaHit = true; break; }
-      skipped.push(`${f.name} (${(err as Error).message})`);
-      continue;
-    }
-    sessionPhotos.push({
-      id, name: imported.name, kind: imported.kind, size: imported.bytes.length, edit: null,
-      thumbUrl: thumb.byteLength ? URL.createObjectURL(new Blob([thumb], { type: "image/jpeg" })) : "",
-    });
-    // Show the first newly-added photo straight away (its decode is in hand).
-    if (!firstNewId) {
-      firstNewId = id;
-      if (!activePhotoId || activePhotoId === "lone") {
-        showDecoded(img, imported);
-        activateCurrent(id);
+      // The write failed, so this photo is NOT in the session — take it back
+      // out of the strip rather than leaving a tile that opens nothing.
+      pendingStore.delete(w.id);
+      const at = sessionPhotos.findIndex((p) => p.id === w.id);
+      if (at >= 0) {
+        if (sessionPhotos[at].thumbUrl) URL.revokeObjectURL(sessionPhotos[at].thumbUrl);
+        sessionPhotos.splice(at, 1);
       }
+      nextOrder--;
+      if (isQuotaError(err)) quotaHit = true;
+      else skipped.push(`${w.name} (${(err as Error).message})`);
     }
     updateSessionStrip();
-    await tick(); // yield so edits on the shown photo stay responsive
+  }
+
+  try {
+    for (let i = 0; i < files.length; i++) {
+      if (quotaHit) break;
+      const f = files[i];
+      adding = { done: i, total: files.length, index: i + 1, name: f.name };
+      if (busy.open) busyText.textContent = `Opening ${files.length} photos — reading ${i + 1} of ${files.length}: ${f.name}`;
+      updateSessionStrip();
+      let imported: ImportedFile;
+      try {
+        imported = guardLocation(await importFile(f));
+      } catch (err) {
+        skipped.push(`${f.name} (${(err as Error).message})`);
+        continue;
+      }
+      if (imported.looksTranscoded) { skipped.push(`${f.name} (arrived as flattened JPEG)`); continue; }
+      let img: DecodedImage;
+      try {
+        img = await decode(imported);
+      } catch (err) {
+        skipped.push(`${f.name} (${(err as Error).message})`);
+        continue;
+      }
+      let thumb: ArrayBuffer;
+      try { thumb = await makeThumb(img); } catch { thumb = new ArrayBuffer(0); }
+      // The previous photo's commit has had this photo's whole decode to
+      // finish in; collect it before starting another.
+      await land();
+      if (quotaHit) break;
+      const id = crypto.randomUUID();
+      pendingStore.add(id);
+      inFlight = {
+        id,
+        name: f.name,
+        p: Session.addPhoto(
+          { id, name: imported.name, kind: imported.kind, size: imported.bytes.length, order: nextOrder++, addedAt: Date.now(), thumb, edit: null },
+          imported.bytes,
+        ),
+      };
+      sessionPhotos.push({
+        id, name: imported.name, kind: imported.kind, size: imported.bytes.length, edit: null,
+        thumbUrl: thumb.byteLength ? URL.createObjectURL(new Blob([thumb], { type: "image/jpeg" })) : "",
+      });
+      // Show the first newly-added photo straight away — it is decoded, and
+      // nothing about looking at it waits on the copy going to disk. Then give
+      // the screen back: everything after this has something to look at.
+      if (!firstNewId) {
+        firstNewId = id;
+        if (!activePhotoId || activePhotoId === "lone") {
+          showDecoded(img, imported);
+          activateCurrent(id);
+        }
+        hideBusy();
+      }
+      // The bar advances; the label keeps naming the file that just landed
+      // until the next one starts, so the two never disagree.
+      adding = { done: i + 1, total: files.length, index: i + 1, name: f.name };
+      updateSessionStrip();
+      await tick(); // yield so edits on the shown photo stay responsive
+    }
+    await land(); // the last write
+  } finally {
+    await land(); // a throw must not strand a write (or a tile) mid-flight
+    adding = null;
+    hideBusy();
   }
   updateSessionStrip();
   await requestPersistentStorage(); // ask the OS to keep the session's bytes
@@ -6034,25 +6125,38 @@ async function addToSession(files: File[], append: boolean) {
  *  stage (--session-h + .has-session), and the CSS shrinks the photo's fit box
  *  to the space ABOVE it — the strip must never cover the picture. */
 function updateSessionStrip() {
+  const keepScroll = sessionThumbs.scrollLeft;
   const real = sessionPhotos.filter((p) => p.id !== "lone");
-  // The strip is for switching — only meaningful from two photos up.
-  if (real.length < 2) {
+  // The strip is for switching — only meaningful from two photos up. While a
+  // set is still coming in it is also the progress report, so it stays.
+  if (real.length < 2 && !adding) {
     sessionStrip.hidden = true;
     sessionThumbs.replaceChildren();
+    sessionProgress.hidden = true;
+    sessionDone.disabled = false;
     stageEl.classList.remove("has-session");
     return;
   }
   sessionStrip.hidden = false;
   const total = real.reduce((s, p) => s + p.size, 0);
   const idx = real.findIndex((p) => p.id === activePhotoId);
-  sessionMeta.textContent =
-    `${real.length} photos · ~${fmtSize(total)}` + (idx >= 0 ? ` · viewing ${idx + 1}` : "");
+  sessionProgress.hidden = !adding;
+  sessionDone.disabled = !!adding;
+  if (adding) {
+    sessionProgressBar.style.width = `${Math.round((adding.done / Math.max(1, adding.total)) * 100)}%`;
+    sessionMeta.textContent = `Opening ${adding.index} of ${adding.total} — ${adding.name}`;
+  } else {
+    sessionMeta.textContent =
+      `${real.length} photos · ~${fmtSize(total)}` + (idx >= 0 ? ` · viewing ${idx + 1}` : "");
+  }
   sessionThumbs.replaceChildren(
     ...real.map((p) => {
       const b = document.createElement("button");
       b.type = "button";
-      b.className = "session-thumb" + (p.id === activePhotoId ? " active" : "");
-      b.title = p.name;
+      const saving = pendingStore.has(p.id);
+      b.className = "session-thumb" + (p.id === activePhotoId ? " active" : "") + (saving ? " saving" : "");
+      b.title = saving ? `${p.name} — still saving` : p.name;
+      b.disabled = saving;
       if (p.thumbUrl) {
         const im = document.createElement("img");
         im.src = p.thumbUrl;
@@ -6061,13 +6165,118 @@ function updateSessionStrip() {
       } else {
         b.append(Object.assign(document.createElement("span"), { className: "session-thumb-name", textContent: p.name }));
       }
-      b.addEventListener("click", () => { if (p.id !== activePhotoId) switchToPhoto(p.id); });
+      b.addEventListener("click", () => {
+        if (stripDragged) return; // that press was a scroll, not a choice
+        if (p.id !== activePhotoId) switchToPhoto(p.id);
+      });
       return b;
     }),
   );
+  // The strip is rebuilt on every add and every switch; without this the scroll
+  // position snapped back to the first photo each time, so a mouse user could
+  // never reach the far end of a long set.
+  sessionThumbs.scrollLeft = keepScroll;
   stageEl.classList.add("has-session");
   stageEl.style.setProperty("--session-h", `${sessionStrip.offsetHeight}px`);
+  revealActiveThumb();
 }
+
+/** Bring the active thumbnail into view — in a set of forty it is usually off
+ *  the end of the strip, and nothing else would ever scroll it back. */
+function revealActiveThumb() {
+  const i = sessionPhotos.filter((p) => p.id !== "lone").findIndex((p) => p.id === activePhotoId);
+  const el = i >= 0 ? (sessionThumbs.children[i] as HTMLElement | undefined) : undefined;
+  el?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+}
+
+// --- Reaching the rest of the set with a mouse. The strip is a native
+// horizontal scroller, which a finger flicks and a trackpad swipes — but a
+// mouse has neither: Safari does not turn a vertical wheel into horizontal
+// scroll, and no browser drag-scrolls a container. So all three routes are
+// wired here: WHEEL (either axis, whichever the mouse has), DRAG (press and
+// pull the strip, with a threshold so a tap is still a tap), and the ARROW
+// KEYS, which move between photos rather than scrolling — the thing actually
+// wanted. ---
+let stripDragged = false;
+
+sessionThumbs.addEventListener(
+  "wheel",
+  (e) => {
+    if (sessionThumbs.scrollWidth <= sessionThumbs.clientWidth + 1) return; // nothing to scroll
+    // A mouse sends deltaY; a trackpad's horizontal swipe sends deltaX. Take
+    // whichever is bigger so both land, and only claim the event when the
+    // strip can actually move that way (or the page stops scrolling for free).
+    const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    if (!d) return;
+    const before = sessionThumbs.scrollLeft;
+    sessionThumbs.scrollLeft = before + d;
+    if (sessionThumbs.scrollLeft !== before) e.preventDefault();
+  },
+  { passive: false },
+);
+
+// Press-and-pull. The threshold is what keeps a tap a tap: under it the click
+// still selects the photo, over it the click is swallowed (see the handler above).
+let stripDrag: { id: number; x: number; left: number } | null = null;
+sessionThumbs.addEventListener("pointerdown", (e) => {
+  // Mouse only. A finger already gets native flick-scrolling with momentum on
+  // iPad; taking those pointers over here would replace a good gesture with a
+  // worse one, and preventDefault on an already-scrolling touch is a no-op.
+  if (e.pointerType !== "mouse" || e.button !== 0) return;
+  stripDragged = false;
+  stripDrag = { id: e.pointerId, x: e.clientX, left: sessionThumbs.scrollLeft };
+});
+sessionThumbs.addEventListener("pointermove", (e) => {
+  if (!stripDrag || e.pointerId !== stripDrag.id) return;
+  const dx = e.clientX - stripDrag.x;
+  if (!stripDragged && Math.abs(dx) < 6) return;
+  if (!stripDragged) {
+    stripDragged = true;
+    // Capture only once it IS a drag, so a plain tap never has its click
+    // retargeted away from the thumbnail.
+    try { sessionThumbs.setPointerCapture(e.pointerId); } catch { /* synthetic pointers can throw */ }
+    sessionThumbs.classList.add("dragging");
+  }
+  sessionThumbs.scrollLeft = stripDrag.left - dx;
+  e.preventDefault();
+});
+function endStripDrag(e: PointerEvent) {
+  if (!stripDrag || e.pointerId !== stripDrag.id) return;
+  stripDrag = null;
+  sessionThumbs.classList.remove("dragging");
+  // Cleared after the click that follows this pointerup has been dispatched.
+  if (stripDragged) setTimeout(() => { stripDragged = false; }, 0);
+}
+sessionThumbs.addEventListener("pointerup", endStripDrag);
+sessionThumbs.addEventListener("pointercancel", endStripDrag);
+
+/** Move `step` photos through the set (wrapping), the keyboard route to what
+ *  tapping a thumbnail does. */
+function stepPhoto(step: number) {
+  const real = sessionPhotos.filter((p) => p.id !== "lone");
+  if (real.length < 2) return;
+  const i = real.findIndex((p) => p.id === activePhotoId);
+  const to = real[((i < 0 ? 0 : i + step) % real.length + real.length) % real.length];
+  if (to && to.id !== activePhotoId) switchToPhoto(to.id);
+}
+
+// Arrows step through the set — but ONLY from the photo itself or the strip.
+// A range slider, a text field and the panel's own tab list all own their
+// arrow keys, and a global handler would steal them.
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+  if (e.altKey || e.ctrlKey || e.metaKey) return;
+  if (document.querySelector("dialog[open]")) return;
+  if (cropArmed) return; // the geometry tools own the frame
+  const t = e.target as HTMLElement | null;
+  const tag = t?.tagName ?? "";
+  if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || t?.isContentEditable) return;
+  const fromPhoto = !t || t === document.body || t === canvas || t === stageEl || sessionStrip.contains(t);
+  if (!fromPhoto) return;
+  if (sessionPhotos.filter((p) => p.id !== "lone").length < 2) return;
+  e.preventDefault();
+  stepPhoto(e.key === "ArrowRight" ? 1 : -1);
+});
 
 /** End the session: free its storage and reset all session state, returning to
  *  the start screen. */
@@ -6089,7 +6298,17 @@ async function endSession() {
 sessionDone.addEventListener("click", async () => {
   const n = sessionPhotos.filter((p) => p.id !== "lone").length;
   if (!confirm(`End this session of ${n} photos?\n\nEach photo's edit is kept only while the session is open — ending it frees the storage.`)) return;
-  await endSession();
+  // Clearing forty RAWs out of IndexedDB is not instant, and Done used to
+  // spend that time looking like nothing had been pressed. Say what is
+  // happening, then say it finished — ending a session throws work away, and
+  // silence is the wrong confirmation for that.
+  showBusy(`Ending the session — freeing ${n} photo${n === 1 ? "" : "s"}…`);
+  try {
+    await endSession();
+  } finally {
+    hideBusy();
+  }
+  toast(`Session ended — ${n} photo${n === 1 ? "" : "s"} cleared from this device.`, 3000);
 });
 
 // Resume a session left in storage by a previous visit (close, crash, or the

@@ -1180,7 +1180,11 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 .session-done {
   flex: none;
   width: auto;
-  padding: 5px 14px;
+  /* 44px, the standing minimum. It was 28px tall — the strip is a HUD floating
+     over the photo, which is exactly where a thumb lands, and the audit that
+     swept the bar and the dialogs had never reached it. */
+  min-height: 44px;
+  padding: 5px 16px;
   font-size: 0.8125rem;
   border-radius: 999px;
   border: 1px solid var(--line);
@@ -1189,6 +1193,32 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   cursor: pointer;
 }
 .session-done:active { background: var(--surface-3); }
+@media (hover: hover) {
+  .session-done:hover { background: var(--surface-3); border-color: var(--line-2); }
+}
+.session-done:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.session-done[disabled] { opacity: 0.6; cursor: default; }
+/* How far through a long open we are. A count alone answers "how many?"; the
+   bar answers "how much longer?", which is the question a 40-photo set raises.
+   Determinate on purpose — the total is known from the moment the files are
+   picked. */
+.session-progress {
+  height: 4px;
+  margin: 0 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.session-progress-bar {
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .session-progress-bar { transition: none; }
+}
 .session-thumbs {
   display: flex;
   gap: 8px;
@@ -1197,6 +1227,16 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   overscroll-behavior: contain;
   padding-bottom: 2px;
   -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  cursor: grab; /* it can be pulled with a mouse — say so */
+}
+.session-thumbs.dragging {
+  cursor: grabbing;
+  scroll-behavior: auto; /* a drag must track the pointer, not glide after it */
+}
+.session-thumbs.dragging .session-thumb { pointer-events: none; }
+@media (prefers-reduced-motion: reduce) {
+  .session-thumbs { scroll-behavior: auto; }
 }
 .session-thumb {
   flex: none;
@@ -1223,6 +1263,25 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   color: var(--glass-txt-2);
   text-align: center;
   word-break: break-word;
+}
+/* A photo that is on screen but whose copy has not finished going to disk.
+   Dimmed and not switchable — switching to it would have nothing to decode
+   from — with a dotted edge so the state reads without relying on colour. */
+.session-thumb.saving {
+  opacity: 0.55;
+  border-style: dotted;
+  border-color: var(--line-2);
+  cursor: progress;
+}
+/* Mouse affordances: nothing in the strip reacted to a pointer before a click,
+   so on a desktop it read as decoration. Hover lifts, focus draws the same ring
+   the rest of the app uses. */
+@media (hover: hover) {
+  .session-thumb:hover { border-color: var(--line-2); transform: translateY(-1px); }
+}
+.session-thumb:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .session-thumb.active {
   border-color: var(--accent);
