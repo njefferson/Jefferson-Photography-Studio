@@ -4874,14 +4874,22 @@ function moveCropDrag(e: PointerEvent) {
   }
   const rf = cropRatioFrac();
   if (rf) {
-    // Preset locked: the dominant drag axis wins, the other follows the ratio.
+    // Preset locked: the axis the POINTER moved wins, the other follows the
+    // ratio. It is the DRAG that decides, never the box's extents — comparing
+    // extents (what this did before) always re-derived the box the drag
+    // started from, because the axis you did not move is by construction
+    // already exactly on the ratio, so it won every comparison. Measured with
+    // a real mouse at 1:1 / 4:5 / 16:9: a straight horizontal or vertical
+    // handle drag moved NOTHING (6 of 12 dead), and every diagonal followed
+    // the smaller component — 90px across and 30px down resized by the 30.
+    // dx is a fraction of the frame's WIDTH and dy of its HEIGHT, so dy is
+    // scaled by rf to compare like with like.
     // clampResizeOnPhoto below slides the corner back along the anchor line,
     // which has the ratio's slope — so the clamp preserves the ratio too.
     const w0 = Math.abs(mdx - ax), h0 = Math.abs(mdy - ay);
-    let w = w0, h = w0 / rf;
-    if (h0 * rf > w0) { h = h0; w = h0 * rf; }
+    let w = Math.abs(dx) >= Math.abs(dy) * rf ? w0 : h0 * rf;
     w = Math.max(w, MIN_CROP, MIN_CROP * rf);
-    h = w / rf;
+    const h = w / rf;
     mdx = ax + (mdx >= ax ? 1 : -1) * w;
     mdy = ay + (mdy >= ay ? 1 : -1) * h;
   }
