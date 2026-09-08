@@ -690,7 +690,7 @@ export function hslAt(hsl: readonly number[], h: number): [number, number, numbe
 
 // --- HSV helpers shared by the per-colour bands (mirrored in the shader) ---
 
-function rgb2hsv(r: number, g: number, b: number): [number, number, number] {
+export function rgb2hsv(r: number, g: number, b: number): [number, number, number] {
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
   const d = max - min;
@@ -721,7 +721,7 @@ export function hsv2rgb(h: number, s: number, v: number): [number, number, numbe
 }
 
 /** Band weight: 1 inside the plateau, smoothstep falloff to 0. */
-function bandWeight(hue: number, center: number, plateau: number, edge: number): number {
+export function bandWeight(hue: number, center: number, plateau: number, edge: number): number {
   let d = Math.abs(hue - center);
   if (d > 180) d = 360 - d;
   if (d <= plateau) return 1;
