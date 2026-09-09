@@ -3976,6 +3976,46 @@ the set survives a reload, a crash or the OS discarding the tab, and each photo
 keeps its own edit. That copy is the 72% above. Batch process is the third thing
 and edits nothing: it develops a whole set unattended into one .zip.
 
+## Asking for one photo and being told about another, 2026-09-09
+
+Reported from a 360-file NEF open on the iPad: tapping a thumbnail put up a
+spinner reading **"Opening 360 photos — reading 41 of 360: NIR_2950.NEF"**.
+
+`switchToPhoto` raises its own `showBusy("Loading…")`. `addToSession` raises one
+too, to cover the wait for the FIRST photo, and hides it the moment a photo is
+on screen — but **the loop keeps running for the rest of the set, and its
+progress line was guarded only by `if (busy.open)`.** So once the reader tapped a
+tile and raised a spinner, the still-running loop wrote its own progress into
+it. Asking for one thing and being told about another is worse than being told
+nothing.
+
+Fixed with ownership: the loop tracks whether the dialog is ITS dialog, drops
+that claim in the same place it calls `hideBusy`, and never writes into one it
+did not raise. Asserted by watching every spinner message across a whole 44-file
+open while tapping a tile part-way through — the only message that appears after
+the tap is "Loading…".
+
+**AND "CAM" WAS NOT A WORD.** The provisional tile badge read `cam`, uppercased
+by CSS. It means "the picture in this tile is the camera's own rendering, not
+this app's, and it will be replaced" — a sentence nobody had been told,
+abbreviated to three letters, on a badge with no explanation anywhere in the
+app. It reads **"preview"** now, and the tile carries a tooltip saying the rest.
+
+**AND THIS ONE COULD NOT BE RENDERED HERE, WHICH IS WORTH RECORDING RATHER THAN
+GLOSSING.** The badge appears only while a tile is stored AND still showing the
+camera preview. Across a 44-file open, polled every 100 ms — and again at 8x CPU
+throttling to widen any narrow window — **the `provisional` class never applied
+once**. These practice DNGs carry no embedded camera preview, so the state is
+not reachable with them at all; the reported NEFs do carry one, which is why the
+badge is in the screenshot and not in any local run.
+
+So what is verified here is the BUILD, not the render: the old `textContent:"cam"`
+is absent from the bundle, `session-thumb-tag",textContent:"preview"` is present,
+and the tooltip string is there. The element, class and DOM path are unchanged.
+**The rendered check needs a file with a camera preview in it, which this repo
+does not have** — worth knowing before the next session assumes the practice set
+covers every tile state.
+
 ## The full-screen dialogs never spent the safe-area inset, 2026-09-09
 
 Reported from the installed iPad: the Quick look header drawn UNDER the iOS
