@@ -3976,6 +3976,52 @@ the set survives a reload, a crash or the OS discarding the tab, and each photo
 keeps its own edit. That copy is the 72% above. Batch process is the third thing
 and edits nothing: it develops a whole set unattended into one .zip.
 
+## Half the practice set is portrait and every thumbnail lay on its side, 2026-09-09
+
+Reported against the Quick look grid. `makeThumb` never read `img.rotate` — the
+EXIF Orientation tag, which `decode.ts` has always resolved into 90-degree CW
+steps and the main view has always honoured. So a frame shot in portrait opened
+upright and its thumbnail lay sideways.
+
+**It was not a corner case.** Reading tag 274 out of all forty-four practice
+DNGs: 22 carry Orientation 1, three carry none, and **19 carry Orientation 8** —
+270 degrees, portrait. Nearly half the set.
+
+**AND IT WAS NEVER ONLY THE GRID.** `makeThumb` builds the Quick look tiles AND
+the session strip tiles, so both were wrong from the same line. Measured before
+the fix: a portrait frame's tile came out 512x341 in the grid and 260x173 in the
+strip, while the photo itself opened 932x1400.
+
+**HOW IT IS DONE.** Destination pixels are mapped back to source inside the
+existing loop, so there is still one pass and no second buffer; only the output
+dimensions swap on an odd quarter-turn. The aspect handed to `compileEdit` stays
+the SOURCE aspect — the edit is computed in the photo's own space and only the
+laying-out of the result turns.
+
+**AND THE SHAPE TEST WAS NOT ALLOWED TO BE THE PROOF.** A tile coming out
+portrait says nothing about WHICH way it turned: 90 and 270 and 180 all pass a
+shape check on a portrait frame, and two of the three would be visibly wrong.
+Two independent checks instead:
+
+- The mapping applied to a known 4x3 pattern and compared against a naive
+ rotate-CW-n-times implementation, for all four rotations. All four match.
+- Each tile correlated against the photo it opens into, on a 5x5 luminance
+ grid: **0.999, 1.000 and 1.000 upright**, against -0.732, 0.535 and -0.437 for
+ the same tile turned 180. Landscape frames unaffected.
+
+**THE HARNESS BUG THAT NEARLY PASSED IT FOR THE WRONG REASON.** The first
+correlation run opened the portrait file alongside `NIR_0102` and read tile
+index 0 — and `inShutterOrder` sorts numerically, so index 0 was `NIR_0102`, a
+LANDSCAPE frame, correlated against itself for a perfect 0.999. The give-away
+was in the log the whole time: it printed the photo as 1400x932 when a portrait
+file was under test. **A test that reports a size it should not have is
+reporting the wrong subject, not a surprising result.**
+
+**WHAT WAS CHECKED AND IS NOT A DEFECT.** The provisional tiles shown while a
+set loads come from the camera's own embedded JPEG, and browsers apply that
+file's EXIF orientation to an `<img>` themselves; across four portrait files no
+tile was landscape in either the provisional or the settled state.
+
 ## What batch was actually doing, 2026-09-09
 
 Asked what batch processing does now, and the answer read off `batchParamsFor`
