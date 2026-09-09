@@ -3976,6 +3976,52 @@ the set survives a reload, a crash or the OS discarding the tab, and each photo
 keeps its own edit. That copy is the 72% above. Batch process is the third thing
 and edits nothing: it develops a whole set unattended into one .zip.
 
+## The session was never asking to be kept, and the search said it was, 2026-09-09
+
+`persistent: no` on the device report, so the ask was added: `requestPersistence()`
+in `session.ts`, memoised per page load, fired from `addPhoto` — the first moment
+the app commits the reader's own data is the honest moment to ask for it to be
+kept — and deliberately NOT awaited, so a refusal cannot delay a write.
+
+**AND THE CLAIM THAT PROMPTED IT WAS HALF WRONG.** The previous entry said
+nothing in `src/` had ever called `navigator.storage.persist()`. It had:
+`main.ts` has asked before every batch run since the batch path was built. The
+search that missed it looked for `storage.persist`, with a literal dot; the code
+reads `storage?.persist?.()`. **A pattern that assumes the punctuation reports
+the code absent from a tree it is in** — the same shape as the hub's §250, where
+a search that never ran reported nothing found, and it landed in the owner's
+report as a fact. The finding underneath survived: the BATCH path asked and the
+SESSION path did not, for as long as sessions have existed, and the session path
+is the one that copies every original to storage.
+
+**SO THERE WERE TWO IMPLEMENTATIONS, WHICH IS THE ACTUAL DEFECT.** Two asks that
+did not know about each other; a probe counting calls to `navigator.storage.persist`
+saw two for a two-photo set. `main.ts`'s `requestPersistentStorage` now delegates
+to the one in `session.ts`, so the batch and the session share a single memoised
+ask.
+
+**WHAT WAS MEASURED.** A spy on `navigator.storage.persist`: zero calls for
+merely opening the page (asking on a page view is asking before there is
+anything to keep), exactly one for a two-photo set. That test FAILED FIRST at
+two calls, which is what found the duplicate — it was written to check the
+memoisation and caught the second implementation instead.
+
+**AND THE REPORT SAYS WHAT THE ANSWER MEANS.** A bare `persistent: no` is half
+an answer: the seven-day rule applies to a browser tab and a home-screen install
+is exempt, so the two facts have to be read together. The Storage line now reads
+`persistent: no — the app asked and this browser declined; a session left
+unopened for about a week may be cleared. Installing it to the home screen is
+exempt from that.` Granted, it reads `persistent: yes — an open session will not
+be evicted`. Both branches asserted against a stubbed `navigator.storage`, and
+the wording changes when the app is already installed, since telling somebody to
+install an app they are running is noise.
+
+**NOT CLAIMED:** that this makes a session safe. No browser is obliged to grant
+it, Safari decides silently on its own heuristics, and this repo already knew a
+neighbouring thing — `batchstore.ts`'s header records that large IDB values go
+to a lazily-flushed sidecar that `durability: "strict"` does not cover. The ask
+is free and the report is honest about the outcome; that is the whole claim.
+
 ## The version number became a way in, 2026-09-09
 
 The GL-stall entry below ends on "what would settle it is a measurement on the
@@ -4096,15 +4142,13 @@ needs re-examining — but it came from instrumenting the APP over real practice
 DNGs, not from this test, and the two are not measuring the same thing. Recorded
 as a tension to resolve with a measurement, not as a correction.
 
-**THE ONE FINDING THE REPORT ITSELF SURFACED: `persistent: no`.** Nothing in
-`src/` has ever called `navigator.storage.persist()`. Opening a set copies every
-original into storage so the set survives a reload, and that copy currently sits
-in evictable storage; WebKit clears script-writable storage after seven days of
-Safari use without interaction with the site, and a home-screen install is
-exempt where a browser tab is not. Not fixed here — it is a product change and
-this release is at the gate. The request is one call and the report already
-prints the answer, so the device would say whether Safari granted it rather than
-anyone assuming.
+**THE ONE FINDING THE REPORT ITSELF SURFACED: `persistent: no`.** Opening a set
+copies every original into storage so the set survives a reload, and that copy
+sits in evictable storage; WebKit clears script-writable storage after seven days
+of Safari use without interaction with the site, and a home-screen install is
+exempt where a browser tab is not. Not fixed in this release — it is a product
+change and this one is at the gate. See the next entry for what it turned out
+to be, including the part of this paragraph that was wrong when it was written.
 
 **VERIFIED.** Version control is a real `<button>` at 53x44 with
 `aria-haspopup="dialog"` — it shipped as a 204px-wide `<span>` that the Home

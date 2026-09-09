@@ -28,13 +28,25 @@ function deviceLine(platform: string, touch: number): string {
   return `${platform}${touch > 0 ? ` · touch screen (${touch} points)` : ""}`;
 }
 
-async function storageLine(): Promise<string> {
+/** `persistent` is the line that decides whether an open session is safe, and
+ *  on its own it is half an answer: WebKit clears script-writable storage after
+ *  seven days of Safari use without interaction with the site, and a
+ *  home-screen install is exempt where a browser tab is not. So the line says
+ *  what a "no" MEANS and names the way out, rather than leaving a bare word
+ *  for whoever reads the report to interpret. `standalone` is passed in
+ *  because the caller has already worked it out for the Installed line. */
+async function storageLine(standalone: boolean): Promise<string> {
   try {
     const est = await navigator.storage?.estimate?.();
     if (!est) return "not reported by this browser";
     const mb = (n?: number) => (n === undefined ? "?" : `${(n / 1024 / 1024).toFixed(0)} MB`);
     const persisted = await navigator.storage?.persisted?.().catch(() => false);
-    return `${mb(est.usage)} used of ${mb(est.quota)} · persistent: ${yes(!!persisted)}`;
+    const used = `${mb(est.usage)} used of ${mb(est.quota)}`;
+    if (persisted) return `${used} · persistent: yes — an open session will not be evicted`;
+    const why = standalone
+      ? "the app asked and this browser declined; installed apps are usually exempt from eviction anyway"
+      : "the app asked and this browser declined — a session left unopened for about a week may be cleared. Installing it to the home screen is exempt from that.";
+    return `${used} · persistent: no — ${why}`;
   } catch {
     return "unavailable";
   }
@@ -91,7 +103,7 @@ export async function buildDiagnostic(version: string, extra: DiagLine[] = []): 
     { k: "Cores", v: String(navigator.hardwareConcurrency ?? "not reported") },
     { k: "Graphics", v: glLine() },
     { k: "Offline worker", v: await swLine() },
-    { k: "Storage", v: await storageLine() },
+    { k: "Storage", v: await storageLine(standalone) },
     { k: "Colours", v: `${document.documentElement.getAttribute("data-theme") ?? "dark"} · palette ${document.documentElement.getAttribute("data-palette") ?? "instrument"}` },
     { k: "Reduced motion", v: yes(window.matchMedia("(prefers-reduced-motion: reduce)").matches) },
     { k: "Language", v: navigator.language },
