@@ -31,6 +31,12 @@ const REC = [0.2126, 0.7152, 0.0722];
  *  found", kept here so the flag and the words agree. */
 export const SKY_MIN_COVERAGE = 0.005;
 
+/** How much further the fill may drift from the seed luminance when the pixel's
+ *  colour still sits dead on the learned cluster. Squared falloff, so it is the
+ *  centre of the cluster that earns the extra room and the edge earns none.
+ *  Calibrated over the 44 practice frames — see NOTES. */
+const SKY_LUMA_STRETCH = 6;
+
 export interface SkyResult {
   mask: BrushMask;
   /** false when too little smooth sky touches the top edge — the caller keeps
@@ -145,12 +151,12 @@ export function buildSkyMask(
     }
   }
   const seedBandArea = seedDepth * (rotate % 2 === 0 ? W : H);
+  const median = (a: number[]) => { const t = [...a].sort((x, y) => x - y); return t[Math.floor(t.length / 2)]; };
   const empty = (): SkyResult => ({ mask: { w: W, h: H, data: new Uint8Array(N) }, found: false, coverage: 0 });
   if (seeds.length < seedBandArea * 0.12) return empty();
 
   // --- learn the sky model robustly: median + MAD, reject outliers, refit once
   // (hillside's top edge mixes sky with dark twigs; the dominant cluster wins) ---
-  const median = (a: number[]) => { const t = [...a].sort((x, y) => x - y); return t[Math.floor(t.length / 2)]; };
   let mL = 0, mcx = 0, mcy = 0, sdL = 0, sdC = 0;
   for (let iter = 0; iter < 2; iter++) {
     mL = median(seeds.map((p) => Ln[p]));
@@ -167,16 +173,29 @@ export function buildSkyMask(
 
   // tolerances: proportional to the seed spread, floored AND capped, then scaled
   // by Reach so the user can loosen/tighten the grow.
-  const tolC = Math.min(0.15, Math.max(0.06, 4 * sdC)) * reach;
-  const tolL = Math.min(0.25, Math.max(0.08, 4 * sdL)) * reach;
+  let tolC = Math.min(0.15, Math.max(0.06, 4 * sdC)) * reach;
+  let tolL = Math.min(0.25, Math.max(0.08, 4 * sdL)) * reach;
   const tolEdge = 0.10 * reach;   // gradient a fill may cross
   const tolAdj = 0.06 * reach;    // adjacent-luma continuity (lets gradients pass)
 
   // --- flood fill from the seeds: stay near the model, follow slow gradients,
-  // don't cross hard edges. 4-connectivity is orientation-free. ---
+  // don't cross hard edges. 4-connectivity is orientation-free.
+  //
+  // It runs TWICE. The model is learned from a strip 6% deep at the top of the
+  // frame, and a big sky is not that strip: by the horizon it is brighter,
+  // hazier and less saturated, so the fill would reach a boundary that is not
+  // an edge in the picture — just the far end of what a thin strip could
+  // describe. Measured on the largest sky in the practice set, the frontier's
+  // rejections split model 38% / edge 33% / chroma 29%, with nothing dominant:
+  // the sky had genuinely left the seed cluster on both axes at once. So after
+  // the first pass the model is re-fitted to the sky ACTUALLY FOUND and the
+  // fill continues from there. Two passes, not a loop — one re-fit lets a
+  // gradient be described, while an unbounded chain of them would let the
+  // cluster walk off into the foliage one small step at a time. ---
   const mask = new Float32Array(N); // 0..1
-  const stack = [...seeds];
-  for (const p of seeds) mask[p] = 1;
+  const fillFrom = (start: number[]) => {
+  const stack = [...start];
+  for (const p of start) mask[p] = 1;
   while (stack.length) {
     const p = stack.pop()!;
     const y = (p / W) | 0, x = p - y * W;
@@ -191,10 +210,48 @@ export function buildSkyMask(
       const cd = Math.hypot(CX[q] - mcx, CY[q] - mcy);
       const ldAdj = Math.abs(Ln[q] - Lp);       // continuity to THIS pixel (gradients pass)
       const ldMod = Math.abs(Ln[q] - mL);        // still within reach of the model
-      if (G[q] < tolEdge && cd < tolC && ldAdj < tolAdj && ldMod < tolL * 2.5) {
+      // The model's LUMINANCE bound is what stops a deep sky being followed all
+      // the way down: a sky darkens from horizon to zenith by far more than a
+      // band learned from a thin strip at the top allows, so the fill walked a
+      // gradient it was built to walk and then ran into a flat cap (measured:
+      // the largest sky in the practice set caught to about half its depth).
+      // Its COLOUR barely moves over the same span — that is the whole premise
+      // of the model, stated at the top of this file: whatever the sky's
+      // colour, it is one tight cluster. So the luminance bound opens up in
+      // proportion to how well the colour still matches, and stays where it was
+      // for anything whose colour has drifted. Foliage and ground do not sneak
+      // in on this: they fail `cd` long before they reach the wider bound.
+      const chromaFit = 1 - Math.min(1, cd / Math.max(1e-6, tolC)); // 1 = dead on the cluster
+      const modelBound = tolL * (2.5 + SKY_LUMA_STRETCH * chromaFit * chromaFit);
+      if (G[q] < tolEdge && cd < tolC && ldAdj < tolAdj && ldMod < modelBound) {
         mask[q] = 1;
         stack.push(q);
       }
+    }
+  }
+  };
+  fillFrom(seeds);
+
+  // Re-fit to what was found, then carry on from its whole frontier. The refit
+  // uses the same robust median + MAD as the seed fit, so a few stray pixels
+  // cannot drag the cluster.
+  {
+    const found: number[] = [];
+    for (let p = 0; p < N; p++) if (mask[p]) found.push(p);
+    if (found.length > seeds.length) {
+      const sample = found.length > 20000
+        ? found.filter((_, i) => i % Math.ceil(found.length / 20000) === 0)
+        : found;
+      mL = median(sample.map((p) => Ln[p]));
+      mcx = median(sample.map((p) => CX[p]));
+      mcy = median(sample.map((p) => CY[p]));
+      const dl = sample.map((p) => Math.abs(Ln[p] - mL));
+      const dc = sample.map((p) => Math.hypot(CX[p] - mcx, CY[p] - mcy));
+      sdL = 1.4826 * median(dl);
+      sdC = 1.4826 * median(dc);
+      tolC = Math.min(0.15, Math.max(0.06, 4 * sdC)) * reach;
+      tolL = Math.min(0.25, Math.max(0.08, 4 * sdL)) * reach;
+      fillFrom(found);
     }
   }
 
