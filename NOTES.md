@@ -5067,6 +5067,82 @@ reported percentage does count only texels above half weight while roughly twice
 that area is touched to some degree — defensible, and worth knowing when the
 number reads lower than the effect looks.**
 
+## Tap-to-white-balance refuses a sample it cannot read, 2026-09-09
+
+**Found by the unprompted half of the cold read** — the pass that is handed no
+claims and simply uses the app. A first-time reader tapped a sunlit snow bank
+expecting neutral, got the whole frame thrown into deep magenta, and read it as
+the app being broken. Help says to tap foliage; nothing at the moment of the tap
+did.
+
+**Why it happened, and it is not a UI problem.** The tap does
+`params.wb = lumNormalize([mean/r, mean/g, mean/b])` on one sampled pixel. A
+CLIPPED channel has no ratio to divide by — the sensor stopped counting before
+the real value — so that is a division by a number the photograph does not
+contain. Infrared floods and clips red first, which is exactly why the result
+was magenta. The dark end fails identically from the other side: near zero the
+ratio is noise, and `lumNormalize`'s clamp turns a meaningless gain into an
+extreme one rather than an obviously wrong one.
+
+**The fix.** `sampleForWb` averages a 5x5 patch — one pixel of a raw frame is
+not a measurement — and returns a verdict. More than a quarter of the patch
+clipped, or a patch peak under 0.02 linear, and the tap is refused, the photo
+untouched, with a sentence saying what is wrong and where to go instead. A
+quarter rather than one pixel, because a lone hot pixel beside good ones is not
+a blown highlight and refusing on it would make the tool feel broken the other
+way.
+
+**Verified against a file whose decode values are known exactly** rather than
+against a photograph: a PNG, left half pure white (linear 1.0), right half
+(185,120,95). Tapping the white half changes nothing and explains itself;
+tapping the coloured half moves the gains 585/585/585 to 456/598/675, warm as
+expected.
+
+**Two instrument errors on the way, both the day's usual shape.** The first test
+tapped the BRIGHTEST DISPLAYED pixel and expected a refusal — but the display
+carries white balance, tone and the look, so a displayed 255 is not a clipped
+decode value and `linearAt` reads the decode. The second used a neutral grey
+patch as the control and recorded that a good tap "did not set white balance" —
+a grey sample gives mean/r = mean/g = mean/b = 1, so the sliders CANNOT move.
+The control could not have passed. Also: reading the toast after waiting for it
+to fade returns the PREVIOUS message, because the element stays in the DOM.
+
+## The hidden duplicate controls are not an accessibility defect, 2026-09-09
+
+**Reported by the cold read** as hidden interactive duplicates mounted in the
+DOM at all times — a Help dialog and a second copy of the practice picker — with
+Undo, Aerochrome, Export & Save and Close each resolving to two or three
+elements when queried by visible text.
+
+**Measured, and it is real for automation and false for accessibility.** A probe
+walking every button, link, input and `label[for]` and excluding anything
+`display:none`, `visibility:hidden`, `[hidden]`, inside `aria-hidden`, inside a
+CLOSED `<dialog>`, or inside a `<template>`:
+
+- start screen — 406 controls in the document, 26 reaching the tree
+- a photo open — 406 in the document, 37 reaching the tree
+- duplicate accessible names among exposed controls, both states: 0
+- exposed controls with zero width or height, both states: 0
+
+A closed `<dialog>` is `display:none`, so its contents are out of the
+accessibility tree entirely. **Nothing to fix, and the accessibility runs that
+kept coming back green were right.** Recorded so it is not re-opened: an agent
+querying by text sees the whole document, and a screen reader does not.
+
+**The general point worth keeping.** A finding from a tool is a fact about the
+tool's view until somebody checks whose view it was. This one was reported
+upward as an accessibility defect before it was measured, which is the same
+error as reading a proxy for the thing.
+
+## "Opening" was still on screen in the other place, 2026-09-09
+
+The ruling that photos are not really "opening" — only one is, the rest are
+being copied onto the device — was applied to the line under the photos and not
+to the modal that appears first, which kept saying `Opening 5 photos — reading 1
+of 5`. The cold read found it on the same screen the fix had already been made
+on. One ruling, two surfaces, and the fix reached one. Both now say "Adding".
+The single-file path still says Opening, because there the photo is being opened.
+
 ## The strip stopped snatching the scroll, 2026-09-09
 
 **The defect, exactly.** `updateSessionStrip()` saved `sessionThumbs.scrollLeft`
