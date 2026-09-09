@@ -18,7 +18,7 @@ import { generateCube } from "./lut";
 import { generateDcp } from "./dcp";
 import { buildGlowMap } from "./glow";
 import { buildLocalMap } from "./localmap";
-import { buildSkyMask } from "./sky";
+import { buildSkyMask, SKY_MIN_COVERAGE } from "./sky";
 import { Tiff } from "./raw/tiff";
 import { drawHistogram } from "./histogram";
 import * as Hotspot from "./hotspot";
@@ -3666,7 +3666,7 @@ function updateSkyStatus() {
   let on = 0;
   for (let i = 0; i < d.length; i++) if (d[i] > 127) on++;
   const frac = d.length ? on / d.length : 0;
-  mUI.skyStatus.textContent = frac < 0.005
+  mUI.skyStatus.textContent = frac < SKY_MIN_COVERAGE
     ? "No clear sky found — try a Brush or Color mask, or raise Reach."
     : `Sky detected — ${Math.round(frac * 100)}% of the frame. Invert for everything but the sky.`;
 }

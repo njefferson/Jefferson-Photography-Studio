@@ -3976,6 +3976,53 @@ the set survives a reload, a crash or the OS discarding the tab, and each photo
 keeps its own edit. That copy is the 72% above. Batch process is the third thing
 and edits nothing: it develops a whole set unattended into one .zip.
 
+## The sky mask, looked at properly, 2026-09-09
+
+Followed up on the earlier observation that buildSkyMask reported found=true on
+43 of 44 practice frames. The app's own mask path was driven over every frame
+and several were rendered and looked at. **The hypothesis going in — that it
+over-reports and tells the reader it found a sky when it has not — was WRONG,
+and the measurements say so.**
+
+**NO FALSE POSITIVES FOUND.** The one frame in the set with genuinely no sky
+reports "No clear sky found" and selects nothing. A frame with only a sliver of
+sky behind a treeline selects exactly that sliver and reports 5%, which is
+right. Rendered mask overlays confirm the selected region is sky in every frame
+looked at.
+
+**WHAT IS REAL IS UNDER-SELECTION ON A DEEP GRADIENT SKY.** On the frame with
+the largest open sky in the set, the default catches roughly the top half and
+leaves a broad band of plainly visible sky unselected, reporting 14%. The cause
+is a genuine inconsistency inside the algorithm: the flood-fill carries an
+adjacent-luma test specifically so it CAN walk down a gradient, and then the
+final selection pass re-tests every filled pixel against the seed median with no
+adjacency allowance — so the fill reaches the lower sky and the last step throws
+it away. Reach recovers it progressively and covers the whole sky at 2.0
+(coverage 14 to 23% at the reported threshold). The control works; the DEFAULT
+is conservative on this class of frame. Retuning a shipped detector is a taste
+call and was not made here.
+
+**`found` COULD NOT SAY NO.** It was a literal `true` at the end of the
+function, decided a hundred lines earlier by the seed test alone — "at least a
+tenth of the top band is smooth" — so a frame whose top edge held any smooth
+patch reported a sky found however little the fill went on to select, including
+nothing. Its own doc comment promised the opposite. Nothing read it, which is
+why no reader was ever misled: regenerateSkyMask takes only `.mask`, and the
+status line recomputes coverage off the bitmap. Now computed from actual
+coverage against SKY_MIN_COVERAGE, which the status line imports so the flag and
+the words cannot disagree. No user-visible change — re-measured across all 44,
+identical results.
+
+**AND AN INSTRUMENT ERROR WORTH KEEPING.** The mask overlay renders as
+`mix(outside, inside, cov)` at the mask's CONTINUOUS weight, so a feathered edge
+tints a wide area faintly. At Reach 2 that made the whole frame look tinted and
+it was nearly written up as "the mask bleeds across the entire picture".
+Measured instead: 42% of texels carry any weight at all against 23% above the
+reported half-weight threshold. A feather doing what a feather does. **The
+reported percentage does count only texels above half weight while roughly twice
+that area is touched to some degree — defensible, and worth knowing when the
+number reads lower than the effect looks.**
+
 ## Audit: what else was treated as an aside, 2026-09-09
 
 Asked directly, after the theme default turned out to have been visible in this

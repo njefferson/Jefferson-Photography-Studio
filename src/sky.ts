@@ -26,6 +26,11 @@ import { chromaVec, type BrushMask } from "./pipeline";
 
 const REC = [0.2126, 0.7152, 0.0722];
 
+/** Below this share of the frame there is no usable sky — the same bar the
+ *  editor's status line applies when it decides whether to say "No clear sky
+ *  found", kept here so the flag and the words agree. */
+export const SKY_MIN_COVERAGE = 0.005;
+
 export interface SkyResult {
   mask: BrushMask;
   /** false when too little smooth sky touches the top edge — the caller keeps
@@ -223,7 +228,17 @@ export function buildSkyMask(
     data[p] = v;
     if (v > 127) selected++;
   }
-  return { mask: { w: W, h: H, data }, found: true, coverage: selected / N };
+  const coverage = selected / N;
+  // `found` is about the RESULT, not about how the search started. It used to
+  // be a literal `true` here, decided a hundred lines earlier by the seed test
+  // alone — "at least a tenth of the top band is smooth" — so a frame whose top
+  // edge happened to hold a smooth patch reported a sky found however little
+  // the fill went on to select, up to and including nothing at all. Nothing in
+  // the app read it (the status line recomputes coverage off the bitmap, which
+  // is why no reader was ever misled), but a documented flag that cannot say
+  // "no" is a trap for whatever reads it next. Same threshold the status line
+  // uses, so the two cannot disagree.
+  return { mask: { w: W, h: H, data }, found: coverage >= SKY_MIN_COVERAGE, coverage };
 }
 
 /** In-place separable gaussian with edge clamping (same shape as glow/localmap). */
