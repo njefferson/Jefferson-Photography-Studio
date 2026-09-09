@@ -269,8 +269,14 @@
               <button id="lookHie" type="button">HIE B&amp;W<small class="look-sub"></small></button>
             </div>
             <p class="note">Press a look again to flip its R&#8646;B channel swap &mdash; the state shows under its name.</p>
-            <button id="irLift" class="toggle full-btn" type="button" aria-pressed="true">Adapt flat frames<small class="look-sub"></small></button>
-            <p class="note">On by default, so a photo opens the best it can without you pressing anything. A frame with no open sky in it &mdash; woodland, a hedge, anything filling the picture with one material &mdash; opens pale and grey: with no dark sky in the histogram the automatic exposure lifts the whole frame, and the automatic balance makes the average neutral, which in an infrared photo nine tenths foliage means neutralising the foliage. This pulls the shadows back down and puts the colour back into the sky and foliage bands, measured against where a frame with open sky lands, and stops short of crushing the shadows to get there. It runs when a photo opens and again when you press a look, so a look lands the same on any frame. A photo that already measures where it should be is left alone. Everything it does shows on the Tone points and the Sky/Foliage sliders &mdash; turn it off here to see the photo without it, or <strong>Go back</strong> to undo one press.</p>
+            <button id="irLift" class="toggle full-btn" type="button" aria-pressed="true">Restore depth</button>
+            <p class="note">Puts back the contrast and colour that a flat frame loses when it opens. On automatically, and again whenever you press a look.</p>
+            <details class="note-more">
+              <summary>Why a photo needs it</summary>
+              <p class="note">A frame with no open sky in it &mdash; woodland, a hedge, anything filling the picture with one material &mdash; opens pale and grey. With no dark sky in the histogram the automatic exposure lifts the whole frame, and the automatic balance makes the average neutral, which in an infrared photo nine tenths foliage means neutralising the foliage itself.</p>
+              <p class="note">This pulls the shadows back down and puts the colour back into the sky and foliage bands, measured against where a frame with open sky lands, and stops short of crushing the shadows to get there. The colour half only applies once a look is on, since it is the look that decides which parts of the picture are sky and which are foliage.</p>
+              <p class="note">A photo that already measures where it should be is left alone. Everything it does shows on the Tone points and the Sky/Foliage sliders, so turn it off here to see the photo without it.</p>
+            </details>
             <label>HIE glow <input id="glow" type="range" min="0" max="1" step="0.01" value="0" /></label>
             <p class="note">Film-style halation &mdash; layers onto any look, not only HIE B&amp;W.</p>
           </section>

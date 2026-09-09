@@ -1502,9 +1502,12 @@ function removeLift(): void {
 // same shape as the R<->B swap, and on by default so nothing has to be
 // remembered to get a usable photo.
 function updateLiftUI() {
+  // Exactly the R<->B swap's shape: a .toggle carrying aria-pressed, whose
+  // pressed state is an accent fill AND a heavier weight, so it does not rest
+  // on colour alone. The off/on segment pair this had first came from the LOOK
+  // buttons, where the row sits on a surface background — on a pressed toggle's
+  // accent fill its muted grey measured 1.01:1 in the light theme.
   ui.irLift.setAttribute("aria-pressed", String(autoLift));
-  const sub = ui.irLift.querySelector(".look-sub") as HTMLElement | null;
-  if (sub) sub.innerHTML = `<span class="seg${autoLift ? "" : " on"}">off</span><span class="seg${autoLift ? " on" : ""}">on</span>`;
 }
 
 ui.irLift.addEventListener("click", () => {
@@ -1514,15 +1517,15 @@ ui.irLift.addEventListener("click", () => {
   if (!current) return;
   if (autoLift) {
     const did = applyLift(activeLook !== null);
-    toast(
-      did
-        ? `Adapted: shadows down ${(did.pull * 100).toFixed(0)}%, foliage colour ×${did.foliage.toFixed(2)}, cool colour ×${did.sky.toFixed(2)}.`
-        : "This frame is already there — its contrast and colour measure where a frame with open sky lands.",
-      3600,
-    );
+    // Silent when it does something: the button shows its own state and every
+    // value it wrote is on a slider a few inches away, so a popup on each press
+    // is noise on a control meant to be pressed back and forth. The ONE case
+    // that needs words is the one with nothing to see — a frame it decided to
+    // leave alone looks identical either way, and without a line saying so the
+    // button reads as broken.
+    if (!did) toast("This photo already has its depth — nothing to put back.", 3200);
   } else {
     removeLift();
-    toast("Adapt is off — photos open exactly as the automatic balance and exposure leave them.", 3600);
   }
   syncToUI();
   draw();

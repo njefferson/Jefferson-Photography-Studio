@@ -49,7 +49,11 @@ export function toast(msg: string, ms = 2200): void {
       opacity: "0",
       transition: "opacity 0.18s ease",
       pointerEvents: "none",
-      wordBreak: "break-all",
+      // NOT break-all: that breaks ordinary prose at any character, so a
+      // sentence could wrap after the first letter of a word (owner-caught on
+      // device). `anywhere` only breaks a word that cannot fit a line on its
+      // own — which is what this was for: an unspaced look code or URL.
+      overflowWrap: "anywhere",
     } as Partial<CSSStyleDeclaration>);
     host.appendChild(toastEl);
   }

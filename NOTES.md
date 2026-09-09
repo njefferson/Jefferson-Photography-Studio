@@ -3976,6 +3976,54 @@ the set survives a reload, a crash or the OS discarding the tab, and each photo
 keeps its own edit. That copy is the 72% above. Batch process is the third thing
 and edits nothing: it develops a whole set unattended into one .zip.
 
+## The device pass on Restore depth, 2026-09-09
+
+Feedback from the iPad. **Most of the behaviour reported was the PRODUCTION
+build, not the design**: the old "Lift a flat frame" button, its old toast, no
+application on a look press, and an on-switch that could not go back. All of
+that was 2.6; staging already carried the toggle. Confirmed by fetching both
+hosts and reading the served markup and bundle rather than assuming — production
+served `class="accent-outline"` with the old label and no `ips-autolift` key,
+staging served the toggle with `aria-pressed="true"`. **Worth remembering: when
+on-device feedback describes behaviour that was already fixed, check WHICH BUILD
+is in front of the reader before touching anything.** Three of five reports
+needed no code at all.
+
+What was genuinely still open, and is now fixed:
+
+**THE NAME.** "Lift" describes the opposite of what it does — it darkens. Now
+**Restore depth**, which is what it puts back: tonal depth, and colour
+separation the automatic balance flattened.
+
+**A TOAST BROKE PROSE AFTER A SINGLE LETTER.** `wordBreak: "break-all"` in
+share.ts's toast, which breaks at ANY character; it was presumably there for an
+unspaced look code or URL. `overflow-wrap: anywhere` does that job and leaves
+ordinary sentences alone. This is the app's ONE toast, so every message in every
+flow was affected, not just this one.
+
+**THE EXPLANATION WAS A WALL.** Two lines now, with the rest behind a
+`<details>` — "Why a photo needs it". The summary carries the 44px target
+itself, and the open/closed state is in the words and the marker, not colour.
+
+**THE TOGGLE STOPPED ANNOUNCING ITSELF.** A popup on every press is noise on a
+control meant to be pressed back and forth, when the button shows its own state
+and every value it writes is on a slider inches away. The one case that keeps a
+message is the one with nothing to see: a frame it decided to leave alone looks
+identical either way, and without a line saying so the button reads as broken.
+
+**TWO TARGET FINDINGS, both from adding one control.** The off/on segment pair
+copied from the LOOK buttons measured **1.01:1** on a pressed toggle's accent
+fill in the light theme — the segments were designed for a surface background,
+not an accent one. Dropped entirely: the R/B swap this is modelled on has no
+segments, and its pressed state is an accent fill AND a heavier weight, so it
+does not rest on colour alone. Removing them then exposed that
+`.toggle.full-btn` renders **34px** — so the swap itself, plus B&W, Crop and
+Straighten, have always been under the minimum. Fixed on the class, which fixes
+all five rather than leaving two sizes of the same control side by side. That is
+the third time this sweep that a target under 44px turned up in the panel; the
+2026-07-29 audit covered the bar and the dialogs and never reached the panel's
+own controls.
+
 ## Adapt flat frames became automatic, 2026-09-08
 
 Owner direction, same day: photos should open the best they can, without a
