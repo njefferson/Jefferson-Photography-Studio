@@ -6113,6 +6113,138 @@ fileInput.addEventListener("change", async () => {
   }
 });
 
+// --- The conventions a reader brings with them ----------------------------
+// Everything the platform gives for free was already right here: every dialog
+// is opened with showModal(), so Escape closes it, focus is trapped and returns
+// on close, and the background goes inert. What needed hand-wiring had not been
+// wired, and a reader does not experience that as "an unimplemented feature" —
+// they experience it as the app not working.
+
+/** Text entry owns its own undo stack and its own clipboard; a range slider,
+ *  a checkbox or a button does not. Bailing on every INPUT would have meant
+ *  Cmd+Z failing in the commonest case there is: nudge a slider, change your
+ *  mind. */
+const TEXT_ENTRY = new Set(["text", "search", "url", "email", "tel", "password", "number"]);
+function isTextEntry(el: EventTarget | null): boolean {
+  const t = el as HTMLElement | null;
+  if (!t) return false;
+  if (t.isContentEditable) return true;
+  if (t.tagName === "TEXTAREA") return true;
+  if (t.tagName === "INPUT") return TEXT_ENTRY.has(((t as HTMLInputElement).type || "text").toLowerCase());
+  return false;
+}
+
+// Undo/redo from the keyboard. Cmd+Z / Ctrl+Z, and both spellings of redo —
+// Cmd+Shift+Z is the Mac and Ctrl+Y the Windows one, and a reader arrives with
+// whichever their other editors taught them.
+document.addEventListener("keydown", (e) => {
+  if (!e.metaKey && !e.ctrlKey) return;
+  const k = e.key.toLowerCase();
+  const wantsUndo = k === "z" && !e.shiftKey;
+  const wantsRedo = (k === "z" && e.shiftKey) || k === "y";
+  if (!wantsUndo && !wantsRedo) return;
+  if (isTextEntry(e.target)) return;
+  if (document.querySelector("dialog[open]")) return; // an open sheet owns the keyboard
+  if (!current) return;
+  e.preventDefault();
+  if (wantsUndo) { if (!undoBtn.disabled) undo(); }
+  else if (!redoBtn.disabled) redo();
+});
+
+/** The picker's own accept list, applied to files that arrive by other routes.
+ *  A drop and a paste have to be as fussy as the picker or they hand the decoder
+ *  something it will fail on later, further from the thing the reader did. */
+const OPENABLE_EXT = /\.(dng|nef|zip|ipslook)$/i;
+function openableFiles(list: FileList | null | undefined): File[] {
+  return Array.from(list ?? []).filter((f) => f.type.startsWith("image/") || OPENABLE_EXT.test(f.name));
+}
+
+async function openFromOutside(files: File[]) {
+  if (!files.length) return;
+  try {
+    await openPicked(files);
+  } catch (err) {
+    welcome.hidden = false;
+    hint.hidden = false;
+    hint.textContent = "Could not open this file: " + (err as Error).message;
+    updateWelcomeReturn();
+  }
+}
+
+// Drag a photo onto the window. dragenter/dragover MUST preventDefault or the
+// browser navigates to the file instead, replacing the app — which is the
+// behaviour anyone dropping a raw on this page got until now.
+let dragDepth = 0; // dragenter/leave fire per element; count them or the hint flickers
+function showDrop(on: boolean) { document.body.classList.toggle("dropping", on); }
+window.addEventListener("dragenter", (e) => {
+  if (!Array.from(e.dataTransfer?.types ?? []).includes("Files")) return;
+  e.preventDefault();
+  if (++dragDepth === 1) showDrop(true);
+});
+window.addEventListener("dragover", (e) => {
+  if (!Array.from(e.dataTransfer?.types ?? []).includes("Files")) return;
+  e.preventDefault();
+  if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+});
+window.addEventListener("dragleave", () => { if (--dragDepth <= 0) { dragDepth = 0; showDrop(false); } });
+window.addEventListener("drop", (e) => {
+  if (!Array.from(e.dataTransfer?.types ?? []).includes("Files")) return;
+  e.preventDefault();
+  dragDepth = 0; showDrop(false);
+  const files = openableFiles(e.dataTransfer?.files);
+  if (!files.length) { toast("That is not a photo this app can open.", 2600); return; }
+  void openFromOutside(files);
+});
+
+// Paste a photo. Same rule as the drop, and silent when the clipboard holds
+// text — a paste that says "not a photo" every time you copy a URL is worse
+// than one that says nothing.
+document.addEventListener("paste", (e) => {
+  if (isTextEntry(e.target)) return;
+  const files = openableFiles((e as ClipboardEvent).clipboardData?.files);
+  if (!files.length) return;
+  e.preventDefault();
+  void openFromOutside(files);
+});
+
+// Back closes the sheet rather than leaving the app. On a home-screen install
+// there is no browser chrome, so Back is a system gesture and losing the whole
+// app to it is not a small thing.
+//
+// The two flags are the whole difficulty: closing a dialog has to consume the
+// history entry it pushed, and consuming it fires popstate, which would then
+// try to close another dialog. Each flag marks "this next event is mine".
+let dlgDepth = 0;
+let closingFromHistory = false;
+let backIsOurs = false;
+// The spinner is a <dialog> too, and showModal()s on every open — but nobody
+// NAVIGATED to it, it is not something Back should dismiss (dismissing it would
+// not stop the work), and pushing an entry every time a photo loads fills the
+// history with churn. A surface earns a history entry by being one the reader
+// chose to open.
+const NO_HISTORY = new Set(["busy"]);
+for (const d of Array.from(document.querySelectorAll("dialog")).filter((x) => !NO_HISTORY.has(x.id))) {
+  new MutationObserver(() => {
+    if ((d as HTMLDialogElement).open) {
+      dlgDepth++;
+      history.pushState({ ipsDialog: dlgDepth }, "");
+    } else if (dlgDepth > 0 && !closingFromHistory) {
+      dlgDepth--;
+      backIsOurs = true;
+      history.back();
+    }
+  }).observe(d, { attributes: true, attributeFilter: ["open"] });
+}
+window.addEventListener("popstate", () => {
+  if (backIsOurs) { backIsOurs = false; return; } // our own consuming back()
+  const open = Array.from(document.querySelectorAll("dialog[open]")) as HTMLDialogElement[];
+  if (!open.length) return;
+  if (dlgDepth > 0) dlgDepth--;
+  closingFromHistory = true;
+  open[open.length - 1].close(); // topmost is the one on screen
+  closingFromHistory = false;
+});
+
 // --- Photo sessions -------------------------------------------------------
 // "Open image" takes one or several. Pick SEVERAL and the set becomes the
 // current session: a strip of big tappable previews you switch between, each

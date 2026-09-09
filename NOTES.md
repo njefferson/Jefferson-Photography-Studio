@@ -5067,6 +5067,84 @@ reported percentage does count only texels above half weight while roughly twice
 that area is touched to some degree — defensible, and worth knowing when the
 number reads lower than the effect looks.**
 
+## The conventions a reader brings with them, 2026-09-09
+
+**VERSION was not bumped for three capability releases before this one.**
+2.12 was declared by the double-tap release; Quick look in the top bar, the
+strip scroll fix with its new control, and the white-balance guard all shipped
+after it as automatic increments (2.12.x). Versioning here is identity then
+CAPABILITY then increment, and features are never increments — each of those
+three should have moved the middle number. They are in production under 2.12.x
+and are not being rewritten; this release declares 2.13. The rule is easy to
+keep and easy to forget precisely because the increment digit moves ON ITS OWN
+from the commit count, so the version always looks like it changed.
+
+
+**The observation that prompted this** was that universal conventions felt
+missing or half-implemented. Audited statically, that was right, and the split
+is sharp: **everything the platform gives for free was already correct, and
+almost nothing that needed hand-wiring had been wired.**
+
+Correct before this change, and worth knowing so nobody "fixes" it: all 13
+dialogs open with `showModal()`, so Escape closes, focus is trapped, focus
+returns to the opener, and the background goes inert — none of it hand-rolled.
+Pinch/pan zoom, wheel on the photo and the strip, `prefers-reduced-motion`,
+44px targets, real buttons with labels, roving tabindex on the panel tabs,
+Delete/Backspace on a selected sticker with the right text-field guards.
+
+Missing, measured: no Cmd/Ctrl+Z at all (the arrow handler bailed on modifiers
+and nothing else claimed them); no `drop`, `dragover` or `dataTransfer`
+handler anywhere in the source; no `paste` handler; no history integration
+beyond `hashchange` for look links.
+
+**What landed.**
+
+- **Undo/redo from the keyboard**, both redo spellings — Cmd+Shift+Z and
+  Ctrl+Y, because a reader arrives with whichever their other editors taught
+  them. The text-field guard is by INPUT TYPE, not by tag: bailing on every
+  `<input>` would have killed Cmd+Z in the commonest case there is, which is
+  nudging a slider and changing your mind. Verified with focus ON a slider.
+- **Drag onto the window.** `dragenter`/`dragover` must `preventDefault()` or
+  the browser NAVIGATES to the dropped file and replaces the app — which is
+  what dropping a raw on this page did until now. `dragenter`/`dragleave` fire
+  per element, so the hint is counted in and out rather than toggled, or it
+  flickers over every child.
+- **Paste**, same accept list, and silent when the clipboard holds text: a
+  paste that says "not a photo" every time you copy a URL is worse than one
+  that says nothing.
+- **Back closes the sheet** instead of leaving the app, which on a home-screen
+  install is a system gesture with no browser chrome to soften it.
+
+**The one that needed care, and the trap in it.** The Back integration observes
+every dialog's `open` attribute and pushes a history entry. `#busy` — the
+loading spinner — is ALSO a `<dialog>` opened with `showModal()`, so the first
+version pushed an entry on every photo open and called `history.back()` on
+every hide. Back during a load would have closed the spinner without stopping
+the work. A surface earns a history entry by being one the reader CHOSE to
+open; the spinner is excluded by id. Asserted: opening a photo adds exactly 0
+history entries.
+
+The two flags in that block are the whole difficulty and neither is optional.
+Closing a dialog has to consume the entry it pushed, and consuming it fires
+`popstate`, which would otherwise close another dialog. Each flag marks the
+next event as ours.
+
+**Verified headlessly:** drop shows the hint and opens; Ctrl+Z undoes with focus
+on a slider and Ctrl+Shift+Z redoes; Ctrl+Z inside a text field is NOT
+intercepted (`defaultPrevented` false); paste opens; opening a photo adds no
+history entries; Back closes Help and stays in the app; Escape still closes.
+
+**On the honesty of these tests:** unlike the strip fix, these have no negative
+control and do not need one — the code did not exist, so "before" is trivially
+absent rather than subtly wrong. The strip fix DID need one and got one, because
+there the behaviour existed and was wrong in a way a test could accidentally
+agree with.
+
+**Still not wired, recorded rather than done:** there is no keyboard route to
+the canvas tools at all — tap-to-white-balance, heal, stickers and warp are
+pointer-only. Arrow keys move through the strip and nothing else. That is a
+larger piece than these four and was not attempted here.
+
 ## Tap-to-white-balance refuses a sample it cannot read, 2026-09-09
 
 **Found by the unprompted half of the cold read** — the pass that is handed no

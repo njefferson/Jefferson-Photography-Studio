@@ -1155,6 +1155,27 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
    strip used to jump back to it on every repaint — which is every thumbnail
    that lands — so scrolling through a long set was impossible while one was
    still loading. Now the strip stays where it is put and this is the way back. */
+/* Dragging a photo over the window. A drop target that says nothing is a drop
+   target nobody trusts — the reader has no way to know the page will take it
+   until after they have let go. */
+body.dropping::after {
+  content: "Drop to open";
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 600 1.25rem/1.3 var(--ui);
+  color: var(--glass-txt);
+  background: rgba(10, 10, 14, 0.62);
+  border: 3px dashed var(--line-2);
+  border-radius: 14px;
+  pointer-events: none; /* never eat the drop it is advertising */
+}
+@media (prefers-reduced-motion: no-preference) {
+  body.dropping::after { transition: opacity 120ms ease; }
+}
 .session-here {
   flex: none;
   width: auto;
