@@ -3976,6 +3976,49 @@ the set survives a reload, a crash or the OS discarding the tab, and each photo
 keeps its own edit. That copy is the 72% above. Batch process is the third thing
 and edits nothing: it develops a whole set unattended into one .zip.
 
+## Every photo in a kept set was decoded twice, 2026-09-09
+
+Reported as a question: why does the strip render every thumbnail again, after
+the Quick look grid was just watched rendering them?
+
+Because it did. `openQuickLook` decodes every picked file to build the grid.
+`keepQuickLook` then took `quickItems.map(it => it.file)` — **the bare Files,
+throwing every rendered picture away** — and handed them to `addToSession`,
+whose background pass decoded all of them a second time to build the strip.
+
+**MEASURED, same twelve files, counting decode-worker replies:**
+
+- opening them directly: 13 decodes
+- Quick look then Keep: 12 for the grid + **13 after Keep** = 25
+
+**Halved: 12 + 1 = 13 after the fix**, the 1 being the photo actually opened for
+display. Every tile still has a picture.
+
+**HOW.** Quick look already has the decode in hand, so it renders the strip
+size from it too — a quarter of the grid tile's pixels, a fraction of the decode
+that produced it. `keepQuickLook` carries those across in a `Map` keyed by the
+File itself, so re-ordering on the way in cannot mismatch a picture to a photo,
+and `addToSession` marks such a tile `real` and stamps its grade, which is what
+keeps `realThumbnails` from picking it up.
+
+**Rendered at the STRIP's size rather than reusing the 512px grid bytes**, and
+the reason is `session.ts`: a thumbnail rides INLINE in the photo's meta row,
+and large IDB values are the one shape this app has measured as not crash-safe.
+A 512px JPEG in every meta row would have traded a decode for the sidecar trap.
+
+**AND ONE ORDERING BUG CAUGHT ON THE WAY.** The camera's embedded preview is
+applied a few lines further down the same loop, unconditionally — so it
+overwrote the finished picture with the camera's magenta stand-in and set the
+tile back to `preview`, handing it straight back to the background pass. The
+whole saving would have been silently undone. It now only fills a tile that has
+no real picture yet.
+
+**WHAT THIS DOES NOT SHOW HERE.** Wall time barely moved in the harness (21.0 s
+to 22.8 s) because these practice DNGs decode quickly and the run waits a fixed
+8 s for the background pass to settle. The saving is a decode per photo, and on
+the 26 MB NEFs this was reported against the decode is the dominant cost —
+so the time it saves is on the device, not on this machine.
+
 ## Restore depth gets a strength slider, 2026-09-09
 
 The targets it solves against — median luminance 0.44, warm saturation 0.35,
