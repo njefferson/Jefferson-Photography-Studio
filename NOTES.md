@@ -3976,6 +3976,56 @@ the set survives a reload, a crash or the OS discarding the tab, and each photo
 keeps its own edit. That copy is the 72% above. Batch process is the third thing
 and edits nothing: it develops a whole set unattended into one .zip.
 
+## Three runs of one build, and all three faults were in the instrument, 2026-09-09
+
+Three device reports pasted back to back on the same staging build. Two of them
+were byte-identical in the report block — including the `Taken` line and the
+storage figure — with different speed numbers underneath. That pair is the
+finding: **the report was built once at page load and never again**, while the
+speed tests could be re-run indefinitely, and "Copy the results" concatenates
+the two. So a pasted block carried a timestamp and a storage reading that did
+not belong to its own measurements. The report is now re-taken at the start of
+every run, so the whole block is one moment. Asserted: three `Taken` stamps,
+all different, across load and two runs.
+
+**AND IT WAS CLAIMING AN ASK IT NEVER MADE.** The Storage line read "the app
+asked and this browser declined". On the TEST PAGE nothing has opened a photo,
+so `requestPersistence()` — which fires from `addPhoto` — has never run there,
+and the line was reporting a call that had not happened. It reads "this browser
+has not granted it" now. The general fault: **a reporter must state what it can
+observe, and `navigator.storage.persisted()` observes the browser's answer, not
+whether anyone asked.** Two facts, one of them not in evidence.
+
+**THE DECODE NUMBER WAS A SINGLE SHOT AND MOVED 3.8x.** Across those three runs
+on one device: 50, 60, 191 ms. Readback held at 11-12 ms and storage at 9-17 in
+the same three, so the noise is decode's alone — thermal, or another app on the
+device. A lone number with that spread is worse than useless because it invites
+a conclusion it cannot support. Now three timed decodes after an untimed
+warm-up, median reported, **and every sample printed beside it** so a reader can
+see the spread rather than take the median on trust. Container: 81 ms from
+81/89/79.
+
+**AND THE TEST WAS WRITING 48 MB TO THE DEVICE PER RUN.** Four runs of two
+durability modes at 6 MB. The reported storage use went 60 MB to 109 across one
+run and did not come back down, even though the throwaway database is deleted —
+Safari's estimate is lagging rather than the data surviving, but a diagnostic
+that inflates the number it also reports is its own problem. Down to three runs
+of each, 36 MB, which still gives a median and a visible spread.
+
+**WHAT THE THREE RUNS ACTUALLY SETTLED, AS DATA.** Readback 11, 12, 11 ms —
+stable, small, and the histogram question is closed. Storage 17, 12, 9 ms per
+6 MB and falling, which with the strict-equals-relaxed finding means the engine
+is accepting rather than syncing. `persistent: no` in all three: Safari declined
+for a browser tab, which is its documented behaviour and is why the line names
+the home-screen install as the way out.
+
+**THE SHAPE, AGAIN.** Every fault this round was in the measuring, not the
+thing measured — a stale timestamp, an unobserved claim, a single sample, and a
+side effect on the quantity being reported. That is four for four, and it is the
+same lesson the deploy checks taught earlier today: **the instrument is the part
+nobody tests.** What caught all four was one cheap habit — running it three
+times and reading the results side by side.
+
 ## The session was never asking to be kept, and the search said it was, 2026-09-09
 
 `persistent: no` on the device report, so the ask was added: `requestPersistence()`
