@@ -1234,7 +1234,11 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   height: 100%;
   padding: 4px;
   font: 0.6875rem/1.2 var(--mono);
-  color: var(--glass-txt-2);
+  /* The tile's own surface, not glass over a photo — --glass-txt-2 is
+     theme-invariant for HUDs floating on an image, and on the light theme's
+     cream surface it measured 1.39:1. This was a rare fallback until every tile
+     started life as a name, waiting for its picture. */
+  color: var(--txt-2);
   text-align: center;
   word-break: break-word;
 }

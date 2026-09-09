@@ -3976,6 +3976,48 @@ the set survives a reload, a crash or the OS discarding the tab, and each photo
 keeps its own edit. That copy is the 72% above. Batch process is the third thing
 and edits nothing: it develops a whole set unattended into one .zip.
 
+## Audit: what else was treated as an aside, 2026-09-09
+
+Asked directly, after the theme default turned out to have been visible in this
+session's own output and walked past. Going back over every measurement taken
+here, three things had been noticed and not pursued. Two were real.
+
+**A REGRESSION SHIPPED IN 2.9, FOUND BY THIS AUDIT AND NOT BY ANY TEST.**
+`makeThumb` spreads `cloneParams(params)` and overrides fourteen fields; `tone`,
+`sky` and `foliage` are not among them. That was correct while those were a
+SHARED creative grade — the thumbnail was meant to carry the live look so it
+matched what opening showed. The moment Restore depth began writing them PER
+FRAME it stopped being correct: every tile in the strip was rendered with a
+curve solved for whichever photo happened to be open, and tapping it re-solved
+and showed something else. That is precisely the defect the thumbnails were
+fixed for once before. Nothing caught it because every test opened one photo or
+compared a tile against itself. Fixed by giving measureFrame and solveLift the
+image they are measuring instead of reading `current`, so a thumbnail solves for
+ITSELF. Verified by rendering the same file's tile in two sessions whose OTHER
+photo differed: 0 of 4800 subpixels differ, and the comparison was shown able to
+see a difference (3586 of 4800 between two different photos).
+
+**A CONTRAST FAILURE THE SAME CHANGE CREATED.** `.session-thumb-name` uses
+`--glass-txt-2`, which is theme-invariant for HUDs floating over a photo. On the
+light theme's cream tile surface it measures **1.39:1**. It had been a rare
+fallback for a thumbnail that would not render; making every tile begin life as
+a name waiting for its picture turned it into the common case. Now `--txt-2`.
+The lesson is narrow and repeatable: **when a rare state becomes the default
+state, its styling has to be re-measured, because it was only ever checked in a
+context nobody looked at.**
+
+**AND ONE THAT WAS NOTHING.** Two frames printed identical statistics to three
+decimal places across all five columns in the calibration sweep, which went by
+unremarked. Checked: 44 distinct files, no duplicates — two frames from the same
+burst, agreeing at that precision after a 260px downsample.
+
+Three others were noticed and DECLARED at the time rather than buried, and stand
+as known and unaddressed: saturation clipping at the top of the Aerochrome range
+(a tenth of the pixels at full chroma on the strongest frames); the sky mask
+reporting "found" on 43 of 44 practice frames including 5% coverage, which makes
+it useless as a classifier and may mean the feature over-reports; and the ~800 ms
+GL program stall at the first photo of a page. None has been investigated.
+
 ## The theme control had no system option — and never had, 2026-09-09
 
 Reported from the device: the switch shows one name, and there is no "follow the

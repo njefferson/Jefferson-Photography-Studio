@@ -1355,8 +1355,7 @@ const FLAT_BAND_MAX = 2; // the sky/foliage saturation sliders' own ceiling
  *  preview and the export use, so what is measured is what is shown. Bands are
  *  weighted by the pipeline's own bandWeight, never a second definition of
  *  "cool". */
-function measureFrame(p: EditParams, divisions = LIFT_GRID): { lumP50: number; lumP25: number; warmSat: number; coolSat: number } {
-  const img = current!;
+function measureFrame(p: EditParams, img: DecodedImage, divisions = LIFT_GRID): { lumP50: number; lumP25: number; warmSat: number; coolSat: number } {
   const step = Math.max(1, Math.floor(Math.min(img.width, img.height) / divisions));
   const edit = compileEdit(p, img.camMatrix, img.width / Math.max(1, img.height));
   const px = new Float32Array(3);
@@ -1394,8 +1393,7 @@ function flatTone(k: number): [number, number, number, number, number] {
  *  the values to apply — or null when the frame already measures where a frame
  *  with open sky lands, which is the no-op case and must stay one. Pure: it
  *  changes nothing, so open, applyLook and the toggle can all use it. */
-function solveLift(withColour: boolean): { tone: [number, number, number, number, number]; foliage: [number, number, number]; sky: [number, number, number]; pull: number } | null {
-  if (!current) return null;
+function solveLift(withColour: boolean, img: DecodedImage, params: EditParams): { tone: [number, number, number, number, number]; foliage: [number, number, number]; sky: [number, number, number]; pull: number } | null {
   // Measure the frame WITHOUT a lift on it. The creative grade — tone included
   // — carries across opens by design, so `params.tone` on a fresh open is
   // whatever the last photo ended with; measuring that and then deciding
@@ -1406,7 +1404,7 @@ function solveLift(withColour: boolean): { tone: [number, number, number, number
   // times this runs, and pressing the toggle twice is a round trip.
   const base = cloneParams(params);
   base.tone = [...TONE_DEFAULT] as typeof base.tone;
-  const before = measureFrame(base);
+  const before = measureFrame(base, img);
   // Only ever pull DOWN and push UP: a frame already at or past the reference
   // is left exactly as it is rather than being dragged to the average.
   //
@@ -1435,7 +1433,7 @@ function solveLift(withColour: boolean): { tone: [number, number, number, number
     for (let i = 0; i < LIFT_BISECT; i++) {
       const mid = (lo + hi) / 2;
       trial.tone = flatTone(mid);
-      const m = measureFrame(trial);
+      const m = measureFrame(trial, img);
       // Two stopping conditions: the median reaching the reference, and the
       // shadows not being crushed to get there — whichever binds first.
       if (m.lumP50 > FLAT_LUM_REF && m.lumP25 > shadowFloor) lo = mid;
@@ -1444,12 +1442,12 @@ function solveLift(withColour: boolean): { tone: [number, number, number, number
     k = lo;
   }
   trial.tone = flatTone(k);
-  const after = measureFrame(trial);
+  const after = measureFrame(trial, img);
   const solve = (measured: number, ref: number) => (measured > 1e-4 ? clamp(ref / measured, 1, FLAT_BAND_MAX) : 1);
   if (withColour) {
     trial.foliage = [base.foliage[0], solve(after.warmSat, FLAT_WARM_REF), base.foliage[2]];
     trial.sky = [base.sky[0], solve(after.coolSat, FLAT_COOL_REF), base.sky[2]];
-    const check = measureFrame(trial);
+    const check = measureFrame(trial, img);
     trial.foliage[1] = clamp(trial.foliage[1] * solve(check.warmSat, FLAT_WARM_REF), 1, FLAT_BAND_MAX);
     trial.sky[1] = clamp(trial.sky[1] * solve(check.coolSat, FLAT_COOL_REF), 1, FLAT_BAND_MAX);
   }
@@ -1468,7 +1466,8 @@ let liftApplied: { tone: string; foliage: string; sky: string; prevTone: number[
 /** Run the lift on the current photo. Returns what it did, for the caller to
  *  report (or not — at open it is silent; the sliders show it). */
 function applyLift(withColour: boolean): { pull: number; foliage: number; sky: number } | null {
-  const r = solveLift(withColour);
+  if (!current) return null;
+  const r = solveLift(withColour, current, params);
   if (!r) { liftApplied = null; return null; }
   const noop = r.pull === 0 && r.foliage[1] === 1 && r.sky[1] === 1;
   liftApplied = {
@@ -6137,7 +6136,20 @@ async function makeThumb(img: DecodedImage, MAX = 260): Promise<ArrayBuffer> {
     lut: null,
     crop: { ...CROP_DEFAULT },
     straighten: 0,
+    // Solved for THIS photo, not inherited from whichever one happens to be
+    // open. Tone, sky and foliage stopped being a shared creative choice the
+    // moment Restore depth started writing them per frame — so cloning the live
+    // params handed every tile another frame's correction, and tapping it
+    // re-solved and showed something different. That is exactly the defect the
+    // thumbnails were fixed for once before (a thumb must match its open).
+    tone: [...TONE_DEFAULT],
+    sky: [0, 1, 1],
+    foliage: [0, 1, 1],
   };
+  if (autoLift) {
+    const lift = solveLift(activeLook !== null, img, p);
+    if (lift) { p.tone = lift.tone; p.sky = lift.sky; p.foliage = lift.foliage; }
+  }
   const edit = compileEdit(p, img.camMatrix, w / h);
   const px = new Float32Array(3);
   const out = new Uint8ClampedArray(w * h * 4);
