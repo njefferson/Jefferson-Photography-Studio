@@ -5067,6 +5067,41 @@ reported percentage does count only texels above half weight while roughly twice
 that area is touched to some degree — defensible, and worth knowing when the
 number reads lower than the effect looks.**
 
+## A fast second tap on a control zoomed the whole app, 2026-09-09
+
+**Reported as** the screen zooming when trying to zoom in quickly — and first
+read here as a PINCH problem, which it was not. The clarification was that it
+happens when tapping the zoom "+" quickly. Two taps in quick succession on a
+button is iOS Safari's double-tap-to-zoom, and it scaled the entire app: the
+exact opposite of what the control the finger was on does.
+
+**Not fixable at the viewport, and that route is banned anyway.**
+`user-scalable=no` and `maximum-scale` were removed from this repo once already
+and must not come back — a control that is awkward to press twice is not a
+reason to stop anyone enlarging the page.
+
+**The fix is `touch-action: manipulation` on controls**, which disables double-
+tap zoom and the legacy 300ms click delay on those elements ONLY. Pinch still
+zooms the page; the viewport meta is untouched. It applies to any control
+somebody presses in a hurry, not just the zoom pair — undo, redo, the strip
+tiles, Back to current.
+
+**Why a BASE rule is safe here, and this was checked rather than assumed.**
+Every control in this app that owns its own gesture declares
+`touch-action: none` on an id or class selector — `#view`, `.grade-wheel`,
+`.crop-handle`, `#toneSvg`, `input[type="range"]` — all of which outrank a bare
+`button` selector, so none of them is weakened. Measured after the change:
+`#view` none, `.crop-handle` none, `#toneSvg` none, panel sliders manipulation
+(their own later override, which is what makes double-tap-to-reset work), and
+all 28 visible buttons manipulation with none left on `auto`.
+
+**Worth noticing about the report.** The first reading was a pinch handler
+problem and would have led to gesture-event interception on the canvas — real
+work, in the wrong place, fixing nothing. One sentence naming the control
+turned it into a one-rule change. A symptom described by its EFFECT ("the whole
+screen zooms") and a symptom described by its TRIGGER ("when I tap + quickly")
+are different amounts of information, and only the second one located it.
+
 ## The conventions a reader brings with them, 2026-09-09
 
 **VERSION was not bumped for three capability releases before this one.**
