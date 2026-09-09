@@ -6494,6 +6494,15 @@ async function addToSession(files: File[], append: boolean) {
   for (const p of planned) { sessionPhotos.push(p); pendingStore.add(p.id); }
   adding = { done: 0, total: files.length, index: 1, name: files[0]?.name ?? "" };
   updateSessionStrip();
+  // OWNERSHIP, because this loop outlives its own dialog. It raises the spinner
+  // to cover the wait for the FIRST photo and hides it the moment one is on
+  // screen — but the loop keeps running for the rest of the set, and it used to
+  // keep writing its progress into `busyText` whenever `busy.open` was true.
+  // So tapping a thumbnail mid-load, which raises its own "Loading…", handed
+  // the reader a spinner that then reported the SET open instead of the photo
+  // they asked for: "Opening 360 photos — reading 41 of 360". Asking for one
+  // thing and being told about another is worse than no message at all.
+  let ownsBusy = true;
   showBusy(`Opening ${files.length} photo${files.length === 1 ? "" : "s"}…`);
 
   /** Drop a planned tile that never became a photo. */
@@ -6543,7 +6552,7 @@ async function addToSession(files: File[], append: boolean) {
       const f = files[i];
       const slot = planned[i];
       adding = { done: i, total: files.length, index: i + 1, name: f.name };
-      if (busy.open) busyText.textContent = `Opening ${files.length} photos — reading ${i + 1} of ${files.length}: ${f.name}`;
+      if (ownsBusy && busy.open) busyText.textContent = `Opening ${files.length} photos — reading ${i + 1} of ${files.length}: ${f.name}`;
       updateSessionStrip();
       let imported: ImportedFile;
       try {
@@ -6596,6 +6605,7 @@ async function addToSession(files: File[], append: boolean) {
           showDecoded(firstImg, imported);
           activateCurrent(slot.id);
         }
+        ownsBusy = false;
         hideBusy(); // there is a photo on screen — nothing left to wait for
         void realThumbnails(); // from here it runs beside the loop, not after it
       }
@@ -6731,9 +6741,13 @@ function updateSessionStrip() {
         b.append(Object.assign(document.createElement("span"), { className: "session-thumb-name", textContent: p.name }));
       }
       // A provisional tile says so in text, not by colour alone: the picture in
-      // it is the camera's rendering, not this app's.
+      // it is the camera's rendering, not this app's. It read "cam", which is
+      // not a word — it was an abbreviation of a sentence nobody had been told,
+      // sitting on a badge with no explanation anywhere. "Preview" is what it
+      // means, and the tile's own tooltip says the rest.
       if (p.thumbState === "preview" && !saving) {
-        b.append(Object.assign(document.createElement("span"), { className: "session-thumb-tag", textContent: "cam" }));
+        b.append(Object.assign(document.createElement("span"), { className: "session-thumb-tag", textContent: "preview" }));
+        b.title = `${p.name} — showing the camera's own preview until this app has developed it`;
       }
       b.addEventListener("click", () => {
         if (stripDragged) return; // that press was a scroll, not a choice
