@@ -7845,13 +7845,18 @@ function heapNearFull(): boolean {
 /** Ask for persistent storage before a batch so the OS is less likely to evict
  *  the crash-recovery data mid-run (iOS clears "best-effort" IDB under pressure).
  *  Best-effort itself — unsupported or denied just means the batch runs without
- *  the extra durability promise. */
+ *  the extra durability promise.
+ *
+ *  ONE IMPLEMENTATION, in session.ts. This used to be its own copy, which meant
+ *  the ask happened once per batch AND once per session and neither knew about
+ *  the other; a probe counting the calls saw two. It also meant the batch path
+ *  had the ask and the SESSION path — the one that copies every original to
+ *  storage so a set survives a reload — did not, for as long as sessions have
+ *  existed. Worth knowing why that went unnoticed: a search for
+ *  `storage.persist` cannot see `storage?.persist?.()`, so the code was
+ *  reported absent from a tree it was in. */
 async function requestPersistentStorage(): Promise<void> {
-  try {
-    await (navigator as { storage?: { persist?(): Promise<boolean> } }).storage?.persist?.();
-  } catch {
-    /* not supported / denied — the batch still runs */
-  }
+  await Session.requestPersistence();
 }
 
 /** A write that failed because the device is out of storage quota (as opposed

@@ -61,10 +61,44 @@ function req<T>(rq: IDBRequest): Promise<T> {
   });
 }
 
+/** Ask the browser to keep this session rather than treat it as cache it may
+ *  evict. Asked ONCE per page load, memoised, and never awaited on a path the
+ *  reader is waiting on — a refusal must not delay a write.
+ *
+ *  Why it matters here: WebKit clears script-writable storage after seven days
+ *  of Safari use without interaction with the site, and everything this module
+ *  writes is script-writable storage. A home-screen install is exempt where a
+ *  browser tab is not, which is why the diagnostic prints BOTH `persistent` and
+ *  whether the app is installed — the two together are the whole answer, and
+ *  either alone is half of it.
+ *
+ *  It reports rather than promises. No browser is obliged to grant this, Safari
+ *  decides silently on its own heuristics, and the honest place for the outcome
+ *  is the diagnostic, which reads `navigator.storage.persisted()` directly
+ *  rather than anything this function remembers. */
+let persistence: Promise<boolean> | null = null;
+export function requestPersistence(): Promise<boolean> {
+  if (persistence) return persistence;
+  persistence = (async () => {
+    try {
+      if (!navigator.storage?.persist) return false;
+      // Already granted — asking again is a no-op, but skip the round trip.
+      if (await navigator.storage.persisted?.()) return true;
+      return await navigator.storage.persist();
+    } catch {
+      return false;
+    }
+  })();
+  return persistence;
+}
+
 /** Store one photo atomically (meta row + all its source chunks in a single
  *  strict-durability transaction): after this resolves the photo is really on
  *  disk, so the session survives a crash the instant a photo is added. */
 export async function addPhoto(meta: PhotoMeta, bytes: Uint8Array): Promise<void> {
+  // The first moment the app actually commits the reader's own data is the
+  // honest moment to ask for it to be kept. Deliberately NOT awaited.
+  void requestPersistence();
   const db = await open();
   try {
     await new Promise<void>((res, rej) => {
