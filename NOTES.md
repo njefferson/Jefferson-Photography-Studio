@@ -3976,6 +3976,56 @@ the set survives a reload, a crash or the OS discarding the tab, and each photo
 keeps its own edit. That copy is the 72% above. Batch process is the third thing
 and edits nothing: it develops a whole set unattended into one .zip.
 
+## The installed app answered three questions at once, 2026-09-09
+
+A report from the app INSTALLED on the home screen, on production, against the
+same report from a browser tab an hour earlier. Three differences, all of them
+worth having.
+
+- **`persistent: yes — an open session will not be evicted`.** Safari declined
+ it for the tab and granted it for the install. That is the documented
+ behaviour and it means the request added this morning works end to end: the
+ ask, the grant, and a line that says what the answer means. The tab's "no" was
+ never a failure of the request.
+- **The quota went from 1000 MB to 39322 MB.** The browser-tab ceiling of about
+ a hundred raw photos, written into this file earlier today, is a fact about a
+ TAB. Installed, it is roughly forty times that. **Any storage estimate has to
+ name which of the two it came from or it is not a number about the app.**
+- **4053 MB already in use, and nothing could say what of.** An origin-wide
+ figure cannot distinguish this app's sessions from its batch-recovery frames
+ from its offline caches, and that is the whole question a reader has when the
+ number looks large.
+
+**SO THE REPORT COUNTS WHAT THE APP ITSELF IS HOLDING NOW.** A new line: photos
+kept in the session store, frames kept in the batch store, and the names of any
+other databases on the origin. **Read-only by construction** — it lists the
+databases that already exist and opens only those, without a version, so
+`onupgradeneeded` cannot fire and a database that does not exist is never
+touched. A diagnostic that creates a database in order to report on storage is
+changing what it measures, and this one has already shipped one line that
+claimed a call it never made. Asserted: on a fresh origin it reads "nothing
+kept" and `indexedDB.databases()` is still empty AFTERWARDS; after a real
+three-photo session it reads "3 photos" and names no file. It also surfaced a
+third store nobody was thinking about — `ips-luts`.
+
+**AND THE SPREAD WAS NOT SURVIVING THE COPY.** The three-sample decode added an
+hour earlier printed its runs in the panel's prose, and `Copy the results`
+builds its block from the name and value alone — so the pasted report, which is
+how these numbers actually travel, carried a median with nothing to judge it
+by. The installed run read decode 338 ms against 170 in the worker, and there
+was no way to tell whether that was three slow samples or one outlier. Now the
+runs go into the copied text as well: `Decoding a raw photo: 79 ms [79 ms, 213
+ms, 69 ms]` from a container run, where the median is honest and the outlier is
+right there beside it. **A measurement's uncertainty has to survive the copy or
+it is not part of the measurement.**
+
+**ONE MORE THING THAT RUN EXPOSED.** In the installed app the background decode
+was TWICE AS FAST as the main thread (170 against 338), where the tab had them
+within a tenth of each other. The panel used to have two verdicts — slower, or
+about the same — and no wording for faster, so it would have said "about the
+same" about a 2x gap. It now names the third case and says what it means: the
+main thread was busy with something else, not that the copy across is free.
+
 ## Three runs of one build, and all three faults were in the instrument, 2026-09-09
 
 Three device reports pasted back to back on the same staging build. Two of them

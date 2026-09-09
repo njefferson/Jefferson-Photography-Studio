@@ -20,15 +20,22 @@ const $ = (id: string) => document.getElementById(id)!;
 const results = $("dResults");
 const out: string[] = [];
 
-function row(name: string, value: string, meaning: string) {
+/** `samples` is the raw run-to-run spread, and it goes into the COPIED text as
+ *  well as the panel. It did not, at first: the spread was added to make a
+ *  median trustworthy, printed only in the panel's prose, and "Copy the results"
+ *  builds its block from name and value alone — so the pasted report, which is
+ *  how these numbers actually travel, carried the median with nothing to judge
+ *  it by. A measurement's uncertainty has to survive the copy or it is not part
+ *  of the measurement. */
+function row(name: string, value: string, meaning: string, samples?: string) {
   const d = document.createElement("div");
   d.className = "dbg-row";
   d.innerHTML = `<div class="dbg-k"></div><div class="dbg-v"></div><p class="dbg-m"></p>`;
   (d.querySelector(".dbg-k") as HTMLElement).textContent = name;
   (d.querySelector(".dbg-v") as HTMLElement).textContent = value;
-  (d.querySelector(".dbg-m") as HTMLElement).textContent = meaning;
+  (d.querySelector(".dbg-m") as HTMLElement).textContent = samples ? `${meaning} Runs: ${samples}.` : meaning;
   results.appendChild(d);
-  out.push(`${name}: ${value}`);
+  out.push(`${name}: ${value}` + (samples ? `   [${samples}]` : ""));
 }
 function note(text: string) {
   const p = document.createElement("p");
@@ -147,10 +154,12 @@ async function decoding(): Promise<void> {
     p.remove();
     const mh = mid(here), mt = mid(there);
     const spread = (xs: number[]) => xs.map((x) => Math.round(x) + " ms").join(", ");
-    row("Decoding a raw photo", ms(mh), `A ${(img.width * img.height / 1e6).toFixed(1)} megapixel practice file, decoded on the main thread — the work that used to freeze the editor while a set loaded. Three runs: ${spread(here)}.`);
-    row("…in the background", ms(mt), (mt > mh * 1.6
+    row("Decoding a raw photo", ms(mh), `A ${(img.width * img.height / 1e6).toFixed(1)} megapixel practice file, decoded on the main thread — the work that used to freeze the editor while a set loaded.`, spread(here));
+    row("…in the background", ms(mt), mt > mh * 1.6
       ? "Slower than doing it directly, which can happen when the copy across costs more than it saves. The point is that the editor stays responsive, not that it finishes sooner."
-      : "About the same as doing it directly, and it leaves the editor free while it runs.") + ` Three runs: ${spread(there)}.`);
+      : mh > mt * 1.6
+        ? "FASTER than doing it directly here, which means the main thread was busy with something else while this ran — the background copy is not what made the difference."
+        : "About the same as doing it directly, and it leaves the editor free while it runs.", spread(there));
   } catch (e) {
     p.remove();
     row("Decoding a raw photo", "not run", `The practice photo could not be loaded (${(e as Error).message}).`);
@@ -235,7 +244,8 @@ async function storage(): Promise<void> {
       ? `This browser takes the same time whether the app asks for the write to be CONFIRMED on the disk or not (${Math.round(ms)} ms against ${Math.round(mr)} ms), which means it is not treating the two differently. So this is how fast it accepts the data, not how fast the data is safely on the device — and the app asks for confirmed writes precisely so a set survives a crash. Fast here is good news for the wait and says nothing about the crash.`
       : `Asking for the write to be CONFIRMED on the disk costs ${Math.round(ms)} ms against ${Math.round(mr)} ms without — so this browser really is waiting for the device, and the number above is the honest one.`;
     row("Saving one photo", `${Math.round(ms)} ms for 6 MB`,
-      `This is what opening a set pays: the app commits each photo on its own and waits for the device. At this rate a 25 MB raw file takes about ${(ms * 25 / 6 / 1000).toFixed(1)} s and forty of them roughly ${((ms * 25 / 6 / 1000) * 40 / 60).toFixed(1)} minutes — less in practice, since the next photo is read and decoded while one write is in flight. ${verdict} Three confirmed writes: ${strict.map((x) => Math.round(x) + " ms").join(", ")} (${mbps.toFixed(0)} MB per second). Unconfirmed: ${relaxed.map((x) => Math.round(x) + " ms").join(", ")}.`);
+      `This is what opening a set pays: the app commits each photo on its own and waits for the device. At this rate a 25 MB raw file takes about ${(ms * 25 / 6 / 1000).toFixed(1)} s and forty of them roughly ${((ms * 25 / 6 / 1000) * 40 / 60).toFixed(1)} minutes — less in practice, since the next photo is read and decoded while one write is in flight. ${verdict} That works out at ${mbps.toFixed(0)} MB per second.`,
+      `confirmed ${strict.map((x) => Math.round(x) + " ms").join(", ")} · unconfirmed ${relaxed.map((x) => Math.round(x) + " ms").join(", ")}`);
   } catch (e) {
     p.remove();
     row("Saving one photo", "not run", `Storage refused the test (${(e as Error).message}).`);
