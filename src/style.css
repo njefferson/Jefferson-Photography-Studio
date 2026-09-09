@@ -1721,7 +1721,10 @@ label.open-btn, label.bar-btn {
   font-weight: 600;
 }
 /* The Creative row (4th row of the 3-wide tab grid): Grade + Stickers, with
-   Warp to complete it to a full 4x3. */
+   Warp to complete it to a full 4x3. Narrow widths run FOUR columns instead
+   (see the media query below), so this grouping is a wide-layout fact, not a
+   guarantee — the tabs are labelled, and the row a tab sits in is not what
+   tells you what it does. */
 .section-head { flex: none; padding: 12px 14px 8px; }
 .section-title { margin: 0; font: 600 0.9375rem/1.2 var(--display); color: var(--txt); }
 .section-sub { margin: 2px 0 0; font-size: 0.75rem; line-height: 1.35; color: var(--txt-3); }
@@ -1844,7 +1847,14 @@ label.open-btn, label.bar-btn {
    than hue (accessibility mandate; axe link-in-text-block). The #infoDlg-scoped
    selector is needed to beat the ID-level `#infoDlg a { text-decoration:none }`
    rule above — plain `.coffee` loses that specificity fight. */
-#infoDlg .coffee { color: var(--accent); text-decoration: underline; font-size: 0.8125rem; }
+/* A link is a target too. This one measured 41x44 by hit area — three pixels
+   short on the axis nobody checks, because a target is a box and the height
+   was the only side anyone had thought about. */
+#infoDlg .coffee {
+  color: var(--accent); text-decoration: underline; font-size: 0.8125rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 44px; min-height: 44px;
+}
 .coffee-row { font-size: 0.8125rem; color: var(--txt-2); }
 .coffee-row a { margin-left: 6px; }
 
@@ -2035,8 +2045,22 @@ label.open-btn, label.bar-btn {
      smaller paddings, not smaller text; tap heights stay ≥36px. */
   .bar { min-height: 44px; gap: 6px 10px; padding-left: 10px; padding-right: 10px; padding-bottom: 4px; }
   .bar-btn { padding: 6px 10px; }
-  .panel-tabs { padding: 8px 10px 0; gap: 4px; }
-  .ptab { padding: 7px 4px; }
+  /* FOUR columns here, three everywhere else. Twelve tabs at the 44px the base
+     rule already asks for is four rows and a 196px strip, which left 129px of
+     panel body on a tall phone and 14px on a short one — trading one
+     accessibility failure for another. Four columns is three rows and 140px,
+     so the target is honoured and the strip costs 16px more than the 28px
+     version it replaces rather than 72px. */
+  .panel-tabs { grid-template-columns: repeat(4, 1fr); padding: 8px 10px 0; gap: 4px; }
+  /* Vertical padding is NOT reduced here. The base rule spends 15px a side to
+     reach a 44px target and says so; this override cut it to 7px and took the
+     tabs to 28px — so the touch floor held at every width EXCEPT the one where
+     the app is used with a finger, which is the only width that matters for it.
+     Measured by hit area rather than by box, since a control can extend its own
+     (the zoom buttons do, and are 45x45): 29px, on the app's primary
+     navigation. Horizontal padding stays tight because that is what buys the
+     narrow layout its width. */
+  .ptab { padding-left: 4px; padding-right: 4px; }
   .panel-body { padding: 2px 10px 12px; }
   #panel label { min-height: 40px; padding: 4px 0 6px; }
   #panel .band label, #panel .subcard label { min-height: 36px; }

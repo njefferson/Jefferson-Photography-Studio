@@ -84,6 +84,32 @@ async function swLine(): Promise<string> {
   }
 }
 
+/** Does this engine implement durable writes at all?
+ *
+ *  `session.ts` commits every photo with `durability: "strict"` and its comment
+ *  says that after the commit resolves "the photo is really on disk". That
+ *  claim depends entirely on the engine honouring the option, and an engine
+ *  that does not recognise it ignores it SILENTLY — a dictionary member that is
+ *  not implemented is simply dropped, with no error and no slower commit.
+ *
+ *  Timings cannot answer this. Strict and relaxed measured the same on a Linux
+ *  container, which was read here as "the flag does nothing" and was wrong:
+ *  that engine accepts the option and reports it back as applied, so equal
+ *  times mean the sync is cheap there (or the container's filesystem is
+ *  absorbing it), not that it is absent. The attribute IS the answer — it is a
+ *  readonly property that exists only where the option is implemented — and it
+ *  costs nothing to ask: no database is opened, nothing is written. */
+function durableLine(): string {
+  try {
+    const implemented = "durability" in IDBTransaction.prototype;
+    return implemented
+      ? "supported — the app asks for each photo to be confirmed on disk before it counts it saved"
+      : "NOT supported by this browser — the app asks for confirmed writes and this engine ignores the request, so a crash in the seconds after a photo is added could lose it";
+  } catch {
+    return "unavailable";
+  }
+}
+
 /** What the APP itself is holding, which is the question `Storage` raises and
  *  cannot answer: an origin figure of several GB says nothing about whether it
  *  is this app's sessions, its batch-recovery frames, or its offline caches.
@@ -156,6 +182,7 @@ export async function buildDiagnostic(version: string, extra: DiagLine[] = []): 
     { k: "Storage", v: await storageLine(standalone) },
     // The line that turns an origin-wide number into something actionable.
     { k: "App is holding", v: await holdingsLine() },
+    { k: "Durable writes", v: durableLine() },
     { k: "Colours", v: `${document.documentElement.getAttribute("data-theme") ?? "dark"} · palette ${document.documentElement.getAttribute("data-palette") ?? "instrument"}` },
     { k: "Reduced motion", v: yes(window.matchMedia("(prefers-reduced-motion: reduce)").matches) },
     { k: "Language", v: navigator.language },
