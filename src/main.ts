@@ -6570,10 +6570,10 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Ar
   // keep writing its progress into `busyText` whenever `busy.open` was true.
   // So tapping a thumbnail mid-load, which raises its own "Loading…", handed
   // the reader a spinner that then reported the SET open instead of the photo
-  // they asked for: "Opening 360 photos — reading 41 of 360". Asking for one
+  // they asked for: "Adding 360 photos — reading 41 of 360". Asking for one
   // thing and being told about another is worse than no message at all.
   let ownsBusy = true;
-  showBusy(`Opening ${files.length} photo${files.length === 1 ? "" : "s"}…`);
+  showBusy(`Adding ${files.length} photo${files.length === 1 ? "" : "s"}…`);
 
   /** Drop a planned tile that never became a photo. */
   const dropPlanned = (id: string) => {
@@ -6622,7 +6622,7 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Ar
       const f = files[i];
       const slot = planned[i];
       adding = { done: i, total: files.length, index: i + 1, name: f.name };
-      if (ownsBusy && busy.open) busyText.textContent = `Opening ${files.length} photos — reading ${i + 1} of ${files.length}: ${f.name}`;
+      if (ownsBusy && busy.open) busyText.textContent = `Adding ${files.length} photos — reading ${i + 1} of ${files.length}: ${f.name}`;
       updateSessionStrip();
       let imported: ImportedFile;
       try {
@@ -8989,7 +8989,16 @@ canvas.addEventListener("click", (e) => {
   // The renderer may show a downscaled proxy; map back to full-res coords.
   const px = Math.min(current.width - 1, Math.round((pvx * current.width) / Math.max(1, previewW)));
   const py = Math.min(current.height - 1, Math.round((pvy * current.height) / Math.max(1, previewH)));
-  const [r, g, b] = linearAt(current, px, py);
+  const sample = sampleForWb(current, px, py);
+  if (sample.verdict !== "ok") {
+    // A refusal has to say what is wrong and where to go instead, or it reads
+    // as the tap not registering. Nothing is changed — the photo is left alone.
+    toast(sample.verdict === "blown"
+      ? "That spot is blown out, so its colour was never recorded — nothing to balance from. Try a midtone: foliage is the usual target in infrared."
+      : "That spot is almost black, so there is not enough colour in it to balance from. Try somewhere brighter — foliage is the usual target.", 4200);
+    return;
+  }
+  const [r, g, b] = sample.lin;
   const mean = (r + g + b) / 3;
   // Brightness-preserving so tapping recolors without darkening.
   params.wb = lumNormalize([mean / r, mean / g, mean / b]);
@@ -8998,6 +9007,40 @@ canvas.addEventListener("click", (e) => {
   draw();
   flushRecord();
 });
+
+// A tapped channel that is CLIPPED has no ratio to read: the sensor stopped
+// counting before the real value, so mean/channel is a division by a number the
+// photograph does not contain. In infrared the red channel floods and clips
+// first, which is why tapping a sunlit highlight threw the whole frame into
+// magenta — the app did exactly what it was told with a number that meant
+// nothing. The dark end fails the same way from the other side: near zero, the
+// ratio is noise, and lumNormalize's clamp turns it into an extreme gain rather
+// than an obviously wrong one.
+const WB_CLIP_LIN = 0.985; // linear; the decode maps the white point to 1
+const WB_DARK_LIN = 0.02;
+const WB_PATCH = 2; // 5x5 — one pixel of a raw frame is not a measurement
+
+/** Average a small patch and say whether it can carry a white balance. */
+function sampleForWb(img: DecodedImage, cx: number, cy: number):
+  { verdict: "ok" | "blown" | "dark"; lin: [number, number, number] } {
+  let r = 0, g = 0, b = 0, n = 0, clipped = 0;
+  for (let dy = -WB_PATCH; dy <= WB_PATCH; dy++) {
+    for (let dx = -WB_PATCH; dx <= WB_PATCH; dx++) {
+      const x = clamp(cx + dx, 0, img.width - 1);
+      const y = clamp(cy + dy, 0, img.height - 1);
+      const [pr, pg, pb] = linearAt(img, x, y);
+      if (pr >= WB_CLIP_LIN || pg >= WB_CLIP_LIN || pb >= WB_CLIP_LIN) clipped++;
+      r += pr; g += pg; b += pb; n++;
+    }
+  }
+  const lin: [number, number, number] = [r / n, g / n, b / n];
+  // A quarter of the patch, not one pixel: a lone hot pixel beside good ones is
+  // not a blown highlight, and refusing on it would make the tool feel broken
+  // in the other direction.
+  if (clipped / n > 0.25) return { verdict: "blown", lin };
+  if (Math.max(lin[0], lin[1], lin[2]) < WB_DARK_LIN) return { verdict: "dark", lin };
+  return { verdict: "ok", lin };
+}
 
 /** Scale WB gains so a neutral keeps its luminance (no overall darkening). */
 function lumNormalize(g: number[]): [number, number, number] {
