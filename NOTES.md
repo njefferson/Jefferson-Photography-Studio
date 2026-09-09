@@ -5067,6 +5067,77 @@ reported percentage does count only texels above half weight while roughly twice
 that area is touched to some degree — defensible, and worth knowing when the
 number reads lower than the effect looks.**
 
+## The strip stopped snatching the scroll, 2026-09-09
+
+**The defect, exactly.** `updateSessionStrip()` saved `sessionThumbs.scrollLeft`
+at the top and restored it four lines from the bottom — a fix with its own
+comment explaining that without it the strip snapped back to the first photo.
+Then the very next line called `revealActiveThumb()`, which scrolled to the
+active photo and threw that restore away. The function runs on every add and
+every thumbnail that lands, so on a long set the strip was dragged back to the
+viewed photo several times a second while it loaded. One line preserving the
+position, the next line discarding it.
+
+**The fix.** `revealActiveThumb(force = false)` scrolls only when
+`activePhotoId` differs from `lastRevealedId`, so it fires on a real switch and
+never on a repaint. `force` is the reader asking.
+
+**And the way back, because losing it was the other half.** `#stripHere`
+("&#8629; Back to current") sits in the strip head, 44px, `hidden` unless the
+viewed photo is outside `sessionThumbs`'s box. Kept honest by the strip's own
+`scroll` event rather than a timer, because a smooth `scrollIntoView` settles
+over several frames and a flick over many.
+
+**Measured, 430x900, six real NEFs, with a NEGATIVE CONTROL.** Scroll to the far
+end while the set is still coming in, then let every thumbnail land: the strip
+holds at 100 of 100, the button is offered at 44px, pressing it returns to 0 and
+the button hides itself. The same test against a build with the old
+unconditional reveal fails on both counts — 100 back to 0, and no button. A test
+that has not failed on the defect is not evidence.
+
+**Instrument error, twice more, both the same shape as the day's others.**
+`.session-thumbs` is `scroll-behavior: smooth`, so `scrollLeft` read straight
+back after being set is the value BEFORE the animation. The first run recorded
+the start position, saw the end position later, and reported the app moving the
+strip on its own — the test measuring its own scroll. Then the settle loop
+written to fix it compared two consecutive reads for equality and passed
+immediately on two identical PRE-animation values. Both were reading a quantity
+that had not finished changing.
+
+**And a third, in the same session: a negative control that was never negative.**
+`npm run build` is `tsc --noEmit && vite build`. The reverted source failed the
+typecheck on an unused variable, so `vite build` never ran, and the "control"
+copied out of `dist/` was the GOOD build. It would have passed and been read as
+proof the test could not fail. A build step that short-circuits leaves the
+previous artefact in place, and an artefact directory looks the same either way.
+
+## Restore depth opens at the solved optimum, 2026-09-09
+
+**What "optimal" means here, measured rather than chosen.** `solveLift` bisects
+onto `FLAT_LUM_REF = 0.44` bounded by a shadow floor, and `scaleLift`
+interpolates linearly from neutral to that answer. So 100% is not a maximum —
+it is the calibrated target for the frame in front of you. Any lower setting is
+a deliberate retreat from it.
+
+**Why it was not opening there.** The strength persisted to
+`localStorage["ips-liftamount"]`. Backing it off once for one photograph meant
+every later photo, and every later visit, opened at that photograph's answer. A
+value solved per-frame cannot be carried to the next frame and still be the
+answer. The persistence is gone; it stays live for the session and starts each
+visit at the solve. Verified: set to 40, reload, reads 100, nothing stored.
+
+**Help was carrying the old justification.** The double-tap line said Quality
+and Restore depth strength both "go back to their usual setting, since those are
+yours rather than the photo's". Half of that is no longer true — the strength is
+the photo's now — so it says so.
+
+**A sample that could not exercise it.** Six real NEFs were measured at 0/70/100%
+and every median was identical at all three. Not a defect: `needsTone` fires
+only when a frame's median is ABOVE the reference, and five of the six sat at or
+below it (0.107 to 0.459). The correction had nothing to do. Choosing a sample
+without first checking it can trigger the thing under test produces a clean row
+of numbers that mean nothing.
+
 ## Quick look reachable from the editor, 2026-09-09
 
 **The report:** the Files picker is small and shows few files at a time when
