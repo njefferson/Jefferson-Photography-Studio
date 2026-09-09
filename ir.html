@@ -77,6 +77,9 @@
           <button class="bar-btn" id="batchBtn" type="button" title="Develop a whole set unattended → one .zip">
             Batch process
           </button>
+          <button class="bar-btn" id="barQuickBtn" type="button" title="See a whole folder as a grid of previews — nothing saved">
+            Quick look
+          </button>
           <label class="open-btn bar-primary" title="Edit one photo — or several as a session">
             Open image(s)
             <input id="file" type="file" accept=".dng,.nef,.zip,.ipslook,image/*" multiple hidden />
@@ -849,7 +852,7 @@
           (masks and imported LUTs are the two things a resume can't restore — they reset with a fresh open;
           re-apply a LUT in a tap from Profiles &amp; LUTs).
           <strong>Done</strong> (on the strip) ends the session and frees the space.</li>
-          <li><strong>Quick look a folder</strong> (start screen) when you just want to <em>see</em> what's in a set:
+          <li><strong>Quick look a folder</strong> (top bar, and on the start screen) when you just want to <em>see</em> what's in a set:
           an instant grid of auto-balanced previews, nothing saved. Tap the keepers and <strong>Keep in a session</strong>
           sends them straight into an editable session.</li>
           <li>On open, <strong>raw photos are auto-balanced</strong> (white balance, exposure, denoise, and blown-highlight recovery when the frame needs it); JPEG/HEIC open as the camera rendered them, with measured denoise only. <strong>Hold: Untouched</strong> shows the bare decode any time.</li>
@@ -977,6 +980,21 @@
         Tuned on an IR-converted Nikon Z50.
         Saves: <strong>JPEG in Display&nbsp;P3</strong> (the exact colors you see, wide-gamut tagged) and <strong>16-bit TIFF in sRGB</strong> (the safest hand-off into other editors).
         Exports keep the photo's <strong>capture date, camera, lens and exposure</strong> (when the original carries them) — never its location.</p>
+
+        <h3>Seeing more of your files while you pick</h3>
+        <p>The picker that opens when you tap <strong>Open image(s)</strong> is Apple's, not this app's.
+        Its size is Safari's decision and no web page can change it — so it cannot be made to fill the screen
+        from in here. Two things do help.</p>
+        <ul>
+          <li><strong>Switch the picker to a list.</strong> The four-square button at its top right toggles
+          between big icons and a compact list, and the list shows several times as many names at once.
+          It is Apple's control and it remembers your choice.</li>
+          <li><strong>Use <em>Quick look</em> instead</strong> (top bar, and on the start screen). You pick the
+          <em>folder</em> once, and the browsing happens in this app's own grid, which does fill the screen —
+          bigger previews, developed rather than raw thumbnails, and you tap the keepers to send them into a
+          session. When you know what you are looking for, the small picker is fine; when you are looking
+          <em>through</em> a shoot, this is the one to reach for.</li>
+        </ul>
 
         <h3>Why the Files picker hangs</h3>
         <p>You pick a folder of raw files, tap <strong>Open</strong>, and nothing happens for a long time with

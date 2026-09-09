@@ -5067,6 +5067,70 @@ reported percentage does count only texels above half weight while roughly twice
 that area is touched to some degree — defensible, and worth knowing when the
 number reads lower than the effect looks.**
 
+## Quick look reachable from the editor, 2026-09-09
+
+**The report:** the Files picker is small and shows few files at a time when
+opening photos. **The answer to the literal question is no** — that picker is
+`UIDocumentPickerViewController`, presented by Safari. Its size is the system's
+and no web API changes it. Saying only that would have been true and useless.
+
+**What was actually wrong.** This app already has a full-screen file browser —
+Quick look, a grid of developed previews with Keep in a session — and it was
+reachable from the start screen ONLY. With photos open, the sole route to more
+files was the system picker. Help said so in as many words: "(start screen)".
+
+`quickFiles` was already sitting in the editor's top bar markup, hidden, with
+nothing pointing at it. The whole fix was the button.
+
+- `#barQuickBtn` is a real `<button>`, not a `<label for=>`. A label pointing at
+  a hidden file input is not keyboard-focusable; `Open image(s)` has that gap
+  already and there was no reason to add a second one. It calls
+  `quickInput.click()` synchronously inside the tap handler, the same pattern
+  `bcQuick` uses — iOS ignores a picker opened outside the gesture.
+- Help gained a section on seeing more files while picking: the picker is
+  Apple's and cannot be resized from a web page, its own four-square control
+  toggles a compact list that shows several times as many names, and Quick look
+  is the route where the browsing happens in a surface this app controls.
+- The "(start screen)" line in Quick start now reads "(top bar, and on the start
+  screen)", because a sentence naming where a control lives is stranded the
+  moment the control moves.
+
+**Measured, headless, 820x1180 and 390x844:** button 44px, centre hit-test lands
+on itself, file chooser opens with multiple, and the Quick look dialog fills the
+viewport exactly (820x1180 of 820x1180). At 390 the editor bar overflows —
+914px of buttons in 370px — and Quick look and Open image(s) both sit off the
+right edge at rest. That is the designed scroll: `.bar-actions-wrap` gets
+`scroll-right` and the `›` fade renders at opacity 1. It pre-dates this change
+(the bar overflowed at ~814px without the new button) and the target device is
+820px wide, where the whole bar fits in 376px. Left as is, recorded here.
+
+**Three instrument errors in one verification, all the same family.** The
+portrait-thumbnail assertion failed twice before the app was ever in question:
+
+- Measured `.ql-tile` preview CSS boxes and got 189x189 for every photo. The
+  previews are `object-fit: contain` in a square tile, so the box is square by
+  construction and cannot carry the photograph's shape.
+- Then queried `canvas` and got nothing, because the tiles are `<img>`.
+- `naturalWidth`/`naturalHeight` answered on the first ask: 512x341 landscape,
+  341x512 for both orientation-8 frames. Rotation was correct the whole time.
+
+Same shape as the target-as-bounding-box and durability-as-elapsed-time errors:
+a proxy was measured and read as the thing itself. Where the interface exposes
+the thing — a hit test, a `durability` attribute, an image's intrinsic size —
+ask it.
+
+**Test-set coverage gap:** of 23 real NEFs, 21 are orientation 1 and 2 are
+orientation 8. Orientation 6 — the other portrait case, and the other branch of
+`orientationToRotate` — is exercised by no real file on hand.
+
+**Hub gates on this repo, measured 2026-09-09 and NOT changed here:** five are
+red and every one pre-dates this work — `third-person-check` (117 sites in 12
+files; no `.third-person-allow` exists here), `example-check` (2 in ir.html),
+`privacy-check` (4 sites, three in this file), `pwa-check` (`skipWaiting()` during
+install, Doctrine §7h.1) and `docs-check` (a table in a tracked `.md`). Counts
+were taken with the change applied and again with it stashed: identical both
+ways, so this commit adds none of them.
+
 ## Audit: what else was treated as an aside, 2026-09-09
 
 Asked directly, after the theme default turned out to have been visible in this

@@ -8437,6 +8437,12 @@ $("batchBtn").addEventListener("click", openBatchDialog);
 $("welcomeBatchBtn").addEventListener("click", openBatchDialog);
 $("bcCurrent").addEventListener("click", () => pickGrade({ kind: "look", look: currentLook(), lutData: params.lut ?? undefined }));
 $("bcAuto").addEventListener("click", () => pickGrade({ kind: "auto" }));
+// Quick look from the editor's own top bar. The system file picker is the
+// system's and cannot be made bigger; this app's own grid is full-screen, and
+// before this it was reachable only from the start screen. Same tap-gesture
+// rule as bcQuick below: click the input synchronously or iOS ignores it.
+$("barQuickBtn").addEventListener("click", () => quickInput.click());
+
 $("bcQuick").addEventListener("click", () => {
   // Not developing a .zip after all — just look. Stay in the tap gesture so
   // iOS opens the picker.
