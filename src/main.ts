@@ -1399,6 +1399,10 @@ const FLAT_SHADOW_FLOOR = 0.02;
 const LIFT_GRID = 64;
 const LIFT_BISECT = 6;
 const FLAT_BAND_MAX = 2; // the sky/foliage saturation sliders' own ceiling
+/** A band with nothing done to it: hue shift 0, saturation 1, lightness 1 —
+ *  the same triple `pcReset` writes and the same one `makeThumb` starts from.
+ *  Named because three places were spelling it out and a fourth needed it. */
+const BAND_NEUTRAL: [number, number, number] = [0, 1, 1];
 
 /** Median luminance and per-band saturation of the frame as the given params
  *  render it — sampled on a coarse grid through the SAME compileEdit the
@@ -1454,6 +1458,18 @@ function solveLift(withColour: boolean, img: DecodedImage, params: EditParams): 
   // times this runs, and pressing the toggle twice is a round trip.
   const base = cloneParams(params);
   base.tone = [...TONE_DEFAULT] as typeof base.tone;
+  // THE SAME ARGUMENT, FOR THE OTHER TWO. The paragraph above was written about
+  // tone and the fix was applied to tone alone, while sky and foliage carry
+  // across opens exactly as tone does — so the frame being MEASURED still wore
+  // the previous photo's band boost. Two consequences, both reported: the
+  // saturation tests could read as already satisfied and the lift did nothing
+  // at open, and where it did fire it solved against a boosted measurement, so
+  // pressing the toggle off and on (which restores the bands first) produced a
+  // different answer from the one the photo opened with. A toggle whose two
+  // states disagree is the bug; making all three start from neutral is what
+  // makes the solve idempotent.
+  base.sky = [...BAND_NEUTRAL] as typeof base.sky;
+  base.foliage = [...BAND_NEUTRAL] as typeof base.foliage;
   const before = measureFrame(base, img);
   // Only ever pull DOWN and push UP: a frame already at or past the reference
   // is left exactly as it is rather than being dragged to the average.
@@ -1526,7 +1542,10 @@ function applyLift(withColour: boolean): { pull: number; foliage: number; sky: n
     // behind. Solving and reverting have to agree on that, or the toggle is not
     // a round trip (it was not: turning it off put another photo's curve on
     // this one, and the two states could not be compared).
-    prevTone: [...TONE_DEFAULT], prevFoliage: [...params.foliage], prevSky: [...params.sky],
+    // All three neutral, for the reason in solveLift: the lift now solves from
+    // neutral bands, so turning it off has to give neutral bands back or the
+    // toggle is not a round trip.
+    prevTone: [...TONE_DEFAULT], prevFoliage: [...BAND_NEUTRAL], prevSky: [...BAND_NEUTRAL],
     tone: r.tone.join(","), foliage: r.foliage.join(","), sky: r.sky.join(","),
   };
   params.tone = r.tone;
@@ -1538,13 +1557,26 @@ function applyLift(withColour: boolean): { pull: number; foliage: number; sky: n
 
 /** Undo the lift, but only where its own values are still in place — anything
  *  the reader has moved since is theirs and stays. */
+/** "Untouched since the lift wrote it" — WITHIN A TOLERANCE, not by string
+ *  equality. The lift writes full precision; the sliders it writes to have a
+ *  0.01 step, and a value that has been through syncToUI/syncFromUI comes back
+ *  rounded. So `1.6537883727523084` became `1.65` and the string test could
+ *  never match: turning the toggle off left the foliage boost on the frame,
+ *  every time, because the check meant to protect a hand-made change was
+ *  reading a rounding as one. Half a slider step is well under any deliberate
+ *  move and well over the rounding. */
+function untouched(live: number[], written: string): boolean {
+  const w = written.split(",").map(Number);
+  return live.length === w.length && live.every((v, i) => Math.abs(v - w[i]) <= 0.005);
+}
+
 function removeLift(): void {
   const a = liftApplied;
   liftApplied = null;
   if (!a) return;
-  if (params.tone.join(",") === a.tone) params.tone = [...a.prevTone] as typeof params.tone;
-  if (params.foliage.join(",") === a.foliage) params.foliage = [...a.prevFoliage] as typeof params.foliage;
-  if (params.sky.join(",") === a.sky) params.sky = [...a.prevSky] as typeof params.sky;
+  if (untouched(params.tone, a.tone)) params.tone = [...a.prevTone] as typeof params.tone;
+  if (untouched(params.foliage, a.foliage)) params.foliage = [...a.prevFoliage] as typeof params.foliage;
+  if (untouched(params.sky, a.sky)) params.sky = [...a.prevSky] as typeof params.sky;
 }
 
 // The toggle. Pressed = this frame is adapted; press again and it is not — the
@@ -5882,7 +5914,19 @@ function establishFreshEdit() {
   // Sky/Foliage sliders, undoable, no pixels touched — the three tests any
   // at-open automatic has to pass.
   liftApplied = null;
-  if (autoLift) applyLift(activeLook !== null); // colour only where a look is already on
+  // NO LOOK, by the time this open is finished: `activeLook` is cleared further
+  // down as part of the same open, so passing what it currently holds solved
+  // this frame with the OUTGOING photo's look while every later press of the
+  // toggle solved it without one — two states that disagree, which is the
+  // toggle appearing to do nothing until pressed off and on. The colour half
+  // belongs to pressing a look, which re-solves with it (see applyLook).
+  //
+  // And NOT `params.swapRB` either, which was tried: the R<->B swap DEFAULTS ON
+  // for this app, so keying off it made every bare frame "wear a look" and the
+  // band boost fired on all of them — the exact failure solveLift's own comment
+  // records, 44 of 44 practice frames adapted at open. Measured again here: the
+  // sky and foliage sliders both went to their 2.0 ceiling on a first open.
+  if (autoLift) applyLift(false);
   syncToUI();
   // Snapshot the as-imported baseline for press-and-hold comparison.
   origParams = {

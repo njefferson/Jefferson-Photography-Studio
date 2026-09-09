@@ -3976,6 +3976,73 @@ the set survives a reload, a crash or the OS discarding the tab, and each photo
 keeps its own edit. That copy is the 72% above. Batch process is the third thing
 and edits nothing: it develops a whole set unattended into one .zip.
 
+## Restore depth: two states that disagreed, and three causes, 2026-09-09
+
+Reported from the device as "default-on but has no effect until off/on again".
+Reproduced, and it was three separate faults stacked on one control. The walk
+did not catch any of them because its assertion presses Aerochrome FIRST and
+then reads the sliders — so it was satisfied by the LOOK path while the at-open
+path was broken. **A test that reaches the right state by a different route
+certifies the route it took, not the one that is failing.**
+
+**1. THE RATCHET FIX WENT TO ONE OF THREE.** `solveLift` resets `tone` to the
+default before measuring, with a paragraph explaining why: the creative grade
+carries across opens, so measuring a frame that still wears the previous photo's
+curve and then deciding "already dark enough" ratchets a whole set down.
+**`sky` and `foliage` carry across in exactly the same way and were never
+neutralised.** So the saturation tests measured a frame already wearing the
+last photo's band boost — reading as satisfied when it was not, and where it did
+fire, solving against a boosted measurement. Both bands now start from
+`BAND_NEUTRAL` alongside tone, and `liftApplied` records neutral as what
+turning it off restores, so the toggle is a round trip in all three.
+
+**2. THE REVERT COMPARED FLOATS THROUGH A CONTROL THAT ROUNDS THEM.**
+`removeLift` only puts a value back if it is still what the lift wrote — a good
+rule, protecting anything the reader has since moved by hand. It tested string
+equality. The lift writes full precision; the sliders have a 0.01 step, and a
+value that has been through `syncToUI`/`syncFromUI` comes back rounded. So
+`1.6537883727523084` became `1.65`, the test could never match, and **turning
+the toggle off left the foliage boost on the frame every time** — the check
+meant to protect a hand-made change was reading its own rounding as one. Now a
+tolerance of half a slider step: far under any deliberate move, far over the
+rounding.
+
+**3. THE AT-OPEN LIFT READ A LOOK THAT THE SAME OPEN WAS ABOUT TO FORGET.**
+`activeLook = null` is set further down the open than the lift that reads it. So
+opening photo 2 solved WITH colour on the strength of photo 1's look, and every
+later press of the toggle — by which time `activeLook` is null — solved the same
+frame WITHOUT it. Measured: at open foliage 1.65 and sky 2.00; press off then
+on and the colour half vanished. Two states that disagree is precisely what the
+report describes. The at-open lift now passes `false`, which is what will be
+true of this frame by the end of the same open, so it and the toggle and the
+thumbnail solve all agree at every moment.
+
+**AND THE FIX FOR 3 THAT WAS TRIED AND MEASURED WRONG.** The first attempt keyed
+the colour half off `params.swapRB` — reasoning, from `solveLift`'s own comment,
+that the channel swap is what puts a frame's materials into the sky and foliage
+bands and that it persists where `activeLook` does not. **`swapRB` DEFAULTS ON
+in this app.** So every bare frame "wore a look" and the band boost fired on all
+of them: the sky and foliage sliders both went to their 2.0 ceiling on a first
+open with nothing pressed. That is the exact failure `solveLift`'s comment
+already records — 44 of 44 practice frames adapted at open — reintroduced by
+reading the comment's rationale and missing the default four hundred lines
+above. Caught by the bare-frame case, which existed only because the reported
+bug forced writing one.
+
+**WHAT IT MEASURES NOW.** Photo 2 opens with the tonal lift and neutral bands;
+off reverts all three; on returns to exactly the opened values, foliage
+included, differing by 0.00 where it differed by the whole colour half before.
+Revisiting a photo twice gives identical values, so there is no ratchet.
+
+**THE BEHAVIOUR CHANGE THIS MAKES, AND IT IS THE OWNER'S CALL.** Switching
+photos with a look's grade still on the frame now gives the TONE half only until
+the look is pressed again. Before, it gave the colour half at open and then
+stripped it on the first toggle press. The new behaviour matches what the UI
+already says — the look button reads as nothing selected after a switch — but
+the real question underneath is whether `activeLook` should survive a photo
+switch within a session at all. It is a design decision, not a defect, and it is
+not being made from here.
+
 ## The installed app answered three questions at once, 2026-09-09
 
 A report from the app INSTALLED on the home screen, on production, against the
