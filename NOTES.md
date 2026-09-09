@@ -3976,6 +3976,69 @@ the set survives a reload, a crash or the OS discarding the tab, and each photo
 keeps its own edit. That copy is the 72% above. Batch process is the third thing
 and edits nothing: it develops a whole set unattended into one .zip.
 
+## Targets by hit area, and a durability claim I got backwards, 2026-09-09
+
+**THE PANEL TABS WERE 28px, AND THE RULE THAT SAYS 44 WAS ALREADY THERE.**
+`.ptab`'s base rule spends `15px` a side to reach 44 and says so in a comment
+citing the accessibility standing rule. The NARROW-WIDTH override cut it to
+`7px`. So the touch floor held at every width except the one where the app is
+used with a finger — which is the only width it exists for. Twelve tabs at 44px
+in the 3-wide grid is four rows and a 196px strip, which left **129px of panel
+body on a tall phone and 14px on a short one**: one accessibility failure traded
+for another, and it was measured before it was kept. Narrow widths now run FOUR
+columns — three rows, 140px, tabs 100x44 at 430px and still 71x44 with no label
+clipped at 320px. Against the 28px version it costs 16px of height, not 72.
+
+**AND TWO OF THE THREE "FINDINGS" FROM THE FIRST SWEEP WERE THE INSTRUMENT.**
+That sweep measured `getBoundingClientRect()`, which is the wrong quantity:
+
+- **The zoom controls were never under the floor.** Their boxes are 40x40 and
+ `#zoomCtl button::before { inset: -3px }` extends the hit area to **45x45** —
+ the CSS even carries the comment `/* 44px hit */`. It stood in this file as a
+ defect for a whole round on the strength of a box measurement.
+- **The range sliders were flagged and are still not measurable this way.** A
+ slider's box is its TRACK; the thing a finger has to hit is the THUMB, which
+ has no box of its own to read. Flagged as unmeasured, not as passing.
+
+The sweep now probes outward from each edge with `elementFromPoint` until the
+point stops resolving to the control, so it measures what a finger actually
+gets. **It also has to be scoped to an open dialog:** a modal's backdrop
+intercepts `elementFromPoint`, so every control behind it measures as its bare
+box and reads as a failure — which is the exact opposite of the truth, since
+those controls are deliberately unreachable while a modal is up. With that
+fixed, every interactive element clears 44 at 430px and 900px, with and without
+each dialog open. One real find came out of the corrected sweep: the ⓘ's tip
+link at **41x44**, three pixels short on the axis nobody checks, because a
+target is a box and only the height had ever been thought about.
+
+**AND THE DURABILITY CLAIM WAS BACKWARDS.** This file stated that neither engine
+honours `durability: "strict"`, inferred from strict and relaxed measuring the
+same, and that statement went out in a handover. **`IDBTransaction.durability` is a readonly
+attribute that reports the value actually applied, and Chromium reports
+`strict` for a strict request and `relaxed` for a relaxed one.** It accepts the
+option. Equal timings are equally consistent with the sync being cheap there —
+or with the container's filesystem absorbing it — and from inside a browser
+those cannot be told apart. The iPad half of the claim was weaker still: it came
+from "a per-commit figure beat that device's amortised one", comparing numbers
+produced by two DIFFERENT versions of the test, one of which had the
+growing-database bug. That comparison was not valid.
+
+**WHAT ACTUALLY SETTLES IT, AND IT IS NOW IN THE REPORT.** An engine that does
+not implement the option ignores it SILENTLY — an unimplemented dictionary
+member is dropped, with no error and no slower commit — so the feature check is
+the answer and the timing never was. `"durability" in IDBTransaction.prototype`
+costs nothing: no database opened, nothing written. The report carries it as
+**Durable writes**, and says what a "not supported" would MEAN rather than
+printing a capability name: that the app asks for confirmed writes, this engine
+ignores the request, and a crash in the seconds after a photo is added could
+lose it. The device can now answer a question two rounds of timing could not.
+
+**THE GENERAL SHAPE, for the fourth time in one session.** Three claims here
+rested on measuring a proxy: a target measured as a box, durability measured as
+elapsed time, and an engine's behaviour inferred by comparing two different
+instruments' outputs. **Where an interface exposes the thing itself — a hit
+test, a `durability` attribute — ask it, and stop timing.**
+
 ## Restore depth: two states that disagreed, and three causes, 2026-09-09
 
 Reported from the device as "default-on but has no effect until off/on again".
