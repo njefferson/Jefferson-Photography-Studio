@@ -6437,7 +6437,7 @@ function inShutterOrder(files: File[]): File[] {
  *  Two or more → a persisted session with the switch strip.
  *  Shared-look files (.ipslook) are peeled off FIRST: a look is not a photo —
  *  it must never destroy, join, or be counted against a photo session. */
-async function openPicked(files: File[]) {
+async function openPicked(files: File[], ready?: Map<File, ArrayBuffer>) {
   files = inShutterOrder(files);
   const parts = await Promise.all(files.map(async (f) => ({ f, isLook: await isLookFile(f).catch(() => false) })));
   const lookFiles = parts.filter((p) => p.isLook).map((p) => p.f);
@@ -6478,7 +6478,7 @@ async function openPicked(files: File[]) {
     }
   }
 
-  await addToSession(files, append);
+  await addToSession(files, append, ready);
 }
 
 /** The lone-photo open: ephemeral, not persisted (there is nothing to resume
@@ -6534,7 +6534,7 @@ async function resetSessionState(clearStorage: boolean) {
 /** Persist and append a set of files to the current session, showing the first
  *  new photo as soon as it's ready. Decoding is sequential with yields so the
  *  UI stays usable; only one decode is in RAM at a time. */
-async function addToSession(files: File[], append: boolean) {
+async function addToSession(files: File[], append: boolean, ready?: Map<File, ArrayBuffer>) {
   if (!append) await resetSessionState(true); // fresh session — clear leftovers
   const skipped: string[] = [];
   let firstNewId: string | null = null;
@@ -6555,6 +6555,7 @@ async function addToSession(files: File[], append: boolean) {
     edit: null,
     thumbUrl: "",
     thumbState: "waiting" as SessionPhoto["thumbState"],
+    thumbGrade: undefined as string | undefined,
   }));
   for (const p of planned) { sessionPhotos.push(p); pendingStore.add(p.id); }
   adding = { done: 0, total: files.length, index: 1, name: files[0]?.name ?? "" };
@@ -6629,9 +6630,26 @@ async function addToSession(files: File[], append: boolean) {
       }
       if (imported.looksTranscoded) { skipped.push(`${f.name} (arrived as flattened JPEG)`); dropPlanned(slot.id); continue; }
 
+      // ALREADY RENDERED, if this set came from Quick look: the grid decoded
+      // every file to build itself and handed the strip-sized picture across,
+      // so the tile is finished before the storage write even starts and
+      // `realThumbnails` will not pick it up. This is the whole of the second
+      // render the reader was watching.
+      const done = ready?.get(f);
+      if (done && done.byteLength) {
+        if (slot.thumbUrl) URL.revokeObjectURL(slot.thumbUrl);
+        slot.thumbUrl = URL.createObjectURL(new Blob([done], { type: "image/jpeg" }));
+        slot.thumbState = "real";
+        slot.thumbGrade = gradeStamp();
+      }
+
       // The camera's own preview, free, from bytes already in hand — so the
       // tile has a picture in it long before anything is decoded.
-      const prev = embeddedPreview(imported.bytes, imported.kind);
+      // ...but never OVER a finished one. The camera's preview is a stand-in
+      // for a picture this app has not rendered yet; putting it on top of one
+      // it already has would downgrade the tile and hand it back to the
+      // background pass, which is the second render this change removes.
+      const prev = slot.thumbState === "real" ? null : embeddedPreview(imported.bytes, imported.kind);
       if (prev) {
         slot.thumbUrl = URL.createObjectURL(new Blob([prev.slice()], { type: "image/jpeg" }));
         slot.thumbState = "preview";
@@ -7077,6 +7095,12 @@ interface QuickItem {
   file: File;
   name: string;
   thumbUrl: string; // object URL for the grid tile ("" if it couldn't decode)
+  /** The SAME picture at strip size, rendered from the same decode. Quick look
+   *  decodes every file to build the grid; keeping a set afterwards used to
+   *  throw all of that away and hand `addToSession` bare files, which decoded
+   *  every one of them a SECOND time to build the strip. Watching a set render
+   *  twice in a row is the reader's own observation, and it was right. */
+  stripThumb: ArrayBuffer | null;
   ok: boolean;
   selected: boolean;
 }
@@ -7203,6 +7227,7 @@ async function openQuickLook(files: File[]) {
     if (gen !== quickGen) return; // closed or restarted under us
     let thumbUrl = "";
     let ok = false;
+    let stripThumb: ArrayBuffer | null = null;
     try {
       const imported = guardLocation(await importFile(f));
       const img = await decodeOffThread(imported);
@@ -7210,6 +7235,14 @@ async function openQuickLook(files: File[]) {
       if (thumb.byteLength) {
         thumbUrl = URL.createObjectURL(new Blob([thumb], { type: "image/jpeg" }));
         ok = true;
+        // A second render at strip size, off the SAME decode. The render is a
+        // fraction of the decode that produced it (a quarter of the pixels of
+        // the grid tile), and it saves that decode happening again later. Made
+        // at the strip's own size rather than reusing the 512px grid bytes,
+        // because the session stores a thumbnail INLINE in its meta row and
+        // that row has to stay small — see session.ts on why large IDB values
+        // are the one shape that is not crash-safe.
+        stripThumb = await makeThumb(img).catch(() => null);
       }
       // img + the imported bytes fall out of scope here; only the small JPEG
       // preview is retained, so RAM stays bounded to N thumbnails.
@@ -7217,7 +7250,7 @@ async function openQuickLook(files: File[]) {
       /* couldn't open — shown as a placeholder tile so nothing goes missing */
     }
     if (gen !== quickGen) { if (thumbUrl) URL.revokeObjectURL(thumbUrl); return; }
-    const it: QuickItem = { file: f, name: f.name, thumbUrl, ok, selected: ok };
+    const it: QuickItem = { file: f, name: f.name, thumbUrl, stripThumb, ok, selected: ok };
     quickItems.push(it);
     addQuickTile(it, quickItems.length);
     done++;
@@ -7241,11 +7274,16 @@ function closeQuickLook() {
 /** Promote the selected previews into a real session (or a lone open, for one).
  *  The picked Files are still alive, so this is just the normal open path. */
 async function keepQuickLook() {
-  const files = quickItems.filter((it) => it.ok && it.selected).map((it) => it.file);
+  const keeping = quickItems.filter((it) => it.ok && it.selected);
+  const files = keeping.map((it) => it.file);
   if (!files.length) return;
+  // Carry the pictures across, keyed by the File itself so re-ordering on the
+  // way in cannot mismatch a thumbnail to a photo.
+  const ready = new Map<File, ArrayBuffer>();
+  for (const it of keeping) if (it.stripThumb) ready.set(it.file, it.stripThumb);
   closeQuickLook();
   try {
-    await openPicked(files);
+    await openPicked(files, ready);
   } catch (err) {
     welcome.hidden = false;
     hint.hidden = false;
