@@ -140,6 +140,7 @@ const ui = {
   autoBtn: $("autoBtn") as HTMLButtonElement,
   irAutoWb: $("irAutoWb") as HTMLButtonElement,
   irLift: $("irLift") as HTMLButtonElement,
+  liftAmt: $("liftAmt") as HTMLInputElement,
   swapBtn: $("swapBtn") as HTMLButtonElement,
   hue: $("hue") as HTMLInputElement,
   sat: $("sat") as HTMLInputElement,
@@ -1330,7 +1331,7 @@ function wireVersionMenu() {
     const real = sessionPhotos.filter((p) => p.id !== "lone").length;
     text.value = await buildDiagnostic(__APP_VERSION__, [
       { k: "Open now", v: current ? `a photo is open${real >= 2 ? ` in a session of ${real}` : ""}` : "nothing open" },
-      { k: "Restore depth", v: autoLift ? "on" : "off" },
+      { k: "Restore depth", v: autoLift ? `on at ${Math.round(liftAmount * 100)}% strength` : "off" },
     ]);
   };
   tag.addEventListener("click", open);
@@ -1390,6 +1391,36 @@ const FLAT_TONE_MAX = 0.22; // the tone points clamp at ±0.25 of their default
 // action, so it reads and behaves like the R<->B swap: pressed means the frame
 // is adapted, and pressing it again puts it back.
 let autoLift = localStorage.getItem("ips-autolift") !== "0";
+/** How far the correction goes, 0..1. The targets it solves against were
+ *  measured across the practice set, but how strongly to apply the answer is a
+ *  judgement about the photograph, not a measurement — so it is a slider rather
+ *  than a number in this file. 1 is the full correction it worked out. */
+let liftAmount = (() => {
+  // `Number(null)` is 0, and 0 passes every range check — so reading a stored
+  // value without first asking whether there IS one defaulted a fresh install
+  // to zero strength: the automatic switched on, visibly on, and doing nothing.
+  // That is the exact complaint this control was added to answer.
+  const raw = (() => { try { return localStorage.getItem("ips-liftamount"); } catch { return null; } })();
+  if (raw === null || raw === "") return 1;
+  const v = Number(raw);
+  return Number.isFinite(v) && v >= 0 && v <= 1 ? v : 1;
+})();
+
+/** Take a solved lift part of the way. Scaling the ANSWER rather than the
+ *  targets keeps the solve idempotent and keeps every intermediate value on the
+ *  same sliders — half strength is half the tone pull and half the extra
+ *  saturation, not a different correction. */
+function scaleLift<T extends { tone: number[]; foliage: number[]; sky: number[]; pull: number }>(r: T, amt: number): T {
+  if (amt >= 1) return r;
+  const mix = (from: number, to: number) => from + (to - from) * amt;
+  return {
+    ...r,
+    tone: r.tone.map((v, i) => mix(TONE_DEFAULT[i], v)),
+    foliage: [r.foliage[0], mix(1, r.foliage[1]), r.foliage[2]],
+    sky: [r.sky[0], mix(1, r.sky[1]), r.sky[2]],
+    pull: r.pull * amt,
+  };
+}
 const FLAT_SHADOW_KEEP = 0.5;
 const FLAT_SHADOW_FLOOR = 0.02;
 // Divisions along the short edge of the sampling grid. It runs on every open
@@ -1534,8 +1565,9 @@ let liftApplied: { tone: string; foliage: string; sky: string; prevTone: number[
  *  report (or not — at open it is silent; the sliders show it). */
 function applyLift(withColour: boolean): { pull: number; foliage: number; sky: number } | null {
   if (!current) return null;
-  const r = solveLift(withColour, current, params);
-  if (!r) { liftApplied = null; return null; }
+  const solved = solveLift(withColour, current, params);
+  if (!solved) { liftApplied = null; return null; }
+  const r = scaleLift(solved, liftAmount);
   const noop = r.pull === 0 && r.foliage[1] === 1 && r.sky[1] === 1;
   liftApplied = {
     // What the frame is WITHOUT a lift, which is what turning it off should
@@ -1583,7 +1615,30 @@ function removeLift(): void {
 // The toggle. Pressed = this frame is adapted; press again and it is not — the
 // same shape as the R<->B swap, and on by default so nothing has to be
 // remembered to get a usable photo.
+/** Re-solve the open photo at the current strength. Same shape as the toggle:
+ *  put back what the lift wrote, then write the new answer, one undo step. */
+function reapplyLift() {
+  if (!current) return;
+  removeLift();
+  if (autoLift) applyLift(activeLook !== null);
+  syncToUI();
+  draw();
+}
+
+ui.liftAmt.addEventListener("input", () => {
+  liftAmount = Math.min(1, Math.max(0, Number(ui.liftAmt.value) / 100));
+  try { localStorage.setItem("ips-liftamount", String(liftAmount)); } catch { /* private mode */ }
+  updateLiftUI();
+  reapplyLift();
+  restripForGrade(); // the tiles are claims about this too
+});
+ui.liftAmt.addEventListener("change", () => flushRecord()); // one undo step per drag
+
 function updateLiftUI() {
+  ui.liftAmt.value = String(Math.round(liftAmount * 100));
+  // The strength of an automatic that is off is not a live control.
+  ui.liftAmt.disabled = !autoLift;
+  (ui.liftAmt.closest("label") as HTMLElement | null)?.classList.toggle("is-off", !autoLift);
   // Exactly the R<->B swap's shape: a .toggle carrying aria-pressed, whose
   // pressed state is an accent fill AND a heavier weight, so it does not rest
   // on colour alone. The off/on segment pair this had first came from the LOOK
@@ -6281,8 +6336,9 @@ async function makeThumb(img: DecodedImage, MAX = 260): Promise<ArrayBuffer> {
     foliage: [0, 1, 1],
   };
   if (autoLift) {
-    const lift = solveLift(activeLook !== null, img, p);
-    if (lift) { p.tone = lift.tone; p.sky = lift.sky; p.foliage = lift.foliage; }
+    const solved = solveLift(activeLook !== null, img, p);
+    const lift = solved && scaleLift(solved, liftAmount);
+    if (lift) { p.tone = lift.tone as typeof p.tone; p.sky = lift.sky as typeof p.sky; p.foliage = lift.foliage as typeof p.foliage; }
   }
   // THE PHOTO'S DISPLAY ROTATION, which this never applied. `img.rotate` is the
   // EXIF Orientation tag as 90-degree CW steps, and the main view has always
@@ -6707,7 +6763,7 @@ function gradeStamp(): string {
   return JSON.stringify([
     activeLook, params.swapRB, params.hue, params.sat, params.contrast, params.tint,
     params.glow, params.lum, params.toneR, params.toneG, params.toneB, params.hsl,
-    params.bwOn, params.bwMix, params.grade, params.mix3, lookBias,
+    params.bwOn, params.bwMix, params.grade, params.mix3, lookBias, autoLift, liftAmount,
   ]);
 }
 
@@ -6753,7 +6809,17 @@ function updateSessionStrip() {
   sessionDone.disabled = !!adding;
   if (adding) {
     sessionProgressBar.style.width = `${Math.round((adding.done / Math.max(1, adding.total)) * 100)}%`;
-    sessionMeta.textContent = `Opening ${adding.index} of ${adding.total} — ${adding.name}`;
+    // WHICH PHOTO YOU ARE ON survives the load. This line used to be replaced
+    // wholesale while a set came in, so the one number the strip exists to tell
+    // you — which of them you are looking at — vanished for the whole wait,
+    // which on 360 files is minutes.
+    //
+    // And they are not "opening". One photo is open; the rest are being read
+    // and copied onto the device so the set survives a reload, which is where
+    // the wait actually goes. Saying "opening" of 360 photos described
+    // something that was not happening.
+    const viewing = idx >= 0 ? `viewing ${idx + 1} · ` : "";
+    sessionMeta.textContent = `${viewing}adding ${adding.index} of ${adding.total} — ${adding.name}`;
   } else {
     sessionMeta.textContent =
       `${real.length} photos · ~${fmtSize(total)}` + (idx >= 0 ? ` · viewing ${idx + 1}` : "");
@@ -7965,8 +8031,9 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["l
   // materials into the sky and foliage bands — the auto-balance-only choice
   // gets the tonal half alone, matching a bare open.
   if (autoLift) {
-    const lift = solveLift(grade.kind !== "auto", img, p);
-    if (lift) { p.tone = lift.tone; p.sky = lift.sky; p.foliage = lift.foliage; }
+    const solved = solveLift(grade.kind !== "auto", img, p);
+    const lift = solved && scaleLift(solved, liftAmount);
+    if (lift) { p.tone = lift.tone as typeof p.tone; p.sky = lift.sky as typeof p.sky; p.foliage = lift.foliage as typeof p.foliage; }
   }
   return p;
 }
