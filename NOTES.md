@@ -3976,6 +3976,80 @@ the set survives a reload, a crash or the OS discarding the tab, and each photo
 keeps its own edit. That copy is the 72% above. Batch process is the third thing
 and edits nothing: it develops a whole set unattended into one .zip.
 
+## A look carries whole, or it does not carry, 2026-09-09
+
+The previous entry left this as a design question for the owner, and it was not
+one. Measured: switching photos kept the look's GRADE — saturation 3, the
+channel swap — while `activeLook` was cleared, so the frame wore Aerochrome and
+the app reported nothing selected. **That is not two behaviours to choose
+between; it is the button and the pixels disagreeing, and one of them was
+false.** Since the grade carrying is deliberate and documented and the identity
+being cleared is not, the identity was the accident.
+
+**AND RELABELLING THE BUTTON WOULD NOT HAVE BEEN THE FIX.** A look's WHITE
+BALANCE bias is not carried: `lookBias` is reset at open and the new photo's
+balance is measured fresh, so a carried "Red" would have been a name over a
+grade missing the bias that defines it. The open now RE-APPLIES the look —
+`applyLook(activeLook)` — which puts the bias on this photo's own balance, the
+grade, and the colour half of the lift on at once. Measured on Red, which has a
+bias: photo 1 balances 507/595/647 and takes Red to 470/598/692; photo 2 opens
+at 513/595/640 with Red re-applied to ITS measurement, not photo 1's numbers
+copied across.
+
+`activeLook = null` also came out of the block it was sitting in, which resets
+composition-specific state — masks, spots, crop. A look is creative state, and
+the rest of the creative grade carries.
+
+**WHAT IS ASSERTED NOW.** A bare frame stays bare: no look, no band boost — the
+regression guard for the `swapRB` attempt recorded in the previous entry.
+Switching photos with Aerochrome on keeps the button on Aerochrome, puts the
+grade on the new photo, and brings the colour half of Restore depth with it.
+Reset returns to the looked state the photo opened in, button included, because
+`baseline` is captured after the re-apply.
+
+**AND THE RESIDUAL IS CLOSED — IT WAS THE ROUNDING AGAIN, ONE LAYER UP.**
+Turning Restore depth off and on returned foliage to 1.71 where the photo opened
+at 1.65. Ruled out first: the image (same 1400x932), the neutralisation, and the
+look criterion. Then the solve INPUTS were dumped at both moments and diffed,
+which named it in one run:
+
+- white balance `0.6162576380649035` against `0.6170426151579793`
+- exposure `7.525785336670117` against `7.53571027928973`
+- denoise `0.44014856293231525` against `0.44`
+
+**The auto-measured baseline is full precision and every slider has a step.**
+`syncToUI` writes 0.44014856293231525 into a control that snaps it to 0.44, and
+the `syncFromUI` further down the open — which is there ON PURPOSE, so the Reset
+baseline is exactly what the reader sees — writes the snapped number back over
+the measurement. The lift solved before that ran; the toggle, pressed later,
+solved after. Two solves, two different sets of inputs, and neither was wrong on
+its own.
+
+Fixed by rounding FIRST: `syncToUI(); syncFromUI();` immediately after the four
+measurements, before anything solves against them. Every consumer downstream —
+the lift, `origParams`, `baseline`, the toggle — now sees one set of numbers,
+and the two solves are identical by construction rather than by coincidence. It
+also means the value the reader is shown is the value being applied, which is
+what the `syncFromUI` was reaching for in the first place.
+
+**It is the same fault `removeLift` carries a note about, one layer up:** a
+full-precision value written to a stepped control does not come back. That one
+was found by a revert that never fired; this one by a round trip that landed 4%
+away. **The general form: any value measured to full precision and displayed on
+a stepped control has two versions, and every consumer has to be told which one
+it is reading.**
+
+Full-frame renders across five practice DNGs after the change: medians 0.378 to
+0.592, no crushed blacks anywhere, blown highlights 0.01% to 1.34%, mean RGB
+near-neutral on all five — the rounding moves nothing visible, which is the
+point, since 0.44 is what the slider was claiming all along.
+
+**AND A HARNESS FACT WORTH KEEPING, which cost a round to learn.** Switching to
+a photo that has been visited before RESTORES ITS SNAPSHOT and runs no solve at
+all; only a first visit takes the at-open path. A probe that clicks back and
+forth between two photos and expects a solve each time gets silence, reads it as
+"no trace fired", and starts looking for the wrong bug.
+
 ## Targets by hit area, and a durability claim I got backwards, 2026-09-09
 
 **THE PANEL TABS WERE 28px, AND THE RULE THAT SAYS 44 WAS ALREADY THERE.**

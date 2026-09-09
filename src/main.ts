@@ -5908,25 +5908,53 @@ function establishFreshEdit() {
   }
   params.denoise = estimateDenoise(src);
   lookBias = [1, 1, 1];
+  // NORMALISE THE MEASUREMENTS TO WHAT THE SLIDERS CAN HOLD, BEFORE ANYTHING
+  // SOLVES AGAINST THEM. The four values above are measured at full precision;
+  // every slider has a step, so `syncToUI` writes 0.44014856293231525 into a
+  // control that snaps it to 0.44, and the `syncFromUI` further down — which is
+  // there on purpose, so the Reset baseline is exactly what the reader sees —
+  // writes the snapped number back over the measurement.
+  //
+  // That left the lift solving against the measurement and the Restore depth
+  // TOGGLE, pressed later, solving against the rounding. Measured: white
+  // balance 0.6162576380649035 against 0.6170426151579793, exposure 7.5257853
+  // against 7.5357102, denoise 0.44014856293231525 against 0.44 — enough to
+  // move a solved foliage boost from 1.65 to 1.71, so pressing the toggle off
+  // and on did not return the photo to how it opened. Rounding first makes the
+  // two solves identical by construction rather than by coincidence.
+  //
+  // It is the same fault `removeLift` carries a note about, one layer up: a
+  // full-precision value written to a stepped control does not come back.
+  syncToUI();
+  syncFromUI();
   // Part of the opened baseline, so it runs BEFORE origParams and the Reset
   // snapshot below are taken: Hold: Original and Reset both mean "the photo as
   // it opened", and this is now part of how it opened. Visible on the Tone and
   // Sky/Foliage sliders, undoable, no pixels touched — the three tests any
   // at-open automatic has to pass.
   liftApplied = null;
-  // NO LOOK, by the time this open is finished: `activeLook` is cleared further
-  // down as part of the same open, so passing what it currently holds solved
-  // this frame with the OUTGOING photo's look while every later press of the
-  // toggle solved it without one — two states that disagree, which is the
-  // toggle appearing to do nothing until pressed off and on. The colour half
-  // belongs to pressing a look, which re-solves with it (see applyLook).
+  // A LOOK CARRIES, OR IT DOES NOT — and half of one is what this was.
+  // The look's GRADE carried to the next photo (saturation, contrast, the
+  // channel swap) while `activeLook` was cleared further down the same open, so
+  // the frame wore Aerochrome and the app reported nothing selected. That is
+  // not a preference between two behaviours; it is the button and the pixels
+  // disagreeing, and one of them was wrong.
   //
-  // And NOT `params.swapRB` either, which was tried: the R<->B swap DEFAULTS ON
-  // for this app, so keying off it made every bare frame "wear a look" and the
-  // band boost fired on all of them — the exact failure solveLift's own comment
-  // records, 44 of 44 practice frames adapted at open. Measured again here: the
-  // sky and foliage sliders both went to their 2.0 ceiling on a first open.
-  if (autoLift) applyLift(false);
+  // Relabelling the button would not have been enough either: a look's WHITE
+  // BALANCE bias is not carried — `lookBias` is reset just above, and this
+  // photo's balance was measured fresh — so a carried "Red" would have been a
+  // name over a grade missing the bias that defines it. Re-applying the look is
+  // what makes every part of it true of this photo at once: the bias, the
+  // grade, and the colour half of the lift, which applyLook re-solves itself.
+  //
+  // Which is also the honest version of the fix tried before it. That one keyed
+  // the lift's colour half off `params.swapRB`, reasoning that the swap is what
+  // puts materials into the sky and foliage bands. The swap DEFAULTS ON here,
+  // so every bare frame "wore a look" and both bands went to their 2.0 ceiling
+  // on a first open — solveLift's own comment records that failure, 44 of 44
+  // practice frames. `activeLook` is non-null only where a look was pressed.
+  if (activeLook && LOOKS[activeLook]) applyLook(activeLook as keyof typeof LOOKS);
+  else if (autoLift) applyLift(false);
   syncToUI();
   // Snapshot the as-imported baseline for press-and-hold comparison.
   origParams = {
@@ -5969,7 +5997,10 @@ function establishFreshEdit() {
     crop: { ...CROP_DEFAULT },
     straighten: 0,
   };
-  activeLook = null;
+  // `activeLook` is NOT cleared here. It sat in a block that resets
+  // composition-specific state — masks, spots, crop — but a look is creative
+  // state, and the rest of the creative grade carries across an open by design.
+  // Clearing only its name is what let the button and the pixels disagree.
   updateLookUI();
   // Tidy the panel for the new photo: scroll the current section to the top.
   panelBody.scrollTop = 0;
