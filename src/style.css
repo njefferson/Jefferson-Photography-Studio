@@ -1351,7 +1351,7 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   flex: 1;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 14px 16px 24px;
+  padding: 14px 16px calc(24px + env(safe-area-inset-bottom, 0px));
 }
 .lib-body .gallery-list { margin: 0 auto; }
 .lib-group {
@@ -1374,7 +1374,14 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  padding: 12px 16px;
+  /* THE STATUS BAR SITS ON TOP OF THIS. Both dialogs that use this header are
+     `position: fixed; inset: 0; height: 100dvh`, so they cover the whole
+     screen INCLUDING the strip iOS draws the clock and battery into. The main
+     `.bar` has spent the top inset since it was written; these two never did,
+     so the title and the Close button were drawn underneath the clock on an
+     installed iPad. One rule, because Quick look and the practice library
+     share this header. */
+  padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 12px;
   border-bottom: 1px solid var(--line);
   background: var(--surface);
 }
@@ -1383,6 +1390,12 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 #qlCount { font: 0.6875rem/1.3 var(--mono); color: var(--txt-2); }
 .ql-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .ql-btn {
+  /* 34px tall as authored, on the primary controls of a full-screen surface.
+     The hit-area sweep never caught it because it only ever opened the two
+     dialogs on the main page. */
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
   width: auto;
   padding: 8px 14px;
   font-size: 0.8125rem;
@@ -1400,7 +1413,9 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   flex: 1;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 14px;
+  /* And the home indicator sits over the BOTTOM of the same full-screen
+     dialog, so the last row of tiles needs to clear it. */
+  padding: 14px 14px calc(14px + env(safe-area-inset-bottom, 0px));
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 12px;
