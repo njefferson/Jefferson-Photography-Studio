@@ -200,6 +200,7 @@
         <div id="sessionStrip" hidden aria-label="Photo session">
           <div class="session-head">
             <span id="sessionMeta" role="status" aria-live="polite" aria-atomic="true"></span>
+            <button id="stripHere" type="button" class="session-here" hidden title="Scroll the strip back to the photo you are viewing">&#8629; Back to current</button>
             <button id="sessionDone" type="button" class="session-done" title="End the session and free its storage">Done</button>
           </div>
           <div id="sessionProgress" class="session-progress" hidden>
@@ -857,7 +858,7 @@
           sends them straight into an editable session.</li>
           <li>On open, <strong>raw photos are auto-balanced</strong> (white balance, exposure, denoise, and blown-highlight recovery when the frame needs it); JPEG/HEIC open as the camera rendered them, with measured denoise only. <strong>Hold: Untouched</strong> shows the bare decode any time.</li>
           <li><strong>Tap foliage</strong> in the photo to fine-tune white balance — the classic IR move.</li>
-          <li><strong>Double-tap any slider</strong> to put it back where the photo opened. Most of them don't start at zero — white balance, exposure and denoise open at values measured from your frame — so this returns that one slider to its opening value, the way <strong>Reset</strong> does for all of them at once. Quality and Restore depth strength go back to their usual setting instead, since those are yours rather than the photo's.</li>
+          <li><strong>Double-tap any slider</strong> to put it back where the photo opened. Most of them don't start at zero — white balance, exposure and denoise open at values measured from your frame — so this returns that one slider to its opening value, the way <strong>Reset</strong> does for all of them at once. Quality goes back to its usual setting instead, since that one is yours rather than the photo's. Restore depth strength goes back to 100% — the full correction worked out for the frame in front of you, which is where every photo opens.</li>
           <li>Pick a <strong>Look</strong>, adjust sliders to taste, then <strong>Export &amp; Save</strong>.</li>
         </ol>
 

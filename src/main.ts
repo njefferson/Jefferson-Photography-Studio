@@ -1391,20 +1391,23 @@ const FLAT_TONE_MAX = 0.22; // the tone points clamp at ±0.25 of their default
 // action, so it reads and behaves like the R<->B swap: pressed means the frame
 // is adapted, and pressing it again puts it back.
 let autoLift = localStorage.getItem("ips-autolift") !== "0";
-/** How far the correction goes, 0..1. The targets it solves against were
- *  measured across the practice set, but how strongly to apply the answer is a
- *  judgement about the photograph, not a measurement — so it is a slider rather
- *  than a number in this file. 1 is the full correction it worked out. */
-let liftAmount = (() => {
-  // `Number(null)` is 0, and 0 passes every range check — so reading a stored
-  // value without first asking whether there IS one defaulted a fresh install
-  // to zero strength: the automatic switched on, visibly on, and doing nothing.
-  // That is the exact complaint this control was added to answer.
-  const raw = (() => { try { return localStorage.getItem("ips-liftamount"); } catch { return null; } })();
-  if (raw === null || raw === "") return 1;
-  const v = Number(raw);
-  return Number.isFinite(v) && v >= 0 && v <= 1 ? v : 1;
-})();
+/** How far the correction goes, 0..1. 1 is the full correction the solve worked
+ *  out for THIS frame — a bisection onto FLAT_LUM_REF bounded by a shadow
+ *  floor, and scaleLift interpolates linearly from neutral to that answer. So 1
+ *  is not a maximum, it is the calibrated target, and it is where every photo
+ *  now opens.
+ *
+ *  IT USED TO PERSIST, and that is why it did not open there. Backing the
+ *  strength off once wrote it to localStorage, so every later photo — and every
+ *  later visit — opened at whatever that one photograph had needed. A value
+ *  solved per-frame cannot be carried to the next frame and still be the
+ *  answer. It stays live for the session and starts each visit at the solve.
+ *
+ *  (The reading it replaces is also why the default is written plainly here:
+ *  `Number(null)` is 0 and 0 passes every range check, so a stored-value read
+ *  that never asked whether there WAS one defaulted a fresh install to zero
+ *  strength — the automatic switched on, visibly on, and doing nothing.) */
+let liftAmount = 1;
 
 /** Take a solved lift part of the way. Scaling the ANSWER rather than the
  *  targets keeps the solve idempotent and keeps every intermediate value on the
@@ -1627,7 +1630,6 @@ function reapplyLift() {
 
 ui.liftAmt.addEventListener("input", () => {
   liftAmount = Math.min(1, Math.max(0, Number(ui.liftAmt.value) / 100));
-  try { localStorage.setItem("ips-liftamount", String(liftAmount)); } catch { /* private mode */ }
   updateLiftUI();
   reapplyLift();
   restripForGrade(); // the tiles are claims about this too
@@ -6169,6 +6171,7 @@ const sessionStrip = $("sessionStrip") as HTMLDivElement;
 const sessionThumbs = $("sessionThumbs") as HTMLDivElement;
 const sessionMeta = $("sessionMeta") as HTMLSpanElement;
 const sessionDone = $("sessionDone") as HTMLButtonElement;
+const stripHere = $("stripHere") as HTMLButtonElement;
 const sessionProgress = $("sessionProgress") as HTMLDivElement;
 const sessionProgressBar = $("sessionProgressBar") as HTMLDivElement;
 
@@ -6960,13 +6963,48 @@ function updateSessionStrip() {
   revealActiveThumb();
 }
 
-/** Bring the active thumbnail into view — in a set of forty it is usually off
- *  the end of the strip, and nothing else would ever scroll it back. */
-function revealActiveThumb() {
+/** The photo the strip was last scrolled to. updateSessionStrip runs on every
+ *  add and every thumbnail that lands, so revealing unconditionally there took
+ *  the strip away from a reader mid-scroll — it restored scrollLeft one line
+ *  earlier and then threw it away again. Reveal on a CHANGE of photo only. */
+let lastRevealedId: string | null = null;
+
+function activeThumbEl(): HTMLElement | undefined {
   const i = sessionPhotos.filter((p) => p.id !== "lone").findIndex((p) => p.id === activePhotoId);
-  const el = i >= 0 ? (sessionThumbs.children[i] as HTMLElement | undefined) : undefined;
-  el?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+  return i >= 0 ? (sessionThumbs.children[i] as HTMLElement | undefined) : undefined;
 }
+
+/** True when the photo being viewed is scrolled out of the strip's viewport. */
+function activeThumbOffscreen(): boolean {
+  const el = activeThumbEl();
+  if (!el) return false;
+  const strip = sessionThumbs.getBoundingClientRect();
+  const r = el.getBoundingClientRect();
+  if (r.width === 0) return false;
+  return r.right <= strip.left + 1 || r.left >= strip.right - 1;
+}
+
+/** The way back, offered only while it is needed. */
+function syncStripHere(): void {
+  stripHere.hidden = !activeThumbOffscreen();
+}
+
+/** Bring the active thumbnail into view — in a set of forty it is usually off
+ *  the end of the strip, and nothing else would ever scroll it back. Automatic
+ *  callers get it only when the photo actually changed; `force` is the reader
+ *  asking for it. */
+function revealActiveThumb(force = false) {
+  if (force || activePhotoId !== lastRevealedId) {
+    lastRevealedId = activePhotoId;
+    activeThumbEl()?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+  }
+  syncStripHere();
+}
+
+// A smooth scrollIntoView settles over several frames and a finger flick over
+// many, so the offer is kept honest by the scroll itself rather than by a timer.
+sessionThumbs.addEventListener("scroll", syncStripHere, { passive: true });
+stripHere.addEventListener("click", () => revealActiveThumb(true));
 
 // --- Reaching the rest of the set with a mouse. The strip is a native
 // horizontal scroller, which a finger flicks and a trackpad swipes — but a
