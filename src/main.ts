@@ -7831,10 +7831,15 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["l
   } else {
     look = grade.kind === "look" ? grade.look : neutralLook();
   }
-  return {
+  const p: EditParams = {
     wb,
     exposure: autoExposure(img, wb),
     denoise: estimateDenoise(img),
+    // THE SAME AUTOMATICS AN OPEN APPLIES. Highlight recovery was missing here
+    // and nowhere else — a single open sets it, and so does the strip
+    // thumbnail; batch was the only path that did not, so a frame with real
+    // clipping came out of a batch unrecovered.
+    recover: img.camMatrix ? autoRecover(img) : 0,
     swapRB: look.swapRB,
     hue: look.hue,
     sat: look.sat,
@@ -7871,6 +7876,23 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["l
     straighten: 0,
     lut, // resolved once at batch start; rides every frame like the grade
   };
+  // AND RESTORE DEPTH, which a batch never solved at all. Measured before this
+  // line existed, one frame with Aerochrome on both sides: the editor rendered
+  // median luminance 0.529 and warm saturation 0.354, the batch 0.634 and
+  // 0.190 — a batch frame came out a tenth brighter and with 46% less colour
+  // than the same photo and the same look in the editor. Nobody comparing a
+  // .zip against the screen would have called that the same develop.
+  //
+  // Solved per frame from that frame's own measurement, exactly as an open
+  // does, and honouring the toggle: Restore depth off means off everywhere.
+  // The colour half runs where a LOOK was chosen, which is what puts a frame's
+  // materials into the sky and foliage bands — the auto-balance-only choice
+  // gets the tonal half alone, matching a bare open.
+  if (autoLift) {
+    const lift = solveLift(grade.kind !== "auto", img, p);
+    if (lift) { p.tone = lift.tone; p.sky = lift.sky; p.foliage = lift.foliage; }
+  }
+  return p;
 }
 
 /** Bake the EXIF-selected hot-spot correction into a decoded frame's pixels,

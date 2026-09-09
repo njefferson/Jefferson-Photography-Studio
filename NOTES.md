@@ -3976,6 +3976,68 @@ the set survives a reload, a crash or the OS discarding the tab, and each photo
 keeps its own edit. That copy is the 72% above. Batch process is the third thing
 and edits nothing: it develops a whole set unattended into one .zip.
 
+## What batch was actually doing, 2026-09-09
+
+Asked what batch processing does now, and the answer read off `batchParamsFor`
+was that it does **less than every other path in the app**. Per frame it sets a
+gray-world balance (times the chosen built-in look's WB bias), auto exposure,
+measured denoise, the grade's creative values and the resolved LUT, and nothing
+composition-specific — no masks, heals, stickers, crop or straighten, all
+deliberate and all documented.
+
+**What it did NOT set:**
+
+- **Highlight recovery.** `recover` appears zero times in `batchParamsFor`. A
+ single open sets `autoRecover`; so does the strip THUMBNAIL builder. Batch was
+ the only path in the app that skipped it, so a frame with real clipping came
+ out of a .zip unrecovered.
+- **Restore depth.** No `solveLift` or `applyLift` anywhere in the batch path.
+ It was never wired in when the lift became automatic at open, and nothing
+ failed, because no test compares a batch frame against the editor.
+
+**MEASURED, BEFORE ANY CHANGE — one frame, Aerochrome on both sides:**
+
+- editor: median luminance 0.5289, warm saturation 0.3541
+- batch: median 0.6335, warm saturation 0.1899
+
+**A tenth brighter and 46% less colour.** Nobody comparing a .zip against the
+screen would have called that the same develop, and the batch dialog's own lead
+enumerated the automatics — "white balance, exposure, denoise, lens fix" — which
+was accurate and therefore not a lie anyone could catch by reading.
+
+**FIXED, and the copy now says so.** `batchParamsFor` sets `recover` like every
+other path and solves the lift per frame from that frame's own measurement,
+honouring the toggle: Restore depth off means off in a batch too. The colour
+half runs where a LOOK was chosen — the auto-balance-only choice gets the tonal
+half alone, matching a bare open.
+
+**HOW IT WAS VERIFIED, which is the part worth copying.** A real batch run
+driven through the UI, the .zip captured from the download, and the JPEG sliced
+straight out of it — `writeZip` uses method 0, STORED, so no inflate is needed —
+then decoded and measured with the same statistics as the editor's own canvas.
+After the fix the same frame reads 0.5184 against 0.5289 and 0.3359 against
+0.3541: about 1%, where the resolutions differ (the batch writes 2800x1864, the
+editor renders 1400x932 on screen).
+
+**AND THAT LAST 1% WAS THEN MEASURED RATHER THAN EXPLAINED AWAY.** Exporting the
+SAME photo from the editor at full resolution, so both sides go through the same
+encoder at the same size: median 0.3908 against 0.3875, warm saturation 0.4054
+against 0.4103 — **0.003 and 0.005**. The develop is the same; the residual was
+resolution and JPEG, exactly as claimed, and now that claim is a measurement.
+
+**ASSERTED AS BEHAVIOUR, not just as numbers.** Three batch runs of one frame:
+Aerochrome with the toggle on reads median 0.3875 / warm 0.4103; with the toggle
+off, 0.4989 / 0.2338 — so the toggle governs a batch; auto-balance-only with the
+toggle on reads 0.4441 / 0.0435 — the tonal half without the colour half, which
+is what a bare open does.
+
+**THE GENERAL SHAPE.** An automatic added to the open path is not added to the
+app. There are four paths that develop a frame here — the open, the strip
+thumbnail, the export and the batch — and a change to one is a divergence in the
+other three until somebody checks. The thumbnails already cost a release for
+exactly this (they wore another photo's correction); this is the same lesson in
+the fourth path, found only because it was asked about.
+
 ## A look carries whole, or it does not carry, 2026-09-09
 
 The previous entry left this as a design question for the owner, and it was not
