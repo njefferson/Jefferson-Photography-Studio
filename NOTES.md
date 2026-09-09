@@ -3976,6 +3976,28 @@ the set survives a reload, a crash or the OS discarding the tab, and each photo
 keeps its own edit. That copy is the 72% above. Batch process is the third thing
 and edits nothing: it develops a whole set unattended into one .zip.
 
+## The sidecar gap was already closed, and I reported it as open twice, 2026-09-09
+
+Carried in two handovers as a standing crash-safety defect: that `batchstore.ts`
+puts large IDB values in a lazily-flushed sidecar which `durability: "strict"`
+does not cover. **It does not, and has not since its v2 upgrade.** `putFrame`
+splits every frame into 30 KB chunks and writes the meta row and all its chunks
+in ONE strict transaction, and the v2 `onupgradeneeded` deletes the old
+whole-frame `frames` store outright, with a comment saying why. `session.ts` has
+the identical shape and the same 30 KB constant.
+
+**The header describing the sidecar trap is the RATIONALE for that design, not a
+description of a live problem** — it opens "MEASURED GOTCHA (2026-07-12)" and
+explains what the chunking exists to avoid. Read out of context it states a
+defect in the present tense, and it was.
+
+**The same error class as four others in this session**, and the cheapest of
+them to have avoided: a comment read as current state. The others were a target
+measured as a bounding box, durability measured as elapsed time, a look's state
+inferred from a variable about to be cleared, and a bundle grepped for a string
+another file carries. **Where the code can be asked directly, ask it.** Ten
+lines of `putFrame` settled this; two handovers of prose did not.
+
 ## Half the practice set is portrait and every thumbnail lay on its side, 2026-09-09
 
 Reported against the Quick look grid. `makeThumb` never read `img.rotate` — the
