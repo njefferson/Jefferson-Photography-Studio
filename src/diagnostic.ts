@@ -43,9 +43,13 @@ async function storageLine(standalone: boolean): Promise<string> {
     const persisted = await navigator.storage?.persisted?.().catch(() => false);
     const used = `${mb(est.usage)} used of ${mb(est.quota)}`;
     if (persisted) return `${used} · persistent: yes — an open session will not be evicted`;
+    // NEVER "the app asked and was declined" — that is a claim about a call
+    // this function did not make and cannot see. On the test page nothing has
+    // opened a photo, so nothing has asked at all, and the report said it had.
+    // State the browser's answer; name the consequence and the way out.
     const why = standalone
-      ? "the app asked and this browser declined; installed apps are usually exempt from eviction anyway"
-      : "the app asked and this browser declined — a session left unopened for about a week may be cleared. Installing it to the home screen is exempt from that.";
+      ? "this browser has not granted it, though installed apps are usually exempt from eviction anyway"
+      : "this browser has not granted it — a session left unopened for about a week may be cleared. Installing it to the home screen is exempt from that.";
     return `${used} · persistent: no — ${why}`;
   } catch {
     return "unavailable";

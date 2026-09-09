@@ -43,7 +43,15 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
 
 // --- the diagnostic text -----------------------------------------------------
 const textArea = $("dText") as HTMLTextAreaElement;
-buildDiagnostic(__APP_VERSION__).then((t) => { textArea.value = t; });
+/** The report is REBUILT before every speed run, not once at page load.
+ *  Pressing "Run again" used to leave the report stamped with the moment the
+ *  page opened while the numbers under it were minutes newer — and "Copy the
+ *  results" concatenates the two, so a pasted block carried a timestamp and a
+ *  storage figure that did not belong to its own measurements. Three reports
+ *  pasted back to back showed it: two of them identical, down to the "Taken"
+ *  line, with different speed numbers underneath. */
+const refreshReport = () => buildDiagnostic(__APP_VERSION__).then((t) => { textArea.value = t; });
+void refreshReport();
 
 async function copy(text: string, btn: HTMLButtonElement, label: string) {
   const old = btn.textContent;
@@ -112,23 +120,37 @@ async function graphics(): Promise<void> {
 }
 
 /** Decoding a real raw file, on the main thread and in the worker. */
+/** THREE OF EACH, MEDIAN REPORTED, AND THE SPREAD PRINTED. A single shot read
+ *  50, 60 and 191 ms across three runs of the same build on one device — a 3.8x
+ *  spread, which makes a lone number worse than useless because it invites a
+ *  conclusion the measurement cannot support. Decode is the noisy one here:
+ *  readback and storage barely moved across the same three runs. */
 async function decoding(): Promise<void> {
   const p = note("Decoding a practice photo…");
+  const REPS = 3;
+  const mid = (xs: number[]) => { const a = [...xs].sort((x, y) => x - y); return (a[(a.length - 1) >> 1] + a[a.length >> 1]) / 2; };
   try {
     const res = await fetch("./examples/NIR_0063.dng");
     if (!res.ok) throw new Error("practice photo not available offline");
     const bytes = new Uint8Array(await res.arrayBuffer());
     const file = { name: "test.dng", kind: sniff(bytes), bytes, looksTranscoded: false };
-    const a = performance.now();
-    const img = await decode({ ...file, bytes: bytes.slice() });
-    const b = performance.now();
-    await decodeOffThread({ ...file, bytes: bytes.slice() });
-    const c = performance.now();
+    const here: number[] = [], there: number[] = [];
+    let img = await decode({ ...file, bytes: bytes.slice() }); // warm-up, not timed
+    for (let i = 0; i < REPS; i++) {
+      const a = performance.now();
+      img = await decode({ ...file, bytes: bytes.slice() });
+      const b = performance.now();
+      await decodeOffThread({ ...file, bytes: bytes.slice() });
+      here.push(b - a);
+      there.push(performance.now() - b);
+    }
     p.remove();
-    row("Decoding a raw photo", ms(b - a), `A ${(img.width * img.height / 1e6).toFixed(1)} megapixel practice file, decoded on the main thread — the work that used to freeze the editor while a set loaded.`);
-    row("…in the background", ms(c - b), (c - b) > (b - a) * 1.6
+    const mh = mid(here), mt = mid(there);
+    const spread = (xs: number[]) => xs.map((x) => Math.round(x) + " ms").join(", ");
+    row("Decoding a raw photo", ms(mh), `A ${(img.width * img.height / 1e6).toFixed(1)} megapixel practice file, decoded on the main thread — the work that used to freeze the editor while a set loaded. Three runs: ${spread(here)}.`);
+    row("…in the background", ms(mt), (mt > mh * 1.6
       ? "Slower than doing it directly, which can happen when the copy across costs more than it saves. The point is that the editor stays responsive, not that it finishes sooner."
-      : "About the same as doing it directly, and it leaves the editor free while it runs.");
+      : "About the same as doing it directly, and it leaves the editor free while it runs.") + ` Three runs: ${spread(there)}.`);
   } catch (e) {
     p.remove();
     row("Decoding a raw photo", "not run", `The practice photo could not be loaded (${(e as Error).message}).`);
@@ -159,7 +181,7 @@ async function decoding(): Promise<void> {
 async function storage(): Promise<void> {
   const p = note("Storage…");
   const DB = "ips-speedtest";
-  const CHUNK = 30 * 1024, PHOTO = 6 * 1024 * 1024, RUNS = 4;
+  const CHUNK = 30 * 1024, PHOTO = 6 * 1024 * 1024, RUNS = 3;
   const mid = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); return (s[(s.length - 1) >> 1] + s[s.length >> 1]) / 2; };
   try {
     const db = await new Promise<IDBDatabase>((res, rej) => {
@@ -213,7 +235,7 @@ async function storage(): Promise<void> {
       ? `This browser takes the same time whether the app asks for the write to be CONFIRMED on the disk or not (${Math.round(ms)} ms against ${Math.round(mr)} ms), which means it is not treating the two differently. So this is how fast it accepts the data, not how fast the data is safely on the device — and the app asks for confirmed writes precisely so a set survives a crash. Fast here is good news for the wait and says nothing about the crash.`
       : `Asking for the write to be CONFIRMED on the disk costs ${Math.round(ms)} ms against ${Math.round(mr)} ms without — so this browser really is waiting for the device, and the number above is the honest one.`;
     row("Saving one photo", `${Math.round(ms)} ms for 6 MB`,
-      `This is what opening a set pays: the app commits each photo on its own and waits for the device. At this rate a 25 MB raw file takes about ${(ms * 25 / 6 / 1000).toFixed(1)} s and forty of them roughly ${((ms * 25 / 6 / 1000) * 40 / 60).toFixed(1)} minutes — less in practice, since the next photo is read and decoded while one write is in flight. ${verdict} Confirmed writes: ${strict.map((x) => Math.round(x) + " ms").join(", ")} (${mbps.toFixed(0)} MB per second). Unconfirmed: ${relaxed.map((x) => Math.round(x) + " ms").join(", ")}.`);
+      `This is what opening a set pays: the app commits each photo on its own and waits for the device. At this rate a 25 MB raw file takes about ${(ms * 25 / 6 / 1000).toFixed(1)} s and forty of them roughly ${((ms * 25 / 6 / 1000) * 40 / 60).toFixed(1)} minutes — less in practice, since the next photo is read and decoded while one write is in flight. ${verdict} Three confirmed writes: ${strict.map((x) => Math.round(x) + " ms").join(", ")} (${mbps.toFixed(0)} MB per second). Unconfirmed: ${relaxed.map((x) => Math.round(x) + " ms").join(", ")}.`);
   } catch (e) {
     p.remove();
     row("Saving one photo", "not run", `Storage refused the test (${(e as Error).message}).`);
@@ -226,6 +248,9 @@ async function storage(): Promise<void> {
   btn.textContent = "Running…";
   results.replaceChildren();
   out.length = 0;
+  // One moment for the whole block: the report is re-taken with the numbers,
+  // and it is what "Copy the results" puts above them.
+  await refreshReport();
   await graphics();
   await decoding();
   await storage();
