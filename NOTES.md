@@ -3976,6 +3976,48 @@ the set survives a reload, a crash or the OS discarding the tab, and each photo
 keeps its own edit. That copy is the 72% above. Batch process is the third thing
 and edits nothing: it develops a whole set unattended into one .zip.
 
+## Saturation clipping: measured, mis-sized, and NOT fixed, 2026-09-09
+
+Owner asked for the clipping flagged earlier to be fixed. **It was measured
+instead, and the finding is that the alarm was wrong by an order of magnitude
+and the change built for it does not earn its place. Nothing shipped.** Recorded
+so nobody re-opens it from the same bad signal.
+
+**WHERE THE BAD SIGNAL CAME FROM.** The original observation was that HSV
+saturation at the 90th percentile reached 1.000 on the strongest frames, read as
+"a tenth of the pixels at full chroma, detail being destroyed". HSV S is
+(max - min) / max, so **S = 1 means only that the smallest channel is zero** —
+which is the ordinary state of any deep shadow. It was counting shadow as damage.
+
+**WHAT THE NUMBERS ACTUALLY ARE.** With Aerochrome across the 44 practice
+frames: 14.9% of pixels have a channel at zero, but only **8% of those are
+bright**. Real out-of-gamut damage — a BRIGHT pixel with a channel clamped to
+zero — averages **1.22% of the frame**, worst about 6%, and exceeds 1% on 13 of
+44 frames. Not a tenth of the picture; roughly a hundredth.
+
+**THE FIX THAT WAS BUILT AND THROWN AWAY.** A soft chroma limit at the
+saturation stage: bound the scale by the largest one that keeps every channel at
+or above zero, approached through a hyperbolic knee (division only, so the
+shader and pipeline.ts stay inside the parity bar) with the top end left alone
+since only 1.9% of pixels reach full white. It is correct and it does almost
+nothing: bright-and-clipped went **1.27% to 1.22%**. Changing how every photo in
+every look renders, for four hundredths of a percentage point, is the wrong
+trade. Reverted; the tree is identical to what shipped.
+
+**AND THE SOURCE IS NOT ONE STAGE.** Tracing the four worst frames: one goes
+from 0% with no look to 6.07% with Aerochrome, so the look makes it; another is
+already at 5.92% before any look at all; and Restore depth REDUCES it on two
+frames while causing all 4% of it on a third. There is no single culprit to fix,
+because this is the ordinary consequence of pushing saturated infrared colour
+through a bounded output gamut.
+
+**THE LESSON, and it is the third time this session.** A statistic that looks
+alarming is not a finding until you know what it is counting. The sky mask's
+"found on 43 of 44" meant something other than over-reporting; the thumbnail
+overlay's frame-wide tint was a feather; and p90 saturation of 1.0 was shadow.
+Each time the shape of the error was the same: a proxy measurement read as the
+thing itself.
+
 ## Fixing the sky mask's gradient under-selection, 2026-09-09
 
 Owner go on the finding above. **Two wrong diagnoses were made and measured out
