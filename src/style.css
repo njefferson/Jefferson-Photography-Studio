@@ -1325,6 +1325,10 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
    focus trap, Escape and focus-restore for free — the fixed-overlay look is
    recreated by pinning the dialog to the full viewport. display:flex would
    force a CLOSED dialog visible, so it only applies while [open]. */
+/* A slider whose automatic is switched off stays readable but says it is not
+   in play. The input is genuinely `disabled` as well, so the state is carried
+   by more than the dimming — colour alone is never the signal. */
+#panel label.is-off { opacity: 0.55; }
 #quickLook,
 #library {
   position: fixed;
