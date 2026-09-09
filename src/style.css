@@ -1329,6 +1329,12 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
    in play. The input is genuinely `disabled` as well, so the state is carried
    by more than the dimming — colour alone is never the signal. */
 #panel label.is-off { opacity: 0.55; }
+/* A double tap on a slider puts it back where the photo opened (see
+   wireSliderReset). On iOS the second tap is otherwise eaten by double-tap
+   zoom, and `manipulation` is what declines that gesture WITHOUT touching page
+   zoom itself — the viewport stays scalable, which is not negotiable here. */
+#panel input[type="range"] { touch-action: manipulation; }
+
 #quickLook,
 #library {
   position: fixed;

@@ -3976,6 +3976,54 @@ the set survives a reload, a crash or the OS discarding the tab, and each photo
 keeps its own edit. That copy is the 72% above. Batch process is the third thing
 and edits nothing: it develops a whole set unattended into one .zip.
 
+## Double-tap a slider to put it back, 2026-09-09
+
+Asked for by the convention it belongs to — Lightroom and Capture One both reset
+a control on a double click — and it matters more here than in either, because
+**most of these sliders do not default to zero.** White balance, exposure and
+denoise open at values MEASURED from the photograph. "Back to default" for them
+is the number this frame opened with, which is already what Reset means in this
+app; the double-tap is Reset for one control instead of all of them.
+
+**Captured from the DOM, not from a table.** The defaults are read off every
+range input at the moment the Reset baseline is taken — `syncToUI` has just
+written the opened values into every control, so the DOM already IS the answer.
+A field-to-element map would have been a second copy of `syncToUI` to keep in
+step, and every second copy this session went looking at had drifted.
+
+**Two controls are preferences, not part of the photo:** export Quality and
+Restore depth Strength open at whatever was last chosen, so "back where it
+opened" would mean "no change". They go to the app's own default (92 and 100).
+
+**THE TOUCH PATH IS NOT `dblclick`.** iOS can swallow the second tap into
+double-tap zoom, so the same gesture is timed by hand off `touchend` at 350 ms,
+and `touch-action: manipulation` on the control declines that gesture —
+WITHOUT touching page zoom, which stays scalable, since locking it is a
+standing fail state here.
+
+**Asserted:** `wbR` opens at 507 and returns to 507, not 0; exposure 615;
+denoise 0.46; recover 0. Quality set to 60 returns to 92. It is ONE undo step,
+and undo gives back the value you had dragged to. On the touch path two quick
+taps put it back and two slow ones do not.
+
+**AND IT THREW ON LOAD FIRST.** The wiring was called with the other startup
+calls near the top of the module, and it closes over `panel`, `flushRecord` and
+the two maps — all declared further down. A `const` referenced before its
+declaration is a temporal dead zone throw, so the whole app failed to start:
+`Cannot access 'Qn' before initialization`. Caught by the walk timing out on the
+welcome screen. Module-level wiring goes AFTER what it closes over, and the
+minifier's renamed identifier is why that error message tells you nothing.
+
+**AND THE HARNESS READ A POLLUTED BASELINE.** The touch check first reported
+`opened 1000 → moved 1000`, which made a working gesture look broken — the
+previous sub-test had left the slider dragged, and "opened" was read from it.
+Reset the control before measuring what its opening value is.
+
+**Discoverable, because a gesture nobody is told about is a gesture nobody
+uses:** every slider carries a tooltip saying what a double-tap does to it, and
+Help's Quick start says it in a sentence, including why the two preference
+sliders behave differently.
+
 ## Every photo in a kept set was decoded twice, 2026-09-09
 
 Reported as a question: why does the strip render every thumbnail again, after
