@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0d0d10" />
+    <title>Test page — Infrared Photography Studio</title>
+    <link rel="stylesheet" href="/palette.css" />
+    <script>
+      try {
+        var d = document.documentElement, s = localStorage;
+        var t = s.getItem("studio-theme");
+        if (t !== "dawn" && t !== "dark") t = matchMedia("(prefers-color-scheme: light)").matches ? "dawn" : "dark";
+        if (t === "dawn") d.setAttribute("data-theme", "dawn");
+        var p = s.getItem("studio-palette");
+        if (p && /^(paper|mono|soft)$/.test(p)) d.setAttribute("data-palette", p);
+        var m = document.querySelector('meta[name=theme-color]');
+        var bg = getComputedStyle(d).getPropertyValue("--bg").trim();
+        if (m && bg) m.setAttribute("content", bg);
+      } catch (e) {}
+    </script>
+  </head>
+  <body class="dbg">
+    <main class="dbg-wrap">
+      <p class="dbg-back"><a href="./ir.html">&lsaquo; Back to Infrared</a></p>
+      <h1>Test page</h1>
+      <p class="dbg-lead">
+        Measurements taken on <strong>this device</strong>, because the answers differ from
+        one to another and a desktop cannot stand in for an iPad. Nothing here changes your
+        photos or your settings, and nothing is sent anywhere. Each test says what it means
+        underneath the number.
+      </p>
+
+      <section class="dbg-sec">
+        <h2>Diagnostic report</h2>
+        <p class="dbg-note">Facts about this device and this build. Copy it into a message when something is wrong — it carries what a screenshot cannot.</p>
+        <div class="dbg-actions">
+          <button id="dCopy" type="button" class="dbg-btn primary">Copy the report</button>
+        </div>
+        <textarea id="dText" class="dbg-text" readonly rows="16" aria-label="Diagnostic report"></textarea>
+      </section>
+
+      <section class="dbg-sec">
+        <h2>Speed</h2>
+        <p class="dbg-note">
+          These are the numbers that decide whether the editor feels quick on this device.
+          They take a few seconds and the page will be busy while they run.
+        </p>
+        <div class="dbg-actions">
+          <button id="dRun" type="button" class="dbg-btn primary">Run the speed tests</button>
+          <button id="dCopyAll" type="button" class="dbg-btn" hidden>Copy the results</button>
+        </div>
+        <div id="dResults" class="dbg-results" role="status" aria-live="polite"></div>
+      </section>
+    </main>
+    <script type="module" src="/src/debug.ts"></script>
+  </body>
+</html>
