@@ -6275,16 +6275,36 @@ async function makeThumb(img: DecodedImage, MAX = 260): Promise<ArrayBuffer> {
     const lift = solveLift(activeLook !== null, img, p);
     if (lift) { p.tone = lift.tone; p.sky = lift.sky; p.foliage = lift.foliage; }
   }
+  // THE PHOTO'S DISPLAY ROTATION, which this never applied. `img.rotate` is the
+  // EXIF Orientation tag as 90-degree CW steps, and the main view has always
+  // honoured it — so a frame shot in portrait opened upright and its THUMBNAIL
+  // lay on its side, in the strip and in the Quick look grid alike, both of
+  // which are built from here. Nineteen of the forty-four practice files carry
+  // Orientation 8, so it was not a corner case; measured before this, a
+  // portrait frame's tile came out 512x341 while the photo itself opened
+  // 932x1400.
+  //
+  // Applied by mapping DESTINATION pixels back to source, so there is still one
+  // pass and no second buffer. The aspect handed to compileEdit stays the
+  // SOURCE aspect: the edit is computed in the photo's own space, and only the
+  // laying-out of the result turns.
+  const rot = ((((img.rotate ?? 0) % 4) + 4) % 4) as 0 | 1 | 2 | 3;
+  const turned = rot === 1 || rot === 3;
+  const ow = turned ? h : w;
+  const oh = turned ? w : h;
   const edit = compileEdit(p, img.camMatrix, w / h);
   const px = new Float32Array(3);
-  const out = new Uint8ClampedArray(w * h * 4);
-  for (let y = 0; y < h; y++) {
-    const sy = Math.min(img.height - 1, Math.floor(y / s));
-    for (let x = 0; x < w; x++) {
+  const out = new Uint8ClampedArray(ow * oh * 4);
+  for (let oy = 0; oy < oh; oy++) {
+    for (let ox = 0; ox < ow; ox++) {
+      // (x, y) in the un-turned thumbnail grid that lands at (ox, oy).
+      const x = rot === 0 ? ox : rot === 1 ? oy : rot === 2 ? w - 1 - ox : w - 1 - oy;
+      const y = rot === 0 ? oy : rot === 1 ? h - 1 - ox : rot === 2 ? h - 1 - oy : ox;
       const sx = Math.min(img.width - 1, Math.floor(x / s));
+      const sy = Math.min(img.height - 1, Math.floor(y / s));
       const [r, g, b] = linearAt(img, sx, sy);
       edit(r, g, b, px, 0, undefined, undefined);
-      const i = (y * w + x) * 4;
+      const i = (oy * ow + ox) * 4;
       out[i] = Math.round(255 * clamp(px[0], 0, 1));
       out[i + 1] = Math.round(255 * clamp(px[1], 0, 1));
       out[i + 2] = Math.round(255 * clamp(px[2], 0, 1));
@@ -6292,8 +6312,8 @@ async function makeThumb(img: DecodedImage, MAX = 260): Promise<ArrayBuffer> {
     }
   }
   const cv = document.createElement("canvas");
-  cv.width = w; cv.height = h;
-  cv.getContext("2d")!.putImageData(new ImageData(out, w, h), 0, 0);
+  cv.width = ow; cv.height = oh;
+  cv.getContext("2d")!.putImageData(new ImageData(out, ow, oh), 0, 0);
   const blob: Blob = await new Promise((res) => cv.toBlob((b) => res(b!), "image/jpeg", 0.72));
   return blob.arrayBuffer();
 }
