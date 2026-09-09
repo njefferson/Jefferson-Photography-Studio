@@ -3976,6 +3976,56 @@ the set survives a reload, a crash or the OS discarding the tab, and each photo
 keeps its own edit. That copy is the 72% above. Batch process is the third thing
 and edits nothing: it develops a whole set unattended into one .zip.
 
+## The "800 ms GL stall" is the software renderer, 2026-09-09
+
+Chased the last open item. **Nothing shipped, and the honest answer is that this
+harness cannot measure it.** Recorded so it is not chased again from here.
+
+**IT WAS NEVER A GL PROGRAM.** The original attribution came from a V8 sampling
+profile showing `(program)` at 996 ms of self time, read as "GL program setup".
+`(program)` is V8's bucket for time not attributable to a JS frame. It has
+nothing to do with a shader program. Measured directly: link and compile take
+**19 ms** at page load, the texture upload 79 ms, and the draws 0 ms each with
+`gl.finish()` forcing completion.
+
+**WHAT THE LONG TASK ACTUALLY IS.** Aggregating the samples INSIDE the 974 ms
+task by call STACK rather than by flat self time: 69% is
+`readPixels <- histogram`. Timed at the call site, one histogram pass on a
+220x146 offscreen buffer reads back in **864 ms** on the first photo and 627 ms
+on the second — absurd for 32k pixels, which is the signal to distrust the
+reading. `renderOffscreen` reports 0 ms because it only QUEUES the draw;
+`readPixels` is the synchronisation point where all queued GPU work is finally
+waited on.
+
+**AND THE READBACK IS NOT THE COST — IT IS THE MESSENGER.** Dragging the
+saturation slider with the histogram ON: 12 readbacks, 6.6 s of readback, worst
+frame 579 ms. With the histogram OFF: no readbacks at all, wall time 6745 ms
+against 6948 ms, worst frame 591 ms. **Turning it off changed nothing.** The
+~550 ms per frame is SwiftShader shading a full-resolution frame in software.
+readPixels was waiting for work that happens either way.
+
+**SO THE NUMBER DOES NOT TRANSFER.** Everything here is a CPU rasteriser. On
+real GPU hardware that shading is a small fraction of it, and there may be no
+perceptible stall at all. **This harness cannot answer whether the iPad has one**
+and no optimisation should be shipped on the strength of it. What IS portable is
+the code shape: a synchronous GPU readback happens on every draw while the
+histogram is visible, and the histogram is ON by default. A sync readback is a
+known hitch on tile-based mobile GPUs — but "known to be a hitch in general" is
+not a measurement of this app on that device, and the two must not be conflated.
+
+**THE EARLIER FIX STANDS, for a smaller reason than was claimed.** Skipping the
+histogram while a set loads still removes N forced flushes at a moment nobody is
+looking at the histogram, and the main-thread time did drop. But the headline
+991 ms to 266 ms was software-renderer time being waited on, not a cost the iPad
+necessarily pays.
+
+**WHAT WOULD SETTLE IT** is a measurement on the device, and this repo has no
+way to take one: it carries no diagnostic report at all (Doctrine §7f — the hub's
+per-app list has this app owing every one of the baseline surfaces, and that gap
+was noticed earlier in this session and not reported at the time). A perf line in
+a diagnostic would answer this and several other questions that currently end in
+"needs the owner's hands".
+
 ## Saturation clipping: measured, mis-sized, and NOT fixed, 2026-09-09
 
 Owner asked for the clipping flagged earlier to be fixed. **It was measured
