@@ -40,7 +40,7 @@ import { parseCube, CUBE_FILE_MAX } from "./cubeimport";
 import { putLut, getLut, listLuts, deleteLut, LUT_COUNT_CAP } from "./luts";
 import { extractLookFromJpeg } from "./lookmark";
 import { encodeQr, drawQr } from "./qr";
-import { wireThemeToggle } from "./theme";
+import { wireThemePicker } from "./theme";
 import { wirePalettePicker } from "./palette";
 
 // Injected at build time from git history (see vite.config.ts).
@@ -4081,7 +4081,7 @@ mUI.clearBrush.addEventListener("click", () => {
 addBrushBtn.addEventListener("click", () => addMask(2));
 
 // Dawn / dark theme switch, living in the ⓘ dialog (shared chrome).
-wireThemeToggle(document.getElementById("themeToggle"));
+wireThemePicker(document.getElementById("themePicker"));
 wirePalettePicker(document.getElementById("palettePicker"));
 
 // Help dialog (usage guide; the ⓘ dialog stays what's-new + support).

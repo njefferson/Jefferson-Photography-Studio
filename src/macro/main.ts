@@ -1,7 +1,7 @@
 import "./macro.css";
 import { stackFocus, type StackFrame } from "./stack";
 import { setupInstalledShare, setupInstallFromApp } from "../share";
-import { wireThemeToggle } from "../theme";
+import { wireThemePicker } from "../theme";
 import { wirePalettePicker } from "../palette";
 import { wireForceUpdate } from "../swupdate";
 
@@ -339,7 +339,7 @@ $("helpClose").addEventListener("click", () => helpDlg.close());
 helpDlg.addEventListener("click", (e) => { if (e.target === helpDlg) helpDlg.close(); });
 
 // Dawn / dark theme switch (shared chrome), living in the help dialog.
-wireThemeToggle(document.getElementById("themeToggle"));
+wireThemePicker(document.getElementById("themePicker"));
 wirePalettePicker(document.getElementById("palettePicker"));
 
 // Installed-app Share (src/share.ts): only when running standalone.

@@ -3976,6 +3976,56 @@ the set survives a reload, a crash or the OS discarding the tab, and each photo
 keeps its own edit. That copy is the 72% above. Batch process is the third thing
 and edits nothing: it develops a whole set unattended into one .zip.
 
+## The theme control had no system option — and never had, 2026-09-09
+
+Reported from the device: the switch shows one name, and there is no "follow the
+OS". Both true, and the second was the larger of the two.
+
+**THE DEFAULT WAS DARK, UNCONDITIONALLY.** `currentTheme()` returned "dawn" only
+when localStorage said so and "dark" otherwise, so a reader who had never touched
+the switch got dark whatever the iPad was set to, and no setting could ask for
+anything else — `prefers-color-scheme` was not consulted anywhere in the app.
+There is corroboration earlier in this same session and it was walked past: an
+axe run with Playwright's `colorScheme: light` rendered identical colours to the
+dark run, and that was noted as "the app must not follow prefers-color-scheme"
+and left. **A measurement that surprises you is a finding, not an aside.**
+
+**AND A TWO-STATE SWITCH CAN ONLY NAME ONE STATE.** It was labelled "Dawn
+theme", so the other half of the control — the one that was also the default —
+had no name on it at all.
+
+Now three options in a radio group: **Match my device** (the new default),
+**Dawn**, **Dark**. The pattern is the palette picker's, sitting a few lines
+below it in the same panel, rather than a new one: `role="radiogroup"` host,
+`role="radio"` buttons, each carrying a name and what it means, `aria-checked`.
+No swatch — there is no single colour that stands for "match my device".
+
+**THE PRE-PAINT SCRIPT HAD TO LEARN THE SAME RULE.** Every page carries an
+inline one-liner that sets `data-theme` before first paint so there is no flash;
+it read localStorage only, so with a system default it would have painted dark
+and then corrected itself one frame later on a light device. It resolves the
+media query now, in all four pages, and the module resolves it identically —
+verified by reading `data-theme` at `waitUntil: "commit"` and again after load.
+
+**FOLLOWING IS LIVE, NOT JUST AT LOAD.** A `prefers-color-scheme` listener
+repaints while — and only while — the choice is "match my device", so an iPad
+switching at sunset carries the app with it. Verified by flipping the emulated
+scheme with the page open: dark to dawn with no reload, and an explicit Dawn
+choice stayed put when the device flipped under it.
+
+**NOTE THE DEFAULT CHANGED FOR EXISTING READERS.** Anyone who never pressed the
+old switch has no stored value, so they move from always-dark to following the
+device. On a light-mode iPad that is a visible change on next open. It is the
+platform convention and it is what the report asked for, but it is a change to
+what people already had.
+
+VERIFIED: first visit follows the device both ways; no flash; live follow;
+explicit choices ignore the device and survive a reload; all three names present;
+every option at least 44px; exactly one checked; axe clean on the launcher, the
+infrared editor and macro, in both device modes. privacy.html carries the
+pre-paint script only and follows correctly with no picker. 37 lines of dead
+two-state switch CSS removed.
+
 ## The device pass on Restore depth, 2026-09-09
 
 Feedback from the iPad. **Most of the behaviour reported was the PRODUCTION

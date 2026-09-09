@@ -41,7 +41,9 @@
     <script>
       try {
         var d = document.documentElement, s = localStorage;
-        if (s.getItem("studio-theme") === "dawn") d.setAttribute("data-theme", "dawn");
+        var t = s.getItem("studio-theme");
+        if (t !== "dawn" && t !== "dark") t = matchMedia("(prefers-color-scheme: light)").matches ? "dawn" : "dark";
+        if (t === "dawn") d.setAttribute("data-theme", "dawn");
         var p = s.getItem("studio-palette");
         if (p && /^(paper|mono|soft)$/.test(p)) d.setAttribute("data-palette", p);
         var m = document.querySelector('meta[name=theme-color]');
