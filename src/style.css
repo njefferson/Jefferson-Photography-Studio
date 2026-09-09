@@ -219,6 +219,31 @@ input[type="range"] {
      scrolls from the label text and the gaps between rows. */
   touch-action: none;
 }
+/* A SECOND TAP ON A CONTROL IS NOT A DOUBLE-TAP ON THE PAGE. Tapping zoom "+"
+   twice in quick succession made iOS Safari take the pair as double-tap-to-zoom
+   and scale the whole app, which is the opposite of what the control does — and
+   it applies to any control somebody presses in a hurry: undo, redo, the strip,
+   the zoom pair.
+
+   `manipulation` disables ONLY double-tap zoom (and the legacy 300ms click
+   delay) on these elements. Pinch still zooms the page, and the viewport meta
+   stays unlocked — `user-scalable=no` and `maximum-scale` are banned here and
+   were removed once already; a control that is hard to press twice is not a
+   reason to stop anyone enlarging the page.
+
+   Deliberately a BASE rule on element/attribute selectors: every control that
+   owns its gesture declares `touch-action: none` on an id or class selector
+   (#view, .grade-wheel, .crop-handle, #toneSvg, input[type=range]), all of
+   which outrank this, so none of them is weakened by it. */
+button,
+[role="button"],
+summary,
+label.open-btn,
+label.bar-btn,
+label.welcome-batch {
+  touch-action: manipulation;
+}
+
 input[type="range"]::-webkit-slider-runnable-track {
   height: 4px;
   border-radius: 999px;
