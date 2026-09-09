@@ -39,7 +39,9 @@
     <script>
       try {
         var d = document.documentElement, s = localStorage;
-        if (s.getItem("studio-theme") === "dawn") d.setAttribute("data-theme", "dawn");
+        var t = s.getItem("studio-theme");
+        if (t !== "dawn" && t !== "dark") t = matchMedia("(prefers-color-scheme: light)").matches ? "dawn" : "dark";
+        if (t === "dawn") d.setAttribute("data-theme", "dawn");
         var p = s.getItem("studio-palette");
         if (p && /^(paper|mono|soft)$/.test(p)) d.setAttribute("data-palette", p);
         var m = document.querySelector('meta[name=theme-color]');
@@ -777,7 +779,10 @@
         <button id="forceUpdate" type="button">Update to the latest version</button>
         <small class="note" id="forceUpdateNote">Checks for a new version and reloads &mdash; use this if a new feature or fix hasn&rsquo;t shown up yet. No need to close the app.</small>
       </div>
-      <p class="theme-row"><button id="themeToggle" type="button"></button></p>
+      <div class="set-row pal-row">
+          <h4 class="pal-head">Day or night</h4>
+          <div id="themePicker" class="pal-picker"></div>
+        </div>
         <div class="set-row pal-row">
           <h4 class="pal-head">Colour palette</h4>
           <div id="palettePicker" class="pal-picker"></div>

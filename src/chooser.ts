@@ -3,10 +3,10 @@
 // loads only when its door is opened). All it does is register the shared
 // service worker so the whole studio works offline.
 import "./launcher.css";
-import { wireThemeToggle } from "./theme";
+import { wireThemePicker } from "./theme";
 import { wirePalettePicker } from "./palette";
 import { wireForceUpdate } from "./swupdate";
-wireThemeToggle(document.getElementById("themeToggle"));
+wireThemePicker(document.getElementById("themePicker"));
 wirePalettePicker(document.getElementById("palettePicker"));
 
 if ("serviceWorker" in navigator) {

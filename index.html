@@ -39,7 +39,9 @@
     <script>
       try {
         var d = document.documentElement, s = localStorage;
-        if (s.getItem("studio-theme") === "dawn") d.setAttribute("data-theme", "dawn");
+        var t = s.getItem("studio-theme");
+        if (t !== "dawn" && t !== "dark") t = matchMedia("(prefers-color-scheme: light)").matches ? "dawn" : "dark";
+        if (t === "dawn") d.setAttribute("data-theme", "dawn");
         var p = s.getItem("studio-palette");
         if (p && /^(paper|mono|soft)$/.test(p)) d.setAttribute("data-palette", p);
         var m = document.querySelector('meta[name=theme-color]');
@@ -157,7 +159,7 @@
 
       <footer class="lc-footer">
         <p class="foot-line">Free &middot; on-device &middot; no account &middot; no upload &middot; <a href="./privacy.html">privacy</a></p>
-        <button id="themeToggle" type="button"></button>
+        <div id="themePicker" class="pal-picker pal-picker-inline"></div>
       </footer>
     </div>
     <!-- First-visit welcome. The SAME card opens from the ⓘ button any time,
