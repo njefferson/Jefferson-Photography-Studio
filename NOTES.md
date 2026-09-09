@@ -3976,6 +3976,39 @@ the set survives a reload, a crash or the OS discarding the tab, and each photo
 keeps its own edit. That copy is the 72% above. Batch process is the third thing
 and edits nothing: it develops a whole set unattended into one .zip.
 
+## The full-screen dialogs never spent the safe-area inset, 2026-09-09
+
+Reported from the installed iPad: the Quick look header drawn UNDER the iOS
+status bar — the clock sitting on top of the title, and Select none / Keep /
+Close tucked beneath the battery indicator.
+
+`.bar`, the app's own top bar, has spent `env(safe-area-inset-top)` since it was
+written. `.ql-head` never did — and both dialogs that use it are
+`position: fixed; inset: 0; height: 100dvh`, so they cover the whole screen
+INCLUDING the strip iOS draws its status bar into. **One header, two surfaces:
+Quick look and the practice library were wrong from the same line.** The
+bottom got the same treatment, since the home indicator sits over the last row
+of tiles.
+
+**AND THE BUTTONS IN THAT HEADER WERE 34px.** `.ql-btn` is authored as
+`padding: 8px 14px` at 0.8125rem — about 34px tall, on the primary controls of a
+full-screen surface. The hit-area sweep added earlier today did not catch it
+because **it only ever opened the two dialogs on the main page.** A sweep is a
+list of states somebody remembered, and the states nobody remembers are exactly
+where this lives. Both full-screen dialogs are in the sweep now, opened directly
+— their controls do not depend on content — and every interactive element clears
+44 at 430px and 900px in all five states.
+
+**VERIFIED AGAINST AN INJECTED INSET, because a headless browser has no status
+bar and reports every inset as zero.** A test run without one passes on the
+machine that cannot have the defect and proves nothing about the device that
+does. With 44px injected the way a device supplies it: the header background
+still starts at y=0 (it SHOULD fill behind the bar), the title lands at y=68 and
+every button at y=56, all clear of the 0–44 strip and all 44px tall.
+
+**Checked and not a defect:** `#unsupported` is the only other fixed full-screen
+element, and it centres its card, so it never reaches the bar.
+
 ## The sidecar gap was already closed, and I reported it as open twice, 2026-09-09
 
 Carried in two handovers as a standing crash-safety defect: that `batchstore.ts`
