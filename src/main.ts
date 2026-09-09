@@ -6086,6 +6086,7 @@ function establishFreshEdit() {
   // a clean undo history. Do this AFTER syncFromUI so the baseline is exactly
   // what the user first sees.
   baseline = snapshot();
+  captureSliderDefaults();
   settled = snapshot();
   undoStack.length = 0;
   redoStack.length = 0;
@@ -6802,6 +6803,74 @@ function restripForGrade(): void {
     if (stale) void realThumbnails();
   }, 900);
 }
+
+/** DOUBLE-TAP A SLIDER TO PUT IT BACK. The convention every photo editor
+ *  shares — Lightroom and Capture One both reset a control on a double click —
+ *  and the reason it matters here is that most of these sliders do NOT default
+ *  to zero. White balance, exposure and denoise open at values MEASURED from
+ *  the photograph, so "the default" for them is the number this frame opened
+ *  with, which is also exactly what Reset means in this app.
+ *
+ *  Captured from the DOM rather than from a table of fields, at the moment the
+ *  Reset baseline is taken: `syncToUI` has just written the opened values into
+ *  every control, so the DOM already IS the answer. A field-to-element map
+ *  would be a second copy of `syncToUI` to keep in step, and the four other
+ *  places this session found a second copy of something had all drifted. */
+const sliderDefaults = new Map<string, string>();
+
+/** The two controls that are app PREFERENCES rather than part of the photo:
+ *  they open at whatever was last chosen, so "back where it opened" would mean
+ *  "no change". These go back to the app's own default instead. */
+const PREF_SLIDER_DEFAULTS: Record<string, string> = { exQuality: "92", liftAmt: "100" };
+
+function captureSliderDefaults(): void {
+  for (const el of document.querySelectorAll<HTMLInputElement>('#panel input[type="range"]')) {
+    if (!el.id || el.id in PREF_SLIDER_DEFAULTS) continue;
+    sliderDefaults.set(el.id, el.value);
+  }
+}
+
+/** Wire every slider in the panel once. Delegated, so controls built later are
+ *  covered without anything having to remember to call this again. */
+function wireSliderReset(): void {
+  // Say so on the control itself. A gesture nobody is told about is a gesture
+  // nobody uses, and this one has no visible affordance at all.
+  for (const el of document.querySelectorAll<HTMLInputElement>('#panel input[type="range"]')) {
+    if (!el.title) el.title = el.id in PREF_SLIDER_DEFAULTS
+      ? "Double-tap to put this back to its usual setting"
+      : "Double-tap to put this back to where the photo opened";
+  }
+  const back = (el: HTMLInputElement) => {
+    const to = PREF_SLIDER_DEFAULTS[el.id] ?? sliderDefaults.get(el.id);
+    if (to === undefined || el.disabled || el.value === to) return;
+    el.value = to;
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+    flushRecord(); // one gesture, one undo step
+  };
+  panel.addEventListener("dblclick", (e) => {
+    const el = (e.target as HTMLElement | null)?.closest?.('input[type="range"]') as HTMLInputElement | null;
+    if (el) { e.preventDefault(); back(el); }
+  });
+  // iOS does not fire dblclick reliably on a range input — the second tap can
+  // be swallowed by the zoom gesture — so the same thing is timed by hand.
+  // `touch-action: manipulation` on the control (see style.css) is what stops
+  // that gesture eating it.
+  let lastId = "", lastAt = 0;
+  panel.addEventListener("touchend", (e) => {
+    const el = (e.target as HTMLElement | null)?.closest?.('input[type="range"]') as HTMLInputElement | null;
+    if (!el) return;
+    const now = Date.now();
+    if (el.id === lastId && now - lastAt < 350) { back(el); lastId = ""; lastAt = 0; }
+    else { lastId = el.id; lastAt = now; }
+  }, { passive: true });
+}
+
+// Wired HERE, not with the other startup calls near the top: this closes over
+// `panel`, `flushRecord` and the two maps above, all declared further down the
+// module than that block, and a `const` referenced before its declaration is a
+// temporal dead zone throw at load — which is exactly what it did.
+wireSliderReset();
 
 /** Repaint the session strip (thumbnails, active highlight, size readout).
  *  The strip takes real layout room: it publishes its measured height on the
