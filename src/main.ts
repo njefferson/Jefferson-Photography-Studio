@@ -613,6 +613,7 @@ function pressLook(key: string) {
     applyLook(key);
   }
   updateLookUI();
+  restripForGrade();
   flushRecord();
 }
 
@@ -6080,6 +6081,14 @@ interface SessionPhoto {
    *  photo is this" instantly and for free. "real" — rendered through this
    *  app's own pipeline, so it matches what tapping it opens into. */
   thumbState: "waiting" | "preview" | "real";
+  /** WHICH GRADE the tile was rendered under. A thumbnail is a claim about what
+   *  tapping it opens into, and the grade carries across the whole session — so
+   *  changing the look after a set is open made every tile a stale claim, and
+   *  `realThumbnails` would not touch them because it only ever looked for
+   *  tiles that were not "real" YET. Measured: with Aerochrome on, the photo
+   *  rendered a colour cast of 1.18/0.90/0.92 and every tile 1.02/0.98/0.99 —
+   *  near-neutral, the look nowhere on them. */
+  thumbGrade?: string;
 }
 
 /** The live, in-memory edit for one photo — kept so switching back within a
@@ -6675,16 +6684,49 @@ async function realThumbnails(): Promise<void> {
         view.thumbUrl = URL.createObjectURL(new Blob([thumb], { type: "image/jpeg" }));
         await Session.setThumb(view.id, thumb).catch(() => {});
       }
-      view.thumbState = "real"; // done either way — never picked up again
+      view.thumbState = "real";
+      view.thumbGrade = gradeStamp(); // what this picture is a claim about
       updateSessionStrip();
     } catch {
       // A thumbnail is not worth failing an open over — the tile keeps the
       // camera preview, or its name, and the photo still opens. Mark it done
       // either way so a file that will never render cannot spin this loop.
       view.thumbState = "real";
+      view.thumbGrade = gradeStamp();
     }
     await tick();
   }
+}
+
+/** The part of the live creative state a thumbnail renders with. `makeThumb`
+ *  clones the live params and then replaces the per-shot ones (balance,
+ *  exposure, denoise) with the photo's own, so only these can make one tile
+ *  differ from another's stored picture. Stamped onto each tile so a tile
+ *  rendered under a different grade can be found and redrawn. */
+function gradeStamp(): string {
+  return JSON.stringify([
+    activeLook, params.swapRB, params.hue, params.sat, params.contrast, params.tint,
+    params.glow, params.lum, params.toneR, params.toneG, params.toneB, params.hsl,
+    params.bwOn, params.bwMix, params.grade, params.mix3, lookBias,
+  ]);
+}
+
+/** A look (or any grade move) changed: every tile is now showing a picture the
+ *  photo would no longer open into. Mark them and let the background pass
+ *  redraw them — it already decodes from storage, is interruptible by its own
+ *  generation guard, and leaves the old picture on screen until a new one
+ *  lands, so nothing blanks out. Debounced, because pressing through four looks
+ *  in a row should redraw once, not four times. */
+let regradeTimer = 0;
+function restripForGrade(): void {
+  clearTimeout(regradeTimer);
+  regradeTimer = window.setTimeout(() => {
+    if (sessionPhotos.length < 2) return; // a lone photo has no strip
+    const stamp = gradeStamp();
+    let stale = 0;
+    for (const v of sessionPhotos) if (v.id !== "lone" && v.thumbGrade !== stamp) { v.thumbState = "waiting"; stale++; }
+    if (stale) void realThumbnails();
+  }, 900);
 }
 
 /** Repaint the session strip (thumbnails, active highlight, size readout).
