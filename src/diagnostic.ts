@@ -84,6 +84,52 @@ async function swLine(): Promise<string> {
   }
 }
 
+/** What the APP itself is holding, which is the question `Storage` raises and
+ *  cannot answer: an origin figure of several GB says nothing about whether it
+ *  is this app's sessions, its batch-recovery frames, or its offline caches.
+ *
+ *  READ-ONLY BY CONSTRUCTION. It lists the databases that already exist and
+ *  opens only those, WITHOUT a version — `indexedDB.open(name)` on an existing
+ *  database never fires an upgrade, and the ones that do not exist are never
+ *  touched. A diagnostic that creates a database in order to report on storage
+ *  is changing the thing it is measuring, and this one already shipped a line
+ *  claiming a call it had not made. */
+async function holdingsLine(): Promise<string> {
+  const WANT: [name: string, store: string, unit: string][] = [
+    ["ips-session", "meta", "photo"],
+    // "meta" in both — batchstore's v1 "frames" store was deleted at its own
+    // v2 upgrade, so naming it here would count a store that cannot exist.
+    ["ips-batch", "meta", "saved frame"],
+  ];
+  try {
+    const listed = await (indexedDB as { databases?(): Promise<{ name?: string }[]> }).databases?.();
+    if (!listed) return "not reported by this browser";
+    const present = new Set(listed.map((d) => d.name).filter(Boolean) as string[]);
+    const counted = await Promise.all(
+      WANT.filter(([n]) => present.has(n)).map(([n, store, unit]) =>
+        new Promise<string>((res) => {
+          const rq = indexedDB.open(n);
+          rq.onerror = () => res(`${n}: could not be read`);
+          rq.onsuccess = () => {
+            const db = rq.result;
+            try {
+              if (!db.objectStoreNames.contains(store)) { db.close(); return res(""); }
+              const c = db.transaction(store).objectStore(store).count();
+              c.onsuccess = () => { const n2 = c.result; db.close(); res(n2 ? `${n2} ${unit}${n2 === 1 ? "" : "s"}` : ""); };
+              c.onerror = () => { db.close(); res(""); };
+            } catch { db.close(); res(""); }
+          };
+        })),
+    );
+    const held = counted.filter(Boolean);
+    const others = [...present].filter((n) => !WANT.some(([w]) => w === n));
+    const tail = others.length ? ` · other databases: ${others.join(", ")}` : "";
+    return (held.length ? held.join(" · ") : "nothing kept") + tail;
+  } catch {
+    return "unavailable";
+  }
+}
+
 /** Build the report. `extra` lets a page add its own lines (the editor adds
  *  what it has open, as counts). */
 export async function buildDiagnostic(version: string, extra: DiagLine[] = []): Promise<string> {
@@ -108,6 +154,8 @@ export async function buildDiagnostic(version: string, extra: DiagLine[] = []): 
     { k: "Graphics", v: glLine() },
     { k: "Offline worker", v: await swLine() },
     { k: "Storage", v: await storageLine(standalone) },
+    // The line that turns an origin-wide number into something actionable.
+    { k: "App is holding", v: await holdingsLine() },
     { k: "Colours", v: `${document.documentElement.getAttribute("data-theme") ?? "dark"} · palette ${document.documentElement.getAttribute("data-palette") ?? "instrument"}` },
     { k: "Reduced motion", v: yes(window.matchMedia("(prefers-reduced-motion: reduce)").matches) },
     { k: "Language", v: navigator.language },
