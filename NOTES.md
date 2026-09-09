@@ -3976,6 +3976,52 @@ the set survives a reload, a crash or the OS discarding the tab, and each photo
 keeps its own edit. That copy is the 72% above. Batch process is the third thing
 and edits nothing: it develops a whole set unattended into one .zip.
 
+## Fixing the sky mask's gradient under-selection, 2026-09-09
+
+Owner go on the finding above. **Two wrong diagnoses were made and measured out
+of the way before the real one; both are recorded because the reasoning that
+produced them looked sound.**
+
+**WRONG ONE.** "The final selection pass re-tests every filled pixel against the
+seed median with no adjacency allowance, so the fill reaches the lower sky and
+the last step throws it away." Re-reading the loop: it opens `if (mask[p])
+continue`. It SKIPS filled pixels — it is the hole fill for sky glimpsed through
+branches, not a re-test. Nothing the fill finds is ever discarded.
+
+**WRONG TWO.** Sky colour is far more stable than sky luminance, so the fill's
+model-luminance bound was widened in proportion to how well a pixel's colour sat
+on the learned cluster. It is a sound argument and it moved 17 of 44 frames — but
+the frame with the actual problem went 14% to 15%. Luminance was not its limiter.
+
+**THE MEASUREMENT THAT SETTLED IT** was instrumenting the fill to count its
+frontier rejections by cause. On the two frames that behave, the fill stops at
+EDGES (90% and 98% of rejections) — it is halting at the treeline, exactly right.
+On the frame that under-selects, the split is model 38% / edge 33% / chroma 29%,
+with nothing dominant: by the horizon that sky has genuinely left the seed
+cluster on BOTH axes at once. No single bound was going to fix it, which is why
+both earlier attempts were reasonable and both were wrong.
+
+**THE FIX IS TO RE-FIT THE MODEL TO THE SKY ACTUALLY FOUND.** The model is
+learned from a strip 6% deep at the top of the frame, and a big sky is not that
+strip. So the fill now runs twice: once from the seed model, then the model is
+re-estimated (same robust median + MAD, sampled at 20k points) from everything
+the first pass selected, and the fill continues from that whole frontier. Two
+passes, not a loop — one re-fit lets a gradient be described, an unbounded chain
+would let the cluster walk into the foliage a small step at a time.
+
+MEASURED over all 44 practice frames, and the numbers are not the point on their
+own — the masks were rendered and looked at. The frame the report was about goes
+14% to 25%, and its teal now reaches the treeline instead of stopping in open sky
+halfway down. The largest gain is 25% to 45% on a cloud-filled sky, fully
+selected with the trees correctly excluded. 36 frames gain, 8 are unchanged, and
+four move DOWN by 1 to 3 points, which is the refit tightening a cluster the
+first pass had let drift. **The frame with no sky still selects nothing and still
+says so** — that was the regression to fear and it did not happen.
+
+COST: the second pass roughly doubles generation. 91-235 ms on the press, median
+165 ms, synchronous. Acceptable for a control that is pressed deliberately;
+worth knowing if it is ever moved somewhere automatic.
+
 ## The sky mask, looked at properly, 2026-09-09
 
 Followed up on the earlier observation that buildSkyMask reported found=true on
