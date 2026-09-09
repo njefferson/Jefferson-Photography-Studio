@@ -3976,6 +3976,52 @@ the set survives a reload, a crash or the OS discarding the tab, and each photo
 keeps its own edit. That copy is the 72% above. Batch process is the third thing
 and edits nothing: it develops a whole set unattended into one .zip.
 
+## The strip was showing a grade nobody was looking at any more, 2026-09-09
+
+Spotted in a screenshot: the photo on screen strongly cyan, every thumbnail in
+the strip beneath it grey-pink. The repo's own rule is that a tile matches what
+tapping it opens into, and `makeThumb` carries a comment citing an
+owner-caught case of exactly this.
+
+**MEASURED, because a screenshot is not a measurement.** Four photos, Aerochrome
+applied, each tile's mean colour compared against the photo it opens into — as a
+CAST (each channel over the mean), so the tile being smaller and a JPEG does not
+count as a colour difference:
+
+- NIR_0063: photo 1.18/0.90/0.92 · tile 1.02/0.98/0.99 — 0.154 apart
+- and every other tile within a hair of neutral, 1.02/0.98/0.99
+
+**The tiles were not wearing the look at all.** `realThumbnails` selects photos
+whose `thumbState !== "real"` — so once a set is in, every tile is "real" and the
+pass returns immediately. The tiles were rendered under whatever grade was live
+at OPEN, and changing the look afterwards never touched them. The earlier fix
+for this (thumbnails wearing another photo's correction) was about which PHOTO's
+values a tile used; this is about which MOMENT's.
+
+**AND THE FIRST HARNESS COULD NOT HAVE SEEN IT.** The tile-versus-photo check
+written earlier today correlates LUMINANCE on a 5x5 grid — it scored 0.999 while
+the tiles were the wrong colour entirely, because a colour cast barely moves
+luminance. **A test that passes on the defect it was written near is worse than
+no test**, and this one passed at three nines.
+
+**THE FIX IS A STAMP, not a re-run.** Each tile records the grade it was drawn
+under — the part of the live state `makeThumb` actually consumes, since it
+replaces balance, exposure and denoise with the photo's own. A look press marks
+every tile whose stamp no longer matches and lets the existing background pass
+redraw them: it already decodes from storage, is interruptible by its generation
+guard, and leaves the old picture up until a new one lands, so nothing blanks.
+
+**Debounced at 900 ms, and measured:** four look presses in a row over a 44-photo
+set cost 45 decodes — **1.02 passes, not four** — and all 44 tiles kept a picture
+throughout. After the fix NIR_0063 reads photo 81/62/64 against tile 81/65/65,
+0.024 apart where it was 0.154.
+
+**WHAT THIS COSTS ON A BIG SET, said plainly:** one look press on a 360-photo
+session queues 360 background decodes. Nothing blocks and the pass abandons
+itself if the session changes, but it is real work, and if that turns out to
+matter the answer is to redraw the visible tiles first rather than to stop
+stamping them.
+
 ## Asking for one photo and being told about another, 2026-09-09
 
 Reported from a 360-file NEF open on the iPad: tapping a thumbnail put up a
