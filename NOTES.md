@@ -3976,6 +3976,54 @@ the set survives a reload, a crash or the OS discarding the tab, and each photo
 keeps its own edit. That copy is the 72% above. Batch process is the third thing
 and edits nothing: it develops a whole set unattended into one .zip.
 
+## Restore depth gets a strength slider, 2026-09-09
+
+The targets it solves against — median luminance 0.44, warm saturation 0.35,
+cool 0.50 — were measured across the practice set and have been carried in this
+file as "taste, not measurement" for the whole session. **How far to apply a
+correction is a judgement about a photograph, and the answer to that is a
+slider, not a constant in a source file.** 0 does nothing, 100 is the full
+correction the frame was solved for, and the whole range is on one control.
+
+**It scales the ANSWER, not the targets.** `scaleLift` mixes the solved values
+back toward doing nothing — half strength is half the tone pull and half the
+extra saturation, not a different correction solved against softer references.
+That keeps the solve idempotent and keeps every intermediate value on the same
+sliders the full one lands on. Applied at all three solve sites: the open, the
+thumbnail, and the batch.
+
+**MEASURED on a frame whose correction is all colour:** full 1.37/1.85 foliage
+and sky, 50% 1.18/1.42 — the midpoints — 0% exactly 1/1, and back to 100%
+identical to the first reading. The slider is disabled while the automatic is
+off, and the strength survives a reload.
+
+**AND IT SHIPPED, BRIEFLY, DEFAULTING TO ZERO.** The stored value was read as
+`Number(localStorage.getItem(...))`, and `Number(null)` is **0** — which passes
+every range check a sane person writes. So a fresh install would have had the
+automatic switched on, showing on, and doing nothing: **the exact complaint this
+control was added to answer, reintroduced by the control itself.** Caught by the
+first run of its own test, whose "100%" baseline read `amt: "0"`. Ask whether
+there IS a stored value before asking what it is.
+
+## "Opening 360 photos" was describing something that was not happening
+
+Two faults in one line, both reported from the device.
+
+**It stopped saying which photo you are on.** The strip's meta line is replaced
+wholesale while a set comes in, so `viewing N` — the one number the strip exists
+to tell you — vanished for the entire load. On 360 files that is minutes of not
+knowing where you are. It now reads `viewing 1 · adding 53 of 360 — NIR_2962.NEF`
+and keeps the position through the whole load.
+
+**And they were not "opening".** One photo is open; the rest are being read and
+copied onto the device so the set survives a reload, which is where the wait
+actually goes. "Opening 360 photos" named an action that was not occurring, on
+the surface whose job is to say what is. It says "adding" now.
+
+Asserted across a 44-file open: 42 distinct lines, every one carrying
+`viewing N`, none saying "Opening", and the settled line still reading
+`44 photos · ~438 MB · viewing 1`.
+
 ## The strip was showing a grade nobody was looking at any more, 2026-09-09
 
 Spotted in a screenshot: the photo on screen strongly cyan, every thumbnail in
