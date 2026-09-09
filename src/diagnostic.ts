@@ -1,0 +1,102 @@
+// The text report (Doctrine §7f). Its job is to carry what the browser's own
+// identification HIDES — above all that iPadOS Safari reports itself as
+// macOS, so `maxTouchPoints` is the only thing separating an iPad from a Mac,
+// and every "is this an iPad?" question downstream depends on it.
+//
+// It is TEXT, and it is asked for instead of a screenshot: a screenshot cannot
+// be searched, cannot be diffed against last week's, and leaves out everything
+// that is not currently on screen.
+//
+// NOTHING THE READER WROTE GOES IN IT. No file names, no photo metadata, no
+// location, no edit values — only facts about the device and the build. A
+// session appears as a COUNT and nothing else. That is asserted, not assumed:
+// the session walk opens a named practice file and greps the built report for
+// its name. Anything added here has to survive the same test.
+
+export interface DiagLine { k: string; v: string }
+
+const yes = (b: boolean) => (b ? "yes" : "no");
+
+/** iPadOS Safari reports "MacIntel". A Mac has no touch screen; an iPad reports
+ *  five. Anything else is taken at its word. */
+function deviceLine(platform: string, touch: number): string {
+  if (/mac/i.test(platform)) {
+    return touch > 0
+      ? `iPad or iPhone — it says "${platform}", but ${touch} touch points means it is not a Mac`
+      : `Mac — says "${platform}" with no touch screen`;
+  }
+  return `${platform}${touch > 0 ? ` · touch screen (${touch} points)` : ""}`;
+}
+
+async function storageLine(): Promise<string> {
+  try {
+    const est = await navigator.storage?.estimate?.();
+    if (!est) return "not reported by this browser";
+    const mb = (n?: number) => (n === undefined ? "?" : `${(n / 1024 / 1024).toFixed(0)} MB`);
+    const persisted = await navigator.storage?.persisted?.().catch(() => false);
+    return `${mb(est.usage)} used of ${mb(est.quota)} · persistent: ${yes(!!persisted)}`;
+  } catch {
+    return "unavailable";
+  }
+}
+
+function glLine(): string {
+  try {
+    const c = document.createElement("canvas");
+    const gl = c.getContext("webgl2");
+    if (!gl) return "WebGL2 NOT available — the editor cannot run";
+    const dbg = gl.getExtension("WEBGL_debug_renderer_info");
+    const r = dbg ? String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)) : "renderer not disclosed";
+    const maxTex = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
+    const float = yes(!!gl.getExtension("EXT_color_buffer_float"));
+    return `${r} · max texture ${maxTex}px · float buffers ${float}`;
+  } catch {
+    return "unavailable";
+  }
+}
+
+async function swLine(): Promise<string> {
+  try {
+    if (!("serviceWorker" in navigator)) return "not supported";
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (!reg) return "not registered";
+    const state = reg.active ? "active" : reg.installing ? "installing" : reg.waiting ? "waiting" : "none";
+    const names = await caches.keys();
+    return `${state}${reg.waiting ? " · an update is WAITING" : ""} · caches: ${names.join(", ") || "none"}`;
+  } catch {
+    return "unavailable";
+  }
+}
+
+/** Build the report. `extra` lets a page add its own lines (the editor adds
+ *  what it has open, as counts). */
+export async function buildDiagnostic(version: string, extra: DiagLine[] = []): Promise<string> {
+  const nav = navigator as Navigator & { standalone?: boolean; deviceMemory?: number };
+  const standalone =
+    window.matchMedia("(display-mode: standalone)").matches || nav.standalone === true;
+  const lines: DiagLine[] = [
+    { k: "App", v: `Infrared Photography Studio v${version}` },
+    { k: "Taken", v: new Date().toISOString() },
+    { k: "Address", v: location.origin + location.pathname },
+    { k: "Installed", v: standalone ? "yes — running as an installed app" : "no — running in the browser" },
+    // The line the whole report exists for. iPadOS Safari in desktop mode
+    // identifies itself as a Mac, and the ONLY thing that separates the two is
+    // the touch count — so the report states the conclusion rather than leaving
+    // whoever reads it to remember the trick.
+    { k: "Device", v: deviceLine(navigator.platform ?? "?", nav.maxTouchPoints ?? 0) },
+    { k: "Touch points", v: String(nav.maxTouchPoints ?? 0) },
+    { k: "Browser string", v: navigator.userAgent },
+    { k: "Screen", v: `${screen.width}x${screen.height} at ${window.devicePixelRatio}x · window ${innerWidth}x${innerHeight}` },
+    { k: "Memory hint", v: nav.deviceMemory ? `${nav.deviceMemory} GB` : "not reported" },
+    { k: "Cores", v: String(navigator.hardwareConcurrency ?? "not reported") },
+    { k: "Graphics", v: glLine() },
+    { k: "Offline worker", v: await swLine() },
+    { k: "Storage", v: await storageLine() },
+    { k: "Colours", v: `${document.documentElement.getAttribute("data-theme") ?? "dark"} · palette ${document.documentElement.getAttribute("data-palette") ?? "instrument"}` },
+    { k: "Reduced motion", v: yes(window.matchMedia("(prefers-reduced-motion: reduce)").matches) },
+    { k: "Language", v: navigator.language },
+    ...extra,
+  ];
+  const w = Math.max(...lines.map((l) => l.k.length));
+  return lines.map((l) => `${l.k.padEnd(w)}  ${l.v}`).join("\n") + "\n";
+}

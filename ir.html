@@ -58,7 +58,7 @@
           <span class="tool-dot ir" aria-hidden="true"></span>
           Infrared
           <button id="infoBtn" class="info-btn" type="button" aria-label="What's new">i</button>
-          <span id="verTag" class="ver-tag" title="Build version (for troubleshooting)"></span>
+          <button id="verTag" class="ver-tag" type="button" aria-haspopup="dialog" title="Build version — and the tools for when something is wrong"></button>
         </span>
         <button id="homeBtn" class="bar-btn" type="button" title="Back to the start screen (keeps your session open)" aria-label="Home">
           <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M3 11l9-8 9 8" /><path d="M5 10v10h5v-6h4v6h5V10" /></svg>
@@ -610,6 +610,20 @@
       </div>
     </div>
 
+    <dialog id="verDlg" aria-labelledby="verDlgTitle">
+      <h2 id="verDlgTitle">This build</h2>
+      <p id="verDlgVer" class="info-ver"></p>
+      <p class="note">If something is wrong, this is what to send — it says what this device is and how the app is set up here. It carries nothing about your photos: no names, no camera data, no location.</p>
+      <label class="sr-only" for="verDlgText">Diagnostic report</label>
+      <textarea id="verDlgText" class="dbg-text" readonly rows="12"></textarea>
+      <div class="ver-actions">
+        <button id="verCopy" type="button" class="primary">Copy the report</button>
+        <a id="verDebug" class="ver-link" href="./debug.html">Test this device&hellip;</a>
+      </div>
+      <p class="note">The test page measures how fast this device decodes a photo, draws a frame and saves to storage — numbers that differ on every device and cannot be guessed from a desktop.</p>
+      <button id="verClose" type="button">Close</button>
+    </dialog>
+
     <dialog id="busy" aria-label="Working">
       <div class="busy-card">
         <div class="spinner" id="busySpinner"></div>
@@ -775,6 +789,10 @@
         <a id="venmo" class="coffee" target="_blank" rel="noopener" hidden>Venmo</a>
       </p>
       <h3 class="rm-head" id="settingsHead">Settings</h3>
+      <div class="set-row">
+        <button id="infoDiag" type="button">Something&rsquo;s wrong &mdash; the report to send</button>
+        <small class="note">Opens a plain-text report of what this device is and how the app is set up here, ready to copy into a message, plus a page that measures how fast this device actually runs. It carries nothing about your photos.</small>
+      </div>
       <div class="set-row">
         <button id="forceUpdate" type="button">Update to the latest version</button>
         <small class="note" id="forceUpdateNote">Checks for a new version and reloads &mdash; use this if a new feature or fix hasn&rsquo;t shown up yet. No need to close the app.</small>

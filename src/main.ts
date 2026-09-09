@@ -19,6 +19,7 @@ import { generateDcp } from "./dcp";
 import { buildGlowMap } from "./glow";
 import { buildLocalMap } from "./localmap";
 import { buildSkyMask, SKY_MIN_COVERAGE } from "./sky";
+import { buildDiagnostic } from "./diagnostic";
 import { Tiff } from "./raw/tiff";
 import { drawHistogram } from "./histogram";
 import * as Hotspot from "./hotspot";
@@ -56,6 +57,7 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 {
   const verTag = document.getElementById("verTag");
   if (verTag) verTag.textContent = `v${__APP_VERSION__}`;
+  wireVersionMenu();
 }
 
 const canvas = $("view") as HTMLCanvasElement;
@@ -1306,7 +1308,55 @@ for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.dn, ui.recover, ui.hue, ui
   el.addEventListener("input", syncFromUI);
 }
 
-// --- Lift a flat frame ------------------------------------------------------
+/** The version number is the way in to the two things you need when something
+ *  is wrong: the report that says what this device IS, and a page that measures
+ *  what it can DO. Both were missing entirely — the version was a dead label,
+ *  and every performance question about the real device ended in a guess. */
+function wireVersionMenu() {
+  const dlg = document.getElementById("verDlg") as HTMLDialogElement | null;
+  const tag = document.getElementById("verTag");
+  if (!dlg || !tag) return;
+  const text = document.getElementById("verDlgText") as HTMLTextAreaElement;
+  const copyBtn = document.getElementById("verCopy") as HTMLButtonElement;
+  (document.getElementById("verDlgVer") as HTMLElement).textContent = `Infrared Photography Studio v${__APP_VERSION__}`;
+  document.getElementById("verClose")!.addEventListener("click", () => dlg.close());
+  const open = async () => {
+    text.value = "Gathering…";
+    dlg.showModal();
+    // Counts only. What is open is useful; WHICH photos is nobody's business
+    // but the reader's, and a report that carries a filename is a report that
+    // cannot safely be pasted anywhere.
+    const real = sessionPhotos.filter((p) => p.id !== "lone").length;
+    text.value = await buildDiagnostic(__APP_VERSION__, [
+      { k: "Open now", v: current ? `a photo is open${real >= 2 ? ` in a session of ${real}` : ""}` : "nothing open" },
+      { k: "Restore depth", v: autoLift ? "on" : "off" },
+    ]);
+  };
+  tag.addEventListener("click", open);
+  // The version number is where this LIVES, and nobody with a problem thinks to
+  // press a version number. The ⓘ is where they look, so it points here — one
+  // dialog, two ways in, rather than a second copy of the report.
+  document.getElementById("infoDiag")?.addEventListener("click", () => {
+    (document.getElementById("infoDlg") as HTMLDialogElement | null)?.close();
+    void open();
+  });
+  copyBtn.addEventListener("click", async () => {
+    const was = copyBtn.textContent;
+    try {
+      await navigator.clipboard.writeText(text.value);
+      copyBtn.textContent = "Copied";
+    } catch {
+      // Refused — select it so it can still be copied by hand. Never a button
+      // that looks like it worked and did not.
+      text.focus();
+      text.select();
+      copyBtn.textContent = "Selected — press Copy";
+    }
+    setTimeout(() => { copyBtn.textContent = was; }, 2200);
+  });
+}
+
+// --- Restore depth ------------------------------------------------------
 // The complaint this answers: an infrared frame with no open sky in it opens
 // pale and grey however it is graded. Measured across the 44 bundled practice
 // frames at their open baseline with Aerochrome on — the ones WITH sky land at

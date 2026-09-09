@@ -2341,3 +2341,88 @@ small { font-size: max(0.6875rem, 0.8em); }
 .pal-sw[data-pal="mono"] { --sw-n-page: var(--pal-mono-night-page); --sw-n-surface: var(--pal-mono-night-surface); --sw-n-rail: var(--pal-mono-night-rail); --sw-n-txt: var(--pal-mono-night-txt); --sw-n-accent: var(--pal-mono-night-accent); --sw-d-page: var(--pal-mono-day-page); --sw-d-surface: var(--pal-mono-day-surface); --sw-d-rail: var(--pal-mono-day-rail); --sw-d-txt: var(--pal-mono-day-txt); --sw-d-accent: var(--pal-mono-day-accent); }
 .pal-sw[data-pal="soft"] { --sw-n-page: var(--pal-soft-night-page); --sw-n-surface: var(--pal-soft-night-surface); --sw-n-rail: var(--pal-soft-night-rail); --sw-n-txt: var(--pal-soft-night-txt); --sw-n-accent: var(--pal-soft-night-accent); --sw-d-page: var(--pal-soft-day-page); --sw-d-surface: var(--pal-soft-day-surface); --sw-d-rail: var(--pal-soft-day-rail); --sw-d-txt: var(--pal-soft-day-txt); --sw-d-accent: var(--pal-soft-day-accent); }
 .pal-txt { min-width: 0; flex: 1; }
+
+
+/* ---- The version menu, and the test page it leads to ---- */
+/* The version tag is a button now, so it needs a real target and a focus ring;
+   it keeps the quiet look it had as a label. */
+.ver-tag {
+  /* Sizes to its own text. As a <span> it did that for free; as a <button> it
+     inherited a block display from the bar's button styling and stretched to
+     204px, landing on top of Home and swallowing its taps — the button could
+     not be pressed at all, and the walk caught it. */
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+  flex: 0 0 auto;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  min-height: 44px;
+  padding: 0 8px;
+  cursor: pointer;
+}
+@media (hover: hover) { .ver-tag:hover { border-color: var(--line-2); color: var(--txt-2); } }
+.ver-tag:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ver-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 10px 0 6px; }
+.ver-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--accent);
+  text-decoration: none;
+}
+.ver-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* The app's generic dialog button is 34px tall — comfortable under a mouse and
+   short of the 44px a finger needs. These two ARE the dialog, so they get the
+   floor. Scoped here rather than raised globally: every other dialog's buttons
+   are a measured, shipped surface and are not being churned from this change. */
+#verDlg button { min-height: 44px; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+.dbg-text {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  font: 0.75rem/1.45 var(--mono);
+  color: var(--txt);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 10px;
+  resize: vertical;
+}
+
+/* The test page itself — a plain document, not an app screen. */
+body.dbg { margin: 0; background: var(--bg); color: var(--txt); font: 400 1rem/1.55 var(--ui); }
+.dbg-wrap { max-width: 44rem; margin: 0 auto; padding: 20px 18px 64px; }
+.dbg-back a { color: var(--accent); text-decoration: none; display: inline-flex; align-items: center; min-height: 44px; }
+.dbg-wrap h1 { font-size: 1.5rem; margin: 4px 0 8px; }
+.dbg-wrap h2 { font-size: 1.125rem; margin: 0 0 6px; }
+.dbg-lead, .dbg-note { color: var(--txt-2); font-size: 0.875rem; margin: 0 0 12px; }
+.dbg-sec { margin: 26px 0; padding-top: 18px; border-top: 1px solid var(--line); }
+.dbg-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+.dbg-btn {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--txt);
+  font: 500 0.9375rem var(--ui);
+  cursor: pointer;
+}
+.dbg-btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.dbg-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.dbg-btn[disabled] { opacity: 0.6; cursor: default; }
+.dbg-results { margin-top: 6px; }
+.dbg-row { padding: 12px 0; border-bottom: 1px solid var(--line); }
+.dbg-k { font: 500 0.9375rem var(--ui); color: var(--txt); }
+.dbg-v { font: 600 1.25rem/1.3 var(--mono); color: var(--accent); margin: 2px 0 4px; }
+.dbg-m { margin: 0; font-size: 0.8125rem; line-height: 1.5; color: var(--txt-2); }
+.dbg-progress { font-size: 0.875rem; color: var(--txt-2); margin: 8px 0; }

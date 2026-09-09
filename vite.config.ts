@@ -301,6 +301,7 @@ export default defineConfig({
         ir: resolve(__dirname, "ir.html"),
         macro: resolve(__dirname, "macro.html"),
         privacy: resolve(__dirname, "privacy.html"),
+        debug: resolve(__dirname, "debug.html"),
       },
     },
   },

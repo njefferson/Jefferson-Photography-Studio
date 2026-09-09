@@ -3976,6 +3976,176 @@ the set survives a reload, a crash or the OS discarding the tab, and each photo
 keeps its own edit. That copy is the 72% above. Batch process is the third thing
 and edits nothing: it develops a whole set unattended into one .zip.
 
+## The version number became a way in, 2026-09-09
+
+The GL-stall entry below ends on "what would settle it is a measurement on the
+device, and this repo has no way to take one." It has one now. Two surfaces,
+both reached from the version number in the editor's own chrome, which until
+this release was a dead label.
+
+**THE REPORT (Doctrine §7f).** Pressing the version opens a dialog holding a
+plain-text report and a Copy button. It carries what the browser's own
+identification HIDES, which is the whole reason it is worth having: iPadOS
+Safari in desktop mode reports its platform as `MacIntel`, so the report does
+not print the platform and leave the reading to whoever gets it — it states the
+conclusion. A `MacIntel` with touch points reads "iPad or iPhone — it says
+MacIntel, but 5 touch points means it is not a Mac"; a `MacIntel` with none
+reads "Mac". Verified against a spoofed navigator in all three shapes. Beyond
+that: whether it is running installed or in a browser tab, screen and window
+size with the device pixel ratio, memory hint, cores, the WebGL2 renderer with
+max texture size and float-buffer support, the service worker's state including
+whether an update is WAITING, storage used against quota and whether it is
+persistent, theme and palette, reduced motion, language, and whether a photo is
+open.
+
+**NOTHING THE READER WROTE IS IN IT.** A session appears as a count — "a photo
+is open in a session of 4" — never a filename, never metadata, never an edit
+value. That is asserted rather than promised: the walk opens a named practice
+file and greps the built report for its name. Copy falls back to selecting the
+text when the clipboard is refused, rather than a button that looks like it
+worked and did not.
+
+**AND THERE ARE TWO WAYS IN, NOT TWO REPORTS.** The version number is where it
+lives; nobody with a problem thinks to press a version number, and the ⓘ is
+where they look. So the ⓘ's Settings section carries a row — "Something's wrong
+— the report to send" — that closes the ⓘ and opens the same dialog. One
+builder, one dialog, two entry points; a second copy of the report is how the
+two drift. Doctrine §7e wants "how to report a problem" in the ⓘ and this is it.
+
+**THE TEST PAGE.** The same dialog links to `/debug.html`, a page in the app
+that MEASURES what the device can do rather than describing it. Five numbers,
+each printed with a sentence saying what it means and what would be normal:
+handing a frame to the graphics chip, reading a frame back, decoding a raw
+photo on the main thread, the same decode in the background worker, and storage
+write speed in MB per second. It is a page rather than a panel because it runs
+work that takes seconds and wants room to print its reasoning.
+
+**THE READBACK LINE EXISTS BECAUSE OF THE ENTRY BELOW.** "Reading a frame back"
+is the exact operation the histogram forces on every redraw, and the one this
+harness proved it cannot size honestly — 189 ms here under SwiftShader, where
+the cost is software rasterisation being waited on rather than the readback
+itself. On the iPad that number is either small or it is the stall, and now the
+device can say which without anybody guessing from a CPU rasteriser.
+
+**MEASURED HERE (headless Chromium, SwiftShader — a floor, not the device):**
+frame render queued 0.0 ms, readback 189 ms, raw decode 56 ms on the main
+thread against 69 ms in the worker.
+
+**AND THEN ON THE REAL iPAD, WHICH IS WHY IT EXISTS.** Safari 26.6.1, Apple GPU,
+8 cores, max texture 16384px (twice the harness's 8192 — a full-resolution frame
+fits in one texture on the device and did not here), storage quota 1000 MB,
+cache `ips-2.10` confirming the release stamp.
+
+- **Reading a frame back: 11 ms.** The harness said 189 and could not size it.
+ **The histogram's forced readback is not a stall on this device and no
+ optimisation is warranted** — the entry below asked exactly this question and
+ the device has now answered it. The 991 ms to 266 ms figure in the earlier
+ set-open work was software-renderer time being waited on, as suspected.
+- **Decode 70 ms on the main thread, 62 ms in the worker.** On the harness the
+ worker cost about a fifth in overhead; on the device it is FASTER. The
+ set-open rewrite's trade — give up a little decode speed to keep the main
+ thread — turns out to cost nothing at all here.
+- **Frame render queued 0.0 ms**, as expected: it only queues.
+
+**AND THE STORAGE NUMBER WAS THE TEST LYING, IN THE INSTRUMENT BUILT TO STOP
+THAT — THREE VERSIONS, TWO OF THEM WRONG.** Written out because the same fault
+recurred one level down each time, and the second version's correction was
+written into this file as a measurement before the third version found it was
+mostly an artefact.
+
+- **v1 — the wrong shape.** Wrote 8 MB in ONE strict-durability transaction and
+ reported throughput: 54 MB per second on the container, 156.9 on the iPad.
+ `session.ts` commits **one strict transaction PER PHOTO**, so a single large
+ commit amortises away the exact cost set-open pays. The sentence printed under
+ the number then used it to predict a forty-photo set in a fraction of a
+ minute. **A number under a sentence the number cannot support is worse than no
+ number.**
+- **v2 — the right shape, contaminated.** Four separate 6 MB strict commits,
+ median reported. It never emptied the store between runs, so every commit
+ wrote into a bigger database: **88, 273, 423, 611 ms** across four runs, which
+ is the store growing rather than the device. Worse, the two durability modes
+ were INTERLEAVED, so the second mode always ran on a larger store than the
+ first — and "unconfirmed" duly came out slower than "confirmed", which cannot
+ happen if the flag means anything. The 252 ms / 24 MB-per-second figure this
+ file carried as v2's validation was mostly that artefact, not amortisation.
+- **v3 — what it does now.** Empties the store before every timed commit and
+ does not time the emptying; alternates which mode goes first run to run; runs
+ BOTH modes and prints both. Container: **strict 94, 120, 137, 152 ms · relaxed
+ 113, 120, 152, 146 ms** — medians 128 against 133, and flat rather than
+ climbing.
+
+**AND THE FINDING THAT CAME OUT OF ASKING TWICE: NEITHER ENGINE HONOURS THE
+FLAG.** Chromium in this container returns the same time for `durability:
+"strict"` and `"relaxed"` (128 against 133 ms), and the iPad's 18 ms for 6 MB —
+a per-commit figure BEATING that same device's amortised one, which is
+impossible if the commit waits on the disk — says the same thing. So the number
+is **how fast the engine accepts the data, not how fast it is safely on the
+device**, and the panel now says so in those words. That matters because the
+whole reason `session.ts` asks for strict is that a set must survive a crash.
+
+**THE RIG WAS MADE TO PROVE IT COULD SEE A DIFFERENCE BEFORE THAT WAS BELIEVED.**
+An instrument returning "these two are the same" is indistinguishable from one
+that cannot tell anything apart. Same code shape, one known difference — 6 MB
+against 12 MB in one commit — read 154 ms against 386, a ratio of 2.51. It has
+resolution, so the equality is a measurement.
+
+**WHAT THIS LEAVES OPEN, DELIBERATELY UNSETTLED.** This file's set-open
+breakdown two hundred lines above attributes ~300-450 ms per photo to waiting on
+the strict-durability commit. If no engine is actually syncing, that attribution
+needs re-examining — but it came from instrumenting the APP over real practice
+DNGs, not from this test, and the two are not measuring the same thing. Recorded
+as a tension to resolve with a measurement, not as a correction.
+
+**THE ONE FINDING THE REPORT ITSELF SURFACED: `persistent: no`.** Nothing in
+`src/` has ever called `navigator.storage.persist()`. Opening a set copies every
+original into storage so the set survives a reload, and that copy currently sits
+in evictable storage; WebKit clears script-writable storage after seven days of
+Safari use without interaction with the site, and a home-screen install is
+exempt where a browser tab is not. Not fixed here — it is a product change and
+this release is at the gate. The request is one call and the report already
+prints the answer, so the device would say whether Safari granted it rather than
+anyone assuming.
+
+**VERIFIED.** Version control is a real `<button>` at 53x44 with
+`aria-haspopup="dialog"` — it shipped as a 204px-wide `<span>` that the Home
+button was intercepting clicks on, found by the walk and fixed by giving it
+`display: inline-flex; width: auto`. axe clean with the dialog open, and clean
+on the test page in both themes.
+
+**AND THE SAME MISS AGAIN, CAUGHT THE SAME WAY.** axe does not measure target
+size, so the dialog went out at axe-0 with Copy and Close both **34px** tall —
+the app's generic dialog button, which is comfortable under a mouse and short
+of the finger floor. Measured at 430px and 900px wide, on every control of both
+new surfaces, which is the check that found it. Raised to 44px scoped to
+`#verDlg` rather than globally: every other dialog's buttons are a measured,
+shipped surface and are not being churned from here. This is the third time a
+control has shipped under 44px with a clean a11y run — `.toggle.full-btn` at
+34px and the version tag at 204x0-effective were the other two. **The target
+sweep is now part of the a11y walk**: every interactive element on the page, at
+430px and 900px, measured against the floor.
+
+**AND THE FIRST RUN OF IT FOUND A STANDING DEBT — NOT FIXED, NOT IN THIS
+RELEASE.** Nothing new is under the floor. What is, and has been:
+
+- **Zoom in / out / fit: 40x40** at both widths. Four pixels short, three
+  controls, and they sit over the photo where a thumb lands.
+- **Every panel tab: 134x28** at 430px wide — Basic, Infrared, Black & white,
+  Colour, Tone, Masks, Export, Corrections, Crop, Grade, Stickers, Warp. These
+  are the app's primary navigation and they are 28px tall on a phone.
+- **Every range slider reports 28px tall** — exposure, the three white-balance
+  gains, recover, denoise, sharpen, texture. **Treat this one as unmeasured
+  rather than as a failure:** the bounding box of an `<input type=range>` is its
+  TRACK, and the thing a finger has to hit is the THUMB, which the sweep cannot
+  see. SC 2.5.8 is about the thumb. Sizing that needs a different instrument.
+
+The first two are real and are a capability item of their own — raising a
+primary navigation strip from 28px to 44px changes the panel's layout at every
+width and is not something to fold into a release about a diagnostic. Recorded
+here so it stops being rediscovered. The full journey walk still passes end to end
+with no page errors. `debug.html` reaches the service-worker precache list, so
+the test page works offline like the rest of the app.
+
+
 ## The "800 ms GL stall" is the software renderer, 2026-09-09
 
 Chased the last open item. **Nothing shipped, and the honest answer is that this
