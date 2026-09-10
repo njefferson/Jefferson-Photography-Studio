@@ -1,3 +1,4 @@
+import "./swstrip.css";
 // Shared "Update to the latest version" wiring for all three PWAs — the Studio
 // chooser, Infrared, and Macro. One service worker at root scope serves the
 // whole site, so this same flow works from any page (owner ask, 2026-07-20:
@@ -80,8 +81,15 @@ export function wireForceUpdate(button: HTMLButtonElement, note: HTMLElement): v
  *  wireForceUpdate above is a PULL — it only helps somebody who already
  *  suspects there is a new version and knows which panel to open. A newcomer
  *  never does. This is the push: the worker waits, and the app says so. */
-export function wireUpdateStrip(strip: HTMLElement, go: HTMLButtonElement, later: HTMLButtonElement): void {
+export function wireUpdateStrip(): void {
   if (!("serviceWorker" in navigator)) return;
+  // Looked up here rather than passed in, so the three callers are one line
+  // each and cannot drift on which ids they use. A page without the markup
+  // simply does not get a strip.
+  const strip = document.getElementById("swStrip");
+  const go = document.getElementById("swStripGo") as HTMLButtonElement | null;
+  const later = document.getElementById("swStripLater") as HTMLButtonElement | null;
+  if (!strip || !go || !later) return;
   let dismissed = false;
   const show = () => { if (!dismissed) strip.hidden = false; };
 

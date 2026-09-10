@@ -3,7 +3,7 @@ import { stackFocus, type StackFrame } from "./stack";
 import { setupInstalledShare, setupInstallFromApp } from "../share";
 import { wireThemePicker } from "../theme";
 import { wirePalettePicker } from "../palette";
-import { wireForceUpdate } from "../swupdate";
+import { wireForceUpdate, wireUpdateStrip } from "../swupdate";
 
 // Macro focus-stacking mode. Loads a focus-shift JPEG set, blends it into one
 // all-in-focus frame, and lets you compare and save. The heavy engine lives in
@@ -354,4 +354,5 @@ if ("serviceWorker" in navigator) {
   const btn = document.getElementById("forceUpdate") as HTMLButtonElement | null;
   const note = document.getElementById("forceUpdateNote");
   if (btn && note) wireForceUpdate(btn, note);
+  wireUpdateStrip(); // §7h: say a new version is waiting, without being asked
 }
