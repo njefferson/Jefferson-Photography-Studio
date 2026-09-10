@@ -19,7 +19,7 @@ import { sniff } from "./import";
 import { readExifSubset } from "./exif";
 import { profileFrame, averageProfiles, round5, NBINS, type FrameProfile } from "./lensprofile";
 import { readZipIndex, readZipEntry, readZipEntryPrefix, imageEntries } from "./zip";
-import { saveFromPayload, listProfiles, removeProfile, coverage, exportAll, importText, type SaveChange } from "./lensstore";
+import { saveFromPayload, listProfiles, removeProfile, coverage, gapsFor, exportAll, importText, type SaveChange } from "./lensstore";
 import { requestPersistence } from "./session";
 import { keepAwake, granted as wakeGranted, supported as wakeSupported } from "./wakelock";
 import { loadMeasured, putMeasured, frameKey } from "./framecache";
@@ -557,29 +557,10 @@ export function wireLensRig(root: ParentNode): void {
             (e.aps.length === 1 ? " Only one aperture here, and a hot-spot changes a long way with aperture: this focal length is described at that aperture and nowhere else." : "") +
             (thin ? " Thin — four or five frames per aperture average out the sky's own gradient." : ""));
         }
-        // The gaps, stated as the next trip out rather than as a complaint.
-        const gaps: string[] = [];
-        const zoom = /(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*mm/i.exec(sl.model);
-        if (zoom) {
-          const lo = Number(zoom[1]), hi = Number(zoom[2]);
-          const cLo = fls[0], cHi = fls[fls.length - 1];
-          if (cHi < hi * 0.9) gaps.push(`nothing above ${cHi}mm on a lens that reaches ${hi}mm`);
-          if (cLo > lo * 1.1) gaps.push(`nothing below ${cLo}mm on a lens that starts at ${lo}mm`);
-          // A hole in the middle wide enough that blending across it is a guess.
-          for (let i = 0; i < fls.length - 1; i++) {
-            if (fls[i + 1] / fls[i] > 2.2) gaps.push(`a gap between ${fls[i]}mm and ${fls[i + 1]}mm`);
-          }
-        }
-        const sweeps = fls.filter((fl) => byFl.get(fl)!.aps.length >= 3);
-        if (!sweeps.length) {
-          gaps.push("no focal length shot at three or more apertures, so the hot-spot's change with aperture is not measured anywhere");
-        } else if (fls.length > sweeps.length) {
-          const single = fls.filter((fl) => byFl.get(fl)!.aps.length === 1);
-          const shared = single.filter((fl) => byFl.get(fl)!.aps.some((a) => byFl.get(sweeps[0])!.aps.includes(a)));
-          if (single.length && !shared.length) {
-            gaps.push(`${single.map((f2) => f2 + "mm").join(" and ")} share no aperture with the sweep at ${sweeps[0]}mm, so focal length and aperture cannot be told apart there — one frame at an aperture already in the sweep would tie them together`);
-          }
-        }
+        // The gaps, stated as the next trip out rather than as a complaint —
+        // and by the same function the stored panel uses, because two copies of
+        // this had already drifted into two different bugs.
+        const gaps = gapsFor(sl.model, fls.map((fl) => ({ fl, aps: byFl.get(fl)!.aps })));
         // Two different things, and running them together would be dishonest: a
         // frame that COULD NOT be used is a problem, and a frame that was not
         // needed is the rig deciding it had enough.
