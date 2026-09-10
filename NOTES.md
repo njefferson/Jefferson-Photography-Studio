@@ -5670,6 +5670,68 @@ profiles on the RAW path at all (they are JPEG-only because full NEFs could not
 be moved into the measurement rig); and `keyFor`'s nearest-focal-length anchor
 selection, which snaps rather than interpolating between anchors.
 
+## The phone spent a whole band on one button, 2026-09-10
+
+**Reported as "the phone user experience is not good", with a screenshot.**
+Measured on an iPhone 15 Pro viewport (393x852) with a portrait photo open,
+which is the case in the screenshot and the worst one — a tall photo in a short
+wide stage:
+
+- top bar **163px, 19% of the screen, in THREE rows**
+- stage 306px, 36% — but the photograph inside it **193x290, 17% of the screen**,
+  with about 100px of empty grey down each side
+- tab strip 148px, 17%
+- so 37% of the screen was chrome and 17% was the photograph
+
+**THE THREE-ROW BAR WAS NOT A DESIGN, IT WAS AN OVERFLOW.** Row one is the back
+link, the app's identity and Home: 87 + 215 + 78 plus gaps = 400px against 373
+available. Twenty-seven pixels over, so Home wrapped — and a wrapped row costs
+50px whether it holds one 78px button or twelve. Thirteen per cent of the screen
+above the photograph, spent on one button, because a row missed by 27px.
+
+Fixed by dropping the WORD "Studio" from the back link below 760px. The chevron
+and the 22px app mark are still the affordance, `aria-label` still reads "Back
+to Studio", and the word returns on a tablet (measured: 87px link at 820px).
+That saves 48px, and the bar is **two rows, 113px, at 375, 393 and 430** — the
+narrowest phone included, which is where it was worst. The photograph goes from
+17% to **23% of the screen**, a third larger, with nothing removed.
+
+**And the link was 4px under the floor** once the word went: 40x44, because its
+padding was `6px 8px 6px 0` and the right side is where it was missing. 44x44
+now, measured by hit area in both themes at both widths. axe clean, no
+horizontal scroll at 375px.
+
+Made to fail first: putting the word back gives 8 failures, and removing the
+min-width brings 40x44 straight back.
+
+## What the remaining phone space is worth, measured, 2026-09-10
+
+Both of these are RECORDED DECISIONS with reasons in style.css, not oversights,
+so they are the owner's to change rather than a session's. Measured at 393x852
+with a portrait photo so the trade is a number:
+
+**As it stands** — photo 226x340, 23% of the screen; tab strip 148px, all 12
+tabs visible, tab hit area 81x44; panel 383px of which 178px is body.
+
+**Tab strip as one horizontally-scrolling row** — photo UNCHANGED at 23%, tab
+strip 52px, 8 of 12 tabs visible, tab hit area 42x44; panel body 178 → **274px**.
+The photograph does not grow at all, because `#panel` is capped at `45dvh` and
+sits at that cap either way — shrinking the tabs feeds the panel's own body, not
+the stage. Worth knowing before anyone builds it expecting a bigger picture.
+
+**Panel cap 45dvh → 38dvh** — photo 266x399, **32% of the screen**, up 39%; tab
+strip unchanged at 148px, all 12 visible; panel body 178 → 119px.
+
+**Both together** — photo **32%**, tab strip 52px, 8 of 12 tabs visible, panel
+body **215px**, which is more room for controls than there is today. The whole
+cost is that four of the twelve tabs need a sideways scroll, and a tab's hit
+area narrows from 81px to 42px while keeping its 44px height.
+
+The style.css note beside the tab strip weighed four columns against three and
+against cutting the padding (which took tabs to 28px and failed the touch
+floor). It never weighed SCROLLING, which keeps the 44px height and is what the
+bar and the session strip already do.
+
 ## Every file chooser now answers a keyboard, 2026-09-10
 
 The finding is recorded below ("could be reached by finger and by nothing
