@@ -90,21 +90,28 @@ export function listProfiles(): StoredProfile[] {
 export function saveFromPayload(payload: {
   camera?: string;
   measured?: string;
-  profiles: Record<string, { kr: number[]; kb: number[]; frames: number; source: string }>;
-  lens_map: Record<string, string>;
-}): { saved: number; ok: boolean } {
+  profiles?: Record<string, { kr: number[]; kb: number[]; frames: number; source: string }>;
+  lens_map?: Record<string, string>;
+}): { saved: number; skipped: string[]; ok: boolean } {
   const shortToModel = new Map<string, string>();
   for (const [model, short] of Object.entries(payload.lens_map ?? {})) shortToModel.set(short, model);
   const list = read();
   let saved = 0;
+  const skipped: string[] = [];
   for (const [key, p] of Object.entries(payload.profiles ?? {})) {
-    const m = /^(.+)@(\d+(?:\.\d+)?)@f([\d.?]+)$/.exec(key);
-    if (!m || !Array.isArray(p.kr) || !Array.isArray(p.kb)) continue;
+    // THE APERTURE IS OPTIONAL IN THE KEY. It was added to the group key after
+    // the rig had already been shipping profiles without it, and a payload from
+    // the older shape came back "saved 0" — SILENTLY. The reader presses the
+    // button, sees no error, and has nothing. Tolerating both shapes costs
+    // three characters; anything still unreadable is named to the caller rather
+    // than dropped, which is the part that actually mattered.
+    const m = /^(.+)@(\d+(?:\.\d+)?)(?:@f([\d.?]+))?$/.exec(key);
+    if (!m || !Array.isArray(p?.kr) || !Array.isArray(p?.kb) || p.kr.length < 2) { skipped.push(key); continue; }
     const entry: StoredProfile = {
       key,
       model: shortToModel.get(m[1]) ?? m[1],
       fl: Number(m[2]),
-      ap: Number(m[3]) || NaN,
+      ap: m[3] ? Number(m[3]) || NaN : NaN,
       kr: p.kr,
       kb: p.kb,
       frames: p.frames ?? 0,
@@ -116,7 +123,7 @@ export function saveFromPayload(payload: {
     if (at >= 0) list[at] = entry; else list.push(entry);
     saved++;
   }
-  return { saved, ok: write(list) };
+  return { saved, skipped, ok: saved > 0 ? write(list) : true };
 }
 
 export function removeProfile(key: string): void {
