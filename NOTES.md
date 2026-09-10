@@ -5670,6 +5670,41 @@ profiles on the RAW path at all (they are JPEG-only because full NEFs could not
 be moved into the measurement rig); and `keyFor`'s nearest-focal-length anchor
 selection, which snaps rather than interpolating between anchors.
 
+## The measurement cost more than the decode, 2026-09-10
+
+Told the owner the remaining cost was the raw decode. It was not, and the
+numbers were there to be taken:
+
+- **decoding a 10 MB raw: 95 ms** (70 ms in the worker) — the app's own speed
+  test has reported this all along.
+- **measuring the decoded frame: 310 ms.** Three times the decode, on the step
+  that is supposed to be the cheap part.
+
+Two things were paying for that and neither bought anything.
+
+**`Math.hypot` cost 145 ms of it.** It is the correct function and it guards
+against an intermediate overflow that cannot happen with pixel coordinates.
+Measured over every pixel of a binned 20 MP frame: **145 ms against 12 ms** for
+`sqrt(dx*dx + dy*dy)`. Twelve times, for a safety margin on numbers that never
+exceed a few thousand.
+
+**The stride targeted four million sampled pixels**, which is 50,000 a bin for
+80 bins. A quarter of that leaves thousands in the thinnest ring — bin 0 spans a
+21-pixel radius on that frame and still keeps ~350 samples. The target is one
+million now.
+
+**310 ms -> 25 ms, twelve times faster, and not one of the 22 assertions moved**
+— tolerances unchanged, because the synthetic frames are 1200x800 and take the
+same stride either way. Per frame the whole job is now decode 95 ms plus measure
+25 ms.
+
+**And the placement was wrong, which was the other half of the report.** The
+rig had been put on the start screen, the version panel and the Corrections
+card — all of which read as somewhere you go looking for a diagnostic. It is a
+product feature: **Measure lens** is a button in the top bar now, beside Batch
+process and Quick look, present with a photo open and without one. Those two are
+the app's other whole-set actions and it belongs with them.
+
 ## It decoded everything to find out it wanted none of it, 2026-09-10
 
 **Reported from a phone: a 1.69 GB zip, no sign of progress, taking forever.**
