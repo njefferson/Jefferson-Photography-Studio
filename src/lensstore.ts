@@ -285,3 +285,69 @@ export function matchNote(p: StoredProfile, ex: ExifSubset | null): string {
   }
   return bits.join("; ");
 }
+
+/** What a set of profiles covers, and where the holes are.
+ *
+ *  ONE ANSWER, TWO PLACES THAT ASK IT. The rig reports coverage for the run
+ *  that just finished; the reader wants the same picture of what is KEPT, at
+ *  any time, so they can go out and shoot the frames that are missing. Working
+ *  it out twice is how the two would come to disagree about what a gap is. */
+export interface LensCoverage {
+  short: string;
+  model: string;
+  /** Ascending focal lengths, each with the apertures measured there. */
+  atFl: { fl: number; aps: string[]; frames: number }[];
+  /** Plain sentences naming what is not covered. Empty when nothing stands out. */
+  gaps: string[];
+  profiles: number;
+}
+
+export function coverage(list: StoredProfile[]): LensCoverage[] {
+  const byLens = new Map<string, StoredProfile[]>();
+  for (const p of list) {
+    const short = /^([^@]+)@/.exec(p.key)?.[1] ?? p.model;
+    (byLens.get(short) ?? byLens.set(short, []).get(short)!).push(p);
+  }
+  const out: LensCoverage[] = [];
+  for (const [short, mine] of byLens) {
+    const byFl = new Map<number, { aps: string[]; frames: number }>();
+    for (const p of mine) {
+      const fl = Math.round(p.fl);
+      const e = byFl.get(fl) ?? byFl.set(fl, { aps: [], frames: 0 }).get(fl)!;
+      e.aps.push(Number.isFinite(p.ap) ? `f/${p.ap}` : "aperture not recorded");
+      e.frames += p.frames;
+    }
+    const fls = [...byFl.keys()].sort((a, b) => a - b);
+    const atFl = fls.map((fl) => ({
+      fl,
+      aps: byFl.get(fl)!.aps.sort((x, y) => (parseFloat(x.slice(2)) || 1e9) - (parseFloat(y.slice(2)) || 1e9)),
+      frames: byFl.get(fl)!.frames,
+    }));
+    const gaps: string[] = [];
+    const zoom = /(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*mm/i.exec(mine[0].model);
+    if (zoom) {
+      const lo = Number(zoom[1]), hi = Number(zoom[2]);
+      if (fls[fls.length - 1] < hi * 0.9) gaps.push(`nothing above ${fls[fls.length - 1]}mm on a lens that reaches ${hi}mm`);
+      if (fls[0] > lo * 1.1) gaps.push(`nothing below ${fls[0]}mm on a lens that starts at ${lo}mm`);
+      for (let i = 0; i < fls.length - 1; i++) {
+        // Wider than this and a blend across the gap is a guess rather than an
+        // interpolation. Measured by leave-one-out on real anchors: across a
+        // 19-50mm hole the blend reproduces the hidden 36mm measurement to
+        // within 1.5 points of gain, which is why the bar is not tighter.
+        if (fls[i + 1] / fls[i] > 2.2) gaps.push(`a gap between ${fls[i]}mm and ${fls[i + 1]}mm`);
+      }
+    }
+    const sweeps = atFl.filter((e) => e.aps.length >= 3);
+    if (!sweeps.length) {
+      gaps.push("no focal length shot at three or more apertures, so how the hot-spot changes with aperture is not measured anywhere");
+    } else {
+      const single = atFl.filter((e) => e.aps.length === 1);
+      const orphan = single.filter((e) => !e.aps.some((a) => sweeps[0].aps.includes(a)));
+      if (orphan.length) {
+        gaps.push(`${orphan.map((e) => e.fl + "mm").join(" and ")} share no aperture with the sweep at ${sweeps[0].fl}mm, so focal length and aperture cannot be told apart there — one frame at an aperture already in the sweep would tie them together`);
+      }
+    }
+    out.push({ short, model: mine[0].model, atFl, gaps, profiles: mine.length });
+  }
+  return out.sort((a, b) => a.short.localeCompare(b.short));
+}
