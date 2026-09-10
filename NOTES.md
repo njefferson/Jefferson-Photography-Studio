@@ -5670,6 +5670,41 @@ profiles on the RAW path at all (they are JPEG-only because full NEFs could not
 be moved into the measurement rig); and `keyFor`'s nearest-focal-length anchor
 selection, which snaps rather than interpolating between anchors.
 
+## The preview would have carried a correction the file did not, 2026-09-10
+
+Caught by reading `export.ts` before answering a question about automatic lens
+correction, not by any walk — and the walks are the point of the finding.
+
+**A raw export does not use the decoded frame.** `getSource` re-reads the CFA
+from the file at native resolution, deliberately, so a saved image is not
+limited by the preview's binned decode. The measured colour correction is
+applied to the decoded frame. So on the RAW path it was in the preview and NOT
+in the exported file. **A screen showing something the saved image does not have
+is worse than the correction being absent from both.**
+
+The 8-bit path was fine by accident: there `getSource` returns the very buffer
+the correction mutated.
+
+Fixed by passing the matched profile into `exportImage` and applying it to the
+raw sampler — in LINEAR, where the gains were measured, so it needs none of the
+sRGB round trip the preview's 8-bit path does. **Batch matches each photo on its
+OWN EXIF**, because a set can span lenses and one match for a whole run would
+apply one lens's colour to another lens's frames.
+
+**AND THE TEST NOW ASSERTS THE FILE.** Every walk in this feature measured the
+screen; Doctrine §14 says that if a feature produces an output, the check has to
+assert something about the OUTPUT, and none of them did. `exportcheck` exports
+twice — correction on, correction bypassed — decodes both saved JPEGs and
+compares: source red at the centre −4.5, source blue +4.4. It derives the
+red/blue mapping from the original file the same way the preview test does,
+because the exported image is display-space too.
+
+Two instrument notes, both already written down and both re-learned anyway.
+The first version waited for a `download` event that could never fire, because
+export makes the blob and then WAITS on a Save press — that exact sentence was
+already in NOTES from an earlier round. The second is the channel swap, for the
+fourth time in this session.
+
 ## The rig measured a lens and nothing read it back, 2026-09-10
 
 **Asked plainly: did the app ingest my numbers, or do you have to do something
