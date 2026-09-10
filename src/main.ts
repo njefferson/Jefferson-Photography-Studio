@@ -3658,7 +3658,7 @@ syncLocSettings();
 // finds nothing.
 wireForceUpdate($("forceUpdate") as HTMLButtonElement, $("forceUpdateNote") as HTMLElement);
 // And the push half of §7h — the strip that says so without being asked.
-wireUpdateStrip($("swStrip"), $("swStripGo") as HTMLButtonElement, $("swStripLater") as HTMLButtonElement);
+wireUpdateStrip();
 
 // --- Local masks: radial / linear gradient with a few local adjustments,
 // placed by dragging handles on the photo. Geometry is in image-uv so masks

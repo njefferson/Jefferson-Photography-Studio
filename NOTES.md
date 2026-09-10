@@ -5067,6 +5067,47 @@ reported percentage does count only texels above half weight while roughly twice
 that area is touched to some degree — defensible, and worth knowing when the
 number reads lower than the effect looks.**
 
+## The update strip reaches all three apps, 2026-09-10
+
+**One service worker at root scope serves the whole site**, so a new release is
+waiting for the chooser and Macro exactly as it is for Infrared — but only
+Infrared had the markup, which meant the other two detected nothing and said
+nothing.
+
+**Three stylesheets, and the strip was in one of them.** `main.ts` imports
+`style.css`, `chooser.ts` imports `launcher.css`, `macro/main.ts` imports
+`macro/macro.css`. Copying the strip's rules into the other two would have made
+three copies of one idea, which is the failure the shared gates exist to avoid,
+one level down. `src/swstrip.css` holds the LOOK and is imported by
+`swupdate.ts` — the module that provides the feature brings its own styling, so
+every app that already imported it got the strip's appearance with no third
+decision to keep in sync.
+
+**Placement is not shared, deliberately.** Infrared's shell is a CSS grid and
+gives the strip a row of its own; Macro's `#app` is a flex column and the
+chooser is plain flow, where a block in normal order is already correct. Only
+`style.css` carries `grid-area: swstrip`. Look shared, position local.
+
+`wireUpdateStrip()` does its own `getElementById` lookups now and returns
+quietly when the markup is absent, so all three callers are one line and cannot
+drift on which ids they use.
+
+**Token availability was checked rather than assumed:** every colour the strip
+uses lives in `public/palette.css`, which all three pages link, and `--ui` is
+defined separately by each app's own stylesheet. Nothing resolves to nothing.
+
+**All three walked against a REAL second worker**, one page at a time: release 2
+waits, the strip appears with its words, both caches sit on the device (so the
+open page is still served release 1), no takeover without being asked, and the
+reader's press activates release 2 and clears the old cache.
+
+**One thing the walk found that is worth knowing and is NOT a defect.** The
+chooser opens a first-run welcome as a MODAL `<dialog>`, which owns the top
+layer and makes the strip behind it inert. It does not matter in practice —
+on a first visit the strip is hidden anyway, because there is nothing to
+announce — but the test has to dismiss the welcome the way a reader would, or
+it measures a modal rather than the strip.
+
 ## A new version now waits and says so, 2026-09-10
 
 **Doctrine §7h, and it was the one gate failing in this repo.** `public/sw.js`

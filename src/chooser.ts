@@ -5,7 +5,7 @@
 import "./launcher.css";
 import { wireThemePicker } from "./theme";
 import { wirePalettePicker } from "./palette";
-import { wireForceUpdate } from "./swupdate";
+import { wireForceUpdate, wireUpdateStrip } from "./swupdate";
 wireThemePicker(document.getElementById("themePicker"));
 wirePalettePicker(document.getElementById("palettePicker"));
 
@@ -19,6 +19,7 @@ if ("serviceWorker" in navigator) {
   const btn = document.getElementById("forceUpdate") as HTMLButtonElement | null;
   const note = document.getElementById("forceUpdateNote");
   if (btn && note) wireForceUpdate(btn, note);
+  wireUpdateStrip(); // §7h: say a new version is waiting, without being asked
 }
 
 // Installed-app Share (src/share.ts): only appears when the launcher is running
