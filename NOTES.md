@@ -6240,6 +6240,59 @@ which edge answered rather than about what is deployed. Six independent fetches
 now, all six required to agree. The `sw.js` cache stamp is the better anchor
 where there is one, since it carries the version.
 
+## The rig reported what came out and nothing about what went in, 2026-09-10
+
+**Asked plainly: there is no way to see which focal length and aperture gaps are
+still open.** There was not. The rig printed the profiles it produced, a
+per-frame list of refusals scrolled off the top, and one line reading "averaged
+from 21 frames out of the 94 you picked" — a number with no account attached.
+Seventy-three frames went somewhere and nothing said where, which lens they
+belonged to, or whether anything was still unshot. That last part is the only
+question a second trip out with the camera can answer, and it was the one thing
+the panel could not say.
+
+**AND IT HID A WHOLE LENS.** A second measurement came back byte-identical to
+the first — the same nine keys, the same numbers, the same lens map — and three
+things agreed on why: the frame counts in the first set sum to exactly the 21
+the panel reported, the visible output text was the `kb` array of
+`50-250@135@f29.0`, and the store said it held nine profiles. The second lens's
+frames were in the set and produced nothing, and the rig's answer to that was
+silence. **Reporting what came out is how a lens can be shot, picked, refused
+frame by frame and never mentioned again.**
+
+**What the report says now**, in three kinds of row per lens:
+
+- **What was measured**, focal length by focal length, with the apertures at
+  each and the frame count. A focal length with ONE aperture says so in
+  words — a hot-spot moves a long way with aperture, so one aperture describes
+  that focal length there and nowhere else. Fewer than three frames per aperture
+  is called thin.
+- **What is still missing**: nothing above the highest focal length shot on a
+  lens that reaches further, nothing below the lowest, a hole in the middle wide
+  enough that blending across it is a guess (a ratio over 2.2), no focal length
+  shot at three or more apertures at all, and the confound — focal lengths that
+  share no aperture with the sweep, so focal length and aperture cannot be told
+  apart there. That last one names the fix: one frame at an aperture already in
+  the sweep ties them together.
+- **A lens that produced nothing at all**, named, with how many of its frames
+  were in the set, the reasons with counts, and the sentence that matters:
+  nothing from this lens is in the numbers below.
+
+**Two counts that must not be run together.** A frame that COULD NOT be used is
+a problem the reader may want to fix; a frame that was NOT NEEDED is the rig
+deciding six at one focal length and aperture is enough and declining to spend a
+full decode. Adding them would turn a working set into a fault report.
+
+Planted the old behaviour back — report only the lenses that produced a
+profile — and the two claims about the unmeasurable lens fail while the rest
+stand, which is the defect stated exactly: the reason was in the report all
+along, just not attached to anything the reader could act on.
+
+**Small copy defects the dump caught**, both invisible until the report was read
+as a reader rather than as a test: apertures came out in string order, so f/16
+sorted before f/4.5, and a reason ending without a full stop ran into the next
+sentence.
+
 ## The shipped profiles are measured data now, and one matcher serves both, 2026-09-10
 
 **The 50-250 was re-measured on the device with the app's own rig** — nine
