@@ -51,10 +51,17 @@ export interface StoredProfile {
   camera: string;
   measured: string;
   /** The hot-spot's share of the centre's brightness, per radial bin, in
-   *  LINEAR space. Present only on the profiles that SHIP with the app, where
-   *  it is the LOW end of the measured range — see hotspotProfiles.ts. A
-   *  profile the reader measured carries colour only, on the owner's call: one
-   *  flat frame reports the bump as a range, and a range is not a correction. */
+   *  LINEAR space, at the LOW end of the measured range.
+   *
+   *  A measurement reports this as a RANGE, because one flat frame cannot
+   *  separate the hot-spot from the lens's own vignette, and for a long time
+   *  that was the reason not to apply it at all. What settled it is that the two
+   *  errors are not equally recoverable: under-corrected, the Hot-spot slider
+   *  finishes the job by hand; over-corrected, no control puts the centre back.
+   *  So the low end is applied and the range is what it came from. The profiles
+   *  that ship with the app were already doing this — a reader's own
+   *  measurement of their own lens on their own body has a better claim to it,
+   *  not a worse one (owner call, 2026-09-10). */
   bump?: number[];
   /** True for a profile that came with the app rather than from this device. */
   builtIn?: boolean;
@@ -90,17 +97,33 @@ export function listProfiles(): StoredProfile[] {
 /** Take a rig payload and keep its colour terms. Replaces any profile already
  *  stored under the same key — re-measuring a lens should improve it, not
  *  leave two answers to one question. */
+/** What one profile in a payload did to what was already kept. Re-measuring
+ *  REPLACES a profile with the same lens, focal length and aperture — which is
+ *  what a reader who re-shoots a lens wants — and a silent replace can put a
+ *  one-frame measurement over a four-frame one with nothing said. */
+export interface SaveChange {
+  key: string;
+  what: "added" | "replaced";
+  /** Frames behind the profile that was displaced, when one was. */
+  wasFrames?: number;
+  frames: number;
+}
+
 export function saveFromPayload(payload: {
   camera?: string;
   measured?: string;
-  profiles?: Record<string, { kr: number[]; kb: number[]; frames: number; source: string }>;
+  profiles?: Record<string, {
+    kr: number[]; kb: number[]; frames: number; source: string;
+    falloff?: number[]; bump_range?: number[];
+  }>;
   lens_map?: Record<string, string>;
-}): { saved: number; skipped: string[]; ok: boolean } {
+}): { saved: number; skipped: string[]; ok: boolean; changes: SaveChange[] } {
   const shortToModel = new Map<string, string>();
   for (const [model, short] of Object.entries(payload.lens_map ?? {})) shortToModel.set(short, model);
   const list = read();
   let saved = 0;
   const skipped: string[] = [];
+  const changes: SaveChange[] = [];
   for (const [key, p] of Object.entries(payload.profiles ?? {})) {
     // THE APERTURE IS OPTIONAL IN THE KEY. It was added to the group key after
     // the rig had already been shipping profiles without it, and a payload from
@@ -117,16 +140,40 @@ export function saveFromPayload(payload: {
       ap: m[3] ? Number(m[3]) || NaN : NaN,
       kr: p.kr,
       kb: p.kb,
+      bump: bumpFrom(p.falloff, p.bump_range),
       frames: p.frames ?? 0,
       source: p.source ?? "",
       camera: payload.camera ?? "",
       measured: payload.measured ?? "",
     };
     const at = list.findIndex((x) => x.key === key);
-    if (at >= 0) list[at] = entry; else list.push(entry);
+    if (at >= 0) {
+      changes.push({ key, what: "replaced", wasFrames: list[at].frames, frames: entry.frames });
+      list[at] = entry;
+    } else {
+      changes.push({ key, what: "added", frames: entry.frames });
+      list.push(entry);
+    }
     saved++;
   }
-  return { saved, skipped, ok: saved > 0 ? write(list) : true };
+  return { saved, skipped, ok: saved > 0 ? write(list) : true, changes };
+}
+
+/** The bump curve to apply, from what a measurement reports.
+ *
+ *  `bump_range` is one number for the whole frame — the hot-spot's share of the
+ *  CENTRE's brightness — and the correction needs a value per radial bin. The
+ *  shape comes from `falloff`, which carries hot-spot and vignette together:
+ *  its excess over the reference ring, scaled so the centre lands on the low end
+ *  of the range, is the hot-spot's part of it. Without a falloff there is no
+ *  shape to scale and nothing is applied, rather than a guess at one. */
+function bumpFrom(falloff?: number[], range?: number[]): number[] | undefined {
+  const lo = range?.[0];
+  if (!Array.isArray(falloff) || falloff.length < 2 || !(typeof lo === "number") || !(lo > 0)) return undefined;
+  const peak = falloff[0] - 1;
+  if (!(peak > 1e-6)) return undefined;
+  const scale = lo / peak;
+  return falloff.map((v) => Math.max(0, Math.round((v - 1) * scale * 1e5) / 1e5));
 }
 
 export function removeProfile(key: string): void {

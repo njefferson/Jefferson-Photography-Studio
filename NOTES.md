@@ -6240,6 +6240,63 @@ which edge answered rather than about what is deployed. Six independent fetches
 now, all six required to agree. The `sw.js` cache stamp is the better anchor
 where there is one, since it carries the version.
 
+## A measured profile carries its brightness now, and one profile corrects a frame, 2026-09-10
+
+**The standing call was colour only**, because one flat frame reports the
+hot-spot as a RANGE and a range is not a correction. What settled it the other
+way is that the two errors are not equally recoverable: under-corrected, the
+Hot-spot slider finishes the job by hand; over-corrected, no control puts the
+centre back. So the LOW end of the range is applied, which is what the profiles
+that ship with the app were already doing — and a reader's own measurement of
+their own lens on their own body has the better claim to it, not a worse one
+(owner call, 2026-09-10).
+
+**A range is one number and a correction needs a curve.** `bump_range` is the
+hot-spot's share of the CENTRE's brightness; the shape comes from `falloff`,
+which carries hot-spot and vignette together, scaled so the centre lands on the
+low end. No falloff, no bump — rather than a guess at the shape. A range of zero
+stores nothing at all, so a lens with no hot-spot wide open applies no
+brightness correction rather than a flat zero curve.
+
+**ONE PROFILE, WHOLE — not the colour from one and the brightness from another.**
+It was exactly that for a while, because a measured profile carried colour only
+and the shipped table carried brightness, and the two composed by accident
+rather than by design. The moment a reader's own measurement started carrying
+both, taking half of each would have meant correcting a frame with two different
+lenses' idea of where its centre is. The reader's supersedes the shipped one in
+full.
+
+**And one strength, and one card.** `params.lensFix` is what the pipeline reads;
+the shipped card's `hsFix` is mirrored into it while that card is the live one.
+The shipped card is HIDDEN while the reader's own profile is in use, because it
+has nothing to contribute and its Strength moves nothing — two sliders over one
+correction, one of them inert, is the shape that makes a reader stop believing
+the panel.
+
+**Found by that: forgetting a measurement left BOTH cards hidden.** The
+correction fell back to the shipped profile correctly and nothing on screen said
+so, until the photograph was opened again. `syncMyLens` tells the shipped card
+when it stops being superseded.
+
+**RE-MEASURING REPLACES, and now it says so.** Asked what happens when a flat
+frame already accounted for is ingested again. Within one run, frames in the
+same lens/focal-length/aperture group are averaged — up to six, spread across
+the set — so nothing is double-counted. Across runs, a profile with the same key
+is replaced outright, which is what a reader re-shooting a lens wants. The hole
+was that the replace was silent: a one-frame measurement could go over a
+four-frame one with nothing said. `saveFromPayload` returns what each profile
+did, and the panel names any replacement made from FEWER frames than the one it
+displaced.
+
+**TWO TESTS ASSERTED A CHANNEL'S SIGN, AND BOTH WENT STALE THE SAME DAY.** "It
+raises the centre's missing blue" was true while the correction was colour only.
+With a brightness half on top, every channel falls and the colour shows as red
+falling FURTHER than blue — the same statement about the centre's excess red,
+and one that survives the correction learning to do something else. The
+preview's claim and the export's claim were both written that way and both had
+to be rewritten. A claim phrased as a direction is a claim about the current
+feature set; one phrased as a comparison is a claim about the thing itself.
+
 ## Seven questions from the device, and what each one measured, 2026-09-10
 
 **Is the location strip taking the lens with it?** No, and it is asserted now

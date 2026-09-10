@@ -194,6 +194,7 @@ const ui = {
 };
 
 const hsUi = {
+  card: $("hsCard") as HTMLElement,
   status: $("hsStatus") as HTMLElement,
   strength: $("hsStrength") as HTMLInputElement,
   bypassBtn: $("hsBypassBtn") as HTMLButtonElement,
@@ -231,15 +232,19 @@ function arrayBufferOf(u8: Uint8Array): ArrayBufferLike {
     : u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength);
 }
 
-/** The colour half for the open photograph: the reader's own measurement when
- *  they have one for this lens, otherwise whatever the shipped profile knows.
+/** The one profile correcting the open photograph: the reader's own measurement
+ *  when they have one for this lens, otherwise the profile that came with the
+ *  app.
  *
- *  ONE SOURCE FOR COLOUR, never a blend of the two. A measurement the reader
- *  took on their own body supersedes a profile measured on another; mixing them
- *  would produce a curve that describes neither lens. */
-function colourHalf(): LensStore.StoredProfile | null {
-  if (myLens) return myLens.p;
-  return Hotspot.hasColour(hotspotState?.p ?? null) ? hotspotState!.p : null;
+ *  ONE PROFILE, WHOLE. Not the colour from one and the brightness from another.
+ *  It was that for a while, because a measured profile carried colour only and
+ *  the shipped table carried brightness — and the moment a reader's own
+ *  measurement started carrying both, taking half of each would have meant
+ *  correcting a frame with two different lenses' idea of where its centre is.
+ *  A measurement taken on the reader's own body supersedes one taken on
+ *  another, in full. */
+function activeProfile(): LensStore.StoredProfile | null {
+  return myLens ? myLens.p : hotspotState?.p ?? null;
 }
 
 /** Push whichever halves of the radial curve this photograph has to the GPU.
@@ -247,8 +252,9 @@ function colourHalf(): LensStore.StoredProfile | null {
  *  see setLensCurve. Called after BOTH matches are worked out at open, and
  *  again whenever either changes. */
 function syncLensTexture() {
-  const c = colourHalf();
-  renderer.setLensCurve(c ? c.kr : null, c ? c.kb : null, hotspotState?.p.bump ?? null);
+  const c = activeProfile();
+  const colour = Hotspot.hasColour(c) ? c : null;
+  renderer.setLensCurve(colour ? colour.kr : null, colour ? colour.kb : null, c?.bump ?? null);
 }
 
 /** The shipped card's Strength governs everything the SHIPPED profile
@@ -256,9 +262,14 @@ function syncLensTexture() {
  *  includes the colour. Without this the colour half went up to the GPU and sat
  *  at a strength of zero: matched, uploaded, and doing nothing, with the card
  *  saying it corrected colour. */
-function syncColourStrength() {
-  if (myLens) return; // the reader's own card owns the colour when they have one
-  params.lensFix = Hotspot.hasColour(hotspotState?.p ?? null) ? params.hsFix : 0;
+/** ONE STRENGTH FOR ONE CORRECTION. `params.lensFix`/`lensBypass` are what the
+ *  pipeline reads; `hsFix`/`hsBypass` are the shipped card's own controls, and
+ *  they are the truth only while the shipped profile is the one being applied.
+ *  Two sliders over one correction, with one of them inert, is the shape that
+ *  makes a reader stop believing any of it. */
+function syncLensStrength() {
+  if (myLens) return; // the reader's own card owns it when they have one
+  params.lensFix = params.hsFix;
   params.lensBypass = params.hsBypass;
 }
 
@@ -269,7 +280,7 @@ function syncColourStrength() {
  *  slider move, which is why it could not run on a raw file at all — a raw
  *  frame has no 8-bit buffer to copy, and one at full size would be 330 MB. */
 function syncHotspot() {
-  syncColourStrength();
+  syncLensStrength();
   syncLensTexture();
   draw();
   updateHotspotUI();
@@ -278,6 +289,13 @@ function syncHotspot() {
 
 function updateHotspotUI() {
   if (!current) { hsUi.status.textContent = "No photo loaded."; hsUi.prompt.hidden = true; return; }
+  // ONE CARD AT A TIME. The reader's own measurement supersedes the shipped
+  // profile in full, so while theirs is in use this card has nothing to
+  // contribute and its Strength moves nothing. A second slider over the same
+  // correction that does not move it is how a reader stops believing the panel.
+  const superseded = !!myLens;
+  hsUi.card.hidden = superseded;
+  if (superseded) return;
   hsUi.strength.disabled = false;
   hsUi.bypassBtn.disabled = false;
   hsUi.strength.value = String(params.hsFix);
@@ -293,16 +311,14 @@ function updateHotspotUI() {
   // What this profile actually knows, said plainly: the 2026-07 pair were
   // measured for brightness alone, and a reader has no way to tell from the
   // picture which of the two kinds they have.
-  const knows = Hotspot.hasColour(p)
-    ? myLens ? "brightness (colour from your own measurement)" : "brightness and colour"
-    : "brightness only";
+  const knows = Hotspot.hasColour(p) ? "brightness and colour" : "brightness only";
   hsUi.status.textContent =
     `${short} · ${src} · ${knows}${note ? ` — ${note}` : ""}${params.hsBypass ? " · bypassed" : ""}`;
 }
 
 hsUi.strength.addEventListener("input", () => {
   params.hsFix = Number(hsUi.strength.value);
-  syncColourStrength();
+  syncLensStrength();
   syncHotspot(); // draw() coalesces the drag into one undo step, like every slider
 });
 hsUi.bypassBtn.addEventListener("click", () => {
@@ -357,9 +373,15 @@ let myLens: { p: LensStore.StoredProfile; note: string } | null = null;
  *  every pixel. In the pipeline it is one number per draw. */
 function syncMyLens() {
   if (!myLens) { params.lensFix = 0; params.lensBypass = false; }
+  syncLensStrength();
   syncLensTexture();
   draw();
   updateMyLensUI();
+  // The shipped card is hidden while the reader's own profile supersedes it, so
+  // it has to be told when that stops being true. Forgetting a measurement left
+  // BOTH cards hidden until the photograph was opened again — the correction
+  // fell back to the shipped profile correctly and nothing on screen said so.
+  updateHotspotUI();
   updateLensCmp();
 }
 
@@ -370,8 +392,11 @@ function updateMyLensUI() {
   myLensUi.bypass.setAttribute("aria-pressed", String(params.lensBypass));
   const p = myLens.p;
   const from = p.source ? ` from ${p.frames} ${p.source} frame${p.frames === 1 ? "" : "s"}` : "";
+  const knows = p.bump?.some((v) => v > 0)
+    ? Hotspot.hasColour(p) ? "brightness and colour" : "brightness"
+    : "colour";
   myLensUi.status.textContent =
-    `${p.model} · measured at ${p.fl}mm${Number.isFinite(p.ap) ? ` f/${p.ap}` : ""}${from}` +
+    `${p.model} · measured at ${p.fl}mm${Number.isFinite(p.ap) ? ` f/${p.ap}` : ""}${from} · ${knows}` +
     (myLens.note ? ` — ${myLens.note}` : "") +
     (params.lensBypass ? " · bypassed" : "");
 }
@@ -401,10 +426,11 @@ function lensCurveFor(imported: ImportedFile): LensCurve | null {
  *  Bypass is a strength of 0, not a missing curve: one place decides how much
  *  of each half lands, and it is the pipeline. */
 function currentLensCurve(): LensCurve | null {
-  const colour = colourHalf();
-  const bump = hotspotState?.p.bump;
-  if (!colour && !bump) return null;
-  return { kr: colour?.kr, kb: colour?.kb, bump };
+  const c = activeProfile();
+  if (!c) return null;
+  const colour = Hotspot.hasColour(c) ? c : null;
+  if (!colour && !c.bump) return null;
+  return { kr: colour?.kr, kb: colour?.kb, bump: c.bump };
 }
 
 /** Called at open, beside initHotspot. */
@@ -418,7 +444,7 @@ function initMyLens(_img: DecodedImage, _imported: ImportedFile) {
   // run and settled the shipped match.
   params.lensFix = myLens ? 1 : 0;
   params.lensBypass = false;
-  syncColourStrength();
+  syncLensStrength();
   syncLensTexture();
   updateMyLensUI();
   updateLensCmp();
@@ -4571,11 +4597,14 @@ function showNoLensFix(on: boolean) {
 }
 wireHold(lensCmpBtn, showNoLensFix);
 
-/** Is any automatic lens correction actually landing on this frame right now? */
-function lensFixLive(): boolean {
-  const colour = !params.lensBypass && (params.lensFix ?? 0) !== 0 && !!colourHalf();
-  const bump = !params.hsBypass && (params.hsFix ?? 0) !== 0 && !!hotspotState?.p.bump?.some((v) => v > 0);
-  return colour || bump;
+/** What the one active profile is correcting on this frame right now, or null
+ *  when nothing is. */
+function lensFixLive(): { colour: boolean; bump: boolean } | null {
+  const c = activeProfile();
+  if (!c || params.lensBypass || (params.lensFix ?? 0) === 0) return null;
+  const colour = Hotspot.hasColour(c);
+  const bump = !!c.bump?.some((v) => v > 0);
+  return colour || bump ? { colour, bump } : null;
 }
 
 /** Show the button when there is something to compare, and say what is on. */
@@ -4583,11 +4612,8 @@ function updateLensCmp() {
   const live = lensFixLive();
   lensCmpBtn.hidden = !live;
   if (!live) return;
-  const mine = !!myLens;
-  const bump = !params.hsBypass && !!hotspotState?.p.bump?.some((v) => v > 0);
-  const colour = !params.lensBypass && !!colourHalf();
-  const what = colour && bump ? "brightness and colour" : bump ? "brightness" : "colour";
-  lensCmpBtn.title = `A lens correction is on this photo (${what}, from ${mine ? "your own measurement" : "the profile that came with the app"}). Press and hold to see it without.`;
+  const what = live.colour && live.bump ? "brightness and colour" : live.bump ? "brightness" : "colour";
+  lensCmpBtn.title = `A lens correction is on this photo (${what}, from ${myLens ? "your own measurement" : "the profile that came with the app"}). Press and hold to see it without.`;
 }
 
 // Panel scroll cues: arrows appear when there is more panel above/below.
