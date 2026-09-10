@@ -2265,7 +2265,10 @@ user-scalable=no.
   optically round), r = 1 at the frame corner. IR-native — no general editor
   does the hot-spot. Spatial, so skipped in the .cube LUT like masks/denoise/
   glow. GPU==CPU ≤1 LSB; pixel-circularity verified on a non-square frame. In
-  the "IR lens fixes" panel. (Colour-cast hot-spot correction could follow.)
+  the "IR lens fixes" panel. Colour-cast hot-spot correction FOLLOWED
+  2026-09-10 as `hotspotColor` (−0.5..+0.5, same circle, red up / blue down in
+  source space, before the matrix and the swap) — see "The hot-spot has a
+  colour, and nothing could touch it".
 - [x] **Global Luminance slider** — one overall lift/drop on top of the tone
   curve. The five-point tone curve (Blacks/Shadows/Midtones/Whites/Highlights)
   already covers those bands (owner decision 2026-07-04), so no separate
@@ -5583,6 +5586,82 @@ mark near an attribution; it was the only one.
 **Still owed:** the strip is wired into `ir.html` only. `index.html` (the Studio
 chooser) and Macro share the same root-scope worker and the same `swupdate.ts`,
 and `wireUpdateStrip` is exported for them, but neither carries the markup yet.
+
+## The hot-spot has a colour, and nothing could touch it, 2026-09-10
+
+**Reported as** a soft red disc in the middle of a plain sky, with the
+clarification that it showed up with Restore depth and Aerochrome ON. That
+second half is the whole diagnosis: the disc is not in the decode, it is
+AMPLIFIED into visibility by the grade.
+
+**What it actually is.** An IR-converted lens passes a little more infrared
+straight up the optical axis than it does to the corners. That has two halves —
+the centre is BRIGHTER, and the centre is a slightly different COLOUR — and this
+app only ever had the first. `hotspot` is a scalar radial gain; so is the
+per-lens profile in `src/hotspot.ts`, whose `apply()` multiplies R, G and B by
+the same `g`. Neither can move a colour, by construction. Then the R⇄B swap
+every colour look is built on takes the small residual tint, puts it on the
+opposite side of the wheel from the sky it sits in, and Restore depth's
+saturation lift finishes the job. A tint of a few percent in the decode becomes
+a disc you cannot look away from.
+
+**What the field does — mined before implementing, per the standing rule.**
+The radial models the raw formats carry are SCALAR. The DNG spec's
+`FixVignetteRadial` opcode is one gain against radius; Adobe's LCP vignette
+model is the same shape; dcraw/LibRaw carry nothing for this at all. There is
+no per-channel radial correction anywhere in the reference formats, because in
+visible-light photography the centre and the corners are the same colour and
+only the brightness differs.
+
+The reference remedy for colour non-uniformity is a different technique
+entirely: FLAT-FIELD correction. RawTherapee's Flat-Field module and every
+astrophotography flat divide the frame by a blurred photograph of a uniform
+field, PER CHANNEL — which corrects the colour half for free, because it never
+collapsed the three channels in the first place. That is the correct answer and
+this app cannot use it: it needs the reader to shoot and supply a flat frame,
+which is not a thing to ask of somebody on a tablet.
+
+**The deviation, written down because the rule requires it.** The app's own
+profiles were measured from 26 flat-field frames — actual flats — and then
+collapsed to one scalar per radius bin. The per-channel information was
+MEASURED AND DISCARDED. Re-measuring those frames per channel is the principled
+fix and is now the top of what this owes; it is not what shipped today, for two
+reasons. The profiles are JPEG-only and keyed to two lenses, so a RAW frame or
+any other lens has no profile to carry a colour term. And an automatic needs a
+per-frame measurement, which was tried and failed: the centre-vs-edge red-over-
+blue ratio measured on single frames across the practice set spread 0.58 to
+2.18, so there is nothing stable enough to drive a correction from one
+photograph. A scalar remedy against a per-channel defect is the diagnosis, not
+a slider's absence.
+
+**What shipped: `hotspotColor`, −0.5..+0.5, default 0.** It runs over exactly
+the circle `hotspotSize` already defines (`hotspotWeight` is now a shared export
+in `pipeline.ts` and the same expression in the shader), multiplying red by
+1 + c·t and blue by 1 − c·t. It sits after `radialGain` and BEFORE the matrix
+and the swap, which is the same placement `hotspot.ts` documents for the
+brightness half and for the same reason: correcting after the false-colour swap
+distorts the colour rather than the luminance.
+
+**And that placement is why the slider's copy names no direction.** A
+source-space red correction shows on screen as blue whenever a look has swapped
+the channels, so "right adds red" is wrong for exactly the case the control
+exists for. The note says to nudge it and reverse if the disc gets stronger,
+and says why. Naming a direction that is right half the time is worse than
+naming none.
+
+Measured on a reported frame: preview centre/edge red-over-blue 1.1931 at 0,
+0.9185 at 0.4. Exported through the CPU mirror: 0.9307. GPU-CPU gap 0.0122,
+inside the standing parity tolerance. Five places wired (`cloneParams`,
+`applySnapshot`, `syncFromUI`, `syncToUI`, the listener array). It is kept OUT
+of `SavedLook`, where `hotspot`, `hotspotSize` and `vignette` already are not:
+it belongs to the lens and the frame, not to the grade, so it does not ride
+looks, profiles or a batch.
+
+**Still owed here:** per-channel profiles re-measured from the 26 flats, which
+would make the colour half automatic for the two profiled lenses; hot-spot
+profiles on the RAW path at all (they are JPEG-only because full NEFs could not
+be moved into the measurement rig); and `keyFor`'s nearest-focal-length anchor
+selection, which snaps rather than interpolating between anchors.
 
 ## A fast second tap on a control zoomed the whole app, 2026-09-09
 

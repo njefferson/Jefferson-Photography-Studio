@@ -106,6 +106,7 @@ uniform int u_readMode;      // 1 = output the mask-stage DISPLAY colour and sto
                              //     (lets the colour mask read its own key colour)
 uniform float u_hotspot;     // IR hot-spot correction (darken centre) 0..0.8
 uniform float u_hotspotSize; // hot-spot radial extent
+uniform float u_hotspotColor; // -0.5..0.5 the hot-spot's COLOUR (+red / -blue at centre)
 uniform float u_vignette;    // -1..1 (+ brighten corners, - darken)
 uniform float u_aspect;      // image width/height — keeps the lens fix circular in pixels
 uniform float u_recover;     // 0..1 pull sensor-clipped pixels to post-WB neutral
@@ -229,6 +230,14 @@ float radialGain(vec2 uv){
   float gVig = 1.0 + u_vignette * 0.85 * smoothstep(0.07, 1.0, r);
   float gHot = 1.0 - u_hotspot * (1.0 - smoothstep(0.0, max(1e-3, u_hotspotSize), r));
   return max(0.0, gVig * gHot);
+}
+/** The hot-spot's radial weight alone: 1 at the centre, 0 past u_hotspotSize.
+ *  Shared with radialGain above so both describe the same circle, and mirrored
+ *  by hotspotWeight() in pipeline.ts. */
+float hotspotWeight(vec2 uv){
+  vec2 d = vec2((uv.x - 0.5) * u_aspect, uv.y - 0.5);
+  float r = 2.0 * length(d) / sqrt(u_aspect * u_aspect + 1.0);
+  return 1.0 - smoothstep(0.0, max(1e-3, u_hotspotSize), r);
 }
 float maskWeight(int i, vec2 uv){
   vec4 gA = u_maskGeoA[i];
@@ -407,6 +416,13 @@ void main() {
 
   // IR lens correction: radial luminance gain (hot-spot / vignette) after WB.
   if (u_hotspot != 0.0 || u_vignette != 0.0) c *= radialGain(v_uv);
+  // And the hot-spot's COLOUR, on the same circle — before the swap and the
+  // matrix below, so it corrects the LENS rather than the false-colour result.
+  if (u_hotspotColor != 0.0) {
+    float t = hotspotWeight(v_uv);
+    c.r *= 1.0 + u_hotspotColor * t;
+    c.b *= 1.0 - u_hotspotColor * t;
+  }
 
   // Camera colour matrix: separates infrared chroma into distinct hues so the
   // channel swap can produce real false colour instead of a single tint.
@@ -673,7 +689,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_vignette", "u_aspect", "u_recover", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_vignette", "u_aspect", "u_recover", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -1034,6 +1050,7 @@ export class Renderer {
     gl.uniform1f(this.loc.u_lum, p.lum || 1);
     gl.uniform1f(this.loc.u_hotspot, p.hotspot ?? 0);
     gl.uniform1f(this.loc.u_hotspotSize, p.hotspotSize ?? 0.5);
+    gl.uniform1f(this.loc.u_hotspotColor, p.hotspotColor ?? 0);
     gl.uniform1f(this.loc.u_vignette, p.vignette ?? 0);
     gl.uniform1f(this.loc.u_aspect, this.imgH ? this.imgW / this.imgH : 1);
     gl.uniform1f(this.loc.u_recover, p.recover ?? 0);
