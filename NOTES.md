@@ -5670,6 +5670,50 @@ profiles on the RAW path at all (they are JPEG-only because full NEFs could not
 be moved into the measurement rig); and `keyFor`'s nearest-focal-length anchor
 selection, which snaps rather than interpolating between anchors.
 
+## It decoded everything to find out it wanted none of it, 2026-09-10
+
+**Reported from a phone: a 1.69 GB zip, no sign of progress, taking forever.**
+Both halves were real and the second was the cause of the first.
+
+**MEASURED BASELINE: a zip of twelve 10 MB raws ran for over FIFTEEN MINUTES
+and never finished.** The reason is not that decoding is slow. Those practice
+files carry no readable EXIF at all — `readExifSubset` returns null on the whole
+file — so the rig decoded every one of them in full and then rejected every one
+for having no lens recorded. Fifteen minutes to say "I cannot use these."
+
+**Ask first.** The rig now runs two passes. The first reads only the head of
+each frame — 1 MB out of 25 — and takes the lens and focal length out of its
+EXIF, which is enough to sort the whole set and to turn away anything unusable
+before a single frame is decoded. `readZipEntryPrefix` inflates only that far
+and cancels; a truncated deflate stream errors by design there, and whatever
+arrived is exactly what was asked for. Re-measured on a set shaped like the
+reported one — 46 frames, 40 with EXIF and 6 without: **0.7 seconds**, and the
+six unusable ones cost nothing.
+
+**AND IT MEASURES A HANDFUL, NOT EVERYTHING.** Four or five frames per focal
+length is what the instructions ask for; the rig now takes up to six per group,
+spread evenly across the set rather than the first six, since a set shot in one
+sweep has its clouds and its sun angle bunched together in time. A 1.69 GB set
+is roughly seventy frames — measuring all of them is tens of minutes to refine a
+number that stopped moving after the sixth. It says how many it skipped and why.
+
+**Progress is one line that updates in place**, with a count and — after two
+frames — an estimate of what is left, and it yields to the browser before each
+decode so the line actually paints.
+
+**APERTURE IS PART OF THE LENS'S BEHAVIOUR, and the first real data made that
+undeniable.** A returned profile had **19 frames averaged into one 50mm number,
+spanning f/4.5 to f/22** — seven different behaviours reported as one. The same
+set showed the point directly: at 135mm f/29 the hot-spot measured 0.186–0.191,
+and at 130mm f/5.3 it measured 0.000. Same lens, nearly the same focal length,
+and the hot-spot is entirely an aperture effect between them. Groups key on
+lens, focal length AND aperture now.
+
+**And the Copy button was at the top while the numbers were at the bottom**,
+under a long list of per-frame findings — so on a phone the reader scrolled
+past everything, found a text box, and tried to select 2 KB of JSON by hand
+(reported, and fair). Copy and Save sit with the text they act on now.
+
 ## A lens is not a photograph, 2026-09-10
 
 **Reported, twice, and both times the answer given was worse than the last.**

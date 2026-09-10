@@ -18,7 +18,7 @@ import { decodeOffThread } from "./decodeClient";
 import { sniff } from "./import";
 import { readExifSubset } from "./exif";
 import { profileFrame, averageProfiles, round5, NBINS, type FrameProfile } from "./lensprofile";
-import { readZipIndex, readZipEntry, imageEntries } from "./zip";
+import { readZipIndex, readZipEntry, readZipEntryPrefix, imageEntries } from "./zip";
 
 declare const __APP_VERSION__: string;
 
@@ -29,8 +29,14 @@ export function wireLensRig(root: ParentNode): void {
   const $ = <T extends HTMLElement>(id: string) => root.querySelector<T>("#" + id)!;
   const profResults = $("lensResults");
   const profText = $<HTMLTextAreaElement>("lensText");
-  const profCopy = $<HTMLButtonElement>("lensCopy");
-  const profSave = $<HTMLButtonElement>("lensSave");
+  // THE COPY BUTTON SITS WITH THE NUMBERS. It used to live in the actions row
+  // at the top, while the text it copies appeared at the bottom under a long
+  // list of per-frame findings — so on a phone the reader scrolled past
+  // everything, found a text box, and tried to select 2 KB of JSON by hand
+  // (owner report, 2026-09-10). The pair travels together now.
+  const profOut = $("lensOut");
+  const profCopy = $<HTMLButtonElement>("lensCopy2");
+  const profSave = $<HTMLButtonElement>("lensSave2");
   const profStop = $<HTMLButtonElement>("lensStop");
 
   /** Clipboard, with a hand-copy fallback — it is refused often enough on iOS
@@ -41,7 +47,7 @@ export function wireLensRig(root: ParentNode): void {
       await navigator.clipboard.writeText(text);
       btn.textContent = "Copied";
     } catch {
-      profText.hidden = false;
+      profOut.hidden = false;
       profText.focus();
       profText.select();
       btn.textContent = "Selected — press Copy";
@@ -85,8 +91,32 @@ export function wireLensRig(root: ParentNode): void {
    *  once — the whole reason `readZipIndex` exists. */
   interface Candidate {
     name: string;
+    /** The whole frame — only ever called for one that is going to be measured. */
     bytes: () => Promise<Uint8Array>;
+    /** Just the head of it, enough for EXIF, without inflating 25 MB. */
+    head: () => Promise<Uint8Array>;
   }
+
+  /** Enough of a file to carry IFD0 and the Exif IFD, and no more. A raw frame
+   *  is 25 MB and its lens is written near the front; inflating the whole thing
+   *  to find out which lens it came from is most of the cost of a big set and
+   *  none of the answer.
+   *
+   *  WHY THIS PASS EXISTS AT ALL, measured: a zip of twelve 10 MB raws took
+   *  over FIFTEEN MINUTES and then rejected every one of them, because they
+   *  carry no readable EXIF — the old code decoded each frame in full before
+   *  asking what lens it was. Asking first turns that into under five seconds.
+   *  1 MB rather than 256 KB because the saving is already ~96% and a file that
+   *  writes its Exif IFD a little further in should not be turned away. */
+  const HEAD_BYTES = 1024 * 1024;
+
+  /** How many frames per lens and focal length are actually worth measuring.
+   *  The page asks for four or five; six leaves a margin for one that turns out
+   *  to be cloudy. Beyond that each extra frame costs a full raw decode and
+   *  moves the average by less than the sky's own gradient. A 1.69 GB set is
+   *  about seventy frames — measuring all of them is tens of minutes of work to
+   *  refine a number that stopped moving after the sixth. */
+  const PER_GROUP = 6;
 
   /** Flatten what was picked. A zip counts as everything inside it: on an iPad a
    *  set of raw frames travels as one, because that is the only way iOS hands
@@ -97,7 +127,11 @@ export function wireLensRig(root: ParentNode): void {
     const out: Candidate[] = [];
     for (const f of files) {
       if (!/\.zip$/i.test(f.name)) {
-        out.push({ name: f.name, bytes: async () => new Uint8Array(await f.arrayBuffer()) });
+        out.push({
+        name: f.name,
+        bytes: async () => new Uint8Array(await f.arrayBuffer()),
+        head: async () => new Uint8Array(await f.slice(0, HEAD_BYTES).arrayBuffer()),
+      });
         continue;
       }
       if (typeof DecompressionStream === "undefined") {
@@ -108,7 +142,11 @@ export function wireLensRig(root: ParentNode): void {
         const inside = imageEntries(await readZipIndex(f));
         if (!inside.length) { say(`${f.name}: no photographs inside it.`); continue; }
         say(`${f.name}: ${inside.length} photograph${inside.length === 1 ? "" : "s"} inside.`);
-        for (const e of inside) out.push({ name: e.name.split("/").pop() ?? e.name, bytes: () => readZipEntry(f, e) });
+        for (const e of inside) out.push({
+        name: e.name.split("/").pop() ?? e.name,
+        bytes: () => readZipEntry(f, e),
+        head: () => readZipEntryPrefix(f, e, HEAD_BYTES),
+      });
       } catch (err) {
         say(`${f.name}: could not be read as a zip (${(err as Error).message}).`);
       }
@@ -124,69 +162,106 @@ export function wireLensRig(root: ParentNode): void {
     input.value = ""; // so choosing the same set twice re-runs
     if (!picked.length) return;
     profResults.replaceChildren();
-    profText.hidden = true;
-    profCopy.hidden = true;
-    profSave.hidden = true;
+    profOut.hidden = true;
     stopRequested = false;
     profStop.hidden = false;
     profStop.textContent = "Stop";
     profStop.onclick = () => { stopRequested = true; profStop.textContent = "Stopping…"; };
 
-    const opening = profNote("Looking at what you picked…");
+    const status = profNote("Looking at what you picked…");
     const files = await expand(picked, (t) => profNote(t));
-    opening.remove();
-    if (!files.length) { profNote("Nothing to measure."); profStop.hidden = true; return; }
+    if (!files.length) { status.textContent = "Nothing to measure."; profStop.hidden = true; return; }
 
-    const groups = new Map<string, { frames: FrameProfile[]; model: string; short: string; fl: number; aps: number[]; kinds: Set<string> }>();
-    let unusable = 0;
+    // --- PASS ONE: which lens is each frame, read from its head only ---------
+    // 256 KB out of a 25 MB raw, so a big zip is sorted in seconds rather than
+    // decoded for minutes to learn what it already says in its EXIF.
+    const seen: { f: Candidate; key: string; model: string; short: string; fl: number; ap: number }[] = [];
     let camera = "";
-
+    let unreadable = 0;
     for (let i = 0; i < files.length; i++) {
-      if (stopRequested) { profNote(`Stopped after ${i} of ${files.length}. What was measured up to here is below.`); break; }
-      const f = files[i];
-      const p = profNote(`Measuring ${f.name} — ${i + 1} of ${files.length}…`);
+      if (stopRequested) break;
+      status.textContent = `Reading what is in the set — ${i + 1} of ${files.length}…`;
+      if (i % 4 === 0) await new Promise((r) => setTimeout(r, 0)); // let it paint
       try {
-        const bytes = await f.bytes();
-        const kind = sniff(bytes);
-        const ex = readExifSubset(bytes);
+        const ex = readExifSubset(await files[i].head());
         const model = ex?.lens?.trim() || "";
         const fl = ex?.focalLength && ex.focalLength[1] ? ex.focalLength[0] / ex.focalLength[1] : NaN;
         const ap = ex?.fNumber && ex.fNumber[1] ? ex.fNumber[0] / ex.fNumber[1] : NaN;
         if (!camera && (ex?.make || ex?.model)) camera = [ex.make, ex.model].filter(Boolean).join(" ");
-        // The frame is decoded off the main thread so a long set does not lock
-        // the page, and dropped as soon as its 240 numbers are out of it.
-        const img = await decodeOffThread({ name: f.name, kind, bytes, looksTranscoded: false });
-        const prof = profileFrame(img);
-        p.remove();
-        const where = model ? `${model} at ${Number.isFinite(fl) ? fl.toFixed(0) + "mm" : "an unrecorded focal length"}` : "no lens recorded in the file";
-        if (!prof.usable) {
-          unusable++;
-          profRow(f.name, "not used", `${prof.why}. ${where}.`);
-          continue;
-        }
-        if (!model || !Number.isFinite(fl)) {
-          unusable++;
-          profRow(f.name, "not used", `The frame measured cleanly, but ${where} — a profile has to be filed under a lens and a focal length, or it cannot be matched to a photograph later.`);
-          continue;
-        }
+        if (!model || !Number.isFinite(fl)) { unreadable++; continue; }
         const short = shortLens(model);
-        const key = `${short}@${Math.round(fl)}`;
-        let g = groups.get(key);
-        if (!g) { g = { frames: [], model, short, fl: Math.round(fl), aps: [], kinds: new Set() }; groups.set(key, g); }
+        // A HOT-SPOT CHANGES WITH APERTURE, so the aperture is part of what is
+        // being measured. Real data made this obvious: a set came back with 19
+        // frames averaged into one 50mm profile spanning f/4.5 to f/22, which
+        // is a survey of seven different behaviours reported as one number.
+        const apKey = Number.isFinite(ap) ? `f${ap.toFixed(1)}` : "f?";
+        seen.push({ f: files[i], key: `${short}@${Math.round(fl)}@${apKey}`, model, short, fl: Math.round(fl), ap });
+      } catch { unreadable++; }
+    }
+
+    // --- CHOOSE: a handful per lens and focal length, spread across the set ---
+    const byKey = new Map<string, typeof seen>();
+    for (const c of seen) (byKey.get(c.key) ?? byKey.set(c.key, []).get(c.key)!).push(c);
+    const chosen: typeof seen = [];
+    let skipped = 0;
+    for (const [, list] of byKey) {
+      if (list.length <= PER_GROUP) { chosen.push(...list); continue; }
+      // Evenly spaced rather than the first six: a set shot in one sweep has
+      // its clouds and its sun angle bunched together in time.
+      const step = list.length / PER_GROUP;
+      for (let i = 0; i < PER_GROUP; i++) chosen.push(list[Math.floor(i * step)]);
+      skipped += list.length - PER_GROUP;
+    }
+    const summary = [
+      `${seen.length} photograph${seen.length === 1 ? "" : "s"} with a lens and focal length in them`,
+      byKey.size ? `${byKey.size} lens/focal-length group${byKey.size === 1 ? "" : "s"}` : "",
+      unreadable ? `${unreadable} with no lens recorded in them` : "",
+    ].filter(Boolean).join(" · ");
+    profNote(summary);
+    if (skipped) profNote(`Measuring ${chosen.length} of them — up to ${PER_GROUP} per lens and focal length, spread across the set. The other ${skipped} would each cost a full decode and would not move the answer; shoot fewer next time, or none of this is wasted, it is just not needed.`);
+    if (!chosen.length) {
+      status.textContent = `Nothing in that set carries a lens and a focal length in its EXIF, so there is nothing to file a profile under. Read from the first ${HEAD_BYTES / 1024} KB of each file. Camera JPEGs and NEFs normally carry it; a file that has been through an editor or a converter often does not.`;
+      profStop.hidden = true;
+      return;
+    }
+
+    // --- PASS TWO: decode and measure only those ----------------------------
+    const groups = new Map<string, { frames: FrameProfile[]; model: string; short: string; fl: number; aps: number[]; kinds: Set<string> }>();
+    let unusable = 0;
+    const t0 = Date.now();
+    const mmss = (ms: number) => {
+      const s2 = Math.max(0, Math.round(ms / 1000));
+      return s2 < 90 ? `${s2}s` : `${Math.round(s2 / 60)} min`;
+    };
+    for (let i = 0; i < chosen.length; i++) {
+      if (stopRequested) { profNote(`Stopped after ${i} of ${chosen.length}. What was measured up to here is below.`); break; }
+      const c = chosen[i];
+      const done = i;
+      const eta = done >= 2 ? ` · about ${mmss(((Date.now() - t0) / done) * (chosen.length - done))} left` : "";
+      status.textContent = `Measuring ${c.f.name} — ${i + 1} of ${chosen.length}${eta}`;
+      await new Promise((r) => setTimeout(r, 0)); // paint before a long decode
+      try {
+        const bytes = await c.f.bytes();
+        const img = await decodeOffThread({ name: c.f.name, kind: sniff(bytes), bytes, looksTranscoded: false });
+        const prof = profileFrame(img);
+        const where = `${c.model} at ${c.fl}mm`;
+        if (!prof.usable) { unusable++; profRow(c.f.name, "not used", `${prof.why}. ${where}.`); continue; }
+        let g = groups.get(c.key);
+        if (!g) { g = { frames: [], model: c.model, short: c.short, fl: c.fl, aps: [], kinds: new Set() }; groups.set(c.key, g); }
         g.frames.push(prof);
-        if (Number.isFinite(ap)) g.aps.push(ap);
+        if (Number.isFinite(c.ap)) g.aps.push(c.ap);
         g.kinds.add(prof.linear ? "raw" : "rendered");
         const cr = prof.kr[0], cb = prof.kb[0];
-        profRow(f.name, key,
+        profRow(c.f.name, c.key,
           `The centre's colour is off by ${pct(Math.abs(cr - 1))} in red and ${pct(Math.abs(cb - 1))} in blue against the same frame's edges. ` +
           `Centre to corner it keeps ${pct(prof.falloffAtCorner)} of its brightness, of which somewhere between ${pct(prof.bumpRange[0])} and ${pct(prof.bumpRange[1])} is hot-spot rather than the lens's own falloff. ` +
           `${prof.linear ? "Measured from the raw sensor data" : "Measured from the rendered image"}, mean level ${pct(prof.meanLevel)}, ${pct(prof.clipFrac)} clipped, ${pct(prof.structure)} variation around a circle.`);
       } catch (err) {
-        p.remove();
         unusable++;
-        profRow(f.name, "not used", `It could not be opened (${(err as Error).message}).`);
+        profRow(c.f.name, "not used", `It could not be opened (${(err as Error).message}).`);
       }
     }
+    status.textContent = `Measured ${chosen.length - unusable} frame${chosen.length - unusable === 1 ? "" : "s"} in ${mmss(Date.now() - t0)}.`;
 
     profStop.hidden = true;
     if (!groups.size) {
@@ -243,11 +318,9 @@ export function wireLensRig(root: ParentNode): void {
     };
     const text = JSON.stringify(payload);
     profText.value = text;
-    profText.hidden = false;
-    profCopy.hidden = false;
-    profSave.hidden = false;
+    profOut.hidden = false;
     const used = Object.values(profiles).reduce((n, x) => n + x.frames, 0);
-    profNote(`${(text.length / 1024).toFixed(1)} KB of numbers, from ${used} of the ${files.length} frame${files.length === 1 ? "" : "s"} picked. Copy it into a message, or save it and send the file — either way the photographs stay here.`);
+    profNote(`${(text.length / 1024).toFixed(1)} KB of numbers, averaged from ${used} frame${used === 1 ? "" : "s"} out of the ${files.length} you picked. Copy it into a message, or save it and send the file — either way the photographs stay here.`);
     profCopy.onclick = () => copy(text, profCopy, "Copy the numbers");
     profSave.onclick = () => {
       const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
