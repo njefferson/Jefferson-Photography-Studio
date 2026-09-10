@@ -865,11 +865,16 @@
         <div class="dbg-actions">
           <label class="dbg-btn primary"><input id="lensFiles" class="file-input" type="file" accept="image/*,.dng,.nef,.DNG,.NEF,.zip,.ZIP,application/zip" multiple />Choose flat frames</label>
           <button id="lensStop" type="button" class="dbg-btn" hidden>Stop</button>
-          <button id="lensCopy" type="button" class="dbg-btn" hidden>Copy the numbers</button>
-          <button id="lensSave" type="button" class="dbg-btn" hidden>Save as a file</button>
         </div>
         <div id="lensResults" class="dbg-results" role="status" aria-live="polite"></div>
-        <textarea id="lensText" class="dbg-text" readonly rows="8" aria-label="Measured lens profile" hidden></textarea>
+        <div id="lensOut" hidden>
+          <p class="note"><strong>The numbers.</strong> Copy them into a message, or save the file &mdash; the photographs stay here either way.</p>
+          <div class="dbg-actions">
+            <button id="lensCopy2" type="button" class="dbg-btn primary">Copy the numbers</button>
+            <button id="lensSave2" type="button" class="dbg-btn">Save as a file</button>
+          </div>
+          <textarea id="lensText" class="dbg-text" readonly rows="6" aria-label="Measured lens profile"></textarea>
+        </div>
       </div>
       <button id="lensClose" type="button">Close</button>
     </dialog>
