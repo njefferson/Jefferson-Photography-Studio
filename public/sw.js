@@ -29,15 +29,20 @@ self.addEventListener("install", (e) => {
   // Populate the NEW cache BEFORE activating (the activate step wipes the old
   // one). addAll is all-or-nothing: if a fetch fails the install aborts and the
   // browser retries on the next visit while the OLD service worker keeps serving
-  // — so a flaky network can never leave a half-empty shell. skipWaiting only
-  // after the shell is in hand.
+  // — so a flaky network can never leave a half-empty shell.
+  //
+  // AND THEN IT WAITS. This used to call skipWaiting() here, so a new worker
+  // took over under the OPEN page — a page still running the previous release's
+  // HTML and modules — and activate immediately deleted the old cache, leaving
+  // that page served new files from then on. A mixed app, and invisible by
+  // construction: nobody finds it by using the app. The reader's decision is
+  // what releases the worker now (Doctrine §7h.1), via the message below.
   e.waitUntil(
     (async () => {
       if (PRECACHE.length) {
         const c = await caches.open(CACHE);
         await c.addAll(PRECACHE);
       }
-      await self.skipWaiting();
     })(),
   );
 });

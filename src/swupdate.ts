@@ -5,10 +5,17 @@
 //
 // It reloads ONLY once the new worker has actually taken control. Reloading on
 // a blind timer (the old bug) dropped you back onto the old cached code, because
-// over a phone connection the new app shell hasn't finished downloading yet. The
-// SW self-activates (skipWaiting) once its precache completes, which fires
-// controllerchange — that's our signal that fresh code is live. Measured on
-// cellular, 2026-07-20.
+// over a phone connection the new app shell hasn't finished downloading yet.
+// controllerchange is the signal that fresh code is live. Measured on cellular,
+// 2026-07-20.
+//
+// THAT SENTENCE USED TO SAY the worker self-activates once its precache
+// completes. It did — sw.js called skipWaiting() during install — and that was
+// the defect: the new worker took over UNDER the open page, which is still
+// running the previous release's HTML and modules, and activate then deletes
+// the old cache, so that page is served new files from then on. A mixed app,
+// invisible by construction. The worker WAITS now, and only a message from the
+// page releases it, which is what both routes below send.
 declare const __APP_VERSION__: string;
 
 export function wireForceUpdate(button: HTMLButtonElement, note: HTMLElement): void {
@@ -66,4 +73,56 @@ export function wireForceUpdate(button: HTMLButtonElement, note: HTMLElement): v
       reloadOnce(); // offline / no SW — a plain reload still refetches network-first
     }
   });
+}
+
+
+/** §7h's other half: the reader is TOLD, without having to go looking.
+ *  wireForceUpdate above is a PULL — it only helps somebody who already
+ *  suspects there is a new version and knows which panel to open. A newcomer
+ *  never does. This is the push: the worker waits, and the app says so. */
+export function wireUpdateStrip(strip: HTMLElement, go: HTMLButtonElement, later: HTMLButtonElement): void {
+  if (!("serviceWorker" in navigator)) return;
+  let dismissed = false;
+  const show = () => { if (!dismissed) strip.hidden = false; };
+
+  const watch = (reg: ServiceWorkerRegistration) => {
+    // Already waiting when the page opened — the commonest case by far, because
+    // the update downloaded during a previous visit.
+    if (reg.waiting && navigator.serviceWorker.controller) show();
+    reg.addEventListener("updatefound", () => {
+      const w = reg.installing;
+      if (!w) return;
+      w.addEventListener("statechange", () => {
+        // "installed" WITH a controller means an update to something already
+        // running. Without a controller it is the very first install, and
+        // announcing a new version to somebody who just arrived is nonsense.
+        if (w.state === "installed" && navigator.serviceWorker.controller) show();
+      });
+    });
+
+    go.addEventListener("click", () => {
+      go.disabled = true;
+      go.textContent = "Updating…";
+      let reloaded = false;
+      const once = () => { if (!reloaded) { reloaded = true; location.reload(); } };
+      navigator.serviceWorker.addEventListener("controllerchange", once, { once: true });
+      (reg.waiting ?? reg.active)?.postMessage({ type: "SKIP_WAITING" });
+      setTimeout(once, 20000); // never a dead end, same safety net as the button
+    });
+    later.addEventListener("click", () => { dismissed = true; strip.hidden = true; });
+
+    // Coming back to the app is the moment worth re-checking: an install left
+    // open on a home screen can sit for days without a navigation.
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") void reg.update().catch(() => {});
+    });
+  };
+
+  // `ready` rather than `getRegistration()`. THIS WAS THE BUG in the first
+  // version, and it made the whole strip dead on arrival while the gate still
+  // reported green: this module runs at import time, the app registers its
+  // worker later, so getRegistration() resolved to undefined and not one
+  // listener was ever attached. `ready` resolves once a registration is ACTIVE,
+  // which is the state this needs and the state that cannot be raced.
+  void navigator.serviceWorker.ready.then(watch).catch(() => {});
 }
