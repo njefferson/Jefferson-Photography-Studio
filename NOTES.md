@@ -1985,7 +1985,7 @@ user-scalable=no.
   re-opened chooser no longer lets the strip poke over the card. (The brand's
   "‹ Studio" link is unchanged — that still leaves the IR editor for the umbrella
   chooser; Home is the way back to the IR editor's OWN start screen.) VERIFIED
-  headless (18/18, one assertion proven to FAIL first): the owner's exact path
+  headless (18/18, one assertion proven to FAIL first): the reported path
   (Resume → Home → Back) works; Home leaves the session in storage (count stays
   2) while Done frees it (count 0); Home survives a reload as Resume; the ✕ and
   Back appear only when there's something live to return to; no page errors.
@@ -3391,9 +3391,9 @@ user-scalable=no.
   enough, or too timid/aggressive?), and the imported-PNG session-only limit
   (persist via IndexedDB later if he wants his cutouts to stick).
 - [x] **Stickers v2 — paint to tuck behind + two-finger resize/spin** — the
-  last of the owner's sticker rework (2026-07-19): "paint to remove portions so
-  it fits in the background… paint to restore portions." BLEND: a "Paint on the
-  sticker" toggle turns canvas strokes from move→paint; "Rub away" drives the
+  last of the sticker rework (2026-07-19). What was missing: no way to remove
+  part of a sticker so it sits in the background, and no way to put it back.
+  BLEND: a "Paint on the sticker" toggle turns canvas strokes from move→paint; "Rub away" drives the
   asset-local mask to 0 (the scene shows through — tuck it behind a branch),
   "Bring back" restores to 255, and "Show the whole sticker again" drops the
   mask. The stroke inverts the SAME transform sticker.ts composites with
@@ -3755,10 +3755,11 @@ user-scalable=no.
   artifact/zoom checks green, axe clean both themes, build clean. NOTE FOR NEXT
   SESSION: the earlier "Sticker usability sweep" entry's `stkBlendToggle` blend-on/
   off is SUPERSEDED by this removal — don't reintroduce it.
-- [x] **Stickers lay ON TOP of the look now, not under it (2026-07-21, owner
-  emphatic)** — THE big one. The owner: "a sticker is a different kind of picture,
-  it can't lay under the same filters" — a colourful cutout composited INTO the
-  source (pre-pipeline) got channel-swapped + WB'd + saturated into neon (his
+- [x] **Stickers lay ON TOP of the look now, not under it (2026-07-21)** — THE
+  big one, and the rule behind it: a sticker is a different kind of picture from
+  the photograph, so it cannot sit under the same filters. A colourful cutout
+  composited INTO the source (pre-pipeline) got channel-swapped + WB'd +
+  saturated into neon (the
   alien/figure screenshots). Fixed by compositing on-top stickers AFTER the whole
   pipeline, so they keep their OWN colours. ARCHITECTURE — a source-space "overlay"
   (`Sticker.onTop`, default true; undefined = on top): the sticker's gamma-sRGB
@@ -6239,6 +6240,92 @@ which edge answered rather than about what is deployed. Six independent fetches
 now, all six required to agree. The `sw.js` cache stamp is the better anchor
 where there is one, since it carries the version.
 
+## The shipped profiles are measured data now, and one matcher serves both, 2026-09-10
+
+**The 50-250 was re-measured on the device with the app's own rig** — nine
+profiles, seven apertures at 50mm plus 130mm and 135mm, 2 to 4 frames each,
+linear space. It replaces three numbers-only entries from the 2026-07 handoff.
+The 16-50 is still the old data until it is re-shot; the table carries both and
+says which is which, and the panel tells the reader.
+
+**What the measurement itself says, before any code.** Checked on arrival rather
+than trusted: bump rises at every one of the seven stops from f/4.5 to f/22
+(0.000 to 0.108) and so does the centre's blue (1.096 to 1.276), with no
+exception anywhere in the series — nothing enforces that, it fell out of the
+optics. kr and kb sit at 1.000 ± 0.002 in the reference ring on every profile,
+which is the rig's own invariant holding. Bin-to-bin roughness is under 0.0024
+throughout, so these are signal.
+
+The centre is relatively BLUER and less red than the edges — kb 1.30, kr 0.92 at
+f/29. Read against ordinary-photo intuition that looks backwards for a hot spot.
+It is not: an additive broadband IR flare on a red-flooded frame lifts the
+weakest channel most in relative terms, and after the R/B swap every colour look
+applies, that excess blue is the red disc in the middle of the sky the app's own
+copy describes.
+
+**ONE MATCHER, TWO SOURCES.** "Which of these profiles fits this frame" was two
+implementations: aperture sets plus log-focal interpolation in `lensstore.ts`,
+and a nearest-focal-length snap in `hotspot.ts`. Same question, and the second
+one had never heard of aperture. `matchIn` is now the only answer and the
+shipped table goes through it, so the profiles that come with the app get the
+aperture matching the reader's own measurements have had for weeks. `hotspot.ts`
+is a lookup: the picker's lists, and turning a manual pick into a synthetic EXIF
+so the manual route cannot drift from the automatic one.
+
+**AND THE NEW DATA IMMEDIATELY BROKE THE OLD MATCHER, WHICH IS THE POINT.**
+Aperture was chosen first and focal length interpolated within the chosen set.
+That is correct while every aperture set spans the focal range, and the shipped
+table does not — seven apertures at 50mm, one at 130mm. A 50mm f/8 frame picked
+the f/5.3 set because f/5.3 is nearest in log aperture, and that set's only
+member was measured at 130mm: nearer in aperture, wrong lens position entirely.
+Both axes are scored together now, the focal term being how far OUTSIDE a set's
+measured range the frame falls (zero when bracketed, because interpolating
+inside a range is not a reach). Both are log ratios, so they add without a fudge
+factor. f/8 at 50mm now takes the f/13 set. Planted aperture-first back: the
+claim returns the 130mm profile again, named in the failure.
+
+**Which end of the range.** One flat frame reports the hot-spot's share as a
+range because it cannot separate it from the lens's own vignette. The shipped
+table takes the LOW end, and the reason is an asymmetry rather than a taste: the
+Hot-spot slider only pulls the centre DOWN, so an under-correction is something
+the reader can finish by hand and an over-correction is a dark hole no control
+undoes. A reader's own measurement still contributes colour only, per the
+standing call — that is a decision to revisit, not one to quietly change.
+
+**The colour half had a strength of zero.** The shipped profile's colour was
+matched, uploaded to the texture, and governed by `params.lensFix`, which is
+only turned on when the READER has a measurement — so a card reading "brightness
+and colour" applied no colour at all. The shipped card's Strength governs
+everything the shipped profile contributes. Found by a walk, not by looking.
+
+**And the note called it theirs.** `matchNote` was written for the reader's own
+measurements and says "blended between your 19mm and 36mm measurements". One
+note serves both cards now, so it takes the wording from `builtIn`. It also
+returned a synthetic "blended 0% / 100%" for a frame sitting exactly on an
+anchor — arithmetically identical, and it reads as though the app cannot tell
+where the frame is.
+
+**The claim that was wrong while the app was right.** A colour correction was
+asserted to move two screen channels in OPPOSITE directions. These profiles
+carry both halves: the brightness term moves all three the same way and the
+colour term rides on top, so all three went down by −26.5, −8.3, −3.4. The
+discriminator is the SPREAD across channels, not the signs — 23.1 for a profile
+with colour against 0.3 for one without. Swap-agnostic, which matters on a
+correction whose channel order has been got backwards four times.
+
+**`hotspotProfiles.ts` is generated.** `genprofiles.mjs` in the scratchpad takes
+rig payloads plus what is left of the handoff, validates bin counts and keys,
+converts the old gamma numbers to linear once at generation time, and emits the
+file. 240 numbers per profile is the one thing nobody reviews by eye, and the
+second lens is now a re-run rather than a hand edit.
+
+**Still open in the data.** Nothing above 135mm on a 50-250 — 38% of its log
+zoom range — so a 200mm frame clamps. And above 50mm focal length and aperture
+are confounded: the only two long-end frames are f/5.3 and f/29, which are also
+the two extremes of the aperture range, so the hot-spot at 130mm cannot be
+separated from the hot-spot at f/29. The 50mm sweep is the shape that works,
+because aperture varies with focal length held still.
+
 ## The shipped lens profiles had never once run on a raw file, 2026-09-10
 
 **Two lenses came measured with the app, and on the format the app is FOR, the
@@ -7207,7 +7294,7 @@ deviation from dcraw's stock D5300 matrix: stock matches NONE of the
 owner's real files; -100 is his standard). PROOF the profile is the whole
 story: rendering the 1709 NEF through the -50 matrix from its own DNG twin
 matches that DNG at mean 0.61/255 (max 4); through the default -100 matrix
-the diff is 13.5/255 — exactly the owner's screenshot. The linearization
+the diff is 13.5/255 — exactly the reported difference. The linearization
 fix holds on this pair too (NEF/DNG normalized means agree within ~2%).
 If a pair with a non-"-100" profile should match exactly: re-export that
 DNG with the -100 profile, or the owner names a different NEF default
@@ -7816,7 +7903,7 @@ Second discipline:
   guided by the stacked COLOUR image so depth transitions snap to real petal
   edges — gather whole pixels. Can't halo (no band mixing) or veil (no
   averaging), and — unlike a plain mode-filter selection — no bright "cut-out"
-  RIM on thin petals over the blown background (Noah caught the rim in IMG_5958;
+  RIM on thin petals over the blown background (the rim showed in IMG_5958;
   the mode-filter's box-blurred measure bled the selection past the edge). Colour
   guidance is essential: luma guidance softens the magenta petals. Fast guided
   filter (subsampled coeffs, full-res guidance) keeps it memory-safe at 20 MP.
