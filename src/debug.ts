@@ -13,6 +13,8 @@ import { buildDiagnostic } from "./diagnostic";
 import { decode } from "./decode";
 import { decodeOffThread } from "./decodeClient";
 import { sniff } from "./import";
+import { readExifSubset } from "./exif";
+import { profileFrame, averageProfiles, round5, NBINS, type FrameProfile } from "./lensprofile";
 
 declare const __APP_VERSION__: string;
 
@@ -60,16 +62,20 @@ const textArea = $("dText") as HTMLTextAreaElement;
 const refreshReport = () => buildDiagnostic(__APP_VERSION__).then((t) => { textArea.value = t; });
 void refreshReport();
 
-async function copy(text: string, btn: HTMLButtonElement, label: string) {
+async function copy(text: string, btn: HTMLButtonElement, label: string, fallback: HTMLTextAreaElement = textArea) {
   const old = btn.textContent;
   try {
     await navigator.clipboard.writeText(text);
     btn.textContent = "Copied";
   } catch {
     // Clipboard refused (it often is, without a gesture it trusts). Select the
-    // text instead so it can be copied by hand — never a dead button.
-    textArea.focus();
-    textArea.select();
+    // text instead so it can be copied by hand — never a dead button. The
+    // fallback has to be the textarea holding THIS text: with the diagnostic's
+    // one hard-wired here, pressing the lens profiler's copy button selected
+    // the report instead, and a hand-copy then carried the wrong block.
+    fallback.hidden = false;
+    fallback.focus();
+    fallback.select();
     btn.textContent = "Selected — press Copy";
   }
   setTimeout(() => { btn.textContent = old ?? label; }, 2200);
@@ -269,4 +275,178 @@ async function storage(): Promise<void> {
   const copyBtn = $("dCopyAll") as HTMLButtonElement;
   copyBtn.hidden = false;
   copyBtn.onclick = () => copy(textArea.value + "\nSpeed\n" + out.join("\n") + "\n", copyBtn, "Copy the results");
+});
+
+// --- measuring a lens --------------------------------------------------------
+// The rig for src/lensprofile.ts. It lives on this page rather than in the
+// editor because it is a measurement, not an edit: it opens nothing into the
+// session, changes no setting, and the frames never leave the device — only
+// the numbers do, and a profile is 240 of them against a flat's 25 MB. That
+// asymmetry is the whole reason it is here: the profiles this app ships are
+// JPEG-only because full raw flats could not be moved to where the original
+// measurement ran. Nothing has to move now.
+
+const profResults = $("dProfResults");
+const profText = $("dProfText") as HTMLTextAreaElement;
+const profCopy = $("dProfCopy") as HTMLButtonElement;
+const profSave = $("dProfSave") as HTMLButtonElement;
+
+/** "NIKKOR Z DX 16-50mm f/3.5-6.3 VR" -> "16-50"; a prime -> its length. The
+ *  shipped data keys on exactly this, and deriving it means a lens nobody has
+ *  entered into a table still gets measured. */
+function shortLens(model: string): string {
+  const zoom = model.match(/(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*mm/i);
+  if (zoom) return `${zoom[1]}-${zoom[2]}`;
+  const prime = model.match(/(\d+(?:\.\d+)?)\s*mm/i);
+  if (prime) return prime[1];
+  return model.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "lens";
+}
+
+function profNote(text: string): HTMLElement {
+  const p = document.createElement("p");
+  p.className = "dbg-progress";
+  p.textContent = text;
+  profResults.appendChild(p);
+  return p;
+}
+
+function profRow(name: string, value: string, meaning: string) {
+  const d = document.createElement("div");
+  d.className = "dbg-row";
+  d.innerHTML = `<div class="dbg-k"></div><div class="dbg-v"></div><p class="dbg-m"></p>`;
+  (d.querySelector(".dbg-k") as HTMLElement).textContent = name;
+  (d.querySelector(".dbg-v") as HTMLElement).textContent = value;
+  (d.querySelector(".dbg-m") as HTMLElement).textContent = meaning;
+  profResults.appendChild(d);
+}
+
+const pct = (x: number) => (x * 100).toFixed(1) + "%";
+
+($("dProfFiles") as HTMLInputElement).addEventListener("change", async (e) => {
+  const input = e.currentTarget as HTMLInputElement;
+  const files = [...(input.files ?? [])];
+  input.value = ""; // so choosing the same set twice re-runs
+  if (!files.length) return;
+  profResults.replaceChildren();
+  profText.hidden = true;
+  profCopy.hidden = true;
+  profSave.hidden = true;
+
+  const groups = new Map<string, { frames: FrameProfile[]; model: string; short: string; fl: number; aps: number[]; kinds: Set<string> }>();
+  let unusable = 0;
+  let camera = "";
+
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    const p = profNote(`Measuring ${f.name} — ${i + 1} of ${files.length}…`);
+    try {
+      const bytes = new Uint8Array(await f.arrayBuffer());
+      const kind = sniff(bytes);
+      const ex = readExifSubset(bytes);
+      const model = ex?.lens?.trim() || "";
+      const fl = ex?.focalLength && ex.focalLength[1] ? ex.focalLength[0] / ex.focalLength[1] : NaN;
+      const ap = ex?.fNumber && ex.fNumber[1] ? ex.fNumber[0] / ex.fNumber[1] : NaN;
+      if (!camera && (ex?.make || ex?.model)) camera = [ex.make, ex.model].filter(Boolean).join(" ");
+      // The frame is decoded off the main thread so a long set does not lock
+      // the page, and dropped as soon as its 240 numbers are out of it.
+      const img = await decodeOffThread({ name: f.name, kind, bytes, looksTranscoded: false });
+      const prof = profileFrame(img);
+      p.remove();
+      const where = model ? `${model} at ${Number.isFinite(fl) ? fl.toFixed(0) + "mm" : "an unrecorded focal length"}` : "no lens recorded in the file";
+      if (!prof.usable) {
+        unusable++;
+        profRow(f.name, "not used", `${prof.why}. ${where}.`);
+        continue;
+      }
+      if (!model || !Number.isFinite(fl)) {
+        unusable++;
+        profRow(f.name, "not used", `The frame measured cleanly, but ${where} — a profile has to be filed under a lens and a focal length, or it cannot be matched to a photograph later.`);
+        continue;
+      }
+      const short = shortLens(model);
+      const key = `${short}@${Math.round(fl)}`;
+      let g = groups.get(key);
+      if (!g) { g = { frames: [], model, short, fl: Math.round(fl), aps: [], kinds: new Set() }; groups.set(key, g); }
+      g.frames.push(prof);
+      if (Number.isFinite(ap)) g.aps.push(ap);
+      g.kinds.add(prof.linear ? "raw" : "rendered");
+      const cr = prof.kr[0], cb = prof.kb[0];
+      profRow(f.name, key,
+        `The centre's colour is off by ${pct(Math.abs(cr - 1))} in red and ${pct(Math.abs(cb - 1))} in blue against the same frame's edges. ` +
+        `Centre to corner it keeps ${pct(prof.falloffAtCorner)} of its brightness, of which somewhere between ${pct(prof.bumpRange[0])} and ${pct(prof.bumpRange[1])} is hot-spot rather than the lens's own falloff. ` +
+        `${prof.linear ? "Measured from the raw sensor data" : "Measured from the rendered image"}, mean level ${pct(prof.meanLevel)}, ${pct(prof.clipFrac)} clipped, ${pct(prof.structure)} variation around a circle.`);
+    } catch (err) {
+      p.remove();
+      unusable++;
+      profRow(f.name, "not used", `It could not be opened (${(err as Error).message}).`);
+    }
+  }
+
+  if (!groups.size) {
+    profNote(unusable ? "Nothing measurable in that set — see the reasons above." : "Nothing to measure.");
+    return;
+  }
+
+  const profiles: Record<string, { falloff: number[]; kr: number[]; kb: number[]; bump_range: number[]; frames: number; source: string; apertures: string }> = {};
+  const lensMap: Record<string, string> = {};
+  const anchors: Record<string, number[]> = {};
+  for (const [key, g] of [...groups].sort((a, b) => a[0].localeCompare(b[0]))) {
+    // A RAW FLAT DISPLACES A RENDERED ONE rather than averaging with it. An
+    // 8-bit rendered frame carries a systematic quantisation bias, not noise:
+    // within one radial ring nearly every pixel rounds to the same code, so
+    // the rounding never averages away, and it bites hardest in the darkest
+    // channel — measured at 0.5% on blue against 0.16% on red, from the same
+    // frame. Averaging the two together would spend a good measurement to
+    // keep a worse one.
+    const raws = g.frames.filter((f) => f.linear);
+    const setAside = raws.length ? g.frames.length - raws.length : 0;
+    const use = raws.length ? raws : g.frames;
+    if (setAside) g.kinds.delete("rendered");
+    const a = averageProfiles(use);
+    profiles[key] = {
+      falloff: round5(a.falloff), kr: round5(a.kr), kb: round5(a.kb),
+      bump_range: round5(a.bumpRange),
+      frames: a.n,
+      source: [...g.kinds].sort().join("+"),
+      apertures: g.aps.length ? [...new Set(g.aps.map((x) => "f/" + x.toFixed(1)))].sort().join(" ") : "unrecorded",
+    };
+    lensMap[g.model] = g.short;
+    (anchors[g.short] ??= []).push(g.fl);
+    const aside = setAside ? ` ${setAside} rendered frame${setAside === 1 ? "" : "s"} set aside, because raw ones are available here and are the better measurement.` : "";
+    profRow(`${key} — averaged`, `${a.n} frame${a.n === 1 ? "" : "s"}`,
+      (a.n < 3
+        ? `Usable, but thin. Four or five frames at a focal length average out the sky's own gradient; ${a.n} leaves it in the numbers.`
+        : `Colour off by ${pct(Math.abs(a.kr[0] - 1))} in red and ${pct(Math.abs(a.kb[0] - 1))} in blue at the centre, and the frame keeps ${pct(a.falloff[NBINS - 1])} of its brightness out at the corner. Shot at ${profiles[key].apertures}.`) + aside);
+  }
+  for (const k of Object.keys(anchors)) anchors[k] = [...new Set(anchors[k])].sort((x, y) => x - y);
+
+  const payload = {
+    format: "ips-lensprofile",
+    version: 1,
+    measured: new Date().toISOString().slice(0, 10),
+    app: __APP_VERSION__,
+    camera: camera || "not recorded",
+    nbins: NBINS,
+    radius_norm: "diagonal",
+    space: "linear",
+    note: "falloff = the whole measured radial profile, 1 in the reference ring (divide by it to flatten); kr/kb = red and blue relative to green, 1 in the reference ring (apply as r/=kr, b/=kb). bump_range is the low and high estimate of how much of the centre's brightness is hot-spot rather than the lens's own vignette — one flat frame cannot narrow it further, so it is reported rather than applied.",
+    profiles,
+    lens_map: lensMap,
+    fl_anchors: anchors,
+  };
+  const text = JSON.stringify(payload);
+  profText.value = text;
+  profText.hidden = false;
+  profCopy.hidden = false;
+  profSave.hidden = false;
+  profNote(`${(text.length / 1024).toFixed(1)} KB of numbers, from ${files.length - unusable} of ${files.length} frames. Copy it into a message, or save it and send the file — either way the photographs stay here.`);
+  profCopy.onclick = () => copy(text, profCopy, "Copy the numbers", profText);
+  profSave.onclick = () => {
+    const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `lens-profile-${payload.measured}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  };
 });

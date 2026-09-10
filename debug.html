@@ -52,6 +52,33 @@
         </div>
         <div id="dResults" class="dbg-results" role="status" aria-live="polite"></div>
       </section>
+
+      <section class="dbg-sec">
+        <h2>Measure a lens</h2>
+        <p class="dbg-note">
+          An infrared-converted lens sends a little more infrared straight up the middle than it
+          does to the corners, so the centre of every frame comes out brighter and a slightly
+          different colour. This measures yours, from your own photographs, on this device.
+        </p>
+        <p class="dbg-note">
+          <strong>What to give it:</strong> frames of nothing &mdash; clear blue sky, filling the
+          whole frame, no sun in shot, no clouds, no lens hood, well exposed but nothing blown.
+          Four or five at each focal length you actually use. RAW or JPEG, both work; the RAW is
+          better. Shoot them the way you shoot, and take them at a few focal lengths across the
+          zoom &mdash; the hot-spot changes with focal length and aperture.
+        </p>
+        <p class="dbg-note">
+          Nothing is uploaded and nothing leaves this device. What comes out is a small block of
+          numbers you can copy or save &mdash; a few kilobytes of text, not the photographs.
+        </p>
+        <div class="dbg-actions">
+          <label class="dbg-btn primary"><input id="dProfFiles" class="file-input" type="file" accept="image/*,.dng,.nef,.DNG,.NEF" multiple />Choose flat frames</label>
+          <button id="dProfCopy" type="button" class="dbg-btn" hidden>Copy the numbers</button>
+          <button id="dProfSave" type="button" class="dbg-btn" hidden>Save as a file</button>
+        </div>
+        <div id="dProfResults" class="dbg-results" role="status" aria-live="polite"></div>
+        <textarea id="dProfText" class="dbg-text" readonly rows="10" aria-label="Measured lens profile" hidden></textarea>
+      </section>
     </main>
     <script type="module" src="/src/debug.ts"></script>
   </body>
