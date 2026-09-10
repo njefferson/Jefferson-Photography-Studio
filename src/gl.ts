@@ -107,6 +107,14 @@ uniform int u_readMode;      // 1 = output the mask-stage DISPLAY colour and sto
 uniform float u_hotspot;     // IR hot-spot correction (darken centre) 0..0.8
 uniform float u_hotspotSize; // hot-spot radial extent
 uniform float u_hotspotColor; // -0.5..0.5 the hot-spot's COLOUR (+red / -blue at centre)
+// The reader's MEASURED lens colour curve: an Nx1 RG float texture, R = the red
+// gain and G = the blue gain, one texel per radial bin. texelFetch rather
+// than texture() on purpose — no filtering, so the bin the shader reads is
+// exactly the bin the CPU mirror indexes, and GPU/CPU parity is by construction
+// rather than by tolerance.
+uniform sampler2D u_lensTex;
+uniform int u_lensN;      // 0 when no measured profile matched this photograph
+uniform float u_lensFix;  // strength; 0 is off
 uniform float u_vignette;    // -1..1 (+ brighten corners, - darken)
 uniform float u_aspect;      // image width/height — keeps the lens fix circular in pixels
 uniform float u_recover;     // 0..1 pull sensor-clipped pixels to post-WB neutral
@@ -423,6 +431,18 @@ void main() {
     c.r *= 1.0 + u_hotspotColor * t;
     c.b *= 1.0 - u_hotspotColor * t;
   }
+  // The MEASURED curve, on the same side of the matrix and the swap. Its own
+  // branch: it does not depend on any manual slider being set.
+  if (u_lensN > 0 && u_lensFix != 0.0) {
+    vec2 d = vec2((v_uv.x - 0.5) * u_aspect, v_uv.y - 0.5);
+    float r = 2.0 * length(d) / sqrt(u_aspect * u_aspect + 1.0);
+    int i = clamp(int(floor(r * float(u_lensN))), 0, u_lensN - 1);
+    vec2 k = texelFetch(u_lensTex, ivec2(i, 0), 0).rg;
+    float gr = 1.0 + (k.r - 1.0) * u_lensFix;
+    float gb = 1.0 + (k.g - 1.0) * u_lensFix;
+    c.r *= gr > 1e-3 ? 1.0 / gr : 1.0;
+    c.b *= gb > 1e-3 ? 1.0 / gb : 1.0;
+  }
 
   // Camera colour matrix: separates infrared chroma into distinct hues so the
   // channel swap can produce real false colour instead of a single tint.
@@ -653,7 +673,29 @@ export class Renderer {
   private isLinear = false;
   private camMatrix: Float32Array | null = null;
   private glowTex: WebGLTexture;
+  /** Upload a measured lens colour curve for the photograph now open, or clear
+   *  it with null. Per-PHOTOGRAPH, never per-draw: the curve is chosen by the
+   *  file's EXIF and does not change as the reader edits. */
+  setLensCurve(kr: ArrayLike<number> | null, kb?: ArrayLike<number> | null): void {
+    const gl = this.gl;
+    const n = kr && kb ? Math.min(kr.length, kb.length) : 0;
+    gl.activeTexture(gl.TEXTURE10);
+    gl.bindTexture(gl.TEXTURE_2D, this.lensTex);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    if (n < 2) {
+      this.lensN = 0;
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG32F, 1, 1, 0, gl.RG, gl.FLOAT, new Float32Array([1, 1]));
+      return;
+    }
+    const data = new Float32Array(n * 2);
+    for (let i = 0; i < n; i++) { data[i * 2] = kr![i]; data[i * 2 + 1] = kb![i]; }
+    this.lensN = n;
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG32F, n, 1, 0, gl.RG, gl.FLOAT, data);
+  }
+
   private toneTex: WebGLTexture;
+  private lensTex: WebGLTexture;
+  private lensN = 0;
   private toneRgbTex: WebGLTexture;
   private brushTex: WebGLTexture;
   private brushSig = ""; // re-upload the packed brush texture only when it changes
@@ -689,7 +731,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_vignette", "u_aspect", "u_recover", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_vignette", "u_aspect", "u_recover", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -715,6 +757,17 @@ export class Renderer {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 1, 1, 0, gl.RED, gl.UNSIGNED_BYTE, new Uint8Array([0]));
 
     // Tone-curve LUT (unit 2); a 256-entry identity ramp until a curve is set.
+    // The measured lens curve (unit 10). RG32F so a 5% correction is not
+    // quantised into 8-bit steps, and NEAREST because the shader fetches an
+    // exact texel rather than sampling between them.
+    this.lensTex = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, this.lensTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG32F, 1, 1, 0, gl.RG, gl.FLOAT, new Float32Array([1, 1]));
+
     this.toneTex = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, this.toneTex);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -1160,6 +1213,15 @@ export class Renderer {
     gl.uniform1i(this.loc.u_toneRgbTex, 6);
     gl.activeTexture(gl.TEXTURE6);
     gl.bindTexture(gl.TEXTURE_2D, this.toneRgbTex);
+    // The reader's measured lens curve (unit 10). The TEXTURE is per-photograph
+    // and uploaded by setLensCurve; only the strength changes per draw, so
+    // moving the Strength slider costs one uniform and no upload — which is the
+    // whole reason this stage moved into the pipeline.
+    gl.uniform1i(this.loc.u_lensTex, 10);
+    gl.uniform1i(this.loc.u_lensN, this.lensN);
+    gl.uniform1f(this.loc.u_lensFix, this.lensN > 0 && !p.lensBypass ? (p.lensFix ?? 0) : 0);
+    gl.activeTexture(gl.TEXTURE10);
+    gl.bindTexture(gl.TEXTURE_2D, this.lensTex);
     // Imported .cube LUT (unit 5). The sig check IS the uploader: the lattice
     // re-uploads only when the LUT identity changes; strength-only changes are
     // just a uniform. Data is padded RGB -> RGBA32F (RGB32F is driver-fragile).

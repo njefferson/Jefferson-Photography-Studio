@@ -6239,6 +6239,58 @@ which edge answered rather than about what is deployed. Six independent fetches
 now, all six required to agree. The `sw.js` cache stamp is the better anchor
 where there is one, since it carries the version.
 
+## The measured lens correction moved into the pipeline, 2026-09-10
+
+**It was a rewrite of the decoded frame, and it worked.** The stored curve was
+multiplied into the pixel buffer at open, and moving Strength undid the old
+multiply and applied a new one. Exact, and it needed no second copy of a 330 MB
+raw frame — but it put the one correction that has to compose with everything
+else OUTSIDE the thing that composes. Three costs, all structural rather than
+cosmetic:
+
+- The export could not see it. `getSource` re-reads the CFA from the file's own
+  bytes, so the saved file came from a decode the correction had never touched;
+  the curve had to be handed to `exportImage` as a separate argument, which is
+  the shape that lets a preview and a file drift apart.
+- Every touch of the Strength slider walked every pixel.
+- Nothing else in the pipeline could be reasoned about relative to it, because
+  it had already happened by the time the pipeline started.
+
+**It is a shader stage now, and a CPU mirror beside it.** `u_lensTex` is an
+RG32F texture, one texel per radial bin, read with `texelFetch` so the bin the
+GPU picks is the bin the CPU picks — `texture()` with any filtering would blend
+two bins and the two paths would disagree by an amount that changes with the
+image size. `lensBin()` and `lensGain()` in `pipeline.ts` are the CPU half, and
+the stage lands in one place: after the manual hot-spot colour, before the
+camera matrix and the R/B swap, because the curve was measured in the FILE's
+channel order and applying it after the swap corrects the wrong channel. That
+trap was hit four separate times over this work.
+
+`tools`-free but real: the parity walk drives the app twice over the same flat,
+once reading the screen and once reading a saved JPEG, and holds them to 1.5 of
+255. Planted a shader that halves the red gain: the screen moved 2.59 away from
+the file, at ch2 — blue on screen, which is red in the file, the swap showing up
+exactly where it should. Clean, the two agree to 0.67.
+
+**Strength and Bypass are `params` fields, not a second copy.** `myLens` used to
+carry `strength` and `bypass` of its own, which history never saw: Undo stepped
+the picture back and left the slider where it was, with nothing on screen to say
+which of the two was right. They are `params.lensFix` and `params.lensBypass`
+now, so Undo, Redo and Reset carry them like every other control. Bypass is a
+separate boolean rather than a strength of 0 on purpose — a reader who drags
+Strength to 0 and a reader who presses Bypass are in the same pipeline state and
+must not be told the same thing, and inferring the label from the number
+relabels the first as the second the moment history restores it.
+
+Two plants, each biting only its own claims. Dropping `updateMyLensUI()` from
+`syncToUI` failed the four card claims and left every picture claim green, which
+is the defect stated exactly: the frame was always right. Inferring the label
+from `lensFix === 0` failed the strength-0 claim alone.
+
+**Adding `lensBypass` is the FIVE-PLACE rule again** — the defaults, cloneParams,
+applySnapshot, syncFromUI, syncToUI — plus the two consumption sites that turn
+the pair into one strength, `compileEdit` and the uniform binding in `gl.ts`.
+
 ## Measuring a lens where the lens is, 2026-09-10
 
 **The question was how to get 25 MB raw flats off the iPad and into a session.**
