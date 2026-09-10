@@ -57,7 +57,7 @@
         <span class="brand">
           <span class="tool-dot ir" aria-hidden="true"></span>
           Infrared
-          <button id="infoBtn" class="info-btn" type="button" aria-label="What's new">i</button>
+          <button id="infoBtn" class="info-btn" type="button" aria-label="About this app — what's new, settings, and reporting a problem">i</button>
           <button id="verTag" class="ver-tag" type="button" aria-haspopup="dialog" title="Build version — and the tools for when something is wrong"></button>
         </span>
         <button id="homeBtn" class="bar-btn" type="button" title="Back to the start screen (keeps your session open)" aria-label="Home">
@@ -398,7 +398,7 @@
             <label>Spot size <input id="healSize" type="range" min="0.002" max="0.035" step="0.001" value="0.008" /></label>
             <small class="note">Move the slider before tapping to preview the size in the middle of the view.</small>
             <button id="healVis" type="button" class="toggle" aria-pressed="false">Visualize spots</button>
-            <small class="note">A high-contrast view that makes dust jump out of flat skies. The photo itself is untouched.</small>
+            <small class="note">A high-contrast view that makes dust jump out of flat skies. It is <strong>live</strong>: a spot you have healed disappears from it, so leave it on while you work. If a fix leaves a faint ring here, the patch was smaller than the dust &mdash; raise <em>Spot size</em> and tap it again. Switching this view on changes nothing about your photo or your export.</small>
             <button id="healAuto" type="button">Find spots automatically</button>
             <button id="healClear" type="button" hidden>Clear all heals</button>
             <small class="note" id="healStatus"></small>
@@ -772,12 +772,16 @@
     <dialog id="infoDlg">
       <div class="dlg-cue up" id="infoCueUp" hidden aria-hidden="true">&#9650;</div>
       <h2>What's new</h2>
+      <p class="info-jump">
+        <button id="jumpRoadmap" type="button" class="info-jump-btn">Roadmap</button>
+        <button id="jumpSettings" type="button" class="info-jump-btn">Settings &amp; reporting a problem</button>
+      </p>
       <p id="infoVer" class="info-ver"></p>
       <ul id="changeList"></ul>
       <p class="more-row">
         <a href="./notes.html" target="_blank" rel="noopener">More &mdash; earlier versions &rarr;</a>
       </p>
-      <h3 class="rm-head">Roadmap</h3>
+      <h3 class="rm-head" id="rmHead">Roadmap</h3>
       <ul id="roadmapList" class="roadmap"></ul>
       <p class="more-row">
         <a href="./notes.html#roadmap" target="_blank" rel="noopener">More &mdash; the full roadmap &rarr;</a>
@@ -969,7 +973,7 @@
           <li><strong>Sharpen</strong> &amp; <strong>Texture</strong> (Basic) — Sharpen crisps fine edges; Texture works the mid-size surface structure (left smooths it). Both are luminance-only, so colors never shift.</li>
           <li><strong>Tone curve + Luminance</strong> — the curve shapes blacks through highlights; Luminance lifts or drops the whole image without clipping either end.</li>
           <li><strong>Masks</strong> — radial, gradient, painted brush, tap-a-color, or automatic sky: local adjustments for one area only. Masks belong to the photo; saved looks stay portable.</li>
-          <li><strong>Dust &amp; spots</strong> (Corrections tab) — arm <em>Heal spots</em> and tap a dust mote: it's patched from clean pixels nearby, in the preview and the export alike. <em>Visualize spots</em> makes dust jump out of flat skies; <em>Find spots automatically</em> sweeps the smooth areas, heals what it finds, and rings every fix for review &mdash; tap a ring to put that one back. Heals belong to the photo — they never ride in saved looks, profiles or a batch.</li>
+          <li><strong>Dust &amp; spots</strong> (Corrections tab) — arm <em>Heal spots</em> and tap a dust mote: it's patched from clean pixels nearby, in the preview and the export alike. <em>Visualize spots</em> makes dust jump out of flat skies and updates as you heal &mdash; a fix that still leaves a ring there was smaller than the dust, so raise <em>Spot size</em>; <em>Find spots automatically</em> sweeps the smooth areas, heals what it finds, and rings every fix for review &mdash; tap a ring to put that one back. Heals belong to the photo — they never ride in saved looks, profiles or a batch.</li>
           <li><strong>IR lens fixes</strong> (Corrections tab) — pulls down the center hot-spot IR-converted lenses produce, and corrects (or adds) corner vignette.</li>
           <li><strong>Crop &amp; rotate</strong> (panel tab) — three one-tap tools, each with its own <em>Done</em>: <strong>Rotate 90&deg;</strong> turns the whole photo; <strong>Crop</strong> shows the box with a rule-of-thirds grid — drag a corner to resize, drag the photo to slide it under the box; <strong>Straighten</strong> adds a fine alignment grid and a degree slider — line a horizon up against the grid (the crop auto-shrinks so no empty corner shows). Pinch to zoom the view while either tool is open. A view onto the photo, not a re-bake — masks and healed spots stay exactly where they are underneath. Composition-specific: never rides in saved looks, profiles or a batch.</li>
         </ul>

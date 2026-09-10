@@ -3564,6 +3564,15 @@ $("locDlgClose").addEventListener("click", () => locDlg.close());
 locDlg.addEventListener("click", (e) => {
   if (e.target === locDlg) locDlg.close(); // tap outside to dismiss
 });
+// The ⓘ panel opens at "What's new". Settings is below the changelog AND the
+// roadmap, and the row a reader wants when something is wrong is inside it, so
+// the one thing you go looking for in a hurry is the furthest down the page.
+for (const [btn, head] of [["jumpRoadmap", "rmHead"], ["jumpSettings", "settingsHead"]] as const) {
+  const el = document.getElementById(btn);
+  const target = document.getElementById(head);
+  if (el && target) el.addEventListener("click", () => target.scrollIntoView({ block: "start", behavior: "smooth" }));
+}
+
 $("locSettings").addEventListener("click", () => {
   locDlg.close();
   openInfoDialog();
@@ -6867,6 +6876,42 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Ar
 // runs off the main thread (decodeClient) so the editor keeps its frame rate.
 let thumbPass = 0;
 
+/** WHICH thumbnail to develop next — the ones the reader can SEE, first.
+ *
+ *  This used to take the first unrendered photo in array order, which is right
+ *  for an open (you are looking at photo 1) and wrong for everything after it.
+ *  Pick a Look on a long set and every tile is invalidated at once; a reader
+ *  scrolled to photo 200 then waits for 199 decodes of pictures that are not on
+ *  screen before the ones under their eyes change. Measured cold: three photos
+ *  took 6-10 seconds to follow a look, and that is the SHORTEST possible case.
+ *
+ *  Order costs nothing here. The same work happens; it just happens where
+ *  somebody is looking. */
+function nextThumbTarget(): (typeof sessionPhotos)[number] | undefined {
+  const ready = sessionPhotos.filter((v) => v.id !== "lone" && v.thumbState !== "real" && !pendingStore.has(v.id));
+  if (!ready.length) return undefined;
+  const all = sessionPhotos.filter((p) => p.id !== "lone");
+  const idx = new Map(all.map((p, i) => [p.id, i]));
+
+  // A tile inside the strip's own box is one the reader is looking at.
+  const box = sessionThumbs.getBoundingClientRect();
+  const onScreen = ready.filter((v) => {
+    const i = idx.get(v.id);
+    if (i === undefined) return false;
+    const el = sessionThumbs.children[i] as HTMLElement | undefined;
+    if (!el) return false;
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.right > box.left && r.left < box.right;
+  });
+  if (onScreen.length) return onScreen[0];
+
+  // Nothing visible waiting — work outwards from the photo being viewed, so
+  // scrolling a little in either direction meets finished tiles.
+  const here = (activePhotoId !== null ? idx.get(activePhotoId) : undefined) ?? 0;
+  return ready.reduce((best, v) =>
+    Math.abs((idx.get(v.id) ?? 0) - here) < Math.abs((idx.get(best.id) ?? 0) - here) ? v : best);
+}
+
 async function realThumbnails(): Promise<void> {
   const gen = ++thumbPass;
   // Runs ALONGSIDE the storage loop, not after it. The two want different
@@ -6877,7 +6922,7 @@ async function realThumbnails(): Promise<void> {
   // is not skipped, it is come back to.
   for (let guard = 0; guard < 10000; guard++) {
     if (gen !== thumbPass) return; // session torn down or restarted under us
-    const view = sessionPhotos.find((v) => v.id !== "lone" && v.thumbState !== "real" && !pendingStore.has(v.id));
+    const view = nextThumbTarget();
     if (!view) {
       // Nothing ready. If anything is still on its way in, wait for it;
       // otherwise every thumbnail that can be made has been.

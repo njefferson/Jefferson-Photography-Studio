@@ -5067,6 +5067,77 @@ reported percentage does count only texels above half weight while roughly twice
 that area is touched to some degree — defensible, and worth knowing when the
 number reads lower than the effect looks.**
 
+## The three cold-read findings, 2026-09-10
+
+### The ⓘ panel opened at the changelog and hid the thing you go looking for
+
+Its button's accessible name was "What's new", and Settings — which holds
+"Something's wrong — the report to send" — sat below the whole changelog AND the
+roadmap. A cold reader found it only because the same report had already been
+found somewhere else. The code already knew: `locSettings` opens the panel and
+then scrolls, under a comment saying the panel opens at "What's new".
+
+Fixed: the button's label is now "About this app — what's new, settings, and
+reporting a problem", and a row of 44px jump buttons sits under the heading.
+Measured: label mentions settings, button 44px, the panel scrolls 0 to 1027 and
+Settings lands in view.
+
+### A look redrew the tiles nobody was looking at first
+
+`realThumbnails()` took the first unrendered photo in ARRAY order. That is right
+for an open — you are looking at photo 1 — and wrong for everything after it.
+Pick a Look and every tile is invalidated at once, so a reader scrolled to photo
+200 waits for 199 decodes of pictures off screen. The cold read measured 6-10
+seconds on THREE photos, which is the shortest case there is.
+
+`nextThumbTarget()` prefers a tile inside the strip's own box, then works
+outwards from the photo being viewed. The same work happens; it happens where
+somebody is looking. Measured on eight photos scrolled to the end: tiles
+redrawn 3,4,5,6,7 then 0,1,2 — all five visible ones first. The control, with
+the old ordering, gives 0,1,2,3,4,5,6,7 and two of the first five on screen.
+
+### Visualize spots — the reader was right, and the reason was not the one anybody wrote down
+
+The report was that the same smudge shows before and after healing. The shader's
+own comment says the opposite: a high-pass of the HEALED texture, "so a fixed
+spot visibly disappears". Measured rather than believed, on a flat synthetic
+field with one 14px mote:
+
+- default Spot size (~7px radius on a 900px frame), heal applied — contrast
+  around the mote went 186 to **255**, worse than before
+- Spot size raised to cover the mote — 186 to **78**, and the plain view flat
+  at 11
+
+So the shader is correct and the copy was not the whole story. **A patch smaller
+than the dust leaves a residual ring, and a high-pass view amplifies exactly
+that** — so a partial fix reads as no fix, or as a worse one. The view is
+telling the truth and it reads as a failure.
+
+And the copy sealed it: "The photo itself is untouched" was meant as *switching
+this on does not edit your photo*, and reads as *this view cannot show your
+heals*. It now says the view is live, that a healed spot disappears from it, and
+that a remaining ring means the patch was smaller than the dust — with Spot size
+named as the remedy.
+
+**Three instrument errors, all mine, all caught by controls.**
+
+- The first heal test used a mote bigger than the default patch, so it measured
+  a partial heal and read it as the visualiser being broken. The app was right
+  and the test image was wrong.
+- The first ordering test recorded NOTHING — the strip is rebuilt wholesale on
+  every repaint, so an attribute observer sees no mutations — and PASSED, because
+  the assertion was guarded by `if (order.length && ...)`. An empty measurement
+  skipped the check and reported success. That is LESSONS §250 in this repo.
+- The tightened assertion then passed the NEGATIVE CONTROL: the threshold was
+  `hit < Math.min(seen.length, 2)`, and the old ordering scored exactly 2. A
+  threshold that a known-bad build clears is not a threshold. It requires all of
+  the first-redrawn tiles to be on screen now.
+- And once it was strict, the FIXED build failed on a batching artefact: polling
+  every 150ms let two tiles change inside one interval, and within a batch the
+  order recorded was array index order, not completion order. At 40ms it
+  resolves. A measurement's own resolution can manufacture the pattern it is
+  looking for.
+
 ## The update strip reaches all three apps, 2026-09-10
 
 **One service worker at root scope serves the whole site**, so a new release is

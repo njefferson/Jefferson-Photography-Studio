@@ -86,6 +86,23 @@ body {
 }
 /* Placement only — the strip's look is src/swstrip.css, shared by all three
    apps. Infrared's shell is a grid, so the strip gets a row of its own. */
+/* The panel opens at "What's new", and Settings — which is where the report a
+   reader needs when something is wrong lives — was a scroll past the whole
+   changelog and roadmap. A cold reader found it only because it had already
+   been found somewhere else. */
+.info-jump { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+.info-jump-btn {
+  min-height: 44px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: transparent;
+  color: var(--txt);
+  font: 0.8125rem/1.2 var(--ui);
+  touch-action: manipulation;
+}
+.info-jump-btn:active { background: var(--surface-3); }
+
 .sw-strip { grid-area: swstrip; }
 /* No image yet -> panel hidden -> give the stage the full width. */
 #app:has(#panel[hidden]) {
