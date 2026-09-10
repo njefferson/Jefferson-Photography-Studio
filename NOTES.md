@@ -6240,6 +6240,79 @@ which edge answered rather than about what is deployed. Six independent fetches
 now, all six required to agree. The `sw.js` cache stamp is the better anchor
 where there is one, since it carries the version.
 
+## Seven questions from the device, and what each one measured, 2026-09-10
+
+**Is the location strip taking the lens with it?** No, and it is asserted now
+rather than reasoned about. `stripLocation` zeroes the GPS entries in place and
+returns a file of the SAME LENGTH; lens, focal length, aperture, camera and
+capture time all survive, and the photograph matches the same profile before and
+after — on a bare TIFF and on a JPEG, because the function has a separate branch
+for each. The rig never goes through that path at all: it reads the picked
+file's own bytes.
+
+**And the first version of that test passed while proving nothing.** It built
+its fixture with `buildExifApp1`, which cannot write GPS — so "the location is
+gone" and "the lens survives" described a file that never had a location. The
+negative control that cannot fail, for the third time on this work. The fixture
+is a hand-written TIFF with a real GPS IFD beside a real Exif IFD, and
+`findLocation` is asserted to see it BEFORE the strip runs.
+
+**Does interpolation fail badly across a hole?** Measured by leave-one-out on
+real anchors: hide the measured 36mm profile, blend 19mm and 50mm across the gap
+it leaves, and compare against the measurement that was hidden. Worst bin off by
+**1.48 points of gain — 3.8 of 255 on a mid-grey**. Using the nearest end alone
+instead costs 9.15, so the blend is about six times better than a snap. Past the
+last measurement it clamps rather than running the trend on. That number is why
+the "gap too wide to blend across" bar in `coverage()` sits at a 2.2 ratio and
+not tighter.
+
+**Does the manual Hot-spot slider still do anything, now that the automatic one
+shares its stage?** Yes: 113.4 to 41.5 at the centre. Size changes the circle,
+zero returns exactly. Asked, so measured.
+
+**THE RIGHT-EDGE SWIPE WAS OUR OWN HISTORY.** Every dialog open pushed an entry
+and every close consumed it with `history.back()` — which leaves a FORWARD entry
+behind, every time, and a swipe from the right edge of an iPad is forward
+navigation. Safari offered to drag the sheet that had just been closed back into
+view. Nothing reopened, because popstate found no dialog open, but the app
+appeared to be pulling a dead page around.
+
+One guard entry now, not one per dialog: pushed at startup, re-pushed after each
+Back that closes something (which is also what truncates any forward entry the
+browser is holding), and closing a sheet touches history not at all. Back still
+closes the top sheet; a Back with nothing open is left alone.
+
+**And the first probe for that passed against the plant.** It compared
+`history.state` before and after asking to go forward — and every entry carries
+the same state object, so the comparison was constant by construction. Counting
+`popstate` events instead: planted, five claims fail; clean, none.
+
+**Three things a reader could not do**, and they are one surface. See what the
+app has measured; remove any of it; see which focal lengths and apertures are
+still unshot. `coverage()` in `lensstore.ts` answers the last one for a list of
+profiles, and BOTH callers use it — the rig for the run that just finished and
+the *Your lenses* panel for what is kept — because working out twice what counts
+as a gap is how the two come to disagree. Removing takes two presses on the same
+button rather than a confirm dialog: a sheet over a sheet on an iPad is worse
+than the thing it is guarding against.
+
+**The button that makes a measurement mean anything was at the bottom of a wall
+of numbers.** One row per photograph, ninety of them on a real set, and the
+reader had to scroll past all of it. The outcome comes first now, the per-frame
+list is folded, and the instructions fold themselves once there is an answer —
+they were read before the frames were picked. Measured on a 430px screen: the
+primary action moved from 593px into a 607px panel to 288px.
+
+**A correction applied without being asked for is the one nobody can tell
+happened.** Nothing said an automatic lens correction was on unless the reader
+went looking under Corrections, and the only before/after was Hold: Untouched,
+which drops white balance, exposure and denoise as well and so answers a
+different question. *Hold: No lens fix* is present ONLY when a correction is
+actually landing on the open frame, so its presence is the indicator; its title
+says what is on and whether it came from the reader's own measurement or from
+the app. Asserted to differ from Hold: Untouched, or it would be a second name
+for that button.
+
 ## The rig reported what came out and nothing about what went in, 2026-09-10
 
 **Asked plainly: there is no way to see which focal length and aperture gaps are

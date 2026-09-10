@@ -70,6 +70,9 @@
           <button id="resetBtn" class="bar-btn" type="button" disabled title="Reset the whole edit to how the photo first opened">Reset</button>
           <button id="origBtn" class="bar-btn" type="button" title="Press and hold to compare with how the photo opened">Hold: Original</button>
           <button id="untouchedBtn" class="bar-btn" type="button" title="Press and hold to see the photo exactly as decoded, nothing applied">Hold: Untouched</button>
+          <!-- Only present when a lens correction is actually on this frame, so
+               its presence is how the reader knows one was applied at all. -->
+          <button id="lensCmpBtn" class="bar-btn" type="button" hidden title="Press and hold to see this photo without the automatic lens correction">Hold: No lens fix</button>
           <button id="histBtn" class="bar-btn" type="button" aria-pressed="true" title="Show or hide the live histogram">Histogram</button>
           <button id="helpBtn" class="bar-btn" type="button">Help</button>
           <button id="shareBtn" class="bar-btn" type="button" hidden title="Share this app or copy its link">&#x2BAD;&#xFE0E; Share</button>
@@ -868,24 +871,45 @@
         <button id="lensCloseTop" type="button" class="dlg-x" aria-label="Close">&#10005;</button>
       </div>
       <div class="dlg-body">
-        <p class="note">An infrared-converted lens sends a little more infrared straight up the middle than it does to the corners, so the centre of every frame comes out brighter and a slightly different colour. This works out yours, from your own photographs, on this device.</p>
-        <p class="note"><strong>What to give it:</strong> frames of nothing &mdash; clear blue sky, filling the whole frame, no sun in shot, no clouds, no lens hood, well exposed but nothing blown. Four or five at each focal length you actually use. RAW or JPEG, both work; the RAW is better.</p>
-        <p class="note"><strong>Give it the whole set at once.</strong> Select as many as you like, and a <strong>.zip</strong> counts as everything inside it &mdash; which is how a folder of RAW files travels on an iPad, since zipping is the only way iOS hands over a NEF without turning it into a JPEG first. Frames are read one at a time, so the size of the zip does not matter. They are sorted into lenses and focal lengths for you.</p>
-        <p class="note">Nothing is uploaded and nothing leaves this device. What comes out is a small block of numbers you can copy or save &mdash; a few kilobytes of text, not the photographs.</p>
+        <details id="lensIntro" open>
+          <summary>What to give it, and what happens to it</summary>
+          <p class="note">An infrared-converted lens sends a little more infrared straight up the middle than it does to the corners, so the centre of every frame comes out brighter and a slightly different colour. This works out yours, from your own photographs, on this device.</p>
+          <p class="note"><strong>What to give it:</strong> frames of nothing &mdash; clear blue sky, filling the whole frame, no sun in shot, no clouds, no lens hood, well exposed but nothing blown. Four or five at each focal length you actually use. RAW or JPEG, both work; the RAW is better.</p>
+          <p class="note"><strong>Give it the whole set at once.</strong> Select as many as you like, and a <strong>.zip</strong> counts as everything inside it &mdash; which is how a folder of RAW files travels on an iPad, since zipping is the only way iOS hands over a NEF without turning it into a JPEG first. Frames are read one at a time, so the size of the zip does not matter. They are sorted into lenses and focal lengths for you.</p>
+          <p class="note">Nothing is uploaded and nothing leaves this device. What comes out is a small block of numbers you can copy or save &mdash; a few kilobytes of text, not the photographs.</p>
+        </details>
         <div class="dbg-actions">
           <label class="dbg-btn primary"><input id="lensFiles" class="file-input" type="file" accept="image/*,.dng,.nef,.DNG,.NEF,.zip,.ZIP,application/zip" multiple />Choose flat frames</label>
           <button id="lensStop" type="button" class="dbg-btn" hidden>Stop</button>
         </div>
-        <div id="lensResults" class="dbg-results" role="status" aria-live="polite"></div>
+        <p class="note" id="lensRunning" hidden role="status"></p>
+        <!-- THE OUTCOME COMES FIRST. This sat below the per-frame list, which is
+             one row per photograph and can be ninety of them: the button that
+             makes the whole thing mean anything was at the bottom of a wall of
+             numbers, and nothing above it said what pressing it would do. -->
         <div id="lensOut" hidden>
-          <p class="note"><strong>Done.</strong> <strong>Use these on my photos</strong> keeps the measurement on this device and puts it to work: when you open a photograph from the same lens, the colour it casts across the frame is taken out, at a strength you can move or switch off on the Corrections tab. Copying or saving the numbers is for sending them on &mdash; the photographs stay here either way.</p>
+          <h3 class="sub-title">Done &mdash; what would you like to do with it?</h3>
+          <p class="note"><strong>Use these on my photos</strong> keeps the measurement on this device and puts it to work straight away: open a photograph from the same lens and the colour the lens casts across the frame is taken out, at a strength you can move or switch off under Corrections. Nothing is uploaded, and your photographs stay where they are. <strong>Copy</strong> and <strong>Save</strong> are only for sending the numbers on to someone else.</p>
           <div class="dbg-actions">
             <button id="lensUse" type="button" class="dbg-btn primary">Use these on my photos</button>
             <button id="lensCopy2" type="button" class="dbg-btn">Copy the numbers</button>
             <button id="lensSave2" type="button" class="dbg-btn">Save as a file</button>
           </div>
           <p class="note" id="lensUseNote" hidden role="status"></p>
-          <textarea id="lensText" class="dbg-text" readonly rows="6" aria-label="Measured lens profile"></textarea>
+          <details id="lensNumbers">
+            <summary>The numbers themselves</summary>
+            <textarea id="lensText" class="dbg-text" readonly rows="6" aria-label="Measured lens profile"></textarea>
+          </details>
+        </div>
+        <div id="lensCoverage"></div>
+        <details id="lensDetail" hidden>
+          <summary>Every frame, one at a time</summary>
+          <div id="lensResults" class="dbg-results" role="status" aria-live="polite"></div>
+        </details>
+        <div class="subcard" id="lensKept" hidden>
+          <div class="sub-title">Your lenses <span>kept on this device</span></div>
+          <p class="note">What this app has measured and is using, what each one covers, and what is still missing from it. Nothing here has left the device, and removing one takes it off this device for good.</p>
+          <div id="lensKeptList"></div>
         </div>
       </div>
       <button id="lensClose" type="button">Close</button>
