@@ -15,6 +15,7 @@ import { decodeOffThread } from "./decodeClient";
 import { sniff } from "./import";
 import { readExifSubset } from "./exif";
 import { profileFrame, averageProfiles, round5, NBINS, type FrameProfile } from "./lensprofile";
+import { readZipIndex, readZipEntry, imageEntries } from "./zip";
 
 declare const __APP_VERSION__: string;
 
@@ -290,6 +291,7 @@ const profResults = $("dProfResults");
 const profText = $("dProfText") as HTMLTextAreaElement;
 const profCopy = $("dProfCopy") as HTMLButtonElement;
 const profSave = $("dProfSave") as HTMLButtonElement;
+const profStop = $("dProfStop") as HTMLButtonElement;
 
 /** "NIKKOR Z DX 16-50mm f/3.5-6.3 VR" -> "16-50"; a prime -> its length. The
  *  shipped data keys on exactly this, and deriving it means a lens nobody has
@@ -322,25 +324,73 @@ function profRow(name: string, value: string, meaning: string) {
 
 const pct = (x: number) => (x * 100).toFixed(1) + "%";
 
+/** One frame to measure: a picked file, or an entry inside a picked zip.
+ *  `bytes()` is deferred so a zip of forty raw frames is never all in memory at
+ *  once — the whole reason `readZipIndex` exists. */
+interface Candidate {
+  name: string;
+  bytes: () => Promise<Uint8Array>;
+}
+
+/** Flatten what was picked. A zip counts as everything inside it: on an iPad a
+ *  set of raw frames travels as one, because that is the only way iOS hands
+ *  over a NEF without transcoding it to JPEG. (The editor deliberately takes
+ *  only the FIRST image out of a zip — it is opening one photo. This is
+ *  measuring a lens, so it wants all of them.) */
+async function expand(files: File[], say: (t: string) => void): Promise<Candidate[]> {
+  const out: Candidate[] = [];
+  for (const f of files) {
+    if (!/\.zip$/i.test(f.name)) {
+      out.push({ name: f.name, bytes: async () => new Uint8Array(await f.arrayBuffer()) });
+      continue;
+    }
+    if (typeof DecompressionStream === "undefined") {
+      say(`${f.name}: this browser cannot open zips (Safari 16.4+, Chrome, Edge, or Firefox 113+). Pick the photographs themselves instead.`);
+      continue;
+    }
+    try {
+      const inside = imageEntries(await readZipIndex(f));
+      if (!inside.length) { say(`${f.name}: no photographs inside it.`); continue; }
+      say(`${f.name}: ${inside.length} photograph${inside.length === 1 ? "" : "s"} inside.`);
+      for (const e of inside) out.push({ name: e.name.split("/").pop() ?? e.name, bytes: () => readZipEntry(f, e) });
+    } catch (err) {
+      say(`${f.name}: could not be read as a zip (${(err as Error).message}).`);
+    }
+  }
+  return out;
+}
+
+let stopRequested = false;
+
 ($("dProfFiles") as HTMLInputElement).addEventListener("change", async (e) => {
   const input = e.currentTarget as HTMLInputElement;
-  const files = [...(input.files ?? [])];
+  const picked = [...(input.files ?? [])];
   input.value = ""; // so choosing the same set twice re-runs
-  if (!files.length) return;
+  if (!picked.length) return;
   profResults.replaceChildren();
   profText.hidden = true;
   profCopy.hidden = true;
   profSave.hidden = true;
+  stopRequested = false;
+  profStop.hidden = false;
+  profStop.textContent = "Stop";
+  profStop.onclick = () => { stopRequested = true; profStop.textContent = "Stopping…"; };
+
+  const opening = profNote("Looking at what you picked…");
+  const files = await expand(picked, (t) => profNote(t));
+  opening.remove();
+  if (!files.length) { profNote("Nothing to measure."); profStop.hidden = true; return; }
 
   const groups = new Map<string, { frames: FrameProfile[]; model: string; short: string; fl: number; aps: number[]; kinds: Set<string> }>();
   let unusable = 0;
   let camera = "";
 
   for (let i = 0; i < files.length; i++) {
+    if (stopRequested) { profNote(`Stopped after ${i} of ${files.length}. What was measured up to here is below.`); break; }
     const f = files[i];
     const p = profNote(`Measuring ${f.name} — ${i + 1} of ${files.length}…`);
     try {
-      const bytes = new Uint8Array(await f.arrayBuffer());
+      const bytes = await f.bytes();
       const kind = sniff(bytes);
       const ex = readExifSubset(bytes);
       const model = ex?.lens?.trim() || "";
@@ -382,6 +432,7 @@ const pct = (x: number) => (x * 100).toFixed(1) + "%";
     }
   }
 
+  profStop.hidden = true;
   if (!groups.size) {
     profNote(unusable ? "Nothing measurable in that set — see the reasons above." : "Nothing to measure.");
     return;
@@ -439,7 +490,8 @@ const pct = (x: number) => (x * 100).toFixed(1) + "%";
   profText.hidden = false;
   profCopy.hidden = false;
   profSave.hidden = false;
-  profNote(`${(text.length / 1024).toFixed(1)} KB of numbers, from ${files.length - unusable} of ${files.length} frames. Copy it into a message, or save it and send the file — either way the photographs stay here.`);
+  const used = Object.values(profiles).reduce((n, x) => n + x.frames, 0);
+  profNote(`${(text.length / 1024).toFixed(1)} KB of numbers, from ${used} of the ${files.length} frame${files.length === 1 ? "" : "s"} picked. Copy it into a message, or save it and send the file — either way the photographs stay here.`);
   profCopy.onclick = () => copy(text, profCopy, "Copy the numbers", profText);
   profSave.onclick = () => {
     const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));

@@ -68,11 +68,20 @@
           zoom &mdash; the hot-spot changes with focal length and aperture.
         </p>
         <p class="dbg-note">
+          <strong>Give it the whole set at once.</strong> Select as many as you like, and a
+          <strong>.zip</strong> counts as everything inside it &mdash; which is how a folder of RAW
+          files travels on an iPad, since zipping is the only way iOS hands over a NEF without
+          turning it into a JPEG first. Frames are read one at a time, so the size of the zip does
+          not matter. They are sorted into lenses and focal lengths for you; you do not have to keep
+          them apart. A long run can be stopped and keeps what it has measured so far.
+        </p>
+        <p class="dbg-note">
           Nothing is uploaded and nothing leaves this device. What comes out is a small block of
           numbers you can copy or save &mdash; a few kilobytes of text, not the photographs.
         </p>
         <div class="dbg-actions">
-          <label class="dbg-btn primary"><input id="dProfFiles" class="file-input" type="file" accept="image/*,.dng,.nef,.DNG,.NEF" multiple />Choose flat frames</label>
+          <label class="dbg-btn primary"><input id="dProfFiles" class="file-input" type="file" accept="image/*,.dng,.nef,.DNG,.NEF,.zip,.ZIP,application/zip" multiple />Choose flat frames</label>
+          <button id="dProfStop" type="button" class="dbg-btn" hidden>Stop</button>
           <button id="dProfCopy" type="button" class="dbg-btn" hidden>Copy the numbers</button>
           <button id="dProfSave" type="button" class="dbg-btn" hidden>Save as a file</button>
         </div>
