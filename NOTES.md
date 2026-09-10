@@ -511,7 +511,7 @@ user-scalable=no.
   channel-swap / IR-WB); (2) is the first cut "stickers + grade on any JPEG/HEIC"
   or the full editor; (3) name/route/icon and whether it installs from the same
   chooser. Ships on its own once scoped — unrelated to the sticker betas.
-- [ ] **Full-bleed alignment view — the tilted photo fills the screen** — owner-caught on device
+- [x] **Full-bleed alignment view — the tilted photo fills the screen** — owner-caught on device
   2026-07-16 (with the crop go-to-main; screenshot IMG_6201, Straighten @ 23.6°).
   While a geometry tool is armed, rotating and pinch-zooming CLIPS the photo
   inside the `#view` box: the tilted/zoomed photo is letterboxed and cut by
@@ -546,6 +546,19 @@ user-scalable=no.
   or export — it's a presentation/layout direction. Scope as its own design pass
   (likely several); the crop overflow-view ships first and proves the model.
 - [ ] **Full-bleed crop — the photo flows behind the crop tools** — owner design
+  **PILOT SHIPPED 2026-09-10, and this stays open because the design questions
+  are not answered.** What landed: with a geometry tool armed the canvas reaches
+  the top and both side edges (safe-area only), the 8px border-radius is gone,
+  and `#stage` drops its 12px gutter. Measured — fills 100% of the width against
+  93%/90% before, side gaps 0 against 30/22, radius 0px against 8px, and all
+  four crop handles still grabbable at 820x1180 and 430x900. The rounded rect
+  was what cut black wedges off a tilted photo's corners, so the alignment item
+  above is resolved by this.
+  **What did NOT land, deliberately:** the bottom still reserves the crop pill's
+  measured height, because the bottom handles have to stay grabbable. Whether
+  the pill should instead float OVER the photo and pass taps through where it is
+  empty is one of the owner's open questions, not a guess for a session to make.
+  The remaining text below is the original entry.
   question 2026-07-16 (the FIRST instance of the "big image" direction above):
   why must the photo be bound inside a "view box" (the
   letterboxed `#view` rect) at all while cropping? Could it simply OVERFLOW — the
@@ -5066,6 +5079,43 @@ reported half-weight threshold. A feather doing what a feather does. **The
 reported percentage does count only texels above half weight while roughly twice
 that area is touched to some degree — defensible, and worth knowing when the
 number reads lower than the effect looks.**
+
+## The geometry view is full-bleed — the pilot, not the whole idea, 2026-09-10
+
+**Three roadmap items looked like one piece and are not.** "Full-bleed
+alignment view" says in its own text that it is SUBSUMED by the crop item. "Big
+image: the photo fills the app" says STILL AN IDEA, lists five open design
+questions, and says plainly not to guess them because they are the owner's taste
+calls — and instructs that the crop overflow view ships FIRST as the pilot that
+proves the model. So the piece that was buildable is the geometry view, and the
+whole-app generalisation was not, and reading the entries was what separated
+them.
+
+**What shipped.** With a geometry tool armed: `#view` reaches the top and both
+side edges (safe-area insets only), `border-radius: 0`, and `#stage` drops its
+12px gutter. The bottom keeps the crop pill's measured reserve.
+
+**Measured at 820x1180 and 430x900, with a negative control on the old CSS:**
+
+- fills 100% of the width, against 93% and 90% before
+- side gaps 0, against 30px and 22px
+- border-radius 0px, against 8px — that rounded rect is what cut the black
+  wedges off a tilted photo's corners, which was the alignment item's whole
+  complaint
+- all four crop handles still grabbable, at both sizes, in both builds
+
+**One assertion of mine was wrong and the measurement caught it.** The first
+version demanded no top gap and failed at 303px. That gap is CENTRING: a 3:1
+test ramp in a portrait stage cannot fill both axes under contain semantics, and
+`margin: auto` centres it. The right question is not "is there a gap" but "is
+the gap symmetric" — an inset frames, centring does not. It now asserts the
+canvas fills one axis, that the side gaps match each other, and that top and
+bottom differ (because only the bottom may reserve room for the pill).
+
+**Left open on purpose, and recorded in the roadmap entry rather than here:**
+whether the pill floats over the photo and passes taps through. That is one of
+the owner's five questions, and answering it by guessing would have spent the
+pilot's whole purpose.
 
 ## The update strip's buttons went monitor-wide on ONE of three apps, 2026-09-10
 
