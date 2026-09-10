@@ -50,6 +50,14 @@ export interface StoredProfile {
   source: string;
   camera: string;
   measured: string;
+  /** The hot-spot's share of the centre's brightness, per radial bin, in
+   *  LINEAR space. Present only on the profiles that SHIP with the app, where
+   *  it is the LOW end of the measured range — see hotspotProfiles.ts. A
+   *  profile the reader measured carries colour only, on the owner's call: one
+   *  flat frame reports the bump as a range, and a range is not a correction. */
+  bump?: number[];
+  /** True for a profile that came with the app rather than from this device. */
+  builtIn?: boolean;
   /** Present when this is a blend of two measurements rather than one of them,
    *  so the panel can say so and a test can tell the two apart. */
   blend?: { loFl: number; hiFl: number; t: number };
@@ -156,11 +164,23 @@ const logMix = (v: number, a: number, b: number) =>
  *  nearest the frame's aperture is used, and the note says when that set was
  *  not shot at this frame's aperture. */
 export function findProfile(ex: ExifSubset | null): StoredProfile | null {
+  return matchIn(read(), ex);
+}
+
+/** Pick the profile for a photograph out of a list of candidates.
+ *
+ *  ONE MATCHER, TWO CALLERS. The profiles that ship with the app and the ones
+ *  the reader measured are the same shape from the same rig, and "which of
+ *  these fits this frame" is one question. It was two implementations — this
+ *  one, and a nearest-focal-length snap in hotspot.ts — which is how the
+ *  shipped table ended up ignoring aperture entirely while this one had
+ *  handled it for weeks. */
+export function matchIn(list: StoredProfile[], ex: ExifSubset | null): StoredProfile | null {
   if (!ex?.lens) return null;
   const model = ex.lens.trim();
   const fl = ex.focalLength && ex.focalLength[1] ? ex.focalLength[0] / ex.focalLength[1] : NaN;
   const ap = ex.fNumber && ex.fNumber[1] ? ex.fNumber[0] / ex.fNumber[1] : NaN;
-  const mine = read().filter((p) => p.model === model);
+  const mine = list.filter((p) => p.model === model);
   if (!mine.length) return null;
   if (!Number.isFinite(fl)) return mine[0];
 
@@ -171,11 +191,25 @@ export function findProfile(ex: ExifSubset | null): StoredProfile | null {
     const k = Number.isFinite(p.ap) ? p.ap.toFixed(2) : "?";
     (sets.get(k) ?? sets.set(k, []).get(k)!).push(p);
   }
+  // Scored on BOTH axes, not aperture first. Aperture-first was fine while every
+  // set spanned the focal range; the profiles that ship with the app do not —
+  // seven apertures at one focal length and one aperture at another — and a
+  // 50mm f/8 frame chose the f/5.3 set, whose only member was measured at
+  // 130mm. Nearer in aperture, and the wrong lens position entirely.
+  //
+  // The focal cost is how far OUTSIDE a set's measured range the frame falls:
+  // zero when the set brackets it, because interpolating inside a range is not
+  // a reach. Both terms are log ratios, so they are the same kind of distance
+  // and add without a fudge factor.
   let best: StoredProfile[] = [];
   let bestCost = Infinity;
-  for (const [k, list] of sets) {
-    const cost = k === "?" || !Number.isFinite(ap) ? 0.4 : Math.abs(Math.log(Number(k) / ap));
-    if (cost < bestCost) { bestCost = cost; best = list; }
+  for (const [k, list2] of sets) {
+    const apCost = k === "?" || !Number.isFinite(ap) ? 0.4 : Math.abs(Math.log(Number(k) / ap));
+    const fls = list2.map((q) => q.fl);
+    const lo = Math.min(...fls), hi = Math.max(...fls);
+    const flCost = fl >= lo && fl <= hi ? 0 : Math.abs(Math.log(fl / (fl < lo ? lo : hi)));
+    const cost = apCost + flCost;
+    if (cost < bestCost) { bestCost = cost; best = list2; }
   }
 
   // 2. within it, bracket the frame's focal length and blend.
@@ -189,11 +223,24 @@ export function findProfile(ex: ExifSubset | null): StoredProfile | null {
   }
   if (lo === hi || lo.fl === hi.fl) return lo;
   const t = logMix(fl, lo.fl, hi.fl);
+  // Landing exactly on an anchor is not a blend of anything. Returning a
+  // synthetic "blended 0% / 100%" is arithmetically identical and reads to the
+  // reader as if the app could not tell where the frame was.
+  if (t <= 0) return lo;
+  if (t >= 1) return hi;
   const n = Math.min(lo.kr.length, hi.kr.length, lo.kb.length, hi.kb.length);
   const kr: number[] = [], kb: number[] = [];
   for (let i = 0; i < n; i++) {
     kr.push(lo.kr[i] + (hi.kr[i] - lo.kr[i]) * t);
     kb.push(lo.kb[i] + (hi.kb[i] - lo.kb[i]) * t);
+  }
+  // The bump blends on the same mix, and only when BOTH ends carry one — a
+  // blend against a missing half would quietly halve the correction.
+  let bump: number[] | undefined;
+  if (lo.bump && hi.bump) {
+    const bn = Math.min(lo.bump.length, hi.bump.length);
+    bump = [];
+    for (let i = 0; i < bn; i++) bump.push(lo.bump[i] + (hi.bump[i] - lo.bump[i]) * t);
   }
   return {
     key: `${lo.key}+${hi.key}`,
@@ -202,6 +249,8 @@ export function findProfile(ex: ExifSubset | null): StoredProfile | null {
     ap: lo.ap,
     kr,
     kb,
+    bump,
+    builtIn: lo.builtIn && hi.builtIn,
     frames: lo.frames + hi.frames,
     source: lo.source === hi.source ? lo.source : `${lo.source}+${hi.source}`,
     camera: lo.camera || hi.camera,
@@ -214,15 +263,25 @@ export function findProfile(ex: ExifSubset | null): StoredProfile | null {
 export function matchNote(p: StoredProfile, ex: ExifSubset | null): string {
   const fl = ex?.focalLength && ex.focalLength[1] ? ex.focalLength[0] / ex.focalLength[1] : NaN;
   const ap = ex?.fNumber && ex.fNumber[1] ? ex.fNumber[0] / ex.fNumber[1] : NaN;
+  // "your measurements" is a claim about where the numbers came from, and it is
+  // false of a profile that shipped with the app. One note serves both cards,
+  // so it has to know which it is describing.
+  const mine = !p.builtIn;
   const bits: string[] = [];
   if (p.blend) {
     const pc = Math.round(p.blend.t * 100);
-    bits.push(`blended between your ${p.blend.loFl}mm and ${p.blend.hiFl}mm measurements (${100 - pc}% / ${pc}%)`);
+    bits.push(mine
+      ? `blended between your ${p.blend.loFl}mm and ${p.blend.hiFl}mm measurements (${100 - pc}% / ${pc}%)`
+      : `between the ${p.blend.loFl}mm and ${p.blend.hiFl}mm profiles (${100 - pc}% / ${pc}%)`);
   } else if (Number.isFinite(fl) && Math.round(fl) !== Math.round(p.fl)) {
     bits.push(`measured at ${p.fl}mm, this frame is ${Math.round(fl)}mm`);
   }
   if (Number.isFinite(ap) && Number.isFinite(p.ap) && Math.abs(ap - p.ap) > 0.15) {
     bits.push(`measured at f/${p.ap}, this frame is f/${ap.toFixed(1)}`);
+  } else if (!Number.isFinite(p.ap) && !mine) {
+    // The 2026-07 pair recorded no aperture, and the hot-spot moves a long way
+    // with one: 0.00 wide open against 0.19 stopped right down, on one lens.
+    bits.push("measured at an aperture that was not recorded");
   }
   return bits.join("; ");
 }
