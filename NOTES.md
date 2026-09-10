@@ -5715,6 +5715,15 @@ siblings, a text file among the images, a zip with no images, and a file that is
 not a zip. Every entry byte-identical to what went in, and a zipped set gives
 numbers identical to the same frames loose to 1e-6.
 
+**AND ONE MORE MEASUREMENT THAT WAS NOT ONE.** The poll that waits for a deploy
+matched `dProfStop` on the fifth try — and the very next fetch, seconds later,
+came back with the PREVIOUS build, 4721 bytes against 5447. Cloudflare's edge
+updates unevenly, so during a rollout two requests a second apart can be
+answered by different builds, and a single confirming fetch is a fact about
+which edge answered rather than about what is deployed. Six independent fetches
+now, all six required to agree. The `sw.js` cache stamp is the better anchor
+where there is one, since it carries the version.
+
 ## Measuring a lens where the lens is, 2026-09-10
 
 **The question was how to get 25 MB raw flats off the iPad and into a session.**
