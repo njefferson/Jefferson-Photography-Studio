@@ -4305,7 +4305,7 @@ const openLens = () => {
 // A LENS IS NOT A PHOTOGRAPH, so every route to this works with nothing open:
 // the start screen, the version panel, and the Corrections card for when you
 // are already looking at the sliders it replaces.
-for (const id of ["welcomeLensBtn", "verLens", "lensMeasureBtn"]) {
+for (const id of ["welcomeLensBtn", "barLensBtn", "verLens", "lensMeasureBtn"]) {
   document.getElementById(id)?.addEventListener("click", openLens);
 }
 wireLensRig(lensDlg);

@@ -129,9 +129,21 @@ export interface RadialMeans {
 }
 
 /** Walk the decoded frame and accumulate per-channel linear means by radius.
- *  Strided when the frame is large: 80 bins over a 20-megapixel frame is
- *  250,000 pixels a bin, and a quarter of that is still four figures of
- *  averaging in the thinnest ring. */
+ *
+ *  THIS IS THE COST OF MEASURING A FRAME, not the decode. Timed on a binned
+ *  20 MP raw (2784x1856, which is what the raw path actually hands over):
+ *  310 ms here against 95 ms to decode the file in the first place. Two things
+ *  were paying for that and neither bought anything:
+ *
+ *  `Math.hypot` — correct, and it guards against overflow that cannot happen
+ *  with pixel coordinates. Measured over every pixel of that frame: 145 ms,
+ *  against 12 ms for `sqrt(dx*dx + dy*dy)`. Twelve times, for a safety margin
+ *  on numbers that never exceed a few thousand.
+ *
+ *  The stride targeted four million sampled pixels, which is 50,000 a bin.
+ *  A quarter of that is still thousands in the thinnest ring — bin 0 spans a
+ *  21-pixel radius on that frame and keeps ~350 samples — and the profile does
+ *  not move. One million is the target now. */
 export function radialMeans(img: DecodedImage): RadialMeans {
   const w = img.width, h = img.height;
   const cx = (w - 1) / 2, cy = (h - 1) / 2;
@@ -143,10 +155,10 @@ export function radialMeans(img: DecodedImage): RadialMeans {
   const sl = new Float64Array(NBINS), sll = new Float64Array(NBINS);
   const lin = img.linear, px = img.pixels;
   if (!lin && !px) throw new Error("decoded frame carries no pixels");
-  const step = Math.max(1, Math.round(Math.sqrt((w * h) / 4e6)));
+  const step = Math.max(1, Math.round(Math.sqrt((w * h) / 1e6)));
   let clipped = 0, seen = 0, sum = 0;
   for (let y = 0; y < h; y += step) {
-    const dy = y - cy;
+    const dy = y - cy, dy2 = dy * dy;
     for (let x = 0; x < w; x += step) {
       const o = (y * w + x) * 4;
       let R: number, G: number, B: number;
@@ -156,7 +168,8 @@ export function radialMeans(img: DecodedImage): RadialMeans {
       if (peak >= 0.99) clipped++;
       seen++;
       sum += peak;
-      const rn = Math.hypot(x - cx, dy) / Rd;
+      const dx = x - cx;
+      const rn = Math.sqrt(dx * dx + dy2) / Rd;
       const i = Math.min(NBINS - 1, (rn * NBINS) | 0);
       sr[i] += R; sg[i] += G; sb[i] += B; cnt[i]++;
       const lum = (R + G + B) / 3;
