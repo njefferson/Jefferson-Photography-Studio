@@ -116,6 +116,8 @@ const params: EditParams = {
   hotspot: 0,
   hotspotSize: 0.5,
   hotspotColor: 0,
+  lensFix: 1,
+  lensBypass: false,
   vignette: 0,
   clarity: 0,
   dehaze: 0,
@@ -300,36 +302,60 @@ const myLensUi = {
   bypass: $("myLensBypass") as HTMLButtonElement,
   forget: $("myLensForget") as HTMLButtonElement,
 };
-let myLens: { p: LensStore.StoredProfile; strength: number; bypass: boolean; applied: number; note: string } | null = null;
+/** The matched profile for the OPEN photograph, and how far it reached to match.
+ *  Strength and Bypass are NOT here — they are `params.lensFix` and
+ *  `params.lensBypass`, so Undo, Redo and Reset carry them like every other
+ *  control. Keeping a second copy on this object is how the picture and the
+ *  slider end up disagreeing after an undo, with nothing to say which is right. */
+let myLens: { p: LensStore.StoredProfile; note: string } | null = null;
 
-/** Move the open frame to whatever strength the controls now say. Exact, and
- *  with no second copy of the frame — see `applyColourDelta`. */
-function syncMyLens(redraw = true) {
-  if (!current || !myLens) return;
-  const want = myLens.bypass ? 0 : myLens.strength;
-  if (want !== myLens.applied) {
-    LensStore.applyColourDelta(current, myLens.p, myLens.applied, want);
-    myLens.applied = want;
-    if (redraw) uploadPreview();
-  }
+/** Move the correction to whatever the controls now say.
+ *
+ *  IT IS A UNIFORM NOW, NOT A REWRITE OF THE FRAME. This used to multiply the
+ *  decoded pixels and undo that multiply when Strength moved — exact, and it
+ *  needed no second copy of a 330 MB raw frame, but it also meant the
+ *  correction sat outside the pipeline: it could not compose with anything, the
+ *  export had to be handed it separately, and every touch of the slider walked
+ *  every pixel. In the pipeline it is one number per draw. */
+function syncMyLens() {
+  if (!myLens) { renderer.setLensCurve(null); params.lensFix = 0; params.lensBypass = false; }
+  draw();
   updateMyLensUI();
 }
 
 function updateMyLensUI() {
   myLensUi.card.hidden = !myLens;
   if (!myLens) return;
-  myLensUi.strength.value = String(myLens.strength);
-  myLensUi.bypass.setAttribute("aria-pressed", String(myLens.bypass));
+  myLensUi.strength.value = String(params.lensFix);
+  myLensUi.bypass.setAttribute("aria-pressed", String(params.lensBypass));
   const p = myLens.p;
   const from = p.source ? ` from ${p.frames} ${p.source} frame${p.frames === 1 ? "" : "s"}` : "";
   myLensUi.status.textContent =
     `${p.model} · measured at ${p.fl}mm${Number.isFinite(p.ap) ? ` f/${p.ap}` : ""}${from}` +
     (myLens.note ? ` — ${myLens.note}` : "") +
-    (myLens.bypass ? " · bypassed" : "");
+    (params.lensBypass ? " · bypassed" : "");
+}
+
+/** The measured curve for a photograph, from its own EXIF. Used by every path
+ *  that renders a frame OTHER than the one the reader has open — thumbnails, a
+ *  batch — because `myLens` belongs to the open photograph and applying it to
+ *  another would put one lens's colour on another lens's frame. */
+function lensCurveFor(imported: ImportedFile): LensStore.StoredProfile | null {
+  try {
+    return LensStore.findProfile(readExifSubset(imported.bytes));
+  } catch {
+    return null;
+  }
+}
+
+/** The curve for the frame the reader has open. Bypass is a strength of 0,
+ *  not a missing curve — one place decides how much of it lands. */
+function currentLensCurve(): LensStore.StoredProfile | null {
+  return myLens ? myLens.p : null;
 }
 
 /** Called at open, beside initHotspot. */
-function initMyLens(img: DecodedImage, imported: ImportedFile) {
+function initMyLens(_img: DecodedImage, imported: ImportedFile) {
   myLens = null;
   let ex = null;
   try {
@@ -338,32 +364,32 @@ function initMyLens(img: DecodedImage, imported: ImportedFile) {
     // unreadable EXIF is simply an unmatched photograph, never a failure
   }
   const p = LensStore.findProfile(ex);
-  if (p) {
-    myLens = { p, strength: 1, bypass: false, applied: 0, note: LensStore.matchNote(p, ex) };
-    LensStore.applyColourDelta(img, p, 0, 1);
-    myLens.applied = 1;
-  }
+  if (p) myLens = { p, note: LensStore.matchNote(p, ex) };
+  // The curve is per-photograph: uploaded once here, then only its strength
+  // moves. Cleared when nothing matched, so the previous photo's lens cannot
+  // leak onto this one.
+  renderer.setLensCurve(myLens ? myLens.p.kr : null, myLens ? myLens.p.kb : null);
+  params.lensFix = myLens ? 1 : 0;
+  params.lensBypass = false;
   updateMyLensUI();
 }
 
 myLensUi.strength.addEventListener("input", () => {
   if (!myLens) return;
-  myLens.strength = Number(myLensUi.strength.value);
-  syncMyLens();
+  params.lensFix = Number(myLensUi.strength.value);
+  syncMyLens(); // draw() coalesces the drag into one undo step, like every slider
 });
 myLensUi.bypass.addEventListener("click", () => {
   if (!myLens) return;
-  myLens.bypass = !myLens.bypass;
+  params.lensBypass = !params.lensBypass;
   syncMyLens();
+  flushRecord(); // one press = one undo step
 });
 myLensUi.forget.addEventListener("click", () => {
   if (!myLens) return;
-  const key = myLens.p.key;
-  myLens.bypass = true;
-  syncMyLens();
-  LensStore.removeProfile(key);
+  LensStore.removeProfile(myLens.p.key);
   myLens = null;
-  updateMyLensUI();
+  syncMyLens();
 });
 
 /** Called once per newly-opened photo, right after decode. Auto-selects the
@@ -480,6 +506,7 @@ function syncFromUI() {
   params.hotspot = Number(ui.hotspot.value);
   params.hotspotSize = Number(ui.hotspotSize.value);
   params.hotspotColor = Number(ui.hotspotColor.value);
+  if (myLens) params.lensFix = Number(myLensUi.strength.value);
   params.vignette = Number(ui.vignette.value);
   params.clarity = Number(ui.clarity.value);
   params.dehaze = Number(ui.dehaze.value);
@@ -529,6 +556,7 @@ function syncToUI() {
   ui.hotspot.value = String(params.hotspot);
   ui.hotspotSize.value = String(params.hotspotSize);
   ui.hotspotColor.value = String(params.hotspotColor);
+  updateMyLensUI(); // the measured-lens card is params-driven too
   ui.vignette.value = String(params.vignette);
   ui.clarity.value = String(params.clarity);
   ui.dehaze.value = String(params.dehaze);
@@ -796,6 +824,8 @@ function cloneParams(p: EditParams): EditParams {
     hotspot: p.hotspot,
     hotspotSize: p.hotspotSize,
     hotspotColor: p.hotspotColor ?? 0,
+    lensFix: p.lensFix ?? 1,
+    lensBypass: p.lensBypass ?? false,
     vignette: p.vignette,
     clarity: p.clarity,
     dehaze: p.dehaze,
@@ -870,6 +900,8 @@ function applySnapshot(s: Snapshot) {
   params.hotspot = c.hotspot;
   params.hotspotSize = c.hotspotSize;
   params.hotspotColor = c.hotspotColor ?? 0;
+  params.lensFix = c.lensFix ?? 1;
+  params.lensBypass = c.lensBypass ?? false;
   params.vignette = c.vignette;
   params.clarity = c.clarity ?? 0;
   params.dehaze = c.dehaze ?? 0;
@@ -1587,7 +1619,9 @@ const BAND_NEUTRAL: [number, number, number] = [0, 1, 1];
  *  "cool". */
 function measureFrame(p: EditParams, img: DecodedImage, divisions = LIFT_GRID): { lumP50: number; lumP25: number; warmSat: number; coolSat: number } {
   const step = Math.max(1, Math.floor(Math.min(img.width, img.height) / divisions));
-  const edit = compileEdit(p, img.camMatrix, img.width / Math.max(1, img.height));
+  // The lens curve too: this measures what the pipeline produces, and the
+  // correction is part of it.
+  const edit = compileEdit(p, img.camMatrix, img.width / Math.max(1, img.height), undefined, currentLensCurve());
   const px = new Float32Array(3);
   const lums: number[] = [];
   let warmW = 0, warmS = 0, coolW = 0, coolS = 0;
@@ -6217,6 +6251,8 @@ function establishFreshEdit() {
     hotspot: 0,
     hotspotSize: 0.5,
   hotspotColor: 0,
+  lensFix: 1,
+  lensBypass: false,
     vignette: 0,
     clarity: 0,
     dehaze: 0,
@@ -6643,7 +6679,7 @@ async function switchToPhoto(id: string) {
 /** Build a small gamma-encoded JPEG thumbnail for the strip — auto white
  *  balanced (so RAW infrared isn't a magenta smear) but ungraded, so it just
  *  says "which photo is this". Cheap: nearest-sampled at thumb resolution. */
-async function makeThumb(img: DecodedImage, MAX = 260): Promise<ArrayBuffer> {
+async function makeThumb(img: DecodedImage, MAX = 260, lens?: LensStore.StoredProfile | null): Promise<ArrayBuffer> {
   const s = Math.min(1, MAX / Math.max(img.width, img.height));
   const w = Math.max(1, Math.round(img.width * s));
   const h = Math.max(1, Math.round(img.height * s));
@@ -6720,7 +6756,7 @@ async function makeThumb(img: DecodedImage, MAX = 260): Promise<ArrayBuffer> {
   const turned = rot === 1 || rot === 3;
   const ow = turned ? h : w;
   const oh = turned ? w : h;
-  const edit = compileEdit(p, img.camMatrix, w / h);
+  const edit = compileEdit(p, img.camMatrix, w / h, undefined, lens ?? null);
   const px = new Float32Array(3);
   const out = new Uint8ClampedArray(ow * oh * 4);
   for (let oy = 0; oy < oh; oy++) {
@@ -7735,7 +7771,7 @@ async function openQuickLook(files: File[]) {
     try {
       const imported = guardLocation(await importFile(f));
       const img = await decodeOffThread(imported);
-      const thumb = await makeThumb(img, QUICK_EDGE);
+      const thumb = await makeThumb(img, QUICK_EDGE, lensCurveFor(imported));
       if (thumb.byteLength) {
         thumbUrl = URL.createObjectURL(new Blob([thumb], { type: "image/jpeg" }));
         ok = true;
@@ -7746,7 +7782,7 @@ async function openQuickLook(files: File[]) {
         // because the session stores a thumbnail INLINE in its meta row and
         // that row has to stay small — see session.ts on why large IDB values
         // are the one shape that is not crash-safe.
-        stripThumb = await makeThumb(img).catch(() => null);
+        stripThumb = await makeThumb(img, 260, lensCurveFor(imported)).catch(() => null);
       }
       // img + the imported bytes fall out of scope here; only the small JPEG
       // preview is retained, so RAM stays bounded to N thumbnails.
@@ -8469,7 +8505,7 @@ ui.exBtn.addEventListener("click", async () => {
       },
       // The raw export re-decodes from the file, so the measured correction has
       // to travel with it or the saved image would not match the screen.
-      myLens && !myLens.bypass ? { p: myLens.p, strength: myLens.strength } : null,
+      currentLensCurve(),
     );
     pendingSave = result;
     // The measured size, so the Quality slider has something to be judged
@@ -8572,6 +8608,8 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["l
     hotspot: 0,
     hotspotSize: 0.5,
   hotspotColor: 0,
+  lensFix: 1,
+  lensBypass: false,
     vignette: 0,
     clarity: look.clarity,
     dehaze: look.dehaze,
@@ -8778,11 +8816,7 @@ async function runBatch(files: File[]) {
         // Each photo in a batch is matched on its OWN EXIF: a set can span
         // lenses and focal lengths, and one match for the whole run would
         // silently apply one lens's colour to another lens's frames.
-        let batchLens: { p: LensStore.StoredProfile; strength: number } | null = null;
-        try {
-          const bp = LensStore.findProfile(readExifSubset(imported.bytes));
-          if (bp) batchLens = { p: bp, strength: 1 };
-        } catch { /* unreadable EXIF is simply no match */ }
+        const batchLens = lensCurveFor(imported);
         const result = await exportImage(
           imported,
           img,
