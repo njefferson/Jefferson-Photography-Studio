@@ -788,7 +788,7 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 #histWrap {
   position: absolute;
   top: 20px;
-  right: 20px;
+  left: 20px;
   z-index: 6;
   padding: 6px;
   border-radius: 10px;
@@ -808,7 +808,7 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   cursor: pointer;
 }
 @media (max-width: 760px) {
-  #histWrap { top: 12px; right: 12px; padding: 4px; }
+  #histWrap { top: 12px; left: 12px; padding: 4px; }
   #histogram { width: 150px; height: 58px; }
 }
 /* Location-data tip: a glass chip over the photo, shown only when the LOADED
@@ -2148,7 +2148,13 @@ label.open-btn, label.bar-btn {
   font-size: 0.8125rem;
   color: var(--txt);
 }
-.a2hs .share-ico { color: var(--accent); font-size: 0.9375rem; }
+.share-ico {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.14em;
+  flex: none;
+}
+.a2hs .share-ico { color: var(--accent); }
 .a2hs button { width: auto; padding: 5px 10px; font-size: 0.8125rem; }
 .a2hs .a2hs-close { background: none; border: none; color: var(--txt-3); font-size: 0.875rem; cursor: pointer; padding: 12px; margin: -12px; }
 .hsl-chips { display: flex; gap: 8px; margin: 10px 0; flex-wrap: wrap; justify-content: center; }

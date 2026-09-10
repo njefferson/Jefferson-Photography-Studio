@@ -8351,3 +8351,40 @@ untransformed, and nothing is in the table that no payload contains.
 **Reverting a plant from the index is not reverting a plant.** `git checkout`
 on a file wiped uncommitted work in it. A plant is reverted from the scratchpad
 copy taken before planting, never from the index.
+
+## Two glass panels on one edge, and a share mark nobody could see, 2026-09-10
+
+Both found in one phone screenshot, and both had been shipping for their whole
+life on the surface they broke.
+
+**The share control drew an empty box.** It was `&#x2BAD;` — BLACK CURVED
+RIGHTWARDS AND UPWARDS ARROW, the codepoint that most resembles the platform's
+own share mark. iOS has no font covering it, so it rendered as tofu: in the
+Studio beside the word "Share", and in the Macro app as the button's ONLY
+content, where the whole control was a box. It is an inline SVG now, sized in
+ems so it rides the text beside it.
+
+The gate is "the share control is DRAWN, not typed" rather than "this codepoint
+is banned", because banning the one character already found catches nothing
+next time. It also measures the button, which no sweep had ever done: it ships
+`hidden` (it exists only inside the installed app), so every hit-area walk
+skipped it. 76x44 with the mark at 13px.
+
+**The histogram sat behind the zoom stack.** `#histWrap` was anchored to the
+stage's top-right. `#zoomCtl` is bottom-right — but its bottom is pushed UP by
+the session strip's height whenever a set is open, and on a phone-height stage
+(393x356 measured) the two meet: **1424 square px of the histogram was behind
+the zoom stack**, which is most of it. Moved to the stage's top-left, which is
+free at every width — `#locTip` owns only the bottom-left.
+
+**A 900px test window is why it shipped.** Every walk before this one ran at
+900x950, where the stage is tall enough that the zoom stack never climbs into
+the histogram. The claim is an INTERSECTION AREA of the two boxes at the phone
+viewport the shot came from, not a look at a screenshot; planted away, it
+reported the 1424.
+
+**Not everything in that shot was the app.** A white pill with a downward
+pointer was sitting over the R-B channel swap button. In Chromium at the same
+viewport, `elementFromPoint` at the button's centre returns the button, and it
+has no `::before` or `::after` — nothing in the app paints there. Recorded as
+unexplained rather than guessed at.
