@@ -89,6 +89,29 @@ const BASE_RMIN = 0.45;
 /** A flat with more than this fraction of clipped pixels has stopped
  *  recording the falloff it is supposed to be measuring. */
 const CLIP_LIMIT = 0.02;
+
+/** The lowest point of a curve, and how far it climbs again after it. */
+function rebound(a: ArrayLike<number>): { rise: number; at: number } {
+  let lo = Infinity, at = 0;
+  for (let i = 0; i < a.length; i++) if (Number.isFinite(a[i]) && a[i] < lo) { lo = a[i]; at = i; }
+  let rise = 0;
+  for (let i = at; i < a.length; i++) if (Number.isFinite(a[i]) && a[i] - lo > rise) rise = a[i] - lo;
+  return { rise: Number.isFinite(lo) ? rise : 0, at };
+}
+
+/** The largest step between neighbouring bins. */
+function maxStep(a: ArrayLike<number>): number {
+  let m = 0, prev = NaN;
+  for (let i = 0; i < a.length; i++) {
+    // A bin with nothing in it is a GAP, not a step: comparing across one would
+    // invent a jump where the flat simply had no pixels in that ring.
+    if (Number.isFinite(a[i])) {
+      if (Number.isFinite(prev)) m = Math.max(m, Math.abs(a[i] - prev));
+      prev = a[i];
+    }
+  }
+  return m;
+}
 /** Below this mean level the frame is noise, not a flat. */
 const DARK_LIMIT = 0.05;
 
@@ -100,6 +123,23 @@ const DARK_LIMIT = 0.05;
  *  gradient, plus noise); anything with a horizon, a cloud edge or a subject
  *  in it runs several times higher. */
 const STRUCTURE_LIMIT = 0.15;
+
+/** How far the falloff may turn back UP on its way to the corner.
+ *
+ *  A lens gets darker away from the centre and keeps getting darker. A profile
+ *  whose outer bins climb again is not describing the lens: the outermost rings
+ *  of a rectangular frame contain only the four CORNERS, so they hold few pixels
+ *  and anything at the edge of the shot — the sun creeping in, a reflection, a
+ *  hood, a finger — lands there with nothing to average it away.
+ *
+ *  BOTH NUMBERS ARE MEASURED, not chosen. Across 27 real profiles from two
+ *  lenses: 25 that look right rebound by 0.0000 to 0.0077 and jump between
+ *  neighbouring colour bins by at most 0.021; the two that are visibly wrong
+ *  rebound by 0.118 and 0.321 and jump by 0.150 and 0.186. The limits sit about
+ *  four times above the worst good one and four times below the best bad one,
+ *  in a gap fifteen times wide. */
+const REBOUND_LIMIT = 0.03;
+const JUMP_LIMIT = 0.05;
 
 /** sRGB inverse EOTF, 8-bit in. Camera JPEGs are sRGB; the raw path arrives
  *  linear already and skips this entirely. */
@@ -340,6 +380,36 @@ export function profileFrame(img: DecodedImage): FrameProfile {
     kr[i] = ng > 0 ? nr / ng : NaN;
     kb[i] = ng > 0 ? nb / ng : NaN;
   }
+
+  // THE SHAPE OF WHAT CAME OUT, not just the frame that went in. Everything
+  // above asks whether the PHOTOGRAPH looks like a flat; this asks whether the
+  // PROFILE looks like a lens, which is a different question and the one that
+  // let two contaminated frames through into a set the reader was told was good.
+  //
+  // It has to run HERE, after the loop above fills them. Placed with the other
+  // checks it read eighty NaNs and passed everything — the arrays exist from the
+  // top of the function and are empty until this point.
+
+  // A GUARD FOR "NOTHING WAS MEASURED" WAS WRITTEN HERE AND TAKEN OUT AGAIN.
+  // It counted the rings that caught pixels and refused a frame with fewer than
+  // half. Measured across frame sizes, it can never fire: at 60x40 pixels 78 of
+  // 80 rings are already filled, and every frame small enough to empty a ring is
+  // stopped first by the reference-ring check or by the structure check. An
+  // unreachable guard is worse than none — it answers "have we handled this?"
+  // for everyone who reads it afterwards, without having handled anything.
+
+  const reb = rebound(falloff);
+  if (reb.rise > REBOUND_LIMIT) {
+    return bad(
+      `the edges of this one brighten again instead of falling away — by ${(reb.rise * 100).toFixed(0)}% out past ${Math.round((reb.at / NBINS) * 100)}% of the way to the corner. ` +
+      `A lens only ever gets darker outwards, so something is in the corner of the frame: the sun creeping in, a reflection, a hood, or a finger`,
+    );
+  }
+  const jump = Math.max(maxStep(kr), maxStep(kb));
+  if (jump > JUMP_LIMIT) {
+    return bad(`the colour jumps by ${jump.toFixed(2)} between one ring and the next, which a lens does not do — the outer rings of this frame have something in them that the rest does not`);
+  }
+
   // Both baselines, only so the gap between them can be reported. Neither
   // result is written into the profile — see the header for why.
   const centre = falloff[0];

@@ -8277,3 +8277,77 @@ Second discipline:
   ir.webmanifest + ir.html — iOS ignores SVG manifest icons, so "install
   Infrared alone" used to land a page-screenshot icon). Still open: the
   umbrella/chooser name (placeholder "Photography Studio").
+
+## A flat frame with something in the corner, and what the gaps actually cost, 2026-09-10
+
+Two rig payloads covering both lenses came in — 9 profiles and 18 profiles —
+and two of the 18 were not describing a lens.
+
+**The shape that says so.** A flat frame's brightness falls away from the
+centre and keeps falling. `16-50@36@f22.0` turned back UP by 11.8% after bin
+66, with a corner brighter than the reference ring (1.042) and colour jumping
+0.150 between neighbouring rings; `50-250@50@f4.5` rebounded 32.1% after bin
+75, corner 1.094, jump 0.186. Something was in the corner of those frames —
+sun creeping in, a reflection, a hood, or a finger.
+
+**The limits are measured, not chosen.** Across all 27 profiles from both
+payloads, the 25 good ones rebound 0.0000-0.0077 with colour jumps at or under
+0.021. The two bad ones rebound 0.1178 and 0.3212 with jumps at or over 0.150 —
+a 15x gap with nothing in it. `REBOUND_LIMIT = 0.03` and `JUMP_LIMIT = 0.05`
+sit in that gap. `lensprofile.ts` now refuses both at measure time and names
+the four things to look for, rather than storing a curve that would brighten
+the corners of every frame it touched.
+
+**AND THE FIRST VERSION OF THAT CHECK PASSED EVERYTHING.** It was placed before
+the loop that fills `falloff`, `kr` and `kb`, so it read 80 NaNs and had no
+opinion about any of them. A shape check has to run after the shape exists. It
+is asserted now by refusing both real bad profiles and accepting two real good
+ones, and it was planted away once (5 failures) before being trusted.
+
+**An empty-frame guard that could never fire, removed.** It was measured across
+frame sizes: a 60x40 frame already fills 78 of 80 rings, and anything smaller
+is caught by the reference-ring or structure check first. A guard nothing can
+reach answers "have we handled this" for everyone who reads it afterwards.
+
+**What the gaps cost, by leave-one-out on real frames.** Hide a measurement,
+ask for exactly that frame, compare against what was hidden:
+
+- Aperture: hiding f/13, f/14, f/16, f/18 and f/20 at 50mm and correcting with
+  the surviving neighbour is off by 2.1 to 5.5 of 255 at worst. Not visible.
+  The negative control is the whole range — the f/4.5 curve on an f/22 frame is
+  off by 24.8 of 255, so the instrument can tell a bad substitution from a good
+  one.
+- Focal length: hiding 36mm and correcting a 36mm f/8 frame with the 50mm
+  profile is off by 15.0 of 255. Visible.
+
+**So intermediate focal lengths earn far more than more stops, and there is a
+structural reason.** Focal length is blended, but only WITHIN one aperture
+group — blending across apertures would average two different lens states. A
+focal-length leave-one-out therefore needs three focal lengths measured at the
+SAME aperture, and the deepest aperture group in the set has two. The
+missing-data walk prints that depth per aperture rather than quietly testing
+the clamp and calling it interpolation, which is what its first version did:
+it compared the blend against the one profile the blend was made of, so the
+claim read `w < w`.
+
+**The shipped table is now 22 profiles across both lenses, every one
+rig-measured.** The 2026-07 handoff pair is gone, so no shipped profile carries
+neutral colour standing in for a measurement — that is asserted, both as "none
+is all-ones" and in the walk, because three harnesses had claims written around
+the placeholder's existence and all three went green describing a table that no
+longer looked like that.
+
+**Generating from two payloads needs a collision rule.** Three keys were
+measured in both. More frames wins, and duplicates surviving the merge throw
+rather than emitting a table with two rows for one key.
+
+**The agreement claim's first version measured a proxy.** It matched shipped
+rows to payload entries by frame count, and the key measured twice with two
+frames each matched both, reporting "23 of 22" and a difference that was two
+honest measurements being compared to each other. What it holds now is the
+property worth holding: every shipped profile is EXACTLY some payload entry,
+untransformed, and nothing is in the table that no payload contains.
+
+**Reverting a plant from the index is not reverting a plant.** `git checkout`
+on a file wiped uncommitted work in it. A plant is reverted from the scratchpad
+copy taken before planting, never from the index.
