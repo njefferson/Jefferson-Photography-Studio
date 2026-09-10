@@ -19,6 +19,7 @@ import { sniff } from "./import";
 import { readExifSubset } from "./exif";
 import { profileFrame, averageProfiles, round5, NBINS, type FrameProfile } from "./lensprofile";
 import { readZipIndex, readZipEntry, readZipEntryPrefix, imageEntries } from "./zip";
+import { saveFromPayload } from "./lensstore";
 
 declare const __APP_VERSION__: string;
 
@@ -321,6 +322,19 @@ export function wireLensRig(root: ParentNode): void {
     profOut.hidden = false;
     const used = Object.values(profiles).reduce((n, x) => n + x.frames, 0);
     profNote(`${(text.length / 1024).toFixed(1)} KB of numbers, averaged from ${used} frame${used === 1 ? "" : "s"} out of the ${files.length} you picked. Copy it into a message, or save it and send the file — either way the photographs stay here.`);
+    // KEEPING IT IS THE POINT. Without this the rig is a form that prints
+    // numbers for somebody else to paste into the app's source.
+    const useBtn = root.querySelector<HTMLButtonElement>("#lensUse")!;
+    const useNote = root.querySelector<HTMLElement>("#lensUseNote")!;
+    useBtn.onclick = () => {
+      const r = saveFromPayload(payload);
+      useNote.hidden = false;
+      useNote.textContent = r.ok
+        ? `Kept ${r.saved} profile${r.saved === 1 ? "" : "s"} on this device. Open a photograph from this lens and look under Corrections — Your measured lens.`
+        : "This browser refused to store it (a private window, or no room left). The numbers above still copy and save.";
+      useBtn.textContent = r.ok ? "Kept" : "Could not keep it";
+      setTimeout(() => { useBtn.textContent = "Use these on my photos"; }, 2600);
+    };
     profCopy.onclick = () => copy(text, profCopy, "Copy the numbers");
     profSave.onclick = () => {
       const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
