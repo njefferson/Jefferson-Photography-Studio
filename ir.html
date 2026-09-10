@@ -433,6 +433,13 @@
                 <button id="hsApplyManual" type="button">Use this lens</button>
               </div>
             </div>
+            <div class="subcard" id="myLensCard" hidden>
+              <div class="sub-title">Your measured lens <span>from your own sky frames</span></div>
+              <small class="note" id="myLensStatus"></small>
+              <label>Strength <input id="myLensStrength" type="range" min="0" max="1.5" step="0.01" value="1" /></label>
+              <button id="myLensBypass" type="button" class="toggle" aria-pressed="false">Bypass</button>
+              <button id="myLensForget" type="button">Forget this profile</button>
+            </div>
           </section>
 
           <!-- ===== COLOR ===== -->
@@ -871,11 +878,13 @@
         </div>
         <div id="lensResults" class="dbg-results" role="status" aria-live="polite"></div>
         <div id="lensOut" hidden>
-          <p class="note"><strong>The numbers.</strong> Copy them into a message, or save the file &mdash; the photographs stay here either way.</p>
+          <p class="note"><strong>Done.</strong> <strong>Use these on my photos</strong> keeps the measurement on this device and puts it to work: when you open a photograph from the same lens, the colour it casts across the frame is taken out, at a strength you can move or switch off on the Corrections tab. Copying or saving the numbers is for sending them on &mdash; the photographs stay here either way.</p>
           <div class="dbg-actions">
-            <button id="lensCopy2" type="button" class="dbg-btn primary">Copy the numbers</button>
+            <button id="lensUse" type="button" class="dbg-btn primary">Use these on my photos</button>
+            <button id="lensCopy2" type="button" class="dbg-btn">Copy the numbers</button>
             <button id="lensSave2" type="button" class="dbg-btn">Save as a file</button>
           </div>
+          <p class="note" id="lensUseNote" hidden role="status"></p>
           <textarea id="lensText" class="dbg-text" readonly rows="6" aria-label="Measured lens profile"></textarea>
         </div>
       </div>
