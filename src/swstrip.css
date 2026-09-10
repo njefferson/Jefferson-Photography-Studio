@@ -25,6 +25,14 @@
 .sw-strip-text { flex: 1 1 auto; min-width: 0; }
 .sw-strip button {
   flex: none;
+  /* Infrared's style.css has `select, button { width: 100% }` — panel controls
+     are full-width there by design, which is why .bar-btn spells out
+     `width: auto` too. Shared component CSS lands on three DIFFERENT base
+     layers, and setting `flex: none` says nothing about width: on ir.html both
+     buttons came out 1568px and stacked, while macro and the chooser were fine.
+     A shared look has to state what it needs, not what the tidiest base would
+     already give it. */
+  width: auto;
   min-height: 44px;
   padding: 6px 14px;
   border-radius: 999px;
