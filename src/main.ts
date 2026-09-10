@@ -67,6 +67,7 @@ const panelBody = $("panelBody") as HTMLElement;
 const cueUp = $("panelUp") as HTMLDivElement;
 const cueDown = $("panelDown") as HTMLDivElement;
 const fileInput = $("file") as HTMLInputElement;
+const welcomeFileInput = $("welcomeFile") as HTMLInputElement;
 
 // No WebGL2 -> a clear explanation with options instead of a blank page. The
 // throw halts this module; the static overlay needs no scripting to stay up.
@@ -6162,9 +6163,15 @@ function establishFreshEdit() {
   requestAnimationFrame(updateScrollCues);
 }
 
-fileInput.addEventListener("change", async () => {
-  const files = Array.from(fileInput.files ?? []);
-  fileInput.value = ""; // allow re-picking the same file(s) later
+// TWO INPUTS, ONE HANDLER. The header's Open and the welcome screen's Open are
+// both on screen at once, and a file input's only affordance is the <label>
+// styled as a button — so each label needs its OWN input for a focus ring to
+// have anywhere to land. A single input pointed at by two `for=` labels put the
+// ring on whichever one happened to contain it, which was never the one being
+// looked at. See NOTES: neither was reachable by keyboard at all before this.
+async function openFromInput(input: HTMLInputElement) {
+  const files = Array.from(input.files ?? []);
+  input.value = ""; // allow re-picking the same file(s) later
   if (!files.length) return;
   try {
     await openPicked(files);
@@ -6174,7 +6181,10 @@ fileInput.addEventListener("change", async () => {
     hint.textContent = "Could not open this file: " + (err as Error).message;
     updateWelcomeReturn();
   }
-});
+}
+for (const el of [fileInput, welcomeFileInput]) {
+  el.addEventListener("change", () => void openFromInput(el));
+}
 
 // --- The conventions a reader brings with them ----------------------------
 // Everything the platform gives for free was already right here: every dialog
@@ -7485,6 +7495,7 @@ let quickItems: QuickItem[] = [];
 let quickGen = 0; // bumped on open/close to abort an in-flight decode loop
 
 const quickInput = $("quickFiles") as HTMLInputElement;
+const welcomeQuickInput = $("welcomeQuickFiles") as HTMLInputElement;
 const quickLook = $("quickLook") as HTMLDialogElement;
 // Escape (native dialog cancel -> close) must free previews exactly like the
 // Close button; closeQuickLook empties quickItems BEFORE calling close(), so
@@ -7668,12 +7679,17 @@ async function keepQuickLook() {
   }
 }
 
-quickInput.addEventListener("change", async () => {
-  const files = Array.from(quickInput.files ?? []);
-  quickInput.value = ""; // allow re-picking the same set later
+// Same shape as openFromInput above: the header button drives `quickInput`
+// with .click(), and the welcome screen's label owns its own input.
+async function quickFromInput(input: HTMLInputElement) {
+  const files = Array.from(input.files ?? []);
+  input.value = ""; // allow re-picking the same set later
   if (!files.length) return;
   await openQuickLook(files);
-});
+}
+for (const el of [quickInput, welcomeQuickInput]) {
+  el.addEventListener("change", () => void quickFromInput(el));
+}
 qlKeep.addEventListener("click", keepQuickLook);
 $("qlClose").addEventListener("click", closeQuickLook);
 qlSelectToggle.addEventListener("click", () => {

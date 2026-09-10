@@ -688,6 +688,11 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 /* Dawn theme toggle: a small labelled switch (launcher footer + info dialogs). */
 
 .open-btn {
+  /* Doctrine §4: 44px, the same floor `.bar-btn` got and this never did — it
+     sits in the same 56px bar, so it fits without the bar growing. Measured
+     before this: 38px in the header and 43px on the start screen, against a
+     44px finger. It is the app's primary control. */
+  min-height: 44px;
   background: var(--accent);
   color: var(--accent-ink);
   font-weight: 600;
@@ -2324,7 +2329,12 @@ label.open-btn, label.bar-btn {
 }
 
 /* Visually hidden, present to assistive tech (headings, live regions). */
-.sr-only {
+/* Visually hidden, still there for a screen reader — and, for `.file-input`,
+   still ON THE TAB ORDER, which `hidden` is not. THREE copies of this rule
+   existed: two `.sr-only` blocks (the later one, with the legacy `clip`, is the
+   one that was actually winning) and `.file-input`. One rule now. */
+.sr-only,
+.file-input {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -2334,6 +2344,16 @@ label.open-btn, label.bar-btn {
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+/* A file input's only affordance is the <label> styled as a button, so that is
+   where the focus ring has to land. Every such input lives INSIDE its own
+   label for exactly this reason — a `for=` pointing at an input somewhere else
+   leaves the ring with nowhere to go. */
+label:has(> .file-input) { position: relative; }
+label:has(> .file-input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* Motion sensitivity: stop the infinite spinner and calm every transition
@@ -2540,10 +2560,6 @@ small { font-size: max(0.6875rem, 0.8em); }
    floor. Scoped here rather than raised globally: every other dialog's buttons
    are a measured, shipped surface and are not being churned from this change. */
 #verDlg button { min-height: 44px; }
-.sr-only {
-  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
-  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
-}
 .dbg-text {
   display: block;
   width: 100%;
@@ -2579,27 +2595,6 @@ body.dbg { margin: 0; background: var(--bg); color: var(--txt); font: 400 1rem/1
 .dbg-btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
 .dbg-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* A file input that is invisible but still ON THE TAB ORDER, with the label
-   that styles it carrying the focus ring.
-   `hidden` takes a control off the tab order entirely, and a <label> is not
-   focusable, so "label styled as a button + hidden input" can be reached by a
-   finger and by a pointer and by nothing else. Measured on the test page
-   before this existed: tabbing it visited four controls and the file chooser
-   was not one of them. (The editor's own Open image(s) is the same pattern and
-   is still like that — see NOTES; it is the app's primary control and belongs
-   in its own release with its own walk, not in this one.) */
-.file-input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  border: 0;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-label:has(> .file-input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 .dbg-btn[disabled] { opacity: 0.6; cursor: default; }
 .dbg-results { margin-top: 6px; }
 .dbg-row { padding: 12px 0; border-bottom: 1px solid var(--line); }
