@@ -315,7 +315,64 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
    say "there's more this way" (owner ask 2026-07-15). Sticky resolves against
    the dialog's own scrollport, so no position:relative (that breaks modal
    centering). */
-#infoDlg { max-height: 82vh; overflow-y: auto; }
+/* THE WAY OUT MUST NOT LIVE INSIDE THE THING THAT SCROLLS.
+   Measured on a 393x852 phone: the ⓘ was 2333px of content in a 699px box —
+   1636px of scrolling, 1.9 screens, before "Close" came into view — and Help
+   was 9465px, eleven screens. Both scrolled as ONE BOX with the way out as the
+   last thing in it, so from the top there was no visible way out at all.
+   Reported from a phone as Close being all the way at the bottom.
+
+   The fix is structural rather than `position: sticky`: the dialog is a flex
+   column that does NOT scroll, a bar at the top carries the title and a ✕, and
+   only the body moves. A bar that is not inside the scrolling box cannot
+   scroll away — it needs no support from any engine and cannot regress. This
+   is Quietkeep's settled convention (public/app.css, "THE ALWAYS-REACHABLE WAY
+   OUT"), where sticky was tried and lost the header on the reference iPad
+   TWICE before the dependency was removed instead of debugged.
+
+   `[open]` IS LOAD-BEARING: a bare `#infoDlg { display: flex }` outranks the
+   UA's `dialog:not([open]) { display: none }` on specificity, so the dialog
+   would close correctly and stay on screen anyway.
+
+   AND `dvh`, NOT `vh`. On a phone browser `vh` is the viewport with the URL bar
+   HIDDEN, which is taller than what is actually on screen — so `82vh` came to
+   about 95% of the visible height, the dialog ran under the browser's own
+   chrome, and the band of backdrop you tap to dismiss all but vanished. That
+   is the other half of the same report: it "doesn't close by tapping out".
+   The rest of this app already uses `dvh` (the panel's 45dvh); these three
+   dialogs were the ones that did not. */
+#infoDlg[open], #helpDlg[open], #batchDlg[open] {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+  max-height: min(82vh, calc(100dvh - 2rem));
+}
+.dlg-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 12px 12px 20px;
+  border-bottom: 1px solid var(--line);
+}
+.dlg-bar h2 { margin: 0 !important; flex: 1 1 auto; min-width: 0; }
+.dlg-x {
+  flex: none;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--txt);
+  font: 500 1rem/1 var(--ui);
+}
+.dlg-body { flex: 1 1 auto; overflow-y: auto; padding: 14px 20px 18px; min-height: 0; }
+#helpDlg .help-body { flex: 1 1 auto; overflow-y: auto; padding: 14px 20px 4px; min-height: 0; }
+#helpDlg > #helpClose,
+#batchDlg > #batchCancel { flex: none; margin: 0 20px 16px; }
 .dlg-cue {
   position: sticky;
   z-index: 3;
@@ -604,7 +661,7 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 .slot-more::before { content: ""; position: absolute; inset: -6px; }
 
 /* Batch-start chooser: pick the grade that goes on every photo. */
-#batchDlg { max-height: 86vh; overflow-y: auto; }
+#batchDlg { max-height: min(86vh, calc(100dvh - 2rem)); }
 .batch-lead { margin: 0 0 14px; font-size: 0.8125rem; line-height: 1.5; color: var(--txt-2); }
 .batch-group { margin: 0 0 14px; }
 .batch-group-title { margin: 0 0 6px; font-size: 0.8125rem; font-weight: 600; color: var(--txt); }
@@ -2221,7 +2278,7 @@ label.open-btn, label.bar-btn {
   #view { inset: 8px; max-width: calc(100% - 16px); max-height: calc(100% - 16px); }
 }
 
-#helpDlg { max-width: min(640px, 92vw); max-height: 82vh; overflow-y: auto; }
+#helpDlg { max-width: min(640px, 92vw); } /* height and scrolling: see the flex-column rule above */
 .help-body { font-size: 0.8125rem; color: var(--txt); line-height: 1.5; }
 /* Shown only inside the installed (standalone) app, where Safari's Share —
    and with it Add to Home Screen — is out of reach. */

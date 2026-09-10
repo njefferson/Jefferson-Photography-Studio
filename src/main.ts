@@ -4289,7 +4289,7 @@ wirePalettePicker(document.getElementById("palettePicker"));
 // Help dialog (usage guide; the ⓘ dialog stays what's-new + support).
 const helpDlg = $("helpDlg") as HTMLDialogElement;
 $("helpBtn").addEventListener("click", () => helpDlg.showModal());
-$("helpClose").addEventListener("click", () => helpDlg.close());
+for (const id of ["helpClose", "helpCloseTop"]) $(id).addEventListener("click", () => helpDlg.close());
 helpDlg.addEventListener("click", (e) => {
   if (e.target === helpDlg) helpDlg.close();
 });
@@ -8796,7 +8796,7 @@ $("bcQuick").addEventListener("click", () => {
   batchDlg.close();
   quickInput.click();
 });
-$("batchCancel").addEventListener("click", () => batchDlg.close());
+for (const id of ["batchCancel", "batchCloseTop"]) $(id).addEventListener("click", () => batchDlg.close());
 batchDlg.addEventListener("click", (e) => {
   if (e.target === batchDlg) batchDlg.close(); // tap outside to dismiss
 });
@@ -9587,17 +9587,21 @@ function grayWorldWB(img: DecodedImage): [number, number, number] {
   const infoCueDown = $("infoCueDown") as HTMLDivElement;
   infoCueUp.hidden = false; // visibility is the .on class (see style.css), not [hidden]
   infoCueDown.hidden = false;
+  // The BODY scrolls now, not the dialog — the bar carrying the ✕ is outside it
+  // on purpose (see style.css, "THE WAY OUT MUST NOT LIVE INSIDE THE THING THAT
+  // SCROLLS"). Reading the cues off `dlg` would give 0 for both forever.
+  const infoBody = $("infoBody") as HTMLDivElement;
   const updateInfoCues = () => {
-    const max = dlg.scrollHeight - dlg.clientHeight;
-    infoCueUp.classList.toggle("on", dlg.scrollTop > 8);
-    infoCueDown.classList.toggle("on", max > 8 && dlg.scrollTop < max - 8);
+    const max = infoBody.scrollHeight - infoBody.clientHeight;
+    infoCueUp.classList.toggle("on", infoBody.scrollTop > 8);
+    infoCueDown.classList.toggle("on", max > 8 && infoBody.scrollTop < max - 8);
   };
-  dlg.addEventListener("scroll", updateInfoCues, { passive: true });
+  infoBody.addEventListener("scroll", updateInfoCues, { passive: true });
   const openInfo = () => { dlg.showModal(); requestAnimationFrame(updateInfoCues); };
   openInfoDialog = openInfo; // registered for the 🛰 dialog's "Open Settings"
 
   $("infoBtn").addEventListener("click", openInfo);
-  $("infoClose").addEventListener("click", () => dlg.close());
+  for (const id of ["infoClose", "infoCloseTop"]) $(id).addEventListener("click", () => dlg.close());
   dlg.addEventListener("click", (e) => {
     if (e.target === dlg) dlg.close(); // tap outside to dismiss
   });

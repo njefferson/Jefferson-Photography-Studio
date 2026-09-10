@@ -409,6 +409,7 @@
             <label>Hot-spot colour <input id="hotspotColor" type="range" min="-0.5" max="0.5" step="0.01" value="0" /></label>
             <p class="note">An IR-converted lens does not only BRIGHTEN the centre &mdash; it usually tints it too, and the R&#8646;B swap every colour look is built on turns that tint into a coloured disc in the middle of the sky. Hot-spot (above) is a plain brightness gain and cannot touch it. This one shifts the centre&rsquo;s colour instead, over the same circle Hot-spot size sets. Which way is which depends on the look you have on &mdash; every colour look swaps red and blue, so the slider&rsquo;s two directions trade places with it. Don&rsquo;t reason about it: nudge one way, and if the disc gets stronger go the other. Work with the look ON and the sky filling the frame, since that is where the disc shows.</p>
             <label>Vignette <input id="vignette" type="range" min="-1" max="1" step="0.01" value="0" /></label>
+            <p class="note">Setting these by eye on every photograph is the fallback. <a href="./debug.html">Measure this lens&hellip;</a> works your own lens&rsquo;s hot-spot out from photographs of empty sky, on this device &mdash; the frames never leave the iPad, and what comes back is a small block of numbers.</p>
             <div class="subcard">
               <div class="sub-title">Matched lens profile <span>measured, per-lens</span></div>
               <small class="note" id="hsStatus">No photo loaded.</small>
@@ -682,7 +683,11 @@
     </dialog>
 
     <dialog id="batchDlg">
-      <h2>Batch process — what goes on every photo?</h2>
+      <div class="dlg-bar">
+        <h2>Batch process — what goes on every photo?</h2>
+        <button id="batchCloseTop" type="button" class="dlg-x" aria-label="Cancel">&#10005;</button>
+      </div>
+      <div class="dlg-body">
       <p class="batch-lead">Each photo is auto-balanced on its own — white balance, exposure, denoise, highlight recovery, lens fix and Restore depth, the same automatics you get when you open one — and you're choosing the <em>creative grade</em> that goes on top. The set comes back as one .zip.</p>
       <div class="batch-group" id="bgCurrent">
         <button class="batch-choice" id="bcCurrent" type="button">
@@ -708,6 +713,7 @@
         <p class="batch-none">Only want to <em>see</em> the folder, not save a .zip? <button id="bcQuick" type="button" class="batch-link">Quick look instead &rarr;</button> — a live grid of previews, nothing written to disk.</p>
       </div>
       <p class="batch-note">Format &amp; Resolution come from the <strong>Export</strong> panel<span id="bcFmt"></span>.</p>
+      </div>
       <button id="batchCancel" type="button">Cancel</button>
     </dialog>
 
@@ -771,8 +777,12 @@
     </dialog>
 
     <dialog id="infoDlg">
+      <div class="dlg-bar">
+        <h2>What's new</h2>
+        <button id="infoCloseTop" type="button" class="dlg-x" aria-label="Close">&#10005;</button>
+      </div>
+      <div class="dlg-body" id="infoBody">
       <div class="dlg-cue up" id="infoCueUp" hidden aria-hidden="true">&#9650;</div>
-      <h2>What's new</h2>
       <p class="info-jump">
         <button id="jumpRoadmap" type="button" class="info-jump-btn">Roadmap</button>
         <button id="jumpSettings" type="button" class="info-jump-btn">Settings &amp; reporting a problem</button>
@@ -832,6 +842,7 @@
       </div>
       <button id="infoClose" type="button">Close</button>
       <div class="dlg-cue down" id="infoCueDown" hidden aria-hidden="true">&#9660;</div>
+      </div>
     </dialog>
 
     <dialog id="askDlg" aria-labelledby="askTitle">
@@ -853,7 +864,10 @@
     </dialog>
 
     <dialog id="helpDlg">
-      <h2>How to use Infrared Photography Studio</h2>
+      <div class="dlg-bar">
+        <h2>How to use Infrared Photography Studio</h2>
+        <button id="helpCloseTop" type="button" class="dlg-x" aria-label="Close">&#10005;</button>
+      </div>
       <div class="help-body">
         <button id="helpTutorials" type="button" class="help-tutorials">&#9654;&#xFE0E; Tutorials — learn by doing on real infrared photos</button>
         <h3>Quick start</h3>
