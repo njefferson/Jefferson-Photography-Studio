@@ -205,6 +205,13 @@ look-button state as TEXT (norm/R⇄B) not hue; mask-row text labels; roadmap
 no outline:none anywhere; toast avoids red/green coding. (The theme toggle
 was NOT correct — role=switch needs aria-checked, not aria-pressed; fixed
 in the a11y release. Don't re-bless the old pattern.)
+NOR WAS "label styled as a button + hidden file input", which sat on this
+list as verified while being unreachable by keyboard and 6px under the touch
+floor — verified against axe, never against the tab key or a hit-area
+measurement. Fixed 2026-09-10. The pattern that IS blessed now: the input
+lives INSIDE its own label carrying `.file-input`, and an input driven by a
+real <button> stays `hidden`. A list entry is only as good as what was
+actually measured to put it there.
 RANGE SLIDERS carry `touch-action: none` + a 22px thumb (style.css ~217) —
 they OWN the finger gesture like every other drag control. Do NOT set
 `pan-y` (it handed the drag to the panel scroller; a finger on the thumb
@@ -5663,6 +5670,60 @@ profiles on the RAW path at all (they are JPEG-only because full NEFs could not
 be moved into the measurement rig); and `keyFor`'s nearest-focal-length anchor
 selection, which snaps rather than interpolating between anchors.
 
+## Every file chooser now answers a keyboard, 2026-09-10
+
+The finding is recorded below ("could be reached by finger and by nothing
+else"). This is what it took to fix, and two things it turned up on the way.
+
+**AN INPUT DRIVEN BY A REAL BUTTON MUST STAY `hidden`.** Making every file
+input focusable would have ADDED defects: `#batchFiles`, `#lookFile` and
+`#lutFile` are opened by real `<button>`s calling `.click()`, so the button is
+already the accessible control and a focusable input beside it is an invisible
+extra tab stop with no affordance. Only an input whose ONLY affordance is a
+`<label>` needs to be on the tab order. Three stay hidden; five changed.
+
+**EVERY LABEL NOW OWNS ITS OWN INPUT, because a `for=` has nowhere to put a
+ring.** The header's Open and the start screen's Open both pointed `for="file"`
+at ONE input, which lives inside the header's label — and both labels are on
+screen at once (measured: header 131x44 at y=9, start screen 154x44 at y=187).
+So focusing that input ringed the header button while the reader was looking at
+the big one on the start screen. The start screen's Open and Quick look each
+have their own input now, and the sticker import's moved inside its label;
+`macro.html`'s did the same. One CSS rule covers all of them:
+`label:has(> .file-input:focus-visible)`. `openFromInput`/`quickFromInput` take
+the input as an argument so the two inputs share one handler rather than two
+copies of it.
+
+**THREE COPIES OF THE VISUALLY-HIDDEN RULE, and the one that was winning was
+not the one being read.** `style.css` carried `.sr-only` TWICE — once with
+`clip-path: inset(50%)` and again, 200 lines later, with the legacy
+`clip: rect(0 0 0 0)` — plus `.file-input` as a third. The later one wins, so
+the first was dead code that looked authoritative. One rule now, `.sr-only,
+.file-input`, with `.file-input` differing only in staying on the tab order.
+
+**AND THE CONTROL WAS SIX PIXELS UNDER THE TOUCH FLOOR THE WHOLE TIME.**
+Measured by hit area, not by CSS box: the header's Open was **38px** and the
+start screen's **43px**, against Doctrine §4's 44. `.bar-btn` was given
+`min-height: 44px` with a comment explaining the bar is 56px so it fits without
+growing — and `.open-btn`, in the same bar, never got it. The bar is unchanged
+at 56px (and 113px at 400px wide) with the floor applied, and there is no
+horizontal scroll at phone width. **It is the app's primary control, it was
+short, and every gate was green** — because a hit-area floor is not something
+axe checks and nobody had measured this one.
+
+**Verified.** Tab walks on all three pages (ir.html start screen 12 stops, up
+from 9, with `#file`, `#welcomeFile` and `#welcomeQuickFiles` among them;
+macro 4; debug 6); the ring lands on the right label in both themes for all
+three; hit areas 44x44 or better; axe clean in both themes; and each control
+still does its job — the start screen's Open opens a photo, its Quick look
+opens a folder, and the sticker import still imports (19 stickers after).
+Made to fail three times first: putting one input back to `hidden` (tab and
+ring both fail), deleting the focus rule (six ring failures), and removing the
+44px floor (38 and 43 come straight back).
+
+Not a VERSION bump. The controls were meant to work and did not for one input
+method; that is a fix, and fixes are increments.
+
 ## A whole set at once, and a zip counts as everything in it, 2026-09-10
 
 The lens rig took several files from the moment it existed, but not the way a
@@ -5834,14 +5895,8 @@ ON the tab order, with `label:has(> .file-input:focus-visible)` putting the ring
 on the label that styles it. Re-measured: five stops, the chooser among them,
 44px tall, ring visible in both themes.
 
-**The editor's is not, deliberately.** It is the app's primary control, the same
-markup appears on three pages, `select, button { width: 100% }` means it cannot
-simply become a `<button>`, and the welcome screen's copy of it uses `for=`
-against an input living inside a different label that is hidden at the time — so
-the ring has nowhere obvious to land. It is on the a11y NEVER-CHURN list as a
-verified pattern, which is exactly the sort of entry this finding says to
-re-check: **verified against axe, never against the tab key.** Its own release,
-with its own walk in both themes.
+**FIXED EVERYWHERE 2026-09-10, on the owner's go**, in its own pass — see the
+section below.
 
 ## A fast second tap on a control zoomed the whole app, 2026-09-09
 

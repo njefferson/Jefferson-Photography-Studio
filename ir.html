@@ -82,7 +82,7 @@
           </button>
           <label class="open-btn bar-primary" title="Edit one photo — or several as a session">
             Open image(s)
-            <input id="file" type="file" accept=".dng,.nef,.zip,.ipslook,image/*" multiple hidden />
+            <input id="file" class="file-input" type="file" accept=".dng,.nef,.zip,.ipslook,image/*" multiple />
           </label>
           <input id="batchFiles" type="file" accept=".dng,.nef,.zip,.ipslook,image/*" multiple hidden />
           <input id="quickFiles" type="file" accept=".dng,.nef,.zip,.ipslook,image/*" multiple hidden />
@@ -167,10 +167,10 @@
           <button id="welcomeClose" class="welcome-close" type="button" hidden aria-label="Close the welcome panel">&#10005;</button>
           <button id="welcomeBack" class="welcome-back" type="button" hidden>&#8249; Back to your photo</button>
           <p id="hint" role="status" aria-live="polite">Edit infrared photos — RAW (NEF / DNG) unlocks the full color magic.</p>
-          <label class="open-btn welcome-open" for="file">Open image(s)</label>
+          <label class="open-btn welcome-open"><input id="welcomeFile" class="file-input" type="file" accept=".dng,.nef,.zip,.ipslook,image/*" multiple />Open image(s)</label>
           <p class="welcome-open-hint">One photo to edit — or several to work as a session: big previews you switch between, each keeping its own edit, all held safely until you're done.</p>
           <p class="welcome-open-hint"><strong>If the Files picker sits there after you tap Open:</strong> that wait is iOS fetching your photos out of iCloud, before this app is handed anything. A file with a cloud badge, or one that says &ldquo;Waiting&hellip;&rdquo;, is not on the iPad yet. Download the folder in Files first and it opens straight away — see <strong>Help &rarr; Why the Files picker hangs</strong>.</p>
-          <label class="welcome-batch" id="welcomeQuickBtn" for="quickFiles">Quick look a folder…</label>
+          <label class="welcome-batch" id="welcomeQuickBtn"><input id="welcomeQuickFiles" class="file-input" type="file" accept=".dng,.nef,.zip,.ipslook,image/*" multiple />Quick look a folder…</label>
           <p class="welcome-batch-hint">See what's in a folder: an instant grid of auto-balanced previews, nothing saved, gone when you close. Tap the keepers to send them into a session.</p>
           <button class="welcome-batch" id="welcomeBatchBtn" type="button">Batch process a set…</button>
           <p class="welcome-batch-hint">Not for editing — develops a whole set unattended into one .zip, each photo auto-balanced, then a look, your current edit, or nothing on top.</p>
@@ -340,8 +340,7 @@
             <div id="stickerGroups" class="bw-mixes" role="group" aria-label="Kind of overlay" hidden></div>
             <div id="stickerCats" class="bw-mixes" role="group" aria-label="Sticker category" hidden></div>
             <div id="stickerAdd" class="bw-mixes" role="group" aria-label="Add a sticker"></div>
-            <label class="welcome-batch" id="stickerImportBtn" for="stickerImport">Import a picture&hellip;</label>
-            <input id="stickerImport" type="file" accept="image/png,image/*" hidden />
+            <label class="welcome-batch" id="stickerImportBtn"><input id="stickerImport" class="file-input" type="file" accept="image/png,image/*" />Import a picture&hellip;</label>
             <div id="stickerControls" hidden>
               <div class="sub-title">Selected sticker</div>
               <button id="stkDelete" type="button">Remove this sticker</button>
