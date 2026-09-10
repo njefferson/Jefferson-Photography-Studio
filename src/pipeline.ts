@@ -87,6 +87,13 @@ export interface EditParams {
    *  centre toward red, negative toward blue. */
   hotspotColor: number;
   vignette: number;
+  /** Strength of the reader's measured lens colour correction, 0 = off. The
+   *  CURVE is not here — see LensCurve. */
+  lensFix: number;
+  /** Bypass is its own field rather than a strength of 0, so a reader who has
+   *  dragged Strength to 0 and a reader who has pressed Bypass are told apart
+   *  after an undo — the label has to stay honest either way. */
+  lensBypass: boolean;
   /** 8-channel HSL colour mixer: flat [hueShiftDeg, satScale, lumScale] × 8
    *  bands at HSL_CENTERS (red, orange, yellow, green, aqua, blue, purple,
    *  magenta). Weights interpolate smoothly between ADJACENT band centres, so
@@ -832,6 +839,44 @@ export function applyCreativeVignette(out: Float32Array, u: number, v: number, a
  * Precompute the edit for export: trig and the hue matrix are computed once,
  * not per pixel. Returns a function writing gamma RGB (0..1) into `out`.
  */
+/** A measured lens colour curve, ready for the pipeline.
+ *
+ *  WHY IT IS AN ARGUMENT RATHER THAN AN EditParams FIELD. The curve belongs to
+ *  the PHOTOGRAPH — it is chosen by the file's own EXIF and does not change as
+ *  the reader edits — while its strength belongs to the EDIT. Putting 160
+ *  numbers through cloneParams and applySnapshot on every undo step to carry
+ *  something that never varies would be the wrong shape, and forgetting one of
+ *  those five places is how a field goes missing from undo (see CLAUDE.md).
+ *  Strength rides in `params.lensFix`; the curve rides here.
+ *
+ *  Applied where the hot-spot's colour is applied, and for the same reason:
+ *  BEFORE the camera matrix and the channel swap, so it corrects the lens
+ *  rather than the false-colour result. It commutes with white balance — both
+ *  are per-channel multiplies — so it does not matter which comes first. */
+export interface LensCurve {
+  /** Red against green, per radial bin. Divide to correct. */
+  kr: ArrayLike<number>;
+  /** Blue against green, per radial bin. */
+  kb: ArrayLike<number>;
+}
+
+/** The gain the pipeline applies at one bin, at a given strength. Shared so the
+ *  shader, the CPU mirror and the test cannot drift into three answers. */
+export function lensGain(k: number, strength: number): number {
+  const v = 1 + (k - 1) * strength;
+  return v > 1e-3 ? 1 / v : 1;
+}
+
+/** The bin a pixel falls in. `r` is the same normalised radius the hot-spot
+ *  uses — 1 at the frame corner. */
+export function lensBin(u: number, v: number, aspect: number, n: number): number {
+  const a = aspect > 0 ? aspect : 1;
+  const dx = (u - 0.5) * a, dy = v - 0.5;
+  const r = (2 * Math.sqrt(dx * dx + dy * dy)) / Math.sqrt(a * a + 1);
+  const i = Math.floor(r * n);
+  return i < 0 ? 0 : i > n - 1 ? n - 1 : i;
+}
+
 export function compileEdit(
   p: EditParams,
   cam?: number[],
@@ -840,6 +885,10 @@ export function compileEdit(
   aspect = 1,
   /** Per-image clarity/dehaze reference maps; omit (LUT bake) to skip both. */
   local?: LocalMap,
+  /** The reader's measured lens colour curve, when one matched this photograph.
+   *  Strength comes from `p.lensFix`; see LensCurve above for why they are
+   *  carried separately. */
+  lens?: LensCurve | null,
 ): (r: number, g: number, b: number, out: Float32Array, glow?: number, u?: number, v?: number) => void {
   const a = (p.hue * Math.PI) / 180;
   const cos = Math.cos(a);
@@ -876,6 +925,19 @@ export function compileEdit(
   const masks = (p.masks ?? []).filter(maskIsActive).slice(0, MAX_MASKS);
   const hasColorMask = masks.some((m) => m.type === 3);
   const lensOn = (p.hotspot ?? 0) !== 0 || (p.vignette ?? 0) !== 0 || (p.hotspotColor ?? 0) !== 0;
+  // The measured curve is its own stage: it must run whether or not any of the
+  // manual lens sliders are off zero.
+  const lensFix = p.lensBypass ? 0 : (p.lensFix ?? 0);
+  const lensN = lens ? Math.min(lens.kr.length, lens.kb.length) : 0;
+  const measuredOn = !!lens && lensFix !== 0 && lensN > 1;
+  const lensGr = measuredOn ? new Float64Array(lensN) : null;
+  const lensGb = measuredOn ? new Float64Array(lensN) : null;
+  if (measuredOn) {
+    for (let i = 0; i < lensN; i++) {
+      lensGr![i] = lensGain(lens!.kr[i], lensFix);
+      lensGb![i] = lensGain(lens!.kb[i], lensFix);
+    }
+  }
   const cl = p.clarity ?? 0;
   const dz = p.dehaze ?? 0;
   const localOn = local && (cl !== 0 || dz !== 0);
@@ -958,6 +1020,16 @@ export function compileEdit(
         r *= 1 + hc * t;
         b *= 1 - hc * t;
       }
+    }
+    // The MEASURED curve, on the same side of the matrix and the swap as the
+    // manual one above. Its own branch because it does not depend on any of the
+    // manual sliders being set.
+    // Spatial, so skipped in the LUT bake where u/v are absent — the same
+    // guard the radial gain above carries, for the same reason.
+    if (measuredOn && u !== undefined && v !== undefined) {
+      const i = lensBin(u, v, aspect, lensN);
+      r *= lensGr![i];
+      b *= lensGb![i];
     }
     // Camera-native -> linear sRGB (after WB, before swap), matching the shader.
     if (cam) {
