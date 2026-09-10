@@ -111,6 +111,7 @@ const params: EditParams = {
   masks: [],
   hotspot: 0,
   hotspotSize: 0.5,
+  hotspotColor: 0,
   vignette: 0,
   clarity: 0,
   dehaze: 0,
@@ -149,6 +150,7 @@ const ui = {
   lum: $("lum") as HTMLInputElement,
   hotspot: $("hotspot") as HTMLInputElement,
   hotspotSize: $("hotspotSize") as HTMLInputElement,
+  hotspotColor: $("hotspotColor") as HTMLInputElement,
   vignette: $("vignette") as HTMLInputElement,
   clarity: $("clarity") as HTMLInputElement,
   dehaze: $("dehaze") as HTMLInputElement,
@@ -386,6 +388,7 @@ function syncFromUI() {
   params.lum = fromPos(Number(ui.lum.value), LUM_LO, LUM_HI);
   params.hotspot = Number(ui.hotspot.value);
   params.hotspotSize = Number(ui.hotspotSize.value);
+  params.hotspotColor = Number(ui.hotspotColor.value);
   params.vignette = Number(ui.vignette.value);
   params.clarity = Number(ui.clarity.value);
   params.dehaze = Number(ui.dehaze.value);
@@ -434,6 +437,7 @@ function syncToUI() {
   ui.lum.value = String(toPos(params.lum, LUM_LO, LUM_HI));
   ui.hotspot.value = String(params.hotspot);
   ui.hotspotSize.value = String(params.hotspotSize);
+  ui.hotspotColor.value = String(params.hotspotColor);
   ui.vignette.value = String(params.vignette);
   ui.clarity.value = String(params.clarity);
   ui.dehaze.value = String(params.dehaze);
@@ -700,6 +704,7 @@ function cloneParams(p: EditParams): EditParams {
     masks: (p.masks ?? []).map((m) => ({ ...m })),
     hotspot: p.hotspot,
     hotspotSize: p.hotspotSize,
+    hotspotColor: p.hotspotColor ?? 0,
     vignette: p.vignette,
     clarity: p.clarity,
     dehaze: p.dehaze,
@@ -773,6 +778,7 @@ function applySnapshot(s: Snapshot) {
   params.masks = c.masks;
   params.hotspot = c.hotspot;
   params.hotspotSize = c.hotspotSize;
+  params.hotspotColor = c.hotspotColor ?? 0;
   params.vignette = c.vignette;
   params.clarity = c.clarity ?? 0;
   params.dehaze = c.dehaze ?? 0;
@@ -1349,7 +1355,7 @@ panelTabsEl.addEventListener("keydown", (e) => {
 }
 
 for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.dn, ui.recover, ui.hue, ui.sat, ui.con, ui.glow, ui.lum,
-  ui.hotspot, ui.hotspotSize, ui.vignette, ui.clarity, ui.dehaze, ui.sharpen, ui.texture,
+  ui.hotspot, ui.hotspotSize, ui.hotspotColor, ui.vignette, ui.clarity, ui.dehaze, ui.sharpen, ui.texture,
   ui.skyHue, ui.skySat, ui.skyLum, ui.folHue, ui.folSat, ui.folLum, ...ui.tones]) {
   el.addEventListener("input", syncFromUI);
 }
@@ -6092,6 +6098,7 @@ function establishFreshEdit() {
     masks: [],
     hotspot: 0,
     hotspotSize: 0.5,
+  hotspotColor: 0,
     vignette: 0,
     clarity: 0,
     dehaze: 0,
@@ -8428,6 +8435,7 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["l
     masks: [],
     hotspot: 0,
     hotspotSize: 0.5,
+  hotspotColor: 0,
     vignette: 0,
     clarity: look.clarity,
     dehaze: look.dehaze,
