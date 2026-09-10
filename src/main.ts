@@ -8467,6 +8467,9 @@ ui.exBtn.addEventListener("click", async () => {
       (f) => {
         busyText.textContent = `Exporting… ${Math.round(f * 100)}%`;
       },
+      // The raw export re-decodes from the file, so the measured correction has
+      // to travel with it or the saved image would not match the screen.
+      myLens && !myLens.bypass ? { p: myLens.p, strength: myLens.strength } : null,
     );
     pendingSave = result;
     // The measured size, so the Quality slider has something to be judged
@@ -8772,12 +8775,21 @@ async function runBatch(files: File[]) {
         if (imported.looksTranscoded) { skipped.push(`${f.name} (arrived as flattened JPEG)`); continue; }
         const img = await decodeOffThread(imported);
         const noLens = applyBatchHotspot(img, imported) === "no-lens";
+        // Each photo in a batch is matched on its OWN EXIF: a set can span
+        // lenses and focal lengths, and one match for the whole run would
+        // silently apply one lens's colour to another lens's frames.
+        let batchLens: { p: LensStore.StoredProfile; strength: number } | null = null;
+        try {
+          const bp = LensStore.findProfile(readExifSubset(imported.bytes));
+          if (bp) batchLens = { p: bp, strength: 1 };
+        } catch { /* unreadable EXIF is simply no match */ }
         const result = await exportImage(
           imported,
           img,
           batchParamsFor(img, grade, batchSettings?.lut ?? null),
           { format, scale, quality, rotate: img.rotate ?? 0, lookRecipe: batchSettings?.recipe },
           (fr) => { busyText.textContent = `Processing ${i + 1} / ${files.length} — ${f.name} · ${Math.round(fr * 100)}%`; },
+          batchLens,
         );
         // Persist immediately (crash-safe), keep nothing in RAM. Stored in
         // small chunks — see batchstore.ts for why never one big value.
