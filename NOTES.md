@@ -6240,6 +6240,60 @@ which edge answered rather than about what is deployed. Six independent fetches
 now, all six required to agree. The `sw.js` cache stamp is the better anchor
 where there is one, since it carries the version.
 
+## The iPad slept and the work was thrown away, 2026-09-10
+
+**Reported from the device: on long loads the iPad goes to sleep, stops all the
+work, and discards everything done to that point.** Two failures, and fixing one
+without the other would have left the reader still losing a run.
+
+**THERE WAS A WAKE LOCK AND IT COVERED ONE JOB.** `acquireWakeLock` in main.ts
+was taken for a BATCH only, and re-taken on visibilitychange only while
+`batchRunning`. So opening a set — minutes of decoding, and the job a reader is
+most likely to walk away from — had no protection at all, and neither did the
+measuring rig. Two implementations of one idea, and the one that existed was
+guarding the job least likely to be left alone.
+
+`src/wakelock.ts` is the only one now, and it counts holders so overlapping jobs
+cannot release each other's. Three things it gets right that a per-job copy kept
+getting wrong: the browser RELEASES the lock whenever the document is hidden and
+does not give it back, so it is re-taken on visibilitychange while anything
+still wants it; it is a REQUEST that an old Safari, a low battery or a policy can
+refuse, so `granted()` reports what actually happened; and every holder releases
+in a `finally`, so a decode that throws cannot leave the screen held for the rest
+of the session.
+
+**And the reader is told before it matters rather than after it failed.** When
+the API is absent or the request is refused, the only remedy is Settings ›
+Display & Brightness › Auto-Lock, and saying so is the difference between a
+reader who finishes and one who comes back to a blank panel.
+
+**THE SECOND HALF: A RUN NOW KEEPS WHAT IT HAS MEASURED.** Every frame was held
+in memory until the run finished, so a sleep, a reload or a tab the system
+reclaimed cost the whole thing. `src/framecache.ts` writes each measured frame as
+it completes, keyed by name and byte length — the same identity a resumed batch
+uses to recognise a file without reading it. Picking the same set again skips
+what is already measured and carries on. The write is AWAITED on purpose: the
+moment being survived is the one right after this frame, so the row has to be on
+disk before the next decode starts. Rows are ~2 KB and stored one per frame,
+which is the shape batchstore.ts's gotcha demands — a large IndexedDB value goes
+to a lazily flushed sidecar and can be lost after a "committed" write.
+
+**AND THE TEST SAID IT WAS BROKEN WHEN IT WAS WORKING.** The resume claim read
+the completion line for the word "reused", and the edit that was supposed to put
+the count in that line had never landed — so a feature that was skipping every
+cached frame reported as if it had measured them all again. Logging what the
+cache actually read settled it in one run: `CACHE want … true` on every frame.
+**A claim that reads a string the feature does not write is not testing the
+feature, it is testing the string** — the third instrument fault of this kind on
+this work, after the GPS fixture with no GPS and the history probe comparing a
+constant.
+
+**A UI measurement that moved because of it.** Adding the screen note pushed the
+primary action from 288px to 364px into a 607px sheet, past the top half the
+panel walk holds it to. The note is guidance for DURING a run and is spent once
+there is an answer, so it is hidden at completion and comes back at the start of
+the next run, which is when it can be acted on.
+
 ## The measurements lived in storage the app does not own, 2026-09-10
 
 **Named from the device: a lens correction needs a warning that it is only kept

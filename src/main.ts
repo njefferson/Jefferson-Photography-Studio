@@ -9,6 +9,7 @@ import { findLocation, stripLocation } from "./gps";
 import { writeZip, crc32 } from "./zip";
 import { putFrame, eachFrame, frameMetas, frameCount, clearFrames } from "./batchstore";
 import * as Session from "./session";
+import { keepAwake } from "./wakelock";
 import { TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, bandWeight, rgb2hsv, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, type MaskLayer, type CropRect } from "./pipeline";
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, type HealSpot } from "./heal";
 import { makeStickerAsset, stickerRect, stickerWorldCorners, stickerXform, compositeStickersIntoRect8, compositeStickersIntoRectF32, compositeStickersOverlay8, type StickerAsset } from "./sticker";
@@ -6991,6 +6992,21 @@ async function openPicked(files: File[], ready?: Map<File, ArrayBuffer>) {
     append = ans === "ok";
   }
 
+  // KEEP THE SCREEN AWAKE FOR THE WHOLE OPEN. Opening a set is minutes of
+  // decoding and the job a reader is most likely to walk away from, and it had
+  // no protection at all — the wake lock this app already had was taken for a
+  // BATCH only. An iPad reaching its own auto-lock partway through stopped the
+  // work where it stood. Released in a finally, so a decode that throws cannot
+  // leave the screen held for the rest of the session.
+  const releaseOpenWake = keepAwake();
+  try {
+    return await openSorted(files, append, ready);
+  } finally {
+    releaseOpenWake();
+  }
+}
+
+async function openSorted(files: File[], append: boolean, ready?: Map<File, ArrayBuffer>) {
   // Single file, not adding to a session → the fast, ephemeral path of old.
   if (files.length === 1 && !append) {
     await resetSessionState(true); // drop a lone photo or un-resumed leftovers
@@ -8853,28 +8869,21 @@ let batchStopRequested = false;
 let batchRemaining: File[] = []; // input Files not yet processed after a stop
 let batchSettings: { grade: BatchGrade; format: ExportFormat; scale: number; quality: number; lut?: EditParams["lut"]; lutMissing?: boolean; recipe?: string } | null = null;
 let pendingSaveIsBatch = false;
-let batchRunning = false;
 
-// A long batch must not die to the screen locking (iPad suspends the tab).
-// Held while processing, released after; iOS drops it when the app is
-// backgrounded, so re-acquire on return while a batch is still running.
-type WakeLockSentinel = { release(): Promise<void> };
-let wakeLock: WakeLockSentinel | null = null;
-async function acquireWakeLock() {
-  try {
-    const wl = (navigator as { wakeLock?: { request(type: "screen"): Promise<WakeLockSentinel> } }).wakeLock;
-    wakeLock = (await wl?.request("screen")) ?? null;
-  } catch {
-    wakeLock = null; // not supported / denied — the batch still runs
-  }
+// A long job must not die to the screen locking. This used to be a wake lock of
+// its own, held only for a BATCH — which is why opening a large set, the job a
+// reader is most likely to walk away from, had no protection at all and the
+// measuring rig had none either. One holder-counted lock in wakelock.ts serves
+// all three now, and it is the one that re-takes the lock on visibilitychange,
+// which this copy did only while a batch was running.
+let releaseBatchWake: (() => void) | null = null;
+function acquireWakeLock() {
+  releaseBatchWake ??= keepAwake();
 }
 function releaseWakeLock() {
-  wakeLock?.release().catch(() => {});
-  wakeLock = null;
+  releaseBatchWake?.();
+  releaseBatchWake = null;
 }
-document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible" && batchRunning) acquireWakeLock();
-});
 
 busyStop.addEventListener("click", () => {
   batchStopRequested = true;
@@ -8909,13 +8918,12 @@ async function runBatch(files: File[]) {
   let noHotspot = 0; // JPEG frames whose lens wasn't in EXIF → no hot-spot fix
   let stoppedEarly: "user" | "memory" | "quota" | null = null;
   batchStopRequested = false;
-  batchRunning = true;
   busyStop.disabled = false;
   busyStop.textContent = "Stop & save what's done";
   showBusy(`Processing 0 / ${files.length}…`);
   busyStop.hidden = false;
   recoverBtn.hidden = true;
-  await acquireWakeLock();
+  acquireWakeLock();
   await requestPersistentStorage();
 
   try {
@@ -9006,7 +9014,6 @@ async function runBatch(files: File[]) {
     hideBusy();
     alert("Batch failed: " + (err as Error).message);
   } finally {
-    batchRunning = false;
     releaseWakeLock();
   }
 }
