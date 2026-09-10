@@ -5067,6 +5067,82 @@ reported percentage does count only texels above half weight while roughly twice
 that area is touched to some degree — defensible, and worth knowing when the
 number reads lower than the effect looks.**
 
+## The update strip's buttons went monitor-wide on ONE of three apps, 2026-09-10
+
+**Caught on device, hours after it shipped to production**: the update offer
+appeared with two stacked, monitor-wide buttons. Measured at 1600px on all three
+pages: Infrared 1568x44 each and stacked; Macro and the chooser 101x44 and 80x44
+side by side. Only Infrared.
+
+**Cause.** `style.css` carries `select, button { width: 100% }` — panel controls
+are full-width there BY DESIGN, which is why `.bar-btn` spells out `width: auto`
+right beside its comment about touch targets. The shared `swstrip.css` set
+`flex: none`, which says nothing about width, so the base rule won unopposed.
+Macro and the chooser have no such base, so they looked correct and hid it.
+
+**The lesson underneath the fix, which is about the good decision, not a bad
+one.** Putting the strip's look in ONE shared file was right — three stylesheets
+would have carried three copies. But a shared component lands on three DIFFERENT
+base layers, and it inherits whichever one it is dropped into. "Look shared,
+placement local" quietly assumed the base was neutral. **A shared look has to
+state what it needs rather than what the tidiest base would already have given
+it**, and the app it breaks in is the one whose base is most opinionated — which
+is also the app it was written in and tested in first.
+
+**And the walk that verified this feature could not see it.** `sw-walk` drives a
+real second worker and asserts waiting, telling, and the takeover — everything
+about BEHAVIOUR, at one viewport, and never once measures the strip's geometry.
+It passed on all three pages while one of them rendered like this.
+
+## The Grade wheel, measured — one half of the report was wrong, 2026-09-10
+
+**Reported:** a drag of roughly 30px near the wheel's centre registered 92%, and
+painted the ENTIRE image rather than just the shadows. Two claims, and they
+needed separating before anything was changed.
+
+**The sensitivity is exactly the designed geometry, not a glitch.** `PUCK_MAX`
+is 33px, and amount is `distance / PUCK_MAX`. A 30px drag is 30/33 = 91%. The
+report's 92% is the control working precisely as written.
+
+**The band containment claim is FALSE**, measured on a black-to-white ramp with
+the shadows band at hue 0 and amount 92%, reading mean R-B per luminance third
+off the displayed frame:
+
+- shadows +70.0
+- mids +11.2
+- highlights 0.0
+
+Six times stronger in the shadows than the mids and nothing at all in the
+highlights. What the reader met was 92% of a correctly-confined shadows tint on
+a false-colour frame that is mostly in the lower range — which reads as "the
+whole image" and is not the same thing.
+
+**Left alone, deliberately, and this is a taste call rather than a defect.** The
+puck is drawn at `amt * PUCK_MAX`, so it sits UNDER THE FINGER. A curved
+response — the obvious way to give fine control near the centre — would put the
+puck somewhere the finger is not, which trades this app's direct manipulation
+for precision. The other route is a bigger wheel, and that costs panel height on
+three bands, on a tablet where panel space is the scarce thing. A precise
+control already sits beside each wheel: the Amount slider, 0-100, which is also
+the labelled path (the wheel is `aria-hidden` and pointer-only by design).
+
+**A wrong selector in the measurement that did not matter, recorded because it
+nearly did.** The test tried to neutralise the channel swap with
+`getElementById("swapRB")`; the control is `swapBtn`, so that step did nothing.
+The measurement still holds — the swap state was identical before and after, so
+the DELTA is unaffected, and a greyscale ramp is greyscale either way (neutral
+R-B read 0.0). A no-op setup step that silently does nothing is one frame
+composition away from invalidating the run.
+
+## The channel swap read as a look, 2026-09-10
+
+The unprompted cold read pressed R&#8646;B on its own, expecting the dramatic
+reversal, and got a flat uniform pale purple that lost separation the frame
+already had. The copy had told it to expect otherwise: "The core false-color
+move". It is the building block those moves are built ON, and on its own it only
+separates colours that white balance has already pulled apart. The note now says
+so, and names the two things to do first.
+
 ## The three cold-read findings, 2026-09-10
 
 ### The ⓘ panel opened at the changelog and hid the thing you go looking for
