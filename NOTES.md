@@ -5737,6 +5737,21 @@ removes it. Made to fail twice — the gamma bug and an inverted gain — and ax
 clean in both themes, with the new card's controls matching the card beside it
 rather than inventing a size.
 
+**A PASTE-IN BOX WAS BUILT AND THEN REMOVED, and the removal is the lesson.**
+The first measurements exist only as text in a message, from before anything
+could keep them, so a "numbers you measured before" control went into the lens
+panel to bring them in without re-shooting. It worked, and it was wrong: the
+owner still has the photographs, so re-measuring costs one press — and the
+control served exactly one situation, this conversation's, while sitting
+permanently in a reader-facing panel. **Solving MY problem in THEIR UI.** Cut
+the same session it was written.
+
+What stayed is the part that was a real defect underneath it: `saveFromPayload`
+silently dropped every profile whose key predated the aperture field, returning
+"saved 0" with nothing said. Both key shapes parse now, and anything still
+unreadable comes back NAMED rather than dropped — a button that appears to work
+and keeps nothing is the worst of the failure modes available.
+
 **Still owed:** the shipped scalar profiles remain JPEG-only, and `applyColour`
 runs on the decoded buffer rather than in the pipeline. Putting the radial
 curves in the shader (a `uniform float[80]` pair, mirrored in `compileEdit`)
