@@ -56,37 +56,14 @@
       <section class="dbg-sec">
         <h2>Measure a lens</h2>
         <p class="dbg-note">
-          An infrared-converted lens sends a little more infrared straight up the middle than it
-          does to the corners, so the centre of every frame comes out brighter and a slightly
-          different colour. This measures yours, from your own photographs, on this device.
-        </p>
-        <p class="dbg-note">
-          <strong>What to give it:</strong> frames of nothing &mdash; clear blue sky, filling the
-          whole frame, no sun in shot, no clouds, no lens hood, well exposed but nothing blown.
-          Four or five at each focal length you actually use. RAW or JPEG, both work; the RAW is
-          better. Shoot them the way you shoot, and take them at a few focal lengths across the
-          zoom &mdash; the hot-spot changes with focal length and aperture.
-        </p>
-        <p class="dbg-note">
-          <strong>Give it the whole set at once.</strong> Select as many as you like, and a
-          <strong>.zip</strong> counts as everything inside it &mdash; which is how a folder of RAW
-          files travels on an iPad, since zipping is the only way iOS hands over a NEF without
-          turning it into a JPEG first. Frames are read one at a time, so the size of the zip does
-          not matter. They are sorted into lenses and focal lengths for you; you do not have to keep
-          them apart. A long run can be stopped and keeps what it has measured so far.
-        </p>
-        <p class="dbg-note">
-          Nothing is uploaded and nothing leaves this device. What comes out is a small block of
-          numbers you can copy or save &mdash; a few kilobytes of text, not the photographs.
+          This moved into the app itself, because a lens has nothing to do with any one
+          photograph and this page is for when something is wrong. It is on the start screen
+          as <strong>Measure your lens…</strong>, and in the Corrections tab beside the
+          hot-spot sliders. Nothing needs to be open first.
         </p>
         <div class="dbg-actions">
-          <label class="dbg-btn primary"><input id="dProfFiles" class="file-input" type="file" accept="image/*,.dng,.nef,.DNG,.NEF,.zip,.ZIP,application/zip" multiple />Choose flat frames</label>
-          <button id="dProfStop" type="button" class="dbg-btn" hidden>Stop</button>
-          <button id="dProfCopy" type="button" class="dbg-btn" hidden>Copy the numbers</button>
-          <button id="dProfSave" type="button" class="dbg-btn" hidden>Save as a file</button>
+          <a class="dbg-btn primary" href="./ir.html?lens=1">Measure your lens&hellip;</a>
         </div>
-        <div id="dProfResults" class="dbg-results" role="status" aria-live="polite"></div>
-        <textarea id="dProfText" class="dbg-text" readonly rows="10" aria-label="Measured lens profile" hidden></textarea>
       </section>
     </main>
     <script type="module" src="/src/debug.ts"></script>

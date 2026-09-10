@@ -174,6 +174,8 @@
           <p class="welcome-batch-hint">See what's in a folder: an instant grid of auto-balanced previews, nothing saved, gone when you close. Tap the keepers to send them into a session.</p>
           <button class="welcome-batch" id="welcomeBatchBtn" type="button">Batch process a set…</button>
           <p class="welcome-batch-hint">Not for editing — develops a whole set unattended into one .zip, each photo auto-balanced, then a look, your current edit, or nothing on top.</p>
+          <button class="welcome-batch" id="welcomeLensBtn" type="button">Measure your lens&hellip;</button>
+          <p class="welcome-batch-hint">An infrared-converted lens brightens and tints the middle of every frame. Give this photographs of empty sky and it works yours out, here on this device — nothing uploaded, nothing to open first.</p>
           <button id="resumeSession" class="welcome-batch" type="button" hidden>Resume session</button>
           <button id="recoverBatch" class="welcome-batch" type="button" hidden>Recover images from an interrupted batch</button>
           <hr class="welcome-div" />
@@ -409,6 +411,8 @@
             <label>Hot-spot colour <input id="hotspotColor" type="range" min="-0.5" max="0.5" step="0.01" value="0" /></label>
             <p class="note">An IR-converted lens does not only BRIGHTEN the centre &mdash; it usually tints it too, and the R&#8646;B swap every colour look is built on turns that tint into a coloured disc in the middle of the sky. Hot-spot (above) is a plain brightness gain and cannot touch it. This one shifts the centre&rsquo;s colour instead, over the same circle Hot-spot size sets. Which way is which depends on the look you have on &mdash; every colour look swaps red and blue, so the slider&rsquo;s two directions trade places with it. Don&rsquo;t reason about it: nudge one way, and if the disc gets stronger go the other. Work with the look ON and the sky filling the frame, since that is where the disc shows.</p>
             <label>Vignette <input id="vignette" type="range" min="-1" max="1" step="0.01" value="0" /></label>
+            <button id="lensMeasureBtn" type="button">Measure your lens&hellip;</button>
+            <p class="note">Setting these by eye on every photograph is the fallback. Measuring works your own lens&rsquo;s hot-spot out from photographs of empty sky &mdash; it needs no photo open, so it is on the start screen and in Settings too.</p>
             <p class="note">Setting these by eye on every photograph is the fallback. <a href="./debug.html">Measure this lens&hellip;</a> works your own lens&rsquo;s hot-spot out from photographs of empty sky, on this device &mdash; the frames never leave the iPad, and what comes back is a small block of numbers.</p>
             <div class="subcard">
               <div class="sub-title">Matched lens profile <span>measured, per-lens</span></div>
@@ -632,6 +636,7 @@
       <div class="ver-actions">
         <button id="verCopy" type="button" class="primary">Copy the report</button>
         <a id="verDebug" class="ver-link" href="./debug.html">Test this device&hellip;</a>
+        <button id="verLens" type="button" class="ver-link">Measure your lens&hellip;</button>
       </div>
       <p class="note">The test page measures how fast this device decodes a photo, draws a frame and saves to storage — numbers that differ on every device and cannot be guessed from a desktop. It also has <strong>Measure a lens</strong>, which works out your own converted lens&rsquo;s hot-spot from photographs of empty sky.</p>
       <button id="verClose" type="button">Close</button>
@@ -843,6 +848,30 @@
       <button id="infoClose" type="button">Close</button>
       <div class="dlg-cue down" id="infoCueDown" hidden aria-hidden="true">&#9660;</div>
       </div>
+    </dialog>
+
+    <!-- Measuring a converted lens. A destination in its own right: it needs no
+         photo open, because a lens is not a photograph. -->
+    <dialog id="lensDlg" aria-labelledby="lensDlgTitle">
+      <div class="dlg-bar">
+        <h2 id="lensDlgTitle">Measure your lens</h2>
+        <button id="lensCloseTop" type="button" class="dlg-x" aria-label="Close">&#10005;</button>
+      </div>
+      <div class="dlg-body">
+        <p class="note">An infrared-converted lens sends a little more infrared straight up the middle than it does to the corners, so the centre of every frame comes out brighter and a slightly different colour. This works out yours, from your own photographs, on this device.</p>
+        <p class="note"><strong>What to give it:</strong> frames of nothing &mdash; clear blue sky, filling the whole frame, no sun in shot, no clouds, no lens hood, well exposed but nothing blown. Four or five at each focal length you actually use. RAW or JPEG, both work; the RAW is better.</p>
+        <p class="note"><strong>Give it the whole set at once.</strong> Select as many as you like, and a <strong>.zip</strong> counts as everything inside it &mdash; which is how a folder of RAW files travels on an iPad, since zipping is the only way iOS hands over a NEF without turning it into a JPEG first. Frames are read one at a time, so the size of the zip does not matter. They are sorted into lenses and focal lengths for you.</p>
+        <p class="note">Nothing is uploaded and nothing leaves this device. What comes out is a small block of numbers you can copy or save &mdash; a few kilobytes of text, not the photographs.</p>
+        <div class="dbg-actions">
+          <label class="dbg-btn primary"><input id="lensFiles" class="file-input" type="file" accept="image/*,.dng,.nef,.DNG,.NEF,.zip,.ZIP,application/zip" multiple />Choose flat frames</label>
+          <button id="lensStop" type="button" class="dbg-btn" hidden>Stop</button>
+          <button id="lensCopy" type="button" class="dbg-btn" hidden>Copy the numbers</button>
+          <button id="lensSave" type="button" class="dbg-btn" hidden>Save as a file</button>
+        </div>
+        <div id="lensResults" class="dbg-results" role="status" aria-live="polite"></div>
+        <textarea id="lensText" class="dbg-text" readonly rows="8" aria-label="Measured lens profile" hidden></textarea>
+      </div>
+      <button id="lensClose" type="button">Close</button>
     </dialog>
 
     <dialog id="askDlg" aria-labelledby="askTitle">
