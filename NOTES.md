@@ -6240,6 +6240,41 @@ which edge answered rather than about what is deployed. Six independent fetches
 now, all six required to agree. The `sw.js` cache stamp is the better anchor
 where there is one, since it carries the version.
 
+## Two shapes for "no hot spot", found by comparing the two paths, 2026-09-10
+
+**The 50-250 was re-ingested on 2.32 and came back identical to the run on
+2.23** — same nine profiles, same numbers, bin for bin. That is what it should
+do and it is worth having said: the measuring path is deterministic across nine
+releases of the app around it.
+
+**The check that was worth making is a different one.** Two pieces of code turn
+`bump_range` into a curve — the generator that writes `hotspotProfiles.ts`, and
+`saveFromPayload` when a reader keeps their own measurement — and they answer the
+same question. Compared over 2000 values: every number they both produce is
+bit-identical. But for the two profiles that measured NO hot spot (`50@f4.5` and
+`130@f5.3`, both with a range starting at zero) the store omitted the curve and
+the generator emitted **eighty zeros**.
+
+The correction is the same either way — 1.0000 at the centre on both sides, and
+`lensFixLive` already reads a zero-filled curve as nothing. So nothing a reader
+could see was wrong. It is still worth fixing, because one idea with two shapes
+is the thing that goes wrong later, and every test written against the wrong one
+inherits it. Three did: a claim that every shipped profile has an 80-bin bump,
+one that stopping down means a bigger number than wide open rather than a number
+where there had been none, and one reading `gains(far)[0]` on a profile that
+now correctly has no gains at all. All three had encoded the zero-filled shape
+as if it were the specification.
+
+An absence is now an absence in both: a profile that found no hot spot carries
+no bump, and says so.
+
+**And this is the same class as the seven instrument faults**, one turn later
+and from the other direction. Those were claims reading a proxy for the
+behaviour; these were claims reading a REPRESENTATION of it. Both are the test
+knowing more about the current implementation than about what the thing is
+supposed to do. The generator's zero-fill was never a decision anyone made — it
+fell out of `scale = 0` — and three tests then wrote it down as truth.
+
 ## Re-picking a folder doubled the session instead of resuming it, 2026-09-10
 
 **An interrupted open already resumed — by a route nobody would take.** The
