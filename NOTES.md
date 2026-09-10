@@ -5670,6 +5670,46 @@ profiles on the RAW path at all (they are JPEG-only because full NEFs could not
 be moved into the measurement rig); and `keyFor`'s nearest-focal-length anchor
 selection, which snaps rather than interpolating between anchors.
 
+## A poll with no bound ran for eleven hours, 2026-09-10
+
+**Found by the owner, in the background-tasks list, not by anything I did.**
+
+The task was one line:
+
+    LOCAL=$(ls dist/assets/ir-*.js | head -1 | xargs basename)
+    until curl -sSL "https://jefferson-photo-studio.pages.dev/ir.html" | grep -q "$LOCAL"; do sleep 10; done
+
+It captured `ir-Cir89U2p.js` from a LOCAL build and waited for production to
+serve that exact file. **It could never match, for two reasons that compound.**
+
+The first is already written down in this file: the bundle's content hash
+includes `__CHANGELOG__`, which is built from commit subjects, so a build made
+BEFORE the commit can never produce the filename CI produces after it. That
+lesson was recorded in this repo and the loop was written anyway.
+
+The second makes it worse: `dist/` was rebuilt dozens of times in the hours
+after, so the captured name was stale within minutes even on its own terms.
+
+**Eleven hours and three minutes. A request to production every ten seconds is
+roughly four thousand of them**, for a condition that was false at the moment it
+was written.
+
+**AND NOTHING SURFACED IT.** A background task that completes sends a
+notification; one that never completes sends nothing, so it sat in a list
+nobody reads. Every other wait written in the same session had a bound —
+`n=$((n+1)); [ $n -gt 16 ] && break` — and reported when it gave up. This one
+did not, and it is the one that ran for half a day.
+
+**THE RULE: a poll gets a bound and a stated failure, always.** `until <cond>;
+do sleep; done` is not a check, it is a hang wearing a check's clothes: when the
+condition is wrong the loop cannot tell you, because saying so is the one thing
+it never does. Bound it, and print what it was still waiting for when it stops.
+
+This also sits under the standing rule that a session cannot see the balance and
+should spend deliberately. A loop left running unattended is spending with
+nobody watching, and the only reason it stopped is that somebody opened a panel
+and asked what it was.
+
 ## The measurement cost more than the decode, 2026-09-10
 
 Told the owner the remaining cost was the raw decode. It was not, and the
