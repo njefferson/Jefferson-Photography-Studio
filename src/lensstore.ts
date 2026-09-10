@@ -377,6 +377,50 @@ export interface LensCoverage {
   profiles: number;
 }
 
+/** What is still missing from a set of measurements, in words, as the next trip
+ *  out rather than as a complaint.
+ *
+ *  ONE COPY, THREE CALLERS' WORTH OF HISTORY. This lived twice — once here for
+ *  the stored panel and once in the rig for the run just measured — and the two
+ *  had drifted into different bugs. The panel looked only at focal lengths with
+ *  exactly ONE aperture, so a real store's 130mm (f/5.3 and f/29) was never
+ *  examined and the report named 135mm alone. The rig's copy reported only when
+ *  NO single-aperture focal length shared with the sweep, and then named all of
+ *  them — so one tied and one untied produced silence. Under-reporting a gap is
+ *  worse than reporting none: the reader plans the next trip out from it.
+ *
+ *  `aps` are the aperture LABELS already formatted for the reader ("f/8"), so
+ *  the two callers compare the same strings they print. */
+export function gapsFor(model: string, atFl: { fl: number; aps: string[] }[]): string[] {
+  const gaps: string[] = [];
+  const fls = atFl.map((e) => e.fl);
+  const zoom = /(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*mm/i.exec(model);
+  if (zoom && fls.length) {
+    const lo = Number(zoom[1]), hi = Number(zoom[2]);
+    if (fls[fls.length - 1] < hi * 0.9) gaps.push(`nothing above ${fls[fls.length - 1]}mm on a lens that reaches ${hi}mm`);
+    if (fls[0] > lo * 1.1) gaps.push(`nothing below ${fls[0]}mm on a lens that starts at ${lo}mm`);
+    // Wider than this and a blend across the gap is a guess rather than an
+    // interpolation. Measured by leave-one-out on real anchors.
+    for (let i = 0; i < fls.length - 1; i++) {
+      if (fls[i + 1] / fls[i] > 2.2) gaps.push(`a gap between ${fls[i]}mm and ${fls[i + 1]}mm`);
+    }
+  }
+  const sweeps = atFl.filter((e) => e.aps.length >= 3);
+  if (!sweeps.length) {
+    gaps.push("no focal length shot at three or more apertures, so how the hot-spot changes with aperture is not measured anywhere");
+    return gaps;
+  }
+  // Untied means sharing nothing with ANY sweep — not "measured at exactly one
+  // aperture", and not "none of them shares".
+  const orphan = atFl.filter((e) => !sweeps.includes(e)
+    && !e.aps.some((a) => sweeps.some((sw) => sw.aps.includes(a))));
+  if (orphan.length) {
+    const names = orphan.map((e) => e.fl + "mm");
+    gaps.push(`${names.join(" and ")} ${names.length === 1 ? "shares" : "share"} no aperture with the sweep at ${sweeps.map((sw) => sw.fl + "mm").join(" or ")}, so focal length and aperture cannot be told apart there — one frame at an aperture already in the sweep would tie ${names.length === 1 ? "it" : "them"} in`);
+  }
+  return gaps;
+}
+
 export function coverage(list: StoredProfile[]): LensCoverage[] {
   const byLens = new Map<string, StoredProfile[]>();
   for (const p of list) {
@@ -398,30 +442,7 @@ export function coverage(list: StoredProfile[]): LensCoverage[] {
       aps: byFl.get(fl)!.aps.sort((x, y) => (parseFloat(x.slice(2)) || 1e9) - (parseFloat(y.slice(2)) || 1e9)),
       frames: byFl.get(fl)!.frames,
     }));
-    const gaps: string[] = [];
-    const zoom = /(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*mm/i.exec(mine[0].model);
-    if (zoom) {
-      const lo = Number(zoom[1]), hi = Number(zoom[2]);
-      if (fls[fls.length - 1] < hi * 0.9) gaps.push(`nothing above ${fls[fls.length - 1]}mm on a lens that reaches ${hi}mm`);
-      if (fls[0] > lo * 1.1) gaps.push(`nothing below ${fls[0]}mm on a lens that starts at ${lo}mm`);
-      for (let i = 0; i < fls.length - 1; i++) {
-        // Wider than this and a blend across the gap is a guess rather than an
-        // interpolation. Measured by leave-one-out on real anchors: across a
-        // 19-50mm hole the blend reproduces the hidden 36mm measurement to
-        // within 1.5 points of gain, which is why the bar is not tighter.
-        if (fls[i + 1] / fls[i] > 2.2) gaps.push(`a gap between ${fls[i]}mm and ${fls[i + 1]}mm`);
-      }
-    }
-    const sweeps = atFl.filter((e) => e.aps.length >= 3);
-    if (!sweeps.length) {
-      gaps.push("no focal length shot at three or more apertures, so how the hot-spot changes with aperture is not measured anywhere");
-    } else {
-      const single = atFl.filter((e) => e.aps.length === 1);
-      const orphan = single.filter((e) => !e.aps.some((a) => sweeps[0].aps.includes(a)));
-      if (orphan.length) {
-        gaps.push(`${orphan.map((e) => e.fl + "mm").join(" and ")} share no aperture with the sweep at ${sweeps[0].fl}mm, so focal length and aperture cannot be told apart there — one frame at an aperture already in the sweep would tie them together`);
-      }
-    }
+    const gaps = gapsFor(mine[0].model, atFl);
     out.push({ short, model: mine[0].model, atFl, gaps, profiles: mine.length });
   }
   return out.sort((a, b) => a.short.localeCompare(b.short));

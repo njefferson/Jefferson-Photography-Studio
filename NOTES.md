@@ -8444,3 +8444,36 @@ measured. "Save a backup of all of them" writes `lens-profiles-<date>.json` —
 the whole store. Three run-exports arrived, two of them identical, and the
 question "did a run get lost" could not be answered from them at all. Ask for
 the store export.
+
+## The gaps report had two copies and two different bugs, 2026-09-10
+
+A screenshot of the panel said "135mm share no aperture with the sweep at 50mm"
+— a plural verb on a list of one, which is the visible half. The invisible half
+is that the sentence was WRONG: 130mm shares no aperture with that sweep either
+(it has f/5.3 and f/29 against a sweep running f/4.5 to f/22), and was never
+examined, because the check looked only at focal lengths measured at exactly ONE
+aperture.
+
+**Under-reporting a gap is worse than reporting no gaps.** The reader plans the
+next trip out from that sentence. "135mm" says take one frame at 135mm; the
+truth was that the whole 130/135 cluster is untied from the 50mm sweep and one
+frame at either would tie it in.
+
+**There were two copies, with two different bugs.** `coverage()` in lensstore.ts
+serves the stored panel; the rig had its own in lensrig.ts for the run just
+measured. The rig's version reported only when NO single-aperture focal length
+shared with the sweep, and then named all of them — so one tied and one untied
+produced SILENCE. Neither bug was visible from the other file. `gapsFor()` is
+the one copy now, and the claim that holds it is not either behaviour but "one
+file builds these sentences", scanned across src.
+
+**The right definition is structural, not a count of apertures**: a focal length
+is untied when it shares no aperture with ANY sweep. That reaches a focal length
+with two apertures, which the old rule could not, and it stops the first sweep
+being the only reference.
+
+**And the test that found it used the real store.** `coverage.mjs` runs against a
+synthetic fixture whose untied focal lengths happen to have one aperture each,
+so it went green through both bugs and is still green. The store off the device
+had the shape neither fixture had. A fixture built to exercise a rule tends to
+be built out of the rule.
