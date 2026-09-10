@@ -8386,8 +8386,15 @@ reported the 1424.
 **Not everything in that shot was the app.** A white pill with a downward
 pointer was sitting over the R-B channel swap button. In Chromium at the same
 viewport, `elementFromPoint` at the button's centre returns the button, and it
-has no `::before` or `::after` — nothing in the app paints there. Recorded as
-unexplained rather than guessed at.
+has no `::before` or `::after` — nothing in the app paints there.
+
+**It is iOS Reachability** — the system's own affordance offering to pull the
+screen down, drawn above the home indicator, over whatever the app has at the
+bottom of the screen. Recorded so the next session reading that screenshot does
+not spend a browser run on it. The instrument was right and said so: a control
+the app does not paint is not a control the app can fix, and reporting it as
+unexplained rather than guessing at a cause is what made it one question instead
+of a fix to something that was never broken.
 
 ## A later measurement is not a better one, and two doors had two rules, 2026-09-10
 
