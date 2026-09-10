@@ -19,7 +19,7 @@ import { sniff } from "./import";
 import { readExifSubset } from "./exif";
 import { profileFrame, averageProfiles, round5, NBINS, type FrameProfile } from "./lensprofile";
 import { readZipIndex, readZipEntry, readZipEntryPrefix, imageEntries } from "./zip";
-import { saveFromPayload } from "./lensstore";
+import { saveFromPayload, listProfiles, removeProfile, coverage } from "./lensstore";
 
 declare const __APP_VERSION__: string;
 
@@ -29,6 +29,9 @@ declare const __APP_VERSION__: string;
 export function wireLensRig(root: ParentNode): void {
   const $ = <T extends HTMLElement>(id: string) => root.querySelector<T>("#" + id)!;
   const profResults = $("lensResults");
+  const profCoverage = $("lensCoverage");
+  const profDetail = $("lensDetail");
+  const profRunning = $("lensRunning");
   const profText = $<HTMLTextAreaElement>("lensText");
   // THE COPY BUTTON SITS WITH THE NUMBERS. It used to live in the actions row
   // at the top, while the text it copies appeared at the bottom under a long
@@ -39,6 +42,15 @@ export function wireLensRig(root: ParentNode): void {
   const profCopy = $<HTMLButtonElement>("lensCopy2");
   const profSave = $<HTMLButtonElement>("lensSave2");
   const profStop = $<HTMLButtonElement>("lensStop");
+  // What is kept is shown whenever the sheet opens, not only after a run — the
+  // reader who wants to know what they have has not necessarily just measured
+  // anything, and the one who wants to delete something certainly has not.
+  const dlg = document.getElementById("lensDlg");
+  if (dlg) {
+    new MutationObserver(() => { if ((dlg as HTMLDialogElement).open) renderKept(); })
+      .observe(dlg, { attributes: true, attributeFilter: ["open"] });
+    if ((dlg as HTMLDialogElement).open) renderKept();
+  }
 
   /** Clipboard, with a hand-copy fallback — it is refused often enough on iOS
    *  that a dead button is the likely outcome otherwise. */
@@ -67,22 +79,71 @@ export function wireLensRig(root: ParentNode): void {
     return model.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "lens";
   }
 
-  function profNote(text: string): HTMLElement {
+  /** WHAT THIS DEVICE IS HOLDING, at any time and not only after a run.
+   *
+   *  Three things were missing and they are one surface. There was no way to see
+   *  what had been kept, no way to remove any of it, and no way to see which
+   *  focal lengths and apertures were still unshot — which is the only question
+   *  a second trip out with the camera can answer. A measurement you cannot
+   *  inspect or undo is not something a reader can be asked to trust. */
+  function renderKept() {
+    const kept = $("lensKept");
+    const list = $("lensKeptList");
+    const stored = listProfiles();
+    kept.hidden = false;
+    list.replaceChildren();
+    if (!stored.length) {
+      profNote("Nothing measured yet. What you measure here stays on this device and is used automatically when you open a photograph from that lens.", list);
+      return;
+    }
+    for (const c of coverage(stored)) {
+      profRow(c.model, `${c.profiles} profile${c.profiles === 1 ? "" : "s"}`,
+        c.atFl.map((e) => `${e.fl}mm at ${e.aps.join(", ")} (${e.frames} frame${e.frames === 1 ? "" : "s"})`).join("; ") + ".", list);
+      profRow(`${c.short} — still missing`, c.gaps.length ? `${c.gaps.length} gap${c.gaps.length === 1 ? "" : "s"}` : "nothing obvious",
+        c.gaps.length ? c.gaps.join("; ") + "." : "Every focal length you have shot has more than one aperture, and the zoom range is covered.", list);
+      const row = document.createElement("div");
+      row.className = "dbg-actions";
+      for (const p of stored.filter((x) => x.key.startsWith(c.short + "@")).sort((a, z) => a.fl - z.fl || a.ap - z.ap)) {
+        const b2 = document.createElement("button");
+        b2.type = "button";
+        b2.className = "dbg-btn";
+        b2.textContent = `Remove ${p.fl}mm ${Number.isFinite(p.ap) ? `f/${p.ap}` : "(no aperture)"}`;
+        // Two presses, because it cannot be undone and the frames it was made
+        // from may be long gone. No dialog: a confirm box on an iPad is another
+        // sheet over a sheet.
+        let armed = false;
+        b2.onclick = () => {
+          if (!armed) { armed = true; b2.textContent = "Remove for good?"; b2.classList.add("primary"); setTimeout(() => { if (armed) { armed = false; b2.classList.remove("primary"); b2.textContent = `Remove ${p.fl}mm ${Number.isFinite(p.ap) ? `f/${p.ap}` : "(no aperture)"}`; } }, 4000); return; }
+          removeProfile(p.key);
+          renderKept();
+        };
+        row.appendChild(b2);
+      }
+      list.appendChild(row);
+    }
+  }
+
+  /** Where the next row goes. The per-frame list is one row per photograph and
+   *  can be ninety of them, so the summary that is worth reading and the detail
+   *  that is worth having are not the same surface. */
+  let sink: HTMLElement = profResults;
+
+  function profNote(text: string, to: HTMLElement = sink): HTMLElement {
     const p = document.createElement("p");
     p.className = "dbg-progress";
     p.textContent = text;
-    profResults.appendChild(p);
+    to.appendChild(p);
     return p;
   }
 
-  function profRow(name: string, value: string, meaning: string) {
+  function profRow(name: string, value: string, meaning: string, to: HTMLElement = sink) {
     const d = document.createElement("div");
     d.className = "dbg-row";
     d.innerHTML = `<div class="dbg-k"></div><div class="dbg-v"></div><p class="dbg-m"></p>`;
     (d.querySelector(".dbg-k") as HTMLElement).textContent = name;
     (d.querySelector(".dbg-v") as HTMLElement).textContent = value;
     (d.querySelector(".dbg-m") as HTMLElement).textContent = meaning;
-    profResults.appendChild(d);
+    to.appendChild(d);
   }
 
   const pct = (x: number) => (x * 100).toFixed(1) + "%";
@@ -163,13 +224,19 @@ export function wireLensRig(root: ParentNode): void {
     input.value = ""; // so choosing the same set twice re-runs
     if (!picked.length) return;
     profResults.replaceChildren();
+    profCoverage.replaceChildren();
+    profDetail.hidden = false;
+    (profDetail as HTMLDetailsElement).open = false;
+    profRunning.hidden = false;
+    profRunning.textContent = "Reading what you picked…";
+    sink = profResults;
     profOut.hidden = true;
     stopRequested = false;
     profStop.hidden = false;
     profStop.textContent = "Stop";
     profStop.onclick = () => { stopRequested = true; profStop.textContent = "Stopping…"; };
 
-    const status = profNote("Looking at what you picked…");
+    const status = profRunning; // outside the fold: a progress line nobody can see is not progress
     const files = await expand(picked, (t) => profNote(t));
     if (!files.length) { status.textContent = "Nothing to measure."; profStop.hidden = true; return; }
 
@@ -338,6 +405,7 @@ export function wireLensRig(root: ParentNode): void {
     // belonged to or why they went — and no way at all to see which focal
     // lengths and apertures were still unmeasured, which is the only question a
     // second trip out with the camera can answer.
+    sink = profCoverage;
     profNote("What you have measured, and what is still missing");
     for (const [short, sl] of sawLens) {
       const mine = Object.entries(profiles).filter(([k]) => k.startsWith(short + "@"));
@@ -406,11 +474,20 @@ export function wireLensRig(root: ParentNode): void {
         (spare ? ` ${spare} more were not needed — ${PER_GROUP} at one focal length and aperture is enough, so the rest were left undecoded rather than costing you the wait.` : ""));
     }
 
+    sink = profCoverage;
     const text = JSON.stringify(payload);
     profText.value = text;
     profOut.hidden = false;
+    // The instructions were read before the frames were picked; leaving them
+    // open pushes the one button that matters off the first screenful.
+    const intro = document.getElementById("lensIntro") as HTMLDetailsElement | null;
+    if (intro) intro.open = false;
     const used = Object.values(profiles).reduce((n, x) => n + x.frames, 0);
-    profNote(`${(text.length / 1024).toFixed(1)} KB of numbers, averaged from ${used} frame${used === 1 ? "" : "s"} out of the ${files.length} you picked. Copy it into a message, or save it and send the file — either way the photographs stay here.`);
+    profRunning.textContent = `Measured ${used} frame${used === 1 ? "" : "s"} out of the ${files.length} you picked, into ${Object.keys(profiles).length} profile${Object.keys(profiles).length === 1 ? "" : "s"}. Nothing left this device.`;
+    profNote(`${(text.length / 1024).toFixed(1)} KB of numbers. Copy it into a message, or save it and send the file — either way the photographs stay here.`);
+    // The outcome is at the top now, and the reader is at the bottom of a long
+    // list of rows. Take them to the thing they came for.
+    profOut.scrollIntoView({ block: "start", behavior: "smooth" });
     // KEEPING IT IS THE POINT. Without this the rig is a form that prints
     // numbers for somebody else to paste into the app's source.
     const useBtn = root.querySelector<HTMLButtonElement>("#lensUse")!;
@@ -422,6 +499,7 @@ export function wireLensRig(root: ParentNode): void {
         ? `Kept ${r.saved} profile${r.saved === 1 ? "" : "s"} on this device. Open a photograph from this lens and look under Corrections — Your measured lens.`
         : "This browser refused to store it (a private window, or no room left). The numbers above still copy and save.";
       useBtn.textContent = r.saved && r.ok ? "Kept" : "Could not keep it";
+      renderKept(); // what is on the device has just changed
       setTimeout(() => { useBtn.textContent = "Use these on my photos"; }, 2600);
     };
     profCopy.onclick = () => copy(text, profCopy, "Copy the numbers");

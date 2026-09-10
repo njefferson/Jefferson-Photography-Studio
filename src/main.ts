@@ -273,6 +273,7 @@ function syncHotspot() {
   syncLensTexture();
   draw();
   updateHotspotUI();
+  updateLensCmp();
 }
 
 function updateHotspotUI() {
@@ -359,6 +360,7 @@ function syncMyLens() {
   syncLensTexture();
   draw();
   updateMyLensUI();
+  updateLensCmp();
 }
 
 function updateMyLensUI() {
@@ -419,6 +421,7 @@ function initMyLens(_img: DecodedImage, _imported: ImportedFile) {
   syncColourStrength();
   syncLensTexture();
   updateMyLensUI();
+  updateLensCmp();
 }
 
 myLensUi.strength.addEventListener("input", () => {
@@ -449,6 +452,7 @@ function initHotspot(_img: DecodedImage, _imported: ImportedFile) {
   params.hsFix = 1;
   params.hsBypass = false;
   updateHotspotUI();
+  updateLensCmp();
 }
 
 /** The open photograph's EXIF, read ONCE. Both lens cards want the lens, the
@@ -607,6 +611,7 @@ function syncToUI() {
   ui.hotspotColor.value = String(params.hotspotColor);
   updateHotspotUI(); // both lens cards are params-driven, so history reaches them
   updateMyLensUI();
+  updateLensCmp();
   ui.vignette.value = String(params.vignette);
   ui.clarity.value = String(params.clarity);
   ui.dehaze.value = String(params.dehaze);
@@ -4546,6 +4551,45 @@ const origBtn = $("origBtn") as HTMLButtonElement;
 wireHold(origBtn, showOriginal);
 wireHold($("untouchedBtn") as HTMLButtonElement, showUntouched);
 
+// --- The automatic lens correction, and being able to see it ---------------
+// It is applied without being asked for, which is the point of it — and that is
+// exactly why a reader has no way to tell it happened, or to judge whether it
+// helped. Both were missing: nothing said a correction was on unless you went
+// looking under Corrections, and the only before/after was Hold: Untouched,
+// which drops white balance, exposure and denoise as well and so answers a
+// different question.
+//
+// This button is PRESENT only when a lens correction is actually on this
+// photograph, so its presence is the indicator; holding it takes off the lens
+// correction and nothing else.
+const lensCmpBtn = $("lensCmpBtn") as HTMLButtonElement;
+function showNoLensFix(on: boolean) {
+  if (!current) return;
+  const p = on ? { ...params, lensFix: 0, lensBypass: true, hsFix: 0, hsBypass: true } : params;
+  renderer.render(p);
+  refreshHistogram(p);
+}
+wireHold(lensCmpBtn, showNoLensFix);
+
+/** Is any automatic lens correction actually landing on this frame right now? */
+function lensFixLive(): boolean {
+  const colour = !params.lensBypass && (params.lensFix ?? 0) !== 0 && !!colourHalf();
+  const bump = !params.hsBypass && (params.hsFix ?? 0) !== 0 && !!hotspotState?.p.bump?.some((v) => v > 0);
+  return colour || bump;
+}
+
+/** Show the button when there is something to compare, and say what is on. */
+function updateLensCmp() {
+  const live = lensFixLive();
+  lensCmpBtn.hidden = !live;
+  if (!live) return;
+  const mine = !!myLens;
+  const bump = !params.hsBypass && !!hotspotState?.p.bump?.some((v) => v > 0);
+  const colour = !params.lensBypass && !!colourHalf();
+  const what = colour && bump ? "brightness and colour" : bump ? "brightness" : "colour";
+  lensCmpBtn.title = `A lens correction is on this photo (${what}, from ${mine ? "your own measurement" : "the profile that came with the app"}). Press and hold to see it without.`;
+}
+
 // Panel scroll cues: arrows appear when there is more panel above/below.
 function updateScrollCues() {
   if (panel.hidden) {
@@ -6516,38 +6560,41 @@ document.addEventListener("paste", (e) => {
 // there is no browser chrome, so Back is a system gesture and losing the whole
 // app to it is not a small thing.
 //
-// The two flags are the whole difficulty: closing a dialog has to consume the
-// history entry it pushed, and consuming it fires popstate, which would then
-// try to close another dialog. Each flag marks "this next event is mine".
-let dlgDepth = 0;
-let closingFromHistory = false;
-let backIsOurs = false;
-// The spinner is a <dialog> too, and showModal()s on every open — but nobody
-// NAVIGATED to it, it is not something Back should dismiss (dismissing it would
-// not stop the work), and pushing an entry every time a photo loads fills the
-// history with churn. A surface earns a history entry by being one the reader
-// chose to open.
-const NO_HISTORY = new Set(["busy"]);
-for (const d of Array.from(document.querySelectorAll("dialog")).filter((x) => !NO_HISTORY.has(x.id))) {
+// ONE GUARD ENTRY, NOT ONE PER DIALOG. This used to push an entry on every open
+// and consume it with history.back() on every close, which works and leaves a
+// FORWARD entry behind every single time — and a swipe from the RIGHT edge of an
+// iPad is forward navigation, so Safari offered to drag the sheet you had just
+// closed back into view. Nothing reopened, because popstate found no dialog
+// open, but the app appeared to be pulling a dead page around.
+//
+// So closing a dialog now touches history not at all, and there is exactly one
+// entry ever: a guard pushed at startup and re-pushed after each Back that
+// closes something. Re-pushing is also what truncates any forward entry the
+// browser is holding. Back with nothing open is left alone — a reader who wants
+// out gets out.
+let guarded = false;
+function pushGuard() {
+  history.pushState({ ipsGuard: 1 }, "");
+  guarded = true;
+}
+pushGuard();
+// A Back with nothing open spends the guard, so the next sheet the reader opens
+// puts one back. Opening while already guarded pushes NOTHING — which is the
+// whole point: no push, no forward entry, no ghost page to swipe at.
+for (const d of Array.from(document.querySelectorAll("dialog")).filter((x) => x.id !== "busy")) {
   new MutationObserver(() => {
-    if ((d as HTMLDialogElement).open) {
-      dlgDepth++;
-      history.pushState({ ipsDialog: dlgDepth }, "");
-    } else if (dlgDepth > 0 && !closingFromHistory) {
-      dlgDepth--;
-      backIsOurs = true;
-      history.back();
-    }
+    if ((d as HTMLDialogElement).open && !guarded) pushGuard();
   }).observe(d, { attributes: true, attributeFilter: ["open"] });
 }
 window.addEventListener("popstate", () => {
-  if (backIsOurs) { backIsOurs = false; return; } // our own consuming back()
-  const open = Array.from(document.querySelectorAll("dialog[open]")) as HTMLDialogElement[];
-  if (!open.length) return;
-  if (dlgDepth > 0) dlgDepth--;
-  closingFromHistory = true;
+  const open = (Array.from(document.querySelectorAll("dialog[open]")) as HTMLDialogElement[])
+    // The spinner is a <dialog> too, and nobody NAVIGATED to it: dismissing it
+    // would not stop the work it is reporting on. A surface earns a Back by
+    // being one the reader chose to open.
+    .filter((d) => d.id !== "busy");
+  if (!open.length) { guarded = false; return; }
   open[open.length - 1].close(); // topmost is the one on screen
-  closingFromHistory = false;
+  pushGuard();
 });
 
 // --- Photo sessions -------------------------------------------------------
