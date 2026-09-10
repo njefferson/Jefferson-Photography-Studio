@@ -111,6 +111,57 @@ const IMAGE_EXTS = [".dng", ".nef", ".tif", ".tiff", ".heic", ".heif", ".jpg", "
 const isReal = (name: string) => !name.includes("__MACOSX/") && !(name.split("/").pop() ?? name).startsWith("._");
 const isImage = (name: string) => IMAGE_EXTS.some((x) => (name.split("/").pop() ?? name).toLowerCase().endsWith(x));
 
+/** Just the FIRST `maxBytes` of an entry, inflating only as far as it must.
+ *
+ *  Reading a lens's EXIF needs the head of a file — a TIFF's IFD0 sits near the
+ *  front — and a raw frame is 25 MB. Inflating whole frames to learn which lens
+ *  they came from is most of the cost of a big zip and none of the answer: a
+ *  1.69 GB set is roughly seventy frames, and four or five per focal length is
+ *  all a profile needs.
+ *
+ *  A truncated deflate stream ERRORS when it runs out without a terminator,
+ *  which is expected here and is not a failure — whatever arrived before that
+ *  is exactly what was asked for. */
+export async function readZipEntryPrefix(file: Blob, e: ZipIndexEntry, maxBytes: number): Promise<Uint8Array> {
+  const head = new Uint8Array(await file.slice(e.localHeaderOffset, e.localHeaderOffset + 30).arrayBuffer());
+  const hv = new DataView(head.buffer, head.byteOffset, head.byteLength);
+  if (head.byteLength < 30 || hv.getUint32(0, true) !== SIG_LOCAL) throw new Error(`Zip entry "${e.name}" has no local header.`);
+  const dataStart = e.localHeaderOffset + 30 + hv.getUint16(26, true) + hv.getUint16(28, true);
+  if (e.method === 0) {
+    return new Uint8Array(await file.slice(dataStart, dataStart + Math.min(e.compSize, maxBytes)).arrayBuffer());
+  }
+  // Take a little more compressed data than the wanted output, since deflate
+  // can expand — and cap it, so a 25 MB entry never has to be read whole.
+  const take = Math.min(e.compSize, maxBytes + 64 * 1024);
+  const comp = new Uint8Array(await file.slice(dataStart, dataStart + take).arrayBuffer());
+  const ds = new DecompressionStream("deflate-raw");
+  const w = ds.writable.getWriter();
+  void w.write(comp).catch(() => {});
+  void w.close().catch(() => {});
+  const r = ds.readable.getReader();
+  const parts: Uint8Array[] = [];
+  let n = 0;
+  try {
+    while (n < maxBytes) {
+      const { value, done } = await r.read();
+      if (done || !value) break;
+      parts.push(value);
+      n += value.length;
+    }
+  } catch {
+    // Truncated on purpose — use what came out.
+  }
+  try { await r.cancel(); } catch { /* already closed */ }
+  const out = new Uint8Array(Math.min(n, maxBytes));
+  let o = 0;
+  for (const part of parts) {
+    if (o >= out.length) break;
+    out.set(part.subarray(0, out.length - o), o);
+    o += part.length;
+  }
+  return out;
+}
+
 /** Every image entry, in the zip's own order, skipping macOS resource forks. */
 export function imageEntries<T extends { name: string }>(entries: T[]): T[] {
   return entries.filter((e) => isReal(e.name) && isImage(e.name));
