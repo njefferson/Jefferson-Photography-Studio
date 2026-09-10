@@ -177,6 +177,8 @@ export function wireLensRig(root: ParentNode): void {
     // 256 KB out of a 25 MB raw, so a big zip is sorted in seconds rather than
     // decoded for minutes to learn what it already says in its EXIF.
     const seen: { f: Candidate; key: string; model: string; short: string; fl: number; ap: number }[] = [];
+    /** Every lens the picked set CONTAINS, whether or not it produces a profile. */
+    const sawLens = new Map<string, { model: string; frames: number; fls: Set<number>; aps: Set<string> }>();
     let camera = "";
     let unreadable = 0;
     for (let i = 0; i < files.length; i++) {
@@ -197,11 +199,22 @@ export function wireLensRig(root: ParentNode): void {
         // is a survey of seven different behaviours reported as one number.
         const apKey = Number.isFinite(ap) ? `f${ap.toFixed(1)}` : "f?";
         seen.push({ f: files[i], key: `${short}@${Math.round(fl)}@${apKey}`, model, short, fl: Math.round(fl), ap });
+        // Every lens the SET contains, whether or not it ends up producing a
+        // profile. Reporting only what came out is how a lens can be shot,
+        // picked, refused frame by frame and never mentioned again.
+        const sl = (sawLens.get(short) ?? sawLens.set(short, { model, frames: 0, fls: new Set<number>(), aps: new Set<string>() }).get(short)!);
+        sl.frames++; sl.fls.add(Math.round(fl)); sl.aps.add(apKey);
       } catch { unreadable++; }
     }
 
     // --- CHOOSE: a handful per lens and focal length, spread across the set ---
     const byKey = new Map<string, typeof seen>();
+    // short lens -> reason -> how many frames it happened to
+    const dropped = new Map<string, Map<string, number>>();
+    const drop = (short: string, why: string) => {
+      const m = dropped.get(short) ?? dropped.set(short, new Map()).get(short)!;
+      m.set(why, (m.get(why) ?? 0) + 1);
+    };
     for (const c of seen) (byKey.get(c.key) ?? byKey.set(c.key, []).get(c.key)!).push(c);
     const chosen: typeof seen = [];
     let skipped = 0;
@@ -212,6 +225,7 @@ export function wireLensRig(root: ParentNode): void {
       const step = list.length / PER_GROUP;
       for (let i = 0; i < PER_GROUP; i++) chosen.push(list[Math.floor(i * step)]);
       skipped += list.length - PER_GROUP;
+      for (let n = 0; n < list.length - PER_GROUP; n++) drop(list[0].short, `not needed — ${PER_GROUP} at that focal length and aperture is enough`);
     }
     const summary = [
       `${seen.length} photograph${seen.length === 1 ? "" : "s"} with a lens and focal length in them`,
@@ -246,7 +260,7 @@ export function wireLensRig(root: ParentNode): void {
         const img = await decodeOffThread({ name: c.f.name, kind: sniff(bytes), bytes, looksTranscoded: false });
         const prof = profileFrame(img);
         const where = `${c.model} at ${c.fl}mm`;
-        if (!prof.usable) { unusable++; profRow(c.f.name, "not used", `${prof.why}. ${where}.`); continue; }
+        if (!prof.usable) { unusable++; drop(c.short, prof.why); profRow(c.f.name, "not used", `${prof.why}. ${where}.`); continue; }
         let g = groups.get(c.key);
         if (!g) { g = { frames: [], model: c.model, short: c.short, fl: c.fl, aps: [], kinds: new Set() }; groups.set(c.key, g); }
         g.frames.push(prof);
@@ -259,6 +273,7 @@ export function wireLensRig(root: ParentNode): void {
           `${prof.linear ? "Measured from the raw sensor data" : "Measured from the rendered image"}, mean level ${pct(prof.meanLevel)}, ${pct(prof.clipFrac)} clipped, ${pct(prof.structure)} variation around a circle.`);
       } catch (err) {
         unusable++;
+        drop(c.short, "it could not be opened");
         profRow(c.f.name, "not used", `It could not be opened (${(err as Error).message}).`);
       }
     }
@@ -317,6 +332,80 @@ export function wireLensRig(root: ParentNode): void {
       lens_map: lensMap,
       fl_anchors: anchors,
     };
+    // --- WHAT YOU HAVE, AND WHAT YOU STILL DO NOT ------------------------
+    // The rig used to print what came OUT and nothing about what went in. A set
+    // of 94 frames came back as 21, with no way to see which lens the other 73
+    // belonged to or why they went — and no way at all to see which focal
+    // lengths and apertures were still unmeasured, which is the only question a
+    // second trip out with the camera can answer.
+    profNote("What you have measured, and what is still missing");
+    for (const [short, sl] of sawLens) {
+      const mine = Object.entries(profiles).filter(([k]) => k.startsWith(short + "@"));
+      if (!mine.length) {
+        const why = [...(dropped.get(short) ?? new Map())]
+          .sort((a, b) => b[1] - a[1])
+          .map(([w, n]) => `${n} × ${w.replace(/\.$/, "")}`)
+          .join("; ");
+        profRow(short, "nothing measured",
+          `${sl.frames} frame${sl.frames === 1 ? "" : "s"} of this lens were in the set and none produced a profile. ${why ? why + "." : "No reason was recorded."} ` +
+          `Nothing from this lens is in the numbers below.`);
+        continue;
+      }
+      // What came out, focal length by focal length.
+      const byFl = new Map<number, { aps: string[]; frames: number }>();
+      for (const [k, v] of mine) {
+        const m = /@(\d+(?:\.\d+)?)@f([\d.?]+)$/.exec(k);
+        if (!m) continue;
+        const fl = Number(m[1]);
+        const e = byFl.get(fl) ?? byFl.set(fl, { aps: [], frames: 0 }).get(fl)!;
+        e.aps.push(m[2] === "?" ? "aperture not recorded" : `f/${Number(m[2])}`);
+        e.frames += v.frames;
+      }
+      const fls = [...byFl.keys()].sort((a, b) => a - b);
+      for (const fl of fls) {
+        const e = byFl.get(fl)!;
+        const thin = e.frames < 3 * e.aps.length;
+        profRow(`${short} at ${fl}mm`, `${e.aps.length} aperture${e.aps.length === 1 ? "" : "s"}`,
+          `${e.aps.sort((x, y) => (parseFloat(x.slice(2)) || 1e9) - (parseFloat(y.slice(2)) || 1e9)).join(", ")} — ${e.frames} frame${e.frames === 1 ? "" : "s"} in all.` +
+          (e.aps.length === 1 ? " Only one aperture here, and a hot-spot changes a long way with aperture: this focal length is described at that aperture and nowhere else." : "") +
+          (thin ? " Thin — four or five frames per aperture average out the sky's own gradient." : ""));
+      }
+      // The gaps, stated as the next trip out rather than as a complaint.
+      const gaps: string[] = [];
+      const zoom = /(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*mm/i.exec(sl.model);
+      if (zoom) {
+        const lo = Number(zoom[1]), hi = Number(zoom[2]);
+        const cLo = fls[0], cHi = fls[fls.length - 1];
+        if (cHi < hi * 0.9) gaps.push(`nothing above ${cHi}mm on a lens that reaches ${hi}mm`);
+        if (cLo > lo * 1.1) gaps.push(`nothing below ${cLo}mm on a lens that starts at ${lo}mm`);
+        // A hole in the middle wide enough that blending across it is a guess.
+        for (let i = 0; i < fls.length - 1; i++) {
+          if (fls[i + 1] / fls[i] > 2.2) gaps.push(`a gap between ${fls[i]}mm and ${fls[i + 1]}mm`);
+        }
+      }
+      const sweeps = fls.filter((fl) => byFl.get(fl)!.aps.length >= 3);
+      if (!sweeps.length) {
+        gaps.push("no focal length shot at three or more apertures, so the hot-spot's change with aperture is not measured anywhere");
+      } else if (fls.length > sweeps.length) {
+        const single = fls.filter((fl) => byFl.get(fl)!.aps.length === 1);
+        const shared = single.filter((fl) => byFl.get(fl)!.aps.some((a) => byFl.get(sweeps[0])!.aps.includes(a)));
+        if (single.length && !shared.length) {
+          gaps.push(`${single.map((f2) => f2 + "mm").join(" and ")} share no aperture with the sweep at ${sweeps[0]}mm, so focal length and aperture cannot be told apart there — one frame at an aperture already in the sweep would tie them together`);
+        }
+      }
+      // Two different things, and running them together would be dishonest: a
+      // frame that COULD NOT be used is a problem, and a frame that was not
+      // needed is the rig deciding it had enough.
+      const all = [...(dropped.get(short) ?? new Map())];
+      const lost = all.filter(([w]) => !w.startsWith("not needed"));
+      const spare = all.filter(([w]) => w.startsWith("not needed")).reduce((n, [, c]) => n + c, 0);
+      const lostN = lost.reduce((n, [, c]) => n + c, 0);
+      profRow(`${short} — still missing`, gaps.length ? `${gaps.length} gap${gaps.length === 1 ? "" : "s"}` : "nothing obvious",
+        (gaps.length ? gaps.join("; ") + "." : "Every focal length you shot has more than one aperture, and the zoom range is covered.") +
+        (lostN ? ` ${lostN} frame${lostN === 1 ? "" : "s"} of this lens could not be used: ${lost.sort((a, b) => b[1] - a[1]).map(([w, n]) => `${n} × ${w}`).join("; ")}.` : "") +
+        (spare ? ` ${spare} more were not needed — ${PER_GROUP} at one focal length and aperture is enough, so the rest were left undecoded rather than costing you the wait.` : ""));
+    }
+
     const text = JSON.stringify(payload);
     profText.value = text;
     profOut.hidden = false;
