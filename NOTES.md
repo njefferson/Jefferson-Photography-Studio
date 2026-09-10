@@ -5663,6 +5663,58 @@ profiles on the RAW path at all (they are JPEG-only because full NEFs could not
 be moved into the measurement rig); and `keyFor`'s nearest-focal-length anchor
 selection, which snaps rather than interpolating between anchors.
 
+## A whole set at once, and a zip counts as everything in it, 2026-09-10
+
+The lens rig took several files from the moment it existed, but not the way a
+set of RAW frames actually travels on an iPad: **zipped**. Zipping is the only
+route that hands iOS a NEF without it being transcoded to JPEG, so "a whole set"
+and "a zip" are the same thing here. It now takes both, and mixes them freely —
+a zip and a loose file in one pick came back as five frames.
+
+**The zip is read one entry at a time, because a set of forty raw frames is a
+gigabyte.** `readZip` decompresses EVERY entry into memory at once, which is
+right for the editor — it wants one photo out of a zip already in memory — and
+impossible here. `readZipIndex`/`readZipEntry` work off a **Blob** instead and
+slice only the byte ranges they need: the tail for the end-of-central-directory
+record, the central directory, then each entry's own bytes. Asserted rather than
+claimed: listing a 264 KB zip read 64 KB of it, and pulling one frame out of
+four read 67 KB.
+
+`readZip` is now written ON TOP of those two rather than beside them. One
+central-directory parser, one extension list (`IMAGE_EXTS`), one resource-fork
+filter — the alternative is a zip that comes out as a JPEG in one place and a
+DNG in another, which is the shape of §243.
+
+**The editor still takes only the FIRST image out of a zip, on purpose** — it is
+opening one photo, and its own source says so. The rig wants all of them. Both
+now go through the same reader, so that difference is one line of intent rather
+than two implementations.
+
+**A long run can be stopped and keeps what it has.** Sixteen frames, stopped
+part way: five kept, filed, averaged and emitted, with a line saying it stopped
+after five of sixteen. Stop is 668x44 and disappears when the run ends.
+
+**THE TEST THAT PASSED WITHOUT MEASURING ANYTHING.** A planted defect — ignore
+the LOCAL header's extra-field length and take the central directory's — went
+green, because every zip in the harness was made by Python's `zipfile`, which
+writes no local extra field. Real zips do: macOS and iOS "Compress" both write
+an extended-timestamp record, and the local and central copies are not even the
+same length. A fifth zip was built carrying a 9-byte local extra field, and the
+same plant then failed on every entry.
+
+**And the plant's first re-run was misread as a pass.** A corrupt data offset
+makes the deflate stream throw, and an uncaught throw came out as a stack trace
+rather than a FAIL line — so a grep for `^FAIL` found nothing and the next
+command's "ZIP OK" was read as the plant's result. The entry read is wrapped now,
+so a corrupt entry reports as the assertion it is. **A test that crashes has not
+passed, and a harness that cannot tell the difference is not a harness.**
+
+Covered: deflated, stored, a trailing 4 KB comment (so the EOCD is not at the
+end), local extra fields, entries inside a folder, `__MACOSX/` forks and `._`
+siblings, a text file among the images, a zip with no images, and a file that is
+not a zip. Every entry byte-identical to what went in, and a zipped set gives
+numbers identical to the same frames loose to 1e-6.
+
 ## Measuring a lens where the lens is, 2026-09-10
 
 **The question was how to get 25 MB raw flats off the iPad and into a session.**

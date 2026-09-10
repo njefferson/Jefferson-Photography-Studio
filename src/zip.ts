@@ -1,16 +1,18 @@
-// Minimal ZIP reader — no dependencies. Enough to pull the first real entry
-// (e.g. a .dng) out of a zip created by iOS/macOS "Compress". Uses the
-// browser's DecompressionStream for deflated entries; supports stored entries.
+// Minimal ZIP reader — no dependencies. Enough to pull real entries (e.g. a
+// .dng) out of a zip created by iOS/macOS "Compress". Uses the browser's
+// DecompressionStream for deflated entries; supports stored entries.
 //
 // We support zips because uploading a zip is the reliable way to get a RAW file
 // through iOS without it being transcoded to JPEG. See PLAN.md "Import hardening".
-
-interface CentralEntry {
-  name: string;
-  method: number; // 0 = stored, 8 = deflate
-  compSize: number;
-  localHeaderOffset: number;
-}
+//
+// TWO WAYS IN, and the difference is memory. `readZip` takes an ArrayBuffer and
+// decompresses EVERY entry at once, which is right for the editor: it wants one
+// photo out of a zip that is already in memory. The lens rig wants forty raw
+// frames out of a zip that may be a gigabyte, and it only needs one at a time —
+// so `readZipIndex`/`readZipEntry` work off a Blob and read only the byte
+// ranges they need, never holding more than a single entry. Both share one
+// central-directory parser; the rule against two implementations of one format
+// is why `readZip` is written on top of them rather than beside them.
 
 const SIG_EOCD = 0x06054b50;
 const SIG_CEN = 0x02014b50;
@@ -21,27 +23,41 @@ export interface ZipEntry {
   bytes: Uint8Array;
 }
 
-/** Returns every file entry in the zip, decompressed. */
-export async function readZip(buf: ArrayBuffer): Promise<ZipEntry[]> {
-  const view = new DataView(buf);
-  const bytes = new Uint8Array(buf);
+export interface ZipIndexEntry {
+  name: string;
+  /** 0 = stored, 8 = deflate. */
+  method: number;
+  /** Compressed size in bytes — what has to be read to get this entry out. */
+  compSize: number;
+  localHeaderOffset: number;
+}
 
-  // Find End Of Central Directory by scanning backwards (comment may follow it).
-  let eocd = -1;
-  for (let i = buf.byteLength - 22; i >= 0; i--) {
+/** How many bytes at the end of a zip can hold the end-of-central-directory
+ *  record: its own 22 plus a comment field of up to 65535. */
+const EOCD_MAX = 22 + 0xffff;
+
+function parseEocd(view: DataView, base: number): { count: number; cdOffset: number; cdSize: number } {
+  // Scan backwards — a comment may follow the record, so its position is not
+  // fixed and the signature is the only anchor.
+  for (let i = view.byteLength - 22; i >= 0; i--) {
     if (view.getUint32(i, true) === SIG_EOCD) {
-      eocd = i;
-      break;
+      return {
+        count: view.getUint16(i + 10, true),
+        cdSize: view.getUint32(i + 12, true),
+        cdOffset: view.getUint32(i + 16, true) - base,
+      };
     }
   }
-  if (eocd < 0) throw new Error("Not a valid zip (no end-of-central-directory).");
+  throw new Error("Not a valid zip (no end-of-central-directory).");
+}
 
-  const count = view.getUint16(eocd + 10, true);
-  let p = view.getUint32(eocd + 16, true); // central directory offset
-
-  const entries: CentralEntry[] = [];
+/** Read a central directory that has already been sliced out, at `p` bytes in.
+ *  `p` is relative to `view`; entry offsets stay absolute, as the zip records
+ *  them. */
+function parseCentral(view: DataView, bytes: Uint8Array, p: number, count: number): ZipIndexEntry[] {
+  const entries: ZipIndexEntry[] = [];
   for (let i = 0; i < count; i++) {
-    if (view.getUint32(p, true) !== SIG_CEN) break;
+    if (p + 46 > view.byteLength || view.getUint32(p, true) !== SIG_CEN) break;
     const method = view.getUint16(p + 10, true);
     const compSize = view.getUint32(p + 20, true);
     const nameLen = view.getUint16(p + 28, true);
@@ -49,22 +65,63 @@ export async function readZip(buf: ArrayBuffer): Promise<ZipEntry[]> {
     const commentLen = view.getUint16(p + 32, true);
     const localHeaderOffset = view.getUint32(p + 42, true);
     const name = new TextDecoder().decode(bytes.subarray(p + 46, p + 46 + nameLen));
-    entries.push({ name, method, compSize, localHeaderOffset });
+    if (!name.endsWith("/")) entries.push({ name, method, compSize, localHeaderOffset });
     p += 46 + nameLen + extraLen + commentLen;
   }
+  return entries;
+}
 
-  const out: ZipEntry[] = [];
-  for (const e of entries) {
-    if (e.name.endsWith("/")) continue; // directory
-    const lh = e.localHeaderOffset;
-    if (view.getUint32(lh, true) !== SIG_LOCAL) continue;
-    const nameLen = view.getUint16(lh + 26, true);
-    const extraLen = view.getUint16(lh + 28, true);
-    const dataStart = lh + 30 + nameLen + extraLen;
-    const comp = bytes.subarray(dataStart, dataStart + e.compSize);
-    const data = e.method === 0 ? comp.slice() : await inflateRaw(comp);
-    out.push({ name: e.name, bytes: data });
+/** List a zip's entries WITHOUT decompressing any of them, reading only the
+ *  tail and the central directory. Cheap enough to run on a file far too large
+ *  to hold in memory. */
+export async function readZipIndex(file: Blob): Promise<ZipIndexEntry[]> {
+  const tailLen = Math.min(EOCD_MAX, file.size);
+  const tailStart = file.size - tailLen;
+  const tail = new Uint8Array(await file.slice(tailStart).arrayBuffer());
+  const { count, cdOffset, cdSize } = parseEocd(new DataView(tail.buffer, tail.byteOffset, tail.byteLength), tailStart);
+  // The directory is usually inside the tail already; slice it only if not.
+  if (cdOffset >= 0 && cdOffset + cdSize <= tail.byteLength) {
+    return parseCentral(new DataView(tail.buffer, tail.byteOffset, tail.byteLength), tail, cdOffset, count);
   }
+  const abs = cdOffset + tailStart;
+  const cd = new Uint8Array(await file.slice(abs, abs + cdSize).arrayBuffer());
+  return parseCentral(new DataView(cd.buffer, cd.byteOffset, cd.byteLength), cd, 0, count);
+}
+
+/** Pull ONE entry out, reading only its own bytes. */
+export async function readZipEntry(file: Blob, e: ZipIndexEntry): Promise<Uint8Array> {
+  // The local header repeats the name and carries its own extra field, whose
+  // length need not match the central directory's — so the data offset can
+  // only be worked out from the local header itself.
+  const head = new Uint8Array(await file.slice(e.localHeaderOffset, e.localHeaderOffset + 30).arrayBuffer());
+  const hv = new DataView(head.buffer, head.byteOffset, head.byteLength);
+  if (head.byteLength < 30 || hv.getUint32(0, true) !== SIG_LOCAL) throw new Error(`Zip entry "${e.name}" has no local header.`);
+  const dataStart = e.localHeaderOffset + 30 + hv.getUint16(26, true) + hv.getUint16(28, true);
+  const comp = new Uint8Array(await file.slice(dataStart, dataStart + e.compSize).arrayBuffer());
+  return e.method === 0 ? comp : inflateRaw(comp);
+}
+
+/** ONE list, in preference order — richest format first, since `pickImageEntry`
+ *  reads it as a priority. Two copies of this list is how a zip comes out as a
+ *  JPEG in one place and a DNG in another. */
+const IMAGE_EXTS = [".dng", ".nef", ".tif", ".tiff", ".heic", ".heif", ".jpg", ".jpeg", ".png"];
+
+/** macOS "Compress" puts a resource fork beside every file; neither is an image
+ *  and both would otherwise be measured. */
+const isReal = (name: string) => !name.includes("__MACOSX/") && !(name.split("/").pop() ?? name).startsWith("._");
+const isImage = (name: string) => IMAGE_EXTS.some((x) => (name.split("/").pop() ?? name).toLowerCase().endsWith(x));
+
+/** Every image entry, in the zip's own order, skipping macOS resource forks. */
+export function imageEntries<T extends { name: string }>(entries: T[]): T[] {
+  return entries.filter((e) => isReal(e.name) && isImage(e.name));
+}
+
+/** Returns every file entry in the zip, decompressed. */
+export async function readZip(buf: ArrayBuffer): Promise<ZipEntry[]> {
+  const blob = new Blob([buf]);
+  const index = await readZipIndex(blob);
+  const out: ZipEntry[] = [];
+  for (const e of index) out.push({ name: e.name, bytes: await readZipEntry(blob, e) });
   return out;
 }
 
@@ -179,11 +236,8 @@ export function writeZip(files: ZipWriteEntry[], modified: Date): Blob {
 
 /** Pick the most likely image entry from a zip (skips macOS resource forks). */
 export function pickImageEntry(entries: ZipEntry[]): ZipEntry | undefined {
-  const real = entries.filter(
-    (e) => !e.name.includes("__MACOSX/") && !e.name.split("/").pop()!.startsWith("._"),
-  );
-  const exts = [".dng", ".nef", ".tif", ".tiff", ".jpg", ".jpeg", ".png"];
-  for (const ext of exts) {
+  const real = entries.filter((e) => isReal(e.name));
+  for (const ext of IMAGE_EXTS) {
     const hit = real.find((e) => e.name.toLowerCase().endsWith(ext));
     if (hit) return hit;
   }
