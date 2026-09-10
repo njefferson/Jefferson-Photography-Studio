@@ -558,7 +558,8 @@ function applyLook(name: keyof typeof LOOKS) {
   // two notes about. A balance a reader actually set differs by far more than
   // one slider step.
   const untouched = base.every((v) => Math.abs(v - 1) < 0.01);
-  if (untouched && current && !current.isRaw) {
+  const balancing = untouched && !!current && !current.isRaw;
+  if (balancing && current) {
     const gw = grayWorldWB(current);
     base[0] = gw[0]; base[1] = gw[1]; base[2] = gw[2];
   }
@@ -567,6 +568,18 @@ function applyLook(name: keyof typeof LOOKS) {
     clamp(base[1] * bias[1], 0.02, 16),
     clamp(base[2] * bias[2], 0.02, 16),
   ];
+  // AND THE EXPOSURE THAT GOES WITH IT. A camera-rendered file opens at
+  // exposure 1 because it opens as the camera made it; gray-world balancing an
+  // infrared frame pulls the flooded red channel down hard, so substituting a
+  // balance WITHOUT re-deriving exposure just makes the picture dark. Measured
+  // on real IR JPEGs: mean 83/59/156 as opened, 35/35/32 after a look — nearly
+  // black and nearly grey.
+  //
+  // makeThumb has always done both together, which is why the tile looked right
+  // while the photo did not. This is the second half of the same fix, and a
+  // synthetic single-hue test frame could never have shown it: gray-world makes
+  // one flat hue neutral, so there was nothing to darken.
+  if (balancing && current) params.exposure = autoExposure(current, params.wb);
   lookBias = bias;
   params.swapRB = look.swapRB;
   params.hue = look.hue;

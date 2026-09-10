@@ -5147,6 +5147,46 @@ false — transient banners, and substring matching that missed a synonym. The
 useful version listed Help's own sections and asked which FEATURES were named,
 which found three real gaps in a document that looked complete.
 
+## Real JPEGs found the half of that fix a synthetic could not, 2026-09-10
+
+Five real camera-rendered infrared JPEGs arrived for testing, and the first run
+against them failed on something the synthetic frame was structurally incapable
+of showing.
+
+**Giving the look a white balance was only half of it.** A camera-rendered file
+opens at `exposure = 1` because it opens as the camera made it. Gray-world
+balancing an infrared frame pulls the flooded red channel down hard — so
+substituting a balance without re-deriving exposure just makes the picture dark.
+Measured on NIR_2810-2812: mean 83/59/156 as opened, **35/35/32** after a look.
+Nearly black and nearly grey.
+
+`makeThumb` has always done both together, which is exactly why the tile looked
+right while the photo did not — the same asymmetry as the white balance itself,
+one line further down. `applyLook` now derives exposure alongside the balance it
+substitutes.
+
+**After:** Aerochrome 110/106/112, Goldie 132/105/32, Aero Red 132/81/34; and the
+view-to-thumbnail chroma gap falls to 3.0, 7.6 and 3.6 from 13.1, 51.8 and 55.0.
+
+**And the synthetic could not have caught it.** A single-hue test frame is made
+neutral by gray-world BY CONSTRUCTION, so there is nothing left to darken. The
+whole defect lives in the gap between a flat test colour and a photograph.
+
+**One assertion of mine was measuring the wrong quantity, again.** It failed
+Aerochrome for making the photo "less colourful than it opened" — chroma 25.5
+against 97.2. But an unedited IR JPEG is a heavy UNIFORM purple cast: high
+chroma, one hue, no separation at all. Counting 30-degree hue buckets holding a
+real share of saturated pixels:
+
+- as opened — chroma 97.2, **1 bucket**
+- Aerochrome — chroma 25.5, **4 buckets**
+- Goldie — chroma 100.7, 3 buckets
+- Aero Red — chroma 99.1, 2 buckets
+
+So the look with the LOWEST chroma produces the MOST colour separation, which is
+precisely what the channel-swap copy says a look does. Chroma cannot tell a cast
+from false colour; hue spread can.
+
 ## A look on a camera-rendered file had no white balance to work on, 2026-09-10
 
 **Reported first as "the thumbnail fix only affects jpg, not nef", then — with a
