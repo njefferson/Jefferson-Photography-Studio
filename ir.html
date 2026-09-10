@@ -416,9 +416,9 @@
             <label>Vignette <input id="vignette" type="range" min="-1" max="1" step="0.01" value="0" /></label>
             <button id="lensMeasureBtn" type="button">Measure your lens&hellip;</button>
             <p class="note">Setting these by eye on every photograph is the fallback. Measuring works your own lens&rsquo;s hot-spot out from photographs of empty sky &mdash; it needs no photo open, so it is on the start screen and in Settings too.</p>
-            <p class="note">Setting these by eye on every photograph is the fallback. <a href="./debug.html">Measure this lens&hellip;</a> works your own lens&rsquo;s hot-spot out from photographs of empty sky, on this device &mdash; the frames never leave the iPad, and what comes back is a small block of numbers.</p>
             <div class="subcard">
-              <div class="sub-title">Matched lens profile <span>measured, per-lens</span></div>
+              <div class="sub-title">Matched lens profile <span>automatic, per-lens</span></div>
+              <p class="note">Two lenses came measured with the app. When a photograph was taken with one of them, its hot-spot correction is chosen from the file&rsquo;s own EXIF and set to the frame&rsquo;s <em>own</em> focal length &mdash; between the two nearest measurements, not snapped to one of them. It needs nothing set by hand, and it works on RAW as well as camera JPEGs. Measure your own lens below and that takes over for the colour.</p>
               <small class="note" id="hsStatus">No photo loaded.</small>
               <label>Strength <input id="hsStrength" type="range" min="0" max="1.5" step="0.01" value="1" /></label>
               <button id="hsBypassBtn" type="button" class="toggle" aria-pressed="false">Bypass</button>
@@ -1170,9 +1170,10 @@
         <p><strong>What rides along, and what doesn't:</strong> a batch carries the <em>creative</em> look only.
         <strong>Masks</strong> (radial, gradient, brush) and the <strong>IR lens fixes</strong> sliders —
         Hot-spot, its size, and Vignette — are tied to one specific frame, so they do <em>not</em> carry into a
-        batch. Instead every photo gets its <em>own</em> hot-spot correction chosen from its EXIF lens; a photo whose
-        lens isn't in the EXIF is processed without that fix, and the finish summary counts how many that was
-        (RAW frames skip it too — the hot-spot profiles are JPEG-only for now).</p>
+        batch. Instead every photo gets its <em>own</em> hot-spot correction chosen from its EXIF lens &mdash; RAW and
+        rendered files alike, and interpolated to the frame's own focal length rather than snapped to the nearest
+        one measured. A photo whose lens isn't in the EXIF is processed without that fix, and the finish summary
+        counts how many that was.</p>
         <p>Every finished photo is <strong>saved to the app's own storage as it completes</strong>, so nothing is
         ever lost: you can <strong>stop mid-run</strong> and keep what's done, tap <strong>Continue</strong> to
         resume the rest, and if the app ever crashes or is closed mid-batch, the start screen offers to
