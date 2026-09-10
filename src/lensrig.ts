@@ -329,10 +329,10 @@ export function wireLensRig(root: ParentNode): void {
     useBtn.onclick = () => {
       const r = saveFromPayload(payload);
       useNote.hidden = false;
-      useNote.textContent = r.ok
+      useNote.textContent = r.saved && r.ok
         ? `Kept ${r.saved} profile${r.saved === 1 ? "" : "s"} on this device. Open a photograph from this lens and look under Corrections — Your measured lens.`
         : "This browser refused to store it (a private window, or no room left). The numbers above still copy and save.";
-      useBtn.textContent = r.ok ? "Kept" : "Could not keep it";
+      useBtn.textContent = r.saved && r.ok ? "Kept" : "Could not keep it";
       setTimeout(() => { useBtn.textContent = "Use these on my photos"; }, 2600);
     };
     profCopy.onclick = () => copy(text, profCopy, "Copy the numbers");
