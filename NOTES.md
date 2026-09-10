@@ -8388,3 +8388,59 @@ pointer was sitting over the R-B channel swap button. In Chromium at the same
 viewport, `elementFromPoint` at the button's centre returns the button, and it
 has no `::before` or `::after` — nothing in the app paints there. Recorded as
 unexplained rather than guessed at.
+
+## A later measurement is not a better one, and two doors had two rules, 2026-09-10
+
+A store export from the device answered a question three run-exports could not:
+what did the app actually KEEP. 23 profiles, and three of them disagreed with
+the sound measurement bin for bin.
+
+**What was lost, measured.** `50-250@50@f22.0` was stored from four frames of
+sky and came back holding two. `50-250@50@f16.0` had moved by 0.028. And
+`50-250@50@f4.5` had moved by 0.318 — it was holding the frame with something
+in its corner, not the clean one. All three are keys that two separate runs
+happened to cover, and `saveFromPayload` did `list[at] = entry` unconditionally:
+whichever run went in last won, regardless of which was better.
+
+**It was not silent, and that did not help.** The running line already said
+"50-250@50@f22.0 had 4, now 2" — a warning printed after the loss, among
+eighteen other lines, at the moment the reader is being told the run worked. The
+fix is to keep the better one, not to describe the worse one more loudly.
+
+**The rule: more frames wins; EQUAL frames still replaces.** Frames are the one
+thing comparable between two measurements of the same lens, focal length and
+aperture — more of them average out the sky's own gradient. Equal replaces
+because re-measuring to the same depth is a deliberate refresh, and refusing it
+would leave no way to correct a measurement except deleting it first. A thinner
+one is kept out, said in words, with Remove named as the way to force it.
+
+**AND THE OTHER DOOR HAD ITS OWN COPY.** `importText` — Restore from a file —
+did its own `list[at] = raw` with no rule at all, so the fix above would have
+reached the rig and not the restore button. Both go through one `place()` now.
+This is the same shape as the bump-curve pair (LESSONS: two paths turn one input
+into one answer and must agree); the difference is that pair was caught by a
+test written to compare them, and this one was caught by reading a real store.
+
+**The shape check moved to the door rather than the rig.** It refused a bad
+frame while measuring, and a payload can also be pasted in, restored from a
+backup, or sent over by somebody else — none of which was measuring. It is
+`shapeProblem()` in lensprofile.ts now, exported, called by `place()`. A stored
+profile carries its bump curve rather than the falloff it came from, so a
+restore sees the colour half only; that half caught both real bad profiles on
+its own (steps of 0.150 and 0.186 against 0.021 for the worst sound one).
+
+**A store that already lost measurements cannot be fixed by fixing the rule.**
+The repair is a file: the three displaced profiles rebuilt from the run that
+measured them, the one that was never a lens dropped, restored in one tap. It is
+verified by restoring it over the real store and reading the curves back —
+22 replaced, none refused, f/22 four frames again, f/4.5's corner red back from
+0.76358 to 1.08111. The dropped one has to be removed by hand: a restore adds
+and replaces, it does not delete, and deleting somebody's measurement because it
+is absent from a file is not something a restore should ever do.
+
+**The run-export and the store-export are different files and only one is a
+backup.** "Save as a file" writes `lens-profile-<date>.json` — the run just
+measured. "Save a backup of all of them" writes `lens-profiles-<date>.json` —
+the whole store. Three run-exports arrived, two of them identical, and the
+question "did a run get lost" could not be answered from them at all. Ask for
+the store export.
