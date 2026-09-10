@@ -125,11 +125,19 @@ export function wireLensRig(root: ParentNode): void {
    *  same event as a re-measurement doing it, and deserves the same sentence. */
   function changeSummary(changes: SaveChange[]): string {
     const added = changes.filter((c) => c.what === "added").length;
-    const replaced = changes.filter((c) => c.what === "replaced");
-    const thinner = replaced.filter((c) => (c.wasFrames ?? 0) > c.frames);
-    const parts = [added ? `${added} new` : "", replaced.length ? `${replaced.length} replaced` : ""].filter(Boolean).join(", ");
-    return (parts ? `(${parts}) ` : "") + (thinner.length
-      ? `${thinner.length} replaced a measurement made from MORE frames of sky: ${thinner.map((c) => `${c.key} had ${c.wasFrames}, now ${c.frames}`).join("; ")}.`
+    const replaced = changes.filter((c) => c.what === "replaced").length;
+    const kept = changes.filter((c) => c.what === "kept");
+    const refused = changes.filter((c) => c.what === "refused");
+    const parts = [added ? `${added} new` : "", replaced ? `${replaced} replaced` : "",
+      kept.length ? `${kept.length} left alone` : "",
+      refused.length ? `${refused.length} not describing a lens` : ""].filter(Boolean).join(", ");
+    // The kept-out ones are the only part that needs explaining: the reader
+    // measured something and it did not go in.
+    const refusedText = refused.length
+      ? ` ${refused.length === 1 ? "One was" : `${refused.length} were`} not stored at all: ${refused.map((c) => `${c.key} — ${c.why}`).join("; ")}.`
+      : "";
+    return (parts ? `(${parts}) ` : "") + refusedText + (kept.length
+      ? `${kept.length === 1 ? "One was" : `${kept.length} were`} left as they were, because what is already stored was measured from MORE frames of sky and averages the sky's own gradient out better: ${kept.map((c) => `${c.key} keeps ${c.wasFrames} frames rather than ${c.frames}`).join("; ")}. To put the new one in anyway, remove the stored one below and measure again.`
       : "");
   }
 

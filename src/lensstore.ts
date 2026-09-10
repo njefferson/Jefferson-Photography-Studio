@@ -31,6 +31,7 @@
 // the same idea.
 
 import type { ExifSubset } from "./exif";
+import { shapeProblem } from "./lensprofile";
 
 const KEY = "ips-lens-profiles-v1";
 
@@ -103,10 +104,42 @@ export function listProfiles(): StoredProfile[] {
  *  one-frame measurement over a four-frame one with nothing said. */
 export interface SaveChange {
   key: string;
-  what: "added" | "replaced";
-  /** Frames behind the profile that was displaced, when one was. */
+  what: "added" | "replaced" | "kept" | "refused";
+  /** Why a measurement was refused, in words, when it was. */
+  why?: string;
+  /** Frames behind the profile that was displaced, or that stood its ground. */
   wasFrames?: number;
   frames: number;
+}
+
+/** Put one profile into the list, or say why it did not go in.
+ *
+ *  ONE RULE, BOTH DOORS. Measuring and restoring each had their own copy of
+ *  this, and only one of them was fixed when the rule changed — which is how a
+ *  four-frame f/22 was displaced by a two-frame one in the first place. A
+ *  backup is not exempt: a file restored over a newer, deeper measurement would
+ *  silently undo it, and a backup taken before the shape check knew better can
+ *  carry a frame with the sun in its corner.
+ *
+ *  Frames are the one thing comparable between two measurements of the same
+ *  lens, focal length and aperture: more of them average out the sky's own
+ *  gradient. EQUAL frames still replaces — re-measuring to the same depth is a
+ *  deliberate refresh, and refusing it would leave no way to correct a
+ *  measurement except deleting it first. */
+function place(list: StoredProfile[], entry: StoredProfile, falloff: ArrayLike<number> | undefined): SaveChange {
+  const problem = shapeProblem(falloff ?? [], entry.kr, entry.kb);
+  if (problem) return { key: entry.key, what: "refused", frames: entry.frames, why: problem };
+  const at = list.findIndex((x) => x.key === entry.key);
+  if (at < 0) {
+    list.push(entry);
+    return { key: entry.key, what: "added", frames: entry.frames };
+  }
+  if (entry.frames < list[at].frames) {
+    return { key: entry.key, what: "kept", wasFrames: list[at].frames, frames: entry.frames };
+  }
+  const was = list[at].frames;
+  list[at] = entry;
+  return { key: entry.key, what: "replaced", wasFrames: was, frames: entry.frames };
 }
 
 export function saveFromPayload(payload: {
@@ -146,14 +179,9 @@ export function saveFromPayload(payload: {
       camera: payload.camera ?? "",
       measured: payload.measured ?? "",
     };
-    const at = list.findIndex((x) => x.key === key);
-    if (at >= 0) {
-      changes.push({ key, what: "replaced", wasFrames: list[at].frames, frames: entry.frames });
-      list[at] = entry;
-    } else {
-      changes.push({ key, what: "added", frames: entry.frames });
-      list.push(entry);
-    }
+    const change = place(list, entry, p.falloff);
+    changes.push(change);
+    if (change.what === "refused" || change.what === "kept") continue;
     saved++;
   }
   return { saved, skipped, ok: saved > 0 ? write(list) : true, changes };
@@ -447,14 +475,12 @@ export function importText(text: string): { saved: number; skipped: string[]; ok
         skipped.push(raw?.key ?? "(a profile with no key)");
         continue;
       }
-      const at = list.findIndex((x) => x.key === raw.key);
-      if (at >= 0) {
-        changes.push({ key: raw.key, what: "replaced", wasFrames: list[at].frames, frames: raw.frames ?? 0 });
-        list[at] = raw;
-      } else {
-        changes.push({ key: raw.key, what: "added", frames: raw.frames ?? 0 });
-        list.push(raw);
-      }
+      // A stored profile carries its bump curve rather than the falloff it came
+      // from, so the shape check here sees the colour half only. That is the
+      // half that caught both real bad profiles.
+      const change = place(list, { ...raw, frames: raw.frames ?? 0 }, undefined);
+      changes.push(change);
+      if (change.what === "refused" || change.what === "kept") continue;
       saved++;
     }
     return { saved, skipped, ok: saved > 0 ? write(list) : true, changes };

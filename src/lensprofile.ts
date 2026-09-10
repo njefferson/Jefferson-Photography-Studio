@@ -141,6 +141,32 @@ const STRUCTURE_LIMIT = 0.15;
 const REBOUND_LIMIT = 0.03;
 const JUMP_LIMIT = 0.05;
 
+/** What is wrong with the SHAPE of a measured profile, in words, or null.
+ *
+ *  Exported because measuring is not the only way a profile gets into the
+ *  store: a payload can be pasted in, or restored from a backup, or handed over
+ *  by somebody else, and those doors used to have no shape check behind them at
+ *  all. One function, so a frame refused at the rig cannot arrive through the
+ *  restore button instead.
+ *
+ *  Both limits are measured rather than chosen: across 27 real profiles the 25
+ *  sound ones rebound 0.0000-0.0077 with colour steps at or under 0.021, and
+ *  the two with something in the corner rebound 0.1178 and 0.3212 with steps at
+ *  or over 0.150. These sit in the gap. */
+export function shapeProblem(falloff: ArrayLike<number>, kr: ArrayLike<number>, kb: ArrayLike<number>): string | null {
+  const reb = rebound(falloff);
+  if (reb.rise > REBOUND_LIMIT) {
+    return `the edges of this one brighten again instead of falling away — by ${(reb.rise * 100).toFixed(0)}% out past ${Math.round((reb.at / falloff.length) * 100)}% of the way to the corner. ` +
+      `A lens only ever gets darker outwards, so something is in the corner of the frame: the sun creeping in, a reflection, a hood, or a finger`;
+  }
+  const jump = Math.max(maxStep(kr), maxStep(kb));
+  if (jump > JUMP_LIMIT) {
+    return `the colour jumps by ${jump.toFixed(2)} between one ring and the next, which a lens does not do — the outer rings of this frame have something in them that the rest does not`;
+  }
+  return null;
+}
+
+
 /** sRGB inverse EOTF, 8-bit in. Camera JPEGs are sRGB; the raw path arrives
  *  linear already and skips this entirely. */
 const SRGB_LIN = (() => {
@@ -398,17 +424,8 @@ export function profileFrame(img: DecodedImage): FrameProfile {
   // unreachable guard is worse than none — it answers "have we handled this?"
   // for everyone who reads it afterwards, without having handled anything.
 
-  const reb = rebound(falloff);
-  if (reb.rise > REBOUND_LIMIT) {
-    return bad(
-      `the edges of this one brighten again instead of falling away — by ${(reb.rise * 100).toFixed(0)}% out past ${Math.round((reb.at / NBINS) * 100)}% of the way to the corner. ` +
-      `A lens only ever gets darker outwards, so something is in the corner of the frame: the sun creeping in, a reflection, a hood, or a finger`,
-    );
-  }
-  const jump = Math.max(maxStep(kr), maxStep(kb));
-  if (jump > JUMP_LIMIT) {
-    return bad(`the colour jumps by ${jump.toFixed(2)} between one ring and the next, which a lens does not do — the outer rings of this frame have something in them that the rest does not`);
-  }
+  const shape = shapeProblem(falloff, kr, kb);
+  if (shape) return bad(shape);
 
   // Both baselines, only so the gap between them can be reported. Neither
   // result is written into the profile — see the header for why.
