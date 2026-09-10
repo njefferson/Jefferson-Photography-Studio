@@ -2183,7 +2183,20 @@ label.open-btn, label.bar-btn {
   .bar-actions-wrap.scroll-right::after { opacity: 1; }
   /* Tighter chrome all around (owner: "it could be tighter", 2026-07-14) —
      smaller paddings, not smaller text; tap heights stay ≥36px. */
-  .bar { min-height: 44px; gap: 6px 10px; padding-left: 10px; padding-right: 10px; padding-bottom: 4px; }
+  .bar { min-height: 44px; gap: 6px 8px; padding-left: 8px; padding-right: 8px; padding-bottom: 4px; }
+  /* THE WORD GOES, THE MARK AND THE CHEVRON STAY. The bar's first row is the
+     back link, the app's identity and Home; on a phone it came to 400px against
+     373 available, so Home wrapped to a row of its own — a whole 50px band, 13%
+     of the screen's height above the photo, spent on one 78px button, and the
+     photo below it was 17% of the screen. Nobody chose that: it is the desktop
+     row overflowing by 27px. Dropping the word "Studio" (the mark and the ‹ are
+     still the affordance, and `aria-label` still says "Back to Studio") saves
+     48px and the row fits at every phone width. */
+  .home-link-word { display: none; }
+  /* With the word gone the link is the chevron and the 22px mark — 40px wide,
+     4px under the floor. The padding it had was 6px 8px 6px 0, so the right
+     side is where it is missing. */
+  .home-link { padding-right: 6px; justify-content: center; min-width: 44px; }
   .bar-btn { padding: 6px 10px; }
   /* FOUR columns here, three everywhere else. Twelve tabs at the 44px the base
      rule already asks for is four rows and a 196px strip, which left 129px of
