@@ -5080,6 +5080,43 @@ reported percentage does count only texels above half weight while roughly twice
 that area is touched to some degree — defensible, and worth knowing when the
 number reads lower than the effect looks.**
 
+## The manual had not kept up with the app, 2026-09-10
+
+**Audited rather than eyeballed.** Every labelled control on the editing surface
+(158 of them) against the text of the Help and info dialogs. Help was in better
+shape than expected — 21k characters, sixteen sections, and nearly every feature
+named — so the gaps were specific rather than general.
+
+**Restore depth appeared in Help exactly once**, inside the double-tap-a-slider
+bullet, and was never explained: not what it does, not that it is ON by default,
+not why it has a Strength slider, and not that it re-solves on every look. It
+was also missing from the Quick start sentence that lists what happens when a
+photo opens, even though it IS one of those automatics. **Recover highlights**
+was named only inside that same parenthetical, never as the slider it is. The
+**Red/Green/Blue gain** sliders — the manual white balance, and the reason this
+app exists at all, since infrared needs a balance outside the visible-light
+range — were named nowhere.
+
+**The panel copy was fine.** Each of those controls carries a good note beside
+it, and Restore depth has a "Why a photo needs it" expander. The manual was what
+had not kept up: a reader who goes to Help to LEARN the app rather than to
+identify a control in front of them found nothing.
+
+**The ten in-app lessons mentioned none of it either** — no Restore depth, no
+Recover highlights, no double-tap-to-reset. Lesson 1 now covers the reset
+convention and why tapping a blown highlight is refused; Lesson 2 covers Restore
+depth beside the looks, since that is when it re-solves, and why the bare swap
+goes flat and purple.
+
+**Verified rendered, not just written:** Help opens, is 20.8k characters, names
+all three, and does not scroll sideways at 900px.
+
+**Worth keeping: the audit was cheap and the impression was wrong in both
+directions.** The naive pass flagged 75 controls as undocumented, most of them
+false — transient banners, and substring matching that missed a synonym. The
+useful version listed Help's own sections and asked which FEATURES were named,
+which found three real gaps in a document that looked complete.
+
 ## A look on a camera-rendered file had no white balance to work on, 2026-09-10
 
 **Reported first as "the thumbnail fix only affects jpg, not nef", then — with a

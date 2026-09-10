@@ -7800,6 +7800,8 @@ const LESSONS: { title: string; tab: PanelTab; steps: string[] }[] = [
       "Tap different things in the photo — foliage, a cloud, the sky — each sets white balance from that point and the colors shift.",
       "Raw photos open auto-balanced; Auto (white balance + exposure) or Reset brings you back to that starting point at any time. Hold: Untouched shows the raw, unbalanced truth.",
       "For big moves, drag the Red / Green / Blue gain sliders. There's no 2000K floor here — that's the move ordinary editors can't make.",
+      "Double-tap any slider to put it back where the photo opened. Most of these don't start at zero — white balance, exposure and denoise open at values measured from your frame — so that's back to this photograph's own starting point, not to nothing.",
+      "Tapping a blown-out spot is refused, and says so: there's no colour recorded in a clipped highlight to balance from. Aim for a midtone — foliage is the usual target.",
     ],
   },
   {
@@ -7809,6 +7811,9 @@ const LESSONS: { title: string; tab: PanelTab; steps: string[] }[] = [
       "The R⇄B channel swap flips the whole color world in one tap — the classic infrared move.",
       "Try the film Looks — Aerochrome, Aero Red, Goldie. Press a look twice to flip its built-in swap.",
       "B&W IR and HIE B&W give the classic black-and-white infrared feel — and the B&W tab goes further, with a full channel mix (that's Lesson 7).",
+      "Restore depth (further down this tab) is already on. Infrared frames usually open flat, and it puts the contrast and colour back — working out how far THIS photo is from where it should sit, then moving it there. It runs again every time you press a look.",
+      "If a look comes out too strong, pull Restore depth's Strength down instead of fighting it with contrast. 100% is the full correction worked out for the frame; lower leaves more of the picture as it arrived.",
+      "Pressing the swap on its own, with no look, usually goes flat and purple — it only separates colours that white balance has already pulled apart. Set white balance first, or pick a look.",
     ],
   },
   {
