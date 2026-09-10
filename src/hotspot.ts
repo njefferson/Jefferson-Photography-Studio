@@ -1,123 +1,79 @@
-// Per-lens IR hot-spot correction from the SHIPPED measurements — a separate,
-// earlier correction from the manual `hotspot`/`hotspotSize` sliders in
-// pipeline.ts/gl.ts: this one is chosen from the file's own EXIF (or a manual
-// lens + focal-length pick) and needs nothing set by hand. Bump-only (vignette
-// excluded), so it composes safely with the Vignette slider.
+// The per-lens IR hot-spot correction that comes WITH the app, as opposed to
+// one the reader measured for themselves (lensstore.ts). Chosen from the
+// photograph's own EXIF, or from a manual lens pick when the file names no
+// lens; it needs nothing set by hand.
 //
-// The profile data is the 2026-07-10 measurement handoff, unchanged. Its apply
-// path is NOT: it multiplied gamma-encoded 8-bit pixels, which meant it could
-// not run on a raw file at all, and it snapped a frame to the nearest measured
-// focal length. Both are dealt with below; the old path is gone rather than
-// kept beside this one, because a function that applies these numbers in the
-// wrong space is exactly the thing a later session would find and call.
+// THIS FILE IS NOW A LOOKUP, NOT AN ALGORITHM. It used to carry its own EXIF
+// parser (JPEG only, which is why these profiles never ran on a raw file), its
+// own nearest-focal-length snap, and its own apply path multiplying
+// gamma-encoded 8-bit pixels. All three are gone: the profiles are the same
+// shape as a measured one, `matchIn` answers "which of these fits this frame"
+// for both, and the pipeline applies the result. What is left here is the part
+// that is genuinely about the SHIPPED table — the manual picker's lists, and
+// turning a manual pick into a match.
 
-import { HOTSPOT_PROFILE_DATA as DATA } from "./hotspotProfiles";
+import { matchIn, type StoredProfile } from "./lensstore";
+import { SHIPPED_PROFILES, SHIPPED_LENSES, SHIPPED_ANCHORS } from "./hotspotProfiles";
+import type { ExifSubset } from "./exif";
 
+/** Short names for the manual picker, in the order they were measured in. */
 export function lensNames(): string[] {
-  return Object.keys(DATA.fl_anchors);
+  return Object.keys(SHIPPED_ANCHORS);
 }
 
+/** The focal lengths actually measured for a lens. Offered by the manual
+ *  picker, and the range a match is clamped to rather than extrapolated past. */
 export function flAnchors(lensShort: string): number[] {
-  return DATA.fl_anchors[lensShort] ?? [];
+  return SHIPPED_ANCHORS[lensShort] ?? [];
 }
 
-// --- The shipped profiles as a PIPELINE curve -------------------------------
-// TWO CHANGES from the ported module, and the second one is the reason this
-// could not be a straight move.
-//
-// 1. NEAREST BECOMES BETWEEN. `nearestFL` snaps a 30mm frame to the 36mm
-//    anchor and applies a correction measured 6mm away at full strength. The
-//    anchors are 19/36/50 and 50/130/250 — a frame is almost never on one.
-//    Blended in log focal length, the same mix `lensstore.ts` uses, and clamped
-//    at both ends: outside the measured range the nearest end is used as it is,
-//    never extrapolated.
-//
-// 2. GAMMA BECOMES LINEAR, AND THE NUMBERS HAVE TO BE CONVERTED FOR IT. The
-//    shipped profiles were measured AND applied on gamma-encoded 8-bit pixels —
-//    the ported `apply` above states that as a requirement, and it came from the
-//    same rig as the data. The pipeline works in linear light, so applying the
-//    same number there would be a different correction: at the largest bump
-//    (0.110 at 16-50@19) multiplying encoded values takes 22% of the light out,
-//    and multiplying linear ones takes 10%. Neither number is wrong; they are
-//    answers to different questions.
-//
-//    So each bin is converted to the linear gain that reproduces what the frame
-//    used to get, at the working point a flat is exposed for. A flat is a
-//    mid-tone by construction — the rig refuses one that is blown or dark — so
-//    mid-grey is not an arbitrary choice of point, it is where the measurement
-//    lives. The conversion is exact there and close either side of it.
-const MID = 0.5; // encoded mid-grey: where a correctly exposed flat sits
+/** The full EXIF model string for a short name, so a manual pick can go through
+ *  the same matcher as an automatic one instead of a second lookup. */
+function modelFor(lensShort: string): string | null {
+  for (const [model, short] of Object.entries(SHIPPED_LENSES)) if (short === lensShort) return model;
+  return null;
+}
 
-function srgbToLinear(v: number): number {
-  return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+/** The shipped profile for a photograph, from its own EXIF. */
+export function findShipped(ex: ExifSubset | null): StoredProfile | null {
+  return matchIn(SHIPPED_PROFILES, ex);
+}
+
+/** The shipped profile for a lens the reader picked by hand, at a focal length
+ *  and — when the file recorded one — the frame's own aperture. Built as a
+ *  synthetic EXIF so the manual route cannot drift from the automatic one. */
+export function findShippedManual(lensShort: string, fl: number, ex: ExifSubset | null): StoredProfile | null {
+  const lens = modelFor(lensShort);
+  if (!lens || !(fl > 0)) return null;
+  return matchIn(SHIPPED_PROFILES, { lens, focalLength: [fl, 1], fNumber: ex?.fNumber });
+}
+
+/** The short name for a lens EXIF names, or null when it is not one of ours. */
+export function shortFor(lens: string | null | undefined): string | null {
+  return (lens && SHIPPED_LENSES[lens.trim()]) ?? null;
+}
+
+/** Does this profile know a colour correction, or only a brightness one? The
+ *  2026-07 handoff measured brightness alone and ships neutral colour; saying
+ *  "it corrects the colour too" of a profile that cannot would be a lie the
+ *  reader has no way to check. */
+export function hasColour(p: StoredProfile | null): boolean {
+  return !!p && p.kr.some((v) => Math.abs(v - 1) > 1e-4);
 }
 
 /** One bin's gamma-space bump as the linear-space bump that costs the same
- *  light at mid-grey. Returns a bump (0 = no correction), not a gain, so it
- *  keeps the shape the shipped data is written in. */
+ *  light at mid-grey, where a correctly exposed flat sits.
+ *
+ *  USED BY THE GENERATOR, NOT AT RUNTIME. The 2026-07 profiles were measured
+ *  AND applied on gamma-encoded pixels — the module they came from stated that
+ *  as a requirement — and the pipeline works in linear light, where the same
+ *  number is a different correction: at the largest bump it is 10% of the light
+ *  rather than 22%. Converting at generation time means the app only ever holds
+ *  one space. It goes when the last handout profile is replaced by a measured
+ *  one. */
 export function bumpToLinear(bump: number): number {
   if (!(bump > 0)) return 0;
-  const g = srgbToLinear(MID / (1 + bump)) / srgbToLinear(MID);
-  return 1 / g - 1;
-}
-
-/** Blend in log focal length; clamped, never extrapolated. */
-function logMix(v: number, a: number, b: number): number {
-  if (a === b) return 0;
-  return Math.min(1, Math.max(0, Math.log(v / a) / Math.log(b / a)));
-}
-
-/** The shipped bump curve for a lens at a focal length, in LINEAR space and
- *  interpolated between anchors. `null` when the lens is not one of the two
- *  that were measured. */
-export function bumpCurve(lensShort: string, fl: number): Float64Array | null {
-  const anchors = DATA.fl_anchors[lensShort];
-  if (!anchors || !anchors.length) return null;
-  const at = (a: number) => DATA.profiles[lensShort + "@" + a] ?? null;
-  const sorted = [...anchors].sort((x, y) => x - y);
-  let lo = sorted[0], hi = sorted[sorted.length - 1];
-  if (fl <= lo) hi = lo;
-  else if (fl >= hi) lo = hi;
-  else {
-    for (let i = 0; i < sorted.length - 1; i++) {
-      if (fl >= sorted[i] && fl <= sorted[i + 1]) { lo = sorted[i]; hi = sorted[i + 1]; break; }
-    }
-  }
-  const a = at(lo), b = at(hi);
-  if (!a || !b) return null;
-  const t = lo === hi ? 0 : logMix(fl, lo, hi);
-  const n = Math.min(a.length, b.length);
-  const out = new Float64Array(n);
-  // Converted first, then blended: what is being mixed is the correction that
-  // will actually be applied, not the number it was written down as.
-  for (let i = 0; i < n; i++) out[i] = bumpToLinear(a[i]) * (1 - t) + bumpToLinear(b[i]) * t;
-  return out;
-}
-
-/** Which of the two shipped lenses a frame was taken with, and where between
- *  the anchors it falls. Reads a lens name from ANY exif reader — the ported
- *  parser above only understands JPEG, which is the whole reason these
- *  profiles have never run on a raw file. */
-export function matchShipped(lens: string | null | undefined, fl: number | null | undefined):
-  { short: string; fl: number } | null {
-  if (!lens || !fl) return null;
-  const short = DATA.lens_map[lens];
-  return short ? { short, fl } : null;
-}
-
-/** What to tell the reader: which lens, and whether the frame sits between two
- *  measured focal lengths or outside them. */
-export function shippedNote(short: string, fl: number): string {
-  const a = [...(DATA.fl_anchors[short] ?? [])].sort((x, y) => x - y);
-  if (!a.length) return "";
-  const r = Math.round(fl);
-  // On an anchor: say so plainly. "between 19 and 36mm, at 36mm" is true and
-  // reads like the app cannot tell where the frame is.
-  if (a.some((x) => Math.abs(x - fl) < 0.5)) return `measured at ${r}mm`;
-  if (fl < a[0]) return `measured at ${a[0]}mm, this frame is ${r}mm`;
-  if (fl > a[a.length - 1]) return `measured at ${a[a.length - 1]}mm, this frame is ${r}mm`;
-  for (let i = 0; i < a.length - 1; i++) {
-    if (fl >= a[i] && fl <= a[i + 1]) return `between ${a[i]} and ${a[i + 1]}mm, at ${r}mm`;
-  }
-  return "";
+  const mid = 0.5;
+  const lin = (v: number) => (v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
+  return 1 / (lin(mid / (1 + bump)) / lin(mid)) - 1;
 }

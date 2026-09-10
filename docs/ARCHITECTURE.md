@@ -513,7 +513,7 @@ was reached by elimination (all measured on the real set / IMG_0934, 2026-07-06)
   measure is ~equal across frames, so the winner flickers per pixel.
 - Laplacian-PYRAMID band merge → killed the grain but RANG — mixing frequency
   bands OVERSHOOTS at strong edges, so thin petals over a blown background got
-  bright halos (the bug Noah caught). ABANDONED; the pyramid module is gone.
+  bright halos. ABANDONED; the pyramid module is gone.
 
 A fourth try, per-pixel argmax + MODE-FILTER of the selection map, was sharp and
 grain-free but left a bright "cut-out" RIM on thin petals over the blown
