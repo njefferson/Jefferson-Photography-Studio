@@ -1148,34 +1148,49 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
    the canvas carries the whole box + handles inward for free. Placed AFTER the
    has-session rule so it wins during a session; env() adds the device's own
    safe-area on top. */
+/* FULL-BLEED GEOMETRY VIEW (roadmap: "Full-bleed crop" + "Full-bleed alignment
+   view", built as the pilot the notes ask for). While a geometry tool is armed
+   the photo stops being an object in a box: it reaches the top and both side
+   edges with no frame and NO ROUNDED CLIPPING, and the aids float over it.
+   The rounded rect was the thing cutting black wedges off a tilted photo's
+   corners, and the 30px frame was the "boxed" feel.
+
+   The BOTTOM still reserves the crop pill's real height. That is not an
+   oversight and it is not the finished design: the bottom handles have to stay
+   grabbable, and whether a floating pill should instead sit OVER the photo and
+   pass taps through is one of the open questions the roadmap says belongs to
+   the owner rather than to a guess. */
 #stage.cropping #view {
-  top: 30px;
-  left: 30px;
-  right: 30px;
+  top: 0;
+  left: env(safe-area-inset-left, 0px);
+  right: env(safe-area-inset-right, 0px);
+  border-radius: 0;
   /* 30px like the sides + the crop pill's REAL height (+16px pill offset),
      measured by setGeoMode into --croptools-h. A FIXED reserve buried the
      bottom handles under the grown pill on portrait photos (owner fail-state,
      IMG_1050) — the reserve must track the pill. */
-  bottom: calc(46px + var(--croptools-h, 66px));
-  max-width: calc(100% - 60px);
-  max-height: calc(100% - 76px - var(--croptools-h, 66px));
+  bottom: calc(10px + var(--croptools-h, 66px));
+  max-width: 100%;
+  max-height: calc(100% - 10px - var(--croptools-h, 66px));
 }
+/* The stage's own 12px gutter would reinstate the frame this rule removes. */
+#stage.cropping { padding: 0; }
 #stage.cropping.has-session #view {
-  bottom: calc(46px + var(--croptools-h, 66px) + var(--session-h, 110px));
-  max-height: calc(100% - 76px - var(--croptools-h, 66px) - var(--session-h, 110px));
+  bottom: calc(10px + var(--croptools-h, 66px) + var(--session-h, 110px));
+  max-height: calc(100% - 10px - var(--croptools-h, 66px) - var(--session-h, 110px));
 }
 @media (max-width: 760px) {
   #stage.cropping #view {
-    top: 22px;
-    left: 22px;
-    right: 22px;
+    top: 0;
+    left: env(safe-area-inset-left, 0px);
+    right: env(safe-area-inset-right, 0px);
     /* Var-based like the wide rule above — a FIXED phone reserve would bury the
        bottom handles the moment the pill grows a row (the wrapped ratio chips
        make that normal). Same numbers as the old fixed 88/110 at the 66px
        default. */
-    bottom: calc(22px + var(--croptools-h, 66px));
-    max-width: calc(100% - 44px);
-    max-height: calc(100% - 44px - var(--croptools-h, 66px));
+    bottom: calc(8px + var(--croptools-h, 66px));
+    max-width: 100%;
+    max-height: calc(100% - 8px - var(--croptools-h, 66px));
   }
 }
 #sessionStrip {
