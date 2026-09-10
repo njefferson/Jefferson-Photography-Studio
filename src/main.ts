@@ -24,6 +24,8 @@ import { Tiff } from "./raw/tiff";
 import { drawHistogram } from "./histogram";
 import * as Hotspot from "./hotspot";
 import { wireLensRig } from "./lensrig";
+import * as LensStore from "./lensstore";
+import { readExifSubset } from "./exif";
 import { setupInstalledShare, setupInstallFromApp, toast } from "./share";
 import {
   type SavedLook,
@@ -275,6 +277,93 @@ hsUi.applyManualBtn.addEventListener("click", () => {
   hotspotState.profileKey = Hotspot.keyFor(hsUi.lens.value, fl);
   hotspotState.source = "manual";
   applyHotspotCorrection();
+});
+
+// --- The reader's OWN measured lens profile ---------------------------------
+// The rig measures a lens and this is what makes the measurement mean
+// something: a profile the reader took from their own sky frames is looked up
+// by the open photograph's EXIF and its COLOUR term applied, at a strength they
+// can see and move, with the untouched decode a press away.
+//
+// It corrects colour only. `falloff` would flatten the corners, which is what
+// the Vignette slider is for, and the hot-spot's own share of the brightness
+// comes back from a measurement as a RANGE rather than a number — see
+// lensstore.ts. The scalar shipped profile keeps the brightness half.
+//
+// It works on RAW as well as rendered files, which the shipped profiles cannot:
+// they are calibrated from JPEG and say so. A profile the reader measured from
+// their own raw frames has no such limit.
+const myLensUi = {
+  card: $("myLensCard") as HTMLElement,
+  status: $("myLensStatus") as HTMLElement,
+  strength: $("myLensStrength") as HTMLInputElement,
+  bypass: $("myLensBypass") as HTMLButtonElement,
+  forget: $("myLensForget") as HTMLButtonElement,
+};
+let myLens: { p: LensStore.StoredProfile; strength: number; bypass: boolean; applied: number; note: string } | null = null;
+
+/** Move the open frame to whatever strength the controls now say. Exact, and
+ *  with no second copy of the frame — see `applyColourDelta`. */
+function syncMyLens(redraw = true) {
+  if (!current || !myLens) return;
+  const want = myLens.bypass ? 0 : myLens.strength;
+  if (want !== myLens.applied) {
+    LensStore.applyColourDelta(current, myLens.p, myLens.applied, want);
+    myLens.applied = want;
+    if (redraw) uploadPreview();
+  }
+  updateMyLensUI();
+}
+
+function updateMyLensUI() {
+  myLensUi.card.hidden = !myLens;
+  if (!myLens) return;
+  myLensUi.strength.value = String(myLens.strength);
+  myLensUi.bypass.setAttribute("aria-pressed", String(myLens.bypass));
+  const p = myLens.p;
+  const from = p.source ? ` from ${p.frames} ${p.source} frame${p.frames === 1 ? "" : "s"}` : "";
+  myLensUi.status.textContent =
+    `${p.model} · measured at ${p.fl}mm${Number.isFinite(p.ap) ? ` f/${p.ap}` : ""}${from}` +
+    (myLens.note ? ` — ${myLens.note}` : "") +
+    (myLens.bypass ? " · bypassed" : "");
+}
+
+/** Called at open, beside initHotspot. */
+function initMyLens(img: DecodedImage, imported: ImportedFile) {
+  myLens = null;
+  let ex = null;
+  try {
+    ex = readExifSubset(imported.bytes);
+  } catch {
+    // unreadable EXIF is simply an unmatched photograph, never a failure
+  }
+  const p = LensStore.findProfile(ex);
+  if (p) {
+    myLens = { p, strength: 1, bypass: false, applied: 0, note: LensStore.matchNote(p, ex) };
+    LensStore.applyColourDelta(img, p, 0, 1);
+    myLens.applied = 1;
+  }
+  updateMyLensUI();
+}
+
+myLensUi.strength.addEventListener("input", () => {
+  if (!myLens) return;
+  myLens.strength = Number(myLensUi.strength.value);
+  syncMyLens();
+});
+myLensUi.bypass.addEventListener("click", () => {
+  if (!myLens) return;
+  myLens.bypass = !myLens.bypass;
+  syncMyLens();
+});
+myLensUi.forget.addEventListener("click", () => {
+  if (!myLens) return;
+  const key = myLens.p.key;
+  myLens.bypass = true;
+  syncMyLens();
+  LensStore.removeProfile(key);
+  myLens = null;
+  updateMyLensUI();
 });
 
 /** Called once per newly-opened photo, right after decode. Auto-selects the
@@ -5999,6 +6088,7 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
   // upload otherwise.)
   const __a = performance.now();
   initHotspot(img, imported);
+  initMyLens(img, imported);
   const __b = performance.now();
   uploadPreview();
   const __c = performance.now();

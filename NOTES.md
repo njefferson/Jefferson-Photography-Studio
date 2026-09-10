@@ -5670,6 +5670,80 @@ profiles on the RAW path at all (they are JPEG-only because full NEFs could not
 be moved into the measurement rig); and `keyFor`'s nearest-focal-length anchor
 selection, which snaps rather than interpolating between anchors.
 
+## The rig measured a lens and nothing read it back, 2026-09-10
+
+**Asked plainly: did the app ingest my numbers, or do you have to do something
+with them — is that why they are on a debug screen?** Both halves were right.
+The rig measured a lens, printed 2.6 KB of JSON, and NOTHING in the app read it.
+The output was data for a developer to paste into `hotspotProfiles.ts`. That is
+not a feature, it is a collection form — and it is why the thing still read as a
+debug screen no matter which button was added to reach it. Moving the button
+three times could never fix a missing return path.
+
+**`src/lensstore.ts` closes the loop.** *Use these on my photos* keeps the
+measurement in `localStorage`; opening a photograph looks its EXIF up against
+what is kept and applies the match, in a *Your measured lens* card on the
+Corrections tab with a Strength slider, a Bypass and *Forget this profile*.
+
+**WHAT IT APPLIES, AND WHAT IT DELIBERATELY DOES NOT.** A measurement returns
+three things and they are not equally trustworthy. `kr`/`kb` are ratios between
+channels, so an achromatic falloff divides out of them whatever its shape —
+well determined, and applied. `falloff` would flatten the corners, which is
+what the Vignette slider is for — not applied, on the owner's call. `bump` comes
+back as a RANGE because one flat frame cannot separate a hot-spot from the
+lens's own vignette, and a range is not a correction — not applied. So a
+measured profile contributes the COLOUR half and the shipped scalar profile
+keeps the brightness half, which is honest about what each of them knows.
+
+**It works on RAW, which the shipped profiles cannot** — they are calibrated
+from JPEG and the panel says so. A profile the reader measured from their own
+raw frames has no such limit.
+
+**A DELTA, NOT A PRISTINE COPY.** The scalar correction keeps an untouched copy
+of the frame and re-applies from it whenever Strength moves. That works because
+it only ever runs on the 8-bit path; a raw frame is Float32 RGBA at full size —
+330 MB for 20 megapixels — and a second one of those on a phone is a crash, not
+a copy. A colour gain is invertible, so going from strength a to b is a multiply
+by g(b)/g(a). Asserted: 1 → 0.4 → 0 returns every pixel to the decode within
+8.9e-8, so the untouched decode stays one press away without being held in
+memory (Doctrine §14).
+
+**AND THE 8-BIT PATH HAD TO LINEARISE FIRST.** The gains are measured in linear
+light; multiplying an sRGB-ENCODED value by one applies roughly its 1/2.4 power
+instead. Planted and measured: a frame that should come back to kr = 1.000
+overshot to **0.908** — past neutral, in the opposite direction, and it
+disturbed the brightness it is supposed to leave alone. The shipped scalar
+correction multiplies encoded values directly and is wrong the same way, smaller
+because its gains are smaller.
+
+**THE SWAP CAUGHT ME A THIRD TIME.** The end-to-end test read the canvas and
+reported the correction moving the picture AWAY from neutral — centre red up,
+centre blue down, the exact opposite of the measurement. The correction was
+right; the display exchanges red and blue whenever the channel swap is on, which
+is the same trap the Hot-spot colour slider's copy already warns readers about.
+Settled by measuring rather than arguing: the file's own channel order came back
+R>G>B and the screen's B>G>R, so the mapping is derived rather than assumed, and
+in SOURCE terms the correction lowers centre red by 5.2 and raises centre blue
+by 3.1. The test derives that mapping every run now instead of trusting either.
+
+**Verified.** The round trip — measure a frame, keep the profile, apply it,
+measure again — returns kr and kb to 1.000 on the linear path and 1.003/0.996 on
+the 8-bit one, with `falloff` untouched to 0.01. Nearest-match picks the 50mm
+profile for a 70mm frame and the 250mm one for 200mm, refuses a different lens
+outright, and says how far it reached. Whole loop through the built app: measure
+a zip, keep it, open a photograph from that lens, the card appears naming the
+lens and what it was measured from, bypass changes the picture, and forgetting
+removes it. Made to fail twice — the gamma bug and an inverted gain — and axe
+clean in both themes, with the new card's controls matching the card beside it
+rather than inventing a size.
+
+**Still owed:** the shipped scalar profiles remain JPEG-only, and `applyColour`
+runs on the decoded buffer rather than in the pipeline. Putting the radial
+curves in the shader (a `uniform float[80]` pair, mirrored in `compileEdit`)
+would make the correction compose with everything else and cost nothing to
+bypass, at the price of a GPU-vs-CPU parity round. That is the right end state
+and it is not what shipped today.
+
 ## A poll with no bound ran for eleven hours, 2026-09-10
 
 **Found by the owner, in the background-tasks list, not by anything I did.**
