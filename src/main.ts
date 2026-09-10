@@ -7900,6 +7900,24 @@ const LESSONS: { title: string; tab: PanelTab; steps: string[] }[] = [
       "Warp bends the picture itself — like crop and healing it stays with this photo, and it isn't carried by saved looks, batch or the .cube / .dcp exports.",
     ],
   },
+  // BATCH AND QUICK LOOK HAD NO LESSON AT ALL. Every other lesson works inside
+  // a panel tab, and these two are top-bar actions with no tab of their own —
+  // which is exactly how they fell out of the tutorial. They share one lesson
+  // because a reader meets them together: look through a folder, then develop
+  // it. The tab is `export`, because that is where the Format and Resolution a
+  // batch writes with actually live.
+  {
+    title: "Lesson 11 · A whole folder at once",
+    tab: "export",
+    steps: [
+      "Quick look (top bar) is for SEEING a folder: pick one and you get a grid of properly balanced previews, made on the spot and kept nowhere. Nothing is saved and nothing is changed.",
+      "Tap the keepers in that grid, then Keep in a session — they come straight through into an editable session without being developed a second time.",
+      "Batch process (top bar) is the other one: it DEVELOPS a whole set unattended and hands you a single .zip. It first asks what goes on every photo — your current edit, a saved look, a built-in look, or auto-balance only.",
+      "Every photo in a batch is still balanced on its own — its own white balance, exposure, denoise, highlight recovery, lens hot-spot fix and Restore depth — with the look layered on top. So it suits a shoot in one style rather than copying one exact frame.",
+      "The .zip is written at the Format and Resolution set on this tab. Check them before a long run.",
+      "Nothing is lost if you stop: leave mid-run and keep what is done, Continue picks up the rest, and if the app closes mid-batch the start screen offers to recover the finished images next time.",
+    ],
+  },
 ];
 
 let activeLesson = -1;

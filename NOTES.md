@@ -5080,6 +5080,36 @@ reported percentage does count only texels above half weight while roughly twice
 that area is touched to some degree — defensible, and worth knowing when the
 number reads lower than the effect looks.**
 
+## Batch and Quick look had no lesson at all, 2026-09-10
+
+**Every other lesson works inside a panel TAB, and these two are top-bar actions
+with no tab of their own** — which is exactly how they fell out of a tutorial
+that is otherwise complete. Structure decided coverage, and nothing noticed.
+
+Lesson 11, "A whole folder at once", covers both, because a reader meets them
+together: look through a folder, then develop it. Its tab is `export`, since
+that is where the Format and Resolution a batch actually writes with live — and
+opening the lesson takes you there, which is the point of the tab field.
+
+Six steps: Quick look shows and keeps nothing; Keep in a session carries the
+pictures through without developing them twice; Batch develops unattended to one
+.zip and asks first what goes on every photo; each photo is still balanced on
+its own with the look on top, so it suits a shoot in one style; the .zip uses
+this tab's Format and Resolution; and nothing is lost if a run stops.
+
+**Measured, not assumed:** 11 chips render, the last reads "A whole folder at
+once", pressing it shows six steps naming both features and switches the panel
+to Export.
+
+**A finding NOT fixed, recorded with its number.** The lesson chips are 34px
+boxes with a `::before` expander at `inset: -5px 0`, which should give 44. The
+real hit area through the centre measures **41px**, three short of this app's own
+floor, and the shortfall is upward only — the rail is 75px with overflow
+visible, so it is not clipping; something above it takes those pixels. Widening
+the inset to -6px changed nothing, so that edit was reverted rather than left in
+as noise. Pre-existing on all eleven chips, and it needs the overlapping element
+found rather than another guess at the expander.
+
 ## The manual had not kept up with the app, 2026-09-10
 
 **Audited rather than eyeballed.** Every labelled control on the editing surface
