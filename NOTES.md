@@ -5080,6 +5080,61 @@ reported percentage does count only texels above half weight while roughly twice
 that area is touched to some degree — defensible, and worth knowing when the
 number reads lower than the effect looks.**
 
+## Thumbnails showed Aerochrome whichever look was picked, 2026-09-10
+
+**Reported on device.** The cause is one line and the reason it looked
+look-specific is the LOOKS table.
+
+`applyLook` bakes a look's WB bias INTO `params.wb` (dividing the previous one
+out, so switching looks replaces rather than compounds). `makeThumb` then
+replaced `params.wb` wholesale with the photo's own `grayWorldWB(img)` — which
+threw the bias away. Every look's tiles therefore shared one neutral white
+balance.
+
+**Why only some looks looked broken.** `aero`, `goldie` and `red` have
+IDENTICAL `swapRB` and `hue`; they differ almost entirely by `wbBias` — goldie
+`[0.78, 1.22, 1.4]`, red `[0.78, 1.02, 1.35]`, aero none at all. Strip the bias
+and all three collapse into Aerochrome. `natural`, `mono`, `sepia` and `hie`
+differ by swap, sat or tint, which survived, so those tiles did change and the
+defect read as "goldie doesn't work" rather than "the WB bias is dropped".
+
+**Fix:** multiply `lookBias` onto the thumbnail's gray-world WB, the same
+multiply `batchParamsFor` already does for a built-in look.
+
+**Measured, with a control:** across Aerochrome to Goldie the main view moves 38
+and the thumbnails move 213. With the bias dropped, as shipped, the view still
+moves 38 and the thumbnails move 5.
+
+## The drop-to-open offer could not be escaped, 2026-09-10
+
+**Caught on device**: dragging with a mouse from the strip raised the
+drop-to-open offer with no way out. Three faults, each of which alone could
+strand it, all in code added earlier the same day:
+
+- the strip's tiles are BUTTONS, but each contains an `<img>`, which is natively
+  draggable — so a mouse drag along the ribbon started a native image drag
+  instead of scrolling
+- an in-page drag was treated like a file arriving
+- only `dragleave` and `drop` could take the offer down, and neither fires when a
+  drag is simply abandoned — so the full-screen scrim stayed up
+
+Also wrong: `dragleave` had no Files guard while `dragenter` did, so it
+decremented the counter on drags that had never incremented it.
+
+**Fixed:** `dragstart` marks an in-page drag and every drag handler ignores it;
+`dragend` and window `blur` both clear; `dragleave` is guarded like the rest;
+tiles carry `draggable = false` in JS as well as `-webkit-user-drag: none` in
+CSS, because that property is not universal.
+
+**The control was PRODUCTION**, which is the build that stranded it: tile image
+`draggable=true`, and an abandoned file drag leaves the offer showing. Both
+assertions pass on the fix.
+
+**And one test failure that was not a defect.** The walk asserted a dropped file
+opens, and it did not — because a session of three was open and the app
+correctly ASKS whether to add to it or start a new one, and the test never
+answered. The app was right; the test was driving half a flow.
+
 ## The geometry view is full-bleed — the pilot, not the whole idea, 2026-09-10
 
 **Three roadmap items looked like one piece and are not.** "Full-bleed

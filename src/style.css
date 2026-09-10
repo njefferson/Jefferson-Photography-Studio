@@ -1314,6 +1314,11 @@ body.dropping::after {
   scroll-behavior: auto; /* a drag must track the pointer, not glide after it */
 }
 .session-thumbs.dragging .session-thumb { pointer-events: none; }
+/* A tile is a BUTTON for switching photos, not something to drag out. Its own
+   <img> is natively draggable, so a mouse drag along the ribbon started a
+   native image drag instead of scrolling the strip — and landed in the
+   drop-to-open offer. */
+.session-thumb, .session-thumb img { -webkit-user-drag: none; user-drag: none; }
 @media (prefers-reduced-motion: reduce) {
   .session-thumbs { scroll-behavior: auto; }
 }

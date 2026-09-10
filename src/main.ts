@@ -6187,22 +6187,44 @@ async function openFromOutside(files: File[]) {
 // browser navigates to the file instead, replacing the app — which is the
 // behaviour anyone dropping a raw on this page got until now.
 let dragDepth = 0; // dragenter/leave fire per element; count them or the hint flickers
+let dragFromInside = false; // a drag that STARTED in this page is not a file arriving
+
+/** THE OFFER MUST ALWAYS BE ESCAPABLE. The first version could not be dismissed:
+ *  dragging a photo out of the strip with a mouse starts a NATIVE drag of the
+ *  tile's own <img>, and there was no dragend listener, so nothing ever took
+ *  the full-screen scrim back down. Three things were wrong and each alone
+ *  could strand it — the strip's tiles were draggable at all, an in-page drag
+ *  was treated like a file arriving, and only dragleave/drop could clear it.
+ *  Every path out is wired now, including window blur, because a drag that
+ *  leaves the window can end somewhere this page never hears about. */
 function showDrop(on: boolean) { document.body.classList.toggle("dropping", on); }
+function endDrop() { dragDepth = 0; dragFromInside = false; showDrop(false); }
+const carriesFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files");
+
+document.addEventListener("dragstart", () => { dragFromInside = true; });
+window.addEventListener("dragend", endDrop);
+window.addEventListener("blur", endDrop);
 window.addEventListener("dragenter", (e) => {
-  if (!Array.from(e.dataTransfer?.types ?? []).includes("Files")) return;
+  if (dragFromInside || !carriesFiles(e)) return;
   e.preventDefault();
   if (++dragDepth === 1) showDrop(true);
 });
 window.addEventListener("dragover", (e) => {
-  if (!Array.from(e.dataTransfer?.types ?? []).includes("Files")) return;
+  if (dragFromInside || !carriesFiles(e)) return;
   e.preventDefault();
   if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
 });
-window.addEventListener("dragleave", () => { if (--dragDepth <= 0) { dragDepth = 0; showDrop(false); } });
+// Guarded like the others: an unguarded dragleave decremented on drags that had
+// never incremented, so the count and the scrim could disagree.
+window.addEventListener("dragleave", (e) => {
+  if (dragFromInside || !carriesFiles(e)) return;
+  if (--dragDepth <= 0) endDrop();
+});
 window.addEventListener("drop", (e) => {
-  if (!Array.from(e.dataTransfer?.types ?? []).includes("Files")) return;
+  const wasInside = dragFromInside;
+  endDrop(); // whatever it was, the offer comes down
+  if (wasInside || !carriesFiles(e)) return;
   e.preventDefault();
-  dragDepth = 0; showDrop(false);
   const files = openableFiles(e.dataTransfer?.files);
   if (!files.length) { toast("That is not a photo this app can open.", 2600); return; }
   void openFromOutside(files);
@@ -6454,7 +6476,22 @@ async function makeThumb(img: DecodedImage, MAX = 260): Promise<ArrayBuffer> {
   // IMG_1256: yellow/blue thumb vs the teal/orange it opened into).
   // Spatial/per-image extras (masks, glow, clarity, LUT, grain) are cleared —
   // they need maps or textures a thumb doesn't have.
-  const wb = grayWorldWB(img);
+  // THE LOOK'S WB BIAS HAS TO COME WITH IT. applyLook bakes the bias INTO
+  // params.wb (dividing the previous one out), and this line replaced params.wb
+  // wholesale with the photo's own gray-world balance — so the bias was dropped
+  // and every look's tiles shared one neutral white balance.
+  //
+  // That is invisible for some looks and total for others. aero, goldie and red
+  // have IDENTICAL swapRB and hue; they differ almost only by wbBias. Strip the
+  // bias and all three render as Aerochrome, whichever one is selected, while
+  // mono/sepia/natural still change because their difference is swap, sat or
+  // tint. Same multiply batchParamsFor already does for a built-in look.
+  const gw = grayWorldWB(img);
+  const wb: [number, number, number] = [
+    clamp(gw[0] * lookBias[0], 0.02, 16),
+    clamp(gw[1] * lookBias[1], 0.02, 16),
+    clamp(gw[2] * lookBias[2], 0.02, 16),
+  ];
   const p: EditParams = {
     ...cloneParams(params),
     wb,
@@ -7112,6 +7149,7 @@ function updateSessionStrip() {
       b.disabled = saving;
       if (p.thumbUrl) {
         const im = document.createElement("img");
+        im.draggable = false; // a tile is a button, not draggable content (CSS user-drag is not universal)
         im.src = p.thumbUrl;
         im.alt = p.name;
         b.append(im);
