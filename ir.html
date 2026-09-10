@@ -910,6 +910,13 @@
         <div class="subcard" id="lensKept" hidden>
           <div class="sub-title">Your lenses <span>kept on this device</span></div>
           <p class="note">What this app has measured and is using, what each one covers, and what is still missing from it. Nothing here has left the device, and removing one takes it off this device for good.</p>
+          <p class="note" id="lensStorageNote" role="status"></p>
+          <div class="dbg-actions">
+            <button id="lensBackup" type="button" class="dbg-btn">Save a backup of all of them</button>
+            <button id="lensBackupCopy" type="button" class="dbg-btn">Copy them all</button>
+            <label class="dbg-btn"><input id="lensRestore" class="file-input" type="file" accept="application/json,.json,.txt" />Restore from a file</label>
+          </div>
+          <p class="note" id="lensRestoreNote" hidden role="status"></p>
           <div id="lensKeptList"></div>
         </div>
       </div>

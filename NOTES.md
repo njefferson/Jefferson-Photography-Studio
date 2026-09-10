@@ -6240,6 +6240,45 @@ which edge answered rather than about what is deployed. Six independent fetches
 now, all six required to agree. The `sw.js` cache stamp is the better anchor
 where there is one, since it carries the version.
 
+## The measurements lived in storage the app does not own, 2026-09-10
+
+**Named from the device: a lens correction needs a warning that it is only kept
+in the browser's agreed-upon memory.** It is `localStorage`, and the framing was
+exactly right — it is not storage this app owns. iOS Safari drops site data
+after a stretch of not visiting, "Clear website data" takes it, a device short
+of room evicts, and `navigator.storage.persist()` asks the browser to keep it
+and may be refused silently.
+
+**A warning with no remedy is bad news delivered on time.** What was missing was
+not a sentence, it was a way out and a way back: no export of what is kept (only
+of the run that had just finished), and no import at all. So a reader who lost
+it had lost the trip out with the camera, not just a file.
+
+- **Save a backup of all of them / Copy them all** — everything kept, as one
+  `ips-lens-backup` file, carrying each profile whole including the brightness
+  curve. Asserted by round-tripping to `JSON.stringify` equality after clearing
+  storage, not by the file merely existing.
+- **Restore from a file** — takes a backup OR a rig payload, because the reader
+  has two files that look like the same thing and refusing one of them for a
+  header is a distinction only the code cares about. A file that is not JSON, or
+  is JSON with no profiles in it, is refused in words with nothing lost.
+- **The note reports what the browser actually decided**, read from
+  `navigator.storage.persisted()`: agreed, not agreed, or would not say. A
+  generic caution would have been the easy thing to write and would have told
+  the reader nothing they could act on. It appears only once something is at
+  stake — an empty device gets no warning.
+- **`requestPersistence()` is asked for at the moment a measurement is kept**,
+  which is when the reader has just spent real effort. It already existed for
+  photo sessions. The note reads what was granted rather than what was asked.
+
+**AND A SELF-INFLICTED ONE WORTH WRITING DOWN.** Reverting a planted defect with
+`git checkout src/lensrig.ts` wiped every uncommitted change in that file — the
+whole backup and restore wiring — because the plant was on a file that also held
+work in progress. Scratchpad copies had been taken for every other file touched
+that round and git was reached for on this one. **Revert a plant from the copy
+you took, never from the index**: the index is the last commit, and the point of
+the exercise is that the work is not committed yet.
+
 ## A measured profile carries its brightness now, and one profile corrects a frame, 2026-09-10
 
 **The standing call was colour only**, because one flat frame reports the

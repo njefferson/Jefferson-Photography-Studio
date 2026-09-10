@@ -398,3 +398,69 @@ export function coverage(list: StoredProfile[]): LensCoverage[] {
   }
   return out.sort((a, b) => a.short.localeCompare(b.short));
 }
+
+// --- Backing it up, and putting it back ------------------------------------
+// WHY THIS EXISTS. A measurement is a trip out with the camera, a set of sky
+// frames and a run of the rig, and it lives in `localStorage` — which is not
+// storage the app owns. A browser may clear it: iOS Safari drops site data
+// after a stretch of not visiting, "Clear website data" takes it, and a device
+// short of room evicts. `navigator.storage.persist()` asks the browser to keep
+// it and the browser is free to say no, silently. None of that is a reason to
+// store it somewhere else — every browser store has the same property — but it
+// is a reason the reader must be able to get their measurements OUT, and back
+// IN on another device or after a clear. A warning with no remedy is just bad
+// news delivered on time.
+
+const BACKUP_FORMAT = "ips-lens-backup";
+
+/** Everything kept on this device, as one file's worth of text. */
+export function exportAll(): string {
+  return JSON.stringify({
+    format: BACKUP_FORMAT,
+    version: 1,
+    saved: new Date().toISOString().slice(0, 10),
+    profiles: read(),
+  });
+}
+
+/** Read a backup, or a rig payload, back in.
+ *
+ *  BOTH SHAPES, because the reader has two files that look like the same thing:
+ *  what the rig printed after a measurement, and what this app wrote as a
+ *  backup. Refusing one of them because of a header would be a distinction only
+ *  the code cares about. */
+export function importText(text: string): { saved: number; skipped: string[]; ok: boolean; changes: SaveChange[] } {
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    return { saved: 0, skipped: ["that file is not the numbers — it did not read as JSON"], ok: true, changes: [] };
+  }
+  const d = data as { format?: string; profiles?: unknown };
+  if (d?.format === BACKUP_FORMAT && Array.isArray(d.profiles)) {
+    const list = read();
+    const changes: SaveChange[] = [];
+    const skipped: string[] = [];
+    let saved = 0;
+    for (const raw of d.profiles as StoredProfile[]) {
+      if (!raw?.key || !Array.isArray(raw.kr) || !Array.isArray(raw.kb) || raw.kr.length < 2) {
+        skipped.push(raw?.key ?? "(a profile with no key)");
+        continue;
+      }
+      const at = list.findIndex((x) => x.key === raw.key);
+      if (at >= 0) {
+        changes.push({ key: raw.key, what: "replaced", wasFrames: list[at].frames, frames: raw.frames ?? 0 });
+        list[at] = raw;
+      } else {
+        changes.push({ key: raw.key, what: "added", frames: raw.frames ?? 0 });
+        list.push(raw);
+      }
+      saved++;
+    }
+    return { saved, skipped, ok: saved > 0 ? write(list) : true, changes };
+  }
+  if (d?.profiles && typeof d.profiles === "object") {
+    return saveFromPayload(data as Parameters<typeof saveFromPayload>[0]);
+  }
+  return { saved: 0, skipped: ["that file has no lens profiles in it"], ok: true, changes: [] };
+}

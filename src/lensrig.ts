@@ -19,7 +19,8 @@ import { sniff } from "./import";
 import { readExifSubset } from "./exif";
 import { profileFrame, averageProfiles, round5, NBINS, type FrameProfile } from "./lensprofile";
 import { readZipIndex, readZipEntry, readZipEntryPrefix, imageEntries } from "./zip";
-import { saveFromPayload, listProfiles, removeProfile, coverage } from "./lensstore";
+import { saveFromPayload, listProfiles, removeProfile, coverage, exportAll, importText, type SaveChange } from "./lensstore";
+import { requestPersistence } from "./session";
 
 declare const __APP_VERSION__: string;
 
@@ -45,6 +46,37 @@ export function wireLensRig(root: ParentNode): void {
   // What is kept is shown whenever the sheet opens, not only after a run — the
   // reader who wants to know what they have has not necessarily just measured
   // anything, and the one who wants to delete something certainly has not.
+  const backupBtn = $<HTMLButtonElement>("lensBackup");
+  const backupCopyBtn = $<HTMLButtonElement>("lensBackupCopy");
+  const restoreInput = $<HTMLInputElement>("lensRestore");
+  const restoreNote = $("lensRestoreNote");
+  backupBtn.onclick = () => {
+    const url = URL.createObjectURL(new Blob([exportAll()], { type: "application/json" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `lens-profiles-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  };
+  backupCopyBtn.onclick = () => copy(exportAll(), backupCopyBtn, "Copy them all");
+  restoreInput.onchange = async () => {
+    const f = restoreInput.files?.[0];
+    if (!f) return;
+    restoreNote.hidden = false;
+    restoreNote.textContent = "Reading…";
+    try {
+      const r = importText(await f.text());
+      restoreNote.textContent = r.saved
+        ? `Restored ${r.saved} profile${r.saved === 1 ? "" : "s"}. ${changeSummary(r.changes)}`.trim()
+        : `Nothing restored. ${r.skipped.join("; ") || "That file had no lens profiles in it."}`;
+      if (r.saved && !r.ok) restoreNote.textContent = "Read the file, but this browser refused to store it (a private window, or no room left).";
+    } catch (err) {
+      restoreNote.textContent = `That file could not be read (${(err as Error).message}).`;
+    }
+    restoreInput.value = ""; // so the same file can be picked again
+    renderKept();
+  };
+
   const dlg = document.getElementById("lensDlg");
   if (dlg) {
     new MutationObserver(() => { if ((dlg as HTMLDialogElement).open) renderKept(); })
@@ -86,12 +118,48 @@ export function wireLensRig(root: ParentNode): void {
    *  focal lengths and apertures were still unshot — which is the only question
    *  a second trip out with the camera can answer. A measurement you cannot
    *  inspect or undo is not something a reader can be asked to trust. */
+  /** What a save or a restore did, in the reader's terms. Shared, because a
+   *  restore that replaces a four-frame measurement with a one-frame one is the
+   *  same event as a re-measurement doing it, and deserves the same sentence. */
+  function changeSummary(changes: SaveChange[]): string {
+    const added = changes.filter((c) => c.what === "added").length;
+    const replaced = changes.filter((c) => c.what === "replaced");
+    const thinner = replaced.filter((c) => (c.wasFrames ?? 0) > c.frames);
+    const parts = [added ? `${added} new` : "", replaced.length ? `${replaced.length} replaced` : ""].filter(Boolean).join(", ");
+    return (parts ? `(${parts}) ` : "") + (thinner.length
+      ? `${thinner.length} replaced a measurement made from MORE frames of sky: ${thinner.map((c) => `${c.key} had ${c.wasFrames}, now ${c.frames}`).join("; ")}.`
+      : "");
+  }
+
+  /** WHERE THIS LIVES, said plainly and with the browser's own answer rather
+   *  than a generic caution. A measurement is a trip out with the camera, a set
+   *  of sky frames and a run of this rig; the reader is entitled to know it sits
+   *  in storage the app does not own, and to be handed the way to keep a copy in
+   *  the same breath. A warning with no remedy is bad news delivered on time. */
+  async function renderStorageNote() {
+    const note = $("lensStorageNote");
+    if (!listProfiles().length) { note.textContent = ""; return; }
+    let persisted: boolean | null = null;
+    try {
+      persisted = (await navigator.storage?.persisted?.()) ?? null;
+    } catch {
+      persisted = null; // a browser that will not answer is not a browser that promised
+    }
+    const where = "These live in this browser's storage for this app, not in a file and not in an account.";
+    note.textContent = persisted === true
+      ? `${where} This browser has agreed to keep it, which is the best any browser offers — it is still lost if you clear website data, remove the app from your home screen, or switch to another device. Save a backup.`
+      : persisted === false
+        ? `${where} This browser has NOT agreed to keep it: it can be cleared when the device is short of room, or after a stretch of not opening the app, and nothing will ask first. Save a backup.`
+        : `${where} This browser will not say whether it intends to keep it, so treat it as something that can go. Save a backup.`;
+  }
+
   function renderKept() {
     const kept = $("lensKept");
     const list = $("lensKeptList");
     const stored = listProfiles();
     kept.hidden = false;
     list.replaceChildren();
+    void renderStorageNote();
     if (!stored.length) {
       profNote("Nothing measured yet. What you measure here stays on this device and is used automatically when you open a photograph from that lens.", list);
       return;
@@ -499,19 +567,18 @@ export function wireLensRig(root: ParentNode): void {
       // folder they have already measured. A replace is what they want — the
       // new frames are the newer truth — but a silent one can put a one-frame
       // measurement over a four-frame one and nothing would ever say so.
-      const added = r.changes.filter((c) => c.what === "added").length;
-      const replaced = r.changes.filter((c) => c.what === "replaced");
-      const thinner = replaced.filter((c) => (c.wasFrames ?? 0) > c.frames);
-      const parts = [
-        added ? `${added} new` : "",
-        replaced.length ? `${replaced.length} replaced` : "",
-      ].filter(Boolean).join(", ");
+      const summary = changeSummary(r.changes);
       useNote.textContent = r.saved && r.ok
-        ? `Kept ${r.saved} profile${r.saved === 1 ? "" : "s"} on this device${parts ? ` (${parts})` : ""}. ` +
-          (thinner.length
-            ? `${thinner.length} of them replaced a measurement made from MORE frames: ${thinner.map((c) => `${c.key} had ${c.wasFrames}, now ${c.frames}`).join("; ")}. More frames average out the sky's own gradient, so if the earlier one was the better shoot you would want it back — it is gone from this device either way.`
-            : "Open a photograph from this lens and look under Corrections — Your measured lens.")
+        ? `Kept ${r.saved} profile${r.saved === 1 ? "" : "s"} on this device. ${summary}`.trim() +
+          (summary.includes("MORE frames")
+            ? " More frames of sky average out its own gradient, so if the earlier one was the better shoot you would want it back — it is gone from this device either way."
+            : " Open a photograph from this lens and look under Corrections — Your measured lens, and save a backup below.")
         : "This browser refused to store it (a private window, or no room left). The numbers above still copy and save.";
+      // A measurement is a real investment of the reader's time, which is the
+      // moment worth spending the one persistence request on. The browser may
+      // refuse; renderStorageNote reads what it actually decided rather than
+      // what was asked.
+      void requestPersistence();
       useBtn.textContent = r.saved && r.ok ? "Kept" : "Could not keep it";
       renderKept(); // what is on the device has just changed
       setTimeout(() => { useBtn.textContent = "Use these on my photos"; }, 2600);
