@@ -5670,6 +5670,75 @@ profiles on the RAW path at all (they are JPEG-only because full NEFs could not
 be moved into the measurement rig); and `keyFor`'s nearest-focal-length anchor
 selection, which snaps rather than interpolating between anchors.
 
+## Close was inside the thing that scrolls, 2026-09-10
+
+**Reported from a phone:** Close on the ⓘ is all the way at the bottom, and it
+does not close by tapping out — is the ⓘ too long?
+
+**The length is not the defect.** Measured at 393x852: the ⓘ held 2333px of
+content in a 699px box — **1636px of scrolling, 1.9 screens, before Close came
+into view**, and from the top there was no way out on screen at all. Help was
+worse and nobody had reported it: **9465px, eleven phone screens.** Both scrolled
+as ONE BOX with the way out as the last element inside it. Batch was the same
+shape with a shallower scroll.
+
+**THE SISTER REPO HAS SETTLED THIS, AND IT COST THEM THREE ROUNDS.** Quietkeep's
+`public/app.css` carries it under "THE ALWAYS-REACHABLE WAY OUT": the dialog is a
+flex column that does NOT scroll, a bar at the top carries the title and the way
+out, and only the body moves. They tried `position: sticky` first — correct, and
+honoured by every engine they tested — and **lost the header on the reference
+iPad twice**, so the dependency was removed rather than debugged. Then the same
+defect came back when five sheets shipped as ordinary dialogs, and again on the
+two longest dialogs that had never been sheets. Their conclusion is the one
+worth copying: a stylesheet cannot fix it, because a selector cannot know about
+a dialog nobody has written yet, so **the enforcement is a walk that fails on
+any dialog with a way out and no scrolling body** — an absence that used to look
+exactly like a presence.
+
+Copied here. `#infoDlg`, `#helpDlg` and `#batchDlg` are flex columns with a
+`.dlg-bar` carrying the heading and a 44x44 ✕; `.dlg-body` (and `.help-body`) is
+the only thing that scrolls. `[open]` is load-bearing on the display rule — a
+bare `#infoDlg { display: flex }` outranks the UA's
+`dialog:not([open]) { display: none }`, so the dialog would close correctly and
+stay on screen anyway. Asserted with `checkVisibility()` after the close rather
+than trusting `close()`.
+
+**AND THE OTHER HALF OF THE REPORT WAS `vh`.** Three dialogs sized themselves
+with bare `vh` while the rest of the app uses `dvh` — `#infoDlg` and `#helpDlg`
+at 82vh, `#batchDlg` at 86vh. On a phone browser `vh` is the viewport with the
+URL bar HIDDEN, which is taller than what is on screen, so 82vh came to roughly
+95% of the visible height: the dialog ran under the browser's own chrome and the
+band of backdrop you tap to dismiss all but vanished. That is why it "doesn't
+close by tapping out" — the handler was there and correct
+(`e.target === dlg`) the whole time, with nowhere left to tap. All three are
+`min(82vh, calc(100dvh - 2rem))` now. Quietkeep's app.css states the same rule
+in the same words; this repo already used `dvh` for the editor panel and simply
+never applied it to the dialogs.
+
+**This half cannot be verified here and is the owner's to check.** Chromium
+headless has no URL bar, so `vh` and `dvh` resolve identically and the band
+measures 77px either way. The reasoning and the sister repo's device findings
+are the evidence; the iPad is the test.
+
+**THE GATE IS THE PROPERTY, NOT THE BUTTON.** The first version of the walk
+looked for a button whose TEXT matched /close|done|cancel/ — and the moment the
+✕ landed it reported the ⓘ still failing, because it was measuring `#infoClose`
+at the bottom and could not see the new way out at the top. It now collects
+every button whose text OR `aria-label` says so and asks whether AT LEAST ONE is
+on screen and unobstructed, at the top of the scroll, half way down, and at the
+end. Made to fail twice: dropping `[open]` (three dialogs stay visible after
+close) and letting the bar scroll again (three dialogs lose their way out).
+
+Measured after: ⓘ 1670px of scrolling, Help 9482px, Batch 141px — and all three
+keep a way out at top, middle and end, in both themes, 44x44, axe clean.
+
+**And the lens rig had one route in, behind a version number.** "Where do I find
+the place to upload lens test shots?" — nowhere, which is the point: the frames
+stay on the iPad. But the only way to Measure a lens was ⓘ → the version tag →
+the test page, which is not a route anybody finds looking for their lens. The IR
+lens fixes card on the Corrections tab now links straight to it, next to the
+sliders it is the answer to.
+
 ## The phone spent a whole band on one button, 2026-09-10
 
 **Reported as "the phone user experience is not good", with a screenshot.**
