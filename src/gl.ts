@@ -1244,7 +1244,8 @@ export class Renderer {
     gl.uniform1i(this.loc.u_lensTex, 10);
     gl.uniform1i(this.loc.u_lensN, this.lensN);
     gl.uniform1f(this.loc.u_lensFix, this.lensHasColour && !p.lensBypass ? (p.lensFix ?? 0) : 0);
-    gl.uniform1f(this.loc.u_lensBump, this.lensHasBump && !p.hsBypass ? (p.hsFix ?? 0) : 0);
+    // Same strength as the colour half: one profile, one correction, one slider.
+    gl.uniform1f(this.loc.u_lensBump, this.lensHasBump && !p.lensBypass ? (p.lensFix ?? 0) : 0);
     gl.activeTexture(gl.TEXTURE10);
     gl.bindTexture(gl.TEXTURE_2D, this.lensTex);
     // Imported .cube LUT (unit 5). The sig check IS the uploader: the lattice

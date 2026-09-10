@@ -940,7 +940,10 @@ export function compileEdit(
   // The measured curve is its own stage: it must run whether or not any of the
   // manual lens sliders are off zero.
   const lensFix = p.lensBypass ? 0 : (p.lensFix ?? 0);
-  const hsFix = p.hsBypass ? 0 : (p.hsFix ?? 0);
+  // Both halves ride the SAME strength: one profile supplies them, so one
+  // slider moves them. `hsFix` is the shipped card's control and reaches here by
+  // being mirrored into lensFix while that card is the live one.
+  const hsFix = lensFix;
   const kr = lens?.kr, kb = lens?.kb, bump = lens?.bump;
   const colourN = kr && kb ? Math.min(kr.length, kb.length) : 0;
   const bumpN = bump ? bump.length : 0;

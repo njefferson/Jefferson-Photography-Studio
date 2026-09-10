@@ -495,8 +495,22 @@ export function wireLensRig(root: ParentNode): void {
     useBtn.onclick = () => {
       const r = saveFromPayload(payload);
       useNote.hidden = false;
+      // RE-MEASURING REPLACES, and saying so matters when a reader re-ingests a
+      // folder they have already measured. A replace is what they want — the
+      // new frames are the newer truth — but a silent one can put a one-frame
+      // measurement over a four-frame one and nothing would ever say so.
+      const added = r.changes.filter((c) => c.what === "added").length;
+      const replaced = r.changes.filter((c) => c.what === "replaced");
+      const thinner = replaced.filter((c) => (c.wasFrames ?? 0) > c.frames);
+      const parts = [
+        added ? `${added} new` : "",
+        replaced.length ? `${replaced.length} replaced` : "",
+      ].filter(Boolean).join(", ");
       useNote.textContent = r.saved && r.ok
-        ? `Kept ${r.saved} profile${r.saved === 1 ? "" : "s"} on this device. Open a photograph from this lens and look under Corrections — Your measured lens.`
+        ? `Kept ${r.saved} profile${r.saved === 1 ? "" : "s"} on this device${parts ? ` (${parts})` : ""}. ` +
+          (thinner.length
+            ? `${thinner.length} of them replaced a measurement made from MORE frames: ${thinner.map((c) => `${c.key} had ${c.wasFrames}, now ${c.frames}`).join("; ")}. More frames average out the sky's own gradient, so if the earlier one was the better shoot you would want it back — it is gone from this device either way.`
+            : "Open a photograph from this lens and look under Corrections — Your measured lens.")
         : "This browser refused to store it (a private window, or no room left). The numbers above still copy and save.";
       useBtn.textContent = r.saved && r.ok ? "Kept" : "Could not keep it";
       renderKept(); // what is on the device has just changed
