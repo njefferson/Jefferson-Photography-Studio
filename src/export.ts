@@ -21,6 +21,7 @@ import { readExifSubset, buildExifApp1, embedExifInJpeg, ifd0ExtraEntries, exifI
 import { embedLookInJpeg } from "./lookmark";
 import type { ImportedFile } from "./import";
 import type { DecodedImage } from "./decode";
+import type { StoredProfile } from "./lensstore";
 
 export type ExportFormat = "jpeg" | "tiff";
 
@@ -122,6 +123,20 @@ export async function exportImage(
   params: EditParams,
   opts: ExportOptions,
   onProgress?: (fraction: number) => void,
+  /** The reader's measured lens profile, if one matched this photograph.
+   *
+   *  WHY IT HAS TO COME IN HERE. A raw export does not use the decoded frame —
+   *  `getSource` re-reads the CFA from the file at native resolution, on
+   *  purpose, so the saved image is not limited by the preview's binned decode.
+   *  The measured colour correction is applied to that decoded frame, so on the
+   *  raw path it would have been in the preview and NOT in the saved file: the
+   *  screen showing something the export does not have is worse than the
+   *  correction being absent from both. Doctrine §14 — if a feature produces an
+   *  output, the check has to assert something about the OUTPUT.
+   *
+   *  The 8-bit path already carries it, because there `getSource` returns the
+   *  very buffer the correction mutated. */
+  lens?: { p: StoredProfile; strength: number } | null,
 ): Promise<ExportResult> {
   const src = getSource(file, current);
   const srcW = "cfa" in src ? src.cfa.width : src.width;
@@ -166,13 +181,33 @@ export async function exportImage(
 
   // Camera-native linear RGB at a source pixel; denoise wraps the sampler so it
   // acts on linear data BEFORE white balance/exposure amplify the noise.
-  const rawSample =
+  const rawSampleBase =
     "cfa" in src
       ? (x: number, y: number) => demosaicPixelLinear(src.cfa, x, y)
       : (x: number, y: number) => {
           const i = (y * src.width + x) * 4;
           return [toLinear8(src.pixels[i]), toLinear8(src.pixels[i + 1]), toLinear8(src.pixels[i + 2])] as [number, number, number];
         };
+  // The measured lens correction, on the raw path only — see `lens` above. Both
+  // samplers are LINEAR here, which is where the gains were measured, so this
+  // needs none of the sRGB round trip the preview's 8-bit path does.
+  const lensOn = !!lens && "cfa" in src && lens.strength !== 0 && lens.p.kr.length > 1;
+  const lensNb = lensOn ? Math.min(lens!.p.kr.length, lens!.p.kb.length) : 0;
+  const lensGr = new Float32Array(lensNb), lensGb = new Float32Array(lensNb);
+  if (lensOn) {
+    const g = (k: number) => { const v = 1 + (k - 1) * lens!.strength; return v > 1e-3 ? 1 / v : 1; };
+    for (let i = 0; i < lensNb; i++) { lensGr[i] = g(lens!.p.kr[i]); lensGb[i] = g(lens!.p.kb[i]); }
+  }
+  const lensCx = (srcW - 1) / 2, lensCy = (srcH - 1) / 2;
+  const lensRd = Math.sqrt(lensCx * lensCx + lensCy * lensCy);
+  const rawSample = lensOn
+    ? (x: number, y: number) => {
+        const t = rawSampleBase(x, y);
+        const dx = x - lensCx, dy = y - lensCy;
+        const i = Math.min(lensNb - 1, ((Math.sqrt(dx * dx + dy * dy) / lensRd) * lensNb) | 0);
+        return [t[0] * lensGr[i], t[1], t[2] * lensGb[i]] as [number, number, number];
+      }
+    : rawSampleBase;
   // Aspect = SOURCE dims (the uv we pass below are source-space), so the lens
   // fix stays circular in pixels regardless of display rotation. The clarity/
   // dehaze maps are rebuilt from the full-res source (cheap: coarse grid).
