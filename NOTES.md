@@ -6240,6 +6240,47 @@ which edge answered rather than about what is deployed. Six independent fetches
 now, all six required to agree. The `sw.js` cache stamp is the better anchor
 where there is one, since it carries the version.
 
+## Re-picking a folder doubled the session instead of resuming it, 2026-09-10
+
+**An interrupted open already resumed — by a route nobody would take.** The
+photos it managed are written to storage as the loop goes, so a relaunch offers
+the whole partial session back under Resume. But the reader's natural move after
+a sleep is to pick the same folder again, and that path recognised nothing:
+every photo already in was imported, stored and tiled a SECOND time. Measured
+before the fix: picking the same four files twice gave **eight tiles** and
+doubled the stored rows. So the resume that existed was unreachable by the
+obvious route, and the obvious route quietly doubled the set.
+
+Identity is the picked file's own name and byte length — what the picker knows
+before anything is read, and the identity a resumed batch has always used.
+`srcName`/`srcSize` ride on the stored meta and come back on a resume, so
+re-picking after a resume is recognised too. Rows written before this carry
+neither, and fall back to the stored name and size.
+
+A set with nothing new in it is refused whole and says so; a set that overlaps
+adds only what is genuinely new and says how many it did not read again. An
+unexplained shortfall would be worse than the doubling.
+
+**FOUR INSTRUMENT FAULTS IN ONE SESSION, ALL THE SAME SHAPE.** The walk for this
+failed five claims on a working feature, and every one was the test:
+
+- tile names read from `textContent`, which is empty whenever a tile has a
+  thumbnail — the name is in `title`;
+- the toast looked for by a class it does not have, and queried after its own
+  fade;
+- then, once it WAS captured, accumulated across steps — so "a set with nothing
+  new says so" passed on a message two steps older;
+- and the resume button addressed as `resumeBtn`, which is not its id.
+
+Add the GPS fixture with no GPS, the history probe comparing a constant object,
+and the resume claim reading a word the feature never wrote, and the pattern is
+one thing: **a claim that reads a PROXY for the behaviour, and passes or fails on
+the proxy.** The proxy is always something easier to reach than the thing —
+a class name, a text node, an accumulated log. The rule that catches all seven:
+before trusting a claim, plant the defect it names and watch it fail. A claim
+that cannot be made to fail is not evidence, and one that fails on working code
+costs an hour of looking in the wrong place.
+
 ## The iPad slept and the work was thrown away, 2026-09-10
 
 **Reported from the device: on long loads the iPad goes to sleep, stops all the

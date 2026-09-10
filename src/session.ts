@@ -30,6 +30,13 @@ export interface PhotoMeta {
   addedAt: number;
   /** Small JPEG thumbnail for the strip (whole image, one small inline value). */
   thumb: ArrayBuffer;
+  /** The PICKED file's own name and byte length, which is what identifies it
+   *  before anything reads it — the identity a resumed batch already uses. Kept
+   *  so re-picking a folder after an interrupted open recognises what is
+   *  already in and does not read it a second time. Absent on rows written
+   *  before this existed, which is why the fallback compares `name`/`size`. */
+  srcName?: string;
+  srcSize?: number;
   /** The photo's edit as a JSON snapshot, or null until it's been visited.
    *  Spatial mask bitmaps are dropped before storing (see main.ts) — they're
    *  composition-specific and reset on a fresh decode, like they always have. */

@@ -6642,6 +6642,9 @@ interface SessionPhoto {
   name: string;
   kind: ImageKind;
   size: number; // source bytes
+  /** The picked file's own name and byte length — see PhotoMeta. */
+  srcName?: string;
+  srcSize?: number;
   edit: string | null; // stored edit JSON (from resume); once visited, liveEdits wins
   thumbUrl: string; // object URL for the strip preview
   /** Which picture the tile is showing. "waiting" — the file has not been read
@@ -7092,9 +7095,40 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Ar
   // second and you could not see what you had picked until it was done. These
   // are not switchable yet — there is nothing stored to switch to — and each
   // becomes so as its bytes land.
+  // ALREADY IN THIS SESSION, and therefore not read again.
+  //
+  // WHY. An interrupted open leaves the photos it managed in storage, and the
+  // reader's natural next move is to pick the same folder again — at which
+  // point every one of them was imported, stored and tiled a SECOND time.
+  // Measured before this existed: picking the same four files twice gave eight
+  // tiles. So the resume that already worked through Resume was unreachable by
+  // the obvious route, and the obvious route quietly doubled the set.
+  //
+  // Identity is the picked file's name and byte length, which is what the
+  // picker knows before anything is read — the same identity a resumed batch
+  // uses. Rows stored before this carry no srcName, so those fall back to the
+  // name and stored size, which are the same values for every path that does
+  // not rewrite the bytes.
+  const already = new Set(sessionPhotos.map((p) => `${p.srcName ?? p.name} ${p.srcSize ?? p.size}`));
+  const reopened: string[] = [];
+  if (append && already.size) {
+    const fresh = files.filter((f) => {
+      if (!already.has(`${f.name} ${f.size}`)) return true;
+      reopened.push(f.name);
+      return false;
+    });
+    files = fresh;
+    if (!files.length) {
+      toast(`All ${reopened.length} of those are already in this session.`, 3200);
+      return;
+    }
+  }
+
   const planned = files.map((f) => ({
     id: crypto.randomUUID(),
     name: f.name,
+    srcName: f.name,
+    srcSize: f.size,
     kind: "unknown" as ImageKind, // the real kind comes from the bytes, not the name
     size: f.size,
     edit: null,
@@ -7223,7 +7257,7 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Ar
       inFlight.set(slot.id, {
         name: f.name,
         p: Session.addPhoto(
-          { id: slot.id, name: imported.name, kind: imported.kind, size: imported.bytes.length, order: nextOrder++, addedAt: Date.now(), thumb: new ArrayBuffer(0), edit: null },
+          { id: slot.id, name: imported.name, kind: imported.kind, size: imported.bytes.length, srcName: f.name, srcSize: f.size, order: nextOrder++, addedAt: Date.now(), thumb: new ArrayBuffer(0), edit: null },
           imported.bytes,
         ),
       });
@@ -7254,6 +7288,11 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Ar
   const notes: string[] = [];
   if (quotaHit) notes.push("Storage filled up — some photos couldn't be added. Free space, or tap Done to end the session.");
   if (skipped.length) notes.push(`${skipped.length} couldn't be opened:\n` + skipped.join("\n"));
+  // Say it, rather than leaving a set that quietly came up short of what was
+  // picked. Skipping is the right thing and an unexplained shortfall is not.
+  if (reopened.length) {
+    toast(`${reopened.length} of those ${reopened.length === 1 ? "was" : "were"} already in this session and ${reopened.length === 1 ? "was" : "were"} not read again.`, 3600);
+  }
   if (notes.length) alert(notes.join("\n\n"));
   if (!sessionPhotos.length) {
     welcome.hidden = false;
@@ -7734,6 +7773,11 @@ async function resumeSession() {
     if (metas.length < 2) { hideBusy(); return; }
     sessionPhotos = metas.map((m) => ({
       id: m.id, name: m.name, kind: m.kind, size: m.size, edit: m.edit,
+      // Carried back so re-picking the same folder after a resume recognises
+      // what is already here. Without this the identity is rebuilt from the
+      // STORED name and size, which is right for every path that does not
+      // rewrite the bytes and wrong for any that ever does.
+      srcName: m.srcName, srcSize: m.srcSize,
       // Only the background pass ever writes a stored thumbnail, so one that is
       // there is the real thing; one that is missing means the pass had not
       // reached that photo before the session was left, and re-running it below
