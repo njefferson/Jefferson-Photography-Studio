@@ -23,6 +23,7 @@ import { buildDiagnostic } from "./diagnostic";
 import { Tiff } from "./raw/tiff";
 import { drawHistogram } from "./histogram";
 import * as Hotspot from "./hotspot";
+import { wireLensRig } from "./lensrig";
 import { setupInstalledShare, setupInstallFromApp, toast } from "./share";
 import {
   type SavedLook,
@@ -4287,6 +4288,32 @@ wireThemePicker(document.getElementById("themePicker"));
 wirePalettePicker(document.getElementById("palettePicker"));
 
 // Help dialog (usage guide; the ⓘ dialog stays what's-new + support).
+// --- Measure your lens ------------------------------------------------------
+// The way out is wired FIRST, before the rig itself, so a throw inside
+// `wireLensRig` can never leave a dialog that cannot be closed (Doctrine §14).
+const lensDlg = $("lensDlg") as HTMLDialogElement;
+for (const id of ["lensClose", "lensCloseTop"]) $(id).addEventListener("click", () => lensDlg.close());
+lensDlg.addEventListener("click", (e) => {
+  if (e.target === lensDlg) lensDlg.close(); // tap outside to dismiss
+});
+const openLens = () => {
+  // Opened from inside the ⓘ or the version panel as well as from the start
+  // screen; two open modals stack badly, so whatever is up closes first.
+  for (const id of ["infoDlg", "verDlg"]) (document.getElementById(id) as HTMLDialogElement | null)?.close();
+  lensDlg.showModal();
+};
+// A LENS IS NOT A PHOTOGRAPH, so every route to this works with nothing open:
+// the start screen, the version panel, and the Corrections card for when you
+// are already looking at the sliders it replaces.
+for (const id of ["welcomeLensBtn", "verLens", "lensMeasureBtn"]) {
+  document.getElementById(id)?.addEventListener("click", openLens);
+}
+wireLensRig(lensDlg);
+// The test page links here with ?lens=1 rather than keeping its own copy.
+if (new URLSearchParams(location.search).has("lens")) {
+  requestAnimationFrame(() => { try { openLens(); } catch { /* never block the app */ } });
+}
+
 const helpDlg = $("helpDlg") as HTMLDialogElement;
 $("helpBtn").addEventListener("click", () => helpDlg.showModal());
 for (const id of ["helpClose", "helpCloseTop"]) $(id).addEventListener("click", () => helpDlg.close());

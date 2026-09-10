@@ -5670,6 +5670,49 @@ profiles on the RAW path at all (they are JPEG-only because full NEFs could not
 be moved into the measurement rig); and `keyFor`'s nearest-focal-length anchor
 selection, which snaps rather than interpolating between anchors.
 
+## A lens is not a photograph, 2026-09-10
+
+**Reported, twice, and both times the answer given was worse than the last.**
+The lens rig shipped on the TEST PAGE — defensible on its own terms: it is a
+measurement, not an edit. Then the routes to it were:
+
+- the version tag, whose panel carries exactly one link and it says **"Test this
+  device…"** — naming no lens anywhere;
+- a link on the **Corrections tab**, which does not exist until a photo is open.
+
+So calibrating a lens meant opening a photograph you did not want to edit,
+finding a tab, and following a link off to the diagnostics page. Measured on
+production with nothing open: the version tag is on screen (67x44, reads
+v2.20.4) and its panel does open, so a route existed — and no text on it says
+"lens", which makes it a route nobody walks. **A path that exists and cannot be
+found is not a path**, and reporting one as though it answered the question was
+the second wrong answer, not a correction of the first.
+
+**It is a dialog in the editor now** (`#lensDlg`, `src/lensrig.ts`), reachable
+from the start screen, the version panel, and the Corrections card — the first
+two with nothing open at all. Asserted with nothing open: the start-screen
+button is there, opens it, and measures a zipped set of four to the same
+numbers as before (kr 1.0904 against a planted 1.08).
+
+**ONE implementation.** The test page kept the markup and 224 lines of wiring;
+it now carries four sentences and a link to `ir.html?lens=1`. Two copies of one
+feature is how a fix reaches only one of them — the same argument as `IMAGE_EXTS`
+in zip.ts and `binary-files.mjs` in the hub.
+
+**The way out was wired FIRST**, before `wireLensRig`, so a throw inside the rig
+can never leave a dialog that cannot be closed. That is Doctrine §14's rule
+verbatim and it costs two lines to obey.
+
+**AND THE A11Y TEST FAILED ON ITS OWN MISTAKE AGAIN.** The new dialog's file
+chooser reported no focus ring in either theme. The CSS was correct: Chromium
+only sets `:focus-visible` when the interaction that led to the focus was a
+KEYBOARD one, and the test clicked the opener with a mouse and then called
+`.focus()`. Opened with Enter and tabbed to, the ring is 2px in both themes.
+Third time this session an instrument has reported a defect that was entirely
+its own — after the strip's scroll position mid-animation and the deploy check
+answered by a stale edge. **When a result looks absurd, suspect the instrument**
+is in this repo's own standing rules, and it keeps being the answer.
+
 ## Close was inside the thing that scrolls, 2026-09-10
 
 **Reported from a phone:** Close on the ⓘ is all the way at the bottom, and it
