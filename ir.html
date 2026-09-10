@@ -866,7 +866,7 @@
           <li><strong>Quick look a folder</strong> (top bar, and on the start screen) when you just want to <em>see</em> what's in a set:
           an instant grid of auto-balanced previews, nothing saved. Tap the keepers and <strong>Keep in a session</strong>
           sends them straight into an editable session.</li>
-          <li>On open, <strong>raw photos are auto-balanced</strong> (white balance, exposure, denoise, and blown-highlight recovery when the frame needs it); JPEG/HEIC open as the camera rendered them, with measured denoise only. <strong>Hold: Untouched</strong> shows the bare decode any time.</li>
+          <li>On open, <strong>raw photos are auto-balanced</strong> (white balance, exposure, denoise, blown-highlight recovery when the frame needs it, and <strong>Restore depth</strong>); JPEG/HEIC open as the camera rendered them, with measured denoise only &mdash; until you pick a Look, which balances them first, because a false-colour look needs colours something has already pulled apart. Every one of those lands on a slider you can see and undo, and <strong>Hold: Untouched</strong> shows the bare decode any time.</li>
           <li><strong>Tap foliage</strong> in the photo to fine-tune white balance — the classic IR move. Tapping a blown-out spot is refused and says so: there is no colour recorded in it to balance from.</li>
           <li><strong>The usual shortcuts work.</strong> <strong>Cmd/Ctrl&#8202;+&#8202;Z</strong> undoes and <strong>Cmd&#8202;+&#8202;Shift&#8202;+&#8202;Z</strong> (or <strong>Ctrl&#8202;+&#8202;Y</strong>) redoes. You can <strong>drag photos onto the window</strong> or <strong>paste</strong> one to open it. <strong>Esc</strong> closes any panel, and on a home-screen install the <strong>Back</strong> gesture closes the panel instead of leaving the app.</li>
           <li><strong>Double-tap any slider</strong> to put it back where the photo opened. Most of them don't start at zero — white balance, exposure and denoise open at values measured from your frame — so this returns that one slider to its opening value, the way <strong>Reset</strong> does for all of them at once. Quality goes back to its usual setting instead, since that one is yours rather than the photo's. Restore depth strength goes back to 100% — the full correction worked out for the frame in front of you, which is where every photo opens.</li>
@@ -906,6 +906,34 @@
         (switch it off in Export if you prefer): anyone opening one here is offered your look. Honest
         caveat: apps that recompress images — Photos edits, Messages optimization, social uploads — strip
         the recipe; a link, file, code or QR always survives.</p>
+
+        <p><strong>Restore depth</strong> (IR tab) is the one automatic that is not just a
+        measurement. An infrared frame very often opens FLAT &mdash; low contrast, washed colour &mdash;
+        because the light it was made from does not spread across the channels the way visible light
+        does. Restore depth puts that contrast and colour back: it works out how far this particular
+        photograph is from a reference, and moves it there. It is <strong>on by default</strong>, it
+        runs again whenever you press a Look, and everything it does lands on the Tone and
+        Sky/Foliage sliders where you can see it and take it back.
+        <strong>Strength</strong> scales the whole correction: 100% is the full amount worked out for
+        the frame in front of you &mdash; which is why every photo opens there &mdash; and lower leaves
+        more of the picture as it arrived. 0% is the same as switching it off. If a frame looks
+        overdone, pull Strength down rather than reaching for contrast.</p>
+
+        <p><strong>Recover highlights</strong> (Basic tab) is for areas the sensor genuinely clipped
+        &mdash; a blown sky, a hot window &mdash; where one or more channels stopped recording before the
+        others did, so the area goes an untrue colour rather than clean white. It pulls those areas
+        back toward neutral for your current white balance, and re-aims itself live as you rebalance.
+        It is set automatically at open when a raw frame actually has clipping, and sits at 0 when it
+        does not. It cannot invent detail that was never recorded &mdash; it fixes the COLOUR of a blown
+        area, not its texture.</p>
+
+        <p><strong>Red, Green and Blue gain</strong> (Basic tab) are white balance itself, one channel
+        at a time, on a log track so 1x sits near the middle. Tapping foliage in the photo sets all
+        three at once and is the usual way in; the sliders are there for when you want to nudge one
+        channel on its own, or push past what any ordinary editor allows &mdash; which is the whole
+        reason this app exists, since infrared needs a balance far outside the visible-light range.
+        <strong>Auto white balance</strong> rebalances to the photo's own neutral, and is the quick way
+        back out of a look's colour cast without losing anything else.</p>
 
         <h3>Which color tool when?</h3>
         <p>The color tools stack from broadest to most surgical — reach for the smallest one that does the job:</p>
