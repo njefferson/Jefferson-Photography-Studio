@@ -58,6 +58,9 @@ export interface StoredProfile {
   source: string;
   camera: string;
   measured: string;
+  /** Present when this is a blend of two measurements rather than one of them,
+   *  so the panel can say so and a test can tell the two apart. */
+  blend?: { loFl: number; hiFl: number; t: number };
 }
 
 function read(): StoredProfile[] {
@@ -134,15 +137,32 @@ export function clearProfiles(): void {
   write([]);
 }
 
+/** A number that is 0 at `a`, 1 at `b`, in proportion rather than in units.
+ *  50mm to 55mm is a small move and 200mm to 205mm a smaller one; 24mm to 29mm
+ *  is not. Apertures are the same shape of quantity — f/4 to f/5.6 is one stop
+ *  wherever it sits. */
+const logMix = (v: number, a: number, b: number) =>
+  a === b ? 0 : Math.min(1, Math.max(0, Math.log(v / a) / Math.log(b / a)));
+
 /** The stored profile that best fits a photograph, or null.
  *
- *  The lens model must match exactly — a profile from one lens says nothing
- *  about another. Focal length and aperture are matched by NEAREST, because a
- *  zoom does not stop at the focal lengths that happened to be measured, and
- *  refusing everything that is not an exact hit would leave the feature doing
- *  nothing on almost every photograph. Focal length is compared in stops-like
- *  proportion rather than millimetres: 50 to 55 is a small move and 200 to 205
- *  is a smaller one, while 24 to 29 is not. */
+ *  THE LENS DOES NOT STOP AT THE FOCAL LENGTHS THAT HAPPENED TO BE MEASURED.
+ *  Picking the nearest profile means a lens measured at 50mm and 250mm hands a
+ *  130mm frame the 50mm curve unchanged — the hot-spot's whole character
+ *  changes across a zoom, so that is a measurement applied where it does not
+ *  belong. Between two measurements the curves are BLENDED, bin by bin, on a
+ *  proportional focal-length axis.
+ *
+ *  It never extrapolates. Outside the measured range the nearest end is used
+ *  as-is: a lens curve continued past where anybody looked is a guess wearing
+ *  a measurement's clothes, and it would be applied silently to every frame.
+ *
+ *  Aperture chooses the SET first, focal length interpolates within it. A
+ *  hot-spot changes more with aperture than with anything else — measured on a
+ *  real lens: 0.19 at f/29 and 0.00 at f/5.3, nearly the same focal length —
+ *  so blending across apertures would average two different lenses. The set
+ *  nearest the frame's aperture is used, and the note says when that set was
+ *  not shot at this frame's aperture. */
 export function findProfile(ex: ExifSubset | null): StoredProfile | null {
   if (!ex?.lens) return null;
   const model = ex.lens.trim();
@@ -151,15 +171,51 @@ export function findProfile(ex: ExifSubset | null): StoredProfile | null {
   const mine = read().filter((p) => p.model === model);
   if (!mine.length) return null;
   if (!Number.isFinite(fl)) return mine[0];
-  let best: StoredProfile | null = null;
-  let bestCost = Infinity;
+
+  // 1. the aperture set nearest this frame's, keeping unrecorded apertures
+  //    together as their own set rather than pretending they are any value.
+  const sets = new Map<string, StoredProfile[]>();
   for (const p of mine) {
-    const flCost = Math.abs(Math.log(p.fl / fl));
-    const apCost = Number.isFinite(ap) && Number.isFinite(p.ap) ? Math.abs(Math.log(p.ap / ap)) * 0.5 : 0.25;
-    const cost = flCost + apCost;
-    if (cost < bestCost) { bestCost = cost; best = p; }
+    const k = Number.isFinite(p.ap) ? p.ap.toFixed(2) : "?";
+    (sets.get(k) ?? sets.set(k, []).get(k)!).push(p);
   }
-  return best;
+  let best: StoredProfile[] = [];
+  let bestCost = Infinity;
+  for (const [k, list] of sets) {
+    const cost = k === "?" || !Number.isFinite(ap) ? 0.4 : Math.abs(Math.log(Number(k) / ap));
+    if (cost < bestCost) { bestCost = cost; best = list; }
+  }
+
+  // 2. within it, bracket the frame's focal length and blend.
+  const by = [...best].sort((a, z) => a.fl - z.fl);
+  if (by.length === 1) return by[0];
+  if (fl <= by[0].fl) return by[0];
+  if (fl >= by[by.length - 1].fl) return by[by.length - 1];
+  let lo = by[0], hi = by[by.length - 1];
+  for (let i = 0; i < by.length - 1; i++) {
+    if (fl >= by[i].fl && fl <= by[i + 1].fl) { lo = by[i]; hi = by[i + 1]; break; }
+  }
+  if (lo === hi || lo.fl === hi.fl) return lo;
+  const t = logMix(fl, lo.fl, hi.fl);
+  const n = Math.min(lo.kr.length, hi.kr.length, lo.kb.length, hi.kb.length);
+  const kr: number[] = [], kb: number[] = [];
+  for (let i = 0; i < n; i++) {
+    kr.push(lo.kr[i] + (hi.kr[i] - lo.kr[i]) * t);
+    kb.push(lo.kb[i] + (hi.kb[i] - lo.kb[i]) * t);
+  }
+  return {
+    key: `${lo.key}+${hi.key}`,
+    model,
+    fl: Math.round(fl),
+    ap: lo.ap,
+    kr,
+    kb,
+    frames: lo.frames + hi.frames,
+    source: lo.source === hi.source ? lo.source : `${lo.source}+${hi.source}`,
+    camera: lo.camera || hi.camera,
+    measured: lo.measured || hi.measured,
+    blend: { loFl: lo.fl, hiFl: hi.fl, t },
+  };
 }
 
 /** How far a match had to reach, in words, so the reader can judge it. */
@@ -167,8 +223,15 @@ export function matchNote(p: StoredProfile, ex: ExifSubset | null): string {
   const fl = ex?.focalLength && ex.focalLength[1] ? ex.focalLength[0] / ex.focalLength[1] : NaN;
   const ap = ex?.fNumber && ex.fNumber[1] ? ex.fNumber[0] / ex.fNumber[1] : NaN;
   const bits: string[] = [];
-  if (Number.isFinite(fl) && Math.round(fl) !== Math.round(p.fl)) bits.push(`measured at ${p.fl}mm, this frame is ${Math.round(fl)}mm`);
-  if (Number.isFinite(ap) && Number.isFinite(p.ap) && Math.abs(ap - p.ap) > 0.15) bits.push(`measured at f/${p.ap}, this frame is f/${ap.toFixed(1)}`);
+  if (p.blend) {
+    const pc = Math.round(p.blend.t * 100);
+    bits.push(`blended between your ${p.blend.loFl}mm and ${p.blend.hiFl}mm measurements (${100 - pc}% / ${pc}%)`);
+  } else if (Number.isFinite(fl) && Math.round(fl) !== Math.round(p.fl)) {
+    bits.push(`measured at ${p.fl}mm, this frame is ${Math.round(fl)}mm`);
+  }
+  if (Number.isFinite(ap) && Number.isFinite(p.ap) && Math.abs(ap - p.ap) > 0.15) {
+    bits.push(`measured at f/${p.ap}, this frame is f/${ap.toFixed(1)}`);
+  }
   return bits.join("; ");
 }
 
