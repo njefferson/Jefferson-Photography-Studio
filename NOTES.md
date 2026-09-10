@@ -5670,6 +5670,43 @@ profiles on the RAW path at all (they are JPEG-only because full NEFs could not
 be moved into the measurement rig); and `keyFor`'s nearest-focal-length anchor
 selection, which snaps rather than interpolating between anchors.
 
+## A lens does not stop at the focal lengths you measured, 2026-09-10
+
+Matching picked the NEAREST stored profile, so a lens measured at 50mm and
+250mm handed a 130mm frame the 50mm curve unchanged — a measurement applied
+where it does not belong, silently, on every frame between the two. Between
+measurements the curves are BLENDED now, bin by bin.
+
+**On a proportional axis, not a linear one.** 50mm to 55mm is a small move and
+200mm to 205mm a smaller one; 24mm to 29mm is not. `logMix` puts the blend
+where the optics are: the geometric mean of 50 and 200 is 100, and a 100mm
+frame lands exactly halfway between the two curves (asserted to 0.001).
+
+**IT NEVER EXTRAPOLATES.** Outside the measured range the nearest end is used
+as it is. A lens curve continued past where anybody looked is a guess wearing a
+measurement's clothes, and it would be applied to every frame without anything
+saying so. Asserted at both ends, and the note still says which end it used and
+how far away the frame is.
+
+**APERTURE PICKS THE SET; FOCAL LENGTH INTERPOLATES INSIDE IT.** This is the
+part the owner's own data settled. A hot-spot changes more with aperture than
+with anything else — measured on a real lens, **0.19 at f/29 and 0.00 at
+f/5.3**, nearly the same focal length — so blending across apertures averages
+two different behaviours into one meaningless curve. Planted exactly that: with
+sets at f/4.5 and f/22, a blend across them returned **3.100 for a wide-open
+frame and 3.100 for a stopped-down one**, the same number for opposite
+conditions. Profiles are grouped by aperture, the set nearest the frame's is
+chosen, and the interpolation happens only inside it.
+
+Measurements from before aperture was recorded form their own set rather than
+being treated as any particular value, and still interpolate over focal length.
+
+The panel says what it did: "blended between your 50mm and 200mm measurements
+(50% / 50%)", or "measured at 50mm, this frame is 24mm" when it clamped.
+
+Made to fail three times — nearest-pick instead of blending (5 failures),
+extrapolation past the ends, and blending across apertures.
+
 ## The preview would have carried a correction the file did not, 2026-09-10
 
 Caught by reading `export.ts` before answering a question about automatic lens
