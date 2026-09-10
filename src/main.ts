@@ -13,7 +13,7 @@ import { TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDe
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, type HealSpot } from "./heal";
 import { makeStickerAsset, stickerRect, stickerWorldCorners, stickerXform, compositeStickersIntoRect8, compositeStickersIntoRectF32, compositeStickersOverlay8, type StickerAsset } from "./sticker";
 import { makeWarpField, encodeWarp, paintWarp, warpIsEmpty as warpFieldEmpty, type WarpField, type WarpTool } from "./warp";
-import type { Sticker, BrushMask } from "./pipeline";
+import type { Sticker, BrushMask, LensCurve } from "./pipeline";
 import { generateCube } from "./lut";
 import { generateDcp } from "./dcp";
 import { buildGlowMap } from "./glow";
@@ -25,7 +25,7 @@ import { drawHistogram } from "./histogram";
 import * as Hotspot from "./hotspot";
 import { wireLensRig } from "./lensrig";
 import * as LensStore from "./lensstore";
-import { readExifSubset } from "./exif";
+import { readExifSubset, type ExifSubset } from "./exif";
 import { setupInstalledShare, setupInstallFromApp, toast } from "./share";
 import {
   type SavedLook,
@@ -91,8 +91,11 @@ let currentFile: ImportedFile | null = null;
 // buffer, before white balance / channel swap / grading ever see it. Not
 // part of EditParams / the undo stack — it's a per-photo source correction,
 // not a creative edit; re-derived fresh each time a photo opens. ---
-let hotspotPristine: Uint8ClampedArray | null = null; // decoded pixels before correction
-let hotspotState: { profileKey: string | null; source: "exif" | "manual" | null; strength: number; bypass: boolean } | null = null;
+/** Which shipped profile this photograph matched, and how it was chosen.
+ *  `fl` is the frame's OWN focal length, not an anchor: the curve is
+ *  interpolated to it. Strength and Bypass are `params.hsFix`/`params.hsBypass`
+ *  so history carries them, the same as the measured card's. */
+let hotspotState: { short: string | null; fl: number | null; source: "exif" | "manual" | null } | null = null;
 
 const params: EditParams = {
   wb: [1, 1, 1],
@@ -118,6 +121,8 @@ const params: EditParams = {
   hotspotColor: 0,
   lensFix: 1,
   lensBypass: false,
+  hsFix: 1,
+  hsBypass: false,
   vignette: 0,
   clarity: 0,
   dehaze: 0,
@@ -223,62 +228,67 @@ function arrayBufferOf(u8: Uint8Array): ArrayBufferLike {
     : u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength);
 }
 
-/** Recompute `current.pixels` from the pristine decode + the active profile,
- *  and push the result to the GPU texture. No-op when the source has no
- *  gamma pixel buffer (RAW path — hot-spot profiles aren't supported there
- *  yet; see hsStatus text). */
-function applyHotspotCorrection() {
-  if (!current?.pixels || !hotspotPristine || !hotspotState) return;
-  current.pixels.set(hotspotPristine);
-  if (!hotspotState.bypass && hotspotState.profileKey) {
-    Hotspot.apply({ width: current.width, height: current.height, data: current.pixels }, hotspotState.profileKey, hotspotState.strength);
-  }
-  // uploadPreview (not a bare setImage): the fresh texture is pristine, so the
-  // heal spots must be re-baked onto the newly corrected pixels.
-  uploadPreview();
+/** The shipped brightness curve for the open photograph, interpolated to its
+ *  own focal length. `null` when the lens is not one of the two measured ones. */
+function currentBumpCurve(): Float64Array | null {
+  if (!hotspotState?.short || !hotspotState.fl) return null;
+  return Hotspot.bumpCurve(hotspotState.short, hotspotState.fl);
+}
+
+/** Push whichever halves of the radial curve this photograph has to the GPU.
+ *  One call for both, because they land on the same texture and the same bin —
+ *  see setLensCurve. Called after BOTH matches are worked out at open, and
+ *  again whenever either changes. */
+function syncLensTexture() {
+  const c = myLens ? myLens.p : null;
+  renderer.setLensCurve(c ? c.kr : null, c ? c.kb : null, currentBumpCurve());
+}
+
+/** Move the shipped correction to whatever its controls now say.
+ *
+ *  IT IS A PIPELINE STAGE NOW, NOT A REWRITE OF THE DECODED FRAME. It used to
+ *  keep an untouched copy of the 8-bit pixels and re-apply from it on every
+ *  slider move, which is why it could not run on a raw file at all — a raw
+ *  frame has no 8-bit buffer to copy, and one at full size would be 330 MB. */
+function syncHotspot() {
+  syncLensTexture();
+  draw();
   updateHotspotUI();
 }
 
 function updateHotspotUI() {
   if (!current) { hsUi.status.textContent = "No photo loaded."; hsUi.prompt.hidden = true; return; }
-  if (!current.pixels) {
-    hsUi.status.textContent = "Not available for RAW yet — profiles are calibrated from JPEG.";
-    hsUi.prompt.hidden = true;
-    hsUi.strength.disabled = true;
-    hsUi.bypassBtn.disabled = true;
-    return;
-  }
   hsUi.strength.disabled = false;
   hsUi.bypassBtn.disabled = false;
-  hsUi.strength.value = String(hotspotState?.strength ?? 1);
-  const bypass = hotspotState?.bypass ?? false;
-  hsUi.bypassBtn.setAttribute("aria-pressed", String(bypass));
-  hsUi.prompt.hidden = !!hotspotState?.profileKey;
-  if (!hotspotState?.profileKey) {
+  hsUi.strength.value = String(params.hsFix);
+  hsUi.bypassBtn.setAttribute("aria-pressed", String(params.hsBypass));
+  const matched = !!hotspotState?.short && !!hotspotState.fl;
+  hsUi.prompt.hidden = matched;
+  if (!matched) {
     hsUi.status.textContent = "Couldn't identify the lens — pick it below.";
   } else {
-    const src = hotspotState.source === "exif" ? "from EXIF" : "manual";
-    hsUi.status.textContent = `${hotspotState.profileKey} · ${src}${bypass ? " · bypassed" : ""}`;
+    const src = hotspotState!.source === "exif" ? "from EXIF" : "manual";
+    const note = Hotspot.shippedNote(hotspotState!.short!, hotspotState!.fl!);
+    hsUi.status.textContent =
+      `${hotspotState!.short} · ${src}${note ? ` — ${note}` : ""}${params.hsBypass ? " · bypassed" : ""}`;
   }
 }
 
 hsUi.strength.addEventListener("input", () => {
-  if (!hotspotState) return;
-  hotspotState.strength = Number(hsUi.strength.value);
-  applyHotspotCorrection();
+  params.hsFix = Number(hsUi.strength.value);
+  syncHotspot(); // draw() coalesces the drag into one undo step, like every slider
 });
 hsUi.bypassBtn.addEventListener("click", () => {
-  if (!hotspotState) return;
-  hotspotState.bypass = !hotspotState.bypass;
-  applyHotspotCorrection();
+  params.hsBypass = !params.hsBypass;
+  syncHotspot();
+  flushRecord(); // one press = one undo step
 });
 hsUi.applyManualBtn.addEventListener("click", () => {
-  if (!hotspotState) return;
   const fl = Number(hsUi.fl.value);
   if (!fl) return;
-  hotspotState.profileKey = Hotspot.keyFor(hsUi.lens.value, fl);
-  hotspotState.source = "manual";
-  applyHotspotCorrection();
+  hotspotState = { short: hsUi.lens.value, fl, source: "manual" };
+  syncHotspot();
+  flushRecord();
 });
 
 // --- The reader's OWN measured lens profile ---------------------------------
@@ -290,11 +300,9 @@ hsUi.applyManualBtn.addEventListener("click", () => {
 // It corrects colour only. `falloff` would flatten the corners, which is what
 // the Vignette slider is for, and the hot-spot's own share of the brightness
 // comes back from a measurement as a RANGE rather than a number — see
-// lensstore.ts. The scalar shipped profile keeps the brightness half.
-//
-// It works on RAW as well as rendered files, which the shipped profiles cannot:
-// they are calibrated from JPEG and say so. A profile the reader measured from
-// their own raw frames has no such limit.
+// lensstore.ts. The shipped scalar profile keeps the brightness half, and the
+// two ride the same radial curve now (see setLensCurve): one texture, one bin,
+// two strengths.
 const myLensUi = {
   card: $("myLensCard") as HTMLElement,
   status: $("myLensStatus") as HTMLElement,
@@ -318,7 +326,8 @@ let myLens: { p: LensStore.StoredProfile; note: string } | null = null;
  *  export had to be handed it separately, and every touch of the slider walked
  *  every pixel. In the pipeline it is one number per draw. */
 function syncMyLens() {
-  if (!myLens) { renderer.setLensCurve(null); params.lensFix = 0; params.lensBypass = false; }
+  if (!myLens) { params.lensFix = 0; params.lensBypass = false; }
+  syncLensTexture();
   draw();
   updateMyLensUI();
 }
@@ -340,18 +349,29 @@ function updateMyLensUI() {
  *  that renders a frame OTHER than the one the reader has open — thumbnails, a
  *  batch — because `myLens` belongs to the open photograph and applying it to
  *  another would put one lens's colour on another lens's frame. */
-function lensCurveFor(imported: ImportedFile): LensStore.StoredProfile | null {
+function lensCurveFor(imported: ImportedFile): LensCurve | null {
+  let ex: ExifSubset | null = null;
   try {
-    return LensStore.findProfile(readExifSubset(imported.bytes));
+    ex = readExifSubset(imported.bytes);
   } catch {
     return null;
   }
+  const measured = ex ? LensStore.findProfile(ex) : null;
+  const m = Hotspot.matchShipped(ex?.lens, focalLengthOf(ex));
+  const bump = m ? Hotspot.bumpCurve(m.short, m.fl) : null;
+  if (!measured && !bump) return null;
+  return { kr: measured?.kr, kb: measured?.kb, bump: bump ?? undefined };
 }
 
-/** The curve for the frame the reader has open. Bypass is a strength of 0,
- *  not a missing curve — one place decides how much of it lands. */
-function currentLensCurve(): LensStore.StoredProfile | null {
-  return myLens ? myLens.p : null;
+/** The curve for the frame the reader has open — both halves, from the two
+ *  matches already worked out at open rather than re-read from the file.
+ *  Bypass is a strength of 0, not a missing curve: one place decides how much
+ *  of each half lands, and it is the pipeline. */
+function currentLensCurve(): LensCurve | null {
+  const measured = myLens ? myLens.p : null;
+  const bump = currentBumpCurve();
+  if (!measured && !bump) return null;
+  return { kr: measured?.kr, kb: measured?.kb, bump: bump ?? undefined };
 }
 
 /** Called at open, beside initHotspot. */
@@ -367,10 +387,11 @@ function initMyLens(_img: DecodedImage, imported: ImportedFile) {
   if (p) myLens = { p, note: LensStore.matchNote(p, ex) };
   // The curve is per-photograph: uploaded once here, then only its strength
   // moves. Cleared when nothing matched, so the previous photo's lens cannot
-  // leak onto this one.
-  renderer.setLensCurve(myLens ? myLens.p.kr : null, myLens ? myLens.p.kb : null);
+  // leak onto this one. Both halves go up together — initHotspot has already
+  // run and settled the shipped match.
   params.lensFix = myLens ? 1 : 0;
   params.lensBypass = false;
+  syncLensTexture();
   updateMyLensUI();
 }
 
@@ -395,26 +416,27 @@ myLensUi.forget.addEventListener("click", () => {
 /** Called once per newly-opened photo, right after decode. Auto-selects the
  *  hot-spot profile from EXIF; if the lens can't be identified, surfaces the
  *  manual picker instead of silently skipping correction (never guess). */
-function initHotspot(img: DecodedImage, imported: ImportedFile) {
-  if (!img.pixels) {
-    hotspotPristine = null;
-    hotspotState = null;
-    updateHotspotUI();
-    return;
-  }
-  hotspotPristine = img.pixels.slice();
-  let info: Hotspot.ExifInfo | null = null;
+function initHotspot(_img: DecodedImage, imported: ImportedFile) {
+  // Read the lens with the reader that understands RAW. The ported parser in
+  // hotspot.ts only accepts a JPEG, which is why these profiles have never once
+  // run on a NEF or a DNG — the format this app is for.
+  let ex: ExifSubset | null = null;
   try {
-    info = Hotspot.fromExif(arrayBufferOf(imported.bytes));
+    ex = readExifSubset(imported.bytes);
   } catch {
     // Unreadable EXIF = unknown lens: fall through to the manual prompt.
   }
-  if (Hotspot.needsPrompt(info)) {
-    hotspotState = { profileKey: null, source: null, strength: 1, bypass: false };
-  } else {
-    hotspotState = { profileKey: info!.profileKey, source: "exif", strength: 1, bypass: false };
-  }
-  applyHotspotCorrection();
+  const m = Hotspot.matchShipped(ex?.lens, focalLengthOf(ex));
+  hotspotState = m ? { short: m.short, fl: m.fl, source: "exif" } : { short: null, fl: null, source: null };
+  params.hsFix = 1;
+  params.hsBypass = false;
+  updateHotspotUI();
+}
+
+/** Focal length in mm from an EXIF rational, or null. */
+function focalLengthOf(ex: ExifSubset | null): number | null {
+  const f = ex?.focalLength;
+  return f && f[1] ? f[0] / f[1] : null;
 }
 
 // --- Live histogram: a floating RGB + luminance readout that re-tallies the
@@ -507,6 +529,7 @@ function syncFromUI() {
   params.hotspotSize = Number(ui.hotspotSize.value);
   params.hotspotColor = Number(ui.hotspotColor.value);
   if (myLens) params.lensFix = Number(myLensUi.strength.value);
+  params.hsFix = Number(hsUi.strength.value);
   params.vignette = Number(ui.vignette.value);
   params.clarity = Number(ui.clarity.value);
   params.dehaze = Number(ui.dehaze.value);
@@ -556,7 +579,8 @@ function syncToUI() {
   ui.hotspot.value = String(params.hotspot);
   ui.hotspotSize.value = String(params.hotspotSize);
   ui.hotspotColor.value = String(params.hotspotColor);
-  updateMyLensUI(); // the measured-lens card is params-driven too
+  updateHotspotUI(); // both lens cards are params-driven, so history reaches them
+  updateMyLensUI();
   ui.vignette.value = String(params.vignette);
   ui.clarity.value = String(params.clarity);
   ui.dehaze.value = String(params.dehaze);
@@ -826,6 +850,8 @@ function cloneParams(p: EditParams): EditParams {
     hotspotColor: p.hotspotColor ?? 0,
     lensFix: p.lensFix ?? 1,
     lensBypass: p.lensBypass ?? false,
+    hsFix: p.hsFix ?? 1,
+    hsBypass: p.hsBypass ?? false,
     vignette: p.vignette,
     clarity: p.clarity,
     dehaze: p.dehaze,
@@ -902,6 +928,8 @@ function applySnapshot(s: Snapshot) {
   params.hotspotColor = c.hotspotColor ?? 0;
   params.lensFix = c.lensFix ?? 1;
   params.lensBypass = c.lensBypass ?? false;
+  params.hsFix = c.hsFix ?? 1;
+  params.hsBypass = c.hsBypass ?? false;
   params.vignette = c.vignette;
   params.clarity = c.clarity ?? 0;
   params.dehaze = c.dehaze ?? 0;
@@ -6253,6 +6281,8 @@ function establishFreshEdit() {
   hotspotColor: 0,
   lensFix: 1,
   lensBypass: false,
+  hsFix: 1,
+  hsBypass: false,
     vignette: 0,
     clarity: 0,
     dehaze: 0,
@@ -6679,7 +6709,7 @@ async function switchToPhoto(id: string) {
 /** Build a small gamma-encoded JPEG thumbnail for the strip — auto white
  *  balanced (so RAW infrared isn't a magenta smear) but ungraded, so it just
  *  says "which photo is this". Cheap: nearest-sampled at thumb resolution. */
-async function makeThumb(img: DecodedImage, MAX = 260, lens?: LensStore.StoredProfile | null): Promise<ArrayBuffer> {
+async function makeThumb(img: DecodedImage, MAX = 260, lens?: LensCurve | null): Promise<ArrayBuffer> {
   const s = Math.min(1, MAX / Math.max(img.width, img.height));
   const w = Math.max(1, Math.round(img.width * s));
   const h = Math.max(1, Math.round(img.height * s));
@@ -8610,6 +8640,8 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["l
   hotspotColor: 0,
   lensFix: 1,
   lensBypass: false,
+  hsFix: 1,
+  hsBypass: false,
     vignette: 0,
     clarity: look.clarity,
     dehaze: look.dehaze,
@@ -8650,19 +8682,19 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["l
   return p;
 }
 
-/** Bake the EXIF-selected hot-spot correction into a decoded frame's pixels,
- *  matching initHotspot(). If the lens can't be identified from EXIF we skip
- *  it for that frame — a bulk run can't stop to ask per photo.
- *  Returns which happened so the batch summary can be honest:
- *   - "applied": hot-spot correction was baked in;
- *   - "no-lens": a JPEG whose EXIF didn't name a lens we have a profile for;
- *   - "raw": RAW frame (profiles are JPEG-only for now — a known, separate skip). */
-function applyBatchHotspot(img: DecodedImage, imported: ImportedFile): "applied" | "no-lens" | "raw" {
-  if (!img.pixels) return "raw"; // RAW: profiles are JPEG-only for now
-  const info = Hotspot.fromExif(arrayBufferOf(imported.bytes));
-  if (!info || Hotspot.needsPrompt(info) || !info.profileKey) return "no-lens";
-  Hotspot.apply({ width: img.width, height: img.height, data: img.pixels }, info.profileKey, 1);
-  return "applied";
+/** Whether a frame in a bulk run matched a shipped lens profile. Nothing is
+ *  baked any more — the curve travels to `exportImage` with the frame, the same
+ *  road the preview takes — so this exists only to keep the batch summary
+ *  honest about which photographs got no lens correction. A bulk run can't stop
+ *  to ask per photo. */
+function batchHasLens(imported: ImportedFile): boolean {
+  let ex: ExifSubset | null = null;
+  try {
+    ex = readExifSubset(imported.bytes);
+  } catch {
+    return false;
+  }
+  return !!Hotspot.matchShipped(ex?.lens, focalLengthOf(ex));
 }
 
 /** Ensure every entry in the zip has a unique name (…-2.jpg on collision). */
@@ -8812,7 +8844,7 @@ async function runBatch(files: File[]) {
         const imported = guardLocation(await importFile(f));
         if (imported.looksTranscoded) { skipped.push(`${f.name} (arrived as flattened JPEG)`); continue; }
         const img = await decodeOffThread(imported);
-        const noLens = applyBatchHotspot(img, imported) === "no-lens";
+        const noLens = !batchHasLens(imported);
         // Each photo in a batch is matched on its OWN EXIF: a set can span
         // lenses and focal lengths, and one match for the whole run would
         // silently apply one lens's colour to another lens's frames.
