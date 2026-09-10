@@ -5663,6 +5663,125 @@ profiles on the RAW path at all (they are JPEG-only because full NEFs could not
 be moved into the measurement rig); and `keyFor`'s nearest-focal-length anchor
 selection, which snaps rather than interpolating between anchors.
 
+## Measuring a lens where the lens is, 2026-09-10
+
+**The question was how to get 25 MB raw flats off the iPad and into a session.**
+The answer is that they never move. A profile is 240 numbers and a flat is a raw
+file; the asymmetry is the whole design. The rig runs on the device, on the
+decoded frame, and emits the numbers — `src/lensprofile.ts`, driven from a
+**Measure a lens** section on the test page.
+
+That also closes the gap the shipped profiles have carried since 2026-07: they
+are JPEG-only *because* full NEFs could not be moved to where the original
+measurement ran. Nothing has to be moved now, and the same rig serves any
+converted lens rather than the two there are numbers for.
+
+**WHAT IT MEASURES, and the one step that makes it work.** Every channel is
+normalised by its OWN value in a reference ring (r 0.55–0.72 of the
+half-diagonal) before anything else. That makes every number downstream
+invariant to exposure and to white balance — which is what lets a raw frame
+(un-white-balanced, red-flooded) and a camera JPEG (balanced, gamma-encoded) be
+measured by the same code and averaged together. Asserted: the same synthetic
+frame at a quarter of the exposure gives identical numbers to 0.001.
+
+    falloff[i] = mean of the three normalised channels    the whole radial profile
+    kr[i] = n_r/n_g,  kb[i] = n_b/n_g                     colour, 1 at the ring
+
+**AND IT DOES NOT SEPARATE HOT-SPOT FROM VIGNETTE, BECAUSE ONE FLAT FRAME
+CANNOT.** This is the finding, and it cost three wrong turns to reach.
+
+Separating them means fitting a baseline to the outer radii and extrapolating
+it inward, and the answer is set by the functional form assumed for the
+falloff. Against frames carrying a known 12% hot-spot:
+
+- A polynomial baseline (1, r², r⁴) reads it as 0.130 on a quadratic vignette
+  and **0.184 on a cos⁴ one**.
+- A cos⁴ baseline reads it as 0.120 on a cos⁴ vignette and **0.097 on a
+  quadratic one**.
+
+Each is near-exact on the falloff it matches and wrong by more than half the
+bump on the other — and a real lens is cos⁴-ish with mechanical vignetting on
+top, so neither is right. **So the rig emits the measured falloff and reports
+the two estimates as a RANGE**, which is the honest width of what one frame can
+say. Asserted both ways: the range brackets the truth on a quadratic vignette
+(0.068–0.119) and on a cos⁴ one (0.120–0.197), and collapses to 0–0 on a frame
+with no hot-spot at all.
+
+**THREE WRONG TURNS, all the same shape: the instrument agreeing with itself.**
+
+1. **A sweep chose the fit's inner radius, against synthetics built from the
+   same polynomial the fit uses.** It said 0.60. On the real JPEG flats that
+   setting read a 0.121 bump as **0.088, moving by 0.007 between four frames of
+   the same sky** — biased and unstable, because extrapolating a quartic from
+   [0.6, 1.0] back to zero amplifies any irregularity in the outer profile. The
+   sweep had measured accuracy on ideal data and never once measured stability
+   against the thing that actually varies.
+2. **An iteration was written to remove the fit's bias, and it is a no-op.**
+   Dividing the bump estimate out of L and refitting returns the same curve,
+   because wherever the estimate is above zero, `L/(1+est)` is *identically* the
+   fitted curve. It was written, run, and moved the answer by 0.0002 — and the
+   comment above it confidently explained the bias it was fixing. The comment
+   went in before the measurement did.
+3. **The bias was diagnosed from an expected value that was itself wrong.** The
+   first "9% shortfall" was arithmetic on bin 0, not a defect: bin 0 spans a
+   range of radii, so a 0.12 bump reads 0.1196 by construction.
+
+**Two other things the rig turned up.**
+
+**An 8-bit rendered flat is a systematically worse measurement than a raw one,
+and not because of noise.** Within one radial ring nearly every pixel rounds to
+the same code, so the rounding never averages away. Measured from one frame
+encoded both ways: blue off by 0.0051, red by 0.0016 — blue worst because it is
+the darkest channel, where one code step is 2.4% of the value. Half a code in
+the right places moves a colour ratio by 1%. So a raw frame **displaces** a
+rendered one within a group rather than averaging with it, and the page says
+why.
+
+**A frame that is not a flat had to be refused, or the rig would confidently
+profile a landscape.** The guard is the mean within-ring relative spread: a
+radial profile assumes every pixel at the same distance from the centre saw the
+same light, and a photograph breaks that completely. Measured: a practice frame
+93%, a synthetic landscape 51%, a noisy sky with its own gradient 1.7%. The
+limit is 15%. Blown and black frames are refused on clipping and mean level.
+
+**Verified.** Twenty-two assertions in a scratch harness (falloff against the
+model's own ratios at three radii, colour separation, exposure invariance, the
+bracketing claim on both vignette shapes, the four refusals, the noise
+tolerance, NaN handling in the average) — and made to fail first, twice:
+collapsing the range to one model misses the cos⁴ truth, and normalising at the
+centre instead of the ring throws every colour number. End-to-end through the
+built page on four real JPEGs carrying real EXIF: filed under `16-50@19`, four
+frames averaged, aperture and camera read, 2.6 KB of output, and a real
+photograph refused. axe clean in both themes; the chooser is 171x44 with a
+visible focus ring.
+
+## The file chooser could be reached by finger and by nothing else, 2026-09-10
+
+**Found while building the section above, and it is not fixed everywhere.**
+The app's pattern for opening files is a `<label>` styled as a button wrapping
+an `<input type="file" hidden>`. `hidden` takes a control off the tab order
+entirely and a `<label>` is not focusable, so the pair can be reached by a
+finger and by a pointer and **by nothing else**.
+
+Measured by tabbing the built pages. The editor's welcome screen has nine focus
+stops — home, ⓘ, the version tag, Untouched, Help, Batch, Quick look, Batch
+process, the gallery — and **Open image(s) is not among them**. The test page
+had four, and its new chooser was not among them either.
+
+The new one is fixed: `.file-input` in style.css keeps the input invisible but
+ON the tab order, with `label:has(> .file-input:focus-visible)` putting the ring
+on the label that styles it. Re-measured: five stops, the chooser among them,
+44px tall, ring visible in both themes.
+
+**The editor's is not, deliberately.** It is the app's primary control, the same
+markup appears on three pages, `select, button { width: 100% }` means it cannot
+simply become a `<button>`, and the welcome screen's copy of it uses `for=`
+against an input living inside a different label that is hidden at the time — so
+the ring has nowhere obvious to land. It is on the a11y NEVER-CHURN list as a
+verified pattern, which is exactly the sort of entry this finding says to
+re-check: **verified against axe, never against the tab key.** Its own release,
+with its own walk in both themes.
+
 ## A fast second tap on a control zoomed the whole app, 2026-09-09
 
 **Reported as** the screen zooming when trying to zoom in quickly — and first

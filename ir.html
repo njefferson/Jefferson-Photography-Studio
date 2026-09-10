@@ -633,7 +633,7 @@
         <button id="verCopy" type="button" class="primary">Copy the report</button>
         <a id="verDebug" class="ver-link" href="./debug.html">Test this device&hellip;</a>
       </div>
-      <p class="note">The test page measures how fast this device decodes a photo, draws a frame and saves to storage — numbers that differ on every device and cannot be guessed from a desktop.</p>
+      <p class="note">The test page measures how fast this device decodes a photo, draws a frame and saves to storage — numbers that differ on every device and cannot be guessed from a desktop. It also has <strong>Measure a lens</strong>, which works out your own converted lens&rsquo;s hot-spot from photographs of empty sky.</p>
       <button id="verClose" type="button">Close</button>
     </dialog>
 
@@ -950,6 +950,16 @@
         stronger. It works over exactly the same circle as the brightness fix, so the two can be set
         together. This is a per-lens, per-frame correction, so it stays with this photo &mdash; it is not
         carried by a saved look.</p>
+
+        <p><strong>Measuring your own lens.</strong> Setting the slider by eye on every photograph is
+        the fallback, not the answer. The test page &mdash; the version number in the &#9432; panel, then
+        <strong>Measure a lens</strong> &mdash; works the hot-spot out from photographs of nothing:
+        four or five frames of clear sky filling the whole frame, at each focal length you use, no sun
+        in shot and nothing blown. It reads the lens and focal length out of the files, measures how the
+        centre differs from the edges in each colour separately, and hands you a small block of numbers.
+        RAW or JPEG both work and the RAW is better. Nothing is uploaded and nothing leaves the iPad
+        &mdash; the photographs stay here and only the numbers come out, which is the whole point of
+        measuring on the device rather than sending the files somewhere.</p>
 
         <h3>Which color tool when?</h3>
         <p>The color tools stack from broadest to most surgical — reach for the smallest one that does the job:</p>
