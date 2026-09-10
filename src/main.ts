@@ -1,6 +1,6 @@
 import "./style.css";
 import { importFile, type ImportedFile, type ImageKind } from "./import";
-import { wireForceUpdate } from "./swupdate";
+import { wireForceUpdate, wireUpdateStrip } from "./swupdate";
 import { type DecodedImage, pickLargestPreview } from "./decode";
 import { decodeOffThread } from "./decodeClient";
 import { Renderer, type EditParams } from "./gl";
@@ -3649,13 +3649,16 @@ setLocStripBtn.addEventListener("click", () => {
 syncLocSettings();
 
 // "Update to the latest version" — a PWA hard-refresh so a new deploy shows
-// without force-closing the app (owner, 2026-07-20: "I don't like having to
-// force close twice… my kids will never get them"). Asks the SW to fetch the
+// without force-closing the app. Before it existed, reaching a new release took
+// TWO force-closes, which is a thing most readers will never do and a thing
+// nobody should have to know (owner rule, 2026-07-20). Asks the SW to fetch the
 // newest sw.js, tells any waiting worker to take over now (the SKIP_WAITING
 // message the SW listens for), then reloads — navigations are network-first, so
 // the reload pulls the fresh shell + its new hashed assets even if the SW check
 // finds nothing.
 wireForceUpdate($("forceUpdate") as HTMLButtonElement, $("forceUpdateNote") as HTMLElement);
+// And the push half of §7h — the strip that says so without being asked.
+wireUpdateStrip($("swStrip"), $("swStripGo") as HTMLButtonElement, $("swStripLater") as HTMLButtonElement);
 
 // --- Local masks: radial / linear gradient with a few local adjustments,
 // placed by dragging handles on the photo. Geometry is in image-uv so masks

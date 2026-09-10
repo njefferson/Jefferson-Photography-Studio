@@ -76,10 +76,39 @@ body {
 #app {
   display: grid;
   grid-template-columns: 1fr 352px;
-  grid-template-rows: auto 1fr;
-  grid-template-areas: "bar bar" "stage panel";
+  grid-template-rows: auto auto 1fr;
+  /* The update strip is its own ROW rather than something floating over the
+     photo: §7h wants the reader told, and a notice laid over the picture in a
+     photo editor is a notice that gets dismissed without being read. Hidden it
+     is display:none, so the row measures 0 and the layout is unchanged. */
+  grid-template-areas: "bar bar" "swstrip swstrip" "stage panel";
   height: 100dvh;
 }
+.sw-strip {
+  grid-area: swstrip;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 8px 16px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line-2);
+  color: var(--txt);
+  font: 0.8125rem/1.3 var(--ui);
+}
+.sw-strip-text { flex: 1 1 auto; min-width: 0; }
+.sw-strip button {
+  flex: none;
+  min-height: 44px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font: inherit;
+  border: 1px solid var(--line-2);
+  background: transparent;
+  color: var(--txt);
+}
+.sw-strip-go { background: var(--surface-3); font-weight: 600; }
+.sw-strip button:active { background: var(--surface-3); }
 /* No image yet -> panel hidden -> give the stage the full width. */
 #app:has(#panel[hidden]) {
   grid-template-columns: 1fr 0;

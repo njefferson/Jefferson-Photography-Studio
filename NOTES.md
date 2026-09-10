@@ -5067,6 +5067,79 @@ reported percentage does count only texels above half weight while roughly twice
 that area is touched to some degree — defensible, and worth knowing when the
 number reads lower than the effect looks.**
 
+## A new version now waits and says so, 2026-09-10
+
+**Doctrine §7h, and it was the one gate failing in this repo.** `public/sw.js`
+called `skipWaiting()` inside install, so a new worker took over under the OPEN
+page — a page still running the previous release's HTML and modules — and
+activate immediately deleted the old cache, leaving that page served new files
+from then on. A mixed app, invisible by construction: nobody finds it by using
+the app. A sibling served one that way for twenty-two releases.
+
+**Why the standing indicator had to land in the SAME commit.** Removing
+`skipWaiting()` alone makes things WORSE, not better: the update then waits and
+nothing tells anyone, so a reader sits on the old release indefinitely. The only
+existing surface was a Settings button — a PULL, which helps somebody who
+already suspects there is a new version and knows which panel to open. A
+newcomer never does.
+
+`#swStrip` is the push half: its own grid ROW rather than something floating
+over the photo, because a notice laid over the picture in a photo editor is a
+notice that gets dismissed unread. Hidden it is `display:none`, so the row
+measures 0 and the layout is untouched.
+
+**THE GATE WAS GREEN ON "the reader is told, in words, that a new version is
+ready" BEFORE ANY OF THIS EXISTED.** It matched the string "Checking for a new
+version…" — text that appears only AFTER the reader presses the Settings button.
+The gate reads source for words; it cannot tell an announcement from a
+confirmation. Its one FAILING check was the honest one, and its passing ones
+were about strings.
+
+**Three instrument errors before the test could be trusted**, each caught only
+by insisting on a control:
+
+- **The strip was dead on arrival and the gate still said PASS.** `wireUpdateStrip`
+  called `getRegistration()` at import time; the app registers its worker later,
+  so that resolved to `undefined` and not one listener was ever attached. It uses
+  `navigator.serviceWorker.ready` now, which resolves once a registration is
+  ACTIVE and cannot be raced.
+- **A `sed` rewrote the test's own assertions.** The replacement came from
+  `grep -o 'ips-[0-9.]*'` inside a command substitution, and `[0-9.]*` matches
+  empty, so a bare `ips-` won and the assertions became
+  `caches.includes('ips-')` — never true for an exact array match, so they fired
+  on a correct app. The cache name is read from release 1 at runtime now, never
+  written into the test.
+- **The takeover flag counted release 1's own arrival.** `controllerchange` fires
+  when the FIRST worker claims the page, and the listener was attached before
+  that, so every run reported a takeover. The flag resets once release 1 is
+  established.
+
+**And the negative control was itself wrong before it was right.** The first
+version of this walk PASSED against a build with `skipWaiting()` restored —
+it read the state immediately after the strip appeared, which is an in-between
+moment that looks identical in both builds. It waits 6 seconds for any
+unrequested takeover to actually happen now.
+
+**Verified against a REAL second worker**, not a mock: serve release 1, let it
+control the page, rewrite the served `sw.js` with a new CACHE name, call
+`update()`. Fixed build — release 2 waits, the strip appears with its words,
+BOTH caches are on the device (so the open page is still served release 1), no
+takeover without being asked; pressing Update now activates release 2 and clears
+the old cache. Control with `skipWaiting()` restored — fails on all three:
+takeover unasked, no wait, old cache gone.
+
+**Also removed: a verbatim quotation of the owner in shipped source**
+(`src/main.ts`, the force-update comment). Role attributions like "owner rule,
+2026-07-20" are the sanctioned form and are fine; quoting the words is banned
+outright. All three gates miss it — `quote-check` only reads markdown
+blockquotes, and `privacy-check` and `third-person-check` anchor on the name,
+which a quotation need not carry. Found by grepping source comments for a quote
+mark near an attribution; it was the only one.
+
+**Still owed:** the strip is wired into `ir.html` only. `index.html` (the Studio
+chooser) and Macro share the same root-scope worker and the same `swupdate.ts`,
+and `wireUpdateStrip` is exported for them, but neither carries the markup yet.
+
 ## A fast second tap on a control zoomed the whole app, 2026-09-09
 
 **Reported as** the screen zooming when trying to zoom in quickly — and first
