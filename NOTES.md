@@ -6239,6 +6239,79 @@ which edge answered rather than about what is deployed. Six independent fetches
 now, all six required to agree. The `sw.js` cache stamp is the better anchor
 where there is one, since it carries the version.
 
+## The shipped lens profiles had never once run on a raw file, 2026-09-10
+
+**Two lenses came measured with the app, and on the format the app is FOR, the
+correction was dead code.** `applyHotspotCorrection` opened with
+`if (!current?.pixels) return` — a raw frame has no 8-bit buffer — and the card
+said so, in a status line only a reader who went looking would find: *Not
+available for RAW yet — profiles are calibrated from JPEG.* The batch path had
+the same gate and its own return value for it. So the app's one automatic lens
+correction ran on camera JPEGs and skipped every NEF and DNG, which is what
+this editor exists to open.
+
+**And the parser was the other half of that.** The ported module carries its own
+EXIF reader that checks for a JPEG SOI marker and returns null otherwise, so
+even with the apply path fixed nothing would have matched: a raw file could
+never get as far as being refused. `readExifSubset` in `exif.ts` has read TIFF
+and JPEG all along. One reader now, and it is that one.
+
+**NEAREST BECOMES BETWEEN.** The anchors are 19/36/50 and 50/130/250mm and a
+photograph is almost never on one. `nearestFL` snapped a 30mm frame to 36mm and
+applied a correction measured 6mm away at full strength. It is a blend between
+the two nearest measurements now, in log focal length — the same mix the
+reader's own measurements already used — and clamped at both ends, so outside
+the measured range the nearest end applies as it is rather than being
+extrapolated into. Measured on the deployed path with one identical grey frame
+written out at three focal lengths: the correction at the centre is 0.861 at
+19mm, 0.903 at 28mm and 0.931 at 36mm. Planted the snap back and 28mm returned
+0.931 — the same answer as 36mm, to four figures, which is exactly what a snap
+looks like when you can see it.
+
+**THE NUMBERS HAD TO BE CONVERTED, AND THIS IS THE PART THAT COULD HAVE GONE
+QUIETLY WRONG.** The shipped profiles were measured AND applied on gamma-encoded
+8-bit pixels — the ported apply function states that as a requirement, and it
+came from the same rig as the data. The pipeline works in linear light. The same
+number applied there is a different correction: at the largest bump, 0.110 at
+16-50@19, multiplying encoded values takes 22% of the light out and multiplying
+linear ones takes 10%. Neither is wrong; they answer different questions, and
+moving the stage without noticing would have halved the app's flagship
+correction under a commit message about architecture.
+
+So each bin is converted to the linear bump that costs the same light at the
+point a flat is exposed for. Mid-grey is not an arbitrary choice: the rig
+refuses a flat that is blown or dark, so that is where the measurement lives.
+0.110 becomes 0.252. Held against the old result across 10–95% of the range the
+worst deviation is **1.10 of 255**; the same numbers left unconverted drift by
+**12.97**. Both are claims in `bumpconv.mjs`, the second one as the negative
+control — a conversion test that cannot fail when the conversion is removed is
+not testing the conversion.
+
+An earlier NOTES entry inferred the opposite — that the shipped gains were
+linear and were being applied in gamma, "wrong the same way, smaller". That was
+written while fixing a different bug in a different module and never checked
+against the ported code, which prescribes gamma space in its own doc comment.
+The inference is corrected here.
+
+**ONE TEXTURE, ONE BIN, TWO STRENGTHS.** The shipped brightness and the reader's
+measured colour ride the same RGB32F curve — kr, kb, bump — read once per pixel
+with `texelFetch`. Two lookups would be two chances to disagree about which ring
+a pixel is in. Green takes the brightness only: the colour half is defined as a
+ratio AGAINST green, so correcting green by it would be correcting twice.
+`hsFix`/`hsBypass` join `lensFix`/`lensBypass` as params fields, so Undo, Redo
+and Reset carry the shipped card too — it had the same defect the measured one
+did, and for the same reason.
+
+The old gamma-space `apply`, its JPEG-only parser and `nearestFL` are deleted
+rather than left beside the replacement. A function that applies these numbers
+in the wrong space is precisely what a later session finds and calls.
+
+**What the practice set cannot test.** All 47 bundled examples have had their
+EXIF stripped, so `readExifSubset` returns null for every one and no shipped
+profile can match them. The RAW claim is made through the manual lens picker on
+a real practice DNG instead, which is the same code path past the match. Worth
+knowing before writing any test that expects a bundled file to carry a lens.
+
 ## The measured lens correction moved into the pipeline, 2026-09-10
 
 **It was a rewrite of the decoded frame, and it worked.** The stored curve was

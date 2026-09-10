@@ -114,7 +114,8 @@ uniform float u_hotspotColor; // -0.5..0.5 the hot-spot's COLOUR (+red / -blue a
 // rather than by tolerance.
 uniform sampler2D u_lensTex;
 uniform int u_lensN;      // 0 when no measured profile matched this photograph
-uniform float u_lensFix;  // strength; 0 is off
+uniform float u_lensFix;  // measured colour strength; 0 is off
+uniform float u_lensBump;  // shipped brightness strength; 0 is off
 uniform float u_vignette;    // -1..1 (+ brighten corners, - darken)
 uniform float u_aspect;      // image width/height — keeps the lens fix circular in pixels
 uniform float u_recover;     // 0..1 pull sensor-clipped pixels to post-WB neutral
@@ -433,15 +434,20 @@ void main() {
   }
   // The MEASURED curve, on the same side of the matrix and the swap. Its own
   // branch: it does not depend on any manual slider being set.
-  if (u_lensN > 0 && u_lensFix != 0.0) {
+  if (u_lensN > 0 && (u_lensFix != 0.0 || u_lensBump != 0.0)) {
     vec2 d = vec2((v_uv.x - 0.5) * u_aspect, v_uv.y - 0.5);
     float r = 2.0 * length(d) / sqrt(u_aspect * u_aspect + 1.0);
     int i = clamp(int(floor(r * float(u_lensN))), 0, u_lensN - 1);
-    vec2 k = texelFetch(u_lensTex, ivec2(i, 0), 0).rg;
+    vec3 k = texelFetch(u_lensTex, ivec2(i, 0), 0).rgb;
     float gr = 1.0 + (k.r - 1.0) * u_lensFix;
     float gb = 1.0 + (k.g - 1.0) * u_lensFix;
-    c.r *= gr > 1e-3 ? 1.0 / gr : 1.0;
-    c.b *= gb > 1e-3 ? 1.0 / gb : 1.0;
+    // The brightness half rides all three channels; the colour half is a ratio
+    // against green, so green takes the bump and nothing else.
+    float gc = 1.0 + k.b * u_lensBump;
+    float ic = gc > 1e-3 ? 1.0 / gc : 1.0;
+    c.r *= (gr > 1e-3 ? 1.0 / gr : 1.0) * ic;
+    c.g *= ic;
+    c.b *= (gb > 1e-3 ? 1.0 / gb : 1.0) * ic;
   }
 
   // Camera colour matrix: separates infrared chroma into distinct hues so the
@@ -676,26 +682,44 @@ export class Renderer {
   /** Upload a measured lens colour curve for the photograph now open, or clear
    *  it with null. Per-PHOTOGRAPH, never per-draw: the curve is chosen by the
    *  file's EXIF and does not change as the reader edits. */
-  setLensCurve(kr: ArrayLike<number> | null, kb?: ArrayLike<number> | null): void {
+  /** Upload the radial lens curve: red-against-green, blue-against-green and
+   *  the shipped brightness bump, one texel per bin. One texture rather than
+   *  two because both halves are read at the same bin on the same draw, and a
+   *  second lookup would be a second chance for them to disagree about which
+   *  ring a pixel is in. A half that is absent uploads as neutral, so the two
+   *  are independently on or off without a second code path. */
+  setLensCurve(kr: ArrayLike<number> | null, kb?: ArrayLike<number> | null, bump?: ArrayLike<number> | null): void {
     const gl = this.gl;
-    const n = kr && kb ? Math.min(kr.length, kb.length) : 0;
+    const cN = kr && kb ? Math.min(kr.length, kb.length) : 0;
+    const bN = bump ? bump.length : 0;
+    const n = cN > 1 && bN > 1 ? Math.min(cN, bN) : Math.max(cN > 1 ? cN : 0, bN > 1 ? bN : 0);
     gl.activeTexture(gl.TEXTURE10);
     gl.bindTexture(gl.TEXTURE_2D, this.lensTex);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     if (n < 2) {
       this.lensN = 0;
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG32F, 1, 1, 0, gl.RG, gl.FLOAT, new Float32Array([1, 1]));
+      this.lensHasColour = false;
+      this.lensHasBump = false;
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB32F, 1, 1, 0, gl.RGB, gl.FLOAT, new Float32Array([1, 1, 0]));
       return;
     }
-    const data = new Float32Array(n * 2);
-    for (let i = 0; i < n; i++) { data[i * 2] = kr![i]; data[i * 2 + 1] = kb![i]; }
+    const data = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      data[i * 3] = cN > 1 ? kr![i] : 1;
+      data[i * 3 + 1] = cN > 1 ? kb![i] : 1;
+      data[i * 3 + 2] = bN > 1 ? bump![i] : 0;
+    }
     this.lensN = n;
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG32F, n, 1, 0, gl.RG, gl.FLOAT, data);
+    this.lensHasColour = cN > 1;
+    this.lensHasBump = bN > 1;
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB32F, n, 1, 0, gl.RGB, gl.FLOAT, data);
   }
 
   private toneTex: WebGLTexture;
   private lensTex: WebGLTexture;
   private lensN = 0;
+  private lensHasColour = false;
+  private lensHasBump = false;
   private toneRgbTex: WebGLTexture;
   private brushTex: WebGLTexture;
   private brushSig = ""; // re-upload the packed brush texture only when it changes
@@ -731,7 +755,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_vignette", "u_aspect", "u_recover", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -1219,7 +1243,8 @@ export class Renderer {
     // whole reason this stage moved into the pipeline.
     gl.uniform1i(this.loc.u_lensTex, 10);
     gl.uniform1i(this.loc.u_lensN, this.lensN);
-    gl.uniform1f(this.loc.u_lensFix, this.lensN > 0 && !p.lensBypass ? (p.lensFix ?? 0) : 0);
+    gl.uniform1f(this.loc.u_lensFix, this.lensHasColour && !p.lensBypass ? (p.lensFix ?? 0) : 0);
+    gl.uniform1f(this.loc.u_lensBump, this.lensHasBump && !p.hsBypass ? (p.hsFix ?? 0) : 0);
     gl.activeTexture(gl.TEXTURE10);
     gl.bindTexture(gl.TEXTURE_2D, this.lensTex);
     // Imported .cube LUT (unit 5). The sig check IS the uploader: the lattice

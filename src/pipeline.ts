@@ -94,6 +94,11 @@ export interface EditParams {
    *  dragged Strength to 0 and a reader who has pressed Bypass are told apart
    *  after an undo — the label has to stay honest either way. */
   lensBypass: boolean;
+  /** Strength and bypass for the SHIPPED per-lens brightness profile, kept
+   *  apart from the measured colour one above for the same reason the cards
+   *  are: they know different things and are turned down for different reasons. */
+  hsFix: number;
+  hsBypass: boolean;
   /** 8-channel HSL colour mixer: flat [hueShiftDeg, satScale, lumScale] × 8
    *  bands at HSL_CENTERS (red, orange, yellow, green, aqua, blue, purple,
    *  magenta). Weights interpolate smoothly between ADJACENT band centres, so
@@ -854,10 +859,17 @@ export function applyCreativeVignette(out: Float32Array, u: number, v: number, a
  *  rather than the false-colour result. It commutes with white balance — both
  *  are per-channel multiplies — so it does not matter which comes first. */
 export interface LensCurve {
-  /** Red against green, per radial bin. Divide to correct. */
-  kr: ArrayLike<number>;
+  /** Red against green, per radial bin. Divide to correct. Absent when the
+   *  photograph has no measurement of its own and only the shipped brightness
+   *  profile applies. */
+  kr?: ArrayLike<number>;
   /** Blue against green, per radial bin. */
-  kb: ArrayLike<number>;
+  kb?: ArrayLike<number>;
+  /** The shipped profile's brightness bump, per radial bin, in LINEAR space
+   *  (see hotspot.ts — the shipped numbers are gamma-space and are converted
+   *  before they get here). Its own strength, `p.hsFix`, because it comes from
+   *  a different source than kr/kb and the reader turns them down separately. */
+  bump?: ArrayLike<number>;
 }
 
 /** The gain the pipeline applies at one bin, at a given strength. Shared so the
@@ -928,16 +940,31 @@ export function compileEdit(
   // The measured curve is its own stage: it must run whether or not any of the
   // manual lens sliders are off zero.
   const lensFix = p.lensBypass ? 0 : (p.lensFix ?? 0);
-  const lensN = lens ? Math.min(lens.kr.length, lens.kb.length) : 0;
-  const measuredOn = !!lens && lensFix !== 0 && lensN > 1;
+  const hsFix = p.hsBypass ? 0 : (p.hsFix ?? 0);
+  const kr = lens?.kr, kb = lens?.kb, bump = lens?.bump;
+  const colourN = kr && kb ? Math.min(kr.length, kb.length) : 0;
+  const bumpN = bump ? bump.length : 0;
+  const colourOn = colourN > 1 && lensFix !== 0;
+  const bumpOn = bumpN > 1 && hsFix !== 0;
+  // One bin count for the stage, so a pixel lands in the same ring for both
+  // halves. They come from the same 80-bin measurement; a mismatch would mean
+  // one of the two data sets changed shape, and the shorter one wins rather
+  // than the stage silently reading past its end.
+  const lensN = colourOn && bumpOn ? Math.min(colourN, bumpN) : colourOn ? colourN : bumpN;
+  const measuredOn = colourOn || bumpOn;
   const lensGr = measuredOn ? new Float64Array(lensN) : null;
   const lensGb = measuredOn ? new Float64Array(lensN) : null;
   if (measuredOn) {
     for (let i = 0; i < lensN; i++) {
-      lensGr![i] = lensGain(lens!.kr[i], lensFix);
-      lensGb![i] = lensGain(lens!.kb[i], lensFix);
+      const gc = bumpOn ? lensGain(1 + bump![i], hsFix) : 1;
+      lensGr![i] = (colourOn ? lensGain(kr![i], lensFix) : 1) * gc;
+      lensGb![i] = (colourOn ? lensGain(kb![i], lensFix) : 1) * gc;
     }
   }
+  // Green carries the brightness half only — the colour half is defined as a
+  // ratio AGAINST green, so correcting green by it would be correcting twice.
+  const lensGg = bumpOn ? new Float64Array(lensN) : null;
+  if (bumpOn) for (let i = 0; i < lensN; i++) lensGg![i] = lensGain(1 + bump![i], hsFix);
   const cl = p.clarity ?? 0;
   const dz = p.dehaze ?? 0;
   const localOn = local && (cl !== 0 || dz !== 0);
@@ -1030,6 +1057,7 @@ export function compileEdit(
       const i = lensBin(u, v, aspect, lensN);
       r *= lensGr![i];
       b *= lensGb![i];
+      if (lensGg) g *= lensGg[i];
     }
     // Camera-native -> linear sRGB (after WB, before swap), matching the shader.
     if (cam) {
