@@ -404,9 +404,11 @@
             <small class="note" id="healStatus"></small>
             <hr class="divider" />
             <div class="sub-title">IR lens fixes <span>hot-spot &amp; vignette</span></div>
-            <p class="note">IR-converted lenses often brighten the center (a "hot-spot"). Pull it down with Hot-spot and set its size; use Vignette to correct edge darkening (right) or add it (left).</p>
+            <p class="note">IR-converted lenses often brighten the center (a "hot-spot") and tint it. Pull the brightness down with Hot-spot, set the circle with Hot-spot size, take the colour out with Hot-spot colour; use Vignette to correct edge darkening (right) or add it (left).</p>
             <label>Hot-spot <input id="hotspot" type="range" min="0" max="0.8" step="0.01" value="0" /></label>
             <label>Hot-spot size <input id="hotspotSize" type="range" min="0.15" max="1" step="0.01" value="0.5" /></label>
+            <label>Hot-spot colour <input id="hotspotColor" type="range" min="-0.5" max="0.5" step="0.01" value="0" /></label>
+            <p class="note">An IR-converted lens does not only BRIGHTEN the centre &mdash; it usually tints it too, and the R&#8646;B swap every colour look is built on turns that tint into a coloured disc in the middle of the sky. Hot-spot (above) is a plain brightness gain and cannot touch it. This one shifts the centre&rsquo;s colour instead, over the same circle Hot-spot size sets. Which way is which depends on the look you have on &mdash; every colour look swaps red and blue, so the slider&rsquo;s two directions trade places with it. Don&rsquo;t reason about it: nudge one way, and if the disc gets stronger go the other. Work with the look ON and the sky filling the frame, since that is where the disc shows.</p>
             <label>Vignette <input id="vignette" type="range" min="-1" max="1" step="0.01" value="0" /></label>
             <div class="subcard">
               <div class="sub-title">Matched lens profile <span>measured, per-lens</span></div>
@@ -935,6 +937,20 @@
         <strong>Auto white balance</strong> rebalances to the photo's own neutral, and is the quick way
         back out of a look's colour cast without losing anything else.</p>
 
+        <p><strong>The coloured disc in the sky</strong> &mdash; a soft round patch of a different colour
+        in the middle of a plain area, usually only visible once a Look is on. It is the lens, not the
+        photo. An IR-converted lens sends a little more infrared straight up the middle than it does to
+        the corners, so the centre of the frame is both brighter and a slightly different colour; the
+        red&#8646;blue swap every colour look is built on takes that small tint and turns it into a disc
+        you cannot miss. <strong>Hot-spot</strong> (Corrections tab) pulls the brightness down and does
+        nothing at all to the colour &mdash; that is what <strong>Hot-spot colour</strong> beside it is
+        for. Set <strong>Hot-spot size</strong> so the circle covers the patch, then move Hot-spot colour
+        until the disc goes flat. Which direction helps depends on the look you have on, since the look
+        may have swapped the channels underneath; nudge it one way and go the other if the disc gets
+        stronger. It works over exactly the same circle as the brightness fix, so the two can be set
+        together. This is a per-lens, per-frame correction, so it stays with this photo &mdash; it is not
+        carried by a saved look.</p>
+
         <h3>Which color tool when?</h3>
         <p>The color tools stack from broadest to most surgical — reach for the smallest one that does the job:</p>
         <ul>
@@ -1002,7 +1018,7 @@
           <li><strong>Tone curve + Luminance</strong> — the curve shapes blacks through highlights; Luminance lifts or drops the whole image without clipping either end.</li>
           <li><strong>Masks</strong> — radial, gradient, painted brush, tap-a-color, or automatic sky: local adjustments for one area only. Masks belong to the photo; saved looks stay portable.</li>
           <li><strong>Dust &amp; spots</strong> (Corrections tab) — arm <em>Heal spots</em> and tap a dust mote: it's patched from clean pixels nearby, in the preview and the export alike. <em>Visualize spots</em> makes dust jump out of flat skies and updates as you heal &mdash; a fix that still leaves a ring there was smaller than the dust, so raise <em>Spot size</em>; <em>Find spots automatically</em> sweeps the smooth areas, heals what it finds, and rings every fix for review &mdash; tap a ring to put that one back. Heals belong to the photo — they never ride in saved looks, profiles or a batch.</li>
-          <li><strong>IR lens fixes</strong> (Corrections tab) — pulls down the center hot-spot IR-converted lenses produce, and corrects (or adds) corner vignette.</li>
+          <li><strong>IR lens fixes</strong> (Corrections tab) — pulls down the center hot-spot IR-converted lenses produce, takes the <em>colour</em> out of it as well (the disc that shows up in a plain sky once a Look is on), and corrects (or adds) corner vignette.</li>
           <li><strong>Crop &amp; rotate</strong> (panel tab) — three one-tap tools, each with its own <em>Done</em>: <strong>Rotate 90&deg;</strong> turns the whole photo; <strong>Crop</strong> shows the box with a rule-of-thirds grid — drag a corner to resize, drag the photo to slide it under the box; <strong>Straighten</strong> adds a fine alignment grid and a degree slider — line a horizon up against the grid (the crop auto-shrinks so no empty corner shows). Pinch to zoom the view while either tool is open. A view onto the photo, not a re-bake — masks and healed spots stay exactly where they are underneath. Composition-specific: never rides in saved looks, profiles or a batch.</li>
         </ul>
 

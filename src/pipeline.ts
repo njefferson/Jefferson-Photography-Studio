@@ -77,6 +77,15 @@ export interface EditParams {
    *  - vignette -1..1: + brightens corners (correct falloff), - darkens them. */
   hotspot: number;
   hotspotSize: number;
+  /** -0.5..0.5 — the hot-spot's COLOUR, not its brightness. An IR-converted
+   *  lens does not only brighten the centre: on the measured 16-50 the centre
+   *  runs blue-heavy against the frame edge (1.568 blue against 1.310 red,
+   *  normalised to the outer ring), and the R-B swap every colour look is built
+   *  on turns that into a red disc, which the saturation then amplifies. The
+   *  existing `hotspot` is a SCALAR gain on all three channels, so it can only
+   *  darken the middle — it cannot touch a colour cast. Positive pushes the
+   *  centre toward red, negative toward blue. */
+  hotspotColor: number;
   vignette: number;
   /** 8-channel HSL colour mixer: flat [hueShiftDeg, satScale, lumScale] × 8
    *  bands at HSL_CENTERS (red, orange, yellow, green, aqua, blue, purple,
@@ -580,6 +589,16 @@ export function radialGain(hotspot: number, hotspotSize: number, vignette: numbe
   return Math.max(0, gVig * gHot);
 }
 
+/** The hot-spot's radial weight alone: 1 at the centre, 0 past hotspotSize.
+ *  Shared by radialGain and the colour correction so the two always describe
+ *  the same circle. */
+export function hotspotWeight(hotspotSize: number, u: number, v: number, aspect: number): number {
+  const a = aspect > 0 ? aspect : 1;
+  const dx = (u - 0.5) * a, dy = v - 0.5;
+  const r = (2 * Math.sqrt(dx * dx + dy * dy)) / Math.sqrt(a * a + 1);
+  return 1 - smooth01(0, Math.max(1e-3, hotspotSize), r);
+}
+
 // --- Crop / straighten geometry (mirrored in the gl.ts vertex shader and
 // export.ts's toSrc — all three must stay numerically identical). `aspect` is
 // always the DISPLAY-ROTATED frame's width/height (the 90-degree u_rot already
@@ -856,7 +875,7 @@ export function compileEdit(
     sky[0] !== 0 || sky[1] !== 1 || sky[2] !== 1 || fol[0] !== 0 || fol[1] !== 1 || fol[2] !== 1;
   const masks = (p.masks ?? []).filter(maskIsActive).slice(0, MAX_MASKS);
   const hasColorMask = masks.some((m) => m.type === 3);
-  const lensOn = (p.hotspot ?? 0) !== 0 || (p.vignette ?? 0) !== 0;
+  const lensOn = (p.hotspot ?? 0) !== 0 || (p.vignette ?? 0) !== 0 || (p.hotspotColor ?? 0) !== 0;
   const cl = p.clarity ?? 0;
   const dz = p.dehaze ?? 0;
   const localOn = local && (cl !== 0 || dz !== 0);
@@ -931,6 +950,14 @@ export function compileEdit(
     if (lensOn && u !== undefined && v !== undefined) {
       const gain = radialGain(p.hotspot, p.hotspotSize, p.vignette, u, v, aspect);
       r *= gain; g *= gain; b *= gain;
+      // The COLOUR half, on the same circle. Before the swap and the matrix, so
+      // it corrects the lens rather than the false-colour result.
+      const hc = p.hotspotColor ?? 0;
+      if (hc !== 0) {
+        const t = hotspotWeight(p.hotspotSize, u, v, aspect);
+        r *= 1 + hc * t;
+        b *= 1 - hc * t;
+      }
     }
     // Camera-native -> linear sRGB (after WB, before swap), matching the shader.
     if (cam) {
