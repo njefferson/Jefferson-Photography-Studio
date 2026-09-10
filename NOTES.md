@@ -5080,6 +5080,50 @@ reported percentage does count only texels above half weight while roughly twice
 that area is touched to some degree — defensible, and worth knowing when the
 number reads lower than the effect looks.**
 
+## A look on a camera-rendered file had no white balance to work on, 2026-09-10
+
+**Reported first as "the thumbnail fix only affects jpg, not nef", then — with a
+screenshot — as "the jpg thumbnail looks good but the image itself didn't
+match". The second reading is the right one, and it inverts the first.**
+
+`establishFreshEdit` sets white balance BY FILE KIND: a raw gets
+`grayWorldWB(src)`, a camera-rendered file gets `params.wb = [1, 1, 1]`. That
+second branch is deliberate — JPEG/HEIC/PNG open as the camera made them. But
+`makeThumb` has always gray-world balanced EVERY file. So for a camera-rendered
+photo the two paths disagree by construction: the tile gets a real balance and
+the open view gets none.
+
+That is why the view went flat purple. Aerochrome carries no `wbBias`, so on a
+JPEG the look resolved to exactly `[1,1,1]` — the channel swap applied to
+channels nothing had pulled apart, which is the bare-swap appearance. A raw
+showed nothing wrong because there both paths already agreed.
+
+**The fix is in the OPEN path, not the thumbnail.** `applyLook` now takes
+gray-world as the base for a camera-rendered file — but only when the balance
+underneath is still the untouched open, so a balance the reader set by tapping
+foliage or moving the gains is theirs and is kept.
+
+**And the first version of that fix silently never ran.** The "is it untouched"
+test compared the base against 1 with a 1e-6 tolerance. `establishFreshEdit`
+deliberately round-trips its measurements through `syncToUI`/`syncFromUI`, so
+`params.wb` holds what a STEPPED gain slider can represent rather than a clean
+1 — and nothing ever matched. It is the same fault this file already carries two
+notes about, one of them in the very function that causes it: a full-precision
+value written to a stepped control does not come back. The tolerance is one
+slider step now.
+
+**Measured, gain sliders (585 = neutral):** at open 585/585/585. Before, after
+Aerochrome still 585/585/585 and after Goldie 548/615/635 — bias only, no
+balance. After, Aerochrome 337/604/693 and Goldie 300/634/743. View-to-thumbnail
+chroma gap on a camera-rendered frame under Aerochrome: 173.6 before, 9.7 after.
+
+**Two of my own measurements were worthless on the way and both flattered a
+wrong theory.** Mean RGB was used to judge "is the view flat" — a mean CANCELS
+opposing hues and reports a vivid false-colour frame as neutral, so chroma is
+the only honest measure. And the synthetic test frame was a single hue, which
+gray-world balances to exactly grey by construction, so an absolute "the view
+must be colourful" bar was measuring the test image rather than the app.
+
 ## Thumbnails showed Aerochrome whichever look was picked, 2026-09-10
 
 **Reported on device.** The cause is one line and the reason it looked

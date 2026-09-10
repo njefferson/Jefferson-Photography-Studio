@@ -531,10 +531,41 @@ function applyLook(name: keyof typeof LOOKS) {
   const look = LOOKS[name];
   const strength = current?.camMatrix ? look.raw : look.jpeg;
   const bias = look.wbBias ?? [1, 1, 1];
+  // Strip the previous look's bias to get the white balance underneath.
+  const base: [number, number, number] = [
+    params.wb[0] / lookBias[0], params.wb[1] / lookBias[1], params.wb[2] / lookBias[2],
+  ];
+  // A LOOK NEEDS A WHITE BALANCE TO WORK ON, AND A CAMERA-RENDERED FILE OPENS
+  // WITHOUT ONE. establishFreshEdit gives JPEG/HEIC/PNG `wb = [1,1,1]` on
+  // purpose — they open as the camera made them (owner rule, 2026-07-25) — while
+  // a raw gets gray-world. So a false-colour look on a JPEG was applying its
+  // swap to channels nothing had pulled apart, and Aerochrome, which carries no
+  // wbBias at all, resolved to exactly [1,1,1]: the bare swap, flat purple.
+  //
+  // The thumbnails were right and the open photo was wrong. makeThumb has always
+  // gray-world balanced every file, so a JPEG's tile showed the look working
+  // while the photo it opened into did not — the same fault the raw path never
+  // showed, because there both paths already agreed.
+  //
+  // Only when the reader has not set a balance themselves: a base that is still
+  // exactly neutral is the untouched open, and tapping foliage or moving the
+  // gain sliders leaves something else, which is theirs to keep.
+  // NOT an exact compare. establishFreshEdit writes the measurements through
+  // syncToUI/syncFromUI on purpose, so params.wb holds what the STEPPED gain
+  // slider can represent, not a clean 1. A 1e-6 tolerance here matched nothing
+  // and the whole branch silently never ran — the same "a full-precision value
+  // written to a stepped control does not come back" this file already carries
+  // two notes about. A balance a reader actually set differs by far more than
+  // one slider step.
+  const untouched = base.every((v) => Math.abs(v - 1) < 0.01);
+  if (untouched && current && !current.isRaw) {
+    const gw = grayWorldWB(current);
+    base[0] = gw[0]; base[1] = gw[1]; base[2] = gw[2];
+  }
   params.wb = [
-    clamp((params.wb[0] / lookBias[0]) * bias[0], 0.02, 16),
-    clamp((params.wb[1] / lookBias[1]) * bias[1], 0.02, 16),
-    clamp((params.wb[2] / lookBias[2]) * bias[2], 0.02, 16),
+    clamp(base[0] * bias[0], 0.02, 16),
+    clamp(base[1] * bias[1], 0.02, 16),
+    clamp(base[2] * bias[2], 0.02, 16),
   ];
   lookBias = bias;
   params.swapRB = look.swapRB;
