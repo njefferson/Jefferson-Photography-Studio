@@ -2313,10 +2313,20 @@ label.open-btn, label.bar-btn {
   white-space: nowrap;
 }
 
+/* THE CUE FLOATS OVER THE PANEL, so where it sits decides which control it
+   covers. Centred, it landed on the MIDDLE of a full-width button's label —
+   "R ⇄ B c▮▮▮▮l swap" on a phone, "HIE B&W" on a desktop — because every
+   control in this panel centres its text. `pointer-events: none` meant the tap
+   still worked and only the reading of it was lost, which is how it survived
+   long enough to be photographed and then blamed on iOS Reachability.
+   Against the right edge it has a clear margin at every width: the panel's
+   buttons are full-width with centred labels, so the corner is the one place
+   nothing is written. */
 .scroll-cue {
   position: sticky;
   display: flex;
-  justify-content: center;
+  justify-content: flex-end;
+  padding-right: 8px;
   height: 0;
   overflow: visible;
   z-index: 6;
