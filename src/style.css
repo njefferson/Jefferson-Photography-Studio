@@ -193,7 +193,27 @@ body {
 }
 
 /* ---- Buttons ---- */
-button { cursor: pointer; font-family: var(--ui); }
+/* A BUTTON LABEL IS NOT PROSE, AND ON IOS A LONG PRESS SELECTS IT. Three of
+   these buttons — Hold: Original, Hold: Untouched, Hold: No lens fix — have
+   press-and-hold as their ONLY gesture, and holding one on an iPad put the
+   text caret in "Hold: No lens fix", painted selection handles around the
+   word, and raised the Copy / Look Up / Translate callout across the toolbar,
+   covering Open image(s). The compare gesture is fighting the text-selection
+   gesture for the same press.
+   THE FIX EXISTED ALREADY AND HAD BEEN APPLIED TO THE INSTANCE, NOT THE CLASS:
+   the same defect was caught on device on 2026-07-15 as a blue selection band
+   over the photo while dragging the crop box, and the three properties that
+   cure it went onto #cropOverlay and the canvas — never onto the buttons whose
+   whole interaction is a hold. It belongs on every button; nothing meant to be
+   copied is one (the version tag opts back in below, and both copyable blocks
+   are textareas). */
+button {
+  cursor: pointer;
+  font-family: var(--ui);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
 select, button {
   width: 100%;
   background: var(--surface-2);

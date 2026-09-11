@@ -9145,3 +9145,38 @@ were reading an accumulator AFTER later `measureFrame` calls had overwritten it;
 is 0.0000 and the hueless share is 0.0000 — the hypothesis was wrong, and the
 only thing that distinguished it from the truth was which call the probe was
 tied to. An accumulator on `globalThis` measures whoever ran last.
+
+## Press-and-hold was fighting iOS text selection, 2026-09-11
+
+Holding **Hold: No lens fix** on an iPad put a text caret in the word "lens",
+painted selection handles around the label, and raised the Copy / Look Up /
+Translate callout across the toolbar, covering **Open image(s)**. A button label
+is selectable text, and press-and-hold is the ONLY gesture these three buttons
+have — Hold: Original, Hold: Untouched, Hold: No lens fix — so the compare
+gesture and the selection gesture were competing for the same press.
+
+**THE CURE WAS ALREADY IN THE FILE, APPLIED TO THE INSTANCE INSTEAD OF THE
+CLASS.** The same defect was caught on device on 2026-07-15 as a translucent
+blue selection band painted over the photo while dragging the crop box, and the
+three properties that fix it — `-webkit-user-select`, `user-select`,
+`-webkit-touch-callout` — went onto `#cropOverlay`, `#cropBox`, `.crop-handle`
+and the canvas. They never went onto a button. A fix written for the symptom
+covers the one element that showed it; the question worth asking at the time was
+which OTHER elements take a long press, and the answer was three buttons named
+for it.
+
+It is on `button` now. Nothing meant to be copied is a button: both copyable
+blocks are textareas, and the version tag — which IS a button — keeps an
+explicit `user-select: text` so the build number can still be lifted out when
+something is wrong.
+
+**WHAT IS VERIFIED AND WHAT IS NOT.** The computed properties are asserted in
+Chromium on all three buttons, which is a fact about the CSS reaching the
+element. Whether iOS then declines to raise the callout is an iOS behaviour and
+needs the device.
+
+**AND THE FIRST HARNESS CONTRADICTED ITSELF.** It claimed every button is
+unselectable and, two lines down, that the version tag stays selectable — two
+claims that cannot both hold. It failed on the version tag, which is the correct
+behaviour, not the defect. A claim set that cannot all pass is not a stricter
+test, it is a broken one.
