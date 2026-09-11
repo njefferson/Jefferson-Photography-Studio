@@ -8388,13 +8388,30 @@ pointer was sitting over the R-B channel swap button. In Chromium at the same
 viewport, `elementFromPoint` at the button's centre returns the button, and it
 has no `::before` or `::after` — nothing in the app paints there.
 
-**It is iOS Reachability** — the system's own affordance offering to pull the
-screen down, drawn above the home indicator, over whatever the app has at the
-bottom of the screen. Recorded so the next session reading that screenshot does
-not spend a browser run on it. The instrument was right and said so: a control
-the app does not paint is not a control the app can fix, and reporting it as
-unexplained rather than guessing at a cause is what made it one question instead
-of a fix to something that was never broken.
+**IT IS THE APP, AND THIS ENTRY SAID OTHERWISE FOR HALF A DAY.** It was recorded
+as iOS Reachability, on the strength of a reading of the screenshot. Then the
+same pill appeared in a screenshot from HEADLESS CHROMIUM ON LINUX, which has no
+Reachability — and asking the page what was painted there returned
+`<span>` at 1083,864, 44x10, containing `&#9660;`: `#panelDown`, the panel's own
+"more below" scroll cue.
+
+It is `position: sticky` with `height: 0` and `bottom: 10px`, so it floats over
+the panel's content by design and lands on whatever control happens to be under
+it — the R-B channel swap button on the phone, HIE B&W in the desktop shot —
+covering the middle of that control's label. `pointer-events: none` means it
+never blocks the tap, only the reading of it.
+
+**The lesson is the entry itself.** `elementFromPoint` at the button's centre
+returning the button was correct and was not enough: a sticky overlay with
+`pointer-events: none` is not at the point it covers. "Nothing in the app paints
+there" was a conclusion drawn from an instrument that cannot see that kind of
+element, and it went into the record as fact. What made it a question rather
+than a fix was luck — the cause was named by someone else, and it was wrong too.
+
+The placement is not settled here: the cue's APPEARANCE is an owner ruling
+(2026-07-20, neutral rather than --accent so it does not vanish against a
+selected chip), so where it sits is the owner's call rather than a defect with
+one obvious remedy.
 
 ## A later measurement is not a better one, and two doors had two rules, 2026-09-10
 
