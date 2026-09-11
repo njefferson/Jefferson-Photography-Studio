@@ -8868,3 +8868,38 @@ Worth measuring rather than assuming when it is taken on: where the tip's box
 actually lands relative to the pointer hotspot, at both a mouse and a touch
 event, rather than reasoning about it from the code. This session has spent
 enough on conclusions drawn from what an element looks like it should do.
+
+## Restore depth: dead on a raw, and it is what yellows a JPEG, 2026-09-11
+
+Asked directly whether Restore depth misbehaves on JPEGs. Measured on one
+photograph supplied both ways, with Aerochrome on, toggling the control:
+
+- **On the raw it does NOTHING.** The button flips `aria-pressed`, the strength
+  slider reads 100, and the picture is identical to 0.0 of 255 in all three
+  channels. Not "solved to zero and correctly applied nothing" — the strength
+  says 100, so the app believes it has a full correction to make and makes none.
+- **On the JPEG it moves the picture 29.6 of 255, and what it moves is BLUE.**
+  Depth off: rgb 90.8 / 87.6 / 111.1. Depth on: 87.8 / 87.5 / 81.5. It pulls the
+  blue channel down by thirty levels and leaves red and green alone.
+
+**So Restore depth is what makes the sky yellow.** Yellow is red plus green with
+the blue taken out, and that is exactly the operation measured. The wrong-colour
+JPEG render and this control are the same finding, which is not what either
+question looked like on its own.
+
+Both halves toggle back exactly (0.00 of 255), so history is sound; it is the
+forward operation that is wrong in two different ways on two file types.
+
+**And the red-blue swap it looks like, it is not.** The raw render and the JPEG
+render look like each other's swap by eye — pale cyan sky and pink foliage
+against a yellow sky and purple foliage — and cyan swapped IS yellow. Measured
+per channel: the raw's RED correlates 0.878 with the JPEG's red, and the raw's
+BLUE correlates 0.893 with the JPEG's RED, while the JPEG's blue correlates
+0.305 and 0.323 with anything. Both raw channels land in the JPEG's red. That is
+red and blue COLLAPSING INTO ONE CHANNEL, not exchanging places.
+
+**The first version of that claim averaged the two correlations** — 0.592
+straight against 0.608 swapped — and reported a marginal swap, which is the
+opposite of what the per-channel numbers say. Averaging the two halves of an
+asymmetric result is a proxy like any other, and it nearly turned a collapse
+into a swap in the record.
