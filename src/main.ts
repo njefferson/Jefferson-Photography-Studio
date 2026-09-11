@@ -764,7 +764,27 @@ function applyLook(name: keyof typeof LOOKS) {
   // one slider step.
   const untouched = base.every((v) => Math.abs(v - 1) < 0.01);
   const balancing = untouched && !!current && !current.isRaw;
-  if (balancing && current) {
+  // A FALSE-COLOUR LOOK NEEDS TWO BANDS, AND SOME FILES ONLY HAVE ONE.
+  //
+  // Aerochrome and its relatives work by moving the sky band one way and the
+  // foliage band the other. A camera-rendered infrared JPEG can arrive with
+  // NOTHING in the cool band at all — measured on a real one: coolSat exactly
+  // 0.0000 at open, against 0.0606 to 0.1729 across fifteen frames that carry a
+  // look perfectly well, with its warm band at 0.7587 against a maximum of
+  // 0.1461 elsewhere. The whole picture is one band.
+  //
+  // Gray-world then MANUFACTURES a second band by crushing red sixfold (a red
+  // gain of 0.17 against 0.54 on the same photograph's raw), which splits the
+  // frame into a yellow sky and purple everything else and takes the rendered
+  // median from 0.44 down to 0.076, crushing 13% of the frame to black. Skipping
+  // it leaves a coherent, evenly exposed picture — 3% crushed — that is simply
+  // not a false-colour rendering, because there was never a second band to make
+  // one from.
+  //
+  // Neither outcome is Aerochrome. The difference is that one of them is honest,
+  // and is said out loud below rather than handed over as a result.
+  const oneBand = balancing && !!current && coolContent(current, params) < COOL_BAND_FLOOR;
+  if (balancing && current && !oneBand) {
     const gw = grayWorldWB(current);
     base[0] = gw[0]; base[1] = gw[1]; base[2] = gw[2];
   }
@@ -785,6 +805,7 @@ function applyLook(name: keyof typeof LOOKS) {
   // synthetic single-hue test frame could never have shown it: gray-world makes
   // one flat hue neutral, so there was nothing to darken.
   if (balancing && current) params.exposure = autoExposure(current, params.wb);
+  lookState(oneBand);
   lookBias = bias;
   params.swapRB = look.swapRB;
   params.hue = look.hue;
@@ -1703,6 +1724,22 @@ const BAND_NEUTRAL: [number, number, number] = [0, 1, 1];
  *  preview and the export use, so what is measured is what is shown. Bands are
  *  weighted by the pipeline's own bandWeight, never a second definition of
  *  "cool". */
+/** MEASURED, NOT CHOSEN. Fifteen frames that carry a false-colour look sit at
+ *  0.0606 to 0.1729; the one that cannot sits at exactly 0.0000. This is three
+ *  times below the lowest frame that works, and everything above zero. */
+const COOL_BAND_FLOOR = 0.02;
+
+/** How much cool-band colour the frame has BEFORE anything is done to it —
+ *  bands neutral, so a boost left over from the last photo is not counted as
+ *  this one's. The same quantity, from the same function, that the lift solves
+ *  against. */
+function coolContent(img: DecodedImage, p: EditParams): number {
+  const neutral = cloneParams(p);
+  neutral.sky = [...BAND_NEUTRAL] as typeof neutral.sky;
+  neutral.foliage = [...BAND_NEUTRAL] as typeof neutral.foliage;
+  return measureFrame(neutral, img, 96).coolSat;
+}
+
 function measureFrame(p: EditParams, img: DecodedImage, divisions = LIFT_GRID): { lumP50: number; lumP25: number; warmSat: number; coolSat: number } {
   const step = Math.max(1, Math.floor(Math.min(img.width, img.height) / divisions));
   // The lens curve too: this measures what the pipeline produces, and the
@@ -1865,6 +1902,15 @@ function applyLift(withColour: boolean): { pull: number; foliage: number; sky: n
  *  is exactly where the refusal reasons in the lens rig were, and for the same
  *  reason it was not enough there either. The state belongs beside the control
  *  it describes. */
+/** SAY WHEN THE FILE CANNOT CARRY THE LOOK. Silence here means handing over a
+ *  yellow sky as though it were the result. */
+function lookState(oneBand: boolean): void {
+  const el = document.getElementById("lookState");
+  if (!el) return;
+  el.hidden = !oneBand;
+  if (oneBand) el.textContent = "This photo came out of the camera as a JPEG with all its colour in one band — there is no sky band for a false-colour look to work with, so what you get is the look's shape without its colours. The raw file from the same shot has both bands and will carry it.";
+}
+
 function liftState(applied: boolean): void {
   const el = document.getElementById("liftState");
   if (!el) return;
