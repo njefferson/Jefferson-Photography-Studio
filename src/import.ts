@@ -99,7 +99,10 @@ export async function importFile(file: File): Promise<ImportedFile> {
 }
 
 // NEF and DNG share the TIFF magic; the extension disambiguates.
-function refineKind(kind: ImageKind, name: string): ImageKind {
+/** A NEF and a DNG are the same magic number — only the NAME tells them apart,
+ *  so every caller of `sniff` that has a filename must come through here.
+ *  Exported because the lens rig did not, and read sixteen raws as previews. */
+export function refineKind(kind: ImageKind, name: string): ImageKind {
   if (kind === "dng" && /\.nef$/i.test(name)) return "nef";
   return kind;
 }
