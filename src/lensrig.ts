@@ -15,7 +15,7 @@
 // reaches only one of them.
 
 import { decodeOffThread } from "./decodeClient";
-import { sniff } from "./import";
+import { sniff, refineKind } from "./import";
 import { readExifSubset } from "./exif";
 import { profileFrame, averageProfiles, round5, NBINS, type FrameProfile } from "./lensprofile";
 import { readZipIndex, readZipEntry, readZipEntryPrefix, imageEntries } from "./zip";
@@ -459,7 +459,22 @@ export function wireLensRig(root: ParentNode): void {
             reused++;
           } else {
             const bytes = await c.f.bytes();
-            const img = await decodeOffThread({ name: c.f.name, kind: sniff(bytes), bytes, looksTranscoded: false });
+            // THE FILENAME IS WHAT MAKES A NEF A NEF. `sniff` reads bytes, and a
+            // NEF and a DNG open with the same TIFF magic number — only
+            // `refineKind`, which takes the name, tells them apart. This called
+            // `sniff` alone, so every NEF arrived at the decoder as a DNG, the
+            // Nikon branch never ran, the DNG path failed on Nikon compression,
+            // and the decode fell through to the EMBEDDED JPEG PREVIEW.
+            //
+            // Measured: sixteen raws and their camera JPEGs of the same frames
+            // returned the same clipping and structure to the rounding — 58.11%
+            // against "58.1%", 46.0% against "46%" — because they were the same
+            // pixels. Every profile this rig has ever stored says
+            // source:"rendered", including the ones measured from raw files,
+            // while the panel above says "RAW or JPEG, both work; the RAW is
+            // better". Four of those sixteen were refused for clipping that is a
+            // property of the preview's tone curve, not of the sensor data.
+            const img = await decodeOffThread({ name: c.f.name, kind: refineKind(sniff(bytes), c.f.name), bytes, looksTranscoded: false });
             prof = profileFrame(img);
             // AWAITED, deliberately. The row has to be on disk before the next
             // decode starts, because the moment being survived is the one right
