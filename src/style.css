@@ -2660,6 +2660,17 @@ body.dbg { margin: 0; background: var(--bg); color: var(--txt); font: 400 1rem/1
 .dbg-sec { margin: 26px 0; padding-top: 18px; border-top: 1px solid var(--line); }
 .dbg-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
 .dbg-btn {
+  /* WIDTH BELONGS TO THE CLASS, NOT THE ELEMENT. The base rule is
+     `select, button { width: 100% }`, keyed on the tag — so a control that has
+     to be a <label> to exist at all (the only way to style a file picker)
+     silently opts out of it and comes out content-width in a column of
+     full-width siblings. Two of these are labels: "Choose flat frames" and
+     "Restore from a file". Measured at 163px against 293px. */
+  width: 100%;
+  box-sizing: border-box;
+  display: block;
+  text-align: center;
+  line-height: 44px;
   min-height: 44px;
   padding: 0 16px;
   border-radius: 9px;
