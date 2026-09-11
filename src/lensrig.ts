@@ -33,7 +33,7 @@ export function wireLensRig(root: ParentNode): void {
   const $ = <T extends HTMLElement>(id: string) => root.querySelector<T>("#" + id)!;
   const profResults = $("lensResults");
   const profCoverage = $("lensCoverage");
-  const profDetail = $("lensDetail");
+  const profDetail = $("lensDetail") as HTMLDetailsElement;
   const profRunning = $("lensRunning");
   const profText = $<HTMLTextAreaElement>("lensText");
   // THE COPY BUTTON SITS WITH THE NUMBERS. It used to live in the actions row
@@ -466,6 +466,17 @@ export function wireLensRig(root: ParentNode): void {
       status.textContent = `Measured ${chosen.length - unusable} frame${chosen.length - unusable === 1 ? "" : "s"} in ${mmss(Date.now() - t0)}.`;
 
       profStop.hidden = true;
+      // A REFUSED FRAME IS THE THING THE READER HAS TO ACT ON, so it cannot be
+      // folded away. The per-frame reasons live in a <details> that starts shut,
+      // which is right for a run where everything worked and the log is thirty
+      // rows of confirmation. It is wrong the moment a frame was turned away —
+      // and when NOTHING was measured those reasons are the only content there
+      // is, so what the reader saw was "Measured 0 frames in 1s." and a closed
+      // triangle, above a note telling them to see reasons they could not see.
+      // Real frames: a 25mm sky that varies 73% around a circle, and a 16mm one
+      // 11.2% clipped. Both correctly refused, both correctly explained, both
+      // invisible.
+      if (unusable > 0) profDetail.open = true;
       if (!groups.size) {
         profNote(unusable ? "Nothing measurable in that set — see the reasons above." : "Nothing to measure.");
         return;
