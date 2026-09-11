@@ -9229,3 +9229,61 @@ flats were shot and refused before anyone measured whether the refusals were
 correct. They were, every time, and the reasons carried their own numbers the
 whole way. The thing that was missing was never in the gate; it was in the
 sentence telling a reader how to produce a frame the gate would accept.
+
+## Every lens profile ever measured came from a JPEG preview, 2026-09-11
+
+Sixteen raw flats were rejected by the rig. The frames were not the problem.
+
+**`sniff()` reads bytes, and a NEF opens with the same TIFF magic number as a
+DNG.** Only `refineKind(kind, name)` separates them, and it needs the FILENAME:
+`if (kind === "dng" && /\.nef$/i.test(name)) return "nef"`. `importFile` calls
+it. `lensrig.ts` called `sniff(bytes)` alone — so every NEF reached the decoder
+labelled `dng`, the Nikon branch never ran, the DNG path failed on Nikon
+compression, and the decode fell through to the EMBEDDED JPEG PREVIEW. One
+missing function call, on the one path where the difference is the whole point.
+
+**It was invisible because both halves of the app agreed with each other.** The
+payload honestly recorded `source: "rendered"` — `prof.linear` really was false
+— so nothing contradicted itself. All 30 shipped profiles say `rendered`,
+including every one made from a raw file, while the panel above the button says
+"RAW or JPEG, both work; the RAW is better". It never was. The editor surfaces
+`previewNotice` when it falls back; the rig has never mentioned it.
+
+**What gave it away was two numbers agreeing too well.** Sixteen frames existed
+as both NEF and camera JPEG. Clipping read 58.11% for the JPEG and "58.1%" for
+the raw; structure 46.0% and "46%"; 41.1% and "41%" — every pair, to the
+rounding. Two decode paths cannot agree that closely. They were the same pixels.
+
+**Reading them properly moves every measurement.** Structure 41% to 28%, 46% to
+18%, 30% to 19%. And four frames refused for being 58-84% BLOWN are not clipped
+at all in the raw: the preview is a finished JPEG carrying the camera's contrast,
+and it saturates long before the sensor does. Four usable frames were turned away
+for a fault that existed only in a thumbnail.
+
+**AND IT SETTLES THE SCALE QUESTION THAT HAD NO ANSWER.** `GREEN_FLOOR`,
+`DARK_LIMIT` and `CLIP_LIMIT` were every one calibrated on rendered frames, and
+whether raw linear sits on the same scale had never been measurable — because
+nothing had ever reached the raw path. Four frames now report their mean level
+down both: 4.3 against 32.5, 4.1 against 30.7, 4.3 against 32.6, 4.8 against
+38.2. **Raw linear is 0.126 to 0.134 of the rendered scale, about 7.6x lower.**
+`DARK_LIMIT = 0.05` therefore means 0.0066 on the raw scale, and four of these
+sixteen are now refused as "too dark to measure (mean 4.1-4.8%)" while sitting
+at 31-38% of the scale that number was set on. Recorded, not fixed: it is a gate
+that decides what is accepted, and four samples is a measurement to take rather
+than a number to guess.
+
+**A HYPOTHESIS THAT FAILED, RECORDED SO IT IS NOT RETRIED.** Before any of this,
+the structure rejections looked like the gate counting the sky's own gradient as
+scenery — sky brightness varies with angle from the sun, so a wide lens captures
+real ramp, and flat-fielding has de-gradiented sky flats for decades. Fitted a
+plane, divided it out, re-measured: structure fell from 63% to 50% on the best
+frames and ROSE from 86% to 136% on the worst, and zero frames became usable.
+The frames genuinely contained scenery. The idea was sound and the data refused
+it.
+
+**AND AN EMPTY RESULT IS NOT A PASS.** The regression run after the fix printed
+two harness names with NOTHING under them. Both default to port 8131, which was
+not running, and the `grep -E "^(ok|FAIL)"` that keeps the output short turned a
+stack trace into silence — which reads exactly like a suite with nothing to say.
+Same shape as a missing CI run being read as a green one (LESSONS §161): the
+question is never "did anything fail", it is "did every claim actually run".
