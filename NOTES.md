@@ -8541,3 +8541,28 @@ and above — 16mm and 24mm are hard to fill with clean sky on a DX body, where
 24mm sees about 61 degrees and 16mm about 83, so the sky's own gradient and the
 horizon are both in the frame. Recorded as a REASON the wide end is thin, not as
 an oversight to be fixed by asking for the same frames again.
+
+## A width rule keyed on the element, and the one control that cannot be one, 2026-09-11
+
+"Restore from a file" came out 163px wide in a column of 293px controls. It is a
+`<label>` wrapping a file input, because that is the only way to style a file
+picker — and the rule that makes controls full width is
+`select, button { width: 100% }`, keyed on the TAG.
+
+**So the one control that cannot be a button is the one that silently opts out
+of the button styling.** Not just this one: "Choose flat frames" is the same
+shape and had the same defect, four rows higher, and nobody had noticed it
+either. The width now belongs to `.dbg-btn` — the class that says "this reads as
+a button here" — rather than to the element, along with the block display,
+centring and line-height that a label does not get for free.
+
+**The a11y sweep could not have caught it.** Every one of these was already
+44px tall and cleared its hit area; the sweep asks whether a control can be hit,
+not whether a row of controls is a row. Ragged widths are not an accessibility
+failure and are not a functional one; they are only visible.
+
+**The claim is per ROW, and the first version was not.** It compared every
+`.dbg-btn` in the dialog against every other and reported two failures that were
+two correctly different rows at different nesting depths — 319px at x=16.7 and
+293px at x=29.7. A fault in the question rather than in the page. Grouped by
+`.dbg-actions` container, it reads the same rows a reader sees.
