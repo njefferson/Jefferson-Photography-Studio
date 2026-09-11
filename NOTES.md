@@ -8757,3 +8757,38 @@ for camera-rendered files only: "substituting a balance WITHOUT re-deriving
 exposure just makes the picture dark", measured at mean 83/59/156 before and
 35/35/32 after. Not yet reproduced on a raw frame; recorded so the next session
 starts at the line rather than at the symptom.
+
+## The lens profile has no filter dimension, 2026-09-11
+
+Reported from the device: the hot-spot correction works, and does NOT work on
+photographs taken through a wavelength filter. **Recorded, not fixed, at the
+owner's instruction.**
+
+**It is not a bug in the correction; it is a missing dimension in the key.** A
+profile is stored under lens, focal length and aperture — `50-250@130@f16.0`.
+Nothing in that key says which band the light was in. A hot spot is the lens's
+internal reflection at a particular WAVELENGTH: a 590nm frame, a 720nm frame and
+an 850nm frame through the same lens at the same focal length and aperture are
+three different hot spots, and the app treats them as one measurement of one
+thing. Whichever filter the flat frames were shot through is the one the stored
+profile describes; every other filter gets that answer applied to a hot spot it
+does not match.
+
+**So the symptom is exactly what the shape of the store predicts**, which is why
+it is worth writing down rather than investigating from scratch: the failure is
+in the identity of a profile, not in the maths that applies it.
+
+What it would take, when it is taken on:
+
+- A filter goes in the key, the way aperture was added to it once before. EXIF
+  does not carry it — no camera records the filter screwed onto the front — so
+  it has to come from the reader, which is a different shape of question from
+  everything else the rig asks, all of which it reads from the file.
+- The matcher must then refuse to reach ACROSS filters the way it already
+  refuses to blend across apertures, rather than silently substituting.
+- And the coverage report gains a third axis, which is the point at which
+  "what am I still missing" stops being a sentence and needs a different shape.
+
+Until then the honest behaviour would be to say which filter a profile was
+measured through and let the reader judge — the app cannot know, but it can
+stop implying the question does not exist.
