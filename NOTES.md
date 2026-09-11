@@ -8632,3 +8632,54 @@ frames. Azimuthal contamination is 4-10% at r=0.15 and 39-55% at r=0.30 on the
 16mm set, against a hot-spot signal of 5-25%. The cloud runs through the middle,
 so there is no radius at which a circle is clean. The idea is sound; the frames
 have to be.
+
+## Two faults in the measure itself, found on real infrared sky, 2026-09-11
+
+Both were in `lensprofile.ts`, both invisible on the frames the rig had been
+fed until now, and both were measured on 25 real frames before either limit was
+touched.
+
+**STRUCTURE COUNTED NOISE AS STRUCTURE.** The check that tells a flat from a
+photograph took the spread of a ring's PIXELS. That includes shot noise. On a
+bright low-ISO flat it is nothing; on a dark high-ISO one it is most of the
+reading — a clean synthetic frame read 0.0048 where the truth is zero, 95%
+noise, and frames at ISO 640-1400 with a mean level of 0.08 carry 0.08-0.14 of
+pure noise against a STRUCTURE_LIMIT of 0.15. A genuinely flat frame, shot dark,
+was refusable for being grainy.
+
+Each ring is split into 24 sectors now; the mean within a sector averages the
+noise away and the spread BETWEEN sector means keeps everything that varies
+around the circle. Measured both ways on all 25: clean frames read 0.0002-0.0118
+by sectors against 0.0048-0.0136 by pixels, contaminated ones 0.4913-0.8715.
+
+**And the property that makes it safe is an INEQUALITY, not two limits that
+agree today.** A sector mean can never be noisier than the pixels it averages,
+so the new reading is always at or below the old one — nothing accepted today
+can become refused. That is the claim the walk holds, over every frame, rather
+than "both numbers separate on this set". 12% to 95% of the reading was noise.
+
+**GREEN IS THE DENOMINATOR, AND IN INFRARED IT GOES TO ZERO.** kr and kb are red
+and blue AGAINST GREEN. The guard was `green > 0`. On nineteen real frames the
+reference-ring green ran 0.003-0.038 in linear light and the ratios came back at
+10 to 41; one frame reported 74745. In 8-bit terms a green of 0.003 is a code of
+about 10, where one code step is a tenth of the value — 10% of quantisation
+error per ring, against the 5-25% effect being measured.
+
+`GREEN_FLOOR = 0.09` sits in the gap: clean frames measure 0.252-0.283, so it is
+2.4x above the worst nonsense and 2.8x below the good. Below it the frame still
+measures BRIGHTNESS, which is carried by red and is unaffected — only colour is
+withheld, and the per-frame row says so.
+
+**THE PLANT IS WHY THAT IS WORTH MORE THAN A CLAMPED NUMBER.** With the floor at
+0, the green-empty control is not merely wrong, it is REFUSED — "the colour
+turns a corner, it bends by 0.11" — because an empty denominator makes a kinked
+curve out of nothing. A sound brightness measurement was being thrown away for
+a colour fault the frame could not help.
+
+**NEITHER LIMIT HAD A POSITIVE CONTROL UNTIL ONE WAS BUILT.** Every real frame
+with no green is also refused for something else first — clipping, or structure
+— so nothing in the set could show the green floor doing its job. A synthetic
+flat with its green scaled to 0.06 is that control, and it had to be written as
+PNG: a JPEG's chroma subsampling puts a 0.06 kink in kr at the corners and gets
+the control refused by the curvature check, which is an artefact of the control
+rather than a fault in the app.
