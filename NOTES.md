@@ -8847,3 +8847,24 @@ measuring the wrong photo entirely because `openSorted` puts NIR_0063 first;
 and planting a change that FAILED TO BUILD without checking the build output,
 so the screenshot that never appeared was read as a missing file rather than as
 a broken plant.
+
+## The double-tap tip is underneath the thing that summons it, 2026-09-11
+
+Reported from the desktop, recorded for later at the owner's instruction.
+
+Double-tapping a slider returns it to where the photo opened, and a tip says so.
+On a mouse the tip appears where the POINTER is — and the pointer is drawn on
+top of it, so the tip is under the arrow that called it up. The reader is told
+where to look by covering the place they are looking.
+
+**And touch is probably worse, not better.** A fingertip covers a far larger
+area than a cursor and, unlike a cursor, the app cannot know where it is once
+the finger lifts. Anything anchored AT the point of contact is hidden by the
+thing making contact. The general rule this is an instance of: a hint about a
+control must not be drawn at the place the control is being operated — above
+it, beside it, or in a fixed place, but never under the hand or the arrow.
+
+Worth measuring rather than assuming when it is taken on: where the tip's box
+actually lands relative to the pointer hotspot, at both a mouse and a touch
+event, rather than reasoning about it from the code. This session has spent
+enough on conclusions drawn from what an element looks like it should do.
