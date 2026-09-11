@@ -19,6 +19,7 @@ import { sniff } from "./import";
 import { readExifSubset } from "./exif";
 import { profileFrame, averageProfiles, round5, NBINS, type FrameProfile } from "./lensprofile";
 import { readZipIndex, readZipEntry, readZipEntryPrefix, imageEntries } from "./zip";
+import { saveBlob } from "./savefile";
 import { saveFromPayload, listProfiles, removeProfile, coverage, gapsFor, exportAll, importText, type SaveChange } from "./lensstore";
 import { requestPersistence } from "./session";
 import { keepAwake, granted as wakeGranted, supported as wakeSupported } from "./wakelock";
@@ -52,13 +53,33 @@ export function wireLensRig(root: ParentNode): void {
   const backupCopyBtn = $<HTMLButtonElement>("lensBackupCopy");
   const restoreInput = $<HTMLInputElement>("lensRestore");
   const restoreNote = $("lensRestoreNote");
-  backupBtn.onclick = () => {
-    const url = URL.createObjectURL(new Blob([exportAll()], { type: "application/json" }));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `lens-profiles-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  // SAY WHAT WENT IN THE FILE. A backup is written to be trusted later, on a
+  // day when the store is gone — and this wrote one with no feedback at all, so
+  // an empty backup and a full one were the same gesture with the same result on
+  // screen. A backup carrying `"profiles":[]` came back from a device that had a
+  // measured profile on it an hour earlier; nothing in the app had said so.
+  //
+  // And it is worth saying because ZERO IS NOT ONE CASE. The store reads out
+  // empty when there is genuinely nothing, and ALSO when localStorage throws —
+  // a private window, storage cleared, permissions — which `read()` catches and
+  // returns as empty on purpose, so nothing downstream crashes. Both write the
+  // same file. The count is the only thing that tells the reader which of those
+  // two days they are having, before they rely on it.
+  //
+  // The save goes through saveBlob for the reason export.ts does: a plain
+  // download does nothing at all on an iPhone or iPad, where the share sheet is
+  // the only way a file reaches the disk. This button was still doing the plain
+  // download — the same fix applied to the instance and not the class.
+  backupBtn.onclick = async () => {
+    const n = listProfiles().length;
+    const blob = new Blob([exportAll()], { type: "application/json" });
+    const how = await saveBlob(blob, `lens-profiles-${new Date().toISOString().slice(0, 10)}.json`);
+    restoreNote.hidden = false;
+    restoreNote.textContent = how === "cancelled"
+      ? "Backup cancelled — nothing was saved."
+      : n === 0
+        ? "That backup is EMPTY — there are no measured profiles on this device to save. Either none has been kept here, or this browser is not letting the app read its storage. Check the list above before you rely on this file."
+        : `Saved ${n} measured profile${n === 1 ? "" : "s"}.`;
   };
   backupCopyBtn.onclick = () => copy(exportAll(), backupCopyBtn, "Copy them all");
   restoreInput.onchange = async () => {
