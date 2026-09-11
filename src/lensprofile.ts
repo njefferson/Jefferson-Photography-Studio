@@ -249,6 +249,12 @@ export interface RadialMeans {
   pixels: number;
   /** True when the source was linear sensor data rather than 8-bit sRGB. */
   linear: boolean;
+  /** Per ring: how many sectors the estimate was built from, and how many were
+   *  in the frame at all. `kept < of` is contamination that was worked around
+   *  rather than a frame that had to be thrown away; `kept === 0` is a radius
+   *  with nothing to say, and its r/g/b are NaN. */
+  keptSectors: Float64Array;
+  ofSectors: Float64Array;
 }
 
 /** Walk the decoded frame and accumulate per-channel linear means by radius.
@@ -280,6 +286,11 @@ export function radialMeans(img: DecodedImage): RadialMeans {
   // See SECTORS below for why that is not the same question.
   const sl = new Float64Array(NBINS), sll = new Float64Array(NBINS);
   const secS = new Float64Array(NBINS * SECTORS), secN = new Float64Array(NBINS * SECTORS);
+  // PER-SECTOR CHANNEL SUMS, FOR EVERY RING. A ring's mean is what the profile
+  // is made of, and a plain mean over the whole ring believes whatever is in it.
+  // Keeping the channels per sector is what lets a ring be estimated from the
+  // sectors that are clean — see robustRing.
+  const secR = new Float64Array(NBINS * SECTORS), secG = new Float64Array(NBINS * SECTORS), secB = new Float64Array(NBINS * SECTORS);
   const lin = img.linear, px = img.pixels;
   if (!lin && !px) throw new Error("decoded frame carries no pixels");
   const step = Math.max(1, Math.round(Math.sqrt((w * h) / 1e6)));
@@ -353,13 +364,14 @@ export function radialMeans(img: DecodedImage): RadialMeans {
       sr[i] += R; sg[i] += G; sb[i] += B; cnt[i]++;
       const lum = (R + G + B) / 3;
       sl[i] += lum; sll[i] += lum * lum;
-      // ONLY FOR THE RINGS THE STRUCTURE LOOP ACTUALLY READS. It stops at
-      // REF_LO, so the sectors past it were an atan2 per sampled pixel whose
-      // result nothing ever looked at — and atan2 is the most expensive thing
-      // in this loop. Guarding on the same bound the reader uses keeps the two
-      // in step: widen the loop and the sectors follow.
-      if (binR(i) <= REF_LO) {
+      {
+        // EVERY RING NOW, not just the ones the structure check reads. The
+        // atan2 was gated to the inner rings when only structure used sectors;
+        // the ring ESTIMATOR uses them everywhere, so the gate would silently
+        // leave the outer half of every profile on the old un-robust path.
         const a = Math.min(SECTORS - 1, (((Math.atan2(dy, dx) + Math.PI) * SECTORS) / (2 * Math.PI)) | 0);
+        const k2 = i * SECTORS + a;
+        secR[k2] += R; secG[k2] += G; secB[k2] += B;
         // The plane, divided out — see the fit above. This value feeds the
         // STRUCTURE reading only; `sl`/`sr`/`sg`/`sb` above are untouched.
         let flat = lum;
@@ -371,6 +383,128 @@ export function radialMeans(img: DecodedImage): RadialMeans {
       }
     }
   }
+  /** ONE RING'S LEVEL, ESTIMATED FROM THE SECTORS THAT AGREE.
+   *
+   *  A ring's mean is what the profile is made of, and a plain mean believes
+   *  whatever is in the ring: a branch in one corner raises that radius for
+   *  every frame it appears in, and nothing downstream can tell. The radial
+   *  model already says every sector at one radius saw the same light, so a
+   *  sector that disagrees is evidence, not noise to be averaged in.
+   *
+   *  Two things vary around a ring and only one of them is a fault:
+   *
+   *  A SMOOTH ILLUMINATION RAMP is a plane, and a plane sampled on a circle is
+   *  exactly `k + A cos(th) + B sin(th)` — one cycle, no more. Averaging the
+   *  whole ring cancels it for free, which is why a plain mean was unbiased
+   *  while every sector was present.
+   *
+   *  LOCALISED CONTAMINATION is a few sectors away from the rest and no cycle
+   *  at all.
+   *
+   *  So fit the one-cycle term, call the sectors that sit far off the fit
+   *  outliers, and refit without them. The answer is the fitted CONSTANT, not
+   *  the mean of the survivors — because once sectors are dropped from one side
+   *  the ramp no longer cancels, and a mean of what is left is biased by exactly
+   *  the amount the ramp was supposed to cancel. Dropping the bright half of a
+   *  ring and averaging the rest is how a robust estimator quietly becomes a
+   *  wrong one.
+   *
+   *  The outlier mask comes from LUMA and is then applied to all three channels:
+   *  cloud and foliage are not a one-channel event, and a mask fitted per
+   *  channel would let a ring keep different sectors for red than for green,
+   *  which is a colour ratio between two different pieces of sky.
+   *
+   *  Where the ring is cut by the frame edge — everything past r = 0.5547 of the
+   *  half-diagonal on a 3:2 frame — only the left and right arcs survive, and
+   *  the ramp's vertical component cannot be identified from them. The fit is
+   *  checked for that and falls back to a constant-only estimate rather than
+   *  solving a direction it cannot see. */
+  const ringLevel = (i: number): { r: number; g: number; b: number; kept: number; of: number } => {
+    const idx: number[] = [], th: number[] = [], lum: number[] = [];
+    for (let a = 0; a < SECTORS; a++) {
+      const k = i * SECTORS + a;
+      if (secN[k] < 24) continue;
+      idx.push(a);
+      th.push(((a + 0.5) / SECTORS) * 2 * Math.PI);
+      lum.push((secR[k] + secG[k] + secB[k]) / (3 * secN[k]));
+    }
+    const of = idx.length;
+    // TOO SMALL TO SECTOR IS NOT THE SAME AS CONTAMINATED. The innermost ring is
+    // a disc of a few hundred pixels on the optical centre; no sector in it
+    // reaches the minimum, so `of` is 0 for a reason that has nothing to do with
+    // what is in the frame. Returning "no estimate" there made the reach scan
+    // stop at ring 0 and refused all sixteen good flats — caught by the corpus
+    // check on its first run after the estimator landed.
+    //
+    // A ring that small cannot be selectively contaminated in any way that
+    // matters at this scale, so its plain mean stands. kept = of = 0 records
+    // that it was never sector-checked, which is a different claim from
+    // "checked and clean".
+    if (of === 0) {
+      if (!(cnt[i] > 0)) return { r: NaN, g: NaN, b: NaN, kept: 0, of: 0 };
+      return { r: sr[i] / cnt[i], g: sg[i] / cnt[i], b: sb[i] / cnt[i], kept: 0, of: 0 };
+    }
+
+    // Solve [1, cos, sin] against `vals` over `use`; returns the constant term,
+    // or the plain mean when the one-cycle part is not identifiable from the
+    // angles that are present.
+    const solve = (vals: number[], use: boolean[]): { k: number; A: number; B: number } => {
+      let n = 0, Sc = 0, Ss = 0, Scc = 0, Sss = 0, Scs = 0, Sv = 0, Svc = 0, Svs = 0;
+      for (let j = 0; j < vals.length; j++) {
+        if (!use[j]) continue;
+        const C = Math.cos(th[j]), S = Math.sin(th[j]), v = vals[j];
+        n++; Sc += C; Ss += S; Scc += C * C; Sss += S * S; Scs += C * S; Sv += v; Svc += v * C; Svs += v * S;
+      }
+      if (n === 0) return { k: NaN, A: 0, B: 0 };
+      const mean = Sv / n;
+      // Not enough angular spread to separate a ramp from a level: a clipped
+      // ring is two opposite arcs, and one of the two directions is invisible.
+      if (n < 5 || Scc < 1e-6 || Sss < 1e-6) return { k: mean, A: 0, B: 0 };
+      const M = [[n, Sc, Ss], [Sc, Scc, Scs], [Ss, Scs, Sss]], rhs = [Sv, Svc, Svs];
+      for (let a = 0; a < 3; a++) {
+        let piv = a;
+        for (let q = a + 1; q < 3; q++) if (Math.abs(M[q][a]) > Math.abs(M[piv][a])) piv = q;
+        [M[a], M[piv]] = [M[piv], M[a]]; [rhs[a], rhs[piv]] = [rhs[piv], rhs[a]];
+        if (Math.abs(M[a][a]) < 1e-9) return { k: mean, A: 0, B: 0 };
+        for (let q = a + 1; q < 3; q++) {
+          const f = M[q][a] / M[a][a];
+          for (let j = a; j < 3; j++) M[q][j] -= f * M[a][j];
+          rhs[q] -= f * rhs[a];
+        }
+      }
+      const co = [0, 0, 0];
+      for (let a = 2; a >= 0; a--) {
+        let acc = rhs[a];
+        for (let j = a + 1; j < 3; j++) acc -= M[a][j] * co[j];
+        co[a] = acc / M[a][a];
+      }
+      return Number.isFinite(co[0]) ? { k: co[0], A: co[1], B: co[2] } : { k: mean, A: 0, B: 0 };
+    };
+
+    const all = idx.map(() => true);
+    const f0 = solve(lum, all);
+    const res = lum.map((v, j) => v - (f0.k + f0.A * Math.cos(th[j]) + f0.B * Math.sin(th[j])));
+    const srt = [...res].sort((x, y) => x - y);
+    const med = srt[srt.length >> 1];
+    const dev = res.map((x) => Math.abs(x - med)).sort((x, y) => x - y);
+    const mad = dev[dev.length >> 1];
+    // A ring with no scatter at all has mad 0; everything is then an outlier by
+    // any ratio, so an absolute floor relative to the ring's own level is what
+    // keeps a clean ring from rejecting itself.
+    const tol = Math.max(4 * mad, 0.01 * Math.abs(f0.k));
+    const keep = res.map((x) => Math.abs(x - med) <= tol);
+    const kept = keep.filter(Boolean).length;
+    // Too little of the ring left to stand for it. NaN is the existing "this
+    // radius has nothing to say" value and every reader already handles it.
+    if (kept < Math.max(5, Math.ceil(of * 0.5))) return { r: NaN, g: NaN, b: NaN, kept, of };
+    const chan = (sec: Float64Array) =>
+      solve(idx.map((a) => sec[i * SECTORS + a] / secN[i * SECTORS + a]), keep).k;
+    return { r: chan(secR), g: chan(secG), b: chan(secB), kept, of };
+  };
+
+  const lev: { r: number; g: number; b: number; kept: number; of: number }[] = [];
+  for (let i = 0; i < NBINS; i++) lev.push(ringLevel(i));
+
   const mk = (s: Float64Array) => {
     const out = new Float64Array(NBINS);
     for (let i = 0; i < NBINS; i++) out[i] = cnt[i] > 0 ? s[i] / cnt[i] : NaN;
@@ -418,8 +552,21 @@ export function radialMeans(img: DecodedImage): RadialMeans {
     const varr = Math.max(0, sum2 / n - mean * mean);
     if (mean > 1e-6) { sp += (Math.sqrt(varr) / mean) * cnt[i]; spN += cnt[i]; }
   }
+  // THE RING LEVELS ARE THE MEASUREMENT NOW. `mk` divides a ring's total by its
+  // pixel count and believes everything in it; `ringLevel` estimates the same
+  // quantity from the sectors that agree with each other. They are identical on
+  // a clean ring and differ exactly where a frame has something in it.
+  const pick = (k: "r" | "g" | "b") => {
+    const out = new Float64Array(NBINS);
+    for (let i = 0; i < NBINS; i++) out[i] = cnt[i] > 0 ? lev[i][k] : NaN;
+    return out;
+  };
+  const kept = new Float64Array(NBINS), ofs = new Float64Array(NBINS);
+  for (let i = 0; i < NBINS; i++) { kept[i] = lev[i].kept; ofs[i] = lev[i].of; }
+  void mk;
   return {
-    r: mk(sr), g: mk(sg), b: mk(sb), counts: cnt,
+    r: pick("r"), g: pick("g"), b: pick("b"), counts: cnt,
+    keptSectors: kept, ofSectors: ofs,
     clipFrac: seen ? clipped / seen : 1,
     meanLevel: seen ? sum / seen : 0,
     structure: spN ? sp / spN : 1,
@@ -544,6 +691,15 @@ export interface FrameProfile {
   meanLevel: number;
   structure: number;
   linear: boolean;
+  /** HOW FAR OUT THIS FRAME COULD ACTUALLY BE MEASURED, as a fraction of the
+   *  half-diagonal, and how many of its rings needed contaminated sectors
+   *  dropped to get there. A frame clean to the corner reads 1; one with
+   *  something along an edge reads less, and the profile past that point is
+   *  NaN rather than a number nothing checked. */
+  goodTo: number;
+  /** Rings where the estimate came from fewer sectors than were present — the
+   *  frame was rescued at that radius rather than believed. */
+  rescuedRings: number;
 }
 
 /** One flat frame -> one profile. */
@@ -557,12 +713,42 @@ export function profileFrame(img: DecodedImage): FrameProfile {
   const refB = ringMean(m.b, REF_LO, REF_HI, m.counts);
   const colour = refG >= GREEN_FLOOR;
   const bad = (why: string): FrameProfile =>
-    ({ falloff, kr, kb, colour, bumpRange: [NaN, NaN], falloffAtCorner: NaN, usable: false, why, clipFrac: m.clipFrac, meanLevel: m.meanLevel, structure: m.structure, linear: m.linear });
+    ({ falloff, kr, kb, colour, bumpRange: [NaN, NaN], falloffAtCorner: NaN, usable: false, why, clipFrac: m.clipFrac, meanLevel: m.meanLevel, structure: m.structure, linear: m.linear, goodTo: 0, rescuedRings: 0 });
   if (!(refR > 0) || !(refG > 0) || !(refB > 0)) return bad("the reference ring caught nothing to measure");
+  // AND THE REFERENCE RING ITSELF HAS TO HAVE SURVIVED. Every curve here is
+  // divided by the level in r 0.55-0.72, so a frame whose estimate runs out
+  // before REF_HI is normalised against rings that were never established. That
+  // is not a shorter profile, it is a profile on an unknown scale — and two of
+  // them cannot be averaged, because each is divided by a different unknown.
+  //
+  // Worth knowing about that band: on a 3:2 frame the top and bottom edges are
+  // at 0.5547 of the half-diagonal, so the whole reference ring is past them and
+  // is sampled from the LEFT AND RIGHT ARCS ONLY — 70% of each ring on average.
+  // The estimator handles the missing sectors, but a frame contaminated down one
+  // side has lost a larger share of that band than the count suggests.
+  {
+    let reach = 0;
+    for (let i = 0; i < NBINS; i++) { if (!Number.isFinite(m.r[i])) break; reach = binR(i) + 0.5 / NBINS; }
+    if (reach < REF_HI)
+      return bad(`only the middle of this one could be measured — out to ${(reach * 100).toFixed(0)}% of the way to the corner, and the rest has something in it`);
+  }
   if (m.clipFrac > CLIP_LIMIT) return bad(`${(m.clipFrac * 100).toFixed(1)}% of it is clipped — a blown flat has stopped recording the falloff`);
   const darkFloor = m.linear ? DARK_LIMIT_RAW : DARK_LIMIT;
   if (m.meanLevel < darkFloor) return bad(`too dark to measure (mean ${(m.meanLevel * 100).toFixed(1)}% of what ${m.linear ? "a raw file" : "a rendered file"} can hold)`);
   if (m.structure > STRUCTURE_LIMIT) return bad(`this is a photograph of something, not a flat — brightness varies by ${(m.structure * 100).toFixed(0)}% around a circle, where empty sky varies by a few percent`);
+
+  // HOW FAR OUT THIS FRAME REACHES. Rings are estimated from the sectors that
+  // agree; a radius where too few agreed has no estimate at all. The frame is
+  // trusted out to the last radius with an UNBROKEN run of estimates from the
+  // centre — unbroken, because a gap means the rings past it were measured
+  // across whatever caused the gap, and a profile with a hole in the middle of
+  // it is not a profile with a shorter reach, it is a wrong one.
+  let goodTo = 0, rescuedRings = 0;
+  for (let i = 0; i < NBINS; i++) {
+    if (!Number.isFinite(m.r[i])) break;
+    goodTo = binR(i) + 0.5 / NBINS;
+    if (m.keptSectors[i] < m.ofSectors[i]) rescuedRings++;
+  }
 
   for (let i = 0; i < NBINS; i++) {
     if (!Number.isFinite(m.r[i]) || !Number.isFinite(m.g[i]) || !Number.isFinite(m.b[i])) continue;
@@ -607,7 +793,7 @@ export function profileFrame(img: DecodedImage): FrameProfile {
   let corner = NaN;
   for (let i = NBINS - 1; i >= 0; i--) if (Number.isFinite(falloff[i]) && m.counts[i] >= 32) { corner = falloff[i]; break; }
 
-  return { falloff, kr, kb, colour, bumpRange: [lo, hi], falloffAtCorner: corner, usable: true, why: "", clipFrac: m.clipFrac, meanLevel: m.meanLevel, structure: m.structure, linear: m.linear };
+  return { falloff, kr, kb, colour, bumpRange: [lo, hi], falloffAtCorner: corner, usable: true, why: "", clipFrac: m.clipFrac, meanLevel: m.meanLevel, structure: m.structure, linear: m.linear, goodTo, rescuedRings };
 }
 
 /** Average several frames of the same lens and focal length. Bins where a
