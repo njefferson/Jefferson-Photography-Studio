@@ -456,7 +456,12 @@ export function wireLensRig(root: ParentNode): void {
           profRow(c.f.name, c.key,
             `The centre's colour is off by ${pct(Math.abs(cr - 1))} in red and ${pct(Math.abs(cb - 1))} in blue against the same frame's edges. ` +
             `Centre to corner it keeps ${pct(prof.falloffAtCorner)} of its brightness, of which somewhere between ${pct(prof.bumpRange[0])} and ${pct(prof.bumpRange[1])} is hot-spot rather than the lens's own falloff. ` +
-            `${prof.linear ? "Measured from the raw sensor data" : "Measured from the rendered image"}, mean level ${pct(prof.meanLevel)}, ${pct(prof.clipFrac)} clipped, ${pct(prof.structure)} variation around a circle.`);
+            `${prof.linear ? "Measured from the raw sensor data" : "Measured from the rendered image"}, mean level ${pct(prof.meanLevel)}, ${pct(prof.clipFrac)} clipped, ${pct(prof.structure)} variation around a circle.` +
+            // Colour is measured AGAINST GREEN, and an infrared frame can have
+            // almost none. Saying so is the difference between a profile that
+            // corrects brightness only and one that appears to have measured a
+            // colour it never saw.
+            (prof.colour ? "" : " Its green channel was too faint to divide by, so this one carries brightness only — no colour."));
         } catch (err) {
           unusable++;
           drop(c.short, "it could not be opened");
