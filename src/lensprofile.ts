@@ -112,8 +112,28 @@ function maxCurve(a: ArrayLike<number>): number {
   }
   return m;
 }
-/** Below this mean level the frame is noise, not a flat. */
+/** Below this mean level the frame is noise, not a flat.
+ *
+ *  TWO VALUES, BECAUSE THERE ARE TWO SCALES. A rendered frame arrives as sRGB
+ *  and is linearised here; a raw one arrives already linear off the sensor, and
+ *  the two do NOT land in the same place. Measured on sixteen frames that exist
+ *  as both a NEF and the camera's JPEG of the same exposure, the raw mean is
+ *  0.126 to 0.134 of the rendered mean — about 7.6x lower, and tight enough
+ *  across four readings to be a scale rather than a scatter.
+ *
+ *  So 0.05 is a RENDERED number. Applied to raw it means 0.38 on the rendered
+ *  scale, which is most of the way to mid-grey: four genuinely well-exposed raw
+ *  flats were turned away as "too dark to measure (mean 4.1-4.8%)" while sitting
+ *  at 31-38% of the scale that limit was set on. It could not have been caught
+ *  before, because until the NEF decode was fixed nothing had ever reached this
+ *  code down the raw path — every frame it had ever seen was rendered.
+ *
+ *  The raw floor is 0.01 rather than the 0.0066 the ratio gives, which is a
+ *  deliberate margin: the ratio rests on four frames from one camera and one
+ *  picture control, and under-rejecting a dark flat costs a noisy profile the
+ *  reader can re-measure, while over-rejecting costs the shoot. */
 const DARK_LIMIT = 0.05;
+const DARK_LIMIT_RAW = 0.01;
 
 /** How much a ring is allowed to vary AROUND itself before the frame stops
  *  being a flat and starts being a photograph. A radial profile assumes every
@@ -481,7 +501,8 @@ export function profileFrame(img: DecodedImage): FrameProfile {
     ({ falloff, kr, kb, colour, bumpRange: [NaN, NaN], falloffAtCorner: NaN, usable: false, why, clipFrac: m.clipFrac, meanLevel: m.meanLevel, structure: m.structure, linear: m.linear });
   if (!(refR > 0) || !(refG > 0) || !(refB > 0)) return bad("the reference ring caught nothing to measure");
   if (m.clipFrac > CLIP_LIMIT) return bad(`${(m.clipFrac * 100).toFixed(1)}% of it is clipped — a blown flat has stopped recording the falloff`);
-  if (m.meanLevel < DARK_LIMIT) return bad(`too dark to measure (mean ${(m.meanLevel * 100).toFixed(1)}%)`);
+  const darkFloor = m.linear ? DARK_LIMIT_RAW : DARK_LIMIT;
+  if (m.meanLevel < darkFloor) return bad(`too dark to measure (mean ${(m.meanLevel * 100).toFixed(1)}% of what ${m.linear ? "a raw file" : "a rendered file"} can hold)`);
   if (m.structure > STRUCTURE_LIMIT) return bad(`this is a photograph of something, not a flat — brightness varies by ${(m.structure * 100).toFixed(0)}% around a circle, where empty sky varies by a few percent`);
 
   for (let i = 0; i < NBINS; i++) {
