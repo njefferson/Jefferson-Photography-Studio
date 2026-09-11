@@ -9061,3 +9061,87 @@ and reported twelve green claims. The remedy is not care: it is reading
 `dist/assets/ir-*.js`'s hash before and after the plant build and refusing to
 believe a run where it did not change. A plant that does not reach the bundle is
 not a plant, and an all-green plant run is the shape that failure takes.
+
+## The rest of the review's findings, and what two of them could not settle, 2026-09-11
+
+Findings 4 and 7 through 11 are fixed. Findings 5 and 6 are calibration debts
+and stay debts — what follows is what they measure now, so the next attempt does
+not start from nothing.
+
+**The cool-band question was being asked about the look you are LEAVING.**
+`measureFrame` picks the cool band's hue from `swapRB` — 30 degrees with the
+swap on, 210 with it off, which are different bands — and `coolContent` ran
+before `params.swapRB = look.swapRB` further down the same function. It agreed
+with the calibration by coincidence: the file opens with the swap on and
+Aerochrome turns it on, so the outgoing and incoming values matched. Coming from
+a swap-on state to Natural IR they do not. The incoming look's swap is passed in
+now.
+
+**"There is nothing to put back" was a claim about the photo made from half a
+measurement.** At open with no look the lift solves the tonal half alone, which
+is a no-op on plenty of frames the full solve moves considerably — so the line
+said the photo already measures where it should be about a photo a look would
+immediately give it work to do on. True of the toggle at that instant and wrong
+about the file, which is the half a reader takes away. The no-look wording now
+says what it is: nothing to put back as this photo stands, and a colour look may
+give it something to work on.
+
+**`atan2` was running on every sampled pixel for rings nothing reads.** The
+structure loop stops at `REF_LO`; the sector accumulation ran to the frame's
+corner. Guarded on the same bound the reader uses, so widening one widens the
+other.
+
+**AND A COMMENT CLAIMED A GUARANTEE THE CODE DOES NOT GIVE.** "This reading is
+always <= the old one: no frame accepted today becomes refused" — a sector mean
+is never noisier than the pixels it averages, so the reading falls, but the
+sector loop also DROPS rings the old code counted: a ring broken into fewer than
+60% usable sectors is skipped, and if that empties the accumulator `structure`
+falls back to 1 and the frame is refused. At real frame sizes it does not arise.
+The direction of the change had been written down as an inequality.
+
+### Finding 6: the floor is unconstrained, not calibrated
+
+`COOL_BAND_FLOOR = 0.02` governs camera-rendered files only — the branch is
+behind `!current.isRaw` — and was calibrated against fifteen raws that never
+reach it. Twenty camera JPEGs were measured through the app's own
+`coolContent`, by instrumenting a scratch build to publish the number rather
+than reading the rule's own verdict back as its evidence:
+
+- twenty camera JPEGs: **coolSat exactly 0.00000, every one**
+- nine raws, for contrast: **0.0611 to 0.2067**
+
+**And the exact zero is the guard, not a ratio.** `coolSat` is
+`coolW > 0 ? coolS / coolW : 0`, and on these frames `coolW` is exactly 0 across
+14406 samples — there are no pixels within 105 degrees of the band's centre at
+all. So any floor anywhere in (0, 0.0611) classifies every frame in evidence
+identically, and a test for `coolW === 0` would too. The number is doing no work
+the evidence can see.
+
+**What it still needs is a camera JPEG of a SCENE.** Nineteen of the twenty are
+the wide-angle hotspot frames, which are photographs of empty sky — one hue by
+construction, so their zero says nothing about a scene. The twentieth is the
+known one-band file. There is still no camera JPEG in evidence that carries a
+look, which is exactly what the finding said.
+
+### Finding 5: the floor has still never seen a raw, and this could not show it one
+
+`GREEN_FLOOR = 0.09` was calibrated on 25 JPEGs and all 30 stored profiles are
+`source:"rendered"`. NIR_2082 exists as both a NEF and the camera's JPEG of the
+same exposure, which looked like the comparison — and both came back
+`linear false`, with `refR` identical to four decimals (0.5252) on both paths.
+**That is not two decode paths.** The rig refuses both frames as photographs and
+says "Measured 0 frames in 1s", which is a preview read rather than a NEF decode:
+a frame refused on the cheap embedded preview never reaches the raw path at all.
+So the raw path cannot be exercised through a frame the rig will not accept, and
+settling this needs one NEF of empty sky.
+
+**THREE READINGS OF ONE NUMBER, TWO OF THEM THE INSTRUMENT.** A probe on the
+band weight first reported 1290 of 6144 samples in-band on a frame whose coolSat
+was zero, which looked like crushed shadows being counted as in-band colour —
+black has no hue and `rgb2hsv` returns 0 for it, which lands dead centre of a
+band centred on 30. A second probe then reported a different number again. Both
+were reading an accumulator AFTER later `measureFrame` calls had overwritten it;
+`solveLift` makes several per look. Scoped to `coolContent`'s own call the weight
+is 0.0000 and the hueless share is 0.0000 — the hypothesis was wrong, and the
+only thing that distinguished it from the truth was which call the probe was
+tied to. An accumulator on `globalThis` measures whoever ran last.
