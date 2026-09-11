@@ -123,6 +123,28 @@ const DARK_LIMIT = 0.05;
  *  entirely fictional profile. Clear sky measures a few percent (its own
  *  gradient, plus noise); anything with a horizon, a cloud edge or a subject
  *  in it runs several times higher. */
+/** How many angular sectors a ring is split into before its spread is taken.
+ *  Enough that a gradient across the frame shows up as a difference between
+ *  sectors; few enough that each holds thousands of pixels to average over. */
+const SECTORS = 24;
+/** GREEN IS THE DENOMINATOR, AND IN INFRARED IT IS THE CHANNEL THAT GOES TO
+ *  ZERO. kr and kb are red and blue AGAINST GREEN, so a frame whose green is
+ *  empty cannot say anything about colour — and says it loudly rather than
+ *  quietly: measured on real frames, a reference-ring green of 0.003 in linear
+ *  light returned a red-to-green ratio of 37, and one frame reported 74745.
+ *  The old guard was `green > 0`, which 0.003 passes.
+ *
+ *  In linear light, 0.003 is an 8-bit code of about 10, where a single code
+ *  step is a tenth of the value — so the ratio carries 10% of quantisation
+ *  error per ring, against the 5-25% effect it is trying to measure. At this
+ *  floor the code is about 90 and a step is under 2%.
+ *
+ *  Measured across 25 frames: clean ones sit at 0.252-0.283, and the nineteen
+ *  infrared frames whose ratios were nonsense at 0.003-0.038. This sits in the
+ *  gap, 2.4x above the worst nonsense and 2.8x below the good. Below it the
+ *  frame still measures BRIGHTNESS, which is carried by red and is unaffected;
+ *  only the colour half is withheld, and the reader is told which. */
+const GREEN_FLOOR = 0.09;
 const STRUCTURE_LIMIT = 0.15;
 
 /** How far the falloff may turn back UP on its way to the corner.
@@ -234,7 +256,11 @@ export function radialMeans(img: DecodedImage): RadialMeans {
   const cnt = new Float64Array(NBINS);
   // Sum and sum-of-squares of each pixel's brightness, per ring, for the
   // within-ring spread that tells a flat from a photograph.
+  // Per ring AND per angular sector: the sum and count inside each sector, so
+  // structure can be measured on sector MEANS rather than on raw pixel spread.
+  // See SECTORS below for why that is not the same question.
   const sl = new Float64Array(NBINS), sll = new Float64Array(NBINS);
+  const secS = new Float64Array(NBINS * SECTORS), secN = new Float64Array(NBINS * SECTORS);
   const lin = img.linear, px = img.pixels;
   if (!lin && !px) throw new Error("decoded frame carries no pixels");
   const step = Math.max(1, Math.round(Math.sqrt((w * h) / 1e6)));
@@ -256,6 +282,8 @@ export function radialMeans(img: DecodedImage): RadialMeans {
       sr[i] += R; sg[i] += G; sb[i] += B; cnt[i]++;
       const lum = (R + G + B) / 3;
       sl[i] += lum; sll[i] += lum * lum;
+      const a = Math.min(SECTORS - 1, (((Math.atan2(dy, dx) + Math.PI) * SECTORS) / (2 * Math.PI)) | 0);
+      secS[i * SECTORS + a] += lum; secN[i * SECTORS + a]++;
     }
   }
   const mk = (s: Float64Array) => {
@@ -267,11 +295,35 @@ export function radialMeans(img: DecodedImage): RadialMeans {
   // in radius are the frame's four corners and carry real azimuthal structure
   // by geometry rather than by content, so the measure stops at the inner
   // reference radius, where a ring is still a ring.
+  // MEASURED ON SECTOR MEANS, BECAUSE PIXEL SPREAD IS PART NOISE. The spread of
+  // a ring's PIXELS counts shot noise alongside the structure it is looking for.
+  // On a bright low-ISO flat that is nothing. On a dark high-ISO one it is most
+  // of the reading: a clean synthetic frame reads 0.0048 by pixel spread where
+  // the truth is zero — 95% noise — and real frames at ISO 640-1400 and a mean
+  // level of 0.08 carry 0.08-0.14 of pure noise, at or above STRUCTURE_LIMIT.
+  // A genuinely flat frame, shot dark, was refused as "a photograph of
+  // something" for being grainy.
+  //
+  // Averaging inside a sector kills the noise and keeps everything that varies
+  // AROUND the circle — cloud, a horizon, a branch, the sun's own gradient.
+  // Measured both ways on 25 frames: clean ones read 0.0002-0.0118 by sectors,
+  // contaminated ones 0.4913-0.8715, so the same STRUCTURE_LIMIT separates them
+  // by 3.3x. And because a sector mean can never be noisier than the pixels it
+  // averages, this reading is always <= the old one: no frame accepted today
+  // becomes refused by the change.
   let sp = 0, spN = 0;
   for (let i = 0; i < NBINS; i++) {
     if (binR(i) > REF_LO || cnt[i] < 32) continue;
-    const mean = sl[i] / cnt[i];
-    const varr = Math.max(0, sll[i] / cnt[i] - mean * mean);
+    let n = 0, sum = 0, sum2 = 0;
+    for (let a = 0; a < SECTORS; a++) {
+      const k = i * SECTORS + a;
+      if (secN[k] < 24) continue; // too few pixels in this sector to average
+      const m = secS[k] / secN[k];
+      n++; sum += m; sum2 += m * m;
+    }
+    if (n < SECTORS * 0.6) continue; // a ring too broken up to say anything about
+    const mean = sum / n;
+    const varr = Math.max(0, sum2 / n - mean * mean);
     if (mean > 1e-6) { sp += (Math.sqrt(varr) / mean) * cnt[i]; spN += cnt[i]; }
   }
   return {
@@ -384,6 +436,9 @@ export interface FrameProfile {
    *  Applied as r /= kr[i], b /= kb[i]. */
   kr: Float64Array;
   kb: Float64Array;
+  /** False when the frame's green was too faint to divide by, so kr and kb are
+   *  a flat 1 and only the brightness half of this profile means anything. */
+  colour: boolean;
   /** The two bracketing estimates of the CENTRAL BUMP alone, for reporting.
    *  Their gap is the honest width of what one flat frame can say; neither is
    *  a profile to correct with. */
@@ -408,8 +463,9 @@ export function profileFrame(img: DecodedImage): FrameProfile {
   const refR = ringMean(m.r, REF_LO, REF_HI, m.counts);
   const refG = ringMean(m.g, REF_LO, REF_HI, m.counts);
   const refB = ringMean(m.b, REF_LO, REF_HI, m.counts);
+  const colour = refG >= GREEN_FLOOR;
   const bad = (why: string): FrameProfile =>
-    ({ falloff, kr, kb, bumpRange: [NaN, NaN], falloffAtCorner: NaN, usable: false, why, clipFrac: m.clipFrac, meanLevel: m.meanLevel, structure: m.structure, linear: m.linear });
+    ({ falloff, kr, kb, colour, bumpRange: [NaN, NaN], falloffAtCorner: NaN, usable: false, why, clipFrac: m.clipFrac, meanLevel: m.meanLevel, structure: m.structure, linear: m.linear });
   if (!(refR > 0) || !(refG > 0) || !(refB > 0)) return bad("the reference ring caught nothing to measure");
   if (m.clipFrac > CLIP_LIMIT) return bad(`${(m.clipFrac * 100).toFixed(1)}% of it is clipped — a blown flat has stopped recording the falloff`);
   if (m.meanLevel < DARK_LIMIT) return bad(`too dark to measure (mean ${(m.meanLevel * 100).toFixed(1)}%)`);
@@ -419,8 +475,8 @@ export function profileFrame(img: DecodedImage): FrameProfile {
     if (!Number.isFinite(m.r[i]) || !Number.isFinite(m.g[i]) || !Number.isFinite(m.b[i])) continue;
     const nr = m.r[i] / refR, ng = m.g[i] / refG, nb = m.b[i] / refB;
     falloff[i] = (nr + ng + nb) / 3;
-    kr[i] = ng > 0 ? nr / ng : NaN;
-    kb[i] = ng > 0 ? nb / ng : NaN;
+    kr[i] = colour ? nr / ng : 1;
+    kb[i] = colour ? nb / ng : 1;
   }
 
   // THE SHAPE OF WHAT CAME OUT, not just the frame that went in. Everything
@@ -458,7 +514,7 @@ export function profileFrame(img: DecodedImage): FrameProfile {
   let corner = NaN;
   for (let i = NBINS - 1; i >= 0; i--) if (Number.isFinite(falloff[i]) && m.counts[i] >= 32) { corner = falloff[i]; break; }
 
-  return { falloff, kr, kb, bumpRange: [lo, hi], falloffAtCorner: corner, usable: true, why: "", clipFrac: m.clipFrac, meanLevel: m.meanLevel, structure: m.structure, linear: m.linear };
+  return { falloff, kr, kb, colour, bumpRange: [lo, hi], falloffAtCorner: corner, usable: true, why: "", clipFrac: m.clipFrac, meanLevel: m.meanLevel, structure: m.structure, linear: m.linear };
 }
 
 /** Average several frames of the same lens and focal length. Bins where a
