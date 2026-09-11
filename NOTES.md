@@ -8683,3 +8683,60 @@ flat with its green scaled to 0.06 is that control, and it had to be written as
 PNG: a JPEG's chroma subsampling puts a 0.06 kink in kr at the corners and gets
 the control refused by the curvature check, which is an artefact of the control
 rather than a fault in the app.
+
+## Export on a PC opened the Windows share sheet, 2026-09-11
+
+`saveBlob` chose the share sheet whenever `navigator.canShare` said yes. The
+share sheet is there because the INSTALLED iOS APP CANNOT DOWNLOAD — a bare
+`a[download]` silently does nothing there. Chrome and Edge on Windows also
+answer yes to `canShare`, so Export on a PC opened the Windows share sheet,
+which is not a way to put a file on disk.
+
+**A capability that EXISTS was standing in for a capability that is MISSING.**
+The question is not "can this platform share" but "would a download do
+nothing here", and those are the same only on iOS. The predicate is now the
+second question, and it is the same one the diagnostic already answers:
+iPadOS Safari reports itself as macOS, so `maxTouchPoints` is what tells an
+iPad from a Mac.
+
+Six platforms are simulated in one browser — Windows, a Mac, a Windows
+TOUCHSCREEN laptop (fingers and a disk both), an iPad reporting itself as a
+Mac, an iPhone, and an iPad with sharing unavailable, which must still fall
+through to the download rather than to nothing. Planted back, three of them
+share instead of saving.
+
+**The Macro app carried its own copy of the same decision**, three lines of it,
+with the same bug. It is `src/savefile.ts` now — its own module rather than a
+corner of `export.ts`, because Macro was pulling in a JPEG encoder and an ICC
+profile writer to put a blob on disk, which also split a 50 kB chunk out of the
+Studio's main bundle as a side effect. The claim that holds it is "exactly one
+module reaches for the share sheet", scanned across src.
+
+**And that scan matched a COMMENT the first time.** `macro/main.ts` still
+mentions `navigator.share` in a note about an iOS landmine while calling
+nothing, so the scan reported two deciders where there is one. It strips
+comments now: a scan that cannot tell prose from code will keep finding prose.
+
+## The session-stepping drift that is not there, 2026-09-11
+
+Reported: exposure may not be reset or auto-applied the way white balance is,
+and Restore depth may be stacking as more photos are viewed. Tested by visiting
+photo 1, walking the whole strip, and coming back — twice, so a drift needing
+two laps is not missed, reading the SLIDERS and the rendered pixels rather than
+any internal state.
+
+**No drift.** Exposure, Restore depth, its strength, denoise and highlight
+recovery are identical after two laps, and the picture moves 0.00 of 255.
+
+That is a real answer but not a complete one: six practice DNGs are not
+fifty-seven of the owner's NEFs, and the frames in the report are a high-contrast
+scene whose shadows crush. What the test rules out is the mechanism — stepping
+does not accumulate. Where to look next is in `main.ts` around line 766:
+`balancing` is `untouched && !current.isRaw`, and `untouched` is false for any
+raw photo, because a raw opens with a measured white balance rather than 1. So
+when a LOOK changes the balance, the exposure derived for the OLD balance is
+kept — which is the failure the comment four lines below it describes and fixes
+for camera-rendered files only: "substituting a balance WITHOUT re-deriving
+exposure just makes the picture dark", measured at mean 83/59/156 before and
+35/35/32 after. Not yet reproduced on a raw frame; recorded so the next session
+starts at the line rather than at the symptom.
