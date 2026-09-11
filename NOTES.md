@@ -8408,10 +8408,17 @@ there" was a conclusion drawn from an instrument that cannot see that kind of
 element, and it went into the record as fact. What made it a question rather
 than a fix was luck — the cause was named by someone else, and it was wrong too.
 
-The placement is not settled here: the cue's APPEARANCE is an owner ruling
-(2026-07-20, neutral rather than --accent so it does not vanish against a
-selected chip), so where it sits is the owner's call rather than a defect with
-one obvious remedy.
+**Moved to the right edge, on the owner's call.** Its APPEARANCE was already an
+owner ruling (2026-07-20, neutral rather than --accent so it does not vanish
+against a selected chip), so the placement was put to them rather than chosen.
+
+The claim is not "the cue does not overlap a control" — it floats by design and
+always will. It is that the cue does not meet the MIDDLE THIRD of a control it
+vertically overlaps, because every control in this panel centres its label, so
+the middle third is where the words are. At both phone and desktop width.
+Planted back to centred, it reports `swapBtn "R ⇆ B channel swap"` covered at
+393px — the exact control in the photograph — and nothing at 1280px, which is
+why a desktop-only check would have called the old placement fine.
 
 ## A later measurement is not a better one, and two doors had two rules, 2026-09-10
 
