@@ -8484,3 +8484,60 @@ synthetic fixture whose untied focal lengths happen to have one aperture each,
 so it went green through both bugs and is still green. The store off the device
 had the shape neither fixture had. A fixture built to exercise a rule tends to
 be built out of the rule.
+
+## A gate that refused good work, and the first real test of blending, 2026-09-11
+
+A six-frame 130mm f/16 came in with a clean monotone falloff to a 0.597 corner
+— and the shape check refused it. Its colour stepped 0.066 between its last two
+bins, over a limit of 0.05.
+
+**The frame was fine and the limit was wrong.** The outermost rings are slivers
+of the frame's corners, and a real lens can fall away fast there. What a lens
+cannot do is turn a corner. The first version of this measured the raw STEP
+between neighbouring rings, calibrated on 27 profiles where the two bad ones
+happened to be both steep and kinked.
+
+**Measured again on 35, with three candidate measures rather than one:**
+
+- raw step: sound 0.0063-0.0659, bad 0.1503-0.1865 — 2.3x, and 0.0659 is a
+  sound profile that the 0.05 limit was already refusing.
+- reversal (the curve moving against its own direction): OVERLAPS. One of the
+  two bad profiles reverses by only 0.0035, less than a third of the sound ones
+  do. The shape that reads as "obviously wrong" is not the discriminator.
+- curvature: sound 0.0061-0.0277, bad 0.0954-0.1512 — **3.4x clear**.
+
+`CURVE_LIMIT = 0.05` sits in that gap, 1.8x above the worst sound profile and
+1.9x below the mildest bad one. Both directions were planted: at 99 a backup
+carrying the bad f/4.5 is stored (corner red 0.76358 again); at 0.005 five sound
+profiles are refused. A limit with only one plant is a limit tested on one side.
+
+**AND THE TWO BAD PROFILES COULD NOT TEST IT.** With the curvature check
+disabled entirely, both are still refused — by the falloff rebound, which fires
+first. The colour half only decides on its own where there is no falloff to
+read, which is the RESTORE path: a stored profile carries its bump curve, not
+the falloff it came from. That is where its negative control lives.
+
+**The shape check moved into the generator too.** The two bad profiles had been
+taken out of a payload BY HAND into an `m2-clean.json`, which meant the table
+was built from a file nobody else reads and the test that checked the table
+against "the measurements" was checking it against the cleaned copy. Same
+function, three callers now: measure, store, generate.
+
+**THE FIRST REAL LEAVE-ONE-OUT ON FOCAL LENGTH.** Blending happens only WITHIN
+one aperture group, so the test needs three focal lengths at the SAME aperture,
+and for two days the deepest group had two — the missing-data walk printed that
+depth instead of quietly testing the clamp and calling it interpolation. f/16
+now runs 50, 130, 200 and 250mm. Hiding an interior one and blending across:
+
+- 130mm hidden, blended from 50mm and 200mm: **4.7 of 255** on brightness, and
+  18.2 points on colour, which is the larger error and worth saying.
+- 200mm hidden, blended from 130mm and 250mm: **0.9 of 255**.
+- And the control that makes the number mean something: snapping 130mm to the
+  nearest measured end instead is 8.6 of 255. The blending is doing work.
+
+**The shipped table is 30 profiles and the 50-250 spans its whole range**
+(50, 130, 135, 200, 250mm). The 16-50 still has two focal lengths, both at 36mm
+and above — 16mm and 24mm are hard to fill with clean sky on a DX body, where
+24mm sees about 61 degrees and 16mm about 83, so the sky's own gradient and the
+horizon are both in the frame. Recorded as a REASON the wide end is thin, not as
+an oversight to be fixed by asking for the same frames again.
