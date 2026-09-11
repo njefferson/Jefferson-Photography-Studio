@@ -8566,3 +8566,69 @@ failure and are not a functional one; they are only visible.
 two correctly different rows at different nesting depths — 319px at x=16.7 and
 293px at x=29.7. A fault in the question rather than in the page. Grouped by
 `.dbg-actions` container, it reads the same rows a reader sees.
+
+## Five proxy reads in one harness, and the app was right all along, 2026-09-11
+
+Nineteen wide-angle frames arrived to answer whether a circular sample of a
+frame's middle could measure a lens the corners cannot. The answer came back,
+and so did a lesson about instruments that is worth more than the answer.
+
+**THE APP WAS NEVER WRONG. THE HARNESS WAS, FIVE TIMES.**
+
+1. It polled for the shape of a SUCCESS — `#lensOut` unhiding, or a refusal word
+   in the running line. A run that refuses every frame and says so in its own
+   words matches neither, so it waited the full fifteen minutes and reported a
+   timeout. Fixed by polling for the dialog going QUIET, which cannot miss an
+   outcome it did not anticipate.
+2. It then read `#lensOut` alone and concluded the reader is told nothing. That
+   element is the tail of the panel.
+3. Told to read the whole dialog, it used `innerText` — which excludes a
+   collapsed `<details>`, and the per-frame reasons live inside one. Three
+   separate reads missed them for that reason alone.
+4. A claim that the app "says why" searched the whole dialog and passed on the
+   word "corners" in the INTRODUCTORY HELP TEXT, which is on screen before a
+   single frame is read. Anchored to the run's own output, it passes honestly.
+5. A claim that the app does not offer to store a measurement it does not have
+   searched `textContent`, which includes HIDDEN markup — reporting an offer
+   that is not on screen. `offsetParent` is the question; presence in the DOM is
+   not. That defect did not exist.
+
+**What the app actually says**, once it can be read: `NIR_3317` at 25mm —
+"this is a photograph of something, not a flat — brightness varies by 73% around
+a circle, where empty sky varies by a few percent". `NIR_3327` at 16mm —
+"11.2% of it is clipped — a blown flat has stopped recording the falloff". Both
+correct, both precise, both actionable. An independent measure agreed: 50-61%
+azimuthal variation at r=0.5 on the same frames.
+
+**THE ONE REAL DEFECT, and it is the shape of all five faults above.** Those
+reasons sit in a `<details>` that starts shut. That is right for a run where
+everything worked and the log is thirty rows of confirmation. It is wrong the
+moment a frame is turned away — and when NOTHING was measured the reasons are
+the only content there is, so the reader saw "Measured 0 frames in 1s." above a
+note reading "see the reasons above", pointing at a closed triangle. It opens
+now whenever any frame was refused.
+
+**And two faults in the MEASURE, found on real infrared sky:**
+
+- **Ring spread counts noise as structure.** `sqrt(var)/mean` over a ring's
+  pixels includes shot noise. Negligible on a bright low-ISO flat; these frames
+  are ISO 640-1400 at a mean level of 0.08-0.25, where noise alone is several
+  percent — and `lensprofile.ts`'s own structure check has exactly this form, so
+  it inflates on any dark high-ISO flat and can refuse a good one. The fix is to
+  split each ring into angular sectors, average WITHIN a sector (which kills
+  noise) and take the spread of the sector MEANS (which keeps cloud and horizon).
+  Measured both ways on the same frames: 0.0710 by pixels against 0.0594 by
+  sectors at r=0.15, and on a clean synthetic control 0.0025 against 0.0000.
+- **`kr = R/G` IS UNDEFINED IN INFRARED.** Green at the centre of these frames
+  runs 0.000 to 0.051 of full scale, and is EXACTLY 0.000 on all nine 16mm
+  frames, against red at 0.197-0.493. The guard is `green > 0`, so a green of
+  0.004 passes it and returns a red-to-green ratio of 81; one frame reported
+  74745. The existing 30 profiles are sound because those frames were brighter,
+  but an app that processes only infrared cannot have its colour reference
+  channel be the one that goes to zero.
+
+**The wide-angle answer itself**: not from a centre sample, not from these
+frames. Azimuthal contamination is 4-10% at r=0.15 and 39-55% at r=0.30 on the
+16mm set, against a hot-spot signal of 5-25%. The cloud runs through the middle,
+so there is no radius at which a circle is clean. The idea is sound; the frames
+have to be.
