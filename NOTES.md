@@ -8903,3 +8903,48 @@ straight against 0.608 swapped — and reported a marginal swap, which is the
 opposite of what the per-channel numbers say. Averaging the two halves of an
 asymmetric result is a proxy like any other, and it nearly turned a collapse
 into a swap in the record.
+
+## Restore depth, looked at properly, 2026-09-11
+
+Asked to fix it. Part of it is fixed and part of it was not what it looked like,
+including in my own report an hour earlier.
+
+**What the control actually writes**, read off the sliders it says it uses
+rather than inferred from the picture:
+
+- the owner's NEF: tone 0/0/0/0, skySat 1, folSat 1 — nothing, in every state.
+- the same frame as a JPEG: skySat **2**, which is the slider's CEILING, with
+  tone and foliage untouched.
+- twelve practice raws: skySat 1.09 to 2.00, folSat 1.00 to 2.00.
+
+**THE CEILING IS NOT THE DISCRIMINATOR, AND THE MEASUREMENT SAID SO BEFORE THE
+RULE SHIPPED.** The proposed fix was "a solve that wants more than the control
+can express is a division by something too small, so refuse it" — the same
+shape as the green floor earlier today. Swept over fourteen frames, TWO PRACTICE
+RAWS ALSO RAIL at 2.00. The rule would have broken good frames. It was measured
+because the green floor was measured; the habit is the only reason it was caught.
+
+**AND I TOLD THE OWNER RESTORE DEPTH MAKES THE SKY YELLOW. IT DOES NOT.** That
+came from one measurement — blue falling 111 to 81.5 when the toggle goes on —
+without looking at the toggle-OFF picture. With Restore depth off the JPEG is
+still yellow-skied and purple, just less saturated. The control amplifies the
+fault; the base look render on a JPEG already has it. A number that is
+consistent with a story is not the story.
+
+**What IS fixed: the control no longer claims a correction it did not make.**
+On a frame that already measures where it should be, the solve returns a no-op,
+`liftApplied` is nulled and nothing is applied — correct — while the button read
+"on" and Strength read 100. Measured: 0.0 of 255 in all three channels between
+on and off. A line beside the control now says so, and is shown exactly when the
+toggle is inert.
+
+The panel's small print has always said "a photo that already measures where it
+should be is left alone" — inside a collapsed `<details>`. That is the SECOND
+time today the honest explanation was in the markup and folded away, after the
+lens rig's refusal reasons. A state belongs beside the control it describes.
+
+**Still open: a look on a camera JPEG renders the wrong colour**, and the cause
+is none of the three things it looked like. Not the forced gray-world balance
+(planted off, result worse). Not Restore depth (off, still wrong). Not a
+red-blue swap (measured per channel: both of the raw's channels land in the
+JPEG's red, which is a collapse rather than an exchange). The frame is kept.
