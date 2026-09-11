@@ -8799,3 +8799,51 @@ What it would take, when it is taken on:
 Until then the honest behaviour would be to say which filter a profile was
 measured through and let the reader judge — the app cannot know, but it can
 stop implying the question does not exist.
+
+## A look on a camera JPEG comes out the wrong colour, and the obvious cause is not it, 2026-09-11
+
+Reproduced on one photograph supplied both ways — `NIR_2082.NEF` and
+`NIR_2082.JPG`, same scene, same moment, same lens, so the only difference is
+which branch of the open path the file takes. That is what makes a difference
+between them attributable to the branch rather than to the picture; the earlier
+control was a wide-angle flat-frame attempt and could never have done it.
+
+**The fault is colour, not brightness.** With Aerochrome the raw renders
+correctly — pale sky, pink foliage. The JPEG renders a YELLOW SKY and purple
+everything else, with the foreground crushed. Measured:
+
+- raw: opens exposure 672, luma 132.7; with the look 123.7, 5.05% crushed.
+- jpeg: opens exposure 419, luma 96.6, rgb 67/52/170; with the look 85.6,
+  **12.95% crushed**, rgb 88/88/82.
+
+38 of 255 apart, and two and a half times the crushed shadow.
+
+**THE LEADING HYPOTHESIS WAS WRONG, AND THE EXPERIMENT SAYS SO.** The candidate
+was `main.ts:766` — `balancing = untouched && !current.isRaw` — forcing a
+gray-world balance onto a file the camera had already balanced, i.e. processing
+it twice. Planted OFF (by inverting the branch, which keeps the type narrowing
+that `false &&` destroys), the JPEG with the look comes out UNIFORMLY PURPLE:
+worse, not better. The forced balance is what stops that, and it is doing its
+job. It also re-derives exposure correctly, 419 to 580.
+
+So what remains is the channel relationships themselves. `rgb 67/52/170` before
+and `88/88/82` after is the same SHAPE as the failure `main.ts:750` records
+(83/59/156 to 35/35/32): a mean pulled to neutral while the extremes split in
+opposite directions. That fix stopped the result going black — 88 rather than
+35 — and did not stop it going neutral-and-split, which is what puts a yellow
+sky next to purple foliage once red and blue are swapped.
+
+**Not fixed, and deliberately not patched from a hypothesis.** The app's own
+help already says the shape of the answer — "a false-colour look needs colours
+something has already pulled apart" — so the question worth asking next is
+whether a camera-rendered IR JPEG retains enough channel separation to carry a
+false-colour look at all, and if it does not, whether the honest behaviour is to
+say so rather than to produce a yellow sky. The frame that shows it is kept.
+
+**Instrument faults on the way, all the same shape as the rest of today's:**
+selecting the right photo and then reading tile[0] (the tile numbers came back
+byte for byte identical to the previous run, which is what gave it away);
+measuring the wrong photo entirely because `openSorted` puts NIR_0063 first;
+and planting a change that FAILED TO BUILD without checking the build output,
+so the screenshot that never appeared was read as a missing file rather than as
+a broken plant.
