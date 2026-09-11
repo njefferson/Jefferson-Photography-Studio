@@ -99,7 +99,6 @@ function rebound(a: ArrayLike<number>): { rise: number; at: number } {
   return { rise: Number.isFinite(lo) ? rise : 0, at };
 }
 
-/** The largest step between neighbouring bins. */
 /** How sharply the curve's SLOPE changes from one ring to the next — a kink
  *  rather than a bend. Steepness alone is not a fault: the outermost rings are
  *  slivers of the frame's corners and a real lens can fall away fast there.
@@ -282,8 +281,15 @@ export function radialMeans(img: DecodedImage): RadialMeans {
       sr[i] += R; sg[i] += G; sb[i] += B; cnt[i]++;
       const lum = (R + G + B) / 3;
       sl[i] += lum; sll[i] += lum * lum;
-      const a = Math.min(SECTORS - 1, (((Math.atan2(dy, dx) + Math.PI) * SECTORS) / (2 * Math.PI)) | 0);
-      secS[i * SECTORS + a] += lum; secN[i * SECTORS + a]++;
+      // ONLY FOR THE RINGS THE STRUCTURE LOOP ACTUALLY READS. It stops at
+      // REF_LO, so the sectors past it were an atan2 per sampled pixel whose
+      // result nothing ever looked at — and atan2 is the most expensive thing
+      // in this loop. Guarding on the same bound the reader uses keeps the two
+      // in step: widen the loop and the sectors follow.
+      if (binR(i) <= REF_LO) {
+        const a = Math.min(SECTORS - 1, (((Math.atan2(dy, dx) + Math.PI) * SECTORS) / (2 * Math.PI)) | 0);
+        secS[i * SECTORS + a] += lum; secN[i * SECTORS + a]++;
+      }
     }
   }
   const mk = (s: Float64Array) => {
@@ -308,9 +314,16 @@ export function radialMeans(img: DecodedImage): RadialMeans {
   // AROUND the circle — cloud, a horizon, a branch, the sun's own gradient.
   // Measured both ways on 25 frames: clean ones read 0.0002-0.0118 by sectors,
   // contaminated ones 0.4913-0.8715, so the same STRUCTURE_LIMIT separates them
-  // by 3.3x. And because a sector mean can never be noisier than the pixels it
-  // averages, this reading is always <= the old one: no frame accepted today
-  // becomes refused by the change.
+  // by 3.3x.
+  //
+  // IT IS NOT A STRICT INEQUALITY, AND THIS SAID IT WAS. A sector mean can never
+  // be noisier than the pixels it averages, so the reading falls — but the
+  // sector loop also DROPS rings the old code counted: a ring broken into fewer
+  // than 60% usable sectors is skipped, and if that empties the accumulator
+  // `structure` falls back to 1 and the frame is refused. At real frame sizes
+  // the inner rings have thousands of pixels each and it does not arise; on a
+  // frame small enough it could. "Always lower" was the direction of the change
+  // read as a guarantee, which it is not.
   let sp = 0, spN = 0;
   for (let i = 0; i < NBINS; i++) {
     if (binR(i) > REF_LO || cnt[i] < 32) continue;

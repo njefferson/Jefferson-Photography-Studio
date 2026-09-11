@@ -788,7 +788,16 @@ function applyLook(name: keyof typeof LOOKS) {
   //
   // Neither outcome is Aerochrome. The difference is that one of them is honest,
   // and is said out loud below rather than handed over as a result.
-  const oneBand = balancing && !!current && coolContent(current, params) < COOL_BAND_FLOOR;
+  //
+  // MEASURED UNDER THE INCOMING LOOK'S SWAP, not the outgoing one. This runs
+  // before `params.swapRB = look.swapRB` further down, and the cool band's hue
+  // is 30 degrees with the swap on and 210 with it off — two different bands. It
+  // agreed with the calibration by coincidence: the file opens with the swap on
+  // and Aerochrome turns it on, so the outgoing and incoming values matched.
+  // Coming from a swap-on state to Natural IR they do not, and the question
+  // "does this file have a cool band for the look you are about to apply" was
+  // being answered about the look you are leaving.
+  const oneBand = balancing && !!current && coolContent(current, params, look.swapRB) < COOL_BAND_FLOOR;
   // REMEMBERED AGAINST THE PHOTO IT WAS MEASURED ON. The line this drives is
   // about the file, so it has to survive a look change and vanish on a new one;
   // holding the frame it belongs to means a stale flag can never be believed.
@@ -1743,10 +1752,15 @@ const COOL_BAND_FLOOR = 0.02;
  *  bands neutral, so a boost left over from the last photo is not counted as
  *  this one's. The same quantity, from the same function, that the lift solves
  *  against. */
-function coolContent(img: DecodedImage, p: EditParams): number {
+function coolContent(img: DecodedImage, p: EditParams, swapRB = p.swapRB): number {
   const neutral = cloneParams(p);
   neutral.sky = [...BAND_NEUTRAL] as typeof neutral.sky;
   neutral.foliage = [...BAND_NEUTRAL] as typeof neutral.foliage;
+  // WHICH SWAP TO MEASURE UNDER IS THE CALLER'S TO SAY. measureFrame picks the
+  // cool band's hue from `swapRB` — 30 degrees with the swap on, 210 with it off
+  // — so the two states measure DIFFERENT bands, and asking about a look means
+  // asking under that look's swap rather than under the one still on screen.
+  neutral.swapRB = swapRB;
   return measureFrame(neutral, img, 96).coolSat;
 }
 
@@ -1877,7 +1891,7 @@ let liftApplied: { tone: string; foliage: string; sky: string; prevTone: number[
 function applyLift(withColour: boolean): { pull: number; foliage: number; sky: number } | null {
   if (!current) return null;
   const solved = solveLift(withColour, current, params);
-  if (!solved) { liftApplied = null; liftState(false); return null; }
+  if (!solved) { liftApplied = null; liftState(false, withColour); return null; }
   const r = scaleLift(solved, liftAmount);
   const noop = r.pull === 0 && r.foliage[1] === 1 && r.sky[1] === 1;
   liftApplied = {
@@ -1895,23 +1909,11 @@ function applyLift(withColour: boolean): { pull: number; foliage: number; sky: n
   params.tone = r.tone;
   params.foliage = r.foliage;
   params.sky = r.sky;
-  if (noop) { liftApplied = null; liftState(false); return null; }
-  liftState(true);
+  if (noop) { liftApplied = null; liftState(false, withColour); return null; }
+  liftState(true, withColour);
   return { pull: r.pull, foliage: r.foliage[1], sky: r.sky[1] };
 }
 
-/** SAY WHEN THERE WAS NOTHING TO DO. The control reads "on" and its Strength
- *  sits at 100 whether or not the solve found a correction to make — so on a
- *  frame that already measures where it should be, pressing the toggle changed
- *  the picture by nothing at all while the app went on presenting a
- *  full-strength correction. Measured on a real frame: 0.0 of 255 in all three
- *  channels between on and off, at Strength 100.
- *
- *  The panel's own small print has always said "a photo that already measures
- *  where it should be is left alone" — buried in a collapsed <details>, which
- *  is exactly where the refusal reasons in the lens rig were, and for the same
- *  reason it was not enough there either. The state belongs beside the control
- *  it describes. */
 /** SAY WHEN THE FILE CANNOT CARRY THE LOOK. Silence here means handing over a
  *  yellow sky as though it were the result.
  *
@@ -1945,11 +1947,32 @@ function lookState(): void {
   if (show) el.textContent = "This photo came out of the camera with all its colour in one band — there is no sky band for a false-colour look to work with, so what you get is the look's shape without its colours. The raw file from the same shot has both bands and will carry it.";
 }
 
-function liftState(applied: boolean): void {
+/** SAY WHEN THERE WAS NOTHING TO DO. The control reads "on" and its Strength
+ *  sits at 100 whether or not the solve found a correction to make — so on a
+ *  frame that already measures where it should be, pressing the toggle changed
+ *  the picture by nothing at all while the app went on presenting a
+ *  full-strength correction. Measured on a real frame: 0.0 of 255 in all three
+ *  channels between on and off, at Strength 100.
+ *
+ *  The panel's own small print has always said "a photo that already measures
+ *  where it should be is left alone" — buried in a collapsed <details>, which
+ *  is exactly where the refusal reasons in the lens rig were, and for the same
+ *  reason it was not enough there either. The state belongs beside the control
+ *  it describes. */
+function liftState(applied: boolean, withColour = true): void {
   const el = document.getElementById("liftState");
   if (!el) return;
   el.hidden = applied;
-  if (!applied) el.textContent = "This photo already measures where it should be, so there is nothing to put back. The toggle and Strength will not change it.";
+  if (applied) return;
+  // AND IT IS A CLAIM ABOUT THE PHOTO ONLY WHEN THE COLOUR HALF WAS IN PLAY.
+  // With no look on, the lift solves the tonal half alone, which is a no-op on
+  // plenty of frames that the full solve moves considerably — so at open this
+  // said "this photo already measures where it should be" about a photo a look
+  // would immediately give it work to do on. True of the toggle at that instant,
+  // and wrong about the file, which is the half a reader takes away.
+  el.textContent = withColour
+    ? "This photo already measures where it should be, so there is nothing to put back. The toggle and Strength will not change it."
+    : "As this photo stands there is nothing to put back, so the toggle and Strength will not change it. A colour look may give it something to work on.";
 }
 
 /** Undo the lift, but only where its own values are still in place — anything
