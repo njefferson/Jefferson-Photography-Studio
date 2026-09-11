@@ -100,15 +100,16 @@ function rebound(a: ArrayLike<number>): { rise: number; at: number } {
 }
 
 /** The largest step between neighbouring bins. */
-function maxStep(a: ArrayLike<number>): number {
-  let m = 0, prev = NaN;
+/** How sharply the curve's SLOPE changes from one ring to the next — a kink
+ *  rather than a bend. Steepness alone is not a fault: the outermost rings are
+ *  slivers of the frame's corners and a real lens can fall away fast there.
+ *  What a lens cannot do is turn a corner. */
+function maxCurve(a: ArrayLike<number>): number {
+  let m = 0, p2 = NaN, p1 = NaN;
   for (let i = 0; i < a.length; i++) {
-    // A bin with nothing in it is a GAP, not a step: comparing across one would
-    // invent a jump where the flat simply had no pixels in that ring.
-    if (Number.isFinite(a[i])) {
-      if (Number.isFinite(prev)) m = Math.max(m, Math.abs(a[i] - prev));
-      prev = a[i];
-    }
+    if (!Number.isFinite(a[i])) continue;
+    if (Number.isFinite(p2) && Number.isFinite(p1)) m = Math.max(m, Math.abs(a[i] - 2 * p1 + p2));
+    p2 = p1; p1 = a[i];
   }
   return m;
 }
@@ -139,7 +140,22 @@ const STRUCTURE_LIMIT = 0.15;
  *  four times above the worst good one and four times below the best bad one,
  *  in a gap fifteen times wide. */
 const REBOUND_LIMIT = 0.03;
-const JUMP_LIMIT = 0.05;
+/** MEASURED ON 35 REAL PROFILES, and the first version of this was measured on
+ *  27 and got it wrong. A raw step between neighbouring rings separated the two
+ *  known-bad profiles from the sound ones by only 2.3x — and then a six-frame
+ *  130mm f/16 arrived with a clean monotone falloff to a 0.597 corner and a
+ *  colour step of 0.066 in its LAST TWO BINS, which the 0.05 limit refused.
+ *  A gate that refuses good work teaches people to route around it.
+ *
+ *  Curvature separates 3.4x clear: sound profiles run 0.0061-0.0277, the two
+ *  with something in the corner run 0.0954-0.1512. This sits in that gap, 1.8x
+ *  above the worst sound one and 1.9x below the mildest bad one.
+ *
+ *  Reversal — the curve moving against the direction it had been going — was
+ *  measured too and OVERLAPS: one of the two bad profiles reverses by 0.0035,
+ *  less than a third of the sound profiles do. It is not the discriminator,
+ *  which is why it is not the rule. */
+const CURVE_LIMIT = 0.05;
 
 /** What is wrong with the SHAPE of a measured profile, in words, or null.
  *
@@ -159,9 +175,9 @@ export function shapeProblem(falloff: ArrayLike<number>, kr: ArrayLike<number>, 
     return `the edges of this one brighten again instead of falling away — by ${(reb.rise * 100).toFixed(0)}% out past ${Math.round((reb.at / falloff.length) * 100)}% of the way to the corner. ` +
       `A lens only ever gets darker outwards, so something is in the corner of the frame: the sun creeping in, a reflection, a hood, or a finger`;
   }
-  const jump = Math.max(maxStep(kr), maxStep(kb));
-  if (jump > JUMP_LIMIT) {
-    return `the colour jumps by ${jump.toFixed(2)} between one ring and the next, which a lens does not do — the outer rings of this frame have something in them that the rest does not`;
+  const kink = Math.max(maxCurve(kr), maxCurve(kb));
+  if (kink > CURVE_LIMIT) {
+    return `the colour turns a corner — it bends by ${kink.toFixed(2)} from one ring to the next, where a lens bends by a tenth of that. The outer rings of this frame have something in them that the rest does not`;
   }
   return null;
 }
