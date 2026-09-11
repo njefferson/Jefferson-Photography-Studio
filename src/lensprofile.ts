@@ -283,6 +283,58 @@ export function radialMeans(img: DecodedImage): RadialMeans {
   const lin = img.linear, px = img.pixels;
   if (!lin && !px) throw new Error("decoded frame carries no pixels");
   const step = Math.max(1, Math.round(Math.sqrt((w * h) / 1e6)));
+
+  // A SKY HAS A GRADIENT AND IT IS NOT THE LENS. Structure asks how much a ring
+  // varies AROUND itself, and a smooth brightness ramp across the frame makes
+  // one side of every ring read higher than the other — indistinguishable, to
+  // that measure, from a branch in the corner. The wider the lens the more ramp
+  // it spans: the same sky reads 27-29% at 17mm and 18-20% at 24-25mm, across
+  // the whole aperture range at each, because aperture does not change what is
+  // in view.
+  //
+  // Flat-fielding has removed the ramp before judging the frame for decades. One
+  // least-squares plane, divided out — illumination is multiplicative — and a
+  // plane cannot absorb a RADIAL term, so the lens's own falloff and hot-spot
+  // survive it untouched. Measured across three populations: sky flats fall from
+  // 5.7-46.7% to 1.6-12.5%, genuinely contaminated frames stay at 43.2-116.7%,
+  // and clean synthetic controls stay at 0.0-2.9%. Worst clean against mildest
+  // contaminated is 12.5 against 43.2 — they separate by 3.5x with the existing
+  // limit already sitting between them.
+  //
+  // ONLY THE STRUCTURE READING USES IT. The radial means this returns — falloff,
+  // kr, kb, the profile itself — are the measurement, and they stay exactly as
+  // the sensor recorded them.
+  let pn = 0, pSx = 0, pSy = 0, pSxx = 0, pSyy = 0, pSxy = 0, pSl = 0, pSxl = 0, pSyl = 0;
+  const pstep = Math.max(step, Math.round(Math.sqrt((w * h) / 2e5)));
+  for (let y = 0; y < h; y += pstep) for (let x = 0; x < w; x += pstep) {
+    const o = (y * w + x) * 4;
+    const L = lin ? (lin[o] + lin[o + 1] + lin[o + 2]) / 3
+                  : (SRGB_LIN[px![o]] + SRGB_LIN[px![o + 1]] + SRGB_LIN[px![o + 2]]) / 3;
+    const u = x / w - 0.5, v = y / h - 0.5;
+    pn++; pSx += u; pSy += v; pSxx += u * u; pSyy += v * v; pSxy += u * v;
+    pSl += L; pSxl += u * L; pSyl += v * L;
+  }
+  const A = [[pn, pSx, pSy], [pSx, pSxx, pSxy], [pSy, pSxy, pSyy]], rhs = [pSl, pSxl, pSyl];
+  for (let i = 0; i < 3; i++) {
+    let piv = i;
+    for (let k = i + 1; k < 3; k++) if (Math.abs(A[k][i]) > Math.abs(A[piv][i])) piv = k;
+    [A[i], A[piv]] = [A[piv], A[i]]; [rhs[i], rhs[piv]] = [rhs[piv], rhs[i]];
+    for (let k = i + 1; k < 3; k++) {
+      const f = A[i][i] ? A[k][i] / A[i][i] : 0;
+      for (let j = i; j < 3; j++) A[k][j] -= f * A[i][j];
+      rhs[k] -= f * rhs[i];
+    }
+  }
+  const co = [0, 0, 0];
+  for (let i = 2; i >= 0; i--) {
+    let acc = rhs[i];
+    for (let j = i + 1; j < 3; j++) acc -= A[i][j] * co[j];
+    co[i] = A[i][i] ? acc / A[i][i] : 0;
+  }
+  // A frame too dark or too odd to fit falls back to no correction rather than
+  // to a divide by nothing.
+  const pMean = co[0] > 1e-6 ? co[0] : 0;
+
   let clipped = 0, seen = 0, sum = 0;
   for (let y = 0; y < h; y += step) {
     const dy = y - cy, dy2 = dy * dy;
@@ -308,7 +360,14 @@ export function radialMeans(img: DecodedImage): RadialMeans {
       // in step: widen the loop and the sectors follow.
       if (binR(i) <= REF_LO) {
         const a = Math.min(SECTORS - 1, (((Math.atan2(dy, dx) + Math.PI) * SECTORS) / (2 * Math.PI)) | 0);
-        secS[i * SECTORS + a] += lum; secN[i * SECTORS + a]++;
+        // The plane, divided out — see the fit above. This value feeds the
+        // STRUCTURE reading only; `sl`/`sr`/`sg`/`sb` above are untouched.
+        let flat = lum;
+        if (pMean) {
+          const g = (co[0] + co[1] * (x / w - 0.5) + co[2] * (y / h - 0.5)) / pMean;
+          if (g > 0.05) flat = lum / g;
+        }
+        secS[i * SECTORS + a] += flat; secN[i * SECTORS + a]++;
       }
     }
   }
