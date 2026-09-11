@@ -513,10 +513,23 @@ export function wireLensRig(root: ParentNode): void {
         lensMap[g.model] = g.short;
         (anchors[g.short] ??= []).push(g.fl);
         const aside = setAside ? ` ${setAside} rendered frame${setAside === 1 ? "" : "s"} set aside, because raw ones are available here and are the better measurement.` : "";
+        // WHICH OF THEM ACTUALLY MEASURED COLOUR. Colour is divided by green,
+        // and an infrared frame can have almost none; those frames still carry
+        // brightness and are averaged for it, but they are left out of the
+        // colour average rather than voting for neutral. A group where that
+        // happened has a colour curve built from fewer frames than its
+        // brightness curve, and the row says so instead of letting the frame
+        // count stand for both.
+        const noColour = a.n - a.colourFrames;
+        const colourNote = a.colourFrames === 0
+          ? " None of these had enough green to measure colour against, so this profile corrects brightness only."
+          : noColour > 0
+            ? ` Colour comes from ${a.colourFrames} of the ${a.n}: the other ${noColour} had too little green to divide by, and are averaged for brightness only.`
+            : "";
         profRow(`${key} — averaged`, `${a.n} frame${a.n === 1 ? "" : "s"}`,
           (a.n < 3
             ? `Usable, but thin. Four or five frames at a focal length average out the sky's own gradient; ${a.n} leaves it in the numbers.`
-            : `Colour off by ${pct(Math.abs(a.kr[0] - 1))} in red and ${pct(Math.abs(a.kb[0] - 1))} in blue at the centre, and the frame keeps ${pct(a.falloff[NBINS - 1])} of its brightness out at the corner. Shot at ${profiles[key].apertures}.`) + aside);
+            : `Colour off by ${pct(Math.abs(a.kr[0] - 1))} in red and ${pct(Math.abs(a.kb[0] - 1))} in blue at the centre, and the frame keeps ${pct(a.falloff[NBINS - 1])} of its brightness out at the corner. Shot at ${profiles[key].apertures}.`) + aside + colourNote);
       }
       for (const k of Object.keys(anchors)) anchors[k] = [...new Set(anchors[k])].sort((x, y) => x - y);
 

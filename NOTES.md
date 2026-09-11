@@ -8997,3 +8997,67 @@ was read as a missing file rather than a broken plant, and the second time only
 the unchanged NUMBERS gave it away. A plant that does not compile is not a
 plant, and `npm run build`'s exit is part of reading its result. The working
 form is a runtime flag placed AFTER the null check, which cannot be folded.
+
+## Three review findings, and the second defect behind each, 2026-09-11
+
+A read-only review of the previous day's work named three faults. Two of them
+had a second one underneath, found only because the harness written to hold the
+fix was driven the way a finger drives the app rather than the way the fix was
+imagined.
+
+**The drag readout sat on the histogram, and the first fix moved the collision
+rather than ending it.** Both draw at the stage's top-left corner. The histogram
+had been moved there a release earlier to get it out from behind the zoom stack,
+and nothing checked what was already in the corner it moved into — the same
+fault, one corner over. Dropping the readout below the histogram left it landing
+on drag-to-adjust's OWN banner whenever the histogram is switched off: **4144
+square pixels at phone width**, where that banner is 90% of the stage wide and
+always up while the drag runs. It now clears the lower of both boxes, each read
+for real. At phone width the banner is the lower; at desktop width the histogram
+is; the harness asserts which one drives at each, because a run where one always
+wins leaves the other branch untested while every overlap claim still passes.
+
+**AND THE FIRST MEASUREMENT OF THAT OVERLAP WAS THE INSTRUMENT.** It was taken
+by setting `tatHud.hidden = false` by hand, which skips the placement entirely —
+and a hand-shown readout carries no text, so it is 44px wide instead of 234. The
+reported 1232 square pixels was a HUD a fifth of its real size. Driven by a real
+pointer drag the overlap is **4480 square pixels at phone width and 6848 at
+desktop**, 100% of the readout at both.
+
+**A frame with no green was voting on colour.** `kr` and `kb` are red and blue
+divided by GREEN, and an infrared frame can have almost none; those frames are
+kept for brightness, which red carries, and marked `colour: false` with a flat 1
+so nothing divides by nothing. Averaged in with the rest, each one pulled the
+whole colour curve toward neutral by its share of the set — five frames saying
+red is 20% high at the centre plus one saying nothing average to **1.1667
+instead of 1.2000**, in every one of the 80 bins, with nothing downstream saying
+it had happened. Colour is averaged over the frames that measured some; the
+averaged row now reports how many of the frames that made it did.
+
+**The one-band line had no path back off the screen, and the swap alone is not
+its gate.** Recomputing it from live state instead of setting it once inside
+`applyLook` fixed the monochrome looks, which do not swap and have no colours to
+lose. It did not fix Reset or Undo: a camera JPEG opens with the channel swap
+ALREADY ON — the swap is the building block the colour looks are built from, not
+a look itself — so `params.swapRB` was true with no look pressed at all, and a
+sentence about what a false-colour LOOK gets out of this file sat under a photo
+that had none on it. The gate is an active colour look AND the swap, because
+pressing a colour look a second time flips the swap off and there is nothing to
+say then either. Walked on one page through every exit in turn: no look, look,
+Reset, look, Undo, look, all four non-swapping looks, look, the raw of the same
+shot, and a look on the raw.
+
+**A HARNESS CASE THAT PASSES FOR THE WRONG REASON IS NOT A PASS.** Opening the
+raw of the same shot carries the look across, so the harness's single press of
+Aerochrome on it was a SECOND press, which flips the swap off — and the claim
+that the raw stays silent passed because of the swap rather than because the raw
+has both bands. Stepping away to a non-swapping look and back makes the case
+say what it claims to say.
+
+**And the plant-that-does-not-compile happened for the third time in two
+sessions.** The first plant of the one-band gate left `oneBandFor` unread,
+failed `tsc`, produced no new bundle, and the harness ran against the GOOD build
+and reported twelve green claims. The remedy is not care: it is reading
+`dist/assets/ir-*.js`'s hash before and after the plant build and refusing to
+believe a run where it did not change. A plant that does not reach the bundle is
+not a plant, and an all-green plant run is the shape that failure takes.

@@ -521,24 +521,40 @@ export function profileFrame(img: DecodedImage): FrameProfile {
  *  frame had nothing are skipped rather than counted as zero — a NaN averaged
  *  in as 0 would pull a real bump down toward nothing and look like a
  *  measurement rather than a gap. */
-export function averageProfiles(fs: FrameProfile[]): { falloff: number[]; kr: number[]; kb: number[]; bumpRange: [number, number]; n: number } {
+export function averageProfiles(fs: FrameProfile[]): { falloff: number[]; kr: number[]; kb: number[]; bumpRange: [number, number]; n: number; colourFrames: number } {
   const use = fs.filter((f) => f.usable);
-  const avg = (pick: (f: FrameProfile) => Float64Array) => {
+  // A FRAME WITH NO GREEN CARRIES FLAT 1s, AND AVERAGING THEM IN IS A VOTE FOR
+  // NEUTRAL. Green is the denominator of kr and kb, and an infrared frame can
+  // have almost none — those frames are kept for BRIGHTNESS, which red carries
+  // and which is unaffected, and marked `colour: false` with their kr and kb
+  // set to a flat 1 so nothing downstream divides by nothing.
+  //
+  // Averaged with the rest, one such frame in six pulls the whole colour curve a
+  // sixth of the way to neutral, silently: the per-frame row says that frame is
+  // brightness-only, and the averaged profile that goes into the store says
+  // nothing at all. Colour is averaged over the frames that measured some, and a
+  // group where none did carries a flat 1 on purpose rather than by accident.
+  const colourFs = use.filter((f) => f.colour);
+  const avgOf = (list: FrameProfile[], pick: (f: FrameProfile) => Float64Array, fallback: number) => {
     const out: number[] = [];
     for (let i = 0; i < NBINS; i++) {
       let s = 0, n = 0;
-      for (const f of use) { const v = pick(f)[i]; if (Number.isFinite(v)) { s += v; n++; } }
-      out.push(n ? s / n : i > 0 ? out[i - 1] : 0);
+      for (const f of list) { const v = pick(f)[i]; if (Number.isFinite(v)) { s += v; n++; } }
+      out.push(n ? s / n : i > 0 ? out[i - 1] : fallback);
     }
     return out;
   };
+  const avg = (pick: (f: FrameProfile) => Float64Array) => avgOf(use, pick, 0);
+  const avgColour = (pick: (f: FrameProfile) => Float64Array) =>
+    colourFs.length ? avgOf(colourFs, pick, 1) : new Array(NBINS).fill(1);
   const los = use.map((f) => f.bumpRange[0]).filter(Number.isFinite);
   const his = use.map((f) => f.bumpRange[1]).filter(Number.isFinite);
   const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : NaN);
   return {
-    falloff: avg((f) => f.falloff), kr: avg((f) => f.kr), kb: avg((f) => f.kb),
+    falloff: avg((f) => f.falloff), kr: avgColour((f) => f.kr), kb: avgColour((f) => f.kb),
     bumpRange: [mean(los), mean(his)],
     n: use.length,
+    colourFrames: colourFs.length,
   };
 }
 
