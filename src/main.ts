@@ -1830,7 +1830,7 @@ let liftApplied: { tone: string; foliage: string; sky: string; prevTone: number[
 function applyLift(withColour: boolean): { pull: number; foliage: number; sky: number } | null {
   if (!current) return null;
   const solved = solveLift(withColour, current, params);
-  if (!solved) { liftApplied = null; return null; }
+  if (!solved) { liftApplied = null; liftState(false); return null; }
   const r = scaleLift(solved, liftAmount);
   const noop = r.pull === 0 && r.foliage[1] === 1 && r.sky[1] === 1;
   liftApplied = {
@@ -1848,8 +1848,28 @@ function applyLift(withColour: boolean): { pull: number; foliage: number; sky: n
   params.tone = r.tone;
   params.foliage = r.foliage;
   params.sky = r.sky;
-  if (noop) { liftApplied = null; return null; }
+  if (noop) { liftApplied = null; liftState(false); return null; }
+  liftState(true);
   return { pull: r.pull, foliage: r.foliage[1], sky: r.sky[1] };
+}
+
+/** SAY WHEN THERE WAS NOTHING TO DO. The control reads "on" and its Strength
+ *  sits at 100 whether or not the solve found a correction to make — so on a
+ *  frame that already measures where it should be, pressing the toggle changed
+ *  the picture by nothing at all while the app went on presenting a
+ *  full-strength correction. Measured on a real frame: 0.0 of 255 in all three
+ *  channels between on and off, at Strength 100.
+ *
+ *  The panel's own small print has always said "a photo that already measures
+ *  where it should be is left alone" — buried in a collapsed <details>, which
+ *  is exactly where the refusal reasons in the lens rig were, and for the same
+ *  reason it was not enough there either. The state belongs beside the control
+ *  it describes. */
+function liftState(applied: boolean): void {
+  const el = document.getElementById("liftState");
+  if (!el) return;
+  el.hidden = applied;
+  if (!applied) el.textContent = "This photo already measures where it should be, so there is nothing to put back. The toggle and Strength will not change it.";
 }
 
 /** Undo the lift, but only where its own values are still in place — anything
