@@ -1,6 +1,7 @@
 import "./macro.css";
 import { stackFocus, type StackFrame } from "./stack";
 import { setupInstalledShare, setupInstallFromApp } from "../share";
+import { saveBlob } from "../savefile";
 import { wireThemePicker } from "../theme";
 import { wirePalettePicker } from "../palette";
 import { wireForceUpdate, wireUpdateStrip } from "../swupdate";
@@ -300,15 +301,11 @@ function renderFullRes(): Promise<void> {
 async function doSave() {
   if (!fullBlob) return;
   const base = frames[0]?.name.replace(/\.[^.]+$/, "") || "stack";
-  const file = new File([fullBlob], `${base}-stacked.jpg`, { type: "image/jpeg" });
-  // iOS: share off a fresh tap opens the share sheet (Save to Photos).
-  if (navigator.canShare?.({ files: [file] })) {
-    try { await navigator.share({ files: [file] }); return; } catch { /* fall through to download */ }
-  }
-  const url = URL.createObjectURL(fullBlob);
-  const a = document.createElement("a");
-  a.href = url; a.download = file.name; a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  // THE SAME DECISION, THE SAME FUNCTION. This carried its own copy of the
+  // "share if the platform can share" test, which sent Export to the Windows
+  // share sheet on a PC. Two copies of one rule is how the Studio's copy got
+  // fixed while this one stayed wrong.
+  await saveBlob(fullBlob, `${base}-stacked.jpg`);
 }
 
 function onSaveTap() {
