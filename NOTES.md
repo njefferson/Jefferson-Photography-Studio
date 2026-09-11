@@ -9180,3 +9180,52 @@ unselectable and, two lines down, that the version tag stays selectable — two
 claims that cannot both hold. It failed on the version tag, which is the correct
 behaviour, not the defect. A claim set that cannot all pass is not a stricter
 test, it is a broken one.
+
+## Every sky flat is being refused, and the rig is right, 2026-09-11
+
+Nineteen wide-angle sky frames, measured through the app's own `radialMeans`
+and `profileFrame`:
+
+- structure **49% to 87%**, against a limit of 15%
+- clipped **0.6% to 11.7%**, against a limit of 2%
+- mean level 12% to 26%, which is fine — well clear of the 5% floor
+
+So it is never darkness. It is scenery and blown highlights, and both readings
+are correct: these frames are not flats.
+
+**THE DE-GRADIENT THEORY WAS TESTED AND IT IS WRONG.** Structure is the spread
+of a ring's sector means, and a smooth brightness ramp across the frame makes
+one side of a ring read higher than the other — indistinguishable, to that
+measure, from something being in the frame. Sky brightness really does vary with
+angle from the sun and with elevation, so the wider the lens the more real
+gradient it captures, and flat-fielding has removed exactly this for decades by
+fitting a plane and dividing it out. It looked like the app's fault.
+
+Fitted and divided out, per frame: structure fell from 63% to 50% on the best
+frames, ROSE from 86% to 136% on the worst, and **zero of nineteen frames became
+usable**. Two frames measure a brightness ramp of over 200% across the frame.
+Whatever is in them is not a plane. A plausible mechanism, a real remedy from
+the right field, and it does not apply here — which only the measurement could
+say.
+
+**WHAT ACTUALLY CAUSED IT, INCLUDING THE HALF THAT CAME FROM THIS SIDE.**
+Overcast was recommended for the reshoot. That is backwards for infrared: cloud
+is bright and textured in near-IR while clear sky is dark and smooth, so an
+overcast sky is close to the worst subject for a flat-field test. The camera
+reference already said "clear sky away from the sun, or a wall in open shade —
+nothing with structure", and the recommendation contradicted it.
+
+**AND THE APP ONLY EVER DOCUMENTED THE HARD WAY.** Its guidance read "clear blue
+sky, filling the whole frame, no sun in shot, no clouds" and never mentioned the
+wall. At a wide focal length the frame takes in so much sky that cloud, horizon
+or a bright patch near the sun almost always creep in — which is what the
+structure numbers are. A shaded wall has no gradient, no cloud and no sun in it,
+and works indoors on the overcast day that makes sky impossible. The wall is the
+first option now, "metered DOWN: nothing blown" replaces "well exposed but
+nothing blown", and the overcast trap is named.
+
+**A GATE THAT REFUSES EVERYTHING IS NOT SELF-EVIDENTLY WRONG.** Three sessions of
+flats were shot and refused before anyone measured whether the refusals were
+correct. They were, every time, and the reasons carried their own numbers the
+whole way. The thing that was missing was never in the gate; it was in the
+sentence telling a reader how to produce a frame the gate would accept.
