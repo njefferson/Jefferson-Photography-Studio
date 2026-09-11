@@ -732,6 +732,11 @@ const LOOKS: Record<string, Look> = {
 // previous look's bias instead of compounding it.
 let lookBias: [number, number, number] = [1, 1, 1];
 
+/** Whether the photo now open has all its colour in one band, and WHICH photo
+ *  that was measured on. See applyLook. */
+let oneBandFlag = false;
+let oneBandFor: DecodedImage | null = null;
+
 function applyLook(name: keyof typeof LOOKS) {
   const look = LOOKS[name];
   const strength = current?.camMatrix ? look.raw : look.jpeg;
@@ -784,6 +789,11 @@ function applyLook(name: keyof typeof LOOKS) {
   // Neither outcome is Aerochrome. The difference is that one of them is honest,
   // and is said out loud below rather than handed over as a result.
   const oneBand = balancing && !!current && coolContent(current, params) < COOL_BAND_FLOOR;
+  // REMEMBERED AGAINST THE PHOTO IT WAS MEASURED ON. The line this drives is
+  // about the file, so it has to survive a look change and vanish on a new one;
+  // holding the frame it belongs to means a stale flag can never be believed.
+  oneBandFlag = oneBand;
+  oneBandFor = current;
   if (balancing && current && !oneBand) {
     const gw = grayWorldWB(current);
     base[0] = gw[0]; base[1] = gw[1]; base[2] = gw[2];
@@ -805,7 +815,6 @@ function applyLook(name: keyof typeof LOOKS) {
   // synthetic single-hue test frame could never have shown it: gray-world makes
   // one flat hue neutral, so there was nothing to darken.
   if (balancing && current) params.exposure = autoExposure(current, params.wb);
-  lookState(oneBand);
   lookBias = bias;
   params.swapRB = look.swapRB;
   params.hue = look.hue;
@@ -854,6 +863,7 @@ const lookButtons: Record<string, HTMLButtonElement> = {
 };
 
 function updateLookUI() {
+  lookState();
   for (const [key, btn] of Object.entries(lookButtons)) {
     const active = activeLook === key;
     btn.classList.toggle("active", active);
@@ -1903,12 +1913,36 @@ function applyLift(withColour: boolean): { pull: number; foliage: number; sky: n
  *  reason it was not enough there either. The state belongs beside the control
  *  it describes. */
 /** SAY WHEN THE FILE CANNOT CARRY THE LOOK. Silence here means handing over a
- *  yellow sky as though it were the result. */
-function lookState(oneBand: boolean): void {
+ *  yellow sky as though it were the result.
+ *
+ *  RECOMPUTED FROM THE LIVE STATE, NOT SET AND FORGOTTEN. The first version was
+ *  written once inside applyLook and had no path back off the screen: Reset,
+ *  Undo past the look, loading a saved grade (which clears activeLook), and
+ *  opening the next photo all left a sentence about sky bands sitting under a
+ *  photo with no look on it. It is called from updateLookUI now, which every one
+ *  of those paths already goes through.
+ *
+ *  AND IT IS ABOUT THE SWAP, which is what separates the bands — the app's own
+ *  help says so. B&W IR, Sepia IR and HIE B&W do not swap and have no colours to
+ *  lose, so a sentence about sky bands under a monochrome look was answering a
+ *  question nobody asked.
+ *
+ *  BUT THE SWAP ALONE IS NOT THE GATE, which is what the first recompute used
+ *  and it left the line up through Reset and through Undo. A camera JPEG opens
+ *  with the swap already on — it is the building block the colour looks are
+ *  built from, not a look — so `params.swapRB` was true with no look pressed at
+ *  all, and the sentence, which is about what a false-colour LOOK gets out of
+ *  this file, sat under a photo that had none on it. The look being active is
+ *  the gate; the swap still has to be on beside it, because pressing a colour
+ *  look a second time flips the swap off and there is nothing to say then
+ *  either. */
+function lookState(): void {
   const el = document.getElementById("lookState");
   if (!el) return;
-  el.hidden = !oneBand;
-  if (oneBand) el.textContent = "This photo came out of the camera as a JPEG with all its colour in one band — there is no sky band for a false-colour look to work with, so what you get is the look's shape without its colours. The raw file from the same shot has both bands and will carry it.";
+  const colourLook = !!activeLook && !!LOOKS[activeLook]?.swapRB;
+  const show = oneBandFlag && oneBandFor === current && !!current && colourLook && params.swapRB;
+  el.hidden = !show;
+  if (show) el.textContent = "This photo came out of the camera with all its colour in one band — there is no sky band for a false-colour look to work with, so what you get is the look's shape without its colours. The raw file from the same shot has both bands and will carry it.";
 }
 
 function liftState(applied: boolean): void {
@@ -4867,6 +4901,32 @@ function showTatHud() {
   const lum = params.hsl[c * 3 + 2];
   tatText.textContent = `${HSL_NAMES[c]} · Hue ${hue > 0 ? "+" : ""}${hue}° · Lum ${lum.toFixed(2)}`;
   tatHud.hidden = false;
+  // BELOW WHATEVER IS ALREADY UP THERE, MEASURED — not at a guessed offset.
+  //
+  // This readout landed exactly on top of the histogram: 4480 square pixels of
+  // overlap at phone width and 6848 at desktop, which is 100% of the readout at
+  // both. Both draw at the stage's top-left corner. The histogram had been moved
+  // to that corner to get it out from behind the zoom stack, and nothing checked
+  // what was already there — the same fault, one corner over.
+  //
+  // The other corners are all spoken for while a drag is running: the bottom
+  // right is the zoom stack (which climbs when a session strip is open) and the
+  // bottom left is the location chip. So the readout drops below the top row,
+  // and the first version of this dropped below the HISTOGRAM alone — which
+  // moved the collision rather than ending it, because the histogram can be
+  // switched off and this mode's own banner is always up while the drag runs.
+  // With it off the readout took the corner back and landed on the banner
+  // instead: 4144 square pixels at phone width, where the banner is 90% of the
+  // stage wide. Both boxes are read for real and the readout clears the lower
+  // of them.
+  const sb = stageEl.getBoundingClientRect();
+  let below = 0;
+  for (const el of [histWrap, tatBanner]) {
+    if (el.hidden) continue;
+    const b = el.getBoundingClientRect();
+    if (b.height) below = Math.max(below, b.bottom - sb.top);
+  }
+  tatHud.style.top = below ? `${Math.round(below) + 8}px` : "";
 }
 function hideTatHud() {
   tatHud.hidden = true;
@@ -6397,6 +6457,8 @@ function establishFreshEdit() {
   // Sky/Foliage sliders, undoable, no pixels touched — the three tests any
   // at-open automatic has to pass.
   liftApplied = null;
+  oneBandFlag = false;
+  oneBandFor = null;
   // A LOOK CARRIES, OR IT DOES NOT — and half of one is what this was.
   // The look's GRADE carried to the next photo (saturation, contrast, the
   // channel swap) while `activeLook` was cleared further down the same open, so
