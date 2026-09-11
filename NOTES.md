@@ -8948,3 +8948,52 @@ is none of the three things it looked like. Not the forced gray-world balance
 (planted off, result worse). Not Restore depth (off, still wrong). Not a
 red-blue swap (measured per channel: both of the raw's channels land in the
 JPEG's red, which is a collapse rather than an exchange). The frame is kept.
+
+## A file with one colour band cannot carry a false-colour look, 2026-09-11
+
+The JPEG fault, found. It is not the balance, not Restore depth, not a swap —
+all three were tested and ruled out — and the answer only appeared once the
+pipeline was instrumented to report its OWN numbers instead of having causes
+inferred from its output, which had produced three wrong answers in a row.
+
+**`coolSat` at open, measured through the app's own `measureFrame`:**
+
+- fifteen frames that carry Aerochrome perfectly well: **0.0606 to 0.1729**
+- the owner's camera JPEG of the same scene as one of them: **exactly 0.0000**
+
+and its warm band reads **0.7587** against a maximum of 0.1461 across the other
+fifteen. The whole picture is in one band. A false-colour look works by moving
+the sky band one way and the foliage band the other, and there is no sky band.
+
+**What the app was doing with that.** Pressing a look on a camera-rendered file
+replaces its balance with gray-world, which on this frame returns a RED GAIN OF
+0.17 — against 0.54 on the same photograph's raw — manufacturing a second band
+by crushing red sixfold. The result is a yellow sky against purple everything,
+with the rendered median falling from a 0.44 reference to **0.0763** and 12.95%
+of the frame crushed to black.
+
+**What it does now.** A frame whose cool band is below `COOL_BAND_FLOOR = 0.02`
+— three times below the lowest frame that works, and everything above zero — is
+not force-balanced, and a line beside the looks says the file has all its colour
+in one band, that what it will get is the look's shape without its colours, and
+that the raw from the same shot has both bands. Crushed shadows fall from 12.95%
+to 3.02% and the sky-band boost stops railing at its ceiling.
+
+**IT IS NOT AEROCHROME EITHER WAY, AND THE NOTE SAYS SO.** Skipping the balance
+gives a coherent, evenly exposed, monochrome-blue picture. That is not a fix for
+the colour; it is the honest outcome of a file that never had the colour, said
+out loud instead of handed over as a result.
+
+**The claim that matters is the regression, and its first version could not
+fail.** Fifteen frames are rendered and compared against a baseline — and the
+baseline has to come from the build BEFORE the change. The first run wrote it
+from the changed build and compared it to itself. Taken properly: all fifteen
+render identically, within 1 of 255 on every channel.
+
+**Two plants in this session broke the build and were nearly read as results.**
+`false && balancing && current` and `balancing && current && false` both fold
+the narrowing away and fail typecheck; the first time, the missing screenshot
+was read as a missing file rather than a broken plant, and the second time only
+the unchanged NUMBERS gave it away. A plant that does not compile is not a
+plant, and `npm run build`'s exit is part of reading its result. The working
+form is a runtime flag placed AFTER the null check, which cannot be folded.
