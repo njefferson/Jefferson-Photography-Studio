@@ -9486,3 +9486,50 @@ that were all refused are all accepted.
 **The lesson is about the test set, not the method.** A negative result on a
 population where the effect cannot appear is not a negative result. Recorded here
 because the earlier entry said otherwise and would have stopped the next attempt.
+
+## Two design choices measured rather than changed, 2026-09-12
+
+Both were on a list of things to fix. Both turned out to be right, and the
+measurement is recorded so the next session does not re-open them.
+
+**A MEASUREMENT ON YOUR OWN BODY SUPERSEDES A SHIPPED ONE IN FULL, and the
+numbers support it.** The concern was that the matcher computes a cost for each
+candidate and the caller then discards it: a profile of your own measured at
+250mm wins for a 50mm photograph over a shipped profile measured at 50mm. The
+existing rule is written down with a reason, so it is a decision rather than a
+defect — and the question is how much a profile actually moves with position.
+
+Measured across the ninety profiles on disk, as mean absolute difference between
+adjacent settings of one lens in one session:
+
+- across focal length at one aperture, the colour curve moves 0.0067 in red and
+  0.0123 in blue per step, worst pair 130mm to 135mm at 0.0547 in blue;
+- across aperture at one focal length, 0.0024 and 0.0056 per step, worst pair
+  f/6.3 to f/9 at 0.1039 in red;
+- a profile's own colour amplitude is 0.0497 to 0.4596.
+
+So a profile from the wrong focal length is off by about a hundredth, against an
+amplitude of five hundredths to nearly a half. A shipped profile is measured on
+a different conversion entirely, and — until this release — in the wrong colour
+space, which is a 2.3x to 3.5x error. **Being your own measurement is worth more
+than being at the right focal length, by more than an order of magnitude.** No
+change.
+
+**APERTURE AND FOCAL LENGTH ARE ALREADY INTERPOLATED LOGARITHMICALLY.** Both
+costs in `matchIn` are `Math.abs(Math.log(a / b))` and the focal blend uses
+`logMix`, so the concern that f-numbers were being treated as a linear scale was
+out of date. What WAS wrong was a comment: the block above `hotspotState` said
+the correction is applied once to the decoded pixel buffer before anything else
+sees it, that it is not part of EditParams or the undo stack, and that the
+matched profile is interpolated to the frame's aperture. All three were false,
+and two of them were contradicted by comments a dozen lines below — the stage
+comment and the `hsFix` doc comment. One file, three answers. Corrected.
+
+**And what is NOT done, so it is not mistaken for done.** The eighty-frame
+labelled corpus that holds the gate honest lives in the session scratchpad, not
+in the repo, so it runs only when a session rebuilds it. Moving the harness in
+is straightforward; moving the FRAMES in is not a session's call, because they
+are photographs and this repository is public. The harness could read them from
+a local folder the repo does not carry, which keeps the gate reproducible for
+whoever has the frames and silent for whoever does not — worth deciding before
+building either half.
