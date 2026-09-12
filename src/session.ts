@@ -232,17 +232,115 @@ export async function removePhoto(id: string): Promise<void> {
 }
 
 /** End the session and free all its storage. */
-export async function clearSession(): Promise<void> {
+/** ENDING A SESSION, WITHOUT THE READER WAITING FOR THE DELETE.
+ *
+ *  This used to empty both stores in ONE transaction and the press awaited it.
+ *  Measured on eight photos and 84 MB: 0.8s, about 110 MB per second of
+ *  waiting — which on a forty-photo session is a gigabyte through the same
+ *  door, on a browser whose deletes are slower than the one that was measured.
+ *
+ *  None of that work needs the reader present. What must finish before the
+ *  start screen comes back is forgetting the INDEX: the meta rows are what
+ *  offer to resume a session, and they are a few kilobytes. Once a meta row is
+ *  gone its chunks are unreachable — nothing lists them, nothing counts them,
+ *  nothing can open them — so they are swept afterwards, and again at every
+ *  start.
+ *
+ *  THE ORDER IS THE SAFETY. Meta first means an interrupted end can only ever
+ *  leave bytes nothing can reach; the other order would leave a session that
+ *  half-resumes, pointing at photos whose bytes are gone. So an interruption
+ *  costs space until the next launch, never correctness.
+ *
+ *  Returns the ids it forgot, so the sweep can go straight to them instead of
+ *  looking for orphans. */
+export async function forgetSession(): Promise<string[]> {
   const db = await open();
   try {
+    const ids = await req<string[]>(db.transaction(META).objectStore(META).getAllKeys() as IDBRequest);
     await new Promise<void>((res, rej) => {
-      const t = db.transaction([META, CHUNKS], "readwrite");
+      const t = db.transaction(META, "readwrite");
       t.oncomplete = () => res();
       t.onerror = () => rej(t.error);
       t.objectStore(META).clear();
-      t.objectStore(CHUNKS).clear();
     });
+    void dropBytes(ids); // not awaited: this is the whole point of the split
+    return ids;
   } finally {
     db.close();
   }
+}
+
+/** The one sweep, and the promise anything that needs it finished can await.
+ *  A second call while one is running joins it rather than starting a rival —
+ *  two sweeps deleting the same ranges is wasted work at best and a pair of
+ *  transactions fighting over one store at worst. */
+let sweeping: Promise<void> | null = null;
+export function sweepSettled(): Promise<void> {
+  return sweeping ?? Promise.resolve();
+}
+
+/** Delete the chunks of photos that are no longer in the index.
+ *
+ *  ONE TRANSACTION PER PHOTO, deliberately. A single transaction spanning a
+ *  gigabyte is exactly what was taken out of the reader's way; running the same
+ *  shape in the background would only move the stall to wherever the next write
+ *  queues behind it. */
+function dropBytes(ids: string[]): Promise<void> {
+  if (!ids.length) return sweepSettled();
+  const run = (async () => {
+    await sweepSettled(); // never two at once on the same store
+    const db = await open();
+    try {
+      for (const id of ids) {
+        await new Promise<void>((res) => {
+          const t = db.transaction(CHUNKS, "readwrite");
+          t.oncomplete = () => res();
+          // A failed delete costs space, not correctness — the next sweep finds
+          // it again. Never reject: one unlucky row must not strand the rest.
+          t.onerror = () => res();
+          t.onabort = () => res();
+          t.objectStore(CHUNKS).delete(IDBKeyRange.bound([id, 0], [id, Infinity]));
+        });
+      }
+    } finally {
+      db.close();
+    }
+  })();
+  // Clear the slot only if it is still OURS: a sweep started after this one
+  // owns it by then, and blanking it would let a third start alongside.
+  const mine: Promise<void> = run.catch(() => {}).finally(() => { if (sweeping === mine) sweeping = null; });
+  sweeping = mine;
+  return mine;
+}
+
+/** Anything left behind by an ending that did not finish — called at start.
+ *
+ *  WALKS ONE PHOTO AT A TIME, not one chunk at a time. A 25 MB photo is more
+ *  than eight hundred 30 KB chunks, so a forty-photo session holds tens of
+ *  thousands of keys; after seeing [id, n] the next key worth looking at is the
+ *  first one past [id, Infinity], which a key cursor can be told to jump to.
+ *  That makes the usual case — nothing orphaned — one step per photo. */
+export async function sweepOrphans(): Promise<number> {
+  const db = await open();
+  let orphans: string[] = [];
+  try {
+    const live = new Set(await req<string[]>(db.transaction(META).objectStore(META).getAllKeys() as IDBRequest));
+    const seen: string[] = [];
+    await new Promise<void>((res, rej) => {
+      const rq = db.transaction(CHUNKS).objectStore(CHUNKS).openKeyCursor();
+      rq.onerror = () => rej(rq.error);
+      rq.onsuccess = () => {
+        const c = rq.result;
+        if (!c) { res(); return; }
+        const k = c.key as [string, number];
+        seen.push(k[0]);
+        c.continue([k[0], Infinity]);
+      };
+    });
+    orphans = seen.filter((id) => !live.has(id));
+  } finally {
+    db.close();
+  }
+  if (orphans.length) await dropBytes(orphans);
+  return orphans.length;
 }

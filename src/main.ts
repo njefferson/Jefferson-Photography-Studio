@@ -7256,7 +7256,13 @@ async function resetSessionState(clearStorage: boolean) {
   nextOrder = 0;
   liveEdits.clear();
   pendingStore.clear();
-  if (clearStorage) await Session.clearSession().catch(() => {});
+  // ONLY THE INDEX IS AWAITED. Forgetting the session is a few kilobytes and
+  // has to be done before the start screen returns, or a session that was just
+  // ended would still offer to resume; the photographs' bytes are unreachable
+  // from that moment and are swept in the background. What used to be here
+  // awaited both, so ending a session made the reader watch a delete measured
+  // at about 110 MB per second.
+  if (clearStorage) await Session.forgetSession().catch(() => {});
 }
 
 /** Persist and append a set of files to the current session, showing the first
@@ -7264,6 +7270,12 @@ async function resetSessionState(clearStorage: boolean) {
  *  UI stays usable; only one decode is in RAM at a time. */
 async function addToSession(files: File[], append: boolean, ready?: Map<File, ArrayBuffer>) {
   if (!append) await resetSessionState(true); // fresh session — clear leftovers
+  // THE ONE PLACE THE DELETE IS STILL WORTH WAITING FOR. Ending a session and
+  // immediately opening another is the only collision: the old bytes are still
+  // on the device, so writing the new set on top of them is what would run the
+  // device out of room. Waiting here puts that wait where a wait is already
+  // expected and shown, rather than on a press that has nothing left to do.
+  await Session.sweepSettled();
   const skipped: string[] = [];
   let firstNewId: string | null = null;
   let quotaHit = false;
@@ -8028,7 +8040,7 @@ async function updateSessionResume() {
       resumeBtn.hidden = true;
       // A lone leftover from a crashed single edit isn't a session — clear it
       // so storage doesn't accumulate orphans.
-      if (metas.length === 1 && !current) await Session.clearSession().catch(() => {});
+      if (metas.length === 1 && !current) await Session.forgetSession().catch(() => {});
     }
   } catch {
     resumeBtn.hidden = true;
@@ -8075,6 +8087,14 @@ async function resumeSession() {
 
 resumeBtn.addEventListener("click", resumeSession);
 updateSessionResume();
+
+// ANYTHING AN INTERRUPTED ENDING LEFT BEHIND, cleared at start rather than
+// kept forever. Ending a session forgets its index first and deletes the bytes
+// afterwards, so a tab closed in between leaves photographs nothing can
+// reach — invisible, uncounted, and still holding the device's space. One
+// key-cursor step per photo when there is nothing to find, which is the usual
+// case, and never awaited by anything the reader is waiting on.
+void Session.sweepOrphans().catch(() => {});
 
 // --- Quick look: preview a whole folder instantly, keep the ones you want ----
 // The pure form of the owner's origin story — "white balance a whole folder

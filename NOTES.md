@@ -9880,3 +9880,44 @@ of a load-bearing function with undo semantics attached (the five-places rule
 above), not a small change. An attempt to confirm the lift as the cause by
 toggling it off failed on the instrument: `#irLift` sits in a collapsed panel and
 cannot be clicked without opening its tab first.
+
+## 2026-09-12 — ending a session stopped being the reader's wait
+
+**THE PRESS AWAITED THE DELETE.** `clearSession` emptied the index and every
+byte in ONE transaction and `endSession` awaited it behind the busy dialog.
+Measured on eight photos and 84 MB: **863 ms, about 110 MB per second of
+waiting** — which on a forty-photo session is a gigabyte through the same door,
+on a browser whose deletes are slower than the one that was measured.
+
+None of that work needs the reader present. What must finish before the start
+screen returns is forgetting the **index**: the meta rows are what offer to
+resume a session, and they are a few kilobytes. Once a meta row is gone its
+chunks are unreachable — nothing lists them, nothing counts them, nothing can
+open them — so they go afterwards, one photo per transaction, and anything an
+interrupted ending leaves is swept at the next start with a key cursor that
+steps once per photo rather than once per chunk (a 25 MB photo is more than
+eight hundred 30 KB chunks).
+
+**THE ORDER IS THE SAFETY.** Index first means an interruption can only ever
+leave bytes nothing can reach. The other order would leave a session that
+half-resumes, pointing at photos whose bytes are gone. An interruption costs
+space until the next launch, never correctness.
+
+**Measured, same rig, both builds** (`sessionfree.mjs` in the session
+scratchpad, which reads the app's own database from the page — the only way to
+tell "deferred" from "fast"):
+
+- before: **863 ms**, and 0 byte rows left at the moment the screen returned;
+- after: **250 ms**, with **2040 of 2720 byte rows still there** at that moment,
+  every one of them gone 0.5s later.
+
+That second number is the claim that does not depend on how fast this machine
+is: a build that awaits the delete reports zero deferred rows however fast its
+disk happens to be. The harness was watched failing on the build before the
+change, on exactly those two claims and no others.
+
+**The one place a wait is still taken** is `addToSession`, which awaits the
+sweep before writing: ending a session and immediately opening another is the
+only collision, and writing a new set on top of bytes still being deleted is
+what would run a device out of room. That wait lands where a wait is already
+expected and shown.
