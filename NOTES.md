@@ -10356,3 +10356,82 @@ in a browser means SharedArrayBuffer, which means COOP and COEP headers across
 the app and its service worker. The per-thread decode and the per-thread copy of
 the file are the price of not doing that, and the memory budget above is what
 keeps that price payable.
+
+## 2026-09-12 — the sharpening pass: a comment that claimed the fix, and a centre colour that was the wrong pixel
+
+**MEASURED FIRST, AGAIN, AND IT FOUND SOMETHING MUCH WORSE THAN A SHAPE.** The
+job was to give `makeRowDetail` the row cache the denoiser already has. What the
+measurement found was a live defect with a big number on it, and then a second
+one underneath it.
+
+**The fill, counted** — source samples taken against pixels the picture asked
+for, over 700,000 output pixels of a 1000x700 source: **2.0 per pixel scanning
+row by row, 4.4 through a 30% crop, 75.6 down a four-degree slant, 1001 down the
+columns.** On the real export path, a 1.88-megapixel crop of a 20.9-megapixel
+raw with sharpen 0.6 and texture 0.4: 4.8 seconds plain, **207 seconds
+straightened by four degrees** — 110 seconds a megapixel against 2.6, for the
+same picture. The horizon leveller shipped two releases ago, so that combination
+is now ordinary rather than exotic.
+
+**AND THE FILE SAID IT HAD ALREADY BEEN FIXED.** The doc comment on
+`makeRowDetail` read "Luma rows are cached in a small ring, like the denoiser, so
+scanning exports stay close to 1x decode cost", directly above a Map that filled
+every pixel of a source row the first time any tap landed on it. The denoiser's
+own comment describes this exact defect, with its own 119x measurement, as
+something it fixed. A comment is not a ring — and a comment that names the fix is
+worse than no comment, because it answers the question for everybody after.
+
+**WHAT IT COSTS NOW** (same file, same edit): whole frame **34.6s** against 33.2
+for the eager fill it replaces — 4% slower; the 30% crop 2.56s a megapixel
+against 2.55; turned a quarter-turn **2.84 against 3.13**; and straightened
+**4.71 against 110.35**, which is the 207-second export finishing in 8.8.
+
+**THREE WRONG HYPOTHESES ABOUT HOW TO PAY FOR IT.** Filling one pixel at a time
+fixed the slant and cost **18%** on the ordinary whole-frame export (33.2s to
+39.3s). Filling aligned blocks of sixteen — on the theory that the cost was the
+flag test — was **no better** (40.0s). The cost was never the test: it was
+replacing forty-nine array loads per pixel with forty-nine function calls. One
+call per tap ROW, filling the seven-pixel span those taps will read, plus a
+single comparison once a row is whole, is what got it to 34.6. A fourth attempt
+held the seven row objects while y stood still, to skip seven map lookups per
+pixel; **the parity harness refused it** — round-robin eviction can recycle a row
+that is still being held — and it was worth two seconds.
+
+**THE SECOND DEFECT, AND THE HARNESS IS WHY IT WAS FOUND.** The first parity run
+failed on all sixteen cases, including ones that could not possibly differ (a
+scan order with identical sample counts, a texture-only setting). "When a result
+looks absurd, suspect the instrument first" — and this time the instrument was
+right and the product was wrong.
+
+`LinearSampler`'s contract says in its own words that the returned array may be
+reused by the next call. `makeRowDetail` took `const c = base(x, y)` and read
+`c[0..2]` **after** forty-nine calls to `raw`. When denoise is off,
+`makeRowDenoiser` returns its input sampler unchanged — so `base` and `raw` are
+then the same function with the same scratch array, and the centre colour became
+whatever the last tap had sampled. The harness passed one sampler as both,
+because the product can, which is the only reason it showed up.
+
+**What the fix changes, measured on a 1.3-megapixel crop of the real raw:** with
+denoise off and sharpen 0.6 plus texture 0.4, **933 pixels of 1,304,800 (0.07%),
+worst by 39 of 255**; with denoise off and straightened four degrees, **95,577
+pixels (7.33%), worst by 50 of 255**; and with the denoise the app opens with,
+**zero**. So it was never reachable on a photograph opened and exported as the
+app hands it over — only with noise reduction pulled to nothing and sharpen or
+texture up, where it put a wrong pixel at the start of every row and across most
+of a straightened frame.
+
+**ONE QUESTION AT A TIME, OR THE PARITY RUN ANSWERS NEITHER.** Proving the row
+cache bit-identical needed the comparison to be against an OLD copy carrying the
+centre-colour guard (`/tmp/detail-old-fixed.ts`), otherwise two changes were
+being measured as one and the run just said "different". With that separation:
+`detailparity.mjs` drives both implementations over four scan orders — row by
+row, down the columns, a four-degree slant, and shuffled off every edge — at four
+slider combinations including a step of 2, and every value is identical, with
+69-98% fewer source samples. It also reports a planted defect (a texture of 0.41
+against 0.40) as different, because a comparison that cannot fail is not a
+comparison.
+
+**STILL OPEN, AND NOT ATTEMPTED.** The denoiser asks a small function for each of
+its twenty-five taps, which is the shape that measured 18% here. Whether the same
+span hoist pays there is unmeasured. Its row cache is already lazy, so this is a
+speed question and not a correctness one.
