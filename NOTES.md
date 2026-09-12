@@ -9921,3 +9921,50 @@ sweep before writing: ending a session and immediately opening another is the
 only collision, and writing a new set on top of bytes still being deleted is
 what would run a device out of room. That wait lands where a wait is already
 expected and shown.
+
+## 2026-09-12 — a look belongs to the session, a grade you made belongs to the photo
+
+**BOTH HALVES WERE HALF TRUE, AND WHICH ONE YOU GOT DEPENDED ON HISTORY NOBODY
+CAN SEE.** Choosing a look carried to a photo that had never been opened —
+`establishFreshEdit` re-applies it — and never to one already visited, whose own
+snapshot was restored instead. Reported as a look not carrying to the next
+photo.
+
+**Measured on the build before the change, over four photos:** a photo already
+opened did not follow (the look buttons read "none" and the picture's red
+against blue did not move, 1.014 both ways); a photo *never* opened did not
+follow either, because by the time it opens `activeLook` is whatever the
+PREVIOUS photo was restored to, which after any browsing at all is nothing. So
+the carry that was supposed to work only worked while you moved strictly
+forwards through photos you had never seen.
+
+**Three pieces.**
+
+- `sessionLook` is the look last chosen and is a fact about the SESSION.
+  `activeLook` stays a fact about the OPEN PHOTO — restored from its snapshot,
+  so the look buttons describe the photograph on screen rather than a press made
+  three photos ago. Comparing a photo's look against itself can never say
+  whether the session has moved on, which is why there had to be two names.
+- A **LookMark** on each photo's edit: the look it was last given, and THE GRADE
+  IT HAD THE MOMENT IT WAS GIVEN. Arriving with the session on a different look,
+  the photo is asked one question — is your grade still exactly what that look
+  left? Untouched, the new look applies. Changed, the reader meant it, and
+  nothing overwrites it. It rides the live edit and the stored one, so it
+  survives a resume; an edit stored before this existed has no mark and is left
+  alone, which is the safe half of the question.
+- **A FLAG WOULD HAVE BEEN WRONG.** "The reader graded this by hand", set from
+  the controls, means every control that ever touches the grade has to remember
+  to set it, and the one somebody forgets silently un-marks a photo. Comparing
+  the grade against what the look left cannot be forgotten by a control added
+  later.
+
+**The mark's stamp excludes the lift's own controls** while the thumbnail
+stamp includes them, and the difference is deliberate: a tile asks "is this
+still a true picture of that photo", where the lift matters; the mark asks "has
+the reader graded this photo by hand", where a change to one session-wide
+strength slider must not read as every photo having been hand-graded at once.
+
+Asserted by `lookcarry.mjs` (session scratchpad), which reads the look buttons
+AND the picture — a look that is only highlighted is a label, and a grade that
+changes with nothing highlighted is the other half of the same lie. Eight
+claims; four of them fail on the build before the change.
