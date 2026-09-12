@@ -186,8 +186,14 @@ export interface SaveChange {
  *  that the frames had too little green to divide by, so the colour half was
  *  withheld. On an infrared lens that is the half the whole correction exists
  *  for, and a profile carrying it is a different KIND of answer from one that
- *  does not, not a better example of the same one. */
-function saysAnythingAboutColour(p: StoredProfile): boolean {
+ *  does not, not a better example of the same one.
+ *
+ *  EXPORTED so the generator that builds the shipped table uses this rule and
+ *  not its own copy of it. It had its own — frame count alone, the same rule
+ *  this replaced — and regenerating the table from raw measurements therefore
+ *  shipped four colourless profiles that had beaten colour-carrying ones on
+ *  frame count. One rule, one implementation, both doors. */
+export function saysAnythingAboutColour(p: { kr: ArrayLike<number>; kb: ArrayLike<number> }): boolean {
   for (const a of [p.kr, p.kb]) for (let i = 0; i < a.length; i++) if (Math.abs(a[i] - 1) > 1e-9) return true;
   return false;
 }
