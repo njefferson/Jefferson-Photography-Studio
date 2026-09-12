@@ -10,6 +10,7 @@ import { Tiff } from "./raw/tiff";
 import { camToSrgbLinear, nikonColorMatrix } from "./color";
 import { cameraModel, readCameraMatrix } from "./decode";
 import { makeRowDenoiser, type LinearSampler } from "./raw/denoise";
+import { canRunParallel, exportBands } from "./exportparallel";
 import { makeRowDetail } from "./raw/detail";
 import { healPatches8, healPatchesFromSampler, wrapWithPatches } from "./heal";
 import { stickerPatches, makeStickerOverlaySampler, type StickerAsset } from "./sticker";
@@ -42,6 +43,43 @@ export interface ExportOptions {
   /** Rasterised sticker assets (keyed by asset id) — needed to bake
    *  params.stickers into the export source. Omitted = no stickers baked. */
   stickerAssets?: Record<string, StickerAsset>;
+  /** ONE SLICE OF THE OUTPUT, and the whole of how the parallel export works.
+   *
+   *  An export is 96% one pass over the pixels (measured: 45.2s of 47.0 on a
+   *  20.9-megapixel raw), and that pass is embarrassingly parallel over output
+   *  rows. A worker is handed the same file, the same edit and a row range, and
+   *  runs exactly this function over it — the same code, so there is no second
+   *  implementation to drift.
+   *
+   *  A SLICE OF THE OUTER LOOP, whichever way it runs: output rows normally,
+   *  and output COLUMNS when the photograph is turned a quarter-turn (the loop
+   *  follows columns there to keep the denoiser's row cache warm). Either way a
+   *  band is a rectangle of the finished picture and comes back in its own
+   *  coordinates — `BandResult` says which axis it was cut along, and the main
+   *  thread puts it where it belongs. Portrait photographs are half of what
+   *  anybody shoots, so "rows only" would have left half the exports on one
+   *  core; the first version did exactly that and the first measurement
+   *  caught it. */
+  band?: { from: number; to: number };
+  /** Hand back the band's own pixels instead of encoding a file. Set only by
+   *  the worker; the main thread stitches the bands and encodes once. */
+  raw?: boolean;
+}
+
+/** What a worker sends back: its band's pixels, in the band's own coordinates —
+ *  a `width` x `height` rectangle of the finished picture, whose top-left
+ *  corner in the whole is (0, band.from) for a row band and (band.from, 0) for
+ *  a column one. */
+export interface BandResult {
+  band: { from: number; to: number };
+  /** Which way the band was cut — the axis the export's outer loop ran along. */
+  axis: "rows" | "columns";
+  /** JPEG path: RGBA bytes, Display P3, `height` rows of `width`. */
+  data?: Uint8ClampedArray;
+  /** TIFF path: 16-bit RGB, same rectangle. */
+  rgb?: Uint16Array;
+  width: number;
+  height: number;
 }
 
 // --- Corner watermark for the bundled practice photos ------------------------
@@ -140,12 +178,28 @@ export interface ExportProfile {
   tag: number;
   yields: number;
   yieldMs: number;
+  /** How many threads ran the per-pixel pass: 1 for the single-threaded path,
+   *  N when the export was split across cores. In the report because a reader
+   *  saying "this is slow on mine" is otherwise indistinguishable from a device
+   *  that quietly fell back to one thread. */
+  threads: number;
 }
 let lastProfile: ExportProfile | null = null;
 export function lastExportProfile(): ExportProfile | null {
   return lastProfile;
 }
 
+// TWO SHAPES, ONE IMPLEMENTATION. A worker asks for `raw: true` and gets its
+// band's pixels; everybody else gets a finished file. Overloads rather than a
+// union return, so no caller has to prove which one it got.
+export function exportImage(
+  file: ImportedFile, current: DecodedImage, params: EditParams,
+  opts: ExportOptions & { raw: true }, onProgress?: (fraction: number) => void, lens?: LensCurve | null,
+): Promise<BandResult>;
+export function exportImage(
+  file: ImportedFile, current: DecodedImage, params: EditParams,
+  opts: ExportOptions, onProgress?: (fraction: number) => void, lens?: LensCurve | null,
+): Promise<ExportResult>;
 export async function exportImage(
   file: ImportedFile,
   current: DecodedImage,
@@ -159,8 +213,8 @@ export async function exportImage(
    *  belongs to the photograph and the strength rides in `params.lensFix`, so
    *  this is the same split the pipeline uses everywhere else. */
   lens?: LensCurve | null,
-): Promise<ExportResult> {
-  const __t: ExportProfile = { megapixels: 0, total: 0, source: 0, pixels: 0, watermark: 0, encode: 0, tag: 0, yields: 0, yieldMs: 0 };
+): Promise<ExportResult | BandResult> {
+  const __t: ExportProfile = { megapixels: 0, total: 0, source: 0, pixels: 0, watermark: 0, encode: 0, tag: 0, yields: 0, yieldMs: 0, threads: 1 };
   const __mark = (k: keyof ExportProfile, from: number) => { __t[k] += performance.now() - from; };
   const __start = performance.now();
   let __a = __start;
@@ -376,12 +430,53 @@ export async function exportImage(
     // below — the pair MUST land together or colors shift. Same appearance as
     // the preview by construction (sRGB is a subset of P3); the wide-gamut
     // container is what Apple devices shoot and share natively.
-    const data = new Uint8ClampedArray(w * h * 4);
+    // ONE BAND'S WORTH when a band was asked for — its own rows, in its own
+    // coordinates, so a worker holds a slice of the picture rather than a whole
+    // copy of it. JPEG only: see ExportOptions.band on why a quarter-turned
+    // export stays single-threaded, and TIFF is the print-master path, rarely
+    // used and enormous either way.
+    // THE BAND IS A RECTANGLE OF THE PICTURE, cut along whichever axis the loop
+    // below runs: rows normally, columns under a quarter-turn. Without a band
+    // these are the whole frame and every index below is the plain one.
+    const from = opts.band ? opts.band.from : 0;
+    const to = opts.band ? Math.min(opts.band.to, outerN) : outerN;
+    const bandX0 = rot & 1 ? from : 0;
+    const bandY0 = rot & 1 ? 0 : from;
+    const bandW = rot & 1 ? to - from : w;
+    const bandH = rot & 1 ? h : to - from;
+    let data = new Uint8ClampedArray(bandW * bandH * 4);
     const p3 = new Float32Array(3);
     __a = performance.now();
-    for (let oIdx = 0; oIdx < outerN; oIdx++) {
+    // SEVERAL CORES, WHEN THIS EXPORT CAN USE THEM. The bands run the same code
+    // this loop runs — the workers call straight back into this function — so
+    // there is no second pipeline to drift. A worker that fails for any reason
+    // falls through to the loop below rather than failing the export: the
+    // reader asked for a photograph, not for a particular number of threads.
+    // WHAT A THREAD WOULD COST, handed to the decision: the file is copied per
+    // worker, the sensor data is decoded per worker, and each holds its band.
+    const job = { fileBytes: file.bytes.length, srcPixels: srcW * srcH, outPixels: w * h };
+    let ranParallel = false;
+    if (canRunParallel(params, opts, job)) {
+      try {
+        const split = await exportBands(
+          file,
+          // A MOSAICED RAW IS RE-READ FROM THE FILE by every worker, so the
+          // preview decode is dead weight on the wire — tens of megabytes
+          // copied per worker for pixels `getSource` will not look at. Sent
+          // whole only when the decode IS the source (JPEG, HEIC, a preview,
+          // a lossy-linear DNG), which is the same test getSource makes.
+          "cfa" in src ? { width: current.width, height: current.height, isRaw: current.isRaw } : current,
+          params, opts, lens ?? null, w, h, job, onProgress);
+        data = split.data;
+        __t.threads = split.threads;
+        ranParallel = true;
+      } catch (err) {
+        console.warn("parallel export failed, falling back to one thread:", err);
+      }
+    }
+    for (let oIdx = ranParallel ? to : from; oIdx < to; oIdx++) {
       if (oIdx % 16 === 0) {
-        onProgress?.(oIdx / outerN);
+        onProgress?.((oIdx - from) / Math.max(1, to - from));
         const __tk = performance.now();
         await tick();
         __t.yields++;
@@ -397,7 +492,7 @@ export async function exportImage(
         applyOnTop(sx, sy); // on-top stickers over the finished look, before grain (matches the shader)
         finishPixel(x, y); // creative vignette + grain, still in sRGB display space
         srgbDisplayToP3Display(out[0], out[1], out[2], p3);
-        const o = (y * w + x) * 4;
+        const o = ((y - bandY0) * bandW + (x - bandX0)) * 4;
         data[o] = p3[0] * 255;
         data[o + 1] = p3[1] * 255;
         data[o + 2] = p3[2] * 255;
@@ -407,6 +502,10 @@ export async function exportImage(
     onProgress?.(1);
     __mark("pixels", __a);
     __a = performance.now();
+    // A WORKER STOPS HERE. The watermark, the canvas, the encoder and the
+    // metadata all belong to the whole picture, and the whole picture is the
+    // main thread's to assemble.
+    if (opts.raw) return { band: { from, to }, axis: rot & 1 ? "columns" : "rows", data, width: bandW, height: bandH };
     if (opts.watermark) {
       // Blend the practice-photo corner mark into the P3 pixels directly
       // (its layer colours converted to P3 too) — drawing the sRGB-intent

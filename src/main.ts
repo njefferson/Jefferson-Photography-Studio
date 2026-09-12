@@ -8191,6 +8191,7 @@ function exportSplit(): string {
   if (!p) return "none this session";
   const s = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
   return `${p.megapixels.toFixed(1)} MP in ${s(p.total)} — reading ${s(p.source)}, pixels ${s(p.pixels)}` +
+    ` on ${p.threads === 1 ? "one thread" : `${p.threads} threads`}` +
     `, encode ${s(p.encode)}, metadata ${s(p.tag + p.watermark)}, paused ${s(p.yieldMs)} over ${p.yields} yields`;
 }
 
