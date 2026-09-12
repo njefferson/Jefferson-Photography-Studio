@@ -9800,3 +9800,83 @@ on the slanted case.
 touched. The denoise pass is the heavier of the two, but a straightened export
 is still paying the detail pass's version of this whenever sharpen or texture is
 off zero.
+
+## 2026-09-12 — the strip's tiles: the flash, and the hot spot they wore
+
+**THE WHOLE ROW FLASHED ON EVERY PHOTO CHANGE AND NOTHING IN IT CHANGED.**
+`updateSessionStrip` rebuilt every tile with `replaceChildren` on every call,
+and it is called on every switch, every add and every thumbnail that lands. A
+fresh `<img>` carrying the same blob URL decodes again, so the price of moving
+the `active` class was the whole strip re-decoding.
+
+Measured with a MutationObserver over the strip, which is the only instrument
+that can tell "rebuilt identically" from "not rebuilt" — a screenshot cannot:
+**twelve tiles destroyed and twelve pictures re-decoded for two presses**, on a
+set of six. Zero and zero after, with the active class and the "viewing 5" line
+still correct. The harness is `stripflash.mjs` in the session scratchpad, and it
+was watched failing on the build before the change.
+
+Tiles are reconciled now: matched to photos by id, moved rather than recreated,
+each part written only when it differs, and the click listener attached once to
+an element that outlives every redraw — so it reads the photo id off the element
+rather than closing over an object a later pass would replace.
+
+**A TILE WAS A CLAIM ABOUT THE READER'S NEXT PRESS RATHER THAN ABOUT THE
+PICTURE.** `params` is one object holding the OPEN photo's edit, and `makeThumb`
+cloned it — so every tile was rendered under whatever grade happened to be live.
+Pressing a look marked the whole strip stale and redrew all of it; moving to a
+photo that carried its own grade left every other tile describing somewhere
+else. A photo that has been opened, or that came back with a stored edit, has
+its own answer, and the tile uses it now — balance, exposure and grade from that
+photo's own edit. Only a photo never opened is rendered under the live look,
+which is honest: `establishFreshEdit` re-applies the active look, so that IS
+what opening it will do. One stamp covers both cases, so a first visit landing
+on the same creative state does not invalidate the tile it already had.
+
+**AND THE LENS CORRECTION WAS MISSING FROM EVERY STRIP TILE.** `lensCurveFor`
+exists for exactly this and its own comment claims "every path that renders a
+frame other than the one the reader has open"; the quick-look grid has always
+passed it and the strip's background pass never did — `makeThumb(img)`, three
+arguments short. So a tile wore the hot spot the photograph does not have, which
+reads as the tile belonging to some other frame.
+
+**THE FIRST TWO INSTRUMENTS FOR THAT BOTH PASSED ON A BUILD CARRYING THE
+DEFECT**, and each failure is worth keeping:
+
+- *The wrong fixtures.* The 44 practice DNGs shipped with the app carry no lens,
+  focal length or aperture at all — checked by reading every one — so no profile
+  can match them and neither path applies any correction. Two identical
+  uncorrected pictures were compared and reported as agreement. The flats in the
+  session scratchpad carry full metadata and match the strongest hot spots
+  measured on this body, 43.3% and 30.2% of the centre's brightness.
+- *The wrong control.* Comparing the strip tile against the quick-look tile
+  proves only that the two thumbnail paths agree, and they can agree by both
+  being uncorrected. The control has to be what the reader is comparing against:
+  the photograph on screen. A WebGL view cannot be read with `getImageData`
+  without a preserved drawing buffer, but a screenshot of the element
+  composites it and can be measured by handing the PNG back to the page as an
+  `<img>` — same ratio code as the tiles.
+- *And the EXIF reader takes a Uint8Array, not an ArrayBuffer.* Handing it the
+  buffer made every file read as carrying no metadata at all, including the very
+  frames the shipped profiles were measured from. An absurd result looked like a
+  finding for about ten minutes.
+
+With that rig: the correction now reaches both tiles (a full 80-bin colour curve
+and an 80-bin brightness curve at strength 1, read back from the thumbnail pass
+itself), and **an opened photo's tile matches the photograph to 0.004** on a
+centre-against-ring measure.
+
+**STILL OPEN, and not to be reported as fixed: an UNOPENED photo's tile is
+0.052 off the photograph** on the same measure (1.133 against 1.081, on a flat
+with a 43.3% hot spot). The lens correction is not the cause — it is present and
+at full strength on both sides. What remains is that the tile RE-DERIVES the
+automatic baseline (the depth lift, and with it exposure and highlight recovery)
+from the image, while opening the photo derives it through `establishFreshEdit`.
+Two derivations of the same thing, and they do not agree to better than a few
+percent on a frame whose centre is near clipping. The fix is to render an
+unopened photo's tile through the same code the open path uses, which means
+lifting the baseline out of `establishFreshEdit` as a pure function — a refactor
+of a load-bearing function with undo semantics attached (the five-places rule
+above), not a small change. An attempt to confirm the lift as the cause by
+toggling it off failed on the instrument: `#irLift` sits in a collapsed panel and
+cannot be clicked without opening its tab first.
