@@ -1631,6 +1631,16 @@ body.dropping::after {
   gap: 12px;
   align-content: start;
 }
+/* A CELL holds the picture (which is the pick control) and the reject beside
+   it — a button cannot contain a button, and both of these have to be real
+   ones. */
+.ql-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+  min-width: 0;
+}
 .ql-tile {
   display: flex;
   flex-direction: column;
@@ -1641,7 +1651,105 @@ body.dropping::after {
   cursor: pointer;
   position: relative;
   min-width: 0;
+  width: 100%;
 }
+/* Reject: its own control, 44px square, top-left so it never sits under the
+   thumb reaching for the picture. */
+.ql-x {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 600 1rem/1 var(--ui);
+  color: var(--glass-txt);
+  background: var(--glass-bg);
+  border: 1.5px solid var(--line-2);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.ql-cell.rejected .ql-x { background: var(--surface-3); color: var(--txt); border-color: var(--txt-3); }
+/* The mark IN WORDS, because a dimmed tile and a tinted border are the same
+   thing to a reader who cannot separate them. */
+.ql-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font: 600 0.6875rem/1 var(--ui);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--glass-txt);
+  background: var(--glass-bg);
+  border: 1px solid var(--line-2);
+}
+.ql-cell.picked .ql-badge { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.ql-cell.picked img { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 0 16px var(--accent-soft); }
+/* Rejected: dimmed AND dashed AND labelled — three carriers, never colour
+   alone, and the picture stays legible enough to change your mind by. */
+.ql-cell.rejected img { opacity: 0.38; border-style: dashed; border-color: var(--line-2); }
+.ql-cell.rejected .ql-name { text-decoration: line-through; color: var(--txt-3); }
+.ql-help {
+  margin: 0;
+  padding: 0 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  font: 0.75rem/1.5 var(--ui);
+  color: var(--txt-2);
+}
+/* Two frames, side by side — stacked when there is not room for two. */
+#qlCompareDlg {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  max-width: 100vw;
+  max-height: 100dvh;
+  margin: 0;
+  padding: 0;
+  border: none;
+  z-index: 45;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--txt);
+}
+#qlCompareDlg[open] { display: flex; }
+#qlCompareDlg::backdrop { background: transparent; }
+.cmp-pair {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 12px 16px;
+}
+@media (max-width: 760px) { .cmp-pair { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; } }
+.cmp-pane {
+  margin: 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+}
+.cmp-pane img {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  object-fit: contain;
+  background: var(--surface-2);
+  border-radius: 10px;
+}
+.cmp-pane figcaption { font: 0.75rem/1.4 var(--mono); color: var(--txt-2); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cmp-pane figcaption .ql-badge { position: static; }
+.cmp-role { font: 600 0.6875rem/1 var(--ui); letter-spacing: 0.06em; text-transform: uppercase; color: var(--txt-3); }
+.cmp-marks { display: flex; gap: 8px; }
 .ql-tile img {
   width: 100%;
   aspect-ratio: 1 / 1;
@@ -1651,10 +1759,7 @@ body.dropping::after {
   border: 2px solid transparent;
   display: block;
 }
-.ql-tile.selected img {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent), 0 0 16px var(--accent-soft);
-}
+
 .ql-check {
   position: absolute;
   top: 8px;
@@ -1672,12 +1777,7 @@ body.dropping::after {
   opacity: 0;
   transition: opacity 0.12s ease;
 }
-.ql-tile.selected .ql-check {
-  opacity: 1;
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-ink);
-}
+
 .ql-name {
   font: 0.6875rem/1.3 var(--mono);
   color: var(--txt-2);
