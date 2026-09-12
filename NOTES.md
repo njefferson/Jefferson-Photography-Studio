@@ -10023,3 +10023,60 @@ been made. And the rebuild count read three decodes of four, because the tiles
 from the previous run were still on screen when the press landed, so "wait until
 there are four pictures" was already true — it was reading a run that had barely
 started. Waiting for the grid to EMPTY first is the signal a new run has begun.
+
+## 2026-09-12 — Level the horizon, and the two measures that did not work
+
+**ON A BUTTON, NEVER AT OPEN.** A frame tilted on purpose must not be
+straightened behind the reader's back, so the angle lands on the Straighten
+slider: visible, one undo away, and the untouched frame one press further. It
+does not arm the Straighten TOOL either — arming a geometry tool takes the stage
+over, and pressing a button in the panel is not asking for that.
+
+**THE METHOD IS THE SETTLED ONE.** Two box blurs, Sobel, keep the strong edges,
+and accumulate them into (angle, offset) cells — a Hough accumulator, fifty
+years old. Infrared helps rather than hurts: the sky-to-foliage boundary is the
+strongest edge in the frame. A radial hot spot cannot bias it, because a radial
+brightening votes for every angle equally.
+
+**WHAT IT TOOK TO GET A HONEST CONFIDENCE, and this is the part worth keeping.**
+Three measures were tried against real frames and two were worthless:
+
+- **Share of the frame's edge weight.** Eight real woodland frames scored
+  0.0002 to 0.003 — whether or not anything in them was straight. Foliage
+  contributes an enormous total and a horizon is one thin line across it.
+- **Ratio to the average accumulator cell.** A smooth gradient with no edge in
+  it at all came back the most confident frame of the set, at 140, because when
+  almost nothing is accumulated the average cell is almost nothing.
+- **How LONG the winning line is**, in frames. This one separates: a drawn
+  horizon 1.2-1.6, the same under heavy noise 0.11, a real infrared hillside
+  0.40, real woodland with no straight line 0.011-0.117, pure texture 0.024. The
+  floor is a quarter of the frame's long edge.
+
+Plus an absolute floor on edge strength, because every other threshold is
+relative to the frame's own strongest edge — which is what makes this work
+across infrared exposures that vary enormously, and which promotes the faint
+contours of a smooth frame to "the strongest edges here".
+
+**ORIENTATION ALONE CANNOT TELL A HORIZON FROM A HEDGE.** The first version
+voted on angle only and would have shipped as a coin flip: a thousand leaf edges
+near level vote exactly like one horizon. Collinearity is the whole difference,
+which is what the offset axis of the accumulator is for.
+
+**Accuracy, measured against frames whose answer is known:** exact to a
+twentieth of a degree against a grating (the same angle at every pixel), within
+0.1 degrees out to three degrees of tilt on a drawn horizon, and within 0.3 by
+twelve. Finer angle cells made it WORSE — a real line is not straight to a tenth
+of a degree, so its votes spread, the peak halved and one frame fell below the
+floor. Sub-cell resolution comes from a parabolic fit on the peak instead, which
+does not split it.
+
+**The sign is asserted end to end rather than reasoned about.** Which way the
+slider turns a frame is a fact about a geometry mirrored in the shader, the CPU
+pipeline and the exporter. `levelwalk.mjs` tilts a real photograph by a known
+amount and presses the button: an inverted sign would go twice as far the wrong
+way. It comes back to the same angle, twice, to a tenth of a degree.
+
+**And the harness labelled its own frames wrongly at first**, reporting a
+hillside declined and a canopy levelled when it was the other way round — a set
+is sorted into shutter order on the way in, so the picker's order is not the
+strip's. The name now comes from the app.

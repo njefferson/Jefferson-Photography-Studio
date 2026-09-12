@@ -631,7 +631,9 @@
             <button id="flipVBtn" class="accent-outline" type="button" aria-label="Flip vertical — mirror top and bottom">&#8645; Flip vertical</button>
             <button id="cropBtn" class="toggle full-btn" type="button" aria-pressed="false" aria-label="Crop">Crop</button>
             <button id="straightenBtn" class="toggle full-btn" type="button" aria-pressed="false" aria-label="Straighten">Straighten</button>
-            <p class="note"><strong>Rotate</strong> means quarter turns only &mdash; 90&deg; at a time; the flips mirror it as you see it. <strong>Straighten</strong> is the fine angle that levels a horizon, and the two are separate tools. Crop opens a draggable box &mdash; with aspect presets (1:1, 4:5&hellip;) on the bottom pill. Straighten levels the horizon with a slider. Crop and Straighten each open on their own &mdash; tap &ldquo;Done&rdquo; to apply.</p>
+            <button id="levelBtn" class="accent-outline" type="button">Level the horizon</button>
+            <p class="note" id="levelNote" role="status" aria-live="polite" hidden></p>
+            <p class="note"><strong>Rotate</strong> means quarter turns only &mdash; 90&deg; at a time; the flips mirror it as you see it. <strong>Straighten</strong> is the fine angle that levels a horizon, and the two are separate tools. <strong>Level the horizon</strong> finds the angle for you from the strongest straight line in the frame &mdash; it lands on the Straighten slider, so you can see it, nudge it, or undo it, and it says so plainly when the frame has no line clear enough to go on. Crop opens a draggable box &mdash; with aspect presets (1:1, 4:5&hellip;) on the bottom pill. Straighten levels the horizon with a slider. Crop and Straighten each open on their own &mdash; tap &ldquo;Done&rdquo; to apply.</p>
           </section>
 
           <div id="panelDown" class="scroll-cue down" hidden><span>&#9660;</span></div>
