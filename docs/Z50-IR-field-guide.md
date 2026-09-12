@@ -69,21 +69,28 @@ reliable way (in-camera) rather than hand-forging the file.
 pick a base → adjust → **Save as** a C-slot. Move between cards/bodies with
 **Load/save → Copy to card / Copy to camera**.
 
-| Save as | Base | Sharpening | Contrast | Brightness | Saturation | Hue | Notes |
-|---------|------|-----------|----------|-----------|-----------|-----|-------|
-| **C-1 "IR Color"** | Vivid | +1 | +2 | +1 | +3 | 0 | red / 590 / none |
-| **C-2 "IR Mono"** | Monochrome | +1 | +2 | +1 | — | — | 720nm; add toning to taste |
+**C-1, "IR Color"** — base Vivid.
+Sharpening +1, contrast +2, brightness +1, saturation +3, hue 0.
+For a red, 590nm or no filter.
+
+**C-2, "IR Mono"** — base Monochrome.
+Sharpening +1, contrast +2, brightness +1; saturation and hue do not apply.
+For 720nm; add toning to taste.
 
 Brightness +1 only lifts the dark IR **preview/JPEG**; it never touches the NEF.
 
 ## 4. Filter cheat-sheet
 
-| Filter | In-camera look after PRE WB | Best use |
-|--------|------------------------------|----------|
-| **Red / 590nm** | Neutral foliage, cyan sky; lots of color to swap | Aerochrome (finish in app) |
-| **720nm** | Near-monochrome | B&W "white forest" (Monochrome PC) |
-| **530nm** | Moderate color | False color, gentler |
-| **None (full-spectrum)** | Similar to red, more haze | Experiment |
+**Red or 590nm.** After a PRE white balance: neutral foliage, cyan sky, and
+plenty of colour to swap. Best for Aerochrome, finished in the app.
+
+**720nm.** Near-monochrome. Best for a black-and-white "white forest", using the
+Monochrome picture control.
+
+**530nm.** Moderate colour. Best for a gentler false colour.
+
+**No filter, full-spectrum.** Similar to red with more haze. Best for
+experimenting.
 
 ## 5. Workflow
 

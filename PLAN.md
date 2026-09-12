@@ -13,14 +13,23 @@ Lightroom.
 
 ## Confirmed decisions
 
-| Area | Decision |
-|------|----------|
-| Input formats | **DNG** primary: lossy-linear (8-bit) and mosaiced (14-bit, lossless-JPEG). **NEF → convert to DNG in Lightroom** (avoids a separate Nikon decoder). |
-| Looks | **Build our own** swap/WB/hue looks and presets. No third-party profiles/LUTs. |
-| Image output | **JPEG q92 Display P3** (default) + **16-bit TIFF** (archival). No DNG image export. |
-| Profile output | **Export `.dcp` (Lightroom) and `.cube` (Photoshop)** generated from the user's in-app edit. |
-| Platform | **Offline-first PWA** for the A16 iPad (model A3355). Native App Store build later. |
-| Service/cloud | **None.** All processing on-device. |
+**Input formats.** DNG primary: lossy-linear (8-bit) and mosaiced (14-bit,
+lossless-JPEG). NEF converted to DNG in Lightroom, avoiding a separate Nikon
+decoder.
+
+**Looks.** Ours: swap, white balance and hue looks and presets. No third-party
+profiles or LUTs.
+
+**Image output.** JPEG q92 Display P3 by default, plus 16-bit TIFF for archive.
+No DNG image export.
+
+**Profile output.** `.dcp` for Lightroom and `.cube` for Photoshop, generated
+from the user's own in-app edit.
+
+**Platform.** Offline-first PWA for the A16 iPad, model A3355. A native App
+Store build later.
+
+**Service and cloud.** None. All processing on-device.
 
 ## Why a custom app beats Lightroom for this (validated on real files)
 
@@ -32,12 +41,17 @@ hardest part of the Lightroom workflow becomes a native feature. Confirmed.
 
 ## Decode strategy (pure-JS, no big WASM blob)
 
-| Source | How |
-|--------|-----|
-| Lossy linear DNG (8-bit) | Baseline-JPEG tile decoded natively (`createImageBitmap`); gamma-2.2 → linear in shader. **Done.** |
-| Mosaiced DNG (14-bit) | Pure-JS **lossless-JPEG (LJ92)** decode + demosaic + black/white levels. Decoder **verified bit-exact** vs LibRaw. **Port in progress.** |
-| JPEG / PNG | Native bitmap decode. **Done.** |
-| Nikon NEF (Compression 34713) | Out of scope for now — **convert to DNG in Lightroom**. Optional future native decoder. |
+**Lossy linear DNG, 8-bit.** Baseline-JPEG tile decoded natively through
+`createImageBitmap`, then gamma-2.2 to linear in the shader. Done.
+
+**Mosaiced DNG, 14-bit.** Pure-JavaScript lossless-JPEG (LJ92) decode, demosaic
+and black/white levels. The decoder is verified bit-exact against LibRaw. Port
+in progress.
+
+**JPEG and PNG.** Native bitmap decode. Done.
+
+**Nikon NEF, compression 34713.** Out of scope for now; convert to DNG in
+Lightroom. A native decoder is possible later.
 
 ## Edit pipeline (per-pixel, GPU)
 
