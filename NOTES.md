@@ -9533,3 +9533,79 @@ are photographs and this repository is public. The harness could read them from
 a local folder the repo does not carry, which keeps the gate reproducible for
 whoever has the frames and silent for whoever does not — worth deciding before
 building either half.
+
+## What four real batches of flats found, 2026-09-12
+
+Four batches measured on a device, four saved payloads and one whole-device
+backup. Every payload carried real colour; every raw profile in the backup read
+a flat 1. That contradiction found four faults, and none of them was in the
+measurement.
+
+**THE STORE WAS NOT LOSING THE COLOUR — the ranking was refusing it.** Running
+all four payloads through the real store and exporting them back kept the colour
+on 68 of 68, so the payload-to-storage path is clean. What the device held was
+the PREVIOUS generation: profiles measured after the raw decode was fixed but
+before the colour floor knew about the raw scale, so `source: raw`, six frames in
+places, and nothing at all about colour.
+
+`place()` ranked a replacement by frame count alone, which ranks a profile that
+measures no colour above one that does. Restoring the device's own backup and
+offering all four runs to it: **15 freshly measured colour-carrying profiles were
+turned away**, reported as "kept", correctly and uselessly. Colour now beats
+frame count; within the same kind, more frames still wins. After the fix the same
+sequence takes the device from 11 of 76 profiles carrying colour to 68 of 76 —
+the other 8 are keys no batch re-shot, which is coverage, not a fault.
+
+**THE TWO SAVES HAD THE SAME SHAPE AND DIFFERENT SCOPES, and the narrow one was
+the one in reach.** "Save as a file" writes the run just finished; the backup of
+everything on the device sat below the entire results list and was reported as
+not findable after an import. Four batches therefore produced four single-run
+files and no backup. Both are in the run's own action row now and each says which
+it is.
+
+**THE HEADLINE ACCOUNTED FOR 42 FRAMES OUT OF 94 AND SAID NOTHING ABOUT THE
+OTHER 52.** Over half a set disappeared between two numbers in one sentence, and
+"21 of them" could be profiles or frames. The reasons were all in the panel, per
+lens, which is the wrong place for the first question anybody asks. It now names
+what came out, then where every frame went — into the profiles, not needed, or
+not usable — and says when the profiles are thin. The buckets are asserted to sum
+to the number picked.
+
+**AND FOUR PICKS STARTED FOUR RUNS OVER ONE PANEL.** The change listener was
+plain and async. Four sets picked in succession ran at once, all writing to one
+set of results and one Keep button; it produced four usable answers only because
+somebody watched and pressed Keep as each arrived. Miss the moment and that run's
+result was replaced with nothing said. Frames picked during a run now join it:
+the pass finishes, and anything that arrived is measured as one set. That costs
+almost nothing, because every frame already done comes back from the store — and
+it is the better answer as well, since frames of the same lens, focal length and
+aperture from two picks now average together instead of becoming two profiles of
+one frame each.
+
+**A NOTE THAT LIVES IN THE PROGRESS LINE DOES NOT EXIST.** The explanation for
+the larger count on a second pass was written into `#lensRunning` and polled for
+every 200ms across a full run — never once caught, because that line is rewritten
+within milliseconds by the read loop. Its own element, checked at the end rather
+than raced.
+
+## A centring that had never once applied, 2026-09-12
+
+`.dbg-btn` set `line-height: 44px` and then, nine lines later in the same rule,
+`font: 500 0.9375rem var(--ui)`. The `font` shorthand resets every part it omits,
+so the line height went back to `normal` and the 44px was dead from the day it
+was written.
+
+Real buttons hid it: a browser centres a button's own text itself. The two file
+pickers in the lens panel are `<label>` elements — the only way a file input can
+be styled at all — and get no such help, so their text sat 1px from the top of a
+44px control with 24px beneath it. **Measured at 23px off centre on both, against
+0.0 on the real buttons beside them in the same row.**
+
+Flex centring now, and the line height folded into the shorthand so there is one
+declaration of it rather than two with the loser first. All four controls measure
+1.8px off centre, which is the font's own ascender against its descender.
+
+**The rule's own comment, four lines above the dead declaration, is about a label
+silently opting out of a tag-keyed width.** The same class then silently opted its
+own centring out by shorthand. A comment explaining one instance of a trap is not
+protection against the next one.
