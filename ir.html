@@ -699,6 +699,45 @@
       <div id="libBody" class="lib-body"></div>
     </dialog>
 
+    <!-- TWO FRAMES, SIDE BY SIDE. One is held and the other steps through the
+         folder, which is how a burst gets culled: you are never comparing two
+         arbitrary photographs, you are asking whether THIS one beats the one
+         you have. Stacks on a narrow screen rather than shrinking to a pair of
+         stamps. -->
+    <dialog id="qlCompareDlg" aria-label="Compare two photos">
+      <div class="ql-head">
+        <div class="ql-title">
+          <h2 class="ql-h">Compare</h2>
+          <span id="cmpCount"></span>
+        </div>
+        <div class="ql-actions">
+          <button id="cmpPrev" type="button" class="ql-btn" aria-label="Previous candidate">&#8592; Prev</button>
+          <button id="cmpNext" type="button" class="ql-btn" aria-label="Next candidate">Next &#8594;</button>
+          <button id="cmpSwap" type="button" class="ql-btn">Hold this one</button>
+          <button id="cmpClose" type="button" class="ql-btn">Close</button>
+        </div>
+      </div>
+      <div class="cmp-pair">
+        <figure class="cmp-pane">
+          <img id="cmpLeftImg" alt="">
+          <figcaption><span class="cmp-role">Holding</span> <span id="cmpLeftName"></span> <span id="cmpLeftMark" class="ql-badge" hidden></span></figcaption>
+          <div class="cmp-marks">
+            <button id="cmpLeftPick" type="button" class="ql-btn">Pick</button>
+            <button id="cmpLeftReject" type="button" class="ql-btn">Reject</button>
+          </div>
+        </figure>
+        <figure class="cmp-pane">
+          <img id="cmpRightImg" alt="">
+          <figcaption><span class="cmp-role">Against</span> <span id="cmpRightName"></span> <span id="cmpRightMark" class="ql-badge" hidden></span></figcaption>
+          <div class="cmp-marks">
+            <button id="cmpRightPick" type="button" class="ql-btn">Pick</button>
+            <button id="cmpRightReject" type="button" class="ql-btn">Reject</button>
+          </div>
+        </figure>
+      </div>
+      <p class="ql-help">These are the preview pictures the grid built, not full-size renders &mdash; enough to choose a frame by, not enough to judge fine focus. Arrows step the photo on the right; <strong>Hold this one</strong> moves it to the left to compare against the rest.</p>
+    </dialog>
+
     <dialog id="quickLook" aria-label="Quick look">
       <div class="ql-head">
         <div class="ql-title">
@@ -707,13 +746,15 @@
           <span id="qlReuseNote" class="ql-reuse" role="status" aria-live="polite"></span>
         </div>
         <div class="ql-actions">
+          <button id="qlCompare" type="button" class="ql-btn" hidden>Compare two</button>
           <button id="qlRebuild" type="button" class="ql-btn" hidden>Build these again</button>
           <button id="qlSelectToggle" type="button" class="ql-btn" hidden>Select none</button>
           <button id="qlKeep" type="button" class="ql-btn ql-keep" disabled>Keep in a session &rarr;</button>
           <button id="qlClose" type="button" class="ql-btn">Close</button>
         </div>
       </div>
-      <div id="qlGrid" class="ql-grid"></div>
+      <div id="qlGrid" class="ql-grid" role="group" aria-label="Photos in this folder — press P to pick, X to reject, C to compare"></div>
+      <p class="ql-help">Tap a photo to <strong>pick</strong> it, or the ✗ to <strong>reject</strong> it. Keep takes your picks if you made any, otherwise everything you did not reject. With a keyboard: <strong>P</strong> picks, <strong>X</strong> rejects, <strong>U</strong> unmarks, <strong>C</strong> compares, and the arrows step past rejects — Home and End reach every photo, including a rejected one.</p>
       <div id="qlPos" class="ql-pos" aria-hidden="true"></div>
     </dialog>
 
