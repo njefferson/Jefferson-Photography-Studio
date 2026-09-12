@@ -1593,6 +1593,11 @@ body.dropping::after {
 .ql-title { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
 .ql-title strong { font: 600 1rem/1.2 var(--display); }
 #qlCount { font: 0.6875rem/1.3 var(--mono); color: var(--txt-2); }
+/* What came back from the device rather than being decoded again. --txt-2 is a
+   calibrated token and clears 4.5:1 in both themes; the line wraps away on a
+   narrow screen rather than squeezing the count beside it. */
+.ql-reuse { font: 0.6875rem/1.3 var(--ui); color: var(--txt-2); min-width: 0; }
+@media (max-width: 560px) { .ql-title { flex-wrap: wrap; } .ql-reuse { flex-basis: 100%; } }
 .ql-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .ql-btn {
   /* 34px tall as authored, on the primary controls of a full-screen surface.

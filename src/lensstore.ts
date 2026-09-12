@@ -154,6 +154,30 @@ export function listProfiles(): StoredProfile[] {
   return read();
 }
 
+/** A CHEAP FINGERPRINT OF EVERY STORED PROFILE, for anything that keeps a
+ *  rendered picture around. A preview or a thumbnail is rendered THROUGH the
+ *  reader's lens correction, so one made before a re-measurement is a portrait
+ *  of the old correction — and re-measuring is not rare: one this month took a
+ *  device from 11 profiles carrying colour to 71.
+ *
+ *  Hashed from the stored text rather than kept as a counter, because a counter
+ *  has to be bumped by every writer and the writer that forgets serves stale
+ *  pictures for ever. */
+export function profilesStamp(): string {
+  let raw = "";
+  try {
+    raw = localStorage.getItem(KEY) ?? "";
+  } catch {
+    return "0"; // private window: nothing stored, nothing to invalidate
+  }
+  let h = 2166136261; // FNV-1a, 32-bit
+  for (let i = 0; i < raw.length; i++) {
+    h ^= raw.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(36) + "." + raw.length.toString(36);
+}
+
 /** Take a rig payload and keep its colour terms. Replaces any profile already
  *  stored under the same key — re-measuring a lens should improve it, not
  *  leave two answers to one question. */
