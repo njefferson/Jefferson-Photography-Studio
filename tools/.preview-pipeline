@@ -1,5 +1,5 @@
 # Written by tools/preview-version-check.mjs --record. Not hand-edited.
 version=2
-hash=c3194717d5372ccf
+hash=077724991069c0e2
 # Recorded WITHOUT a version bump. The evidence the pictures did not change:
-proven=the same 20.9 MP raw exported before and after: sha256 cf329769f749fbe6b92049cfe0ab909b both times, twice over
+proven=src/raw/detail.ts only: makeRowDetail returns its base sampler untouched when sharpen <= 0 and texture === 0, and makeThumb sets both to 0 explicitly (src/main.ts, the preview EditParams), so no preview can reach the changed code. The changes themselves: the luma row cache fills where it is read (detailparity.mjs, four scan orders x four slider settings, every value identical, with a planted defect reported as different), and the centre colour is held as three numbers rather than a reused array, which only differs when base and raw are the same sampler - denoise 0 with sharpen or texture up, measured at 933 of 1,304,800 pixels and ZERO with denoise on. Previews set denoise 0 AND sharpen 0, so neither path is reachable.
