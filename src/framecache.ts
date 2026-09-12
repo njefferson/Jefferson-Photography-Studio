@@ -15,6 +15,26 @@
 //
 // The key is the file's name and byte length, which is what identifies a picked
 // file across runs without reading it — the same identity a resumed batch uses.
+//
+// AND THE VERSION OF THE APP THAT MEASURED IT, which the key did NOT carry and
+// which turned this from a convenience into a way of serving a fixed bug back.
+//
+// A cached row is the OUTPUT of the decoder and the profiler. Change either and
+// every row becomes an answer from the old code, and a row is reused for a
+// fortnight. So after the decoder was fixed to read Nikon raws as raw rather
+// than as their embedded previews, and after the per-radius estimator stopped
+// emptying the corner, re-measuring the same files would have returned the same
+// numbers from before both fixes — with the rig reporting them as "already done
+// from an earlier run", which reads as progress. Nothing would have looked
+// wrong; the profiles would just still have been the old ones.
+//
+// The version rather than a hand-kept measuring-code number, because a number
+// somebody has to remember to bump is a number that gets forgotten exactly when
+// it matters. This one moves on every release by construction. The cost is that
+// a release ends any run in progress, and the moment this cache exists to
+// survive is a sleep or a reload in the middle of measuring — minutes, not
+// releases.
+declare const __APP_VERSION__: string;
 
 export interface CachedFrame {
   key: string;
@@ -29,8 +49,11 @@ const STORE = "frames";
 const KEEP_MS = 14 * 24 * 60 * 60 * 1000; // a fortnight: long enough to finish a shoot
 
 export function frameKey(name: string, size: number): string {
-  return `${name} ${size}`;
+  return `${__APP_VERSION__} ${name} ${size}`;
 }
+
+/** The prefix every key from this build carries. */
+const mine = () => `${__APP_VERSION__} `;
 
 function open(): Promise<IDBDatabase> {
   return new Promise((res, rej) => {
@@ -55,9 +78,18 @@ export async function loadMeasured(): Promise<Map<string, unknown>> {
       const rq = tx.objectStore(STORE).getAll();
       rq.onsuccess = () => {
         const now = Date.now();
+        const pre = mine();
+        let others = 0;
         for (const row of (rq.result ?? []) as CachedFrame[]) {
-          if (row?.key && row.profile && now - (row.at ?? 0) < KEEP_MS) out.set(row.key, row.profile);
+          if (!row?.key || !row.profile) continue;
+          // A ROW FROM ANOTHER BUILD IS NOT A ROW, IT IS AN OLD ANSWER.
+          if (!row.key.startsWith(pre)) { others++; continue; }
+          if (now - (row.at ?? 0) < KEEP_MS) out.set(row.key, row.profile);
         }
+        // Sweep them rather than leave them to age out over a fortnight. This is
+        // also what gives clearMeasured a caller: it was exported and never
+        // called by anything, which is a check nobody had run.
+        if (others) void clearMeasured();
         res();
       };
       rq.onerror = () => res(); // an unreadable cache is an empty one, never a failure
