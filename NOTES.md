@@ -9691,3 +9691,39 @@ whatever on an iPhone or iPad — the share sheet is the only way a file reaches
 the disk there. The backup button beside it had been fixed for exactly that
 months earlier: the fix was applied to the instance and not to the class. Both
 go through `saveBlob` now, and the run save says which scope it wrote.
+
+## The shipped table, remeasured from raw, 2026-09-12
+
+`src/hotspotProfiles.ts` went from 30 profiles to 72, and from every one
+recording `source: "rendered"` to 67 of 72 recording `raw`. 71 of the 72 carry a
+colour curve; before, all 30 did, but every one of them was measured after the
+camera matrix and its tone curve, which reads 3.5x too strong in red and 2.3x in
+blue against the same frames measured from the sensor.
+
+Generated from five rig payloads, not hand-edited: four batches plus the
+reingest that followed the queueing change, which is why 52 of the 72 rest on
+two or more frames where the afternoon's batches were almost all singles.
+
+**THE GENERATOR HAD THE DEFECT THAT HAD JUST BEEN FIXED IN THE APP.** Its
+collision rule was frame count alone — the same rule `place()` stopped using
+hours earlier, and for the same reason. Regenerating with it put FOUR colourless
+rendered profiles into the shipped table ahead of raw ones carrying colour,
+purely because they had been shot more times. `saysAnythingAboutColour` is
+exported from `lensstore.ts` now and the generator imports it, with a check that
+throws if the export disappears rather than silently falling back to frames.
+Three collisions are decided by colour on the current data.
+
+**One key is still flat: 50-250 at 250mm f/32**, whose only measurement is a
+three-frame rendered one. Nothing re-shot it, and no store rule can conjure
+colour into a measurement that did not find any. Four more keys on the device
+were offered nothing by this round and keep their older readings: 130mm at f/13,
+200mm at f/16, 250mm at f/9 and 250mm at f/32.
+
+**And an assertion had to be narrowed twice, each time because the corpus grew.**
+"Every stored profile carries colour" was true while every input did; adding the
+reingest payload, which contains one honestly flat profile, made it false without
+anything being wrong. It now reads: no profile loses a colour curve a payload
+gave it, and a profile is flat only where every payload for it was flat. That is
+a claim about the store. The first one was a claim about the corpus wearing a
+correctness claim's clothes, which is the same shape as counting the whole device
+when only part of it was re-measured.
