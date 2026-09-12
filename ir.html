@@ -888,6 +888,11 @@
         </div>
         <p class="note" id="lensScreenNote" hidden role="status"></p>
         <p class="note" id="lensRunning" hidden role="status"></p>
+        <!-- A PASS AFTER THE FIRST NEEDS ITS OWN LINE. Explaining the larger
+             count in #lensRunning does not work: that line is the progress
+             readout and is rewritten within milliseconds, so the explanation was
+             measured as never visible. This one persists until the run ends. -->
+        <p class="note" id="lensJoinNote" hidden role="status"></p>
         <!-- THE OUTCOME COMES FIRST. This sat below the per-frame list, which is
              one row per photograph and can be ninety of them: the button that
              makes the whole thing mean anything was at the bottom of a wall of
