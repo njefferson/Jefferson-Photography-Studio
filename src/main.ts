@@ -6979,7 +6979,7 @@ async function switchToPhoto(id: string) {
 /** Build a small gamma-encoded JPEG thumbnail for the strip — auto white
  *  balanced (so RAW infrared isn't a magenta smear) but ungraded, so it just
  *  says "which photo is this". Cheap: nearest-sampled at thumb resolution. */
-async function makeThumb(img: DecodedImage, MAX = 260, lens?: LensCurve | null): Promise<ArrayBuffer> {
+async function makeThumb(img: DecodedImage, MAX = 260, lens?: LensCurve | null, own?: Snapshot | null): Promise<ArrayBuffer> {
   const s = Math.min(1, MAX / Math.max(img.width, img.height));
   const w = Math.max(1, Math.round(img.width * s));
   const h = Math.max(1, Math.round(img.height * s));
@@ -7000,18 +7000,32 @@ async function makeThumb(img: DecodedImage, MAX = 260, lens?: LensCurve | null):
   // bias and all three render as Aerochrome, whichever one is selected, while
   // mono/sepia/natural still change because their difference is swap, sat or
   // tint. Same multiply batchParamsFor already does for a built-in look.
-  const gw = grayWorldWB(img);
+  // WITH `own`, EVERY VALUE COMES FROM THAT PHOTO'S OWN EDIT — balance,
+  // exposure and grade alike — because it has all of them already measured and
+  // there is nothing to guess. Without it the photo has never been opened, so
+  // the tile is a claim about what opening it WILL do: its own measured balance
+  // and exposure, under the live look, which is what establishFreshEdit
+  // applies.
+  const gw = own ? own.params.wb : grayWorldWB(img);
+  const bias = own ? ([1, 1, 1] as [number, number, number]) : lookBias;
   const wb: [number, number, number] = [
-    clamp(gw[0] * lookBias[0], 0.02, 16),
-    clamp(gw[1] * lookBias[1], 0.02, 16),
-    clamp(gw[2] * lookBias[2], 0.02, 16),
+    clamp(gw[0] * bias[0], 0.02, 16),
+    clamp(gw[1] * bias[1], 0.02, 16),
+    clamp(gw[2] * bias[2], 0.02, 16),
   ];
   const p: EditParams = {
-    ...cloneParams(params),
+    ...cloneParams(own ? own.params : params),
+    // An own edit carries its own correction strength. Without one, the tile
+    // claims what opening the photo will do — full strength where a profile
+    // matched, and nothing where none did — rather than inheriting whatever
+    // the OPEN photo's slider happens to say, which is a different frame's
+    // answer.
+    lensFix: own ? own.params.lensFix : lens ? 1 : 0,
+    lensBypass: own ? own.params.lensBypass : false,
     wb,
-    exposure: autoExposure(img, wb),
+    exposure: own ? own.params.exposure : autoExposure(img, wb),
     denoise: 0,
-    recover: img.camMatrix ? autoRecover(img) : 0,
+    recover: own ? (own.params.recover ?? 0) : img.camMatrix ? autoRecover(img) : 0,
     masks: [],
     spots: [],
     glow: 0,
@@ -7034,7 +7048,7 @@ async function makeThumb(img: DecodedImage, MAX = 260, lens?: LensCurve | null):
     sky: [0, 1, 1],
     foliage: [0, 1, 1],
   };
-  if (autoLift) {
+  if (autoLift && !own) {
     const solved = solveLift(activeLook !== null, img, p);
     const lift = solved && scaleLift(solved, liftAmount);
     if (lift) { p.tone = lift.tone as typeof p.tone; p.sky = lift.sky as typeof p.sky; p.foliage = lift.foliage as typeof p.foliage; }
@@ -7385,7 +7399,9 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Ar
         if (slot.thumbUrl) URL.revokeObjectURL(slot.thumbUrl);
         slot.thumbUrl = URL.createObjectURL(new Blob([done], { type: "image/jpeg" }));
         slot.thumbState = "real";
-        slot.thumbGrade = gradeStamp();
+        // The grid rendered this one under the live grade, which for a photo
+        // arriving in the session is also what opening it will apply.
+        slot.thumbGrade = stampFor(slot);
       }
 
       // The camera's own preview, free, from bytes already in hand — so the
@@ -7535,8 +7551,17 @@ async function realThumbnails(): Promise<void> {
     }
     try {
       const bytes = await Session.getBytes(view.id);
-      const img = await decodeOffThread({ name: view.name, kind: view.kind, bytes, looksTranscoded: false });
-      const thumb = await makeThumb(img);
+      const imported: ImportedFile = { name: view.name, kind: view.kind, bytes, looksTranscoded: false };
+      const img = await decodeOffThread(imported);
+      const own = ownEdit(view);
+      // THE LENS CORRECTION WAS MISSING FROM EVERY STRIP TILE, so a tile wore
+      // the hot spot the photograph itself does not have — a bright disc in the
+      // middle of the tile and none in the picture it opens into, which reads
+      // as the tile belonging to some other frame. `lensCurveFor` exists for
+      // exactly this (its own comment says "every path that renders a frame
+      // other than the one the reader has open") and the quick-look grid has
+      // always passed it; this path never did.
+      const thumb = await makeThumb(img, 260, lensCurveFor(imported), own);
       if (gen !== thumbPass) return;
       if (!sessionPhotos.some((p) => p.id === view.id)) continue; // dropped while we worked
       if (thumb.byteLength) {
@@ -7545,14 +7570,14 @@ async function realThumbnails(): Promise<void> {
         await Session.setThumb(view.id, thumb).catch(() => {});
       }
       view.thumbState = "real";
-      view.thumbGrade = gradeStamp(); // what this picture is a claim about
+      view.thumbGrade = stampFor(view); // what this picture is a claim about
       updateSessionStrip();
     } catch {
       // A thumbnail is not worth failing an open over — the tile keeps the
       // camera preview, or its name, and the photo still opens. Mark it done
       // either way so a file that will never render cannot spin this loop.
       view.thumbState = "real";
-      view.thumbGrade = gradeStamp();
+      view.thumbGrade = stampFor(view);
     }
     await tick();
   }
@@ -7563,12 +7588,44 @@ async function realThumbnails(): Promise<void> {
  *  exposure, denoise) with the photo's own, so only these can make one tile
  *  differ from another's stored picture. Stamped onto each tile so a tile
  *  rendered under a different grade can be found and redrawn. */
-function gradeStamp(): string {
+function stampOf(pr: EditParams, look: string | null, bias: [number, number, number]): string {
   return JSON.stringify([
-    activeLook, params.swapRB, params.hue, params.sat, params.contrast, params.tint,
-    params.glow, params.lum, params.toneR, params.toneG, params.toneB, params.hsl,
-    params.bwOn, params.bwMix, params.grade, params.mix3, lookBias, autoLift, liftAmount,
+    look, pr.swapRB, pr.hue, pr.sat, pr.contrast, pr.tint,
+    pr.glow, pr.lum, pr.toneR, pr.toneG, pr.toneB, pr.hsl,
+    pr.bwOn, pr.bwMix, pr.grade, pr.mix3, bias, autoLift, liftAmount,
   ]);
+}
+function gradeStamp(): string {
+  return stampOf(params, activeLook, lookBias);
+}
+
+/** WHAT THIS PHOTO'S OWN EDIT SAYS, or null for one that has never been opened
+ *  and carries nothing stored.
+ *
+ *  `params` is a single object that holds the OPEN photo's edit, so anything
+ *  reading it while building a tile for a different photo is reading the wrong
+ *  photo. That is what made the strip a claim about the reader's next press
+ *  rather than about the picture: a tile was rendered under whatever grade
+ *  happened to be live, so moving between photos left every tile describing
+ *  somewhere else. A photo that has been opened, or that came back with a
+ *  stored edit from a resumed session, has its own answer — use it. */
+function ownEdit(view: { id: string; edit: string | null }): Snapshot | null {
+  const live = liveEdits.get(view.id);
+  if (live) return live.snapshot;
+  if (view.edit) {
+    try { return JSON.parse(view.edit) as Snapshot; } catch { return null; }
+  }
+  return null;
+}
+
+/** The grade a tile for this photo SHOULD be rendered under: its own, or — for
+ *  a photo not yet opened — the live one, because that is what opening it will
+ *  apply (establishFreshEdit re-applies the active look). One stamp either
+ *  way, so a first visit that lands on the same creative state as the tile
+ *  already showed does not invalidate it. */
+function stampFor(view: { id: string; edit: string | null }): string {
+  const own = ownEdit(view);
+  return own ? stampOf(own.params, own.activeLook, own.lookBias) : gradeStamp();
 }
 
 /** A look (or any grade move) changed: every tile is now showing a picture the
@@ -7582,9 +7639,16 @@ function restripForGrade(): void {
   clearTimeout(regradeTimer);
   regradeTimer = window.setTimeout(() => {
     if (sessionPhotos.length < 2) return; // a lone photo has no strip
-    const stamp = gradeStamp();
     let stale = 0;
-    for (const v of sessionPhotos) if (v.id !== "lone" && v.thumbGrade !== stamp) { v.thumbState = "waiting"; stale++; }
+    for (const v of sessionPhotos) {
+      if (v.id === "lone") continue;
+      // PER PHOTO, not one session stamp: a look pressed here changes THIS
+      // photo's edit and the future of every photo not yet opened, and nothing
+      // about a photo already edited to something else. Marking the whole strip
+      // stale redrew tiles that were already right — which is work, and on a
+      // tablet it is visible work.
+      if (v.thumbGrade !== stampFor(v)) { v.thumbState = "waiting"; stale++; }
+    }
     if (stale) void realThumbnails();
   }, 900);
 }
@@ -7696,50 +7760,89 @@ function updateSessionStrip() {
     sessionMeta.textContent =
       `${real.length} photos · ~${fmtSize(total)}` + (idx >= 0 ? ` · viewing ${idx + 1}` : "");
   }
-  sessionThumbs.replaceChildren(
-    ...real.map((p) => {
-      const b = document.createElement("button");
-      b.type = "button";
-      const saving = pendingStore.has(p.id);
-      b.className =
-        "session-thumb" +
-        (p.id === activePhotoId ? " active" : "") +
-        (saving ? " saving" : "") +
-        (p.thumbState === "preview" ? " provisional" : "");
-      b.title = saving
-        ? `${p.name} — still saving`
-        : p.thumbState === "preview"
-          ? `${p.name} — showing the camera's own preview until this app has rendered its own`
-          : p.name;
-      b.disabled = saving;
-      if (p.thumbUrl) {
+  // EVERY TILE USED TO BE THROWN AWAY AND REBUILT HERE, on every call — and
+  // this is called on every switch, every add and every thumbnail that lands.
+  // A new <img> with the same blob URL decodes again, so moving between photos
+  // made the whole row blink while not one picture changed: reported from a
+  // real session, and measured before this was written as twelve tiles
+  // destroyed and twelve pictures re-decoded for two presses.
+  //
+  // So the tiles are RECONCILED instead: matched to photos by id, moved rather
+  // than recreated, and each part written only when it differs. A press that
+  // only changes which photo is active now changes one class on two elements.
+  const have = new Map<string, HTMLElement>();
+  for (const el of [...sessionThumbs.children]) {
+    const id = (el as HTMLElement).dataset.pid;
+    if (id) have.set(id, el as HTMLElement);
+    else el.remove(); // not ours — nothing writes untagged children, but never leave one
+  }
+  real.forEach((p, i) => {
+    let b = have.get(p.id);
+    if (!b) {
+      b = document.createElement("button");
+      b.setAttribute("type", "button");
+      b.dataset.pid = p.id;
+      // The listener is attached ONCE, to an element that outlives every
+      // redraw, so it reads the photo's id off the element rather than closing
+      // over a photo object that a later reconcile would have replaced.
+      b.addEventListener("click", () => {
+        if (stripDragged) return; // that press was a scroll, not a choice
+        const id = b!.dataset.pid;
+        if (id && id !== activePhotoId) void switchToPhoto(id);
+      });
+    }
+    have.delete(p.id);
+    const saving = pendingStore.has(p.id);
+    const cls =
+      "session-thumb" +
+      (p.id === activePhotoId ? " active" : "") +
+      (saving ? " saving" : "") +
+      (p.thumbState === "preview" ? " provisional" : "");
+    if (b.className !== cls) b.className = cls;
+    // A provisional tile says so in text, not by colour alone: the picture in
+    // it is the camera's rendering, not this app's. It read "cam", which is
+    // not a word — it was an abbreviation of a sentence nobody had been told,
+    // sitting on a badge with no explanation anywhere. "Preview" is what it
+    // means, and the tile's own tooltip says the rest.
+    const title = saving
+      ? `${p.name} — still saving`
+      : p.thumbState === "preview"
+        ? `${p.name} — showing the camera's own preview until this app has developed it`
+        : p.name;
+    if (b.title !== title) b.title = title;
+    if ((b as HTMLButtonElement).disabled !== saving) (b as HTMLButtonElement).disabled = saving;
+
+    const img = b.querySelector("img");
+    if (p.thumbUrl) {
+      if (img) {
+        // THE SRC IS WRITTEN ONLY WHEN THE PICTURE IS ACTUALLY A NEW ONE.
+        // Assigning the same URL re-decodes it, which is the flash this whole
+        // function was rewritten to stop.
+        if (img.getAttribute("src") !== p.thumbUrl) img.src = p.thumbUrl;
+        if (img.alt !== p.name) img.alt = p.name;
+      } else {
         const im = document.createElement("img");
         im.draggable = false; // a tile is a button, not draggable content (CSS user-drag is not universal)
         im.src = p.thumbUrl;
         im.alt = p.name;
-        b.append(im);
-      } else {
-        b.append(Object.assign(document.createElement("span"), { className: "session-thumb-name", textContent: p.name }));
+        b.replaceChildren(im);
       }
-      // A provisional tile says so in text, not by colour alone: the picture in
-      // it is the camera's rendering, not this app's. It read "cam", which is
-      // not a word — it was an abbreviation of a sentence nobody had been told,
-      // sitting on a badge with no explanation anywhere. "Preview" is what it
-      // means, and the tile's own tooltip says the rest.
-      if (p.thumbState === "preview" && !saving) {
-        b.append(Object.assign(document.createElement("span"), { className: "session-thumb-tag", textContent: "preview" }));
-        b.title = `${p.name} — showing the camera's own preview until this app has developed it`;
-      }
-      b.addEventListener("click", () => {
-        if (stripDragged) return; // that press was a scroll, not a choice
-        if (p.id !== activePhotoId) switchToPhoto(p.id);
-      });
-      return b;
-    }),
-  );
-  // The strip is rebuilt on every add and every switch; without this the scroll
-  // position snapped back to the first photo each time, so a mouse user could
-  // never reach the far end of a long set.
+    } else if (!b.querySelector(".session-thumb-name")) {
+      b.replaceChildren(Object.assign(document.createElement("span"), { className: "session-thumb-name", textContent: p.name }));
+    }
+    const tag = b.querySelector(".session-thumb-tag");
+    const wantTag = p.thumbState === "preview" && !saving;
+    if (wantTag && !tag) b.append(Object.assign(document.createElement("span"), { className: "session-thumb-tag", textContent: "preview" }));
+    else if (!wantTag && tag) tag.remove();
+
+    // Order, without touching anything already in the right place.
+    if (sessionThumbs.children[i] !== b) sessionThumbs.insertBefore(b, sessionThumbs.children[i] ?? null);
+  });
+  for (const el of have.values()) el.remove(); // photos that left the session
+  // The strip was rebuilt on every add and every switch; without this the
+  // scroll position snapped back to the first photo each time, so a mouse user
+  // could never reach the far end of a long set. Kept now because an insert
+  // can still move the scroll.
   sessionThumbs.scrollLeft = keepScroll;
   stageEl.classList.add("has-session");
   stageEl.style.setProperty("--session-h", `${sessionStrip.offsetHeight}px`);
