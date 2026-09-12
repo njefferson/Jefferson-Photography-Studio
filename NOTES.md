@@ -609,6 +609,44 @@ user-scalable=no.
   to manifest.webmanifest for richer install/share sheets. Generate via the
   headless-Chromium pipeline (same as icons) from a good open-photo state;
   needs curated assets, so deferred from the setup pass.
+- [ ] **Tiles for a photo you have not opened yet** — measured 2026-09-12 and
+  written up under "the strip's tiles". A tile for a photo you HAVE opened
+  matches the photograph to 0.004 on a centre-against-edge measure; one you have
+  not is 0.052 off, on a flat with a 43% hot spot. The lens correction is not
+  the cause — it is present at full strength on both sides. The automatic depth
+  lift is worked out twice, once for the tile and once when the photo opens, and
+  the two answers differ on a frame whose middle is near white. The fix is to
+  render an unopened photo's tile through the same code the open path uses,
+  which means lifting the opening baseline out of `establishFreshEdit` as a pure
+  function — a refactor of a load-bearing function with undo semantics attached
+  (see "Adding an EditParams field" in CLAUDE.md), not a small change.
+- [ ] **Exporting a sharpened photo that is also straightened** — the sibling of
+  the 119x straighten fix of 2026-09-12, and deliberately not touched in it.
+  `makeRowDetail` in `src/raw/detail.ts` has the same eager-row shape at line 88:
+  it fills a cached row right across the image the first time any part of it is
+  read, which is right for a scan that walks straight down the picture and
+  catastrophic the moment a straighten angle makes it walk on a slant. The
+  denoise pass was the heavier of the two and is fixed; a straightened export
+  still pays this one whenever Sharpen or Texture is off zero. Same remedy, same
+  bit-identical proof required (build the old implementation beside the new one
+  and compare, rather than writing a fresh reference).
+- [ ] **How long an export really takes** — unmeasured, and the straighten case
+  showed why that matters: a 119x cost sat in an ordinary-looking export for
+  however long it had been there. Nothing has timed where a plain export's
+  seconds actually go — the decode, the per-pixel edit, or the JPEG encode — so
+  there is no basis for saying which one to attack. Measure first, on a real
+  24-megapixel frame at full quality, and report the split before changing
+  anything.
+- [ ] **Lens profiles that cannot vanish** — owner ask, 2026-09-12: the measured
+  profiles "shouldn't suddenly disappear for a user expecting them to be
+  durable". They live in this browser's localStorage; the app asks the browser
+  to keep it, which the browser may refuse now or revoke later — WebKit clears
+  script-writable storage after seven days without a visit, and an installed
+  home-screen app is exempt where a tab is not. The panel already says which of
+  those states the device is in. What is owed is a route that does not depend on
+  that at all: an export the reader keeps (which exists) plus a prompt to take
+  one when a set has been measured, and an honest account in the ⓘ of what
+  survives what.
 
 ## Shipped (roadmap archive)
 
@@ -10080,3 +10118,70 @@ way. It comes back to the same angle, twice, to a tenth of a degree.
 hillside declined and a canopy levelled when it was the other way round — a set
 is sorted into shutter order on the way in, so the picker's order is not the
 strip's. The name now comes from the app.
+
+## 2026-09-12 — picks, rejects, and comparing two frames
+
+**ONE FLAG THAT STARTED TRUE ON EVERY PHOTO** is what a quick look had. "Keep
+these" meant "keep everything I did not untick", and there was no way to say a
+frame was bad as opposed to not yet considered — which is most of them, in a
+folder you are going through.
+
+Three states now: **pick**, **reject**, or nothing yet, which is what every
+culling tool has had since slide sorters. Lightroom's flags and Photo Mechanic's
+whole reason to exist are the precedent, and the two that earn their place here
+are the ones that were asked for: a pick, and a reject that dims the tile and is
+skipped by the arrow keys.
+
+**What Keep takes is stated once, in `willKeep`, because it is SAID in three
+places** — the button's own label, the header's count, and the keep itself. The
+rule is the one a reader would guess: your picks if you made any, otherwise
+everything you did not reject. A folder gone through without marking anything
+behaves exactly as it did before there were marks, and one pick changes the
+answer to "only what I chose".
+
+**THE MARK IS IN WORDS ON THE TILE**, not in the tinting: a dimmed tile and a
+tinted border are the same thing to a reader who cannot separate them, so a
+picked tile says Pick and a rejected one says Reject, and a rejected one also
+carries a dashed edge and a struck-through name. Three carriers, none of them
+colour alone (the standing mandate).
+
+**A cell, not a tile.** Reject is its own 44px control and a button cannot
+contain a button, so the picture (which IS the pick) and the reject sit side by
+side in a `.ql-cell` wrapper.
+
+**One tab stop for the whole grid**, with arrows moving within it — the roving
+tabindex every grid widget uses. A folder of three hundred photographs would
+otherwise put six hundred tab stops between the grid and the Keep button. P
+picks, X rejects, U unmarks, C compares; arrows skip rejects, which is what a
+reject is FOR, and Home and End reach everything so nothing is ever stranded
+behind its own mark.
+
+**COMPARING IS ONE HELD AND ONE STEPPING**, not two arbitrary frames. That is
+how a burst is actually culled: the question is never "these two photographs"
+but "does this one beat the one I have". Arrows step the candidate, Hold this
+one moves it across, and a mark made while comparing is in the grid when you
+come back — asserted, because two surfaces over one model is exactly where a
+mark goes missing.
+
+It shows the grid's own preview pictures rather than full renders. A full-size
+decode per step would take seconds each and make stepping through a burst
+unusable; a preview is enough to choose a frame by and not enough to judge fine
+focus, and the panel says so rather than letting it be assumed.
+
+**Asserted by `cull.mjs`** (session scratchpad), which claims what the app WILL
+DO rather than what the tiles look like: the counts in words, the Keep button's
+own promise at each stage, an arrow press skipping a rejected frame, compare
+opening on two different photographs, the candidate stepping, the hold moving
+across, a reject made while comparing arriving in the grid, and finally **which
+photographs actually reach the session**. The last claim was wrong on the first
+run and the app was right: rejecting a picked frame while comparing REPLACES the
+pick, so one pick survived rather than two.
+
+**And the harness waited ten minutes for something that was never coming** — a
+single kept photo opens alone, with no strip at all, so waiting for two tiles
+waits forever, behind a `.catch()` that made the timeout silent.
+
+**The compare dialog joined `a11y.mjs`'s surface list in the same commit that
+created it** (hub LESSONS §28 — a new surface that does not is a surface that
+ships unmeasured). Zero axe violations in both themes, every control 44px or
+more at 430px and 900px wide.

@@ -8291,7 +8291,32 @@ interface QuickItem {
    *  twice in a row is the reader's own observation, and it was right. */
   stripThumb: ArrayBuffer | null;
   ok: boolean;
-  selected: boolean;
+  /** PICK, REJECT, OR NOTHING YET — the three states every culling tool has
+   *  had since slide sorters, and what a reader going through a folder
+   *  actually does: this one, not this one, and the great majority they have
+   *  no opinion about yet.
+   *
+   *  It replaced a single `selected` flag that started TRUE on every photo, so
+   *  "keep these" meant "keep everything I did not untick" and there was no way
+   *  to say a frame was bad as opposed to not-yet-considered. */
+  mark: "pick" | "reject" | null;
+}
+
+/** WHAT "KEEP" WILL TAKE, in one place because it is stated in three: the
+ *  button's own label, the header's count, and the keep itself.
+ *
+ *  The rule is the one a reader would guess: your picks if you made any,
+ *  otherwise everything you did not reject. That way a folder gone through
+ *  without marking anything behaves exactly as it did before there were marks,
+ *  and one pick changes the answer to "only what I chose". */
+function willKeep(it: QuickItem, anyPicks: boolean): boolean {
+  return it.ok && (anyPicks ? it.mark === "pick" : it.mark !== "reject");
+}
+function quickPickCount(): number {
+  return quickItems.reduce((n, it) => n + (it.mark === "pick" ? 1 : 0), 0);
+}
+function quickRejectCount(): number {
+  return quickItems.reduce((n, it) => n + (it.mark === "reject" ? 1 : 0), 0);
 }
 
 let quickItems: QuickItem[] = [];
@@ -8305,7 +8330,7 @@ let quickItems: QuickItem[] = [];
 setUpdateCost(() => {
   if (!quickLook.open || !quickItems.length) return null;
   const n = quickItems.length;
-  const picked = quickItems.reduce((c, it) => c + (it.selected ? 1 : 0), 0);
+  const picked = quickPickCount();
   return `this quick look of ${n} photo${n === 1 ? "" : "s"} cannot survive it — the browser will not re-open files you picked, so you would choose the folder again and wait for the previews a second time` +
     (picked && picked !== n ? `, and the ${picked} you have kept selected would be forgotten.` : ".");
 });
@@ -8329,48 +8354,134 @@ const qlPos = $("qlPos") as HTMLDivElement;
 const QUICK_EDGE = 512; // grid-tile preview edge (bigger than the strip's 260)
 
 function quickSelectedCount(): number {
-  return quickItems.reduce((n, it) => n + (it.selected ? 1 : 0), 0);
+  const picks = quickPickCount() > 0;
+  return quickItems.reduce((n, it) => n + (willKeep(it, picks) ? 1 : 0), 0);
 }
 
 /** Refresh the header: count/progress, the Keep button's live count, and the
  *  select-all/none toggle. `progress` is shown while still decoding. */
 function updateQuickHeader(progress?: string) {
   const ok = quickItems.filter((it) => it.ok).length;
+  const picks = quickPickCount();
+  const rejects = quickRejectCount();
   const sel = quickSelectedCount();
-  qlCount.textContent = progress ?? `${ok} photo${ok === 1 ? "" : "s"}`;
-  qlKeep.textContent = sel ? `Keep ${sel} in a session →` : "Keep in a session →";
+  // Counts in WORDS, never in colour: the marks are readable in grayscale and
+  // by anyone who never looks at the tiles' tinting at all.
+  const parts = [`${ok} photo${ok === 1 ? "" : "s"}`];
+  if (picks) parts.push(`${picks} picked`);
+  if (rejects) parts.push(`${rejects} rejected`);
+  qlCount.textContent = progress ?? parts.join(" · ");
+  qlKeep.textContent = !sel
+    ? "Keep in a session →"
+    : picks
+      ? `Keep ${sel} pick${sel === 1 ? "" : "s"} in a session →`
+      : `Keep ${sel} in a session →`;
   qlKeep.disabled = sel === 0;
-  const anyUnsel = quickItems.some((it) => it.ok && !it.selected);
-  qlSelectToggle.textContent = anyUnsel ? "Select all" : "Select none";
-  qlSelectToggle.hidden = ok === 0;
+  qlSelectToggle.textContent = picks ? "Clear picks" : rejects ? "Clear rejects" : "";
+  qlSelectToggle.hidden = !(picks || rejects);
+  const cmp = document.getElementById("qlCompare") as HTMLButtonElement | null;
+  if (cmp) cmp.hidden = ok < 2;
 }
 
 /** Append one grid tile (a preview, or a placeholder for a file that wouldn't
  *  decode). Tapping a good tile toggles whether it's a keeper. `n` is the
  *  photo's 1-based position in the grid — shown on the tile so a big set
  *  stays countable ("what number am I on?"). */
+/** Paint one cell to match its item — called on every mark, and the only place
+ *  that knows what a mark looks like. */
+function paintQuickCell(cell: HTMLElement, it: QuickItem): void {
+  const tile = cell.querySelector(".ql-tile") as HTMLButtonElement | null;
+  const badge = cell.querySelector(".ql-badge") as HTMLElement | null;
+  const x = cell.querySelector(".ql-x") as HTMLButtonElement | null;
+  cell.classList.toggle("picked", it.mark === "pick");
+  cell.classList.toggle("rejected", it.mark === "reject");
+  if (badge) {
+    // TEXT, NOT COLOUR. A dimmed tile and a tinted border are the same thing to
+    // a reader who cannot separate them, so the state is written on the tile.
+    badge.textContent = it.mark === "pick" ? "Pick" : it.mark === "reject" ? "Reject" : "";
+    badge.hidden = !it.mark;
+  }
+  if (tile) tile.setAttribute("aria-pressed", String(it.mark === "pick"));
+  if (x) x.setAttribute("aria-pressed", String(it.mark === "reject"));
+}
+
+function markQuick(it: QuickItem, mark: QuickItem["mark"]): void {
+  it.mark = it.mark === mark ? null : mark; // pressing the same mark takes it off
+  const i = quickItems.indexOf(it);
+  const cell = qlGrid.children[i] as HTMLElement | undefined;
+  if (cell) paintQuickCell(cell, it);
+  updateQuickHeader();
+}
+
 function addQuickTile(it: QuickItem, n: number) {
+  // A CELL, because a tile now carries two controls and a button cannot hold a
+  // button. The picture itself is the pick — the same tap that used to select —
+  // and reject is its own small control beside it.
+  const cell = document.createElement("div");
+  cell.className = "ql-cell";
   const tile = document.createElement("button");
   tile.type = "button";
-  tile.className = "ql-tile" + (it.selected ? " selected" : "");
+  tile.className = "ql-tile";
+  tile.tabIndex = -1; // one tab stop for the whole grid; arrows move within it
   tile.title = it.name;
   if (it.ok && it.thumbUrl) {
     const im = document.createElement("img");
     im.src = it.thumbUrl;
     im.alt = it.name;
     tile.append(im);
-    tile.append(Object.assign(document.createElement("span"), { className: "ql-check", textContent: "✓" }));
-    tile.addEventListener("click", () => {
-      it.selected = !it.selected;
-      tile.classList.toggle("selected", it.selected);
-      updateQuickHeader();
-    });
+    tile.setAttribute("aria-label", `Pick ${it.name}`);
+    tile.addEventListener("click", () => { quickCursor = quickItems.indexOf(it); markQuick(it, "pick"); focusQuickCursor(false); });
+    cell.append(tile);
+    const x = document.createElement("button");
+    x.type = "button";
+    x.className = "ql-x";
+    x.tabIndex = -1;
+    x.textContent = "✗";
+    x.setAttribute("aria-label", `Reject ${it.name}`);
+    x.addEventListener("click", (e) => { e.stopPropagation(); quickCursor = quickItems.indexOf(it); markQuick(it, "reject"); focusQuickCursor(false); });
+    cell.append(x);
+    cell.append(Object.assign(document.createElement("span"), { className: "ql-badge", hidden: true }));
   } else {
     tile.classList.add("ql-bad");
+    tile.disabled = true;
     tile.append(Object.assign(document.createElement("span"), { className: "ql-bad-mark", textContent: "⚠︎" }));
+    cell.append(tile);
   }
-  tile.append(Object.assign(document.createElement("span"), { className: "ql-name", textContent: `${n} · ${it.name}` }));
-  qlGrid.append(tile);
+  cell.append(Object.assign(document.createElement("span"), { className: "ql-name", textContent: `${n} · ${it.name}` }));
+  qlGrid.append(cell);
+  paintQuickCell(cell, it);
+}
+
+/** WHERE THE READER IS IN THE GRID. One tab stop for the whole thing and arrows
+ *  within it — the roving-tabindex shape every grid widget uses — so a folder of
+ *  three hundred does not put six hundred stops between the grid and the Keep
+ *  button. */
+let quickCursor = 0;
+function focusQuickCursor(scroll = true): void {
+  const cells = [...qlGrid.children] as HTMLElement[];
+  cells.forEach((c, i) => {
+    const t = c.querySelector(".ql-tile") as HTMLButtonElement | null;
+    if (t) t.tabIndex = i === quickCursor ? 0 : -1;
+  });
+  const at = cells[quickCursor]?.querySelector(".ql-tile") as HTMLButtonElement | null;
+  if (!at) return;
+  at.focus({ preventScroll: !scroll });
+  if (scroll) at.scrollIntoView({ block: "nearest" });
+}
+
+/** Step the cursor, SKIPPING REJECTS — which is what a reject is for. A
+ *  rejected frame is still reachable by tapping it, and by Home and End, so
+ *  nothing is ever stranded behind its own mark. */
+function stepQuickCursor(by: number): void {
+  const n = quickItems.length;
+  if (!n) return;
+  let i = quickCursor;
+  for (let step = 0; step < n; step++) {
+    i += by;
+    if (i < 0 || i >= n) return;
+    const it = quickItems[i];
+    if (it.ok && it.mark !== "reject") { quickCursor = i; focusQuickCursor(); return; }
+  }
 }
 
 // --- Scroll-position pill: with a big set the grid is a long scroll and the
@@ -8481,7 +8592,7 @@ async function openQuickLook(files: File[]) {
          opened and is shown as a placeholder tile so nothing goes missing */
     }
     if (gen !== quickGen) { if (thumbUrl) URL.revokeObjectURL(thumbUrl); return; }
-    const it: QuickItem = { file: f, name: f.name, thumbUrl, stripThumb, ok, selected: ok };
+    const it: QuickItem = { file: f, name: f.name, thumbUrl, stripThumb, ok, mark: null };
     quickItems.push(it);
     addQuickTile(it, quickItems.length);
     done++;
@@ -8521,9 +8632,99 @@ function updateRebuildNote(): void {
   btn.hidden = !n;
 }
 
+/** COMPARING TWO FRAMES. One is held on the left and the other steps through
+ *  the folder on the right, which is how a burst is actually culled: the
+ *  question is never "these two arbitrary photographs" but "does this one beat
+ *  the one I have".
+ *
+ *  It shows the grid's own preview pictures rather than full renders. A
+ *  full-size decode per step would take seconds each and make stepping through
+ *  a burst unusable; a preview is enough to choose a frame by and not enough to
+ *  judge fine focus, and the panel says so rather than letting it be assumed. */
+const cmpDlg = document.getElementById("qlCompareDlg") as HTMLDialogElement | null;
+let cmpHold = 0;      // index of the frame being held
+let cmpAgainst = 0;   // index of the candidate
+
+function usableQuick(): number[] {
+  return quickItems.map((it, i) => (it.ok && it.thumbUrl ? i : -1)).filter((i) => i >= 0);
+}
+
+function paintCompare(): void {
+  if (!cmpDlg) return;
+  const pane = (side: "Left" | "Right", idx: number) => {
+    const it = quickItems[idx];
+    const img = document.getElementById(`cmp${side}Img`) as HTMLImageElement | null;
+    const name = document.getElementById(`cmp${side}Name`);
+    const mark = document.getElementById(`cmp${side}Mark`);
+    if (!it || !img || !name || !mark) return;
+    if (img.getAttribute("src") !== it.thumbUrl) img.src = it.thumbUrl;
+    img.alt = it.name;
+    name.textContent = `${idx + 1} · ${it.name}`;
+    mark.textContent = it.mark === "pick" ? "Pick" : it.mark === "reject" ? "Reject" : "";
+    mark.hidden = !it.mark;
+  };
+  pane("Left", cmpHold);
+  pane("Right", cmpAgainst);
+  const list = usableQuick();
+  const at = list.indexOf(cmpAgainst);
+  const count = document.getElementById("cmpCount");
+  if (count) count.textContent = `${at + 1} of ${list.length}`;
+}
+
+function openCompare(from: number): void {
+  if (!cmpDlg || typeof cmpDlg.showModal !== "function") return;
+  const list = usableQuick();
+  if (list.length < 2) return;
+  cmpHold = list.includes(from) ? from : list[0];
+  cmpAgainst = list.find((i) => i !== cmpHold) ?? cmpHold;
+  paintCompare();
+  if (!cmpDlg.open) cmpDlg.showModal();
+}
+
+function stepCompare(by: number): void {
+  const list = usableQuick().filter((i) => i !== cmpHold);
+  if (!list.length) return;
+  const at = list.indexOf(cmpAgainst);
+  const next = at < 0 ? 0 : (at + by + list.length) % list.length;
+  cmpAgainst = list[next];
+  paintCompare();
+}
+
+if (cmpDlg) {
+  document.getElementById("qlCompare")?.addEventListener("click", () => openCompare(quickCursor));
+  document.getElementById("cmpPrev")?.addEventListener("click", () => stepCompare(-1));
+  document.getElementById("cmpNext")?.addEventListener("click", () => stepCompare(1));
+  document.getElementById("cmpSwap")?.addEventListener("click", () => {
+    const was = cmpHold;
+    cmpHold = cmpAgainst;
+    cmpAgainst = was;
+    paintCompare();
+  });
+  document.getElementById("cmpClose")?.addEventListener("click", () => cmpDlg.close());
+  const mark = (idx: () => number, m: QuickItem["mark"]) => () => {
+    const it = quickItems[idx()];
+    if (it) { markQuick(it, m); paintCompare(); }
+  };
+  document.getElementById("cmpLeftPick")?.addEventListener("click", mark(() => cmpHold, "pick"));
+  document.getElementById("cmpLeftReject")?.addEventListener("click", mark(() => cmpHold, "reject"));
+  document.getElementById("cmpRightPick")?.addEventListener("click", mark(() => cmpAgainst, "pick"));
+  document.getElementById("cmpRightReject")?.addEventListener("click", mark(() => cmpAgainst, "reject"));
+  cmpDlg.addEventListener("keydown", (e) => {
+    const key = e.key.toLowerCase();
+    if (key === "arrowright") stepCompare(1);
+    else if (key === "arrowleft") stepCompare(-1);
+    else if (key === "p") { const it = quickItems[cmpAgainst]; if (it) { markQuick(it, "pick"); paintCompare(); } }
+    else if (key === "x") { const it = quickItems[cmpAgainst]; if (it) { markQuick(it, "reject"); paintCompare(); } }
+    else return;
+    e.preventDefault();
+  });
+}
+
 /** Close the grid, free every preview, and abort any decode still running. */
 function closeQuickLook() {
   quickGen++;
+  // Its pictures are the grid's object URLs, revoked two lines below.
+  if (cmpDlg?.open) cmpDlg.close();
   for (const it of quickItems) if (it.thumbUrl) URL.revokeObjectURL(it.thumbUrl);
   quickItems = [];
   qlGrid.replaceChildren();
@@ -8535,7 +8736,8 @@ function closeQuickLook() {
 /** Promote the selected previews into a real session (or a lone open, for one).
  *  The picked Files are still alive, so this is just the normal open path. */
 async function keepQuickLook() {
-  const keeping = quickItems.filter((it) => it.ok && it.selected);
+  const picks = quickPickCount() > 0;
+  const keeping = quickItems.filter((it) => willKeep(it, picks));
   const files = keeping.map((it) => it.file);
   if (!files.length) return;
   // Carry the pictures across, keyed by the File itself so re-ordering on the
@@ -8566,14 +8768,40 @@ for (const el of [quickInput, welcomeQuickInput]) {
 }
 qlKeep.addEventListener("click", keepQuickLook);
 $("qlClose").addEventListener("click", closeQuickLook);
+// One button, and what it clears depends on what there is to clear: picks
+// first, because a folder with picks in it is one the reader has been choosing
+// from and the rejects are still information.
 qlSelectToggle.addEventListener("click", () => {
-  const target = quickItems.some((it) => it.ok && !it.selected); // any unselected → select all
+  const clearing: QuickItem["mark"] = quickPickCount() ? "pick" : "reject";
   quickItems.forEach((it, i) => {
-    if (!it.ok) return;
-    it.selected = target;
-    qlGrid.children[i]?.classList.toggle("selected", target);
+    if (it.mark !== clearing) return;
+    it.mark = null;
+    const cell = qlGrid.children[i] as HTMLElement | undefined;
+    if (cell) paintQuickCell(cell, it);
   });
   updateQuickHeader();
+});
+
+/** THE KEYS, on the grid itself. P and X are what every culling tool has used
+ *  for thirty years; U takes a mark off; arrows move and skip rejects; Home and
+ *  End reach everything, including a frame behind its own reject. */
+qlGrid.addEventListener("keydown", (e) => {
+  if (!quickItems.length) return;
+  const cols = Math.max(1, Math.round(qlGrid.clientWidth / Math.max(1, (qlGrid.firstElementChild as HTMLElement | null)?.offsetWidth ?? 1)));
+  const here = quickItems[quickCursor];
+  const key = e.key.toLowerCase();
+  if (key === "arrowright") { stepQuickCursor(1); }
+  else if (key === "arrowleft") { stepQuickCursor(-1); }
+  else if (key === "arrowdown") { stepQuickCursor(cols); }
+  else if (key === "arrowup") { stepQuickCursor(-cols); }
+  else if (e.key === "Home") { quickCursor = 0; focusQuickCursor(); }
+  else if (e.key === "End") { quickCursor = quickItems.length - 1; focusQuickCursor(); }
+  else if (key === "p" && here) { markQuick(here, "pick"); }
+  else if (key === "x" && here) { markQuick(here, "reject"); }
+  else if (key === "u" && here) { here.mark = null; const c = qlGrid.children[quickCursor] as HTMLElement | undefined; if (c) paintQuickCell(c, here); updateQuickHeader(); }
+  else if (key === "c") { openCompare(quickCursor); }
+  else return;
+  e.preventDefault();
 });
 
 // "Got it" — in learn mode the numbered chips are the persistent affordance, so
