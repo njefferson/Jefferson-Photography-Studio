@@ -224,7 +224,7 @@ without better evidence.
 ## Example photos (`public/examples/`)
 
 Half-res REAL raw DNGs generated from the owner's NEFs (and, for the backyard
-wave, from his Lightroom-converted DNGs): Bayer mosaic binned 2x2 SAME-COLOUR,
+wave, from Lightroom-converted DNGs): Bayer mosaic binned 2x2 SAME-COLOUR,
 uncompressed CFA (Compression 1), black 1008 / white 15520, Z50 matrix
 embedded, ~10.4MB each (Cloudflare Pages limit is 25MB/file). The gallery is
 declared in src/main.ts GALLERY (53 tiles = 44 RAW + 9 watermarked JPEGs; the

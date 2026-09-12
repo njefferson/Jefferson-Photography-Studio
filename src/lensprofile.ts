@@ -900,12 +900,17 @@ export function averageProfiles(fs: FrameProfile[]): { falloff: number[]; kr: nu
   const avg = (pick: (f: FrameProfile) => Float64Array) => avgOf(use, pick, 0);
   const avgColour = (pick: (f: FrameProfile) => Float64Array) =>
     colourFs.length ? avgOf(colourFs, pick, 1) : new Array(NBINS).fill(1);
-  const los = use.map((f) => f.bumpRange[0]).filter(Number.isFinite);
-  const his = use.map((f) => f.bumpRange[1]).filter(Number.isFinite);
+  // `loEnds`/`hiEnds` rather than the obvious shortening of "low" and "high":
+  // the second one is a bare third-person pronoun, and the gate that refuses
+  // those in every repo cannot tell a variable name from an attribution — nor
+  // should it have to, since the pattern has to stay blunt to see an
+  // attribution that names nobody at all.
+  const loEnds = use.map((f) => f.bumpRange[0]).filter(Number.isFinite);
+  const hiEnds = use.map((f) => f.bumpRange[1]).filter(Number.isFinite);
   const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : NaN);
   return {
     falloff: avg((f) => f.falloff), kr: avgColour((f) => f.kr), kb: avgColour((f) => f.kb),
-    bumpRange: [mean(los), mean(his)],
+    bumpRange: [mean(loEnds), mean(hiEnds)],
     n: use.length,
     colourFrames: colourFs.length,
     space,

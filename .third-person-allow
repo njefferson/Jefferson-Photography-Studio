@@ -1,0 +1,26 @@
+# DECLARED EXCEPTIONS to the never-in-the-third-person rule (hub gate:
+# third-person-check.mjs). Format: file | why it is not a reference to a person |
+# the matched word.
+#
+# The pattern is a bare pronoun and is blunt ON PURPOSE — a narrower one cannot
+# see an attribution that names nobody, which is the whole thing it exists to
+# catch. So the usable half is this list, and every line in it is a claim that
+# the match is not about a person.
+#
+# A REFERENCE TO THE OWNER IS NEVER DECLARABLE. Rewrite it: say the ROLE for a
+# governance fact, and for anything else say what was wrong and what it
+# measured. Every entry below was checked by reading the line.
+#
+# Checked both ways: a declaration matching nothing fails, so a later scrub
+# cannot silently un-cover a file.
+
+# Nikon's own name for its High Efficiency raw compression (Z8, Z9, Z50 II),
+# which this app does not decode and has to name in order to say so.
+ir.html | Nikon High Efficiency raw compression, the format's own name | HE
+src/decode.ts | Nikon High Efficiency raw compression, the format's own name | HE
+docs/ARCHITECTURE.md | Nikon High Efficiency raw compression, plus the He of He & Sun 2015 | He
+
+# Kaiming He, first author of the guided-filter paper the clarity and dehaze
+# maps are built on. A citation, not a person in this project.
+src/macro/stack.ts | cited author's surname, He & Sun 2015 (guided filter) | He
+NOTES.md | Nikon High Efficiency raw compression, the format's own name | HE

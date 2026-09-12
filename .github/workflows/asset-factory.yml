@@ -62,9 +62,13 @@ jobs:
         with:
           node-version: "22"
 
+      # `npm ci`, NOT `npm install`: install resolves whatever the registry
+      # serves at that moment, so a run is not reproducible and a compromised
+      # or merely newer transitive dependency lands without anything saying so.
+      # ci is bound by the lockfile, which is committed beside the manifest.
       - name: Install factory deps
         working-directory: asset-factory
-        run: npm install
+        run: npm ci
 
       - name: Plan (counts + cost estimate)
         working-directory: asset-factory

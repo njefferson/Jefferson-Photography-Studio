@@ -42,7 +42,7 @@ export function allRecords(dir = DIRS.catalog) {
 }
 
 // ---- curation: the owner-taste layer, kept OUT of the regenerable records so a
-// full regeneration never destroys his decisions.
+// full regeneration never destroys a curation decision.
 // { approved: {id: true|false}, favorites: [id], names: {id: "display-name"} }
 export function readCuration(path = DIRS.curation) {
   if (!existsSync(path)) return { approved: {}, favorites: [], names: {} };
