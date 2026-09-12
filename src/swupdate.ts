@@ -19,10 +19,40 @@ import "./swstrip.css";
 // page releases it, which is what both routes below send.
 declare const __APP_VERSION__: string;
 
+/** WHAT TAKING THE UPDATE WOULD COST RIGHT NOW, or null when it costs nothing.
+ *
+ *  Applying an update reloads the page, and a reload is not free for every
+ *  screen. A quick look in particular CANNOT survive one: the browser will not
+ *  re-open a file the reader picked, so the folder has to be picked again, and
+ *  the thumbnails it had built are in memory only.
+ *
+ *  Reported from a real session — the update was taken mid-quick-look and every
+ *  thumbnail was discarded and rebuilt. The strip had no way to know it was
+ *  interrupting anything, because nothing told it.
+ *
+ *  A FUNCTION RATHER THAN A FLAG, deliberately. A flag has to be cleared on
+ *  every path out of the state it describes, and the one path somebody forgets
+ *  leaves the app permanently claiming there is work to lose. Asked at the
+ *  moment of the press, the answer cannot go stale. */
+let updateCost: (() => string | null) | null = null;
+export function setUpdateCost(fn: (() => string | null) | null): void {
+  updateCost = fn;
+}
+
 export function wireForceUpdate(button: HTMLButtonElement, note: HTMLElement): void {
-  let forcing = false;
+  let forcing = false, armed = false;
   button.addEventListener("click", async () => {
     if (forcing) return;
+    // EVERY ROUTE THAT APPLIES AN UPDATE ASKS THE SAME QUESTION. The strip
+    // below grew a cost check first, and this button — the older route, in
+    // Settings — did not have one, which would have made the warning a
+    // property of which control the reader happened to find.
+    const cost = armed ? null : updateCost?.() ?? null;
+    if (cost) {
+      armed = true;
+      note.textContent = `Updating restarts the app, and ${cost} Press again to go ahead.`;
+      return;
+    }
     forcing = true;
     button.disabled = true;
     note.textContent = "Checking for a new version…";
@@ -77,6 +107,53 @@ export function wireForceUpdate(button: HTMLButtonElement, note: HTMLElement): v
 }
 
 
+/** A MODAL DIALOG MAKES THE STRIP UNPRESSABLE — and the state most worth
+ *  warning about IS a modal dialog.
+ *
+ *  The strip lives in the page's own flow. `showModal()` puts a dialog in the
+ *  top layer and makes everything outside it inert, so while a quick look of a
+ *  folder is on screen the strip is behind the backdrop and dead to the touch.
+ *  Measured: a press on Update during a quick look never landed — the element
+ *  was never "visible, enabled and stable", for thirty seconds.
+ *
+ *  That is the §4 shape exactly. The warning was built, it was correct, and it
+ *  could not be reached from the one screen it was built for; its presence in
+ *  the source answered "have we handled this" for everyone after.
+ *
+ *  So the strip FOLLOWS the top layer: into the topmost open modal, and back
+ *  out when that closes. It is the SAME element moved, not a copy — every
+ *  listener wired below still applies, where a second copy of the markup in
+ *  each dialog would have drifted. The stack is kept in the order dialogs
+ *  opened, because document order does not say which one is on top. */
+function followModals(strip: HTMLElement): void {
+  const home = strip.parentElement;
+  if (!home) return;
+  const next = strip.nextSibling; // put it back exactly where it came from
+  const stack: HTMLDialogElement[] = [];
+  const isModal = (d: HTMLDialogElement) => {
+    try { return d.matches(":modal"); } catch { return d.open; } // :modal is newer than dialog itself
+  };
+  const place = () => {
+    const top = stack.length ? stack[stack.length - 1] : null;
+    if (top) {
+      if (strip.parentElement !== top) { strip.classList.add("sw-hosted"); top.prepend(strip); }
+    } else if (strip.parentElement !== home) {
+      strip.classList.remove("sw-hosted");
+      home.insertBefore(strip, next);
+    }
+  };
+  const seen = (d: HTMLDialogElement) => {
+    const i = stack.indexOf(d);
+    if (d.open && isModal(d)) { if (i < 0) stack.push(d); }
+    else if (i >= 0) stack.splice(i, 1);
+    place();
+  };
+  for (const d of document.querySelectorAll("dialog")) seen(d as HTMLDialogElement);
+  new MutationObserver((recs) => {
+    for (const r of recs) if (r.target instanceof HTMLDialogElement) seen(r.target);
+  }).observe(document.documentElement, { attributes: true, attributeFilter: ["open"], subtree: true });
+}
+
 /** §7h's other half: the reader is TOLD, without having to go looking.
  *  wireForceUpdate above is a PULL — it only helps somebody who already
  *  suspects there is a new version and knows which panel to open. A newcomer
@@ -90,6 +167,7 @@ export function wireUpdateStrip(): void {
   const go = document.getElementById("swStripGo") as HTMLButtonElement | null;
   const later = document.getElementById("swStripLater") as HTMLButtonElement | null;
   if (!strip || !go || !later) return;
+  followModals(strip);
   let dismissed = false;
   const show = () => { if (!dismissed) strip.hidden = false; };
 
@@ -108,7 +186,20 @@ export function wireUpdateStrip(): void {
       });
     });
 
+    // Two presses when there is something to lose, one when there is not. The
+    // cost is read at the press, and the text names the work rather than
+    // warning in the abstract — "you will lose your quick look of 94 photos"
+    // is a decision; "are you sure?" is a speed bump.
+    let armed = false;
     go.addEventListener("click", () => {
+      const cost = armed ? null : updateCost?.() ?? null;
+      if (cost) {
+        armed = true;
+        const text = strip.querySelector(".sw-strip-text");
+        if (text) text.textContent = `Updating restarts the app, and ${cost} Press Update again to go ahead, or Not now to keep working.`;
+        go.textContent = "Update anyway";
+        return;
+      }
       go.disabled = true;
       go.textContent = "Updating…";
       let reloaded = false;

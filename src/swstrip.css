@@ -44,3 +44,13 @@
 }
 .sw-strip-go { background: var(--surface-3); font-weight: 600; }
 .sw-strip button:active { background: var(--surface-3); }
+
+/* HOSTED INSIDE A MODAL DIALOG (swupdate.ts followModals). Only the top layer
+   is interactive while a modal is open, so the strip moves into the dialog
+   rather than sitting inert behind its backdrop. These dialogs are flex
+   columns whose body takes the remaining space; the strip must not be the
+   item that gives way. */
+.sw-strip.sw-hosted {
+  flex: 0 0 auto;
+  padding-top: calc(8px + env(safe-area-inset-top, 0px));
+}
