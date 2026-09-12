@@ -66,6 +66,11 @@ export interface StoredProfile {
   bump?: number[];
   /** True for a profile that came with the app rather than from this device. */
   builtIn?: boolean;
+  /** The camera this profile's COLOUR was measured on, when that is not the
+   *  camera of the photograph it is being applied to. Set by the matcher, never
+   *  stored: its presence means the colour half was withheld, and the panel has
+   *  something to say about why. */
+  otherCamera?: string;
   /** Present when this is a blend of two measurements rather than one of them,
    *  so the panel can say so and a test can tell the two apart. */
   blend?: { loFl: number; hiFl: number; t: number };
@@ -347,7 +352,49 @@ export function findProfile(ex: ExifSubset | null): StoredProfile | null {
  *  one, and a nearest-focal-length snap in hotspot.ts — which is how the
  *  shipped table ended up ignoring aperture entirely while this one had
  *  handled it for weeks. */
+/** The camera a frame was taken on, in the same spelling the rig records. */
+function cameraOf(ex: ExifSubset | null): string {
+  return [ex?.make, ex?.model].filter(Boolean).join(" ").trim();
+}
+
+/** THE COLOUR HALF BELONGS TO THE BODY, NOT ONLY TO THE LENS.
+ *
+ *  `kr`/`kb` are how much red and blue the centre has against green across the
+ *  frame. In infrared that is two things multiplied together: how the lens's
+ *  transmission varies across the field, which is the lens, and what the sensor
+ *  does with the wavelengths that reach it — which is set by the filter inside
+ *  the CONVERTED BODY. A 720nm conversion has almost no blue to measure; a
+ *  full-spectrum one has a great deal.
+ *
+ *  So a colour curve measured on one converted body is not a fact about that
+ *  lens on anybody else's. The brightness half is different: a hot-spot is
+ *  internal reflection inside the lens barrel, which is geometry, and it
+ *  transfers.
+ *
+ *  This mattered little while the profiles that shipped carried colour measured
+ *  from camera JPEGs, which was wrong for everyone including the photographer
+ *  who measured it. It matters now: the shipped table is 72 profiles of real,
+ *  conversion-specific colour, and applying those to a stranger's differently
+ *  converted body would make the app worse for them than no correction at all.
+ *
+ *  WITHHELD ONLY WHEN BOTH CAMERAS ARE KNOWN AND THEY DIFFER. A frame with no
+ *  make or model in it — a stripped JPEG, an export of an export — cannot be
+ *  told apart from a match, and refusing colour there would break the ordinary
+ *  case to guard the rare one. */
+function forCamera(p: StoredProfile, ex: ExifSubset | null): StoredProfile {
+  const mine = cameraOf(ex), theirs = (p.camera ?? "").trim();
+  if (!mine || !theirs || mine === theirs) return p;
+  if (!saysAnythingAboutColour(p)) return p;
+  const flat: number[] = new Array(p.kr.length).fill(1);
+  return { ...p, kr: flat, kb: [...flat], otherCamera: theirs };
+}
+
 export function matchIn(list: StoredProfile[], ex: ExifSubset | null): StoredProfile | null {
+  const picked = matchAny(list, ex);
+  return picked ? forCamera(picked, ex) : null;
+}
+
+function matchAny(list: StoredProfile[], ex: ExifSubset | null): StoredProfile | null {
   if (!ex?.lens) return null;
   const model = ex.lens.trim();
   const fl = ex.focalLength && ex.focalLength[1] ? ex.focalLength[0] / ex.focalLength[1] : NaN;
@@ -447,6 +494,9 @@ export function matchNote(p: StoredProfile, ex: ExifSubset | null): string {
       : `between the ${p.blend.loFl}mm and ${p.blend.hiFl}mm profiles (${100 - pc}% / ${pc}%)`);
   } else if (Number.isFinite(fl) && Math.round(fl) !== Math.round(p.fl)) {
     bits.push(`measured at ${p.fl}mm, this frame is ${Math.round(fl)}mm`);
+  }
+  if (p.otherCamera) {
+    bits.push(`its colour was measured on a ${p.otherCamera} and this photograph is not from one, so only the brightness applies — an infrared conversion decides what colour the sensor sees, and that is not a property of the lens`);
   }
   if (Number.isFinite(ap) && Number.isFinite(p.ap) && Math.abs(ap - p.ap) > 0.15) {
     bits.push(`measured at f/${p.ap}, this frame is f/${ap.toFixed(1)}`);

@@ -9727,3 +9727,76 @@ gave it, and a profile is flat only where every payload for it was flat. That is
 a claim about the store. The first one was a claim about the corpus wearing a
 correctness claim's clothes, which is the same shape as counting the whole device
 when only part of it was re-measured.
+
+## A colour curve does not travel to another camera, 2026-09-12
+
+The shipped table was regenerated from raw and grew to 72 profiles of real,
+conversion-specific colour. `matchIn` filtered on `p.model === model` — the LENS
+— and never looked at the body, so all 72 would have applied in full to anyone
+with the same lens on a different camera.
+
+**That is wrong in infrared specifically.** `kr`/`kb` are two things multiplied
+together: how the lens's transmission varies across the field, which is the
+lens, and what the sensor does with the wavelengths reaching it, which is set by
+the filter inside the CONVERTED BODY. A 720nm conversion has almost no blue to
+measure; a full-spectrum one has a great deal. The brightness half is different
+— a hot-spot is internal reflection inside the barrel, which is geometry, and it
+does travel.
+
+**The largest colour departure in the table is 27.8%.** That is what a
+stranger's differently converted body would have had applied to it, and it would
+have been worse than no correction at all.
+
+It mattered little before today, which is why nothing caught it: the shipped
+colour was measured from camera JPEGs and was wrong for everybody, including the
+photographer who measured it. Making it right for one body is what made it wrong
+for the others.
+
+**Withheld only when BOTH cameras are known and they differ.** A frame with no
+make or model — a stripped JPEG, an export of an export — cannot be told apart
+from a match, and refusing colour there would break the ordinary case to guard
+the rare one. The panel says which camera the colour came from and why only the
+brightness applies.
+
+**And it broke the magnitude harness, correctly.** That harness plants a profile
+with `camera: "planted"` against a fixture with a real one, so the new rule
+withheld its colour and the run reported the correction absent — a true result
+about the wrong thing. It plants with no camera now, which is the case it wants;
+the camera rule has its own harness with a real body on both sides.
+
+## What a straighten angle costs at export, 2026-09-12
+
+Exporting a straightened photograph took minutes longer than the same photograph
+untouched. The cause is one line of caching policy.
+
+`makeRowDenoiser` caches SOURCE ROWS and fills each one eagerly across the whole
+image width, keeping a ring of about a dozen. That is exactly right for a scan
+that walks the source top-to-bottom, which is what an export does with no
+straighten — and catastrophic the moment the scan walks a slant, because the
+source row then changes every few output pixels and each miss pays a full image
+width of demosaic work for the three or four pixels actually wanted.
+
+**Measured on a 6000x4000 source with denoise on, over the same 80,000 output
+pixels: 306,000 source samples flat against 36,480,000 at four degrees. 119x the
+work for the same picture** — 456 samples per output pixel against 3.8, which
+extrapolates to eleven billion samples for a full frame against ninety million.
+
+Rows are filled where they are read now, with a generation counter per ring slot
+so forgetting a reused row is one integer write rather than a fill of the width.
+
+**BIT-IDENTICAL, AND THE FIRST ATTEMPT TO PROVE IT USED THE WRONG INSTRUMENT.**
+The claim is that the change alters when the sampler is called and never what it
+returns. The first check compared the new code against a freshly written
+reference bilateral, which disagreed by 2.7e-8 on two cases and 0.016 on a
+third — and that says the reference disagreed, not that the change did: a
+hand-written reference carries its own precision and its own clamping. Building
+the OLD implementation and the NEW one side by side settled it: exact over
+twelve combinations of strength and tap spacing, scanned top-to-bottom, along a
+four-degree slant, and shuffled off every edge, with 6.9x fewer source samples
+on the slanted case.
+
+**STILL OPEN, and not to be reported as fixed:** `makeRowDetail` in
+`src/raw/detail.ts` has the same eager-row shape at line 88 and has not been
+touched. The denoise pass is the heavier of the two, but a straightened export
+is still paying the detail pass's version of this whenever sharpen or texture is
+off zero.
