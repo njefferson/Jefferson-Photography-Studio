@@ -180,6 +180,18 @@ export interface SaveChange {
  *  gradient. EQUAL frames still replaces — re-measuring to the same depth is a
  *  deliberate refresh, and refusing it would leave no way to correct a
  *  measurement except deleting it first. */
+/** Does this profile say anything about colour, or is it a flat 1?
+ *
+ *  A flat 1 is not a measurement of a neutral lens — it is the recorded fact
+ *  that the frames had too little green to divide by, so the colour half was
+ *  withheld. On an infrared lens that is the half the whole correction exists
+ *  for, and a profile carrying it is a different KIND of answer from one that
+ *  does not, not a better example of the same one. */
+function saysAnythingAboutColour(p: StoredProfile): boolean {
+  for (const a of [p.kr, p.kb]) for (let i = 0; i < a.length; i++) if (Math.abs(a[i] - 1) > 1e-9) return true;
+  return false;
+}
+
 function place(list: StoredProfile[], entry: StoredProfile, falloff: ArrayLike<number> | undefined): SaveChange {
   const problem = shapeProblem(falloff ?? [], entry.kr, entry.kb);
   if (problem) return { key: entry.key, what: "refused", frames: entry.frames, why: problem };
@@ -188,7 +200,26 @@ function place(list: StoredProfile[], entry: StoredProfile, falloff: ArrayLike<n
     list.push(entry);
     return { key: entry.key, what: "added", frames: entry.frames };
   }
-  if (entry.frames < list[at].frames) {
+  // COLOUR BEATS FRAME COUNT, AND NOTHING ELSE DOES.
+  //
+  // The rank was frame count alone, on the sound reasoning that more frames of
+  // sky average out the sky's own gradient. It ranked a profile that measures
+  // NO colour above one that does, because the first was shot more times.
+  //
+  // That is not a hypothetical. The floor that stopped raw frames measuring
+  // colour was on the rendered scale for the whole life of the feature, so a
+  // device can hold a generation of six-frame profiles with a flat 1 for
+  // colour — and measured against one real device, fifteen freshly measured
+  // colour-carrying profiles were about to be turned away by them. The run
+  // would have reported "kept", correctly and uselessly, and the correction
+  // would have stayed brightness-only with nothing saying why.
+  //
+  // So the comparison is two-level: a profile that says something about colour
+  // outranks one that says nothing, and only within the same kind does the
+  // frame count decide.
+  const mine = saysAnythingAboutColour(entry), theirs = saysAnythingAboutColour(list[at]);
+  const better = mine !== theirs ? mine : entry.frames >= list[at].frames;
+  if (!better) {
     return { key: entry.key, what: "kept", wasFrames: list[at].frames, frames: entry.frames };
   }
   const was = list[at].frames;

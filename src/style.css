@@ -2698,16 +2698,33 @@ body.dbg { margin: 0; background: var(--bg); color: var(--txt); font: 400 1rem/1
      "Restore from a file". Measured at 163px against 293px. */
   width: 100%;
   box-sizing: border-box;
-  display: block;
+  /* CENTRED BY THE BOX, NOT BY A LINE HEIGHT — and the reason is three lines
+     below this one.
+     This rule used to say `display: block` with `line-height: 44px`, and then
+     `font: 500 0.9375rem var(--ui)` AFTER it. The `font` shorthand resets every
+     part it omits, so it set line-height back to `normal` and the 44px was dead
+     from the day it was written. A real <button> looked centred anyway, because
+     a browser centres a button's own text for you. A <label> gets no such help,
+     so the text sat 1px from the top of a 44px control with 24px under it —
+     measured at 23px off centre on both file pickers in the lens panel, which
+     are labels because that is the only way a file input can be styled at all.
+     The same comment below is about a label silently opting out of a tag-keyed
+     width; this is the class silently opting its own centring out.
+     Flex centring cannot be undone by a shorthand, holds when the text wraps to
+     two lines, and treats the label and the button identically. line-height now
+     lives INSIDE the shorthand so there is one declaration of it, not two with
+     the loser first. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
-  line-height: 44px;
   min-height: 44px;
-  padding: 0 16px;
+  padding: 6px 16px;
   border-radius: 9px;
   border: 1px solid var(--line);
   background: var(--surface-2);
   color: var(--txt);
-  font: 500 0.9375rem var(--ui);
+  font: 500 0.9375rem/1.25 var(--ui);
   cursor: pointer;
 }
 .dbg-btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
