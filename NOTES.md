@@ -10255,3 +10255,104 @@ had no way to express "the sources changed and the pictures provably did not",
 which is exactly what happened — so it grew one: `--record --proven "<evidence>"`
 writes the claim into `tools/.preview-pipeline`, where it lands in the diff for
 whoever reviews it. Recording with neither a bump nor evidence is still refused.
+
+## 2026-09-12 — the export on several cores: 47s to 20s, and byte for byte
+
+The entry above ends by naming parallelism as the only thing left that moves the
+number, and by predicting how it would have to work. Two of those predictions
+were wrong and the third was optimistic. All three are worth keeping.
+
+**WHAT IT DOES.** A band is a slice of the export's own outer loop: each worker
+is handed the same file, the same edit and one band, and calls **the same
+`exportImage`** the main thread calls. There is no second pipeline, which is the
+whole reason the bytes can come out identical. The main thread stitches the bands
+and encodes once.
+
+**PREDICTION ONE, WRONG: "the source split into bands with halos for the 5x5 and
+7x7 taps".** No halos, because the source is not split. Each worker gets a copy
+of the whole file and decodes its own sensor data, so every neighbourhood tap is
+in range by construction. Slicing the source would have needed a halo computed
+back through crop, straighten, rotation and flip — four places to be subtly
+wrong in a way that shows up as a line across the picture. The copy costs about a
+second per worker, in parallel with the others, and the memory below.
+
+**PREDICTION TWO, WRONG: "embarrassingly parallel over output rows".** Rows only
+would have left HALF of all exports on one core, and the first measurement caught
+it: the test frame is a portrait one, so the export's loop runs output COLUMNS
+(it follows columns under a quarter-turn to keep the denoiser's row cache warm),
+`canRunParallel` said no, and the export came back at 46.8s with the diagnostic
+reporting one thread. A band is now a rectangle of the finished picture cut along
+whichever axis the loop runs, and `BandResult` says which — so the stitch can put
+a narrow strip back down every row of the output rather than assuming one
+contiguous slice.
+
+**PREDICTION THREE, OPTIMISTIC: "four cores would take 47s to about 13".**
+Measured on the same 20.9-megapixel NEF at full size and quality 92 with the
+app's own default edit: **46.8s to 19.7s**, on three threads — the container
+reports four cores and the main thread keeps one. That is 2.37x, not 3.6x. The
+camera-rendered path (the same frame's 20.7-megapixel JPEG) went **36.9s to
+15.6s**.
+
+**BIT-IDENTICAL, BY TWO INSTRUMENTS, BECAUSE ONE OF THEM ONLY EVER TESTS ONE
+ROTATION.**
+
+- *The finished file.* sha256 `cf329769f749fbe6b92049cfe0ab909b97ee25acbe5481e4`
+  `167eae5098916be4` on the 20.9-megapixel NEF, from the single-threaded build
+  and from the three-thread build, and equal to the baseline measured before any
+  of this existed. The camera JPEG likewise: one hash, two thread counts.
+- *`bandsplit.mjs`* (session scratchpad) drives `exportImage` directly in node,
+  with no browser: a whole-frame export against four bands stitched by the
+  product's own `stitchBands`, at all four rotations, across five edits — the
+  edit a photo opens with, sharpen with clarity and texture, halation with a
+  creative vignette and grain, straightened four degrees, and no denoise at all.
+  Twenty comparisons, all equal. **And a planted defect the run reports as
+  different** (one band asked for the wrong rows), because a comparison that
+  cannot fail is not a comparison.
+
+The second instrument exists because the seam is the only real risk here and the
+browser cannot reach it: the full-size run exercises ONE rotation and ONE edit,
+while the risk lives in the scan order of two row caches — the denoiser's and the
+detail pass's. Whether a band's first rows come out the same as those rows in a
+whole-frame pass is arithmetic, and a browser is a poor place to prove
+arithmetic. That is also why the stitch is its own exported function rather than
+a loop buried in the worker plumbing: it is the half that can be wrong in a way
+nobody sees, and it is now driven directly.
+
+**MEMORY, MEASURED RATHER THAN GUESSED — and it is the reason there is a
+budget.** Peak resident memory across every browser process, sampled once a
+second through a real export: **1.88 GB on one thread, 2.19 GB on three**. That
+is 104 MB per extra thread, against the 96 MB predicted by the model now in
+`perWorkerMb` (the file, two bytes per source pixel for the decode, four bytes
+per output pixel for the band, plus overhead). The model is the part that
+travels: the same shot at 45 megapixels would cost about 220 MB a thread, and
+three of those is a killed tab rather than a slow export — a tablet browser kills
+the tab instead of swapping, and a killed tab loses the session. So the thread
+count walks down from four until `n x perWorkerMb(n)` fits in **600 MB**, and if
+two will not fit the export runs on one thread and takes its time.
+
+**WHAT FALLS BACK, AND THE FALLBACK IS THE OLD PATH UNCHANGED.** TIFF (the print
+master, enormous either way); heal spots, stickers and warp, whose assets are
+bitmaps a worker cannot be handed cheaply; anything under two megapixels, where
+starting workers would show; and any browser without module workers. On top of
+that, **a worker that fails for any reason falls through to the single-threaded
+loop** — the reader asked for a photograph, not for a particular number of
+threads. The single-threaded path was re-verified against the same hash after the
+band refactor touched its write offset.
+
+**THE DIAGNOSTIC SAYS WHICH HAPPENED**: "pixels 18.1s on 3 threads", or "on one
+thread". Without it, a report saying an export is slow on one device is
+indistinguishable from a device that quietly fell back — and every reason to fall
+back above is invisible from outside.
+
+**A SIDE EFFECT WORTH HAVING.** The single-threaded pass yields to the interface
+233 times per export, which is what keeps the progress bar alive; the parallel
+pass yields none, because the main thread is idle while the workers run. Progress
+now moves when a band moves rather than between yields.
+
+**WHAT WAS NOT ATTEMPTED, AND IT IS WHAT THE REFERENCES DO.** LibRaw, darktable
+and RawTherapee split the output across threads exactly like this, but they
+decode the sensor data ONCE and share the buffer. Sharing memory between workers
+in a browser means SharedArrayBuffer, which means COOP and COEP headers across
+the app and its service worker. The per-thread decode and the per-thread copy of
+the file are the price of not doing that, and the memory budget above is what
+keeps that price payable.
