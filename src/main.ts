@@ -915,7 +915,9 @@ function pressLook(key: string) {
     activeLook = key;
     applyLook(key);
   }
+  sessionLook = activeLook; // chosen here, and it follows you through the set
   updateLookUI();
+  markLook(); // the photo now wears this look, untouched by hand
   restripForGrade();
   flushRecord();
 }
@@ -6517,9 +6519,15 @@ function establishFreshEdit() {
   // so every bare frame "wore a look" and both bands went to their 2.0 ceiling
   // on a first open — solveLift's own comment records that failure, 44 of 44
   // practice frames. `activeLook` is non-null only where a look was pressed.
+  // A FRESH PHOTO WEARS THE SESSION'S LOOK. This read `activeLook`, which by
+  // then is whatever the PREVIOUS photo happened to be wearing — the same
+  // thing in the common case and not the same thing at all once a photo can
+  // keep a grade of its own.
+  activeLook = sessionLook;
   if (activeLook && LOOKS[activeLook]) applyLook(activeLook as keyof typeof LOOKS);
   else if (autoLift) applyLift(false);
   syncToUI();
+  markLook(); // what this photo was opened wearing, and the grade it had then
   // Snapshot the as-imported baseline for press-and-hold comparison.
   origParams = {
     wb: [...params.wb] as [number, number, number],
@@ -6839,6 +6847,69 @@ interface LiveEdit {
   undo: Snapshot[];
   redo: Snapshot[];
   orig: EditParams | null;
+  /** See LookMark. Absent on edits written before looks carried. */
+  lookMark?: LookMark | null;
+}
+
+/** A LOOK BELONGS TO THE SESSION, AND A GRADE YOU MADE BELONGS TO THE PHOTO.
+ *
+ *  Both of those were half true. Choosing a look carried to photos never
+ *  opened — `establishFreshEdit` re-applies it — and did not carry to any photo
+ *  already visited, whose own state was restored instead. So the same press did
+ *  two different things depending on history the reader cannot see, which is
+ *  what "it did not carry over to the next one" was.
+ *
+ *  This is how a photo knows which it is. The mark records the look the photo
+ *  was last given and THE GRADE IT HAD THE MOMENT IT WAS GIVEN — so arriving
+ *  with the session on a different look, the photo can be asked one question:
+ *  is your grade still exactly what that look left, or have you been changed
+ *  since? Untouched, the new look applies. Changed, the reader meant it, and
+ *  nothing here overwrites it.
+ *
+ *  A FLAG WOULD HAVE BEEN WRONG. "The reader graded this by hand" set from the
+ *  controls means every control that ever touches the grade has to remember to
+ *  set it, and the one somebody forgets silently un-marks a photo. Comparing
+ *  the grade against what the look left cannot be forgotten by a new control. */
+type LookMark = { look: string | null; stamp: string };
+
+/** THE LOOK THE READER LAST CHOSE, which is a fact about the SESSION.
+ *
+ *  `activeLook` is a fact about the OPEN PHOTO — restored from its snapshot, so
+ *  the look buttons always describe the photograph on screen rather than a
+ *  press made three photos ago. That is right, and it is also why carrying a
+ *  look needs a second name: comparing a photo's look against itself can never
+ *  say whether the session has moved on. */
+let sessionLook: string | null = null;
+
+/** The mark for the OPEN photo, kept beside `params` for the same reason the
+ *  grade is: there is one open photo. Captured into its live edit and its
+ *  stored edit, and restored with them. */
+let lookMark: LookMark | null = null;
+function markLook(): void {
+  lookMark = { look: activeLook, stamp: stampOf(params, activeLook, lookBias, false) };
+}
+
+/** Does this photo still wear exactly what its look left it? */
+function looksUntouched(m: LookMark | null): boolean {
+  return !!m && m.stamp === stampOf(params, m.look, lookBias, false);
+}
+
+/** A look you chose applies to every photo you have not graded yourself.
+ *
+ *  Called on arrival at a photo that already had an edit. A photo with no mark
+ *  — one stored before this existed — is left alone, which is the safe half of
+ *  the question. So is a photo whose grade no longer matches its mark. */
+function carryLook(): void {
+  if (!sessionLook || !LOOKS[sessionLook]) return; // nothing chosen to carry
+  if (!lookMark || lookMark.look === sessionLook) return; // already wearing it
+  if (!looksUntouched(lookMark)) return; // graded by hand — the reader meant it
+  activeLook = sessionLook;
+  applyLook(sessionLook as keyof typeof LOOKS);
+  syncToUI();
+  updateLookUI();
+  markLook();
+  flushRecord();     // one press of a look = one undo step, on every photo it reaches
+  restripForGrade(); // this photo's tile is now a different claim
 }
 
 let sessionPhotos: SessionPhoto[] = [];
@@ -6890,7 +6961,7 @@ function editToJson(): string {
   const s = snapshot();
   // Masks (bitmaps) and the imported LUT (Float32Array lattice) are runtime
   // data — stripped here; a durable resume restores neither (Help says so).
-  return JSON.stringify({ params: { ...s.params, masks: [], lut: null, warp: null }, activeLook: s.activeLook, lookBias: s.lookBias });
+  return JSON.stringify({ params: { ...s.params, masks: [], lut: null, warp: null }, activeLook: s.activeLook, lookBias: s.lookBias, lookMark });
 }
 
 /** Capture the active photo's live edit into memory and persist a durable copy
@@ -6906,6 +6977,7 @@ function captureActiveEdit() {
     undo: [...undoStack],
     redo: [...redoStack],
     orig: origParams,
+    lookMark,
   });
   const json = editToJson();
   const view = sessionPhotos.find((p) => p.id === id);
@@ -6925,6 +6997,7 @@ function restoreLiveEdit(st: LiveEdit) {
   clearTimeout(recordTimer);
   recordTimer = 0;
   applySnapshot(st.snapshot); // repaints + syncs UI
+  lookMark = st.lookMark ?? null;
   updateEditButtons();
   updateSlotUI();
   requestAnimationFrame(updateScrollCues);
@@ -6940,12 +7013,19 @@ function activateCurrent(id: string) {
   activePhotoId = id;
   if (st) {
     restoreLiveEdit(st);
+    carryLook(); // the session's look reaches a photo you have not graded yourself
   } else {
     establishFreshEdit();
     const view = sessionPhotos.find((p) => p.id === id);
     if (view?.edit) {
       try {
-        applySnapshot(JSON.parse(view.edit) as Snapshot);
+        const stored = JSON.parse(view.edit) as Snapshot & { lookMark?: LookMark | null };
+        applySnapshot(stored);
+        // The stored mark, not the one establishFreshEdit just made: the grade
+        // on screen is the stored one now, so the question "has this been
+        // changed since its look" has to be asked of the stored answer.
+        lookMark = stored.lookMark ?? null;
+        carryLook();
       } catch {
         /* corrupt stored edit — keep the fresh baseline */
       }
@@ -7600,11 +7680,17 @@ async function realThumbnails(): Promise<void> {
  *  exposure, denoise) with the photo's own, so only these can make one tile
  *  differ from another's stored picture. Stamped onto each tile so a tile
  *  rendered under a different grade can be found and redrawn. */
-function stampOf(pr: EditParams, look: string | null, bias: [number, number, number]): string {
+function stampOf(pr: EditParams, look: string | null, bias: [number, number, number], withLift = true): string {
   return JSON.stringify([
     look, pr.swapRB, pr.hue, pr.sat, pr.contrast, pr.tint,
     pr.glow, pr.lum, pr.toneR, pr.toneG, pr.toneB, pr.hsl,
-    pr.bwOn, pr.bwMix, pr.grade, pr.mix3, bias, autoLift, liftAmount,
+    pr.bwOn, pr.bwMix, pr.grade, pr.mix3, bias,
+    // The lift's OWN controls belong to a thumbnail's question ("is this tile
+    // still a true picture of that photo") and not to the look's ("has the
+    // reader graded this photo by hand since"). Including them there would read
+    // a change of lift strength — one session-wide control — as every photo
+    // having been hand-graded at once.
+    ...(withLift ? [autoLift, liftAmount] : []),
   ]);
 }
 function gradeStamp(): string {
