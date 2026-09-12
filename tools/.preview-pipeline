@@ -1,3 +1,5 @@
 # Written by tools/preview-version-check.mjs --record. Not hand-edited.
 version=2
-hash=fe4c45f4326a9e29
+hash=c3194717d5372ccf
+# Recorded WITHOUT a version bump. The evidence the pictures did not change:
+proven=the same 20.9 MP raw exported before and after: sha256 cf329769f749fbe6b92049cfe0ab909b both times, twice over

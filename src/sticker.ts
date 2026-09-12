@@ -378,7 +378,9 @@ export function compositeStickersIntoRectF32(
 }
 
 /** A linear sampler (x,y) -> [r,g,b], as export.ts uses. */
-export type Sampler = (x: number, y: number) => [number, number, number] | Float32Array;
+/** See LinearSampler in raw/denoise — the returned array may be reused by the
+ *  next call; read the numbers out at once. */
+export type Sampler = (x: number, y: number) => ArrayLike<number>;
 
 export interface StickerPatch extends Rect {
   data: Float32Array; // linear RGB, 3 per pixel — the wrapWithPatches shape

@@ -10185,3 +10185,73 @@ waits forever, behind a `.catch()` that made the timeout silent.
 created it** (hub LESSONS §28 — a new surface that does not is a surface that
 ships unmeasured). Zero axe violations in both themes, every control 44px or
 more at 430px and 900px wide.
+
+## 2026-09-12 — where an export's seconds actually go, and two hypotheses that were wrong
+
+**MEASURE FIRST WAS THE RIGHT ORDER**, and it is the only reason this entry is
+not a story about a fix that did nothing. Export speed was named a priority with
+no measurement behind it anywhere; the one number that existed came from a bug —
+a straightened export doing 119 times the work.
+
+**The split, on a 20.9-megapixel NEF at full size and quality 92, with the app's
+own default edit (denoise 0.47):**
+
+- total **46.97s**
+- re-reading the raw file 1.11s (2%)
+- **the per-pixel pass 45.20s (96%)**
+- the JPEG encoder 0.53s (1%)
+- colour profile and metadata 0.04s
+- waiting on the 233 yields that keep the interface alive: 0.97s (2%)
+
+So there is nothing to win in the encoder, the file reading, or the metadata:
+**the pass over the pixels is the export.** Turning denoise off takes the whole
+export to **18.71s**, which puts **28 seconds — 60% of the export — in the
+twenty-five bilateral taps per pixel**, each with a `Math.exp` in it. A
+microbenchmark of that exp alone over 522 million taps: **15.0s**.
+
+**TWO HYPOTHESES, BOTH MEASURED, BOTH WRONG.**
+
+- *Per-pixel allocations.* The coordinate mapping allocated two arrays per output
+  pixel, the demosaic allocated an array and two closures per source pixel, and
+  every sampler in the chain returned a fresh triple — sixty-odd million
+  short-lived objects for one photograph. All removed (out-params and reused
+  scratch arrays, contract documented on `LinearSampler`). **Measured gain:
+  0%** — 47.22s against 46.97s. V8's escape analysis and generational collector
+  were already handling them.
+- *The recomputed tap luma.* Each of the 522 million taps recomputed
+  `r·0.2126 + g·0.7152 + b·0.0722`, and each source pixel's luma was recomputed
+  by all twenty-five pixels that see it. Cached beside the row (in a
+  **Float64Array**, because `v` is float32 and rounding the luma a second time
+  would change the exported pixels). A microbenchmark said 8.1s. **Measured
+  gain: 1.03s, about 2%.**
+
+Both changes are kept: they are exact, they remove real garbage, and the
+out-param shape is what a worker-side loop wants. But the honest number is that
+together they bought **2%**, on a desktop-class container. The iPad is
+unmeasured.
+
+**BIT-IDENTICAL, PROVEN BY THE FILE'S OWN HASH.** Every export above was
+compared by sha256 of the finished JPEG: `cf329769f749fbe6b92049cfe0ab909b`
+before the changes and after both of them. That is the strongest form of "this
+changed when the work happens and never what comes out" available here.
+
+**WHAT THAT LEAVES.** Single-threaded exact optimisation is finished: the
+algorithm's own floor is the exp, and the remaining time is memory traffic over
+the row ring. The answer is **parallelism** — the export is embarrassingly
+parallel over output rows, and four cores would take 47s to about 13. That is
+its own piece of work and is NOT started: it needs the source split into bands
+with halos for the 5x5 and 7x7 taps, the coarse glow/local maps built once and
+shared, and a fallback to today's path for stickers, warp, heal patches and
+masks. The bit-identical proof is the same hash comparison used above.
+
+**AND THE PROBE BECAME AN INSTRUMENT.** The stage timings are not a test hook:
+`lastExportProfile()` feeds a line in the §7f diagnostic, so a reader saying
+"this takes forever" sends a report with the split in it rather than a stopwatch
+and a guess. Counts and seconds only — it names no file.
+
+**The preview-pipeline gate fired on all of this, and it was right to.** It
+hashes the sources a preview is made of, and this touched four of them. It also
+had no way to express "the sources changed and the pictures provably did not",
+which is exactly what happened — so it grew one: `--record --proven "<evidence>"`
+writes the claim into `tools/.preview-pipeline`, where it lands in the diff for
+whoever reviews it. Recording with neither a bump nor evidence is still refused.
