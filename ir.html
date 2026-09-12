@@ -226,7 +226,7 @@
 
       <aside id="panel" hidden>
         <!-- Segmented tab grid: six core adjustment tabs in a 2x3 grid, with
-             Corrections and Crop & rotate as full-width footer rows below them.
+             Corrections and Crop & straighten as full-width footer rows below them.
              Active tab is remembered per session (main.ts). -->
         <div id="panelTabs" class="panel-tabs" role="tablist" aria-label="Editor sections">
           <button id="ptab-basic" aria-controls="sec-basic" class="ptab active" type="button" data-tab="basic" role="tab" aria-selected="true">Basic</button>
@@ -237,7 +237,7 @@
           <button id="ptab-masks" aria-controls="sec-masks" class="ptab" type="button" data-tab="masks" role="tab" aria-selected="false">Masks</button>
           <button id="ptab-export" aria-controls="sec-export" class="ptab" type="button" data-tab="export" role="tab" aria-selected="false">Export</button>
           <button id="ptab-corrections" aria-controls="sec-corrections" class="ptab" type="button" data-tab="corrections" role="tab" aria-selected="false">Corrections</button>
-          <button id="ptab-crop" aria-controls="sec-crop" class="ptab" type="button" data-tab="crop" role="tab" aria-selected="false">Crop &amp; rotate</button>
+          <button id="ptab-crop" aria-controls="sec-crop" class="ptab" type="button" data-tab="crop" role="tab" aria-selected="false">Crop &amp; straighten</button>
           <!-- The Creative row (row 4): Grade + Stickers + Warp complete the
                4x3 tab grid. -->
           <button id="ptab-grade" aria-controls="sec-grade" class="ptab" type="button" data-tab="grade" role="tab" aria-selected="false">Grade</button>
@@ -614,14 +614,24 @@
             <small class="note">A LUT recolours the finished image on top of everything above &mdash; in the preview and every export alike. An exported <strong>.cube</strong> includes it baked in; <strong>.dcp</strong> can't carry it. LUTs are stored on this device (sizes shown) &mdash; delete any time. Links and look codes can't carry a LUT; share its .cube file instead.</small>
           </section>
 
-          <!-- ===== CROP & ROTATE ===== -->
+          <!-- ===== CROP & STRAIGHTEN =====
+               NAMED FOR THE TWO THINGS THAT ARE NOT THE SAME AS EACH OTHER.
+               This tab was "Crop & rotate" while containing a Rotate 90°
+               button, a Crop box and a Straighten slider — so "rotate" meant
+               the whole panel at the tab and one button inside it, and the word
+               was also a hue-rotation preset in the channel mixer and the
+               sticker handle. Four meanings, and the two that matter here are a
+               quarter turn and a fine angle, which are different operations
+               with different geometry and different export cost.
+               Lightroom and Photoshop both name this panel for crop and
+               straighten and keep Rotate for the discrete quarter-turn. -->
           <section class="section" role="tabpanel" id="sec-crop" aria-labelledby="ptab-crop" data-tab="crop" hidden>
             <button id="rotateBtn" class="accent-outline" type="button" aria-label="Rotate 90 degrees clockwise">&#8635; Rotate 90&deg;</button>
             <button id="flipHBtn" class="accent-outline" type="button" aria-label="Flip horizontal — mirror left and right">&#8646; Flip horizontal</button>
             <button id="flipVBtn" class="accent-outline" type="button" aria-label="Flip vertical — mirror top and bottom">&#8645; Flip vertical</button>
             <button id="cropBtn" class="toggle full-btn" type="button" aria-pressed="false" aria-label="Crop">Crop</button>
             <button id="straightenBtn" class="toggle full-btn" type="button" aria-pressed="false" aria-label="Straighten">Straighten</button>
-            <p class="note">Rotate turns the whole photo 90&deg;; the flips mirror it as you see it. Crop opens a draggable box &mdash; with aspect presets (1:1, 4:5&hellip;) on the bottom pill. Straighten levels the horizon with a slider. Crop and Straighten each open on their own &mdash; tap &ldquo;Done&rdquo; to apply.</p>
+            <p class="note"><strong>Rotate</strong> means quarter turns only &mdash; 90&deg; at a time; the flips mirror it as you see it. <strong>Straighten</strong> is the fine angle that levels a horizon, and the two are separate tools. Crop opens a draggable box &mdash; with aspect presets (1:1, 4:5&hellip;) on the bottom pill. Straighten levels the horizon with a slider. Crop and Straighten each open on their own &mdash; tap &ldquo;Done&rdquo; to apply.</p>
           </section>
 
           <div id="panelDown" class="scroll-cue down" hidden><span>&#9660;</span></div>
@@ -1099,7 +1109,7 @@
         papers they're named for.</p>
         <p>The <strong>Channel mixer</strong> is the full recipe behind the R&#8646;B swap: build each
         output channel (red, green, blue) from any blend of the three inputs. Start from a preset —
-        Aerochrome, Copper, a channel Rotate — then fine-tune the nine sliders for invented false-color
+        Aerochrome, Copper, a channel cycle (red to green to blue) — then fine-tune the nine sliders for invented false-color
         palettes. Unlike grain and vignette, the mixer is pure color: it bakes into both .cube and .dcp
         exports.</p>
 
@@ -1141,7 +1151,7 @@
           <li><strong>Masks</strong> — radial, gradient, painted brush, tap-a-color, or automatic sky: local adjustments for one area only. Masks belong to the photo; saved looks stay portable.</li>
           <li><strong>Dust &amp; spots</strong> (Corrections tab) — arm <em>Heal spots</em> and tap a dust mote: it's patched from clean pixels nearby, in the preview and the export alike. <em>Visualize spots</em> makes dust jump out of flat skies and updates as you heal &mdash; a fix that still leaves a ring there was smaller than the dust, so raise <em>Spot size</em>; <em>Find spots automatically</em> sweeps the smooth areas, heals what it finds, and rings every fix for review &mdash; tap a ring to put that one back. Heals belong to the photo — they never ride in saved looks, profiles or a batch.</li>
           <li><strong>IR lens fixes</strong> (Corrections tab) — pulls down the center hot-spot IR-converted lenses produce, takes the <em>colour</em> out of it as well (the disc that shows up in a plain sky once a Look is on), and corrects (or adds) corner vignette.</li>
-          <li><strong>Crop &amp; rotate</strong> (panel tab) — three one-tap tools, each with its own <em>Done</em>: <strong>Rotate 90&deg;</strong> turns the whole photo; <strong>Crop</strong> shows the box with a rule-of-thirds grid — drag a corner to resize, drag the photo to slide it under the box; <strong>Straighten</strong> adds a fine alignment grid and a degree slider — line a horizon up against the grid (the crop auto-shrinks so no empty corner shows). Pinch to zoom the view while either tool is open. A view onto the photo, not a re-bake — masks and healed spots stay exactly where they are underneath. Composition-specific: never rides in saved looks, profiles or a batch.</li>
+          <li><strong>Crop &amp; straighten</strong> (panel tab) — three one-tap tools, each with its own <em>Done</em>: <strong>Rotate 90&deg;</strong> turns the whole photo in quarter turns and nothing else; <strong>Crop</strong> shows the box with a rule-of-thirds grid — drag a corner to resize, drag the photo to slide it under the box; <strong>Straighten</strong> adds a fine alignment grid and a degree slider — line a horizon up against the grid (the crop auto-shrinks so no empty corner shows). Pinch to zoom the view while either tool is open. A view onto the photo, not a re-bake — masks and healed spots stay exactly where they are underneath. Composition-specific: never rides in saved looks, profiles or a batch.</li>
         </ul>
 
         <h3>Profiles &amp; LUTs</h3>
