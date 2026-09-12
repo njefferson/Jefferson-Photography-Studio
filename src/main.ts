@@ -1,6 +1,6 @@
 import "./style.css";
 import { importFile, type ImportedFile, type ImageKind } from "./import";
-import { wireForceUpdate, wireUpdateStrip } from "./swupdate";
+import { wireForceUpdate, wireUpdateStrip, setUpdateCost } from "./swupdate";
 import { type DecodedImage, pickLargestPreview } from "./decode";
 import { decodeOffThread } from "./decodeClient";
 import { Renderer, type EditParams } from "./gl";
@@ -8001,6 +8001,20 @@ interface QuickItem {
 }
 
 let quickItems: QuickItem[] = [];
+// WHAT AN UPDATE WOULD COST WHILE A QUICK LOOK IS OPEN. Applying an update
+// reloads the page, and a quick look cannot survive a reload: iPad Safari will
+// not re-open a file the reader picked, so the folder has to be picked again,
+// and the thumbnails built for it are in memory only.
+//
+// Asked at the moment of the press rather than tracked as a flag, so it cannot
+// be left set by a path out of the grid that forgot to clear it.
+setUpdateCost(() => {
+  if (!quickLook.open || !quickItems.length) return null;
+  const n = quickItems.length;
+  const picked = quickItems.reduce((c, it) => c + (it.selected ? 1 : 0), 0);
+  return `this quick look of ${n} photo${n === 1 ? "" : "s"} cannot survive it — the browser will not re-open files you picked, so you would choose the folder again and wait for the previews a second time` +
+    (picked && picked !== n ? `, and the ${picked} you have kept selected would be forgotten.` : ".");
+});
 let quickGen = 0; // bumped on open/close to abort an in-flight decode loop
 
 const quickInput = $("quickFiles") as HTMLInputElement;
