@@ -22,7 +22,9 @@ const MAP_W = 192;
 const REC = [0.2126, 0.7152, 0.0722];
 
 export function buildGlowMap(
-  sample: (x: number, y: number) => [number, number, number],
+  /** See LinearSampler in raw/denoise: the array may be reused, and this
+   *  reads it into the map immediately. */
+  sample: (x: number, y: number) => ArrayLike<number>,
   srcW: number,
   srcH: number,
 ): GlowMap {
@@ -33,8 +35,8 @@ export function buildGlowMap(
     const sy = Math.min(srcH - 1, Math.floor(((y + 0.5) * srcH) / H));
     for (let x = 0; x < W; x++) {
       const sx = Math.min(srcW - 1, Math.floor(((x + 0.5) * srcW) / W));
-      const [r, g, b] = sample(sx, sy);
-      luma[y * W + x] = r * REC[0] + g * REC[1] + b * REC[2];
+      const s = sample(sx, sy);
+      luma[y * W + x] = s[0] * REC[0] + s[1] * REC[1] + s[2] * REC[2];
     }
   }
 

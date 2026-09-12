@@ -33,7 +33,14 @@ export function rangeSigma(strength: number): number {
   return 0.1 * strength * strength;
 }
 
-export type LinearSampler = (x: number, y: number) => [number, number, number];
+/** A linear-RGB sample at an integer source pixel.
+ *
+ *  THE RETURNED ARRAY MAY BE REUSED BY THE NEXT CALL, and every caller here
+ *  reads it immediately — destructured, copied into a row, or accumulated. An
+ *  export of a 21-megapixel raw makes one of these calls per output pixel and
+ *  another per source pixel, so a fresh three-element array per call is tens of
+ *  millions of them for one photograph. Hold what you need, not the array. */
+export type LinearSampler = (x: number, y: number) => ArrayLike<number>;
 
 /**
  * Wraps a linear-RGB sampler with bilateral denoising. Rows are cached in a
@@ -91,6 +98,17 @@ export function makeRowDenoiser(
   interface Row {
     y: number;
     v: Float32Array;
+    /** THE TAP'S LUMA, CACHED BESIDE IT. Every pixel asks twenty-five taps for
+     *  their luma, and each of those taps is asked by twenty-five pixels — so
+     *  the same three multiplies and two adds were done twenty-five times for
+     *  every source pixel in the frame. Measured on a 20.9-megapixel export:
+     *  522 million taps, and the luma alone is 8.1 seconds of them.
+     *
+     *  A DOUBLE ARRAY, not a float one. `v` is float32 and the luma is a double
+     *  computed from those floats; storing it in a Float32Array would round it
+     *  a second time and change the exported pixels, which is the one thing
+     *  this may not do. */
+    l: Float64Array;
     /** Which generation filled each pixel. Equal to `gen` means present. */
     seen: Int32Array;
     gen: number;
@@ -104,7 +122,7 @@ export function makeRowDenoiser(
     if (hit) return hit;
     let row: Row;
     if (ring.length < rowSpan) {
-      row = { y: cy, v: new Float32Array(width * 3), seen: new Int32Array(width), gen: 1 };
+      row = { y: cy, v: new Float32Array(width * 3), l: new Float64Array(width), seen: new Int32Array(width), gen: 1 };
       ring.push(row);
     } else {
       // Oldest slot, round-robin — the same eviction order the Map had, and the
@@ -122,23 +140,25 @@ export function makeRowDenoiser(
   const at = (row: Row, x: number): number => {
     const o = x * 3;
     if (row.seen[x] !== row.gen) {
-      const [r, g, b] = sample(x, row.y);
-      row.v[o] = r;
-      row.v[o + 1] = g;
-      row.v[o + 2] = b;
+      const s = sample(x, row.y);
+      row.v[o] = s[0];
+      row.v[o + 1] = s[1];
+      row.v[o + 2] = s[2];
+      // From the STORED floats, so the value is identical to the one the old
+      // code computed after reading them back.
+      row.l[x] = row.v[o] * REC[0] + row.v[o + 1] * REC[1] + row.v[o + 2] * REC[2];
       row.seen[x] = row.gen;
     }
     return o;
   };
 
+  // One array for the life of this sampler — see LinearSampler on why.
+  const scratch: [number, number, number] = [0, 0, 0];
   return (x, y) => {
     const cRow = getRow(y);
     const cx = x < 0 ? 0 : x >= width ? width - 1 : x;
-    const co = at(cRow, cx);
-    const cr = cRow.v[co];
-    const cg = cRow.v[co + 1];
-    const cb = cRow.v[co + 2];
-    const lc = cr * REC[0] + cg * REC[1] + cb * REC[2];
+    at(cRow, cx);
+    const lc = cRow.l[cx];
     let sr = 0;
     let sg = 0;
     let sb = 0;
@@ -154,7 +174,7 @@ export function makeRowDenoiser(
         const r = row.v[so];
         const g = row.v[so + 1];
         const b = row.v[so + 2];
-        const ls = r * REC[0] + g * REC[1] + b * REC[2];
+        const ls = row.l[sx];
         const rel = (ls - lc) / (lc + 0.02);
         const w = SPATIAL[k] * Math.exp(-rel * rel * inv2s2);
         sr += r * w;
@@ -163,6 +183,9 @@ export function makeRowDenoiser(
         wsum += w;
       }
     }
-    return [sr / wsum, sg / wsum, sb / wsum];
+    scratch[0] = sr / wsum;
+    scratch[1] = sg / wsum;
+    scratch[2] = sb / wsum;
+    return scratch;
   };
 }

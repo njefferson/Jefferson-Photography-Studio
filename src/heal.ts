@@ -174,7 +174,9 @@ export function bakeRgbaF32(
 // --- Export-side overlay: healed patches over a linear sampler ---------------
 
 export type Rgb = [number, number, number];
-export type Sampler = (x: number, y: number) => Rgb;
+/** See LinearSampler in raw/denoise — the returned array may be reused by the
+ *  next call, so every reader here takes the numbers out at once. */
+export type Sampler = (x: number, y: number) => ArrayLike<number>;
 
 export interface HealPatch extends Rect {
   /** Linear RGB, 3 floats per pixel, row-major within the rect. */
@@ -225,11 +227,13 @@ export function healPatchesFromSampler(
       const py = rect.y0 + y;
       for (let x = 0; x < rect.w; x++) {
         const px = rect.x0 + x;
-        let [r, g, b] = sample(px, py);
+        const s0 = sample(px, py);
+        let r = s0[0], g = s0[1], b = s0[2];
         for (const c of sp) {
           const w = weightAt(c, px, py);
           if (w <= 0) continue;
-          const [qr, qg, qb] = sample(clampI(px + c.offX, W - 1), clampI(py + c.offY, H - 1));
+          const q = sample(clampI(px + c.offX, W - 1), clampI(py + c.offY, H - 1));
+          const qr = q[0], qg = q[1], qb = q[2];
           r += (qr - r) * w;
           g += (qg - g) * w;
           b += (qb - b) * w;

@@ -122,19 +122,39 @@ if (existsSync(RECORD)) {
   was.version = Number(was.version);
 }
 
-const record = () => {
-  writeFileSync(RECORD, `# Written by tools/preview-version-check.mjs --record. Not hand-edited.\nversion=${version}\nhash=${hash}\n`);
-  console.log(`\n  preview pipeline: recorded version ${version} at ${hash}\n`);
+const record = (proven = "") => {
+  writeFileSync(RECORD, `# Written by tools/preview-version-check.mjs --record. Not hand-edited.\nversion=${version}\nhash=${hash}\n` +
+    (proven ? `# Recorded WITHOUT a version bump. The evidence the pictures did not change:\nproven=${proven}\n` : ""));
+  console.log(`\n  preview pipeline: recorded version ${version} at ${hash}${proven ? `\n  without a bump, on: ${proven}` : ""}\n`);
 };
 
+/** THE THIRD CASE, and it is a real one: the sources changed and the pictures
+ *  provably did not.
+ *
+ *  A change can touch this code and be output-neutral — a loop rearranged, an
+ *  allocation removed, a value cached rather than recomputed. Bumping the
+ *  version there would throw away every reader's kept previews to replace them
+ *  with identical bytes. But a free pass would gut the gate, so the escape is
+ *  an ASSERTION that lands in the record file and therefore in the diff:
+ *
+ *      node tools/preview-version-check.mjs --record --proven "same sha256 …"
+ *
+ *  Whoever reviews the commit sees the claim beside the hash it excused. */
+const provenAt = process.argv.indexOf("--proven");
 if (process.argv.includes("--record")) {
   if (hash === was.hash) { console.log(`\n  preview pipeline: already recorded (version ${version}, ${hash})\n`); process.exit(0); }
-  if (!(version > was.version)) {
-    console.error(`\n  preview pipeline: the sources changed but PREVIEW_PIPELINE is still ${version}.`);
-    console.error("  Move it first — recording without moving it is the same as not having a gate.\n");
+  const proven = provenAt >= 0 ? String(process.argv[provenAt + 1] ?? "").trim() : "";
+  if (provenAt >= 0 && proven.length < 12) {
+    console.error("\n  preview pipeline: --proven needs the evidence, not a word. Name what was compared.\n");
     process.exit(1);
   }
-  record();
+  if (!proven && !(version > was.version)) {
+    console.error(`\n  preview pipeline: the sources changed but PREVIEW_PIPELINE is still ${version}.`);
+    console.error("  Move it first, or record with --proven \"<how you know the pictures did not change>\".");
+    console.error("  Recording with neither is the same as not having a gate.\n");
+    process.exit(1);
+  }
+  record(proven);
   process.exit(0);
 }
 
