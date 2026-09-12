@@ -5,7 +5,7 @@
 
 // Single source of truth for edit parameters lives in pipeline.ts so the GPU
 // preview and CPU export can never drift apart.
-import { toneEvaluator, toneIsIdentity, maskIsActive, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, type EditParams, type LocalMap, type CropRect } from "./pipeline";
+import { toneEvaluator, toneIsIdentity, maskIsActive, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, LENS_GAIN_LO, LENS_GAIN_HI, type EditParams, type LocalMap, type CropRect } from "./pipeline";
 export type { EditParams };
 
 // A faithful 256-entry identity ramp for the tone LUT. A 2-texel [0,255] ramp
@@ -69,6 +69,15 @@ void main() {
 
 const FRAG = `#version 300 es
 precision highp float;
+// Bounds for the measured lens gain — see pipeline.ts LENS_GAIN_LO/HI.
+// toFixed, NOT the bare number: GLSL will not convert an int literal to a float,
+// so an interpolated 2 gives "cannot convert from const int to const highp
+// float" and the whole shader fails to compile. The app then reports itself
+// unsupported and every browser harness fails on a click being intercepted,
+// which looks like a UI change and is a missing decimal point. tsc is green
+// either way — a shader is a string to it.
+const float LENS_GAIN_LO = ${LENS_GAIN_LO.toFixed(6)};
+const float LENS_GAIN_HI = ${LENS_GAIN_HI.toFixed(6)};
 in vec2 v_uv;
 in vec2 v_cropUv;
 out vec4 frag;
@@ -243,6 +252,23 @@ float radialGain(vec2 uv){
 /** The hot-spot's radial weight alone: 1 at the centre, 0 past u_hotspotSize.
  *  Shared with radialGain above so both describe the same circle, and mirrored
  *  by hotspotWeight() in pipeline.ts. */
+// THE MEASURED GAIN, BOUNDED, and the same arithmetic as pipeline.ts lensGain.
+// The two limits are injected from that one constant rather than typed here, so
+// the shader and the CPU mirror cannot be given two different bounds. The old
+// form guarded the divisor instead of the gain, which admits a factor of a
+// thousand and then snaps back to 1 — see pipeline.ts lensGain for what that
+// cost and why a bin of zero reached 100x at strength 0.99.
+//
+// NOTE FOR ANYONE EDITING THE COMMENTS IN THIS FILE: the shader is a JavaScript
+// template literal, so a backtick in a comment ends it and the rest of the
+// shader is parsed as TypeScript. This paragraph replaces one that quoted the
+// old expression in backticks and did exactly that.
+float lensGain(float k, float s) {
+  float v = 1.0 + (k - 1.0) * s;
+  if (!(v > 1e-6)) return LENS_GAIN_HI;
+  return clamp(1.0 / v, LENS_GAIN_LO, LENS_GAIN_HI);
+}
+
 float hotspotWeight(vec2 uv){
   vec2 d = vec2((uv.x - 0.5) * u_aspect, uv.y - 0.5);
   float r = 2.0 * length(d) / sqrt(u_aspect * u_aspect + 1.0);
@@ -439,15 +465,12 @@ void main() {
     float r = 2.0 * length(d) / sqrt(u_aspect * u_aspect + 1.0);
     int i = clamp(int(floor(r * float(u_lensN))), 0, u_lensN - 1);
     vec3 k = texelFetch(u_lensTex, ivec2(i, 0), 0).rgb;
-    float gr = 1.0 + (k.r - 1.0) * u_lensFix;
-    float gb = 1.0 + (k.g - 1.0) * u_lensFix;
     // The brightness half rides all three channels; the colour half is a ratio
     // against green, so green takes the bump and nothing else.
-    float gc = 1.0 + k.b * u_lensBump;
-    float ic = gc > 1e-3 ? 1.0 / gc : 1.0;
-    c.r *= (gr > 1e-3 ? 1.0 / gr : 1.0) * ic;
+    float ic = lensGain(1.0 + k.b, u_lensBump);
+    c.r *= lensGain(k.r, u_lensFix) * ic;
     c.g *= ic;
-    c.b *= (gb > 1e-3 ? 1.0 / gb : 1.0) * ic;
+    c.b *= lensGain(k.g, u_lensFix) * ic;
   }
 
   // Camera colour matrix: separates infrared chroma into distinct hues so the
@@ -692,7 +715,12 @@ export class Renderer {
     const gl = this.gl;
     const cN = kr && kb ? Math.min(kr.length, kb.length) : 0;
     const bN = bump ? bump.length : 0;
-    const n = cN > 1 && bN > 1 ? Math.min(cN, bN) : Math.max(cN > 1 ? cN : 0, bN > 1 ? bN : 0);
+    // A BIN COUNT IS A RADIUS MAPPING, NOT A RESOLUTION — see pipeline.ts. The
+    // shorter of the two used to win, which stretches the longer curve outward
+    // rather than trimming it. When they disagree the colour half keeps its own
+    // length and the brightness half stands down, matching the CPU mirror.
+    const useB = bN > 1 && (cN <= 1 || cN === bN);
+    const n = cN > 1 ? cN : useB ? bN : 0;
     gl.activeTexture(gl.TEXTURE10);
     gl.bindTexture(gl.TEXTURE_2D, this.lensTex);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
@@ -707,11 +735,11 @@ export class Renderer {
     for (let i = 0; i < n; i++) {
       data[i * 3] = cN > 1 ? kr![i] : 1;
       data[i * 3 + 1] = cN > 1 ? kb![i] : 1;
-      data[i * 3 + 2] = bN > 1 ? bump![i] : 0;
+      data[i * 3 + 2] = useB ? bump![i] : 0;
     }
     this.lensN = n;
     this.lensHasColour = cN > 1;
-    this.lensHasBump = bN > 1;
+    this.lensHasBump = useB;
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB32F, n, 1, 0, gl.RGB, gl.FLOAT, data);
   }
 

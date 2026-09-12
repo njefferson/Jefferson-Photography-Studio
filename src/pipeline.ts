@@ -872,11 +872,37 @@ export interface LensCurve {
   bump?: ArrayLike<number>;
 }
 
+/** HOW FAR A MEASURED PROFILE MAY MOVE ONE CHANNEL, either way.
+ *
+ *  Not a matter of taste — a bound on what the data can be. Across all 160
+ *  profiles that exist (30 shipped, 130 measured), every kr and kb bin sits
+ *  between 0.772 and 1.460, and every brightness bin between 1.000 and 1.288.
+ *  At the strength slider's maximum of 1.5 the largest honest correction any of
+ *  them asks for is 1.52x on a channel. So half and double leave every real
+ *  measurement untouched with room on both sides, and a bin that is not a
+ *  measurement can no longer paint anything. */
+export const LENS_GAIN_LO = 0.5, LENS_GAIN_HI = 2;
+
 /** The gain the pipeline applies at one bin, at a given strength. Shared so the
- *  shader, the CPU mirror and the test cannot drift into three answers. */
+ *  shader, the CPU mirror and the test cannot drift into three answers.
+ *
+ *  THE GUARD USED TO BE ON THE DIVISOR AND THAT IS NOT A BOUND. It read
+ *  `v > 1e-3 ? 1/v : 1`, which admits a gain of a thousand and then drops to 1
+ *  the moment the divisor crosses the threshold — so the correction rose without
+ *  limit as the slider moved and then vanished, which is the opposite of a
+ *  guard. A bin of 0 (a radius with no measurement, stored as a null and read
+ *  back as zero) reaches 100x at strength 0.99 and 1x at 1.00.
+ *
+ *  A non-finite bin returns 1, because a missing measurement is neutral. A
+ *  divisor at or below zero means the correction has been driven past the point
+ *  where the channel would vanish, so it saturates at the upper bound rather
+ *  than changing sign. */
 export function lensGain(k: number, strength: number): number {
+  if (!Number.isFinite(k) || !Number.isFinite(strength)) return 1;
   const v = 1 + (k - 1) * strength;
-  return v > 1e-3 ? 1 / v : 1;
+  if (!(v > 1e-6)) return LENS_GAIN_HI;
+  const g = 1 / v;
+  return g > LENS_GAIN_HI ? LENS_GAIN_HI : g < LENS_GAIN_LO ? LENS_GAIN_LO : g;
 }
 
 /** The bin a pixel falls in. `r` is the same normalised radius the hot-spot
@@ -950,24 +976,34 @@ export function compileEdit(
   const colourOn = colourN > 1 && lensFix !== 0;
   const bumpOn = bumpN > 1 && hsFix !== 0;
   // One bin count for the stage, so a pixel lands in the same ring for both
-  // halves. They come from the same 80-bin measurement; a mismatch would mean
-  // one of the two data sets changed shape, and the shorter one wins rather
-  // than the stage silently reading past its end.
-  const lensN = colourOn && bumpOn ? Math.min(colourN, bumpN) : colourOn ? colourN : bumpN;
-  const measuredOn = colourOn || bumpOn;
+  // halves.
+  //
+  // A BIN COUNT IS NOT A RESOLUTION, IT IS A RADIUS MAPPING. The shorter of the
+  // two used to win, which reads as a safe choice and is not: the bin a pixel
+  // lands in is `floor(r * n)`, so running an 80-bin curve at n = 60 does not
+  // truncate it, it STRETCHES it — the bin describing 74% of the way to the
+  // corner gets applied at the corner. Both curves are 80 bins everywhere they
+  // exist, and the store now refuses any profile that is not, so a mismatch
+  // here means one of the two is corrupt. The colour half is the reader's own
+  // measurement of their own lens, so it keeps its length and the brightness
+  // half stands down, rather than both being applied at the wrong radii.
+  const lengthsAgree = !(colourOn && bumpOn) || colourN === bumpN;
+  const useBump = bumpOn && lengthsAgree;
+  const lensN = colourOn ? colourN : bumpN;
+  const measuredOn = colourOn || useBump;
   const lensGr = measuredOn ? new Float64Array(lensN) : null;
   const lensGb = measuredOn ? new Float64Array(lensN) : null;
   if (measuredOn) {
     for (let i = 0; i < lensN; i++) {
-      const gc = bumpOn ? lensGain(1 + bump![i], hsFix) : 1;
+      const gc = useBump ? lensGain(1 + bump![i], hsFix) : 1;
       lensGr![i] = (colourOn ? lensGain(kr![i], lensFix) : 1) * gc;
       lensGb![i] = (colourOn ? lensGain(kb![i], lensFix) : 1) * gc;
     }
   }
   // Green carries the brightness half only — the colour half is defined as a
   // ratio AGAINST green, so correcting green by it would be correcting twice.
-  const lensGg = bumpOn ? new Float64Array(lensN) : null;
-  if (bumpOn) for (let i = 0; i < lensN; i++) lensGg![i] = lensGain(1 + bump![i], hsFix);
+  const lensGg = useBump ? new Float64Array(lensN) : null;
+  if (useBump) for (let i = 0; i < lensN; i++) lensGg![i] = lensGain(1 + bump![i], hsFix);
   const cl = p.clarity ?? 0;
   const dz = p.dehaze ?? 0;
   const localOn = local && (cl !== 0 || dz !== 0);
