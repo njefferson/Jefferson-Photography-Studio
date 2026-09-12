@@ -429,18 +429,30 @@ export function radialMeans(img: DecodedImage): RadialMeans {
       lum.push((secR[k] + secG[k] + secB[k]) / (3 * secN[k]));
     }
     const of = idx.length;
-    // TOO SMALL TO SECTOR IS NOT THE SAME AS CONTAMINATED. The innermost ring is
-    // a disc of a few hundred pixels on the optical centre; no sector in it
-    // reaches the minimum, so `of` is 0 for a reason that has nothing to do with
-    // what is in the frame. Returning "no estimate" there made the reach scan
-    // stop at ring 0 and refused all sixteen good flats — caught by the corpus
-    // check on its first run after the estimator landed.
+    // TOO FEW SECTORS TO CHECK IS NOT THE SAME AS CONTAMINATED, and this is the
+    // branch that decides which of the two a sparse ring is called. Two places
+    // in every frame have fewer than five sectors that clear the pixel minimum,
+    // for reasons of GEOMETRY rather than content:
     //
-    // A ring that small cannot be selectively contaminated in any way that
-    // matters at this scale, so its plain mean stands. kept = of = 0 records
-    // that it was never sector-checked, which is a different claim from
-    // "checked and clean".
-    if (of === 0) {
+    //  - The innermost ring is a disc of a few hundred pixels on the optical
+    //    centre. At rig resolution no sector in it reaches the minimum at all.
+    //  - The outermost rings are past the frame's long edges as well as its
+    //    short ones, so what is left of them is four corner arcs.
+    //
+    // The test below needs five survivors, because dropping a sector from
+    // fewer than that leaves too few angles to re-fit the ramp — so on those
+    // rings it can never be satisfied and every one of them came back NaN.
+    // That is the whole of both regressions the estimator shipped with: ring 0
+    // NaN stopped the reach scan at the first radius and refused all sixteen
+    // good flats, and bins 77-79 NaN emptied the corner, which is where a
+    // contaminated frame is told apart from a lens.
+    //
+    // A ring this sparse gets its plain pixel-weighted mean, which is what the
+    // whole profile was before the estimator existed and what main still ships.
+    // kept = of = 0 records that it was never sector-checked, which is a
+    // different claim from "checked and clean" — and it keeps rescuedRings
+    // counting only rings where sectors were actually dropped.
+    if (of < 5) {
       if (!(cnt[i] > 0)) return { r: NaN, g: NaN, b: NaN, kept: 0, of: 0 };
       return { r: sr[i] / cnt[i], g: sg[i] / cnt[i], b: sb[i] / cnt[i], kept: 0, of: 0 };
     }
@@ -496,6 +508,11 @@ export function radialMeans(img: DecodedImage): RadialMeans {
     const kept = keep.filter(Boolean).length;
     // Too little of the ring left to stand for it. NaN is the existing "this
     // radius has nothing to say" value and every reader already handles it.
+    // Five is a floor and half is a share, and both are needed: five is what
+    // re-fitting the ramp costs, and half is what stops a ring being spoken for
+    // by a minority of itself. Reachable only because the branch above has
+    // already sent every ring with fewer than five sectors to its plain mean —
+    // applied to those, this floor is a refusal that can never be lifted.
     if (kept < Math.max(5, Math.ceil(of * 0.5))) return { r: NaN, g: NaN, b: NaN, kept, of };
     const chan = (sec: Float64Array) =>
       solve(idx.map((a) => sec[i * SECTORS + a] / secN[i * SECTORS + a]), keep).k;
