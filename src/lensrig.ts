@@ -328,17 +328,16 @@ export function wireLensRig(root: ParentNode): void {
 
   let stopRequested = false;
 
-  $<HTMLInputElement>("lensFiles").addEventListener("change", async (e) => {
-    const input = e.currentTarget as HTMLInputElement;
-    const picked = [...(input.files ?? [])];
-    input.value = ""; // so choosing the same set twice re-runs
-    if (!picked.length) return;
-    // THE SCREEN, FIRST. An iPad on its own auto-lock timer sleeps in the middle
-    // of ninety frames and the work stops where it stood. Taken before anything
-    // slow starts, and released in a finally so a thrown decode cannot leave it
-    // held for the rest of the session.
-    const release = keepAwake();
-    try {
+  /** Frames picked that this run has not taken in yet. */
+  const waiting: File[] = [];
+  let running = false;
+  /** How many frames arrived while a run was already going, for the note that
+   *  explains why the count went up. */
+  let joinedMidRun = 0;
+
+  /** Measure one set, start to finish, and offer the result. */
+  const measureRun = async (picked: File[]) => {
+    {
       // WHAT THE READER NEEDS TO KNOW BEFORE A LONG RUN, not after it failed.
       // The wake lock is a request; when it is refused or absent the only remedy
       // is on the device, and saying so is the difference between a reader who
@@ -354,6 +353,19 @@ export function wireLensRig(root: ParentNode): void {
       (profDetail as HTMLDetailsElement).open = false;
       profRunning.hidden = false;
       profRunning.textContent = "Reading what you picked…";
+      // SAY WHY THE COUNT WENT UP, IN A LINE THAT SURVIVES. On a pass after the
+      // first the set is larger than the one the reader last picked, and
+      // without this the run looks like it restarted itself for no reason.
+      //
+      // This was written into the progress line above and measured as never
+      // visible: that line is rewritten within milliseconds by the read loop.
+      // Its own element, cleared when the whole sequence ends.
+      const joinNote = $("lensJoinNote");
+      if (joinedMidRun) {
+        joinNote.hidden = false;
+        joinNote.textContent = `${joinedMidRun} more frame${joinedMidRun === 1 ? "" : "s"} arrived while the last set was measuring, so this measures everything together rather than as two answers. Frames already done come straight back from this device, so only the new ones cost anything.`;
+      }
+      joinedMidRun = 0;
       sink = profResults;
       profOut.hidden = true;
       stopRequested = false;
@@ -757,11 +769,58 @@ export function wireLensRig(root: ParentNode): void {
         a.click();
         setTimeout(() => URL.revokeObjectURL(url), 4000);
       };
+    }
+  };
+
+  // PICKING AGAIN DOES NOT START A SECOND RUN OVER THE SAME PANEL.
+  //
+  // This was a plain change listener, so four sets picked in quick succession
+  // started four runs at once, all writing to one set of result panels and one
+  // Keep button. It only produced four usable answers because somebody watched
+  // and pressed Keep as each one arrived — miss the moment and that run's
+  // result was replaced by the next with nothing said.
+  //
+  // Frames picked while a run is going now JOIN it. The run finishes, and if
+  // anything arrived meanwhile the whole set is measured again as one — which
+  // costs almost nothing, because every frame already done comes straight back
+  // from the store, and it is the better answer as well as the simpler one:
+  // frames of the same lens, focal length and aperture from two different picks
+  // average together instead of becoming two profiles of one frame each.
+  //
+  // The screen lock is taken once around the whole sequence rather than per
+  // pick, so a pick landing between two passes cannot leave it held.
+  $<HTMLInputElement>("lensFiles").addEventListener("change", async (e) => {
+    const input = e.currentTarget as HTMLInputElement;
+    const picked = [...(input.files ?? [])];
+    input.value = ""; // so choosing the same set twice re-runs
+    if (!picked.length) return;
+    waiting.push(...picked);
+    if (running) { joinedMidRun += picked.length; return; }
+    running = true;
+    $("lensJoinNote").hidden = true;
+    // THE SCREEN, FIRST. An iPad on its own auto-lock timer sleeps in the middle
+    // of ninety frames and the work stops where it stood. Taken before anything
+    // slow starts, and released in a finally so a thrown decode cannot leave it
+    // held for the rest of the session.
+    const release = keepAwake();
+    try {
+      let all: File[] = [];
+      while (waiting.length) {
+        const take = waiting.splice(0);
+        all = [...all, ...take];
+        await measureRun(all);
+        // A reader who pressed Stop meant it. Anything that arrived while the
+        // run was going is dropped rather than starting a fresh pass they did
+        // not ask for, and the panel already says where it stopped.
+        if (stopRequested) { waiting.length = 0; joinedMidRun = 0; break; }
+      }
     } finally {
       // However it ends — finished, stopped, or a decode that threw — the
       // screen goes back to the reader's own auto-lock. A lock left held is a
       // battery complaint nobody would ever trace back to here.
       release();
+      running = false;
+      joinedMidRun = 0;
     }
   });
 }
