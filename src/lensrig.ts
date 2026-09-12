@@ -70,6 +70,29 @@ export function wireLensRig(root: ParentNode): void {
   // download does nothing at all on an iPhone or iPad, where the share sheet is
   // the only way a file reaches the disk. This button was still doing the plain
   // download — the same fix applied to the instance and not the class.
+  /** THE NAME OF A SAVED FILE HAS TO SAY WHAT IS IN IT AND WHEN IT WAS SAVED.
+   *
+   *  The two saves were `lens-profile-<date>` for one run and
+   *  `lens-profiles-<date>` for everything on the device. One letter apart, and
+   *  which one is which is not guessable — four run files and one backup came
+   *  out of an afternoon and had to be told apart by opening them.
+   *
+   *  And a date alone is not unique within a day. Saving twice leaves the
+   *  operating system to disambiguate, which it does by appending its own
+   *  parenthetical: `(1)`, `(2)`, and on iOS sometimes silently replacing.
+   *  Those numbers say nothing about order or content. The time does.
+   *
+   *  So: what it is, then the date, then the time to the minute. Sorted by name
+   *  a folder of these reads in the order they were saved. */
+  const savedAs = (what: "this-run" | "all-profiles") => {
+    const d = new Date();
+    const p2 = (n: number) => String(n).padStart(2, "0");
+    const stamp = `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}`;
+    return what === "all-profiles"
+      ? `lens-all-profiles-on-this-device-${stamp}.json`
+      : `lens-one-run-${stamp}.json`;
+  };
+
   // ONE IMPLEMENTATION, TWO PLACES TO PRESS IT. The whole-device backup sat at
   // the bottom of the panel, below every result row, and was reported as not
   // findable straight after an import — which is the one moment it matters,
@@ -78,7 +101,7 @@ export function wireLensRig(root: ParentNode): void {
   const backupNow = async (note: HTMLElement) => {
     const n = listProfiles().length;
     const blob = new Blob([exportAll()], { type: "application/json" });
-    const how = await saveBlob(blob, `lens-profiles-${new Date().toISOString().slice(0, 10)}.json`);
+    const how = await saveBlob(blob, savedAs("all-profiles"));
     note.hidden = false;
     note.textContent = how === "cancelled"
       ? "Backup cancelled — nothing was saved."
@@ -761,13 +784,17 @@ export function wireLensRig(root: ParentNode): void {
       const backupNote2 = root.querySelector<HTMLElement>("#lensBackupNote2")!;
       backup2.onclick = () => void backupNow(backupNote2);
       profCopy.onclick = () => copy(text, profCopy, "Copy this run");
-      profSave.onclick = () => {
-        const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `lens-profile-${payload.measured}.json`;
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(url), 4000);
+      // SAVEBLOB, NOT A PLAIN DOWNLOAD. This was an anchor with a download
+      // attribute, which does nothing whatever on an iPhone or iPad — the share
+      // sheet is the only way a file reaches the disk there. The backup button
+      // beside it had already been fixed for exactly this; the fix had been
+      // applied to the instance and not to the class.
+      profSave.onclick = async () => {
+        const how = await saveBlob(new Blob([text], { type: "application/json" }), savedAs("this-run"));
+        backupNote2.hidden = false;
+        backupNote2.textContent = how === "cancelled"
+          ? "Save cancelled — nothing was written."
+          : `Saved this run's ${nProf} profile${nProf === 1 ? "" : "s"} to a file. This is the run only; the button above writes every profile on this device.`;
       };
     }
   };
