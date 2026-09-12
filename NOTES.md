@@ -9968,3 +9968,58 @@ Asserted by `lookcarry.mjs` (session scratchpad), which reads the look buttons
 AND the picture — a look that is only highlighted is a label, and a grade that
 changes with nothing highlighted is the other half of the same lie. Eight
 claims; four of them fail on the build before the change.
+
+## 2026-09-12 — the same folder does not decode twice
+
+**A QUICK LOOK RENDERS EVERY PICKED FILE THROUGH THE REAL PIPELINE**, which is
+the whole point of it and also why opening a folder already looked at cost
+exactly what the first look cost. Reported from a real session: the same folder,
+repeatedly, watched loading.
+
+Rendered previews are kept now (`src/previewcache.ts`), keyed on the FILE — name,
+byte length and modified time — because that is what identifies a picked file
+before anything reads it, and it is the identity a resumed session already uses.
+No handle and no path: the browser gives neither.
+
+**WHAT MAKES A KEPT PICTURE WRONG, all of it in the key:**
+
+- the file changed — a different name, length or modified time is a different
+  file;
+- the app's rendering changed — `PREVIEW_PIPELINE`, declared in that file and
+  held to the code by `tools/preview-version-check.mjs`;
+- **the reader's own lens profiles changed.** A preview is rendered THROUGH the
+  correction, so a picture made before a re-measurement is a portrait of the old
+  correction — and re-measuring is not rare: one this month took a device from
+  11 profiles carrying colour to 71. `LensStore.profilesStamp()` is an FNV hash
+  of the stored text rather than a counter, because a counter has to be bumped
+  by every writer and the writer that forgets serves stale pictures for ever.
+
+**THE GATE IS THE PART WORTH COPYING.** A cache keyed on a number nobody
+remembers to bump serves the wrong picture for ever, and a comment asking for
+the bump cannot refuse anything. `tools/preview-version-check.mjs` hashes the
+sources a preview is actually made of — decode, pipeline, the raw decoders, the
+lens store, the shipped profiles, and two NAMED REGIONS of main.ts
+(`makeThumb` and `lensCurveFor`) — against a recorded hash, and fails the commit
+on any change until `PREVIEW_PIPELINE` moves and the record is rewritten with
+`--record`, which itself refuses if the number did not move. It is in
+`.branch-guard`'s `also=` list, so it runs on every commit.
+
+Regions rather than the whole of main.ts on purpose: main.ts changes every day
+for reasons that have nothing to do with a rendered picture, and a gate that
+demands a version bump on every commit teaches everyone to bump without
+thinking, which is the same as not having a gate.
+
+**Measured** (`previewkeep.mjs`, session scratchpad — counting DECODES rather
+than seconds, because a clock measures this machine and the decode count
+measures the app): a folder nobody has looked at, 4 decodes; the same folder
+again, **0 decodes** and back in 1.3s against 2.8s; "Build these again" really
+re-renders all 4 and what it makes is kept in turn; and a change to the stored
+lens profiles renders all 4 again.
+
+**Two instrument errors on the way, both worth keeping.** The harness first
+wrote to a lens-profile key of its own invention (`ips-lens-profiles`, where the
+app uses `…-v1`) and reported the app failing to notice a change that had not
+been made. And the rebuild count read three decodes of four, because the tiles
+from the previous run were still on screen when the press landed, so "wait until
+there are four pictures" was already true — it was reading a run that had barely
+started. Waiting for the grid to EMPTY first is the signal a new run has begun.

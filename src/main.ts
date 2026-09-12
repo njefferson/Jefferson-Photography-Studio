@@ -25,6 +25,7 @@ import { Tiff } from "./raw/tiff";
 import { drawHistogram } from "./histogram";
 import * as Hotspot from "./hotspot";
 import { wireLensRig } from "./lensrig";
+import { getPreview, putPreview, prunePreviews, clearPreviews, previewStats } from "./previewcache";
 import * as LensStore from "./lensstore";
 import { readExifSubset, type ExifSubset } from "./exif";
 import { setupInstalledShare, setupInstallFromApp, toast } from "./share";
@@ -1645,9 +1646,14 @@ function wireVersionMenu() {
     // but the reader's, and a report that carries a filename is a report that
     // cannot safely be pasted anywhere.
     const real = sessionPhotos.filter((p) => p.id !== "lone").length;
+    // Counts and bytes, never a filename: a kept preview is a picture of one of
+    // the reader's photographs, and how many there are is the whole of what a
+    // report needs to say about them.
+    const kept = await previewStats().catch(() => ({ rows: 0, bytes: 0 }));
     text.value = await buildDiagnostic(__APP_VERSION__, [
       { k: "Open now", v: current ? `a photo is open${real >= 2 ? ` in a session of ${real}` : ""}` : "nothing open" },
       { k: "Restore depth", v: autoLift ? `on at ${Math.round(liftAmount * 100)}% strength` : "off" },
+      { k: "Kept previews", v: kept.rows ? `${kept.rows} (${(kept.bytes / 1e6).toFixed(1)} MB)` : "none" },
     ]);
   };
   tag.addEventListener("click", open);
@@ -8342,12 +8348,35 @@ async function openQuickLook(files: File[]) {
   updateQuickHeader(`Decoding 0 / ${files.length}…`);
 
   let done = 0;
+  let reused = 0;
+  // READ ONCE, AND CLEARED HERE. A run can end early — the grid closed, another
+  // pick started over it — and a flag cleared only at the bottom would then
+  // bypass the store on the NEXT run instead of this one.
+  const bypass = rebuilding;
+  rebuilding = false;
+  // ONE FINGERPRINT FOR THE WHOLE RUN. Every preview is rendered through the
+  // reader's lens correction, so the stored profiles are part of what a cached
+  // picture is a picture OF; read once here rather than per file, because it
+  // cannot change while this loop runs.
+  const lensStamp = LensStore.profilesStamp();
   for (const f of files) {
     if (gen !== quickGen) return; // closed or restarted under us
     let thumbUrl = "";
     let ok = false;
     let stripThumb: ArrayBuffer | null = null;
+    // ALREADY RENDERED, ON THIS DEVICE, FROM THIS FILE. Keyed on the file's own
+    // name, length and modified time, on this build's pipeline and on the
+    // profiles above — so the same folder comes back at once and a changed
+    // anything renders again. `rebuilding` is the reader's override.
+    const cached = bypass ? null : await getPreview(f, QUICK_EDGE, lensStamp).catch(() => null);
+    if (cached && cached.grid.byteLength) {
+      thumbUrl = URL.createObjectURL(new Blob([cached.grid], { type: "image/jpeg" }));
+      ok = true;
+      stripThumb = cached.strip?.byteLength ? cached.strip : null;
+      reused++;
+    }
     try {
+      if (ok) throw null; // already have it — skip the decode without duplicating the tail
       const imported = guardLocation(await importFile(f));
       const img = await decodeOffThread(imported);
       const thumb = await makeThumb(img, QUICK_EDGE, lensCurveFor(imported));
@@ -8362,11 +8391,15 @@ async function openQuickLook(files: File[]) {
         // that row has to stay small — see session.ts on why large IDB values
         // are the one shape that is not crash-safe.
         stripThumb = await makeThumb(img, 260, lensCurveFor(imported)).catch(() => null);
+        // Kept for next time. Not awaited: the reader is watching the grid
+        // fill, and a write to storage is not part of that.
+        if (stripThumb) void putPreview(f, QUICK_EDGE, { grid: thumb, strip: stripThumb }, lensStamp);
       }
       // img + the imported bytes fall out of scope here; only the small JPEG
       // preview is retained, so RAM stays bounded to N thumbnails.
     } catch {
-      /* couldn't open — shown as a placeholder tile so nothing goes missing */
+      /* a cache hit throws null past the decode; anything else could not be
+         opened and is shown as a placeholder tile so nothing goes missing */
     }
     if (gen !== quickGen) { if (thumbUrl) URL.revokeObjectURL(thumbUrl); return; }
     const it: QuickItem = { file: f, name: f.name, thumbUrl, stripThumb, ok, selected: ok };
@@ -8376,7 +8409,37 @@ async function openQuickLook(files: File[]) {
     updateQuickHeader(done < files.length ? `Decoding ${done} / ${files.length}…` : undefined);
     await tick(); // yield so the grid paints and taps stay responsive
   }
+  lastRun = { files, reused };
   updateQuickHeader();
+  updateRebuildNote();
+  void prunePreviews(); // one pass per run, never per file
+}
+
+/** THE READER'S OVERRIDE, and the reason it exists: a cache whose only way out
+ *  is a version number is a cache the reader cannot argue with. Everything that
+ *  SHOULD invalidate a preview is in its key, and this is for the time
+ *  something does not. */
+let rebuilding = false;
+let lastRun: { files: File[]; reused: number } | null = null;
+
+document.getElementById("qlRebuild")?.addEventListener("click", async () => {
+  if (!lastRun) return;
+  const files = lastRun.files;
+  await clearPreviews();
+  rebuilding = true; // this run renders everything, and stores what it renders
+  await openQuickLook(files);
+});
+
+function updateRebuildNote(): void {
+  const note = document.getElementById("qlReuseNote");
+  const btn = document.getElementById("qlRebuild") as HTMLButtonElement | null;
+  if (!note || !btn) return;
+  const n = lastRun?.reused ?? 0;
+  const total = lastRun?.files.length ?? 0;
+  note.textContent = n
+    ? `${n} of ${total} came back from this device — no decoding needed.`
+    : "";
+  btn.hidden = !n;
 }
 
 /** Close the grid, free every preview, and abort any decode still running. */
