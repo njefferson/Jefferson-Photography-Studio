@@ -12,3 +12,10 @@
 work=claude/*
 promote=main
 escape=JPS_PROMOTE
+
+# Run on every commit: the quick look keeps rendered previews on the device and
+# hands them back instead of decoding again, so a change to the code a preview
+# is MADE of has to move the declared version or the app serves a picture this
+# build would not make. A comment asking for that was written first; this is the
+# version that can refuse.
+also=tools/preview-version-check.mjs
