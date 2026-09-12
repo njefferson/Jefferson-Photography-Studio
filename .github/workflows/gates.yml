@@ -36,6 +36,6 @@ permissions:
 
 jobs:
   hub-gates:
-    uses: njefferson/noahjefferson/.github/workflows/hub-gates.yml@88dbe9082276b1939ed0db83a230c3f1cb2ffc6a
+    uses: njefferson/noahjefferson/.github/workflows/hub-gates.yml@82069a9e0c085e213fdcf681a90826717e20504d
     with:
       pwa: true
