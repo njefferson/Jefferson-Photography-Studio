@@ -164,6 +164,39 @@ const SECTORS = 24;
  *  frame still measures BRIGHTNESS, which is carried by red and is unaffected;
  *  only the colour half is withheld, and the reader is told which. */
 const GREEN_FLOOR = 0.09;
+/** THE SAME FLOOR ON THE RAW SCALE, WHICH IS NOT THE SAME NUMBER — and while it
+ *  was, no raw frame in existence could measure colour.
+ *
+ *  Read the floor above for what it is: 0.09 is not a level that means anything
+ *  on its own, it is where ONE CODE STEP falls to about 2% of the value. That
+ *  makes it a statement about the QUANTISATION STEP, and the step is a property
+ *  of the scale. Rendered frames arrive 8-bit and are linearised through a
+ *  lookup, so the step in linear light grows with the value; raw frames arrive
+ *  as 14-bit sensor samples and the step is flat and tiny.
+ *
+ *  Measured on sixteen pairs of the same frame, one raw and one camera JPEG:
+ *
+ *    raw         reference green 0.0195-0.0753   step 3.45e-5   0.05-0.18% of it
+ *    rendered    reference green 0.0077-0.1090   step 5e-4-2e-3  2.3-6.8% of it
+ *
+ *  So the floor that was meant to buy "one step under 2%" was, on the raw scale,
+ *  refusing measurements forty times better than that — while admitting rendered
+ *  ones at up to 6.8%, three times worse than its own target. NOT ONE raw flat
+ *  reaches 0.09; the highest is 0.0753.
+ *
+ *  WHAT THAT COST, and it is the whole of "the correction is too strong". The rig
+ *  already prefers a raw frame over a rendered one and sets the rendered ones
+ *  aside (see lensrig). So a group with raw frames in it measured colour from
+ *  nothing and stored a flat 1, and a group without them stored colour measured
+ *  after the camera matrix and its tone curve — which on the same sixteen frames
+ *  reads 3.5x the raw answer in red and 2.3x in blue, because the camera's own
+ *  green row (-0.537, 2.703, -1.166) multiplies a camera-space residual by 2.7.
+ *  Every profile measured so far records `source: "rendered"`.
+ *
+ *  0.002 is where one 14-bit step is 1.7% of the value, the same bargain the
+ *  rendered floor strikes. Every raw flat measured clears it by ten times or
+ *  more, and a frame whose green really is empty still does not. */
+const GREEN_FLOOR_RAW = 0.002;
 const STRUCTURE_LIMIT = 0.15;
 
 /** How far the falloff may turn back UP on its way to the corner.
@@ -728,7 +761,9 @@ export function profileFrame(img: DecodedImage): FrameProfile {
   const refR = ringMean(m.r, REF_LO, REF_HI, m.counts);
   const refG = ringMean(m.g, REF_LO, REF_HI, m.counts);
   const refB = ringMean(m.b, REF_LO, REF_HI, m.counts);
-  const colour = refG >= GREEN_FLOOR;
+  // The floor belongs to the scale the frame arrived on, like the darkness floor
+  // below. Named in one place so the two can never drift apart.
+  const colour = refG >= (m.linear ? GREEN_FLOOR_RAW : GREEN_FLOOR);
   const bad = (why: string): FrameProfile =>
     ({ falloff, kr, kb, colour, bumpRange: [NaN, NaN], falloffAtCorner: NaN, usable: false, why, clipFrac: m.clipFrac, meanLevel: m.meanLevel, structure: m.structure, linear: m.linear, goodTo: 0, rescuedRings: 0 });
   if (!(refR > 0) || !(refG > 0) || !(refB > 0)) return bad("the reference ring caught nothing to measure");
@@ -817,8 +852,30 @@ export function profileFrame(img: DecodedImage): FrameProfile {
  *  frame had nothing are skipped rather than counted as zero — a NaN averaged
  *  in as 0 would pull a real bump down toward nothing and look like a
  *  measurement rather than a gap. */
-export function averageProfiles(fs: FrameProfile[]): { falloff: number[]; kr: number[]; kb: number[]; bumpRange: [number, number]; n: number; colourFrames: number } {
-  const use = fs.filter((f) => f.usable);
+export function averageProfiles(fs: FrameProfile[]): { falloff: number[]; kr: number[]; kb: number[]; bumpRange: [number, number]; n: number; colourFrames: number; space: "raw" | "rendered"; setAside: number } {
+  const usable = fs.filter((f) => f.usable);
+  // ONE SPACE PER PROFILE, AND THE CHOICE IS MADE HERE RATHER THAN BY THE CALLER.
+  //
+  // A raw frame is measured in camera-native linear light, which is where the
+  // correction is applied. A camera JPEG has been through white balance, the
+  // camera matrix and the camera's tone curve first. Measured on sixteen pairs
+  // of the SAME frame, the two disagree by more than a rounding error in both
+  // halves: colour by 3.5x in red and 2.3x in blue as a departure from 1, and
+  // the brightness curve by 1.24x at the centre. The rendered reading is also
+  // three times less repeatable frame to frame. An average of the two is not a
+  // compromise between two measurements, it is a number that describes neither
+  // frame.
+  //
+  // So raw frames DISPLACE rendered ones. This lived in the rig, one call site
+  // away, and splitting by space there happened BEFORE unusable frames were
+  // dropped — so one unusable raw frame in a group displaced every good rendered
+  // one, and the group averaged to a falloff of eighty zeros over no frames at
+  // all. Filtering first and splitting second is the whole fix, and it belongs
+  // next to the average it governs rather than beside one of its callers.
+  const raws = usable.filter((f) => f.linear);
+  const use = raws.length ? raws : usable;
+  const space: "raw" | "rendered" = raws.length ? "raw" : "rendered";
+  const setAside = usable.length - use.length;
   // A FRAME WITH NO GREEN CARRIES FLAT 1s, AND AVERAGING THEM IN IS A VOTE FOR
   // NEUTRAL. Green is the denominator of kr and kb, and an infrared frame can
   // have almost none — those frames are kept for BRIGHTNESS, which red carries
@@ -851,6 +908,8 @@ export function averageProfiles(fs: FrameProfile[]): { falloff: number[]; kr: nu
     bumpRange: [mean(los), mean(his)],
     n: use.length,
     colourFrames: colourFs.length,
+    space,
+    setAside,
   };
 }
 

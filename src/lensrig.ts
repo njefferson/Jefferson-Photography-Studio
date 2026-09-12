@@ -432,7 +432,7 @@ export function wireLensRig(root: ParentNode): void {
       }
 
       // --- PASS TWO: decode and measure only those ----------------------------
-      const groups = new Map<string, { frames: FrameProfile[]; model: string; short: string; fl: number; aps: number[]; kinds: Set<string> }>();
+      const groups = new Map<string, { frames: FrameProfile[]; model: string; short: string; fl: number; aps: number[] }>();
       let unusable = 0;
       // WHAT A PREVIOUS RUN ALREADY MEASURED. Read once, not per frame. A frame
       // that is in here costs nothing this time: the decode is the expensive
@@ -484,10 +484,9 @@ export function wireLensRig(root: ParentNode): void {
           const where = `${c.model} at ${c.fl}mm`;
           if (!prof.usable) { unusable++; drop(c.short, prof.why); profRow(c.f.name, "not used", `${prof.why}. ${where}.`); continue; }
           let g = groups.get(c.key);
-          if (!g) { g = { frames: [], model: c.model, short: c.short, fl: c.fl, aps: [], kinds: new Set() }; groups.set(c.key, g); }
+          if (!g) { g = { frames: [], model: c.model, short: c.short, fl: c.fl, aps: [] }; groups.set(c.key, g); }
           g.frames.push(prof);
           if (Number.isFinite(c.ap)) g.aps.push(c.ap);
-          g.kinds.add(prof.linear ? "raw" : "rendered");
           const cr = prof.kr[0], cb = prof.kb[0];
           profRow(c.f.name, c.key,
             `The centre's colour is off by ${pct(Math.abs(cr - 1))} in red and ${pct(Math.abs(cb - 1))} in blue against the same frame's edges. ` +
@@ -527,23 +526,23 @@ export function wireLensRig(root: ParentNode): void {
       const lensMap: Record<string, string> = {};
       const anchors: Record<string, number[]> = {};
       for (const [key, g] of [...groups].sort((a, b) => a[0].localeCompare(b[0]))) {
-        // A RAW FLAT DISPLACES A RENDERED ONE rather than averaging with it. An
-        // 8-bit rendered frame carries a systematic quantisation bias, not noise:
-        // within one radial ring nearly every pixel rounds to the same code, so
-        // the rounding never averages away, and it bites hardest in the darkest
-        // channel — measured at 0.5% on blue against 0.16% on red, from the same
-        // frame. Averaging the two together would spend a good measurement to
-        // keep a worse one.
-        const raws = g.frames.filter((f) => f.linear);
-        const setAside = raws.length ? g.frames.length - raws.length : 0;
-        const use = raws.length ? raws : g.frames;
-        if (setAside) g.kinds.delete("rendered");
-        const a = averageProfiles(use);
+        // A RAW FLAT DISPLACES A RENDERED ONE rather than averaging with it — see
+        // averageProfiles, which now owns that rule and reports what it set
+        // aside. It used to be done here, and doing it here meant doing it
+        // before unusable frames were dropped, so one unusable raw frame
+        // discarded every good rendered frame in its group.
+        const a = averageProfiles(g.frames);
+        const setAside = a.setAside;
         profiles[key] = {
           falloff: round5(a.falloff), kr: round5(a.kr), kb: round5(a.kb),
           bump_range: round5(a.bumpRange),
           frames: a.n,
-          source: [...g.kinds].sort().join("+"),
+          // WHAT IT WAS ACTUALLY MEASURED FROM, taken from the average that did
+          // the measuring. This was a set of every kind of frame the group had
+          // seen, joined with a plus — so it could read "raw+rendered" for a
+          // profile measured from the raw frames alone, and the reader was told
+          // the profile came from frames half of which had been set aside.
+          source: a.space,
           apertures: g.aps.length ? [...new Set(g.aps.map((x) => "f/" + x.toFixed(1)))].sort().join(" ") : "unrecorded",
         };
         lensMap[g.model] = g.short;
