@@ -31,7 +31,7 @@
 // the same idea.
 
 import type { ExifSubset } from "./exif";
-import { shapeProblem } from "./lensprofile";
+import { shapeProblem, NBINS } from "./lensprofile";
 
 const KEY = "ips-lens-profiles-v1";
 
@@ -71,12 +71,66 @@ export interface StoredProfile {
   blend?: { loFl: number; hiFl: number; t: number };
 }
 
+/** THE SHAPE A CURVE HAS TO HAVE TO BE APPLIED AT ALL.
+ *
+ *  Every curve that exists — 30 shipped, 130 measured — is exactly NBINS long
+ *  and carries no non-finite bin. The checks here are for what arrives from
+ *  somewhere else: a backup file edited by hand, a payload from a future or
+ *  older rig, a JSON round trip that turned a NaN into a null and then into a
+ *  zero. A zero is the dangerous one, because it is a perfectly good number and
+ *  the correction it asks for used to be a hundredfold.
+ *
+ *  Bounds rather than just finiteness, because a bin far outside what any lens
+ *  has ever measured is corruption whichever way it reads, and clamping it in
+ *  the pipeline would apply a plausible-looking correction nobody measured. The
+ *  pipeline clamps as well; this refuses.
+ *
+ *  THE TWO CURVES ARE DIFFERENT KINDS OF NUMBER AND NEED DIFFERENT BOUNDS, which
+ *  is why they are two functions rather than one with arguments. A colour curve
+ *  is a RATIO against green and sits around 1; every one that exists is between
+ *  0.772 and 1.460, and a 0 in it is the null bin that used to ask for a
+ *  hundredfold correction. A brightness curve is a SHARE of the centre's
+ *  brightness and sits between 0 and about 1.5 — a 0 means no hot-spot at that
+ *  radius, which is the ordinary reading out at the edges of every profile that
+ *  ships.
+ *
+ *  One bound was applied to both for about ten minutes. Every profile with a
+ *  brightness curve was then refused on read, so nothing matched any photograph
+ *  and the panel simply did not appear — no error, no note, the correction just
+ *  silently absent. Caught by a probe that opened a photograph and asked whether
+ *  the card was showing. */
+function bandProblem(name: string, a: unknown, n: number, lo: number, hi: number): string | null {
+  if (!Array.isArray(a)) return `no ${name} curve`;
+  if (a.length !== n) return `its ${name} curve has ${a.length} radius bands where this version reads ${n}`;
+  for (let i = 0; i < a.length; i++) {
+    const v = a[i];
+    if (typeof v !== "number" || !Number.isFinite(v)) return `its ${name} curve has no number at band ${i + 1}`;
+    if (v < lo || v > hi) return `its ${name} curve reads ${v} at band ${i + 1}, which no lens measures`;
+  }
+  return null;
+}
+/** A colour curve: red or blue against green, 1 in the reference ring. */
+export function colourProblem(a: unknown, n: number): string | null {
+  return bandProblem("colour", a, n, 0.2, 5);
+}
+/** A brightness curve: the hot-spot's share of the centre, 0 where there is
+ *  none. */
+export function bumpProblem(a: unknown, n: number): string | null {
+  return bandProblem("brightness", a, n, 0, 4);
+}
+
 function read(): StoredProfile[] {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return [];
     const v = JSON.parse(raw);
-    return Array.isArray(v) ? (v as StoredProfile[]).filter((p) => p && Array.isArray(p.kr) && Array.isArray(p.kb)) : [];
+    if (!Array.isArray(v)) return [];
+    // READ IS WHERE A CORRUPT PROFILE ACTUALLY ENTERS. It used to check that kr
+    // and kb were arrays and nothing about what was in them, so a stored curve
+    // with a zero or a null in it was handed to the pipeline as a measurement.
+    return (v as StoredProfile[]).filter((p) =>
+      p && !colourProblem(p.kr, NBINS) && !colourProblem(p.kb, NBINS)
+        && (p.bump === undefined || !bumpProblem(p.bump, NBINS)));
   } catch {
     return []; // a private window, cleared storage, or something else's key
   }
@@ -165,7 +219,13 @@ export function saveFromPayload(payload: {
     // three characters; anything still unreadable is named to the caller rather
     // than dropped, which is the part that actually mattered.
     const m = /^(.+)@(\d+(?:\.\d+)?)(?:@f([\d.?]+))?$/.exec(key);
-    if (!m || !Array.isArray(p?.kr) || !Array.isArray(p?.kb) || p.kr.length < 2) { skipped.push(key); continue; }
+    if (!m) { skipped.push(key); continue; }
+    // THE SAME CHECK AS ON READ, AT THE OTHER DOOR. This used to accept any pair
+    // of arrays with two or more entries, so a curve of the wrong length was
+    // stored and then applied at the wrong radii, and a curve with a zero in it
+    // was applied as a hundredfold correction on one ring.
+    const bad = colourProblem(p?.kr, NBINS) ?? colourProblem(p?.kb, NBINS);
+    if (bad) { skipped.push(key); continue; }
     const entry: StoredProfile = {
       key,
       model: shortToModel.get(m[1]) ?? m[1],
