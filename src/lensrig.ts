@@ -70,17 +70,23 @@ export function wireLensRig(root: ParentNode): void {
   // download does nothing at all on an iPhone or iPad, where the share sheet is
   // the only way a file reaches the disk. This button was still doing the plain
   // download — the same fix applied to the instance and not the class.
-  backupBtn.onclick = async () => {
+  // ONE IMPLEMENTATION, TWO PLACES TO PRESS IT. The whole-device backup sat at
+  // the bottom of the panel, below every result row, and was reported as not
+  // findable straight after an import — which is the one moment it matters,
+  // because that is when there is something new to lose. The second button
+  // lives in the run's own action row; both call this.
+  const backupNow = async (note: HTMLElement) => {
     const n = listProfiles().length;
     const blob = new Blob([exportAll()], { type: "application/json" });
     const how = await saveBlob(blob, `lens-profiles-${new Date().toISOString().slice(0, 10)}.json`);
-    restoreNote.hidden = false;
-    restoreNote.textContent = how === "cancelled"
+    note.hidden = false;
+    note.textContent = how === "cancelled"
       ? "Backup cancelled — nothing was saved."
       : n === 0
         ? "That backup is EMPTY — there are no measured profiles on this device to save. Either none has been kept here, or this browser is not letting the app read its storage. Check the list above before you rely on this file."
-        : `Saved ${n} measured profile${n === 1 ? "" : "s"}.`;
+        : `Saved every profile on this device — ${n} of them — into one file.`;
   };
+  backupBtn.onclick = () => void backupNow(restoreNote);
   backupCopyBtn.onclick = () => copy(exportAll(), backupCopyBtn, "Copy them all");
   restoreInput.onchange = async () => {
     const f = restoreInput.files?.[0];
@@ -668,14 +674,40 @@ export function wireLensRig(root: ParentNode): void {
       const intro = document.getElementById("lensIntro") as HTMLDetailsElement | null;
       if (intro) intro.open = false;
       const used = Object.values(profiles).reduce((n, x) => n + x.frames, 0);
+      const nProf = Object.keys(profiles).length;
+      // EVERY FRAME THE READER PICKED IS ACCOUNTED FOR, AND THE NUMBERS ADD UP.
+      //
+      // This line read "Measured 42 frames out of the 94 you picked, into 37
+      // profiles, 21 of them measured in an earlier run and kept." Three numbers,
+      // and not one of them answers what a person actually wants to know. It
+      // never said what became of the other 52 — over half the set vanished
+      // between two numbers in one sentence — and "21 of them" could be profiles
+      // or frames. The reasons were all present further down the panel, per lens,
+      // which is the wrong place for the first question anybody asks.
+      //
+      // So: what you now have, then where every frame went, then how thin it is.
+      // `skipped` are frames past the cap, `unusable` were refused with a reason,
+      // and `stoppedAt` is a run cut short — those three plus the frames in the
+      // profiles are the whole set, which is asserted rather than hoped for.
+      const lensNamesHere = [...new Set(Object.keys(profiles).map((k) => k.split("@")[0]))];
+      const thin = Object.values(profiles).filter((x) => x.frames < 3).length;
+      const accounted = used + skipped + unusable;
+      const unexplained = Math.max(0, files.length - accounted);
+      const where: string[] = [];
+      if (used) where.push(`${used} went into the profiles${reused ? ` (${reused} of those came from an earlier run rather than being measured again)` : ""}`);
+      if (skipped) where.push(`${skipped} were not needed, because ${PER_GROUP} frames at one focal length and aperture is enough`);
+      if (unusable) where.push(`${unusable} could not be used, each for a reason given below`);
+      if (unexplained) where.push(`${unexplained} were not reached, because the run was stopped`);
       profRunning.textContent =
-        `Measured ${used} frame${used === 1 ? "" : "s"} out of the ${files.length} you picked, into ` +
-        `${Object.keys(profiles).length} profile${Object.keys(profiles).length === 1 ? "" : "s"}` +
-        // Say when a run cost less because an earlier one had already done the
-        // work. Without this the resume is invisible: it happens, and the reader
-        // has no way to tell it from having measured everything again.
-        (reused ? `, ${reused} of them measured in an earlier run and kept` : "") +
-        ". Nothing left this device.";
+        `You now have ${nProf} profile${nProf === 1 ? "" : "s"}` +
+        (lensNamesHere.length ? ` across ${lensNamesHere.length === 1 ? "one lens" : `${lensNamesHere.length} lenses`} — ${lensNamesHere.join(" and ")}` : "") +
+        `. Of the ${files.length} frame${files.length === 1 ? "" : "s"} you picked, ${where.join("; ")}. ` +
+        (thin === nProf && nProf > 0
+          ? `Every one of these rests on ${nProf === 1 ? "a single frame" : "one or two frames"}: usable, but four or five frames at one focal length and aperture average out the sky's own gradient. `
+          : thin
+            ? `${thin} of them rest${thin === 1 ? "s" : ""} on one or two frames, which is usable but thin — four or five average out the sky's own gradient. `
+            : "") +
+        `Nothing left this device.`;
       profNote(`${(text.length / 1024).toFixed(1)} KB of numbers. Copy it into a message, or save it and send the file — either way the photographs stay here.`);
       // The screen advice is for DURING a run. Once there is an answer it is
       // spent, and leaving it up pushes the one button that matters down the
@@ -713,7 +745,10 @@ export function wireLensRig(root: ParentNode): void {
         renderKept(); // what is on the device has just changed
         setTimeout(() => { useBtn.textContent = "Use these on my photos"; }, 2600);
       };
-      profCopy.onclick = () => copy(text, profCopy, "Copy the numbers");
+      const backup2 = root.querySelector<HTMLButtonElement>("#lensBackup2")!;
+      const backupNote2 = root.querySelector<HTMLElement>("#lensBackupNote2")!;
+      backup2.onclick = () => void backupNow(backupNote2);
+      profCopy.onclick = () => copy(text, profCopy, "Copy this run");
       profSave.onclick = () => {
         const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
         const a = document.createElement("a");

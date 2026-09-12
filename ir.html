@@ -894,11 +894,23 @@
              numbers, and nothing above it said what pressing it would do. -->
         <div id="lensOut" hidden>
           <h3 class="sub-title">Done &mdash; what would you like to do with it?</h3>
-          <p class="note"><strong>Use these on my photos</strong> keeps the measurement on this device and puts it to work straight away: open a photograph from the same lens and the colour the lens casts across the frame is taken out, at a strength you can move or switch off under Corrections. Nothing is uploaded, and your photographs stay where they are. <strong>Copy</strong> and <strong>Save</strong> are only for sending the numbers on to someone else.</p>
+          <p class="note"><strong>Use these on my photos</strong> keeps this run on this device and puts it to work straight away: open a photograph from the same lens and the colour the lens casts across the frame is taken out, at a strength you can move or switch off under Corrections. Nothing is uploaded, and your photographs stay where they are.</p>
+          <!-- TWO SAVES WITH DIFFERENT SCOPES, AND THE NARROW ONE WAS THE ONE IN
+               REACH. "Save as a file" writes only the run you have just done;
+               the backup of everything on the device sat far below, past the
+               whole results list, and was reported as not findable after an
+               import. Four separate single-run files came out of four batches
+               because the button in front of the reader saves the batch. Both
+               are here now and both say which they are. -->
           <div class="dbg-actions">
             <button id="lensUse" type="button" class="dbg-btn primary">Use these on my photos</button>
-            <button id="lensCopy2" type="button" class="dbg-btn">Copy the numbers</button>
-            <button id="lensSave2" type="button" class="dbg-btn">Save as a file</button>
+            <button id="lensBackup2" type="button" class="dbg-btn">Back up every profile on this device</button>
+          </div>
+          <p class="note" id="lensBackupNote2" hidden role="status"></p>
+          <p class="note">Sending the numbers to somebody else, rather than keeping them: <strong>Copy</strong> and <strong>Save this run</strong> cover only the frames you just measured.</p>
+          <div class="dbg-actions">
+            <button id="lensCopy2" type="button" class="dbg-btn">Copy this run</button>
+            <button id="lensSave2" type="button" class="dbg-btn">Save this run as a file</button>
           </div>
           <p class="note" id="lensUseNote" hidden role="status"></p>
           <details id="lensNumbers">
