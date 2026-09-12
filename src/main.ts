@@ -1543,7 +1543,9 @@ const TAB_META: Record<PanelTab, { name: string; sub: string }> = {
   grade: { name: "Grade", sub: "Color wheels, toned mono, grain & vignette" },
   stickers: { name: "Stickers", sub: "Drop UFOs into the trees" },
   warp: { name: "Warp", sub: "Push, swirl, pinch & bloat" },
-  crop: { name: "Crop & rotate", sub: "Rotate, crop & straighten" },
+  // "Rotate" is the quarter-turn tool and nothing else now — see ir.html's
+  // section comment for the four things the word used to mean.
+  crop: { name: "Crop & straighten", sub: "Quarter turns, crop & fine angle" },
 };
 const panelTabsEl = $("panelTabs") as HTMLElement;
 const sectionTitleEl = $("sectionTitle") as HTMLElement;
