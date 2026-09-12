@@ -492,6 +492,27 @@ export function wireLensRig(root: ParentNode): void {
             `The centre's colour is off by ${pct(Math.abs(cr - 1))} in red and ${pct(Math.abs(cb - 1))} in blue against the same frame's edges. ` +
             `Centre to corner it keeps ${pct(prof.falloffAtCorner)} of its brightness, of which somewhere between ${pct(prof.bumpRange[0])} and ${pct(prof.bumpRange[1])} is hot-spot rather than the lens's own falloff. ` +
             `${prof.linear ? "Measured from the raw sensor data" : "Measured from the rendered image"}, mean level ${pct(prof.meanLevel)}, ${pct(prof.clipFrac)} clipped, ${pct(prof.structure)} variation around a circle.` +
+            // HOW MUCH OF THE FRAME ACTUALLY WENT INTO IT. Both numbers were
+            // computed and then thrown away, which is the same fault the header
+            // of lensprofile.ts opens by describing.
+            //
+            // Each ring is estimated from the angular sectors that agree with
+            // each other; a sector holding a cloud edge or a branch is dropped.
+            // A frame can therefore be used and still have had a fifth of its
+            // radii rescued that way, or have run out before the corner — and
+            // "used" said neither. Measured across sixteen raw flats of clear
+            // sky: every one reached the corner, and the number of rescued radii
+            // ran from 0 to 15 of 80, which is the difference between a clean
+            // sky and one with something at the edge of it.
+            //
+            // Said only when there is something to say, so the ordinary row does
+            // not grow a sentence that always reads the same.
+            (prof.goodTo < 0.999
+              ? ` Measurable out to ${pct(prof.goodTo)} of the way to the corner; past that something was in the way.`
+              : "") +
+            (prof.rescuedRings > 0
+              ? ` ${prof.rescuedRings} of its ${NBINS} radius bands needed part of the circle left out — cloud, foliage or a bright edge at that distance from the centre.`
+              : "") +
             // Colour is measured AGAINST GREEN, and an infrared frame can have
             // almost none. Saying so is the difference between a profile that
             // corrects brightness only and one that appears to have measured a
