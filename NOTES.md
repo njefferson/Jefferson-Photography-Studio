@@ -9287,3 +9287,202 @@ not running, and the `grep -E "^(ok|FAIL)"` that keeps the output short turned a
 stack trace into silence — which reads exactly like a suite with nothing to say.
 Same shape as a missing CI run being read as a green one (LESSONS §161): the
 question is never "did anything fail", it is "did every claim actually run".
+
+## Three floors and a cache: why every profile read "rendered", 2026-09-12
+
+Four fixes that are really one story, and it ends with a measured magnitude for
+"the correction is too strong".
+
+**THE RIG ALREADY PREFERRED RAW FRAMES AND HAD NEVER ONCE BEEN GIVEN ONE.** It
+sets rendered frames aside when raw ones are present, with a written reason. The
+NEF decode fault meant no frame ever arrived as raw, so that branch never ran —
+and then the green floor meant that once it did, the raw frames would measure no
+colour at all. Two mechanisms in direct conflict, each correct on its own.
+
+**Census of every profile that exists: 30 shipped and 130 measured, all of them
+`source: "rendered"`.** Not one was measured from sensor data. That is the
+finding, and it is a one-line script over the payload files.
+
+**THE GREEN FLOOR BELONGED TO THE 8-BIT SCALE AND ITS OWN COMMENT SAYS SO.**
+0.09 is not a level that means anything; it is where one code step falls to
+about 2% of the value. That is a statement about the quantisation step, and the
+step is a property of the scale. Measured on sixteen pairs of the same frame,
+one NEF and one camera JPEG:
+
+- raw reference green 0.0195 to 0.0753, step 3.45e-5, so one step is 0.05% to
+  0.18% of the value;
+- rendered reference green 0.0077 to 0.1090, step 5.2e-4 to 2.5e-3, so one step
+  is 2.3% to 6.8% of it.
+
+So the floor was refusing measurements forty times better than its own target
+while admitting ones three times worse. Not one raw flat reaches 0.09; the
+highest is 0.0753. `GREEN_FLOOR_RAW = 0.002` is where one 14-bit step is 1.7% of
+the value — the same bargain, struck on the right scale.
+
+**AND THE MAGNITUDE, WHICH IS THE ANSWER TO A QUESTION ASKED FROM A TABLET.**
+Same sixteen frames, raw against rendered, as a departure from 1: colour reads
+3.53x in red and 2.30x in blue, and the brightness curve 1.24x at the centre.
+The camera matrix's green row is (-0.537, 2.703, -1.166), so a camera-space
+residual comes out 2.7x larger after it — which is where the factor comes from.
+Raw is also the more repeatable measurement, by 4.7x on red and 2.6x on blue
+across the set, and 3.2x on brightness.
+
+**THE BRIGHTNESS CURVE DISAGREES TOO,** which was checked as a hypothesis that
+it would not. So the one-space rule covers the whole profile, and it moved out
+of the rig and into `averageProfiles`, which is the function it governs. Splitting
+by space in the rig ran BEFORE unusable frames were dropped: one unusable raw
+frame displaced every good rendered frame in its group, and the group averaged
+to eighty zeros over no frames. Filtering first and splitting second is the fix.
+
+**A `source` OF "raw+rendered" WAS POSSIBLE AND MEANINGLESS.** It was a set of
+every kind of frame the group had seen, joined with a plus, so it could say both
+about a profile measured from one. It now comes from the average that did the
+measuring.
+
+**AND THE CACHE WOULD HAVE HANDED ALL OF IT BACK.** The rig keeps each measured
+frame so a sleep does not throw a run away, keyed on filename and size, for a
+fortnight — and nothing about which build measured it. A row is the OUTPUT of the
+decoder and the profiler. Re-measuring the same files after either is fixed
+returns the answers from before the fix, with the rig reporting them as "already
+done from an earlier run", which reads as progress. Keyed on the app version now,
+which moves on every release by construction rather than by somebody remembering;
+rows from other builds are swept rather than left to expire. The cost is that a
+release ends a run in progress, and the moment this cache exists to survive is a
+sleep in the middle of measuring — minutes, not releases.
+
+## The five sectors that could never be found, 2026-09-12
+
+The per-radius estimator shipped with two regressions and they had one cause.
+
+Each ring is estimated from the angular sectors that agree with each other, and
+the test needs five survivors, because dropping a sector from fewer than five
+leaves too few angles to re-fit the ramp. Two places in every frame have fewer
+than five sectors for reasons of geometry rather than content: the innermost ring
+is a disc a few pixels across, and the outermost rings are past the long edges as
+well as the short ones, so what is left of them is four corner arcs. On those
+rings the test could never be satisfied and every one returned no estimate.
+
+**Which end broke depended on the frame size, which is why the check sweeps
+sizes.** At 1600x1067 — what the rig's own downscale produces — ring 0 came back
+empty, the reach scan stops at the first gap, and every good flat was refused as
+measurable "out to 0%". At 3000x2000 the centre was fine and the last three bins
+emptied, which is the corner, which is where a contaminated frame is told apart
+from a lens. At 600x400 it was the last four.
+
+Rings that sparse now take their plain pixel-weighted mean, which is what the
+profile was before the estimator existed. They are recorded as never
+sector-checked rather than as checked and clean, which keeps the rescued-ring
+count honest.
+
+**THE MASKS DO DISAGREE RING TO RING, AND IT IS BELOW WHAT THE OUTPUT CARRIES.**
+Nothing makes ring 40 and ring 41 keep the same sectors, so in principle adjacent
+radii describe different pieces of sky. Measured on the sixteen raw flats: radii
+where sectors were dropped kink 2.41x more, ring to ring, than radii kept whole —
+a real effect, on 7.3% of radii, up to 15 of 80 in one frame. The excess is
+0.00089 in a curve whose own amplitude averages 0.0650, so 1.36% of the signal;
+as a gain that is 0.089%, which moves a mid-tone by 0.051 of one 8-bit code step.
+A coherence fix could not be verified in the output, so it was not made. One
+percent of the amplitude was the first line drawn here and it was arbitrary; the
+code step is not.
+
+**AND THE RIG NOW SAYS HOW MUCH OF EACH FRAME WENT IN.** Reach and rescued-ring
+count were both computed and reported nowhere, which is the fault the header of
+`lensprofile.ts` opens by describing. Said only when there is something to say.
+
+## A guard on the divisor is not a bound, 2026-09-12
+
+The measured gain read `v > 1e-3 ? 1/v : 1`, which admits a factor of a thousand
+and then snaps to 1 the moment the divisor crosses the threshold. A band of 0 — a
+radius with no measurement, saved as a blank and read back as a number — asks for
+100x at strength 0.99 and 1x at 1.00. So the correction grew without limit as the
+slider moved and vanished at the end of its travel.
+
+Bounded to half and double now, which is a measurement rather than a taste: every
+band of every profile that exists sits between 0.772 and 1.460 for colour and
+1.000 and 1.288 for brightness, and at the slider's maximum of 1.5 the largest
+honest correction any of them asks for is 1.52x. Nothing real is clamped, checked
+across 906 combinations of band and strength.
+
+**A BIN COUNT IS A RADIUS MAPPING, NOT A RESOLUTION.** Two curves of different
+length were truncated to the shorter, which reads as the safe choice and is not:
+the band a pixel lands in is `floor(r * n)`, so running an 80-band curve at n=60
+stretches it — the band describing 74% of the way out gets applied at the corner.
+
+**AND THE TWO CURVES NEEDED DIFFERENT BOUNDS, WHICH COST TEN MINUTES TO LEARN.**
+A colour curve is a ratio against green and sits around 1. A brightness curve is
+a share of the centre and sits between 0 and about 1.5 — a 0 means no hot-spot at
+that radius, which is the ordinary reading at the edges of every profile that
+ships. One bound applied to both refused every profile carrying a brightness
+curve on read, so nothing matched any photograph and the correction panel simply
+did not appear: no error, no note, the correction silently absent. Caught by a
+probe that opened a photograph and asked whether the card was showing.
+
+## What four harnesses could not see, 2026-09-12
+
+Every one of these produced a confident wrong answer this session.
+
+**A SHADER IS A STRING TO THE TYPE CHECKER.** `npm run build` is green on a
+fragment shader that will not compile, and what happens then is not an error
+where the edit was: the renderer fails, the app declares the browser
+unsupported, an overlay covers the page, and every browser harness fails on
+"element intercepts pointer events". That reads like a UI change. It was an
+interpolated `2` where GLSL needs `2.0` — it will not convert an int literal to
+a float. `shadercheck.mjs` is the cheap first check now: does the shader compile
+and does the app come up.
+
+**AND A BACKTICK IN A SHADER COMMENT ENDS THE SHADER.** The fragment source is a
+template literal, so quoting the old expression in backticks inside a comment
+terminated it and the rest was parsed as TypeScript.
+
+**A COMPARISON WITH NOTHING APPLIED AGREES PERFECTLY.** The GPU-versus-CPU check
+opens a photograph, expects a profile to match, and compares the screen against
+the exported file. With no profile matched both are uncorrected, they agree to
+0.3 of 255, and the claim passes having compared nothing — which is exactly what
+happened while the store was refusing every profile. "The profile matched" failed
+and "GPU and CPU agree" passed, and the run read as one flaky assertion rather
+than as a correction that had vanished. It stops on that now, and asserts the
+curve is doing something to the picture.
+
+**THE MAGNITUDE WAS THE UNMEASURED THING.** Nothing asked whether the amount was
+right — only whether the stage ran, whether the two paths agreed, and whether the
+rig accepted the right frames. A profile measured in the wrong colour space, three
+times too strong, passed all of them. `lensbase.mjs` plants a profile with known
+numbers, measures the render with the correction on and bypassed, and compares the
+ratio to what `lensGain` predicts: 2.1% off, with a window sized to reject a
+factor rather than a percent.
+
+**AND IT READ THE WRONG CHANNEL FIRST.** The lens stage runs before the R/B swap,
+deliberately, and the swap is on by default — so a correction to the stage's red
+arrives in the screen's blue. The first version measured screen red against a
+prediction about stage red, found it had not moved at all, and reported the
+correction absent. It was 2% from perfect in the other channel. The harness reads
+the swap toggle now.
+
+**AND `innerText` RETURNS NOTHING FOR A COLLAPSED PANEL.** The rig's per-frame
+rows are in detail panels, and two versions of a check read two empty strings and
+concluded a sentence was missing. Read `textContent`, and ask for the structure
+the rig actually builds rather than for the shortest element mentioning a
+filename.
+
+**THE COMMON SHAPE: A REGEX THAT MUST NOT MATCH PASSES ON AN EMPTY STRING.** Two
+missing rows read as two of four claims passing. Every harness that reads strings
+now stops when the strings are not there, and `preflight.mjs` refuses to let one
+begin against a dead port, a 404 body, or a server left running on an older
+build.
+
+## The de-gradient was tried against the one population it cannot help, 2026-09-12
+
+An earlier entry records fitting a plane to a flat frame, dividing it out and
+finding it made nothing usable — "the idea was sound and the data refused it".
+
+That conclusion was wrong and the levelling is in `main`. It was measured on
+frames that genuinely contain cloud and lit foliage, where a plane correctly
+does nothing: those stay at 43% to 117% however they are levelled. The frames it
+is for are clear sky, whose own brightness ramp a wide lens spans more of — and
+on those, structure falls from 5.7-46.7% to 1.6-12.5% while the contaminated
+population does not move and synthetic controls stay clean. Sixteen raw flats
+that were all refused are all accepted.
+
+**The lesson is about the test set, not the method.** A negative result on a
+population where the effect cannot appear is not a negative result. Recorded here
+because the earlier entry said otherwise and would have stopped the next attempt.
