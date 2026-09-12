@@ -40,13 +40,24 @@ moves.
 
 ## What lands in each new folder (from the factory)
 
-| folder | app label | fed by | examples |
-|---|---|---|---|
-| `wildlife` | Wildlife | wildlife | Crow, Owl, Hawk, Fox, Bear, Wolf, Rabbit, Butterfly, Dragonfly, Snake, Frog |
-| `foreground` | Foreground | occluders | Fern, Pine/Oak branch, Tall grass, Rock, Spider web, Window frame, Log, Cattails |
-| `sky` | Sky | normal (aloft) | Moon, Meteor, Lightning, Cloud wisp, Hot-air balloon, Airplane, Helicopter, Kite |
-| `atmosphere` | Atmosphere & light | atmosphere + camera + campfire | Ground fog, Smoke, Embers, God rays, Lens flare, Light leak, Dust orb, Heat shimmer |
-| `props` | Everyday | normal (objects) | Picnic basket, Tent, Camping chair, Lantern, Flowers, Rowboat, Kayak, Sailboat |
+**`wildlife`** — shown as "Wildlife", fed by wildlife.
+Crow, Owl, Hawk, Fox, Bear, Wolf, Rabbit, Butterfly, Dragonfly, Snake, Frog.
+
+**`foreground`** — shown as "Foreground", fed by occluders.
+Fern, Pine or Oak branch, Tall grass, Rock, Spider web, Window frame, Log,
+Cattails.
+
+**`sky`** — shown as "Sky", fed by normal (aloft).
+Moon, Meteor, Lightning, Cloud wisp, Hot-air balloon, Airplane, Helicopter,
+Kite.
+
+**`atmosphere`** — shown as "Atmosphere & light", fed by atmosphere, camera and
+campfire.
+Ground fog, Smoke, Embers, God rays, Lens flare, Light leak, Dust orb, Heat
+shimmer.
+
+**`props`** — shown as "Everyday", fed by normal (objects).
+Picnic basket, Tent, Camping chair, Lantern, Flowers, Rowboat, Kayak, Sailboat.
 
 The existing groups are unchanged and still fed as before: **Creatures & craft**
 (`cryptids` incl. Bigfoot + Wendigo, `ufo`, `aliens`, `spirits`, `beasts` incl.

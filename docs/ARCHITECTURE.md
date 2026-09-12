@@ -132,13 +132,25 @@ pipeline.ts (gl.ts re-exports).
 
 ## Decoders (`src/raw/`) — all pure JS, no WASM, all verified vs LibRaw
 
-| Format | File | Notes |
-|---|---|---|
-| Nikon NEF (Compression 34713) | `nef.ts` | dcraw's algorithm: fixed Huffman trees, linearization curve in MakerNote tag 0x96, 2-back predictor. Verified BIT-EXACT. Z50 levels: black 1008, white 15520 (14-bit). Does NOT support Z8/Z9 High-Efficiency NEF. |
-| Mosaiced DNG, lossless JPEG (Comp 7) | `lj92.ts` + `dngRaw.ts` | LJ92: DNG packs Bayer columns as interleaved JPEG components (tile CFA col = x*Nf + c). Verified BIT-EXACT over 20.8M px. |
-| Mosaiced DNG, uncompressed (Comp 1) | `dngRaw.ts` | Used by the bundled example files. |
-| Lossy linear DNG (Comp 34892) | `decode.ts` | Baseline-JPEG tile decoded natively; gamma-2.2-encoded (verified 0.015 err vs linear). NO camera matrix on this path — those files already carry baked color. |
-| JPEG/PNG | `decode.ts` | Native decode; browser applies EXIF orientation itself. |
+**Nikon NEF, compression 34713** — `nef.ts`.
+dcraw's algorithm: fixed Huffman trees, the linearization curve in MakerNote tag
+0x96, and a 2-back predictor. Verified bit-exact. Z50 levels are black 1008 and
+white 15520 at 14-bit. Does NOT support Z8 or Z9 High-Efficiency NEF.
+
+**Mosaiced DNG, lossless JPEG, compression 7** — `lj92.ts` with `dngRaw.ts`.
+DNG packs Bayer columns as interleaved JPEG components, so a tile's CFA column
+is `x * Nf + c`. Verified bit-exact over 20.8M pixels.
+
+**Mosaiced DNG, uncompressed, compression 1** — `dngRaw.ts`.
+Used by the bundled example files.
+
+**Lossy linear DNG, compression 34892** — `decode.ts`.
+Baseline-JPEG tile decoded natively, gamma-2.2-encoded, verified at 0.015 error
+against linear. No camera matrix on this path: those files already carry baked
+colour.
+
+**JPEG and PNG** — `decode.ts`.
+Native decode; the browser applies EXIF orientation itself.
 
 X-Trans (Fuji) is NOT supported anywhere. Preview = half-res 2x2-binned
 demosaic (`demosaic.ts`); export = full-res bilinear per pixel.

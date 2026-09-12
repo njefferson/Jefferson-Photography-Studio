@@ -10,11 +10,11 @@ and they appear, categorized and precached, on the next deploy with no app code.
 Promote PNGs to `public/stickers/<category>/<name>.png`. Recognized categories,
 grouped by the picker's three kinds:
 
-| kind | category folders |
-|---|---|
-| 👣 Creatures & craft | `cryptids`, `ufo`, `aliens`, `spirits`, `beasts` |
-| 🔍 Evidence | `tracks`, `gear`, `lights` |
-| 🏕️ Scene & nature | `wildlife`, `foreground`, `sky`, `atmosphere`, `props` |
+**Creatures and craft.** `cryptids`, `ufo`, `aliens`, `spirits`, `beasts`.
+
+**Evidence.** `tracks`, `gear`, `lights`.
+
+**Scene and nature.** `wildlife`, `foreground`, `sky`, `atmosphere`, `props`.
 
 A file in any **unrecognized** folder still shows — it falls back to the app's
 `other` → "❓ New" bucket. No breakage; it just isn't grouped until a category is
