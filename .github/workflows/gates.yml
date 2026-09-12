@@ -1,0 +1,41 @@
+name: Gates
+
+# THE HUB'S GATES, CALLED RATHER THAN COPIED.
+#
+# The gates themselves were never forked — each takes `--repo ../app`, which is
+# why five divergent copies do not exist. The WORKFLOW that calls them was
+# copied into eight repos by hand and drifted exactly the way a forked file
+# does, so "which gates does this repo run" had eight answers. This repo was
+# one of the ones answering "none": it referenced the hub in no workflow at
+# all, and the never-in-the-third-person gate had therefore never run here.
+#
+# It was red when first run: 119 references across 13 files, 92 of them in
+# NOTES.md, in a public repository. Scrubbing that is worth nothing if nothing
+# holds it — which is what this file is for.
+#
+# The inputs each name a FACT about this repo rather than a preference. `pwa` is
+# true because there is a service worker. `mirror` is false because this repo
+# does not carry its own offline copy of the disclosure patterns. No palette
+# JSON and no text-size paths are declared yet; both are real gaps rather than
+# opinions, and naming them here is how they stay visible.
+#
+# The flag is a description, NEVER a way to switch a failing gate off. Two were
+# failing when this was wired — an undeclared placeholder pair and an `npm
+# install` in the asset-factory workflow — and both were fixed rather than
+# declared away.
+#
+# The pin is read out of THIS file's own `uses:` line by the called workflow, so
+# the gates and the wiring can never be two different versions.
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  hub-gates:
+    uses: njefferson/noahjefferson/.github/workflows/hub-gates.yml@88dbe9082276b1939ed0db83a230c3f1cb2ffc6a
+    with:
+      pwa: true

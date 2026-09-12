@@ -102,7 +102,7 @@ See **`PLAN.md`** for the full build plan.
 
 - THE TAXONOMY (owner rule, 2026-07-18): **identity → capability → increment**.
   - **Identity (major, X.0)** — the product changes as a thing: a different
-    approach and mindset, a new edition. The owner declares these; he has
+    approach and mindset, a new edition. The owner declares these, and has
     declared the CREATIVE RELEASE the first one → it ships as **2.0**.
   - **Capability (middle number)** — a release that ADDS something: a new
     tool, format, mode. EVERY capability release that ships to main bumps it
@@ -388,8 +388,8 @@ STILL DARK-ONLY: the theme-color meta tag is a single static value per page
 (#08080b), so the iOS status bar stays dark-tinted in dawn. Pre-existing across
 every page; fixing it means having the pre-paint script rewrite the tag.
 
-FULL PALETTE MATRIX 2026-07-30 (owner: "I'd prefer no problems"; backgrounds
-were explicitly on the table). Every foreground token was solved against every
+FULL PALETTE MATRIX 2026-07-30 (the standard set was no remaining contrast
+failures anywhere, with backgrounds explicitly in scope rather than fixed). Every foreground token was solved against every
 background it can land on, in all FOUR palettes — Studio dusk/dawn and the hub's
 dark/light — rather than sampling what happened to be on screen. Result after
 the two fixes below: every text and rail pairing meets its threshold, all four
@@ -475,8 +475,8 @@ user-scalable=no.
 > CREATIVE-RELEASE GATE EXCEPTION (owner call, 2026-07-19): the Creative
 > features (grade, mixer, stickers, warp) ship STRAIGHT TO MAIN as a beta,
 > WITHOUT the usual staging on-device-pass gate — they're brand-new
-> capabilities and the owner wants real users to see them, and he tests them
-> in production ("I will test on Main"). He's especially excited about
+> capabilities and the owner wants real users to see them, and the owner tests them
+> in production, on main, rather than on staging. The interest is chiefly in
 > stickers. This exception is Creative-only; the hard staging gate still
 > holds for changes to existing behaviour. Each Creative item is still fully
 > headless-verified (unit + walk, fail-first) before merge.
@@ -533,16 +533,16 @@ user-scalable=no.
   full-bleed background and the tilt/zoom view stops clipping). No fix in
   isolation; presentation-only, nothing touches the pipeline or export.
 - [ ] **Big image: the photo fills the app, menus float over it** — owner
-  direction 2026-07-16, given as he ended the session and moved to a new one.
-  STILL AN IDEA — he says so plainly, expect design questions. The vision: the
+  direction 2026-07-16, given as the owner ended the session and moved to a new one.
+  STILL AN IDEA — the owner says so plainly, expect design questions. The vision: the
   open photo is the BACKGROUND everywhere in the app, not boxed inside a stage.
   The picture fills the screen (overflowing behind as needed) and EVERY control
   — the top bar, the editor drawer/tabs, histogram, lesson chips, crop aids,
   banners — FLOATS over it. One coherent feel across the WHOLE app, not just the
   crop tool. The "let the photo overflow" crop item below is the FIRST concrete
   instance of this pattern: build it as the pilot, learn the design answers on
-  it, then generalise outward. OPEN DESIGN QUESTIONS to settle WITH HIM as it
-  takes shape (don't guess these — they're his taste calls): do floating panels
+  it, then generalise outward. OPEN DESIGN QUESTIONS to settle WITH THE OWNER as it
+  takes shape (don't guess these — they're the owner's taste calls): do floating panels
   sit opaque over the photo, or scrim/blur the photo behind them for legibility
   (white controls over a bright IR sky need contrast)? how do the adjustment
   drawer and a full-bleed photo coexist in portrait, where the drawer claims
@@ -630,7 +630,7 @@ user-scalable=no.
 > (vite.config.ts, stops at the next `## `) no longer renders all of dev
 > history to end users (share-readiness audit, 2026-07-17).
 
-- [x] **Guide lines in Straighten & Crop** — owner ask 2026-07-15 (his third
+- [x] **Guide lines in Straighten & Crop** — owner ask 2026-07-15 (the owner's third
   crop pass): thin-line overlays to align against, one per geometry tool.
   (1) STRAIGHTEN — reference lines to align a horizon or vertical bars against
   while leveling: a set of screen-true horizontal + vertical lines that stay
@@ -664,7 +664,7 @@ user-scalable=no.
   ips-hist="0" + aria-pressed flips, button brings it back.
 - [x] **Crop controls should stand out + a rotate cue** — owner ask 2026-07-15
   (on-device, with the crop go): the Straighten slider and Reset crop button
-  are easy to miss. He wants them to carry the "active" blue background like
+  are easy to miss. The owner wants them to carry the "active" blue background like
   the "tap here" pill does (open to a better suggestion). AND a circle-arrow
   (↻) paired with the crop icon — both on the top-bar Crop button and at the
   bottom near Straighten — so it visually reads that rotation/leveling is
@@ -754,7 +754,7 @@ user-scalable=no.
   the up-arrows read right, and the "Crop & rotate" name.
   THIRD ON-DEVICE PASS (2026-07-15, staging, iPhone — THE persistent misread,
   cache ips-v58 → ips-v59): the owner never wanted a COMBINED crop+straighten
-  mode — he wanted THREE separate tools, each activated on its own. The old
+  mode — the owner wanted THREE separate tools, each activated on its own. The old
   single "Crop & straighten" button armed one mode showing the box AND the
   slider at once ("fighting two controls"). FIX: split into two independent
   modes via a new `geoMode: "crop" | "straighten" | null` (main.ts). `cropArmed`
@@ -934,7 +934,7 @@ user-scalable=no.
   (with the crop go-to-main), a REGRESSION from the box-first/pinch release: once
   the photo has been STRAIGHTENED or CROPPED, a resize handle (and maybe a pan)
   can drag the crop box PAST the image edge into the black void — the box is
-  allowed larger than / outside the photo (his IMG_1007: the box's top + right run
+  allowed larger than / outside the photo (the owner's IMG_1007: the box's top + right run
   off the rounded photo edge into black; also visible after a straighten). Export
   reads `params.crop`, so a box dragged out there bakes black/transparent wedges
   into the saved image — fix before it bites.
@@ -1061,10 +1061,10 @@ user-scalable=no.
   different resolution than the live preview proxy.
   NEEDS THE OWNER'S HANDS on the iPad: the drag feel (corner handle size,
   whether dragging the box itself to move reads as expected on a finger vs a
-  pointer), the straighten slider's range (±45°) and step (0.1°), and his
+  pointer), the straighten slider's range (±45°) and step (0.1°), and the owner's
   verdict on the "photo tilts, box doesn't" straighten preview versus a
   Lightroom-style tilting viewfinder box (documented above as the deliberate
-  simpler choice for this release — a candidate for a follow-up if he wants
+  simpler choice for this release — a candidate for a follow-up if the owner wants
   the box to visually tilt instead). NOT YET DONE: no aspect-ratio presets
   (free-form only); masks/heals were NOT re-verified live under an active
   crop in this pass (the geometry math is shared and should carry them
@@ -1080,7 +1080,7 @@ user-scalable=no.
   -webkit-tap-highlight-color:transparent + -webkit-touch-callout:none (the
   same guard #view already had; the overlay's div children had been missed).
   (2) The BOTTOM-LEFT corner handle couldn't be grabbed when the box sat in
-  the frame's bottom-left-most corner — until he SHRANK the Safari window.
+  the frame's bottom-left-most corner — until the owner SHRANK the Safari window.
   Root cause: a full-frame crop put the handle flush in the physical screen's
   bottom-left corner, exactly where iOS reserves the first touch for the
   home-indicator swipe (bottom edge) and back-swipe (left edge); resizing the
@@ -1169,7 +1169,7 @@ user-scalable=no.
   on-screen preview on real frames — the fix matches the proxy FOOTPRINT, but the
   exact sharpen/texture ceiling is still eyeballed (KS/KT), so expect a tuning
   round like denoise took; the tap-spacing model samples native pixels at proxy
-  spacing (a hair of aliasing on extreme high-freq detail is possible — his call
+  spacing (a hair of aliasing on extreme high-freq detail is possible — the owner's call
   if it ever shows). (2) Install this release, go fully offline, and confirm the
   app still opens and edits after the update with NO online visit in between
   (all measurements so far are Chromium + a simulated update, not iOS Safari's
@@ -1184,7 +1184,7 @@ user-scalable=no.
   lesson per tile), and the ONE-TILE-PER-SCENE rule (binned DNG REPLACES the
   scene's JPEG tile — never side by side; owner called out the duplicate).
   WAITING ON: the owner uploading the NEFs (session repo access can't add
-  files; he uploads to the chat, one or a zip at a time — full-res originals
+  files; the owner uploads to the chat, one or a zip at a time — full-res originals
   never enter the repo, only the binned DNGs do).
   DESIGN DECIDED (owner pick, 2026-07-14): TAG TILES FREELY — each tile
   names the lesson it opens on (`GalleryTile.lesson`), several photos may
@@ -1192,7 +1192,7 @@ user-scalable=no.
   machinery (the owner's own "gets complicated" caution), no one-frame-per-
   lesson constraint. Lessons stay SKILLS that work on any frame — the
   mapping only decides where a tap lands you. Sessions propose a sensible
-  mapping for his approval as frames arrive.
+  mapping for the owner's approval as frames arrive.
   FIRST WAVE SHIPPED to staging 2026-07-14 (cache ips-v40 → ips-v41): the
   owner uploaded five zips (NIR_1638/1687/1701/1708/1822 NEFs, all Z50);
   all five binned to 10.4 MB DNGs in public/examples/. GALLERY is now 22
@@ -1210,7 +1210,7 @@ user-scalable=no.
   walk (22 tiles, all thumbs decode, each of the six RAW tiles opens the
   editor ON its lesson chip and renders, no page errors); tsc + vite clean.
   NEEDS THE OWNER'S HANDS on the iPad: decode speed/feel of the new DNGs,
-  the thumb look, the lesson-order grid reading, and his verdict on each
+  the thumb look, the lesson-order grid reading, and the owner's verdict on each
   frame↔lesson pairing (session proposal, easily re-tagged). STILL WITHOUT
   RAW TWINS: NIR_1665/1706/1716/1721/1808/1825/1827/1864/1866 + the four
   D5300 magenta frames (different camera — matrix/levels must come from
@@ -1222,7 +1222,7 @@ user-scalable=no.
   tap-WB target) ② Through the boughs (1873) ③ Pine & clouds (1824) ④
   Shoreline forest (1821) ⑤ Glowing pine (1877). FLAGGED to the owner:
   1824 is close kin to 1822 Lone pine (same spot, different frame — both
-  kept deliberately, one line to drop if he'd rather). Verified: the
+  kept deliberately, one line to drop if the owner would rather). Verified: the
   built-app walk grew to 25/25 (27 tiles, all thumbs decode, each of the
   ELEVEN RAW tiles opens on its lesson chip and renders, no page errors).
   WAVES 3-5 same day (one push, cache ips-v42 → ips-v43): 21 more zips
@@ -1241,7 +1241,7 @@ user-scalable=no.
   NIR_1674 SKIPPED (same two-trunks beach scene as the 1638 tile);
   NIR_1652 SKIPPED (landscape variant of 1651's subject — kept the tighter
   portrait). NIR_1645's zip contained the camera JPG, NO NEF — owner owes a
-  re-send if he wants that scene. REGRESSION GOLD: the owner re-sent
+  re-send if the owner wants that scene. REGRESSION GOLD: the owner re-sent
   NIR_1675.NEF and the rebuilt bin-dng.cjs output is BYTE-IDENTICAL to the
   committed public/examples/NIR_1675.dng — the rebuilt pipeline is the
   same pipeline. STILL WITHOUT RAW: NIR_1706/1808/1825/1864/1866 + the 4
@@ -1261,9 +1261,9 @@ user-scalable=no.
   upload store did NOT survive the restart either — only re-sent zips
   exist on disk; if a wave is uncommitted when the container dies, ask
   the owner to re-upload it.
-  TUTORIAL SET vs LIBRARY (owner call 2026-07-14, "cull down to a tutorial
-  set and set aside the full set as an example library"; his picks: 11
-  lesson tiles + variety extras, expander with group headers; cache
+  TUTORIAL SET vs LIBRARY (owner call 2026-07-14: cull to a tutorial set and
+  keep the full set aside as an example library; the chosen set was 11
+  lesson tiles plus variety extras, with an expander and group headers; cache
   ips-v44 → ips-v45): the start screen now shows a 13-tile TUTORIAL SET
   (the lesson-tagged pairs in lesson order + The playhouse + Lavender as
   variety picks — `CORE` set in main.ts) and a "Browse the full library ·
@@ -1295,7 +1295,7 @@ user-scalable=no.
   non-core GALLERY entries REMAIN in data and their DNGs REMAIN deployed
   (~420 MB of currently-unreachable files) — "set aside as an example
   library" pending a home the owner actually wants (options: a page of
-  its own, inside Help, or trimming the files from deploy entirely — HIS
+  its own, inside Help, or trimming the files from deploy entirely — THE OWNER'S
   call, don't rebuild unprompted). Verified 31/31 headless: 13 tiles, no
   library element anywhere, all 13 open on their lesson chips and render,
   no page errors.
@@ -1312,7 +1312,7 @@ user-scalable=no.
   folder (NIR_1597–1619 + Archive.zip) is a DIFFERENT project, not the
   gallery RAWs.
 - [x] **Studio icon in the top bar + the wrapped corner** — owner ask
-  2026-07-14, given WITH the main-release GO (his screenshot: at iPad width
+  2026-07-14, given WITH the main-release GO. Measured at iPad width
   the top-left "‹ Studio" link wraps onto two lines, and the brand area
   should carry the Studio/NJ mark). SHIPPED to staging 2026-07-15 (cache
   ips-v50 → ips-v51): the NJ mark (icons/icon-192.png at 22px, rounded,
@@ -1363,8 +1363,8 @@ user-scalable=no.
   render; the double-tap race resolves to the newer tile with no page
   errors. Harness lives in the session scratchpad (server.mjs +
   sweep-entry.ts esbuild bundle + run-tests.mjs). NEEDS THE OWNER'S
-  HANDS: the corner mark's look at his sizes/themes, and that the wrap
-  from his screenshot is gone on the real iPad.
+  HANDS: the corner mark's look at the owner's sizes/themes, and that the wrap
+  measured at that width is gone on the real iPad.
 - [x] **Install the sub-apps from inside the installed Studio** — owner ask
   2026-07-15 ("There is no way to save to Home Screen from within the studio
   as a web app, for the two sub-apps"): the installed launcher is standalone —
@@ -1397,7 +1397,7 @@ user-scalable=no.
   the browser, revealed under navigator.standalone, contain NO anchors
   (copy buttons only), and the clipboard carries the absolute sub-app URL.
 - [x] **Landing scroll cue + a home for the example library** — owner ask
-  2026-07-15 (his screenshot: at iPad landscape the welcome card ended AT
+  2026-07-15. Measured at iPad landscape: the welcome card ended AT
   the fold — "can sometimes look like there is nothing to scroll down
   to"). OWNER PICKS same day: landing "a, b, and c seem all good" (all
   three fold fixes); library "needs its own location to go into".
@@ -1448,7 +1448,7 @@ user-scalable=no.
   practice export carries the mark, baked-JPEG tile does NOT get a
   second one, the user's own photo carries none, note visibility follows).
   NEEDS THE OWNER'S HANDS: the library's feel (group order, tile size,
-  Close placement), the cue's look over his content, the peek on the
+  Close placement), the cue's look over the owner's content, the peek on the
   REAL iPad (Safari chrome heights differ from headless), and the mark's
   size/placement taste on a real export.
 - [x] **Dust & spot removal** — heal sensor dust and hot pixels, the classic IR
@@ -1527,7 +1527,7 @@ user-scalable=no.
   / Back restores them (spot intact), no page errors. tsc + vite build clean.
   NEEDS THE OWNER'S HANDS on the iPad: the heal FEEL (feather 0.45, search
   distances, default spot size 0.008), how aggressive auto-detect should be on
-  HIS frames (real Z50 dust — all tuning so far is synthetic motes + the
+  THE OWNER'S frames (real Z50 dust — all tuning so far is synthetic motes + the
   teaching JPEGs), Visualize contrast gain (×5), detectSpots RAM on a full
   2800px preview (~70 MB transient), and tap-accuracy of small spots on
   finger vs pointer. LATER (unchanged): content-aware gradient-domain blend
@@ -1548,7 +1548,7 @@ user-scalable=no.
   overlay only. LESSON, now a comment in applyZoom: pinch/pan is a pure CSS
   transform with NO repaint — EVERY on-photo overlay must be retraced there,
   not just in draw(). positionHealOverlay() added beside positionMaskOverlay().
-  (3) AUTO-DETECT picked wrong things and IGNORED HIS OBVIOUS SPOT. The
+  (3) AUTO-DETECT picked wrong things and IGNORED THE OWNER'S OBVIOUS SPOT. The
   obvious spot was a LARGE FAINT smudge — real dust at small apertures —
   invisible to the single-scale pass. detectSpots is now THREE-SCALE
   (fine / mid / coarse; mid+coarse dark-only), with three measured lessons:
@@ -1563,8 +1563,8 @@ user-scalable=no.
   crowd's median strength. Verified: planted-smudge recall 2/3 (the third
   sits right against foliage and merges with it — a manual tap covers that),
   fine motes still 8/8, gallery sweep 0-4 finds per frame (hilltown 40 → 2).
-  Owner is uploading THE REAL DUSTY PHOTO from his pass — tune the detector
-  against it when it lands (his missed smudge becomes the regression case).
+  Owner is uploading THE REAL DUSTY PHOTO from that pass — tune the detector
+  against it when it lands (the smudge the detector missed becomes the regression case).
   All verified headless again: full parity suite (heal still adds ZERO drift)
   + UI suite grown to 32/32 (size-preview ring appears and fades, slider
   resizes the active ring 20.5→33.8, pinch-zoom scales the ring exactly with
@@ -1572,8 +1572,8 @@ user-scalable=no.
   Harness gotcha for the file: synthetic PointerEvents have no active pointer,
   so setPointerCapture throws NotFoundError — stub capture in the test page
   before dispatching a simulated pinch.
-  DETECTOR REBUILT ON THE OWNER'S REAL NEF (2026-07-14, same day — he uploaded
-  NIR_1675.NEF, the frame from his screenshots; cache ips-v36 → ips-v37). His
+  DETECTOR REBUILT ON THE OWNER'S REAL NEF (2026-07-14, same day — the owner uploaded
+  NIR_1675.NEF, the frame the reports were about; cache ips-v36 → ips-v37). Its
   smudge measured rBlob 50-80 preview px at ~5% depth in open sky — and the
   session's synthetic tuning had been wrong on every axis. detectSpots is now:
   a 3-level PYRAMID (full/2×/4× planes; a huge faint smudge becomes a small
@@ -1627,8 +1627,8 @@ user-scalable=no.
   faint dark round patch in smooth sky (the same class as the plausible real
   dust the NEF surfaced — these teaching JPEGs came from the same sensor).
   NEEDS THE OWNER'S HANDS: re-run Find spots on NIR_1675 on the iPad (expect
-  the big smudge ringed first + a couple of faint companions), and his verdict
-  on aggressiveness across his library.
+  the big smudge ringed first + a couple of faint companions), and the owner's verdict
+  on aggressiveness across a real library.
   INTO THE LEARNING LIBRARY (owner ask 2026-07-14, same day; cache ips-v37 →
   ips-v38): NIR_1675 is now teaching frame #15 — tile "Lakeside & sensor
   dust" (after Lake & contrails; GALLERY is 18 tiles = 3 RAW + 15 JPEG) — and
@@ -1649,7 +1649,7 @@ user-scalable=no.
   card on Basic, Visualize flips the render, Find spots rings land ON the
   known smudge, honest status, no page errors); the main UI suite still
   passes with the shifted tile order.
-  OWNER'S UPCOMING PLAN (2026-07-14): he will add RAW VERSIONS of all library
+  OWNER'S UPCOMING PLAN (2026-07-14): the owner will add RAW VERSIONS of all library
   frames. HARD CONSTRAINT to plan around: **Cloudflare Pages refuses files
   over 25 MB** — NIR_1675.NEF is 28.8 MB, so raw NEFs cannot deploy as-is.
   OWNER CHOSE BINNING ("You bin it", 2026-07-14) — PIPELINE BUILT AND FIRST
@@ -1670,15 +1670,15 @@ user-scalable=no.
   Lesson-wise the owner also found it opening Lesson 1 — GalleryTile grew an
   optional `lesson` field and openGalleryPhoto opens the tile's HOME lesson
   (default 0); the dust tile carries lesson: 5, so tapping it lands straight
-  on Dust & spots with chip ⑥ active. WHEN THE REST OF HIS RAW VERSIONS
+  on Dust & spots with chip ⑥ active. WHEN THE REST OF THE OWNER'S RAW VERSIONS
   ARRIVE: replace each scene's JPEG tile with its binned-DNG tile (one tile
   per scene — the owner explicitly rejected side-by-side duplicates). VERIFIED: decodes through the normal app
   path (1400×932 preview), no CFA-phase artifacts, the real smudge is the TOP
   find at exactly (1232,400) = the NEF coords ÷2 — binning RAISED its
   signal-to-noise — and the in-app round trip (open tile → Find spots → rings
-  + review) passes headless. Use the same script for the rest of his RAW
+  + review) passes headless. Use the same script for the rest of the owner's RAW
   uploads. Also remember: Z50 II High-Efficiency NEFs don't decode at all —
-  his Z50 classics are fine.
+  the owner's Z50 classics are fine.
   AUTO-SWEEP REVIEW MODE (owner feedback 2026-07-14: the rings read as
   "places someone still has to touch", and "the tap-to-heal menu shouldn't
   open unless someone is doing a manual tap to heal"; cache bump shared with
@@ -1691,7 +1691,7 @@ user-scalable=no.
   setHealReview), mutually exclusive with the picture tools, cleared by fresh
   opens/Clear-all/arming heal manually, and dismisses itself when the last
   ring is put back. The heal-mode banner now appears ONLY when the owner arms
-  Heal spots himself. Lesson 6 step 2 and the Help line reworded to match.
+  Heal spots without help. Lesson 6 step 2 and the Help line reworded to match.
   VERIFIED headless: lesson suite grown to 21/21 (sweep → solid rings +
   review banner, heal button stays un-pressed and its banner closed, ring-tap
   drops exactly one fix, banner-tap retires rings but keeps the heals, the
@@ -1699,13 +1699,13 @@ user-scalable=no.
   (its sweep found 10 faint spots on a practice frame and the review path
   handled them).
 - [x] **Learn on real photos — lessons ride on the picture** — owner ask
-  2026-07-14 (his framing: instead of dedicated tutorial photos, "lessons that
+  2026-07-14 (the owner's framing: instead of dedicated tutorial photos, "lessons that
   can be collapsed to 1, 2, 3 on top of the photo and when you touch them shows
   lessons 1, 2, 3"). SHIPPED to staging 2026-07-14.
   BACKSTORY: the owner had uploaded example IR frames that got stranded — 5 were
   committed to branch `example-ir-photos` (PR #10), 15 more were only PR-body
   attachments this session's egress policy (github.com/user-attachments → 403)
-  could not fetch. He re-uploaded the keepers directly. Teaching set started at
+  could not fetch. The owner re-uploaded the keepers directly. Teaching set started at
   13, grew to 15, then trimmed to **14 low-res frames** in
   `public/examples/gallery/` (1600 px long edge, q80; full-res originals never
   enter the repo): 10 red-filter Z50 (forests, skies, a lakeside with contrails,
@@ -1820,7 +1820,7 @@ user-scalable=no.
   Screen with each style on the iPad (the live-swap was already confirmed by the
   probe — this just confirms the three finished icons look right installed).
   CHANGE-IT-LATER PASS 2026-07-13 (owner clarification: the picker read as
-  install-time only; he wants to switch icons AFTER installing): on the web an
+  install-time only; the owner wants to switch icons AFTER installing): on the web an
   installed tile's icon is BAKED at Add-to-Home-Screen — iOS never re-reads it,
   no JS/manifest change can repaint it, so "change it later" honestly means
   remove-the-tile-and-re-add. The picker now says exactly that, per surface
@@ -1885,8 +1885,8 @@ user-scalable=no.
   "Open image" takes one or several; the picked set becomes the current
   session — big tappable previews in-app, choose and switch from there, each
   photo keeping its own edit while you move around. Explicitly NOT a
-  library/database ("I'm not interested in building databases") — impermanent
-  by design, but "can't get lost 'too' soon". The structural consequence:
+  library or database — that was ruled out explicitly — and impermanent by
+  design, but not so impermanent that work is lost while it is still wanted. The structural consequence:
   iPad Safari cannot re-open a picked File after a reload (proven with batch
   Continue), so surviving a close/crash REQUIRES copying each photo's bytes
   into the app's own storage at open — the batchstore chunked crash-safe IDB
@@ -2057,14 +2057,14 @@ user-scalable=no.
   confirmed on device, 2026-07-13.)
 - [x] **Quick look** — see what's in a folder without loading a session or
   round-tripping a .zip (owner ask 2026-07-13, GO given same day; this is the
-  pure form of his origin story: "white balance an entire folder so I could
-  see what files I was actually dealing with"). Design agreed: pick files →
+  pure form of the need the app was built for: white-balance a whole folder
+  just to see what the files in it actually are). Design agreed: pick files →
   decode a small AUTO-BALANCED preview of each straight from the picked Files
   → a full-screen tappable grid with filenames. NOTHING is copied to storage
   (unlike sessions) — previews live in RAM only, so it's instant to open and
   instant to Done, and honestly ephemeral: iPad Safari can't re-read picked
   Files after a reload, so a quick look lasts only until the tab closes —
-  which fits "what am I dealing with?" exactly. From the grid, "keep these"
+  which fits that need exactly — see what is there, then stop. From the grid, "keep these"
   promotes the CHECKED picks into a real session (the File objects are still
   alive in-page, so promotion just runs the normal addToSession copy). Build
   notes: reuse the session thumbnailer (makeThumb) at a bigger edge (~512px
@@ -2115,8 +2115,8 @@ user-scalable=no.
   3-DNG pick comes out sorted; fail-first: the unsorted build fails the
   same walk; no page errors).
 - [x] **Batch process asks what goes on every photo** — owner feedback
-  2026-07-13 (his origin story: he wanted to white-balance an entire folder
-  just to SEE what files he was dealing with): batch used to silently take the
+  2026-07-13 (the need the app was built for: white-balance an entire folder
+  just to SEE what files the owner was dealing with): batch used to silently take the
   on-screen edit — meaningless when nothing is open — and the "Batch export"
   name still read like a sibling of "Open image(s)". Now named **Batch
   process** (owner's word), and tapping it opens a CHOOSER dialog before the
@@ -2586,7 +2586,7 @@ user-scalable=no.
   everything else "works great" — plus two asks: each ratio's INVERSE and a
   CUSTOM ratio. ROOT CAUSE: `#stage.cropping #view` reserved a FIXED 96px for
   the pill, sized for the pre-chips one-row pill; the chip row (wrapping to
-  two lines on his iPad) grew the pill to ~140px, which floated OVER the
+  two lines on the iPad) grew the pill to ~140px, which floated OVER the
   photo's lower band — box bottom + grid buried, handles at the pill's edge.
   ALL FIXED same day (cache ips-v78 → ips-v79):
   • The view now steps back by the pill's REAL height — setGeoMode measures
@@ -2616,12 +2616,11 @@ user-scalable=no.
   and the custom dialog's feel.
 - [x] **Crop ratio chips — obvious tap affordance, no side-scroll** — owner
   feedback 2026-07-18, given WITH the promote of the aspect/flip + fix
-  releases. Two asks, his words: (1) "Does the preset look slightly
-  different so it's obvious it can be tapped and reset? I just don't want it
-  to lose the functionality by becoming camouflaged as soon as it's used" —
-  the ACTIVE chip must still read as a live control (it flips to its inverse
-  on a second tap). (2) "I'd like that to be made neater, I don't want to
-  have to scroll left and right to see all of the aspect ratios."
+  releases. Two asks. (1) A chip that has been used must still look tappable —
+  the ACTIVE chip has to read as a live control rather than a spent one, since
+  it flips to its inverse on a second tap, and it was becoming camouflaged the
+  moment it was applied. (2) Every aspect ratio has to be visible at once, with no
+  scrolling left and right to find one.
   SHIPPED (cache ips-v79 → ips-v80):
   • WRAP, NOT SCROLL — #cropRatios wraps into centered rows (gap 10px/6px;
     the wider row-gap keeps the two rows' −6px hit extensions from fighting;
@@ -2719,7 +2718,7 @@ user-scalable=no.
   legacy/hostile coercion. NEEDS THE OWNER'S HANDS (iPad/iPhone): how the
   five mixes look on real 720nm frames (filter weights are tuned by eye —
   trivial to retune); the chip row layout in the narrow drawer; the section
-  note's wording; whether B&W belongs in the IR tab where he expects it.
+  note's wording; whether B&W belongs in the IR tab where the owner expects it.
   TUTORIAL FOLLOW-UP (same release, staging round 2): **Lesson 7 · Black &
   white — the 720nm mono** (tab "ir", four steps: the switch + why a channel
   mix beats zero saturation; named mixes then weights; per-colour grey via
@@ -2747,12 +2746,12 @@ user-scalable=no.
   with an 8th chip on the iPhone — and at desktop widths the wrapped
   rail's Exit chip now rides OVER the histogram HUD (chips are z-above it
   and stay tappable/legible on the dark glass; histogram hides on tap as
-  ever) — fine headless, his call on the real screen.
-  OWNER FEEDBACK, staging round 3 (2026-07-18, "I love the function"):
-  B&W gets ITS OWN PANEL TAB next to IR instead of living under the IR
-  section — and he likes that a 9th tab completes the grid ("a final full
-  menu": the .panel-tabs 3-column grid now fills exactly 3×3, no orphan
-  row). DONE: "bw" added to PANEL_TABS after "ir" (TAB_META "Black &
+  ever) — fine headless, the owner's call on the real screen.
+  OWNER FEEDBACK, staging round 3 (2026-07-18): the function itself was
+  approved, and B&W gets ITS OWN PANEL TAB next to IR instead of living under
+  the IR section. A ninth tab also completes the grid, which was wanted for its
+  own sake: the .panel-tabs 3-column grid now fills exactly 3×3, with no orphan
+  row. DONE: "bw" added to PANEL_TABS after "ir" (TAB_META "Black &
   white / Channel-mix mono, made for 720nm"; the IR sub reverts to
   "Channel swap & looks"); the whole block moved into its own
   `.section[data-tab="bw"]` with "Named mixes" / "Channel weights"
@@ -2767,7 +2766,7 @@ user-scalable=no.
   15/15 re-run green against the tabbed build (both walks now also assert
   the full 3×3 = 9 tabs; axe covers the IR AND B&W sections, both
   themes). NEEDS THE OWNER'S HANDS: the 3×3 tab-grid density on the
-  iPhone, and whether "B&W" is the label he wants on the tab
+  iPhone, and whether "B&W" is the label the owner wants on the tab
   (alternatives easy: "Mono", or "Black & white" if it fits the cell).
   MERGED TO MAIN 2026-07-18 (owner go; PR #28, rebase) — production
   deploys as 1.2.
@@ -2775,7 +2774,7 @@ user-scalable=no.
 - [x] **Learning library tile in the grid** — owner verdict 2026-07-15 (given
   WITH the crop go to main): the dashed "Browse the full example library"
   pill was "completely missable, and most people would never know it was
-  there — it's at the bottom and does not stand out." His design: a TILE
+  there — it's at the bottom and does not stand out." The owner's design: a TILE
   inside the tutorial grid that looks like SEVERAL PHOTOS STACKED behind one
   another, labeled "Learning library", opening the same full-screen library
   overlay; keep the photo count; remove the pill (one way in, not two).
@@ -2809,8 +2808,8 @@ user-scalable=no.
   MERGED TO MAIN 2026-07-18 (owner "Promote to main"; PR #29, rebase) —
   ships as a 1.2.x increment.
 
-- [x] **Location-data guard — the 🛰 tip** — owner ask 2026-07-18, HIS WORDS:
-  "Somewhere it got lost" — the ask had never been recorded; captured and
+- [x] **Location-data guard — the 🛰 tip** — owner ask 2026-07-18. The ask had
+  been made earlier and never written down anywhere; captured and
   built the same day as THE SECOND CAPABILITY RELEASE, ships as **1.3**
   (VERSION in the release's final commit). The ask, in full: an icon (a
   satellite or some other tip) shows when location data is saved with the
@@ -2867,11 +2866,11 @@ user-scalable=no.
   hide the tip immediately; strip-on-open cleans while the tip stays
   honest; Open Settings lands in the ⓘ dialog; axe clean on the dialog +
   settings in both themes; no page errors.
-  NEEDS THE OWNER'S HANDS (iPad): the 🛰 glyph renders as he pictured it;
+  NEEDS THE OWNER'S HANDS (iPad): the 🛰 glyph renders as the owner pictured it;
   the chip's bottom-left home; the dialog + settings wording; the real
   share-sheet feel of "re-save over the original" on iOS (headless proxies
-  it as a download); and a REAL SnapBridge-tagged NEF from his camera —
-  the harness GPS block is synthetic (structurally identical, but his
+  it as a download); and a REAL SnapBridge-tagged NEF from the owner's camera —
+  the harness GPS block is synthetic (structurally identical, but the owner's
   genuine file is the true test).
   KNOWN LIMITS (recorded, deliberate): HEIC/PNG location isn't handled
   (PNG eXIf is vanishingly rare; iOS HEIC arrives transcoded) — the strip
@@ -2910,7 +2909,7 @@ user-scalable=no.
   second fresh context proves Esc); doors stay live; axe clean on the
   open card in both themes; no page errors.
   NEEDS THE OWNER'S HANDS (iPad): the card's tone/wording, the ⓘ button's
-  corner spot vs the notch/safe-area on his devices, and whether the
+  corner spot vs the notch/safe-area on the real devices, and whether the
   auto-open feels welcoming rather than in-the-way on a first real visit.
   OWNER REWORK WITH THE PROMOTE (2026-07-18): "you're asking a user to
   read two paragraphs before figuring out how to install — they'll never
@@ -2982,7 +2981,7 @@ user-scalable=no.
   NEEDS THE OWNER'S HANDS (iPad — the true P3 screen): an exported JPEG
   next to the app preview in Apple Photos (they should be
   indistinguishable), and one social-upload round trip (recompressors
-  convert tagged P3 correctly, but his pipeline is the real test).
+  convert tagged P3 correctly, but the owner's pipeline is the real test).
   MERGED TO MAIN 2026-07-18 (owner "Promote"; PR #34, rebase) —
   production deploys as 1.4.
 
@@ -3019,7 +3018,7 @@ user-scalable=no.
   the exported TIFF RE-OPENS in the app's own decoder; EXIF-less source →
   EXIF-less export; no page errors. p3-walk re-run green (parity 3.3 —
   the new APP1 doesn't disturb the profile pair).
-  NEEDS THE OWNER'S HANDS: export one of HIS real NEFs and check Photos
+  NEEDS THE OWNER'S HANDS: export one of THE OWNER'S real NEFs and check Photos
   shows the capture date (not the export date) and the camera/lens line;
   confirm a strip-on-open cleaned file still exports with its date.
 
@@ -3196,9 +3195,9 @@ user-scalable=no.
   bw (its 9-tab pin updated to 10 — the intended change), downscale,
   overlay, p3, exif, loc. VERSION → 2.0 in this release's own commit.
   NEEDS THE OWNER'S HANDS: wheel-drag feel on the iPad (puck size, the
-  full-width Grade row placement he hasn't blessed yet), grain character
-  on the real panel at his usual export sizes, the five toned-mono
-  recipes against his taste (they're my calibration), and strong tints
+  full-width Grade row placement the owner hasn't blessed yet), grain character
+  on the real panel at the owner's usual export sizes, the five toned-mono
+  recipes against the owner's taste (they're my calibration), and strong tints
   through the Display-P3 JPEG path in Apple Photos.
 - [x] **Custom false color — full 3×3 channel mixer** — CREATIVE, ships as
   **2.1** (the first middle-bump within Creative). A new "Custom false
@@ -3237,7 +3236,7 @@ user-scalable=no.
   whether the mixer belongs in the Grade tab or wants its own home on
   the real iPad.
 - [x] **Stickers — UFOs in the trees** — CREATIVE, shipped as a BETA
-  straight to main (owner's 2026-07-19 gate exception; he's most excited
+  straight to main (owner's 2026-07-19 gate exception; the owner is most excited
   about this one). VERSION unchanged (still 2.1 — this is an increment on
   the Creative line, not a new capability number; bump the middle when the
   owner blesses stickers out of beta or the next capability lands).
@@ -3292,9 +3291,9 @@ user-scalable=no.
   downscale/overlay walks re-run green (grade/bw tab-shape + count asserts
   updated: Grade is now a normal cell, 11 tabs).
   BETA / NEEDS THE OWNER'S HANDS: this is the FIRST sticker cut — drag/
-  scale/rotate feel on the iPad, the four art pieces against his taste, the
+  scale/rotate feel on the iPad, the four art pieces against the owner's taste, the
   peek-behind at full strength (mottled — maybe cap it lower), and whether
-  he wants pinch-to-scale/rotate on the sticker itself (currently sliders).
+  the owner wants pinch-to-scale/rotate on the sticker itself (currently sliders).
   DEFERRED (recorded, not built): PNG-with-alpha import as a custom
   sticker; auto-seed occlusion from the sky/foliage/colour masks (the
   richer mask-machinery route in the architecture sketch); the beam
@@ -3389,7 +3388,7 @@ user-scalable=no.
   all 8 PNGs precache. NEEDS THE OWNER'S HANDS: the art taste on the real iPad
   (are these believable-in-scene?), auto-match STRENGTH (is the seed close
   enough, or too timid/aggressive?), and the imported-PNG session-only limit
-  (persist via IndexedDB later if he wants his cutouts to stick).
+  (persist via IndexedDB later, if cutouts should survive a reload).
 - [x] **Stickers v2 — paint to tuck behind + two-finger resize/spin** — the
   last of the sticker rework (2026-07-19). What was missing: no way to remove
   part of a sticker so it sits in the background, and no way to put it back.
@@ -3442,7 +3441,7 @@ user-scalable=no.
   regressions updated (pick the UFO category before Saucer) + green; build clean,
   manifest present + precached. NEEDS THE OWNER'S HANDS: the picker's feel with a
   real 50+ set (filter-by-chip vs a scrollable sheet), the category split, and
-  confirming his AI-made PNGs (transparent, sized) land in the right folders.
+  confirming the owner's AI-made PNGs (transparent, sized) land in the right folders.
   DELIVERY ASSUMPTION: committed PNGs in category folders (permanent, precached,
   offline), with runtime "Import a picture" kept for one-offs.
 - [x] **Sticker perspective — drag the corners to set the plane (Increment B)** —
@@ -3525,7 +3524,7 @@ user-scalable=no.
   strength visibly changes it, the button recomputes for a new spot, axe both
   themes; PLANT=nomatch (strength 0==1) FAILS. adjust unit + all sticker
   regressions green. NEEDS THE OWNER'S HANDS: whether the default 0.85 strength
-  feels right, and whether he wants saturation folded into the auto-match too
+  feels right, and whether the owner wants saturation folded into the auto-match too
   (left manual for now — auto-sat was too unpredictable to trust).
 - [x] **Blend to match REWORKED — actually works now, and on iOS (2026-07-20)** —
   owner on device: "the blend is not working in any sort of way" (a blown-white
@@ -3557,7 +3556,8 @@ user-scalable=no.
 - [x] **Force-update button + picker legibility (2026-07-20 device fixes)** — (a)
   Settings gained "Update to the latest version": a `SKIP_WAITING` message the SW
   now listens for + `reg.update()` → skipWaiting → reload, so a new deploy shows
-  without the double force-close (owner: "my kids will never get them"). (b) The
+  without the double force-close, which nobody outside this project would ever
+  have worked out was needed. (b) The
   sticker picker's three tiers were indistinguishable — kind chips are now larger
   above a divider, the selected category is a lighter outlined highlight, stickers
   stay plain; and the "more below" scroll arrow moved off --accent (it matched the
@@ -3647,7 +3647,7 @@ user-scalable=no.
   the shadow's placement pain)** — a cast shadow is now GLUED to the creature it
   came from and tracks its position / scale / spin on every settle, so you place
   the creature once and the contact puddle rides along — no more casting a shadow
-  and then hand-lining-it-up (the exact friction he hit: "impossible to place").
+  and then hand-lining-it-up, which made placement effectively impossible.
   MODEL: `Sticker.linkTo` = the creature's `id`; castShadow stamps it. `syncLinked
   Shadows()` runs at the TOP of syncSpotsToTexture (before the bake change-
   detection, so a followed shadow re-bakes at its new spot) and copies x/y/scale/
@@ -3667,7 +3667,7 @@ user-scalable=no.
   Dev hooks `__stickers()` (read-only snapshot) + `__select(i)` added for the walk,
   alongside the existing `__stickerBakes`. NEEDS THE OWNER'S HANDS: whether the
   shadow strip below the creature is an easy enough tap-target to grab for a manual
-  offset (auto-follow means most placements never need it; if he wants a dedicated
+  offset (auto-follow means most placements never need it; if the owner wants a dedicated
   nudge/direction control that's a clean follow-up).
   - FOLLOW-UP FIX (2026-07-21, owner: "rotating the shadow makes the whole image
     show again, not the rotating shadow"): the live ghost is a plain rotated
@@ -3790,7 +3790,7 @@ user-scalable=no.
   sampler values at 0 LSB (max delta 0 over 2545 covered px). axe clean both
   themes. Help + Lesson 9 rewritten. NEEDS THE OWNER'S HANDS: confirm on the iPad
   that on-top stickers now read as their own picture (and export the same), and the
-  in-look opt-in still gives the cryptid-in-infrared effect when he wants it.
+  in-look opt-in still gives the cryptid-in-infrared effect when the owner wants it.
 - [x] **Sticker usability sweep + zoom-with-no-wheel (2026-07-21 device asks)** —
   owner on device, five things at once (branch
   `claude/sticker-blending-resize-rotate-tr3hrl`, BETA straight to main via
@@ -3801,7 +3801,7 @@ user-scalable=no.
   it"). updateStickerUI mirrors it as ✓-text + aria-pressed and disables the
   strength slider + "Blend to match" button when off. (2) **Resize/rotate right on
   the photo** — the owner "didn't see how" (only sliders/pinch + the persp corner
-  handles, which skew, confused him). positionStickerOverlay now has three modes
+  handles, which skew, confused the owner). positionStickerOverlay now has three modes
   by data-mode: `persp` (4 skew handles, unchanged), `xform` (4 `.sticker-size`
   resize corners + a `.sticker-rotate` knob on a `.sticker-stem`, shown when a
   sticker is selected and neither perspective nor blend-paint is armed), and `box`
@@ -3844,13 +3844,13 @@ user-scalable=no.
   DEFERRED — **the "double blend" the owner flagged next**: stickers composite
   INTO the source (pre-pipeline), so the IR look (WB, camera matrix, R↔B swap,
   saturation, grade) re-cooks even a matched sticker — a colourful alien blows to
-  neon (his screenshot). Blend-off helps but the look still processes it. The real
+  neon, measured on the device. Blend-off helps but the look still processes it. The real
   cure is a per-sticker "lay it on top / keep its own look" mode that composites
   AFTER the pipeline (a new display-space stage in BOTH preview + export, with
   occlusion/mask/perspective in display space) — a real architectural fork; parked
   for owner direction before building (asked in chat, per the no-picker rule).
 - [x] **New Infrared app icon + social tile (Bigfoot IR forest)** — owner ask
-  2026-07-20, from a ChatGPT-made color-IR forest he liked (a Bigfoot subtly
+  2026-07-20, from a ChatGPT-made color-IR forest the owner liked (a Bigfoot subtly
   placed in the trees; source in session uploads). Three deliverables, all cut
   from that one square image via the headless-Chromium canvas pipeline
   (`gen-brand.mjs`, scratchpad): (1) **IR icon** — `public/icon.svg` now embeds
@@ -5834,7 +5834,8 @@ and it is not what shipped today.
 
 ## A poll with no bound ran for eleven hours, 2026-09-10
 
-**Found by the owner, in the background-tasks list, not by anything I did.**
+**Nothing in the session found this. It surfaced in the background-tasks list,
+which is outside anything the session was watching.**
 
 The task was one line:
 
@@ -6947,9 +6948,10 @@ all 28 visible buttons manipulation with none left on `auto`.
 **Worth noticing about the report.** The first reading was a pinch handler
 problem and would have led to gesture-event interception on the canvas — real
 work, in the wrong place, fixing nothing. One sentence naming the control
-turned it into a one-rule change. A symptom described by its EFFECT ("the whole
-screen zooms") and a symptom described by its TRIGGER ("when I tap + quickly")
-are different amounts of information, and only the second one located it.
+turned it into a one-rule change. A symptom described by its EFFECT — the whole
+screen zooms — and the same symptom described by its TRIGGER — it happens when
+the plus control is tapped in quick succession — are different amounts of
+information, and only the second one located it.
 
 ## The conventions a reader brings with them, 2026-09-09
 
@@ -7628,12 +7630,12 @@ the old Z 50-matrix look (the LR-familiar rendering, more color
 separation); (b) the DSC_4776 DNG twin never arrived (its zip was too big
 for the chat upload; Drive delivery to a session is hard-capped at
 10 MB/file) — its NEF decodes clean on the same path, but that pair itself
-is unverified until he re-sends a smaller zip; (c) the ~3% white-level
+is unverified until the owner re-sends a smaller zip; (c) the ~3% white-level
 residual (curve top vs Adobe's true saturation point) stays a candidate for
 a per-model saturation table, absorbed by auto exposure today.
 RESOLVED same night — the "1709 still mismatched / channels swapped" report
 (owner's Quick-look screenshot on the fixed build; DSC_1709 pair re-sent):
-NOT a decode bug. His Lightroom-iOS DNGs embed a Rob Shea IR camera
+NOT a decode bug. The owner's Lightroom-iOS DNGs embed a Rob Shea IR camera
 profile, and it differs per photo: DSC_4940 (and, per the matching
 screenshot tiles, 4776) carry ProfileName (50936) "Infrared Temp -100",
 DSC_1709 carries "Infrared Temp -50" (both ProfileCopyright "Rob Shea").
@@ -7643,7 +7645,7 @@ legitimately renders per its own profile and the app is RIGHT to honor it.
 The NEF-side hardcode (read from 4940's DNG) is therefore the "-100"
 PROFILE matrix, not Adobe stock — color.ts now says so (deliberate
 deviation from dcraw's stock D5300 matrix: stock matches NONE of the
-owner's real files; -100 is his standard). PROOF the profile is the whole
+owner's real files; -100 is the owner's standard). PROOF the profile is the whole
 story: rendering the 1709 NEF through the -50 matrix from its own DNG twin
 matches that DNG at mean 0.61/255 (max 4); through the default -100 matrix
 the diff is 13.5/255 — exactly the reported difference. The linearization
@@ -7687,12 +7689,13 @@ NEEDS OWNER'S EYES: thumbnail appearance on device (harness covers code path
 + build only).
 
 OWNER RULING 2026-07-25 REV. 2 — AUTO BASELINE AT OPEN, PER FILE TYPE.
-The blanket "nothing at open" below was a STABILIZATION MEASURE ("only
-because I could not get you to stop fucking up so I could even get a
-testable version"), not the product. The product, settled by Q&A in chat
-(his answers verbatim: 1 "Lighter touch good call", 2 "No infrared photos
-will be in dark", 3 "What is normally done in apps?", 4 "Autobaseline.
-'Hold original' should have an 'original' option somehow"):
+The blanket "nothing at open" below was a STABILIZATION MEASURE, adopted
+because the build was not staying reliable enough to test at all, and never the
+product. The product was settled by four answers in chat: the denoise is a
+lighter touch than it was; there is no dark-scene special case, because no
+infrared photograph is shot in the dark; the baseline should be what apps of
+this class normally do; and it is automatic, with the untouched decode still
+reachable behind a Hold control:
 - RAW (isRaw: NEF, mosaiced DNG, lossy-linear DNG): gray-world WB + auto
   exposure (bright-end 0.85 — no dark-scene special case, per answer 2) +
   measured denoise (owner-tuned 2026-07-12: barely clears the grain) +
@@ -7700,7 +7703,7 @@ will be in dark", 3 "What is normally done in apps?", 4 "Autobaseline.
   sources only — recovery renders only there). 0.7 calibrated: lowest
   fully-clean value on DSC_4940 is 0.6, plus margin; industry-normal —
   LR/ACR/C1 apply (stronger) reconstruction unconditionally in default raw
-  rendering (the answer to his Q3).
+  rendering (the answer to the owner's Q3).
 - CAMERA-RENDERED (JPEG/HEIC/PNG/third-party previews): as the camera made
   them + measured denoise ONLY (lighter touch, answer 1).
 - Reset returns to this baseline (answer 4). NEW "Hold: Untouched" button
@@ -7725,7 +7728,7 @@ pointers have no id; capture is best-effort).
 
 (SUPERSEDED by rev. 2 above — kept for the ledger:)
 OWNER RULING 2026-07-25 — NOTHING HAPPENS TO A PHOTO AT OPEN. FINAL.
-His words: "Stop doing ANYTHING to the photo at fucking open." A photo opens
+The ask was that nothing whatever happens to a photograph at open. A photo opens
 exactly as decoded: WB [1,1,1], exposure 1, denoise 0, and NO automatic
 highlight repair. Every automatic adjustment is now an EXPLICIT press: Auto
 (Basic: WB + exposure + denoise), Auto WB (top of IR tab: WB only), tap-WB.
@@ -7780,7 +7783,7 @@ users can't use it" report; owner's D5300 full-spectrum frame DSC_4940):
   saturation point. NEFs carry no DNG level tags, so every OTHER camera got the
   Z 50's ceiling too. A D5300 saturates at 16383 — feeding it 15520 pushed the
   whole frame ~6% over and pinned ~14% of it (all the sky + IR-lit foliage) past
-  white with NO headroom to recover. Noah never saw it because he feeds the app
+  white with NO headroom to recover. Noah never saw it because the owner feeds the app
   DNGs (Adobe DNG Converter writes real per-file black/white/ColorMatrix, and the
   DNG path already reads them); the hardcode only bites on native NEF opens.
 - FIX: white is now read from the FILE'S OWN linearization curve
@@ -7812,7 +7815,7 @@ users can't use it" report; owner's D5300 full-spectrum frame DSC_4940):
   safer than a milky lift; both are candidates for a real per-model table later.
 
 FIXED 2026-07-24 (IR highlight fringe + blown-sky flattening — the "D5300
-doesn't come out as CLEAN as my Z 50" report, DSC_4940 + the owner's five
+cleanliness report against the Z 50, DSC_4940 + the five
 staging screenshots; TWO attempts, the first REJECTED — read both):
 - SYMPTOM: lurid lime-green (and magenta) fringes on every high-contrast edge
   (bare branches against bright sky), plus a wide green band around thick
@@ -7832,7 +7835,8 @@ staging screenshots; TWO attempts, the first REJECTED — read both):
   sky's real cloud gradient got averaged up into the clipped garbage, and every
   near-clip region (0.9–1.0 = genuine bright detail, not clip) collapsed to one
   flat tone. Owner's screenshots: whole skies as flat salmon/magenta slabs.
-  His words: "you drop every channel to the least common denominator." OWNER
+  What was wrong, in one line: every channel was being reduced to the least
+  common denominator of the three. OWNER
   RULE (standing, non-negotiable): NEVER discard captured channel data to hide
   a broken channel — rebuild the broken channel from evidence instead, and
   never touch a value the sensor actually resolved.
@@ -8148,7 +8152,7 @@ Classical, subscription-grade tools (fit the current architecture directly):
   the tasteful ceiling sits on real frames (KS/KT are eyeballed, not owner-tuned
   yet — the denoise curve took two feedback rounds, expect the same), the GPU
   cost of the 7×7 taps on a big proxy, and whether Texture's mid-band radius is
-  the structure he wants. Cache bumped ips-v33 → ips-v34.
+  the structure the owner wants. Cache bumped ips-v33 → ips-v34.
 - **Heal / clone** for sensor dust & hot pixels — clone-stamp first,
   content-aware later. PROMOTED 2026-07-14 to the "Next capability release"
   queue as **Dust & spot removal** (owner ask) — see that entry for the plan.
@@ -8158,7 +8162,7 @@ Classical, subscription-grade tools (fit the current architecture directly):
   IR-native, per-pixel. PROMOTED 2026-07-18 to the "Next capability release"
   queue (Creative release, v2.0) — see that entry.
 - **UFOs in the trees — playful sticker compositing** (owner ask 2026-07-14,
-  given right after the dust-release promotion; he'll open a NEW CHAT for it —
+  given right after the dust-release promotion; the owner will open a NEW CHAT for it —
   next session, read this entry first). PROMOTED 2026-07-18 to the "Next
   capability release" queue (Creative release, v2.0); this entry keeps the
   architecture sketch. The idea: paste fun cutouts (UFOs,
@@ -9609,3 +9613,81 @@ declaration of it rather than two with the loser first. All four controls measur
 silently opting out of a tag-keyed width.** The same class then silently opted its
 own centring out by shorthand. A comment explaining one instance of a trap is not
 protection against the next one.
+
+## The third-person gate had never run here, and was red by 119, 2026-09-12
+
+The privacy rule has three halves and this repo was running one of them. The
+`privacy-check` gate anchors on the owner's NAME and `quote-check` finds a
+set-apart quotation; neither can see a comment recording that a report was
+correct and whose it was. `third-person-check` is that half, and this repo
+referenced the hub in no workflow at all — so it had never run.
+
+Run against the working tree: **119 references across 13 files, 92 of them in
+NOTES.md**, in a public repository. All of them predate this pass.
+
+**The split, measured rather than estimated.** Ten were false positives of the
+kind the allow-list exists for: Nikon's own name for its High Efficiency raw
+compression, which this app has to name in order to say it cannot decode it, and
+the He of He & Sun 2015, the guided-filter paper the clarity and dehaze maps are
+built on. One more was a variable whose name was the possessive pronoun,
+standing for the high ends of a range, and it was RENAMED rather than declared
+— `loEnds`/`hiEnds` — because a declaration is a claim somebody has to maintain
+and a rename costs nothing. The other 108 were real.
+
+**NAMING THE ROLE IS THE FIX FOR THE PRONOUN AND NOT FOR THE ATTRIBUTION, which
+is the part worth remembering.** Rewriting 85 lines of pronoun to the role
+turned the third-person gate green and turned `privacy-check` RED: a possessive
+naming the role and then a piece of EVIDENCE — a screenshot, an origin story —
+is attribution, which is a different half of the same rule. The gate that had
+been passing all day started failing on two lines created by satisfying its
+neighbour. Every possessive that attributes
+EVIDENCE — a screenshot, an origin story, a missed smudge, a pass, a library —
+is now what it measured; the ones that record a step only a person can take
+("on the owner's call", "needs the owner's hands", "the owner's ruling") stay,
+which is the carve-out the gate itself encodes.
+
+**AND FOURTEEN VERBATIM QUOTATIONS WERE INVISIBLE TO ALL THREE GATES.** They sit
+inside ordinary prose rather than as set-apart blockquotes, so `quote-check`
+cannot see them; they name nobody, so `privacy-check` cannot either; and they
+contain no pronoun. Found by searching for quoted strings containing a
+first-person pronoun. One of them republished swearing under the owner's name in
+a public repository, which is the exact failure the rule was written for. All
+fourteen are now what was wrong and what it measured.
+
+**AND WRITING THIS ENTRY BROKE BOTH GATES AGAIN.** The paragraphs above named
+the banned shapes by reproducing them, so prose whose whole job is to say a
+pattern must not appear contained two instances of it. That is the same problem
+a sibling app solved for its copy gate with a declared list rather than a
+pattern; here the cheaper answer was to describe the shape instead of quoting
+it, which is what the rule asks of every other line in this file.
+
+**IT IS WIRED INTO CI NOW, WHICH IS THE POINT.** A scrub nothing holds is a
+scrub that lasts until the next session. `.github/workflows/gates.yml` calls the
+hub's shared `hub-gates.yml` at a pinned SHA rather than copying the job — the
+wiring drifted across eight repos precisely because it was copied. Two other
+gates were red when it was wired and were FIXED rather than switched off with an
+input: two undeclared placeholders (`.example-allow` now declares both, and
+both are invented rather than the nearest real look) and an `npm install` in the
+asset-factory workflow, now `npm ci`, which is bound by the lockfile committed
+beside it.
+
+## Two saved files, one letter apart, 2026-09-12
+
+`lens-profile-<date>.json` was one run and `lens-profiles-<date>.json` was every
+profile on the device. Four run files and one backup came out of one afternoon
+and had to be told apart by opening them.
+
+A date alone is also not unique within a day, so a second save left the
+operating system to disambiguate with its own `(1)`, `(2)` — numbers that say
+nothing about order or content, and on iOS sometimes a silent replace.
+
+They are `lens-one-run-<date>-<hhmm>.json` and
+`lens-all-profiles-on-this-device-<date>-<hhmm>.json` now, built by one function
+so the two names cannot drift apart again, and sorted by name a folder of them
+reads in the order they were saved.
+
+**And the run save was still a plain anchor download**, which does nothing
+whatever on an iPhone or iPad — the share sheet is the only way a file reaches
+the disk there. The backup button beside it had been fixed for exactly that
+months earlier: the fix was applied to the instance and not to the class. Both
+go through `saveBlob` now, and the run save says which scope it wrote.

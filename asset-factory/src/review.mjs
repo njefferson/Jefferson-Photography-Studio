@@ -2,7 +2,7 @@
 // review/ folder and build one contact-sheet PNG so the whole batch can be
 // judged at a glance. The workflow commits review/ to a throwaway branch; a
 // session then reads it back over the GitHub API (which isn't proxy-blocked,
-// unlike the artifact blob host) and hands the images to the owner's device.
+// unlike the artifact blob host) and hands the images back for review.
 import sharp from "sharp";
 import { mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";

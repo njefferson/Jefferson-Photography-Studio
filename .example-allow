@@ -1,0 +1,16 @@
+# DECLARED EXAMPLES on this app's surfaces (hub gate: example-check.mjs).
+# Format: file | where it came from | the example text.
+#
+# A placeholder is published copy, and the nearest real scenario belongs to
+# somebody. "invented" means exactly that: made up for the placeholder, not
+# taken from a real look, a real file or a real plan. Checked both ways, so a
+# declaration that stops matching fails rather than quietly covering nothing.
+
+# The name field for saving a look. A made-up look name, in the app's own
+# vocabulary — Aerochrome is the historical film stock the look is named after,
+# not anybody's saved look.
+ir.html | invented | e.g. Dusk Aerochrome
+
+# The paste box for importing a look someone sent you. Not an example of a
+# look at all — an instruction standing in for empty.
+ir.html | invented | Paste here&hellip;

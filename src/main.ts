@@ -4829,8 +4829,8 @@ function applyZoom() {
   }
   // EVERY on-photo overlay must retrace the transform — pinch/pan is a pure
   // CSS move with no repaint, so anything skipped here visibly detaches from
-  // the picture (the heal rings did exactly that on the owner's iPad,
-  // 2026-07-14, while the baked fixes themselves moved with the photo).
+  // the picture (the heal rings did exactly that on an iPad, 2026-07-14, while
+  // the baked fixes themselves moved with the photo).
   positionMaskOverlay();
   positionHealOverlay();
   positionCropOverlay();

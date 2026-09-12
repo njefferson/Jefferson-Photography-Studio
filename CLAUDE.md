@@ -25,12 +25,12 @@ settled design decisions, and measured gotchas that must not be re-learned.
 - `main` == production (jefferson-photo-studio.pages.dev, deployed on push).
 - The `staging` branch deploys to staging.jefferson-photo-studio.pages.dev.
   Every product change goes: designated `claude/*` branch → push to `staging`
-  → the owner's on-device pass → his explicit go → PR + merge to `main`.
+  → the owner's on-device pass → the owner's explicit go → PR + merge to `main`.
   Never merge a product change to main without that go. Docs-only changes
   (NOTES.md, this file) may merge without the gate.
 - Push to `staging` UNPROMPTED whenever work reaches a point the owner needs
-  to test AND no other branch is already waiting for his go to `main` — don't
-  make him ask; that's what staging is for (owner rule, 2026-07-13). Staging
+  to test AND no other branch is already waiting for a go to `main` — being
+  asked for it is the signal this rule was broken (owner rule, 2026-07-13). Staging
   may be force-pushed: its history is disposable, but check first that every
   staging-only commit is already contained in `main` (`git cherry`).
 - Parallel sessions happen. Before pushing anywhere, fetch and check what
