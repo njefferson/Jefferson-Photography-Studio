@@ -1,0 +1,14 @@
+# WHERE WORK COMMITS IN THIS REPO, and it is a family rather than one name:
+# every session is given its own `claude/*` branch, so no single branch name
+# could be written here. That is why this file did not exist until now — and
+# its absence failed the shared gates workflow at step one, which meant every
+# gate after it never ran on a runner at all.
+#
+# The flow this states: commit on the session branch, push that same history to
+# `staging` for the on-device pass, merge to `main` by pull request. Nothing
+# commits on `staging` (it is pushed to), and `main` is reached by a rebase
+# merge on GitHub, which no local hook sees — JPS_PROMOTE is the door for the
+# rare local commit there, said out loud.
+work=claude/*
+promote=main
+escape=JPS_PROMOTE
