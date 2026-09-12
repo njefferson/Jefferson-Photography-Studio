@@ -86,16 +86,29 @@ const renderer = (() => {
 let current: DecodedImage | null = null;
 let currentFile: ImportedFile | null = null;
 
-// --- Hot-spot profile correction: a SEPARATE, earlier pass from the manual
+// --- Hot-spot profile correction: a SEPARATE stage from the manual
 // `hotspot`/`hotspotSize` slider above (params.hotspot). Auto-selected from
-// EXIF (or a manual lens+FL pick) and applied once to the decoded pixel
-// buffer, before white balance / channel swap / grading ever see it. Not
-// part of EditParams / the undo stack — it's a per-photo source correction,
-// not a creative edit; re-derived fresh each time a photo opens. ---
+// EXIF, or from a manual lens and focal-length pick, and applied as a PIPELINE
+// STAGE in linear light after white balance and before the camera matrix and
+// the channel swap. Re-derived fresh each time a photo opens, because the
+// profile belongs to the photograph rather than to the session. ---
+//
+// THIS PARAGRAPH SAID THREE THINGS THAT WERE NO LONGER TRUE, and two of them
+// were contradicted by comments a dozen lines below it. It said the correction
+// was applied once to the decoded pixel buffer before anything else saw it —
+// that was the old design, and `syncHotspot` below explains at length why it
+// is a stage now. It said the correction is not part of EditParams or the undo
+// stack, while the very next doc comment says Strength and Bypass are
+// `params.hsFix`/`params.hsBypass` precisely so that history carries them. And
+// it said the matched profile is interpolated to the frame's aperture, when
+// aperture CHOOSES A SET and only focal length interpolates — see matchIn,
+// which explains that a hot-spot changes so much with aperture that blending
+// across two of them would average two different lenses.
 /** The shipped profile this photograph matched, and how it was chosen. It is a
  *  StoredProfile like the reader's own — same rig, same shape, same matcher —
- *  already interpolated to the frame's own focal length and aperture. Strength
- *  and Bypass are `params.hsFix`/`params.hsBypass` so history carries them. */
+ *  with its curves interpolated to the frame's own focal length, inside the
+ *  aperture set nearest the frame's aperture. Strength and Bypass are
+ *  `params.hsFix`/`params.hsBypass` so history carries them. */
 let hotspotState: { p: LensStore.StoredProfile; short: string; source: "exif" | "manual" } | null = null;
 /** The open photograph's EXIF, parsed ONCE at open. Both lens cards need it and
  *  both used to read the file for themselves. */
