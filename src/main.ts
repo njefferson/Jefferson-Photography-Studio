@@ -25,6 +25,7 @@ import { Tiff } from "./raw/tiff";
 import { drawHistogram } from "./histogram";
 import * as Hotspot from "./hotspot";
 import { wireLensRig } from "./lensrig";
+import { findTilt } from "./straighten";
 import { getPreview, putPreview, prunePreviews, clearPreviews, previewStats } from "./previewcache";
 import * as LensStore from "./lensstore";
 import { readExifSubset, type ExifSubset } from "./exif";
@@ -5887,6 +5888,84 @@ straightenSlider.addEventListener("input", () => {
   draw();
 });
 straightenSlider.addEventListener("change", flushRecord); // one drag of the slider = one undo step
+
+/** LEVEL THE HORIZON — the angle found for you, landing on the slider.
+ *
+ *  On a button and never at open. A frame tilted on purpose must not be
+ *  straightened behind the reader's back (Doctrine §14 on silent changes), and
+ *  the three tests any automatic here has to pass are met by putting the answer
+ *  on a visible control: it shows, it undoes, and the untouched frame is one
+ *  press away.
+ *
+ *  It says the angle it found, and says so plainly when it found nothing — a
+ *  confident quarter of a degree on a frame with no line in it is worse than an
+ *  admission. */
+const levelBtn = document.getElementById("levelBtn") as HTMLButtonElement | null;
+const levelNote = document.getElementById("levelNote");
+function sayLevel(text: string): void {
+  if (!levelNote) return;
+  levelNote.textContent = text;
+  levelNote.hidden = !text;
+}
+levelBtn?.addEventListener("click", () => {
+  if (!current) return;
+  const img = current;
+  // A REDUCED COPY, because a horizon is a low-frequency thing and a 24-
+  // megapixel scan would cost seconds to say the same number. 900 on the long
+  // edge is about half a megapixel and takes a few tens of milliseconds.
+  const scale = Math.min(1, 900 / Math.max(img.width, img.height));
+  const w = Math.max(2, Math.round(img.width * scale));
+  const h = Math.max(2, Math.round(img.height * scale));
+  const lum = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) {
+    const sy = Math.min(img.height - 1, Math.floor(y / scale));
+    for (let x = 0; x < w; x++) {
+      const sx = Math.min(img.width - 1, Math.floor(x / scale));
+      const [r, g, b] = linearAt(img, sx, sy);
+      // Gamma-ish, so a dark sky against bright foliage reads as the edge a
+      // reader sees rather than as the much smaller difference linear light
+      // says it is.
+      lum[y * w + x] = Math.sqrt(Math.max(0, 0.2126 * r + 0.7152 * g + 0.0722 * b));
+    }
+  }
+  const t0 = performance.now();
+  const found = findTilt((x, y) => lum[y * w + x], w, h);
+  const ms = Math.round(performance.now() - t0);
+  if (!found) {
+    sayLevel("No line clear enough to level by — the Straighten slider is still yours.");
+    return;
+  }
+  // THE SIGN IS THE APP'S, NOT THE FINDER'S. `findTilt` reports which way the
+  // frame's lines lean; the slider takes the angle that puts them back. Which
+  // of those is negative is a fact about this pipeline's geometry and is
+  // asserted end to end rather than reasoned about, by levelling a frame that
+  // was deliberately tilted and measuring what came out.
+  const put = Math.max(-45, Math.min(45, Math.round(-found.degrees * 10) / 10));
+  // IT DOES NOT OPEN THE STRAIGHTEN TOOL. Arming a geometry tool takes over the
+  // stage — the crop pill, the alignment grid, the panel pulled aside — and
+  // pressing a button in the panel is not asking for that. The angle lands on
+  // the slider, the picture changes, and the tool is there if the reader wants
+  // to nudge it.
+  params.straighten = put;
+  straightenSlider.value = String(put);
+  straightenVal.textContent = `${put.toFixed(1)}°`;
+  {
+    // The crop has to come in, or a levelled frame shows empty corners where
+    // the photograph has been turned out of them.
+    const rf = cropRatioFrac();
+    params.crop = rf ? ratioInscribe(rf) : cropSafeBound();
+  }
+  if (geoMode !== null) {
+    viewFreezeCenter = null;
+    viewZoom = boxFillZoom();
+    positionCropOverlay();
+  }
+  draw();
+  flushRecord(); // one press = one undo step
+  sayLevel(put === 0
+    ? `Already level — nothing to put right (${ms} ms).`
+    : `Levelled by ${Math.abs(put).toFixed(1)}° — on the Straighten slider, yours to nudge or undo.`);
+});
 
 cropResetBtn.addEventListener("click", () => {
   if (!cropArmed) return;
