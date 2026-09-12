@@ -628,16 +628,35 @@ export function cropToDisplayUv(
   straightenDeg: number,
   aspect: number,
 ): [number, number] {
+  const out: [number, number] = [0, 0];
+  cropToDisplayUvInto(tx, ty, crop, straightenDeg, aspect, out);
+  return out;
+}
+
+/** The same mapping, written into an array the caller owns.
+ *
+ *  An export calls this once per output pixel — twenty million times for one
+ *  photograph — and a fresh two-element array on each was pure waste. Same
+ *  arithmetic, character for character; only where the numbers land. */
+export function cropToDisplayUvInto(
+  tx: number,
+  ty: number,
+  crop: CropRect,
+  straightenDeg: number,
+  aspect: number,
+  out: Float64Array | number[],
+): void {
   const lx = crop.x + tx * crop.w;
   const ly = crop.y + ty * crop.h;
-  if (!straightenDeg) return [lx, ly];
+  if (!straightenDeg) { out[0] = lx; out[1] = ly; return; }
   const a = (-straightenDeg * Math.PI) / 180;
   const dx = (lx - 0.5) * aspect;
   const dy = ly - 0.5;
   const cosA = Math.cos(a), sinA = Math.sin(a);
   const rx = dx * cosA - dy * sinA;
   const ry = dx * sinA + dy * cosA;
-  return [rx / aspect + 0.5, ry + 0.5];
+  out[0] = rx / aspect + 0.5;
+  out[1] = ry + 0.5;
 }
 
 /** Inverse of cropToDisplayUv: pre-straighten display uv -> final crop-local

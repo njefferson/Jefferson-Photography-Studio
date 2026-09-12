@@ -87,8 +87,8 @@ export function makeRowDetail(
     if (!row) {
       row = new Float32Array(width);
       for (let x = 0; x < width; x++) {
-        const [r, g, b] = raw(x, cy);
-        row[x] = r * REC[0] + g * REC[1] + b * REC[2];
+        const s = raw(x, cy);
+        row[x] = s[0] * REC[0] + s[1] * REC[1] + s[2] * REC[2];
       }
       lumaRows.set(cy, row);
       while (lumaRows.size > rowSpan) {
@@ -98,6 +98,8 @@ export function makeRowDetail(
     return row;
   };
 
+  // One array for the life of this sampler — see LinearSampler on why.
+  const scratch: [number, number, number] = [0, 0, 0];
   return (x, y) => {
     const c = base(x, y);
     const cx = x < 0 ? 0 : x >= width ? width - 1 : x;
@@ -123,6 +125,9 @@ export function makeRowDetail(
     let gain = 1 + hp / (Lc + DETAIL_EPS);
     if (gain < DETAIL_GAIN_MIN) gain = DETAIL_GAIN_MIN;
     else if (gain > DETAIL_GAIN_MAX) gain = DETAIL_GAIN_MAX;
-    return [c[0] * gain, c[1] * gain, c[2] * gain];
+    scratch[0] = c[0] * gain;
+    scratch[1] = c[1] * gain;
+    scratch[2] = c[2] * gain;
+    return scratch;
   };
 }

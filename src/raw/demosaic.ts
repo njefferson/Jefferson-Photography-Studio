@@ -73,19 +73,28 @@ export function demosaicBinned(
  * Used by the export path where native resolution matters.
  */
 export function demosaicPixelLinear(c: RawCfa, x: number, y: number): [number, number, number] {
+  const out: [number, number, number] = [0, 0, 0];
+  demosaicPixelLinearInto(c, x, y, out);
+  return out;
+}
+
+/** The same pixel, written into an array the caller owns.
+ *
+ *  WHY THERE ARE TWO OF THESE. An export of a 21-megapixel raw calls this once
+ *  per source pixel, and the version above allocated an array AND TWO CLOSURES
+ *  on every one of those calls — sixty-odd million short-lived objects for one
+ *  photograph. The arithmetic below is character for character what it was; the
+ *  only change is where the numbers are put and that `at` and `colorAt` are
+ *  written out rather than built per call. Proven by hashing the exported
+ *  file: identical bytes, measurably less time. */
+export function demosaicPixelLinearInto(c: RawCfa, x: number, y: number, out: [number, number, number] | Float32Array | number[]): void {
   const { cfa, width, height, pattern, black, white } = c;
   const scale = 1 / Math.max(1, white - black);
-  const at = (xx: number, yy: number) => {
-    const cx = xx < 0 ? 0 : xx >= width ? width - 1 : xx;
-    const cy = yy < 0 ? 0 : yy >= height ? height - 1 : yy;
-    return Math.max(0, (cfa[cy * width + cx] - black) * scale);
-  };
-  const colorAt = (xx: number, yy: number) => pattern[(yy & 1) * 2 + (xx & 1)];
-
-  const rgb: [number, number, number] = [0, 0, 0];
   for (let ch = 0; ch < 3; ch++) {
-    if (colorAt(x, y) === ch) {
-      rgb[ch] = at(x, y);
+    if (pattern[(y & 1) * 2 + (x & 1)] === ch) {
+      const cx0 = x < 0 ? 0 : x >= width ? width - 1 : x;
+      const cy0 = y < 0 ? 0 : y >= height ? height - 1 : y;
+      out[ch] = Math.max(0, (cfa[cy0 * width + cx0] - black) * scale);
       continue;
     }
     let sum = 0;
@@ -93,13 +102,15 @@ export function demosaicPixelLinear(c: RawCfa, x: number, y: number): [number, n
     for (let dy = -1; dy <= 1; dy++) {
       for (let dx = -1; dx <= 1; dx++) {
         if (dx === 0 && dy === 0) continue;
-        if (colorAt(x + dx, y + dy) === ch) {
-          sum += at(x + dx, y + dy);
+        const xx = x + dx, yy = y + dy;
+        if (pattern[(yy & 1) * 2 + (xx & 1)] === ch) {
+          const cx = xx < 0 ? 0 : xx >= width ? width - 1 : xx;
+          const cy = yy < 0 ? 0 : yy >= height ? height - 1 : yy;
+          sum += Math.max(0, (cfa[cy * width + cx] - black) * scale);
           n++;
         }
       }
     }
-    rgb[ch] = n ? sum / n : 0;
+    out[ch] = n ? sum / n : 0;
   }
-  return rgb;
 }

@@ -4,7 +4,7 @@ import { wireForceUpdate, wireUpdateStrip, setUpdateCost } from "./swupdate";
 import { type DecodedImage, pickLargestPreview } from "./decode";
 import { decodeOffThread } from "./decodeClient";
 import { Renderer, type EditParams } from "./gl";
-import { exportImage, saveBlob, type ExportFormat } from "./export";
+import { exportImage, saveBlob, lastExportProfile, type ExportFormat } from "./export";
 import { findLocation, stripLocation } from "./gps";
 import { writeZip, crc32 } from "./zip";
 import { putFrame, eachFrame, frameMetas, frameCount, clearFrames } from "./batchstore";
@@ -1655,6 +1655,10 @@ function wireVersionMenu() {
       { k: "Open now", v: current ? `a photo is open${real >= 2 ? ` in a session of ${real}` : ""}` : "nothing open" },
       { k: "Restore depth", v: autoLift ? `on at ${Math.round(liftAmount * 100)}% strength` : "off" },
       { k: "Kept previews", v: kept.rows ? `${kept.rows} (${(kept.bytes / 1e6).toFixed(1)} MB)` : "none" },
+      // WHERE THE LAST EXPORT'S SECONDS WENT. "It takes forever" is the report
+      // that arrives, and a stopwatch cannot say which part; this can, from the
+      // device it actually happened on.
+      { k: "Last export", v: exportSplit() },
     ]);
   };
   tag.addEventListener("click", open);
@@ -8179,6 +8183,15 @@ async function endSession() {
   updateWelcomeReturn(); // current is null now → hide the ✕ / Back controls
   renderMaskOverlay();
   updateSessionResume();
+}
+
+/** The last export's own timing, for the diagnostic — one line, no filenames. */
+function exportSplit(): string {
+  const p = lastExportProfile();
+  if (!p) return "none this session";
+  const s = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
+  return `${p.megapixels.toFixed(1)} MP in ${s(p.total)} — reading ${s(p.source)}, pixels ${s(p.pixels)}` +
+    `, encode ${s(p.encode)}, metadata ${s(p.tag + p.watermark)}, paused ${s(p.yieldMs)} over ${p.yields} yields`;
 }
 
 sessionDone.addEventListener("click", async () => {

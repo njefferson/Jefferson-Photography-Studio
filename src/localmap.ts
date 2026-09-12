@@ -17,7 +17,9 @@ const MAP_W = 256;
 const REC = [0.2126, 0.7152, 0.0722];
 
 export function buildLocalMap(
-  sample: (x: number, y: number) => [number, number, number],
+  /** See LinearSampler in raw/denoise: the array may be reused, and this
+   *  reads it into the map immediately. */
+  sample: (x: number, y: number) => ArrayLike<number>,
   srcW: number,
   srcH: number,
 ): LocalMap {
@@ -29,7 +31,8 @@ export function buildLocalMap(
     const sy = Math.min(srcH - 1, Math.floor(((y + 0.5) * srcH) / H));
     for (let x = 0; x < W; x++) {
       const sx = Math.min(srcW - 1, Math.floor(((x + 0.5) * srcW) / W));
-      const [r, g, b] = sample(sx, sy);
+      const s = sample(sx, sy);
+      const r = s[0], g = s[1], b = s[2];
       luma[y * W + x] = r * REC[0] + g * REC[1] + b * REC[2];
       dark[y * W + x] = Math.min(r, g, b);
     }
