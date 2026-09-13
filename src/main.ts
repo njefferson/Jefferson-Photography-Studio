@@ -5,7 +5,7 @@ import { type DecodedImage, pickLargestPreview, linearAt } from "./decode";
 import { decodeOffThread, decodeLanes } from "./decodeClient";
 import { Renderer, type EditParams } from "./gl";
 import { exportImage, saveBlob, lastExportProfile, getSource, proxyFactorFor, type ExportFormat } from "./export";
-import { buildLinearSource } from "./gpuexport";
+import { buildLinearSourceInBands } from "./gpuexport";
 import { fromHalf } from "./half";
 import { findLocation, stripLocation } from "./gps";
 import { writeZip, crc32 } from "./zip";
@@ -5109,6 +5109,7 @@ let healPreviewTimer = 0;
  *  and schedule a repaint, which re-bakes params.spots on the way. */
 function uploadPreview() {
   if (!current) return;
+  nativeGen++;                       // anything still building belongs to the old photograph
   previewSrc = toPreview(current);
   // THE TAP SCALE IS PART OF THE UPLOAD, NOT A SEPARATE STEP. The noise
   // reduction and the sharpening measure their footprint in texels of whatever
@@ -5125,6 +5126,60 @@ function uploadPreview() {
   bakedScreen = [];
   bakedWarpRev = -1;
   draw();
+  void upgradeToNativeResolution(nativeGen);
+}
+
+/** Which photograph the native-resolution build in flight belongs to. Bumped by
+ *  every upload, so a build that finishes after the reader has moved on knows to
+ *  throw its work away rather than paint it over somebody else's picture. */
+let nativeGen = 0;
+
+/** THE PHOTOGRAPH SHARPENS BEHIND ITSELF.
+ *
+ *  The editor has always worked on a half-size copy of a raw. Holding the whole
+ *  frame instead makes the preview and the export the same pixels at the same
+ *  scale, which retires a whole class of defect — but building it costs half a
+ *  second to a second on the devices measured for a 5-megapixel practice file,
+ *  so two to three for one from the camera. Paying that before anything appears
+ *  would be a wait on every photograph in exchange for something the reader
+ *  cannot see directly, which is not a trade worth offering.
+ *
+ *  So the proxy goes up first, exactly as fast as it always has, and this
+ *  replaces it when the real thing is ready. The same discipline the session
+ *  strip already uses: show it now, fill it in after. */
+async function upgradeToNativeResolution(gen: number): Promise<void> {
+  if (!current || !currentFile) return;
+  if (previewSrc?.linear16) return;                      // already native
+  const file = currentFile, img = current;
+  try {
+    const src = getSource(file, img);
+    if (!("cfa" in src)) return;                         // not a mosaiced raw
+    const { width, height } = src.cfa;
+    if ((width * height) / 1e6 > NATIVE_MAX_MP) return;  // memory, not the surface
+    const built = await buildLinearSourceInBands(file, img, { shouldStop: () => gen !== nativeGen });
+    if (!built || gen !== nativeGen || !current) return;
+    previewSrc = built.image;
+    previewW = built.image.width;
+    previewH = built.image.height;
+    previewTapScale = proxyFactorFor(src, width, height);
+    renderer.setTapScale(previewTapScale);
+    renderer.setImage(previewSrc);
+    renderer.setOverlaySize(previewSrc.width, previewSrc.height);
+    // The texture is new, so everything baked into the old one is gone. Same
+    // reset uploadPreview does — a stale "already baked" flag here would leave
+    // a reader's heals and stickers silently missing from the sharper picture.
+    bakedSpots = [];
+    bakedStickers = [];
+    bakedNormal = [];
+    bakedScreen = [];
+    bakedOccSig = "";
+    bakedWarpRev = -1;
+    draw();
+  } catch (err) {
+    // The proxy is already on screen and correct; a failure here costs
+    // sharpness, never the photograph.
+    console.warn("native-resolution working copy unavailable, staying on the proxy:", err);
+  }
 }
 
 /** Re-bake the heal spots into the texture when they changed. Every affected
@@ -10621,34 +10676,6 @@ function toPreview(img: DecodedImage): { width: number; height: number; pixels?:
   previewW = img.width;
   previewH = img.height;
   previewTapScale = 1;
-  // THE WORKING COPY AT NATIVE RESOLUTION — for mosaiced raws, which are the
-  // only sources the editor has ever downscaled for reasons other than a
-  // drawing-buffer limit. Measured on three devices: drawing from a
-  // full-resolution texture is never slower than from the half-size proxy and
-  // is faster on the iPad with the fewest cores; half precision costs 0.018 of
-  // 255 and halves the memory. What it BUYS is that the preview and the export
-  // become the same pixels at the same scale.
-  if (currentFile) {
-    try {
-      const src = getSource(currentFile, img);
-      if ("cfa" in src) {
-        const fw = src.cfa.width, fh = src.cfa.height;
-        if ((fw * fh) / 1e6 <= NATIVE_MAX_MP) {
-          const built = buildLinearSource(currentFile, img, true);
-          if (built.image.linear16) {
-            previewW = built.image.width;
-            previewH = built.image.height;
-            previewTapScale = proxyFactorFor(src, fw, fh);
-            return built.image as { width: number; height: number; linear16: Uint16Array; camMatrix?: number[] };
-          }
-        }
-      }
-    } catch (err) {
-      // A raw this path cannot read is not a reason to fail to show the
-      // photograph — the binned proxy below has always worked. Say so once.
-      console.warn("native-resolution working copy unavailable, using the proxy:", err);
-    }
-  }
   if (!img.pixels || Math.max(img.width, img.height) <= MAX_PREVIEW) return img;
   const s = MAX_PREVIEW / Math.max(img.width, img.height);
   const w = Math.max(1, Math.round(img.width * s));
