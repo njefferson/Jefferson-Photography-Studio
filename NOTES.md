@@ -626,16 +626,6 @@ user-scalable=no.
   segmentation needs an on-device ML model (WebGPU — the "frontier" backlog
   item); there is no classical stand-in the way sky had one. Architect as a mask
   type so it slots into the same engine when ready.
-- [ ] **High-contrast modes — forced-colors and prefers-contrast** — a11y
-  audit 2026-07-17. Low-likelihood platform (Windows High Contrast; the
-  owner is iPad-first) but cheap insurance: active/selected states are
-  bg-fill-only and vanish when forced-colors strips backgrounds. Add an
-  @media (forced-colors: active) block giving active states a visible
-  border/underline, and a prefers-contrast: more bump for --line/--txt-3.
-- [ ] **Manifest screenshots** — repo audit 2026-07-17: add real screenshots
-  to manifest.webmanifest for richer install/share sheets. Generate via the
-  headless-Chromium pipeline (same as icons) from a good open-photo state;
-  needs curated assets, so deferred from the setup pass.
 - [ ] **Tiles for a photo you have not opened yet** — measured 2026-09-12 and
   written up under "the strip's tiles". A tile for a photo you HAVE opened
   matches the photograph to 0.004 on a centre-against-edge measure; one you have
@@ -805,6 +795,38 @@ user-scalable=no.
   Two platform-specific things moved rather than shrank: the welcome screen's
   iCloud paragraph is now shown only on iOS, and the Files-picker Help section
   says at the top that it is an iPhone and iPad matter.
+
+- [x] **High-contrast modes — forced-colors and prefers-contrast** — SHIPPED
+  2026-09-13. Of the five places this app shows "this one is selected", FOUR
+  already changed text weight as well as fill and survived a forced-colors
+  strip. The fifth was the **session strip** — which photograph you are editing
+  was a background fill alone, so in high contrast it said nothing, and it is
+  the worst of the five to lose. Selected states now also carry an outline in
+  the system highlight colour. The scope was measured rather than assumed: the
+  note that prompted it said every active state was affected, and one was.
+  The first version of the test passed with the fix turned off, because it
+  happened to check one of the four that were already fine.
+
+- [x] **Manifest screenshots** — SHIPPED 2026-09-13, all three apps, both
+  shapes, shot headlessly from the app itself so they cannot drift from what it
+  looks like. **Not precached** — the browser's install dialog reads them and
+  the app never does, so bundling them put half a megabyte into every install
+  and every release's fresh cache, and `addAll` is all-or-nothing, which makes
+  them half a megabyte of new ways for an install to fail on a thin connection.
+  Same exclusion the social-share images already had.
+  **`tools/manifest-shots-check.mjs` is the gate, and it reads the BYTES.**
+  Every field in a screenshot entry is a claim — that the file is there, that it
+  is the type and the SIZE it says — and a wrong one is refused in silence: the
+  browser drops the entry and shows the plain prompt, which is indistinguishable
+  from never having added screenshots. It parses the JPEG segment chain for the
+  real dimensions, checks both directions, and refuses a manifest that offers
+  only one form factor. Wired into `.branch-guard`'s `also=`.
+  **Two of the six were caught showing the wrong thing before they shipped.**
+  The launcher pair had the first-visit welcome dialog open over the tool cards
+  — a modal is not the product — and the Macro pair started as an error message,
+  because the shot script fed a RAW to a tool that takes JPEGs. The launcher
+  walk now refuses to save a frame with `dialog[open]` in it, and the Macro one
+  refuses a frame still on the start panel.
 
 ## Shipped (roadmap archive)
 
