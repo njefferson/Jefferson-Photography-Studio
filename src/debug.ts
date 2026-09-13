@@ -575,13 +575,27 @@ async function sameEverywhere(): Promise<void> {
     const frac = Math.min(1, Math.sqrt(5e5 / (img.width * img.height)));
     params.crop = { x: (1 - frac) / 2, y: (1 - frac) / 2, w: frac, h: frac };
     const t0 = performance.now();
-    const out = await exportImage({ name: "practice.dng", kind: sniff(bytes), bytes, looksTranscoded: false }, img, params, { format: "jpeg", scale: 1, quality: 0.92 });
+    const pfile = { name: "practice.dng", kind: sniff(bytes), bytes, looksTranscoded: false };
+    const out = await exportImage(pfile, img, params, { format: "jpeg", scale: 1, quality: 0.92 });
     const buf = new Uint8Array(await out.blob.arrayBuffer());
     let f = 0x811c9dc5;
     for (let i = 0; i < buf.length; i++) { f ^= buf[i]; f = Math.imul(f, 0x01000193); }
+    // THE PIXELS, SEPARATELY FROM THE FILE, because the first comparison across
+    // two engines came back 158328ac at 728 KB against e5ac8a29 at 504 KB — a
+    // 44% difference in SIZE at the same quality setting, which is the browsers'
+    // own JPEG encoders disagreeing and says nothing about the photograph. This
+    // is the same export stopped before it is encoded, so two devices can tell
+    // whether their pipelines compute the same picture even when their encoders
+    // will never write the same file.
+    const rawOut = await exportImage(pfile, img, params, { format: "jpeg", scale: 1, quality: 0.92, raw: true });
+    let g = 0x811c9dc5;
+    const rd = rawOut.data;
+    if (rd) for (let i = 0; i < rd.length; i++) { g ^= rd[i]; g = Math.imul(g, 0x01000193); }
     p.remove();
+    row("A practice photograph, its pixels", rd ? `${hex(g)} · ${(rd.length / 4 / 1e6).toFixed(2)} MP` : "not produced",
+      "The same export, stopped before the browser encodes it. THIS is the honest test of whether two devices compute the same photograph: the line below is the finished file, and a browser's JPEG encoder is its own, so two devices can agree here and still write files of different sizes.");
     row("A practice photograph, exported", `${hex(f)} · ${(buf.length / 1024).toFixed(0)} KB · ${((performance.now() - t0) / 1000).toFixed(1)}s`,
-      "The app's own bundled practice file, exported at about a megapixel with a fixed edit — the same input on every device, so the fingerprint is comparable. Two devices printing the same one export identically today; two that differ do not, and never did.");
+      "The finished file. Measured across two engines it came back 44% different in SIZE at the same quality — their JPEG encoders are not the same encoder. So a file that is byte-identical everywhere was never something this app offered, whatever the pixels do.");
   } catch (e) {
     p.remove();
     row("A practice photograph, exported", "not run", `It could not be exported here (${(e as Error).message}).`);
