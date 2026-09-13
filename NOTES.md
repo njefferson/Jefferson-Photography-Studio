@@ -11833,3 +11833,39 @@ deterministic conversion should look like.
 iPad 32 ms against the proxy's 37; 8-core iPad 17 against 16; desktop 10 against
 11. Level everywhere, and the full-resolution frame is now built in bands behind
 the photograph rather than before it.
+
+## 2026-09-13 — the footprint sweep, at the right resolution, over four frames
+
+**THE HALVED-FOOTPRINT PLANT, MEASURED AT THE CANVAS'S OWN RESOLUTION:**
+
+- NIR_0063 — average **0.995** of 255, worst 59, **33,296** pixels over 8
+  (0.64%), 669 over 24;
+- NIR_0152 — average **1.925**, worst 124, **135,643** over 8 (2.60%), 1,319
+  over 24;
+- NIR_1675 — average **1.620**, worst 85, **137,777** over 8 (2.64%), 2,692 over
+  24 (the portrait frame, 1864x2800);
+- NIR_1873 — average **2.519**, worst 79, **257,632** over 8 (4.94%), 4,971 over
+  24.
+
+**AGAINST WHAT THE SAME PLANT MEASURED BEFORE: 0.229 of 255, worst 6, ZERO
+pixels over 8.** The downsample to 700 pixels was hiding essentially the whole
+effect — sixteen source pixels averaged into every sample, and a halved denoise
+and sharpen footprint is precisely what lives inside that average.
+
+**AND THE ONE FRAME IN THE FIXTURE WAS THE LEAST SENSITIVE OF THE FOUR.**
+NIR_0063 shows 0.64% of pixels over 8; NIR_1873 shows 4.94% — nearly eight times
+as much. Verifying on the single frame that happened to be there, even at the
+right resolution, would have reported the smallest signal available as though it
+were the measurement. That is the test-set rule from Doctrine §14 arriving as a
+number rather than a principle.
+
+**WHAT THIS PROVES AND WHAT IT DOES NOT.** It proves the tap scale is
+load-bearing and that what ships is not the halved value — the sweep separates
+correct from planted on every frame, by margins from 33,000 to 257,000 pixels.
+It does NOT prove the shipped value is exactly right; a test that distinguishes
+a value from one wrong value is not a test that the value is correct. The reason
+to believe it is right is separate and should be stated as such: `proxyFactorFor`
+is the same function the computed export already uses to reproduce the proxy's
+footprint, and the test page's drawn-against-computed comparison — which runs
+through the same tap scale — still reports 0.66 of 255 with the operators on,
+unchanged from before the working copy existed.
