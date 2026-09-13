@@ -2987,6 +2987,24 @@ body.dbg { margin: 0; background: var(--bg); color: var(--txt); font: 400 1rem/1
   font: 0.9375rem/1.3 var(--ui);
 }
 .help-find-count { margin: 6px 2px 0; color: var(--txt-3); font-size: 0.8125rem; min-height: 1.1em; }
+/* A sub-section inside a long Help section. Indented and lighter than the
+   section above it so the nesting reads without a rule or a fill — the same
+   reason the marked install row is words and weight rather than a colour. */
+.help-sub {
+  margin: 0.5rem 0 0.5rem 0.6rem;
+  padding-left: 0.7rem;
+  border-left: 2px solid var(--line-2);
+}
+.help-sub > summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--txt-2);
+}
+.help-sub[open] > summary { color: var(--txt); }
+
 /* A Help section that is only true on some platforms says so at the top, in
    words. Not a colour and not an icon — the rule here is that meaning never
    rides on colour alone, and this sentence has to survive being read aloud and

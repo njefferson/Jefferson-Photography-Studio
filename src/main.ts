@@ -11084,6 +11084,10 @@ setupInstallFromApp("irInstallFromApp");
   const input = document.getElementById("helpFilter") as HTMLInputElement | null;
   const count = document.getElementById("helpFilterCount");
   const secs = [...document.querySelectorAll<HTMLDetailsElement>("details.help-sec")];
+  // The sub-sections a long section is split into. A match inside one of these
+  // is a match in its parent too, so `secs` still decides which sections show;
+  // these decide which part of a shown section is open.
+  const subs = [...document.querySelectorAll<HTMLDetailsElement>("details.help-sub")];
   if (input && count && secs.length) {
     // What each section was showing before a filter touched it, so clearing the
     // box restores the reader's own state rather than a default.
@@ -11094,18 +11098,30 @@ setupInstallFromApp("irInstallFromApp");
       if (!q) {
         if (filtering) {
           filtering = false;
-          for (const d of secs) { d.hidden = false; d.open = wasOpen.get(d) ?? false; }
+          for (const d of [...secs, ...subs]) { d.hidden = false; d.open = wasOpen.get(d) ?? false; }
         }
         count.textContent = "";
         return;
       }
-      if (!filtering) { filtering = true; for (const d of secs) wasOpen.set(d, d.open); }
+      if (!filtering) {
+        filtering = true;
+        for (const d of secs) wasOpen.set(d, d.open);
+        for (const d of subs) wasOpen.set(d, d.open);
+      }
       let hits = 0;
       for (const d of secs) {
         const hit = (d.textContent ?? "").toLowerCase().includes(q);
         d.hidden = !hit;
         d.open = hit;
         if (hit) hits++;
+      }
+      // AND THE SUB-SECTIONS INSIDE A MATCH. Opening only the outer one leaves
+      // the reader looking at four closed headings with no clue which holds the
+      // word they typed, which is the scroll the filter exists to replace.
+      for (const d of subs) {
+        const hit = (d.textContent ?? "").toLowerCase().includes(q);
+        d.hidden = !hit;
+        d.open = hit;
       }
       count.textContent = hits === 0
         ? `Nothing here matches “${input.value.trim()}”. Try a shorter word.`
