@@ -13,6 +13,7 @@ import { buildDiagnostic } from "./diagnostic";
 import { decode } from "./decode";
 import { decodeOffThread } from "./decodeClient";
 import { sniff } from "./import";
+import { workerCount } from "./exportparallel";
 
 declare const __APP_VERSION__: string;
 
@@ -256,6 +257,151 @@ async function storage(): Promise<void> {
   }
 }
 
+/** COULD THE EXPORT RUN ON THE GRAPHICS CHIP INSTEAD? Asked here because it
+ *  cannot be asked anywhere else.
+ *
+ *  The editor's live view already runs the whole edit as shaders — noise
+ *  reduction, sharpen, texture, clarity, dehaze, halation, grain, vignette, the
+ *  hot-spot and lens corrections, the LUT and the perspective warp. The export
+ *  re-implements every one of them on the processor, and both files carry
+ *  comments asking whoever edits one to keep the numbers in step with the other
+ *  by hand. Drawing the export instead would be faster and would end that
+ *  duplication — but only if this device can hold a whole photograph in one
+ *  texture, draw to it off the main thread, and read it back without the
+ *  readback costing more than the drawing saved.
+ *
+ *  A desktop container answers none of that: it has a software rasteriser, so
+ *  every number it gives is a measurement of software pretending to be a
+ *  graphics chip. */
+async function exportOnTheGpu(): Promise<void> {
+  const p = note("Asking what this device's graphics chip could do with an export…");
+  // A real frame from the camera this app is built around.
+  const FW = 5600, FH = 3728;
+  const cv = document.createElement("canvas");
+  cv.width = 64; cv.height = 64;
+  const gl = cv.getContext("webgl2");
+  if (!gl) { p.remove(); row("An export on the graphics chip", "WebGL2 unavailable", "Not possible on this device."); return; }
+  const maxTex = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
+  const floatOk = !!gl.getExtension("EXT_color_buffer_float");
+  row("Largest texture", `${maxTex} px`, maxTex >= FW
+    ? `A whole ${FW}x${FH} frame fits in one texture here, so an export could be drawn in a single pass.`
+    : `A ${FW}x${FH} frame does NOT fit — an export would have to be drawn in ${Math.ceil(FW / maxTex) * Math.ceil(FH / maxTex)} pieces and joined, which is ordinary but is work.`);
+  row("16-bit and float drawing", floatOk ? "available" : "not available", floatOk
+    ? "The print-master (TIFF) path could be drawn as well as the JPEG one, and intermediate steps keep their precision."
+    : "Drawing could still produce a JPEG, but a 16-bit print master would have to stay on the processor.");
+
+  // THE MEASUREMENT THAT DECIDES IT: draw a frame-sized target with arithmetic
+  // in every pixel, then read every pixel back, which is what an export must do
+  // and what a live preview never does.
+  const W = Math.min(FW, maxTex), H = Math.min(FH, maxTex);
+  try {
+    const tex = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, W, H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    const fb = gl.createFramebuffer()!;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error("a frame-sized drawing target was refused");
+    gl.viewport(0, 0, W, H);
+    const vs = `#version 300 es
+      void main(){ vec2 q[3] = vec2[3](vec2(-1.,-1.),vec2(3.,-1.),vec2(-1.,3.)); gl_Position = vec4(q[gl_VertexID],0.,1.); }`;
+    // Twenty-five weighted taps with an exponential in each is what the noise
+    // reduction does per pixel, and it is 60% of an export. Standing in for it
+    // rather than for an empty draw is the whole point.
+    const fs = `#version 300 es
+      precision highp float; out vec4 o;
+      void main(){ vec3 c = vec3(0.); float w = 0.;
+        for (int i=-2;i<=2;i++) for (int j=-2;j<=2;j++) {
+          float d = float(i*i + j*j);
+          float k = exp(-d * 0.35);
+          c += k * vec3(fract(sin((gl_FragCoord.x+float(i))*12.9898 + (gl_FragCoord.y+float(j))*78.233) * 43758.5453));
+          w += k; }
+        o = vec4(c / w, 1.); }`;
+    const mk = (t: number, src: string) => { const sh = gl.createShader(t)!; gl.shaderSource(sh, src); gl.compileShader(sh); return sh; };
+    const prog = gl.createProgram()!;
+    gl.attachShader(prog, mk(gl.VERTEX_SHADER, vs));
+    gl.attachShader(prog, mk(gl.FRAGMENT_SHADER, fs));
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error("the test shader would not link");
+    gl.useProgram(prog);
+    gl.drawArrays(gl.TRIANGLES, 0, 3); // warm-up, not timed
+    gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));
+    await tick();
+
+    const t0 = performance.now();
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.finish();
+    const t1 = performance.now();
+    // Read back in bands, the way an export would, so a device that cannot
+    // allocate one 84 MB buffer still answers.
+    const BANDS = 4;
+    const bandH = Math.ceil(H / BANDS);
+    const buf = new Uint8Array(W * bandH * 4);
+    for (let b = 0; b < BANDS; b++) {
+      const y = b * bandH, h = Math.min(bandH, H - y);
+      if (h > 0) gl.readPixels(0, y, W, h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+    }
+    const t2 = performance.now();
+    gl.deleteProgram(prog);
+    gl.deleteFramebuffer(fb);
+    gl.deleteTexture(tex);
+    p.remove();
+    const draw = t1 - t0, read = t2 - t1;
+    row("Drawing a whole photograph", ms(draw),
+      `${(W * H / 1e6).toFixed(1)} megapixels with twenty-five weighted taps in every pixel — the shape of the work the noise reduction does, which is about 60% of an export.`);
+    row("Reading it back", ms(read),
+      `An export has to bring every pixel back to be written into a file; the live view never does. Drawing and reading together: ${ms(draw + read)}.`);
+    row("What that would mean", `about ${((draw + read) / 1000).toFixed(1)} s`,
+      `Against the ${(W * H / 1e6).toFixed(1)}-megapixel export this app measures on its own processor path. If this number is seconds rather than tens of seconds, moving the export onto the graphics chip is worth building — and it would also end the two hand-kept copies of the edit. If it is not, the processor path stays and this answered it.`);
+  } catch (err) {
+    p.remove();
+    row("An export on the graphics chip", "refused", `This device would not do it: ${String((err as Error)?.message ?? err)}. That is an answer, not a failure — it means the export stays on the processor here.`);
+  }
+
+  // AND OFF THE MAIN THREAD? A full-resolution draw on the main thread freezes
+  // the editor for its duration, which is what the threaded export was built to
+  // stop doing.
+  const wp = note("Asking whether a background thread can draw…");
+  try {
+    const w = new Worker(new URL("./glprobe.worker.ts", import.meta.url), { type: "module" });
+    const res = await new Promise<{ ok: boolean; maxTexture: number; float: boolean; note: string }>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("no answer in ten seconds")), 10000);
+      w.onmessage = (e) => { clearTimeout(timer); resolve(e.data); };
+      w.onerror = () => { clearTimeout(timer); reject(new Error("the background thread would not start")); };
+      w.postMessage({});
+    }).finally(() => w.terminate());
+    wp.remove();
+    row("Drawing in the background", res.ok ? "available" : "not available",
+      res.ok
+        ? `${res.note} — largest texture there ${res.maxTexture} px${res.float ? ", float drawing too" : ""}. An export could be drawn without the editor freezing.`
+        : `${res.note}. A drawn export would have to happen on the main thread here, which would freeze the editor while it ran.`);
+  } catch (err) {
+    wp.remove();
+    row("Drawing in the background", "not available", `${String((err as Error)?.message ?? err)}. A drawn export would freeze the editor on this device.`);
+  }
+}
+
+/** HOW MANY THREADS THIS DEVICE GIVES THE EXPORT, and what it decided. The
+ *  export splits a photograph across cores and then removes threads until the
+ *  memory they would need fits a budget — a tablet kills the tab rather than
+ *  swapping. Which of those two decided the answer is invisible from outside,
+ *  and it is the first thing to know when an export is slower here than the
+ *  numbers say. */
+function threads(): void {
+  const cores = navigator.hardwareConcurrency || 0;
+  // The file the numbers in the release notes were measured on.
+  const job = { fileBytes: 26.1e6, srcPixels: 5600 * 3728, outPixels: 5600 * 3728 };
+  const n = workerCount(job);
+  const big = workerCount({ fileBytes: 55e6, srcPixels: 8256 * 5504, outPixels: 8256 * 5504 });
+  row("Cores this browser admits to", cores ? String(cores) : "not reported",
+    cores ? "The export keeps one for the interface and splits the rest of the work." : "Without a number the export assumes two.");
+  row("Threads a 21-megapixel export would use", n === 1 ? "one — it would not split" : String(n),
+    n === 1
+      ? "Either this browser has no background threads, or the memory each would need does not fit the budget. The export runs as it always did."
+      : `Each one holds its own copy of the file and its own decode of it. A 45-megapixel raw would get ${big === 1 ? "none — it would not split" : big}.`);
+}
+
 ($("dRun") as HTMLButtonElement).addEventListener("click", async (e) => {
   const btn = e.currentTarget as HTMLButtonElement;
   btn.disabled = true;
@@ -266,6 +412,8 @@ async function storage(): Promise<void> {
   // and it is what "Copy the results" puts above them.
   await refreshReport();
   await graphics();
+  threads();
+  await exportOnTheGpu();
   await decoding();
   await storage();
   btn.textContent = "Run again";
