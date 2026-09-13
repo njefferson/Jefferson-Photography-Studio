@@ -11913,3 +11913,40 @@ the export becomes a readback of the preview — and the drawn export is per-chi
 settled tonight. Until that is built, the full-resolution working copy buys
 zoomed-in detail and nothing else. It was a real argument about a future state
 being used as though it were a present one.
+
+## 2026-09-13 — adding the settle delay silently disarmed the test that guards the swap
+
+**THE RACE TEST SWITCHED PHOTOGRAPHS 300 MS APART.** That was correct when the
+rebuild started the moment a photograph opened. Adding the 1.2-second settle
+delay meant photograph 0's build never STARTED before the switch — so the guard
+against a finished build painting over the wrong picture was not exercised at
+all, and the test went green for the wrong reason. Nothing failed. Nothing
+warned. A passing test whose trigger condition had been removed underneath it.
+
+Fixed by waiting 2.6 seconds — past the delay and into the work — before
+switching. It passes again, and now for the reason it claims.
+
+**BE PRECISE ABOUT WHAT THAT PASS RESTS ON.** The test does not directly assert
+that the build was in flight at the moment of the switch; it infers it. The
+chain: the reference captures at the top of the same run show both photographs
+reaching native resolution when left alone, so the upgrade does start and
+finish; 2.6 seconds exceeds the 1.2-second delay; therefore the build was
+running when the switch happened. Sound, and inference rather than assertion —
+recorded as such so the next session does not read it as stronger than it is.
+
+**THIS IS THE FOURTH SHAPE OF THE SAME FAILURE IN ONE SESSION**, and the pattern
+is worth more than any of the instances:
+
+- a plant applied by string that landed in a DIFFERENT function with the same
+  constant name, and the clean run read as "the probe is fine";
+- a plant that did not COMPILE, so the negative control ran against the correct
+  build and would have been read as the test having teeth;
+- a comparison sampled at 700 pixels from a 2,800-wide canvas, which reported a
+  planted defect as zero pixels over 8 because the defect lives in exactly the
+  detail that downsampling averages away;
+- and this one: a guard's trigger condition changed by an unrelated improvement,
+  leaving its test passing while measuring nothing.
+
+**Every one of them looked like a pass.** None of them failed, errored, or
+warned. The only thing that caught any of them was going back and asking what
+the green actually proved — which is the habit, not any particular check.
