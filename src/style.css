@@ -2238,6 +2238,10 @@ label.open-btn, label.bar-btn {
 .mask-editor-actions { display: flex; gap: 6px; margin-top: 8px; }
 .mask-editor-actions button { width: auto; padding: 6px 12px; font-size: 0.8125rem; }
 
+/* The lost-graphics overlay shares the unsupported card's look, because it is
+   the same kind of moment: something outside the reader's control stopped the
+   editor working, and what they need is what happened and what fixes it. */
+#glLost,
 #unsupported {
   position: fixed;
   inset: 0;
@@ -2247,6 +2251,15 @@ label.open-btn, label.bar-btn {
   justify-content: center;
   background: var(--bg);
   padding: 24px;
+}
+/* The ONE control on a screen a reader reaches when nothing else works, so it
+   is held to the touch minimum explicitly rather than inheriting whatever .btn
+   happens to be. It measured 34px — under the 44px floor — and nothing caught
+   that until a test drove the real failure and looked at the button. */
+#glLostReload {
+  min-height: 44px;
+  padding-inline: 18px;
+  font-size: 0.9375rem;
 }
 .unsupported-card {
   max-width: 480px;

@@ -641,6 +641,22 @@
       </aside>
     </div>
 
+    <!-- THE GRAPHICS GOING AWAY MID-SESSION. Same shape as the overlay below,
+         because it is the same kind of moment: something outside the reader's
+         control has stopped the editor working, and the useful thing to give
+         them is what happened and what fixes it. Silence here meant a blank
+         space where the photograph had been, with the strip and the histogram
+         beside it looking perfectly normal, and clearing the session not
+         helping — because a session does not make a new graphics context. -->
+    <div id="glLost" hidden>
+      <div class="unsupported-card">
+        <h2>The photo can't be drawn right now</h2>
+        <p>The browser took back the graphics this editor draws with. That usually means it ran short of memory, or the tab sat in the background too long.</p>
+        <p><strong>Reloading the page fixes it.</strong> Your saved photos and looks are untouched — but anything open and unsaved in this session will be lost, which is why this is asking rather than doing it.</p>
+        <p><button id="glLostReload" type="button" class="btn primary">Reload the page</button></p>
+        <p>If it keeps happening, opening fewer photographs at once is the thing most likely to help.</p>
+      </div>
+    </div>
     <div id="unsupported" hidden>
       <div class="unsupported-card">
         <h2>This browser can't run the editor</h2>
