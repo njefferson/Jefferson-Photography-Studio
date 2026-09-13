@@ -12288,3 +12288,33 @@ LAST now, after every worker has been questioned.
 Third variant of one error today: a number true in isolation reported as a number
 under load; a total across twelve tabs reported as an on-screen quantity; and now
 two moments reported as one. Each time the individual facts were correct.
+
+## 2026-09-13 — forced-colors: one state in five was genuinely invisible, and it was the session strip
+
+**THE ROADMAP ITEM SAID "active/selected states are bg-fill-only and vanish".**
+Measured under Chromium's forced-colors emulation, with the new block disabled,
+across five state pairs:
+
+- editor tabs — `[weight]`, already distinguishable;
+- crop ratio chips — `[bg, weight]`, fine;
+- mix chips — `[bg, weight]`, fine;
+- top-bar toggles — `[bg, weight]`, fine;
+- **session strip — `[NOTHING]`.**
+
+So the premise was true of ONE of five. Four already carried `font-weight: 700`
+alongside the fill, which survives forced colours; the audit generalised from a
+pattern that mostly was not there. **And the one that was broken is the worst
+one to lose** — the session strip is how a reader knows which photograph they
+are editing, and in forced colours it told them nothing at all.
+
+With the block in place the strip differs by `[outline, weight, border, color]`.
+
+**THE FIRST VERSION OF THIS TEST HAD NO TEETH AND PASSED ANYWAY.** It checked a
+single element — a tab — and passed with the fix disabled, because that tab was
+one of the four that never needed fixing. One element is a test set (Doctrine
+§14), and the useful output here was never "pass" but WHICH ONES, which only a
+per-element sweep can say.
+
+Worth keeping about the shape: the fix is right, the item's reasoning was not,
+and both facts matter. Shipping it while believing "every state was broken"
+would have left the next session with a false model of the stylesheet.
