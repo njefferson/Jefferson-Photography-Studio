@@ -11785,3 +11785,51 @@ export's dependence on the machine actually lives. Its value alone says nothing
 The operators-on drawn fingerprint stays `fe3da8c6` on this machine, the
 computed pixels stay `7afc9c2a`, and the saved file stays `e5ac8a29` at 504 KB —
 all unchanged across every release tonight, which is the point of taking them.
+
+## 2026-09-13 — the locating fingerprint came back and killed the hypothesis it was built to test
+
+**THREE DEVICES, THREE VALUES, AND THE TWO IPADS DIFFER FROM EACH OTHER.**
+With the noise reduction and sharpening OFF — colour pipeline only, no
+neighbourhood operators anywhere in it — the drawn frame fingerprints
+`643772fa` on the desktop, `85ea2da9` on the 8-core iPad and `9f4f8282` on the
+4-core iPad. The last two are the same browser, the same engine and the same GPU
+family.
+
+**So the hope is dead, and it was stated in advance which result would kill
+it.** The proposition was that everything tying a drawn export to the machine
+lives inside those two operators, and that fixing them would make a drawn export
+as reproducible as today's computed one. It does not and it would not. The
+colour half — white balance, the camera matrix, highlight recovery, the hot-spot
+and lens corrections, tone, saturation, contrast, the channel mix, the
+wide-gamut conversion — is already per-chip at the bit level. **A drawn export
+can never be byte-reproducible across machines, and no bounded piece of work
+changes that.**
+
+**WHAT THE EARLIER READING GOT WRONG, AND IT WAS A REAL ERROR.** Two renderers
+reporting identical difference STATISTICS was read as one systematic difference
+reproduced by both. The statistics are identical; the frames are not. Identical
+aggregate numbers over two million pixels and a differing hash mean the frames
+differ in a handful of pixels — which is what was concluded about the iPads'
+operators-ON frames an hour earlier and should have been concluded here too. The
+same mistake, in the same session, about the same pair of measurements: a
+fingerprint answers identical-or-not, and aggregates answer how far, and neither
+one answers the other's question.
+
+**IT CHANGES NOTHING ABOUT WHETHER TO DRAW THE EXPORT.** The magnitudes are
+unchanged and still invisible: on the iPads, **152 pixels over 8 of 255 and 31
+over 24, out of 1,999,882**, with the noise reduction and sharpening off; 388
+over 24 with them on. What it changes is that "drawn AND identical everywhere"
+was never on the table, so it must not be offered, planned for, or implied. The
+honest statement stays the one measured: a drawn export is that machine's own,
+by an amount nobody can see.
+
+**AND THE ROUNDING FIX IS CONFIRMED ON ALL THREE DEVICES.** `What half the
+memory costs the picture` reads **0.010 of 255** on the desktop and both iPads,
+against 0.018 on every run before `half.ts` began rounding to nearest. Same
+value on three different graphics chips and two engines, which is what a
+deterministic conversion should look like.
+
+**Frame times, with the source the app actually ships (half precision):** 4-core
+iPad 32 ms against the proxy's 37; 8-core iPad 17 against 16; desktop 10 against
+11. Level everywhere, and the full-resolution frame is now built in bands behind
+the photograph rather than before it.
