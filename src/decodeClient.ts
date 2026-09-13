@@ -155,3 +155,15 @@ export function decodeOffThread(file: ImportedFile): Promise<DecodedImage> {
 export function decodeLanes(): number {
   return lanes.length;
 }
+
+/** HOW MANY THIS DEVICE WILL RUN, without starting any.
+ *
+ *  `decodeLanes` reports how many are ALIVE, which is zero until something
+ *  decodes — and a caller sizing its own concurrency before the first decode
+ *  read that zero and ran one at a time, which is the queue this pool exists to
+ *  remove. The diagnostic deliberately reports the live count (it must not
+ *  spawn workers to describe the app); a caller about to spawn them wants the
+ *  planned one. */
+export function decodeLaneTarget(): number {
+  return lanes.length || laneCount();
+}

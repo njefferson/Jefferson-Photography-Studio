@@ -662,6 +662,11 @@ user-scalable=no.
   ever switched; reading `#fileName`, which is not what names the open photo;
   and a MutationObserver watching `src` ATTRIBUTES when a redraw replaces the
   whole `<img>` node.
+- [ ] **The version menu runs the full width of the screen** — reported
+  2026-09-13. Pressing the version number in the Infrared app opens a menu that
+  spans the whole screen width, while every other menu in the app stays
+  constrained. Presentation only; it is the odd one out rather than the rule.
+
 - [ ] **Opening a set on several cores** — measured 2026-09-13, and the first
   version of this item blamed the wrong thing (see "the tile audit was wrong").
   What is true: every photograph is decoded by ONE worker, one after another,
@@ -673,6 +678,36 @@ user-scalable=no.
   queued behind a single worker, with the export's pool already written as the
   shape that fixes it. Measure the real split on a device first — the test page
   reports both halves now.
+  **HALF DONE 2026-09-13, and this stays open for the measurement it asks for.**
+  The pool itself was built earlier the same day — `decodeClient` runs three or
+  four lanes — and **the pass that decodes every photograph in a set was still
+  handing it one file and waiting**, so two of three lanes sat idle through the
+  whole of a set open. The pool was built and its largest customer queued.
+  `realThumbnails` now keeps up to the lane count in flight.
+  **Sized by `decodeLaneTarget()`, not `decodeLanes()`.** The latter reports how
+  many lanes are ALIVE, which is zero until something decodes — and this pass
+  runs when nothing has decoded yet, so the first version sized itself at one
+  and changed nothing. The diagnostic keeps the live count deliberately (a
+  report must not spawn workers to describe the app); a caller about to spawn
+  them wants the planned one.
+  **The gain HERE is small and the number that matters is not this one.** Twelve
+  practice raws, three runs each in a container on a software rasteriser: 11.8s
+  median with one in flight against 11.0s with the pool, about 7%. This machine
+  decodes a raw in 43 ms where an 8-core iPad takes 180, so the decode share —
+  the part being parallelised — is at its smallest here. A device measurement is
+  still owed and is the one to record.
+  **Correctness is asserted by COUNTING DECODES, because the tiles cannot see
+  the defect.** Without the in-flight guard two lanes take the same photo and
+  both write the SAME correct tile: ten tiles, ten distinct pictures, a strip
+  that looks perfect, and the device decoding everything three times. Patching
+  `Worker.prototype.postMessage` counts what actually went to a decoder — 11 for
+  ten photos with the guard (the opened photo is decoded to be shown and again
+  for its tile, which is correct), **31 without it**. The walk also asserts one
+  tile per photo and a clean teardown mid-pass.
+  Two instrument faults on the way: a first version of the correctness walk
+  passed against the planted defect because it only counted tiles, and ending a
+  session asks with a native `confirm()`, which Playwright DISMISSES by default
+  — so the teardown branch never ran while reporting a failure about the app.
 - [ ] **The editor's WORKING COPY at native resolution** — never call this "full
   size" to the owner: the export panel already owns that phrase, its scale
   control reads "Full (native)" and a Quality slider sits at 92 beside it, and a
