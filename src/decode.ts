@@ -34,6 +34,27 @@ export interface DecodedImage {
   previewNotice?: string;
 }
 
+/** Linear RGB at an image pixel, from whichever buffer the decoder produced.
+ *
+ *  IT LIVES HERE RATHER THAN IN main.ts because everything that reads a decoded
+ *  photograph needs it — the thumbnails, the frame measurements, the sky mask —
+ *  and because a function inside the page module cannot be timed by the test
+ *  page or moved into a worker. A copy of it in either place would be a second
+ *  implementation of the one thing that must not have two. */
+export function linearAt(img: DecodedImage, x: number, y: number): [number, number, number] {
+  const i = (y * img.width + x) * 4;
+  if (img.linear) {
+    return [
+      Math.max(1e-4, img.linear[i]),
+      Math.max(1e-4, img.linear[i + 1]),
+      Math.max(1e-4, img.linear[i + 2]),
+    ];
+  }
+  const p = img.pixels!;
+  const toLin = (v: number) => Math.max(1e-4, Math.pow(v / 255, 2.2));
+  return [toLin(p[i]), toLin(p[i + 1]), toLin(p[i + 2])];
+}
+
 /** TIFF/EXIF Orientation (tag 274) -> display rotation in 90-degree CW steps. */
 function orientationToRotate(ifds: Ifd[]): number {
   const o = ifds[0]?.num(274)[0];

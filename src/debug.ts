@@ -14,6 +14,8 @@ import { decode } from "./decode";
 import { decodeOffThread } from "./decodeClient";
 import { sniff } from "./import";
 import { workerCount } from "./exportparallel";
+import { linearAt } from "./decode";
+import { compileEdit, TONE_DEFAULT, GRADE_DEFAULT, MIX3_DEFAULT, hslDefault, CROP_DEFAULT, type EditParams } from "./pipeline";
 
 declare const __APP_VERSION__: string;
 
@@ -410,6 +412,79 @@ function threads(): void {
       : `Each one holds its own copy of the file and its own decode of it. A 45-megapixel raw would get ${big === 1 ? "none — it would not split" : big}.`);
 }
 
+/** WHAT ONE TILE IN THE STRIP COSTS, on this device.
+ *
+ *  The strip and the quick look grid render every tile by walking its pixels on
+ *  the main thread, so forty photographs are forty of these, one after another,
+ *  with nothing else able to happen in between. How much that actually costs is
+ *  the question, and a test container cannot answer it: profiling a set open
+ *  there put most of the time in the graphics driver rather than in this
+ *  arithmetic, because a container draws through software pretending to be a
+ *  graphics chip.
+ *
+ *  This times THE SAME arithmetic the tile does — the app's own compiled edit,
+ *  over the app's own linear read, into the same canvas and the same JPEG — at
+ *  the size the strip actually asks for. It does not include working out the
+ *  automatic depth lift, which happens once per tile as well, so the real figure
+ *  is a little higher than this one. */
+async function buildingATile(): Promise<void> {
+  const p = note("Building a tile the way the strip does…");
+  try {
+    const res = await fetch("./examples/NIR_0063.dng");
+    if (!res.ok) throw new Error("practice photo not available offline");
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    const img = await decodeOffThread({ name: "test.dng", kind: sniff(bytes), bytes, looksTranscoded: false });
+    const MAX = 260;
+    const s = Math.min(1, MAX / Math.max(img.width, img.height));
+    const w = Math.max(1, Math.round(img.width * s)), h = Math.max(1, Math.round(img.height * s));
+    const params: EditParams = {
+      wb: [1, 1, 1], exposure: 1, recover: 0, swapRB: true, hue: 0, sat: 1, contrast: 1, denoise: 0,
+      tint: [1, 1, 1], glow: 0, sky: [0, 1, 1], foliage: [0, 1, 1],
+      tone: [...TONE_DEFAULT], toneR: [...TONE_DEFAULT], toneG: [...TONE_DEFAULT], toneB: [...TONE_DEFAULT],
+      lum: 1, masks: [], hotspot: 0, hotspotSize: 0.5, hotspotColor: 0, lensFix: 1, lensBypass: false,
+      hsFix: 1, hsBypass: false, vignette: 0, clarity: 0, dehaze: 0, sharpen: 0, texture: 0,
+      hsl: hslDefault(), bwOn: false, bwMix: [1, 1, 1], grade: [...GRADE_DEFAULT], grainAmt: 0, grainSize: 1.5,
+      vigAmt: 0, vigMid: 0.5, mix3: [...MIX3_DEFAULT], spots: [], crop: { ...CROP_DEFAULT }, straighten: 0,
+    };
+    const REPS = 3;
+    const mid = (xs: number[]) => { const a = [...xs].sort((x, y) => x - y); return (a[(a.length - 1) >> 1] + a[a.length >> 1]) / 2; };
+    const runs: number[] = [];
+    for (let r = 0; r < REPS; r++) {
+      const t0 = performance.now();
+      const edit = compileEdit(params, img.camMatrix, img.width / img.height, undefined, null);
+      const px = new Float32Array(3);
+      const out = new Uint8ClampedArray(w * h * 4);
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const sx = Math.min(img.width - 1, Math.floor(x / s));
+          const sy = Math.min(img.height - 1, Math.floor(y / s));
+          const [rr, gg, bb] = linearAt(img, sx, sy);
+          edit(rr, gg, bb, px, 0, undefined, undefined);
+          const i = (y * w + x) * 4;
+          out[i] = 255 * Math.min(1, Math.max(0, px[0]));
+          out[i + 1] = 255 * Math.min(1, Math.max(0, px[1]));
+          out[i + 2] = 255 * Math.min(1, Math.max(0, px[2]));
+          out[i + 3] = 255;
+        }
+      }
+      const cv = document.createElement("canvas");
+      cv.width = w; cv.height = h;
+      cv.getContext("2d")!.putImageData(new ImageData(out, w, h), 0, 0);
+      await new Promise<void>((done) => cv.toBlob(() => done(), "image/jpeg", 0.72));
+      runs.push(performance.now() - t0);
+      await tick();
+    }
+    p.remove();
+    const m = mid(runs);
+    row("Building one tile", ms(m),
+      `A ${w}x${h} tile from a ${(img.width * img.height / 1e6).toFixed(1)}-megapixel photograph, with the app's own edit over every pixel of it — the work the strip does for each photo, on the main thread, with nothing else able to happen while it runs. Forty of them is about ${((m * 40) / 1000).toFixed(1)} s of that. The real tile also works out the automatic depth lift, so this is the floor rather than the figure.`,
+      runs.map((x) => Math.round(x) + " ms").join(", "));
+  } catch (e) {
+    p.remove();
+    row("Building one tile", "not run", `The practice photo could not be used (${(e as Error).message}).`);
+  }
+}
+
 ($("dRun") as HTMLButtonElement).addEventListener("click", async (e) => {
   const btn = e.currentTarget as HTMLButtonElement;
   btn.disabled = true;
@@ -423,6 +498,7 @@ function threads(): void {
   threads();
   await exportOnTheGpu();
   await decoding();
+  await buildingATile();
   await storage();
   btn.textContent = "Run again";
   btn.disabled = false;

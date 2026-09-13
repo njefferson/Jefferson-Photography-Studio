@@ -1,7 +1,7 @@
 import "./style.css";
 import { importFile, type ImportedFile, type ImageKind } from "./import";
 import { wireForceUpdate, wireUpdateStrip, setUpdateCost } from "./swupdate";
-import { type DecodedImage, pickLargestPreview } from "./decode";
+import { type DecodedImage, pickLargestPreview, linearAt } from "./decode";
 import { decodeOffThread } from "./decodeClient";
 import { Renderer, type EditParams } from "./gl";
 import { exportImage, saveBlob, lastExportProfile, type ExportFormat } from "./export";
@@ -10611,21 +10611,6 @@ function toPreview(img: DecodedImage): { width: number; height: number; pixels?:
   previewW = w;
   previewH = h;
   return { width: w, height: h, pixels: data, camMatrix: img.camMatrix };
-}
-
-/** Linear RGB at an image pixel, from whichever buffer the decoder produced. */
-function linearAt(img: DecodedImage, x: number, y: number): [number, number, number] {
-  const i = (y * img.width + x) * 4;
-  if (img.linear) {
-    return [
-      Math.max(1e-4, img.linear[i]),
-      Math.max(1e-4, img.linear[i + 1]),
-      Math.max(1e-4, img.linear[i + 2]),
-    ];
-  }
-  const p = img.pixels!;
-  const toLin = (v: number) => Math.max(1e-4, Math.pow(v / 255, 2.2));
-  return [toLin(p[i]), toLin(p[i + 1]), toLin(p[i + 2])];
 }
 
 function clamp(v: number, lo: number, hi: number) {
