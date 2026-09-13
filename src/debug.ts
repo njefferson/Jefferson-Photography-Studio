@@ -17,6 +17,8 @@ import { workerCount } from "./exportparallel";
 import { linearAt } from "./decode";
 import { compileEdit, TONE_DEFAULT, GRADE_DEFAULT, MIX3_DEFAULT, hslDefault, CROP_DEFAULT, type EditParams } from "./pipeline";
 import { exportImage } from "./export";
+import { drawFrame, canDrawFrame, buildLinearSource } from "./gpuexport";
+import { Renderer } from "./gl";
 
 declare const __APP_VERSION__: string;
 
@@ -586,6 +588,217 @@ async function sameEverywhere(): Promise<void> {
   }
 }
 
+/** THE DRAWN EXPORT AGAINST THE COMPUTED ONE, on this device.
+ *
+ *  The whole case for drawing an export rests on the picture being the same
+ *  picture. It cannot be the SAME BYTES — a graphics chip computes in float
+ *  where the processor uses doubles — so the question is how far apart they are,
+ *  and that is a number rather than an argument. Compared before either is
+ *  encoded, so JPEG is not in the way.
+ *
+ *  Nothing of the reader's is used: the app's own bundled practice photograph,
+ *  a fixed edit, a crop to keep it quick. */
+async function drawnVersusComputed(): Promise<void> {
+  const p = note("Drawing an export, and computing the same one, to compare…");
+  try {
+    const res = await fetch("./examples/NIR_0063.dng");
+    if (!res.ok) throw new Error("practice photo not available offline");
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    const file = { name: "practice.dng", kind: sniff(bytes), bytes, looksTranscoded: false };
+    const img = await decodeOffThread({ ...file, bytes: bytes.slice() });
+    const params: EditParams = {
+      wb: [1.6, 1, 0.7], exposure: 1.2, recover: 0, swapRB: true, hue: 0, sat: 1.1, contrast: 1.05, denoise: 0.47,
+      tint: [1, 1, 1], glow: 0, sky: [0, 1, 1], foliage: [0, 1, 1],
+      tone: [...TONE_DEFAULT], toneR: [...TONE_DEFAULT], toneG: [...TONE_DEFAULT], toneB: [...TONE_DEFAULT],
+      lum: 1, masks: [], hotspot: 0, hotspotSize: 0.5, hotspotColor: 0, lensFix: 1, lensBypass: false,
+      hsFix: 1, hsBypass: false, vignette: 0, clarity: 0, dehaze: 0, sharpen: 0.4, texture: 0,
+      hsl: hslDefault(), bwOn: false, bwMix: [1, 1, 1], grade: [...GRADE_DEFAULT], grainAmt: 0, grainSize: 1.5,
+      vigAmt: 0, vigMid: 0.5, mix3: [...MIX3_DEFAULT], spots: [], crop: { ...CROP_DEFAULT }, straighten: 0,
+    };
+    const frac = Math.min(1, Math.sqrt(5e5 / (img.width * img.height)));
+    params.crop = { x: (1 - frac) / 2, y: (1 - frac) / 2, w: frac, h: frac };
+    if (!canDrawFrame(params)) throw new Error("this edit is outside what the drawn path covers yet");
+
+    // TWICE, because the two answers mean different things. With the noise
+    // reduction and sharpening ON, any difference is dominated by those two
+    // neighbourhood operators — the only stages where the shader's texel grid
+    // and the processor's pixel grid can disagree about WHERE to sample. With
+    // both OFF, every other stage in the pipeline is being compared on its own:
+    // white balance, the camera matrix, highlight recovery, the hot-spot and
+    // lens corrections, tone, saturation, contrast, the channel mix. If that
+    // second number is small, the port's remaining work is confined to two
+    // functions rather than spread through the pipeline.
+    const flat: EditParams = { ...params, denoise: 0, sharpen: 0, texture: 0 };
+    const runs: { label: string; drawn: ReturnType<typeof drawFrame>; computed: { data?: Uint8ClampedArray; width: number; height?: number }; computedMs: number }[] = [];
+    const pairs: [string, EditParams][] = [["with the noise reduction and sharpening on", params], ["with both of those off", flat]];
+    for (const [label, pr] of pairs) {
+      const drawn = drawFrame(file, img, pr, null);
+      await tick();
+      const t0 = performance.now();
+      const computed = await exportImage(file, img, pr, { format: "jpeg", scale: 1, quality: 0.92, raw: true });
+      runs.push({ label, drawn, computed, computedMs: performance.now() - t0 });
+      await tick();
+    }
+    p.remove();
+    for (const r of runs) compareOne(r.label, r.drawn, r.computed, r.computedMs);
+    return;
+
+    void 0;
+  } catch (e) {
+    p.remove();
+    row("A drawn export against a computed one", "not run", `${(e as Error).message}.`);
+  }
+}
+
+function compareOne(label: string, drawn: ReturnType<typeof drawFrame>, computed: { data?: Uint8ClampedArray; width: number; height?: number }, computedMs: number): void {
+  {
+    const a = drawn.data, b = computed.data;
+    if (!b || a.length !== b.length) {
+      row(`Drawn against computed, ${label}`, "not comparable",
+        `The two came out different sizes (${drawn.width}x${drawn.height} against ${computed.width}x${computed.height ?? "?"}), so there is nothing to compare yet.`);
+      return;
+    }
+    // WHERE the differences are, not just how big. An average of one and a worst
+    // of eighty are two different stories: noise spreads evenly, a sampling
+    // offset sits on the EDGES, and bad edge handling sits on the BORDER. The
+    // instrument has to be able to tell them apart or the next hour goes into
+    // the wrong fix.
+    const W = drawn.width, H = drawn.height;
+    const lum = (arr: Uint8ClampedArray, i: number) => 0.2126 * arr[i] + 0.7152 * arr[i + 1] + 0.0722 * arr[i + 2];
+    let worst = 0, sum = 0, n = 0, over2 = 0, sr = 0, sg = 0, sb = 0;
+    let edgeOver = 0, edgePx = 0, gradAll = 0, gradBad = 0, badN = 0;
+    const BORDER = 4;
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const i = (y * W + x) * 4;
+        let px = 0;
+        for (let k = 0; k < 3; k++) {
+          const ad = Math.abs(a[i + k] - b[i + k]);
+          if (ad > worst) worst = ad;
+          if (ad > px) px = ad;
+          sum += ad; n++;
+        }
+        sr += a[i] - b[i]; sg += a[i + 1] - b[i + 1]; sb += a[i + 2] - b[i + 2];
+        const onBorder = x < BORDER || y < BORDER || x >= W - BORDER || y >= H - BORDER;
+        if (onBorder) { edgePx++; if (px > 2) edgeOver++; }
+        else if (px > 2) over2++;
+        // Local contrast in the COMPUTED frame, which is the reference.
+        if (x > 0 && y > 0 && x < W - 1 && y < H - 1) {
+          const g = Math.abs(lum(b, i + 4) - lum(b, i - 4)) + Math.abs(lum(b, i + W * 4) - lum(b, i - W * 4));
+          gradAll += g;
+          if (px > 2) { gradBad += g; badN++; }
+        }
+      }
+    }
+    const px = a.length / 4;
+    const meanGrad = gradAll / Math.max(1, px), badGrad = gradBad / Math.max(1, badN);
+    const d = drawn.ms;
+    row(`Drawn against computed, ${label}`,
+      `average ${(sum / n).toFixed(2)} of 255, worst ${worst}`,
+      `The same photograph, ${(px / 1e6).toFixed(2)} megapixels, compared before either is encoded. ` +
+      `${((over2 / px) * 100).toFixed(1)}% of the interior differs by more than 2, against ${((edgeOver / Math.max(1, edgePx)) * 100).toFixed(1)}% of the four-pixel border. ` +
+      `Where they differ, the local contrast averages ${badGrad.toFixed(1)} against ${meanGrad.toFixed(1)} over the whole frame — ${badGrad > meanGrad * 2 ? "so the disagreement sits on the EDGES, which is what a half-texel sampling offset looks like" : "so it is spread across the picture rather than sitting on edges"}. ` +
+      `Colour shift: R ${(sr / px).toFixed(2)}, G ${(sg / px).toFixed(2)}, B ${(sb / px).toFixed(2)}. ` +
+      `A drawn export can never be byte-identical — a graphics chip works in float where the processor works in doubles — so what matters is whether this is small enough to be invisible.`);
+    row("…and what that pair took",
+      `drawn ${ms(d.source + d.upload + d.draw + d.read + d.p3)} · computed ${ms(computedMs)}`,
+      `The drawn one: ${ms(d.source)} reading and demosaicing the sensor data, ${ms(d.upload)} handing it to the graphics chip, ${ms(d.draw)} drawing, ${ms(d.read)} reading it back, ${ms(d.p3)} converting to the wide-gamut space the file is saved in. The demosaic is the part that does not go away, and it is the part that could be split across cores next.`);
+  }
+}
+
+/** COULD THE LIVE VIEW RUN AT FULL RESOLUTION ON THIS DEVICE?
+ *
+ *  The editor works on a downscaled copy of the photograph for one reason: a
+ *  full-resolution render was too costly when that decision was made. Whether it
+ *  still is has never been measured on these devices — and the answer decides
+ *  more than speed. The proxy is why the noise-reduction and sharpening
+ *  footprints are defined in proxy texels, why the export has to reproduce that
+ *  footprint by hand, and why a saved file can differ from what was on screen.
+ *  Full resolution would make the preview and the export the same pixels.
+ *
+ *  THE COST IS NOT THE DRAWING. A full-resolution preview still draws only as
+ *  many pixels as the screen has; what grows is the TEXTURE it samples from, and
+ *  the memory that holds it. So this measures the three things that decide it:
+ *  whether the upload succeeds at all, what it costs, and whether drawing from a
+ *  full-size texture at screen size stays interactive against drawing from a
+ *  half-size one. */
+async function fullResolutionPreview(): Promise<void> {
+  const p = note("Asking whether the live view could run at full resolution here…");
+  try {
+    const res = await fetch("./examples/NIR_0063.dng");
+    if (!res.ok) throw new Error("practice photo not available offline");
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    const file = { name: "practice.dng", kind: sniff(bytes), bytes, looksTranscoded: false };
+    const img = await decodeOffThread({ ...file, bytes: bytes.slice() });
+    const built = buildLinearSource(file, img);
+    const mp = (built.image.width * built.image.height) / 1e6;
+    row("Building a full-resolution frame", `${ms(built.ms)} · ${(built.bytes / 1e6).toFixed(0)} MB for ${mp.toFixed(1)} MP`,
+      `Reading the sensor data and demosaicing every pixel, once, into the buffer a texture wants. It scales with the photograph: ${(built.bytes / 1e6 / mp).toFixed(0)} MB a megapixel, so a 21-megapixel raw would want about ${Math.round((built.bytes / 1e6 / mp) * 21)} MB held while it is open.`);
+
+    // Half the size, for the comparison — the proxy the app uses today.
+    const half = { width: built.image.width >> 1, height: built.image.height >> 1, camMatrix: built.image.camMatrix, linear: undefined };
+    const halfLinear = new Float32Array((half.width * half.height) * 4);
+    if (built.image.linear) {
+      for (let y = 0; y < half.height; y++) {
+        for (let x = 0; x < half.width; x++) {
+          const s2 = ((y * 2) * built.image.width + x * 2) * 4, d = (y * half.width + x) * 4;
+          halfLinear[d] = built.image.linear[s2]; halfLinear[d + 1] = built.image.linear[s2 + 1];
+          halfLinear[d + 2] = built.image.linear[s2 + 2]; halfLinear[d + 3] = 1;
+        }
+      }
+    }
+
+    const params: EditParams = {
+      wb: [1.6, 1, 0.7], exposure: 1.2, recover: 0, swapRB: true, hue: 0, sat: 1.1, contrast: 1.05, denoise: 0.47,
+      tint: [1, 1, 1], glow: 0, sky: [0, 1, 1], foliage: [0, 1, 1],
+      tone: [...TONE_DEFAULT], toneR: [...TONE_DEFAULT], toneG: [...TONE_DEFAULT], toneB: [...TONE_DEFAULT],
+      lum: 1, masks: [], hotspot: 0, hotspotSize: 0.5, hotspotColor: 0, lensFix: 1, lensBypass: false,
+      hsFix: 1, hsBypass: false, vignette: 0, clarity: 0, dehaze: 0, sharpen: 0.4, texture: 0,
+      hsl: hslDefault(), bwOn: false, bwMix: [1, 1, 1], grade: [...GRADE_DEFAULT], grainAmt: 0, grainSize: 1.5,
+      vigAmt: 0, vigMid: 0.5, mix3: [...MIX3_DEFAULT], spots: [], crop: { ...CROP_DEFAULT }, straighten: 0,
+    };
+    // Screen-sized output, which is what a preview actually draws, with the crop
+    // doing the sizing since that is how the renderer sets its canvas.
+    const SCREEN = 1400;
+    type Src = { width: number; height: number; pixels?: Uint8ClampedArray; linear?: Float32Array; camMatrix?: number[] };
+    const sources: [string, Src][] = [
+      ["full resolution", built.image],
+      ["the half-size proxy it uses today", { width: half.width, height: half.height, camMatrix: half.camMatrix, linear: halfLinear }],
+    ];
+    for (const [label, image] of sources) {
+      const frac = Math.min(1, SCREEN / Math.max(image.width, image.height));
+      const pr = { ...params, crop: { x: (1 - frac) / 2, y: (1 - frac) / 2, w: frac, h: frac } };
+      const canvas = document.createElement("canvas");
+      let r;
+      try {
+        r = new Renderer(canvas);
+        const t0 = performance.now();
+        r.setImage(image);
+        const upload = performance.now() - t0;
+        r.setToneCurve(pr.tone, pr.toneR, pr.toneG, pr.toneB);
+        r.render(pr); // warm-up, not timed
+        r.readFrame();
+        await tick();
+        const N = 5;
+        const t1 = performance.now();
+        for (let i = 0; i < N; i++) { r.render(pr); r.readFrame(); }
+        const per = (performance.now() - t1) / N;
+        row(`Drawing from ${label}`, `upload ${ms(upload)} · ${ms(per)} a frame`,
+          `A ${canvas.width}x${canvas.height} draw — about what a screen asks for — sampled from a ${(image.width * image.height / 1e6).toFixed(1)}-megapixel texture. Under 16 ms a frame is smooth at sixty; under 33 is smooth at thirty. The upload happens once when a photograph opens.`);
+      } catch (err) {
+        row(`Drawing from ${label}`, "refused", `This device would not do it: ${String((err as Error)?.message ?? err)}.`);
+      } finally {
+        canvas.width = 1; canvas.height = 1;
+      }
+      await tick();
+    }
+    p.remove();
+  } catch (e) {
+    p.remove();
+    row("Could the live view run at full resolution", "not run", `${(e as Error).message}.`);
+  }
+}
+
 ($("dRun") as HTMLButtonElement).addEventListener("click", async (e) => {
   const btn = e.currentTarget as HTMLButtonElement;
   btn.disabled = true;
@@ -601,6 +814,8 @@ async function sameEverywhere(): Promise<void> {
   await decoding();
   await buildingATile();
   await sameEverywhere();
+  await drawnVersusComputed();
+  await fullResolutionPreview();
   await storage();
   btn.textContent = "Run again";
   btn.disabled = false;
