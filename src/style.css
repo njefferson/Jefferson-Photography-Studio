@@ -2915,3 +2915,19 @@ body.dbg { margin: 0; background: var(--bg); color: var(--txt); font: 400 1rem/1
   /* No fade — it simply stays, which is the safer failure for a mode hint. */
   #fullViewHint { animation: none; opacity: 1; }
 }
+
+/* Install / uninstall steps: one line per platform, scannable, because the
+   previous version was a paragraph naming one platform and the reader on any
+   other had to work out that nothing applied to them. */
+.install-list {
+  margin: 8px 0 14px;
+  padding-left: 20px;
+  list-style: disc;
+}
+.install-list li { margin: 0 0 6px; line-height: 1.5; }
+.install-list code {
+  font: 0.8125rem/1.2 var(--mono, ui-monospace, monospace);
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--surface-3);
+}
