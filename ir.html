@@ -426,18 +426,17 @@
             <label>Spot size <input id="healSize" type="range" min="0.002" max="0.035" step="0.001" value="0.008" /></label>
             <small class="note">Move the slider before tapping to preview the size in the middle of the view.</small>
             <button id="healVis" type="button" class="toggle" aria-pressed="false">Visualize spots</button>
-            <small class="note">A high-contrast view that makes dust jump out of flat skies. It is <strong>live</strong>: a spot you have healed disappears from it, so leave it on while you work. If a fix leaves a faint ring here, the patch was smaller than the dust &mdash; raise <em>Spot size</em> and tap it again. Switching this view on changes nothing about your photo or your export.</small>
+            <small class="note">A high-contrast view that makes dust jump out of flat skies &mdash; live, so leave it on while you work, and it changes nothing about your photo. A faint ring left behind means the patch was smaller than the dust: raise <em>Spot size</em> and tap again.</small>
             <button id="healAuto" type="button">Find spots automatically</button>
             <button id="healClear" type="button" hidden>Clear all heals</button>
             <small class="note" id="healStatus"></small>
             <hr class="divider" />
             <div class="sub-title">IR lens fixes <span>hot-spot &amp; vignette</span></div>
-            <p class="note">IR-converted lenses often brighten the center (a "hot-spot") and tint it. Pull the brightness down with Hot-spot, set the circle with Hot-spot size, take the colour out with Hot-spot colour; use Vignette to correct edge darkening (right) or add it (left).</p>
+            <p class="note">IR-converted lenses often brighten the centre (a &ldquo;hot-spot&rdquo;) and tint it. <strong>Hot-spot</strong> pulls the brightness down, <strong>Hot-spot size</strong> sets the circle, <strong>Hot-spot colour</strong> takes the colour out of it &mdash; which direction helps depends on the look, so nudge one way and go back if the disc gets stronger. <strong>Vignette</strong> corrects edge darkening (right) or adds it (left).</p>
             <label>Hot-spot <input id="hotspot" type="range" min="0" max="0.8" step="0.01" value="0" /></label>
             <label>Hot-spot size <input id="hotspotSize" type="range" min="0.15" max="1" step="0.01" value="0.5" /></label>
             <label>Hot-spot colour <input id="hotspotColor" type="range" min="-0.5" max="0.5" step="0.01" value="0" /></label>
-            <p class="note">Takes the colour out of the centre disc a converted lens leaves in a plain sky &mdash; Hot-spot above only changes its brightness. Which direction helps depends on the look, so nudge one way and go back if the disc gets stronger. Easiest to judge with a look on and sky filling the frame.</p>
-            <label>Vignette <input id="vignette" type="range" min="-1" max="1" step="0.01" value="0" /></label>
+                        <label>Vignette <input id="vignette" type="range" min="-1" max="1" step="0.01" value="0" /></label>
             <button id="lensMeasureBtn" type="button">Measure your lens&hellip;</button>
             <p class="note">Setting these by eye on every photograph is the fallback. Measuring works your own lens&rsquo;s hot-spot out from photographs of empty sky &mdash; it needs no photo open, so it is on the start screen and in Settings too.</p>
             <div class="subcard" id="hsCard">
