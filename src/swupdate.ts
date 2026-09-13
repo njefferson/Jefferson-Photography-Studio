@@ -171,10 +171,38 @@ export function wireUpdateStrip(): void {
   let dismissed = false;
   const show = () => { if (!dismissed) strip.hidden = false; };
 
+  /** IS THE WAITING WORKER ACTUALLY A NEWER APP THAN THIS PAGE?
+   *
+   *  A waiting worker is not the same thing as a new version, and the strip used
+   *  to treat them as identical. Navigations are network-first, so a reload
+   *  hands the reader the newest page straight away — and the browser then
+   *  notices `sw.js` has changed and parks a new worker, which the strip
+   *  announced as "a new version is available", naming the version already on
+   *  screen. Being offered an update to what you are already running is the kind
+   *  of thing that teaches somebody to ignore the strip, and §7h only works if
+   *  the strip is believed.
+   *
+   *  So it asks. No answer within a moment means an older worker without the
+   *  handler, and that falls through to showing — informing wrongly is a smaller
+   *  failure than staying quiet about a real update. */
+  const isNewerThanThisPage = (w: ServiceWorker): Promise<boolean> =>
+    new Promise((resolve) => {
+      let settled = false;
+      const done = (v: boolean) => { if (!settled) { settled = true; resolve(v); } };
+      try {
+        const ch = new MessageChannel();
+        ch.port1.onmessage = (e) => done(String(e.data ?? "") !== __APP_VERSION__);
+        w.postMessage({ type: "VERSION" }, [ch.port2]);
+      } catch { done(true); }
+      setTimeout(() => done(true), 1500);
+    });
+
+  const showIfNewer = async (w: ServiceWorker) => { if (await isNewerThanThisPage(w)) show(); };
+
   const watch = (reg: ServiceWorkerRegistration) => {
     // Already waiting when the page opened — the commonest case by far, because
     // the update downloaded during a previous visit.
-    if (reg.waiting && navigator.serviceWorker.controller) show();
+    if (reg.waiting && navigator.serviceWorker.controller) void showIfNewer(reg.waiting);
     reg.addEventListener("updatefound", () => {
       const w = reg.installing;
       if (!w) return;
@@ -182,7 +210,7 @@ export function wireUpdateStrip(): void {
         // "installed" WITH a controller means an update to something already
         // running. Without a controller it is the very first install, and
         // announcing a new version to somebody who just arrived is nonsense.
-        if (w.state === "installed" && navigator.serviceWorker.controller) show();
+        if (w.state === "installed" && navigator.serviceWorker.controller) void showIfNewer(w);
       });
     });
 

@@ -12091,3 +12091,46 @@ taken here.
 took **59 ms** where earlier runs on this device said 15-23, while the half-
 memory upload stayed at 17. One run, so not a conclusion — but the half-float
 path being three times cheaper to upload is consistent across every run tonight.
+
+## 2026-09-13 — the update strip announced a worker swap as a new version, and registration failures are invisible
+
+**WHY A VERSION APPEARS, GETS RELOADED, AND IS THEN OFFERED AS AN UPDATE.**
+Navigations are network-first (`sw.js`: "always try for the freshest app shell"),
+so a reload hands the reader the new page immediately and `__APP_VERSION__` shows
+the new number. The browser SEPARATELY notices `sw.js` changed, installs a new
+worker and parks it. The strip's condition was `if (reg.waiting &&
+navigator.serviceWorker.controller) show()` — the EXISTENCE of a waiting worker,
+with no version comparison anywhere — so it announced that parked worker as "a
+new version is available", naming the version already on screen. What was
+actually pending was the offline copy catching up, which needs no decision from
+anybody. **Being offered an update to what you are already running is how a
+reader learns to ignore the strip**, and §7h only works if the strip is believed.
+
+Fixed: the worker answers a `VERSION` message, and the strip asks before it
+speaks. Same version, silent; different, shows as before; no answer inside 1.5 s
+falls through to showing, because informing wrongly is a smaller failure than
+silence about a real update.
+
+**AND THE TEST PAGE NEVER HAD A STRIP AT ALL.** `swupdate` was imported by
+`chooser.ts` and `main.ts` only. The page somebody is most likely to be sitting
+on while a release goes out was the one page that never mentioned one. Wired.
+
+**THE BIGGER FIND, WHICH CAME OUT OF THE VERIFICATION FAILING.** A container run
+reported `registration: false` while a populated `ips-2.43.35` cache sat right
+beside it — and the reason nobody would ever know is one line, in two files:
+
+`navigator.serviceWorker.register("./sw.js").catch(() => {});`
+
+**An empty catch.** If registration fails — a bad MIME type, a scope refusal, a
+transient network error on that one request, an exception during install — the
+app is silently not offline-capable, the update strip can never appear because
+there is nothing to wait on, and NOTHING anywhere says so. The ⓘ report's
+"Offline worker" line reads from the registration, so it reports the symptom
+without the cause, and there is no cause to read because it was thrown away.
+
+**This is not yet explained and is not yet fixed.** The container behaviour may
+be an artefact of the harness rather than the product — a fresh browser profile,
+a plain static server, a `load` event that may already have fired before the
+listener attached. What is certain regardless is that the failure would be
+invisible on a real device too, and that is worth fixing whether or not it is
+what happened here.

@@ -10950,6 +10950,71 @@ const VENMO_URL = "https://venmo.com/u/noahjefferson";
 setupInstalledShare("shareBtn");
 setupInstallFromApp("irInstallFromApp");
 
+/* ---- FULL VIEW: the photograph with nothing over it ----------------------
+ *
+ *  Asked for directly: see the photo being edited on its own, and get back with
+ *  Escape or a tap. Built to the conventions rather than invented — every photo
+ *  application does some version of this, and the shared parts are: a toggle in
+ *  the chrome, the browser's own fullscreen where it exists, Escape out, and a
+ *  click or tap anywhere out. All four are wired, because which one somebody
+ *  reaches for is not predictable and getting STUCK in a mode with no controls
+ *  is the failure that matters.
+ *
+ *  Native fullscreen is asked for and its refusal is not a failure: iPadOS only
+ *  gained element fullscreen recently and an installed app is already
+ *  chrome-less, so the in-page version — collapsing the grid — has to stand on
+ *  its own anyway. It does; the native call is a bonus that hides the browser's
+ *  own furniture when it is available. */
+{
+  const btn = $("fullViewBtn") as HTMLButtonElement;
+  const hint = $("fullViewHint") as HTMLElement;
+  const app = $("app") as HTMLElement;
+  let on = false;
+
+  const setHint = () => {
+    // Re-trigger the fade each time rather than only on first entry: somebody
+    // who comes back a second time needs telling again just as much.
+    hint.hidden = false;
+    hint.style.animation = "none";
+    void hint.offsetWidth;
+    hint.style.animation = "";
+  };
+
+  const enter = () => {
+    if (on || !current) return;      // nothing to look at is not a mode worth entering
+    on = true;
+    app.dataset.full = "1";
+    btn.setAttribute("aria-pressed", "true");
+    setHint();
+    // Refused (or unsupported) is fine — the in-page version is the real one.
+    void document.documentElement.requestFullscreen?.().catch(() => {});
+    draw();
+  };
+
+  const leave = () => {
+    if (!on) return;
+    on = false;
+    delete app.dataset.full;
+    btn.setAttribute("aria-pressed", "false");
+    hint.hidden = true;
+    if (document.fullscreenElement) void document.exitFullscreen?.().catch(() => {});
+    draw();
+  };
+
+  btn.addEventListener("click", () => (on ? leave() : enter()));
+  // A tap or click anywhere on the photograph. Pointerup rather than click so a
+  // finger and a mouse behave the same, and so a drag that ends elsewhere does
+  // not count as a tap.
+  stageEl.addEventListener("pointerup", () => { if (on) leave(); });
+  document.addEventListener("keydown", (e) => {
+    if (!on) return;
+    if (e.key === "Escape") { e.preventDefault(); leave(); }
+  });
+  // The browser's own exit (its Escape, its gesture, its button) must not leave
+  // the page believing it is still in the mode.
+  document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && on) leave(); });
+}
+
 // Offline support.
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {

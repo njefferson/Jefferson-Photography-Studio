@@ -74,6 +74,7 @@
                its presence is how the reader knows one was applied at all. -->
           <button id="lensCmpBtn" class="bar-btn" type="button" hidden title="Press and hold to see this photo without the automatic lens correction">Hold: No lens fix</button>
           <button id="histBtn" class="bar-btn" type="button" aria-pressed="true" title="Show or hide the live histogram">Histogram</button>
+          <button id="fullViewBtn" class="bar-btn" type="button" aria-pressed="false" title="See the photo on its own, with nothing over it — Escape or a tap returns">Full view</button>
           <button id="helpBtn" class="bar-btn" type="button">Help</button>
           <button id="shareBtn" class="bar-btn" type="button" hidden title="Share this app or copy its link"><svg class="share-ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 1.6 5.2 4.4M8 1.6l2.8 2.8M8 1.6v7.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.6 6.6H3.2a1 1 0 0 0-1 1v5.6a1 1 0 0 0 1 1h9.6a1 1 0 0 0 1-1V7.6a1 1 0 0 0-1-1h-1.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Share</button>
           <span class="bar-sep" aria-hidden="true"></span>
@@ -136,6 +137,12 @@
              2026-07-21). They also work while a brush tool is armed, when the
              canvas gestures are busy painting. Cursor-anchored wheel zoom is wired
              on the canvas too. -->
+        <!-- A MODE ANNOUNCES ITSELF AND OFFERS AN OBVIOUS EXIT. Full view removes
+             every control on purpose, which is exactly the state where somebody
+             can be stuck without knowing how to get out. This says so on the way
+             in and then gets out of the way. aria-live so it is heard, not only
+             seen. -->
+        <p id="fullViewHint" hidden role="status">Tap anywhere or press Escape to go back</p>
         <div id="zoomCtl" hidden role="group" aria-label="Zoom the photo">
           <button id="zoomIn" type="button" aria-label="Zoom in">+</button>
           <span id="zoomPct" aria-hidden="true">100%</span>
