@@ -801,48 +801,101 @@ function compareOne(label: string, drawn: ReturnType<typeof drawFrame>, computed
  *  mode that costs a release. */
 async function aCanvasTheSizeOfTheFrame(): Promise<void> {
   const FW = 5600, FH = 3728;
-  // GET THE CONTEXT FIRST, THEN GROW THE CANVAS — which is both how the app
-  // does it and the only way this measures what it claims to. Asking for the
-  // context on an already-huge canvas can be refused outright: getContext
-  // returns null, and a probe written that way reports "WebGL2 unavailable" on
-  // a device whose WebGL2 is perfectly fine. That false statement was produced
-  // on purpose here before this version existed, which is why it is written
-  // this way round. A null context on a 1x1 canvas means what it says.
+  // THE FIRST VERSION OF THIS ASKED ON AN EMPTY PAGE, AND THAT ANSWER COST A
+  // REAL SESSION.
+  //
+  // It requested a full-frame canvas with nothing else allocated, got it on all
+  // three devices, and that was written down as "your devices can do this". In
+  // the editor the same request happens while the session already holds a couple
+  // of hundred megabytes of photographs, the current one's texture, the previous
+  // one's buffers and every other context the app keeps. The canvas allocation
+  // failed there, silently, and the photograph went blank. The probe was not
+  // wrong; what it was taken to mean was.
+  //
+  // So it asks the question the app actually faces: how much can already be held
+  // before a full-frame drawing surface stops being available? A ladder, stopping
+  // at the first refusal, releasing as it goes. The number that comes back is an
+  // approximation — real memory is fragmented differently from one big ladder of
+  // buffers — and it is enormously closer to the truth than a yes taken on an
+  // empty page.
   const cv = document.createElement("canvas");
   cv.width = 1;
   cv.height = 1;
-  const gl = cv.getContext("webgl2", { preserveDrawingBuffer: true });
-  if (!gl) { row("A drawing surface the size of the frame", "WebGL2 unavailable", "This device has no WebGL2 at all, so nothing below applies."); return; }
-  cv.width = FW;
-  cv.height = FH;
-  const gw = gl.drawingBufferWidth, gh = gl.drawingBufferHeight;
-  // A known colour, cleared and read straight back from the FAR CORNER — the
-  // part a clamp would have dropped. Nothing clever: the failure this looks for
-  // is black where something else was asked for.
-  gl.viewport(0, 0, gw, gh);
-  gl.clearColor(0.25, 0.5, 0.75, 1);
-  gl.clear(gl.COLOR_BUFFER_BIT);
-  gl.finish();
-  const px = new Uint8Array(4);
-  gl.readPixels(Math.max(0, gw - 1), Math.max(0, gh - 1), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
-  const painted = Math.abs(px[0] - 64) <= 2 && Math.abs(px[1] - 128) <= 2 && Math.abs(px[2] - 191) <= 2;
-  const full = gw === FW && gh === FH;
-  await tick();
-  row("A drawing surface the size of the frame",
-    full && painted ? `yes — ${gw}x${gh}` : !full ? `clamped to ${gw}x${gh}` : `${gw}x${gh}, came back ${px[0]},${px[1]},${px[2]}`,
-    `Asked for a ${FW}x${FH} canvas — a whole frame from the camera this app is built around — then cleared it to a known colour and read the FAR CORNER back. ` +
-    (full && painted
-      ? "So the live view could run at native resolution here without changing how the picture reaches the screen: the simple version of the change is enough on this device."
-      : !full
-        ? "The browser quietly gave a smaller surface than asked for, which is the behaviour the app already works around by downscaling anything over 2800 pixels for display. A native-resolution view here cannot just ask for a bigger canvas — it has to draw a full-size texture into a view-sized surface, with smooth sampling, which is more work and more memory."
-        : "The surface was allocated at the size asked for and then did not paint it — the silent-black failure exactly. Same conclusion: a full-size texture drawn into a view-sized surface.") +
-    ` This is a DIFFERENT limit from the largest-texture line above: that one draws into an off-screen target, this one into a canvas, and a device can allow the first and refuse the second.`);
-  // 84 MB of drawing buffer plus whatever the driver keeps beside it, and
-  // nothing else here needs it. Let it go rather than leaving it to a collector
-  // that has no idea how expensive it is.
-  gl.getExtension("WEBGL_lose_context")?.loseContext();
-  cv.width = 1;
-  cv.height = 1;
+  const probe = cv.getContext("webgl2", { preserveDrawingBuffer: true });
+  if (!probe) { row("A drawing surface the size of the frame", "WebGL2 unavailable", "This device has no WebGL2 at all, so nothing below applies."); return; }
+  const lose = () => { try { probe.getExtension("WEBGL_lose_context")?.loseContext(); } catch { /* already gone */ } };
+
+  const tryFullFrame = (): boolean => {
+    try {
+      cv.width = FW;
+      cv.height = FH;
+      if (probe.drawingBufferWidth !== FW || probe.drawingBufferHeight !== FH) return false;
+      probe.viewport(0, 0, FW, FH);
+      probe.clearColor(0.25, 0.5, 0.75, 1);
+      probe.clear(probe.COLOR_BUFFER_BIT);
+      probe.finish();
+      const px = new Uint8Array(4);
+      probe.readPixels(FW - 1, FH - 1, 1, 1, probe.RGBA, probe.UNSIGNED_BYTE, px);
+      return Math.abs(px[0] - 64) <= 2 && Math.abs(px[1] - 128) <= 2 && Math.abs(px[2] - 191) <= 2;
+    } catch { return false; }
+  };
+
+  // TOUCHED, not merely allocated: a buffer nobody writes to may cost nothing at
+  // all until it is used, which would make the ladder measure a promise rather
+  // than memory.
+  const held: Uint8Array[] = [];
+  // AND NO STEP IS ALLOWED TO BE ABSURD. Trying to prove the ceiling branch
+  // fires, a step of 100,000 MB was planted — and the browser did not throw. It
+  // sat there, for over ten minutes, neither succeeding nor failing. A request
+  // far beyond what a machine has does not reliably fail fast; it can hang, and
+  // a hang inside a diagnostic is worse than the question going unanswered. The
+  // real steps are 100-200 MB and were never at risk, but the cap says so rather
+  // than leaving it to whoever edits the array next.
+  const MAX_STEP_MB = 512;
+  const holdAnother = (mb: number): boolean => {
+    if (mb > MAX_STEP_MB) return false;
+    try {
+      const b = new Uint8Array(mb * 1e6);
+      for (let i = 0; i < b.length; i += 4096) b[i] = 1;
+      held.push(b);
+      return true;
+    } catch { return false; }
+  };
+
+  let ceiling = -1, lastOk = 0;
+  try {
+    // 0 MB first — the old question, kept, because a device that refuses even
+    // that needs to know before anything else is discussed.
+    if (!tryFullFrame()) {
+      row("A drawing surface the size of the frame", "refused even with nothing held",
+        `Asked for a ${FW}x${FH} canvas — a whole frame from the camera this app is built around — on an otherwise empty page, and did not get it. A full-resolution editing view is not possible on this device by this route at all.`);
+      return;
+    }
+    // Then the same request with more and more already held, which is the state
+    // the editor is actually in.
+    const STEPS = [100, 100, 100, 100, 100, 100, 200, 200];
+    for (const mb of STEPS) {
+      if (!holdAnother(mb)) { ceiling = lastOk; break; }
+      lastOk += mb;
+      cv.width = 1; cv.height = 1;           // release the previous surface first
+      if (!tryFullFrame()) { ceiling = lastOk; break; }
+    }
+    await tick();
+    const verdict = ceiling < 0
+      ? `still available with ${lastOk} MB held`
+      : `lost it at ${ceiling} MB held`;
+    row("A drawing surface the size of the frame", verdict,
+      `Asked for a ${FW}x${FH} canvas — a whole frame from your camera — repeatedly, with more and more memory already held each time, because that is the state the editor is in when it asks. ` +
+      (ceiling < 0
+        ? `It was still available with ${lastOk} MB held, which is more than a session of photographs plus a full-resolution copy needs. This device has room.`
+        : `It stopped being available once about ${ceiling} MB was held. A session of eight photographs is roughly 200 MB before the editor holds anything of its own, and a full-resolution copy of one frame is another 170 MB — so this is the number that decides whether the full-resolution view can be switched back on here.`) +
+      ` The figure is an approximation: real memory is fragmented differently from a ladder of big buffers. It is still far closer to what the app faces than asking on an empty page, which is what the first version of this did — and that answer is why the full-resolution view is currently switched off.`);
+  } finally {
+    held.length = 0;
+    lose();
+    cv.width = 1;
+    cv.height = 1;
+  }
 }
 
 /** COULD THE LIVE VIEW RUN AT FULL RESOLUTION ON THIS DEVICE?
