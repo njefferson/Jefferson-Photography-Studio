@@ -106,7 +106,15 @@ See **`PLAN.md`** for the full build plan.
     declared the CREATIVE RELEASE the first one → it ships as **2.0**.
     - **3.0 IS DECLARED AND CLAIMED (owner, 2026-09-13): the OPTIMIZED
       RELEASE.** It ships when the export is fixed and the full-resolution
-      question is decided — the two together, not either alone. That is an
+      question is decided — the two together, not either alone.
+      **MEASURED LATER THE SAME NIGHT, the two turn out to be separable**: the
+      full-resolution preview costs nothing and gives up nothing (the export
+      stays computed, so the photograph is still identical on every device),
+      while the drawn export is four to twenty times faster AND makes the saved
+      file depend on the graphics chip that saved it — two devices drawing the
+      same photograph fingerprint `fe3da8c6` and `38b69ce1`. So 3.0 can ship
+      with the first half built and the second half decided, and the decision
+      is the owner's with both sides quantified. That is an
       identity change rather than a capability one because it is the same
       product working a different way: the picture on screen and the picture
       saved become the same pixels, and the machine's own hardware does the
@@ -11155,3 +11163,39 @@ running 2.43.6's bundle. That is §7h behaving exactly as designed — the page 
 from the network, the new worker is installed and waiting rather than swapping
 under it — but it means the next OFFLINE launch would serve the older cache until
 the update is taken.
+
+## 2026-09-13 — the drawn frames differ by machine, and 3.0 splits in two because of it
+
+**`fe3da8c6` on the desktop, `38b69ce1` on the iPad.** The same photograph drawn
+through the same shaders on two graphics chips is not the same photograph. Each
+one rounds its own way, which is what a graphics chip does — and it is the first
+measurement tonight that COSTS something rather than clearing something.
+
+**What today has, and what drawing would trade away.** Every device computes
+`7afc9c2a`: the photograph this app makes does not depend on the machine. A drawn
+export gives that up. How far apart the two drawn frames are is not directly
+measured — a fingerprint says different, not how different — but each differs
+from the SAME computed reference by **0.63 average on the desktop and 0.66 on the
+iPad, worst 100 and 56**, so the gap between the two drawn frames is bounded by
+roughly the sum: under about one and a third of 255 on average, with isolated
+pixels far larger. Every measurement of it puts the disagreement on edges.
+
+**AND THIS IS WHY 3.0 IS TWO PIECES, NOT ONE.** They were being treated as a pair
+because they arrived together. They are not a pair:
+
+- **The full-resolution preview costs nothing and gives up nothing.** With the
+  tap scale holding today's footprint, the preview and the COMPUTED export agree
+  by construction — same pixels, same scale — and the export stays on the
+  processor, so `7afc9c2a` stays true on every device. Price: 170 MB held for a
+  21-megapixel frame, frame time no worse anywhere measured, 0.018 of 255 for the
+  half-float source. **Nothing measured argues against it.**
+- **The drawn export is the one with a price.** It is four to twenty times faster
+  and far steadier (830 ms against 4,115 and 10,370 on the same machine), and it
+  makes the saved file depend on the graphics chip that saved it.
+
+So the full-resolution half can proceed on the evidence, and the drawn half is a
+decision for the owner with both sides now quantified: **a photograph that is the
+same everywhere and an export that takes seconds, or an export that takes one
+second and is that machine's own.** That is a real choice about what the product
+promises, and it was never a session's to make — the fault earlier was offering
+it before it had numbers, not offering it at all.
