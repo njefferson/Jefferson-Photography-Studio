@@ -10637,3 +10637,59 @@ main.ts into decode.ts in the same commit — not for tidiness: a function insid
 the page module cannot be timed by the test page or moved into a worker, and a
 copy of it in either place would be a second implementation of the one thing that
 must not have two.
+
+## 2026-09-13 — three devices, and the decoder gets lanes
+
+Reports came back from a desktop and both iPads. Everything here is from those
+three, and two of the conclusions written yesterday do not survive them.
+
+**THE GPU ANSWER HOLDS EVERYWHERE, INCLUDING THE DEVICE THIS APP IS FOR.** A
+whole 20.9-megapixel frame with twenty-five weighted taps in every pixel, drawn
+and read all the way back: **54 ms on the desktop, 76 on the 8-core iPad, 61 on
+the 4-core one.** All three report a 16384-pixel texture limit, so a frame fits
+whole with no tiling; all three have float buffers; all three can draw in a
+background thread. Against 19.7 seconds for the threaded processor export, on a
+device class where that export is slower still.
+
+**"STORAGE IS THE LARGER HALF OF A SET OPEN" WAS A DESKTOP FACT.** The iPads
+commit 6 MB in **15 ms and 29 ms**, against the desktop's 77 — so on the device
+this app was built for, storage is nearly free and the decode is what a set open
+waits on: a practice raw decodes in **180 ms and 92 ms in the background** on the
+two iPads, against 43 on the desktop. The machine with the most idle cores was
+paying the most per photograph, through a single decode worker.
+
+**SO THE DECODER HAS LANES NOW.** `decodeClient.ts` keeps the same public call
+and the same fallback story, and runs up to three decodes at once (four where the
+device reports 16 GB or more): one job per lane, a queue in front, and a lane
+that dies takes only its own jobs with it — the single-worker version failed
+every pending decode in the app and moved everything to the main thread for the
+rest of the session. **How many, and why not simply the core count:** a lane in
+flight holds a file's bytes and the decode it produced, about 110 MB for a 25 MB
+raw, so three is ~330 MB — inside the envelope the parallel export already
+spends and was measured against. Safari reports no memory at all, so a device
+that does not say gets the conservative number.
+
+Measured in the container (4 cores, 3 lanes) on eight practice raws: **14.1s to
+a full strip becomes 11.8s, and the first photograph on screen 1.1s becomes
+0.5s.** The container's storage is its slow part, so the iPad gain should be
+larger; the test page reports both halves per device now.
+
+**AND THE PARITY CHECK FOR IT WAS VACUOUS UNTIL A PLANTED DEFECT SAID SO.** The
+test page now decodes the same file on the main thread and in a lane and compares
+them, which is the claim that concurrency changed nothing. The first version
+hashed `a[i] & 255` over the decoded array — and for a Float32Array of linear
+values in [0,1] that coerces almost every element to **zero** before masking, so
+it hashed a few million zeros and agreed with itself no matter what. A planted
+one-pixel change of +0.001 in the worker passed it. Hashing the underlying BYTES
+catches it: the same plant now reports `NO — 78a9fa0b against 3651eff7`, and the
+reverted build reports yes. *Make a new test fail once before trusting it*, and
+this one needed it.
+
+**Two device facts worth keeping.** The 8-core iPad gets **four** export threads,
+not seven: Safari never reports `deviceMemory`, so the conservative cap applies
+and the budget is not what binds. Raising it is a gamble against a tab kill that
+would lose the reader's session, and the drawn export would make the question
+moot — so it stays where it is, deliberately. And that same iPad reports a
+**1000 MB storage quota** (the other reports 38 GB), which is one forty-photo set
+of 25 MB raws: the quota path already stops the open and says so, but it is the
+device to remember when anything here assumes room.

@@ -11,7 +11,7 @@
 import "./style.css";
 import { buildDiagnostic } from "./diagnostic";
 import { decode } from "./decode";
-import { decodeOffThread } from "./decodeClient";
+import { decodeOffThread, decodeLanes } from "./decodeClient";
 import { sniff } from "./import";
 import { workerCount } from "./exportparallel";
 import { linearAt } from "./decode";
@@ -150,14 +150,44 @@ async function decoding(): Promise<void> {
     const file = { name: "test.dng", kind: sniff(bytes), bytes, looksTranscoded: false };
     const here: number[] = [], there: number[] = [];
     let img = await decode({ ...file, bytes: bytes.slice() }); // warm-up, not timed
+    let offThread: Awaited<ReturnType<typeof decodeOffThread>> | null = null;
     for (let i = 0; i < REPS; i++) {
       const a = performance.now();
       img = await decode({ ...file, bytes: bytes.slice() });
       const b = performance.now();
-      await decodeOffThread({ ...file, bytes: bytes.slice() });
+      offThread = await decodeOffThread({ ...file, bytes: bytes.slice() });
       here.push(b - a);
       there.push(performance.now() - b);
     }
+    // THE SAME PICTURE, ASSERTED ON THE DEVICE. The background decoder runs the
+    // same code, and "runs the same code" is exactly the kind of claim that is
+    // true until somebody changes one of them. Now several decodes run at once,
+    // so it is also the claim that concurrency changed nothing.
+    // THE BYTES, NOT THE VALUES, and the difference is the whole check. The
+    // first version hashed `a[i] & 255` over the decoded array — which for a
+    // Float32Array of linear values in [0,1] coerces almost every element to 0
+    // before masking, so it hashed a few million zeros and agreed with itself
+    // no matter what. A planted one-pixel change (+0.001) passed it. Hashing
+    // the underlying bytes catches any bit that moves.
+    const fnv = (a: ArrayBufferView | undefined): string => {
+      if (!a) return "none";
+      const b = new Uint8Array(a.buffer, a.byteOffset, a.byteLength);
+      let h = 0x811c9dc5;
+      for (let i = 0; i < b.length; i++) { h ^= b[i]; h = Math.imul(h, 0x01000193); }
+      return (h >>> 0).toString(16);
+    };
+    const mine = fnv(img.linear ?? img.pixels), theirs = fnv(offThread?.linear ?? offThread?.pixels);
+    const lanes = decodeLanes();
+    row("Decoders running at once", lanes ? String(lanes) : "none — decoding happens on the main thread here",
+      lanes > 1
+        ? "Opening a set decodes this many photographs at a time instead of one after another. Each one holds its file and its decode while it works, which is why it is not simply the number of cores."
+        : lanes === 1
+          ? "This device decodes one photograph at a time in the background — it has too few cores to spare more."
+          : "Background threads are unavailable, so the decode happens on the main thread and the editor cannot answer while it runs.");
+    row("The background decode matches", mine === theirs ? `yes (${mine})` : `NO — ${mine} against ${theirs}`,
+      mine === theirs
+        ? "The same photograph comes back whether it is decoded here or on another thread, checked pixel by pixel on this device."
+        : "THEY DIFFER, which should be impossible — the same decoder runs in both places. Worth reporting.");
     p.remove();
     const mh = mid(here), mt = mid(there);
     const spread = (xs: number[]) => xs.map((x) => Math.round(x) + " ms").join(", ");
