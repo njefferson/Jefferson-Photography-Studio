@@ -935,6 +935,22 @@ user-scalable=no.
   forty lines further down, about a `<label>` silently opting OUT of the same
   tag-keyed width; this was the same fault in the other direction. The class
   sets `width: auto` and both are 141px and 143px now, at 44px tall.
+  **`tools/class-width-walk.mjs` is the instrument, and it is in the REPO.**
+  It renders all four pages, opens every dialog, and flags any class worn by two
+  different TAGS in one container whose widths differ by more than 60px —
+  because whether the tag rule or the class rule wins is a cascade question no
+  grep can answer. It finds nothing across the app today, and removing
+  `width: auto` from `.ver-link` makes it print a 463px spread, so its green
+  means something. Not in `.branch-guard`'s `also=`: it drives a browser against
+  a served build. Run it before a UI release, beside the a11y walk.
+  It is tracked rather than left in the scratchpad because it took four attempts
+  and the next session to meet this defect would otherwise build it again.
+  **Two of those four attempts are worth keeping.** A plant applied with `sed`
+  to the first `width: auto` in the file landed 1,977 lines away from the rule
+  it was meant to disable, and the walk's green measured nothing; and anchoring
+  on the rule's closing brace found the one INSIDE its own comment, because the
+  comment quotes `select, button { width: 100% }`. Plant by a unique anchor, and
+  print what was planted.
 
 ## Shipped (roadmap archive)
 
