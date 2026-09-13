@@ -11673,3 +11673,38 @@ sweep of several practice frames rather than one photograph at one pair of
 slider values — which is this repo's own standing rule for a pixel-pipeline
 change and was being skipped. Whichever number a single frame produced would
 have been a test set to solve toward.
+
+## 2026-09-13 — the working copy costs two to three seconds every time you open a photograph, and that is not acceptable yet
+
+**THE SWEEP DID NOT FINISH, AND CHASING WHY FOUND A REAL DEFECT.** Four practice
+raws, opened as a set, thirteen minutes, not one frame captured. The container's
+software rasteriser makes everything slow, so that alone proves nothing — but
+the device numbers already on record say the same thing and they are not a
+container artefact.
+
+**BUILDING THE FULL-RESOLUTION FRAME IS NOT FREE AND IT IS PAID PER
+PHOTOGRAPH.** From the test page, on a 5.2-megapixel practice raw: **466 ms on
+the 4-core iPad, 713 ms on the 8-core, 994-1,100 ms on the desktop**. The camera
+this app is built around makes 20.9 megapixels — four times that frame — so
+opening or switching to one photograph would cost roughly **two seconds on the
+4-core iPad and three on the 8-core**, on the MAIN THREAD, before anything
+appears. Today that is a binned demosaic that is essentially instant.
+
+**So the change as it stands trades a real, frequent cost for a benefit the
+reader cannot see directly.** The benefit is worth having — the preview and the
+export become the same pixels — but not at a two-second stall on every photo in
+a forty-photo session. Nobody would take that trade if it were put to them, and
+it was not put to them; it was introduced by a session optimising something
+else.
+
+**THE SHAPE OF THE FIX IS ALREADY IN THIS APP.** The session strip shows every
+tile immediately and fills each one in afterwards; the same discipline applies
+here. Show the binned proxy at once, exactly as today, then upgrade to the
+native-resolution frame when it is ready — and build it OFF the main thread,
+which the decode worker already demonstrates is possible for this exact data.
+The reader sees the photograph at the speed they see it now and it quietly
+sharpens, rather than waiting for a better one.
+
+**Until that exists, the working copy on staging is a measurement, not a
+release.** It is correct, it is honest about memory, and it stalls the editor.
+Recorded here rather than discovered on a tablet.
