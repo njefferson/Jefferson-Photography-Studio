@@ -19,3 +19,10 @@ escape=JPS_PROMOTE
 # build would not make. A comment asking for that was written first; this is the
 # version that can refuse.
 also=tools/preview-version-check.mjs
+
+# Run on every commit: the install prompt's pictures of the app. Every field in
+# a manifest `screenshots` entry is a claim about a file — that it is there,
+# that it is the type and the SIZE it says — and a wrong one is refused in
+# silence, leaving the plain prompt that looks exactly like having no
+# screenshots at all. This reads the bytes and compares.
+also=tools/manifest-shots-check.mjs
