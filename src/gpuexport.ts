@@ -84,6 +84,28 @@ export function canDrawFrame(params: EditParams): boolean {
  *  it at interactive speed, the proxy stops being necessary — and with it goes
  *  the whole footprint problem the tap scale exists to paper over, because the
  *  preview and the export would then be the same pixels at the same scale. */
+/** GIVE THE BROWSER A TURN — a macrotask, and not a clamped one.
+ *
+ *  Two wrong answers here, both of which look right. A resolved promise is a
+ *  MICROTASK: it runs straight back without ever letting the page paint, so the
+ *  freeze this exists to prevent survives wearing a different hat. And
+ *  `setTimeout(…, 0)` is a macrotask but browsers clamp nested ones to about
+ *  4 ms — at an 8 ms slice that is roughly 475 yields for a 21-megapixel frame,
+ *  so nearly two seconds of the total spent waiting on a timer rather than
+ *  working. Half again on the wall clock, bought for nothing.
+ *
+ *  A MessageChannel message is a real macrotask with no clamp: the page gets its
+ *  turn to paint and handle a touch, and comes straight back. `setTimeout` stays
+ *  as the fallback for anywhere the channel is unavailable. */
+function yieldToBrowser(): Promise<void> {
+  if (typeof MessageChannel === "undefined") return new Promise((r) => setTimeout(r, 0));
+  return new Promise((resolve) => {
+    const ch = new MessageChannel();
+    ch.port1.onmessage = () => { ch.port1.close(); ch.port2.close(); resolve(); };
+    ch.port2.postMessage(0);
+  });
+}
+
 /** THE SAME FRAME, BUILT IN SLICES SO NOTHING FREEZES.
  *
  *  `buildLinearSource` runs the whole demosaic in one synchronous loop, which is
@@ -105,7 +127,7 @@ export function canDrawFrame(params: EditParams): boolean {
  *  right picture with the wrong one, which is worse than being slow. */
 export async function buildLinearSourceInBands(
   file: ImportedFile, current: DecodedImage,
-  opts: { rowsPerSlice?: number; shouldStop?: () => boolean; onRow?: (y: number, of: number) => void } = {},
+  opts: { sliceMs?: number; shouldStop?: () => boolean; onRow?: (y: number, of: number) => void } = {},
 ): Promise<{ image: { width: number; height: number; linear16: Uint16Array; camMatrix?: number[] }; ms: number; bytes: number } | null> {
   const t0 = performance.now();
   const src = getSource(file, current);
@@ -114,25 +136,35 @@ export async function buildLinearSourceInBands(
   const linear16 = new Uint16Array(width * height * 4);
   const ONE = toHalf(1);
   const px = new Float32Array(3);
-  // A band rather than a row: yielding per row on a 3,712-row frame is 3,712
-  // round trips through the event loop, which costs more than the work. 64 rows
-  // is a few milliseconds of work per slice on the slowest device measured.
-  const rows = Math.max(1, opts.rowsPerSlice ?? 64);
-  for (let y0 = 0; y0 < height; y0 += rows) {
+  // A TIME BUDGET, NOT A ROW COUNT — and the row count was a real defect, not a
+  // tuning preference. It was set to 64 against a 2,800-wide practice frame. A
+  // frame from the camera this app is built around is 5,600 wide, so the same
+  // 64 rows is twice the work, and it measured 3.8 s over 58 bands on a desktop:
+  // about 65 ms a slice, four times a frame, for four seconds. The editor is
+  // meant to stay usable while this runs, and at 65 ms a slice it would not.
+  //
+  // So each slice works until its budget is spent and then yields, whatever the
+  // frame's width and whatever the device's speed. 8 ms leaves room inside a
+  // 16 ms frame for the browser to paint the photograph the reader is already
+  // looking at. Total wall time is a little longer; that is the trade being made
+  // on purpose.
+  const budget = Math.max(1, opts.sliceMs ?? 8);
+  let y0 = 0;
+  while (y0 < height) {
     if (opts.shouldStop?.()) return null;
-    const y1 = Math.min(height, y0 + rows);
-    for (let y = y0; y < y1; y++) {
-      let i = y * width * 4;
+    const sliceStart = performance.now();
+    let y1 = y0;
+    do {
+      let i = y1 * width * 4;
       for (let x = 0; x < width; x++, i += 4) {
-        demosaicPixelLinearInto(src.cfa, x, y, px);
+        demosaicPixelLinearInto(src.cfa, x, y1, px);
         linear16[i] = toHalf(px[0]); linear16[i + 1] = toHalf(px[1]); linear16[i + 2] = toHalf(px[2]); linear16[i + 3] = ONE;
       }
-    }
+      y1++;
+    } while (y1 < height && performance.now() - sliceStart < budget);
+    y0 = y1;
     opts.onRow?.(y1, height);
-    // A macrotask, not a microtask: a resolved promise would run straight back
-    // here without ever letting the browser paint, which is the freeze this
-    // exists to prevent wearing a different hat.
-    await new Promise<void>((r) => setTimeout(r, 0));
+    await yieldToBrowser();
   }
   if (opts.shouldStop?.()) return null;
   return { image: { width, height, linear16, camMatrix: src.cam }, ms: performance.now() - t0, bytes: linear16.byteLength };
