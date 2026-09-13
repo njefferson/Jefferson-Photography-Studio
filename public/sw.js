@@ -63,6 +63,15 @@ self.addEventListener("activate", (e) => {
 // appear — the exact thing the button exists to avoid.
 self.addEventListener("message", (e) => {
   if (e.data && e.data.type === "SKIP_WAITING") self.skipWaiting();
+  // WHICH VERSION THIS WORKER IS. Asked by the update strip before it tells
+  // anybody an update is available, because a waiting worker is not the same
+  // thing as a newer app: navigations are network-first, so a reload hands the
+  // reader the new page immediately while the browser separately notices sw.js
+  // changed and parks a new worker. The strip used to announce that parked
+  // worker as "a new version", naming the version already on screen.
+  if (e.data && e.data.type === "VERSION" && e.ports && e.ports[0]) {
+    e.ports[0].postMessage(CACHE.replace(/^ips-/, ""));
+  }
 });
 
 self.addEventListener("fetch", (e) => {

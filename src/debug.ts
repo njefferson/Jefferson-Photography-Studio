@@ -10,6 +10,10 @@
 
 import "./style.css";
 import { buildDiagnostic } from "./diagnostic";
+// The test page gets the update strip too — it had never had one, so the page a
+// reader is most likely to be sitting on during a release was the one that
+// never told them a release had happened.
+import { wireUpdateStrip } from "./swupdate";
 import { decode } from "./decode";
 import { decodeOffThread, decodeLanes } from "./decodeClient";
 import { sniff } from "./import";
@@ -71,6 +75,8 @@ const textArea = $("dText") as HTMLTextAreaElement;
 // nothing is open here. So this one says where they are rather than leaving two
 // reports that look alike to be told apart by whoever notices something
 // missing.
+wireUpdateStrip();
+
 const refreshReport = () => buildDiagnostic(__APP_VERSION__, [
   { k: "Not in this report", v: "the photograph you have open — open the app itself and use its ⓘ for that" },
 ]).then((t) => { textArea.value = t; });

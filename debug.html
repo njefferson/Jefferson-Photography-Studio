@@ -21,6 +21,15 @@
     </script>
   </head>
   <body class="dbg">
+    <!-- THE SAME STRIP THE EDITOR HAS. It was never wired here, so this page —
+         the one somebody is most likely to be sitting on while a release goes
+         out — was the one page that never said a new version had arrived. §7h
+         is about the reader being told, and a diagnostic page has readers. -->
+    <div id="swStrip" class="sw-strip" hidden role="status">
+      <span class="sw-strip-text">A new version of this app is ready.</span>
+      <button id="swStripGo" type="button" class="sw-strip-go">Update now</button>
+      <button id="swStripLater" type="button" class="sw-strip-later">Not now</button>
+    </div>
     <main class="dbg-wrap">
       <p class="dbg-back"><a href="./ir.html">&lsaquo; Back to Infrared</a></p>
       <h1>Test page</h1>
