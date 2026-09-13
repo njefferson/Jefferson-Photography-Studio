@@ -171,7 +171,7 @@ export function setupIconPicker(container: HTMLElement): void {
     if (isStandaloneApp()) {
       live.innerHTML =
         `Your pick — <b>${name}</b> — is saved, but this installed app keeps the ` +
-        `icon it was added with; iPad tiles can't be repainted in place. To switch: ` +
+        `icon it was added with; a home-screen tile can't be repainted in place. To switch: ` +
         `touch and hold the Studio icon on your Home Screen → <b>Remove</b>, then open ` +
         `the Studio in <b>Safari</b> and <b>Add&nbsp;to&nbsp;Home&nbsp;Screen</b> ` +
         `again — it will come back wearing ${name}.`;
