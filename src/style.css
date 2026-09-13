@@ -2694,6 +2694,48 @@ small { font-size: max(0.6875rem, 0.8em); }
   :root { --txt-3: var(--txt-2); --line: var(--line-2); }
 }
 
+/* ---- forced-colors: active (Windows High Contrast and friends) ----------
+   THE FAILURE THIS FIXES: every "selected", "pressed" and "active" state in
+   this app is a BACKGROUND FILL — an accent behind the chip, the tab, the
+   look. Forced-colors replaces every background with a system colour, so all
+   of those collapse to identical and the app silently loses the answer to
+   "which one am I on". Nothing errors; it just stops telling you.
+
+   So state gets a second carrier that survives: an outline in the system
+   Highlight colour, which the platform guarantees is distinguishable from the
+   surrounding surface, plus the weight it already carries. That is the same
+   rule the rest of the app follows — colour is never the only carrier — applied
+   to the one mode where the colour is taken away.
+
+   Low-likelihood platform and cheap insurance, which is why it is a short
+   block and not a second design. */
+@media (forced-colors: active) {
+  .bar-btn[aria-pressed="true"],
+  .toggle[aria-pressed="true"],
+  .ratio-chip[aria-pressed="true"],
+  .mix-chip[aria-pressed="true"],
+  .panel-notes-toggle[aria-pressed="true"],
+  [role="tab"][aria-selected="true"],
+  .ptab.active,
+  .chip.active,
+  .session-thumb.active,
+  .looks-grid button.active,
+  .mask-row .mask-pick.active {
+    outline: 3px solid Highlight;
+    outline-offset: -3px;
+    font-weight: 700;
+  }
+  /* A focus ring must never be the same shape as the selected ring, or the two
+     become one signal. Focus sits OUTSIDE the box; selection sits inside it. */
+  :focus-visible { outline: 2px solid Highlight; outline-offset: 2px; }
+  /* Anything whose whole job is a colour — swatches, the palette miniature —
+     has to keep painting, or the picker becomes a list of identical boxes. */
+  .pal-sw, .swatch, .grade-wheel { forced-color-adjust: none; }
+  /* The update strip and the lost-graphics card are notices: give them an edge
+     so they read as separate from the page rather than dissolving into it. */
+  .sw-strip, .unsupported-card { border: 1px solid CanvasText; }
+}
+
 /* ---- selection: was browser default, i.e. unverified in every palette ---- */
 ::selection { background: var(--accent-soft); color: var(--txt); }
 
