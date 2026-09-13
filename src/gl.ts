@@ -1097,22 +1097,32 @@ export class Renderer {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, map.width, map.height, 0, gl.RED, gl.UNSIGNED_BYTE, u8);
   }
 
-  setImage(img: { width: number; height: number; pixels?: Uint8ClampedArray; linear?: Float32Array; camMatrix?: number[] }) {
+  setImage(img: { width: number; height: number; pixels?: Uint8ClampedArray; linear?: Float32Array; linear16?: Uint16Array; camMatrix?: number[] }) {
     const gl = this.gl;
     const { width, height } = img;
     this.imgW = width;
     this.imgH = height;
-    this.isLinear = !!img.linear;
+    this.isLinear = !!(img.linear || img.linear16);
     // Upload column-major for GLSL (our matrix is row-major).
     this.camMatrix = img.camMatrix ? rowToColMajor(img.camMatrix) : null;
     this.applySize();
     gl.bindTexture(gl.TEXTURE_2D, this.tex);
-    if (img.linear) {
+    if (img.linear || img.linear16) {
       // Float textures aren't reliably linear-filterable across devices; the
       // canvas is 1:1 with the texture, so NEAREST is correct anyway.
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, width, height, 0, gl.RGBA, gl.FLOAT, img.linear);
+      if (img.linear16) {
+        // HALF THE MEMORY, and the reason it matters is a device rather than a
+        // preference: a full-resolution frame is 16 MB a megapixel as float32 —
+        // about 340 MB for a 21-megapixel raw — and the iPad with the least room
+        // reports no memory figure at all, so the app cannot ask. Half-float
+        // holds ~11 bits of relative precision, which is what every HDR image
+        // pipeline uses for linear data, and the shader samples it identically.
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, width, height, 0, gl.RGBA, gl.HALF_FLOAT, img.linear16);
+      } else {
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, width, height, 0, gl.RGBA, gl.FLOAT, img.linear!);
+      }
     } else {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
