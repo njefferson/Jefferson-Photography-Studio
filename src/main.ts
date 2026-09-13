@@ -7961,7 +7961,16 @@ async function realThumbnails(): Promise<void> {
   const inFlight = new Set<Promise<void>>();
   // The PLANNED count, not the live one: nothing has decoded yet when a set
   // opens, so `decodeLanes()` is 0 here and this pass would size itself at one.
-  const lanes = Math.max(1, decodeLaneTarget());
+  //
+  // AND ONE LANE SHORT, DELIBERATELY. These decodes are speculative — nobody is
+  // waiting on a tile — while the decode behind a photo the reader just tapped
+  // is the only thing on screen they are waiting for, and the pool is
+  // first-come-first-served with no notion of which is which. Taking every lane
+  // put an interactive open behind up to four tile decodes; leaving one free
+  // means it never waits behind more than the rest of this pass's in-flight
+  // work. A priority queue in decodeClient would be the complete answer; this
+  // is the cheap half of it and it removes the worst case.
+  const lanes = Math.max(1, decodeLaneTarget() - 1);
   for (let guard = 0; guard < 10000; guard++) {
     if (gen !== thumbPass) { await Promise.allSettled([...inFlight]); return; }
     const view = inFlight.size < lanes ? nextThumbTarget() : undefined;
