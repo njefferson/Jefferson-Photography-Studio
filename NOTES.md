@@ -530,15 +530,6 @@ user-scalable=no.
 > different approach and mindset"). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
-- [ ] **Install and UNINSTALL instructions for every platform, not just iPad** —
-  the ⓘ explains adding to a home screen on iOS and nothing else. Android tends
-  to prompt on its own; on a computer, Edge, Chrome, Firefox and Safari each
-  install differently and the app says nothing. **And it owes the way back
-  out**: an installed web app is not a shortcut, so deleting the icon does not
-  remove it, and a reader handed the install has been handed something they
-  cannot obviously undo. Uninstall is the half that never gets written, and it
-  is the half somebody needs when they are already annoyed.
-
 - [ ] **A pass on the words themselves** — it is all far too wordy. Every panel,
   hint and dialog has grown by accretion, each addition reasonable on its own,
   and nobody has read the whole thing as a reader rather than as its author.
@@ -773,6 +764,23 @@ user-scalable=no.
   Also platform-branched: the lens rig's auto-lock instruction, which named an
   iPad Settings path to everybody and now names the path for the machine in
   hand, or none at all where it does not know one.
+
+- [x] **Install and UNINSTALL instructions for every platform, not just iPad** —
+  SHIPPED 2026-09-13. The ⓘ explained adding to a home screen on iOS and
+  nothing else, and said nothing at all about getting back out.
+  Both halves are lists now, on all three surfaces — Infrared's Help, Macro's
+  Help, and the launcher — covering iPhone/iPad, Android, Chrome or Edge on a
+  computer, Safari on a Mac, and Firefox (which cannot install one, said
+  plainly rather than left out).
+  **Uninstall leads with why it is not obvious:** an installed web app is not a
+  shortcut, so unpinning it from a taskbar or dock does not remove it — then
+  the route per platform, and what removal does and does not touch. It is the
+  half nobody writes and the half somebody needs when they are already annoyed.
+  Every row carries `data-plat` (and `data-browser` where the row is
+  browser-specific), so the device work above marks the reader's own row while
+  leaving the list whole — a reader is often setting up a machine other than
+  the one they are holding, and hiding the rest would answer the wrong
+  question.
 
 ## Shipped (roadmap archive)
 

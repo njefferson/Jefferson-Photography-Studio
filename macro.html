@@ -122,9 +122,16 @@
           <li data-plat="windows mac linux" data-browser="firefox"><strong>Firefox</strong> — cannot install web apps on a computer; it works normally in the browser.</li>
         </ul>
         <h4>Removing it again</h4>
-        <p><strong>An installed app is not a shortcut</strong>, so unpinning it does not remove it.
-        Hold the icon and delete it on a phone or tablet; on a computer open <code>chrome://apps</code>
-        or <code>edge://apps</code> and uninstall it there, or delete it from Applications on a Mac.</p>
+        <p>Worth knowing before you install: <strong>an installed app is not a shortcut</strong>, so
+        unpinning it from a taskbar or dock does not remove it.</p>
+        <ul class="install-list">
+          <li data-plat="ios"><strong>iPhone, iPad</strong> — hold the icon, <strong>Remove App</strong>, <strong>Delete App</strong>.</li>
+          <li data-plat="android"><strong>Android</strong> — hold the icon, <strong>Uninstall</strong>.</li>
+          <li data-plat="windows mac linux chromeos" data-browser="chrome"><strong>Chrome</strong> — open <code>chrome://apps</code>, right-click it, <strong>Remove</strong>.</li>
+          <li data-plat="windows mac linux" data-browser="edge"><strong>Edge</strong> — open <code>edge://apps</code>, then <strong>Uninstall</strong>. On Windows it is also listed under Settings → Apps.</li>
+          <li data-plat="mac" data-browser="safari"><strong>Mac — Safari</strong> — delete it from your Applications folder like any other app.</li>
+        </ul>
+        <p class="note">Removing the app does not touch photos you have already saved.</p>
         <div class="from-app" id="macroInstallFromApp" hidden>
           <p><strong>You're in the installed app right now</strong> — it has no Safari Share button,
           and links can't leave the app either, so Add to Home Screen can't be reached from here.
