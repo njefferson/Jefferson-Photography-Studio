@@ -11750,3 +11750,38 @@ from both. So the test detects "not the selected photograph" rather than
 specifically "the abandoned one", and what appeared was more likely a frame
 caught mid-swap than photo 0 fully painted. It separates correct from planted,
 which is its job; it is not a diagnosis of what a reader would have seen.
+
+## 2026-09-13 — the rounding fix shows up on the device, and the locating fingerprint has its first value
+
+**HALF PRECISION NOW COSTS 0.010 OF 255 INSTEAD OF 0.018.** The desktop's test
+page reports `What half the memory costs the picture: average 0.010 of 255,
+worst 4`, against 0.018 on every run before `half.ts` started rounding to
+nearest instead of truncating. That is the synthetic measurement — 0.055 down to
+0.028 over 300,001 values — arriving on a real device on a real photograph, at
+the same ratio. A change measured in a test and then confirmed in the product
+rather than assumed to have carried.
+
+**AND THE TILE IS 16 MS AGAIN** — 17, 15, 16 across three passes, against the
+1,030 ms that three consistent passes reported before the graphics contexts
+stopped leaking. This is a fresh page load rather than a second run in the same
+tab, so it is consistent with the fix rather than proof of it; the proof is the
+before-and-after in the container, where a second run went from never finishing
+in ten minutes to 107 seconds against the first run's 105.
+
+**THE COLOUR-ONLY DRAWN FINGERPRINT: `643772fa` on the desktop** (NVIDIA GTX
+1650 through ANGLE/Direct3D11). This is the line that locates where a drawn
+export's dependence on the machine actually lives. Its value alone says nothing
+— **an iPad's is what settles it**:
+
+- if an iPad also prints `643772fa`, then the whole colour half of the pipeline
+  is bit-identical across graphics chips AND across browser engines, and
+  everything that makes a drawn export machine-specific is inside the noise
+  reduction and the sharpening — a bounded place, with a real prospect of being
+  fixed, after which a drawn export would be as device-independent as today's
+  computed one;
+- if it differs, the plain pipeline varies too and that prospect is dead, which
+  is worth knowing before any work is spent on it.
+
+The operators-on drawn fingerprint stays `fe3da8c6` on this machine, the
+computed pixels stay `7afc9c2a`, and the saved file stays `e5ac8a29` at 504 KB —
+all unchanged across every release tonight, which is the point of taking them.
