@@ -14,14 +14,14 @@
       "sizes": "1280x800",
       "type": "image/jpeg",
       "form_factor": "wide",
-      "label": "The Macro Studio start panel, ready for a focus-shift set"
+      "label": "A focus-shift burst stacked into one frame that is sharp front to back"
     },
     {
       "src": "./screenshots/macro-narrow.jpg",
       "sizes": "720x1280",
       "type": "image/jpeg",
       "form_factor": "narrow",
-      "label": "Macro Studio on a phone-width screen"
+      "label": "Macro Studio stacking a burst on a phone-width screen"
     }
   ],
   "icons": [

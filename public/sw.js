@@ -23,7 +23,13 @@ const PRECACHE = [/* __PRECACHE_MANIFEST__ */];
 // content (binned once from the camera originals); if one is ever replaced
 // under the same name, bump THIS version too.
 const EXAMPLES = "ips-examples-v1";
-const isExampleRaw = (url) => url.pathname.includes("/examples/") && url.pathname.endsWith(".dng");
+// Anything under /examples/ that the reader can ask for: the Infrared practice
+// RAWs and the Macro practice burst. Both are immutable bytes binned once from
+// camera originals, both are fetched on demand rather than precached, and both
+// belong in the cache that SURVIVES a release — a reader who has pulled the
+// macro set down should not re-download it because the app shipped a fix.
+const isExampleAsset = (url) =>
+  url.pathname.includes("/examples/") && /\.(dng|jpg)$/.test(url.pathname);
 
 self.addEventListener("install", (e) => {
   // Populate the NEW cache BEFORE activating (the activate step wipes the old
@@ -116,7 +122,7 @@ self.addEventListener("fetch", (e) => {
       // that race).
       if (res.ok) {
         const copy = res.clone();
-        const bucket = isExampleRaw(url) ? EXAMPLES : CACHE;
+        const bucket = isExampleAsset(url) ? EXAMPLES : CACHE;
         e.waitUntil(caches.open(bucket).then((c) => c.put(req, copy)).catch(() => {}));
       }
       return res;
