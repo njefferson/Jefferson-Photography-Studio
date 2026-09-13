@@ -87,6 +87,20 @@ const renderer = (() => {
     throw err;
   }
 })();
+// THE GRAPHICS GOING AWAY IS SAID OUT LOUD NOW. Before this, every draw after a
+// lost context quietly did nothing: the photograph vanished, the strip and the
+// histogram carried on looking normal beside the empty space, and clearing the
+// session did not help — a session does not make a new context, only reloading
+// does. Nobody could be expected to work that out from a blank rectangle.
+renderer.onContextLost = () => {
+  const el = document.getElementById("glLost");
+  if (el) el.hidden = false;
+  console.warn("graphics context lost — the photograph cannot be drawn until the page is reloaded");
+};
+{
+  const b = document.getElementById("glLostReload");
+  if (b) b.addEventListener("click", () => location.reload());
+}
 let current: DecodedImage | null = null;
 let currentFile: ImportedFile | null = null;
 

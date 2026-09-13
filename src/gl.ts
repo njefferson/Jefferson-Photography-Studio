@@ -702,6 +702,17 @@ export class Renderer {
   private straighten = 0; // last-applied straighten angle (degrees), for inverse mapping
   private isLinear = false;
   private isHalf = false;   // the texture is RGBA16F rather than RGBA32F
+  private contextLost = false;
+  /** Told when the browser takes the graphics away — see the constructor. */
+  onContextLost?: () => void;
+  onContextRestored?: () => void;
+
+  /** True once the browser has taken the context away. Every draw after that is
+   *  a no-op whatever this class does, so callers check it rather than painting
+   *  nothing and reporting success. */
+  get lost(): boolean {
+    return this.contextLost || this.gl.isContextLost();
+  }
   private camMatrix: Float32Array | null = null;
   private patchHalf = new Uint16Array(0); // reused scratch for half-float patches
   private glowTex: WebGLTexture;
@@ -778,6 +789,31 @@ export class Renderer {
     const gl = canvas.getContext("webgl2", { preserveDrawingBuffer: true });
     if (!gl) throw new Error("WebGL2 is required and not available on this device.");
     this.gl = gl;
+    // A LOST CONTEXT USED TO BE A BLANK EDITOR WITH NO EXPLANATION, AND IT
+    // SURVIVED CLEARING THE SESSION.
+    //
+    // The browser takes the graphics context away when it runs short of memory,
+    // when iOS backgrounds the tab for long enough, or when the driver resets.
+    // Every draw after that silently does nothing — no error, no exception, no
+    // warning — so the photograph disappears, and starting a fresh session does
+    // not help, because a session does not make a new context. Only reloading
+    // the page does. Somebody hitting this has no way to know that.
+    //
+    // preventDefault is what makes restoration POSSIBLE at all; without it the
+    // browser never fires the restored event. Actually rebuilding every program,
+    // texture and uniform is a bigger piece of work than this, so for now the
+    // job is to stop it being silent and to say the one thing that fixes it.
+    canvas.addEventListener("webglcontextlost", (e) => {
+      e.preventDefault();
+      this.contextLost = true;
+      this.onContextLost?.();
+    });
+    canvas.addEventListener("webglcontextrestored", () => {
+      // Not treated as recovered: the programs and textures this class built are
+      // all gone, and pretending otherwise would draw nothing while claiming to
+      // work. The flag stays set until a reload builds a real one.
+      this.onContextRestored?.();
+    });
     this.prog = link(gl, VERT, FRAG);
     gl.useProgram(this.prog);
 
