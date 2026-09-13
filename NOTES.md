@@ -12355,3 +12355,45 @@ per-element sweep can say.
 Worth keeping about the shape: the fix is right, the item's reasoning was not,
 and both facts matter. Shipping it while believing "every state was broken"
 would have left the next session with a false model of the stylesheet.
+
+## The macro stacker, measured on a real burst for the first time, 2026-09-13
+
+The owner supplied a focus-shift set — a shared folder of NEF+JPG pairs,
+NOA_3538…3584, Nikon Z50_2. Thirteen consecutive JPEGs at **5568×3712** were run
+through Macro Studio end to end, which had never been done with real frames:
+every earlier check used synthetic or single images, and the manifest screenshot
+of the app shows an empty start panel because nothing here could be fed to it.
+
+**It works.** Preview stack (2048 long edge): **8.8–9.0s** for 13 frames. Full
+resolution, tiled, in the export worker: **5568×3712 in 34s**, peak **102 MB**
+JS heap. Both in headless Chromium on a software rasteriser, so a real device
+with a GPU is the floor, not the ceiling. The result is sharp front to back
+across the flower heads with the background dissolved smooth — no selection rim,
+no per-frame bloom contour, which are the two things that go wrong first.
+
+**AND THE FIRST VERDICT WAS THE INSTRUMENT, AGAIN.** A focus check over a 4×4
+grid reported the stack softer than the best single frame in **15 of 16
+regions** — against a stack that is visibly correct. Fourteen of those cells are
+background, and the stacker averages the out-of-focus background to a stable
+mean ON PURPOSE (`sumR/sumG/sumB` in `stack.ts`). Averaging removes grain; a
+Laplacian focus measure counts grain as detail. The one cell containing the
+subject read **1.44×** the best single frame, which is the only cell the claim
+was ever about. A measure applied where the behaviour is deliberately the
+opposite will report the design as a defect every time, at full confidence.
+
+**Two walk faults worth not repeating.** The first walk loaded the frames and
+polled for a result without ever pressing **Stack**, so both sides waited for
+the other; the second waited on `#result.src` when `#result` is a `<canvas>`,
+which has no `src` and never would have finished. A walk that can never
+terminate looks exactly like a slow one.
+
+**What it found in the product:** the on-screen stack is a 2048-long-edge
+preview and the app said nothing about it. The reader sees a finished-looking
+picture, pinches in, finds it soft, and the only honest thing on screen was the
+Export button's own label. The status line now names both sizes.
+
+**STILL THE OWNER'S CALL, not a session's:** whether any of these frames ship
+as a bundled macro practice set (the IR side has 44 practice DNGs and the macro
+side has none, which is why its manifest screenshot shows an empty panel), and
+whether a stacked result may be used as that screenshot. Both publish the
+owner's own photographs in a public repo under their name.
