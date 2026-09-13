@@ -620,23 +620,31 @@ user-scalable=no.
   which means lifting the opening baseline out of `establishFreshEdit` as a pure
   function — a refactor of a load-bearing function with undo semantics attached
   (see "Adding an EditParams field" in CLAUDE.md), not a small change.
-- [ ] **Exporting a sharpened photo that is also straightened** — the sibling of
-  the 119x straighten fix of 2026-09-12, and deliberately not touched in it.
-  `makeRowDetail` in `src/raw/detail.ts` has the same eager-row shape at line 88:
-  it fills a cached row right across the image the first time any part of it is
-  read, which is right for a scan that walks straight down the picture and
-  catastrophic the moment a straighten angle makes it walk on a slant. The
-  denoise pass was the heavier of the two and is fixed; a straightened export
-  still pays this one whenever Sharpen or Texture is off zero. Same remedy, same
-  bit-identical proof required (build the old implementation beside the new one
-  and compare, rather than writing a fresh reference).
-- [ ] **How long an export really takes** — unmeasured, and the straighten case
-  showed why that matters: a 119x cost sat in an ordinary-looking export for
-  however long it had been there. Nothing has timed where a plain export's
-  seconds actually go — the decode, the per-pixel edit, or the JPEG encode — so
-  there is no basis for saying which one to attack. Measure first, on a real
-  24-megapixel frame at full quality, and report the split before changing
-  anything.
+- [ ] **Opening a set on several cores** — measured 2026-09-13 and written up
+  under "where the work still happens on one thread". Every tile in the strip and
+  the quick look grid is rendered pixel by pixel ON THE MAIN THREAD by
+  `makeThumb`, and every photograph is decoded by ONE worker, one after another.
+  Eight practice raws: 14.1 seconds to a complete strip, 1.8 a photograph, with
+  the main thread blocked for 5.2 of them across 22 long tasks, the worst
+  1,841ms — 37% of the open unable to answer a tap. A forty-photo set
+  extrapolates to about seventy seconds, half a minute of it frozen. The shape
+  is the one the export already uses: a pool of workers, each holding its own
+  copy, with a job queue in front; `decodeClient.ts` becomes the pool and
+  `makeThumb` moves into it. The lens rig queues behind the same single worker
+  for ninety flats and gets the same win for free.
+- [ ] **The export drawn rather than computed** — scoped 2026-09-13, waiting on
+  numbers from the device. The live view already runs the entire edit as shaders
+  in `gl.ts`; `export.ts` implements every one of them again in TypeScript, and
+  both files carry comments asking whoever edits one to keep the constants in
+  step by hand. Drawing the export through the shaders that already exist would
+  be faster AND would end that duplication — one implementation of the edit
+  instead of two, with the preview and the export provably the same thing. What
+  it waits on is the test page's new probes on a real iPad: whether a whole frame
+  fits in one texture, whether a background thread can draw, and above all what a
+  frame-sized render costs to READ BACK, which is the part a preview never pays.
+  The decision that comes with it is the owner's: a drawn export cannot be
+  byte-identical to today's, because a graphics chip computes in float where the
+  processor uses doubles. It would match the PREVIEW instead.
 - [ ] **Lens profiles that cannot vanish** — owner ask, 2026-09-12: the measured
   profiles "shouldn't suddenly disappear for a user expecting them to be
   durable". They live in this browser's localStorage; the app asks the browser
@@ -649,6 +657,22 @@ user-scalable=no.
   survives what.
 
 ## Shipped (roadmap archive)
+
+- [x] **2.40 — the export on several cores, and a straightened export that no
+  longer takes minutes** — SHIPPED 2026-09-13 (PR #99, rebase-merged on the
+  owner's go). The per-pixel pass runs on up to four threads, each calling the
+  same `exportImage` over a slice of the output: 46.8s to 19.7s on a
+  20.9-megapixel raw, 36.9s to 15.6s on the camera JPEG of the same frame, and
+  byte-for-byte identical output proven by the file's own sha256 from one thread
+  and from three. A band is a rectangle cut along whichever axis the export's
+  loop runs, because rows alone left every portrait frame single-threaded and the
+  first measurement caught it. Memory measured at 1.88 GB on one thread against
+  2.19 on three, so the thread count walks down until the estimate fits a 600 MB
+  budget. Also in it: the sharpening pass fills rows where they are read (a
+  straightened 1.9-megapixel crop from 207 seconds to 8.8) and stops holding a
+  buffer the sampler is allowed to reuse, which had been putting a wrong pixel at
+  the start of every row whenever denoise was at zero and sharpen or texture up.
+  Both halves of that are §285 and §286 in the shared lessons.
 
 - [x] **2.3 — D5300 & full-spectrum support** — SHIPPED 2026-07-25 (PR #68,
   rebase-merged; owner on-device pass on staging). Per-file NEF decode levels
@@ -10435,3 +10459,89 @@ comparison.
 its twenty-five taps, which is the shape that measured 18% here. Whether the same
 span hoist pays there is unmeasured. Its row cache is already lazy, so this is a
 speed question and not a correctness one.
+
+## 2026-09-13 — where the work still happens on one thread, and what the graphics chip could take
+
+Written after the export learned to use several cores, because the question that
+followed was the right one: is anything else in this app doing by hand what the
+machine already has hardware for? Four places, measured.
+
+**THE STRIP AND THE QUICK LOOK GRID RENDER ON THE MAIN THREAD, PIXEL BY PIXEL.**
+`makeThumb` runs the compiled edit over every pixel of every tile in a plain
+loop, on the main thread, one photograph after another. Measured opening eight
+practice raws: **14.1 seconds to a complete strip — 1.8 a photograph — with the
+main thread blocked for 5.2 of them across 22 long tasks, the worst 1,841ms.**
+That is 37% of the open unable to answer a tap, and the worst single freeze is
+nearly two seconds. A forty-photo set extrapolates to about seventy seconds with
+half a minute of that frozen.
+
+**DECODE IS ONE WORKER, AND IT IS SERIAL.** `decodeClient.ts` constructs exactly
+one, deliberately and with a good fallback story, and every decode in the app
+queues behind it: opening a set, the quick look, and the lens rig measuring
+ninety flats one file at a time. It was a real win when it landed — the main
+thread stopped freezing during a set open — and it left the *parallelism* on the
+table. The export's worker pool is the shape this wants: N workers, each holding
+its own copy, a job queue in front.
+
+**THE LIVE VIEW IS ALREADY ON THE GRAPHICS CHIP, AND THE EXPORT RE-IMPLEMENTS IT
+ON THE PROCESSOR.** This is the finding that matters most and it is not a
+performance observation. `gl.ts` carries the whole edit as shaders — noise
+reduction, sharpen, texture, clarity, dehaze, halation, grain, vignette, the
+hot-spot and lens corrections, the tone curves, the LUT and the perspective warp.
+`export.ts` implements every one of them again in TypeScript. Both files carry
+comments instructing whoever edits one to keep the literals in step with the
+other by hand ("mirror these literals in gl.ts"). Two copies of one edit, kept
+identical by discipline, is a defect waiting on the next person who changes one
+constant — and making the processor copy three times faster is a lap around it.
+
+**AND A CONTAINER CANNOT SCOPE THAT**, which is why the answer is a page rather
+than an estimate. A headless browser draws through a software rasteriser: its
+graphics numbers measure the software. So the test page (`debug.html`) grew the
+probes the decision actually needs, and the device answers them:
+
+- the largest texture, and whether a whole 5600x3728 frame fits in one;
+- whether float and 16-bit drawing are available, which decides whether the
+  print-master TIFF path could be drawn or has to stay on the processor;
+- **a frame-sized render with twenty-five weighted taps and an exponential in
+  every pixel** — the shape of the work that is 60% of an export — drawn and then
+  read back in bands, timed separately;
+- whether a background thread can draw at all (`OffscreenCanvas` with WebGL2 in a
+  worker), because a full-resolution draw on the main thread would freeze the
+  editor for its duration, which is the thing the threaded export was built to
+  stop doing;
+- and how many threads THIS device's export would actually use, and whether it
+  was the core count or the memory budget that decided.
+
+**What the container says, recorded as the software-rasteriser figure it is:**
+largest texture 8192 (a frame fits), float available, drawing in a worker
+available, the frame drawn in 2.9ms and **read back in 2,344ms**. The draw is
+meaningless — a software rasteriser defers everything to the read — but the shape
+of the answer is the thing to carry: **on this path the readback dominates, and
+the readback is the part a live preview never pays.** If a real device reads a
+frame back in tens of milliseconds, a drawn export is seconds and worth building.
+If it reads it back in seconds, the processor path stays and the duplication has
+to be solved a different way.
+
+**THE SCOPE, IF THE ANSWER COMES BACK FAVOURABLE.** Not a rewrite: the shaders
+exist and the export already knows how to split work.
+
+1. Render the export through `gl.ts`'s own program at full resolution, into a
+   texture rather than the screen, in tiles if the frame is larger than the
+   device's limit, reading back band by band. In a worker if the device draws in
+   one, on the main thread with the existing yields if not.
+2. Keep the processor path for what the shader does not do — heal patches and
+   stickers are bitmaps composited separately, and the 16-bit TIFF master needs
+   float readback — and fall back to it whole on any failure, exactly as the
+   threaded export does.
+3. **The proof cannot be the hash this time**, and that is the part to decide
+   before starting: a graphics chip computes in float where the processor uses
+   doubles, so a drawn export will not be byte-identical to today's. It would be
+   identical to THE PREVIEW instead, which is arguably the more honest promise —
+   what you saw is what you saved — but it is a product decision about what
+   "correct" means, and it is not a session's to make. The measurable form is a
+   difference image against the processor export with a stated tolerance, plus
+   the same band harness for seams.
+
+**WHAT WOULD BE TRUE AFTERWARDS** is worth stating because it is the real prize:
+one implementation of the edit instead of two, with the preview and the export
+provably the same thing rather than two files hand-kept in step.
