@@ -23,6 +23,7 @@
 import { Renderer } from "./gl";
 import { getSource, proxyFactorFor } from "./export";
 import { demosaicPixelLinearInto } from "./raw/demosaic";
+import { toHalf } from "./half";
 import { srgbDisplayToP3Display } from "./icc";
 import type { ImportedFile } from "./import";
 import type { DecodedImage } from "./decode";
@@ -83,28 +84,6 @@ export function canDrawFrame(params: EditParams): boolean {
  *  it at interactive speed, the proxy stops being necessary — and with it goes
  *  the whole footprint problem the tap scale exists to paper over, because the
  *  preview and the export would then be the same pixels at the same scale. */
-/** float32 -> IEEE half, the layout a RGBA16F texture wants.
- *
- *  Written out rather than reached for, because the browser has no primitive
- *  for it and the alternatives are worse: `Math.fround` rounds to float32 and
- *  stops there, and a DataView per pixel would be twenty million calls. The
- *  values here are linear sensor data in [0, 1] with no infinities and no NaNs
- *  — everything the general case worries about — so this handles the normal
- *  range, flushes subnormals to zero (a value that small is darker than the
- *  sensor's own noise floor) and clamps above. */
-const f32 = new Float32Array(1);
-const i32 = new Int32Array(f32.buffer);
-function toHalf(v: number): number {
-  f32[0] = v;
-  const x = i32[0];
-  const sign = (x >> 16) & 0x8000;
-  let e = ((x >> 23) & 0xff) - 127 + 15;
-  const m = x & 0x7fffff;
-  if (e <= 0) return sign;                    // too small to represent: zero
-  if (e >= 31) return sign | 0x7bff;          // too large: the biggest finite half
-  return sign | (e << 10) | (m >> 13);
-}
-
 export function buildLinearSource(file: ImportedFile, current: DecodedImage, half = false): {
   image: { width: number; height: number; pixels?: Uint8ClampedArray; linear?: Float32Array; linear16?: Uint16Array; camMatrix?: number[] };
   ms: number;
