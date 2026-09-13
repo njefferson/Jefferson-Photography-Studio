@@ -112,15 +112,23 @@ See **`PLAN.md`** for the full build plan.
       stays computed, so the photograph is still identical on every device),
       while the drawn export is four to twenty times faster AND makes the saved
       file depend on the graphics chip that saved it — two devices drawing the
-      same photograph fingerprint `fe3da8c6` and `38b69ce1`. So 3.0 can ship
-      with the first half built and the second half decided, and the decision
-      is the owner's with both sides quantified. That is an
+      same photograph fingerprint `fe3da8c6` and `38b69ce1` — and a third,
+      `a466a4cb`, from the second iPad, two of those on the SAME engine, so it is
+      per graphics chip rather than per browser. So 3.0 can ship with the first
+      half built and the second half decided, and the decision is the owner's
+      with both sides quantified.
+      **AND THE HALVES HAVE TO BE NAMED CAREFULLY**: calling the first one "full
+      size" in a report collided head-on with the export panel's own "Full
+      (native)" scale and its Quality slider, and the owner rightly asked which
+      of the two was being decided. It is neither — it is the editor's internal
+      working copy — and the only thing actually being decided is the drawn
+      export. That is an
       identity change rather than a capability one because it is the same
       product working a different way: the picture on screen and the picture
       saved become the same pixels, and the machine's own hardware does the
       work it was already sitting there able to do. **Nothing between now and
       then takes a 3.x number**, and the work that lands in it is the two
-      roadmap items named "The live view at full resolution" and "The export
+      roadmap items named "The editor's WORKING COPY at native resolution" and "The export
       drawn rather than computed" — measured on three devices on 2026-09-13
       and written up in the entries of that date.
   - **Capability (middle number)** — a release that ADDS something: a new
@@ -650,8 +658,13 @@ user-scalable=no.
   queued behind a single worker, with the export's pool already written as the
   shape that fixes it. Measure the real split on a device first — the test page
   reports both halves now.
-- [ ] **The live view at full resolution, which makes the export a readback** —
-  **ships in 3.0, the optimized release (owner declaration, 2026-09-13)** —
+- [ ] **The editor's WORKING COPY at native resolution** — never call this "full
+  size" to the owner: the export panel already owns that phrase, its scale
+  control reads "Full (native)" and a Quality slider sits at 92 beside it, and a
+  crop already changes the output's dimensions. NOTHING in that panel changes.
+  This is the internal copy the live view is drawn from, half resolution today
+  and invisible as a control. **Ships in 3.0, the optimized release (owner
+  declaration, 2026-09-13)** —
   MEASURED ON ALL THREE DEVICES 2026-09-13 and the premise for the proxy is gone:
   a full-resolution HALF-FLOAT source draws a screen-sized frame NO WORSE than
   today's quarter-size proxy on every device measured. On the iPads the three
@@ -11225,3 +11238,32 @@ the quarter-size proxy on any of them. **Frame time is settled and it is not the
 deciding factor; memory is (170 MB against 340 for a 21-megapixel frame), and the
 reason to do it was always that the screen and the saved file become the same
 pixels.**
+
+## 2026-09-13 — a name that collided with a control, and what was actually being decided
+
+The closing question put to the owner read "full size only, or both". **Both
+words were wrong.** The export panel's scale control already reads **"Full
+(native)"**, with a **Quality** slider at 92 beside it, and a crop already changes
+the output's dimensions — so "full size" pointed at two existing controls and an
+obvious third question, none of which were the subject. The owner asked, exactly
+as they should have, which of the two they were deciding.
+
+**What the phrase was standing in for**: the editor's INTERNAL WORKING COPY. A
+raw is decoded at half resolution for the live view today, and the export
+separately re-reads the file at native resolution and recomputes the whole edit
+on the processor — two copies of the photograph, two copies of the edit. The
+change makes the working copy native so there is one of each. It is invisible as
+a control: no scale, no quality, no crop behaviour changes.
+
+**And the question itself was malformed.** The working-copy change has no
+measured cost on any of four devices, which by this repo's own rule makes it work
+rather than a decision. Offering it as one of two options manufactured a choice
+where there was one thing to do and one thing to decide. The single real question
+is whether the export is DRAWN (about a second, and the file belongs to the
+machine) or stays COMPUTED (four to twenty seconds, and the photograph is
+identical on every machine).
+
+**The rule this earns**: before naming a change in a report, check the words
+against the app's own controls. A term that collides with a control does not read
+as a new idea — it reads as one of the controls, and the reader has to spend a
+question finding out it is neither.
