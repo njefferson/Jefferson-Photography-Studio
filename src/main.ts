@@ -10938,16 +10938,20 @@ const VENMO_URL = "https://venmo.com/u/noahjefferson";
   const a2hs = $("a2hs") as HTMLDivElement;
   const installBtn = $("a2hsInstall") as HTMLButtonElement;
   const A2HS_KEY = "ips-a2hs";
-  const standalone =
+  // NOT A CONST READ ONCE AT STARTUP, which is what this was. `refresh()` can
+  // only change its mind about something it re-reads, and the one fact most
+  // likely to change while the page is open is whether the app got installed.
+  const standaloneNow = () =>
     window.matchMedia("(display-mode: standalone)").matches ||
     (navigator as Navigator & { standalone?: boolean }).standalone === true;
+  let installed = false;   // set by the appinstalled event, below
   // iPadOS in desktop mode reports MacIntel + touch; catch it too.
   const isIOS =
     /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   let installEvt: (Event & { prompt?: () => Promise<void> }) | null = null;
 
-  const shouldShow = () => !standalone && localStorage.getItem(A2HS_KEY) !== "no" && (isIOS || !!installEvt);
+  const shouldShow = () => !standaloneNow() && !installed && localStorage.getItem(A2HS_KEY) !== "no" && (isIOS || !!installEvt);
   const refresh = () => { a2hs.hidden = !shouldShow(); };
 
   window.addEventListener("beforeinstallprompt", (e) => {
@@ -10957,6 +10961,29 @@ const VENMO_URL = "https://venmo.com/u/noahjefferson";
     ($("a2hsText") as HTMLElement).textContent = "Use it like an app — install for full screen & offline:";
     refresh();
   });
+  // OFFERING AN INSTALL TO SOMEBODY WHO HAS JUST INSTALLED IT.
+  //
+  // Reported from a real device: the app asked to be installed on its own
+  // welcome screen immediately after being installed, and only closing and
+  // reopening cleared it. On Chromium and Android the browser says so — this
+  // event fires the moment an install completes — and the app was not
+  // listening, so the tab you installed FROM kept asking.
+  //
+  // It does not solve the iOS case and nothing here can: Safari has no such
+  // event, installing happens in the share sheet where the page cannot see it,
+  // the tab never becomes standalone, and an installed iOS web app gets its own
+  // storage partition — so the app cannot even leave a note for the tab to
+  // find. On iOS the honest remedy is the dismiss button, and making it
+  // findable is a design job rather than this one.
+  window.addEventListener("appinstalled", () => {
+    installed = true;
+    localStorage.setItem(A2HS_KEY, "no");   // and do not ask again on a later visit
+    refresh();
+  });
+  // A page that becomes standalone while open (a desktop browser can do this)
+  // should stop asking at that moment rather than on the next load.
+  window.matchMedia("(display-mode: standalone)").addEventListener?.("change", refresh);
+
   installBtn.addEventListener("click", async () => {
     await installEvt?.prompt?.();
     a2hs.hidden = true;
