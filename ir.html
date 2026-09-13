@@ -182,7 +182,11 @@
           <p id="hint" role="status" aria-live="polite">Edit infrared photos — RAW (NEF / DNG) unlocks the full color magic.</p>
           <label class="open-btn welcome-open"><input id="welcomeFile" class="file-input" type="file" accept=".dng,.nef,.zip,.ipslook,image/*" multiple />Open image(s)</label>
           <p class="welcome-open-hint">One photo to edit — or several to work as a session: big previews you switch between, each keeping its own edit, all held safely until you're done.</p>
-          <p class="welcome-open-hint"><strong>If the Files picker sits there after you tap Open:</strong> that wait is iOS fetching your photos out of iCloud, before this app is handed anything. A file with a cloud badge, or one that says &ldquo;Waiting&hellip;&rdquo;, is not on the iPad yet. Download the folder in Files first and it opens straight away — see <strong>Help &rarr; Why the Files picker hangs</strong>.</p>
+          <!-- iCloud and the Files picker are an iOS story, and this paragraph
+               was on the first screen every reader sees, on every machine. It
+               ships hidden and is revealed on iOS only (src/platform.ts); the
+               full version, for every platform, is in Help either way. -->
+          <p class="welcome-open-hint" data-only-plat="ios" hidden><strong>If the Files picker sits there after you tap Open:</strong> that wait is iOS fetching your photos out of iCloud, before this app is handed anything. A file with a cloud badge, or one that says &ldquo;Waiting&hellip;&rdquo;, is not on this <span data-device-noun>device</span> yet. Download the folder in Files first and it opens straight away — see <strong>Help &rarr; Why the Files picker hangs</strong>.</p>
           <label class="welcome-batch" id="welcomeQuickBtn"><input id="welcomeQuickFiles" class="file-input" type="file" accept=".dng,.nef,.zip,.ipslook,image/*" multiple />Quick look a folder…</label>
           <p class="welcome-batch-hint">See what's in a folder: an instant grid of auto-balanced previews, nothing saved, gone when you close. Tap the keepers to send them into a session.</p>
           <button class="welcome-batch" id="welcomeBatchBtn" type="button">Batch process a set…</button>
@@ -965,7 +969,7 @@
           <p class="note">An infrared-converted lens sends a little more infrared straight up the middle than it does to the corners, so the centre of every frame comes out brighter and a slightly different colour. This works out yours, from your own photographs, on this device.</p>
           <p class="note"><strong>What to give it:</strong> frames of nothing &mdash; a plain wall in open shade, or clear sky away from the sun, filling the whole frame, no lens hood, and metered DOWN: nothing blown. Four or five at each focal length you actually use. RAW or JPEG, both work; the RAW is better.</p>
           <p class="note"><strong>A wall is the easier one, and much easier wide.</strong> At a wide focal length the frame takes in so much sky that cloud, horizon or a bright patch near the sun almost always creep in, and any of those makes the frame a photograph of something rather than a flat. A shaded wall has no gradient, no cloud and no sun in it. <strong>Overcast is not the easy option it sounds like</strong> &mdash; in infrared, cloud is bright and textured while clear sky is dark and smooth, so an overcast sky is one of the worst things to point this at.</p>
-          <p class="note"><strong>Give it the whole set at once.</strong> Select as many as you like, and a <strong>.zip</strong> counts as everything inside it &mdash; which is how a folder of RAW files travels on an iPad, since zipping is the only way iOS hands over a NEF without turning it into a JPEG first. Frames are read one at a time, so the size of the zip does not matter. They are sorted into lenses and focal lengths for you.</p>
+          <p class="note"><strong>Give it the whole set at once.</strong> Select as many as you like, and a <strong>.zip</strong> counts as everything inside it &mdash; which is how a folder of RAW files travels on an iPhone or iPad, where zipping is the only way iOS hands over a NEF without turning it into a JPEG first. Everywhere else you can simply select the files. Frames are read one at a time, so the size of the zip does not matter. They are sorted into lenses and focal lengths for you.</p>
           <p class="note">Nothing is uploaded and nothing leaves this device. What comes out is a small block of numbers you can copy or save &mdash; a few kilobytes of text, not the photographs.</p>
         </details>
         <div class="dbg-actions">
@@ -1298,8 +1302,14 @@
         </ul>
         </details>
         <details class="help-sec">
-          <summary>Why the Files picker hangs</summary>
+          <summary>Why the Files picker hangs (iPhone, iPad)</summary>
 
+        <!-- REFERENCE MATERIAL, so it stays visible on every platform: somebody
+             on a computer may be setting up the iPad they shoot with. What it
+             owes them is a heading that says at a glance whether it is about
+             them, rather than a page of iOS instructions in a neutral voice. -->
+        <p class="help-scope">This one is about iPhone and iPad. On Android, Windows, Mac or Linux the file
+        picker hands files over straight away and none of the below applies.</p>
         <p>You pick a folder of raw files, tap <strong>Open</strong>, and nothing happens for a long time with
         nothing on screen to say why. <strong>That wait is not this app.</strong> Everything you see until the
         picker closes belongs to iOS: this app is not running, has not been handed a single file, and has no way
@@ -1311,13 +1321,13 @@
         folder of 40 raw files is a gigabyte or more over whatever connection you are on.</p>
         <p>How to tell, and what to do:</p>
         <ul>
-          <li>In the picker, a file with a <strong>cloud badge</strong> beside its name is not on the iPad. One
+          <li>In the picker, a file with a <strong>cloud badge</strong> beside its name is not on the device yet. One
           with no badge is local and opens immediately. The picker cannot sort or filter by this — the badge is
           the only signal Apple gives you.</li>
           <li><strong>Download the folder before you open it.</strong> In the Files app, touch and hold the
           folder (or the selected files) and choose <strong>Download Now</strong>. Wait for the badges to
           disappear, then come back here.</li>
-          <li><strong>Keep it local.</strong> iCloud Drive&rsquo;s settings carry an <strong>Optimize iPad
+          <li><strong>Keep it local.</strong> iCloud Drive&rsquo;s settings carry an <strong>Optimize iPhone/iPad
           Storage</strong> switch — that is the one doing the evicting. Turning it off keeps shoots on the
           device. (Apple has moved where it sits more than once, so look for it under iCloud in Settings rather
           than a fixed path.)</li>
@@ -1365,21 +1375,21 @@
 
         <p>You get a full-screen icon that works offline. Open the page you want, then:</p>
         <ul class="install-list">
-          <li><strong>iPhone, iPad</strong> — Safari's <strong>Share</strong> button, then <strong>Add to Home Screen</strong>.</li>
-          <li><strong>Android</strong> — Chrome usually offers it; otherwise the <strong>⋮</strong> menu → <strong>Install app</strong>.</li>
-          <li><strong>Windows, Mac, Linux — Chrome or Edge</strong> — the install icon at the right of the address bar, or the browser menu → <strong>Install</strong>.</li>
-          <li><strong>Mac — Safari</strong> — <strong>File → Add to Dock</strong>.</li>
-          <li><strong>Firefox</strong> — cannot install web apps on a computer. It works normally in the browser; nothing is missing except the icon.</li>
+          <li data-plat="ios"><strong>iPhone, iPad</strong> — Safari's <strong>Share</strong> button, then <strong>Add to Home Screen</strong>.</li>
+          <li data-plat="android"><strong>Android</strong> — Chrome usually offers it; otherwise the <strong>⋮</strong> menu → <strong>Install app</strong>.</li>
+          <li data-plat="windows mac linux chromeos" data-browser="chrome edge"><strong>Windows, Mac, Linux — Chrome or Edge</strong> — the install icon at the right of the address bar, or the browser menu → <strong>Install</strong>.</li>
+          <li data-plat="mac" data-browser="safari"><strong>Mac — Safari</strong> — <strong>File → Add to Dock</strong>.</li>
+          <li data-plat="windows mac linux" data-browser="firefox"><strong>Firefox</strong> — cannot install web apps on a computer. It works normally in the browser; nothing is missing except the icon.</li>
         </ul>
         <h4>Removing it again</h4>
         <p>Worth knowing before you install: <strong>an installed app is not a shortcut</strong>, so
         unpinning it from a taskbar or dock does not remove it.</p>
         <ul class="install-list">
-          <li><strong>iPhone, iPad</strong> — hold the icon, <strong>Remove App</strong>, <strong>Delete App</strong>. This deletes its saved sessions too.</li>
-          <li><strong>Android</strong> — hold the icon, <strong>Uninstall</strong>.</li>
-          <li><strong>Chrome</strong> — open <code>chrome://apps</code>, right-click it, <strong>Remove</strong>.</li>
-          <li><strong>Edge</strong> — open <code>edge://apps</code>, then <strong>Uninstall</strong>. On Windows it is also listed under Settings → Apps.</li>
-          <li><strong>Mac — Safari</strong> — delete it from your Applications folder like any other app.</li>
+          <li data-plat="ios"><strong>iPhone, iPad</strong> — hold the icon, <strong>Remove App</strong>, <strong>Delete App</strong>. This deletes its saved sessions too.</li>
+          <li data-plat="android"><strong>Android</strong> — hold the icon, <strong>Uninstall</strong>.</li>
+          <li data-plat="windows mac linux chromeos" data-browser="chrome"><strong>Chrome</strong> — open <code>chrome://apps</code>, right-click it, <strong>Remove</strong>.</li>
+          <li data-plat="windows mac linux" data-browser="edge"><strong>Edge</strong> — open <code>edge://apps</code>, then <strong>Uninstall</strong>. On Windows it is also listed under Settings → Apps.</li>
+          <li data-plat="mac" data-browser="safari"><strong>Mac — Safari</strong> — delete it from your Applications folder like any other app.</li>
         </ul>
         <p class="note">Removing the app does not touch photos you have exported. Where the browser
         also offers to clear its data, that is what erases saved sessions and looks.</p>

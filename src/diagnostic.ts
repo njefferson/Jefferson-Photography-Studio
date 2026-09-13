@@ -13,19 +13,24 @@
 // the session walk opens a named practice file and greps the built report for
 // its name. Anything added here has to survive the same test.
 
+import { device } from "./platform";
+
 export interface DiagLine { k: string; v: string }
 
 const yes = (b: boolean) => (b ? "yes" : "no");
 
-/** iPadOS Safari reports "MacIntel". A Mac has no touch screen; an iPad reports
- *  five. Anything else is taken at its word. */
+/** What the app believes it is running on, and what the browser CLAIMED — both,
+ *  because the whole reason this line exists is that the two disagree on an
+ *  iPad, and a report that prints only the conclusion cannot be checked.
+ *
+ *  The conclusion is src/platform.ts's, not a second opinion worked out here.
+ *  A diagnostic that reasons independently of the app is diagnosing a different
+ *  app: this line used to say "iPad or iPhone" from its own rules while the
+ *  export path decided the same question by different ones. */
 function deviceLine(platform: string, touch: number): string {
-  if (/mac/i.test(platform)) {
-    return touch > 0
-      ? `iPad or iPhone — it says "${platform}", but ${touch} touch points means it is not a Mac`
-      : `Mac — says "${platform}" with no touch screen`;
-  }
-  return `${platform}${touch > 0 ? ` · touch screen (${touch} points)` : ""}`;
+  const d = device();
+  const claimed = `says "${platform || "nothing"}"${touch > 0 ? `, ${touch} touch points` : ", no touch screen"}`;
+  return `${d.noun} — ${claimed}`;
 }
 
 /** `persistent` is the line that decides whether an open session is safe, and
