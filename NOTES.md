@@ -672,18 +672,26 @@ user-scalable=no.
   photograph 1.977). And that second number is NOT yet a finding — the tile is
   260px and the photograph 904px, and a centre-against-edge ratio is
   scale-sensitive, so some of it is the comparison and not the app.
-  **AND EVERY FIXTURE AVAILABLE HERE IS THE WRONG ONE, for two different
-  reasons.** The 44 practice DNGs carry no lens, focal length or aperture at
-  all. The frames used here are from a **NIKON Z50_2**, and every shipped
-  profile is for a **NIKON Z 50** — a different body string, so no profile can
-  match those either. That is why forcing the tile's `lensFix` to 0, and then
-  its `hsFix` to 0, changed the result by exactly nothing across three builds:
-  no curve was ever being passed, so neither strength had anything to scale.
-  **What a real measurement of this needs**, stated so nobody rebuilds the
-  instrument to find out: frames from a body a shipped profile actually names,
-  OR a reader-measured profile planted in `localStorage` that matches the
-  frames' model, focal length and aperture — plus the tile and the photograph
-  compared at the SAME scale.
+  **A CLAIM MADE HERE THAT THE APP ITSELF REFUTED.** This note said no shipped
+  profile could match those frames, because they are from a NIKON Z50_2 and
+  every shipped profile's header names a NIKON Z 50. That was read off a
+  provenance COMMENT; `matchAny` keys on `p.model === ex.lens`, the LENS, and
+  the body is not part of matching at all. Asked directly, the app says:
+  *matched 50-250 from EXIF, brightness only, measured at 130mm against this
+  frame's 145mm, colour withheld because it was measured on a different body
+  and an infrared conversion decides what colour the sensor sees, which is not
+  a property of the lens.* Exactly right, and better than the reasoning that
+  doubted it. **Ask the app before concluding something about its matching.**
+  So the fixture DOES exercise the brightness half, and forcing the tile's
+  `lensFix` to 0 and then its `hsFix` to 0 still changed nothing across three
+  builds — which is now an OPEN question rather than an explained one: the
+  strength the thumbnail path applies that bump through is not either of those
+  fields, and finding which it is, is where the next session starts.
+  The 44 practice DNGs remain the wrong fixture for any of this: they carry no
+  lens, focal length or aperture at all.
+  **And the scale problem is real and unsolved**: a 260px tile and a 904px
+  canvas cannot be compared on a centre-against-edge ratio without rendering
+  both at one size first.
   The fixture point still holds for anyone re-measuring this properly: the 44
   practice DNGs carry no lens, focal length or aperture at all, so no profile
   can match them and neither path applies a correction — frames that exercise
