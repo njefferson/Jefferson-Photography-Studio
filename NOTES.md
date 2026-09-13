@@ -10894,3 +10894,43 @@ byte-identity, and a Safari engine is still the test that matters.
 takes **8** threads there (it was 4 before the policy read `deviceMemory`), and
 **4** decoders run at once. One tile: 16 ms and 23 ms — consistent with the 21 ms
 that corrected the earlier claim.
+
+## 2026-09-13 — half-float is not a compromise, it is the faster one
+
+The desktop's third run, with the half-float source in it, and it changes the
+conclusion rather than confirming it.
+
+- **Full resolution, float32: 19 ms a frame, 34 ms to upload, 16 MB a megapixel.**
+- **Full resolution, half-float: 12 ms a frame, 18 ms to upload, 8 MB a megapixel.**
+- **The half-size proxy the app uses today: 13 ms a frame, 9.8 ms to upload.**
+
+So a FULL-RESOLUTION half-float source draws a frame **as fast as today's
+quarter-of-the-pixels proxy** — 12 ms against 13 — and faster than the
+full-resolution float32 one. Halving the source halves the texture bandwidth as
+well as the memory, and sampling is bandwidth-bound, so the smaller format wins
+twice. The measurement includes a full canvas readback in every case that a real
+preview never performs, and the spread between the three (19, 12, 13) shows that
+readback is not what dominates them.
+
+**What it costs the picture stays where it was: 0.018 of 255 on average, worst
+4**, comparing the same frame drawn from each source through the same shaders.
+
+**So the proxy has no remaining justification on that machine.** It exists
+because a full-resolution render was too costly; a full-resolution half-float
+source is the same speed as the proxy and 170 MB for a 21-megapixel raw. What
+that buys is not frame time — it is that the preview and the export become the
+same pixels at the same scale, which retires the proxy-texel footprint, the tap
+scale, `proxyFactorFor`, and the class of defect where a tile or an export
+disagrees with the photograph.
+
+**Three runs, one export fingerprint.** `e5ac8a29` from the installed app twice
+and a browser tab once, with the arithmetic sweep at `b1af01c8` each time. The
+export is deterministic on that engine. A Safari engine is the only thing that
+can still move it.
+
+**What the iPads have to answer, and one of the answers is a crash.** The probe
+builds both sources back to back, so it holds roughly 150 MB at once on a
+5-megapixel practice file. On the iPad that reports no memory figure and a
+1000 MB storage quota, a tab that reloads during that section IS the measurement
+— it says the device will not hold what a full-resolution preview needs, and the
+answer is the half-float path or nothing.
