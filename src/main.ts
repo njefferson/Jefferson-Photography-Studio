@@ -1685,6 +1685,8 @@ function wireVersionMenu() {
       // to load" and "it never upgraded at all" look identical, and they mean
       // opposite things. This says which happened, on the device it happened on.
       { k: "Editing copy", v: editingCopyLine() },
+      // Kept rather than shown once and lost — see recordFailure.
+      { k: "Last failure", v: lastFailure },
     ]);
   };
   tag.addEventListener("click", open);
@@ -5204,6 +5206,25 @@ function scheduleNativeUpgrade(gen: number): void {
  *  upgrade: how long the build took, or why it did not run. */
 let nativeReport = "not attempted yet";
 
+/** THE LAST FAILURE'S OWN WORDS, KEPT.
+ *
+ *  A photograph that would not open raised an alert and the message was gone the
+ *  moment it was dismissed — so the one artefact that could identify what
+ *  actually failed survived nowhere, and the cause had to be guessed from
+ *  whatever had most recently changed. Three probes were built on that guess and
+ *  every one of them measured something true and irrelevant.
+ *
+ *  This keeps it: what failed, which file, and what the editor was doing at the
+ *  time — because "it broke while the full-resolution rebuild was running" and
+ *  "it broke with nothing else happening" are different bugs and the difference
+ *  is invisible an hour later. */
+let lastFailure = "none this session";
+function recordFailure(what: string, err: unknown, file?: { name?: string; kind?: string; bytes?: Uint8Array }): void {
+  const msg = (err as Error)?.message ?? String(err);
+  const where = file ? ` · ${file.name ?? "?"} (${file.kind ?? "?"}, ${file.bytes ? Math.round(file.bytes.length / 1e6) + " MB" : "size unknown"})` : "";
+  lastFailure = `${what}: ${msg}${where} · working copy was "${nativeReport}" · ${new Date().toISOString().slice(11, 19)}`;
+}
+
 function editingCopyLine(): string {
   if (!current || !previewSrc) return "nothing open";
   const mp = (previewSrc.width * previewSrc.height) / 1e6;
@@ -7299,6 +7320,7 @@ async function switchToPhoto(id: string) {
     showDecoded(img, imported);
     activateCurrent(id);
   } catch (err) {
+    recordFailure("opening a photo", err, { name: view.name, kind: view.kind });
     alert("Couldn't open that photo: " + (err as Error).message);
   } finally {
     hideBusy();
@@ -8424,6 +8446,7 @@ async function resumeSession() {
     activateCurrent(first.id);
     void realThumbnails(); // finish any thumbnails the last visit never reached
   } catch (err) {
+    recordFailure("resuming the session", err);
     alert("Couldn't resume the session: " + (err as Error).message);
   } finally {
     hideBusy();
@@ -11018,6 +11041,9 @@ setupInstallFromApp("irInstallFromApp");
 // Offline support.
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js").catch(() => {});
+    // NOT AN EMPTY CATCH. A registration that fails leaves the app silently not
+    // offline-capable, with no update strip possible because there is nothing to
+    // wait on, and nothing anywhere saying why. The report can show it now.
+    navigator.serviceWorker.register("./sw.js").catch((err) => recordFailure("registering the offline worker", err));
   });
 }
