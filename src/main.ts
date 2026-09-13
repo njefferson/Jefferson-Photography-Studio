@@ -11117,6 +11117,35 @@ setupInstallFromApp("irInstallFromApp");
   }
 }
 
+/* ---- The explanations beside each control -------------------------------
+ *
+ *  Sixty-three of them, 1,540 words, permanently in the editing panel. They are
+ *  how somebody learns what Recover or the channel mix does, so deleting them
+ *  would be a worse app for a first visit — but nobody needs a 125-word note on
+ *  lens tinting beside a slider they have dragged two hundred times, and it
+ *  pushes the controls apart so that fewer of them fit on screen at once.
+ *
+ *  On by default, because a reader who has never seen the app is the one who
+ *  cannot afford them missing. Remembered once turned off, because a reader who
+ *  turned them off has said what they want. */
+{
+  const btn = document.getElementById("panelNotes") as HTMLButtonElement | null;
+  const KEY = "ips-panel-notes";
+  if (btn) {
+    const apply = (on: boolean) => {
+      document.getElementById("panel")?.classList.toggle("notes-off", !on);
+      btn.setAttribute("aria-pressed", String(on));
+      btn.textContent = on ? "Explanations" : "Explanations off";
+    };
+    apply(localStorage.getItem(KEY) !== "off");
+    btn.addEventListener("click", () => {
+      const on = btn.getAttribute("aria-pressed") !== "true";
+      localStorage.setItem(KEY, on ? "on" : "off");
+      apply(on);
+    });
+  }
+}
+
 // Offline support.
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {

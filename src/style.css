@@ -2972,3 +2972,23 @@ body.dbg { margin: 0; background: var(--bg); color: var(--txt); font: 400 1rem/1
 .help-sec[open] > summary::before { transform: rotate(45deg); }
 @media (prefers-reduced-motion: reduce) { .help-sec > summary::before { transition: none; } }
 .help-sec > summary:focus-visible { outline: 2px solid var(--focus, currentColor); outline-offset: 2px; border-radius: 6px; }
+
+/* The explanations toggle, and the panel without them. */
+.panel-notes-toggle {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  margin: 0 0 8px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line-2);
+  background: transparent;
+  color: var(--txt-2, var(--txt));
+  font: 0.8125rem/1.2 var(--ui);
+  text-align: left;
+  touch-action: manipulation;
+}
+.panel-notes-toggle[aria-pressed="false"] { color: var(--txt-3); }
+.panel-notes-toggle:active { background: var(--surface-3); }
+/* Only the explanatory prose goes — never a label, a value, or a warning. */
+#panel.notes-off .note { display: none; }
