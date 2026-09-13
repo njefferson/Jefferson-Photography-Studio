@@ -2425,7 +2425,13 @@ label.open-btn, label.bar-btn {
   #view { inset: 8px; max-width: calc(100% - 16px); max-height: calc(100% - 16px); }
 }
 
-#helpDlg, #lensDlg { max-width: min(640px, 92vw); } /* height and scrolling: see the flex-column rule above */
+/* THE THREE REFERENCE DIALOGS, one expression rather than three.
+   #verDlg was not in this list and had no width of its own, so it fell through
+   to the shared `calc(100% - 36px)` and opened at 97% of the screen while every
+   other content dialog sat at 520 or 640 — measured 1244px against 520px at
+   1280 wide, and 784 against 520 on a tablet. It carries a twelve-row report,
+   so it takes the wider of the two rather than the 520 the short dialogs use. */
+#helpDlg, #lensDlg, #verDlg { max-width: min(640px, 92vw); } /* height and scrolling: see the flex-column rule above */
 .help-body { font-size: 0.8125rem; color: var(--txt); line-height: 1.5; }
 /* Shown only inside the installed (standalone) app, where Safari's Share —
    and with it Add to Home Screen — is out of reach. */
@@ -2816,6 +2822,13 @@ small { font-size: max(0.6875rem, 0.8em); }
 .ver-link {
   display: inline-flex;
   align-items: center;
+  /* WIDTH BELONGS TO THE CLASS, NOT THE ELEMENT — the same rule this file
+     states forty lines down, broken here in the other direction. The base is
+     `select, button { width: 100% }`, keyed on the TAG, so of the two controls
+     wearing this class the <button> came out 604px and the <a> 141px, side by
+     side in the same row, looking like two different kinds of thing. The class
+     says content-width and both obey it. */
+  width: auto;
   min-height: 44px;
   padding: 0 12px;
   border: 1px solid var(--line);
