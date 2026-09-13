@@ -11990,3 +11990,45 @@ overlay appeared, said the right things, and its button measured **34 pixels
 tall against this repo's 44-pixel floor**. The one control on the one screen a
 reader reaches when nothing else works, too small to hit by touch. It inherited
 `.btn` and nothing checked it. 44 now, asserted by that test.
+
+## 2026-09-13 — the drawing-surface probe now asks the question the app faces, and its ceiling branch is UNPROVEN
+
+**IT ASKED ON AN EMPTY PAGE, AND THAT ANSWER COST A SESSION.** The probe
+requested a 5600x3728 canvas with nothing else allocated, got it on all three
+devices, and that was written down as "all three devices allow a full-frame
+drawing surface — so the working copy is the cheap version everywhere". In the
+editor the same request happens while the session holds a couple of hundred
+megabytes of photographs, the current one's texture and the previous one's
+buffers. It failed there, silently, and the photograph went blank. **The probe
+was never wrong; what it was taken to mean was.**
+
+**IT NOW CLIMBS A LADDER.** Ask for the full-frame canvas, hold another 100 MB,
+ask again, and keep going to about a gigabyte — stopping at the first refusal and
+reporting how much was held when the surface stopped being available. The buffers
+are TOUCHED rather than merely allocated, because an untouched buffer may cost
+nothing until it is used, which would make the ladder measure a promise. The row
+says plainly that the figure is an approximation, since real memory is fragmented
+differently from a ladder of big buffers.
+
+**AND THE CEILING BRANCH HAS NOT BEEN SEEN TO FIRE.** Two attempts to force it
+in the container failed for unrelated reasons, and the honest state is that the
+"lost it at N MB" path is reasoned but unobserved:
+
+- squeezing the JS heap to 256 MB made the whole test page crawl — it builds an
+  84 MB frame on the way past — and twenty minutes produced nothing;
+- squeezing only graphics memory did not produce a result either;
+- and a planted step of 100,000 MB, meant to fail instantly, **did not throw at
+  all — the browser sat on it for over ten minutes.** Which is its own finding,
+  and is fixed: no single step may now exceed 512 MB, because a hang inside a
+  diagnostic is worse than the question going unanswered.
+
+**A third self-inflicted one, recorded because it has now happened twice
+tonight:** `pkill -9 -f ladder.mjs` killed the shell running the command that
+contained that string, before it did anything — the self-match the hub's own
+lessons describe for `pgrep -f`. Kill by PID.
+
+So this ships as strictly more information than the probe it replaces, with its
+failure path untested here. **The devices are where it gets exercised** — the
+8-core iPad reporting a 1000 MB quota is precisely where a ceiling should appear,
+and if it never does on any device, that is a finding about the ladder rather
+than about the devices.
