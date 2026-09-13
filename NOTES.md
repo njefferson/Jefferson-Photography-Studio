@@ -104,6 +104,17 @@ See **`PLAN.md`** for the full build plan.
   - **Identity (major, X.0)** — the product changes as a thing: a different
     approach and mindset, a new edition. The owner declares these, and has
     declared the CREATIVE RELEASE the first one → it ships as **2.0**.
+    - **3.0 IS DECLARED AND CLAIMED (owner, 2026-09-13): the OPTIMIZED
+      RELEASE.** It ships when the export is fixed and the full-resolution
+      question is decided — the two together, not either alone. That is an
+      identity change rather than a capability one because it is the same
+      product working a different way: the picture on screen and the picture
+      saved become the same pixels, and the machine's own hardware does the
+      work it was already sitting there able to do. **Nothing between now and
+      then takes a 3.x number**, and the work that lands in it is the two
+      roadmap items named "The live view at full resolution" and "The export
+      drawn rather than computed" — measured on three devices on 2026-09-13
+      and written up in the entries of that date.
   - **Capability (middle number)** — a release that ADDS something: a new
     tool, format, mode. EVERY capability release that ships to main bumps it
     (owner decision, 2026-07-18): the core sweep goes 1.2, 1.3, … Bump the
@@ -632,11 +643,16 @@ user-scalable=no.
   shape that fixes it. Measure the real split on a device first — the test page
   reports both halves now.
 - [ ] **The live view at full resolution, which makes the export a readback** —
+  **ships in 3.0, the optimized release (owner declaration, 2026-09-13)** —
   MEASURED ON ALL THREE DEVICES 2026-09-13 and the premise for the proxy is gone:
-  a full-resolution HALF-FLOAT source draws a screen-sized frame at least as fast
-  as today's quarter-size proxy everywhere (desktop 12 ms against 13, 8-core iPad
-  18 against 15, 4-core iPad 28 against 35) and costs 170 MB for a 21-megapixel
-  frame. The catch that decides HOW: denoise and sharpen tap in texels, so
+  a full-resolution HALF-FLOAT source draws a screen-sized frame NO WORSE than
+  today's quarter-size proxy on every device measured. On the iPads the three
+  sources are within run-to-run noise and the ordering is not stable — a second
+  run of the 4-core iPad reversed it (28 against 35 one run, 33 against 27 the
+  next), which is why the drawing probe now takes three passes and prints the
+  spread. The desktop is consistent (12-13 against 13, float32 19). Memory is the
+  solid number: 170 MB for a 21-megapixel frame against 340, and what the halving
+  costs the picture reads 0.018 of 255 on every device. The catch that decides HOW: denoise and sharpen tap in texels, so
   full resolution would silently halve their footprint and change what every
   tuned slider means — so it ships with the tap scale set to the old proxy factor,
   which reproduces today's footprint exactly, and the acceptance test is that a
@@ -657,8 +673,9 @@ user-scalable=no.
   defect where a tile or an export disagrees with the photograph. The test page
   reports the memory per device, so the decision has numbers. Do this BEFORE the
   drawn export below — it subsumes most of it.
-- [ ] **The export drawn rather than computed** — scoped 2026-09-13, waiting on
-  numbers from the device. The live view already runs the entire edit as shaders
+- [ ] **The export drawn rather than computed** — **ships in 3.0 with the item
+  above, the two together (owner declaration, 2026-09-13)** — scoped 2026-09-13,
+  waiting on numbers from the device. The live view already runs the entire edit as shaders
   in `gl.ts`; `export.ts` implements every one of them again in TypeScript, and
   both files carry comments asking whoever edits one to keep the constants in
   step by hand. Drawing the export through the shaders that already exist would
@@ -11034,3 +11051,82 @@ change attached, decided later and on purpose.
 change and require the pixels to match. That is the same shape as every
 bit-identical proof in this file, and it is what stops a performance change from
 quietly restyling everybody's photographs.
+
+## 2026-09-13 — every device computes the same photograph, and 3.0 is claimed
+
+**THE PIXEL FINGERPRINT CAME BACK IDENTICAL ON EVERY DEVICE: `7afc9c2a`.** A
+Linux container (Chromium), a Windows desktop (Edge 153, NVIDIA) and an iPad
+(Safari 26.6, JavaScriptCore, Apple GPU) all compute the same 2-megapixel export,
+byte for byte, before encoding. Their FILES differ — `e5ac8a29` at 504 KB against
+`158328ac` at 728 KB — and that is `canvas.toBlob` meaning two different JPEG
+encoders, nothing about the photograph.
+
+**AND THEIR ARITHMETIC FINGERPRINTS DIFFER** (`b1af01c8` against `b7d5e311`), so
+the engines really do disagree about some transcendental somewhere in a
+two-thousand-step sweep — **and not one of those disagreements survives to any of
+two million pixels.** That is worth knowing precisely: the pipeline is
+deterministic across engines in a way the raw arithmetic is not.
+
+**SO THE DECISION I PUT TO THE OWNER WAS WRONG IN BOTH DIRECTIONS, AND THE
+MEASUREMENT SETTLED IT.** First it was framed as "today's export is byte-identical
+on every device" — false, the files differ by 44%. Then, having measured that, it
+was called a hedge with nothing on one side — also wrong. What exists is
+**identical PIXELS across devices**, which is a real property and a good one, and
+a drawn export would put it at risk because each graphics chip rounds its own
+way. The honest statement of the choice is: today the photograph does not depend
+on the machine and the export can differ from the preview; drawn, the export
+matches the preview exactly on that machine and may differ slightly between
+machines.
+
+**WHICH IS ALSO MEASURABLE, SO IT IS BEING MEASURED.** The test page now
+fingerprints the DRAWN frame beside the computed one. If two devices print the
+same drawn fingerprint, a drawn export is as device-independent as today's and
+the choice disappears; if they differ, that line is exactly what would be traded
+for the speed. Nobody has to argue about it.
+
+**THE INSTRUMENT GOT CHEAPER IN THE SAME PASS.** Taking those fingerprints
+separately meant THREE full exports of the same photograph on every run — 18.3
+seconds in the container, paid by a reader standing in front of a tablet. The
+comparison probe already computes the computed frame and the drawn frame from the
+same edit and the same crop, so the fingerprints are taken from the pair already
+in hand: **5.5 seconds instead of 18.3**, same three numbers.
+
+**AND 3.0 IS CLAIMED (owner, 2026-09-13): the OPTIMIZED RELEASE**, shipping when
+the export is fixed and the full-resolution question is decided — the two
+together. See "## Versioning" for what that means for numbering between now and
+then: nothing takes a 3.x until both land.
+
+## 2026-09-13 — a conclusion drawn from one run, reversed by the next
+
+**"A full-resolution half-float source is faster than the proxy on two of three
+devices" was drawn from single runs, and the second run of one device reverses
+it.** On the 4-core iPad, first run: half-float 28 ms a frame, proxy 35, float32
+39. Second run of the same device: **half-float 33, proxy 27, float32 24.** The
+ordering flipped completely.
+
+**So the honest statement is narrower.** On the iPads the three sources are
+within run-to-run noise of each other — every figure across four iPad runs sits
+between 15 and 39 ms, and which one "wins" is not stable. Only the desktop showed
+a consistent ordering across two runs (half-float 12-13, proxy 13, float32 19).
+
+**What still stands, because it was measured the same way every time:**
+
+- **memory** — 8 MB a megapixel against 16, so 170 MB against 340 for a
+  21-megapixel frame;
+- **what half the memory costs the picture** — 0.018 of 255, worst 4, *identical
+  on all four devices*, which is what a deterministic conversion looks like;
+- **that full resolution is affordable at all** — no device measured it as
+  dramatically worse than the proxy, on any run.
+
+**And the deciding argument was never frame time.** It is that the preview and
+the export become the same pixels at the same scale. Frame time only had to be
+"not worse", and it is not worse.
+
+**THE INSTRUMENT WAS THE REAL DEFECT, AND IT IS FIXED.** The decode and storage
+probes take three runs, report the median and print the spread — because a lone
+number on a real device invites a conclusion it cannot support, which is written
+into this file twice already. The drawing measurement took ONE pass of five
+frames and printed one number, and a conclusion was duly drawn from it before the
+second run existed. It now takes three passes, reports the median, prints all
+three, and its own prose says to compare the spread against the gap between the
+rows before deciding one source is faster than another.

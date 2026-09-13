@@ -580,20 +580,13 @@ async function sameEverywhere(): Promise<void> {
     const buf = new Uint8Array(await out.blob.arrayBuffer());
     let f = 0x811c9dc5;
     for (let i = 0; i < buf.length; i++) { f ^= buf[i]; f = Math.imul(f, 0x01000193); }
-    // THE PIXELS, SEPARATELY FROM THE FILE, because the first comparison across
-    // two engines came back 158328ac at 728 KB against e5ac8a29 at 504 KB — a
-    // 44% difference in SIZE at the same quality setting, which is the browsers'
-    // own JPEG encoders disagreeing and says nothing about the photograph. This
-    // is the same export stopped before it is encoded, so two devices can tell
-    // whether their pipelines compute the same picture even when their encoders
-    // will never write the same file.
-    const rawOut = await exportImage(pfile, img, params, { format: "jpeg", scale: 1, quality: 0.92, raw: true });
-    let g = 0x811c9dc5;
-    const rd = rawOut.data;
-    if (rd) for (let i = 0; i < rd.length; i++) { g ^= rd[i]; g = Math.imul(g, 0x01000193); }
     p.remove();
-    row("A practice photograph, its pixels", rd ? `${hex(g)} · ${(rd.length / 4 / 1e6).toFixed(2)} MP` : "not produced",
-      "The same export, stopped before the browser encodes it. THIS is the honest test of whether two devices compute the same photograph: the line below is the finished file, and a browser's JPEG encoder is its own, so two devices can agree here and still write files of different sizes.");
+    // THE PIXELS AND THE DRAWN VERSION ARE FINGERPRINTED BY THE COMPARISON BELOW,
+    // which already computes both frames from the same edit and the same crop.
+    // Taking them here as well meant three full exports of the same photograph
+    // on every run — eighteen seconds in a container, and a tablet pays that on
+    // a page somebody is waiting in front of. One export here, the other two
+    // reused.
     row("A practice photograph, exported", `${hex(f)} · ${(buf.length / 1024).toFixed(0)} KB · ${((performance.now() - t0) / 1000).toFixed(1)}s`,
       "The finished file. Measured across two engines it came back 44% different in SIZE at the same quality — their JPEG encoders are not the same encoder. So a file that is byte-identical everywhere was never something this app offered, whatever the pixels do.");
   } catch (e) {
@@ -654,6 +647,29 @@ async function drawnVersusComputed(): Promise<void> {
       await tick();
     }
     p.remove();
+    // THE TWO FINGERPRINTS, FROM THE PAIR ALREADY IN HAND. Three devices — two
+    // engines, three platforms, an NVIDIA card and an Apple GPU — computed the
+    // SAME pixels for this export (7afc9c2a on every one) while their own
+    // arithmetic fingerprints differ. That is a real property: the photograph
+    // this app makes does not depend on the machine, even though the FILE does,
+    // because the browsers' JPEG encoders are not the same encoder.
+    //
+    // A drawn export puts that property in question, since each graphics chip
+    // rounds its own way. So the drawn frame is fingerprinted too: matching
+    // across devices means nothing is given up by moving to it, and differing
+    // means this line is exactly what would be traded for the speed.
+    const fp = (a: ArrayBufferView | undefined): string => {
+      if (!a) return "none";
+      const b8 = new Uint8Array(a.buffer, a.byteOffset, a.byteLength);
+      let h = 0x811c9dc5;
+      for (let i = 0; i < b8.length; i++) { h ^= b8[i]; h = Math.imul(h, 0x01000193); }
+      return (h >>> 0).toString(16).padStart(8, "0");
+    };
+    const first = runs[0];
+    row("A practice photograph, its pixels", first.computed.data ? `${fp(first.computed.data)} · ${(first.computed.data.length / 4 / 1e6).toFixed(2)} MP` : "not produced",
+      "The export above, stopped before the browser encodes it. THIS is the honest test of whether two devices compute the same photograph — the file line is the browser's own JPEG encoder, and two devices can agree here while writing files of different sizes.");
+    row("…and the same photograph drawn", `${fp(first.drawn.data)} · ${(first.drawn.data.length / 4 / 1e6).toFixed(2)} MP`,
+      "The identical export drawn through the shaders instead. Compare this line BETWEEN devices: matching means a drawn export is as device-independent as the computed one and nothing is lost by moving to it; differing means the picture would depend on the graphics chip, which is what today's export does not do.");
     for (const r of runs) compareOne(r.label, r.drawn, r.computed, r.computedMs);
     return;
 
@@ -738,6 +754,7 @@ function compareOne(label: string, drawn: ReturnType<typeof drawFrame>, computed
  *  half-size one. */
 async function fullResolutionPreview(): Promise<void> {
   const p = note("Asking whether the live view could run at full resolution here…");
+  const mid = (xs: number[]) => { const a = [...xs].sort((x, y) => x - y); return (a[(a.length - 1) >> 1] + a[a.length >> 1]) / 2; };
   try {
     const res = await fetch("./examples/NIR_0063.dng");
     if (!res.ok) throw new Error("practice photo not available offline");
@@ -798,14 +815,26 @@ async function fullResolutionPreview(): Promise<void> {
         r.render(pr); // warm-up, not timed
         r.readFrame();
         await tick();
-        const N = 5;
-        const t1 = performance.now();
+        // THREE PASSES, MEDIAN REPORTED, SPREAD PRINTED — the rule the decode and
+        // storage probes already follow, and this one did not. A single pass of
+        // five frames put the three sources in an order that REVERSED on the
+        // next run of the same iPad (half-float 28 ms then 33, the proxy 35 then
+        // 27), and a conclusion was drawn from the first before the second
+        // existed. One number here invites exactly that.
+        const N = 5, PASSES = 3;
+        const passes: number[] = [];
         let last: Uint8ClampedArray | null = null;
-        for (let i = 0; i < N; i++) { r.render(pr); last = r.readFrame(); }
-        const per = (performance.now() - t1) / N;
+        for (let pass = 0; pass < PASSES; pass++) {
+          const t1 = performance.now();
+          for (let i = 0; i < N; i++) { r.render(pr); last = r.readFrame(); }
+          passes.push((performance.now() - t1) / N);
+          await tick();
+        }
+        const per = mid(passes);
         if (last) drawnBy.set(label, last);
         row(`Drawing from ${label}`, `upload ${ms(upload)} · ${ms(per)} a frame`,
-          `A ${canvas.width}x${canvas.height} draw — about what a screen asks for — sampled from a ${(image.width * image.height / 1e6).toFixed(1)}-megapixel texture. Under 16 ms a frame is smooth at sixty; under 33 is smooth at thirty. The upload happens once when a photograph opens.`);
+          `A ${canvas.width}x${canvas.height} draw — about what a screen asks for — sampled from a ${(image.width * image.height / 1e6).toFixed(1)}-megapixel texture. Under 16 ms a frame is smooth at sixty; under 33 is smooth at thirty. The upload happens once when a photograph opens. Compare the spread against the gap between these rows before concluding one source is faster than another.`,
+          passes.map((x) => Math.round(x) + " ms").join(", "));
       } catch (err) {
         row(`Drawing from ${label}`, "refused", `This device would not do it: ${String((err as Error)?.message ?? err)}.`);
       } finally {
