@@ -26,3 +26,11 @@ also=tools/preview-version-check.mjs
 # silence, leaving the plain prompt that looks exactly like having no
 # screenshots at all. This reads the bytes and compares.
 also=tools/manifest-shots-check.mjs
+
+# Run on every commit: the hub's FAST surface gates — placeholders and examples,
+# set-apart quotations, and the no-tables rule over tracked markdown. They ran
+# in CI and nowhere else, so a placeholder added to the Help filter went red on
+# the runner three pushes after the commit that introduced it, and nothing
+# local could refuse it. The two slow ones (privacy, third person: 10s and 19s)
+# stay in CI on purpose — half a minute per commit gets routed around.
+also=tools/hub-surface-gates.mjs

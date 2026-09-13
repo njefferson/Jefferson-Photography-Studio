@@ -14,3 +14,8 @@ ir.html | invented | e.g. Dusk Aerochrome
 # The paste box for importing a look someone sent you. Not an example of a
 # look at all — an instruction standing in for empty.
 ir.html | invented | Paste here&hellip;
+
+# The Help filter box. The three words after "e.g." are section names from this
+# app's own Help — picker, batch and install are all real headings in it — so
+# the example points at the page it is on rather than at anybody's search.
+ir.html | invented | Search — e.g. picker, batch, install
