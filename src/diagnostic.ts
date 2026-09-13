@@ -92,7 +92,6 @@ async function swLine(version: string): Promise<string> {
     const reg = await navigator.serviceWorker.getRegistration();
     if (!reg) return "not registered";
     const state = reg.active ? "active" : reg.installing ? "installing" : reg.waiting ? "waiting" : "none";
-    const names = await caches.keys();
     // WHAT A WAITING WORKER ACTUALLY MEANS, rather than that one exists.
     //
     // Navigations are network-first, so a reload hands the reader the newest
@@ -114,6 +113,20 @@ async function swLine(version: string): Promise<string> {
     }
     const active = reg.active ? await workerVersion(reg.active) : null;
     const activeNote = active && active !== version ? ` · the worker serving this page is v${active}` : "";
+    // THE CACHE LIST IS READ LAST, AND THAT ORDER IS THE POINT.
+    //
+    // It used to be read before the workers were questioned, and a report came
+    // back naming a waiting v2.43.39 next to caches that held only v2.43.38 —
+    // which looks exactly like a worker that reached "waiting" without its cache
+    // and would have been a serious defect, since taking that update would leave
+    // a broken offline copy. It was not: install populates the cache before a
+    // worker can wait at all, and `addAll` is all-or-nothing so a failure aborts
+    // the install entirely. What actually happened is that a worker finished
+    // installing in the gap between the snapshot and the question, so the list
+    // was simply older than the answer beside it. A diagnostic that reports two
+    // facts gathered at different moments as though they were one moment
+    // invents contradictions for its reader to chase.
+    const names = await caches.keys();
     return `${state}${waitingNote}${activeNote} · caches: ${names.join(", ") || "none"}`;
   } catch {
     return "unavailable";

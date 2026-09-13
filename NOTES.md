@@ -12259,3 +12259,32 @@ screen**, not the decluttering the total implied.
 words per tab, beside the controls they explain, they are a reasonable teaching
 surface. The next place to look, if this continues, is the lens dialog and the
 welcome — not more trimming of the panel.
+
+## 2026-09-13 — the "waiting worker with no cache" was the report's own race
+
+**THE CONTRADICTION, AND IT WAS FLAGGED AS POSSIBLY SERIOUS.** A desktop report
+named a waiting **v2.43.39** beside caches holding only **v2.43.38**. If a worker
+could reach "waiting" without its cache, taking that update would leave a broken
+offline copy — a real defect, and worth chasing rather than shrugging at.
+
+**IT CANNOT HAPPEN, AND THE CODE SAYS SO.** Install opens the cache and
+`addAll`s the whole precache list — all-or-nothing, so a single failed fetch
+aborts the install and the worker never reaches "installed" at all, with the old
+one still serving. A waiting worker therefore always has its cache. The built
+`sw.js` carries 213 precache entries, so the other candidate — an empty PRECACHE
+letting install succeed while creating no cache — is out too.
+
+**WHAT ACTUALLY HAPPENED IS THAT THE REPORT ASKED ITS QUESTIONS IN THE WRONG
+ORDER.** `swLine` read `caches.keys()` FIRST and questioned the workers
+afterwards. A worker that finished installing in that gap appears as waiting,
+beside a cache list captured moments earlier that cannot know about it. The list
+was older than the answer printed next to it.
+
+**A diagnostic that gathers two facts at different moments and prints them as
+one moment invents contradictions for its reader to chase** — and this one
+invented a plausible, alarming, entirely fictional defect. The cache list is read
+LAST now, after every worker has been questioned.
+
+Third variant of one error today: a number true in isolation reported as a number
+under load; a total across twelve tabs reported as an on-screen quantity; and now
+two moments reported as one. Each time the individual facts were correct.
