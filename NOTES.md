@@ -11708,3 +11708,45 @@ sharpens, rather than waiting for a better one.
 **Until that exists, the working copy on staging is a measurement, not a
 release.** It is correct, it is honest about memory, and it stalls the editor.
 Recorded here rather than discovered on a tablet.
+
+## 2026-09-13 — the photograph arrives at the old speed and sharpens behind itself
+
+**THE STALL IS GONE AND THE SHAPE IS THE SESSION STRIP'S.** `uploadPreview` puts
+the binned proxy up exactly as it always has, then `upgradeToNativeResolution`
+fills in the native-resolution half-float frame behind it and swaps.
+`buildLinearSourceInBands` does the demosaic in 64-row bands with a macrotask
+between each — a microtask would run straight back without letting the browser
+paint, which is the same freeze wearing a different hat. Measured in the
+container: **on screen in 0.55 s at 1400 wide, 2800 wide four seconds later**,
+and the editor answers throughout.
+
+**THE RACE IS THE DANGEROUS PART AND IT IS GUARDED.** A build that finishes
+after the reader has moved on must not paint — `nativeGen` is bumped by every
+upload and checked between bands and again before the swap. The swap also resets
+every `baked*` flag, because the texture is new and a stale "already baked"
+would leave a reader's heals and stickers silently missing from the sharper
+picture.
+
+**THE TEST FOR IT TOOK THREE TRIES AND EACH FAILURE WAS THE INSTRUMENT.**
+
+1. **It only checked the end state.** Both photographs start a build; the
+   abandoned one can finish FIRST, paint, and be overwritten a moment later — so
+   the test passes while a reader sees the wrong photograph flash up. It now
+   samples every 250 ms across the whole window.
+2. **Then it failed on correct code.** Sampling began at the click, catching the
+   normal moment between selecting a photograph and its proxy being uploaded —
+   the old picture not yet replaced, which is not this defect. It arms only once
+   the selected photograph is actually on screen; after that, the abandoned one
+   reappearing is fair game.
+3. **And the first plant did not compile.** TypeScript rejected it — `gen`
+   unused — so the "negative control" ran against the CORRECT build, and a green
+   result there would have been read as the test having teeth. A plant that does
+   not build is not a plant. Re-planted referencing `gen` in a way that never
+   stops anything, it **failed**, which is what a negative control is for.
+
+**One honest note on what the failing frame showed.** With the guard removed the
+offending frame read 87.16 against photo 0's 110.88 and photo 1's 115.39 — far
+from both. So the test detects "not the selected photograph" rather than
+specifically "the abandoned one", and what appeared was more likely a frame
+caught mid-swap than photo 0 fully painted. It separates correct from planted,
+which is its job; it is not a diagnosis of what a reader would have seen.
