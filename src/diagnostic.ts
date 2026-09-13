@@ -71,14 +71,50 @@ function glLine(): string {
   }
 }
 
-async function swLine(): Promise<string> {
+/** Ask a worker which version it is. Same mechanism the update strip uses, and
+ *  here for the same reason: a WAITING worker is not necessarily a newer app. */
+function workerVersion(w: ServiceWorker): Promise<string | null> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = (v: string | null) => { if (!settled) { settled = true; resolve(v); } };
+    try {
+      const ch = new MessageChannel();
+      ch.port1.onmessage = (e) => done(String(e.data ?? "") || null);
+      w.postMessage({ type: "VERSION" }, [ch.port2]);
+    } catch { done(null); }
+    setTimeout(() => done(null), 1200);
+  });
+}
+
+async function swLine(version: string): Promise<string> {
   try {
     if (!("serviceWorker" in navigator)) return "not supported";
     const reg = await navigator.serviceWorker.getRegistration();
     if (!reg) return "not registered";
     const state = reg.active ? "active" : reg.installing ? "installing" : reg.waiting ? "waiting" : "none";
     const names = await caches.keys();
-    return `${state}${reg.waiting ? " · an update is WAITING" : ""} · caches: ${names.join(", ") || "none"}`;
+    // WHAT A WAITING WORKER ACTUALLY MEANS, rather than that one exists.
+    //
+    // Navigations are network-first, so a reload hands the reader the newest
+    // page at once while the worker CONTROLLING it is still the previous one.
+    // In that state a worker is legitimately parked holding the version already
+    // on screen — and this line used to call that "an update is WAITING", which
+    // is true of the worker and misleading about the app. It is also why two
+    // caches are present and correct: the active worker's and the waiting one's,
+    // the latter filled at install so the update works offline the moment it is
+    // taken. Nothing is leaking.
+    let waitingNote = "";
+    if (reg.waiting) {
+      const v = await workerVersion(reg.waiting);
+      waitingNote = v === null
+        ? " · a worker is waiting (version unknown — an older one without the handler)"
+        : v === version
+          ? ` · a worker is waiting, but it is this same version (${v}) — the offline copy catching up, nothing to take`
+          : ` · an update is WAITING (v${v})`;
+    }
+    const active = reg.active ? await workerVersion(reg.active) : null;
+    const activeNote = active && active !== version ? ` · the worker serving this page is v${active}` : "";
+    return `${state}${waitingNote}${activeNote} · caches: ${names.join(", ") || "none"}`;
   } catch {
     return "unavailable";
   }
@@ -178,7 +214,7 @@ export async function buildDiagnostic(version: string, extra: DiagLine[] = []): 
     { k: "Memory hint", v: nav.deviceMemory ? `${nav.deviceMemory} GB` : "not reported" },
     { k: "Cores", v: String(navigator.hardwareConcurrency ?? "not reported") },
     { k: "Graphics", v: glLine() },
-    { k: "Offline worker", v: await swLine() },
+    { k: "Offline worker", v: await swLine(version) },
     { k: "Storage", v: await storageLine(standalone) },
     // The line that turns an origin-wide number into something actionable.
     { k: "App is holding", v: await holdingsLine() },

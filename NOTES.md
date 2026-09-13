@@ -12168,3 +12168,33 @@ device instead of reconstructed from a guess.
 **The full-resolution view stays off regardless.** Not because memory was proven
 to be the cause — it was not — but because a real session broke with it on and
 nothing since has explained why.
+
+## 2026-09-13 — three caches is correct, and the desktop report is the update bug in the wild
+
+**`caches: ips-examples-v1, ips-2.43.27, ips-2.43.36` IS NOT A LEAK.** Activate
+deletes every cache but its own and EXAMPLES, and it does. While an update
+waits, two app caches are legitimately present: the ACTIVE worker's, and the
+WAITING worker's — filled at install, before activation, deliberately, so that
+taking the update works offline the moment it is taken. Written down because a
+future session will see two version-stamped caches and try to fix it.
+
+**AND THE SAME LINE IS THE REPORTED BUG, CAUGHT IN THE WILD.** The page says it
+is **v2.43.36**. The worker actually controlling it is **2.43.27**. The update
+waiting is **2.43.36** — the version already on screen. That is exactly the
+sequence described: navigations are network-first, so a reload delivers the new
+page immediately while the worker lags, and then the new worker parks and gets
+announced as an update to what the reader is already running.
+
+**SO THE DIAGNOSTIC LINE GOT THE SAME FIX AS THE STRIP, for the same reason.**
+It reported the EXISTENCE of a waiting worker as "an update is WAITING". It now
+asks the worker its version and says which case it is: a genuine update with its
+version number, or *"a worker is waiting, but it is this same version — the
+offline copy catching up, nothing to take"*. It also names the version of the
+worker actually serving the page when that differs from the page's own, because
+those two being different is the entire explanation and it was nowhere on the
+report.
+
+**The pattern worth keeping:** a state that is TRUE and a state that MATTERS are
+different, and a diagnostic that reports the first as though it were the second
+sends its reader after the wrong thing. It cost a round of questions here, from
+the one person the report exists for.
