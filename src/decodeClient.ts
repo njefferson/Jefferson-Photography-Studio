@@ -1,83 +1,157 @@
-// Main-thread side of the decode worker. Everything in the app decodes through
+// Main-thread side of the decode workers. Everything in the app decodes through
 // here, so there is one place that decides worker-or-not and one place that
 // falls back.
 //
 // The fallback is not decoration: this app is offline-first and installs to a
 // home screen, so it has to keep working where a module worker cannot be
-// constructed at all. Any failure to START the worker drops that decode — and
-// every later one — onto the main thread, which is exactly the behaviour the
-// app had before. A decode that fails INSIDE the worker is a different thing:
-// that is the file being damaged, and its message must reach the reader
-// unchanged ("file looks damaged or incomplete"), never be retried into a
-// second identical failure.
-
+// constructed at all. Any failure to START a worker drops that decode onto the
+// main thread, which is exactly the behaviour the app had before. A decode that
+// fails INSIDE a worker is a different thing: that is the file being damaged,
+// and its message must reach the reader unchanged ("file looks damaged or
+// incomplete"), never be retried into a second identical failure.
+//
+// SEVERAL LANES, NOT ONE, since 2026-09-13. Moving the decode off the main
+// thread was the fix that stopped a set open freezing the editor, and it left
+// the several-cores half undone: one worker meant forty photographs were
+// decoded one after another, and the lens rig sent ninety flats through the
+// same door.
+//
+// Measured on the devices this app is actually used on, by the test page: a
+// practice raw decodes in 180 ms on an 8-core iPad and 92 ms on a 4-core one,
+// against 43 on a desktop — so the device with the most cores idle is the one
+// paying the most per photograph.
+//
+// HOW MANY LANES, and why it is not "as many as there are cores". Each lane in
+// flight holds a file's bytes and the decode it produced: about 110 MB for a
+// 25 MB raw (26 MB of file, ~84 MB of half-resolution linear float). Three of
+// those is ~330 MB, which is inside the same envelope the parallel export
+// spends and was measured against. Safari reports no memory at all, so a device
+// that does not say gets the conservative number rather than the optimistic one.
 import { decode as decodeHere, type DecodedImage } from "./decode";
 import type { ImportedFile } from "./import";
 
 type Pending = { resolve: (v: DecodedImage) => void; reject: (e: Error) => void };
-
-let worker: Worker | null = null;
-let workerDead = false; // construction or runtime failure — stay on the main thread
-let nextJob = 1;
-const pending = new Map<number, Pending>();
-
-function failAll(message: string) {
-  const err = new Error(message);
-  for (const p of pending.values()) p.reject(err);
-  pending.clear();
+interface Lane {
+  worker: Worker;
+  pending: Map<number, Pending>;
 }
 
-function getWorker(): Worker | null {
-  if (workerDead) return null;
-  if (worker) return worker;
+const lanes: Lane[] = [];
+let started = false;
+let allDead = false; // every lane failed — stay on the main thread
+let nextJob = 1;
+/** Jobs waiting for a free lane, oldest first. */
+const queue: { file: ImportedFile; resolve: (v: DecodedImage) => void; reject: (e: Error) => void }[] = [];
+
+function laneCount(): number {
+  const nav = typeof navigator !== "undefined" ? navigator : undefined;
+  const cores = nav?.hardwareConcurrency || 2;
+  const mem = (nav as (Navigator & { deviceMemory?: number }) | undefined)?.deviceMemory;
+  const cap = typeof mem === "number" && mem >= 16 ? 4 : 3;
+  return Math.max(1, Math.min(cap, cores - 1));
+}
+
+function spawn(): Lane | null {
+  let worker: Worker;
   try {
     worker = new Worker(new URL("./decode.worker.ts", import.meta.url), { type: "module" });
   } catch {
-    workerDead = true;
     return null;
   }
+  const lane: Lane = { worker, pending: new Map() };
   worker.onmessage = (e: MessageEvent<{ id: number; ok: boolean; img?: DecodedImage; message?: string }>) => {
-    const p = pending.get(e.data.id);
+    const p = lane.pending.get(e.data.id);
     if (!p) return;
-    pending.delete(e.data.id);
+    lane.pending.delete(e.data.id);
     if (e.data.ok && e.data.img) p.resolve(e.data.img);
     else p.reject(new Error(e.data.message ?? "decode failed"));
+    pump();
   };
-  // The worker itself died (not a file that would not decode). Everything
-  // waiting on it is lost, so fail those honestly and put every later decode
-  // back on the main thread rather than hanging forever on a dead port.
-  worker.onerror = () => {
-    workerDead = true;
-    worker = null;
-    failAll("The decoder stopped unexpectedly — trying again will use the slower path.");
+  // THIS LANE died (not a file that would not decode). Everything waiting on it
+  // is lost, so fail those honestly and drop the lane — the others keep going,
+  // and only when the last one is gone does the app fall back to the main
+  // thread. The single-worker version failed every pending decode in the app
+  // and moved everything to the main thread for the rest of the session.
+  const kill = (message: string) => {
+    const dead = [...lane.pending.values()];
+    lane.pending.clear();
+    const i = lanes.indexOf(lane);
+    if (i >= 0) lanes.splice(i, 1);
+    try { lane.worker.terminate(); } catch { /* already gone */ }
+    if (!lanes.length) allDead = true;
+    for (const p of dead) p.reject(new Error(message));
+    pump();
   };
-  worker.onmessageerror = () => {
-    workerDead = true;
-    worker = null;
-    failAll("A decoded photo could not be handed back from the decoder.");
-  };
-  return worker;
+  worker.onerror = () => kill("The decoder stopped unexpectedly — trying again will use the slower path.");
+  worker.onmessageerror = () => kill("A decoded photo could not be handed back from the decoder.");
+  return lane;
 }
 
-/** Decode off the main thread where possible, on it where not. Same decoder
- *  either way (src/decode.ts) — see decode.worker.ts. */
-export function decodeOffThread(file: ImportedFile): Promise<DecodedImage> {
-  const w = getWorker();
-  if (!w) return decodeHere(file);
-  const id = nextJob++;
-  return new Promise<DecodedImage>((resolve, reject) => {
-    pending.set(id, { resolve, reject });
+function ensureLanes(): void {
+  if (started || allDead) return;
+  started = true;
+  const want = laneCount();
+  for (let i = 0; i < want; i++) {
+    const lane = spawn();
+    if (lane) lanes.push(lane);
+  }
+  if (!lanes.length) allDead = true;
+}
+
+/** The lane with the least in flight — with one job per lane at a time this is
+ *  simply the first idle one, and the queue below holds the rest. */
+function freeLane(): Lane | undefined {
+  return lanes.find((l) => l.pending.size === 0);
+}
+
+function pump(): void {
+  while (queue.length) {
+    const lane = freeLane();
+    if (!lane) return;
+    const job = queue.shift()!;
+    const id = nextJob++;
+    lane.pending.set(id, { resolve: job.resolve, reject: job.reject });
     try {
       // Bytes are COPIED, not transferred: the caller still needs them to write
       // the photo into storage.
-      w.postMessage({ id, file });
-    } catch (err) {
-      pending.delete(id);
-      workerDead = true;
-      worker = null;
-      // Could not even post — fall back for this decode and all later ones.
-      decodeHere(file).then(resolve, reject);
-      void err;
+      lane.worker.postMessage({ id, file: job.file });
+    } catch {
+      lane.pending.delete(id);
+      const i = lanes.indexOf(lane);
+      if (i >= 0) lanes.splice(i, 1);
+      if (!lanes.length) allDead = true;
+      // Could not even post — this decode falls back, and the lane is gone.
+      decodeHere(job.file).then(job.resolve, job.reject);
     }
+  }
+}
+
+/** Decode off the main thread where possible, on it where not. Same decoder
+ *  either way (src/decode.ts) — see decode.worker.ts.
+ *
+ *  ONE JOB PER LANE AT A TIME, deliberately: a lane holds its file and its
+ *  decode for the duration, so handing a lane three jobs at once would triple
+ *  what it holds without decoding anything sooner. Extra work waits in the
+ *  queue, which is also what keeps a forty-photo set from having forty files in
+ *  memory at once. */
+export function decodeOffThread(file: ImportedFile): Promise<DecodedImage> {
+  ensureLanes();
+  if (allDead || !lanes.length) return decodeHere(file);
+  return new Promise<DecodedImage>((resolve, reject) => {
+    queue.push({ file, resolve, reject });
+    pump();
   });
+}
+
+/** How many decodes can be in flight at once — for the test page and the
+ *  diagnostic, so a reader's report says whether this device got any lanes at
+ *  all rather than leaving it to be inferred.
+ *
+ *  IT DOES NOT START THEM. A report must never change the thing it reports on:
+ *  asking the diagnostic for this number would otherwise spawn three workers on
+ *  a device that had not decoded anything yet, and then truthfully report that
+ *  it had three. Zero here means "none running", which on a fresh page is the
+ *  honest answer. */
+export function decodeLanes(): number {
+  return lanes.length;
 }
