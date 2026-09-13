@@ -12224,3 +12224,38 @@ report.
 different, and a diagnostic that reports the first as though it were the second
 sends its reader after the wrong thing. It cost a round of questions here, from
 the one person the report exists for.
+
+## 2026-09-13 — the wordiness, measured before being cut
+
+**8,963 WORDS OF READER-FACING TEXT IN `ir.html`.** Measured rather than
+estimated, and the distribution is the whole story:
+
+- **Help: 4,368 words** — seventeen sections in one continuous dialog with no
+  way in. Half the app's text in one scroll.
+- the editing panel: 2,510 across twelve tabs;
+- the lens dialog 501, the welcome 266, the ⓘ 217.
+
+**HELP WAS THE REAL PROBLEM AND THE FIX IS SHAPE, NOT LENGTH.** The words were
+mostly earning their place — somebody hitting a hanging Files picker needs all
+430 of those — but stacked with no navigation, every reader paid for every
+section to reach the one they wanted. Each section now folds, Quick start is
+open, and a filter narrows as you type: "picker" gives three sections, already
+open, with a count announced. **491 words on arrival instead of 4,368**, and
+nothing deleted.
+
+**AND I OVERSTATED THE PANEL, WHICH IS WORTH RECORDING BECAUSE THE NUMBER WAS
+TRUE.** "1,540 words of explanatory notes in the editing panel" is correct as a
+total and misleading as a description: only one tab renders at a time, so what a
+reader actually faces is about **four notes and a hundred words** beside
+nineteen controls. A real total reported as though it were an on-screen quantity
+is the same error as a limit measured in isolation reported as a limit under
+load — the third time today.
+
+The explanations toggle stays, because it is reversible, remembered, and on by
+default for a first visit. But its honest measured gain is **one more control on
+screen**, not the decluttering the total implied.
+
+**What the panel notes are NOT is a problem of writing.** At roughly a hundred
+words per tab, beside the controls they explain, they are a reasonable teaching
+surface. The next place to look, if this continues, is the lens dialog and the
+welcome — not more trimming of the panel.
