@@ -11130,3 +11130,28 @@ frames and printed one number, and a conclusion was duly drawn from it before th
 second run existed. It now takes three passes, reports the median, prints all
 three, and its own prose says to compare the spread against the gap between the
 rows before deciding one source is faster than another.
+
+## 2026-09-13 — the drawn fingerprint, and what three passes showed immediately
+
+**The desktop's drawn frame fingerprints `fe3da8c6`** (NVIDIA GTX 1650 through
+ANGLE/D3D11), against `7afc9c2a` for the computed one — which is expected and not
+the question. The question is whether a SECOND device drawing the same photograph
+also prints `fe3da8c6`. The container prints `62b68d97` on a software rasteriser,
+which says nothing: different renderer entirely. **An iPad's number is the one
+that settles whether a drawn export is as machine-independent as today's
+computed one.**
+
+**AND THE THREE PASSES PAID FOR THEMSELVES ON THE FIRST RUN.** The spreads:
+full resolution **[23, 12, 10]**, half-float **[12, 10, 9]**, the proxy
+**[12, 10, 10]**. The first pass is the slowest on every source — a warm-up that
+a single-pass measurement folds into the answer and a median discards. On medians
+the desktop reads 12 ms, 10 and 10: **half-float and the proxy are equal, float32
+is two milliseconds behind.** That is the same story the earlier single runs told,
+now with the evidence printed beside it instead of one number to be trusted.
+
+**One housekeeping observation from the same report**: the installed app listed
+caches for both `ips-2.43.3` and `ips-2.43.6` with an update WAITING, while
+running 2.43.6's bundle. That is §7h behaving exactly as designed — the page came
+from the network, the new worker is installed and waiting rather than swapping
+under it — but it means the next OFFLINE launch would serve the older cache until
+the update is taken.
