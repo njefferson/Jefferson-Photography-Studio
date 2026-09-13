@@ -1047,7 +1047,22 @@
       </div>
       <div class="help-body">
         <button id="helpTutorials" type="button" class="help-tutorials">&#9654;&#xFE0E; Tutorials — learn by doing on real infrared photos</button>
-        <h3>Quick start</h3>
+        
+        <!-- A MENU, NOT A SCROLL. Seventeen sections and 4,368 words lived here
+             as one continuous page with no way in, so somebody who needed the
+             430 words about the Files picker had to scroll past everything else
+             to reach them. The words are not the problem — most of them are
+             needed by somebody, some of the time — being in each other's way
+             is. Each section collapses, Quick start is open, and the box below
+             filters by what the reader actually types. -->
+        <div class="help-find">
+          <label for="helpFilter" class="sr-only">Search this help</label>
+          <input id="helpFilter" type="search" placeholder="Search — e.g. picker, batch, install" autocomplete="off" />
+          <p id="helpFilterCount" class="help-find-count" role="status"></p>
+        </div>
+        <details class="help-sec" open>
+          <summary>Quick start</summary>
+
         <ol>
           <li><strong>Open image(s)</strong> (or pick a practice photo). RAW — NEF or DNG — unlocks the full color range.
           Pick several and they become a <strong>session</strong>: a strip of previews along the bottom, tap to switch,
@@ -1064,22 +1079,28 @@
           <li><strong>Double-tap any slider</strong> to put it back where the photo opened. Most of them don't start at zero — white balance, exposure and denoise open at values measured from your frame — so this returns that one slider to its opening value, the way <strong>Reset</strong> does for all of them at once. Quality goes back to its usual setting instead, since that one is yours rather than the photo's. Restore depth strength goes back to 100% — the full correction worked out for the frame in front of you, which is where every photo opens.</li>
           <li>Pick a <strong>Look</strong>, adjust sliders to taste, then <strong>Export &amp; Save</strong>.</li>
         </ol>
+        </details>
+        <details class="help-sec">
+          <summary>Gestures</summary>
 
-        <h3>Gestures</h3>
         <ul>
           <li><strong>Tap</strong> the photo — set white balance from that point (aim at foliage). While a picture tool is armed — Heal, a color pick, brush painting or drag-to-adjust — that tool takes the tap instead.</li>
           <li><strong>Pinch</strong> — zoom (up to 8&times;); drag to pan while zoomed. No touchscreen? Use the <strong>+ / &minus; / Fit</strong> buttons in the photo's bottom-right corner, or the mouse wheel over the photo — both work even while you're brushing, so you can zoom right in to edit up close.</li>
           <li><strong>Press &amp; hold</strong> the photo (or the <em>Hold: Original</em> button) — compare with how the photo opened. <em>Hold: Untouched</em> shows the bare decode with nothing applied.</li>
         </ul>
+        </details>
+        <details class="help-sec">
+          <summary>Top bar</summary>
 
-        <h3>Top bar</h3>
         <ul>
           <li><strong>Undo / Redo</strong> — step back and forward through your edit, one gesture per step. A fresh edit after an undo starts a new path forward.</li>
           <li><strong>Reset</strong> — the whole edit returns to how the photo first opened (the auto baseline).</li>
           <li><strong>Histogram</strong> — a live RGB + luminance readout floating over the photo. Tap the histogram itself to tuck it away; the button brings it back.</li>
         </ul>
+        </details>
+        <details class="help-sec">
+          <summary>Looks &amp; adjustments</summary>
 
-        <h3>Looks &amp; adjustments</h3>
         <p>Looks are one-tap recipes; every slider stays live afterwards so you can push further.
         Looks tagged <span class="badge">R&#8646;B</span> use the <strong>red&#8646;blue channel swap</strong> —
         the move that makes IR sky blue and foliage red/gold. Toggle the swap button to see its effect on any look.
@@ -1150,8 +1171,10 @@
         RAW or JPEG both work and the RAW is better. Nothing is uploaded and nothing leaves your device
         &mdash; the photographs stay here and only the numbers come out, which is the whole point of
         measuring on the device rather than sending the files somewhere.</p>
+        </details>
+        <details class="help-sec">
+          <summary>Which color tool when?</summary>
 
-        <h3>Which color tool when?</h3>
         <p>The color tools stack from broadest to most surgical — reach for the smallest one that does the job:</p>
         <ul>
           <li><strong>Channel swap</strong> — flips the whole color world at once (red&#8646;blue). The IR move.</li>
@@ -1164,8 +1187,10 @@
         tear into visible bands. That's why a chip's Hue reaches &plusmn;60&deg; and fades toward its
         neighbors — it's what keeps the adjustment invisible-clean. When one chip's reach isn't enough,
         make the big move with <strong>Hue shift</strong> first, then finish with the chip.</p>
+        </details>
+        <details class="help-sec">
+          <summary>Grade — wheels, toned mono, grain &amp; vignette</summary>
 
-        <h3>Grade — wheels, toned mono, grain &amp; vignette</h3>
         <p>The Grade tab tints the picture by brightness instead of by color: one wheel each for
         <strong>Shadows</strong>, <strong>Midtones</strong> and <strong>Highlights</strong>. Drag a
         wheel's dot out from the centre — direction picks the colour, distance the strength — or use
@@ -1180,8 +1205,10 @@
         Aerochrome, Copper, a channel cycle (red to green to blue) — then fine-tune the nine sliders for invented false-color
         palettes. Unlike grain and vignette, the mixer is pure color: it bakes into both .cube and .dcp
         exports.</p>
+        </details>
+        <details class="help-sec">
+          <summary>Stickers &mdash; UFOs in the trees <span class="lut-badge">Beta</span></summary>
 
-        <h3>Stickers &mdash; UFOs in the trees <span class="lut-badge">Beta</span></h3>
         <p>In the <strong>Stickers</strong> tab, tap a sticker to drop it on the photo, then drag it into
         place. A sticker sits <strong>on top</strong> of the picture with its own colours &mdash; it's a
         different kind of image, so it is <em>not</em> pushed through the infrared processing (grain still
@@ -1201,8 +1228,10 @@
         vignette, which fixes the lens on the full frame. Everything here rides saved looks, sessions and
         batch. Exports: the wheels bake into .cube files; grain and vignette don't (a .cube carries colour
         only) — and .dcp can't carry any of it.</p>
+        </details>
+        <details class="help-sec">
+          <summary>Warp &mdash; bend the picture <span class="lut-badge">Beta</span></summary>
 
-        <h3>Warp &mdash; bend the picture <span class="lut-badge">Beta</span></h3>
         <p>The <strong>Warp</strong> tab pushes the picture around with your finger. Pick a tool and
         drag on the photo: <strong>Push</strong> smears pixels along your stroke, <strong>Swirl</strong>
         twists them, <strong>Pinch</strong> draws them inward and <strong>Bloat</strong> pushes them out.
@@ -1210,8 +1239,10 @@
         experiment freely and Reset warp when you want the picture back. Like crop and healing, warp
         bends the picture itself, so it stays with this photo &mdash; it isn't carried by saved looks,
         batch or the .cube / .dcp exports.</p>
+        </details>
+        <details class="help-sec">
+          <summary>Light &amp; area tools</summary>
 
-        <h3>Light &amp; area tools</h3>
         <ul>
           <li><strong>Clarity</strong> — punches up local structure (or softens, pulled left). <strong>Dehaze</strong> — cuts the veil that flattens distant subjects; brightness-only, so colors stay put.</li>
           <li><strong>Sharpen</strong> &amp; <strong>Texture</strong> (Basic) — Sharpen crisps fine edges; Texture works the mid-size surface structure (left smooths it). Both are luminance-only, so colors never shift.</li>
@@ -1221,23 +1252,29 @@
           <li><strong>IR lens fixes</strong> (Corrections tab) — pulls down the center hot-spot IR-converted lenses produce, takes the <em>colour</em> out of it as well (the disc that shows up in a plain sky once a Look is on), and corrects (or adds) corner vignette.</li>
           <li><strong>Crop &amp; straighten</strong> (panel tab) — three one-tap tools, each with its own <em>Done</em>: <strong>Rotate 90&deg;</strong> turns the whole photo in quarter turns and nothing else; <strong>Crop</strong> shows the box with a rule-of-thirds grid — drag a corner to resize, drag the photo to slide it under the box; <strong>Straighten</strong> adds a fine alignment grid and a degree slider — line a horizon up against the grid (the crop auto-shrinks so no empty corner shows). Pinch to zoom the view while either tool is open. A view onto the photo, not a re-bake — masks and healed spots stay exactly where they are underneath. Composition-specific: never rides in saved looks, profiles or a batch.</li>
         </ul>
+        </details>
+        <details class="help-sec">
+          <summary>Profiles &amp; LUTs</summary>
 
-        <h3>Profiles &amp; LUTs</h3>
         <p><strong>.cube</strong> bakes your color look for Photoshop/video apps &mdash; including any imported LUT,
         so the file is your full on-screen look. You can also <strong>import</strong> any .cube LUT and blend it over
         your grade with a strength slider; a saved look remembers its LUT, and it rides into Batch process too.
         <strong>.dcp</strong> is a Lightroom camera profile (beta) &mdash; it can't carry imported LUTs (it's a camera
         profile, not a look file). Denoise, glow, sharpen, texture, clarity, dehaze, masks and heals are spatial effects and can't ride along in profiles.</p>
+        </details>
+        <details class="help-sec">
+          <summary>Works with</summary>
 
-        <h3>Works with</h3>
         <p>JPEG/PNG from any camera &middot; HEIC (in Safari) &middot; RAW from any Bayer-sensor camera converted to DNG
         (free Adobe DNG Converter, or Lightroom's Convert to DNG) &middot; Nikon NEF natively
         (classic compressed; not High-Efficiency — Z8/Z9 and the Z50&nbsp;II's HE&#8202;/&#8202;HE* files need converting to DNG first) &middot; Fujifilm X-Trans not supported.
         Tuned on an IR-converted Nikon Z50.
         Saves: <strong>JPEG in Display&nbsp;P3</strong> (the exact colors you see, wide-gamut tagged) and <strong>16-bit TIFF in sRGB</strong> (the safest hand-off into other editors).
         Exports keep the photo's <strong>capture date, camera, lens and exposure</strong> (when the original carries them) — never its location.</p>
+        </details>
+        <details class="help-sec">
+          <summary>Seeing more of your files while you pick</summary>
 
-        <h3>Seeing more of your files while you pick</h3>
         <p>The picker that opens when you tap <strong>Open image(s)</strong> is Apple's, not this app's.
         Its size is Safari's decision and no web page can change it — so it cannot be made to fill the screen
         from in here. Two things do help.</p>
@@ -1251,8 +1288,10 @@
           session. When you know what you are looking for, the small picker is fine; when you are looking
           <em>through</em> a shoot, this is the one to reach for.</li>
         </ul>
+        </details>
+        <details class="help-sec">
+          <summary>Why the Files picker hangs</summary>
 
-        <h3>Why the Files picker hangs</h3>
         <p>You pick a folder of raw files, tap <strong>Open</strong>, and nothing happens for a long time with
         nothing on screen to say why. <strong>That wait is not this app.</strong> Everything you see until the
         picker closes belongs to iOS: this app is not running, has not been handed a single file, and has no way
@@ -1285,8 +1324,10 @@
         or the tab being discarded. So going back to those photos later is <strong>Resume session</strong> on the
         start screen, which touches neither iCloud nor the picker. Ending a session with <strong>Done</strong> is
         what throws that copy away.</p>
+        </details>
+        <details class="help-sec">
+          <summary>Batch process — develop a whole set at once</summary>
 
-        <h3>Batch process — develop a whole set at once</h3>
         <p><strong>Open image(s)</strong> is for <em>editing</em> (one photo, or a few as a session);
         <strong>Batch process</strong> is for <em>output</em> — it develops a whole set unattended and hands you a .zip.
         Tap it (in the top bar next to <em>Open image(s)</em>, or on the start screen) and it first asks
@@ -1310,8 +1351,10 @@
         resume the rest, and if the app ever crashes or is closed mid-batch, the start screen offers to
         <strong>recover</strong> the finished images next time you open it. If the device runs out of storage
         mid-batch, it stops the same gentle way — save the <strong>.zip</strong> to free space, then Continue.</p>
+        </details>
+        <details class="help-sec">
+          <summary>Install as an app — one, two, or three</summary>
 
-        <h3>Install as an app — one, two, or three</h3>
         <p>You get a full-screen icon that works offline. Open the page you want, then:</p>
         <ul class="install-list">
           <li><strong>iPhone, iPad</strong> — Safari's <strong>Share</strong> button, then <strong>Add to Home Screen</strong>.</li>
@@ -1347,8 +1390,10 @@
           <li><strong>Both, or all three</strong> — install any mix; each is independent, so the Infrared app never carries the Macro engine and vice-versa.</li>
         </ul>
         <p>You can add or remove any of them later — installing one never blocks the others.</p>
+        </details>
+        <details class="help-sec">
+          <summary>Tips</summary>
 
-        <h3>Tips</h3>
         <ul>
           <li>Import from <strong>Files</strong>, not the Photo Library — iOS silently converts RAW to JPEG there. A zipped RAW also works.</li>
           <li>Scenes with big empty dark skies take more Contrast; scenes with shadow detail (roads, dark trees) look best gentle.</li>
@@ -1357,7 +1402,8 @@
         </ul>
       </div>
       <button id="helpClose" type="button">Close</button>
-    </dialog>
+        </details>
+</dialog>
 
     <script type="module" src="/src/main.ts"></script>
   </body>
