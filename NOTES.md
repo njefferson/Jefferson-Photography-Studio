@@ -10693,3 +10693,49 @@ moot — so it stays where it is, deliberately. And that same iPad reports a
 **1000 MB storage quota** (the other reports 38 GB), which is one forty-photo set
 of 25 MB raws: the quota path already stops the open and says so, but it is the
 device to remember when anything here assumes room.
+
+## 2026-09-13 — a question that should have been a measurement
+
+**THE DECISION PUT TO THE OWNER WAS HALF A HEDGE.** It read: a drawn export
+cannot be byte-identical to today's, so should it match the preview instead, or
+should the export stay on the processor? The second half of that is a real
+product question. The first half asserted a property of TODAY'S app — "the same
+file on every device" — **that was never measured and is probably false.**
+
+The standard allows `Math.exp`, `Math.pow` and the rest to be
+implementation-approximated; engines differ. The denoiser calls `exp` 522 million
+times in one 20.9-megapixel export. So a Chromium export and a Safari export of
+the same photograph agreeing byte for byte would be luck, not design — and the
+option "keep it identical" may be protecting something the app has never had.
+
+**It cannot be settled here** (no WebKit in the container), so it went into the
+app, which is what §7j is for. The test page now prints two fingerprints:
+
+- **the engine's arithmetic**, over a fixed sweep of the exponentials, gammas and
+  logs the pipeline leans on — milliseconds, and the root of the question;
+- **a real export of the app's own bundled practice photograph**, at a fixed
+  edit, through the real pipeline. Same input on every device, so the number is
+  comparable. Two devices printing different fingerprints have never produced
+  identical files.
+
+**AND THE PITCH FOR THE PORT WAS ALSO HALF WRONG.** It said the two copies of the
+edit — the shaders and the processor path — were kept in step "by discipline", in
+a way that implies drift. Measured instead: a practice photograph rendered on
+screen against the same photograph exported, compared as block means over the
+middle half of the frame (the canvas letterboxes and the export does not), 12x12
+grid, per channel: **average difference 3.38 of 255, worst block 17, systematic
+shift under 1.3 in every channel.** The export is JPEG at 92 and the canvas is a
+display-size render, so a couple of units is this method's floor. **The two
+implementations have not visibly drifted.** The case for drawing the export is
+speed and preventing FUTURE drift — not repairing present drift, which is not
+there.
+
+**TWO INSTRUMENT ERRORS IN THE SAME HOUR, BOTH WORTH KEEPING.** The fingerprint
+export was first taken at a scale that produced about a megapixel, then halved
+to half a megapixel to make the page quicker — **and it got slower, 10.7 seconds
+to 15.5.** A scaled export box-filters: it samples `round(1/scale)` squared source
+pixels for every output pixel, so asking for fewer pixels asked for more work per
+pixel. It takes a CROP at native scale now. And that 15.5 was taken while an
+accessibility sweep was running in the background on the same container, so it
+was never a clean number either — a timing taken while something else runs is not
+a timing.

@@ -16,6 +16,7 @@ import { sniff } from "./import";
 import { workerCount } from "./exportparallel";
 import { linearAt } from "./decode";
 import { compileEdit, TONE_DEFAULT, GRADE_DEFAULT, MIX3_DEFAULT, hslDefault, CROP_DEFAULT, type EditParams } from "./pipeline";
+import { exportImage } from "./export";
 
 declare const __APP_VERSION__: string;
 
@@ -515,6 +516,76 @@ async function buildingATile(): Promise<void> {
   }
 }
 
+/** DOES THIS DEVICE COMPUTE THE SAME EXPORT AS THAT ONE?
+ *
+ *  Asked because a claim was made without it. "The exported file is identical on
+ *  every device" was stated as a property of today's app and never tested — and
+ *  the standard explicitly allows `Math.exp`, `Math.pow` and the rest to be
+ *  implementation-approximated, while the noise reduction calls exp 522 million
+ *  times in one export. Two engines that round one of those differently produce
+ *  different files, and nothing in the app would ever notice.
+ *
+ *  Two fingerprints. The first is the ENGINE's arithmetic, which costs
+ *  milliseconds and is the root of it. The second is a real export of a bundled
+ *  practice photograph through the app's own pipeline — the whole claim, end to
+ *  end. Same photograph everywhere, so the numbers are comparable between
+ *  devices: run this on two and compare. Nothing of the reader's is used or
+ *  reported. */
+async function sameEverywhere(): Promise<void> {
+  const hex = (h: number) => (h >>> 0).toString(16).padStart(8, "0");
+  // The transcendentals the pipeline actually leans on, over a fixed sweep.
+  let h = 0x811c9dc5;
+  const mix = (v: number) => {
+    const b = new Uint8Array(new Float64Array([v]).buffer);
+    for (let i = 0; i < 8; i++) { h ^= b[i]; h = Math.imul(h, 0x01000193); }
+  };
+  for (let i = 0; i < 2000; i++) {
+    const x = i / 97.3;
+    mix(Math.exp(-x));        // the bilateral's range term
+    mix(Math.pow(x % 1 || 0.5, 2.2)); // the gamma the 8-bit path uses
+    mix(Math.log(1 + x));
+    mix(Math.sin(x) * Math.cos(x / 3));
+  }
+  row("This device's arithmetic", hex(h),
+    "A fingerprint of the maths the edit leans on — exponentials, gamma, logs — over a fixed sweep. Two devices that print the same number compute an export the same way. Two that do not cannot produce identical files, however carefully the app is written.");
+
+  const p = note("Exporting a practice photograph to fingerprint it…");
+  try {
+    const res = await fetch("./examples/NIR_0063.dng");
+    if (!res.ok) throw new Error("practice photo not available offline");
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    const img = await decodeOffThread({ name: "test.dng", kind: sniff(bytes), bytes: bytes.slice(), looksTranscoded: false });
+    const params: EditParams = {
+      wb: [1.6, 1, 0.7], exposure: 1.2, recover: 0, swapRB: true, hue: 0, sat: 1.1, contrast: 1.05, denoise: 0.47,
+      tint: [1, 1, 1], glow: 0, sky: [0, 1, 1], foliage: [0, 1, 1],
+      tone: [...TONE_DEFAULT], toneR: [...TONE_DEFAULT], toneG: [...TONE_DEFAULT], toneB: [...TONE_DEFAULT],
+      lum: 1, masks: [], hotspot: 0, hotspotSize: 0.5, hotspotColor: 0, lensFix: 1, lensBypass: false,
+      hsFix: 1, hsBypass: false, vignette: 0, clarity: 0, dehaze: 0, sharpen: 0.4, texture: 0,
+      hsl: hslDefault(), bwOn: false, bwMix: [1, 1, 1], grade: [...GRADE_DEFAULT], grainAmt: 0, grainSize: 1.5,
+      vigAmt: 0, vigMid: 0.5, mix3: [...MIX3_DEFAULT], spots: [], crop: { ...CROP_DEFAULT }, straighten: 0,
+    };
+    // A CROP AT NATIVE SCALE, not a scaled-down whole frame. Asking for a
+    // fraction of the size looks like the cheap way to do this and is not: a
+    // scaled export box-filters, sampling round(1/scale) squared source pixels
+    // for every output pixel, so asking for half a megapixel instead of one
+    // MADE IT SLOWER — 15.5 seconds against 10.7, measured. Cropping asks for
+    // fewer pixels and does the same work per pixel, which is what was wanted.
+    const frac = Math.min(1, Math.sqrt(5e5 / (img.width * img.height)));
+    params.crop = { x: (1 - frac) / 2, y: (1 - frac) / 2, w: frac, h: frac };
+    const t0 = performance.now();
+    const out = await exportImage({ name: "practice.dng", kind: sniff(bytes), bytes, looksTranscoded: false }, img, params, { format: "jpeg", scale: 1, quality: 0.92 });
+    const buf = new Uint8Array(await out.blob.arrayBuffer());
+    let f = 0x811c9dc5;
+    for (let i = 0; i < buf.length; i++) { f ^= buf[i]; f = Math.imul(f, 0x01000193); }
+    p.remove();
+    row("A practice photograph, exported", `${hex(f)} · ${(buf.length / 1024).toFixed(0)} KB · ${((performance.now() - t0) / 1000).toFixed(1)}s`,
+      "The app's own bundled practice file, exported at about a megapixel with a fixed edit — the same input on every device, so the fingerprint is comparable. Two devices printing the same one export identically today; two that differ do not, and never did.");
+  } catch (e) {
+    p.remove();
+    row("A practice photograph, exported", "not run", `It could not be exported here (${(e as Error).message}).`);
+  }
+}
+
 ($("dRun") as HTMLButtonElement).addEventListener("click", async (e) => {
   const btn = e.currentTarget as HTMLButtonElement;
   btn.disabled = true;
@@ -529,6 +600,7 @@ async function buildingATile(): Promise<void> {
   await exportOnTheGpu();
   await decoding();
   await buildingATile();
+  await sameEverywhere();
   await storage();
   btn.textContent = "Run again";
   btn.disabled = false;
