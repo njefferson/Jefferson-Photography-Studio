@@ -1056,6 +1056,28 @@ export class Renderer {
     this.tapScale = Number.isFinite(texels) && texels >= 1 ? texels : 1;
   }
 
+  /** GIVE THE GRAPHICS CONTEXT BACK.
+   *
+   *  A browser allows only a handful of live WebGL contexts — around sixteen in
+   *  Chromium — and setting `canvas.width = 1` releases NONE of it: the context,
+   *  its programs and every texture it holds stay alive until the canvas is
+   *  collected, which is whenever the collector feels like it. The test page
+   *  builds a Renderer per source to compare them, so three contexts, each
+   *  holding a full-resolution texture, leaked on every press of Run. Past the
+   *  cap the browser starts killing the OLDEST contexts, which is somebody
+   *  else's renderer.
+   *
+   *  Anything that makes a throwaway Renderer calls this in a `finally`. The
+   *  app's own long-lived one never needs it. */
+  dispose() {
+    const gl = this.gl;
+    try {
+      gl.bindTexture(gl.TEXTURE_2D, null);
+      gl.useProgram(null);
+      gl.getExtension("WEBGL_lose_context")?.loseContext();
+    } catch { /* a context already gone is the state we wanted */ }
+  }
+
   /** Source-space mirror bits (1 = x, 2 = y). A view transform like rotation:
    *  not part of the edit/undo; the export takes it via opts.flip. */
   setFlip(bits: number) {
