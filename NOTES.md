@@ -11463,3 +11463,60 @@ takes slightly LONGER to build (1,077 ms against 994 — the conversion is real
 work) and then uploads faster (23 ms against 35) and draws marginally faster
 (10.0 ms a frame against 11). About even on time, half the memory, and it costs
 the picture 0.018 of 255 with a worst of 4.
+
+## 2026-09-13 — two renderers with nothing in common reported the same difference to the digit
+
+**THE OPERATORS-OFF COMPARISON CAME BACK IDENTICAL ON A SOFTWARE RASTERISER AND
+AN NVIDIA CARD.** Not close — identical in every field: `average 0.21 of 255,
+worst 74 · 450 over 8, 134 over 24 of 1999882 · edges 1.9x`, from a container
+running SwiftShader and from a GTX 1650 through ANGLE/Direct3D11.
+
+**Difference statistics that match to the digit are not two chips each rounding
+their own way.** They are ONE systematic difference between the shader and the
+processor code, reproduced exactly by both renderers — a constant, a conversion,
+an order of operations, something with a single cause. Meanwhile the same two
+renderers disagree in the operators-ON case (492 over 24 against 559) and their
+drawn fingerprints differ across every graphics chip measured.
+
+**WHICH LOCATES THE PROBLEM, IF IT HOLDS.** Everything that makes a drawn export
+depend on the machine would then live in the noise reduction and the sharpening
+— twenty-five weighted taps and a neighbourhood each — and nothing in white
+balance, the camera matrix, highlight recovery, the hot-spot and lens
+corrections, tone, saturation, contrast, the channel mix or the wide-gamut
+conversion. That is a small enough place to go and FIX, which would dissolve the
+last objection to drawing the export at all.
+
+**SO THE TEST PAGE NOW FINGERPRINTS THAT FRAME TOO**, and it costs nothing
+because the frame is already in hand from the comparison. If the operators-off
+fingerprint matches across devices while the operators-on one does not, the
+finding is confirmed and the work is bounded. If it differs, the plain pipeline
+varies too and this hope is dead — which is worth knowing just as much, and
+cheaper than assuming either way.
+
+**Do not read this as settled from two renderers.** One of them is a software
+rasteriser, which is exactly the case where agreement proves least: it may agree
+with the processor because it IS a processor. The real test is two different
+graphics chips, which is what the devices will answer.
+
+## 2026-09-13 — three graphics contexts leaked on every press of Run
+
+**`fullResolutionPreview` BUILDS A `Renderer` PER SOURCE AND NEVER GAVE ONE
+BACK.** Its `finally` set `canvas.width = 1`, which releases nothing: the
+context, its programs and every texture it holds stay alive until the canvas is
+collected. Three sources, three contexts, each holding a full-resolution texture
+— 84 MB, 42 MB and the proxy — leaked on every run, and a browser allows only
+about sixteen live contexts before it starts killing the OLDEST, which is
+somebody else's renderer.
+
+`Renderer.dispose()` now exists and does what the name says; the probe calls it
+in the `finally`. The app's own long-lived renderer never needs it, which is why
+the class never had one — a throwaway Renderer is a test-page invention and it
+arrived without the matching teardown.
+
+**This is being investigated as a possible cause of a separate regression** — a
+second desktop report showed a tile taking 1,030 ms where the run nineteen
+minutes earlier said 15 ms, three consistent passes each time. The tile loop is
+pure processor work with no WebGL in it at all, so a leaked context cannot
+explain it directly; what a leaked context and a 84 MB canvas CAN do is push the
+page into memory pressure that a later run pays for. A repeat test is running.
+**Not yet attributed — recorded here as an open question, not a diagnosis.**
