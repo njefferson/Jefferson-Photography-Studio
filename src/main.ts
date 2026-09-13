@@ -2,7 +2,7 @@ import "./style.css";
 import { importFile, type ImportedFile, type ImageKind } from "./import";
 import { wireForceUpdate, wireUpdateStrip, setUpdateCost } from "./swupdate";
 import { type DecodedImage, pickLargestPreview, linearAt } from "./decode";
-import { decodeOffThread, decodeLanes } from "./decodeClient";
+import { decodeOffThread, decodeLanes, decodeLaneTarget } from "./decodeClient";
 import { Renderer, type EditParams } from "./gl";
 import { exportImage, saveBlob, lastExportProfile, getSource, proxyFactorFor, type ExportFormat } from "./export";
 import { buildLinearSourceInBands } from "./gpuexport";
@@ -7873,7 +7873,7 @@ let thumbPass = 0;
  *  Order costs nothing here. The same work happens; it just happens where
  *  somebody is looking. */
 function nextThumbTarget(): (typeof sessionPhotos)[number] | undefined {
-  const ready = sessionPhotos.filter((v) => v.id !== "lone" && v.thumbState !== "real" && !pendingStore.has(v.id));
+  const ready = sessionPhotos.filter((v) => v.id !== "lone" && v.thumbState !== "real" && !pendingStore.has(v.id) && !thumbsInFlight.has(v.id));
   if (!ready.length) return undefined;
   const all = sessionPhotos.filter((p) => p.id !== "lone");
   const idx = new Map(all.map((p, i) => [p.id, i]));
@@ -7897,6 +7897,51 @@ function nextThumbTarget(): (typeof sessionPhotos)[number] | undefined {
     Math.abs((idx.get(v.id) ?? 0) - here) < Math.abs((idx.get(best.id) ?? 0) - here) ? v : best);
 }
 
+/** Photos a lane has already taken. `thumbState` cannot carry this: it is also
+ *  what the strip reads to decide whether a tile is provisional, so a fourth
+ *  value would have to be handled at every display site to mean "still waiting,
+ *  but do not pick it again". */
+const thumbsInFlight = new Set<string>();
+
+/** ONE PHOTO'S TILE, start to finish. Lifted out of the loop below so several
+ *  can be in flight at once — see the comment on the loop for why that is the
+ *  whole point. Returns nothing and throws nothing: a thumbnail is not worth
+ *  failing an open over. */
+async function oneThumbnail(view: SessionPhoto, gen: number): Promise<void> {
+  try {
+    const bytes = await Session.getBytes(view.id);
+    const imported: ImportedFile = { name: view.name, kind: view.kind, bytes, looksTranscoded: false };
+    const img = await decodeOffThread(imported);
+    const own = ownEdit(view);
+    // THE LENS CORRECTION WAS MISSING FROM EVERY STRIP TILE, so a tile wore
+    // the hot spot the photograph itself does not have — a bright disc in the
+    // middle of the tile and none in the picture it opens into, which reads
+    // as the tile belonging to some other frame. `lensCurveFor` exists for
+    // exactly this (its own comment says "every path that renders a frame
+    // other than the one the reader has open") and the quick-look grid has
+    // always passed it; this path never did.
+    const thumb = await makeThumb(img, 260, lensCurveFor(imported), own);
+    if (gen !== thumbPass) return;
+    if (!sessionPhotos.some((p) => p.id === view.id)) return; // dropped while we worked
+    if (thumb.byteLength) {
+      if (view.thumbUrl) URL.revokeObjectURL(view.thumbUrl);
+      view.thumbUrl = URL.createObjectURL(new Blob([thumb], { type: "image/jpeg" }));
+      await Session.setThumb(view.id, thumb).catch(() => {});
+    }
+    view.thumbState = "real";
+    view.thumbGrade = stampFor(view); // what this picture is a claim about
+    updateSessionStrip();
+  } catch {
+    // A thumbnail is not worth failing an open over — the tile keeps the
+    // camera preview, or its name, and the photo still opens. Mark it done
+    // either way so a file that will never render cannot spin this loop.
+    view.thumbState = "real";
+    view.thumbGrade = stampFor(view);
+  } finally {
+    thumbsInFlight.delete(view.id);
+  }
+}
+
 async function realThumbnails(): Promise<void> {
   const gen = ++thumbPass;
   // Runs ALONGSIDE the storage loop, not after it. The two want different
@@ -7905,49 +7950,41 @@ async function realThumbnails(): Promise<void> {
   // to (measured: last picture at 7.5 s when this waited for the loop, against
   // storage itself finishing at 4.8 s). A photo whose bytes have not landed yet
   // is not skipped, it is come back to.
+  // SEVERAL AT ONCE, because the decoder already is. decodeClient runs three or
+  // four lanes, and this pass — the one that decodes every photograph in a set —
+  // handed it ONE file and waited, so two of three lanes sat idle through the
+  // whole of a set open. The pool was built and its largest customer queued.
+  //
+  // Bounded by the lane count rather than by the core count: each job in flight
+  // holds a file's bytes and the decode it produced, and the lane count is the
+  // number that memory envelope was chosen for.
+  const inFlight = new Set<Promise<void>>();
+  // The PLANNED count, not the live one: nothing has decoded yet when a set
+  // opens, so `decodeLanes()` is 0 here and this pass would size itself at one.
+  const lanes = Math.max(1, decodeLaneTarget());
   for (let guard = 0; guard < 10000; guard++) {
-    if (gen !== thumbPass) return; // session torn down or restarted under us
-    const view = nextThumbTarget();
+    if (gen !== thumbPass) { await Promise.allSettled([...inFlight]); return; }
+    const view = inFlight.size < lanes ? nextThumbTarget() : undefined;
     if (!view) {
-      // Nothing ready. If anything is still on its way in, wait for it;
-      // otherwise every thumbnail that can be made has been.
+      if (inFlight.size) {
+        // Wait for whichever finishes first and go round again — a free lane is
+        // the only thing that can change the answer above.
+        await Promise.race([...inFlight]).catch(() => {});
+        continue;
+      }
+      // Nothing ready and nothing running. If anything is still on its way in,
+      // wait for it; otherwise every thumbnail that can be made has been.
       const waiting = sessionPhotos.some((v) => v.id !== "lone" && v.thumbState !== "real" && pendingStore.has(v.id));
       if (!waiting) return;
       await new Promise((r) => setTimeout(r, 120));
       continue;
     }
-    try {
-      const bytes = await Session.getBytes(view.id);
-      const imported: ImportedFile = { name: view.name, kind: view.kind, bytes, looksTranscoded: false };
-      const img = await decodeOffThread(imported);
-      const own = ownEdit(view);
-      // THE LENS CORRECTION WAS MISSING FROM EVERY STRIP TILE, so a tile wore
-      // the hot spot the photograph itself does not have — a bright disc in the
-      // middle of the tile and none in the picture it opens into, which reads
-      // as the tile belonging to some other frame. `lensCurveFor` exists for
-      // exactly this (its own comment says "every path that renders a frame
-      // other than the one the reader has open") and the quick-look grid has
-      // always passed it; this path never did.
-      const thumb = await makeThumb(img, 260, lensCurveFor(imported), own);
-      if (gen !== thumbPass) return;
-      if (!sessionPhotos.some((p) => p.id === view.id)) continue; // dropped while we worked
-      if (thumb.byteLength) {
-        if (view.thumbUrl) URL.revokeObjectURL(view.thumbUrl);
-        view.thumbUrl = URL.createObjectURL(new Blob([thumb], { type: "image/jpeg" }));
-        await Session.setThumb(view.id, thumb).catch(() => {});
-      }
-      view.thumbState = "real";
-      view.thumbGrade = stampFor(view); // what this picture is a claim about
-      updateSessionStrip();
-    } catch {
-      // A thumbnail is not worth failing an open over — the tile keeps the
-      // camera preview, or its name, and the photo still opens. Mark it done
-      // either way so a file that will never render cannot spin this loop.
-      view.thumbState = "real";
-      view.thumbGrade = stampFor(view);
-    }
+    thumbsInFlight.add(view.id);
+    const job = oneThumbnail(view, gen).finally(() => inFlight.delete(job));
+    inFlight.add(job);
     await tick();
   }
+  await Promise.allSettled([...inFlight]);
 }
 
 /** The part of the live creative state a thumbnail renders with. `makeThumb`
