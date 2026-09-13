@@ -11520,3 +11520,72 @@ pure processor work with no WebGL in it at all, so a leaked context cannot
 explain it directly; what a leaked context and a 84 MB canvas CAN do is push the
 page into memory pressure that a later run pays for. A repeat test is running.
 **Not yet attributed — recorded here as an open question, not a diagnosis.**
+
+## 2026-09-13 — all three devices allow a full-frame drawing surface, so the working copy is the cheap version
+
+**`yes — 5600x3728` ON EVERY DEVICE.** The 12-core desktop with the GTX 1650,
+the 4-core iPad and the 8-core iPad all allocated a canvas the size of a whole
+frame from the camera, painted it and read the far corner back. So the
+native-resolution working copy does NOT need the drawing buffer decoupled from
+the texture, does not need a mip chain, and does not need the extra third of
+memory that a mip chain costs. The expensive version does not have to be built.
+
+**AND FULL RESOLUTION IS NEVER WORSE TO DRAW FROM.** On the 4-core iPad it is
+FASTER than the proxy the app uses today — 32 ms a frame against 44, with
+half-float at 36 and the spreads overlapping — and on the 8-core iPad all three
+sources land on 16-17 ms. On the desktop they are 12, 10 and 13. Across three
+devices and every run, no source is meaningfully behind any other; what differs
+is memory, 84 MB against 42 for a 5.2-megapixel frame.
+
+## 2026-09-13 — the fingerprint said "different" and I read it as "different picture"
+
+**THE TWO IPADS PRINTED DIFFERENT DRAWN FINGERPRINTS — `38b69ce1` AND
+`a466a4cb` — AND IDENTICAL DIFFERENCE STATISTICS.** Every field: average 0.66 of
+255, worst 56, 25,662 pixels over 8, 388 over 24 of 1,999,882, edges 2.6x. Five
+statistics over two million pixels agreeing exactly while a hash over every byte
+disagrees means the two frames differ in a handful of pixels at most.
+
+**So "three graphics chips, three different photographs" was true and
+misleading, and it was my sentence.** A fingerprint is a BINARY: it answers
+identical-or-not and says nothing about how far. Having built the magnitude
+instrument specifically because an average and a worst pixel could not answer
+"would I notice", I then let a hash answer exactly that question two paragraphs
+later. The honest statement is that the drawn frames differ between graphics
+chips of the same family by an amount too small to move any of five statistics.
+
+**AND THE SYSTEMATIC PART TRACKS THE BROWSER, NOT THE CHIP.** With the two
+neighbourhood operators off, the numbers cluster in two groups and the grouping
+is not what would be expected:
+
+- a software rasteriser and an NVIDIA card through ANGLE/Direct3D11 — nothing in
+  common as hardware, same browser family — report `0.21 · worst 74 · 450 over 8
+  · 134 over 24 · edges 1.9x`, identically;
+- two different Apple GPUs in two different iPads report `0.19 · worst 47 · 152
+  over 8 · 31 over 24 · edges 1.8x`, identically.
+
+Same browser, agree to the digit across utterly different hardware. Different
+browser, differ. So the systematic difference between a drawn frame and a
+computed one is a property of how the BROWSER compiles and runs the shader, and
+the per-chip residue on top of it is the handful of pixels above. That is the
+opposite of "it depends on your graphics card", which is what this file said
+twice today.
+
+**The Safari numbers are also SMALLER** — 152 pixels over 8 against 450, 31 over
+24 against 134 — so on the devices this app is actually used on, the drawn
+colour pipeline agrees with the computed one more closely than on the desktop.
+
+## 2026-09-13 — what the drawn export costs on the devices, not the desktop
+
+Three devices, the same 2-megapixel photograph and the same edit:
+
+- **4-core iPad** — drawn 625 ms, computed 2,689 ms;
+- **8-core iPad** — drawn 1,084 ms, computed 4,278 ms;
+- **desktop** — drawn 895 ms, computed 4,056 ms.
+
+Roughly four times faster everywhere, and the iPads are where it matters, since
+they are the machines with the fewest cores to throw at a computed export — the
+4-core iPad uses three threads and the 8-core four, against the desktop's eight.
+Building the full-resolution frame, which is most of a drawn export's cost
+today, takes 466 ms on the 4-core iPad and 713 on the 8-core. **All of that
+disappears once the working copy holds the frame**, because the source is then
+already built and already on the graphics chip.
