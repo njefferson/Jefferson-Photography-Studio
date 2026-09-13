@@ -11199,3 +11199,29 @@ same everywhere and an export that takes seconds, or an export that takes one
 second and is that machine's own.** That is a real choice about what the product
 promises, and it was never a session's to make — the fault earlier was offering
 it before it had numbers, not offering it at all.
+
+## 2026-09-13 — three graphics chips, three different drawn photographs
+
+The 8-core iPad drew the practice export to **`a466a4cb`**. The 4-core iPad drew
+it to `38b69ce1`. The desktop drew it to `fe3da8c6`.
+
+**Three devices, three answers — and two of them run the same engine.** Both
+iPads are Safari 26.6 on JavaScriptCore with an Apple GPU, and they disagree with
+each other. So the variation is not Chromium-against-Safari, which could have
+been argued as two vendors; **it is per graphics chip**. A drawn export would
+produce a file particular to the hardware that drew it, across essentially every
+device model, while the computed one produces `7afc9c2a` on all four machines
+measured.
+
+That does not make the drawn export wrong — it makes its price precise. Four to
+twenty times faster, far steadier, and the saved file belongs to the machine.
+
+**AND THE SAME RUN GAVE THE CLEANEST FULL-RESOLUTION RESULT YET.** All three
+sources drew a screen-sized frame in **16 ms**, with spreads of [17, 16, 16],
+[17, 16, 16] and [16, 16, 17] — indistinguishable, and tight enough that the
+three-pass discipline can say so rather than implying it. Across four devices and
+every run now taken, full resolution has never measured meaningfully worse than
+the quarter-size proxy on any of them. **Frame time is settled and it is not the
+deciding factor; memory is (170 MB against 340 for a 21-megapixel frame), and the
+reason to do it was always that the screen and the saved file become the same
+pixels.**
