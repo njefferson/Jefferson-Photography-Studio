@@ -83,29 +83,63 @@ export function canDrawFrame(params: EditParams): boolean {
  *  it at interactive speed, the proxy stops being necessary — and with it goes
  *  the whole footprint problem the tap scale exists to paper over, because the
  *  preview and the export would then be the same pixels at the same scale. */
-export function buildLinearSource(file: ImportedFile, current: DecodedImage): {
-  image: { width: number; height: number; pixels?: Uint8ClampedArray; linear?: Float32Array; camMatrix?: number[] };
+/** float32 -> IEEE half, the layout a RGBA16F texture wants.
+ *
+ *  Written out rather than reached for, because the browser has no primitive
+ *  for it and the alternatives are worse: `Math.fround` rounds to float32 and
+ *  stops there, and a DataView per pixel would be twenty million calls. The
+ *  values here are linear sensor data in [0, 1] with no infinities and no NaNs
+ *  — everything the general case worries about — so this handles the normal
+ *  range, flushes subnormals to zero (a value that small is darker than the
+ *  sensor's own noise floor) and clamps above. */
+const f32 = new Float32Array(1);
+const i32 = new Int32Array(f32.buffer);
+function toHalf(v: number): number {
+  f32[0] = v;
+  const x = i32[0];
+  const sign = (x >> 16) & 0x8000;
+  let e = ((x >> 23) & 0xff) - 127 + 15;
+  const m = x & 0x7fffff;
+  if (e <= 0) return sign;                    // too small to represent: zero
+  if (e >= 31) return sign | 0x7bff;          // too large: the biggest finite half
+  return sign | (e << 10) | (m >> 13);
+}
+
+export function buildLinearSource(file: ImportedFile, current: DecodedImage, half = false): {
+  image: { width: number; height: number; pixels?: Uint8ClampedArray; linear?: Float32Array; linear16?: Uint16Array; camMatrix?: number[] };
   ms: number;
   bytes: number;
 } {
   const t0 = performance.now();
   const src = getSource(file, current);
-  let image: { width: number; height: number; pixels?: Uint8ClampedArray; linear?: Float32Array; camMatrix?: number[] };
+  let image: { width: number; height: number; pixels?: Uint8ClampedArray; linear?: Float32Array; linear16?: Uint16Array; camMatrix?: number[] };
   if ("cfa" in src) {
     const { width, height } = src.cfa;
-    const linear = new Float32Array(width * height * 4);
     const px = new Float32Array(3);
-    for (let y = 0, i = 0; y < height; y++) {
-      for (let x = 0; x < width; x++, i += 4) {
-        demosaicPixelLinearInto(src.cfa, x, y, px);
-        linear[i] = px[0]; linear[i + 1] = px[1]; linear[i + 2] = px[2]; linear[i + 3] = 1;
+    if (half) {
+      const linear16 = new Uint16Array(width * height * 4);
+      const ONE = toHalf(1);
+      for (let y = 0, i = 0; y < height; y++) {
+        for (let x = 0; x < width; x++, i += 4) {
+          demosaicPixelLinearInto(src.cfa, x, y, px);
+          linear16[i] = toHalf(px[0]); linear16[i + 1] = toHalf(px[1]); linear16[i + 2] = toHalf(px[2]); linear16[i + 3] = ONE;
+        }
       }
+      image = { width, height, linear16, camMatrix: src.cam };
+    } else {
+      const linear = new Float32Array(width * height * 4);
+      for (let y = 0, i = 0; y < height; y++) {
+        for (let x = 0; x < width; x++, i += 4) {
+          demosaicPixelLinearInto(src.cfa, x, y, px);
+          linear[i] = px[0]; linear[i + 1] = px[1]; linear[i + 2] = px[2]; linear[i + 3] = 1;
+        }
+      }
+      image = { width, height, linear, camMatrix: src.cam };
     }
-    image = { width, height, linear, camMatrix: src.cam };
   } else {
     image = { width: src.width, height: src.height, pixels: src.pixels };
   }
-  const bytes = image.linear ? image.linear.byteLength : (image.pixels?.byteLength ?? 0);
+  const bytes = image.linear?.byteLength ?? image.linear16?.byteLength ?? image.pixels?.byteLength ?? 0;
   return { image, ms: performance.now() - t0, bytes };
 }
 
