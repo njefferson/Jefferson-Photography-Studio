@@ -11065,6 +11065,58 @@ setupInstallFromApp("irInstallFromApp");
   document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && on) leave(); });
 }
 
+/* ---- HELP: findable, rather than long ------------------------------------
+ *
+ *  Seventeen sections and about 4,400 words sat in one dialog as a single
+ *  scroll. The words were mostly earning their place — somebody hitting a
+ *  hanging Files picker needs all 430 of those — but with no way in, every
+ *  reader paid for every section to reach the one they wanted.
+ *
+ *  So: each section collapses, and this filters them. Typing hides the sections
+ *  that do not match and opens the ones that do, so the answer is two or three
+ *  keystrokes away instead of a scroll. Clearing it returns the menu. The count
+ *  is announced, because a filter that silently matches nothing looks like a
+ *  broken dialog. */
+{
+  const input = document.getElementById("helpFilter") as HTMLInputElement | null;
+  const count = document.getElementById("helpFilterCount");
+  const secs = [...document.querySelectorAll<HTMLDetailsElement>("details.help-sec")];
+  if (input && count && secs.length) {
+    // What each section was showing before a filter touched it, so clearing the
+    // box restores the reader's own state rather than a default.
+    const wasOpen = new WeakMap<HTMLDetailsElement, boolean>();
+    let filtering = false;
+    const apply = () => {
+      const q = input.value.trim().toLowerCase();
+      if (!q) {
+        if (filtering) {
+          filtering = false;
+          for (const d of secs) { d.hidden = false; d.open = wasOpen.get(d) ?? false; }
+        }
+        count.textContent = "";
+        return;
+      }
+      if (!filtering) { filtering = true; for (const d of secs) wasOpen.set(d, d.open); }
+      let hits = 0;
+      for (const d of secs) {
+        const hit = (d.textContent ?? "").toLowerCase().includes(q);
+        d.hidden = !hit;
+        d.open = hit;
+        if (hit) hits++;
+      }
+      count.textContent = hits === 0
+        ? `Nothing here matches “${input.value.trim()}”. Try a shorter word.`
+        : `${hits} of ${secs.length} sections`;
+    };
+    input.addEventListener("input", apply);
+    // Escape clears the filter before the dialog takes it as "close me" — the
+    // reader almost always means the box they are typing in.
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && input.value) { e.preventDefault(); e.stopPropagation(); input.value = ""; apply(); }
+    });
+  }
+}
+
 // Offline support.
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
