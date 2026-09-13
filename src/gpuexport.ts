@@ -84,6 +84,60 @@ export function canDrawFrame(params: EditParams): boolean {
  *  it at interactive speed, the proxy stops being necessary — and with it goes
  *  the whole footprint problem the tap scale exists to paper over, because the
  *  preview and the export would then be the same pixels at the same scale. */
+/** THE SAME FRAME, BUILT IN SLICES SO NOTHING FREEZES.
+ *
+ *  `buildLinearSource` runs the whole demosaic in one synchronous loop, which is
+ *  right for the test page and for an export — nobody is looking at the screen.
+ *  It is wrong for the editor: measured on the devices, a 5-megapixel practice
+ *  raw takes 466 ms on the 4-core iPad and 713 on the 8-core, so a 21-megapixel
+ *  file from the camera this app is built around is two to three SECONDS of
+ *  frozen editor every time a photograph opens. Nobody would accept that trade
+ *  for a sharper working copy, and nobody was asked.
+ *
+ *  So the reader gets the photograph immediately at the resolution they get it
+ *  today, and this fills in the native-resolution one behind it in bands,
+ *  yielding to the browser between each. Total wall time is a little longer;
+ *  the difference is that the editor answers throughout.
+ *
+ *  `shouldStop` is checked between bands. Switching photographs mid-build must
+ *  abandon the work rather than finish it and hand back a frame belonging to a
+ *  photograph nobody is looking at — the swap that follows would replace the
+ *  right picture with the wrong one, which is worse than being slow. */
+export async function buildLinearSourceInBands(
+  file: ImportedFile, current: DecodedImage,
+  opts: { rowsPerSlice?: number; shouldStop?: () => boolean; onRow?: (y: number, of: number) => void } = {},
+): Promise<{ image: { width: number; height: number; linear16: Uint16Array; camMatrix?: number[] }; ms: number; bytes: number } | null> {
+  const t0 = performance.now();
+  const src = getSource(file, current);
+  if (!("cfa" in src)) return null;           // already demosaiced: nothing to build
+  const { width, height } = src.cfa;
+  const linear16 = new Uint16Array(width * height * 4);
+  const ONE = toHalf(1);
+  const px = new Float32Array(3);
+  // A band rather than a row: yielding per row on a 3,712-row frame is 3,712
+  // round trips through the event loop, which costs more than the work. 64 rows
+  // is a few milliseconds of work per slice on the slowest device measured.
+  const rows = Math.max(1, opts.rowsPerSlice ?? 64);
+  for (let y0 = 0; y0 < height; y0 += rows) {
+    if (opts.shouldStop?.()) return null;
+    const y1 = Math.min(height, y0 + rows);
+    for (let y = y0; y < y1; y++) {
+      let i = y * width * 4;
+      for (let x = 0; x < width; x++, i += 4) {
+        demosaicPixelLinearInto(src.cfa, x, y, px);
+        linear16[i] = toHalf(px[0]); linear16[i + 1] = toHalf(px[1]); linear16[i + 2] = toHalf(px[2]); linear16[i + 3] = ONE;
+      }
+    }
+    opts.onRow?.(y1, height);
+    // A macrotask, not a microtask: a resolved promise would run straight back
+    // here without ever letting the browser paint, which is the freeze this
+    // exists to prevent wearing a different hat.
+    await new Promise<void>((r) => setTimeout(r, 0));
+  }
+  if (opts.shouldStop?.()) return null;
+  return { image: { width, height, linear16, camMatrix: src.cam }, ms: performance.now() - t0, bytes: linear16.byteLength };
+}
+
 export function buildLinearSource(file: ImportedFile, current: DecodedImage, half = false): {
   image: { width: number; height: number; pixels?: Uint8ClampedArray; linear?: Float32Array; linear16?: Uint16Array; camMatrix?: number[] };
   ms: number;
