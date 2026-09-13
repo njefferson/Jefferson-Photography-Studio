@@ -11362,3 +11362,40 @@ not move is the **computed export's fingerprint** (`7afc9c2a` on every device,
 already taken by the test page) and the **footprint of the noise reduction and
 sharpening**, held by `setTapScale(proxyFactorFor(...))` and measured by the
 drawn-against-computed comparison rather than judged by eye.
+
+## 2026-09-13 — the canvas-size question, built into the test page, and the plant that caught a lie
+
+**THE MISSING MEASUREMENT NOW EXISTS.** `aCanvasTheSizeOfTheFrame` asks for a
+5600x3728 canvas — a whole frame from the camera this app is built around —
+clears it to a known colour and reads the FAR CORNER back. Three outcomes, and
+they are genuinely different: the size asked for and the colour returned (the
+simple version of a native-resolution view works here); a smaller surface than
+asked for (the browser clamped and said nothing); or the right size and black
+(clamped while reporting success, which is the one that costs a release).
+
+**THE PLANT CAUGHT A FALSE STATEMENT, WHICH IS WHY IT IS WRITTEN THIS WAY
+ROUND.** The first version created the canvas at frame size and THEN asked for
+the WebGL2 context. Planted at 60000x40000, `getContext("webgl2")` returned
+**null** — a third failure mode nobody had accounted for — and the probe duly
+reported **"WebGL2 unavailable — not possible on this device"** about a device
+whose WebGL2 is perfectly fine. A reader would have been sent to replace a
+tablet over a canvas dimension. The fix is the order the app itself uses: get
+the context on a 1x1 canvas, then GROW the canvas and read
+`drawingBufferWidth/Height`. Re-planted at the same size, it now reports
+**"clamped to 5760x5760"**, which is the truth.
+
+**AND THE CONTAINER'S REAL ANSWER IS A NARROW YES.** Unplanted it reports
+`yes — 5600x3728`: the frame fits. But the clamp measured one line above it is
+**5760** — the frame clears it by 160 pixels. A camera 3% wider would be
+refused on this renderer, so "it fits" here is not headroom, it is a near miss,
+and there is no reason to expect an iPad's number to be the same one. That is
+precisely why this is a device measurement rather than a decision taken here.
+
+**A SECOND SLIP WORTH RECORDING, BECAUSE IT WAS SILENT.** The first plant was
+applied by replacing the first occurrence of `const FW = 5600, FH = 3728;` —
+and there are TWO functions in that file with that exact line. It planted the
+OTHER one, the run came back clean, and a clean run from a plant reads as "the
+probe is fine" rather than "the plant missed". It was caught only because the
+reported size was 5600 when 60000 had been asked for. A plant has to be verified
+BY LINE, not by string, in any file where a constant name is shared — and a
+plant that produces a passing result is an instrument failure, never a pass.
