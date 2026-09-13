@@ -637,6 +637,31 @@ user-scalable=no.
   which means lifting the opening baseline out of `establishFreshEdit` as a pure
   function — a refactor of a load-bearing function with undo semantics attached
   (see "Adding an EditParams field" in CLAUDE.md), not a small change.
+  **RE-MEASURED 2026-09-13 with a fixture that can see it, and it is FIVE TIMES
+  worse than recorded.** A tile read before its photo was opened and again after
+  differs by **0.2726 of 1** on mean RGB, with the centre-against-edge ratio
+  moving 2.567 to 2.342 — against the 0.052 in the line above. Two frames from a
+  NIKKOR Z DX 50-250mm, which is one of the lenses `hotspotProfiles.ts` ships a
+  measurement for, so both halves of the opening baseline are live.
+  **The fixture is the whole finding.** The same probe over four PRACTICE DNGs
+  reports 0.0000 four times, because those 44 files carry no lens, focal length
+  or aperture at all and no profile can match them — the trap this repo already
+  recorded once under "the tile audit was wrong" and walked into again.
+  Frames that exercise it have to carry real lens metadata; they cannot ship
+  here, so the probe takes a directory (`FRAMEDIR`, scratchpad `tilebaseline.mjs`).
+  **AND ONE HYPOTHESIS IS RULED OUT.** It looked as though nothing re-checked a
+  tile's stamp when its photo gained an edit — `restripForGrade` is called only
+  on a grade move — so a call was added where the edit is stored. Measured on
+  builds with and without it: **tiles already redraw after their photos are
+  opened either way**, and the added call only shifted which tile won a
+  debounce race. It was removed rather than shipped. The divergence is the
+  BASELINE being computed twice by different code, exactly as this item says,
+  not a missing invalidation.
+  Three instrument faults on the way, each of which reported a perfect fix:
+  clicking `#sessionStrip`'s children (the header, not the tiles) so no photo
+  ever switched; reading `#fileName`, which is not what names the open photo;
+  and a MutationObserver watching `src` ATTRIBUTES when a redraw replaces the
+  whole `<img>` node.
 - [ ] **Opening a set on several cores** — measured 2026-09-13, and the first
   version of this item blamed the wrong thing (see "the tile audit was wrong").
   What is true: every photograph is decoded by ONE worker, one after another,
