@@ -12052,3 +12052,42 @@ colours rather than from the palette:
 All well clear of 4.5:1. Nothing to fix, which is the outcome that only counts
 because the same harness had already found something on this surface an hour
 earlier.
+
+## 2026-09-13 — the ladder answered "no ceiling at 1 GB", which means it is measuring the wrong memory
+
+**THE 8-CORE IPAD — the constrained one, the one that reports a 1000 MB quota
+and no memory figure at all — came back `still available with 1000 MB held`.**
+The ladder ran every step and the full-frame drawing surface was never refused.
+
+**THAT DOES NOT VINDICATE THE FEATURE. IT CONVICTS THE INSTRUMENT, AGAIN.** The
+ladder holds `Uint8Array`s: system and JavaScript-heap memory. The editor's
+pressure at the moment things broke was a **167 MB RGBA16F TEXTURE plus an 84 MB
+drawing buffer** — GPU-side allocations that a ladder of ArrayBuffers does not
+touch at all. So the probe now answers "can this device allocate a big canvas
+while the JS heap is loaded", which is a real question and is **not the question
+the editor failed at**.
+
+This is the SAME error as the version before it, one level in. The first probe
+asked on an empty page and was read as though it had asked under load. This one
+loads the wrong side of the machine and is about to be read as though it had
+loaded the right one. Writing "measure it under load" was not enough; *which*
+load was never specified, and the obvious-to-allocate thing is not the thing
+that was scarce.
+
+**WHAT THE FAILURE ACTUALLY LOOKED LIKE, re-read with this in hand.** A NEF that
+would not decode while switching photographs is a heap allocation failing inside
+the decoder. A blank canvas that survived clearing the session is a lost WebGL
+context. Both are consistent with GPU-side exhaustion, or with the two kinds of
+memory together, and neither is measured by what is currently shipping.
+
+**SO THE LADDER NEEDS A SECOND RUNG: hold what the editor holds.** Full-
+resolution half-float textures, one at a time, the size a real frame makes, with
+the canvas re-tested after each. That is the number that decides whether the
+full-resolution view returns — and until it exists, the feature stays off on the
+strength of a real session breaking, not on the strength of any measurement
+taken here.
+
+**Also in the same report, worth having:** uploading a full-resolution frame
+took **59 ms** where earlier runs on this device said 15-23, while the half-
+memory upload stayed at 17. One run, so not a conclusion — but the half-float
+path being three times cheaper to upload is consistent across every run tonight.
