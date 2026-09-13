@@ -147,6 +147,38 @@ body {
   box-shadow: 0 6px 20px rgba(255, 94, 126, 0.3);
 }
 .open-btn:active { filter: brightness(0.92); }
+/* The file input itself is HIDDEN — its only affordance is the label above,
+   styled as a button. Without this it draws its own "Choose Files / No file
+   chosen" control on top of that label, which is what the start panel shipped:
+   two overlapping controls where the design has one. Hidden this way rather
+   than with `hidden` or display:none, both of which take it OFF THE TAB ORDER
+   and leave the button unreachable by keyboard. (The Infrared app has carried
+   this rule all along; this stylesheet is separate and never got it.) */
+.file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* Keyboard focus has to land somewhere visible once the input is hidden: the
+   label wears the ring on the input's behalf. The page's own :focus-visible
+   rule does fire on the input, but a ring around a clipped 1x1 box is a ring
+   nobody can see.
+   --accent, NOT --macro. --macro is a GRADIENT, and `outline: 2px solid
+   <gradient>` is invalid, so the browser drops the whole declaration and the
+   outline computes to `none` — measured: the label read "none 0px" with the
+   rule present, correct and applying. Nothing errors; the ring simply never
+   draws. Only ever put a plain colour after `solid`. */
+label:has(> .file-input) { position: relative; }
+label:has(> .file-input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 
 /* ---- Work view ---- */
 #work { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 0.7rem; }
