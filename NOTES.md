@@ -11589,3 +11589,44 @@ Building the full-resolution frame, which is most of a drawn export's cost
 today, takes 466 ms on the 4-core iPad and 713 on the 8-core. **All of that
 disappears once the working copy holds the frame**, because the source is then
 already built and already on the graphics chip.
+
+## 2026-09-13 — the half-precision conversion is one file now, rounds properly, and its test failed three times for three wrong reasons
+
+**IT WAS WRITTEN INSIDE `gpuexport.ts` FOR ONE CALLER** — the probe asking
+whether a full-resolution source could be held in half the memory. The devices
+said yes, so the editor's working copy becomes half-float, and the moment that
+happens the same arithmetic is needed by the heal patch, the sticker bake and
+anything else touching the pristine buffer. Two copies of a float conversion is
+the two-file-lists shape from the hub's lessons: one gets a fix and the other
+does not. It is `src/half.ts`, and `gpuexport.ts` imports it.
+
+**AND IT WAS TRUNCATING WHERE IT SHOULD ROUND.** Measured over 300,001 values
+across the working range: truncation averages **0.055 of 255** and peaks at
+0.249; round-to-nearest-ties-to-even averages **0.028** and peaks at **0.125**.
+Exactly half the error, for one comparison and an increment. It also now clamps
+a mantissa carry that would otherwise roll into exponent 31 and produce an
+infinity — a value one step over the top of the range meaning a black or white
+hole in the picture.
+
+**THE TEST FAILED THREE TIMES AND WAS WRONG ALL THREE TIMES.** Every failure
+accused working code:
+
+1. **Hand-typed bit patterns.** `toHalf(0.0001)` was asserted to be `0x018c`,
+   which is a subnormal encoding of 2.36e-5. The correct answer, `0x068d`, is
+   what the code returned. A constant somebody writes out by hand is not a
+   reference, it is a second implementation with no tests.
+2. **Demanding exact agreement with the reference.** Two correct
+   round-to-nearest implementations differ by ONE step at an exact midpoint —
+   one breaks ties to even, the other away from zero. 23 of 300,001 disagreed,
+   all by one step, none further.
+3. **Measuring the error against the float64 literal** instead of the float32
+   value the converter is actually handed. In float32 those 23 are EXACT ties,
+   equidistant; in float64 they look like one side being nearer, so the test
+   reported the code as the worse of the two. Verified by printing the low
+   thirteen mantissa bits: `0x1000`, the tie value exactly.
+
+**The reference is an independent implementation now** — sign, exponent and
+mantissa from `Math.log2` and `Math.round`, sharing no line with the bit
+twiddling it checks — rather than a list of constants. And the bar it holds is
+the one that is actually true: never more than one step apart, and never the
+worse of the two against the float32 value.
