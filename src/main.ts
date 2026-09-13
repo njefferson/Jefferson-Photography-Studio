@@ -2,7 +2,7 @@ import "./style.css";
 import { importFile, type ImportedFile, type ImageKind } from "./import";
 import { wireForceUpdate, wireUpdateStrip, setUpdateCost } from "./swupdate";
 import { type DecodedImage, pickLargestPreview, linearAt } from "./decode";
-import { decodeOffThread } from "./decodeClient";
+import { decodeOffThread, decodeLanes } from "./decodeClient";
 import { Renderer, type EditParams } from "./gl";
 import { exportImage, saveBlob, lastExportProfile, type ExportFormat } from "./export";
 import { findLocation, stripLocation } from "./gps";
@@ -1655,6 +1655,10 @@ function wireVersionMenu() {
       { k: "Open now", v: current ? `a photo is open${real >= 2 ? ` in a session of ${real}` : ""}` : "nothing open" },
       { k: "Restore depth", v: autoLift ? `on at ${Math.round(liftAmount * 100)}% strength` : "off" },
       { k: "Kept previews", v: kept.rows ? `${kept.rows} (${(kept.bytes / 1e6).toFixed(1)} MB)` : "none" },
+      // REPORTED, NEVER STARTED (decodeClient.decodeLanes) — a report that spawns
+      // three workers in order to say there are three is not a report. Zero on a
+      // page where nothing has been opened, which is the honest answer there.
+      { k: "Decoders at once", v: decodeLanes() ? String(decodeLanes()) : "none running yet" },
       // WHERE THE LAST EXPORT'S SECONDS WENT. "It takes forever" is the report
       // that arrives, and a stopwatch cannot say which part; this can, from the
       // device it actually happened on.
