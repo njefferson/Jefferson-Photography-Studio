@@ -1665,6 +1665,12 @@ function wireVersionMenu() {
       // that arrives, and a stopwatch cannot say which part; this can, from the
       // device it actually happened on.
       { k: "Last export", v: exportSplit() },
+      // WHICH COPY OF THE PHOTOGRAPH IS BEING EDITED, and what it cost to get
+      // there. The editor shows the half-size copy first and replaces it with
+      // the full-resolution one a moment later; from outside, "it took a while
+      // to load" and "it never upgraded at all" look identical, and they mean
+      // opposite things. This says which happened, on the device it happened on.
+      { k: "Editing copy", v: editingCopyLine() },
     ]);
   };
   tag.addEventListener("click", open);
@@ -5129,6 +5135,19 @@ function uploadPreview() {
   void upgradeToNativeResolution(nativeGen);
 }
 
+/** How the working copy got to where it is, for the ⓘ report. Set by the
+ *  upgrade: how long the build took, or why it did not run. */
+let nativeReport = "not attempted yet";
+
+function editingCopyLine(): string {
+  if (!current || !previewSrc) return "nothing open";
+  const mp = (previewSrc.width * previewSrc.height) / 1e6;
+  const size = `${previewSrc.width}x${previewSrc.height} (${mp.toFixed(1)} MP)`;
+  return previewSrc.linear16
+    ? `${size} — full resolution · ${nativeReport}`
+    : `${size} — half size · ${nativeReport}`;
+}
+
 /** Which photograph the native-resolution build in flight belongs to. Bumped by
  *  every upload, so a build that finishes after the reader has moved on knows to
  *  throw its work away rather than paint it over somebody else's picture. */
@@ -5148,16 +5167,21 @@ let nativeGen = 0;
  *  replaces it when the real thing is ready. The same discipline the session
  *  strip already uses: show it now, fill it in after. */
 async function upgradeToNativeResolution(gen: number): Promise<void> {
-  if (!current || !currentFile) return;
-  if (previewSrc?.linear16) return;                      // already native
+  nativeReport = "starting";
+  if (!current || !currentFile) { nativeReport = "nothing open"; return; }
+  if (previewSrc?.linear16) { nativeReport = "already full resolution"; return; }
   const file = currentFile, img = current;
+  const t0 = performance.now();
   try {
     const src = getSource(file, img);
-    if (!("cfa" in src)) return;                         // not a mosaiced raw
+    if (!("cfa" in src)) { nativeReport = "this file is already developed, so there is nothing to rebuild"; return; }
     const { width, height } = src.cfa;
-    if ((width * height) / 1e6 > NATIVE_MAX_MP) return;  // memory, not the surface
+    if ((width * height) / 1e6 > NATIVE_MAX_MP) {
+      nativeReport = `staying half size: ${((width * height) / 1e6).toFixed(1)} MP is over the ${NATIVE_MAX_MP} MP limit`;
+      return;
+    }
     const built = await buildLinearSourceInBands(file, img, { shouldStop: () => gen !== nativeGen });
-    if (!built || gen !== nativeGen || !current) return;
+    if (!built || gen !== nativeGen || !current) { nativeReport = "abandoned — you moved to another photograph"; return; }
     previewSrc = built.image;
     previewW = built.image.width;
     previewH = built.image.height;
@@ -5175,9 +5199,11 @@ async function upgradeToNativeResolution(gen: number): Promise<void> {
     bakedOccSig = "";
     bakedWarpRev = -1;
     draw();
+    nativeReport = `rebuilt in ${((performance.now() - t0) / 1000).toFixed(1)}s`;
   } catch (err) {
     // The proxy is already on screen and correct; a failure here costs
     // sharpness, never the photograph.
+    nativeReport = `stayed half size: ${String((err as Error)?.message ?? err)}`;
     console.warn("native-resolution working copy unavailable, staying on the proxy:", err);
   }
 }
