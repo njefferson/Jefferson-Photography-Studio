@@ -620,18 +620,17 @@ user-scalable=no.
   which means lifting the opening baseline out of `establishFreshEdit` as a pure
   function — a refactor of a load-bearing function with undo semantics attached
   (see "Adding an EditParams field" in CLAUDE.md), not a small change.
-- [ ] **Opening a set on several cores** — measured 2026-09-13 and written up
-  under "where the work still happens on one thread". Every tile in the strip and
-  the quick look grid is rendered pixel by pixel ON THE MAIN THREAD by
-  `makeThumb`, and every photograph is decoded by ONE worker, one after another.
-  Eight practice raws: 14.1 seconds to a complete strip, 1.8 a photograph, with
-  the main thread blocked for 5.2 of them across 22 long tasks, the worst
-  1,841ms — 37% of the open unable to answer a tap. A forty-photo set
-  extrapolates to about seventy seconds, half a minute of it frozen. The shape
-  is the one the export already uses: a pool of workers, each holding its own
-  copy, with a job queue in front; `decodeClient.ts` becomes the pool and
-  `makeThumb` moves into it. The lens rig queues behind the same single worker
-  for ninety flats and gets the same win for free.
+- [ ] **Opening a set on several cores** — measured 2026-09-13, and the first
+  version of this item blamed the wrong thing (see "the tile audit was wrong").
+  What is true: every photograph is decoded by ONE worker, one after another,
+  and the lens rig sends ninety flats through the same door. What is NOT the
+  problem: the tiles, measured at 21 ms each on the test page — forty of them is
+  under a second. The set-open cost is storage commits (about 320 ms for a 25 MB
+  raw on a desktop, serial by design so a crash cannot leave a half-resumable
+  session) and decode, and decode is the actionable half: pure computation,
+  queued behind a single worker, with the export's pool already written as the
+  shape that fixes it. Measure the real split on a device first — the test page
+  reports both halves now.
 - [ ] **The export drawn rather than computed** — scoped 2026-09-13, waiting on
   numbers from the device. The live view already runs the entire edit as shaders
   in `gl.ts`; `export.ts` implements every one of them again in TypeScript, and
@@ -10592,3 +10591,49 @@ durability measurement at all. The threshold now treats "confirmed is no slower"
 as the same non-answer it treats "within 25%" as, and says so in those words.
 It is the fourth time in that one function's life that a number which looked like
 a measurement was an artefact of how it was taken.
+
+## 2026-09-13 — the tile audit was wrong, and the profile said so
+
+**CORRECTING YESTERDAY'S OWN ENTRY.** The audit above reports that opening eight
+raws blocks the main thread for 5.2 seconds across 22 long tasks, worst 1,841ms,
+and attributes it to the tiles being rendered pixel by pixel on the main thread.
+The structural half is a fact about the code. **The cost half is wrong, and the
+number that shows it is 21 milliseconds.**
+
+A 260-pixel tile is 68,000 pixels. That is tens of milliseconds of arithmetic,
+not two seconds, and the arithmetic on my own note should have been enough to
+stop the claim before it was published. It was not, so a CPU profile through the
+debugger protocol settled it: of 10.8 seconds opening six raws, **49% is idle and
+24% is `(program)`** — time inside the browser rather than in any JavaScript
+frame — with `readPixels` and `texImage2D` the largest named entries. In this
+container those are a software rasteriser doing graphics work synchronously. The
+long tasks are real; **what is in them is mostly the fake graphics chip.**
+
+**MEASURED PROPERLY, ON THE APP'S OWN ARITHMETIC:** the test page now builds a
+tile exactly the way the strip does — the app's compiled edit over the app's own
+linear read, into the same canvas and the same JPEG, at the size the strip asks
+for — and reports **21 ms**, three runs. Forty tiles is 0.84 seconds of main
+thread, not 5.2.
+
+**SO WHERE DOES A SET OPEN ACTUALLY GO?** From the same test page, on the desktop
+that sent the first report: **77 ms to commit 6 MB** to storage, which is about
+320 ms for a 25 MB raw, and a decode of 43 ms in the worker for a practice file.
+On a forty-photo set of 25 MB raws that is roughly 13 seconds of storage commits
+alone, serial by design — one confirmed transaction per photo, so a crash can
+never leave a half-resumable session. **Storage is the larger half and decode is
+the actionable one**: decode is pure computation queued behind a single worker,
+and the export's pool is the shape that fixes it.
+
+**WHAT THIS COSTS IN CREDIBILITY IS THE POINT.** The wrong number was published
+in a release note, a status page and this file within an hour of being measured,
+and the thing that would have caught it — multiplying 68,000 pixels by a
+plausible per-pixel cost — takes ten seconds. A measurement that arrives with a
+mechanism attached ("the tiles are on the main thread, so the tiles are the
+freeze") is the easiest kind to believe and the hardest to check, because the
+mechanism is true and it is the ATTRIBUTION that is invented.
+
+**And the instrument it leaves behind is the fix.** `linearAt` moved out of
+main.ts into decode.ts in the same commit — not for tidiness: a function inside
+the page module cannot be timed by the test page or moved into a worker, and a
+copy of it in either place would be a second implementation of the one thing that
+must not have two.
