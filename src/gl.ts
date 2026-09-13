@@ -769,6 +769,8 @@ export class Renderer {
   private histH = 0;
   private histBuf: Uint8Array | null = null;
 
+  private tapScale = 1;
+
   constructor(private canvas: HTMLCanvasElement) {
     const gl = canvas.getContext("webgl2", { preserveDrawingBuffer: true });
     if (!gl) throw new Error("WebGL2 is required and not available on this device.");
@@ -1032,6 +1034,28 @@ export class Renderer {
     if (this.imgW) this.applySize();
   }
 
+  /** HOW WIDE A NEIGHBOURHOOD TAP IS, in texels of the image currently loaded.
+   *
+   *  One for the live view, which is the only thing that ever needed it: the
+   *  preview runs on a downscaled proxy, so one texel there already spans
+   *  several native pixels and the denoise and detail footprints come out the
+   *  size the reader tuned.
+   *
+   *  A drawn EXPORT loads the full-resolution frame instead, where one texel is
+   *  one native pixel — so without this its taps are a fraction of the width the
+   *  reader previewed, and it denoises and sharpens finer structure than they
+   *  chose. Measured on a 2-megapixel crop before this existed: no colour
+   *  difference at all against the computed export (shift under 0.25 per
+   *  channel) and 30% of pixels differing by more than 2, concentrated on the
+   *  edges — a footprint error, not a precision one.
+   *
+   *  `u_texel` is used for nothing but those taps and their grid snapping, so
+   *  scaling it reproduces a proxy's footprint exactly, snapping included.
+   *  Default 1 leaves every existing caller untouched. */
+  setTapScale(texels: number) {
+    this.tapScale = Number.isFinite(texels) && texels >= 1 ? texels : 1;
+  }
+
   /** Source-space mirror bits (1 = x, 2 = y). A view transform like rotation:
    *  not part of the edit/undo; the export takes it via opts.flip. */
   setFlip(bits: number) {
@@ -1138,7 +1162,7 @@ export class Renderer {
     }
     gl.uniform3f(this.loc.u_sky, p.sky[0], p.sky[1], p.sky[2]);
     gl.uniform3f(this.loc.u_fol, p.foliage[0], p.foliage[1], p.foliage[2]);
-    gl.uniform2f(this.loc.u_texel, 1 / this.imgW, 1 / this.imgH);
+    gl.uniform2f(this.loc.u_texel, this.tapScale / this.imgW, this.tapScale / this.imgH);
     gl.uniform1f(this.loc.u_split, split);
     gl.uniform3f(this.loc.u_wb, p.wb[0], p.wb[1], p.wb[2]);
     gl.uniform1i(this.loc.u_swap, p.swapRB ? 1 : 0);
@@ -1339,6 +1363,23 @@ export class Renderer {
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     this.bindPipeline(p, split, this.rotQ, 0, this.spotVis ? 1 : 0, true, this.maskViz);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  /** THE WHOLE FRAME, AS PIXELS. `histogram` reads a corner of it and
+   *  `readUvPixel` reads a texel; an export needs all of it, top row first —
+   *  GL's origin is the bottom-left and every consumer in this app counts rows
+   *  from the top. The context is created with `preserveDrawingBuffer`, so this
+   *  is valid after the frame has been composited as well as before. */
+  readFrame(): Uint8ClampedArray {
+    const gl = this.gl;
+    const w = this.canvas.width, h = this.canvas.height;
+    const raw = new Uint8Array(w * h * 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, raw);
+    const out = new Uint8ClampedArray(w * h * 4);
+    const stride = w * 4;
+    for (let y = 0; y < h; y++) out.set(raw.subarray((h - 1 - y) * stride, (h - y) * stride), y * stride);
+    return out;
   }
 
   /** Overwrite a rect of the source texture with healed pixels (heal.ts bakes

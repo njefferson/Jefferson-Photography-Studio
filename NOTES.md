@@ -631,6 +631,20 @@ user-scalable=no.
   queued behind a single worker, with the export's pool already written as the
   shape that fixes it. Measure the real split on a device first — the test page
   reports both halves now.
+- [ ] **The live view at full resolution, which makes the export a readback** —
+  measured 2026-09-13 and the premise for the proxy may have expired. The editor
+  works on a downscaled copy because a full-resolution render was too costly when
+  that was decided; drawing a screen-sized frame from a full-resolution texture
+  now measures the SAME as drawing it from the proxy (1418 ms against 1412 in a
+  container — the absolutes are software, the equality is structural, because the
+  work is per output pixel). What it costs is memory: 16 MB a megapixel as
+  float32, about 340 MB for a 21-megapixel frame against roughly 84 for today's
+  proxy, halved by a half-float texture. The prize is not speed: it is that the
+  preview and the export become the same pixels at the same scale, which retires
+  the proxy-texel footprint, the tap scale, `proxyFactorFor`, and the class of
+  defect where a tile or an export disagrees with the photograph. The test page
+  reports the memory per device, so the decision has numbers. Do this BEFORE the
+  drawn export below — it subsumes most of it.
 - [ ] **The export drawn rather than computed** — scoped 2026-09-13, waiting on
   numbers from the device. The live view already runs the entire edit as shaders
   in `gl.ts`; `export.ts` implements every one of them again in TypeScript, and
@@ -10739,3 +10753,101 @@ pixel. It takes a CROP at native scale now. And that 15.5 was taken while an
 accessibility sweep was running in the background on the same container, so it
 was never a clean number either — a timing taken while something else runs is not
 a timing.
+
+## 2026-09-13 — the drawn export, spiked: the colour is right and the detail is not
+
+Built behind the test page, wired to nothing a reader can press, because a pixel
+pipeline earns its way in with numbers.
+
+**THE STRUCTURAL FINDING IS GOOD NEWS AND IT SHRANK THE JOB.** `Renderer` already
+sizes its canvas from the image it is given (`applySize`), times the crop — so
+drawing an export needs NO new geometry, no tiling and no second shader: hand the
+same renderer a full-resolution image instead of a preview-sized one and it draws
+a full-resolution frame. All three measured devices report a 16384-pixel texture
+limit, so a 5600x3728 frame fits whole.
+
+**AND THE HEADLINE NUMBER I QUOTED WAS THE WRONG ONE.** "A frame drawn and read
+back in 54 ms" is the per-pixel edit only. The shaders need the whole demosaiced
+frame as a texture, and today's export demosaics one pixel at a time inside its
+sampler chain and never holds the result. Measured on the same 20.9-megapixel
+raw: **0.77 s to read the sensor data out of the file, 2.44 s to demosaic the
+whole frame into 334 MB of float32** (2.80 s into 167 MB of uint16, for a
+half-float texture). So a drawn export projects to **about four seconds**, not a
+tenth of one — still four to five times faster than the 19.7-second threaded
+export, and the demosaic is embarrassingly parallel, so the lanes built this
+morning could take it further.
+
+**THE COMPARISON, WHICH IS WHY THIS IS A SPIKE AND NOT A RELEASE.** Same
+photograph, same edit, 2-megapixel crop, compared BEFORE either is encoded so
+JPEG is not in the way:
+
+- average difference **1.26 of 255**, worst **84**;
+- colour shift **R -0.22, G -0.21, B -0.01** — there is no tone or colour
+  disagreement at all;
+- **30.2% of the interior differs by more than 2**, against 19.9% of the
+  four-pixel border, and where they differ the local contrast averages **24.1
+  against 11.4** over the whole frame.
+
+So the disagreement sits on the EDGES, and that is a footprint difference rather
+than a precision one. The denoise and detail taps are defined in PROXY texels:
+the live view runs them on a half-resolution copy, and the computed export
+reproduces that footprint on purpose by spacing its taps `step` native pixels
+apart. Giving the renderer a full-resolution image makes its taps one native
+pixel apart — half the width — so it denoises and sharpens a tighter
+neighbourhood than the reader saw.
+
+**THE NEXT PIECE IS THEREFORE A TAP SCALE THE RENDERER DOES NOT HAVE.** The
+shader multiplies its tap offsets by `u_texel`; a drawn export needs them
+multiplied by the proxy factor as well, so what is saved matches what was
+previewed. That is a uniform and a setter, defaulting to 1 so the live path is
+untouched — and the comparison above is the instrument that will say whether it
+worked.
+
+**What the instrument itself is worth recording for.** It reports WHERE the
+differences are, not just how big, because "average 1.26, worst 84" is two
+different stories and only one of them is a problem. Noise spreads evenly; a
+footprint or offset error sits on the gradients; bad edge handling sits on the
+border. Without that split the next hour goes into the wrong fix — and on the
+first run the honest reading was not available until the instrument could tell
+them apart.
+
+## 2026-09-13 — the proxy's premise, tested: drawing from a full frame costs the same
+
+The proxy exists because a full-resolution live render was too expensive when that
+choice was made. Whether it still is had never been measured on these devices,
+and the answer decides more than speed: the proxy is WHY the noise-reduction and
+sharpening footprints are defined in proxy texels, why the export has to
+reproduce that footprint by hand, and why a saved file can differ from what was
+on screen at all.
+
+**THE COST IS NOT THE DRAWING, AND THE MEASUREMENT IS STRUCTURAL RATHER THAN
+HARDWARE-BOUND.** A preview draws as many pixels as the SCREEN has, whatever the
+texture behind it. Measured by drawing a screen-sized frame from a full-resolution
+texture and from the half-size proxy, back to back in the same run: **1418 ms a
+frame against 1412** — the same, within noise. (Those absolutes are a software
+rasteriser and mean nothing; the equality is the point, and it is structural: the
+work is per output pixel.)
+
+**WHAT IT DOES COST IS MEMORY AND ONE UPLOAD.** 16 MB a megapixel as float32, so
+about **340 MB held for a 21-megapixel frame** while it is open — against roughly
+84 MB for today's proxy — and 43 ms to hand it over rather than 17. Half-float
+(RGBA16F) halves the memory and the renderer already asks for the extension it
+needs. On the 8-core iPad, which reports a 1000 MB storage quota and no memory
+figure at all, that is the number to be careful about; the other iPad and the
+desktop have room.
+
+**WHY IT MATTERS BEYOND SPEED.** A full-resolution preview makes the export a
+READBACK rather than a second implementation: the same texture, the same shaders,
+the same footprint, so what is saved is what was on screen by construction. It
+would retire `proxyFactorFor`, the tap scale added an hour earlier, and the whole
+class of defect where a tile or an export disagrees with the photograph. The
+comparison already built says the rest of the pipeline is ready for that: with the
+neighbourhood operators off, a drawn frame and a computed one differ by **0.21 of
+255 on average** — white balance, the camera matrix, highlight recovery, the
+hot-spot and lens corrections, tone, saturation, contrast and the channel mix all
+agree. With those operators on it is 0.67 average and 11% of pixels over 2, all
+of it on edges, which is the footprint question and nothing else.
+
+**The probe is in the test page**, so the three devices can answer the memory
+question with numbers rather than a guess. Nothing is wired into what a reader
+presses.
