@@ -749,6 +749,68 @@ function compareOne(label: string, drawn: ReturnType<typeof drawFrame>, computed
   }
 }
 
+/** CAN THIS DEVICE HAVE A DRAWING SURFACE THE SIZE OF THE WHOLE PHOTOGRAPH?
+ *
+ *  This is the question that decides whether the live view can run at native
+ *  resolution, and it had been answered by accident with the wrong measurement.
+ *  The GPU probe above draws a 5600x3728 frame and reads it back in tens of
+ *  milliseconds on every device tried — but it draws into a FRAMEBUFFER OBJECT
+ *  with a texture attachment, and a render target that size being accepted says
+ *  nothing about a CANVAS that size being accepted. They are different limits.
+ *
+ *  And the canvas one fails SILENTLY: iOS Safari clamps a drawing buffer it
+ *  will not give you, keeps rendering, and hands back a black picture with no
+ *  error anywhere. That is exactly why the app downscales anything over 2800px
+ *  for display today. So the honest test is to ask for one, read back what was
+ *  actually allocated, and then DRAW A KNOWN COLOUR AND READ IT — because a
+ *  clamp that reports the size you asked for and paints black is the failure
+ *  mode that costs a release. */
+async function aCanvasTheSizeOfTheFrame(): Promise<void> {
+  const FW = 5600, FH = 3728;
+  // GET THE CONTEXT FIRST, THEN GROW THE CANVAS — which is both how the app
+  // does it and the only way this measures what it claims to. Asking for the
+  // context on an already-huge canvas can be refused outright: getContext
+  // returns null, and a probe written that way reports "WebGL2 unavailable" on
+  // a device whose WebGL2 is perfectly fine. That false statement was produced
+  // on purpose here before this version existed, which is why it is written
+  // this way round. A null context on a 1x1 canvas means what it says.
+  const cv = document.createElement("canvas");
+  cv.width = 1;
+  cv.height = 1;
+  const gl = cv.getContext("webgl2", { preserveDrawingBuffer: true });
+  if (!gl) { row("A drawing surface the size of the frame", "WebGL2 unavailable", "This device has no WebGL2 at all, so nothing below applies."); return; }
+  cv.width = FW;
+  cv.height = FH;
+  const gw = gl.drawingBufferWidth, gh = gl.drawingBufferHeight;
+  // A known colour, cleared and read straight back from the FAR CORNER — the
+  // part a clamp would have dropped. Nothing clever: the failure this looks for
+  // is black where something else was asked for.
+  gl.viewport(0, 0, gw, gh);
+  gl.clearColor(0.25, 0.5, 0.75, 1);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.finish();
+  const px = new Uint8Array(4);
+  gl.readPixels(Math.max(0, gw - 1), Math.max(0, gh - 1), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  const painted = Math.abs(px[0] - 64) <= 2 && Math.abs(px[1] - 128) <= 2 && Math.abs(px[2] - 191) <= 2;
+  const full = gw === FW && gh === FH;
+  await tick();
+  row("A drawing surface the size of the frame",
+    full && painted ? `yes — ${gw}x${gh}` : !full ? `clamped to ${gw}x${gh}` : `${gw}x${gh}, came back ${px[0]},${px[1]},${px[2]}`,
+    `Asked for a ${FW}x${FH} canvas — a whole frame from the camera this app is built around — then cleared it to a known colour and read the FAR CORNER back. ` +
+    (full && painted
+      ? "So the live view could run at native resolution here without changing how the picture reaches the screen: the simple version of the change is enough on this device."
+      : !full
+        ? "The browser quietly gave a smaller surface than asked for, which is the behaviour the app already works around by downscaling anything over 2800 pixels for display. A native-resolution view here cannot just ask for a bigger canvas — it has to draw a full-size texture into a view-sized surface, with smooth sampling, which is more work and more memory."
+        : "The surface was allocated at the size asked for and then did not paint it — the silent-black failure exactly. Same conclusion: a full-size texture drawn into a view-sized surface.") +
+    ` This is a DIFFERENT limit from the largest-texture line above: that one draws into an off-screen target, this one into a canvas, and a device can allow the first and refuse the second.`);
+  // 84 MB of drawing buffer plus whatever the driver keeps beside it, and
+  // nothing else here needs it. Let it go rather than leaving it to a collector
+  // that has no idea how expensive it is.
+  gl.getExtension("WEBGL_lose_context")?.loseContext();
+  cv.width = 1;
+  cv.height = 1;
+}
+
 /** COULD THE LIVE VIEW RUN AT FULL RESOLUTION ON THIS DEVICE?
  *
  *  The editor works on a downscaled copy of the photograph for one reason: a
@@ -892,6 +954,7 @@ async function fullResolutionPreview(): Promise<void> {
   await buildingATile();
   await sameEverywhere();
   await drawnVersusComputed();
+  await aCanvasTheSizeOfTheFrame();
   await fullResolutionPreview();
   await storage();
   btn.textContent = "Run again";
