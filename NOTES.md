@@ -698,16 +698,6 @@ user-scalable=no.
   The decision that comes with it is the owner's: a drawn export cannot be
   byte-identical to today's, because a graphics chip computes in float where the
   processor uses doubles. It would match the PREVIEW instead.
-- [ ] **Lens profiles that cannot vanish** — owner ask, 2026-09-12: the measured
-  profiles "shouldn't suddenly disappear for a user expecting them to be
-  durable". They live in this browser's localStorage; the app asks the browser
-  to keep it, which the browser may refuse now or revoke later — WebKit clears
-  script-writable storage after seven days without a visit, and an installed
-  home-screen app is exempt where a tab is not. The panel already says which of
-  those states the device is in. What is owed is a route that does not depend on
-  that at all: an export the reader keeps (which exists) plus a prompt to take
-  one when a set has been measured, and an honest account in the ⓘ of what
-  survives what.
 
 - [x] **Stop calling every device an iPad** — SHIPPED 2026-09-13. The app said
   "iPad" in copy any browser on any machine reads, because it was built on one
@@ -827,6 +817,49 @@ user-scalable=no.
   because the shot script fed a RAW to a tool that takes JPEGs. The launcher
   walk now refuses to save a frame with `dialog[open]` in it, and the Macro one
   refuses a frame still on the start panel.
+
+- [x] **Lens profiles that cannot vanish** — SHIPPED 2026-09-13. Two of the
+  three parts were already built: the export the reader keeps, and a panel note
+  that prints the BROWSER'S OWN answer about whether it intends to keep the
+  storage rather than a generic caution.
+  **What was missing was the only question the reader actually has:** have the
+  measurements on this device ever left it. "Save a backup" printed on every
+  visit says the same thing to somebody who backed up five minutes ago and to
+  somebody who has measured eleven lenses and never taken a copy.
+  **It records the STAMP, not a flag or a date** — `profilesStamp()` already
+  hashes the stored text for the preview cache, so a stamp that still matches
+  means the file the reader holds IS what is on the device, and the moment they
+  measure anything new it stops matching by itself with nothing to remember to
+  update. A boolean would read "backed up" for ever after one press; the state
+  machine has four values and `stale` is the one that matters.
+  Marked only when a copy actually left — a cancelled share sheet is not a
+  backup and an empty export is not a backup of anything. Shown after a run
+  keeps a profile, which is the moment there is something new to lose, and in
+  the panel note, where `.needs-backup` is a left rule and weight rather than a
+  colour so it survives grayscale and a forced-colors strip.
+  Asserted twice: the four states driven through real storage (scratchpad
+  `backupstate.mjs`, 7 checks) and the three on screen through the real panel
+  (`backupwalk.mjs`). Both plants compile and both are caught — the
+  boolean-flag design fails 2 of 7, and forgetting to re-render after a backup
+  fails the walk.
+  **And the third part: Help now carries an account of what survives what** —
+  what is kept on this device, what clears it (website data, deleting an
+  installed app, a browser needing the room, a private window), and what
+  survives all of it. It names the iOS rule explicitly: Safari clears a site's
+  storage after about a week unless it is installed to the home screen.
+  **The fixture cost a round.** Profiles carry NBINS=80 radial bins and `read()`
+  silently drops anything else, so a 24-bin fixture made all seven checks report
+  an empty device — a green-looking "empty, empty, empty" that was the test
+  data, not the code.
+  **AND THE REPO'S OWN GATE REFUSED THE FIRST COMMIT, RIGHTLY.** The bookkeeping
+  was written inside `lensstore.ts`, which `tools/preview-version-check.mjs`
+  hashes because a quick-look preview is rendered THROUGH the reader's lens
+  correction. Taking the bump it asked for would have thrown away every preview
+  every reader has cached, to record a change that cannot alter a pixel. It
+  lives in `src/lensbackup.ts` instead — the file it came out of says in its own
+  header that it only keeps and matches, and whether a copy exists elsewhere is
+  a different question asked by a different part of the screen. A gate that
+  refuses is also a design review.
 
 ## Shipped (roadmap archive)
 

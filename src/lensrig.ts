@@ -22,6 +22,7 @@ import { profileFrame, averageProfiles, round5, NBINS, type FrameProfile } from 
 import { readZipIndex, readZipEntry, readZipEntryPrefix, imageEntries } from "./zip";
 import { saveBlob } from "./savefile";
 import { saveFromPayload, listProfiles, removeProfile, coverage, gapsFor, exportAll, importText, type SaveChange } from "./lensstore";
+import { markBackedUp, backupState, backupSentence } from "./lensbackup";
 import { requestPersistence } from "./session";
 import { keepAwake, granted as wakeGranted, supported as wakeSupported } from "./wakelock";
 import { loadMeasured, putMeasured, frameKey } from "./framecache";
@@ -120,14 +121,21 @@ export function wireLensRig(root: ParentNode): void {
     const blob = new Blob([exportAll()], { type: "application/json" });
     const how = await saveBlob(blob, savedAs("all-profiles"));
     note.hidden = false;
+    // MARK IT ONLY WHEN A FILE ACTUALLY LEFT. A cancelled share sheet is not a
+    // backup, and an empty one is not a backup of anything.
+    if (how !== "cancelled" && n > 0) markBackedUp();
     note.textContent = how === "cancelled"
       ? "Backup cancelled — nothing was saved."
       : n === 0
         ? "That backup is EMPTY — there are no measured profiles on this device to save. Either none has been kept here, or this browser is not letting the app read its storage. Check the list above before you rely on this file."
         : `Saved every profile on this device — ${n} of them — into one file.`;
   };
-  backupBtn.onclick = () => void backupNow(restoreNote);
-  backupCopyBtn.onclick = () => copy(exportAll(), backupCopyBtn, "Copy them all");
+  backupBtn.onclick = async () => { await backupNow(restoreNote); void renderStorageNote(); };
+  backupCopyBtn.onclick = async () => {
+    await copy(exportAll(), backupCopyBtn, "Copy them all");
+    if (listProfiles().length) markBackedUp();
+    void renderStorageNote();
+  };
   restoreInput.onchange = async () => {
     const f = restoreInput.files?.[0];
     if (!f) return;
@@ -223,11 +231,18 @@ export function wireLensRig(root: ParentNode): void {
       persisted = null; // a browser that will not answer is not a browser that promised
     }
     const where = "These live in this browser's storage for this app, not in a file and not in an account.";
-    note.textContent = persisted === true
+    // WHAT THE READER ACTUALLY WANTS TO KNOW GOES FIRST. The browser's
+    // intentions matter, but "have my measurements ever left this device" is
+    // the question, and it is the one thing the note could not answer.
+    const mine = backupSentence(backupState());
+    note.textContent = (mine ? mine + " " : "") + (persisted === true
       ? `${where} This browser has agreed to keep it, which is the best any browser offers — it is still lost if you clear website data, remove the app from your home screen, or switch to another device. Save a backup.`
       : persisted === false
         ? `${where} This browser has NOT agreed to keep it: it can be cleared when the device is short of room, or after a stretch of not opening the app, and nothing will ask first. Save a backup.`
-        : `${where} This browser will not say whether it intends to keep it, so treat it as something that can go. Save a backup.`;
+        : `${where} This browser will not say whether it intends to keep it, so treat it as something that can go. Save a backup.`);
+    // The note is a status line, and a reader who has never saved anything is
+    // being told something that needs doing rather than something that is so.
+    note.classList.toggle("needs-backup", backupState().kind !== "current");
   }
 
   function renderKept() {
@@ -786,7 +801,14 @@ export function wireLensRig(root: ParentNode): void {
           ? `Kept ${r.saved} profile${r.saved === 1 ? "" : "s"} on this device. ${summary}`.trim() +
             (summary.includes("MORE frames")
               ? " More frames of sky average out its own gradient, so if the earlier one was the better shoot you would want it back — it is gone from this device either way."
-              : " Open a photograph from this lens and look under Corrections — Your measured lens, and save a backup below.")
+              : " Open a photograph from this lens and look under Corrections — Your measured lens.") +
+            // THE MOMENT THERE IS SOMETHING NEW TO LOSE. A trip out with the
+            // camera, a set of sky frames and a run of this rig have just
+            // become a few hundred numbers in a browser's storage, and the
+            // reader is standing at the one screen with a Save button on it.
+            // Telling them "save a backup below" is a direction; telling them
+            // what state their backup is actually in is an answer.
+            " " + backupSentence(backupState())
           : "This browser refused to store it (a private window, or no room left). The numbers above still copy and save.";
         // A measurement is a real investment of the reader's time, which is the
         // moment worth spending the one persistence request on. The browser may
@@ -795,6 +817,7 @@ export function wireLensRig(root: ParentNode): void {
         void requestPersistence();
         useBtn.textContent = r.saved && r.ok ? "Kept" : "Could not keep it";
         renderKept(); // what is on the device has just changed
+        void renderStorageNote(); // ...so the backup state has too
         setTimeout(() => { useBtn.textContent = "Use these on my photos"; }, 2600);
       };
       const backup2 = root.querySelector<HTMLButtonElement>("#lensBackup2")!;
