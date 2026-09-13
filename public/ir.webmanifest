@@ -1,7 +1,7 @@
 {
   "name": "Infrared Photography Studio",
   "short_name": "Infrared",
-  "description": "Infrared photo editor — unbounded white balance, channel swap, hue shifts.",
+  "description": "Infrared photo editor \u2014 unbounded white balance, channel swap, hue shifts.",
   "start_url": "./ir.html",
   "scope": "./",
   "display": "standalone",
@@ -9,8 +9,39 @@
   "background_color": "#0b0b0d",
   "theme_color": "#0b0b0d",
   "icons": [
-    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
-    { "src": "./ir-icon-180.png", "sizes": "180x180", "type": "image/png", "purpose": "any" },
-    { "src": "./ir-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "./ir-icon-180.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./ir-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "./screenshots/ir-wide.jpg",
+      "sizes": "1280x800",
+      "type": "image/jpeg",
+      "form_factor": "wide",
+      "label": "Editing an infrared photograph, with the session strip and the IR controls"
+    },
+    {
+      "src": "./screenshots/ir-narrow.jpg",
+      "sizes": "720x1280",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "Editing an infrared photograph on a phone-width screen"
+    }
   ]
 }

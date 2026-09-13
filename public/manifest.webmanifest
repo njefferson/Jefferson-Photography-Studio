@@ -9,6 +9,22 @@
   "orientation": "any",
   "background_color": "#0b0b0d",
   "theme_color": "#0b0b0d",
+  "screenshots": [
+    {
+      "src": "./screenshots/studio-wide.jpg",
+      "sizes": "1280x800",
+      "type": "image/jpeg",
+      "form_factor": "wide",
+      "label": "The Studio launcher, with the Infrared and Macro doors"
+    },
+    {
+      "src": "./screenshots/studio-narrow.jpg",
+      "sizes": "720x1280",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "The Studio launcher on a phone-width screen"
+    }
+  ],
   "icons": [
     { "src": "./icons/icon-192-light.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "./icons/icon-512-light.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }

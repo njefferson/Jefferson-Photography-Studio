@@ -8,6 +8,22 @@
   "orientation": "any",
   "background_color": "#0b0b0d",
   "theme_color": "#0b0b0d",
+  "screenshots": [
+    {
+      "src": "./screenshots/macro-wide.jpg",
+      "sizes": "1280x800",
+      "type": "image/jpeg",
+      "form_factor": "wide",
+      "label": "The Macro Studio start panel, ready for a focus-shift set"
+    },
+    {
+      "src": "./screenshots/macro-narrow.jpg",
+      "sizes": "720x1280",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "Macro Studio on a phone-width screen"
+    }
+  ],
   "icons": [
     { "src": "./macro-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
     { "src": "./macro-icon-180.png", "sizes": "180x180", "type": "image/png", "purpose": "any" },

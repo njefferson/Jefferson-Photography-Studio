@@ -261,6 +261,13 @@ function precacheManifest(): Plugin {
         // Social-share images are fetched by link scrapers (GitHub/Cloudflare/
         // OpenGraph), never by the app itself — no reason to precache the bytes.
         .filter((p) => p !== "ir-social.jpg" && p !== "studio-social.jpg")
+        // Manifest screenshots are the same shape: the BROWSER's install dialog
+        // reads them, the app never does. Precaching them put half a megabyte
+        // into every install and into every release's fresh cache, for pictures
+        // no reader ever sees from inside the app — and addAll is
+        // all-or-nothing, so they would also be half a megabyte of new ways for
+        // an install to fail on a thin connection.
+        .filter((p) => !p.startsWith("screenshots/"))
         .filter((p) => statSync(resolve(dist, p)).isFile()) // drop directory entries
         .map((p) => "./" + p);
       // The chooser PWA launches at "./" (start_url in manifest.webmanifest), so
