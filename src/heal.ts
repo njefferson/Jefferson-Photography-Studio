@@ -1,4 +1,5 @@
 // Dust & spot healing: a per-photo list of feathered clone spots that REWRITES
+import { fromHalf } from "./half";
 // THE SOURCE — each spot copies a clean patch from a nearby offset over the
 // defect, blended by a radial feather.
 //
@@ -137,35 +138,43 @@ export function bakeRgba8(
  * RGBA32F texture upload, keeping the export mirror within float epsilon.
  */
 export function bakeRgbaF32(
-  src: Float32Array,
+  src: Float32Array | Uint16Array,
   W: number,
   H: number,
   spots: readonly HealSpot[],
   rect: Rect,
 ): Float32Array {
   const sp = toPx(spots, W, H);
+  // THE PRISTINE BUFFER MAY BE HALF-FLOAT NOW — the editor's working copy holds
+  // a whole photograph at native resolution, which is affordable in half
+  // precision and not in float32. The arithmetic below is untouched; only how a
+  // value is fetched changes, and a heal rectangle is a few hundred pixels, so
+  // the indirection is not worth avoiding.
+  const at: (i: number) => number = src instanceof Uint16Array
+    ? (i) => fromHalf((src as Uint16Array)[i])
+    : (i) => (src as Float32Array)[i];
   const out = new Float32Array(rect.w * rect.h * 4);
   for (let y = 0; y < rect.h; y++) {
     const py = rect.y0 + y;
     for (let x = 0; x < rect.w; x++) {
       const px = rect.x0 + x;
       const si = (py * W + px) * 4;
-      let r = src[si], g = src[si + 1], b = src[si + 2];
+      let r = at(si), g = at(si + 1), b = at(si + 2);
       for (const s of sp) {
         const w = weightAt(s, px, py);
         if (w <= 0) continue;
         const qx = clampI(px + s.offX, W - 1);
         const qy = clampI(py + s.offY, H - 1);
         const qi = (qy * W + qx) * 4;
-        r += (src[qi] - r) * w;
-        g += (src[qi + 1] - g) * w;
-        b += (src[qi + 2] - b) * w;
+        r += (at(qi) - r) * w;
+        g += (at(qi + 1) - g) * w;
+        b += (at(qi + 2) - b) * w;
       }
       const o = (y * rect.w + x) * 4;
       out[o] = Math.fround(r);
       out[o + 1] = Math.fround(g);
       out[o + 2] = Math.fround(b);
-      out[o + 3] = src[si + 3];
+      out[o + 3] = at(si + 3);
     }
   }
   return out;
@@ -281,9 +290,16 @@ export function wrapWithPatches(sample: Sampler, patches: HealPatch[], H: number
 
 /** Luma accessor over either preview buffer shape (gamma bytes or linear). */
 export function lumaAccessor(
-  src: { pixels?: Uint8ClampedArray; linear?: Float32Array },
+  src: { pixels?: Uint8ClampedArray; linear?: Float32Array; linear16?: Uint16Array },
   W: number,
 ): (x: number, y: number) => number {
+  if (src.linear16 && !src.linear) {
+    const l16 = src.linear16;
+    return (x, y) => {
+      const i = (y * W + x) * 4;
+      return 255 * Math.sqrt(Math.max(0, fromHalf(l16[i]) * 0.2126 + fromHalf(l16[i + 1]) * 0.7152 + fromHalf(l16[i + 2]) * 0.0722));
+    };
+  }
   if (src.pixels) {
     const p = src.pixels;
     return (x, y) => {

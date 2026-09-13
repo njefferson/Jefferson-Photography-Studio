@@ -6,6 +6,7 @@
 // Single source of truth for edit parameters lives in pipeline.ts so the GPU
 // preview and CPU export can never drift apart.
 import { toneEvaluator, toneIsIdentity, maskIsActive, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, LENS_GAIN_LO, LENS_GAIN_HI, type EditParams, type LocalMap, type CropRect } from "./pipeline";
+import { toHalfBuffer } from "./half";
 export type { EditParams };
 
 // A faithful 256-entry identity ramp for the tone LUT. A 2-texel [0,255] ramp
@@ -700,7 +701,9 @@ export class Renderer {
   private crop: CropRect = CROP_DEFAULT; // last-applied crop, drives canvas size + inverse mapping
   private straighten = 0; // last-applied straighten angle (degrees), for inverse mapping
   private isLinear = false;
+  private isHalf = false;   // the texture is RGBA16F rather than RGBA32F
   private camMatrix: Float32Array | null = null;
+  private patchHalf = new Uint16Array(0); // reused scratch for half-float patches
   private glowTex: WebGLTexture;
   /** Upload a measured lens colour curve for the photograph now open, or clear
    *  it with null. Per-PHOTOGRAPH, never per-draw: the curve is chosen by the
@@ -1125,6 +1128,7 @@ export class Renderer {
     this.imgW = width;
     this.imgH = height;
     this.isLinear = !!(img.linear || img.linear16);
+    this.isHalf = !!img.linear16 && !img.linear;
     // Upload column-major for GLSL (our matrix is row-major).
     this.camMatrix = img.camMatrix ? rowToColMajor(img.camMatrix) : null;
     this.applySize();
@@ -1423,7 +1427,17 @@ export class Renderer {
     if (!this.imgW || w <= 0 || h <= 0) return;
     gl.bindTexture(gl.TEXTURE_2D, this.tex);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-    if (this.isLinear) {
+    if (this.isLinear && this.isHalf) {
+      // THE CALLER STILL HANDS US FLOAT32 and that is deliberate. Every bake in
+      // the app — heals, in-look stickers, their occlusion — works in float and
+      // is checked against the export's float arithmetic; making each of them
+      // half-aware would be four places to get wrong instead of one. A heal
+      // rectangle is a few hundred pixels, so converting it here costs nothing
+      // measurable, and the pristine buffer it was read from is the half-float
+      // one, so the round trip is not lossy twice.
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, x, y, w, h, gl.RGBA, gl.HALF_FLOAT,
+        toHalfBuffer(data as Float32Array, this.patchHalf.length >= (data as Float32Array).length ? this.patchHalf : (this.patchHalf = new Uint16Array((data as Float32Array).length))));
+    } else if (this.isLinear) {
       gl.texSubImage2D(gl.TEXTURE_2D, 0, x, y, w, h, gl.RGBA, gl.FLOAT, data as Float32Array);
     } else {
       gl.texSubImage2D(gl.TEXTURE_2D, 0, x, y, w, h, gl.RGBA, gl.UNSIGNED_BYTE, data as Uint8Array);

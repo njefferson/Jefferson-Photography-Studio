@@ -4,7 +4,9 @@ import { wireForceUpdate, wireUpdateStrip, setUpdateCost } from "./swupdate";
 import { type DecodedImage, pickLargestPreview, linearAt } from "./decode";
 import { decodeOffThread, decodeLanes } from "./decodeClient";
 import { Renderer, type EditParams } from "./gl";
-import { exportImage, saveBlob, lastExportProfile, type ExportFormat } from "./export";
+import { exportImage, saveBlob, lastExportProfile, getSource, proxyFactorFor, type ExportFormat } from "./export";
+import { buildLinearSource } from "./gpuexport";
+import { fromHalf } from "./half";
 import { findLocation, stripLocation } from "./gps";
 import { writeZip, crc32 } from "./zip";
 import { putFrame, eachFrame, frameMetas, frameCount, clearFrames } from "./batchstore";
@@ -5072,7 +5074,7 @@ const healStatus = $("healStatus") as HTMLElement;
  *  linear buffer, or the transient downscale for >MAX_PREVIEW 8-bit sources).
  *  Heal bakes read it — it stays PRISTINE; healed pixels live only in the
  *  texture — so keep the reference in sync with every setImage call. */
-let previewSrc: { width: number; height: number; pixels?: Uint8ClampedArray; linear?: Float32Array } | null = null;
+let previewSrc: { width: number; height: number; pixels?: Uint8ClampedArray; linear?: Float32Array; linear16?: Uint16Array } | null = null;
 let bakedSpots: HealSpot[] = []; // what the texture currently has baked in
 let bakedStickers: Sticker[] = []; // IN-LOOK stickers baked INTO the source texture
 let bakedNormal: Sticker[] = []; // ON-TOP (over-blend) stickers in the overlay texture
@@ -5108,6 +5110,13 @@ let healPreviewTimer = 0;
 function uploadPreview() {
   if (!current) return;
   previewSrc = toPreview(current);
+  // THE TAP SCALE IS PART OF THE UPLOAD, NOT A SEPARATE STEP. The noise
+  // reduction and the sharpening measure their footprint in texels of whatever
+  // texture is bound; a working copy at native resolution has texels half the
+  // width of the proxy's, so without this every reader's denoise and sharpen
+  // would quietly narrow to half the footprint they chose. Set beside setImage
+  // so the two can never be out of step — that pairing is the whole defect.
+  renderer.setTapScale(previewTapScale);
   renderer.setImage(previewSrc);
   renderer.setOverlaySize(previewSrc.width, previewSrc.height); // on-top overlays track the source size
   bakedSpots = [];
@@ -5164,7 +5173,7 @@ function syncSpotsToTexture() {
   const ex = params.exposure;
   const occ = {
     wb: [params.wb[0] * ex, params.wb[1] * ex, params.wb[2] * ex] as [number, number, number],
-    cam: previewSrc.linear ? current.camMatrix ?? null : null,
+    cam: previewSrc.linear || previewSrc.linear16 ? current.camMatrix ?? null : null,
   };
 
   // (1) SOURCE bake — heals + IN-LOOK stickers. Every affected rect (old+new) is
@@ -5179,8 +5188,8 @@ function syncSpotsToTexture() {
     }
     for (const rect of rects) {
       if (rect.w <= 0 || rect.h <= 0) continue;
-      if (previewSrc.linear) {
-        const data = bakeRgbaF32(previewSrc.linear, W, H, cur, rect);
+      if (previewSrc.linear || previewSrc.linear16) {
+        const data = bakeRgbaF32((previewSrc.linear ?? previewSrc.linear16)!, W, H, cur, rect);
         compositeStickersIntoRectF32(data, rect, W, H, inLook, stickerAssets, occ, dispRot);
         renderer.patchImage(rect.x0, rect.y0, rect.w, rect.h, data);
       } else {
@@ -5202,6 +5211,7 @@ function syncSpotsToTexture() {
     const occBaseAt = (sx: number, sy: number, into: Float32Array) => {
       const o = (sy * W + sx) * 4;
       if (previewSrc!.linear) { into[0] = previewSrc!.linear[o]; into[1] = previewSrc!.linear[o + 1]; into[2] = previewSrc!.linear[o + 2]; }
+      else if (previewSrc!.linear16) { const l = previewSrc!.linear16; into[0] = fromHalf(l[o]); into[1] = fromHalf(l[o + 1]); into[2] = fromHalf(l[o + 2]); }
       else { const p = previewSrc!.pixels!; into[0] = Math.pow(p[o] / 255, 2.2); into[1] = Math.pow(p[o + 1] / 255, 2.2); into[2] = Math.pow(p[o + 2] / 255, 2.2); }
     };
     // Rebuild every affected rect (old+new) of a group into its overlay texture,
@@ -10593,9 +10603,52 @@ const MAX_PREVIEW = 2800;
 let previewW = 0;
 let previewH = 0;
 
-function toPreview(img: DecodedImage): { width: number; height: number; pixels?: Uint8ClampedArray; linear?: Float32Array; camMatrix?: number[] } {
+/** How many texels of the CURRENT working copy one proxy texel is worth — the
+ *  number `setTapScale` wants. 1 whenever the working copy IS what the editor
+ *  has always used; the real proxy factor when it is the native-resolution one. */
+let previewTapScale = 1;
+
+/** Above this the native-resolution working copy is refused and the old proxy
+ *  is used instead. 24 megapixels in half precision is about 192 MB held while
+ *  a photograph is open; the camera this app is built around makes 20.9, so the
+ *  bound clears it with room and still refuses something absurd. All three
+ *  devices measured allocate a drawing surface the size of a whole frame, so
+ *  the surface is not what this is protecting — memory is, and the device with
+ *  the least of it reports no memory figure at all, so the app cannot ask. */
+const NATIVE_MAX_MP = 24;
+
+function toPreview(img: DecodedImage): { width: number; height: number; pixels?: Uint8ClampedArray; linear?: Float32Array; linear16?: Uint16Array; camMatrix?: number[] } {
   previewW = img.width;
   previewH = img.height;
+  previewTapScale = 1;
+  // THE WORKING COPY AT NATIVE RESOLUTION — for mosaiced raws, which are the
+  // only sources the editor has ever downscaled for reasons other than a
+  // drawing-buffer limit. Measured on three devices: drawing from a
+  // full-resolution texture is never slower than from the half-size proxy and
+  // is faster on the iPad with the fewest cores; half precision costs 0.018 of
+  // 255 and halves the memory. What it BUYS is that the preview and the export
+  // become the same pixels at the same scale.
+  if (currentFile) {
+    try {
+      const src = getSource(currentFile, img);
+      if ("cfa" in src) {
+        const fw = src.cfa.width, fh = src.cfa.height;
+        if ((fw * fh) / 1e6 <= NATIVE_MAX_MP) {
+          const built = buildLinearSource(currentFile, img, true);
+          if (built.image.linear16) {
+            previewW = built.image.width;
+            previewH = built.image.height;
+            previewTapScale = proxyFactorFor(src, fw, fh);
+            return built.image as { width: number; height: number; linear16: Uint16Array; camMatrix?: number[] };
+          }
+        }
+      }
+    } catch (err) {
+      // A raw this path cannot read is not a reason to fail to show the
+      // photograph — the binned proxy below has always worked. Say so once.
+      console.warn("native-resolution working copy unavailable, using the proxy:", err);
+    }
+  }
   if (!img.pixels || Math.max(img.width, img.height) <= MAX_PREVIEW) return img;
   const s = MAX_PREVIEW / Math.max(img.width, img.height);
   const w = Math.max(1, Math.round(img.width * s));
