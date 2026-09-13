@@ -10545,3 +10545,50 @@ exist and the export already knows how to split work.
 **WHAT WOULD BE TRUE AFTERWARDS** is worth stating because it is the real prize:
 one implementation of the edit instead of two, with the preview and the export
 provably the same thing rather than two files hand-kept in step.
+
+## 2026-09-13 — the first real device report, and what it decided
+
+The test page's new probes came back from a desktop editing machine — 12 cores,
+32 GB, a GeForce GTX 1650 through ANGLE/D3D11, Chromium 153. Everything below is
+from that report; the iPad is still unmeasured.
+
+**THE GPU QUESTION IS SETTLED, AND IT IS NOT CLOSE.** A whole 20.9-megapixel
+frame, with twenty-five weighted taps and an exponential in every pixel, drawn
+and then read all the way back: **the draw rounds to 0.0 ms and the readback is
+54 ms** — about a tenth of a second in total, against **19.7 seconds** for the
+threaded processor export and 46.8 before it. Largest texture 16384, so a frame
+fits whole with no tiling; float buffers available, so the 16-bit print master
+could be drawn too; and a background thread can draw, so it need not freeze the
+editor. The older histogram-shaped probe (a 2000x1400 readback) came back at 22
+ms, consistent.
+
+What the probe does NOT cover, and what an implementation still has to pay:
+uploading the full-resolution source as a texture, and the real program rather
+than a stand-in with the same arithmetic shape. Neither is likely to turn a
+tenth of a second into twenty, but neither is measured, and the difference
+between "decisive" and "measured" is worth keeping straight.
+
+**THE THREAD CAP WAS COSTING THAT MACHINE HALF ITS CORES.** The report says it
+plainly: *Threads a 21-megapixel export would use: 4*, on twelve cores with 32 GB.
+The cap of four and the 600 MB budget were both chosen for a tablet, and they
+were applied to every device because nothing asked the device what it had.
+
+Both scale now, off `deviceMemory`: a machine claiming 16 GB or more gets up to
+eight threads and a 1500 MB budget, 8 GB gets 1000 MB, and **anything that does
+not report — which includes every Safari, so every iPad — keeps exactly the
+numbers that were measured on one**. That is the right direction of failure: only
+a device that says it has memory gets to spend it. On the reporting desktop a
+21-megapixel export now takes eight threads rather than four, and a 45-megapixel
+raw takes eight as well (179 MB a thread modelled, 1.43 GB in total). On an
+unreporting four-core device the answer is 3, unchanged, and a file too large for
+two threads still runs on one. `threadpolicy.mjs` asserts all six profiles.
+
+**AND THE STORAGE VERDICT WAS ABOUT TO MISLEAD.** The same report read *77 ms
+confirmed against 111 ms unconfirmed* — and the page's verdict line said the
+browser "really is waiting for the device", because the two differed by more than
+its 25% threshold. Waiting for a disk cannot be quicker than not waiting: a
+confirmed write coming back FASTER is not a small durability cost, it is not a
+durability measurement at all. The threshold now treats "confirmed is no slower"
+as the same non-answer it treats "within 25%" as, and says so in those words.
+It is the fourth time in that one function's life that a number which looked like
+a measurement was an artefact of how it was taken.

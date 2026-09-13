@@ -244,9 +244,17 @@ async function storage(): Promise<void> {
     const mbps = (PHOTO / 1024 / 1024) / (ms / 1000);
     // "Same" needs a threshold, and 25% is well outside the run-to-run spread
     // seen on both engines while being far under the gap a real disk sync makes.
-    const same = Math.abs(ms - mr) <= Math.max(ms, mr) * 0.25;
+    // TWO WAYS FOR THE FLAG TO MEAN NOTHING, and the first version only knew
+    // one. "Within 25%" catches an engine that returns the same time for both.
+    // The other is the confirmed write coming back FASTER than the unconfirmed
+    // one, which is not a small durability cost — it is not a durability
+    // measurement at all, since waiting for a disk cannot be quicker than not
+    // waiting. The first real report from a device read 77 ms confirmed against
+    // 111 ms unconfirmed, and the line under it said the browser "really is
+    // waiting for the device". It is noise, and it has to read as noise.
+    const same = ms <= mr || Math.abs(ms - mr) <= Math.max(ms, mr) * 0.25;
     const verdict = same
-      ? `This browser takes the same time whether the app asks for the write to be CONFIRMED on the disk or not (${Math.round(ms)} ms against ${Math.round(mr)} ms), which means it is not treating the two differently. So this is how fast it accepts the data, not how fast the data is safely on the device — and the app asks for confirmed writes precisely so a set survives a crash. Fast here is good news for the wait and says nothing about the crash.`
+      ? `This browser does not take longer when the app asks for the write to be CONFIRMED on the disk (${Math.round(ms)} ms against ${Math.round(mr)} ms without), which means it is not treating the two differently. So this is how fast it accepts the data, not how fast the data is safely on the device — and the app asks for confirmed writes precisely so a set survives a crash. Fast here is good news for the wait and says nothing about the crash.`
       : `Asking for the write to be CONFIRMED on the disk costs ${Math.round(ms)} ms against ${Math.round(mr)} ms without — so this browser really is waiting for the device, and the number above is the honest one.`;
     row("Saving one photo", `${Math.round(ms)} ms for 6 MB`,
       `This is what opening a set pays: the app commits each photo on its own and waits for the device. At this rate a 25 MB raw file takes about ${(ms * 25 / 6 / 1000).toFixed(1)} s and forty of them roughly ${((ms * 25 / 6 / 1000) * 40 / 60).toFixed(1)} minutes — less in practice, since the next photo is read and decoded while one write is in flight. ${verdict} That works out at ${mbps.toFixed(0)} MB per second.`,
