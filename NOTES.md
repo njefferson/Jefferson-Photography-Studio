@@ -632,6 +632,18 @@ user-scalable=no.
   shape that fixes it. Measure the real split on a device first — the test page
   reports both halves now.
 - [ ] **The live view at full resolution, which makes the export a readback** —
+  MEASURED ON ALL THREE DEVICES 2026-09-13 and the premise for the proxy is gone:
+  a full-resolution HALF-FLOAT source draws a screen-sized frame at least as fast
+  as today's quarter-size proxy everywhere (desktop 12 ms against 13, 8-core iPad
+  18 against 15, 4-core iPad 28 against 35) and costs 170 MB for a 21-megapixel
+  frame. The catch that decides HOW: denoise and sharpen tap in texels, so
+  full resolution would silently halve their footprint and change what every
+  tuned slider means — so it ships with the tap scale set to the old proxy factor,
+  which reproduces today's footprint exactly, and the acceptance test is that a
+  photograph renders pixel for pixel as it did. Whether those operators should
+  work at native scale is a SEPARATE product question with a slider-meaning
+  change attached. Original note follows.
+- [ ] **(superseded detail) The live view at full resolution** —
   measured 2026-09-13 and the premise for the proxy may have expired. The editor
   works on a downscaled copy because a full-resolution render was too costly when
   that was decided; drawing a screen-sized frame from a full-resolution texture
@@ -10934,3 +10946,91 @@ builds both sources back to back, so it holds roughly 150 MB at once on a
 1000 MB storage quota, a tab that reloads during that section IS the measurement
 — it says the device will not hold what a full-resolution preview needs, and the
 answer is the half-float path or nothing.
+
+## 2026-09-13 — the byte-identity question, answered: the encoders were never the same
+
+The 8-core iPad ran the fingerprints, and the answer is not subtle.
+
+- **Desktop (Chromium/V8, Edge 153):** arithmetic `b1af01c8`, export
+  `e5ac8a29` · **504 KB**.
+- **iPad (Safari 26.6, JavaScriptCore, Apple GPU):** arithmetic `b7d5e311`,
+  export `158328ac` · **728 KB**.
+
+A 44% difference in FILE SIZE at the same quality setting is not arithmetic
+rounding — it is `canvas.toBlob(…, "image/jpeg", 0.92)` meaning two different
+encoders. **So "the same file on every device" was never a property this app
+had, and could not be one**, whatever the pixel pipeline does. The decision
+offered to the owner — keep today's byte-identity, or accept a drawn export that
+matches the preview — had nothing on one side of it. That is now measured rather
+than argued, which is what it should have been in the first place.
+
+**AND THE FINGERPRINT COULD NOT TELL WHICH HALF DIFFERED**, because it hashes
+the finished file. So the test page now prints a SECOND fingerprint: the same
+export stopped before the browser encodes it. Two devices agreeing there compute
+the same photograph even though their encoders will never write the same bytes —
+and that is the property actually worth protecting. It costs a second export of
+the practice crop (about seven seconds on an iPad), which is the honest price of
+separating the two questions.
+
+**The full-resolution question on that iPad**, for the record: full resolution
+float32 **16 ms a frame**, half-float **18 ms**, today's proxy **15 ms** — all
+three within three milliseconds, so full resolution costs essentially nothing
+there either. Unlike the desktop, half-float is marginally SLOWER on the Apple
+GPU than float32 (18 against 16, where the desktop read 12 against 19), so the
+format is a memory choice on that device rather than a speed one: 42 MB against
+84 for a 5-megapixel frame, 170 against 340 for a 21-megapixel one. What it costs
+the picture came back **0.018 of 255, worst 4 — identical to the desktop's
+number**, which is a useful cross-check that the conversion is deterministic.
+
+Also from that run: storage **13 ms for 6 MB** (the desktop takes 58), decode 332
+ms on the main thread against 182 in the background, three decoders at once, four
+export threads, and a drawn export three times faster than the computed one
+(1409 ms against 4239).
+
+## 2026-09-13 — all three devices in: the proxy has no justification left, and the catch that keeps it honest
+
+The second iPad (4 cores, Apple GPU) closed the set, and two things are now
+settled rather than argued.
+
+**THE EXPORT IS DETERMINISTIC WITHIN AN ENGINE AND DIFFERENT BETWEEN THEM.** Both
+iPads printed the identical pair — arithmetic `b7d5e311`, export `158328ac` at
+**728 KB** — on quite different hardware, and the desktop printed `b1af01c8` /
+`e5ac8a29` at **504 KB**. Same photograph, same edit, same quality setting, 44%
+apart in file size. That is two JPEG encoders, not two answers: the pipeline
+agrees with itself across Apple hardware and the container differs.
+
+**A FULL-RESOLUTION HALF-FLOAT SOURCE IS AT LEAST AS FAST AS TODAY'S PROXY
+EVERYWHERE, AND FASTER ON TWO OF THREE.** Frame times, drawing screen-sized:
+
+- **desktop** — half-float 12 ms, proxy 13, float32 19
+- **8-core iPad** — float32 16, half-float 18, proxy 15 (all within three)
+- **4-core iPad** — half-float **28**, proxy 35, float32 39
+
+On the weakest device the full-resolution half-float source beats the
+quarter-of-the-pixels proxy by 7 ms a frame. Sampling 32-bit float is the
+expensive part on an Apple GPU, not the size — which is why the format matters
+more than the resolution does. Memory: 8 MB a megapixel, **170 MB for a
+21-megapixel frame**, against 16 MB and 340 for float32. What it costs the
+picture read **0.018 of 255, worst 4 on all three devices** — the same number
+everywhere, so the conversion is deterministic rather than device-dependent.
+
+**AND THE CATCH, WHICH IS NOT A REASON TO STOP BUT IS A REASON NOT TO RUSH.**
+Going full-resolution changes what the neighbourhood sliders MEAN unless it is
+done deliberately. Denoise and sharpen tap a 5x5 and 7x7 grid in TEXELS; on a
+half-resolution proxy that is ten and fourteen native pixels wide, and on a
+full-resolution source it would be five and seven. Every photograph the reader
+has tuned would render with a finer, weaker denoise and a tighter sharpen —
+their settings would quietly mean something else.
+
+So the move is: full-resolution half-float source **with the tap scale set to the
+old proxy factor**, which reproduces today's footprint exactly (the shader's
+`u_texel` is used for nothing but those taps and their grid snapping). The
+appearance is preserved by construction, the preview and the export become the
+same pixels at the same scale, and whether the neighbourhood operators SHOULD
+work at native scale becomes a separate product question with a slider-meaning
+change attached, decided later and on purpose.
+
+**The acceptance test writes itself**: render a photograph before and after the
+change and require the pixels to match. That is the same shape as every
+bit-identical proof in this file, and it is what stops a performance change from
+quietly restyling everybody's photographs.
