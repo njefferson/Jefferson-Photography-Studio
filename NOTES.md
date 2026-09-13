@@ -658,11 +658,32 @@ user-scalable=no.
   `makeThumb`. The 0.052 in the line above was measured against the PHOTOGRAPH
   ON SCREEN, and nothing here re-measures that. It stands, unverified by this
   session.
-  One hypothesis was ruled out along the way: forcing the tile's `lensFix` to 0
-  moved the (spurious) drift not at all, so the tile-versus-open difference in
-  how the lens correction is applied — `lensCurveFor` counts a shipped profile,
-  `initMyLens` counts only the reader's own measurement — is not the term that
-  dominates.
+  **THE RIGHT CONTROL IS BUILT NOW, and it is the audit's own:** the tile for a
+  photo that has NOT been opened, read first, against the PHOTOGRAPH that then
+  appears when it is opened — captured as a screenshot of the canvas handed back
+  to the page as an `<img>`, because a WebGL canvas cannot be read with
+  `getImageData` without a preserved drawing buffer. Scratchpad
+  `tilevsphoto.mjs`. Screenshot the CANVAS, never `#stage`: the stage includes
+  the app's ground around the picture, and dark margins wreck a
+  centre-against-edge ratio far harder than any hot spot (measured: 0.62 against
+  1.98 for the same frame).
+  **What it reports is a near-perfect colour match and a hot-spot difference:**
+  mean RGB apart by **0.0048**, centre-against-edge apart by **0.31** (tile 2.287,
+  photograph 1.977). And that second number is NOT yet a finding — the tile is
+  260px and the photograph 904px, and a centre-against-edge ratio is
+  scale-sensitive, so some of it is the comparison and not the app.
+  **AND EVERY FIXTURE AVAILABLE HERE IS THE WRONG ONE, for two different
+  reasons.** The 44 practice DNGs carry no lens, focal length or aperture at
+  all. The frames used here are from a **NIKON Z50_2**, and every shipped
+  profile is for a **NIKON Z 50** — a different body string, so no profile can
+  match those either. That is why forcing the tile's `lensFix` to 0, and then
+  its `hsFix` to 0, changed the result by exactly nothing across three builds:
+  no curve was ever being passed, so neither strength had anything to scale.
+  **What a real measurement of this needs**, stated so nobody rebuilds the
+  instrument to find out: frames from a body a shipped profile actually names,
+  OR a reader-measured profile planted in `localStorage` that matches the
+  frames' model, focal length and aperture — plus the tile and the photograph
+  compared at the SAME scale.
   The fixture point still holds for anyone re-measuring this properly: the 44
   practice DNGs carry no lens, focal length or aperture at all, so no profile
   can match them and neither path applies a correction — frames that exercise
