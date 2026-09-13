@@ -11267,3 +11267,51 @@ identical on every machine).
 against the app's own controls. A term that collides with a control does not read
 as a new idea — it reads as one of the controls, and the reader has to spend a
 question finding out it is neither.
+
+## 2026-09-13 — "average 0.6, worst 100" answered neither question, so the instrument now counts what can be seen
+
+**THE COMPARISON REPORTED AN AVERAGE AND AN EXTREME, AND THOSE POINT OPPOSITE
+WAYS.** A drawn frame differs from the computed one by 0.63 of 255 on average on
+the desktop and 0.66 on the iPad — nothing — with a worst pixel of 100 and 56.
+Both numbers are true and neither answers the only question anyone actually has,
+which is whether it would be noticed. A lone stray pixel at 100 is invisible in a
+photograph; a fringe of four thousand pixels at 24 along every hard edge is a
+different product. The instrument could not tell those apart, so a decision was
+being carried on a statistic that could not support it.
+
+**IT NOW COUNTS TWO BANDS.** How many pixels differ by more than **8** of 255 —
+roughly where a difference stops being absorbed by continuous tone and by a
+quality-92 JPEG's quantisation — and how many by more than **24**, which is
+visible on a flat area. Both are printed with their percentage and a plain
+reading of whether that is a scattering or a fringe. It costs nothing: the loop
+that already computes the average, the worst, the border share and the local
+contrast gains two comparisons.
+
+**AND IN THE CONTAINER, ON A SOFTWARE RASTERISER, THE ANSWER IS A SCATTERING.**
+Two megapixels, the practice raw, the same edit:
+
+- with the noise reduction and sharpening on — 25,894 pixels over 8 (**1.3%**)
+  and **492 over 24 (0.025%)**, one pixel in four thousand, the local contrast
+  where they differ 29.9 against 11.4 over the frame, so all of it on edges;
+- with both of those off — 450 over 8 (0.023%) and 134 over 24 (0.0067%).
+
+That is a fourth renderer, not one of the owner's, and its own fingerprint
+(`62b68d97`) is nothing like the three real ones. It is offered as the shape of
+the answer, not the answer: the devices print their own numbers on the next run.
+
+**THE PLANT.** The new counter was made to fail first: the threshold was set to
+`px > -1` so every pixel qualifies, and the row duly read **100.000%** while the
+8-band beside it still read 1.295% — so the counter is wired to the output and a
+wrong threshold shows up as an absurd number rather than a plausible one. Then
+reverted and re-run for the figures above. A counter that has only ever been seen
+printing a small number has not been tested.
+
+**WHAT IT MEANS FOR THE DRAWN EXPORT.** Neither frame is a reference. The
+computed one is not ground truth — it is simply the one every engine agrees on,
+because they all run the same arithmetic on the processor — and a graphics chip
+rounding differently is not a chip rounding *worse*. So no machine would produce
+an inferior photograph; they would produce photographs that differ from one
+another by about five hundred pixels in two million at a level anyone could
+point at, all of it on edges. The property being traded is reproducibility, not
+quality — and it is already partly gone, because two browsers write the same
+pixels to files 44% apart in size through their own JPEG encoders.

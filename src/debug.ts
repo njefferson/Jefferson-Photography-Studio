@@ -696,6 +696,15 @@ function compareOne(label: string, drawn: ReturnType<typeof drawFrame>, computed
     const W = drawn.width, H = drawn.height;
     const lum = (arr: Uint8ClampedArray, i: number) => 0.2126 * arr[i] + 0.7152 * arr[i + 1] + 0.0722 * arr[i + 2];
     let worst = 0, sum = 0, n = 0, over2 = 0, sr = 0, sg = 0, sb = 0;
+    // AND HOW MANY OF THEM ARE BIG ENOUGH TO SEE. "Average 0.6, worst 100" is
+    // two facts that point opposite ways, and neither answers the only question
+    // a reader has: would I notice? A single stray pixel at 100 is invisible in
+    // a photograph; a fringe of 4,000 pixels at 24 along every hard edge is a
+    // different product. Below about 8 of 255 nothing is visible in continuous
+    // tone, and a quality-92 JPEG quantises most of it away besides; by 24 it is
+    // visible on a flat area. So count both bands rather than reporting the
+    // extreme and leaving the reader to guess how lonely it is.
+    let over8 = 0, over24 = 0;
     let edgeOver = 0, edgePx = 0, gradAll = 0, gradBad = 0, badN = 0;
     const BORDER = 4;
     for (let y = 0; y < H; y++) {
@@ -712,6 +721,8 @@ function compareOne(label: string, drawn: ReturnType<typeof drawFrame>, computed
         const onBorder = x < BORDER || y < BORDER || x >= W - BORDER || y >= H - BORDER;
         if (onBorder) { edgePx++; if (px > 2) edgeOver++; }
         else if (px > 2) over2++;
+        if (px > 8) over8++;
+        if (px > 24) over24++;
         // Local contrast in the COMPUTED frame, which is the reference.
         if (x > 0 && y > 0 && x < W - 1 && y < H - 1) {
           const g = Math.abs(lum(b, i + 4) - lum(b, i - 4)) + Math.abs(lum(b, i + W * 4) - lum(b, i - W * 4));
@@ -729,6 +740,8 @@ function compareOne(label: string, drawn: ReturnType<typeof drawFrame>, computed
       `${((over2 / px) * 100).toFixed(1)}% of the interior differs by more than 2, against ${((edgeOver / Math.max(1, edgePx)) * 100).toFixed(1)}% of the four-pixel border. ` +
       `Where they differ, the local contrast averages ${badGrad.toFixed(1)} against ${meanGrad.toFixed(1)} over the whole frame — ${badGrad > meanGrad * 2 ? "so the disagreement sits on the EDGES, which is what a half-texel sampling offset looks like" : "so it is spread across the picture rather than sitting on edges"}. ` +
       `Colour shift: R ${(sr / px).toFixed(2)}, G ${(sg / px).toFixed(2)}, B ${(sb / px).toFixed(2)}. ` +
+      `How much of it could be SEEN: ${over8} pixels differ by more than 8 of 255 (${((over8 / px) * 100).toFixed(3)}%) and ${over24} by more than 24 (${((over24 / px) * 100).toFixed(3)}%) — ` +
+      `${over24 === 0 ? "so nothing in this frame reaches a level anyone could point at" : over24 < px / 10000 ? "a scattering, not a fringe" : "enough to look for along the edges"}. ` +
       `A drawn export can never be byte-identical — a graphics chip works in float where the processor works in doubles — so what matters is whether this is small enough to be invisible.`);
     row("…and what that pair took",
       `drawn ${ms(d.source + d.upload + d.draw + d.read + d.p3)} · computed ${ms(computedMs)}`,
