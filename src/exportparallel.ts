@@ -52,11 +52,32 @@ function perWorkerMb(fileBytes: number, srcPixels: number, outPixels: number, n:
   return (fileBytes + srcPixels * 2 + (outPixels * 4) / n) / 1e6 + 10;
 }
 
-/** The memory an export may spend on threads that are not the main one. A
- *  tablet browser kills the tab rather than swapping, and a killed tab loses
- *  the whole session — so when the budget cannot buy a second thread, the
- *  export runs on one and takes its time. */
-const BUDGET_MB = 600;
+/** The memory an export may spend on threads that are not the main one, and how
+ *  many threads it may start at all. A tablet browser kills the tab rather than
+ *  swapping, and a killed tab loses the whole session.
+ *
+ *  BOTH SCALE WITH THE MACHINE, because a single pair of numbers cannot serve
+ *  both devices this app runs on. The first version capped at four threads and
+ *  600 MB for a tablet's sake — and the first real report came from a desktop
+ *  with TWELVE cores and 32 GB, where a 21-megapixel export used four of them
+ *  and left the other eight idle. A thread costs about 104 MB on that file
+ *  (measured), so eight of them is 830 MB: nothing on a machine with 32 GB and
+ *  fatal on one with 4.
+ *
+ *  `deviceMemory` is a coarse hint and Safari does not implement it at all —
+ *  which is exactly the right failure here: no answer means the tablet numbers,
+ *  and only a device that SAYS it has memory gets to spend it. */
+function memoryHintGb(): number {
+  const n = (typeof navigator !== "undefined" ? (navigator as Navigator & { deviceMemory?: number }).deviceMemory : undefined);
+  return typeof n === "number" && n > 0 ? n : 0;
+}
+function budgetMb(): number {
+  const gb = memoryHintGb();
+  return gb >= 16 ? 1500 : gb >= 8 ? 1000 : 600;
+}
+function threadCap(): number {
+  return memoryHintGb() >= 16 ? 8 : 4;
+}
 
 export interface ParallelJob {
   fileBytes: number;
@@ -75,16 +96,16 @@ export function canRunParallel(params: EditParams, opts: ExportOptions, job: Par
   return workerCount(job) >= 2;
 }
 
-/** How many to start: two fewer than the machine claims, cap 4 — the main
- *  thread still has to stay answerable, and past four the memory costs more
- *  than the arithmetic saves on a tablet — then as many of those as the memory
- *  budget above will actually pay for. Returns 1 when it will not pay for two,
- *  which is `canRunParallel` saying no. */
+/** How many to start: one fewer than the machine claims, capped by how much
+ *  memory it admits to having — the main thread still has to stay answerable —
+ *  then as many of those as the budget above will actually pay for. Returns 1
+ *  when it will not pay for two, which is `canRunParallel` saying no. */
 export function workerCount(job: ParallelJob): number {
   const cores = typeof navigator !== "undefined" ? (navigator.hardwareConcurrency || 2) : 2;
-  const byCores = Math.max(2, Math.min(4, cores - 1));
+  const byCores = Math.max(2, Math.min(threadCap(), cores - 1));
+  const budget = budgetMb();
   for (let n = byCores; n >= 2; n--) {
-    if (n * perWorkerMb(job.fileBytes, job.srcPixels, job.outPixels, n) <= BUDGET_MB) return n;
+    if (n * perWorkerMb(job.fileBytes, job.srcPixels, job.outPixels, n) <= budget) return n;
   }
   return 1;
 }
