@@ -5152,11 +5152,33 @@ function uploadPreview() {
  *  and earns nothing at all while they flick through a session of forty. A short
  *  wait separates those two without asking anybody to press anything: stay on a
  *  photograph and it sharpens; move on and it never starts. */
+/** OFF, AFTER A REAL SESSION ON A REAL IPAD BROKE.
+ *
+ *  Switching between photographs produced "this NEF couldn't be decoded" on a
+ *  file that had opened, and a fresh session afterwards showed no photograph at
+ *  all — a blank canvas with a populated histogram and populated thumbnails
+ *  beside it, which is what a drawing buffer that could not be allocated looks
+ *  like.
+ *
+ *  THE MEASUREMENT THAT SAID THIS WAS SAFE WAS TAKEN IN THE WRONG CONDITIONS.
+ *  The test page asked for a 5600x3728 canvas on an otherwise empty page and got
+ *  it, on all three devices, and that was read as "the device can do this". In
+ *  the app the same allocation is asked for while the session already holds
+ *  216 MB of file bytes, a 167 MB half-float texture, the previous photograph's
+ *  buffers and every other context the editor keeps. A limit measured in
+ *  isolation is not the limit that applies under load, and nothing about the
+ *  probe's answer was wrong except what it was taken to mean.
+ *
+ *  Off until that is understood and the memory is accounted for, rather than
+ *  left on behind a threshold guessed from a measurement that does not apply. */
+const NATIVE_ENABLED = false;
+
 const NATIVE_SETTLE_MS = 1200;
 let nativeTimer = 0;
 
 function scheduleNativeUpgrade(gen: number): void {
   clearTimeout(nativeTimer);
+  if (!NATIVE_ENABLED) { nativeReport = "off — the full-resolution rebuild is disabled while a memory fault is investigated"; return; }
   nativeReport = "waiting to see if you stay on this photograph";
   nativeTimer = window.setTimeout(() => {
     if (gen !== nativeGen) return;
