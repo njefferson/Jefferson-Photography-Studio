@@ -339,6 +339,48 @@ function onSaveTap() {
 }
 
 // Wiring
+/* ---- The practice burst ------------------------------------------------
+ *
+ *  Thirteen frames of a focus-shift set ship with the app so the stacker can
+ *  be tried by somebody who has never shot one — the Infrared side has had a
+ *  practice library since early on and this side had nothing, which is also
+ *  why its install-prompt screenshot showed an empty panel.
+ *
+ *  NOT PRECACHED. They are fetched on this press and land in the EXAMPLES
+ *  cache, which survives a release (sw.js) — the same treatment as the
+ *  practice RAWs, for the same reason: nobody should re-download megabytes
+ *  they already have because the app shipped a fix.
+ *
+ *  Progress is reported per frame. On a slow connection this is 2.5 MB, and a
+ *  button that does nothing visible for twenty seconds is a button that gets
+ *  pressed again. */
+const PRACTICE_COUNT = 13;
+const tryBurstBtn = document.getElementById("tryBurst") as HTMLButtonElement | null;
+tryBurstBtn?.addEventListener("click", async () => {
+  tryBurstBtn.disabled = true;
+  const said = tryBurstBtn.textContent;
+  try {
+    const out: File[] = [];
+    for (let i = 1; i <= PRACTICE_COUNT; i++) {
+      const name = `focus-${String(i).padStart(2, "0")}.jpg`;
+      tryBurstBtn.textContent = `Fetching ${i} of ${PRACTICE_COUNT}…`;
+      const res = await fetch(`./examples/macro/${name}`);
+      if (!res.ok) throw new Error(`${name} came back ${res.status}`);
+      out.push(new File([await res.blob()], name, { type: "image/jpeg" }));
+    }
+    tryBurstBtn.textContent = said;
+    await loadFiles(out);
+  } catch (err) {
+    // Say what failed and leave the way forward open — the reader can still
+    // choose their own frames, and the button is still there to try again.
+    intakeHint.textContent =
+      "Could not fetch the practice set (" + (err as Error).message + "). Choose your own frames, or try again.";
+    tryBurstBtn.textContent = said;
+  } finally {
+    tryBurstBtn.disabled = false;
+  }
+});
+
 filesInput.addEventListener("change", () => filesInput.files && loadFiles(filesInput.files));
 stackBtn.addEventListener("click", runStack);
 saveBtn.addEventListener("click", onSaveTap);
