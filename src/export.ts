@@ -143,7 +143,7 @@ export async function makeWatermarkLayer(
   return { canvas, x: w - boxW, y: h - boxH };
 }
 
-type Source =
+export type Source =
   | { cfa: RawCfa; cam: number[] }
   | { pixels: Uint8ClampedArray; width: number; height: number };
 
@@ -380,8 +380,7 @@ export async function exportImage(
   // export sharpens ~2x finer structure than the preview showed. The factor is a
   // property of the source, so single and batch exports agree. Kept in sync with
   // main.ts MAX_PREVIEW (8-bit proxy) and demosaic.ts binning (RAW = half-res).
-  const PREVIEW_MAX = 2800;
-  const proxyFactor = "cfa" in src ? 2 : Math.max(1, Math.max(srcW, srcH) / PREVIEW_MAX);
+  const proxyFactor = proxyFactorFor(src, srcW, srcH);
   // Denoise first, then sharpen/texture — the same order the shader runs them
   // (raw neighbourhood -> denoised centre -> detail gain). Both are no-ops when
   // their slider is 0, so a plain edit keeps the 1x-decode fast path.
@@ -603,7 +602,19 @@ export async function exportImage(
   }
 }
 
-function getSource(file: ImportedFile, current: DecodedImage): Source {
+/** Exported so the drawn-export path reads its source through THE SAME
+ *  function — the one place that decides what a file's pixels actually are. */
+/** HOW MANY NATIVE PIXELS ONE PREVIEW TEXEL SPANS — the one place that answers
+ *  it, because three paths need the same answer: the computed export spaces its
+ *  neighbourhood taps this far apart, a drawn export scales the shader's taps by
+ *  it, and a batch export has to agree with a single one. Kept in sync with
+ *  main.ts MAX_PREVIEW (8-bit proxy) and demosaic.ts binning (RAW = half-res). */
+export function proxyFactorFor(src: Source, srcW: number, srcH: number): number {
+  const PREVIEW_MAX = 2800;
+  return "cfa" in src ? 2 : Math.max(1, Math.max(srcW, srcH) / PREVIEW_MAX);
+}
+
+export function getSource(file: ImportedFile, current: DecodedImage): Source {
   if (file.kind === "nef") {
     const ifds = new Tiff(file.bytes).allIfds();
     return { cfa: readNefCfa(file.bytes), cam: camToSrgbLinear(nikonColorMatrix(cameraModel(ifds))) };
