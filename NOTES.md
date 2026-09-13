@@ -530,15 +530,6 @@ user-scalable=no.
 > different approach and mindset"). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
-- [ ] **Stop calling every device an iPad** — the app says "iPad" in copy that
-  any browser on any machine reads, because it was built on one and the language
-  followed the author rather than the reader. Either detect what is actually in
-  front of the person and say that, or say "device" and be right everywhere.
-  Detection is the better answer where it changes what they should DO (the
-  install steps below); plain "device" is the better answer where it is just a
-  noun. Do not guess from the browser string alone — iPadOS Safari reports
-  itself as a Mac, which is exactly why the diagnostic reads `maxTouchPoints`.
-
 - [ ] **Install and UNINSTALL instructions for every platform, not just iPad** —
   the ⓘ explains adding to a home screen on iOS and nothing else. Android tends
   to prompt on its own; on a computer, Edge, Chrome, Firefox and Safari each
@@ -744,6 +735,44 @@ user-scalable=no.
   that at all: an export the reader keeps (which exists) plus a prompt to take
   one when a set has been measured, and an honest account in the ⓘ of what
   survives what.
+
+- [x] **Stop calling every device an iPad** — SHIPPED 2026-09-13. The app said
+  "iPad" in copy any browser on any machine reads, because it was built on one
+  and the language followed its author rather than its reader.
+  **One module answers the device question now: `src/platform.ts`.** It existed
+  in THREE places before — the install prompt's own `isIOS`, the export path's
+  `downloadIsUseless`, and the diagnostic's `deviceLine` — each written
+  separately, each slightly different, and no two of them wrong the same way
+  (hub LESSONS §243 is this shape). All three ask the module; nothing else
+  matches a browser string.
+  The one fact it turns on: iPadOS Safari reports `MacIntel` and a Macintosh
+  browser string on purpose, so only `maxTouchPoints` separates an iPad (5)
+  from a Mac (0). Tested against fourteen real browser strings
+  (scratchpad `plattest.mjs`) including that pair, which differ ONLY in that
+  number; planting `iPadInDesktopMode = false` fails exactly one case.
+  Three shapes of copy, decided per sentence:
+  (1) just a noun -> `<span data-device-noun>device</span>`, filled in with the
+  device's real name and shipping with the right word already in it, so a
+  script that never runs still leaves a correct sentence;
+  (2) only true on one platform -> `data-only-plat="ios"`, shipped HIDDEN and
+  revealed on a match — the welcome screen's iCloud/Files paragraph was the
+  first thing every reader on every machine saw, and it is an iOS story;
+  (3) reference material a reader may want for a machine they are not holding
+  (the install and uninstall lists, the Files-picker section) -> stays whole
+  for everyone, with the reader's own row marked in WORDS ("you're on this")
+  plus weight, never a fill, and the Help section carrying a scope line.
+  The install rows also carry `data-browser` where it matters, because on a Mac
+  running Chrome the Safari row is not the reader's row.
+  Verified in a browser as four devices (scratchpad `devicewalk.mjs` for
+  Infrared, `macrodev.mjs` for Macro): the noun, the hidden note, and exactly
+  the right marked rows. Both plants — ignoring the browser constraint, and
+  revealing the note always — fail it. **The first two plants PASSED and meant
+  nothing: each left a variable unused, so `tsc --noEmit` failed the build and
+  the walk ran against the old dist.** A plant that does not compile is not a
+  negative control.
+  Also platform-branched: the lens rig's auto-lock instruction, which named an
+  iPad Settings path to everybody and now names the path for the machine in
+  hand, or none at all where it does not know one.
 
 ## Shipped (roadmap archive)
 

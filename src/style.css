@@ -2987,6 +2987,23 @@ body.dbg { margin: 0; background: var(--bg); color: var(--txt); font: 400 1rem/1
   font: 0.9375rem/1.3 var(--ui);
 }
 .help-find-count { margin: 6px 2px 0; color: var(--txt-3); font-size: 0.8125rem; min-height: 1.1em; }
+/* A Help section that is only true on some platforms says so at the top, in
+   words. Not a colour and not an icon — the rule here is that meaning never
+   rides on colour alone, and this sentence has to survive being read aloud and
+   being read in a high-contrast mode that replaces every fill. */
+.help-scope {
+  margin: 0 0 0.7rem;
+  padding: 0.45rem 0.7rem;
+  border-left: 3px solid var(--line-2);
+  color: var(--txt-2);
+  font-size: 0.9em;
+}
+/* The row in a platform list that matches the device in hand. The MARK is the
+   words appended by markPlatformList(); this only makes the row a little
+   heavier, so the mark is not carrying its weight alone in a mode that drops
+   the weight. */
+li.plat-you { font-weight: 600; }
+.plat-you-mark { color: var(--txt-2); font-weight: 400; font-style: italic; }
 .help-sec { border-top: 1px solid var(--line); }
 .help-sec > summary {
   /* A real heading that is also the control. 44px so it is a touch target, and

@@ -4,6 +4,7 @@ import { setupInstalledShare, setupInstallFromApp } from "../share";
 import { saveBlob } from "../savefile";
 import { wireThemePicker } from "../theme";
 import { wirePalettePicker } from "../palette";
+import { wireDeviceCopy } from "../platform";
 import { wireForceUpdate, wireUpdateStrip } from "../swupdate";
 
 // Macro focus-stacking mode. Loads a focus-shift JPEG set, blends it into one
@@ -336,6 +337,9 @@ $("helpClose").addEventListener("click", () => helpDlg.close());
 helpDlg.addEventListener("click", (e) => { if (e.target === helpDlg) helpDlg.close(); });
 
 // Dawn / dark theme switch (shared chrome), living in the help dialog.
+// What device is this, and say so in the copy. One call: the nouns, the notes
+// that are only true on one platform, and the marked row in each install list.
+wireDeviceCopy();
 wireThemePicker(document.getElementById("themePicker"));
 wirePalettePicker(document.getElementById("palettePicker"));
 

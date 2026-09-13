@@ -7,7 +7,10 @@
 // export.ts for exactly that, which also split a 50 kB chunk out of the app's
 // main bundle as a side effect.
 //
-// Two copies of this decision already existed and one of them was wrong.
+// Two copies of this decision already existed and one of them was wrong. A
+// THIRD had grown by the time the device question was consolidated; all of
+// them ask src/platform.ts now.
+import { isIOS } from "./platform";
 
 export function download(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob);
@@ -34,13 +37,11 @@ export function download(blob: Blob, name: string) {
  *  tell an iPad from a Mac; `maxTouchPoints` is what does (Doctrine 7f, and the
  *  reason the diagnostic prints it). */
 function downloadIsUseless(): boolean {
-  const plat = navigator.platform || "";
-  const touch = navigator.maxTouchPoints || 0;
-  if (/iP(hone|ad|od)/.test(plat)) return true;
-  // An iPad in desktop mode: "MacIntel" with a touchscreen. A real Mac reports
-  // 0 here, and a Windows touchscreen laptop is not caught because its platform
-  // string is not a Mac one.
-  return /Mac/.test(plat) && touch > 1;
+  // Only iOS and iPadOS. Android's browsers download properly, and so does
+  // every desktop one — including the Windows Chrome and Edge that answer
+  // `canShare` with yes and then open a share sheet a file cannot be saved
+  // from, which is the bug the paragraph above is about.
+  return isIOS();
 }
 
 /** Save a file the way that actually works on the device in hand: the share

@@ -17,6 +17,7 @@
 import { decodeOffThread } from "./decodeClient";
 import { sniff, refineKind } from "./import";
 import { readExifSubset } from "./exif";
+import { device } from "./platform";
 import { profileFrame, averageProfiles, round5, NBINS, type FrameProfile } from "./lensprofile";
 import { readZipIndex, readZipEntry, readZipEntryPrefix, imageEntries } from "./zip";
 import { saveBlob } from "./savefile";
@@ -30,6 +31,22 @@ declare const __APP_VERSION__: string;
 /** Wire the rig inside `root`, which must contain the ids below. Everything is
  *  scoped to `root` rather than to the document so the same markup can sit in a
  *  dialog, a page, or anywhere else. */
+/** WHERE THE AUTO-LOCK SETTING LIVES, on the machine actually in front of the
+ *  reader. This named one path, on an iPad, to everybody — no help at all to
+ *  somebody running a long lens measurement on an Android tablet or a laptop.
+ *  An unknown platform gets NO path rather than a wrong one: the sentence still
+ *  says what to do and only loses where to do it. */
+function sleepPath(): string {
+  switch (device().family) {
+    case "ios": return " — on an iPhone or iPad that is Settings \u203a Display & Brightness \u203a Auto-Lock";
+    case "android": return " — on Android that is Settings \u203a Display \u203a Screen timeout";
+    case "mac": return " — on a Mac that is System Settings \u203a Lock Screen";
+    case "windows": return " — on Windows that is Settings \u203a System \u203a Power & battery \u203a Screen and sleep";
+    case "chromeos": return " — on a Chromebook that is Settings \u203a Device \u203a Power";
+    default: return "";
+  }
+}
+
 export function wireLensRig(root: ParentNode): void {
   const $ = <T extends HTMLElement>(id: string) => root.querySelector<T>("#" + id)!;
   const profResults = $("lensResults");
@@ -368,7 +385,7 @@ export function wireLensRig(root: ParentNode): void {
       const screen = $("lensScreenNote");
       screen.hidden = false;
       screen.textContent = !wakeSupported()
-        ? "This browser cannot keep the screen awake. If the screen locks partway through, turn off automatic locking before a long run — on an iPad that is Settings › Display & Brightness › Auto-Lock. What has already been measured is kept as it goes either way, so picking the same set again carries on from there rather than starting over."
+        ? `This browser cannot keep the screen awake. If the screen locks partway through, turn off automatic locking before a long run${sleepPath()}. What has already been measured is kept as it goes either way, so picking the same set again carries on from there rather than starting over.`
         : "Keeping the screen awake while this runs. Anything already measured is kept as it goes, so if the screen does lock, picking the same set again carries on from where it stopped rather than starting over.";
       profResults.replaceChildren();
       profCoverage.replaceChildren();
