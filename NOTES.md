@@ -530,6 +530,32 @@ user-scalable=no.
 > different approach and mindset"). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
+- [ ] **Stop calling every device an iPad** — the app says "iPad" in copy that
+  any browser on any machine reads, because it was built on one and the language
+  followed the author rather than the reader. Either detect what is actually in
+  front of the person and say that, or say "device" and be right everywhere.
+  Detection is the better answer where it changes what they should DO (the
+  install steps below); plain "device" is the better answer where it is just a
+  noun. Do not guess from the browser string alone — iPadOS Safari reports
+  itself as a Mac, which is exactly why the diagnostic reads `maxTouchPoints`.
+
+- [ ] **Install and UNINSTALL instructions for every platform, not just iPad** —
+  the ⓘ explains adding to a home screen on iOS and nothing else. Android tends
+  to prompt on its own; on a computer, Edge, Chrome, Firefox and Safari each
+  install differently and the app says nothing. **And it owes the way back
+  out**: an installed web app is not a shortcut, so deleting the icon does not
+  remove it, and a reader handed the install has been handed something they
+  cannot obviously undo. Uninstall is the half that never gets written, and it
+  is the half somebody needs when they are already annoyed.
+
+- [ ] **A pass on the words themselves** — it is all far too wordy. Every panel,
+  hint and dialog has grown by accretion, each addition reasonable on its own,
+  and nobody has read the whole thing as a reader rather than as its author.
+  This is a design job about what someone needs at the moment they are reading,
+  not a copy-editing job about making sentences shorter — cutting evenly would
+  keep the same shape and lose the detail that is load-bearing. Expect whole
+  paragraphs to go rather than every paragraph to shrink.
+
 - [ ] **Creative — a third app for regular photos** — owner direction 2026-07-19
   ("a separate page next to infrared and macro, called creative, for regular
   photos, installable separately… same things we're building here… I suppose I
