@@ -11315,3 +11315,40 @@ another by about five hundred pixels in two million at a level anyone could
 point at, all of it on edges. The property being traded is reproducibility, not
 quality — and it is already partly gone, because two browsers write the same
 pixels to files 44% apart in size through their own JPEG encoders.
+
+## 2026-09-13 — the native-resolution working copy has a trap in it, found before writing any of it
+
+**`Renderer.setImage` SETS `NEAREST` ON EVERY FLOAT TEXTURE, and the comment
+beside it says why: "the canvas is 1:1 with the texture".** That is true today
+and it is exactly what stops being true. A native-resolution working copy hands
+the renderer a 21-megapixel texture and asks it to draw into a canvas of about
+one and a half — a 4:1 minification, point-sampled. Point-sampling a minified
+texture is aliasing by construction: every drawn pixel takes ONE sensor pixel
+and ignores the fifteen beside it, so fine detail turns into crawling speckle
+that moves when the view moves. It would look worse than the proxy it replaced,
+and it would look worse in exactly the places this change exists to improve.
+
+**So the working copy is half-float for a second reason, and this one is not
+about memory.** In WebGL2 an `RGBA16F` texture is filterable in core; `RGBA32F`
+needs `OES_texture_float_linear`, which is not on every device. Linear filtering
+is the minimum; proper minification of a 4:1 reduction wants a mip chain, which
+is more memory again (a third) and one `generateMipmap` per upload. Both are
+decided by measurement on the devices, not here — but neither is optional, and
+"it already draws" is not evidence it draws correctly, because a still frame of
+a static scene is the one case where aliasing is hardest to see.
+
+**AND THE ACCEPTANCE TEST WRITTEN EARLIER IN THIS FILE IS WRONG.** It said to
+render a photograph before and after and require the pixels to match. That
+cannot hold for the PREVIEW: a full-resolution source minified to the screen is
+a different render from a half-resolution source drawn 1:1, and if it matched,
+nothing would have changed. The test that is actually right is two tests:
+
+- the **computed export** is untouched — still `7afc9c2a` on every device, which
+  is the fingerprint the test page already takes, and any drift in it means the
+  preview change leaked into the saved file;
+- the **look** is unchanged — the denoise and sharpening footprints stay where
+  the reader put them, which is what `setTapScale(proxyFactorFor(...))` is for,
+  measured by the same drawn-against-computed comparison rather than by eye.
+
+The first is a fingerprint and the second is a number. Neither is "it looks
+right", which is what an untested version of this change would be resting on.
