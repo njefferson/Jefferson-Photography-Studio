@@ -11630,3 +11630,46 @@ mantissa from `Math.log2` and `Math.round`, sharing no line with the bit
 twiddling it checks — rather than a list of constants. And the bar it holds is
 the one that is actually true: never more than one step apart, and never the
 worse of the two against the float32 value.
+
+## 2026-09-13 — the working copy runs at native resolution, and its acceptance test is not finished
+
+**WHAT LANDED.** For mosaiced raws, `toPreview` now builds the whole frame at
+native resolution in half precision through `buildLinearSource`, and
+`uploadPreview` sets `setTapScale(proxyFactorFor(...))` beside `setImage` so the
+two can never be out of step. `Renderer` gained `isHalf` and `patchImage`
+converts a float rect on the way in; `bakeRgbaF32` and `lumaAccessor` read a
+half-float pristine buffer. Above 24 megapixels the old binned proxy is used
+instead — memory, not the drawing surface, since all three devices allocate a
+full-frame surface.
+
+Measured in the container on a practice raw: the canvas goes from **1400x932 to
+2800x1864**, the photograph is on screen (mean 110.6 of 255, not a black
+canvas), and against the old proxy at the same displayed size the picture
+differs by **0.748 of 255 on average, worst 24, one sample in 326,200 over 24**.
+
+**THE NEGATIVE CONTROL FAILED THE FIRST TIME, AND SAYING SO IS THE POINT.**
+Planting a wrong tap scale — the reader's noise-reduction and sharpening
+footprint halved, which is the single defect this change most risks — moved the
+picture by **0.229 of 255, worst 6, ZERO samples over 8**. The test could not
+tell a correct tap scale from a missing one. A test that cannot fail on the
+defect it exists for is not evidence, and the change would have been reported as
+verified on it.
+
+**FIRST CAUSE: the settings.** A photograph opens with the noise reduction
+barely above the grain and sharpening at zero, so the footprint those two work
+over barely touches the picture. With them at 0.47 and 0.4 the plant moves it to
+**0.540 of 255, worst 24, 233 samples over 8** — teeth, but not many.
+
+**SECOND CAUSE, AND THIS ONE IS THE INSTRUMENT: it samples at 700x466.** Both
+canvases are 2800 wide, so every sample averages about sixteen source pixels —
+and a halved denoise and sharpen footprint lives exactly in that fine detail.
+The comparison is being taken at the scale least able to see the thing it is
+looking for. The earlier drawn-against-computed measurement, which found 30% of
+pixels over 2 from precisely this defect, compared at native resolution.
+
+**SO THE VERIFICATION IS NOT DONE AND THIS IS NOT CLAIMED AS VERIFIED.** What it
+needs: comparison at the canvas's own resolution rather than downsampled, and a
+sweep of several practice frames rather than one photograph at one pair of
+slider values — which is this repo's own standing rule for a pixel-pipeline
+change and was being skipped. Whichever number a single frame produced would
+have been a test set to solve toward.
