@@ -181,18 +181,18 @@
           <button id="welcomeBack" class="welcome-back" type="button" hidden>&#8249; Back to your photo</button>
           <p id="hint" role="status" aria-live="polite">Edit infrared photos — RAW (NEF / DNG) unlocks the full color magic.</p>
           <label class="open-btn welcome-open"><input id="welcomeFile" class="file-input" type="file" accept=".dng,.nef,.zip,.ipslook,image/*" multiple />Open image(s)</label>
-          <p class="welcome-open-hint">One photo to edit — or several to work as a session: big previews you switch between, each keeping its own edit, all held safely until you're done.</p>
+          <p class="welcome-open-hint">One photo, or a set to work through &mdash; each keeps its own edit.</p>
           <!-- iCloud and the Files picker are an iOS story, and this paragraph
                was on the first screen every reader sees, on every machine. It
                ships hidden and is revealed on iOS only (src/platform.ts); the
                full version, for every platform, is in Help either way. -->
           <p class="welcome-open-hint" data-only-plat="ios" hidden><strong>If the Files picker sits there after you tap Open:</strong> that wait is iOS fetching your photos out of iCloud, before this app is handed anything. A file with a cloud badge, or one that says &ldquo;Waiting&hellip;&rdquo;, is not on this <span data-device-noun>device</span> yet. Download the folder in Files first and it opens straight away — see <strong>Help &rarr; Why the Files picker hangs</strong>.</p>
           <label class="welcome-batch" id="welcomeQuickBtn"><input id="welcomeQuickFiles" class="file-input" type="file" accept=".dng,.nef,.zip,.ipslook,image/*" multiple />Quick look a folder…</label>
-          <p class="welcome-batch-hint">See what's in a folder: an instant grid of auto-balanced previews, nothing saved, gone when you close. Tap the keepers to send them into a session.</p>
+          <p class="welcome-batch-hint">An instant grid of a whole folder. Nothing is saved.</p>
           <button class="welcome-batch" id="welcomeBatchBtn" type="button">Batch process a set…</button>
-          <p class="welcome-batch-hint">Not for editing — develops a whole set unattended into one .zip, each photo auto-balanced, then a look, your current edit, or nothing on top.</p>
+          <p class="welcome-batch-hint">Develops a whole set into one .zip, unattended.</p>
           <button class="welcome-batch" id="welcomeLensBtn" type="button">Measure your lens&hellip;</button>
-          <p class="welcome-batch-hint">An infrared-converted lens brightens and tints the middle of every frame. Give this photographs of empty sky and it works yours out, here on this device — nothing uploaded, nothing to open first.</p>
+          <p class="welcome-batch-hint">Works out your lens&rsquo;s bright centre, from your own sky frames.</p>
           <button id="resumeSession" class="welcome-batch" type="button" hidden>Resume session</button>
           <button id="recoverBatch" class="welcome-batch" type="button" hidden>Recover images from an interrupted batch</button>
           <hr class="welcome-div" />
@@ -201,7 +201,7 @@
             <button id="a2hsInstall" type="button" hidden>Install app</button>
             <button id="a2hsClose" type="button" class="a2hs-close" aria-label="Dismiss">&#10005;</button>
           </div>
-          <p class="ex-title">&hellip;or learn by doing — tap a practice photo and the numbered lessons ride along on the picture. The RAW ones unlock the full color magic.</p>
+          <p class="ex-title">&hellip;or learn by doing &mdash; tap a practice photo, and the lessons ride along on it.</p>
           <!-- The way into the full library is the grid's LAST tile (the
                stacked-photos "Learning library" tile, built in main.ts) —
                the old dashed pill here was "completely missable" (owner). -->
@@ -296,7 +296,7 @@
             <button id="irAutoWb" class="accent-outline" type="button">Auto white balance</button>
             <p class="note">Rebalances to this photo's own neutral &mdash; the quick way back out of a look's color cast. Touches nothing else.</p>
             <button id="swapBtn" type="button" class="toggle full-btn" aria-pressed="true">R &#8646; B channel swap</button>
-            <p class="note">Swaps the red and blue channels &mdash; the building block every color look is built on, not a look itself. <strong>On its own it usually goes flat and purple</strong>, because the swap only separates colors that white balance has already pulled apart: set white balance first (tap foliage), or pick a look, and then this is the switch that flips the result. Color looks switch it on; toggle here or re-press a look to compare.</p>
+            <p class="note">Swaps the red and blue channels &mdash; the building block under every colour look, not a look itself. <strong>On its own it usually goes flat and purple:</strong> set white balance first (tap foliage) or pick a look, and this becomes the switch that flips the result.</p>
             <div class="sub-title">Looks</div>
             <div class="looks-grid">
               <button id="lookAero" type="button">Aerochrome<small class="look-sub"></small></button>
@@ -436,7 +436,7 @@
             <label>Hot-spot <input id="hotspot" type="range" min="0" max="0.8" step="0.01" value="0" /></label>
             <label>Hot-spot size <input id="hotspotSize" type="range" min="0.15" max="1" step="0.01" value="0.5" /></label>
             <label>Hot-spot colour <input id="hotspotColor" type="range" min="-0.5" max="0.5" step="0.01" value="0" /></label>
-            <p class="note">An IR-converted lens does not only BRIGHTEN the centre &mdash; it usually tints it too, and the R&#8646;B swap every colour look is built on turns that tint into a coloured disc in the middle of the sky. Hot-spot (above) is a plain brightness gain and cannot touch it. This one shifts the centre&rsquo;s colour instead, over the same circle Hot-spot size sets. Which way is which depends on the look you have on &mdash; every colour look swaps red and blue, so the slider&rsquo;s two directions trade places with it. Don&rsquo;t reason about it: nudge one way, and if the disc gets stronger go the other. Work with the look ON and the sky filling the frame, since that is where the disc shows.</p>
+            <p class="note">Takes the colour out of the centre disc a converted lens leaves in a plain sky &mdash; Hot-spot above only changes its brightness. Which direction helps depends on the look, so nudge one way and go back if the disc gets stronger. Easiest to judge with a look on and sky filling the frame.</p>
             <label>Vignette <input id="vignette" type="range" min="-1" max="1" step="0.01" value="0" /></label>
             <button id="lensMeasureBtn" type="button">Measure your lens&hellip;</button>
             <p class="note">Setting these by eye on every photograph is the fallback. Measuring works your own lens&rsquo;s hot-spot out from photographs of empty sky &mdash; it needs no photo open, so it is on the start screen and in Settings too.</p>
@@ -597,7 +597,7 @@
               <input id="exQuality" type="range" min="50" max="100" step="1" value="92" aria-describedby="exQualityNote" />
               <span id="exQualityVal">92 · high</span>
             </label>
-            <small id="exQualityNote" class="note">How hard the JPEG is squeezed. Lower makes a smaller file and starts smudging fine detail &mdash; foliage texture and grain go first, which is most of an infrared frame. <strong>92</strong> is the default and is visually clean; go to 100 only for a print master, and below 80 only when a file has to be small. TIFF has no quality setting &mdash; it keeps every bit.</small>
+            <small id="exQualityNote" class="note">How hard the JPEG is squeezed &mdash; foliage texture and grain smudge first, which is most of an infrared frame. <strong>92</strong> is clean; 100 for a print master, below 80 only when the file has to be small. TIFF keeps every bit.</small>
             <label class="check-row"><input id="exRecipe" type="checkbox" checked /> JPEGs carry their look recipe <small>(anyone opening one here gets offered your look)</small></label>
             <p id="exWmNote" class="wm-note" hidden>Practice photos export with the small Studio mark in the corner — your own photos never do.</p>
             <button id="exBtn" type="button" class="primary">Export &amp; Save</button>
@@ -652,7 +652,7 @@
             <button id="straightenBtn" class="toggle full-btn" type="button" aria-pressed="false" aria-label="Straighten">Straighten</button>
             <button id="levelBtn" class="accent-outline" type="button">Level the horizon</button>
             <p class="note" id="levelNote" role="status" aria-live="polite" hidden></p>
-            <p class="note"><strong>Rotate</strong> means quarter turns only &mdash; 90&deg; at a time; the flips mirror it as you see it. <strong>Straighten</strong> is the fine angle that levels a horizon, and the two are separate tools. <strong>Level the horizon</strong> finds the angle for you from the strongest straight line in the frame &mdash; it lands on the Straighten slider, so you can see it, nudge it, or undo it, and it says so plainly when the frame has no line clear enough to go on. Crop opens a draggable box &mdash; with aspect presets (1:1, 4:5&hellip;) on the bottom pill. Straighten levels the horizon with a slider. Crop and Straighten each open on their own &mdash; tap &ldquo;Done&rdquo; to apply.</p>
+            <p class="note"><strong>Rotate</strong> is quarter turns; <strong>Straighten</strong> is the fine angle that levels a horizon; <strong>Crop</strong> is a draggable box with aspect presets. Each opens on its own &mdash; tap <strong>Done</strong> to apply. <strong>Level the horizon</strong> finds the angle for you and lands it on the Straighten slider, so you can nudge or undo it.</p>
           </section>
 
           <div id="panelDown" class="scroll-cue down" hidden><span>&#9660;</span></div>
