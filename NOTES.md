@@ -11869,3 +11869,47 @@ is the same function the computed export already uses to reproduce the proxy's
 footprint, and the test page's drawn-against-computed comparison — which runs
 through the same tap scale — still reports 0.66 of 255 with the operators on,
 unchanged from before the working copy existed.
+
+## 2026-09-13 — what the full-resolution copy is actually worth, measured on a real frame
+
+**AT THE SIZE A PHOTOGRAPH IS SHOWN, IT IS WORTH NOTHING, AND THE NUMBER SAYING
+SO WAS ALREADY IN THIS FILE.** The before-and-after comparison read **0.748 of
+255 average, one sample in 326,200 over 24** — and it was recorded as "the look
+holds", which is true and is not the point. The half-size copy is 2,800 pixels
+wide against a display using about 1,200: it already had 2.3 times more pixels
+than the screen could use, so doubling that to 4.7 cannot show anybody anything.
+The measurement was a verdict and it was read as reassurance. It took the owner
+saying they could not tell two images apart for the file's own number to be
+read correctly.
+
+**ZOOMED TO 1:1 IT DOES SHOW, AND ONLY WHERE THERE IS DETAIL TO SHOW.** Twelve
+regions of a real 20.9-megapixel frame (`NIR_2082.NEF`), each blown up to the
+same size on screen, half-size against full:
+
+- the most detailed region — **3.67 of 255 average, 8.6% of samples over 8**;
+- the next three — 3.25, 2.63, 2.52, between 3.8% and 7.0% over 8;
+- the flat top row, which is sky — 1.49 to 1.65, around 0.5% over 8;
+- worst single sample anywhere: 41 of 255. A softness difference, not a
+  different photograph.
+
+**AND THE FIRST VERSION OF THAT MEASUREMENT SAMPLED ONE PATCH**, at 42%/42%,
+chosen for no reason, and reported 2.07 as the answer. Whether extra pixels show
+anything depends entirely on what is in the patch — sky shows nothing however
+many pixels it has — so one patch is a test set and which one it is decides the
+verdict. Twelve across the frame, reported as a spread, cannot be picked to
+suit. (Doctrine §14, written six hours earlier, applied to the session that
+wrote it.)
+
+**SO THE UPGRADE WAITS 1.2 SECONDS NOW.** Flick through a session of forty and
+not one of them rebuilds; settle on a photograph and it sharpens behind itself.
+The cost — about four seconds of background work and 170 MB held — is paid where
+it buys something and nowhere else, and nobody has to press anything.
+
+**ALSO CORRECTED: the structural benefit that was quoted repeatedly is not real
+yet.** "The preview and the export become the same pixels" was cited several
+times tonight as the deciding argument. The export computes from the file
+independently and never reads the preview copy, so that benefit arrives only if
+the export becomes a readback of the preview — and the drawn export is per-chip,
+settled tonight. Until that is built, the full-resolution working copy buys
+zoomed-in detail and nothing else. It was a real argument about a future state
+being used as though it were a present one.
