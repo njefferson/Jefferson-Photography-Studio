@@ -734,8 +734,14 @@ function compareOne(label: string, drawn: ReturnType<typeof drawFrame>, computed
     const px = a.length / 4;
     const meanGrad = gradAll / Math.max(1, px), badGrad = gradBad / Math.max(1, badN);
     const d = drawn.ms;
+    // THE BANDS GO IN THE VALUE, NOT THE EXPLANATION. "Copy the results" copies
+    // each row's NAME AND VALUE and nothing else — so a number that lives only
+    // in the paragraph beside it never leaves the device. These counts were
+    // added specifically to be reported from real devices, and the first report
+    // that came back did not contain them. Anything MEASURED belongs in the
+    // value; the paragraph is for what it means.
     row(`Drawn against computed, ${label}`,
-      `average ${(sum / n).toFixed(2)} of 255, worst ${worst}`,
+      `average ${(sum / n).toFixed(2)} of 255, worst ${worst} · ${over8} over 8, ${over24} over 24 of ${px} · edges ${(badGrad / Math.max(1e-6, meanGrad)).toFixed(1)}x`,
       `The same photograph, ${(px / 1e6).toFixed(2)} megapixels, compared before either is encoded. ` +
       `${((over2 / px) * 100).toFixed(1)}% of the interior differs by more than 2, against ${((edgeOver / Math.max(1, edgePx)) * 100).toFixed(1)}% of the four-pixel border. ` +
       `Where they differ, the local contrast averages ${badGrad.toFixed(1)} against ${meanGrad.toFixed(1)} over the whole frame — ${badGrad > meanGrad * 2 ? "so the disagreement sits on the EDGES, which is what a half-texel sampling offset looks like" : "so it is spread across the picture rather than sitting on edges"}. ` +
