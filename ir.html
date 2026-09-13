@@ -235,6 +235,14 @@
         <!-- Segmented tab grid: six core adjustment tabs in a 2x3 grid, with
              Corrections and Crop & straighten as full-width footer rows below them.
              Active tab is remembered per session (main.ts). -->
+        <!-- SIXTY-THREE EXPLANATORY NOTES LIVED PERMANENTLY IN THIS PANEL —
+             1,540 words, including a 125-word paragraph about lens tinting
+             sitting next to a slider somebody is trying to drag. They are worth
+             having: on a first visit they are how the controls get learned. They
+             are not worth having on the fiftieth. So they are a toggle, on to
+             begin with, and remembered once turned off. -->
+        <button id="panelNotes" type="button" class="panel-notes-toggle" aria-pressed="true"
+                title="Show or hide the explanations beside each control">Explanations</button>
         <div id="panelTabs" class="panel-tabs" role="tablist" aria-label="Editor sections">
           <button id="ptab-basic" aria-controls="sec-basic" class="ptab active" type="button" data-tab="basic" role="tab" aria-selected="true">Basic</button>
           <button id="ptab-ir" aria-controls="sec-ir" class="ptab" type="button" data-tab="ir" role="tab" aria-selected="false">IR</button>
