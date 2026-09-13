@@ -12134,3 +12134,37 @@ a plain static server, a `load` event that may already have fired before the
 listener attached. What is certain regardless is that the failure would be
 invisible on a real device too, and that is worth fixing whether or not it is
 what happened here.
+
+## 2026-09-13 — the memory hypothesis is not supported by any measurement, and the original failure is unexplained
+
+**BOTH IPADS: `still available with 1000 MB held · 6 frames OK`.** Six
+frame-sized half-float textures is **about a gigabyte of texture**, on top of a
+gigabyte of ordinary memory, with a full-frame drawing surface still available
+afterwards. Six is the loop's CAP, so the honest reading is "at least six" — the
+ladder has never found a ceiling on any device, in either kind of memory.
+
+**The editor needs ONE frame.** So nothing measured supports the explanation
+that has been carried since the session broke: that a 167 MB texture and an
+84 MB drawing surface exhausted the device. That was a plausible story told
+immediately after a failure, and three rounds of instrument-building have failed
+to produce a single number that backs it.
+
+**WHAT IS ACTUALLY KNOWN about the failure, stripped of the story:** a NEF that
+had opened would not decode when switched to, raising the app's own decode
+error; and afterwards a fresh session drew nothing, which is a lost WebGL
+context and is now handled. That is the whole evidence. Everything else — which
+allocation failed, whether anything ran out at all — was inferred from the shape
+of the change that had just landed, which is the least reliable kind of
+inference and the easiest to mistake for diagnosis.
+
+**SO THE NEXT STEP IS NOT ANOTHER PROBE.** Three of them have been built and
+each measured something true and irrelevant. What is missing is the failure's
+own words: the decode error is shown in an `alert()` and then gone, so the one
+artefact that would identify it survives nowhere. The ⓘ report now keeps the
+last open failure — what it was, which file, and whether the full-resolution
+rebuild was running at the time — so the NEXT occurrence is diagnosable from the
+device instead of reconstructed from a guess.
+
+**The full-resolution view stays off regardless.** Not because memory was proven
+to be the cause — it was not — but because a real session broke with it on and
+nothing since has explained why.
