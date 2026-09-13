@@ -10851,3 +10851,46 @@ of it on edges, which is the footprint question and nothing else.
 **The probe is in the test page**, so the three devices can answer the memory
 question with numbers rather than a guess. Nothing is wired into what a reader
 presses.
+
+## 2026-09-13 — half the memory for the same picture, and what two desktop runs said
+
+**THE FULL-RESOLUTION QUESTION NOW HAS REAL NUMBERS**, from a 12-core desktop
+with a GTX 1650, run twice — once from the installed app on production and once
+from a browser tab on staging.
+
+- Drawing a screen-sized frame **from a full-resolution texture: 17 ms and 20 ms**
+  across the two runs. **From the half-size proxy it uses today: 12 ms both
+  times.** Both figures include a full canvas readback the probe does and a real
+  preview never would, so the true difference is smaller than the 5-8 ms gap.
+- Uploading the full frame: **35 ms and 36 ms**, against 10-11 for the proxy.
+- Holding it: **16 MB a megapixel**, so about 340 MB for a 21-megapixel raw.
+
+**AND THE MEMORY HALVES WITHOUT COSTING THE PICTURE.** A half-float (RGBA16F)
+source is **8 MB a megapixel — 170 MB for that raw** — and the frame drawn from
+it differs from the float32 one by **0.018 of 255 on average, worst 4**. The
+average is nothing; the worst is a handful of pixels and is the honest reason not
+to call it free. `Renderer.setImage` takes `linear16` now and the shader samples
+it identically; the conversion is written out because the browser has no
+primitive for it and a DataView per pixel would be twenty million calls.
+
+**THE DRAWN EXPORT IS NOT JUST FASTER, IT IS STEADIER.** On the same machine,
+the same 2-megapixel pair: computed **4,115 ms** in one run and **10,370 ms** in
+the other — 2.5x apart for identical work — while drawn was **830 ms and
+852 ms**. Storage moved the same way (58 ms against 119 ms for 6 MB). Whatever
+else the machine is doing lands on the processor path and not on the graphics
+one, which is a product fact and not only a benchmark fact: a reader's export
+time varies with their machine's mood today.
+
+**Both runs fingerprinted identically** — the arithmetic sweep `b1af01c8` and a
+real practice export `e5ac8a29` — so the export is deterministic across runs and
+across installed-versus-tab on one engine. The container prints a DIFFERENT
+arithmetic fingerprint (`b0bad6ce`) and the SAME export fingerprint, which
+calibrates the instrument: **the arithmetic line is a canary, not a verdict.** It
+is sensitive to a last-digit difference anywhere in a 2000-step sweep, and an
+8-bit export quantises those away. The export fingerprint is what settles
+byte-identity, and a Safari engine is still the test that matters.
+
+**Threads and lanes, confirmed on the real machine**: a 21-megapixel export now
+takes **8** threads there (it was 4 before the policy read `deviceMemory`), and
+**4** decoders run at once. One tile: 16 ms and 23 ms — consistent with the 21 ms
+that corrected the earlier claim.

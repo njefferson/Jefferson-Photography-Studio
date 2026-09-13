@@ -734,6 +734,9 @@ async function fullResolutionPreview(): Promise<void> {
     const mp = (built.image.width * built.image.height) / 1e6;
     row("Building a full-resolution frame", `${ms(built.ms)} · ${(built.bytes / 1e6).toFixed(0)} MB for ${mp.toFixed(1)} MP`,
       `Reading the sensor data and demosaicing every pixel, once, into the buffer a texture wants. It scales with the photograph: ${(built.bytes / 1e6 / mp).toFixed(0)} MB a megapixel, so a 21-megapixel raw would want about ${Math.round((built.bytes / 1e6 / mp) * 21)} MB held while it is open.`);
+    const half16 = buildLinearSource(file, img, true);
+    row("…and the same frame at half the memory", `${ms(half16.ms)} · ${(half16.bytes / 1e6).toFixed(0)} MB`,
+      `The same picture in half-float, which is what every HDR image pipeline uses for linear data and what the graphics chip samples identically. A 21-megapixel raw would want about ${Math.round((half16.bytes / 1e6 / mp) * 21)} MB instead. Whether it costs any visible precision is the comparison below.`);
 
     // Half the size, for the comparison — the proxy the app uses today.
     const half = { width: built.image.width >> 1, height: built.image.height >> 1, camMatrix: built.image.camMatrix, linear: undefined };
@@ -763,8 +766,10 @@ async function fullResolutionPreview(): Promise<void> {
     type Src = { width: number; height: number; pixels?: Uint8ClampedArray; linear?: Float32Array; camMatrix?: number[] };
     const sources: [string, Src][] = [
       ["full resolution", built.image],
+      ["full resolution at half the memory", half16.image],
       ["the half-size proxy it uses today", { width: half.width, height: half.height, camMatrix: half.camMatrix, linear: halfLinear }],
     ];
+    const drawnBy = new Map<string, Uint8ClampedArray>();
     for (const [label, image] of sources) {
       const frac = Math.min(1, SCREEN / Math.max(image.width, image.height));
       const pr = { ...params, crop: { x: (1 - frac) / 2, y: (1 - frac) / 2, w: frac, h: frac } };
@@ -781,8 +786,10 @@ async function fullResolutionPreview(): Promise<void> {
         await tick();
         const N = 5;
         const t1 = performance.now();
-        for (let i = 0; i < N; i++) { r.render(pr); r.readFrame(); }
+        let last: Uint8ClampedArray | null = null;
+        for (let i = 0; i < N; i++) { r.render(pr); last = r.readFrame(); }
         const per = (performance.now() - t1) / N;
+        if (last) drawnBy.set(label, last);
         row(`Drawing from ${label}`, `upload ${ms(upload)} · ${ms(per)} a frame`,
           `A ${canvas.width}x${canvas.height} draw — about what a screen asks for — sampled from a ${(image.width * image.height / 1e6).toFixed(1)}-megapixel texture. Under 16 ms a frame is smooth at sixty; under 33 is smooth at thirty. The upload happens once when a photograph opens.`);
       } catch (err) {
@@ -791,6 +798,20 @@ async function fullResolutionPreview(): Promise<void> {
         canvas.width = 1; canvas.height = 1;
       }
       await tick();
+    }
+    // DOES HALF THE MEMORY COST ANY OF THE PICTURE? The two frames above were
+    // drawn from the same photograph through the same shaders, differing only in
+    // how precisely the source was stored.
+    const a = drawnBy.get("full resolution"), bHalf = drawnBy.get("full resolution at half the memory");
+    if (a && bHalf && a.length === bHalf.length) {
+      let worst = 0, sum = 0, n = 0;
+      for (let i = 0; i < a.length; i += 4) {
+        for (let k = 0; k < 3; k++) { const d = Math.abs(a[i + k] - bHalf[i + k]); if (d > worst) worst = d; sum += d; n++; }
+      }
+      row("What half the memory costs the picture", `average ${(sum / n).toFixed(3)} of 255, worst ${worst}`,
+        worst <= 1
+          ? "Nothing a person could see: the two frames are the same picture to within one step of 255, so the memory is free to give up."
+          : "Worth looking at before choosing it — the two frames differ by more than one step of 255 somewhere.");
     }
     p.remove();
   } catch (e) {
