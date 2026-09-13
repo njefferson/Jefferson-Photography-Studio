@@ -51,6 +51,7 @@ import { extractLookFromJpeg } from "./lookmark";
 import { encodeQr, drawQr } from "./qr";
 import { wireThemePicker } from "./theme";
 import { wirePalettePicker } from "./palette";
+import { isIOS as isIOSDevice, wireDeviceCopy } from "./platform";
 
 // Injected at build time from git history (see vite.config.ts).
 declare const __CHANGELOG__: { hash: string; date: string; subject: string; version: string }[];
@@ -4672,6 +4673,9 @@ mUI.clearBrush.addEventListener("click", () => {
 addBrushBtn.addEventListener("click", () => addMask(2));
 
 // Dawn / dark theme switch, living in the ⓘ dialog (shared chrome).
+// What device is this, and say so in the copy. One call: the nouns, the notes
+// that are only true on one platform, and the marked row in each install list.
+wireDeviceCopy();
 wireThemePicker(document.getElementById("themePicker"));
 wirePalettePicker(document.getElementById("palettePicker"));
 
@@ -10945,10 +10949,9 @@ const VENMO_URL = "https://venmo.com/u/noahjefferson";
     window.matchMedia("(display-mode: standalone)").matches ||
     (navigator as Navigator & { standalone?: boolean }).standalone === true;
   let installed = false;   // set by the appinstalled event, below
-  // iPadOS in desktop mode reports MacIntel + touch; catch it too.
-  const isIOS =
-    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  // Was three lines of its own string-matching here. src/platform.ts answers
+  // this for the whole app now, iPadOS-in-desktop-mode included.
+  const isIOS = isIOSDevice();
   let installEvt: (Event & { prompt?: () => Promise<void> }) | null = null;
 
   const shouldShow = () => !standaloneNow() && !installed && localStorage.getItem(A2HS_KEY) !== "no" && (isIOS || !!installEvt);
