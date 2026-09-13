@@ -637,18 +637,37 @@ user-scalable=no.
   which means lifting the opening baseline out of `establishFreshEdit` as a pure
   function — a refactor of a load-bearing function with undo semantics attached
   (see "Adding an EditParams field" in CLAUDE.md), not a small change.
-  **RE-MEASURED 2026-09-13 with a fixture that can see it, and it is FIVE TIMES
-  worse than recorded.** A tile read before its photo was opened and again after
-  differs by **0.2726 of 1** on mean RGB, with the centre-against-edge ratio
-  moving 2.567 to 2.342 — against the 0.052 in the line above. Two frames from a
-  NIKKOR Z DX 50-250mm, which is one of the lenses `hotspotProfiles.ts` ships a
-  measurement for, so both halves of the opening baseline are live.
-  **The fixture is the whole finding.** The same probe over four PRACTICE DNGs
-  reports 0.0000 four times, because those 44 files carry no lens, focal length
-  or aperture at all and no profile can match them — the trap this repo already
-  recorded once under "the tile audit was wrong" and walked into again.
-  Frames that exercise it have to carry real lens metadata; they cannot ship
-  here, so the probe takes a directory (`FRAMEDIR`, scratchpad `tilebaseline.mjs`).
+  **A RE-MEASUREMENT ON 2026-09-13 REPORTED 0.2726 AND WAS WRONG — it measured
+  the provisional preview, not the baseline.** The number is recorded here
+  because it was published in a commit message before it was checked, and
+  because the way it looked right is the point.
+  A tile shows the camera's own embedded JPEG the instant a photo lands and
+  replaces it when this app's render arrives — a shipped feature. Both satisfy
+  "the image has loaded", so a reading taken too early catches the camera's
+  picture and the reading after catches the app's, and the difference between
+  those two is large, real, and about nothing. It was **0.2726 and 0.2730 on two
+  different photographs**, which should have been the tell: a per-photo
+  measurement divergence does not come out the same to three decimals on two
+  frames. Waiting for every tile to lose its `.provisional` class first gives
+  **0.0000 on both**.
+  So on this control, with these frames, the tile for an unopened photo matches
+  the tile after opening EXACTLY.
+  **And the control itself is the wrong one for this item**, which the audit
+  above already says in so many words: comparing a tile against a tile proves
+  only that the two readings agree, and they can agree by both going through
+  `makeThumb`. The 0.052 in the line above was measured against the PHOTOGRAPH
+  ON SCREEN, and nothing here re-measures that. It stands, unverified by this
+  session.
+  One hypothesis was ruled out along the way: forcing the tile's `lensFix` to 0
+  moved the (spurious) drift not at all, so the tile-versus-open difference in
+  how the lens correction is applied — `lensCurveFor` counts a shipped profile,
+  `initMyLens` counts only the reader's own measurement — is not the term that
+  dominates.
+  The fixture point still holds for anyone re-measuring this properly: the 44
+  practice DNGs carry no lens, focal length or aperture at all, so no profile
+  can match them and neither path applies a correction — frames that exercise
+  the lens half have to carry real metadata, and they cannot ship here, so the
+  probe takes a directory (`FRAMEDIR`, scratchpad `tilebaseline.mjs`).
   **AND ONE HYPOTHESIS IS RULED OUT.** It looked as though nothing re-checked a
   tile's stamp when its photo gained an edit — `restripForGrade` is called only
   on a grade move — so a call was added where the edit is stored. Measured on
