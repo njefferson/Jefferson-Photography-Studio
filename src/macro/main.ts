@@ -192,7 +192,17 @@ async function runStack() {
     drawImageData(result);
     const moved = res.shifts.filter((s) => s.dx || s.dy).length;
     const secs = ((performance.now() - t0) / 1000).toFixed(1);
-    status.textContent = `${active.length} of ${frames.length} frames · done in ${secs}s` + (moved ? ` · aligned ${moved}` : "");
+    // SAY THAT THIS IS A PREVIEW. The stack on screen is built at
+    // PREVIEW_LONG_EDGE so it lands in seconds; the file you keep is rendered
+    // at the frames' own size when you press Export full-res, and takes about a
+    // minute. Without this line the reader is pinch-zooming a 2048px image
+    // believing it is the result, and the only honest thing on screen about it
+    // was the button's own label.
+    const nat = await nativeSize(active[0].blob);
+    status.textContent =
+      `${active.length} of ${frames.length} frames · done in ${secs}s` +
+      (moved ? ` · aligned ${moved}` : "") +
+      (nat ? ` · preview at ${result.width}×${result.height}; Export full-res renders ${nat.w}×${nat.h}` : "");
     // Result-viewer HUD: a status pill (top-left) + a compare hint (bottom).
     statusPill.hidden = false;
     statusPill.textContent = `✓ Stacked · ${active.length} frames`;
@@ -209,6 +219,20 @@ async function runStack() {
     progress.hidden = true;
     stackBtn.disabled = false;
     resetBtn.disabled = false;
+  }
+}
+
+/** The frames' own pixel size, for saying what Export full-res will produce.
+ *  Returns null rather than throwing: a status line is not worth failing a
+ *  stack that already succeeded. */
+async function nativeSize(blob: Blob): Promise<{ w: number; h: number } | null> {
+  try {
+    const b = await createImageBitmap(blob);
+    const wh = { w: b.width, h: b.height };
+    b.close();
+    return wh;
+  } catch {
+    return null;
   }
 }
 
