@@ -862,6 +862,30 @@ async function aCanvasTheSizeOfTheFrame(): Promise<void> {
     } catch { return false; }
   };
 
+  // AND THE RUNG THAT ACTUALLY MATTERS: hold what the EDITOR holds.
+  //
+  // The ladder below stacks ArrayBuffers, which is system and JavaScript-heap
+  // memory. What the editor had allocated when a real session broke was a 167 MB
+  // RGBA16F texture and an 84 MB drawing buffer — GPU-side, and untouched by any
+  // number of ArrayBuffers. The 8-core iPad duly reported "still available with
+  // 1000 MB held" while being the device that had just failed. A probe that
+  // loads the wrong side of the machine answers a real question that is not the
+  // question asked.
+  const textures: WebGLTexture[] = [];
+  const holdAFrame = (): boolean => {
+    try {
+      const t = probe.createTexture();
+      if (!t) return false;
+      probe.bindTexture(probe.TEXTURE_2D, t);
+      // The size the editor really holds: a whole frame, half-float, four
+      // channels — about 167 MB for a 20.9-megapixel raw.
+      probe.texImage2D(probe.TEXTURE_2D, 0, probe.RGBA16F, FW, FH, 0, probe.RGBA, probe.HALF_FLOAT, null);
+      if (probe.getError() !== probe.NO_ERROR) { probe.deleteTexture(t); return false; }
+      textures.push(t);
+      return true;
+    } catch { return false; }
+  };
+
   let ceiling = -1, lastOk = 0;
   try {
     // 0 MB first — the old question, kept, because a device that refuses even
@@ -880,18 +904,37 @@ async function aCanvasTheSizeOfTheFrame(): Promise<void> {
       cv.width = 1; cv.height = 1;           // release the previous surface first
       if (!tryFullFrame()) { ceiling = lastOk; break; }
     }
+    // Then the same question with whole FRAMES held, which is the editor's own
+    // shape of memory rather than a convenient one.
+    let frames = 0;
+    for (let i = 0; i < 6; i++) {
+      if (!holdAFrame()) break;
+      frames++;
+      cv.width = 1; cv.height = 1;
+      if (!tryFullFrame()) { frames = -frames; break; }   // negative: this one broke it
+    }
     await tick();
-    const verdict = ceiling < 0
+    const framesMb = Math.round((FW * FH * 8) / 1e6);
+    const frameNote = frames === 0
+      ? ` A full-resolution frame could not be held at all on this device, which is the clearest possible answer: the full-resolution view is not available here.`
+      : frames < 0
+        ? ` Holding ${-frames} full-resolution frame${-frames === 1 ? "" : "s"} (${(-frames) * framesMb} MB of texture) took the surface away. The editor holds ONE while a photograph is open, so this is the number that decides whether the full-resolution view can come back.`
+        : ` Still there with ${frames} full-resolution frames held — ${frames * framesMb} MB of texture, the editor's own shape of memory rather than a convenient one. That is the reassuring answer, and it is the one this line exists to give.`;
+    const verdict = (ceiling < 0
       ? `still available with ${lastOk} MB held`
-      : `lost it at ${ceiling} MB held`;
+      : `lost it at ${ceiling} MB held`)
+      + (frames <= 0 ? ` · ${frames === 0 ? "no frame would fit" : `${-frames} frame${-frames === 1 ? "" : "s"} broke it`}` : ` · ${frames} frames OK`);
     row("A drawing surface the size of the frame", verdict,
       `Asked for a ${FW}x${FH} canvas — a whole frame from your camera — repeatedly, with more and more memory already held each time, because that is the state the editor is in when it asks. ` +
       (ceiling < 0
         ? `It was still available with ${lastOk} MB held, which is more than a session of photographs plus a full-resolution copy needs. This device has room.`
         : `It stopped being available once about ${ceiling} MB was held. A session of eight photographs is roughly 200 MB before the editor holds anything of its own, and a full-resolution copy of one frame is another 170 MB — so this is the number that decides whether the full-resolution view can be switched back on here.`) +
+      frameNote +
       ` The figure is an approximation: real memory is fragmented differently from a ladder of big buffers. It is still far closer to what the app faces than asking on an empty page, which is what the first version of this did — and that answer is why the full-resolution view is currently switched off.`);
   } finally {
     held.length = 0;
+    for (const t of textures) { try { probe.deleteTexture(t); } catch { /* context may be gone */ } }
+    textures.length = 0;
     lose();
     cv.width = 1;
     cv.height = 1;
