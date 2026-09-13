@@ -11950,3 +11950,43 @@ is worth more than any of the instances:
 **Every one of them looked like a pass.** None of them failed, errored, or
 warned. The only thing that caught any of them was going back and asking what
 the green actually proved — which is the habit, not any particular check.
+
+## 2026-09-13 — a lost graphics context was a blank editor that survived clearing the session
+
+**THE SYMPTOM, FROM A REAL IPAD:** a photograph that would not decode while
+switching, and then a NEW session showing nothing at all — an empty space where
+the photograph goes, with a populated histogram and a populated strip beside it,
+and the zoom control reading 100%. Clearing the session did not help.
+
+**THE CAUSE: THERE WAS NO CONTEXT-LOSS HANDLING ANYWHERE IN THE APP.**
+`grep webglcontextlost src/*.ts` returned nothing. When the browser takes the
+WebGL context back — short of memory, a long spell backgrounded on iOS, a driver
+reset — every draw afterwards silently does nothing. No error, no exception, no
+warning. And a new session does not make a new context, so the blank survives
+everything except a page reload, which nobody could be expected to work out from
+an empty rectangle.
+
+**That is a defect independent of what triggered it here.** The native-resolution
+working copy made it likely by asking for 167 MB of texture and an 84 MB drawing
+buffer on top of a session already holding 216 MB, but iOS backgrounding would
+do the same to an app that had never had that feature.
+
+**WHAT IS THERE NOW.** `Renderer` listens for `webglcontextlost`, calls
+`preventDefault` (without it the browser never offers restoration at all),
+records the loss and exposes `lost`. The app shows an overlay in the same shape
+as the existing no-WebGL2 one: what happened, that reloading fixes it, what a
+reload costs — the open session — and a button. It ASKS rather than reloading,
+because the cost is the reader's work.
+
+**FULL RECOVERY IS NOT CLAIMED AND IS NOT DONE.** Rebuilding every program,
+texture and uniform on `webglcontextrestored` is a larger piece of work than
+this, and a half-restored renderer that draws nothing while reporting success
+would be worse than the blank it replaces. The flag stays set until a reload
+builds a real one.
+
+**AND THE TEST FOUND A REAL DEFECT IN THE FIX.** Driving the failure for real —
+`WEBGL_lose_context` is the browser's own simulation of exactly this — the
+overlay appeared, said the right things, and its button measured **34 pixels
+tall against this repo's 44-pixel floor**. The one control on the one screen a
+reader reaches when nothing else works, too small to hit by touch. It inherited
+`.btn` and nothing checked it. 44 now, asserted by that test.
