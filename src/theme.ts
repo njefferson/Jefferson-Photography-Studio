@@ -20,7 +20,7 @@ export type ThemeChoice = "system" | "dawn" | "dark";
 type Mode = "dawn" | "dark";
 
 const OPTIONS: { id: ThemeChoice; name: string; note: string }[] = [
-  { id: "system", name: "Match my device", note: "Follows the iPad's own Light/Dark setting, and changes with it." },
+  { id: "system", name: "Match my device", note: "Follows this device's own Light/Dark setting, and changes with it." },
   { id: "dawn", name: "Dawn", note: "Light, always — whatever the device is set to." },
   { id: "dark", name: "Dark", note: "Dark, always — whatever the device is set to." },
 ];

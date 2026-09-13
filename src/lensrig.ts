@@ -368,8 +368,8 @@ export function wireLensRig(root: ParentNode): void {
       const screen = $("lensScreenNote");
       screen.hidden = false;
       screen.textContent = !wakeSupported()
-        ? "This browser cannot keep the screen awake. If the iPad locks partway through, set Settings › Display & Brightness › Auto-Lock to Never before a long run — what has already been measured is kept as it goes either way, so picking the same set again carries on from there rather than starting over."
-        : "Keeping the screen awake while this runs. Anything already measured is kept as it goes, so if the iPad does lock, picking the same set again carries on from where it stopped rather than starting over.";
+        ? "This browser cannot keep the screen awake. If the screen locks partway through, turn off automatic locking before a long run — on an iPad that is Settings › Display & Brightness › Auto-Lock. What has already been measured is kept as it goes either way, so picking the same set again carries on from there rather than starting over."
+        : "Keeping the screen awake while this runs. Anything already measured is kept as it goes, so if the screen does lock, picking the same set again carries on from where it stopped rather than starting over.";
       profResults.replaceChildren();
       profCoverage.replaceChildren();
       profDetail.hidden = false;
