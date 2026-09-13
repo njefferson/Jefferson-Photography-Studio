@@ -63,7 +63,17 @@ const textArea = $("dText") as HTMLTextAreaElement;
  *  storage figure that did not belong to its own measurements. Three reports
  *  pasted back to back showed it: two of them identical, down to the "Taken"
  *  line, with different speed numbers underneath. */
-const refreshReport = () => buildDiagnostic(__APP_VERSION__).then((t) => { textArea.value = t; });
+// THIS REPORT AND THE EDITOR'S ARE NOT THE SAME REPORT, and that cost a round
+// trip: a line was added to the editor's, "look at the ⓘ report" was said
+// without naming which page, and the test page's was sent back instead —
+// correctly, since this is where every report all evening had come from. The
+// lines that describe the photograph currently open cannot exist here, because
+// nothing is open here. So this one says where they are rather than leaving two
+// reports that look alike to be told apart by whoever notices something
+// missing.
+const refreshReport = () => buildDiagnostic(__APP_VERSION__, [
+  { k: "Not in this report", v: "the photograph you have open — open the app itself and use its ⓘ for that" },
+]).then((t) => { textArea.value = t; });
 void refreshReport();
 
 async function copy(text: string, btn: HTMLButtonElement, label: string, fallback: HTMLTextAreaElement = textArea) {
