@@ -12032,3 +12032,23 @@ failure path untested here. **The devices are where it gets exercised** — the
 8-core iPad reporting a 1000 MB quota is precisely where a ceiling should appear,
 and if it never does on any device, that is a finding about the ladder rather
 than about the devices.
+
+## 2026-09-13 — the lost-graphics overlay, audited as a surface rather than as a button
+
+It shipped having been checked for exactly ONE thing — the reload button's
+height — and that check found a real defect (34px against this repo's 44px
+floor), which is reason enough to think the rest was worth measuring too. This
+repo's standing rule is that a new reader-facing surface gets the a11y walk
+before it ships, and a new surface had just been added without one.
+
+Both themes, axe over the overlay subtree, contrast computed from the rendered
+colours rather than from the palette:
+
+- **dark** — heading and body 9.45:1, button label 9.54:1, focus ring present,
+  0 axe violations;
+- **light** — heading and body 12.84:1, button label 9.19:1, focus ring present,
+  0 axe violations.
+
+All well clear of 4.5:1. Nothing to fix, which is the outcome that only counts
+because the same harness had already found something on this surface an hour
+earlier.
