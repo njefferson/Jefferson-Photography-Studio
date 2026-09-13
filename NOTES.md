@@ -11316,39 +11316,49 @@ point at, all of it on edges. The property being traded is reproducibility, not
 quality — and it is already partly gone, because two browsers write the same
 pixels to files 44% apart in size through their own JPEG encoders.
 
-## 2026-09-13 — the native-resolution working copy has a trap in it, found before writing any of it
+## 2026-09-13 — the native-resolution trap is real, and the way it was written down was wrong
 
-**`Renderer.setImage` SETS `NEAREST` ON EVERY FLOAT TEXTURE, and the comment
-beside it says why: "the canvas is 1:1 with the texture".** That is true today
-and it is exactly what stops being true. A native-resolution working copy hands
-the renderer a 21-megapixel texture and asks it to draw into a canvas of about
-one and a half — a 4:1 minification, point-sampled. Point-sampling a minified
-texture is aliasing by construction: every drawn pixel takes ONE sensor pixel
-and ignores the fifteen beside it, so fine detail turns into crawling speckle
-that moves when the view moves. It would look worse than the proxy it replaced,
-and it would look worse in exactly the places this change exists to improve.
+**WHAT WAS WRITTEN AN HOUR AGO:** that `Renderer.setImage` sets `NEAREST` on
+every float texture, so a native-resolution working copy would point-sample a
+21-megapixel texture down into a view-sized canvas and alias. **The destination
+is right and the mechanism was not, and the error was not reading
+`applySize`.** The canvas is sized FROM the image — `canvas.width = baseW *
+crop.w` — so the drawing buffer is 1:1 with the texture and always has been.
+`NEAREST` is correct today for exactly the reason its own comment gives, and
+nothing in the current code aliases. A claim about what a file does, written
+without opening the function that decides it.
 
-**So the working copy is half-float for a second reason, and this one is not
-about memory.** In WebGL2 an `RGBA16F` texture is filterable in core; `RGBA32F`
-needs `OES_texture_float_linear`, which is not on every device. Linear filtering
-is the minimum; proper minification of a 4:1 reduction wants a mip chain, which
-is more memory again (a third) and one `generateMipmap` per upload. Both are
-decided by measurement on the devices, not here — but neither is optional, and
-"it already draws" is not evidence it draws correctly, because a still frame of
-a static scene is the one case where aliasing is hardest to see.
+**AND THE CORRECTED VERSION IS A BIGGER FINDING, NOT A SMALLER ONE.** Because
+the canvas follows the image, a native-resolution working copy does not quietly
+minify — it asks for a **21-megapixel drawing buffer**, which is the precise
+thing `MAX_PREVIEW` exists to prevent. Its comment says so: iOS Safari silently
+clamps large WebGL drawing buffers, and the symptom is a black canvas rather
+than an error. So the change is not "hand the renderer a bigger texture". It is:
 
-**AND THE ACCEPTANCE TEST WRITTEN EARLIER IN THIS FILE IS WRONG.** It said to
-render a photograph before and after and require the pixels to match. That
-cannot hold for the PREVIEW: a full-resolution source minified to the screen is
-a different render from a half-resolution source drawn 1:1, and if it matched,
-nothing would have changed. The test that is actually right is two tests:
+- **decouple the drawing buffer from the texture** — canvas at view size, texture
+  at native — which no part of the renderer does today and which `applySize`,
+  `readUvPixel`, the histogram pass, the crop mapping and `readFrame` all assume
+  the opposite of;
+- **and only then** does the minification become the shader's job, and only then
+  is `NEAREST` an aliasing bug that wants `LINEAR` plus a mip chain. The order
+  matters: fix the filter first and nothing changes, because nothing is
+  minifying yet.
 
-- the **computed export** is untouched — still `7afc9c2a` on every device, which
-  is the fingerprint the test page already takes, and any drift in it means the
-  preview change leaked into the saved file;
-- the **look** is unchanged — the denoise and sharpening footprints stay where
-  the reader put them, which is what `setTapScale(proxyFactorFor(...))` is for,
-  measured by the same drawn-against-computed comparison rather than by eye.
+**THE INSTRUMENT DOES NOT LICENSE THE CANVAS, AND THIS IS THE SHARPER HALF.**
+The device numbers that started all of this — a whole 5600x3728 frame drawn and
+read back in 54 ms on the desktop and 76 and 61 on the two iPads — were measured
+by drawing into a **framebuffer object with a texture attachment**, not into a
+canvas. A render target that size being accepted says nothing about a DRAWING
+BUFFER that size being accepted; they are different limits with different
+clamping behaviour, and the iOS one fails silently. So "both iPads handled a
+21-megapixel frame" is true of the export path, which can and should draw into
+an FBO, and is unproven for the live view. That is a measurement the test page
+still owes: allocate a canvas at frame size, draw, read one pixel, and report
+whether it came back black.
 
-The first is a fingerprint and the second is a number. Neither is "it looks
-right", which is what an untested version of this change would be resting on.
+**The acceptance test stands as corrected.** The preview cannot be required to
+match pixel for pixel — if it matched, nothing would have improved. What must
+not move is the **computed export's fingerprint** (`7afc9c2a` on every device,
+already taken by the test page) and the **footprint of the noise reduction and
+sharpening**, held by `setTapScale(proxyFactorFor(...))` and measured by the
+drawn-against-computed comparison rather than judged by eye.
