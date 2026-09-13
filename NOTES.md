@@ -662,11 +662,6 @@ user-scalable=no.
   ever switched; reading `#fileName`, which is not what names the open photo;
   and a MutationObserver watching `src` ATTRIBUTES when a redraw replaces the
   whole `<img>` node.
-- [ ] **The version menu runs the full width of the screen** — reported
-  2026-09-13. Pressing the version number in the Infrared app opens a menu that
-  spans the whole screen width, while every other menu in the app stays
-  constrained. Presentation only; it is the odd one out rather than the rule.
-
 - [ ] **Opening a set on several cores** — measured 2026-09-13, and the first
   version of this item blamed the wrong thing (see "the tile audit was wrong").
   What is true: every photograph is decoded by ONE worker, one after another,
@@ -920,6 +915,26 @@ user-scalable=no.
   header that it only keeps and matches, and whether a copy exists elsewhere is
   a different question asked by a different part of the screen. A gate that
   refuses is also a design review.
+
+- [x] **The version menu runs the full width of the screen** — SHIPPED
+  2026-09-13, reported the same day. `#verDlg` carried no width of its own, so
+  it fell through to the shared `calc(100% - 36px)`: **1244px of 1280 on a
+  desktop and 784 of 820 on a tablet**, against 640 for Help and the lens panel
+  and 520 for every short dialog. Measured across all fifteen dialogs — the only
+  other three at 100% are the library, Quick look and the compare view, which
+  are full-screen deliberately. It joins the `#helpDlg, #lensDlg` rule at
+  `min(640px, 92vw)` rather than getting a third expression; it carries a
+  twelve-row report, so it takes the wider of the two sizes. Checked for
+  overflow at 1280, 820 and 390 wide: nothing sticks out and the page never
+  scrolls sideways.
+  **AND THE SAME LOOK FOUND ITS NEIGHBOUR.** In that dialog's action row, "Test
+  this device" is an `<a>` and "Measure your lens" is a `<button>`, both wearing
+  `.ver-link` — and the base rule is `select, button { width: 100% }`, keyed on
+  the TAG. So one came out 141px and the other 604px, side by side, looking like
+  two different kinds of control. This stylesheet already states the principle
+  forty lines further down, about a `<label>` silently opting OUT of the same
+  tag-keyed width; this was the same fault in the other direction. The class
+  sets `width: auto` and both are 141px and 143px now, at 44px tall.
 
 ## Shipped (roadmap archive)
 
