@@ -530,14 +530,6 @@ user-scalable=no.
 > different approach and mindset"). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
-- [ ] **A pass on the words themselves** — it is all far too wordy. Every panel,
-  hint and dialog has grown by accretion, each addition reasonable on its own,
-  and nobody has read the whole thing as a reader rather than as its author.
-  This is a design job about what someone needs at the moment they are reading,
-  not a copy-editing job about making sentences shorter — cutting evenly would
-  keep the same shape and lose the detail that is load-bearing. Expect whole
-  paragraphs to go rather than every paragraph to shrink.
-
 - [ ] **Creative — a third app for regular photos** — owner direction 2026-07-19
   ("a separate page next to infrared and macro, called creative, for regular
   photos, installable separately… same things we're building here… I suppose I
@@ -781,6 +773,38 @@ user-scalable=no.
   leaving the list whole — a reader is often setting up a machine other than
   the one they are holding, and hiding the rest would answer the wrong
   question.
+
+- [x] **A pass on the words themselves** — SHIPPED 2026-09-13.
+  **MEASURED PER SCREEN, never as a total.** The instrument counts words that
+  are actually painted, because the two ways of getting this wrong both
+  overstate: summing twelve panel tabs reports 1,540 words for a screen showing
+  about a hundred, and counting a CLOSED `<details>` adds copy nobody can see —
+  Chromium still reports a painted box for its children, which inflated the IR
+  tab by 59 words until the counter was fixed. Every number below is one screen
+  as a reader meets it.
+  **Start screen: 228 -> 149.** Five ways in, each with a full paragraph
+  explaining it, and each of those paragraphs restating what the screen it
+  opens already says at greater length. One line each now — enough to choose.
+  Nothing was lost: the batch dialog's lead, the lens dialog's `<details>` and
+  the quick-look grid's own help all carry the detail, where it applies.
+  **Corrections tab: 371 -> 248.** Its 125-word hot-spot-colour note was the
+  longest in the app, sitting beside the slider it describes, duplicating a
+  group note ten lines above it AND the Help entry. One note for the three
+  sliders now, keeping the only thing the long one knew that the short one did
+  not: which way to push, and that it depends on the look.
+  **Crop 189 -> 125, export 270 -> 250, IR 285 -> 257.** Every tab is now under
+  260 with explanations ON, and the Explanations toggle still takes them all
+  away for a reader who has learned the controls.
+  **Help was NOT cut, on the owner's call** — it is reference somebody opens on
+  purpose, and length is not its problem. What was wrong there was one section,
+  "Looks & adjustments", holding 991 words on four unrelated subjects behind a
+  single heading: 2.7x the next longest, with no way in but the top. Split into
+  four sub-headings with every word kept, and the Help filter now opens the
+  SUB-section holding the match rather than only its parent — without that, a
+  search leaves the reader looking at four closed headings.
+  Two platform-specific things moved rather than shrank: the welcome screen's
+  iCloud paragraph is now shown only on iOS, and the Files-picker Help section
+  says at the top that it is an iPhone and iPad matter.
 
 ## Shipped (roadmap archive)
 
