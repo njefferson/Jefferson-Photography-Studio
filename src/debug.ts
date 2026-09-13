@@ -670,6 +670,24 @@ async function drawnVersusComputed(): Promise<void> {
       "The export above, stopped before the browser encodes it. THIS is the honest test of whether two devices compute the same photograph — the file line is the browser's own JPEG encoder, and two devices can agree here while writing files of different sizes.");
     row("…and the same photograph drawn", `${fp(first.drawn.data)} · ${(first.drawn.data.length / 4 / 1e6).toFixed(2)} MP`,
       "The identical export drawn through the shaders instead. Compare this line BETWEEN devices: matching means a drawn export is as device-independent as the computed one and nothing is lost by moving to it; differing means the picture would depend on the graphics chip, which is what today's export does not do.");
+    // AND THE SAME FRAME WITHOUT THE TWO NEIGHBOURHOOD OPERATORS, which is the
+    // line that says WHERE any device-dependence lives.
+    //
+    // Two renderers with nothing in common — a software rasteriser and an NVIDIA
+    // card through Direct3D — reported the operators-off comparison IDENTICALLY,
+    // to the digit: average 0.21, worst 74, 450 pixels over 8 and 134 over 24 of
+    // the same 1,999,882. Difference statistics that match that exactly are not
+    // two renderers each rounding their own way; they are one systematic
+    // difference between the shader and the processor code, reproduced exactly
+    // on both. If this fingerprint also matches across graphics chips, then
+    // everything that makes a drawn export device-dependent lives in the noise
+    // reduction and the sharpening — and that is a fixable place rather than a
+    // property of graphics hardware. If it differs, the plain pipeline varies
+    // too and that hope is dead. Either way it costs nothing: the frame is
+    // already in hand.
+    const flatRun = runs[1];
+    if (flatRun) row("…and drawn with those two turned off", `${fp(flatRun.drawn.data)}`,
+      "The same photograph drawn again with the noise reduction and sharpening off, so only the colour half of the pipeline is in it. Compare BETWEEN devices like the line above: if this one matches everywhere while the line above does not, then a drawn export's dependence on the graphics chip lives entirely in those two operators, which is a small enough place to go and fix.");
     for (const r of runs) compareOne(r.label, r.drawn, r.computed, r.computedMs);
     return;
 
@@ -919,6 +937,10 @@ async function fullResolutionPreview(): Promise<void> {
       } catch (err) {
         row(`Drawing from ${label}`, "refused", `This device would not do it: ${String((err as Error)?.message ?? err)}.`);
       } finally {
+        // The CONTEXT, not just the canvas — see Renderer.dispose. Three of
+        // these leaked on every run before this line existed, each holding a
+        // full-resolution texture.
+        r?.dispose();
         canvas.width = 1; canvas.height = 1;
       }
       await tick();
