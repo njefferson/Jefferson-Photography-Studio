@@ -11399,3 +11399,67 @@ probe is fine" rather than "the plant missed". It was caught only because the
 reported size was 5600 when 60000 had been asked for. A plant has to be verified
 BY LINE, not by string, in any file where a constant name is shared — and a
 plant that produces a passing result is an instrument failure, never a pass.
+
+## 2026-09-13 — the numbers the test page measured never left the device
+
+**"COPY THE RESULTS" COPIES EACH ROW'S NAME AND VALUE AND NOTHING ELSE.** The
+visible-difference bands were added specifically so real devices could report
+them — and they were written into the row's EXPLANATION, which the copy button
+does not include. The first desktop report came back without a single one of
+them. The measurement ran, printed on the screen, and then stayed there.
+
+**That is the same failure as a gate that greps for the wrong string**: the
+instrument was correct, the thing it produced was correct, and the channel it
+had to travel down dropped it silently. Nothing errored. The row looked complete
+on the page, which is the one place the person reading the report is not.
+
+**THE RULE, AND IT IS GENERAL:** anything MEASURED belongs in the row's VALUE.
+The paragraph beside it is for what the number means, never for the number. A
+swept pass over the file found one more of the same shape — the share of pixels
+differing by more than 2 and the local-contrast comparison that decides whether
+a disagreement sits on edges — so the value now carries `average`, `worst`, the
+two band counts with the frame's pixel count, and the edge concentration as a
+single ratio.
+
+**Verified against the COPIED BLOCK rather than the page**, which is the whole
+point: the harness now rebuilds what the copy button writes and asserts the
+bands are in it. On this renderer it reads `average 0.67 of 255, worst 81 ·
+25894 over 8, 492 over 24 of 1999882 · edges 2.6x`.
+
+## 2026-09-13 — what the desktop said, and the one place the drawn export loses
+
+**A FULL-FRAME DRAWING SURFACE IS FINE ON THE DESKTOP: `yes — 5600x3728`.** So
+on that machine the cheap version of a native-resolution view works — no
+decoupling of the drawing buffer from the texture, no mip chain. The iPads are
+the ones that decide whether the expensive version has to be built at all, and
+that is still outstanding.
+
+**AND THE DRAWN EXPORT IS NOT UNIFORMLY FASTER, WHICH IS WORTH STATING
+PLAINLY.** Same machine, same photograph, the two pairs the comparison runs:
+
+- with the noise reduction and sharpening ON — drawn **898 ms**, computed
+  **4,037 ms**;
+- with both of them OFF — drawn **1,507 ms**, computed **1,216 ms**. The drawn
+  one LOSES.
+
+**The reason is structural and it is the argument for the working copy, not
+against the drawn export.** A drawn export's cost is dominated by building and
+uploading the source — 994 ms to read the sensor data and demosaic a 5.2-
+megapixel frame on this machine — and that cost is the same whether the edit is
+trivial or heavy. The computed export's cost scales with the edit, because the
+edit IS the work. So drawn wins by 4.5x on a real edit and loses on an empty
+one.
+
+**Which is exactly the cost the working copy removes.** Once the editor holds
+the frame at native resolution, the source is already built and already on the
+graphics chip — the export stops paying 994 ms and becomes a draw and a
+readback. The two halves of 3.0 were separated earlier on the grounds that they
+are independent. They are independent in RISK and not in VALUE: the drawn export
+is worth 4.5x on its own and considerably more behind the working copy.
+
+**Memory, same run, for the record.** Full resolution 84 MB for 5.2 MP (16 MB a
+megapixel, so ~340 MB for a 21-megapixel raw); half-float 42 MB. Half-float
+takes slightly LONGER to build (1,077 ms against 994 — the conversion is real
+work) and then uploads faster (23 ms against 35) and draws marginally faster
+(10.0 ms a frame against 11). About even on time, half the memory, and it costs
+the picture 0.018 of 255 with a worst of 4.
