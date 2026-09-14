@@ -2992,11 +2992,22 @@ small { font-size: max(0.6875rem, 0.8em); }
   text-decoration: none;
 }
 .ver-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-/* The app's generic dialog button is 34px tall — comfortable under a mouse and
-   short of the 44px a finger needs. These two ARE the dialog, so they get the
-   floor. Scoped here rather than raised globally: every other dialog's buttons
-   are a measured, shipped surface and are not being churned from this change. */
-#verDlg button { min-height: 44px; }
+/* THE FLOOR, FOR EVERY DIALOG BUTTON, WHICH IT WAS NOT.
+   The app's generic dialog button is 34px tall — comfortable under a mouse and
+   short of the 44px a finger needs. This rule was once scoped to #verDlg alone,
+   under a reason that read: "every other dialog's buttons are a measured,
+   shipped surface and are not being churned from this change."
+
+   THEY WERE NOT MEASURED. The accessibility sweep opened three of the fifteen
+   dialogs in this page, so "measured" described a state nothing had ever
+   checked — and when tools/a11y-walk.mjs was given the whole list it found the
+   location dialog's four buttons at 35px, on a screen that asks a reader to
+   make a privacy decision by finger. The floor is generic now, and every dialog
+   is measured on every run, so the scoping is neither needed nor defensible.
+
+   min-height only ever RAISES: a button already clearing 44px is untouched, so
+   this reaches exactly the controls that were short. */
+dialog button { min-height: 44px; }
 .dbg-text {
   display: block;
   width: 100%;

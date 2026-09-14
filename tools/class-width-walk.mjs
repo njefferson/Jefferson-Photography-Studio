@@ -3,6 +3,8 @@
 //
 //   node tools/class-width-walk.mjs            (needs dist/ served on :8131)
 //
+// The pages it walks come from tools/surfaces.mjs, not from a list in here.
+//
 // NOT in .branch-guard's `also=`: it drives a real browser against a real
 // build, which is seconds, not milliseconds. Run it before a UI release,
 // beside the a11y walk.
@@ -27,10 +29,18 @@
 // style.css, rebuild, and this prints a 463px spread.
 
 import { chromium } from "/home/user/Jefferson-Photography-Studio/node_modules/playwright-core/index.mjs";
+// THE PAGE LIST IS NOT THIS FILE'S TO KEEP. It carried four page names, hard
+// coded, while SEVEN deploy — so notes.html, privacy.html and the status page
+// were never walked, and nothing said so. tools/surfaces.mjs is the one
+// enumeration, checked both ways against the build, and importing it is the
+// only way two walks cannot disagree about what this app is made of.
+import { PAGES, check as checkSurfaces } from "./surfaces.mjs";
+const bad = checkSurfaces();
+if (bad.length) { for (const x of bad) console.error("FAIL  " + x); process.exit(1); }
 const b = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium", args: ["--use-gl=swiftshader","--enable-unsafe-swiftshader"] });
 let found = 0;
 try {
-  for (const page of ["ir.html", "macro.html", "index.html", "debug.html"]) {
+  for (const page of PAGES.map((p) => p.file)) {
     const p = await b.newPage({ viewport: { width: 1280, height: 950 } });
     await p.goto(`http://127.0.0.1:8131/${page}`);
     await p.waitForTimeout(1200);
@@ -69,5 +79,5 @@ try {
     await p.close();
   }
 } finally { await b.close(); }
-console.log(found ? `\n${found} place(s) where one class produced two shapes` : "\nno class produces two shapes across the four pages");
+console.log(found ? `\n${found} place(s) where one class produced two shapes` : `\nno class produces two shapes across the ${PAGES.length} pages`);
 process.exit(0);
