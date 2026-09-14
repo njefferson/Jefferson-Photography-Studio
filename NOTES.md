@@ -1803,6 +1803,59 @@ One more dead declaration came out of reading that rule: `#cropDone` carried
 bare `#cropDone`, so it had never once applied. Removed rather than
 re-specified; `6px 12px` is what the button has always been.
 
+## Six infrared JPEGs, a look, and no explanation, 2026-09-14
+
+**Reported as:** a six-photo set on staging, the NEF rendering correctly and
+every JPEG flat purple with Aerochrome lit — *the problem is fixed with that
+image now, but nothing else works.*
+
+**It is not a rendering defect and it is not a regression.** A camera-rendered
+infrared JPEG can arrive with all its colour in ONE band, and `applyLook`
+already measures that (`coolContent < COOL_BAND_FLOOR`) and deliberately does
+NOT gray-world balance such a file — balancing manufactures a second band, takes
+the rendered median from 0.44 to 0.076 and crushes 13% of the frame to black.
+That decision is calibrated, documented, and correct. **What the reader got was
+the decision without the sentence that explains it.**
+
+`#lookState` carries that sentence, and it was gated on `oneBandFlag &&
+oneBandFor === current` — a flag written only inside `applyLook`. `applyLook`
+runs on a FIRST visit to a photo and never again: returning to one goes
+`activateCurrent` → `restoreLiveEdit` → `applySnapshot`, which restores every
+parameter and does not re-press the look. So the flag still described whichever
+photo last had a look applied, the identity check failed, and the line was
+hidden on every return visit.
+
+A flat purple frame with the look lit and nothing saying why reads as the app
+having broken. **A picture that needs an explanation and does not carry one is
+the same defect as a wrong picture** — it only costs the reader longer to find
+out.
+
+**Fixed by asking the photograph instead of remembering the answer.**
+`fileIsOneBand(img)` measures `coolContent` from `origParams` — the as-imported
+baseline, restored on every switch — so first visit and return ask the identical
+question, cached against BOTH the image and that baseline object. The failure
+being replaced was a cache with no key. The two dead globals went with it.
+
+**Measured on three builds with `tools/oneband-walk.mjs`:** production 2.46.6
+fails, the 2.46.16 that was on the device fails identically, the fix passes. So
+this is not a regression from the colour work — it is what a return visit has
+always done.
+
+**The fixtures are made, not found, and the walk says so.** The practice raws
+here carry no embedded preview and the reported frames were not reachable, so
+each fixture is a JPEG of a practice raw's BARE DECODE — what Hold: Untouched
+shows, which is the same red-flooded unbalanced state a camera writes for
+infrared. Check 0 is a control asserting the fixture really is one-band: the
+interesting check passes vacuously on a two-band file, and the first fixture
+tried was exactly that and said so on the first run.
+
+**STILL OPEN, and it is a decision rather than a defect.** The app's choice is
+*skip the balance and explain*. The alternative is *balance anyway and show a
+crushed frame*. The code's own comment is right that neither is Aerochrome and
+that one of them is honest — but the honest one still hands back a purple
+picture. A third option exists and is not built: offer the balance as a press
+("Balance it anyway") beside the sentence, so the reader sees both and picks.
+
 ## Shipped (roadmap archive)
 
 - [x] **Four ways a tile lied about its photograph** — SHIPPED 2026-09-14 to
