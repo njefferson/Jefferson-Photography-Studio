@@ -1743,27 +1743,40 @@ and the only way to learn anything was to run the walk again, by which time the
 load that produced the failure was gone. Three lines of context is the
 difference between a report and a prompt to re-run.
 
-## A check reading state written by a promise nothing waits for, 2026-09-14
+## The strip kept saying a photo was still held after it was let go, 2026-09-14
+
+**This section replaces a wrong diagnosis written earlier the same day, and the
+wrong one is kept here because the mistake is the useful part.**
 
 `release-walk` check 1b — *the tile of the photo you left says it reopens from
-the saved copy* — passed standalone and went red in the sixteen-walk sweep.
-Not a flake: the title changes when the leaving photo's working state is handed
-back, and that release rides `saved.then(…)` off the IndexedDB write. `stepTo`
-waits for the new tile to go `.active` and for the busy dialog to close, and
-**neither of those is that promise.** On an idle machine the write lands in the
-same frame and reading the title straight afterwards is right by accident.
+the saved copy* — passed standalone and went red in the sweep. The first reading
+was "a check reading state written by a promise nothing waits for", and the fix
+was to make the walk WAIT up to fifteen seconds for the title to change. It
+passed. In the next full sweep it failed again, having burned the whole timeout
+first — a fast failure turned into a slow one, same verdict.
 
-`tileTitleWhen` waits for the expected answer and then returns what it found —
-it does not assert, so a title that never arrives comes back unchanged and fails
-at the caller. That is the difference between waiting for a condition and
-assuming it, and it is why the wait does not hide a defect: planted against a
-string the app never writes, the check waits its fifteen seconds and then fails.
-Applied to 1b and to check 4, which is the same read in reverse.
+**The title was not late. It was never going to arrive.** Leaving a decided
+photo releases its working state in `saved.then(...)`, and the tile's title is
+built from `liveEdits.has(p.id)` at render time — and nothing redrew the strip
+after the release. On an idle machine some unrelated repaint usually comes
+along within a frame or two, which is why it looked correct for the life of the
+feature. Under load nothing came at all.
 
-The general shape, and it is the second one this session: **a check that reads
-state written by a promise nothing waits for is measuring the machine.** The
-first was `switch-instrument-walk` check 8, where the fix belonged in the
-instrument; here the app is right and the walk was reading too early.
+**Waiting cannot produce a repaint that nothing schedules.** That is the whole
+lesson, and it generalises: a check that has to wait for a repaint is usually
+telling you the repaint is missing.
+
+Fixed in the app — `updateSessionStrip()` inside the `then`, at the moment the
+answer changes — and the wait came back out of the walk.
+
+**And the walk needed one more correction to be able to see it at all.** With
+the wait removed it still passed against the unfixed app, because `heldCount`
+opens and closes the version dialog first, and that round trip is a repaint plus
+the better part of a second — long enough to correct a stale strip before the
+check meant to catch it looks. The tile is read FIRST now, which is also what
+the reader sees: the strip the moment they land on the next photo. Read in that
+order the walk fails on the unfixed build and passes on the fixed one, on an
+idle machine, with no load required.
 
 ## The crop bar had never been measured, 2026-09-14
 

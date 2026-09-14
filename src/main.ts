@@ -7923,7 +7923,24 @@ async function switchToPhoto(id: string, opts?: { quiet?: boolean }) {
     // is, so it stays.
     if (leaving && leaving !== id && leavingMarked && release.ok) {
       saved.then(
-        () => { if (activePhotoId !== leaving) liveEdits.delete(leaving); },
+        () => {
+          if (activePhotoId !== leaving) liveEdits.delete(leaving);
+          // AND REDRAW THE STRIP, because the tile's title is built from
+          // `liveEdits.has(p.id)` and this is the moment that answer changes.
+          // Without it the release lands — the held count drops, the memory is
+          // back — and the tile goes on saying the photo is still held until
+          // some unrelated repaint happens along. On an idle machine one
+          // usually does, within a frame or two, which is why this looked
+          // correct; under load nothing came for fifteen seconds.
+          //
+          // The first attempt at this was in the WALK: make the check wait for
+          // the title instead of reading it straight away. That was the wrong
+          // half — waiting cannot produce a repaint that nothing schedules, so
+          // it turned a fast failure into a slow one and reported the same
+          // verdict. A check that has to wait for a repaint is usually telling
+          // you the repaint is missing.
+          updateSessionStrip();
+        },
         () => { /* the write failed: keep what we have */ },
       );
     }

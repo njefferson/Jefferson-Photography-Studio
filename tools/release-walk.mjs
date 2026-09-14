@@ -36,30 +36,14 @@ async function heldCount(p) {
 }
 const meta = (p) => p.evaluate(() => document.getElementById("sessionMeta").textContent);
 const undoOff = (p) => p.evaluate(() => document.getElementById("undoBtn").disabled);
+// READ STRAIGHT AWAY, ON PURPOSE. An earlier version of this walk waited up to
+// fifteen seconds for the title to change, which made a red check green on an
+// idle machine and left it red under load — because the title was not late, it
+// was never going to arrive: the release ran in a promise and nothing redrew
+// the strip afterwards. Waiting cannot produce a repaint that nothing
+// schedules. A check that has to wait for a repaint is usually telling you the
+// repaint is missing, and this one was.
 const tileTitle = (p, i) => p.evaluate((n)=>document.querySelectorAll("#sessionThumbs .session-thumb")[n].title, i);
-/** The tile's title after the RELEASE has landed, not after the step has.
- *
- *  Leaving a decided photo hands its working state back, and the tile's title
- *  changes when it does — but the release rides a promise chain off the save,
- *  and `stepTo` waits for the new tile to go .active and for the busy dialog to
- *  close. Neither of those is that promise. On an idle machine the write lands
- *  inside the same frame and reading the title straight afterwards is right by
- *  accident; in a sixteen-walk sweep it is not, and check 1b went red on the
- *  full run while every standalone run passed.
- *
- *  So this WAITS for the expected answer and then returns what it found. It
- *  does not assert — the caller still does, and a title that never arrives
- *  comes back unchanged and fails there, which is the difference between
- *  waiting for a condition and assuming it. Synchronous DOM state only: a
- *  waitForFunction predicate returning a Promise is truthy the moment it is
- *  created, so such a poll passes instantly and measures nothing (NOTES). */
-async function tileTitleWhen(p, i, text, want, ms = 15000) {
-  await p.waitForFunction(
-    ([n, t, w]) => (document.querySelectorAll("#sessionThumbs .session-thumb")[n]?.title ?? "").includes(t) === w,
-    [i, text, want], { timeout: ms },
-  ).catch(() => {});
-  return tileTitle(p, i);
-}
 const expo = (p) => p.evaluate(() => Number(document.getElementById("expo").value));
 const key = async (p, k) => { await p.evaluate(()=>(document.activeElement instanceof HTMLElement?document.activeElement.blur():undefined)); await p.keyboard.press(k); };
 
@@ -95,6 +79,15 @@ try {
   const edited = await expo(p);
   await key(p, "p");
   await stepTo(p, 2);
+  // THE TILE FIRST, BEFORE ANYTHING ELSE TOUCHES THE PAGE. `heldCount` opens
+  // and closes the version dialog, and that round trip is itself a repaint plus
+  // the better part of a second — long enough for an incidental redraw to
+  // correct a stale strip before the check that is supposed to catch it looks.
+  // Read in this order the walk passed on a build with no repaint at the
+  // release at all; read in the other it caught it. What the reader sees is the
+  // strip the moment they land on the next photo, so that is the moment to
+  // read.
+  const tileAfterLeaving = await tileTitle(p, 1);
   const afterLeaving = await heldCount(p);
   // Photo 1 was decided and let go of; photo 0 never was, so it is still held.
   // The claim is that moving on did not ADD one, which is what an undecided
@@ -103,7 +96,7 @@ try {
   // Read from where the reader is STANDING: the photo you are on is held by
   // definition, so its tile must not claim to have been let go of.
   check("1b the tile of the photo you left says it reopens from the saved copy",
-    (await tileTitleWhen(p, 1, "reopens from the saved copy", true)).includes("reopens from the saved copy"), true);
+    tileAfterLeaving.includes("reopens from the saved copy"), true);
   check("1c the tile you are ON does not say that", (await tileTitle(p, 2)).includes("reopens"), false);
 
   // Coming back: the picture, the look and the sliders return; the history does not.
@@ -111,7 +104,7 @@ try {
   check("2 the sliders come back exactly", await expo(p), edited);
   check("3 and there is no undo history to take back", await undoOff(p), true);
   check("4 and back on it, the tile no longer claims it is put away",
-    (await tileTitleWhen(p, 1, "reopens from the saved copy", false)).includes("reopens from the saved copy"), false);
+    (await tileTitle(p, 1)).includes("reopens from the saved copy"), false);
 
   // An undecided photo keeps everything, exactly as before.
   await stepTo(p, 3);
