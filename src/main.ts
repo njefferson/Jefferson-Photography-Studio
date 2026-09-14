@@ -962,8 +962,6 @@ let lookBias: [number, number, number] = [1, 1, 1];
 
 /** Whether the photo now open has all its colour in one band, and WHICH photo
  *  that was measured on. See applyLook. */
-let oneBandFlag = false;
-let oneBandFor: DecodedImage | null = null;
 
 function applyLook(name: keyof typeof LOOKS) {
   const look = LOOKS[name];
@@ -1026,11 +1024,10 @@ function applyLook(name: keyof typeof LOOKS) {
   // "does this file have a cool band for the look you are about to apply" was
   // being answered about the look you are leaving.
   const oneBand = balancing && !!current && coolContent(current, params, look.swapRB) < COOL_BAND_FLOOR;
-  // REMEMBERED AGAINST THE PHOTO IT WAS MEASURED ON. The line this drives is
-  // about the file, so it has to survive a look change and vanish on a new one;
-  // holding the frame it belongs to means a stale flag can never be believed.
-  oneBandFlag = oneBand;
-  oneBandFor = current;
+  // The line this measurement also drives — the sentence saying the file has
+  // only one band — is NOT remembered from here. It was, through a flag plus an
+  // identity check, and that flag was only ever written on a first visit: see
+  // fileIsOneBand, which asks the question of the photograph instead.
   if (balancing && current && !oneBand) {
     const gw = grayWorldWB(current);
     base[0] = gw[0]; base[1] = gw[1]; base[2] = gw[2];
@@ -2229,11 +2226,52 @@ function applyLift(withColour: boolean): { pull: number; foliage: number; sky: n
  *  the gate; the swap still has to be on beside it, because pressing a colour
  *  look a second time flips the swap off and there is nothing to say then
  *  either. */
+/** DOES THIS FILE HAVE A SECOND BAND — asked of the photograph in front of you,
+ *  every time, instead of remembered from the last look that was pressed.
+ *
+ *  THE DEFECT THIS REPLACES. `oneBandFlag` was set inside applyLook and read
+ *  back through `oneBandFor === current`, and applyLook runs on a FIRST visit to
+ *  a photo and never again: returning to one goes through activateCurrent ->
+ *  restoreLiveEdit -> applySnapshot, which restores every parameter and does not
+ *  re-press the look. So the flag still described whichever photo last had a
+ *  look applied, the identity check then failed, and the sentence was hidden.
+ *
+ *  What that looked like on a real set: six camera-rendered infrared JPEGs, a
+ *  colour look pressed, every frame correctly NOT gray-world balanced because
+ *  each has all its colour in one band — and the explanation for that appearing
+ *  on the first visit to each photo and on none of the returns. The reader gets
+ *  a flat purple frame with Aerochrome lit and nothing on screen saying why,
+ *  which reads as the app having broken rather than as the file having one band.
+ *  A picture that needs an explanation and does not carry one is the same defect
+ *  as a wrong picture; it just costs the reader longer to find out.
+ *
+ *  MEASURED FROM `origParams`, NOT THE LIVE ONES. The question is about the FILE
+ *  — the balancing decision in applyLook asks it of the photo as opened, with an
+ *  untouched white balance — and by the time a look is on, `params.wb` carries
+ *  that look's bias, which is a different measurement of a different thing. The
+ *  as-imported baseline is restored on every switch (`origParams = st.orig`), so
+ *  first visit and return ask the identical question.
+ *
+ *  Cached against BOTH the image and that baseline object, so a return visit
+ *  costs nothing and a genuinely new baseline can never be answered from a stale
+ *  one — the failure above was a cache with no key. */
+const oneBandCache = new WeakMap<DecodedImage, { p: EditParams; v: boolean }>();
+function fileIsOneBand(img: DecodedImage | null): boolean {
+  if (!img || img.isRaw || !origParams) return false;
+  const hit = oneBandCache.get(img);
+  if (hit && hit.p === origParams) return hit.v;
+  // Under the swap, because that is the state a colour look puts the frame in
+  // and the cool band's hue is 30 degrees with it on and 210 with it off.
+  const v = coolContent(img, origParams, true) < COOL_BAND_FLOOR;
+  oneBandCache.set(img, { p: origParams, v });
+  return v;
+}
+
 function lookState(): void {
   const el = document.getElementById("lookState");
   if (!el) return;
   const colourLook = !!activeLook && !!LOOKS[activeLook]?.swapRB;
-  const show = oneBandFlag && oneBandFor === current && !!current && colourLook && params.swapRB;
+  const show = !!current && fileIsOneBand(current) && colourLook && params.swapRB;
   el.hidden = !show;
   if (show) el.textContent = "This photo came out of the camera with all its colour in one band — there is no sky band for a false-colour look to work with, so what you get is the look's shape without its colours. The raw file from the same shot has both bands and will carry it.";
 }
@@ -7104,8 +7142,6 @@ function establishFreshEdit() {
   // Sky/Foliage sliders, undoable, no pixels touched — the three tests any
   // at-open automatic has to pass.
   liftApplied = null;
-  oneBandFlag = false;
-  oneBandFor = null;
   // A LOOK CARRIES, OR IT DOES NOT — and half of one is what this was.
   // The look's GRADE carried to the next photo (saturation, contrast, the
   // channel swap) while `activeLook` was cleared further down the same open, so
