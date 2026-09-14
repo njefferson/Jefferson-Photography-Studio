@@ -1907,6 +1907,72 @@ from a silent drop into four compile errors.
 The Help line describing the balance-on-look behaviour said something that now
 has an exception and a control, so it was corrected in the same commit.
 
+## The file picker wedged the whole app, and nothing in it could tell, 2026-09-14
+
+**Reported on production v2.46.6, installed to the home screen:** batch process
+→ the Files window → Search → a letter typed → the scope selector appears → the
+window closes by itself. **After that no file could be opened from any entry
+point** until the app was force-quit.
+
+**What the code was.** Ten `<input type="file">` elements, every one long-lived
+and reused; five driven with `.click()`, five inside a `<label>` the reader taps.
+**Not one `cancel` handler on any of them** — the only
+`addEventListener("cancel", …)` in the app was on the busy dialog. So a picker
+that closed with nothing was an event this app never received: it was not told,
+learned nothing, and presented the same element next time.
+
+On iOS in a standalone app, a document picker dismissed through that path can
+leave WebKit believing one is still presented for the element it was opened
+from, and every later click on that element is ignored in silence. The element
+is dead for the life of the page.
+
+**Never reuse an input.** The element is replaced with a fresh clone immediately
+before the picker opens. The five clicked in code go through `openPicker(id)`;
+the five inside a label are swapped by a CAPTURING `pointerdown` listener, which
+lands before the label forwards its activation, with the clone staying inside
+the same label so the forwarding still finds it. Turning those five into buttons
+would have moved real controls for a reason the reader cannot see.
+
+The handler lives in a registry against the ID rather than on the element,
+because the element is now disposable — that is the whole point, and a `const`
+holding one is the bug. Seven module-level `const`s pointing at inputs were
+deleted; `tsc` found them.
+
+**A way out that is not force-quit.** Two opens with neither `change` nor
+`cancel` is the signature, and the app offers a reload — the same reset without
+leaving the app. A reader should never have to invent force-quit.
+
+**And a counter in the §7f report**, because this cannot be reproduced here:
+pickers opened against pickers that came back. A second occurrence arrives as
+evidence rather than as a description of a screen.
+
+### What is verified and what is not
+
+`tools/picker-walk.mjs` proves all eight in-app paths replace their element,
+that a deliberately wedged one is not the element the next attempt uses, that a
+picked file still reaches the app, and that the counter reaches the report. **Ten
+of its checks fail on the build before this and none after.**
+
+**It cannot prove the stuck picker clears on the device.** Every measurement in
+this repository is Chromium and this is a WebKit presentation bug in standalone
+mode. Recreating the element is the standard remedy; it is not verified until it
+is verified there.
+
+### Two instrument errors on the way, both caught by a control
+
+**A dead module reads as eleven unrelated defects.** `const pickerHandlers` sat
+with its helpers two thousand lines below the earliest `registerPicker` call at
+3580. Functions hoist; `const` does not. The bundle threw at boot and every
+check in the walk failed at once — including opening a photo, which has nothing
+to do with pickers. The walk reports page errors as check 0 now, so one dead
+module reads as one failure.
+
+**`cloneNode` copies attributes, so a `data-` stamp rides onto the clone.** The
+walk marked each input with `data-stamp` and then asked whether the stamp
+survived — it always did, and the walk reported REUSED eight times about code
+that was working. An expando property is not cloned. The failing check was
+right that something was wrong and wrong about what: the instrument.
+
 ## Shipped (roadmap archive)
 
 - [x] **Four ways a tile lied about its photograph** — SHIPPED 2026-09-14 to
