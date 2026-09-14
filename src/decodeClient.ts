@@ -30,7 +30,36 @@
 import { decode as decodeHere, type DecodedImage } from "./decode";
 import type { ImportedFile } from "./import";
 
-type Pending = { resolve: (v: DecodedImage) => void; reject: (e: Error) => void };
+/** WHERE A DECODE'S TIME ACTUALLY WENT. Waiting for a free lane and decoding
+ *  are different problems with different fixes — a queue is the app's own doing,
+ *  a slow decode is the device — and one number cannot tell them apart. The
+ *  editor's own decode sat behind a background thumbnail pass for seconds at a
+ *  time and the only thing anyone could say about it was "loading is slow". */
+export interface DecodeTiming {
+  /** ms between asking for the decode and a lane picking it up. */
+  queued: number;
+  /** ms spent actually decoding, in the lane or on the main thread. */
+  run: number;
+  /** How many decodes were already waiting when this one was asked for. */
+  depth: number;
+  /** False when no worker could be used and this ran on the main thread. */
+  offThread: boolean;
+}
+
+export interface DecodeOptions {
+  /** Called once when the decode settles, win or lose. Reporting only — it must
+   *  never change what is decoded or when. */
+  onTiming?: (t: DecodeTiming) => void;
+}
+
+type Pending = {
+  resolve: (v: DecodedImage) => void;
+  reject: (e: Error) => void;
+  onTiming?: (t: DecodeTiming) => void;
+  queuedAt: number;
+  startedAt: number;
+  depth: number;
+};
 interface Lane {
   worker: Worker;
   pending: Map<number, Pending>;
@@ -41,7 +70,14 @@ let started = false;
 let allDead = false; // every lane failed — stay on the main thread
 let nextJob = 1;
 /** Jobs waiting for a free lane, oldest first. */
-const queue: { file: ImportedFile; resolve: (v: DecodedImage) => void; reject: (e: Error) => void }[] = [];
+const queue: {
+  file: ImportedFile;
+  resolve: (v: DecodedImage) => void;
+  reject: (e: Error) => void;
+  onTiming?: (t: DecodeTiming) => void;
+  queuedAt: number;
+  depth: number;
+}[] = [];
 
 function laneCount(): number {
   const nav = typeof navigator !== "undefined" ? navigator : undefined;
@@ -63,6 +99,9 @@ function spawn(): Lane | null {
     const p = lane.pending.get(e.data.id);
     if (!p) return;
     lane.pending.delete(e.data.id);
+    // Reported win or lose: a decode that failed still spent the time, and a
+    // report that only covers the successful ones flatters the app.
+    p.onTiming?.({ queued: p.startedAt - p.queuedAt, run: performance.now() - p.startedAt, depth: p.depth, offThread: true });
     if (e.data.ok && e.data.img) p.resolve(e.data.img);
     else p.reject(new Error(e.data.message ?? "decode failed"));
     pump();
@@ -110,7 +149,10 @@ function pump(): void {
     if (!lane) return;
     const job = queue.shift()!;
     const id = nextJob++;
-    lane.pending.set(id, { resolve: job.resolve, reject: job.reject });
+    lane.pending.set(id, {
+      resolve: job.resolve, reject: job.reject, onTiming: job.onTiming,
+      queuedAt: job.queuedAt, startedAt: performance.now(), depth: job.depth,
+    });
     try {
       // Bytes are COPIED, not transferred: the caller still needs them to write
       // the photo into storage.
@@ -121,7 +163,7 @@ function pump(): void {
       if (i >= 0) lanes.splice(i, 1);
       if (!lanes.length) allDead = true;
       // Could not even post — this decode falls back, and the lane is gone.
-      decodeHere(job.file).then(job.resolve, job.reject);
+      decodeOnThisThread(job.file, job.onTiming, job.queuedAt, job.depth).then(job.resolve, job.reject);
     }
   }
 }
@@ -134,13 +176,29 @@ function pump(): void {
  *  what it holds without decoding anything sooner. Extra work waits in the
  *  queue, which is also what keeps a forty-photo set from having forty files in
  *  memory at once. */
-export function decodeOffThread(file: ImportedFile): Promise<DecodedImage> {
+export function decodeOffThread(file: ImportedFile, opts?: DecodeOptions): Promise<DecodedImage> {
   ensureLanes();
-  if (allDead || !lanes.length) return decodeHere(file);
+  const queuedAt = performance.now();
+  if (allDead || !lanes.length) return decodeOnThisThread(file, opts?.onTiming, queuedAt, 0);
   return new Promise<DecodedImage>((resolve, reject) => {
-    queue.push({ file, resolve, reject });
+    queue.push({ file, resolve, reject, onTiming: opts?.onTiming, queuedAt, depth: queue.length });
     pump();
   });
+}
+
+/** The main-thread fallback, timed the same way a lane is so the report does not
+ *  go quiet on the devices that need it most. Nothing waited for a lane here, so
+ *  the queued half is zero by definition rather than by omission. */
+function decodeOnThisThread(
+  file: ImportedFile, onTiming: ((t: DecodeTiming) => void) | undefined, queuedAt: number, depth: number,
+): Promise<DecodedImage> {
+  const startedAt = performance.now();
+  const p = decodeHere(file);
+  if (onTiming) {
+    const done = () => onTiming({ queued: startedAt - queuedAt, run: performance.now() - startedAt, depth, offThread: false });
+    p.then(done, done);
+  }
+  return p;
 }
 
 /** How many decodes can be in flight at once — for the test page and the
