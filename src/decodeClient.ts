@@ -50,6 +50,19 @@ export interface DecodeOptions {
   /** Called once when the decode settles, win or lose. Reporting only — it must
    *  never change what is decoded or when. */
   onTiming?: (t: DecodeTiming) => void;
+  /** THE READER IS WAITING ON THIS ONE. Go to the head of the queue instead of
+   *  the tail.
+   *
+   *  The pool is first-come-first-served and has no notion of which decode
+   *  somebody is looking at. The background pass that builds a picture for every
+   *  photo in a set is its largest customer, so tapping a photo could queue
+   *  behind several of those — and `realThumbnails` works around it by leaving
+   *  one lane free, which its own comment calls the cheap half of this.
+   *
+   *  Only the three places where a photograph is on its way to the screen pass
+   *  it. A tile decode never does: a tile arriving a moment later is nothing,
+   *  and a queue where everything is urgent is the queue we already had. */
+  front?: boolean;
 }
 
 type Pending = {
@@ -181,7 +194,9 @@ export function decodeOffThread(file: ImportedFile, opts?: DecodeOptions): Promi
   const queuedAt = performance.now();
   if (allDead || !lanes.length) return decodeOnThisThread(file, opts?.onTiming, queuedAt, 0);
   return new Promise<DecodedImage>((resolve, reject) => {
-    queue.push({ file, resolve, reject, onTiming: opts?.onTiming, queuedAt, depth: queue.length });
+    const job = { file, resolve, reject, onTiming: opts?.onTiming, queuedAt, depth: queue.length };
+    if (opts?.front) queue.unshift(job);
+    else queue.push(job);
     pump();
   });
 }

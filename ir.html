@@ -599,6 +599,14 @@
 
           <!-- ===== EXPORT ===== -->
           <section class="section" role="tabpanel" id="sec-export" aria-labelledby="ptab-export" data-tab="export" hidden>
+            <!-- THE WAY BACK to exports you have finished and not yet saved. The
+                 line over the photo is the push — here is the file you just
+                 made — and it can be dismissed; this is the pull, in the panel
+                 you already open to export, and it stays until they are saved. -->
+            <div id="exportWaitingRow" class="export-waiting" hidden>
+              <p class="note" id="exportWaitingText" role="status" aria-live="polite"></p>
+              <button id="exportWaitingSave" type="button">Save them all</button>
+            </div>
             <label>Format
               <select id="exFormat">
                 <option value="jpeg">JPEG</option>
