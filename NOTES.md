@@ -1127,6 +1127,60 @@ the build. Sequential on purpose: run at once, the other walks become the thing
 The three slow ones are a11y (69s, seven pages in both themes), export-report
 (69s) and tile-truth (71s); the rest are under half a minute each.
 
+## Blue circles where a hot-spot was corrected, 2026-09-14
+
+**REPORTED FROM PRODUCTION at 2.46.6, and the correction maths is byte-identical
+to 2.43** — `git show fc839f2:src/pipeline.ts` and the promoted copy agree on
+every line of the lens stage, and the only change to `lensstore.ts` in those 52
+commits was extracting an FNV-1a hash that returns the same string. So this is
+not from the promote; production simply jumped 52 commits and is showing work
+that had been on staging for weeks.
+
+**WHAT A BLUE CIRCLE IS, in this app's own numbers.** `lensGain(k, s)` is
+`1 / (1 + (k - 1) * s)`, clamped to 0.5..2. An IR hot-spot is red-strong at the
+centre, so a measurement has `kr > 1` and `kb < 1` there, and the correction
+pulls red DOWN and pushes blue UP. The pipeline documents the honest range of a
+measured bin as **0.772..1.460**, across all 160 profiles that exist. Run through
+`lensGain` at the strengths the slider offers:
+
+- strength 1.0, a strong but entirely valid measurement — red 0.685x, blue
+  1.295x, **blue over red 1.89x**
+- strength 1.5, the slider's maximum — red 0.592x, blue 1.520x, **2.57x**
+- strength 0.5 — red 0.813x, blue 1.129x, 1.39x
+- a bin outside the honest range — red 0.500x, blue 2.000x, 4.00x, both clamped
+
+**So a blue disc is reachable from correct data at full strength.** It does not
+require a corrupt profile, and the number tells the two apart: a clamped gain
+means the measurement is out of range, an unclamped 1.9x means the correction is
+doing exactly what it was asked to.
+
+**THE APP COULD NOT SAY ANY OF THIS, which is the actual defect here.** The §7f
+report had no lens section at all — not which profile matched, not from where,
+not what it applies — so a lens report could only be answered by asking the
+reader to describe a screen, which is the one thing §7f exists to stop. It now
+carries two lines: which profile supplies the colour half and which the
+brightness half (they can be two DIFFERENT profiles — the reader's measurement
+supplies colour and a shipped profile the brightness), and the gains that
+actually land at r = 0, read through the same `lensGain` the pipeline uses so it
+reports what LANDS rather than what was stored, with strength, bypass and the
+clamp included. The ratio is named rather than left bare, because a report that
+makes the reader judge whether 1.9 is a lot has not reported.
+
+**AND THE LENS PATH CANNOT BE EXERCISED WITH THE SHIPPED PRACTICE FILES.** All 44
+practice DNGs return `null` from `readExifSubset`, so no profile can ever match
+one: every local run of the correction is the no-profile path. That is why this
+had to be reasoned from the arithmetic and then built into the app rather than
+reproduced here, and it is a standing gap — the one stage of the pipeline with no
+local fixture at all.
+
+**Found on the way, and fixed:** `switch-instrument-walk.mjs` check 8 compared
+five whole-millisecond parts against their rounded total with a 5% tolerance.
+Five roundings can differ by 5 ms whatever the instrument does, and on a 67 ms
+total that IS 7.5% — it failed at 4.5% and passed on re-run. Measured over four
+runs the real spread is 1.8-2.1%, so the proportional part stays at 5% and an
+absolute floor of 6 ms (five roundings plus one) covers the small-total case. A
+planted 40 ms disagreement is still refused.
+
 ## A verdict pressed as the tab goes away, 2026-09-14
 
 **FIXED.** `Session.setMark` opens a database, reads a row and puts it back under
