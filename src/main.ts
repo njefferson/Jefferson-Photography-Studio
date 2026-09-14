@@ -6973,13 +6973,23 @@ welcomeBack.addEventListener("click", returnToEditor);
  *  already being measured; they were pushed onto a window global that nothing in
  *  the app or the tools ever read, so the numbers existed and could not be seen
  *  from the device they were measured on. */
-let lastShowPhases: { hotspot: number; upload: number; zoom: number; glow: number; local: number; px: number } | null = null;
+let lastShowPhases: { hotspot: number; upload: number; zoom: number; glow: number; local: number; rest: number; px: number } | null = null;
 
 /** Show an already-decoded image: upload it, build its reference maps and set
  *  the view. Does NOT touch the edit — callers follow with either a fresh
  *  baseline (establishFreshEdit) or a restored one (restoreLiveEdit). Shared by
  *  the single-open path, the example loader and session photo-switching. */
 function showDecoded(img: DecodedImage, imported: ImportedFile) {
+  // THE FIRST AND LAST INSTANT OF THIS FUNCTION, so the phases below can be
+  // held to the whole rather than to most of it. The five named phases cover
+  // the middle — the location guard, the canvas label and the tool disarm run
+  // before them, and unhiding the panel, leaving learn mode and rebuilding the
+  // zoom control run after. That head and tail is real work belonging to no
+  // phase, so "the five parts add up to showing" was never true; it passed
+  // because both are fast on an idle machine, and the walk asserting it went
+  // red under load with the tolerance widened twice to chase it. Reported as
+  // `rest` it becomes an accounting line instead of a guess.
+  const __z = performance.now();
   current = img;
   currentFile = imported;
   // Location guard: paths that build ImportedFile by hand (session restore's
@@ -7017,7 +7027,7 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
   const __e = performance.now();
   renderer.setLocalMap(buildLocalMap((x, y) => linearAt(img, x, y), img.width, img.height));
   const __f = performance.now();
-  lastShowPhases = { hotspot: __b - __a, upload: __c - __b, zoom: __d - __c, glow: __e - __d, local: __f - __e, px: img.width * img.height };
+  // (recorded at the end of this function, so `rest` can carry the tail too)
   panel.hidden = false;
   welcome.hidden = true;
   lesson.hidden = true;
@@ -7030,6 +7040,13 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
   // Honesty gate: a third-party raw (CR2/ARW/…) opens via its embedded JPEG
   // preview — the user must know they are NOT editing raw data. The editor is
   // up (welcome hidden), so an alert is the only surface that reaches them.
+  lastShowPhases = {
+    hotspot: __b - __a, upload: __c - __b, zoom: __d - __c, glow: __e - __d, local: __f - __e,
+    rest: (__a - __z) + (performance.now() - __f),
+    px: img.width * img.height,
+  };
+  // Last, because it opens a dialog: the notice is the reader's, the six
+  // numbers above are the instrument's, and nothing after this line is timed.
   if (img.previewNotice) noticeDialog("Preview only", img.previewNotice);
 }
 
@@ -7758,6 +7775,7 @@ interface SwitchProfile {
   show: number;
   hotspot: number;
   upload: number;
+  rest: number;
   zoom: number;
   glow: number;
   local: number;
@@ -7887,6 +7905,7 @@ async function switchToPhoto(id: string, opts?: { quiet?: boolean }) {
       zoom: ph?.zoom ?? 0,
       glow: ph?.glow ?? 0,
       local: ph?.local ?? 0,
+      rest: ph?.rest ?? 0,   // the head and tail of showDecoded, so the parts partition the whole
       // The strip reconcile runs INSIDE activateCurrent, so it is taken out of
       // that number rather than added beside it.
       activate: t4 - t3 - lastStripMs,
@@ -9224,7 +9243,7 @@ function switchSplit(): string {
   return (
     `${p.megapixels.toFixed(1)} MP in ${t(p.total)} — reading ${t(p.getBytes)} over ${p.chunkRows} stored pieces` +
     `, decode waited ${t(p.decodeQueued)} then ran ${t(p.decodeRun)} ${p.decodeOffThread ? "on a worker" : "on the main thread"}` +
-    `, showing ${t(p.show)} (hot spot ${t(p.hotspot)}, upload ${t(p.upload)}, zoom ${t(p.zoom)}, glow ${t(p.glow)}, local ${t(p.local)})` +
+    `, showing ${t(p.show)} (hot spot ${t(p.hotspot)}, upload ${t(p.upload)}, zoom ${t(p.zoom)}, glow ${t(p.glow)}, local ${t(p.local)}, rest ${t(p.rest)})` +
     `, settling ${t(p.activate)}, strip ${t(p.strip)}` +
     ` — ${p.fresh ? "first visit" : "been here before"}, ${other}` +
     `; ${p.sessionSize} photos, ${p.thumbsInFlight} thumbnail${p.thumbsInFlight === 1 ? "" : "s"} being built` +

@@ -55,3 +55,13 @@ also=tools/notes-check.mjs
 # rule added to the hub in between is enforced nowhere while the marker says it
 # has been read. This repo had no marker at all and a pin four weeks behind.
 also=tools/hub-pin-check.mjs
+
+# Run on every commit: a bare `var(--x)` naming a property nothing defines. CSS
+# has no error for that — the declaration is dropped at computed-value time and
+# an inherited property just INHERITS, so the element renders a plausible colour
+# and every sweep that reads the rendered DOM agrees with it. The crop bar
+# declared `--txt-1` in three places; no stylesheet in this repo has ever
+# defined that name. It took reverse-mapping rendered colours back to tokens for
+# the palette spec to notice, which is a browser run — this is a text scan that
+# refuses the commit.
+also=tools/token-check.mjs
