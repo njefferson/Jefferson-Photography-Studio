@@ -83,16 +83,16 @@
       <h2>Where the builds are</h2>
       <ul class="facts">
         <li><b>Production</b> <span>v2.43, at <code>fc839f2</code>. It has not moved since.</span></li>
-        <li><b>On staging</b> <span>v2.43, the head of the working branch — 41 commits ahead of production.</span></li>
-        <li><b>Last verified green</b> <span><code>e13e091</code>: build clean, the Quick look keys walk five of five, the default-look walk eleven of eleven, the class-width walk clean, axe clean in both themes. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
-        <li><b>Version after this batch</b> <span>still 2.43 — nothing here is a capability release yet. The first is 2.44.</span></li>
+        <li><b>On staging</b> <span>v2.44, the head of the working branch — 42 commits ahead of production.</span></li>
+        <li><b>Last verified green</b> <span><code>9757945</code>: build clean, and every walk green — the Quick look keys, the switch instrument against a planted delay, the verdicts fifteen of fifteen, the default look eleven of eleven, the class-width walk, the whole journey from the start screen to a saved export, and axe in both themes. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
+        <li><b>Version after this batch</b> <span>2.44 — the first capability release of this run. The next one is 2.45.</span></li>
       </ul>
 
       <div class="yours">
         <h2>Waiting on you</h2>
         <ul>
           <li>
-            <strong>A pass on staging.</strong> 41 commits are sitting on the
+            <strong>A pass on staging.</strong> 42 commits are sitting on the
             staging branch and have never had a go to production. That is the whole of
             the Help rewrite, the install and uninstall instructions, the device naming,
             the manifest screenshots, the lens-durability panel, the macro practice
@@ -150,13 +150,17 @@
           now arrives in the session as a pick. Part two of three in the next
           capability release.
         </li>
-        <li class="now"><span class="state">Building now</span>
+        <li class="done"><span class="state">Shipped to staging</span>
           <strong>Deciding lets the app put the photo down.</strong>
-          Marking a photo you are finished with frees what it is holding. Coming back
-          reopens it from the saved copy, which the app says rather than leaves you to
-          discover.
+          Marking a photo you are finished with frees what it was holding, once the
+          saved copy is really on the device. Walking a six-photo set and deciding on
+          each holds two instead of six. Coming back rebuilds it from the saved copy:
+          the picture, the look and every slider return, the undo history does not,
+          and the tile says so before you press anything. A photo with brush masks, an
+          imported LUT or a warp is kept instead, and the strip says which and why.
+          This one carries the release: <strong>v2.44</strong>.
         </li>
-        <li class="later"><span class="state">Not started</span>
+        <li class="now"><span class="state">Building now</span>
           <strong>Export stops owning the screen.</strong>
           The same export, the same two presses, with the editor still live while it
           runs.
@@ -199,10 +203,9 @@
           one from a long session.
         </li>
         <li>
-          <strong>An edited photo is never let go of.</strong> Every photo visited in a
-          session keeps its full working state, including the ones you are finished with.
-          That is what the fifth stage is for; until then, the count is at least visible
-          in the report.
+          <strong>An UNDECIDED photo is still never let go of.</strong> Releasing is
+          tied to a verdict, so a session walked without deciding holds every photo it
+          has visited, exactly as before. The count is visible in the report.
         </li>
         <li>
           <strong>A photo that has been healed, stickered or warped exports on one

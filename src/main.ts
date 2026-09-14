@@ -7277,10 +7277,14 @@ function editToJson(): string {
   return JSON.stringify({ params: { ...s.params, masks: [], lut: null, warp: null }, activeLook: s.activeLook, lookBias: s.lookBias, lookMark });
 }
 
-/** Capture the active photo's live edit into memory and persist a durable copy
- *  (fire-and-forget — the row is small and strict-durable). */
-function captureActiveEdit() {
-  if (!activePhotoId) return;
+/** Capture the active photo's live edit into memory and persist a durable copy.
+ *
+ *  RETURNS THE DURABLE WRITE now, rather than dropping it. Every existing caller
+ *  still ignores it, which is the old behaviour exactly; the one that does not is
+ *  `switchToPhoto`, which must not let go of a photo's working state until the
+ *  saved copy it will be rebuilt from is really on the disk. */
+function captureActiveEdit(): Promise<void> {
+  if (!activePhotoId) return Promise.resolve();
   flushRecord(); // settle any in-flight slider drag first
   const id = activePhotoId;
   liveEdits.set(id, {
@@ -7295,7 +7299,9 @@ function captureActiveEdit() {
   const json = editToJson();
   const view = sessionPhotos.find((p) => p.id === id);
   if (view) view.edit = json;
-  Session.setEdit(id, json).catch(() => {});
+  const saved = Session.setEdit(id, json);
+  saved.catch(() => {}); // callers that do not want it must not see an unhandled rejection
+  return saved;
 }
 
 /** Restore a photo's full in-memory edit state onto the live editor. */
@@ -7340,6 +7346,17 @@ function activateCurrent(id: string) {
         // changed since its look" has to be asked of the stored answer.
         lookMark = stored.lookMark ?? null;
         carryLook();
+        // NOTHING THE READER JUST DID PRODUCED THIS STATE, so it must not become
+        // an undo step. `establishFreshEdit` settles on the bare open, and the
+        // stored edit is laid over it — after which the capture below flushes,
+        // sees the two differ, and pushes a step whose target is a state the
+        // reader has never seen. Arriving at a photo and finding one press of
+        // Undo waiting is not history, it is the restore showing through.
+        //
+        // Pre-existing: every resumed session did this. It only became visible
+        // when a decided photo started coming back this way too. `baseline` is
+        // deliberately NOT moved — Reset still returns to how the photo opens.
+        settled = snapshot();
       } catch {
         /* corrupt stored edit — keep the fresh baseline */
       }
@@ -7348,6 +7365,30 @@ function activateCurrent(id: string) {
   }
   updateSessionStrip();
 }
+
+/** WHAT THE SAVED COPY CANNOT HOLD. `editToJson` drops brush masks, an imported
+ *  LUT and a warp before storing — they are runtime data and a durable resume has
+ *  never restored them. So a photo carrying any of the three cannot be rebuilt
+ *  from its saved copy, and letting go of its working state would lose that work
+ *  rather than park it.
+ *
+ *  AND THE LOOK HAS TO MATCH. Coming back to a released photo runs
+ *  `establishFreshEdit` first, which takes the Reset baseline under the
+ *  session's look as it is THEN — so a photo whose grade came from somewhere
+ *  else would come back with a different Reset target than it had. Keeping those
+ *  in memory is the honest answer; the alternative is a Reset that silently
+ *  moves. */
+function canLetGo(): { ok: boolean; why: string } {
+  if (params.masks?.length) return { ok: false, why: "it has brush masks" };
+  if (params.lut) return { ok: false, why: "it has an imported LUT" };
+  if (params.warp) return { ok: false, why: "it has a warp" };
+  if ((lookMark?.look ?? null) !== sessionLook) return { ok: false, why: "its look is not the one this set is on" };
+  return { ok: true, why: "" };
+}
+
+/** Set when a marked photo was KEPT in memory anyway, and why — so the strip can
+ *  say so instead of leaving the reader to wonder. */
+let keptInMemory = "";
 
 /** Whether the last activateCurrent was a first visit (a fresh baseline and a
  *  stored edit to lay over it) or a return to a photo already in memory. */
@@ -7440,7 +7481,14 @@ async function switchToPhoto(id: string) {
   if (id === activePhotoId && current) return;
   const view = sessionPhotos.find((p) => p.id === id);
   if (!view) return;
-  captureActiveEdit();
+  // WHAT WE ARE LEAVING, and whether its working state can be let go of. Read
+  // BEFORE the capture, because the capture is about to be the last thing that
+  // touches this photo.
+  const leaving = activePhotoId;
+  const leavingMarked = !!sessionPhotos.find((p) => p.id === leaving)?.mark;
+  const release = leavingMarked ? canLetGo() : { ok: false, why: "" };
+  const saved = captureActiveEdit();
+  keptInMemory = leavingMarked && !release.ok ? release.why : "";
   showBusy("Loading…");
   // Read before the work starts: these are the conditions the switch ran under,
   // and every one of them has moved by the time it finishes.
@@ -7460,6 +7508,24 @@ async function switchToPhoto(id: string) {
     const t3 = performance.now();
     activateCurrent(id);
     const t4 = performance.now();
+    // LET GO OF THE PHOTO WE LEFT, once its saved copy is really on the disk.
+    //
+    // ATTACHED HERE rather than beside the capture, because the durable write is
+    // a few kilobytes and settles long before the photo being opened has been
+    // read and decoded: a handler attached earlier ran while `activePhotoId` was
+    // still the photo we were leaving, and the guard below — which is there for
+    // the reader who comes straight back — refused every release there was.
+    // Measured: nothing was ever released, and the count said so.
+    //
+    // IN `then`, NEVER `finally`. A refused write means the saved copy this
+    // photo would be rebuilt from is not there, and the live one is all there
+    // is, so it stays.
+    if (leaving && leaving !== id && leavingMarked && release.ok) {
+      saved.then(
+        () => { if (activePhotoId !== leaving) liveEdits.delete(leaving); },
+        () => { /* the write failed: keep what we have */ },
+      );
+    }
     const ph = lastShowPhases;
     lastSwitchProfile = {
       total: t4 - t0,
@@ -8363,7 +8429,11 @@ function writeSessionMeta(real: SessionPhoto[], idx: number, total: number): voi
     `${real.length} photos · ~${fmtSize(total)}` +
     (idx >= 0 ? ` · viewing ${idx + 1}` : "") +
     (picked ? ` · ${picked} picked` : "") +
-    (rejected ? ` · ${rejected} rejected` : "");
+    (rejected ? ` · ${rejected} rejected` : "") +
+    // A decided photo normally has its working state let go of. When one is kept
+    // anyway the reader is told which and why, rather than being left to notice
+    // that the count did not move.
+    (keptInMemory ? ` · last one kept in memory — ${keptInMemory}` : "");
 }
 
 /** THE WHOLE OF ONE TILE, written only where it differs.
@@ -8394,11 +8464,17 @@ function paintSessionTile(b: HTMLElement, p: SessionPhoto): void {
   // sitting on a badge with no explanation anywhere. "Preview" is what it
   // means, and the tile's own tooltip says the rest.
   const verdict = p.mark === "pick" ? " — Pick" : p.mark === "reject" ? " — Reject" : "";
+  // LET GO OF, AND SAID SO. A decided photo whose working state has been
+  // released reopens from its saved copy: the picture, the look and every slider
+  // come back, and the undo history does not. The reader is told that here and
+  // by the Undo button being off when they arrive, rather than finding out by
+  // pressing Undo and watching nothing happen.
+  const released = !!p.mark && !!p.edit && !liveEdits.has(p.id) ? " · edit saved, reopens from the saved copy" : "";
   const title = saving
     ? `${p.name} — still saving`
     : p.thumbState === "preview"
       ? `${p.name}${verdict} — showing the camera's own preview until this app has developed it`
-      : p.name + verdict;
+      : p.name + verdict + released;
   if (b.title !== title) b.title = title;
   if ((b as HTMLButtonElement).disabled !== saving) (b as HTMLButtonElement).disabled = saving;
 

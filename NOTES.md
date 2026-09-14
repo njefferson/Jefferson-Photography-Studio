@@ -1011,6 +1011,25 @@ user-scalable=no.
 
 ## Shipped (roadmap archive)
 
+- [x] **2.44 — deciding in the session, and the app acting on it** — SHIPPED
+  2026-09-14 to staging, awaiting the on-device pass. Three parts. A standing
+  DEFAULT LOOK in Settings, so a reader who grades everything the same way stops
+  pressing the same button once per folder; it seeds the session look and takes
+  the path a pressed look already takes, so it lands on a visible control, costs
+  no undo step and leaves Hold: Untouched showing the bare decode. PICK AND
+  REJECT on the session photo — the quick look's two words and three keys, on
+  the place the decision is actually made, durable in `PhotoMeta.mark`, painted
+  by the strip reconcile rather than beside it, counted in the strip's own
+  status line, reachable by finger through two 44px buttons that cost nothing in
+  chrome (140px before, 140px after, at 430px and 900px). And a verdict now LETS
+  THE APP PUT THE PHOTO DOWN: the working state of a decided photo is released
+  once its saved copy is really on the disk, so walking a set deciding as you go
+  holds two photos instead of all of them. Coming back rebuilds it from the
+  saved copy — the picture, the look and every slider return, the undo history
+  does not, and the tile says so before you press anything. A photo carrying
+  brush masks, an imported LUT or a warp is kept instead, and the strip says
+  which and why. Still open after this: the switch is still slow, and what to do
+  about it waits on three reports from the device it is slow on.
 - [x] **2.40 — the export on several cores, and a straightened export that no
   longer takes minutes** — SHIPPED 2026-09-13 (PR #99, rebase-merged on the
   owner's go). The per-pixel pass runs on up to four threads, each calling the
@@ -12883,3 +12902,61 @@ Measured in both themes: real buttons labelled in words, the one you are on
 reading as pressed, the verdict as a WORD on the tile, a rejected tile differing
 by line style as well as dimming, the counts announced through a live region that
 already existed, and axe clean over the strip.
+
+
+## A decision the app can act on, 2026-09-14
+
+"Finished with this one" is a fact the app can use: the working state of a photo
+the reader will not edit again is memory held for nobody. Every photo visited in
+a session kept its full live edit — snapshot, baseline, settled state, both undo
+stacks — for the life of the session, and nothing ever evicted one.
+
+WHAT IS RELEASED, AND WHEN. On leaving a photo that carries a verdict,
+`switchToPhoto` drops its `liveEdits` entry — but only after the durable copy it
+will be rebuilt from has really landed. `captureActiveEdit` returns its
+`Session.setEdit` promise now instead of dropping it; every other caller still
+ignores it, which is the old behaviour exactly.
+
+IN `then`, NEVER `finally`. A refused write means the saved copy is not there and
+the live one is all there is. Proved by planting a `setEdit` that throws: nothing
+is released and the count says so.
+
+**AND THE ATTACH POINT WAS WRONG FIRST TIME, in a way that is worth keeping.**
+The handler was attached beside the capture, guarded by "only if we have actually
+moved on" — and the durable write is a few kilobytes that settles long before the
+photo being opened has been read and decoded, so the guard saw the photo we were
+leaving still active and refused every release there was. Nothing was ever let
+go of; the instrument from the morning said so immediately, which is the whole
+reason it was built first. Attached after the switch lands, the guard means what
+it says.
+
+WHAT CANNOT BE RELEASED. `editToJson` drops brush masks, an imported LUT and a
+warp before storing, so a photo carrying any of the three cannot be rebuilt from
+its saved copy — its entry stays, and the strip says which and why rather than
+leaving the reader to notice the count did not move. The look has to match too:
+coming back runs `establishFreshEdit` first, which takes the Reset baseline under
+the session's look AS IT IS THEN, so a photo whose grade came from somewhere else
+would come back with a Reset target it never had. Keeping those is the honest
+answer; a Reset that silently moves is not.
+
+**A PHANTOM UNDO STEP, pre-existing, found by this work and fixed here.**
+Restoring a stored edit runs `establishFreshEdit` (which settles on the bare
+open) and then lays the stored edit over it — after which the capture flushes,
+sees the two differ, and pushes an undo step whose target is a state the reader
+has never seen. Every resumed session did this; it only became visible when a
+decided photo started coming back the same way. The arrival state is now settled
+explicitly, so there is no step to take back. `baseline` is deliberately NOT
+moved: Reset still returns to how the photo opens.
+
+MEASURED ON A SIX-PHOTO PRACTICE SET: walking all six and deciding on each leaves
+two photos holding working state instead of six. An undecided photo is held
+exactly as before. The number that matters is from a 170-photo session on the
+device it is slow on, and the report carries it.
+
+FOUR HARNESS FAULTS AGAIN, all of them the instrument. The expected count was
+written as one when two is right — the photo you are standing on is held by
+definition. The tooltip check read the tile of the photo the reader is ON, which
+is held and must not claim otherwise. And P was pressed on a photo the walk had
+already picked, which TOOK THE PICK OFF and left the check measuring an undecided
+photo; it ensures the verdict now instead of toggling it. Five of nine checks
+fail against the build before this change.
