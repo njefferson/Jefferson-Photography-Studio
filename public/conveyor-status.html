@@ -83,8 +83,8 @@
       <h2>Where the builds are</h2>
       <ul class="facts">
         <li><b>Production</b> <span>v2.43, at <code>fc839f2</code>. It has not moved since.</span></li>
-        <li><b>On staging</b> <span>v2.44, the head of the working branch — 42 commits ahead of production.</span></li>
-        <li><b>Last verified green</b> <span><code>9757945</code>: build clean, and every walk green — the Quick look keys, the switch instrument against a planted delay, the verdicts fifteen of fifteen, the default look eleven of eleven, the class-width walk, the whole journey from the start screen to a saved export, and axe in both themes. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
+        <li><b>On staging</b> <span>v2.44, the head of the working branch — 43 commits ahead of production.</span></li>
+        <li><b>Last verified green</b> <span><code>1e3e0f5</code> (v2.44): build clean, and every walk green — the Quick look keys, the switch instrument against a planted delay, the verdicts fifteen of fifteen, the default look eleven of eleven, the class-width walk, the whole journey from the start screen to a saved export, and axe in both themes. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
         <li><b>Version after this batch</b> <span>2.44 — the first capability release of this run. The next one is 2.45.</span></li>
       </ul>
 
@@ -92,7 +92,7 @@
         <h2>Waiting on you</h2>
         <ul>
           <li>
-            <strong>A pass on staging.</strong> 42 commits are sitting on the
+            <strong>A pass on staging.</strong> 43 commits are sitting on the
             staging branch and have never had a go to production. That is the whole of
             the Help rewrite, the install and uninstall instructions, the device naming,
             the manifest screenshots, the lens-durability panel, the macro practice
@@ -160,12 +160,16 @@
           imported LUT or a warp is kept instead, and the strip says which and why.
           This one carries the release: <strong>v2.44</strong>.
         </li>
-        <li class="now"><span class="state">Building now</span>
+        <li class="done"><span class="state">Shipped to staging</span>
           <strong>Export stops owning the screen.</strong>
-          The same export, the same two presses, with the editor still live while it
-          runs.
+          The same export and the same two presses, with the editor live while it
+          runs: move to another photo, grade it, drag a slider — the file being
+          written is the one you pressed Export on, proven byte for byte against the
+          old flow. Progress and the finished file sit on a line over the photo, so
+          they are reachable whichever panel tab you are on. A failure explains
+          itself, offers Try again, and is remembered in the report.
         </li>
-        <li class="later"><span class="state">Not started</span>
+        <li class="now"><span class="state">Building now</span>
           <strong>Everything you exported saves in one go.</strong>
           Finished exports collect until you ask for them, as one file or one zip.
         </li>
@@ -209,8 +213,10 @@
         </li>
         <li>
           <strong>A photo that has been healed, stickered or warped exports on one
-          thread.</strong> The parallel export refuses those, so they are as slow as they
-          ever were.
+          thread</strong>, and the sliders stutter while it does. The parallel export
+          refuses those. Measured here: 15.1&nbsp;s for a 5.2&nbsp;megapixel frame,
+          4.9&nbsp;s of it paused to let the screen keep up, against 6.6&nbsp;s on
+          three threads.
         </li>
         <li>
           <strong>The accessibility walk still lives outside the repository.</strong> It

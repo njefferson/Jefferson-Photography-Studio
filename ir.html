@@ -171,6 +171,21 @@
           &#10003; <span id="healReviewText">Spots healed</span>
           <span class="tat-banner-off">tap a ring to put that one back &middot; tap here to keep them</span>
         </button>
+        <!-- THE EXPORT'S OWN LINE, over the photo rather than inside the Export
+             tab. The point of a non-modal export is that the reader carries on
+             working, and carrying on working means changing tabs — which put
+             both the progress AND the finished file behind a tab nobody had a
+             reason to go back to. Measured: the walk could not reach Save.
+             role=status is present from parse, not added when something
+             happens. -->
+        <div id="exportStrip" class="export-hud" hidden>
+          <p id="exportStripText" role="status" aria-live="polite" aria-atomic="true"></p>
+          <div id="exportStripActions" class="export-hud-actions" hidden>
+            <button id="exportSave" type="button">Save image</button>
+            <button id="exportRetry" type="button" hidden>Try again</button>
+            <button id="exportDismiss" type="button">Dismiss</button>
+          </div>
+        </div>
         <button id="colorBanner" type="button" hidden>
           <span>&#127919; Color mask — tap the photo to pick the color to match</span>
           <span class="tat-banner-off">Tap again to re-pick &middot; tap here when done</span>
