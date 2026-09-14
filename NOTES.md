@@ -13096,3 +13096,87 @@ AND THE HARNESS WAS WRONG TWICE MORE. A reload leaves the START SCREEN — the
 session is offered, not resumed — so there was no panel to press Export in; and
 after the single-file rule changed, the check that clicked Save-all had to go
 through Dismiss, which is the only state where a collection of one exists.
+
+
+## Six defects the device found in an hour, 2026-09-14
+
+v2.45 reached a real Windows session and came back with six faults in one sitting.
+Every one of them had a walk that was green.
+
+**THE PANEL COUNTED ONE FILE AS TWO.** `clearExportStrip` passed the sentence
+"N exported, not yet saved" into `showExportStrip`, which appends its own copy of
+that sentence whenever something is waiting — so the panel printed it twice and
+a reader counted two files. The sentence has one home now and no caller may pass
+it in. **A sentence written in two places will be printed twice.**
+
+**DISMISS DID NOT DISMISS.** It hid the line and then immediately showed it again
+whenever anything was collected, which is not something a button called Dismiss
+can do. It hides, and keeps the files — dismissing a status line is not a decision
+to throw away something you made. The way back moved to a row at the top of the
+Export panel, which is the one surface that does not go away when a floating line
+is dismissed: the line over the photograph is the push, the row is the pull.
+
+**SAVING A FILE HANDED IT BACK A SECOND TIME.** After a successful save the
+handler re-counted the store instead of taking the file out of it, so the panel
+went on offering a file already on the disk and pressing Save wrote a second copy
+beside the first. The code's own comment said removing one file "is not something
+the store does" — which is a reason to give the store that, not a reason to leave
+the file in. `removeFrame` deletes the meta row and the frame's chunk range in one
+transaction, and the stored name travels on the pending export because a second
+export of the same photo is stored under a different one.
+
+**THE PRESSED VERDICT BUTTON READ AS THE ONE THAT WAS OFF.** It filled with the
+accent at 12–15%, which composites to a mid-grey: measured, the pressed button was
+rgb(30,34,42) against an unpressed rgb(65,65,65) in the dark theme — DARKER than
+its neighbour — and rgb(68,70,73) against cream in the light one. It fills with
+the accent now, in both.
+
+**AND A PICKED TILE LOOKED LIKE THE PHOTO BEING VIEWED.** Both wore
+`border-color: var(--accent)`, so a strip with several picks in it had several
+tiles that read as active, and in grayscale they were the same tile — the failure
+the standing rule exists to stop, shipped by the change that added the second
+state. The verdict's carriers are its word and its filled badge; the border
+belongs to "which one am I on", and that tile now also carries an offset ring,
+which is a SHAPE no other state has.
+
+**MOVING BETWEEN PHOTOS GOT SLOWER, and the standing look is why.** `carryLook`
+ends with `restripForGrade()`, and `carryLook` returns early when no session look
+is set — so before the default-look setting existed, a fresh import never
+triggered it. With a default look, `sessionLook` is non-null from boot and it
+fired on every photo of every import. `restripForGrade` marks every tile whose
+grade stamp differs as `waiting` and restarts the whole thumbnail pass, and the
+stamps taken during an import come from an editor that changes half way through
+it — the first photo opens mid-import and moves the live grade under every tile
+already in. So the whole strip was re-decoded while the reader was trying to move
+through it. It now refuses to sweep while a set is still coming in.
+
+**THE OTHER HALF OF THAT IS THE PRIORITY QUEUE, and this report is the evidence it
+was waiting for.** It is slow specifically while the thumbnail pass runs, and the
+quick look — which has the lanes to itself — is fine. `decodeOffThread` takes
+`{front: true}` and unshifts; exactly three callers pass it, all of them a
+photograph on its way to the screen: the switch, a resume's first open, and the
+one photo shown while a set is being stored. A tile decode never does. This is the
+priority queue `realThumbnails`' own comment calls the complete answer to its
+one-lane-short workaround, which stays as the memory bound.
+
+### Why the walks were green
+
+They are worth writing down one at a time, because each is a different way to
+measure nothing.
+
+- The collection walk read the store count and the BUTTON LABEL, and never read
+  the panel's own text. The doubled sentence was in the one place nothing looked.
+- It never ran the sequence a reader runs: export, save, then look at what is
+  still offered. It saved the collection or it saved one file, never one and then
+  the other.
+- **The colour check passed against the broken build twice, for two different
+  reasons.** First it compared `getComputedStyle().backgroundColor`, which hands
+  back the rgba AS DECLARED — a 15%-alpha accent looks like a bright colour there
+  and nothing like what the reader sees. Composited over its ancestors it still
+  passed, because the check asked whether the two buttons DIFFERED (167 apart in
+  the light theme) rather than whether the pressed one was filled. A mid-grey
+  differs from everything and reads as on nothing. The check now asserts the
+  composited colour IS the accent, and fails on the old build in both themes.
+- And resolving `--accent` with a digit regex turned `#9fc2f5` into `rgb(9,2,5)`.
+  A token is a string until a browser parses it; set it on a probe and read it
+  back.

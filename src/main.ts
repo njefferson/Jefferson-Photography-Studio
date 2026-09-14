@@ -7503,7 +7503,7 @@ async function switchToPhoto(id: string) {
     const bytes = await Session.getBytes(id, (n) => { rows = n; });
     const t1 = performance.now();
     const imported: ImportedFile = { name: view.name, kind: view.kind, bytes, looksTranscoded: false };
-    const img = await decodeOffThread(imported, { onTiming: (t) => { decode.t = t; } });
+    const img = await decodeOffThread(imported, { onTiming: (t) => { decode.t = t; }, front: true });
     const t2 = performance.now();
     showDecoded(img, imported);
     const t3 = performance.now();
@@ -8045,7 +8045,7 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
       let firstImg: DecodedImage | null = null;
       if (!firstNewId && (!activePhotoId || activePhotoId === "lone")) {
         try {
-          firstImg = await decodeOffThread(imported);
+          firstImg = await decodeOffThread(imported, { front: true });
         } catch (err) {
           skipped.push(`${f.name} (${(err as Error).message})`);
           dropPlanned(slot.id);
@@ -8317,6 +8317,17 @@ function restripForGrade(): void {
   clearTimeout(regradeTimer);
   regradeTimer = window.setTimeout(() => {
     if (sessionPhotos.length < 2) return; // a lone photo has no strip
+    // NOT WHILE A SET IS STILL COMING IN. Every tile is about to be built
+    // anyway, and the stamps taken during an import come from an editor whose
+    // state changes half way through it — the first photo opens mid-import and
+    // moves the live grade under every tile already in. Marking those stale
+    // restarts the whole thumbnail pass, which then competes with the reader
+    // trying to move through the set.
+    //
+    // This never fired on a fresh import before a standing look existed:
+    // carryLook, which calls this, returns early with no session look set. The
+    // default-look setting made it fire on every photo of every import.
+    if (adding) { restripForGrade(); return; } // come back when the set is in
     let stale = 0;
     for (const v of sessionPhotos) {
       if (v.id === "lone") continue;
@@ -8913,7 +8924,7 @@ async function resumeSession() {
     const first = sessionPhotos[0];
     const bytes = await Session.getBytes(first.id);
     const imported: ImportedFile = { name: first.name, kind: first.kind, bytes, looksTranscoded: false };
-    const img = await decodeOffThread(imported);
+    const img = await decodeOffThread(imported, { front: true });
     showDecoded(img, imported);
     activateCurrent(first.id);
     void realThumbnails(); // finish any thumbnails the last visit never reached
@@ -10157,11 +10168,14 @@ const exportSave = $("exportSave") as HTMLButtonElement;
 const exportRetry = $("exportRetry") as HTMLButtonElement;
 const exportDismiss = $("exportDismiss") as HTMLButtonElement;
 const exportSaveAll = $("exportSaveAll") as HTMLButtonElement;
+const exportWaitingRow = $("exportWaitingRow") as HTMLElement;
+const exportWaitingText = $("exportWaitingText") as HTMLElement;
+const exportWaitingSave = $("exportWaitingSave") as HTMLButtonElement;
 
 /** The finished file, waiting for a gesture to save it. Deliberately NOT
  *  `pendingSave`: that one belongs to the busy dialog, which Batch, session-end
  *  and resume still use, and `hideBusy` clears it. */
-let pendingExport: { blob: Blob; name: string } | null = null;
+let pendingExport: { blob: Blob; name: string; storedName?: string } | null = null;
 
 /** EXPORTS COLLECT UNTIL YOU ASK FOR THEM, in their own database.
  *
@@ -10176,38 +10190,63 @@ let pendingExport: { blob: Blob; name: string } | null = null;
 const EXPORTS = frameStore("ips-exports");
 let exportCount = 0;
 
+/** THIS FUNCTION OWNS THE WAITING SENTENCE and no caller may pass it in.
+ *
+ *  One did, and this appended its own copy underneath: the panel told a reader
+ *  that one file was waiting, on two lines, and they counted two files. A
+ *  sentence written in two places is a sentence that will be printed twice.
+ *
+ *  THE FILE IN HAND IS ALSO IN THE COLLECTION, so neither the count nor the
+ *  second button may describe it either. One export, just finished, is
+ *  "Ready — name · size" and one Save button; a collection is only a collection
+ *  once there is something in it besides the one on offer. */
 function showExportStrip(text: string, opts: { actions?: boolean; save?: boolean; retry?: boolean } = {}): void {
-  // THE FILE IN HAND IS ALSO IN THE COLLECTION, so neither the count nor the
-  // second button may describe it a second time. One export, just finished, is
-  // "Ready — name · size" and one Save button; a collection is only a
-  // collection once there is something in it besides the one on offer.
   const alsoWaiting = exportCount - (pendingExport ? 1 : 0);
-  exportStripText.textContent = text + (alsoWaiting > 0 ? `\n${exportCount} exported, not yet saved` : "");
+  const lines = [text.trim(), alsoWaiting > 0 ? `${exportCount} exported, not yet saved` : ""].filter(Boolean);
+  if (!lines.length) { clearExportStrip(); return; } // nothing to say, so say nothing
+  exportStripText.textContent = lines.join("\n");
   exportStrip.hidden = false;
   exportStripActions.hidden = !opts.actions && alsoWaiting <= 0;
   exportSave.hidden = !opts.save;
   exportRetry.hidden = !opts.retry;
   exportSaveAll.hidden = alsoWaiting <= 0;
   exportSaveAll.textContent = exportCount === 1 ? "Save the waiting export" : `Save all ${exportCount} exports`;
+  updateExportWaitingRow();
 }
 
-/** Put the line away. The COLLECTED exports are untouched — they are files the
- *  reader has made and not yet saved, and dismissing a status line is not a
- *  decision to throw those away. */
+/** PUT THE LINE AWAY, which is what the button says. It used to put the line
+ *  away and then immediately show it again whenever anything was collected,
+ *  which is not something a button called Dismiss can do. The files are kept —
+ *  dismissing a status line is not a decision to throw away something you made —
+ *  and the way back to them is the row in the Export panel. */
 function clearExportStrip(): void {
   pendingExport = null;
-  if (exportCount) { showExportStrip(`${exportCount} exported, not yet saved`, { actions: true }); return; }
   exportStrip.hidden = true;
   exportStripActions.hidden = true;
+  updateExportWaitingRow();
 }
 
 exportDismiss.addEventListener("click", clearExportStrip);
 
+/** THE WAY BACK, in the panel the reader already opens to export. The floating
+ *  line is the push — here is the file you just made; this is the pull — here is
+ *  what is still waiting, whenever you want to look. Written by the same count
+ *  the line uses, so the two cannot disagree. */
+function updateExportWaitingRow(): void {
+  exportWaitingRow.hidden = exportCount === 0;
+  exportWaitingText.textContent =
+    exportCount === 1
+      ? "1 export is waiting to be saved."
+      : `${exportCount} exports are waiting to be saved.`;
+  exportWaitingSave.textContent = exportCount === 1 ? "Save it" : "Save them all";
+}
+
 /** Hand the collection over: one file as itself, two or more as a zip. A zip of
  *  one is a thing the reader then has to unpack for no reason. */
-exportSaveAll.addEventListener("click", async () => {
+async function saveCollectedExports(): Promise<void> {
   if (exportSaveAll.disabled) return;
   exportSaveAll.disabled = true;
+  exportWaitingSave.disabled = true;
   const was = exportStripText.textContent;
   try {
     const entries: { name: string; size: number; crc: number; data: Blob }[] = [];
@@ -10226,8 +10265,12 @@ exportSaveAll.addEventListener("click", async () => {
     showExportStrip(`Could not save them: ${(err as Error).message}`, { actions: true });
   } finally {
     exportSaveAll.disabled = false;
+    exportWaitingSave.disabled = false;
   }
-});
+}
+
+exportSaveAll.addEventListener("click", () => void saveCollectedExports());
+exportWaitingSave.addEventListener("click", () => void saveCollectedExports());
 
 /** Keep one finished export. Names are made unique against WHAT IS ALREADY
  *  STORED, not just against this session: the store survives a reload by
@@ -10240,6 +10283,10 @@ async function collectExport(result: { blob: Blob; name: string }, srcName: stri
     const taken = new Set((await EXPORTS.frameMetas()).map((m) => m.name));
     const name = uniqueName(result.name, taken);
     await EXPORTS.putFrame({ name, crc: crc32(bytes), size: bytes.length, srcName, srcSize }, bytes);
+    // UNDER WHAT NAME, because it is not always the file's own: a second export
+    // of the same photo is stored beside the first rather than replacing it, and
+    // saving this one has to take THIS one out of the collection.
+    if (pendingExport && pendingExport.blob === result.blob) pendingExport.storedName = name;
     exportCount = await EXPORTS.frameCount();
   } catch (err) {
     // Storage full, or refused: the file is still in hand and still saveable
@@ -10257,10 +10304,14 @@ exportSave.addEventListener("click", async () => {
     const saved = pendingExport;
     const how = await saveBlob(saved.blob, saved.name);
     if (how === "cancelled") return; // the sheet was closed on purpose — keep the file
-    // Saved on its own, so it is no longer waiting: the count has to stop
-    // claiming it. Cheapest honest way is to re-read the store after removing
-    // it, and removing one file is not something the store does — so the whole
-    // collection is re-counted from what it actually holds.
+    // SAVED ON ITS OWN MEANS IT IS NO LONGER WAITING, so it comes OUT of the
+    // collection. This used to re-count the store instead, which left the file
+    // in it — so the panel went on offering a file that was already on the disk,
+    // and pressing Save again wrote a second copy beside the first. The store
+    // had no way to remove one file; that was a reason to give it one.
+    if (saved.storedName) {
+      await EXPORTS.removeFrame(saved.storedName).catch((err) => recordFailure("tidying a saved export away", err));
+    }
     exportCount = await EXPORTS.frameCount().catch(() => exportCount);
     clearExportStrip();
   } catch (err) {
