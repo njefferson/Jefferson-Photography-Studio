@@ -82,8 +82,8 @@
 
       <h2>Where the builds are</h2>
       <ul class="facts">
-        <li><b>Production</b> <span>v2.43, at <code>fc839f2</code>. It has not moved since.</span></li>
-        <li><b>On staging</b> <span>v2.46, the head of the working branch. Everything on it has been pushed there and none of it has been to production.</span></li>
+        <li><b>Production</b> <span>v2.46.4, at <code>ec2cf80</code> &mdash; 52 commits promoted 2026-09-14 by rebase, so the history stayed linear and the patch notes read as releases. Verified by fetching the deployed bundle and diffing it against a local build of that commit: byte for byte, content hash included.</span></li>
+        <li><b>On staging</b> <span>The head of the working branch, level with production at the moment of the promote and moving ahead of it again as work lands.</span></li>
         <li><b>Last verified green</b> <span><code>99e8a0f</code>: build clean, and every walk green — the new tile-truth walk (eight of its checks red against the build before it, all green after), the Quick look keys, the switch instrument against a planted delay, the default look, the class-width walk, the whole journey from the start screen to a saved export, the export gate byte for byte, and axe in both themes. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
         <li><b>Version after this batch</b> <span>2.46. Three capability releases: 2.44 is the deciding, 2.45 the exporting, 2.46 acting on what you picked. What has landed since is fixes, which take the increment digit and no version bump.</span></li>
       </ul>
@@ -92,12 +92,10 @@
         <h2>Waiting on you</h2>
         <ul>
           <li>
-            <strong>A pass on staging.</strong> Production has not moved since
-            <code>fc839f2</code>, and everything since is waiting on it: the Help
-            rewrite, the install and uninstall instructions, the device naming, the
-            manifest screenshots, the lens-durability panel, the macro practice burst,
-            and now both of the releases below. A count sat here and was wrong twice,
-            because writing it into the page is itself a commit.
+            <strong>A pass on staging.</strong> Production caught up on 2026-09-14 and
+            everything listed below is now live. What lands after this is what is
+            waiting. A count sat here and was wrong twice, because writing it into the
+            page is itself a commit.
           </li>
           <li>
             <strong>Three switches in the big session, then copy the report.</strong>
@@ -174,6 +172,17 @@
           itself, offers Try again, and is remembered in the report.
         </li>
         <li class="done"><span class="state">Shipped to staging</span>
+          <strong>Every screen is measured now, and six buttons were too small.</strong>
+          The accessibility sweep was rebuilt from nothing before each release and
+          lived nowhere; it is in the repository now, and its list of screens is a
+          rule rather than a note. It had been opening three of the fifteen dialogs
+          in the editor and checking one of the seven pages. Given all of them it
+          found six buttons at 35&nbsp;px &mdash; on the dialog that asks what
+          happens to the location written into your photograph, and on the one that
+          asks you to confirm &mdash; against the 44&nbsp;px a finger needs. Every
+          dialog button clears it now, and every screen is checked on every run.
+        </li>
+        <li class="done"><span class="state">Shipped to staging</span>
           <strong>Four ways a tile lied about the photograph.</strong>
           The tiles are how you decide, so a tile is a promise about what tapping it
           will show. Four things broke that promise and all four are fixed together.
@@ -238,9 +247,12 @@
           three threads.
         </li>
         <li>
-          <strong>The accessibility walk still lives outside the repository.</strong> It
-          is rebuilt and run before each of these goes to staging, and its result is
-          written into the notes, but nothing in the repository holds it.
+          <strong>A verdict pressed at the instant the page reloads can be lost.</strong>
+          The mark is written to storage durably, and a reload can beat the write:
+          the one lost is always the last one pressed. It matters more than it
+          sounds, because an iPad drops background tabs and reloads them by itself,
+          which is what a long culling session looks like. Repairing it is a
+          decision about when to write, not a patch.
         </li>
       </ul>
 
