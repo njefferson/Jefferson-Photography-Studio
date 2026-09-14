@@ -34,3 +34,14 @@ also=tools/manifest-shots-check.mjs
 # local could refuse it. The two slow ones (privacy, third person: 10s and 19s)
 # stay in CI on purpose — half a minute per commit gets routed around.
 also=tools/hub-surface-gates.mjs
+
+# Run on every commit: the ⓘ dialog's Roadmap is parsed out of NOTES.md by
+# vite.config.ts, and that parser is wrapped in a try/catch returning an EMPTY
+# LIST — so every way of getting it wrong builds cleanly, deploys green, and
+# shows the reader a dialog with nothing in it. A session appending a section
+# anchored on the string "## Shipped (roadmap archive)", which is MENTIONED in
+# quotes inside the roadmap section's own blockquote 800 lines above the real
+# heading; the section landed inside the roadmap, its `## ` stopped the parser
+# before the first bullet, and the in-app Roadmap went from 18 items to 0 across
+# five commits, to staging and to production, with nothing anywhere going red.
+also=tools/notes-check.mjs
