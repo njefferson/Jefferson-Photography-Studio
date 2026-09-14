@@ -8780,12 +8780,18 @@ async function openQuickLook(files: File[]) {
   const gen = ++quickGen;
   for (const it of quickItems) if (it.thumbUrl) URL.revokeObjectURL(it.thumbUrl);
   quickItems = [];
+  // BACK TO THE START OF THIS FOLDER. The cursor is module state and survived
+  // the last one, so a second folder opened in the same sitting began with the
+  // cursor pointing at a photo from the folder before it — past the end of a
+  // shorter set, where the key handler reads `undefined` and does nothing.
+  quickCursor = 0;
   qlGrid.replaceChildren();
   if (!quickLook.open) quickLook.showModal();
   updateQuickHeader(`Decoding 0 / ${files.length}…`);
 
   let done = 0;
   let reused = 0;
+  let landed = false; // whether the cursor has been put on a real tile yet
   // READ ONCE, AND CLEARED HERE. A run can end early — the grid closed, another
   // pick started over it — and a flag cleared only at the bottom would then
   // bypass the store on the NEXT run instead of this one.
@@ -8842,6 +8848,22 @@ async function openQuickLook(files: File[]) {
     const it: QuickItem = { file: f, name: f.name, thumbUrl, stripThumb, ok, mark: null };
     quickItems.push(it);
     addQuickTile(it, quickItems.length);
+    // THE KEYS LIVE ON THE GRID, so they do nothing until the focus is inside
+    // it. The dialog opens with the grid empty, so the browser puts the focus on
+    // the first thing it can find — the Close button, a SIBLING of the grid —
+    // and every tile is born tabIndex -1 (addQuickTile). P, X, U and C were
+    // therefore unreachable until the reader clicked a tile, and clicking a tile
+    // IS the pick: the keys could not be used to make the first decision, only
+    // to repeat one already made by hand.
+    //
+    // The first tile with a picture in it takes the cursor. Only the first —
+    // after that the reader owns where the focus is, and a set still filling in
+    // must never pull it back.
+    if (!landed && ok) {
+      landed = true;
+      quickCursor = quickItems.length - 1; // a placeholder tile is disabled and cannot hold focus
+      focusQuickCursor(false); // no scroll: the grid has not been scrolled yet
+    }
     done++;
     updateQuickHeader(done < files.length ? `Decoding ${done} / ${files.length}…` : undefined);
     await tick(); // yield so the grid paints and taps stay responsive
@@ -8948,6 +8970,15 @@ if (cmpDlg) {
     paintCompare();
   });
   document.getElementById("cmpClose")?.addEventListener("click", () => cmpDlg.close());
+  // AND THE FOCUS COMES BACK TO THE GRID. A native dialog returns the focus to
+  // whatever had it before showModal — which for the C key is the tile it was
+  // pressed from (right), and for the "Compare two" BUTTON is that button
+  // (outside the grid, where the keys do not reach). One listener covers both
+  // routes, including Escape. Not while the whole quick look is being torn
+  // down: there the grid is about to be emptied and the dialog closed, and
+  // moving the focus into it on the way out only makes a screen reader read a
+  // tile that is disappearing.
+  cmpDlg.addEventListener("close", () => { if (!closingQuickLook) focusQuickCursor(false); });
   const mark = (idx: () => number, m: QuickItem["mark"]) => () => {
     const it = quickItems[idx()];
     if (it) { markQuick(it, m); paintCompare(); }
@@ -8968,8 +8999,14 @@ if (cmpDlg) {
 }
 
 /** Close the grid, free every preview, and abort any decode still running. */
+/** Set while the whole quick look is being dismantled, so the compare dialog's
+ *  own close handler knows not to put the focus back into a grid that is about
+ *  to be emptied. */
+let closingQuickLook = false;
+
 function closeQuickLook() {
   quickGen++;
+  closingQuickLook = true;
   // Its pictures are the grid's object URLs, revoked two lines below.
   if (cmpDlg?.open) cmpDlg.close();
   for (const it of quickItems) if (it.thumbUrl) URL.revokeObjectURL(it.thumbUrl);
@@ -8978,6 +9015,7 @@ function closeQuickLook() {
   clearTimeout(qlPosHide);
   qlPos.classList.remove("show");
   if (quickLook.open) quickLook.close();
+  closingQuickLook = false;
 }
 
 /** Promote the selected previews into a real session (or a lone open, for one).
