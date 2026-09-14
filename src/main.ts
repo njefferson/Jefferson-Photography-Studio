@@ -7105,6 +7105,11 @@ interface SessionPhoto {
   /** The picked file's own name and byte length — see PhotoMeta. */
   srcName?: string;
   srcSize?: number;
+  /** THE READER'S VERDICT — the same two words the quick look uses, and absent
+   *  until one is made. It is NOT an edit: it is not in EditParams, not in the
+   *  undo stack and not in LiveEdit, so Undo leaves it alone and U is its only
+   *  way off. See session.ts PhotoMeta.mark for why it is durable. */
+  mark?: "pick" | "reject";
   edit: string | null; // stored edit JSON (from resume); once visited, liveEdits wins
   thumbUrl: string; // object URL for the strip preview
   /** Which picture the tile is showing. "waiting" — the file has not been read
@@ -7665,7 +7670,13 @@ function inShutterOrder(files: File[]): File[] {
  *  Two or more → a persisted session with the switch strip.
  *  Shared-look files (.ipslook) are peeled off FIRST: a look is not a photo —
  *  it must never destroy, join, or be counted against a photo session. */
-async function openPicked(files: File[], ready?: Map<File, ArrayBuffer>) {
+/** WHAT THE QUICK LOOK HANDS ACROSS when its picks become a session. It used to
+ *  be the strip picture alone, which is why the verdict the reader had just made
+ *  in the grid was thrown away on the way in: they picked four photos out of
+ *  forty and arrived at a session where nothing was picked. */
+type ReadyFile = { thumb?: ArrayBuffer; mark?: SessionPhoto["mark"] };
+
+async function openPicked(files: File[], ready?: Map<File, ReadyFile>) {
   files = inShutterOrder(files);
   const parts = await Promise.all(files.map(async (f) => ({ f, isLook: await isLookFile(f).catch(() => false) })));
   const lookFiles = parts.filter((p) => p.isLook).map((p) => p.f);
@@ -7704,7 +7715,7 @@ async function openPicked(files: File[], ready?: Map<File, ArrayBuffer>) {
   }
 }
 
-async function openSorted(files: File[], append: boolean, ready?: Map<File, ArrayBuffer>) {
+async function openSorted(files: File[], append: boolean, ready?: Map<File, ReadyFile>) {
   // Single file, not adding to a session → the fast, ephemeral path of old.
   if (files.length === 1 && !append) {
     await resetSessionState(true); // drop a lone photo or un-resumed leftovers
@@ -7791,7 +7802,7 @@ async function resetSessionState(clearStorage: boolean) {
 /** Persist and append a set of files to the current session, showing the first
  *  new photo as soon as it's ready. Decoding is sequential with yields so the
  *  UI stays usable; only one decode is in RAM at a time. */
-async function addToSession(files: File[], append: boolean, ready?: Map<File, ArrayBuffer>) {
+async function addToSession(files: File[], append: boolean, ready?: Map<File, ReadyFile>) {
   if (!append) await resetSessionState(true); // fresh session — clear leftovers
   // THE ONE PLACE THE DELETE IS STILL WORTH WAITING FOR. Ending a session and
   // immediately opening another is the only collision: the old bytes are still
@@ -7850,6 +7861,7 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Ar
     thumbUrl: "",
     thumbState: "waiting" as SessionPhoto["thumbState"],
     thumbGrade: undefined as string | undefined,
+    mark: undefined as SessionPhoto["mark"],
   }));
   for (const p of planned) { sessionPhotos.push(p); pendingStore.add(p.id); }
   adding = { done: 0, total: files.length, index: 1, name: files[0]?.name ?? "" };
@@ -7930,9 +7942,14 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Ar
       // `realThumbnails` will not pick it up. This is the whole of the second
       // render the reader was watching.
       const done = ready?.get(f);
-      if (done && done.byteLength) {
+      // The verdict made in the grid, carried in with the photo rather than
+      // written afterwards: a later setMark would race this row's own strict
+      // write and quietly do nothing, because the row it looks for is not there
+      // yet (session.ts setThumb has the same shape and the same silence).
+      slot.mark = done?.mark;
+      if (done?.thumb && done.thumb.byteLength) {
         if (slot.thumbUrl) URL.revokeObjectURL(slot.thumbUrl);
-        slot.thumbUrl = URL.createObjectURL(new Blob([done], { type: "image/jpeg" }));
+        slot.thumbUrl = URL.createObjectURL(new Blob([done.thumb], { type: "image/jpeg" }));
         slot.thumbState = "real";
         // The grid rendered this one under the live grade, which for a photo
         // arriving in the session is also what opening it will apply.
@@ -7974,7 +7991,14 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Ar
       inFlight.set(slot.id, {
         name: f.name,
         p: Session.addPhoto(
-          { id: slot.id, name: imported.name, kind: imported.kind, size: imported.bytes.length, srcName: f.name, srcSize: f.size, order: nextOrder++, addedAt: Date.now(), thumb: new ArrayBuffer(0), edit: null },
+          {
+            id: slot.id, name: imported.name, kind: imported.kind, size: imported.bytes.length,
+            srcName: f.name, srcSize: f.size, order: nextOrder++, addedAt: Date.now(),
+            thumb: new ArrayBuffer(0), edit: null,
+            // Spread rather than `mark: undefined`, so an undecided photo's row
+            // has no such field at all — the same shape a cleared verdict leaves.
+            ...(done?.mark ? { mark: done.mark } : {}),
+          },
           imported.bytes,
         ),
       });
@@ -8315,6 +8339,105 @@ wireSliderReset();
 /** How long the last updateSessionStrip call took, start to finish. */
 let lastStripMs = 0;
 
+/** The strip's one line of prose, and the only place it is written.
+ *
+ *  WHICH PHOTO YOU ARE ON survives a load: this line used to be replaced
+ *  wholesale while a set came in, so the one number the strip exists to tell you
+ *  vanished for the whole wait, which on 360 files is minutes. And they are not
+ *  "opening" — one photo is open; the rest are being read and copied onto the
+ *  device so the set survives a reload, which is where the wait actually goes.
+ *
+ *  The verdict counts ride here rather than anywhere else, because this element
+ *  is a role=status that the reconcile rewrites on every switch, every add and
+ *  every thumbnail that lands: anything announced through it from somewhere else
+ *  is gone within one press. */
+function writeSessionMeta(real: SessionPhoto[], idx: number, total: number): void {
+  if (adding) {
+    const viewing = idx >= 0 ? `viewing ${idx + 1} · ` : "";
+    sessionMeta.textContent = `${viewing}adding ${adding.index} of ${adding.total} — ${adding.name}`;
+    return;
+  }
+  const picked = real.reduce((n, p) => n + (p.mark === "pick" ? 1 : 0), 0);
+  const rejected = real.reduce((n, p) => n + (p.mark === "reject" ? 1 : 0), 0);
+  sessionMeta.textContent =
+    `${real.length} photos · ~${fmtSize(total)}` +
+    (idx >= 0 ? ` · viewing ${idx + 1}` : "") +
+    (picked ? ` · ${picked} picked` : "") +
+    (rejected ? ` · ${rejected} rejected` : "");
+}
+
+/** THE WHOLE OF ONE TILE, written only where it differs.
+ *
+ *  Pulled out of the reconcile so that marking a photo can repaint ONE tile
+ *  instead of all of them — the reconcile walks every photo and forces two
+ *  layouts at the end, which on a set of two hundred is not something to do for
+ *  a keystroke. Both callers produce the same DOM, which is the point: a fast
+ *  path that paints something the reconcile would not is a fast path that gets
+ *  undone by the next arrow press.
+ *
+ *  AND THAT IS WHY THE VERDICT IS AN INPUT HERE rather than painted beside it.
+ *  This function rewrites the tile's whole class string and removes any tag it
+ *  did not put there, so anything drawn on a tile from outside survives until
+ *  the next switch or the next thumbnail landing, and then vanishes. */
+function paintSessionTile(b: HTMLElement, p: SessionPhoto): void {
+  const saving = pendingStore.has(p.id);
+  const cls =
+    "session-thumb" +
+    (p.id === activePhotoId ? " active" : "") +
+    (saving ? " saving" : "") +
+    (p.thumbState === "preview" ? " provisional" : "") +
+    (p.mark === "pick" ? " picked" : p.mark === "reject" ? " rejected" : "");
+  if (b.className !== cls) b.className = cls;
+  // A provisional tile says so in text, not by colour alone: the picture in
+  // it is the camera's rendering, not this app's. It read "cam", which is
+  // not a word — it was an abbreviation of a sentence nobody had been told,
+  // sitting on a badge with no explanation anywhere. "Preview" is what it
+  // means, and the tile's own tooltip says the rest.
+  const verdict = p.mark === "pick" ? " — Pick" : p.mark === "reject" ? " — Reject" : "";
+  const title = saving
+    ? `${p.name} — still saving`
+    : p.thumbState === "preview"
+      ? `${p.name}${verdict} — showing the camera's own preview until this app has developed it`
+      : p.name + verdict;
+  if (b.title !== title) b.title = title;
+  if ((b as HTMLButtonElement).disabled !== saving) (b as HTMLButtonElement).disabled = saving;
+
+  const img = b.querySelector("img");
+  if (p.thumbUrl) {
+    if (img) {
+      // THE SRC IS WRITTEN ONLY WHEN THE PICTURE IS ACTUALLY A NEW ONE.
+      // Assigning the same URL re-decodes it, which is the flash this whole
+      // function was rewritten to stop.
+      if (img.getAttribute("src") !== p.thumbUrl) img.src = p.thumbUrl;
+      if (img.alt !== p.name) img.alt = p.name;
+    } else {
+      const im = document.createElement("img");
+      im.draggable = false; // a tile is a button, not draggable content (CSS user-drag is not universal)
+      im.src = p.thumbUrl;
+      im.alt = p.name;
+      b.replaceChildren(im);
+    }
+  } else if (!b.querySelector(".session-thumb-name")) {
+    b.replaceChildren(Object.assign(document.createElement("span"), { className: "session-thumb-name", textContent: p.name }));
+  }
+  const tag = b.querySelector(".session-thumb-tag");
+  const wantTag = p.thumbState === "preview" && !saving;
+  if (wantTag && !tag) b.append(Object.assign(document.createElement("span"), { className: "session-thumb-tag", textContent: "preview" }));
+  else if (!wantTag && tag) tag.remove();
+  // THE VERDICT IN A WORD, in its own element so the block above cannot take it
+  // off: the two tags can be on one tile at once and they are different claims.
+  const markTag = b.querySelector(".session-thumb-mark");
+  const wantMark = !!p.mark && !saving;
+  if (wantMark && !markTag) {
+    b.append(Object.assign(document.createElement("span"), { className: "session-thumb-mark", textContent: p.mark === "pick" ? "Pick" : "Reject" }));
+  } else if (wantMark && markTag) {
+    const word = p.mark === "pick" ? "Pick" : "Reject";
+    if (markTag.textContent !== word) markTag.textContent = word;
+  } else if (!wantMark && markTag) {
+    markTag.remove();
+  }
+}
+
 function updateSessionStrip() {
   const __strip0 = performance.now();
   const keepScroll = sessionThumbs.scrollLeft;
@@ -8335,22 +8458,9 @@ function updateSessionStrip() {
   const idx = real.findIndex((p) => p.id === activePhotoId);
   sessionProgress.hidden = !adding;
   sessionDone.disabled = !!adding;
+  writeSessionMeta(real, idx, total);
   if (adding) {
     sessionProgressBar.style.width = `${Math.round((adding.done / Math.max(1, adding.total)) * 100)}%`;
-    // WHICH PHOTO YOU ARE ON survives the load. This line used to be replaced
-    // wholesale while a set came in, so the one number the strip exists to tell
-    // you — which of them you are looking at — vanished for the whole wait,
-    // which on 360 files is minutes.
-    //
-    // And they are not "opening". One photo is open; the rest are being read
-    // and copied onto the device so the set survives a reload, which is where
-    // the wait actually goes. Saying "opening" of 360 photos described
-    // something that was not happening.
-    const viewing = idx >= 0 ? `viewing ${idx + 1} · ` : "";
-    sessionMeta.textContent = `${viewing}adding ${adding.index} of ${adding.total} — ${adding.name}`;
-  } else {
-    sessionMeta.textContent =
-      `${real.length} photos · ~${fmtSize(total)}` + (idx >= 0 ? ` · viewing ${idx + 1}` : "");
   }
   // EVERY TILE USED TO BE THROWN AWAY AND REBUILT HERE, on every call — and
   // this is called on every switch, every add and every thumbnail that lands.
@@ -8384,48 +8494,7 @@ function updateSessionStrip() {
       });
     }
     have.delete(p.id);
-    const saving = pendingStore.has(p.id);
-    const cls =
-      "session-thumb" +
-      (p.id === activePhotoId ? " active" : "") +
-      (saving ? " saving" : "") +
-      (p.thumbState === "preview" ? " provisional" : "");
-    if (b.className !== cls) b.className = cls;
-    // A provisional tile says so in text, not by colour alone: the picture in
-    // it is the camera's rendering, not this app's. It read "cam", which is
-    // not a word — it was an abbreviation of a sentence nobody had been told,
-    // sitting on a badge with no explanation anywhere. "Preview" is what it
-    // means, and the tile's own tooltip says the rest.
-    const title = saving
-      ? `${p.name} — still saving`
-      : p.thumbState === "preview"
-        ? `${p.name} — showing the camera's own preview until this app has developed it`
-        : p.name;
-    if (b.title !== title) b.title = title;
-    if ((b as HTMLButtonElement).disabled !== saving) (b as HTMLButtonElement).disabled = saving;
-
-    const img = b.querySelector("img");
-    if (p.thumbUrl) {
-      if (img) {
-        // THE SRC IS WRITTEN ONLY WHEN THE PICTURE IS ACTUALLY A NEW ONE.
-        // Assigning the same URL re-decodes it, which is the flash this whole
-        // function was rewritten to stop.
-        if (img.getAttribute("src") !== p.thumbUrl) img.src = p.thumbUrl;
-        if (img.alt !== p.name) img.alt = p.name;
-      } else {
-        const im = document.createElement("img");
-        im.draggable = false; // a tile is a button, not draggable content (CSS user-drag is not universal)
-        im.src = p.thumbUrl;
-        im.alt = p.name;
-        b.replaceChildren(im);
-      }
-    } else if (!b.querySelector(".session-thumb-name")) {
-      b.replaceChildren(Object.assign(document.createElement("span"), { className: "session-thumb-name", textContent: p.name }));
-    }
-    const tag = b.querySelector(".session-thumb-tag");
-    const wantTag = p.thumbState === "preview" && !saving;
-    if (wantTag && !tag) b.append(Object.assign(document.createElement("span"), { className: "session-thumb-tag", textContent: "preview" }));
-    else if (!wantTag && tag) tag.remove();
+    paintSessionTile(b, p);
 
     // Order, without touching anything already in the right place.
     if (sessionThumbs.children[i] !== b) sessionThumbs.insertBefore(b, sessionThumbs.children[i] ?? null);
@@ -8436,6 +8505,7 @@ function updateSessionStrip() {
   // could never reach the far end of a long set. Kept now because an insert
   // can still move the scroll.
   sessionThumbs.scrollLeft = keepScroll;
+  updateVerdictButtons();
   stageEl.classList.add("has-session");
   // offsetHeight forces a layout, and so does revealActiveThumb below — this
   // function runs on every switch, every add and every thumbnail that lands, so
@@ -8444,6 +8514,69 @@ function updateSessionStrip() {
   revealActiveThumb();
   lastStripMs = performance.now() - __strip0;
 }
+
+const sessionPick = $("sessionPick") as HTMLButtonElement;
+const sessionReject = $("sessionReject") as HTMLButtonElement;
+
+/** The two buttons describe the photo you are looking at, so they are rewritten
+ *  wherever that changes. */
+function updateVerdictButtons(): void {
+  const p = sessionPhotos.find((x) => x.id === activePhotoId);
+  sessionPick.setAttribute("aria-pressed", String(p?.mark === "pick"));
+  sessionReject.setAttribute("aria-pressed", String(p?.mark === "reject"));
+  const off = !p;
+  if (sessionPick.disabled !== off) sessionPick.disabled = off;
+  if (sessionReject.disabled !== off) sessionReject.disabled = off;
+}
+
+/** RECORD A VERDICT ON THE PHOTO YOU ARE LOOKING AT.
+ *
+ *  Pressing the same one again takes it off, exactly as it does in the quick
+ *  look — one vocabulary for one decision, in both places it can be made.
+ *
+ *  Repaints ONE tile rather than the whole strip: the reconcile walks every
+ *  photo and forces two layouts at the end, and on a set of two hundred that is
+ *  not a thing to do for a keystroke. The tile it paints is the one the
+ *  reconcile would have painted, because it is the same function. */
+function markSessionPhoto(id: string, mark: SessionPhoto["mark"]): void {
+  const p = sessionPhotos.find((x) => x.id === id);
+  if (!p) return;
+  const next = p.mark === mark ? undefined : mark;
+  p.mark = next;
+  // A verdict that does not survive a reload is a highlight, not a decision —
+  // and a write that fails silently is the same thing with extra steps.
+  Session.setMark(id, next).catch((err) => recordFailure("saving a verdict", err));
+  const tile = [...sessionThumbs.children].find((el) => (el as HTMLElement).dataset.pid === id) as HTMLElement | undefined;
+  if (tile) paintSessionTile(tile, p);
+  const real = sessionPhotos.filter((x) => x.id !== "lone");
+  writeSessionMeta(real, real.findIndex((x) => x.id === activePhotoId), real.reduce((n, x) => n + x.size, 0));
+  updateVerdictButtons();
+}
+
+sessionPick.addEventListener("click", () => { if (activePhotoId) markSessionPhoto(activePhotoId, "pick"); });
+sessionReject.addEventListener("click", () => { if (activePhotoId) markSessionPhoto(activePhotoId, "reject"); });
+
+/** P, X AND U ON THE SESSION, under the arrow keys' own guard set — a range
+ *  slider, a text field and the panel's tab list all own their keys, and a
+ *  global handler that did not check would steal them. Deliberately the same
+ *  three letters as the quick look: it is the same decision, made where the
+ *  reader actually makes it, which is the photo at fit size above the strip. */
+document.addEventListener("keydown", (e) => {
+  const key = e.key.toLowerCase();
+  if (key !== "p" && key !== "x" && key !== "u") return;
+  if (e.altKey || e.ctrlKey || e.metaKey) return;
+  if (document.querySelector("dialog[open]")) return;
+  if (cropArmed) return; // the geometry tools own the frame
+  const t = e.target as HTMLElement | null;
+  const tag = t?.tagName ?? "";
+  if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || t?.isContentEditable) return;
+  const fromPhoto = !t || t === document.body || t === canvas || t === stageEl || sessionStrip.contains(t);
+  if (!fromPhoto) return;
+  if (sessionPhotos.filter((p) => p.id !== "lone").length < 2) return;
+  if (!activePhotoId) return;
+  e.preventDefault();
+  markSessionPhoto(activePhotoId, key === "u" ? undefined : key === "p" ? "pick" : "reject");
+});
 
 /** The photo the strip was last scrolled to. updateSessionStrip runs on every
  *  add and every thumbnail that lands, so revealing unconditionally there took
@@ -8691,6 +8824,7 @@ async function resumeSession() {
       // there is the real thing; one that is missing means the pass had not
       // reached that photo before the session was left, and re-running it below
       // finishes the job rather than leaving a permanently nameless tile.
+      mark: m.mark, // a verdict survives a reload or it was never a decision
       thumbState: (m.thumb.byteLength ? "real" : "waiting") as SessionPhoto["thumbState"],
       thumbUrl: m.thumb.byteLength ? URL.createObjectURL(new Blob([m.thumb], { type: "image/jpeg" })) : "",
     }));
@@ -9238,8 +9372,11 @@ async function keepQuickLook() {
   if (!files.length) return;
   // Carry the pictures across, keyed by the File itself so re-ordering on the
   // way in cannot mismatch a thumbnail to a photo.
-  const ready = new Map<File, ArrayBuffer>();
-  for (const it of keeping) if (it.stripThumb) ready.set(it.file, it.stripThumb);
+  // AN ENTRY FOR EVERY KEPT PHOTO, not only the ones with a picture ready: the
+  // entry carries the verdict now, and a pick whose strip tile had not been
+  // built would otherwise arrive in the session unmarked.
+  const ready = new Map<File, ReadyFile>();
+  for (const it of keeping) ready.set(it.file, { thumb: it.stripThumb ?? undefined, mark: it.mark === "pick" ? "pick" : undefined });
   closeQuickLook();
   try {
     await openPicked(files, ready);

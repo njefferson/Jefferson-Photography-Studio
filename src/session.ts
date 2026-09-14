@@ -37,6 +37,13 @@ export interface PhotoMeta {
    *  before this existed, which is why the fallback compares `name`/`size`. */
   srcName?: string;
   srcSize?: number;
+  /** THE READER'S VERDICT on this photo: kept, not kept, or not decided yet
+   *  (absent). The same two words the quick look uses, because they are the same
+   *  decision made in a different place — a session is where the deciding
+   *  actually happens, and until now it was the one tool that could not record
+   *  one. Absent on every row written before this existed, which reads as
+   *  undecided, which is what those photos are. */
+  mark?: "pick" | "reject";
   /** The photo's edit as a JSON snapshot, or null until it's been visited.
    *  Spatial mask bitmaps are dropped before storing (see main.ts) — they're
    *  composition-specific and reset on a fresh decode, like they always have. */
@@ -188,6 +195,36 @@ export async function setThumb(id: string, thumb: ArrayBuffer): Promise<void> {
       rq.onsuccess = () => {
         const meta = rq.result as PhotoMeta | undefined;
         if (meta) store.put({ ...meta, thumb });
+      };
+    });
+  } finally {
+    db.close();
+  }
+}
+
+/** Record (or clear) one photo's verdict. Same shape as setThumb: read the meta
+ *  row, put it back whole, one strict-durability transaction, nothing else
+ *  touched. A verdict has to survive a reload or it is not a decision, it is a
+ *  highlight. */
+export async function setMark(id: string, mark: PhotoMeta["mark"]): Promise<void> {
+  const db = await open();
+  try {
+    await new Promise<void>((res, rej) => {
+      const t = db.transaction(META, "readwrite", { durability: "strict" } as IDBTransactionOptions);
+      t.oncomplete = () => res();
+      t.onabort = () => rej(t.error ?? new Error("write aborted"));
+      t.onerror = () => rej(t.error ?? new Error("write failed"));
+      const store = t.objectStore(META);
+      const rq = store.get(id);
+      rq.onsuccess = () => {
+        const meta = rq.result as PhotoMeta | undefined;
+        if (!meta) return; // photo removed under us — nothing to mark
+        // Written as an ABSENT field rather than undefined-valued, so a cleared
+        // verdict and one that was never made are the same row.
+        const next = { ...meta };
+        if (mark) next.mark = mark;
+        else delete next.mark;
+        store.put(next);
       };
     });
   } finally {
