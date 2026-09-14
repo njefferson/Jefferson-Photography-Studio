@@ -1869,6 +1869,44 @@ that one of them is honest — but the honest one still hands back a purple
 picture. A third option exists and is not built: offer the balance as a press
 ("Balance it anyway") beside the sentence, so the reader sees both and picks.
 
+## The one-band decision goes back to the reader, 2026-09-14
+
+**Asked: didn't they used to work?** They did something different, and the
+answer is in the history rather than in anybody's memory. Before 2026-09-11
+every camera-rendered file was gray-world balanced under a colour look, with no
+exception. `1f29118` added one: a file whose cool band measures under
+`COOL_BAND_FLOOR` is left unbalanced, keeping the camera's own colour.
+
+**That was a taste call made by a session, on one photograph.** The commit's
+evidence is crushed shadows falling from 13% to 3% on that frame, plus fifteen
+two-band frames confirmed unchanged. One file decided a policy. At least six
+real frames hit it, and the standing taste on record is maximum saturation,
+gentle contrast, shadows alive — which is the side of that trade the policy gave
+away.
+
+**So it is a control now, not a policy.** `params.forceBalance` re-runs the
+active look with the exception suppressed, so the balance and the exposure that
+goes with it are re-derived for that photograph rather than patched on. It lands
+on the white balance and exposure sliders like every automatic here, is one undo
+step, and is per-shot corrective so it does not ride a SavedLook — the same call
+white balance gets.
+
+**Measured on the fixtures, and the numbers do not support the original policy
+as a general rule.** On the frame the walk uses: unbalanced rgb(66,107,178),
+balanced rgb(131,99,93) — a completely different picture — and **0.0% crushed
+either way**. The 13% that justified the exception was one photograph's number,
+not the shape of the problem. A rendering that costs nothing in shadows on this
+frame was being withheld because it cost 13% on another.
+
+**Five places or undo silently breaks, and the compiler found four more.**
+`cloneParams`, `applySnapshot`, the three params literals, `makeThumb` — and
+then `tsc` refused four EditParams literals in `debug.ts` that no checklist
+mentions. Making the field REQUIRED rather than optional is what turned that
+from a silent drop into four compile errors.
+
+The Help line describing the balance-on-look behaviour said something that now
+has an exception and a control, so it was corrected in the same commit.
+
 ## Shipped (roadmap archive)
 
 - [x] **Four ways a tile lied about its photograph** — SHIPPED 2026-09-14 to

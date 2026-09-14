@@ -76,6 +76,52 @@ try {
   await stepTo(0);
   const back = await state();
   check("1 the sentence is still there after switching away and back", back, first);
+
+  // ── the choice ──────────────────────────────────────────────────────────
+  // "Balance it anyway" is the rendering this app used to give these files
+  // before 2026-09-11, when skipping the balance became the policy. It has to
+  // CHANGE THE PICTURE — a button that relabels itself and leaves the canvas
+  // alone is the shape of defect this whole walk exists for — and it has to
+  // survive undo and a switch like any other edit.
+  const shot = () => p.evaluate(() => {
+    const c = document.querySelector("canvas");
+    const g = c.getContext("webgl2") || c.getContext("webgl");
+    const w = 64, h = 64;
+    const buf = new Uint8Array(w * h * 4);
+    if (g) {
+      const fx = Math.floor((c.width - w) / 2), fy = Math.floor((c.height - h) / 2);
+      g.readPixels(fx, fy, w, h, g.RGBA, g.UNSIGNED_BYTE, buf);
+    }
+    let r = 0, gg = 0, b = 0, dark = 0;
+    for (let i = 0; i < buf.length; i += 4) {
+      r += buf[i]; gg += buf[i + 1]; b += buf[i + 2];
+      if (Math.max(buf[i], buf[i + 1], buf[i + 2]) < 16) dark++;
+    }
+    const n = buf.length / 4;
+    return { r: +(r / n).toFixed(1), g: +(gg / n).toFixed(1), b: +(b / n).toFixed(1), crushed: +(dark / n).toFixed(3) };
+  });
+  const before = await shot();
+  await p.evaluate(() => document.getElementById("lookForceBalance")?.click());
+  await p.waitForTimeout(1600);
+  const after = await shot();
+  const label = await p.evaluate(() => document.getElementById("lookForceBalance")?.textContent.trim());
+  console.log(`        unbalanced rgb(${before.r},${before.g},${before.b}) crushed ${(before.crushed*100).toFixed(1)}%`);
+  console.log(`        balanced   rgb(${after.r},${after.g},${after.b}) crushed ${(after.crushed*100).toFixed(1)}%`);
+  const moved = Math.abs(before.r - after.r) + Math.abs(before.g - after.g) + Math.abs(before.b - after.b);
+  check("2 the button exists and says what it will do next", label, "Back to the camera's colour");
+  check("3 pressing it CHANGES THE PICTURE, not just the label", moved > 12, true);
+
+  await p.keyboard.press("Control+z");
+  await p.waitForTimeout(1200);
+  const undone = await shot();
+  check("4 and one press is one undo step", Math.abs(undone.r - before.r) < 6 && Math.abs(undone.b - before.b) < 6, true);
+
+  await p.evaluate(() => document.getElementById("lookForceBalance")?.click());
+  await p.waitForTimeout(1600);
+  await stepTo(1);
+  await stepTo(0);
+  const kept = await p.evaluate(() => document.getElementById("lookForceBalance")?.getAttribute("aria-pressed"));
+  check("5 the choice survives leaving the photo and coming back", kept, "true");
 } finally { await b.close(); }
 console.log(failed ? `\n${failed} check(s) failed` : "\nall checks passed");
 process.exit(failed ? 1 : 0);
