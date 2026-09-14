@@ -505,7 +505,15 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   min-height: 32px;
   padding: 5px 10px;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  /* THE RAIL IS A CALIBRATED TOKEN, not a white at some alpha. A glass HUD
+     floats over the photo, so its fill is --glass-bg composited over whatever
+     the frame happens to be — rgb(7,7,9) over a black frame and rgb(96,96,98)
+     over a white one. Measured against that bright end, rgba(255,255,255,0.35)
+     is a 2.17:1 edge and rgba(150,150,170,0.35) — what #zoomCtl shipped — is
+     1.44:1, both under the 3:1 floor a control edge has to clear. --glass-txt-2
+     is 3.85:1 at the same worst case and is already the token for "second-rank
+     mark on glass". */
+  border: 1px solid var(--glass-txt-2);
   background: transparent;
   color: var(--glass-txt);
   font: 500 0.75rem/1.2 var(--ui);
@@ -875,7 +883,7 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   width: 40px;
   height: 40px;
   padding: 0;
-  border: 1px solid rgba(150, 150, 170, 0.35);
+  border: 1px solid var(--glass-txt-2); /* 1.44:1 as rgba(150,150,170,0.35) over a bright frame — see .ratio-chip */
   border-radius: 10px;
   background: transparent;
   color: var(--glass-txt);
@@ -1056,10 +1064,20 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   gap: 8px;
   padding: 10px 16px 12px;
   border-radius: 18px;
-  background: var(--accent-soft); /* blue-tinted "active" glass — stands out without the solid fill the exit banner uses */
+  /* A HUD OVER THE PHOTO IS GLASS, and this one was half of that: it took its
+     fill from --accent-soft, which follows the theme, while every chip inside
+     it was already written for glass and painted --glass-txt, which does not.
+     In the night theme near-white on the dark wash measured 14.16:1 and looked
+     designed; in the day theme the same near-white landed on a LIGHT wash at
+     1.56:1 and the ratio chips were gone. The wash was carrying the "crop is
+     active" signal, so the accent stays as the border and the Done button's
+     glow — what changes is that the fill no longer flips with the theme. */
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
   border: 1px solid var(--accent);
   box-shadow: 0 3px 14px rgba(0, 0, 0, 0.45);
-  color: var(--txt-1);
+  color: var(--glass-txt);
   width: min(88%, 360px);
 }
 #cropTools .crop-row { display: flex; align-items: center; gap: 10px; }
@@ -1078,10 +1096,24 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   font-variant-numeric: tabular-nums;
   touch-action: none; /* it owns the press, like every other drag control here */
 }
-#cropTools .crop-lbl { flex: 1; font-size: 0.8125rem; font-weight: 600; color: var(--txt-1); }
+#cropTools .crop-lbl { flex: 1; font-size: 0.8125rem; font-weight: 600; color: var(--glass-txt); }
 #cropTools input[type="range"] { width: 100%; margin: 0; }
-#straightenVal { font-size: 0.75rem; font-variant-numeric: tabular-nums; color: var(--txt-1); flex: none; min-width: 4ch; text-align: right; }
-#cropTools button { flex: none; width: auto; padding: 6px 12px; font-size: 0.75rem; border-color: var(--accent); }
+#straightenVal { font-size: 0.75rem; font-variant-numeric: tabular-nums; color: var(--glass-txt); flex: none; min-width: 4ch; text-align: right; }
+#cropTools button { flex: none; width: auto; padding: 6px 12px; font-size: 0.75rem; }
+/* Reset and the tenth-degree nudges follow #zoomCtl rather than the page's
+   button surface: on glass a theme-following pill is a light chip on a dark
+   HUD in the day theme, and an accent border is navy on near-black there — a
+   rail under the 3:1 floor. Transparent fill, glass text, neutral rail.
+   THE TWO :not()s ARE LOAD-BEARING. Written as a bare `#cropTools button` this
+   outranks both `#cropDone` and `.ratio-chip[aria-pressed="true"]` on id alone,
+   and the first version of it silently deleted the accent fill from the Done
+   button and the selected ratio chip — the two controls in the bar whose whole
+   job is to look filled. Excluded by the selector, they never collide. */
+#cropTools button:not(.primary):not([aria-pressed="true"]) {
+  background: transparent;
+  color: var(--glass-txt);
+  border: 1px solid var(--glass-txt-2);
+}
 #cropTools button:disabled { opacity: 0.45; } /* honest greyed state when the crop is already identity */
 /* Done is the primary exit — accent-filled so it's the obvious way back out of
    the tool (owner got lost with the old tiny "tap here" hint). */
@@ -1201,7 +1233,7 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   border-radius: 999px;
   border: 1px solid var(--accent);
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--txt); /* see .accent-outline: accent text on the accent wash fights itself */
   cursor: pointer;
 }
 .welcome-back:active { background: var(--surface-3); }
@@ -1219,7 +1251,7 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   border-radius: 10px;
   border: 1px solid var(--accent);
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--txt); /* see .accent-outline */
   cursor: pointer;
   text-align: left;
 }
@@ -2218,10 +2250,20 @@ label.open-btn, label.bar-btn {
 .note { display: block; margin: 6px 0; font-size: 0.75rem; line-height: 1.45; color: var(--txt-3); text-align: left; }
 .note.footnote { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
 .note-inline { font-size: 0.6875rem; color: var(--txt-3); }
+/* THE LABEL IS --txt, NOT --accent. An accent-tinted fill with accent-coloured
+   text on it works against itself: the wash pulls the ground toward the very
+   colour the text is, so the more visible the tint, the worse the contrast.
+   Measured across the eight palettes, accent-on-accent-wash falls to 4.13 in
+   the day theme over --page and 4.37 in the night theme over --surface-1 —
+   under the 4.5 floor in six of the twenty-four groundxpalette pairs — while
+   the same accent on the PLAIN ground clears everywhere (worst 4.87). Swapping
+   the label to --txt clears everywhere by a margin (worst 6.33) and costs the
+   control nothing: the accent border and the tint still carry the signal, so
+   colour is not the only thing saying what this is. */
 .accent-outline {
   background: var(--accent-soft);
   border: 1px solid var(--accent);
-  color: var(--accent);
+  color: var(--txt);
   font-weight: 600;
   padding: 10px;
   border-radius: 9px;

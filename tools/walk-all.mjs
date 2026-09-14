@@ -62,7 +62,21 @@ for (const w of walks) {
 const bad = results.filter((r) => r.code !== 0);
 for (const r of bad) {
   console.log(`\n--- ${r.file} ---`);
-  for (const line of r.out.split("\n")) if (/FAIL|Error|error/.test(line)) console.log("  " + line);
+  // WITH THE LINES ABOVE IT, because a walk prints its MEASUREMENT on the line
+  // before its verdict — "showing's five parts 70 ms vs 70 ms" then "ok 8 …".
+  // Printing only the lines matching FAIL gives the name of the check and not
+  // one number from it, so the only way to learn anything is to run the walk
+  // again, by which time the load that produced the failure is gone. Three
+  // lines of context is the difference between a report and a prompt to re-run.
+  const lines = r.out.split("\n");
+  let last = -1;
+  for (const [i, line] of lines.entries()) {
+    if (!/FAIL|Error|error/.test(line)) continue;
+    const from = Math.max(last + 1, i - 3);
+    if (from > last + 1) console.log("  ...");
+    for (let j = from; j <= i; j++) console.log("  " + lines[j]);
+    last = i;
+  }
 }
 const total = (results.reduce((n, r) => n + r.ms, 0) / 1000).toFixed(0);
 console.log(bad.length ? `\n${bad.length} of ${results.length} failed (${total}s)\n` : `\nall ${results.length} walks passed (${total}s)\n`);

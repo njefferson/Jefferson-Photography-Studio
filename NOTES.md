@@ -1177,7 +1177,7 @@ canopy where fractions swing on rounding; a `location.reload()` that only queues
 a navigation; and a strength sweep that drove `stkMatchStrength` because it was
 the first id matching /stren/i. Every one of them produced a confident number.
 
-## Healed spots cloning the wrong colour — REPRODUCED, NOT FIXED, 2026-09-14
+## Healed spots cloning the wrong colour — RETRACTED, it was the measurement, 2026-09-14
 
 **THE REPORT WAS ABOUT HEALED DUST SPOTS, and the first two hours went to the
 wrong defect.** "Hot-spots" was read as the IR LENS hot-spot and a whole lens
@@ -1196,10 +1196,28 @@ and blue carry the false colour — in a channel-swapped infrared frame two
 regions can match in brightness and be opposite in hue, and the search clones
 one into the other and scores it well.
 
-**REPRODUCED on a practice frame**, `tools/heal-source-walk.mjs`: a healed disc
-came out **rgb(122,14,11) against a surround of rgb(128,33,26)** — red matches
-within 5%, green and blue are less than half. That is the mechanism, visible, in
-a region bright enough to have a colour.
+**"REPRODUCED" ON A PRACTICE FRAME — AND IT WAS NOT.** The first walk reported a
+healed disc at rgb(122,14,11) against a surround of rgb(128,33,26) and a colour
+distance of 0.150. It compared the disc against a ring **1.6-2.6 radii out, on
+the canvas, after the full pipeline** — a neighbourhood far wider than the
+**1.05-1.5** annulus `findHealSource` actually matches on. On a frame with
+structure at that scale it was measuring content the search never claimed to
+match, and calling the difference a defect.
+
+**THE REAL MEASUREMENT SAYS THE SEARCH IS ALREADY OPTIMAL.** Asking the right
+question — how does the patch the app picks compare with the best colour match
+available in its own 48 offsets, and with the best in a set twelve times larger
+— on the reader's own NIR_1376 and on two practice frames, at twelve taps:
+
+- what the app picks: **0.000 to 0.007**
+- the best available in the same 48 offsets: **0.000 to 0.001**
+- the best available anywhere: **0.000 to 0.001**
+
+There is no gap. A colour-aware score would choose what it already chooses, which
+is exactly why adding one at weight 900 moved nothing — not because the weight
+was wrong, but because there was nothing to promote. The luma-only scoring is a
+real visible-light assumption and it is not costing anything measurable on these
+frames.
 
 **AND TWO ATTEMPTED FIXES BOTH FAILED, MEASURED.**
 
@@ -1212,12 +1230,9 @@ a region bright enough to have a colour.
   3 x 16. Worst went **0.150 to 0.164** and the chosen sources moved further
   away, which is further from similar. Reverted.
 
-The likely reading of both results is that the candidate set has no
-chromatically-matching member to promote: 48 offsets in a ring 2.4-4.6 radii out
-are all on the same side of whatever boundary the spot sits near, so weighting
-colour only reorders equally wrong options and widening reaches worse ones. That
-is a hypothesis and it is written as one — the next attempt should test it
-directly rather than adjust the score again.
+That hypothesis — that the candidate set had no good member to promote — was
+tested directly and is also wrong. Good members exist and the app already picks
+them. Both fixes failed because **there was no defect to fix**.
 
 **WHAT SHIPPED INSTEAD: the report can now answer it from the reader's own
 photograph.** Every healed spot is listed with how far its patch came from, in
@@ -1232,10 +1247,19 @@ match is amplified into a visible cast. Any fix that only tightens the raw-buffe
 match may still leave a visible disc, and any measurement taken only on the raw
 buffer will say the heal is fine.
 
-**The walk is left FAILING on purpose.** It has found a real defect and the
-defect is not fixed; a threshold moved up to make the sweep green would be the
-sweep lying. `tools/walk-all.mjs` will report 1 of 16 failing until this is
-repaired, and that is the honest state.
+**THE WALK WAS REWRITTEN TO ASK THE QUESTION THE CODE ANSWERS.** It now measures
+the GAP — the app's pick against the best available to it, and against the best
+available at all — because a gap on the first leg means the scoring is wrong and
+a gap on the second means the candidate set is too small, and no gap means the
+search is doing as well as it can. Thresholds at 0.02, ten times the observed
+noise. It passes, honestly, and it would catch the defect it was originally
+written to imagine.
+
+**The cost of the version that asked the wrong question: two speculative changes
+to a pixel pipeline, both reverted, and a NOTES section that claimed a
+reproduction.** A measurement has to ask the question the code is answering, or
+it invents work — and it invents it with a number attached, which is what makes
+it persuasive.
 
 **Not reproduced: the cyan disc itself.** No practice frame at any tap tried
 produces one. The frames are different scenes, and the report is from a
@@ -1586,6 +1610,160 @@ against this build, and failed against the pre-change build too, so it is not
 from this work. Check 15 does the same reload and does not flake. It reads the
 marks as soon as `#busy` closes; naming the cause would be a guess, and the
 measurement is that it reproduces on both builds.
+
+## The colour gate this repo never ran, and the four things it found, 2026-09-14
+
+`gates.yml` had passed no `palette-path` for the life of the file, under a
+comment calling it a real gap. So `palette-check.mjs` — the hub gate that holds
+a palette to the contrast floors in `PALETTES.md` — was skipped on every CI run,
+and the contrast numbers in `ACCESSIBILITY.md` were held by nothing but the hand
+that took them.
+
+**The spec is generated, not written.** `tools/palette-spec.mjs` applies each of
+the eight family x theme combinations to a real document and reads the tokens
+RESOLVED, so an `rgba()` rail or a token defined through another token comes out
+as the value a browser computes rather than as the text in the file. Writing the
+JSON by hand would have made it a second copy of `public/palette.css`, and this
+repo's history is mostly about second copies. It is committed because CI has no
+browser — an artefact, like the branch guard's hook.
+
+**All eight palettes clear every hard floor**, and seventeen notes remain: role
+pairings the gate forecasts and this app does not paint.
+
+### `_renders`, and why a short list is worse than no list
+
+The gate measures the FULL cross product of text roles against every fill tinted
+with the accent wash, which is what makes a palette portable. Against this app
+that produced seventeen hard failures, and the wash would have to drop from 15%
+alpha to **2.9%** to clear them — the deletion of a visible selected state, not a
+fix.
+
+`_renders` is the hub's own answer: a pairing the app was OBSERVED to paint stays
+a hard failure, one it does not paint becomes a note. Its instruction is exact —
+the list must be MEASURED, never typed.
+
+It was measured, and it was short three separate ways, each of which turns a
+defect into a forecast:
+
+- it swept the state the app boots into, so nine wash-painting elements measured
+  0x0 because the editor had no photo open;
+- then requiring visibility was itself wrong — measured on all eight hidden
+  elements, the ground each reverse-maps to while hidden is the SAME one it maps
+  to forced visible, so `display` was never part of the answer;
+- and the landing page's ground is a `radial-gradient(var(--bg-2), var(--bg))`,
+  so a walk looking for an opaque `backgroundColor` reached `<html>` and dropped
+  five more. The honest answer is BOTH stops.
+
+Two pairings became seven. What found it was instrumenting the DROPS — the same
+sweep re-run printing every discarded element with a reason — not reading the
+results, which were correct as far as they went. The generator now aborts and
+names the element on any text colour that maps to no token and any ground that
+maps to no role or gradient stop, and prints the off-role accent-on-wash cases as
+*skipped, not dropped*.
+
+**Two checks hold the artefact to the app.** `tools/palette-spec-check.mjs` pins
+it to the sha256 of `public/palette.css` and runs in `.branch-guard`'s `also=`
+with no browser; it cannot see `_renders`, which is measured from the whole app,
+so section 4 of `tools/a11y-walk.mjs` re-measures that list and fails in both
+directions. The sweep is IMPORTED by the walk from the generator rather than
+reimplemented — two implementations of one measurement is how a check comes to
+agree with itself and nothing else. Both were planted red first.
+
+### What it found
+
+Four defects, all recorded as F-07 to F-10 in `ACCESSIBILITY.md` with their
+numbers. In short:
+
+- **The crop bar was half a glass HUD.** It floats over the photo and took its
+  fill from `--accent-soft`, which follows the theme, while every chip inside it
+  painted the theme-invariant `--glass-txt`. Night: 14.16:1, looked designed.
+  Day: **1.56:1** — the ratio chips, Reset and the straighten nudges gone. It is
+  `--glass-bg` now, like `#zoomCtl`, and measures 5.67:1 over the worst frame.
+- **Control rails on glass at 1.44:1.** `rgba(255,255,255,0.35)` on the chips and
+  `rgba(150,150,170,0.35)` on the zoom buttons, both under the 3:1 an edge has to
+  clear. Both take `var(--glass-txt-2)` now — 3.85:1, and a calibrated token
+  rather than a one-off alpha.
+- **Accent labels on the accent wash.** A wash made FROM the accent moves the
+  ground toward the accent, so the more visible the state the worse the text.
+  Under 4.5 in six of twenty-four ground x palette pairs; the label is `--txt`
+  now, which clears everywhere at worst 6.33.
+- **`var(--txt-1)` in three places, defined nowhere.** CSS does not warn — the
+  declaration is dropped and an inherited property inherits, so it rendered a
+  plausible colour and every DOM-reading sweep agreed with it.
+  `tools/token-check.mjs` refuses that commit now.
+
+### The one to carry to the next UI change
+
+Writing the button treatment as `#cropTools button` — one id, one element —
+outranks `#cropDone` and `.ratio-chip[aria-pressed="true"]` on id specificity
+alone, and silently deleted the accent fill from the two controls in that bar
+whose entire job is to look filled. It built cleanly. The two `:not()`s in the
+shipped rule are load-bearing, not tidiness.
+
+And the first re-measurement after the glass fix came back at 1.56:1 unchanged,
+which reads as "the fix did not work". It was the probe: its ancestor walk looked
+for an opaque background and stepped straight PAST `#cropTools` once the fill
+became `rgba` glass. A translucent ancestor is part of the answer. The instrument
+had been correct until the code it measured changed shape underneath it.
+
+## A tolerance chasing a defect in the instrument, twice, 2026-09-14
+
+`switch-instrument-walk` check 8 asserted that showing's five named parts add up
+to `showing`. **They could not.** `show` is measured as `t3 - t2` across the
+whole of `showDecoded`, while the five phase clocks (`__a`…`__f`) cover only its
+middle: the location guard, the canvas `aria-label` and the tool disarm run
+before the first clock starts, and unhiding the panel, leaving learn mode and
+rebuilding the zoom control run after the last one stops. That head and tail is
+real work belonging to no phase.
+
+It passed on an idle machine because both are fast, and went red whenever the
+container was loaded — **which produced exactly the wrong repair each time.**
+First the tolerance went to 5%. Then a 4.5% failure re-ran green, and an
+absolute 6 ms floor was added under a comment reasoning about five
+whole-millisecond ROUNDINGS. Rounding was never the mechanism, so the floor was
+fitted to a story rather than derived from the variable that actually moved: the
+very next full sweep failed on the same check, and a standalone re-run passed at
+0 ms, 0 ms and 1 ms. That is what a tolerance covering the wrong variable always
+does — it is wide enough on an idle box and it explains nothing.
+
+**Fixed in the instrument, not the threshold.** `showDecoded` takes a timestamp
+as its first statement and another as its last, and reports `rest` — the head
+plus the tail — as a sixth phase, so the parts partition the whole by
+construction. The tolerance is a flat 6 ms (six whole-millisecond roundings) and
+is no longer a fraction of anything. Verified with four cores deliberately
+loaded: 0 ms, 1 ms, 1 ms.
+
+The §7f diagnostic shows `rest` beside the other five, so the accounting the
+walk checks is the accounting a reader can see.
+
+**And the sweep now prints the numbers.** `walk-all.mjs` printed only the lines
+matching FAIL, and a walk prints its MEASUREMENT on the line *before* its
+verdict — so a failure gave the name of the check and not one number from it,
+and the only way to learn anything was to run the walk again, by which time the
+load that produced the failure was gone. Three lines of context is the
+difference between a report and a prompt to re-run.
+
+## A check reading state written by a promise nothing waits for, 2026-09-14
+
+`release-walk` check 1b — *the tile of the photo you left says it reopens from
+the saved copy* — passed standalone and went red in the sixteen-walk sweep.
+Not a flake: the title changes when the leaving photo's working state is handed
+back, and that release rides `saved.then(…)` off the IndexedDB write. `stepTo`
+waits for the new tile to go `.active` and for the busy dialog to close, and
+**neither of those is that promise.** On an idle machine the write lands in the
+same frame and reading the title straight afterwards is right by accident.
+
+`tileTitleWhen` waits for the expected answer and then returns what it found —
+it does not assert, so a title that never arrives comes back unchanged and fails
+at the caller. That is the difference between waiting for a condition and
+assuming it, and it is why the wait does not hide a defect: planted against a
+string the app never writes, the check waits its fifteen seconds and then fails.
+Applied to 1b and to check 4, which is the same read in reverse.
+
+The general shape, and it is the second one this session: **a check that reads
+state written by a promise nothing waits for is measuring the machine.** The
+first was `switch-instrument-walk` check 8, where the fix belonged in the
+instrument; here the app is right and the walk was reading too early.
 
 ## Shipped (roadmap archive)
 
