@@ -21,11 +21,20 @@ function versionBase(): string {
   }
 }
 
-/** The commit that last changed VERSION (i.e. where the current base was
- *  declared), or "" if VERSION doesn't exist in history. */
-function versionCommit(): string {
+/** What the VERSION file said AT a given commit, or "" before it existed. */
+function versionBaseAt(hash: string): string {
   try {
-    return git("git log -1 --format=%H -- VERSION");
+    return git(`git show ${hash}:VERSION`).trim();
+  } catch {
+    return "";
+  }
+}
+
+/** The commit that last changed VERSION as of `hash` — i.e. where the base that
+ *  commit shipped under was declared. "" if VERSION does not exist there. */
+function versionCommitAt(hash: string): string {
+  try {
+    return git(`git log -1 --format=%H ${hash} -- VERSION`);
   } catch {
     return "";
   }
@@ -35,13 +44,32 @@ function versionCommit(): string {
  *  - pre-VERSION history: 0.N (N = update sequence number = commit count);
  *  - the commit that declared the base: the base itself ("1.0");
  *  - commits after it: base.M (M = updates since the declaration) — automatic
- *    point releases: 1.0.1, 1.0.2, ... until VERSION is bumped again. */
-function versionFor(fullHash: string, base: string, baseCommit: string): string {
+ *    point releases: 1.0.1, 1.0.2, ... until VERSION is bumped again.
+ *
+ *  RESOLVED AS OF THAT COMMIT, which it was not. The base and the commit that
+ *  declared it were read once at HEAD and passed in for every entry, so for any
+ *  commit OLDER than the last bump `rev-list --count baseCommit..hash` is 0 —
+ *  an ancestor has nothing after it — `since > 0` is false, no exception is
+ *  thrown, and it fell through to the pre-VERSION `0.N` scheme. The in-app patch
+ *  notes show five releases; three of them read `v0.257`, which is not a version
+ *  and is not even stable: it is a count of reachable commits, so the same
+ *  source built on a full clone printed `v0.540` for the same release. They
+ *  shipped as 2.45.1, 2.45.2 and 2.45.3, which is what those entries say now.
+ *
+ *  `base` is passed only for HEAD, where the working tree's VERSION is the
+ *  answer even if the release commit has not been made yet. Every other caller
+ *  lets this resolve it from the commit itself. */
+function versionFor(fullHash: string, base = versionBaseAt(fullHash)): string {
+  const baseCommit = versionCommitAt(fullHash);
   if (base && baseCommit) {
     if (fullHash === baseCommit) return base;
     try {
       const since = Number(git(`git rev-list --count ${baseCommit}..${fullHash}`));
       if (since > 0) return `${base}.${since}`;
+      // Zero is not a failure and must not fall through: it means this commit
+      // IS the declaration reached by another route (a rebase, a shallow
+      // boundary), and the base alone is the honest answer.
+      return base;
     } catch {
       /* fall through to the 0.N scheme */
     }
@@ -58,15 +86,13 @@ const INTERNAL_SUBJECT = /^(Roadmap|Notes|Docs|Internal|Chore):/i;
  *  notes.html page. Reads extra history so the filter can't starve the list. */
 function filteredLog(want: number) {
   try {
-    const base = versionBase();
-    const baseCommit = versionCommit();
     const out = git(`git log -${want * 2 + 10} --pretty=format:"%h|%H|%ad|%s" --date=short`);
     return out
       .split("\n")
       .filter(Boolean)
       .map((line) => {
         const [hash, full, date, ...rest] = line.split("|");
-        return { hash, date, subject: rest.join("|"), version: versionFor(full, base, baseCommit) };
+        return { hash, date, subject: rest.join("|"), version: versionFor(full) };
       })
       .filter((c) => !INTERNAL_SUBJECT.test(c.subject))
       .slice(0, want);
@@ -117,7 +143,7 @@ function roadmap() {
 
 function appVersion() {
   try {
-    return versionFor(git("git rev-parse HEAD"), versionBase(), versionCommit());
+    return versionFor(git("git rev-parse HEAD"), versionBase());
   } catch {
     return versionBase() || "dev";
   }
