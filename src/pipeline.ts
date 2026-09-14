@@ -94,6 +94,21 @@ export interface EditParams {
    *  dragged Strength to 0 and a reader who has pressed Bypass are told apart
    *  after an undo — the label has to stay honest either way. */
   lensBypass: boolean;
+  /** BALANCE A ONE-BAND FILE ANYWAY — the reader's call, not the app's.
+   *
+   *  A camera-rendered infrared JPEG can arrive with all its colour in one
+   *  band, and applyLook then leaves it unbalanced: gray-world manufactures a
+   *  second band by crushing red sixfold, which on the frame that calibrated it
+   *  took 13% of the picture to black. Skipping that keeps the camera's colour
+   *  and gives a look's shape without its colours.
+   *
+   *  Neither is Aerochrome, and which one is WANTED is a matter of taste on a
+   *  particular photograph — so this exists rather than a policy. Nothing in the
+   *  render reads it; applyLook does, and what it produces lands on the white
+   *  balance and exposure sliders like every other automatic. It is per-shot
+   *  corrective, so it does not ride a SavedLook, for the same reason white
+   *  balance does not. */
+  forceBalance: boolean;
   /** Strength and bypass for the SHIPPED per-lens brightness profile, kept
    *  apart from the measured colour one above for the same reason the cards
    *  are: they know different things and are turned down for different reasons. */

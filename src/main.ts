@@ -159,6 +159,7 @@ const params: EditParams = {
   hotspotColor: 0,
   lensFix: 1,
   lensBypass: false,
+  forceBalance: false,
   hsFix: 1,
   hsBypass: false,
   vignette: 0,
@@ -1023,7 +1024,15 @@ function applyLook(name: keyof typeof LOOKS) {
   // Coming from a swap-on state to Natural IR they do not, and the question
   // "does this file have a cool band for the look you are about to apply" was
   // being answered about the look you are leaving.
-  const oneBand = balancing && !!current && coolContent(current, params, look.swapRB) < COOL_BAND_FLOOR;
+  // AND THE READER CAN OVERRIDE IT. Skipping the balance on a one-band file is
+  // a judgement between two renderings that are both defensible — the camera's
+  // own colour with a look's shape but not its colours, or a false-colour
+  // rendering bought by crushing red sixfold. It shipped as a policy decided on
+  // ONE photograph. `forceBalance` is the reader saying which they want on THIS
+  // one, and it lands on the white balance and exposure sliders exactly like
+  // the automatic it replaces, so it is visible and undoable.
+  const oneBand = balancing && !!current && !params.forceBalance
+    && coolContent(current, params, look.swapRB) < COOL_BAND_FLOOR;
   // The line this measurement also drives — the sentence saying the file has
   // only one band — is NOT remembered from here. It was, through a flag plus an
   // identity check, and that flag was only ever written on a first visit: see
@@ -1138,6 +1147,22 @@ for (const key of Object.keys(lookButtons)) {
   lookButtons[key].addEventListener("click", () => pressLook(key));
 }
 
+/** "Balance it anyway" — the one-band rendering the reader did not get to pick.
+ *
+ *  Re-runs the active look with the override set, so the balance and the
+ *  exposure that goes with it are re-derived for THIS photograph rather than
+ *  patched on. One press is one undo step, like the lens bypass beside it. */
+document.getElementById("lookForceBalance")?.addEventListener("click", () => {
+  if (!activeLook || !LOOKS[activeLook]) return;
+  params.forceBalance = !params.forceBalance;
+  applyLook(activeLook as keyof typeof LOOKS);
+  syncToUI();
+  updateLookUI();
+  draw();
+  restripForGrade();
+  flushRecord();
+});
+
 // --- Edit history: snapshots power Go back (undo), Reset (whole edit) and the
 // saved-look slots. A snapshot is the full editor state — the EditParams plus
 // the look highlight (activeLook) and the WB bias a look baked in (lookBias),
@@ -1175,6 +1200,7 @@ function cloneParams(p: EditParams): EditParams {
     hotspotColor: p.hotspotColor ?? 0,
     lensFix: p.lensFix ?? 1,
     lensBypass: p.lensBypass ?? false,
+    forceBalance: p.forceBalance ?? false,
     hsFix: p.hsFix ?? 1,
     hsBypass: p.hsBypass ?? false,
     vignette: p.vignette,
@@ -1253,6 +1279,9 @@ function applySnapshot(s: Snapshot) {
   params.hotspotColor = c.hotspotColor ?? 0;
   params.lensFix = c.lensFix ?? 1;
   params.lensBypass = c.lensBypass ?? false;
+  // applySnapshot restores fields INDIVIDUALLY, so one missing here is dropped
+  // in silence by Undo and Reset — which is how `recover` was lost once.
+  params.forceBalance = c.forceBalance ?? false;
   params.hsFix = c.hsFix ?? 1;
   params.hsBypass = c.hsBypass ?? false;
   params.vignette = c.vignette;
@@ -2273,7 +2302,15 @@ function lookState(): void {
   const colourLook = !!activeLook && !!LOOKS[activeLook]?.swapRB;
   const show = !!current && fileIsOneBand(current) && colourLook && params.swapRB;
   el.hidden = !show;
-  if (show) el.textContent = "This photo came out of the camera with all its colour in one band — there is no sky band for a false-colour look to work with, so what you get is the look's shape without its colours. The raw file from the same shot has both bands and will carry it.";
+  const txt = document.getElementById("lookStateTxt");
+  const btn = document.getElementById("lookForceBalance") as HTMLButtonElement | null;
+  if (show && txt) txt.textContent = params.forceBalance
+    ? "This photo has all its colour in one band, and you have asked for it to be balanced anyway — the look's colours come from a band the balance made, and the shadows pay for it. Press again to go back to the camera's own colour."
+    : "This photo came out of the camera with all its colour in one band — there is no sky band for a false-colour look to work with, so what you get is the look's shape without its colours. The raw file from the same shot has both bands and will carry it.";
+  if (btn) {
+    btn.setAttribute("aria-pressed", String(!!params.forceBalance));
+    btn.textContent = params.forceBalance ? "Back to the camera's colour" : "Balance it anyway";
+  }
 }
 
 /** SAY WHEN THERE WAS NOTHING TO DO. The control reads "on" and its Strength
@@ -7196,6 +7233,7 @@ function establishFreshEdit() {
   hotspotColor: 0,
   lensFix: 1,
   lensBypass: false,
+  forceBalance: false,
   hsFix: 1,
   hsBypass: false,
     vignette: 0,
@@ -8027,6 +8065,7 @@ async function makeThumb(img: DecodedImage, MAX = 260, lens?: LensCurve | null, 
     // answer.
     lensFix: own ? own.params.lensFix : lens ? 1 : 0,
     lensBypass: own ? own.params.lensBypass : false,
+    forceBalance: own ? (own.params.forceBalance ?? false) : false,
     wb,
     exposure: own ? own.params.exposure : autoExposure(img, wb),
     denoise: 0,
@@ -11093,6 +11132,7 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["l
   hotspotColor: 0,
   lensFix: 1,
   lensBypass: false,
+  forceBalance: false,
   hsFix: 1,
   hsBypass: false,
     vignette: 0,

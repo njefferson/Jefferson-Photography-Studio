@@ -2283,6 +2283,19 @@ label.open-btn, label.bar-btn {
    the label to --txt clears everywhere by a margin (worst 6.33) and costs the
    control nothing: the accent border and the tint still carry the signal, so
    colour is not the only thing saying what this is. */
+/* The one-band notice is a paragraph plus the control that answers it, so it
+   is a column rather than a <p>: the sentence explains the rendering and the
+   button offers the other one. The button needs `width: auto` because this
+   stylesheet's base makes every button full-width, which on a note reads as a
+   banner rather than as a choice. */
+#lookState {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+#lookState .accent-outline { width: auto; padding: 10px 14px; }
+
 .accent-outline {
   background: var(--accent-soft);
   border: 1px solid var(--accent);
