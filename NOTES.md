@@ -1011,6 +1011,16 @@ user-scalable=no.
 
 ## Shipped (roadmap archive)
 
+- [x] **2.46 — acting on the photos you picked** — SHIPPED 2026-09-14 to staging,
+  awaiting the on-device pass. Picking marked photos and nothing consumed the
+  marks; the Export panel now says how many are picked and exports them all in one
+  press, into the collection that already hands over as one file or one zip. Each
+  one goes through the app's OWN open and the SAME export description the Export
+  button uses — proven byte for byte, both for a photo edited by hand and for one
+  picked in the quick look and never opened. Stoppable, one at a time, and it puts
+  the reader back on the photo they were standing on. With it: a quarter-turn now
+  survives leaving a photo and coming back, and straightening gained a tenth-of-a-
+  degree button either side of the slider plus twice as many alignment lines.
 - [x] **2.45 — exporting as you go, without stopping** — SHIPPED 2026-09-14 to
   staging, awaiting the on-device pass. Two parts. EXPORT STOPPED OWNING THE
   SCREEN: the same export, the same two presses, with the editor live while it
@@ -13180,3 +13190,69 @@ measure nothing.
 - And resolving `--accent` with a digit regex turned `#9fc2f5` into `rgb(9,2,5)`.
   A token is a string until a browser parses it; set it on a probe and read it
   back.
+
+
+## Acting on the picks, 2026-09-14
+
+Picking shipped and nothing consumed it. A reader could mark a hundred photos and
+then had no way to act on them: the export collection beside it holds exports
+already run, one at a time, which is a different thing. The Export panel now says
+how many are picked and exports them all in one press.
+
+**THE FIRST IMPLEMENTATION WAS WRONG AND THE WALK CAUGHT IT.** It built each
+photo's parameters through `batchParamsFor` — the function a batch uses, whose own
+comment says it applies "the same automatics an open applies". It does not, quite:
+a batch sets the channel swap from the look, while an open leaves the running
+value, which defaults ON for a raw. Measured against the same photo opened and
+exported by hand: **43 of 255 on the worst channel and 6 on the mean.** That is a
+visibly different photograph, from two implementations of one idea.
+
+**SO THERE IS ONE PATH NOW.** `openPhotoExportJob()` describes an export of the
+photo that is open — file, frame, parameters, options, lens — and BOTH the Export
+button and the picked export use it. The picked export OPENS each photo through
+`switchToPhoto` (quietly, so a modal does not flash per photo) and then exports
+what is open. It is not a parallel develop that has to be kept in step; it is the
+reader pressing Export on each one, done for them. Byte-identical is then true by
+construction, and the walk asserts it both ways: a photo edited and turned by hand,
+and a photo picked in the quick look and never opened.
+
+It is stoppable, keeps what is already stored when stopped, refuses to run while a
+single export is going and vice versa, and puts the reader back on the photo they
+were standing on — they pressed a button in a panel, they did not ask to be left
+at the end of the run.
+
+## A quarter-turn that stays turned, 2026-09-14
+
+`showDecoded` sets the rotation from the file's own EXIF and the flip to zero on
+every open, and neither was in the stored edit or in `LiveEdit`. So turning a
+portrait frame, moving on and coming back put it back the way the camera wrote it
+— and the picked export would have exported it that way too. Both now ride the
+edit, restored after `showDecoded` has set the file's default. They are view state
+and still ride no saved look and no batch, exactly like crop and straighten.
+Asserted by the SHAPE of the frame on screen rather than by reading the renderer's
+own variable, across a switch away and back, a Reset, and a reload.
+
+## Straightening: what was actually coarse, 2026-09-14
+
+The report was that it would not go finer than about a third of a degree. The
+finder is not the reason: `findTilt` already fits a parabola to the Hough peak and
+takes its vertex, and its own comment records 0.54° from the cell centre against
+0.66° interpolated on a horizon drawn at 0.7°.
+
+**THE SLIDER IS. Measured: 0.429° per pixel of drag, across 210 px.** Ninety
+degrees of range on a HUD pill is a control for finding an angle, not for landing
+on one, and a keyboard could always do tenths where a finger never could. There is
+a −0.1° and a +0.1° button either side of it now, 44 px, hold to repeat after a
+beat so a tap that lingers is still one tenth, and a whole hold is one undo step
+like a drag of the slider.
+
+The alignment grid went from sixths to twelfths while straightening, at a lower
+alpha because twice the lines at the same weight is twice the ink over the
+photograph. A horizon is levelled against the nearest line to it, so what helps is
+having one close.
+
+**AND THE GRID CHECK LIED TWICE before it worked.** It first read the declared
+CSS looking for "12" — the browser had already resolved `calc(100% / 12)`, so it
+found nothing and reported a grid that had changed as one that had not. Rewritten
+to read the resolved period, it looked for pixels; the period comes back as
+`8.33333%`. Counted from the percentage it reads twelve, both axes, both themes.
