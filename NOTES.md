@@ -527,7 +527,38 @@ user-scalable=no.
 > short bold title so the parser stays reliable. Editing this list updates
 > the app on the next deploy. Both the roadmap and the patch notes (last
 > commits) refresh automatically on push.
-> Shipped items move to the "## A tile is a claim, 2026-09-14
+> Shipped items move to the "## The patch notes labelled three releases with a commit count, 2026-09-14
+
+**FOUND BY VERIFYING A DEPLOY, not by looking for it.** Comparing the bundle the
+runner built against the one built here, to prove the deployed code was the code
+that had been walked, they differed — same length, sixteen bytes apart, all of
+them inside the patch-notes version strings: `version:"0.540"` on the runner
+against `version:"0.257"` here, for the same release.
+
+**Neither was right.** `versionFor` in `vite.config.ts` read the VERSION base and
+the commit that declared it ONCE, at HEAD, and passed both in for every entry.
+For a commit older than the last bump, `git rev-list --count baseCommit..hash` is
+0 — an ancestor has nothing after it — so `since > 0` was false, nothing threw,
+and it fell through to the pre-VERSION `0.N` scheme, which is a count of
+reachable commits. Three of the five releases the app shows read `v0.257`. It is
+not a version, and it is not stable either: this container's clone is shallow at
+259 commits and the runner's is full at 540, so the same release was labelled two
+different ways by the same source.
+
+They shipped as **2.45, 2.45.1, 2.45.2 and 2.45.3**, which is what the ⓘ panel
+and `notes.html` say now. The fix resolves the base AS OF each commit —
+`git show <hash>:VERSION` and `git log -1 --format=%H <hash> -- VERSION` — and
+treats a count of zero as "this commit is the declaration" rather than as a
+failure. HEAD keeps passing the working tree's VERSION in, because a release
+commit's own build must read the bump it is making.
+
+**The shape worth keeping.** A fallback reached by a FALSE CONDITION rather than
+by an exception is silent by construction: the `catch` beside it says what the
+fallback is for, and the path that actually reached it never went near the catch.
+And a number derived from `rev-list --count` is a fact about a clone, not about a
+release — it cannot be a version unless every clone that builds is full.
+
+## A tile is a claim, 2026-09-14
 
 The strip and the quick look grid ARE the conveyor: the reader decides from the
 tiles and never opens most of the set. So a tile is a claim — this is what
