@@ -15,9 +15,20 @@ name: Gates
 #
 # The inputs each name a FACT about this repo rather than a preference. `pwa` is
 # true because there is a service worker. `mirror` is false because this repo
-# does not carry its own offline copy of the disclosure patterns. No palette
-# JSON and no text-size paths are declared yet; both are real gaps rather than
-# opinions, and naming them here is how they stay visible.
+# does not carry its own offline copy of the disclosure patterns.
+#
+# `textsize-paths` was empty for the life of this file, under a note calling it
+# a real gap rather than an opinion — and a gap that is named and not closed is
+# a gap. Filled 2026-09-14 with every stylesheet this app ships and every page
+# it serves from source. It came back green on the first run (no fixed font
+# sizes, 100 relative declarations) and a planted `font-size: 13px` in
+# swstrip.css made it fail, so the green is a measurement rather than an
+# absence. It matters here beyond conformance: page zoom scales px and these
+# apps are used on a tablet, where raising the default text size is the setting
+# people actually reach for, and a px-only stylesheet does nothing for them.
+#
+# `palette-path` stays empty, and that one IS still a gap: it needs a palette
+# JSON this repo does not have, which is its own piece of work.
 #
 # The flag is a description, NEVER a way to switch a failing gate off. Two were
 # failing when this was wired — an undeclared placeholder pair and an `npm
@@ -36,6 +47,7 @@ permissions:
 
 jobs:
   hub-gates:
-    uses: njefferson/noahjefferson/.github/workflows/hub-gates.yml@82069a9e0c085e213fdcf681a90826717e20504d
+    uses: njefferson/noahjefferson/.github/workflows/hub-gates.yml@bf9e3ab752c33c3309604d6c04c62b985b3bf6ca
     with:
       pwa: true
+      textsize-paths: src/style.css src/launcher.css src/swstrip.css public/palette.css ir.html macro.html index.html debug.html privacy.html

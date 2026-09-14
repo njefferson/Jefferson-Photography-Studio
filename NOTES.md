@@ -1046,6 +1046,62 @@ of, which is hub §119's closing point arriving from the other direction.
 And a section boundary is load-bearing markup when something parses the file —
 appending to a document that is also an input is a code change wearing prose.
 
+## Reading the doctrine found a whole app with no version on screen, 2026-09-14
+
+**THIS REPO HAD NO `.doctrine-sync` AT ALL**, so nothing recorded which version
+of the shared rules it had ever been held to, and every session got the same
+"no marker" message carrying no information about what was unreconciled. The hub
+says to run `doctrine-sync.mjs` FIRST in any sibling session; it had never been
+run here. Reading DOCTRINE.md rather than the index of it found two things.
+
+**§7b — Macro Studio shipped without a build stamp, for its whole life.** The
+rule is non-negotiable per app, from the first deploy: the running version is on
+screen in the normal working view, written at BOOT, because the reader reports
+from a device with a screenshot they did not compose — and without a version on
+it, a live defect, one already fixed, a stale cached shell and a build from three
+releases ago are indistinguishable, and the session guesses. The editor has
+carried one since its first deploy. The other app in the same repository had
+none.
+
+**AND THE FIRST FIX WAS ON SCREEN AND WAS NOT THE STAMP.** Adding the markup and
+a boot write produced a stamp measuring the inherited body colour at the
+inherited size with `user-select` never reaching it: `.ver-tag` lives in
+`style.css`, and **Macro Studio does not load style.css**. The class did nothing.
+Measured before and after — `rgb(234,234,234)` at default size against
+`rgb(193,193,193)` at 11px, which is what `--txt-3` resolves to and what the
+editor's stamp has always been.
+
+So the look moved to `src/verstamp.css`, imported by `src/verstamp.ts`, which is
+the one module that writes the stamp — the `swstrip.css` shape exactly, and for
+the reason that file already gives: three stylesheets would otherwise carry three
+copies and "which one is current" would have three answers. The editor's inline
+stamp write became a call to the same function. Asserted on both apps in both
+themes: on screen at rest, the colour IS the `--txt-3` token, `opacity: 1` (a
+stamp dimmed with opacity is invisible to a contrast gate — §7b, and two sibling
+apps shipped 2.54:1 while their gate read 4.79:1), 11px, and selectable so a
+version can be pasted rather than transcribed.
+
+**§4 — `textsize-paths` was empty in `gates.yml` for the life of that file**,
+under a comment calling it a real gap rather than an opinion. A gap that is named
+and not closed is a gap. Filled with every stylesheet this app ships and every
+page it serves from source. It came back green on the first run — no fixed font
+sizes, 100 relative declarations — and a planted `font-size: 13px` in
+`swstrip.css` made it fail, so the green is a measurement rather than an absence.
+It matters here beyond conformance: page zoom scales `px`, and on a tablet
+raising the DEFAULT TEXT SIZE is the setting people actually reach for, which a
+px-only stylesheet does nothing for.
+
+**And the pin was four weeks behind the marker that did not exist.** `gates.yml`
+called the hub at `82069a9` while the hub was at `bf9e3ab`, so every gate added
+upstream in between was enforced nowhere. Both now read `bf9e3ab`, and
+`tools/hub-pin-check.mjs` (copied from the sibling that carries it, where it is
+deliberately a repo-local check rather than a hub gate) runs on every commit
+through `.branch-guard`'s `also=`. Planted a pin behind the marker: refused.
+
+**Still open from that read:** there is no `ACCESSIBILITY.md` (§12 — the
+append-only register, for a repo with a UI), and `palette-path` stays empty
+because it needs a palette JSON this repo does not have.
+
 ## The sweep is fifteen walks and one command now, 2026-09-14
 
 **FOUR WALKS WERE IN THE REPOSITORY AND ROUGHLY EIGHTEEN WERE NOT**, including
