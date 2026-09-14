@@ -1046,6 +1046,51 @@ of, which is hub §119's closing point arriving from the other direction.
 And a section boundary is load-bearing markup when something parses the file —
 appending to a document that is also an input is a code change wearing prose.
 
+## A verdict pressed as the tab goes away, 2026-09-14
+
+**FIXED.** `Session.setMark` opens a database, reads a row and puts it back under
+strict durability — tens of milliseconds at best — while a verdict is one
+keypress. The mark lost was always the LAST one pressed; the ones before it had
+time to land.
+
+**Not a contrived race on the device this is built for.** iPadOS discards
+background tabs and reloads them by itself, so "the page came back a moment after
+I pressed X" is what a long culling session looks like. The whole point of a
+verdict is that it is a decision rather than a highlight.
+
+The intent is now recorded SYNCHRONOUSLY, in `localStorage`, before the durable
+write is started: by the time the press returns, the mark exists somewhere no
+reload can beat. The durable row is still the real home — the mirror only has to
+survive the gap. `listPhotos` applies anything left over and re-issues the write,
+so a mark that died in the gap comes back on resume and then lands properly, and
+it is done THERE rather than in a separate call because it is the one function
+every path that rebuilds a session already goes through. `forgetSession` clears
+the mirror, or a pending verdict outlives the session it belonged to.
+
+Two details that are not decoration. A cleared verdict is stored as `null`, which
+is a different thing from no entry — U followed by a discard has to clear the
+stored mark, not leave it. And the entry is dropped on completion only if it is
+still the same answer, because a second press while the first was in flight
+leaves a NEWER intent there and clearing it would throw the reader's last press
+away.
+
+**THE FIRST VERSION OF THE WALK PASSED AGAINST THE DEFECT, and that is the part
+worth keeping.** It issued the press and `location.reload()` from inside the page
+in one task, which sounds tight and is not: reload only QUEUES a navigation, the
+document keeps running, and the write commits before unload. With the
+synchronous mirror REMOVED it reported four of four green — a negative control
+coming back clean, which means the instrument was measuring nothing.
+`tools/verdict-durability-walk.mjs` closes the page instead, destroying the
+renderer with the write in flight, which is what a discarded tab actually does.
+Against the unfixed write path checks 3 and 4 fail and 1 and 2 pass, and those
+two passing are the controls: they prove the walk reached the state and that
+earlier marks really do survive.
+
+**And this was the intermittent check.** The scratchpad `verdicts.mjs` check 10
+reloads right after its final press, failed now and then for weeks, and was
+written off as flaky. It was not flaky. It was the product, and the
+intermittency was how close the race ran.
+
 ## The accessibility sweep is in the repository, and its list refuses now, 2026-09-14
 
 **IT WAS THE ONE THE RECORDS NAMED.** The sweep was rebuilt in the session

@@ -157,15 +157,103 @@ export async function setEdit(id: string, edit: string | null): Promise<void> {
   }
 }
 
-/** Every stored photo's metadata (incl. thumbnail + edit), strip order first. */
+// THE PRESS IS SYNCHRONOUS AND THE WRITE IS NOT, AND A RELOAD CAN LAND BETWEEN
+// THEM. `setMark` opens a database, reads a row and puts it back under strict
+// durability — tens of milliseconds at best — while a verdict is one keypress.
+// Measured: press X and reload at once and the mark is gone, every time, and it
+// is always the LAST one pressed; the ones before it had time to land.
+//
+// That is not a contrived race on the device this is built for. iPadOS discards
+// background tabs and reloads them by itself, so "the page reloaded a moment
+// after I pressed X" is what a long culling session looks like, not an edge
+// case — and the whole point of a verdict is that it is a decision rather than
+// a highlight.
+//
+// So the intent is recorded SYNCHRONOUSLY, in localStorage, before the durable
+// write is even started: by the time the press returns, the mark exists
+// somewhere no reload can beat. The durable row is still the real home — this
+// only has to survive the gap. `listPhotos` applies anything left over and
+// re-issues the write, so a mark that died in the gap comes back on resume and
+// then lands properly.
+//
+// Failure is silent BY DESIGN, twice over: a private window throws on
+// localStorage, and losing the mirror only puts the behaviour back to what it
+// was. A reader must not be told about a safety net they never asked for.
+const PENDING_KEY = "ips-pending-marks";
+
+type PendingMarks = Record<string, PhotoMeta["mark"] | null>;
+
+function readPending(): PendingMarks {
+  try {
+    const raw = localStorage.getItem(PENDING_KEY);
+    const p = raw ? JSON.parse(raw) : {};
+    return p && typeof p === "object" ? (p as PendingMarks) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writePending(p: PendingMarks): void {
+  try {
+    if (Object.keys(p).length) localStorage.setItem(PENDING_KEY, JSON.stringify(p));
+    else localStorage.removeItem(PENDING_KEY);
+  } catch {
+    /* private window, or full: the durable write is still the real one */
+  }
+}
+
+/** Remember an intent the durable write has not caught up with. `null` is a
+ *  CLEARED verdict, which is a different thing from "no pending entry" — U on a
+ *  photo followed by a reload has to clear the stored mark, not leave it. */
+function notePending(id: string, mark: PhotoMeta["mark"]): void {
+  const p = readPending();
+  p[id] = mark ?? null;
+  writePending(p);
+}
+
+/** Drop an entry once its row is really on the disk — but only if it is still
+ *  the same answer. A second press while the first was in flight leaves a newer
+ *  intent here, and clearing it on the older write's completion would throw the
+ *  reader's last press away. */
+function clearPending(id: string, mark: PhotoMeta["mark"]): void {
+  const p = readPending();
+  if (!(id in p)) return;
+  if (p[id] !== (mark ?? null)) return;
+  delete p[id];
+  writePending(p);
+}
+
+/** Every stored photo's metadata (incl. thumbnail + edit), strip order first.
+ *
+ *  Anything still pending is applied over what came back and written again, so
+ *  a resume shows the verdict the reader actually pressed. Done here rather
+ *  than in a separate call somebody has to remember: this is the one function
+ *  every path that rebuilds a session already goes through. */
 export async function listPhotos(): Promise<PhotoMeta[]> {
   const db = await open();
+  let metas: PhotoMeta[];
   try {
-    const metas = await req<PhotoMeta[]>(db.transaction(META).objectStore(META).getAll());
-    return metas.sort((a, b) => a.order - b.order);
+    metas = await req<PhotoMeta[]>(db.transaction(META).objectStore(META).getAll());
   } finally {
     db.close();
   }
+  const pending = readPending();
+  const ids = Object.keys(pending);
+  if (ids.length) {
+    for (const m of metas) {
+      if (!(m.id in pending)) continue;
+      const want = pending[m.id];
+      if (want) m.mark = want;
+      else delete m.mark;
+    }
+    // Not awaited: a resume must not wait on a repair, and a failure here just
+    // leaves the entry pending for next time.
+    for (const id of ids) {
+      if (!metas.some((m) => m.id === id)) { clearPending(id, pending[id] ?? undefined); continue; }
+      void setMark(id, pending[id] ?? undefined).catch(() => {});
+    }
+  }
+  return metas.sort((a, b) => a.order - b.order);
 }
 
 export async function photoCount(): Promise<number> {
@@ -207,6 +295,9 @@ export async function setThumb(id: string, thumb: ArrayBuffer): Promise<void> {
  *  touched. A verdict has to survive a reload or it is not a decision, it is a
  *  highlight. */
 export async function setMark(id: string, mark: PhotoMeta["mark"]): Promise<void> {
+  // FIRST, AND SYNCHRONOUSLY — see PENDING_KEY above. Everything below can be
+  // beaten by a reload; this line cannot.
+  notePending(id, mark);
   const db = await open();
   try {
     await new Promise<void>((res, rej) => {
@@ -227,6 +318,7 @@ export async function setMark(id: string, mark: PhotoMeta["mark"]): Promise<void
         store.put(next);
       };
     });
+    clearPending(id, mark); // the row is really on the disk now
   } finally {
     db.close();
   }
@@ -306,6 +398,9 @@ export async function forgetSession(): Promise<string[]> {
       t.objectStore(META).clear();
     });
     void dropBytes(ids); // not awaited: this is the whole point of the split
+    // And the synchronous mirror, or a pending verdict outlives the session it
+    // belonged to and accumulates for ever in a key nobody reads.
+    writePending({});
     return ids;
   } finally {
     db.close();
