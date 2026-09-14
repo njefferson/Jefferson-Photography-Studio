@@ -337,7 +337,15 @@
               <button id="lookHie" type="button">HIE B&amp;W<small class="look-sub"></small></button>
             </div>
             <p class="note">Press a look again to flip its R&#8646;B channel swap &mdash; the state shows under its name.</p>
-            <p class="note" id="lookState" role="status" aria-live="polite" hidden></p>
+            <!-- The one-band notice, and the choice it used to make for you.
+                 Before 2026-09-11 a camera JPEG like this was always balanced
+                 under a colour look; a session then made skipping it the policy,
+                 on one photograph's evidence. The sentence stays and the button
+                 puts the other rendering one press away, per photo, undoable. -->
+            <div class="note" id="lookState" role="status" aria-live="polite" hidden>
+              <span id="lookStateTxt"></span>
+              <button id="lookForceBalance" type="button" class="accent-outline" aria-pressed="false">Balance it anyway</button>
+            </div>
             <button id="irLift" class="toggle full-btn" type="button" aria-pressed="true">Restore depth</button>
             <p class="note" id="liftState" role="status" aria-live="polite" hidden></p>
             <label>Strength <input id="liftAmt" type="range" min="0" max="100" step="5" value="100" /></label>
@@ -1137,7 +1145,7 @@
           <li><strong>Quick look a folder</strong> (top bar, and on the start screen) when you just want to <em>see</em> what's in a set:
           an instant grid of auto-balanced previews, nothing saved. Tap the keepers and <strong>Keep in a session</strong>
           sends them straight into an editable session.</li>
-          <li>On open, <strong>raw photos are auto-balanced</strong> (white balance, exposure, denoise, blown-highlight recovery when the frame needs it, and <strong>Restore depth</strong>); JPEG/HEIC open as the camera rendered them, with measured denoise only &mdash; until you pick a Look, which balances them first, because a false-colour look needs colours something has already pulled apart. Every one of those lands on a slider you can see and undo, and <strong>Hold: Untouched</strong> shows the bare decode any time.</li>
+          <li>On open, <strong>raw photos are auto-balanced</strong> (white balance, exposure, denoise, blown-highlight recovery when the frame needs it, and <strong>Restore depth</strong>); JPEG/HEIC open as the camera rendered them, with measured denoise only &mdash; until you pick a Look, which balances them first, because a false-colour look needs colours something has already pulled apart. A camera file with all its colour in ONE band is the exception: balancing it invents the second band by crushing red, so the app leaves it alone, says so beside the looks, and offers <strong>Balance it anyway</strong> if you want that rendering on that photograph. Every one of those lands on a slider you can see and undo, and <strong>Hold: Untouched</strong> shows the bare decode any time.</li>
           <li><strong>Tap foliage</strong> in the photo to fine-tune white balance — the classic IR move. Tapping a blown-out spot is refused and says so: there is no colour recorded in it to balance from.</li>
           <li><strong>The usual shortcuts work.</strong> <strong>Cmd/Ctrl&#8202;+&#8202;Z</strong> undoes and <strong>Cmd&#8202;+&#8202;Shift&#8202;+&#8202;Z</strong> (or <strong>Ctrl&#8202;+&#8202;Y</strong>) redoes. You can <strong>drag photos onto the window</strong> or <strong>paste</strong> one to open it. <strong>Esc</strong> closes any panel, and on a home-screen install the <strong>Back</strong> gesture closes the panel instead of leaving the app.</li>
           <li><strong>Double-tap any slider</strong> to put it back where the photo opened. Most of them don't start at zero — white balance, exposure and denoise open at values measured from your frame — so this returns that one slider to its opening value, the way <strong>Reset</strong> does for all of them at once. Quality goes back to its usual setting instead, since that one is yours rather than the photo's. Restore depth strength goes back to 100% — the full correction worked out for the frame in front of you, which is where every photo opens.</li>
