@@ -527,243 +527,7 @@ user-scalable=no.
 > short bold title so the parser stays reliable. Editing this list updates
 > the app on the next deploy. Both the roadmap and the patch notes (last
 > commits) refresh automatically on push.
-> Shipped items move to the "## The accessibility sweep is in the repository, and its list refuses now, 2026-09-14
-
-**IT WAS THE LAST INSTRUMENT THAT WAS NOT.** The sweep was rebuilt in the session
-scratchpad before each release, its result written into these notes, and nothing
-in the repository held it — so a session that did not know it existed shipped
-without it, and a container going away took it with it. Both this file and the
-live status page carried that as an open debt for weeks. It is
-`tools/a11y-walk.mjs` now, beside the two walks that moved for the same reason.
-
-**MOVING THE FILE WAS THE SMALL HALF.** The scratchpad version carried this, in
-its own words, above a hardcoded list:
-
-    A NEW SURFACE JOINS THIS LIST IN THE SAME COMMIT THAT CREATES IT, or it
-    ships unmeasured — which is how .ql-btn stayed 34px for as long as it did.
-
-True, and it refused nothing. Measured on the run that replaced it: **ir.html
-declares fifteen dialogs and the sweep opened three**; the axe pass ran on
-`ir.html` alone while **seven pages deploy**. The instruction had been read and
-obeyed by whoever wrote it and by nobody since, which is the whole of this
-family's escalation argument — `branch-guard` and `plan-guard` are the same
-shape.
-
-`tools/surfaces.mjs` is the one enumeration and it is an ASSERTION, checked
-**both ways against the BUILD** rather than against the source tree, because
-`notes.html` does not exist as a file — vite generates it at build time, so a
-list built from the repository would be missing a page that ships. A page or
-dialog that deploys undeclared fails; a declaration that no longer deploys fails
-too, because a removed surface leaves its entry behind and the next reader
-trusts it. Four plants, each made to fail before the list was trusted: a dropped
-dialog, a page that no longer exists, a page removed from the list, a dialog
-listed that is not in the markup. `class-width-walk.mjs` imports the same list —
-it had four page names hardcoded while seven deploy, so three pages were never
-walked and nothing said so.
-
-**WHAT THE FIRST FULL RUN FOUND, and the comment that had already excused it.**
-`style.css` carried, above a rule scoped to one dialog:
-
-    ...every other dialog's buttons are a measured, shipped surface and are not
-    being churned from this change.
-
-They were not measured. With the whole list in hand the sweep found **six
-buttons at 35px on two decision dialogs** — `#locDlg`'s four, which ask a reader
-to choose what happens to the location written into their photograph, and
-`#askDlg`'s two. On a tablet, by finger, against a 44px floor. The rule is
-generic now (`dialog button { min-height: 44px }`), which `min-height` makes
-safe: it only ever raises, so it reaches exactly the controls that were short
-and leaves every one already clearing the floor alone. Negative control: put the
-floor back to 34 and the sweep reports six failures across three dialogs and two
-widths; restore it and all pass.
-
-**Two of the first run's ten findings were the instrument, and both corrections
-are the standard rather than a way past it.**
-
-- **Inline in a sentence is exempt.** SC 2.5.8 excepts a target "in a sentence,
-  or whose size is otherwise constrained by the line-height of non-target
-  text" — enlarging a link in the middle of a paragraph breaks the paragraph.
-  The sweep matched every `a[href]` including prose links. Tested structurally
-  rather than by tag, because this app has a `<button>` styled as a link
-  mid-sentence (`#bcQuick`) and it is the same case: laid out inline, and
-  sharing its parent with real text. **Five elements are exempt across all seven
-  pages and every one prints on every run** — an exemption nobody sees is the
-  difference between "the sweep found nothing" and "the sweep looked at
-  nothing", and only the printed list tells them apart.
-- **A button labelled at open time is empty when opened cold**, and an empty
-  button measures its padding. `#askDlg`'s two came back 41x19 that way and read
-  as a finding. The walk seeds them with **"OK"**, which is the shortest label
-  `askDialog` is actually called with, so the measurement is the tightest real
-  case rather than a flattering one — and it says on every run which buttons it
-  seeded. With the real label they measure 77x35, which is how the genuine
-  height shortfall surfaced.
-
-**Found, not fixed, and it may matter more than it looks.** The scratchpad
-`verdicts.mjs` check 10 is intermittent, and this run showed the mechanism: the
-mark lost is always the one set immediately before the reload (`-,-,Pick,-`
-against `-,Reject,Pick,-` — the Pick, set earlier, survives). `Session.setMark`
-is a durable write and the reload can beat it. It reproduces on the pre-change
-build, so it is not from this work. **The reason to look at it: iPadOS discards
-background tabs and reloads them**, so "pressed X and the page reloaded in the
-same instant" is not a contrived sequence on the target device — it is what a
-long culling session looks like. Fixing it is a design decision (block, or
-write on `pagehide`), not a tail-end patch.
-
-## The patch notes labelled three releases with a commit count, 2026-09-14
-
-**FOUND BY VERIFYING A DEPLOY, not by looking for it.** Comparing the bundle the
-runner built against the one built here, to prove the deployed code was the code
-that had been walked, they differed — same length, sixteen bytes apart, all of
-them inside the patch-notes version strings: `version:"0.540"` on the runner
-against `version:"0.257"` here, for the same release.
-
-**Neither was right.** `versionFor` in `vite.config.ts` read the VERSION base and
-the commit that declared it ONCE, at HEAD, and passed both in for every entry.
-For a commit older than the last bump, `git rev-list --count baseCommit..hash` is
-0 — an ancestor has nothing after it — so `since > 0` was false, nothing threw,
-and it fell through to the pre-VERSION `0.N` scheme, which is a count of
-reachable commits. Three of the five releases the app shows read `v0.257`. It is
-not a version, and it is not stable either: this container's clone is shallow at
-259 commits and the runner's is full at 540, so the same release was labelled two
-different ways by the same source.
-
-They shipped as **2.45, 2.45.1, 2.45.2 and 2.45.3**, which is what the ⓘ panel
-and `notes.html` say now. The fix resolves the base AS OF each commit —
-`git show <hash>:VERSION` and `git log -1 --format=%H <hash> -- VERSION` — and
-treats a count of zero as "this commit is the declaration" rather than as a
-failure. HEAD keeps passing the working tree's VERSION in, because a release
-commit's own build must read the bump it is making.
-
-**The shape worth keeping.** A fallback reached by a FALSE CONDITION rather than
-by an exception is silent by construction: the `catch` beside it says what the
-fallback is for, and the path that actually reached it never went near the catch.
-And a number derived from `rev-list --count` is a fact about a clone, not about a
-release — it cannot be a version unless every clone that builds is full.
-
-**AND THE BUILD IS REPRODUCIBLE NOW, WHICH IT WAS NOT.** Fetching the deployed
-bundle and comparing it with a local build of the same commit now comes back
-byte-for-byte identical — the same content hash in the filename, the same bytes
-apart from the sourcemap name — from a 259-commit shallow clone against a
-540-commit full one. Before the fix the two could not agree, because the version
-strings baked into the patch notes counted whatever history the clone had. That
-comparison is worth running on any release: a green deploy row says the job
-exited zero, and this says the thing that shipped is the thing that was walked.
-
-**One instrument error on the way, and it is the standing one.** The first
-comparison came back differing at byte 48 and it was tempting to read that as a
-build that was not reproducible after all. The deployed site had moved on by one
-commit between the fetch and the build — the app's own version line said 2.46.3
-while the local build was 5aa019e at 2.46.2 — so two different commits were being
-compared, and the difference was the shared chunk's content hash in an import.
-When a result looks absurd, suspect the instrument: here it was comparing against
-whatever the edge happened to be serving rather than against a named commit.
-
-## A tile is a claim, 2026-09-14
-
-The strip and the quick look grid ARE the conveyor: the reader decides from the
-tiles and never opens most of the set. So a tile is a claim — this is what
-opening this photograph will show you — and the app already had the machinery to
-keep it true: a `thumbGrade` stamped onto every tile, a `stampFor` that says what
-the tile should be a picture of, and `restripForGrade` to mark the ones that have
-stopped matching. Four things got past all of it. None of them is a function
-doing something other than what it says; each is a function whose statement is
-only true under a condition no single file states.
-
-**A kept preview came back under the grade it was made under.** `previewKey` had
-the file's identity, the build's pipeline, the preview size and the reader's lens
-profiles in it, under a header in `src/previewcache.ts` listing "what makes a
-cached picture wrong, and every one of these is in the key". The grade was not in
-it, and a grid tile is rendered under the live look, swap, bias and lift —
-`makeThumb` with no own edit clones exactly that state. Scan a folder under
-Aerochrome, press B&W IR, scan the same folder: every tile came back Aerochrome,
-and the app said so in its own words, "3 of 3 came back from this device — no
-decoding needed". The fix is the grade in the key, fingerprinted through the one
-FNV-1a in the new `src/stamp.ts` — which `profilesStamp` had written inline and
-now calls, because the second copy is where two answers come from.
-`PREVIEW_PIPELINE` moved 2 to 3: nothing in the old rows says what grade they are
-pictures of, so they must not be reachable, not merely missed.
-
-**And the strip-sized twin in the same row made it worse.** That twin is what
-"Keep in a session" hands across, and the session then stamped it with the
-CURRENT grade under a comment reading "the grid rendered this one under the live
-grade" — true of a fresh render, false of a cache hit. A stale picture marked
-true is worse than a stale picture: `restripForGrade` only ever redraws a tile
-whose stamp has stopped matching, so that one could never be found again.
-
-**Opening a photograph flattened its tile.** In `makeThumb` the object literal
-set `tone`, `sky` and `foliage` to identity unconditionally, overriding the
-spread of the photo's own params, and the re-solve below it was gated on `!own`.
-So a photo that had never been opened got the lift solved for it, and a photo
-that HAD been opened — carrying its own solved curve — had it thrown away with
-nothing to put it back. Restore depth is on by default, so that was every opened
-photo. The clearing was collateral from an earlier fix whose target was the other
-branch (a tile inheriting ANOTHER frame's correction); for a photo's own edit the
-values were never another frame's. Measured: 23.53 of 255 mean channel difference
-between the same photograph's tile opened and not opened under one look, against
-2.08 with the curve kept, which is the JPEG encoder and the 32px resample.
-
-**Restore depth never redrew the strip.** Its strength slider called
-`restripForGrade` ("the tiles are claims about this too"); the on/off toggle
-beside it did not, so the strip went on showing the other state for the rest of
-the session. And `stampFor` could not have expressed the right answer anyway: it
-put the lift's session controls into EVERY tile's stamp, so a toggle would have
-marked the whole strip stale including photos it cannot touch. The two cases are
-rendered from different things and are now stamped differently — a tile with no
-own edit is drawn through the session controls, so they belong in its stamp; a
-tile with one is drawn from that photo's own stored curve, so the three fields
-the lift writes belong in its stamp instead.
-
-**Those three fields go in `stampFor` and never in `stampOf`, and this is the
-trap.** `stampOf` is shared with the look-mark question, and `markLook` takes its
-stamp AFTER `applyLook` has run the lift — so a lift curve inside `stampOf` would
-make `looksUntouched` false on arrival at every other frame, silently stopping
-`carryLook` from carrying the session look. That is the standing default look,
-and it would have broken with nothing failing.
-
-**The open photograph's own tile was the one a look could not reach.** `ownEdit`
-answered with the `liveEdits` snapshot, which is SEEDED on arrival by
-`activateCurrent` and rewritten only on the way out by `captureActiveEdit`.
-Nothing refreshes it while the reader works — `flushRecord` moves the undo stack,
-not this — so for the photo actually open it was the state they came in on. Its
-stamp therefore never moved, `restripForGrade` never marked it stale, and the one
-tile a reader checks a look against first was the one tile that never followed.
-`ownEdit` now answers `snapshot()` for the active photo.
-
-**Why they shipped together.** Fixing the toggle alone would have made the
-flattening universal: before this, opening a photo did not change its stamp (a
-first visit lands on the same creative state the tile already showed, which is
-deliberate), so nothing redrew the tile and the defect stayed latent until
-something else forced a render. The toggle is exactly that something else.
-
-**`tools/tile-truth-walk.mjs`** is the instrument, committed rather than left in
-the scratchpad for the reason `class-width-walk.mjs` gives in its own header.
-Reading the source cannot answer any of these: telling a cache hit from a fresh
-render, or a redrawn tile from an untouched one, takes rendering both and
-measuring. It reads every tile three ways — the blob URL (was it redrawn at all),
-a hash of the stored JPEG bytes, and a 32x32 RGB signature so two pictures can be
-compared when the encoder is not byte-deterministic. **Eight of its checks went
-red against the tree as it was and all are green after it**; five pass on BOTH
-builds on purpose and are the controls, because a build that never caches or
-never redraws would otherwise read as a clean sheet.
-
-**Three things the first version of that walk got wrong, each of which looked
-like a finding.** Waiting for the grid's CELL count let it read tiles that had no
-picture yet, which came back as NaN differences and one accidental hash match.
-Its check on opening a photo used a no-op restripe as the trigger and measured
-0.00 against a build with the defect in it — a check that cannot fail is not a
-check; it takes two sessions of the same files, one where the photo is opened
-first and one where it never is. And it asserted that every tile follows a look,
-which is not true and should not be: a photo graded and left is not what a look
-pressed on a different frame is about, and the two that stayed put were right.
-
-**Observed, not fixed.** The scratchpad `verdicts.mjs` check 10 ("both verdicts
-come back after a reload") is intermittent — it failed once and passed once
-against this build, and failed against the pre-change build too, so it is not
-from this work. Check 15 does the same reload and does not flake. It reads the
-marks as soon as `#busy` closes; naming the cause would be a guess, and the
-measurement is that it reproduces on both builds.
-
-## Shipped (roadmap archive)" section below
+> Shipped items move to the "## Shipped (roadmap archive)" section below
 > (same format, full SHIPPED records) so the in-app roadmap shows only
 > what's genuinely coming; notes.html renders the archive as "Recently
 > shipped". Keep this section to OPEN items only.
@@ -1244,6 +1008,289 @@ measurement is that it reproduces on both builds.
   on the rule's closing brace found the one INSIDE its own comment, because the
   comment quotes `select, button { width: 100% }`. Plant by a unique anchor, and
   print what was planted.
+
+## The in-app Roadmap went to zero and five commits shipped it, 2026-09-14
+
+**A SESSION APPENDING TO THIS FILE BROKE THE DIALOG THIS FILE FEEDS.** The ⓘ
+Roadmap is parsed out of NOTES.md by `vite.config.ts`: find
+`## Next capability release`, read the `- [ ]` bullets under it, **stop at the
+next `## `**. An append anchored on the string `## Shipped (roadmap archive)`
+and used a plain replace — and that heading is MENTIONED, in quotes, inside the
+roadmap section's own blockquote, eight hundred lines above the real heading. So
+three sections landed INSIDE the roadmap, the first of their `## ` headings
+stopped the parser before the first bullet, and **the roadmap went from 18 items
+to 0**.
+
+It shipped in `dd643a1` and was still broken through `a8b5e05` — five commits,
+to staging and then to production, where it is live as this is written. Nothing
+went red anywhere, and nothing could: `checklist()` is wrapped in a try/catch
+returning `[]`, so every way of getting this wrong produces a clean build, a
+green deploy and a dialog with nothing in it. The build even told the truth on
+every run and nobody was reading it, because there was no number to compare it
+against.
+
+**`tools/notes-check.mjs` runs on every commit now**, through `.branch-guard`'s
+`also=`. It asserts the OUTPUT of the same parse rather than the shape of the
+file — what the reader would actually see — and it checks each heading appears
+exactly once AT THE START OF A LINE, because a bare `indexOf` on either of those
+strings is precisely what went wrong. Run against the state that shipped it
+reports two failures; against the commit before, none.
+
+**Three things to take from it.**
+A string that names a heading is not an anchor — the file that documents a
+heading contains that heading's name, so the mention comes first and a plain
+replace finds the documentation rather than the section.
+A parser whose failure mode is an empty result cannot be monitored by watching
+for errors; it has to be checked by asserting a count somebody knows the shape
+of, which is hub §119's closing point arriving from the other direction.
+And a section boundary is load-bearing markup when something parses the file —
+appending to a document that is also an input is a code change wearing prose.
+
+## The accessibility sweep is in the repository, and its list refuses now, 2026-09-14
+
+**IT WAS THE ONE THE RECORDS NAMED.** The sweep was rebuilt in the session
+scratchpad before each release, its result written into these notes, and nothing
+in the repository held it — so a session that did not know it existed shipped
+without it, and a container going away took it with it. Both this file and the
+live status page carried that as an open debt for weeks. It is
+`tools/a11y-walk.mjs` now, beside the two walks that moved for the same reason.
+
+**THIS PARAGRAPH SAID "THE LAST INSTRUMENT THAT WAS NOT", AND THAT WAS WRONG** —
+written into the commit message too, where it cannot be corrected. Counted after
+the fact: `journey`, `rotation`, `release`, `verdicts`, `collect`, `export-ui`,
+`export-report`, `switch-instrument`, `export-bytes` and nine feature-specific
+a11y probes are all still scratchpad-only, including `export-bytes`, which is
+the gate holding the output byte-identical, and `a11y-verdicts`, which encodes
+hub §293. **Four walks are in the repository and roughly eighteen are not.** The
+a11y sweep was the one the RECORDS named as owed, which is a different claim and
+the only one that was true.
+
+**MOVING THE FILE WAS THE SMALL HALF.** The scratchpad version carried this, in
+its own words, above a hardcoded list:
+
+    A NEW SURFACE JOINS THIS LIST IN THE SAME COMMIT THAT CREATES IT, or it
+    ships unmeasured — which is how .ql-btn stayed 34px for as long as it did.
+
+True, and it refused nothing. Measured on the run that replaced it: **ir.html
+declares fifteen dialogs and the sweep opened three**; the axe pass ran on
+`ir.html` alone while **seven pages deploy**. The instruction had been read and
+obeyed by whoever wrote it and by nobody since, which is the whole of this
+family's escalation argument — `branch-guard` and `plan-guard` are the same
+shape.
+
+`tools/surfaces.mjs` is the one enumeration and it is an ASSERTION, checked
+**both ways against the BUILD** rather than against the source tree, because
+`notes.html` does not exist as a file — vite generates it at build time, so a
+list built from the repository would be missing a page that ships. A page or
+dialog that deploys undeclared fails; a declaration that no longer deploys fails
+too, because a removed surface leaves its entry behind and the next reader
+trusts it. Four plants, each made to fail before the list was trusted: a dropped
+dialog, a page that no longer exists, a page removed from the list, a dialog
+listed that is not in the markup. `class-width-walk.mjs` imports the same list —
+it had four page names hardcoded while seven deploy, so three pages were never
+walked and nothing said so.
+
+**WHAT THE FIRST FULL RUN FOUND, and the comment that had already excused it.**
+`style.css` carried, above a rule scoped to one dialog:
+
+    ...every other dialog's buttons are a measured, shipped surface and are not
+    being churned from this change.
+
+They were not measured. With the whole list in hand the sweep found **six
+buttons at 35px on two decision dialogs** — `#locDlg`'s four, which ask a reader
+to choose what happens to the location written into their photograph, and
+`#askDlg`'s two. On a tablet, by finger, against a 44px floor. The rule is
+generic now (`dialog button { min-height: 44px }`), which `min-height` makes
+safe: it only ever raises, so it reaches exactly the controls that were short
+and leaves every one already clearing the floor alone. Negative control: put the
+floor back to 34 and the sweep reports six failures across three dialogs and two
+widths; restore it and all pass.
+
+**Two of the first run's ten findings were the instrument, and both corrections
+are the standard rather than a way past it.**
+
+- **Inline in a sentence is exempt.** SC 2.5.8 excepts a target "in a sentence,
+  or whose size is otherwise constrained by the line-height of non-target
+  text" — enlarging a link in the middle of a paragraph breaks the paragraph.
+  The sweep matched every `a[href]` including prose links. Tested structurally
+  rather than by tag, because this app has a `<button>` styled as a link
+  mid-sentence (`#bcQuick`) and it is the same case: laid out inline, and
+  sharing its parent with real text. **Five elements are exempt across all seven
+  pages and every one prints on every run** — an exemption nobody sees is the
+  difference between "the sweep found nothing" and "the sweep looked at
+  nothing", and only the printed list tells them apart.
+- **A button labelled at open time is empty when opened cold**, and an empty
+  button measures its padding. `#askDlg`'s two came back 41x19 that way and read
+  as a finding. The walk seeds them with **"OK"**, which is the shortest label
+  `askDialog` is actually called with, so the measurement is the tightest real
+  case rather than a flattering one — and it says on every run which buttons it
+  seeded. With the real label they measure 77x35, which is how the genuine
+  height shortfall surfaced.
+
+**Found, not fixed, and it may matter more than it looks.** The scratchpad
+`verdicts.mjs` check 10 is intermittent, and this run showed the mechanism: the
+mark lost is always the one set immediately before the reload (`-,-,Pick,-`
+against `-,Reject,Pick,-` — the Pick, set earlier, survives). `Session.setMark`
+is a durable write and the reload can beat it. It reproduces on the pre-change
+build, so it is not from this work. **The reason to look at it: iPadOS discards
+background tabs and reloads them**, so "pressed X and the page reloaded in the
+same instant" is not a contrived sequence on the target device — it is what a
+long culling session looks like. Fixing it is a design decision (block, or
+write on `pagehide`), not a tail-end patch.
+
+## The patch notes labelled three releases with a commit count, 2026-09-14
+
+**FOUND BY VERIFYING A DEPLOY, not by looking for it.** Comparing the bundle the
+runner built against the one built here, to prove the deployed code was the code
+that had been walked, they differed — same length, sixteen bytes apart, all of
+them inside the patch-notes version strings: `version:"0.540"` on the runner
+against `version:"0.257"` here, for the same release.
+
+**Neither was right.** `versionFor` in `vite.config.ts` read the VERSION base and
+the commit that declared it ONCE, at HEAD, and passed both in for every entry.
+For a commit older than the last bump, `git rev-list --count baseCommit..hash` is
+0 — an ancestor has nothing after it — so `since > 0` was false, nothing threw,
+and it fell through to the pre-VERSION `0.N` scheme, which is a count of
+reachable commits. Three of the five releases the app shows read `v0.257`. It is
+not a version, and it is not stable either: this container's clone is shallow at
+259 commits and the runner's is full at 540, so the same release was labelled two
+different ways by the same source.
+
+They shipped as **2.45, 2.45.1, 2.45.2 and 2.45.3**, which is what the ⓘ panel
+and `notes.html` say now. The fix resolves the base AS OF each commit —
+`git show <hash>:VERSION` and `git log -1 --format=%H <hash> -- VERSION` — and
+treats a count of zero as "this commit is the declaration" rather than as a
+failure. HEAD keeps passing the working tree's VERSION in, because a release
+commit's own build must read the bump it is making.
+
+**The shape worth keeping.** A fallback reached by a FALSE CONDITION rather than
+by an exception is silent by construction: the `catch` beside it says what the
+fallback is for, and the path that actually reached it never went near the catch.
+And a number derived from `rev-list --count` is a fact about a clone, not about a
+release — it cannot be a version unless every clone that builds is full.
+
+**AND THE BUILD IS REPRODUCIBLE NOW, WHICH IT WAS NOT.** Fetching the deployed
+bundle and comparing it with a local build of the same commit now comes back
+byte-for-byte identical — the same content hash in the filename, the same bytes
+apart from the sourcemap name — from a 259-commit shallow clone against a
+540-commit full one. Before the fix the two could not agree, because the version
+strings baked into the patch notes counted whatever history the clone had. That
+comparison is worth running on any release: a green deploy row says the job
+exited zero, and this says the thing that shipped is the thing that was walked.
+
+**One instrument error on the way, and it is the standing one.** The first
+comparison came back differing at byte 48 and it was tempting to read that as a
+build that was not reproducible after all. The deployed site had moved on by one
+commit between the fetch and the build — the app's own version line said 2.46.3
+while the local build was 5aa019e at 2.46.2 — so two different commits were being
+compared, and the difference was the shared chunk's content hash in an import.
+When a result looks absurd, suspect the instrument: here it was comparing against
+whatever the edge happened to be serving rather than against a named commit.
+
+## A tile is a claim, 2026-09-14
+
+The strip and the quick look grid ARE the conveyor: the reader decides from the
+tiles and never opens most of the set. So a tile is a claim — this is what
+opening this photograph will show you — and the app already had the machinery to
+keep it true: a `thumbGrade` stamped onto every tile, a `stampFor` that says what
+the tile should be a picture of, and `restripForGrade` to mark the ones that have
+stopped matching. Four things got past all of it. None of them is a function
+doing something other than what it says; each is a function whose statement is
+only true under a condition no single file states.
+
+**A kept preview came back under the grade it was made under.** `previewKey` had
+the file's identity, the build's pipeline, the preview size and the reader's lens
+profiles in it, under a header in `src/previewcache.ts` listing "what makes a
+cached picture wrong, and every one of these is in the key". The grade was not in
+it, and a grid tile is rendered under the live look, swap, bias and lift —
+`makeThumb` with no own edit clones exactly that state. Scan a folder under
+Aerochrome, press B&W IR, scan the same folder: every tile came back Aerochrome,
+and the app said so in its own words, "3 of 3 came back from this device — no
+decoding needed". The fix is the grade in the key, fingerprinted through the one
+FNV-1a in the new `src/stamp.ts` — which `profilesStamp` had written inline and
+now calls, because the second copy is where two answers come from.
+`PREVIEW_PIPELINE` moved 2 to 3: nothing in the old rows says what grade they are
+pictures of, so they must not be reachable, not merely missed.
+
+**And the strip-sized twin in the same row made it worse.** That twin is what
+"Keep in a session" hands across, and the session then stamped it with the
+CURRENT grade under a comment reading "the grid rendered this one under the live
+grade" — true of a fresh render, false of a cache hit. A stale picture marked
+true is worse than a stale picture: `restripForGrade` only ever redraws a tile
+whose stamp has stopped matching, so that one could never be found again.
+
+**Opening a photograph flattened its tile.** In `makeThumb` the object literal
+set `tone`, `sky` and `foliage` to identity unconditionally, overriding the
+spread of the photo's own params, and the re-solve below it was gated on `!own`.
+So a photo that had never been opened got the lift solved for it, and a photo
+that HAD been opened — carrying its own solved curve — had it thrown away with
+nothing to put it back. Restore depth is on by default, so that was every opened
+photo. The clearing was collateral from an earlier fix whose target was the other
+branch (a tile inheriting ANOTHER frame's correction); for a photo's own edit the
+values were never another frame's. Measured: 23.53 of 255 mean channel difference
+between the same photograph's tile opened and not opened under one look, against
+2.08 with the curve kept, which is the JPEG encoder and the 32px resample.
+
+**Restore depth never redrew the strip.** Its strength slider called
+`restripForGrade` ("the tiles are claims about this too"); the on/off toggle
+beside it did not, so the strip went on showing the other state for the rest of
+the session. And `stampFor` could not have expressed the right answer anyway: it
+put the lift's session controls into EVERY tile's stamp, so a toggle would have
+marked the whole strip stale including photos it cannot touch. The two cases are
+rendered from different things and are now stamped differently — a tile with no
+own edit is drawn through the session controls, so they belong in its stamp; a
+tile with one is drawn from that photo's own stored curve, so the three fields
+the lift writes belong in its stamp instead.
+
+**Those three fields go in `stampFor` and never in `stampOf`, and this is the
+trap.** `stampOf` is shared with the look-mark question, and `markLook` takes its
+stamp AFTER `applyLook` has run the lift — so a lift curve inside `stampOf` would
+make `looksUntouched` false on arrival at every other frame, silently stopping
+`carryLook` from carrying the session look. That is the standing default look,
+and it would have broken with nothing failing.
+
+**The open photograph's own tile was the one a look could not reach.** `ownEdit`
+answered with the `liveEdits` snapshot, which is SEEDED on arrival by
+`activateCurrent` and rewritten only on the way out by `captureActiveEdit`.
+Nothing refreshes it while the reader works — `flushRecord` moves the undo stack,
+not this — so for the photo actually open it was the state they came in on. Its
+stamp therefore never moved, `restripForGrade` never marked it stale, and the one
+tile a reader checks a look against first was the one tile that never followed.
+`ownEdit` now answers `snapshot()` for the active photo.
+
+**Why they shipped together.** Fixing the toggle alone would have made the
+flattening universal: before this, opening a photo did not change its stamp (a
+first visit lands on the same creative state the tile already showed, which is
+deliberate), so nothing redrew the tile and the defect stayed latent until
+something else forced a render. The toggle is exactly that something else.
+
+**`tools/tile-truth-walk.mjs`** is the instrument, committed rather than left in
+the scratchpad for the reason `class-width-walk.mjs` gives in its own header.
+Reading the source cannot answer any of these: telling a cache hit from a fresh
+render, or a redrawn tile from an untouched one, takes rendering both and
+measuring. It reads every tile three ways — the blob URL (was it redrawn at all),
+a hash of the stored JPEG bytes, and a 32x32 RGB signature so two pictures can be
+compared when the encoder is not byte-deterministic. **Eight of its checks went
+red against the tree as it was and all are green after it**; five pass on BOTH
+builds on purpose and are the controls, because a build that never caches or
+never redraws would otherwise read as a clean sheet.
+
+**Three things the first version of that walk got wrong, each of which looked
+like a finding.** Waiting for the grid's CELL count let it read tiles that had no
+picture yet, which came back as NaN differences and one accidental hash match.
+Its check on opening a photo used a no-op restripe as the trigger and measured
+0.00 against a build with the defect in it — a check that cannot fail is not a
+check; it takes two sessions of the same files, one where the photo is opened
+first and one where it never is. And it asserted that every tile follows a look,
+which is not true and should not be: a photo graded and left is not what a look
+pressed on a different frame is about, and the two that stayed put were right.
+
+**Observed, not fixed.** The scratchpad `verdicts.mjs` check 10 ("both verdicts
+come back after a reload") is intermittent — it failed once and passed once
+against this build, and failed against the pre-change build too, so it is not
+from this work. Check 15 does the same reload and does not flake. It reads the
+marks as soon as `#busy` closes; naming the cause would be a guess, and the
+measurement is that it reproduces on both builds.
 
 ## Shipped (roadmap archive)
 
