@@ -3,7 +3,7 @@ import { importFile, type ImportedFile, type ImageKind } from "./import";
 import { wireForceUpdate, wireUpdateStrip, setUpdateCost } from "./swupdate";
 import { type DecodedImage, pickLargestPreview, linearAt } from "./decode";
 import { decodeOffThread, decodeLanes, decodeLaneTarget, type DecodeTiming } from "./decodeClient";
-import { sourceIsMosaiced } from "./export";
+import { sourceIsMosaiced, type ExportOptions } from "./export";
 import { Renderer, type EditParams } from "./gl";
 import { exportImage, saveBlob, lastExportProfile, getSource, proxyFactorFor, type ExportFormat } from "./export";
 import { buildLinearSourceInBands } from "./gpuexport";
@@ -1199,6 +1199,13 @@ const slotEls: { name: HTMLSpanElement; save: HTMLButtonElement; load: HTMLButto
 // look.ts, shared with the share/import paths (links, files, codes).
 
 function currentLook(): SavedLook {
+  return lookFrom(params);
+}
+
+/** The creative grade carried by a set of parameters. Was only ever asked of
+ *  the live ones; exporting a photo that is not open needs the same reading of
+ *  its own. */
+function lookFrom(params: EditParams): SavedLook {
   return {
     swapRB: params.swapRB,
     hue: params.hue,
@@ -6063,9 +6070,13 @@ function endCropPointer(e: PointerEvent) {
 cropOverlay.addEventListener("pointerup", endCropPointer);
 cropOverlay.addEventListener("pointercancel", endCropPointer);
 
-straightenSlider.addEventListener("input", () => {
+/** Put the photograph at an angle, from wherever the request came. Extracted so
+ *  the slider and the tenth-of-a-degree buttons cannot drift apart: they are the
+ *  same operation reached two ways. */
+function applyStraighten(deg: number): void {
   if (geoMode !== "straighten") return;
-  params.straighten = Math.round(Number(straightenSlider.value) * 10) / 10;
+  params.straighten = Math.max(-45, Math.min(45, Math.round(deg * 10) / 10));
+  straightenSlider.value = String(params.straighten);
   straightenVal.textContent = `${params.straighten.toFixed(1)}°`;
   // Re-fit the crop to the new angle (safe inscribed bound, keeps it on the
   // photo) — preserving the preset ratio when one is locked.
@@ -6083,8 +6094,62 @@ straightenSlider.addEventListener("input", () => {
   viewZoom = boxFillZoom();
   positionCropOverlay();
   draw();
-});
+}
+
+straightenSlider.addEventListener("input", () => applyStraighten(Number(straightenSlider.value)));
 straightenSlider.addEventListener("change", flushRecord); // one drag of the slider = one undo step
+
+/** A TENTH OF A DEGREE, BY FINGER.
+ *
+ *  The slider already steps by a tenth, and a tenth is not something a finger
+ *  can ask for: the range is ninety degrees across a pill a few hundred pixels
+ *  wide, so one pixel of drag is about a third of a degree — which is what
+ *  "it will not go finer than about a third of a degree" actually was. The
+ *  keyboard could always do it with an arrow key; a tablet had no way at all.
+ *
+ *  Hold to repeat, and the whole hold is ONE undo step — the same rule the
+ *  slider's own drag follows. */
+function wireNudge(btn: HTMLButtonElement, by: number): void {
+  let delay = 0;
+  let repeat = 0;
+  let held = false;
+  const step = () => applyStraighten(params.straighten + by);
+  const stop = () => {
+    if (!held) return;
+    held = false;
+    // BOTH handles, because the hold goes through two of them: a pause, and
+    // then the repeat. Clearing one and not the other leaves a timer running
+    // after the finger has gone.
+    clearTimeout(delay);
+    clearInterval(repeat);
+    delay = 0;
+    repeat = 0;
+    flushRecord(); // one press, or one hold, = one undo step
+  };
+  btn.addEventListener("pointerdown", (e) => {
+    if (geoMode !== "straighten") return;
+    e.preventDefault();
+    btn.setPointerCapture?.(e.pointerId);
+    held = true;
+    step(); // the tap itself is one tenth, always
+    // A BEAT BEFORE IT RUNS AWAY. Repeating from the first frame means a tap
+    // held a moment too long moves two tenths, which is the opposite of what a
+    // control for landing exactly is for.
+    delay = window.setTimeout(() => { if (held) repeat = window.setInterval(step, 100); }, 400);
+  });
+  // Every way a press can end, so the repeat can never outlive the finger.
+  for (const ev of ["pointerup", "pointercancel", "pointerleave", "blur"]) btn.addEventListener(ev, stop);
+  // And a keyboard press, which sends no pointer events at all.
+  btn.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    if (geoMode !== "straighten") return;
+    step();
+  });
+  btn.addEventListener("keyup", () => flushRecord());
+}
+wireNudge($("straightenDown") as HTMLButtonElement, -0.1);
+wireNudge($("straightenUp") as HTMLButtonElement, 0.1);
 
 /** LEVEL THE HORIZON — the angle found for you, landing on the slider.
  *
@@ -7141,6 +7206,25 @@ interface LiveEdit {
   orig: EditParams | null;
   /** See LookMark. Absent on edits written before looks carried. */
   lookMark?: LookMark | null;
+  /** WHICH WAY UP, and whether mirrored. View state rather than edit state —
+   *  it rides no saved look and no batch, exactly like crop and straighten —
+   *  but it is still something the reader DID to this photograph, and it was
+   *  being thrown away: `showDecoded` sets the rotation from the file's own
+   *  EXIF on every open, so turning a frame and moving on put it back the way
+   *  the camera wrote it. Absent on edits written before this was kept. */
+  rot?: number;
+  flip?: number;
+}
+
+/** Put a photo back the way the reader left it standing. Called after
+ *  `showDecoded`, which has just set the file's own orientation. */
+function applyView(rot: number | undefined, flip: number | undefined): void {
+  if (rot === undefined && flip === undefined) return;
+  if (rot !== undefined) renderer.setRotation(rot);
+  if (flip !== undefined) renderer.setFlip(flip);
+  // The frame's shape on screen may have changed, so the fit has to be taken
+  // again — the same thing the Rotate button does after turning it.
+  resetZoom();
 }
 
 /** A LOOK BELONGS TO THE SESSION, AND A GRADE YOU MADE BELONGS TO THE PHOTO.
@@ -7275,7 +7359,14 @@ function editToJson(): string {
   const s = snapshot();
   // Masks (bitmaps) and the imported LUT (Float32Array lattice) are runtime
   // data — stripped here; a durable resume restores neither (Help says so).
-  return JSON.stringify({ params: { ...s.params, masks: [], lut: null, warp: null }, activeLook: s.activeLook, lookBias: s.lookBias, lookMark });
+  return JSON.stringify({
+    params: { ...s.params, masks: [], lut: null, warp: null },
+    activeLook: s.activeLook, lookBias: s.lookBias, lookMark,
+    // Which way up, kept with the edit so a resumed session and a bulk export
+    // both show the photograph the way it was left rather than the way the
+    // camera wrote it.
+    rot: renderer.rotation, flip: renderer.flip,
+  });
 }
 
 /** Capture the active photo's live edit into memory and persist a durable copy.
@@ -7296,6 +7387,8 @@ function captureActiveEdit(): Promise<void> {
     redo: [...redoStack],
     orig: origParams,
     lookMark,
+    rot: renderer.rotation,
+    flip: renderer.flip,
   });
   const json = editToJson();
   const view = sessionPhotos.find((p) => p.id === id);
@@ -7316,6 +7409,7 @@ function restoreLiveEdit(st: LiveEdit) {
   origParams = st.orig;
   clearTimeout(recordTimer);
   recordTimer = 0;
+  applyView(st.rot, st.flip); // before the repaint, so the frame is drawn the right way up
   applySnapshot(st.snapshot); // repaints + syncs UI
   lookMark = st.lookMark ?? null;
   updateEditButtons();
@@ -7340,7 +7434,8 @@ function activateCurrent(id: string) {
     const view = sessionPhotos.find((p) => p.id === id);
     if (view?.edit) {
       try {
-        const stored = JSON.parse(view.edit) as Snapshot & { lookMark?: LookMark | null };
+        const stored = JSON.parse(view.edit) as Snapshot & { lookMark?: LookMark | null; rot?: number; flip?: number };
+        applyView(stored.rot, stored.flip);
         applySnapshot(stored);
         // The stored mark, not the one establishFreshEdit just made: the grade
         // on screen is the stored one now, so the question "has this been
@@ -7390,6 +7485,16 @@ function canLetGo(): { ok: boolean; why: string } {
 /** Set when a marked photo was KEPT in memory anyway, and why — so the strip can
  *  say so instead of leaving the reader to wonder. */
 let keptInMemory = "";
+
+/** Why an export will be slow, said only where it is knowable at the press: the
+ *  parallel export refuses a photo carrying healed spots, stickers or a warp,
+ *  and refuses TIFF. It also refuses an output too small to be worth splitting,
+ *  and that size is the export's own arithmetic — an earlier version guessed it
+ *  from the half-size preview and printed "on one thread" over an export the
+ *  app's own report said had run on three. */
+function willRunOnOneThread(p: EditParams, format: string): boolean {
+  return (p.spots?.length ?? 0) > 0 || (p.stickers?.length ?? 0) > 0 || !!p.warp || format !== "jpeg";
+}
 
 /** Whether the last activateCurrent was a first visit (a fresh baseline and a
  *  stored edit to lay over it) or a return to a photo already in memory. */
@@ -7478,7 +7583,7 @@ function watchLongTasks(): { heldDuring: (from: number, to: number) => number | 
 
 /** Switch the editor to another session photo (decoded on demand from storage,
  *  so only ever one photo's pixels are in RAM). */
-async function switchToPhoto(id: string) {
+async function switchToPhoto(id: string, opts?: { quiet?: boolean }) {
   if (id === activePhotoId && current) return;
   const view = sessionPhotos.find((p) => p.id === id);
   if (!view) return;
@@ -7490,7 +7595,10 @@ async function switchToPhoto(id: string) {
   const release = leavingMarked ? canLetGo() : { ok: false, why: "" };
   const saved = captureActiveEdit();
   keptInMemory = leavingMarked && !release.ok ? release.why : "";
-  showBusy("Loading…");
+  // QUIET while the picked export walks the set: it shows its own progress, and
+  // a modal per photo would take the screen back that the whole non-modal export
+  // exists to leave alone.
+  if (!opts?.quiet) showBusy("Loading…");
   // Read before the work starts: these are the conditions the switch ran under,
   // and every one of them has moved by the time it finishes.
   const watch = watchLongTasks();
@@ -8612,6 +8720,7 @@ function updateVerdictButtons(): void {
   const p = sessionPhotos.find((x) => x.id === activePhotoId);
   sessionPick.setAttribute("aria-pressed", String(p?.mark === "pick"));
   sessionReject.setAttribute("aria-pressed", String(p?.mark === "reject"));
+  updatePickedRow(); // the count in the Export panel is the same count
   const off = !p;
   if (sessionPick.disabled !== off) sessionPick.disabled = off;
   if (sessionReject.disabled !== off) sessionReject.disabled = off;
@@ -10171,6 +10280,10 @@ const exportSaveAll = $("exportSaveAll") as HTMLButtonElement;
 const exportWaitingRow = $("exportWaitingRow") as HTMLElement;
 const exportWaitingText = $("exportWaitingText") as HTMLElement;
 const exportWaitingSave = $("exportWaitingSave") as HTMLButtonElement;
+const exportStop = $("exportStop") as HTMLButtonElement;
+const exportPickedRow = $("exportPickedRow") as HTMLElement;
+const exportPickedText = $("exportPickedText") as HTMLElement;
+const exportPickedBtn = $("exportPickedBtn") as HTMLButtonElement;
 
 /** The finished file, waiting for a gesture to save it. Deliberately NOT
  *  `pendingSave`: that one belongs to the busy dialog, which Batch, session-end
@@ -10200,7 +10313,7 @@ let exportCount = 0;
  *  second button may describe it either. One export, just finished, is
  *  "Ready — name · size" and one Save button; a collection is only a collection
  *  once there is something in it besides the one on offer. */
-function showExportStrip(text: string, opts: { actions?: boolean; save?: boolean; retry?: boolean } = {}): void {
+function showExportStrip(text: string, opts: { actions?: boolean; save?: boolean; retry?: boolean; stop?: boolean } = {}): void {
   const alsoWaiting = exportCount - (pendingExport ? 1 : 0);
   const lines = [text.trim(), alsoWaiting > 0 ? `${exportCount} exported, not yet saved` : ""].filter(Boolean);
   if (!lines.length) { clearExportStrip(); return; } // nothing to say, so say nothing
@@ -10209,7 +10322,8 @@ function showExportStrip(text: string, opts: { actions?: boolean; save?: boolean
   exportStripActions.hidden = !opts.actions && alsoWaiting <= 0;
   exportSave.hidden = !opts.save;
   exportRetry.hidden = !opts.retry;
-  exportSaveAll.hidden = alsoWaiting <= 0;
+  exportStop.hidden = !opts.stop;
+  exportSaveAll.hidden = alsoWaiting <= 0 || bulkRunning; // one thing at a time
   exportSaveAll.textContent = exportCount === 1 ? "Save the waiting export" : `Save all ${exportCount} exports`;
   updateExportWaitingRow();
 }
@@ -10223,6 +10337,7 @@ function clearExportStrip(): void {
   pendingExport = null;
   exportStrip.hidden = true;
   exportStripActions.hidden = true;
+  exportStop.hidden = true;
   updateExportWaitingRow();
 }
 
@@ -10232,6 +10347,18 @@ exportDismiss.addEventListener("click", clearExportStrip);
  *  line is the push — here is the file you just made; this is the pull — here is
  *  what is still waiting, whenever you want to look. Written by the same count
  *  the line uses, so the two cannot disagree. */
+/** HOW MANY YOU HAVE PICKED, and the one press that acts on them. In the Export
+ *  panel because that is where the format, size and quality this will use
+ *  already live — a reader sets those first and then does this. */
+function updatePickedRow(): void {
+  const picks = sessionPhotos.filter((p) => p.id !== "lone" && p.mark === "pick").length;
+  exportPickedRow.hidden = picks === 0;
+  exportPickedText.textContent =
+    picks === 1 ? "1 photo is picked." : `${picks} photos are picked.`;
+  exportPickedBtn.textContent = picks === 1 ? "Export it" : `Export all ${picks}`;
+  exportPickedBtn.disabled = bulkRunning;
+}
+
 function updateExportWaitingRow(): void {
   exportWaitingRow.hidden = exportCount === 0;
   exportWaitingText.textContent =
@@ -10271,6 +10398,99 @@ async function saveCollectedExports(): Promise<void> {
 
 exportSaveAll.addEventListener("click", () => void saveCollectedExports());
 exportWaitingSave.addEventListener("click", () => void saveCollectedExports());
+
+/** EXPORT THE ONES YOU PICKED — the whole reason for picking.
+ *
+ *  Marking photos was half a workflow: the verdict existed and nothing consumed
+ *  it. This walks the picked photos in strip order and puts each through the
+ *  SAME `exportImage` a single export uses, with that photo's OWN edit, into the
+ *  same collection the Save-them-all button already hands over.
+ *
+ *  ONE AT A TIME, because each one holds a file's bytes and a decode while it
+ *  runs, and that is the envelope everything else in this app is sized for.
+ *  Never `{front: true}` on these decodes: nobody is watching them, and the
+ *  photo the reader taps must not queue behind twelve of them. */
+let bulkRunning = false;
+let bulkStopRequested = false;
+
+async function exportPicked(): Promise<void> {
+  if (bulkRunning) return;
+  const picks = sessionPhotos.filter((p) => p.id !== "lone" && p.mark === "pick");
+  if (!picks.length) return;
+  bulkRunning = true;
+  bulkStopRequested = false;
+  ui.exBtn.disabled = true;
+  updatePickedRow();
+  const releaseWake = keepAwake();
+  const startedOn = activePhotoId;
+  let done = 0;
+  const skipped: string[] = [];
+  try {
+    const taken = new Set((await EXPORTS.frameMetas()).map((m) => m.name));
+    for (let i = 0; i < picks.length; i++) {
+      if (bulkStopRequested) break;
+      if (heapNearFull()) { skipped.push("stopped — this device is low on memory"); break; }
+      const view = picks[i];
+      const where = `${i + 1} of ${picks.length}`;
+      showExportStrip(`Opening ${where} — ${view.name}…`, { actions: true, stop: true });
+      // OPEN IT, RATHER THAN WORK OUT WHAT OPENING IT WOULD DO. This is the
+      // whole design: the photo goes through the app's own open — the same
+      // measurements, the same automatics, the same session look, the same
+      // stored edit laid over them — and is then exported through the same
+      // description the Export button uses. Two implementations of "how this
+      // photo develops" is how a picked export ends up not matching the photo
+      // it was picked from, which is exactly what happened before this.
+      if (view.id !== activePhotoId) await switchToPhoto(view.id, { quiet: true });
+      if (activePhotoId !== view.id || !current || !currentFile) { skipped.push(`${view.name} (could not be opened)`); continue; }
+      const job = openPhotoExportJob();
+      if (!job) { skipped.push(`${view.name} (could not be opened)`); continue; }
+      const slow = willRunOnOneThread(job.params, job.opts.format) ? " — on one thread" : "";
+      try {
+        const result = await exportImage(
+          job.file, job.frame, job.params, job.opts,
+          (f) => showExportStrip(`Exporting ${where} — ${view.name}… ${Math.round(f * 100)}%${slow}`, { actions: true, stop: true }),
+          job.lens,
+        );
+        const out = new Uint8Array(await result.blob.arrayBuffer());
+        await EXPORTS.putFrame(
+          { name: uniqueName(result.name, taken), crc: crc32(out), size: out.length, srcName: view.srcName ?? view.name, srcSize: view.srcSize ?? view.size },
+          out,
+        );
+        done++;
+        exportCount = await EXPORTS.frameCount();
+      } catch (err) {
+        if (isQuotaError(err)) { skipped.push("stopped — this device is out of storage"); break; }
+        skipped.push(`${view.name} (${(err as Error).message})`);
+      }
+    }
+  } catch (err) {
+    recordFailure("exporting the photos you picked", err);
+    skipped.push((err as Error).message);
+  } finally {
+    // BACK WHERE THE READER WAS. They pressed a button in a panel; they did not
+    // ask to be left standing on the last photo of the run.
+    if (startedOn && startedOn !== activePhotoId) await switchToPhoto(startedOn, { quiet: true }).catch(() => {});
+    bulkRunning = false;
+    ui.exBtn.disabled = false;
+    releaseWake();
+    updatePickedRow();
+  }
+  const stopped = bulkStopRequested || skipped.some((x) => x.startsWith("stopped"));
+  const head =
+    done === 0 ? "Nothing could be exported."
+    : stopped ? `Stopped — ${done} of ${picks.length} exported and kept.`
+    : `Exported ${done} of ${picks.length}.`;
+  // WHAT DID NOT WORK, named rather than counted away.
+  const trouble = skipped.length ? ` ${skipped.length === 1 ? skipped[0] : `${skipped.length} could not be done: ${skipped[0]}`}` : "";
+  showExportStrip(head + trouble, { actions: true });
+}
+
+exportPickedBtn.addEventListener("click", () => void exportPicked());
+exportStop.addEventListener("click", () => {
+  bulkStopRequested = true;
+  exportStop.hidden = true;
+  showExportStrip("Stopping after this one…", { actions: true });
+});
 
 /** Keep one finished export. Names are made unique against WHAT IS ALREADY
  *  STORED, not just against this session: the store survives a reload by
@@ -10322,18 +10542,30 @@ exportSave.addEventListener("click", async () => {
   }
 });
 
-async function runExport(): Promise<void> {
-  if (!current || !currentFile) return;
-  if (heapNearFull()) {
-    showExportStrip("This device is low on memory right now. Close a few tabs, or end the session and open the photo on its own.", { actions: true });
-    return;
-  }
-  // EVERYTHING THE EXPORT READS, READ NOW. The editor stays live while this
-  // runs, so `params` — one object that is mutated in place — the rotation, the
-  // flip, the look and the lens curve would otherwise be read mid-flight from
-  // whatever photo the reader has moved on to.
+/** EVERYTHING AN EXPORT OF THE OPEN PHOTO READS, read at one moment.
+ *
+ *  ONE DESCRIPTION, TWO CALLERS. The Export button uses it, and so does
+ *  exporting the photos you picked — which is why those two produce the same
+ *  file rather than two develops that have to be kept in step by hand. An
+ *  earlier version of the picked export built its own parameters through the
+ *  function a BATCH uses, and came out visibly different: 43 of 255 on the worst
+ *  channel and 6 on the mean, because a batch forces the look's channel swap
+ *  while an open keeps the running one. Two implementations of "how this photo
+ *  develops" is one too many.
+ *
+ *  It is read AT THE PRESS because the editor stays live while an export runs:
+ *  `params` is one object mutated in place, and the rotation, flip, look and
+ *  lens curve would otherwise be read mid-flight from whatever the reader moved
+ *  on to. */
+function openPhotoExportJob(): {
+  file: ImportedFile; frame: DecodedImage; params: EditParams; lens: LensCurve | null;
+  // NOT the bare ExportOptions: that type also describes the one-band shape a
+  // worker asks for, and naming it here made the compiler read a whole-file
+  // export as a band. This is a finished file, and says so.
+  opts: ExportOptions & { raw?: undefined; band?: undefined };
+} | null {
+  if (!current || !currentFile) return null;
   const file = currentFile;
-  const snapParams = cloneParams(params);
   const opts = {
     format: ui.exFormat.value as ExportFormat,
     scale: Number(ui.exScale.value),
@@ -10344,7 +10576,6 @@ async function runExport(): Promise<void> {
     lookRecipe: recipeForExport(currentLook()),
     stickerAssets: { ...stickerAssets }, // baked in; the reader may place more while this runs
   };
-  const lens = currentLensCurve();
   // A MOSAICED RAW IS RE-READ FROM THE FILE, so the export needs nothing from
   // the decoded frame but its size — and holding the frame would keep ~84 MB of
   // half-resolution float alive for the whole run, beside the next photo's own.
@@ -10352,6 +10583,18 @@ async function runExport(): Promise<void> {
   const frame: DecodedImage = sourceIsMosaiced(file)
     ? ({ width: current.width, height: current.height, isRaw: current.isRaw } as DecodedImage)
     : current;
+  return { file, frame, params: cloneParams(params), opts, lens: currentLensCurve() };
+}
+
+async function runExport(): Promise<void> {
+  if (!current || !currentFile) return;
+  if (heapNearFull()) {
+    showExportStrip("This device is low on memory right now. Close a few tabs, or end the session and open the photo on its own.", { actions: true });
+    return;
+  }
+  const job = openPhotoExportJob();
+  if (!job) return;
+  const { file, frame, params: snapParams, opts, lens } = job;
   // WHY THIS ONE WILL BE SLOW, said only where it is actually knowable at the
   // press. The parallel export refuses a photo carrying healed spots, stickers
   // or a warp, and refuses TIFF — those are facts about the edit. It ALSO
@@ -10363,11 +10606,7 @@ async function runExport(): Promise<void> {
   // to canRunParallel, and printed "on one thread" over an export the app's own
   // report then said had run on three. A label that is wrong about the thing it
   // exists to explain is worse than no label.
-  const oneThread =
-    (snapParams.spots?.length ?? 0) > 0 ||
-    (snapParams.stickers?.length ?? 0) > 0 ||
-    !!snapParams.warp ||
-    opts.format !== "jpeg";
+  const oneThread = willRunOnOneThread(snapParams, opts.format);
 
   ui.exBtn.disabled = true; // ONE AT A TIME: at most one extra frame is ever held
   const releaseWake = keepAwake();
