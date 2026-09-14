@@ -527,7 +527,112 @@ user-scalable=no.
 > short bold title so the parser stays reliable. Editing this list updates
 > the app on the next deploy. Both the roadmap and the patch notes (last
 > commits) refresh automatically on push.
-> Shipped items move to the "## Shipped (roadmap archive)" section below
+> Shipped items move to the "## A tile is a claim, 2026-09-14
+
+The strip and the quick look grid ARE the conveyor: the reader decides from the
+tiles and never opens most of the set. So a tile is a claim — this is what
+opening this photograph will show you — and the app already had the machinery to
+keep it true: a `thumbGrade` stamped onto every tile, a `stampFor` that says what
+the tile should be a picture of, and `restripForGrade` to mark the ones that have
+stopped matching. Four things got past all of it. None of them is a function
+doing something other than what it says; each is a function whose statement is
+only true under a condition no single file states.
+
+**A kept preview came back under the grade it was made under.** `previewKey` had
+the file's identity, the build's pipeline, the preview size and the reader's lens
+profiles in it, under a header in `src/previewcache.ts` listing "what makes a
+cached picture wrong, and every one of these is in the key". The grade was not in
+it, and a grid tile is rendered under the live look, swap, bias and lift —
+`makeThumb` with no own edit clones exactly that state. Scan a folder under
+Aerochrome, press B&W IR, scan the same folder: every tile came back Aerochrome,
+and the app said so in its own words, "3 of 3 came back from this device — no
+decoding needed". The fix is the grade in the key, fingerprinted through the one
+FNV-1a in the new `src/stamp.ts` — which `profilesStamp` had written inline and
+now calls, because the second copy is where two answers come from.
+`PREVIEW_PIPELINE` moved 2 to 3: nothing in the old rows says what grade they are
+pictures of, so they must not be reachable, not merely missed.
+
+**And the strip-sized twin in the same row made it worse.** That twin is what
+"Keep in a session" hands across, and the session then stamped it with the
+CURRENT grade under a comment reading "the grid rendered this one under the live
+grade" — true of a fresh render, false of a cache hit. A stale picture marked
+true is worse than a stale picture: `restripForGrade` only ever redraws a tile
+whose stamp has stopped matching, so that one could never be found again.
+
+**Opening a photograph flattened its tile.** In `makeThumb` the object literal
+set `tone`, `sky` and `foliage` to identity unconditionally, overriding the
+spread of the photo's own params, and the re-solve below it was gated on `!own`.
+So a photo that had never been opened got the lift solved for it, and a photo
+that HAD been opened — carrying its own solved curve — had it thrown away with
+nothing to put it back. Restore depth is on by default, so that was every opened
+photo. The clearing was collateral from an earlier fix whose target was the other
+branch (a tile inheriting ANOTHER frame's correction); for a photo's own edit the
+values were never another frame's. Measured: 23.53 of 255 mean channel difference
+between the same photograph's tile opened and not opened under one look, against
+2.08 with the curve kept, which is the JPEG encoder and the 32px resample.
+
+**Restore depth never redrew the strip.** Its strength slider called
+`restripForGrade` ("the tiles are claims about this too"); the on/off toggle
+beside it did not, so the strip went on showing the other state for the rest of
+the session. And `stampFor` could not have expressed the right answer anyway: it
+put the lift's session controls into EVERY tile's stamp, so a toggle would have
+marked the whole strip stale including photos it cannot touch. The two cases are
+rendered from different things and are now stamped differently — a tile with no
+own edit is drawn through the session controls, so they belong in its stamp; a
+tile with one is drawn from that photo's own stored curve, so the three fields
+the lift writes belong in its stamp instead.
+
+**Those three fields go in `stampFor` and never in `stampOf`, and this is the
+trap.** `stampOf` is shared with the look-mark question, and `markLook` takes its
+stamp AFTER `applyLook` has run the lift — so a lift curve inside `stampOf` would
+make `looksUntouched` false on arrival at every other frame, silently stopping
+`carryLook` from carrying the session look. That is the standing default look,
+and it would have broken with nothing failing.
+
+**The open photograph's own tile was the one a look could not reach.** `ownEdit`
+answered with the `liveEdits` snapshot, which is SEEDED on arrival by
+`activateCurrent` and rewritten only on the way out by `captureActiveEdit`.
+Nothing refreshes it while the reader works — `flushRecord` moves the undo stack,
+not this — so for the photo actually open it was the state they came in on. Its
+stamp therefore never moved, `restripForGrade` never marked it stale, and the one
+tile a reader checks a look against first was the one tile that never followed.
+`ownEdit` now answers `snapshot()` for the active photo.
+
+**Why they shipped together.** Fixing the toggle alone would have made the
+flattening universal: before this, opening a photo did not change its stamp (a
+first visit lands on the same creative state the tile already showed, which is
+deliberate), so nothing redrew the tile and the defect stayed latent until
+something else forced a render. The toggle is exactly that something else.
+
+**`tools/tile-truth-walk.mjs`** is the instrument, committed rather than left in
+the scratchpad for the reason `class-width-walk.mjs` gives in its own header.
+Reading the source cannot answer any of these: telling a cache hit from a fresh
+render, or a redrawn tile from an untouched one, takes rendering both and
+measuring. It reads every tile three ways — the blob URL (was it redrawn at all),
+a hash of the stored JPEG bytes, and a 32x32 RGB signature so two pictures can be
+compared when the encoder is not byte-deterministic. **Eight of its checks went
+red against the tree as it was and all are green after it**; five pass on BOTH
+builds on purpose and are the controls, because a build that never caches or
+never redraws would otherwise read as a clean sheet.
+
+**Three things the first version of that walk got wrong, each of which looked
+like a finding.** Waiting for the grid's CELL count let it read tiles that had no
+picture yet, which came back as NaN differences and one accidental hash match.
+Its check on opening a photo used a no-op restripe as the trigger and measured
+0.00 against a build with the defect in it — a check that cannot fail is not a
+check; it takes two sessions of the same files, one where the photo is opened
+first and one where it never is. And it asserted that every tile follows a look,
+which is not true and should not be: a photo graded and left is not what a look
+pressed on a different frame is about, and the two that stayed put were right.
+
+**Observed, not fixed.** The scratchpad `verdicts.mjs` check 10 ("both verdicts
+come back after a reload") is intermittent — it failed once and passed once
+against this build, and failed against the pre-change build too, so it is not
+from this work. Check 15 does the same reload and does not flake. It reads the
+marks as soon as `#busy` closes; naming the cause would be a guess, and the
+measurement is that it reproduces on both builds.
+
+## Shipped (roadmap archive)" section below
 > (same format, full SHIPPED records) so the in-app roadmap shows only
 > what's genuinely coming; notes.html renders the archive as "Recently
 > shipped". Keep this section to OPEN items only.
@@ -1010,6 +1115,17 @@ user-scalable=no.
   print what was planted.
 
 ## Shipped (roadmap archive)
+
+- [x] **Four ways a tile lied about its photograph** — SHIPPED 2026-09-14 to
+  staging, awaiting the on-device pass. Every one of them is a picture that was
+  WRONG rather than code that was, which is why all four survived green gates: a
+  quick look kept its rendered tiles on the device and handed them back under a
+  DIFFERENT look; opening a photograph flattened its own tile; Restore depth
+  changed every tile in the strip and redrew none of them; and a look pressed on
+  the photograph you were looking at reached every tile except that one. Found
+  by reading while shipping 2.46, all four fixed together because they compound
+  — two of them stamped a stale picture as current, where nothing could ever
+  find it again. See "## A tile is a claim" below.
 
 - [x] **2.46 — acting on the photos you picked** — SHIPPED 2026-09-14 to staging,
   awaiting the on-device pass. Picking marked photos and nothing consumed the
@@ -10439,7 +10555,11 @@ byte length and modified time — because that is what identifies a picked file
 before anything reads it, and it is the identity a resumed session already uses.
 No handle and no path: the browser gives neither.
 
-**WHAT MAKES A KEPT PICTURE WRONG, all of it in the key:**
+**WHAT MAKES A KEPT PICTURE WRONG, all of it in the key** — and that claim was
+wrong here for two days. The GRADE was missing from the list and from the key,
+and a grid tile is rendered under the live one; see "## A tile is a claim,
+2026-09-14". A list that states its own completeness is a list nobody re-reads
+against the code.
 
 - the file changed — a different name, length or modified time is a different
   file;

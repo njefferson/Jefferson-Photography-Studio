@@ -31,6 +31,7 @@
 // the same idea.
 
 import type { ExifSubset } from "./exif";
+import { fnv1a } from "./stamp";
 import { shapeProblem, NBINS } from "./lensprofile";
 
 const KEY = "ips-lens-profiles-v1";
@@ -170,12 +171,7 @@ export function profilesStamp(): string {
   } catch {
     return "0"; // private window: nothing stored, nothing to invalidate
   }
-  let h = 2166136261; // FNV-1a, 32-bit
-  for (let i = 0; i < raw.length; i++) {
-    h ^= raw.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return (h >>> 0).toString(36) + "." + raw.length.toString(36);
+  return fnv1a(raw);
 }
 
 /** Take a rig payload and keep its colour terms. Replaces any profile already
