@@ -558,6 +558,24 @@ fallback is for, and the path that actually reached it never went near the catch
 And a number derived from `rev-list --count` is a fact about a clone, not about a
 release — it cannot be a version unless every clone that builds is full.
 
+**AND THE BUILD IS REPRODUCIBLE NOW, WHICH IT WAS NOT.** Fetching the deployed
+bundle and comparing it with a local build of the same commit now comes back
+byte-for-byte identical — the same content hash in the filename, the same bytes
+apart from the sourcemap name — from a 259-commit shallow clone against a
+540-commit full one. Before the fix the two could not agree, because the version
+strings baked into the patch notes counted whatever history the clone had. That
+comparison is worth running on any release: a green deploy row says the job
+exited zero, and this says the thing that shipped is the thing that was walked.
+
+**One instrument error on the way, and it is the standing one.** The first
+comparison came back differing at byte 48 and it was tempting to read that as a
+build that was not reproducible after all. The deployed site had moved on by one
+commit between the fetch and the build — the app's own version line said 2.46.3
+while the local build was 5aa019e at 2.46.2 — so two different commits were being
+compared, and the difference was the shared chunk's content hash in an import.
+When a result looks absurd, suspect the instrument: here it was comparing against
+whatever the edge happened to be serving rather than against a named commit.
+
 ## A tile is a claim, 2026-09-14
 
 The strip and the quick look grid ARE the conveyor: the reader decides from the
