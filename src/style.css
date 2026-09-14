@@ -502,7 +502,15 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 .ratio-chip { white-space: nowrap; flex: none; }
 .ratio-chip {
   position: relative;
-  min-height: 32px;
+  /* 34, NOT 32. With the ±6 extension below that is 46 reachable; at 32 it
+     measured 43 — the two hit tests either side of the extension do not both
+     reach its outermost pixel, so the design's exact-44 had no margin and lost
+     one to rounding. Raising the extension instead would have overlapped the
+     neighbouring chip, since the row-gap is 10; raising the chip does not. It
+     was never measured because the crop bar is hidden until you enter crop,
+     and the hit sweep looks at what is on screen — the walk enters both
+     geometry modes now. */
+  min-height: 34px;
   padding: 5px 10px;
   border-radius: 8px;
   /* THE RAIL IS A CALIBRATED TOKEN, not a white at some alpha. A glass HUD
@@ -1099,7 +1107,18 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 #cropTools .crop-lbl { flex: 1; font-size: 0.8125rem; font-weight: 600; color: var(--glass-txt); }
 #cropTools input[type="range"] { width: 100%; margin: 0; }
 #straightenVal { font-size: 0.75rem; font-variant-numeric: tabular-nums; color: var(--glass-txt); flex: none; min-width: 4ch; text-align: right; }
+/* 44px, because Reset and Done are TAPPED. They rendered 28px tall for the
+   life of this bar: the ratio chips beside them buy their 44 with a ::before
+   extension and the straighten nudges declare min-height outright, but these
+   two had only their padding. Nothing caught it because the bar is hidden
+   until you enter crop, and the accessibility walk's hit sweep measures what
+   is on screen — same shape as the palette sweep that only visited the state
+   the app boots into. The walk enters both geometry modes now.
+   An extension was the wrong tool here: the row-gap is 10px, so the ±8 these
+   would need overlaps the neighbour. The bar steps the view back by its
+   MEASURED height in both width bands, so a taller pill is safe. */
 #cropTools button { flex: none; width: auto; padding: 6px 12px; font-size: 0.75rem; }
+#cropTools button:not(.ratio-chip) { min-height: 44px; }
 /* Reset and the tenth-degree nudges follow #zoomCtl rather than the page's
    button surface: on glass a theme-following pill is a light chip on a dark
    HUD in the day theme, and an accent border is navy on near-black there — a
@@ -1117,7 +1136,11 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 #cropTools button:disabled { opacity: 0.45; } /* honest greyed state when the crop is already identity */
 /* Done is the primary exit — accent-filled so it's the obvious way back out of
    the tool (owner got lost with the old tiny "tap here" hint). */
-#cropDone { background: var(--accent); color: var(--accent-ink); font-weight: 700; padding: 7px 18px; box-shadow: 0 2px 14px -2px var(--accent); } /* accent glow so it pops off the soft pill */
+/* No padding here: `#cropTools button` is one id and one element and outranks a
+   bare `#cropDone`, so the `padding: 7px 18px` that stood on this line never
+   once applied. Removed rather than re-specified — what shipped for the life of
+   the bar is 6px 12px, and that is the size this button has always been. */
+#cropDone { background: var(--accent); color: var(--accent-ink); font-weight: 700; box-shadow: 0 2px 14px -2px var(--accent); } /* accent glow so it pops off the soft pill */
 @media (max-width: 760px) {
   #cropTools { bottom: 10px; padding: 9px 12px 11px; }
 }

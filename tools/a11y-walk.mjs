@@ -204,6 +204,40 @@ try {
           await page.evaluate(() => document.querySelector("dialog[open]")?.close());
           await page.waitForTimeout(150);
         }
+
+        // AND THE MODES, which are not dialogs and are not on screen at rest.
+        //
+        // The crop bar is a whole panel of controls that only exists once you
+        // enter crop or straighten, so this sweep — which measures what is
+        // rendered — had never seen one of them. Measured the first time it
+        // was pointed at them: Reset and Done were 28px tall, in a bar used by
+        // finger on a tablet, for the life of the bar. Everything around them
+        // was correct, which is what made it invisible: the ratio chips buy
+        // their 44 with a ::before extension and the straighten nudges declare
+        // min-height outright, so nothing about the bar looked unconsidered.
+        //
+        // Same shape as the palette sweep that only visited the state the app
+        // boots into: a sweep reports on the states it visited, and nothing
+        // says which ones those were.
+        if (s.file === "ir.html") {
+          for (const [mode, id] of [["crop", "cropBtn"], ["straighten", "straightenBtn"]]) {
+            const on = await page.evaluate((b) => {
+              document.getElementById("ptab-crop")?.click();
+              const el = document.getElementById(b);
+              if (!el) return false;
+              el.click();
+              return el.getAttribute("aria-pressed") === "true";
+            }, id);
+            if (!on) { fail(`${s.file} ${vw}px ${mode}: the mode would not turn on, so its controls are unmeasured`); continue; }
+            await page.waitForTimeout(500);
+            const inside = await page.evaluate(HIT);
+            if (inside.small.length) fail(`${s.file} ${vw}px ${mode} mode: ${inside.small.join(" · ")}`);
+            else ok(`${s.file} ${vw}px ${mode} mode: all >= 44`);
+            if (inside.exempt.length) note(`inline in a sentence, exempt (SC 2.5.8): ${inside.exempt.join(" · ")}`);
+            await page.evaluate((b) => document.getElementById(b)?.click(), id);
+            await page.waitForTimeout(250);
+          }
+        }
       } finally { await page.close(); }
     }
   }

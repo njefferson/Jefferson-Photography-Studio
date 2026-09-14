@@ -1765,6 +1765,44 @@ state written by a promise nothing waits for is measuring the machine.** The
 first was `switch-instrument-walk` check 8, where the fix belonged in the
 instrument; here the app is right and the walk was reading too early.
 
+## The crop bar had never been measured, 2026-09-14
+
+Section 2 of the accessibility walk measures hit areas on every page and inside
+every dialog. `#cropTools` is neither — it is a MODE, and it only exists once
+you enter crop or straighten. So a whole panel of controls, on the surface this
+app is most used by finger, had never been in the sweep.
+
+Pointed at it for the first time: **Reset and Done were 28px tall**, and the
+ratio chips measured **43px reachable** against a 44 floor.
+
+**What made it invisible is that everything around them was correct.** The
+chips buy their target with a `::before` extension; the straighten nudges
+declare `min-height: 44px` outright. Nothing about the bar looked unconsidered,
+so nobody read the two buttons that had only their padding.
+
+The chips' 43 is worth its own sentence. The design is 32px plus a ±6
+extension, which is exactly 44 — and the walk measures REACHABLE area by hit
+testing outward from the element's edges, where the two probes either side do
+not both reach the extension's outermost pixel. **An exact-44 design has no
+margin and loses one to rounding.** Raising the extension would have overlapped
+the neighbouring chip (the row-gap is 10, and the comment on `#cropRatios`
+already says the ±6 barely clear each other), so the chip goes to 34 instead:
+46 reachable, extensions untouched.
+
+Reset and Done take `min-height: 44px` through
+`#cropTools button:not(.ratio-chip)` — the bar steps the view back by its
+MEASURED height in both width bands, so a taller pill cannot bury the handles.
+
+**And the walk enters both geometry modes now**, which is the part that matters
+more than either fix. Same shape as the palette sweep that only visited the
+state the app boots into: a sweep reports on the states it visited, and nothing
+says which ones those were.
+
+One more dead declaration came out of reading that rule: `#cropDone` carried
+`padding: 7px 18px`, and `#cropTools button` — one id, one element — outranks a
+bare `#cropDone`, so it had never once applied. Removed rather than
+re-specified; `6px 12px` is what the button has always been.
+
 ## Shipped (roadmap archive)
 
 - [x] **Four ways a tile lied about its photograph** — SHIPPED 2026-09-14 to
