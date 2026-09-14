@@ -1367,6 +1367,23 @@ body.dropping::after {
    made by pressing P is a decision most of its readers cannot make at all.
    Same pill as Done beside it, same 44px floor. */
 .session-verdicts { display: flex; gap: 6px; flex: none; margin-left: auto; }
+/* Exports finished and not yet saved, offered in the panel rather than over the
+   photograph — the one surface that does not go away when the floating line is
+   dismissed. */
+.export-waiting {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.export-waiting .note { margin: 0 0 8px; color: var(--txt); }
+.export-waiting button {
+  width: 100%;
+  min-height: 44px;
+  border-radius: 999px;
+}
+
 /* THE EXPORT'S OWN LINE, floating over the photo like the mode banners beside
    it. Not a dialog: an export that owns the screen is one you cannot work
    through, and working through it means changing tabs, so it cannot live inside
@@ -1434,9 +1451,14 @@ body.dropping::after {
 .session-verdict[disabled] { opacity: 0.6; cursor: default; }
 /* Pressed is not a tint: the border fills, the weight moves AND the label says
    so. Three carriers, the same rule the quick look's badges follow. */
+/* PRESSED IS FILLED. It was --accent-soft, which is the accent at 15% — over the
+   strip's own surface that is fainter than the UNPRESSED button beside it, so
+   the one that was on read as the one that was off. The look buttons and the
+   quick look's badges both fill; this matches them. */
 .session-verdict[aria-pressed="true"] {
   border-color: var(--accent);
-  background: var(--accent-soft);
+  background: var(--accent);
+  color: var(--accent-ink);
   font-weight: 700;
 }
 .session-verdict[aria-pressed="true"]::after { content: " \2713"; }
@@ -1583,7 +1605,11 @@ body.dropping::after {
   border: 1px solid var(--line-2);
   pointer-events: none;
 }
-.session-thumb.picked { border-color: var(--accent); }
+/* A PICKED TILE MUST NOT WEAR THE ACTIVE TILE'S BORDER. Both were accent, so a
+   strip with several picks in it had several tiles that looked like the one
+   being viewed — and in grayscale they were identical, which is the failure the
+   standing rule exists to stop. The verdict's carriers are its WORD and its
+   filled badge; the border belongs to "which one am I on". */
 .session-thumb.picked .session-thumb-mark { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 /* Rejected: dimmed AND dashed AND labelled — three carriers, never colour
    alone, and the picture stays legible enough to change your mind by. */
@@ -1610,9 +1636,13 @@ body.dropping::after {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+/* THE PHOTO YOU ARE ON. Three carriers and one of them is SHAPE: it is the only
+   tile that lifts, and the only one wearing an offset ring. A verdict can now
+   put a coloured badge on any tile, so "which one am I looking at" cannot rest
+   on colour at all. */
 .session-thumb.active {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent), 0 0 14px var(--accent-soft);
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent), 0 0 14px var(--accent-soft);
   transform: translateY(-2px);
 }
 @media (max-width: 640px) {

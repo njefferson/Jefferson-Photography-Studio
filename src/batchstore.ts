@@ -110,6 +110,30 @@ export async function clearFrames(dbName: string = DB): Promise<void> {
   }
 }
 
+/** Take ONE frame out — meta row and every chunk, in a single transaction.
+ *
+ *  A batch clears the whole store when its zip is saved, so nothing needed this
+ *  until exports started collecting one at a time: saving a single file on its
+ *  own has to take that file out, or the collection goes on offering something
+ *  that is already on the disk. */
+export async function removeFrame(name: string, dbName: string = DB): Promise<void> {
+  const db = await open(dbName);
+  try {
+    await new Promise<void>((res, rej) => {
+      const t = db.transaction([META, CHUNKS], "readwrite");
+      t.oncomplete = () => res();
+      t.onabort = () => rej(t.error ?? new Error("remove aborted"));
+      t.onerror = () => rej(t.error ?? new Error("remove failed"));
+      t.objectStore(META).delete(name);
+      // The chunk keys are [frame, idx], so one bound range is every piece of
+      // this frame and nothing of any other.
+      t.objectStore(CHUNKS).delete(IDBKeyRange.bound([name, 0], [name, Infinity]));
+    });
+  } finally {
+    db.close();
+  }
+}
+
 /** Visit every stored frame, materializing ONE frame's chunks at a time so a
  *  big batch never has all its bytes in RAM at once. */
 export async function eachFrame(fn: (f: FrameMeta & { parts: ArrayBuffer[] }) => void, dbName: string = DB): Promise<void> {
@@ -143,6 +167,7 @@ export function frameStore(dbName: string) {
     frameMetas: () => frameMetas(dbName),
     frameCount: () => frameCount(dbName),
     clearFrames: () => clearFrames(dbName),
+    removeFrame: (name: string) => removeFrame(name, dbName),
     eachFrame: (fn: (f: FrameMeta & { parts: ArrayBuffer[] }) => void) => eachFrame(fn, dbName),
   };
 }
