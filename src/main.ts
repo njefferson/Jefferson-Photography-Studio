@@ -1671,6 +1671,7 @@ function wireVersionMenu() {
     text.value = await buildDiagnostic(__APP_VERSION__, [
       { k: "Open now", v: current ? `a photo is open${real >= 2 ? ` in a session of ${real}` : ""}` : "nothing open" },
       { k: "Restore depth", v: autoLift ? `on at ${Math.round(liftAmount * 100)}% strength` : "off" },
+      { k: "Default look", v: defaultLook() ? (BUILTIN_NAMES[defaultLook()!] ?? defaultLook()!) : "none — photos open ungraded" },
       { k: "Kept previews", v: kept.rows ? `${kept.rows} (${(kept.bytes / 1e6).toFixed(1)} MB)` : "none" },
       // REPORTED, NEVER STARTED (decodeClient.decodeLanes) — a report that spawns
       // three workers in order to say there are three is not a report. Zero on a
@@ -7164,7 +7165,29 @@ type LookMark = { look: string | null; stamp: string };
  *  press made three photos ago. That is right, and it is also why carrying a
  *  look needs a second name: comparing a photo's look against itself can never
  *  say whether the session has moved on. */
-let sessionLook: string | null = null;
+/** THE LOOK EVERY PHOTO OPENS WEARING, kept between sessions. A reader who uses
+ *  the same grade on everything was pressing it once per set forever; this is
+ *  that press, remembered. Absent means none, which is what the app has always
+ *  done and stays the default.
+ *
+ *  It is NOT an edit parameter and does not ride a saved look: it seeds
+ *  `sessionLook`, and everything after that is the path a pressed look already
+ *  takes. So it lands on a visible control (the look button reads as pressed),
+ *  it is undoable and resettable like any look, and Hold: Untouched still shows
+ *  the bare decode — the three tests Doctrine §14 sets for an automatic. */
+const DEFAULT_LOOK_KEY = "ips-default-look";
+
+function defaultLook(): string | null {
+  try {
+    const v = localStorage.getItem(DEFAULT_LOOK_KEY);
+    return v && LOOKS[v] ? v : null; // a look that no longer exists is no look
+  } catch {
+    return null; // private mode, or storage refused
+  }
+}
+
+/** THE SESSION'S look, seeded from the standing preference at boot. */
+let sessionLook: string | null = defaultLook();
 
 /** The mark for the OPEN photo, kept beside `params` for the same reason the
  *  grade is: there is one open photo. Captured into its live edit and its
@@ -7748,6 +7771,14 @@ async function resetSessionState(clearStorage: boolean) {
   nextOrder = 0;
   liveEdits.clear();
   pendingStore.clear();
+  // A NEW SET STARTS ON THE STANDING DEFAULT — and only when there is one. With
+  // no preference set this leaves the session look exactly where it was, which
+  // is what the app has always done: press a look on one set and the next set
+  // you open still wears it. Here rather than in endSession because all four
+  // ways a session is torn down come through this one function, and only one of
+  // them is the Done button.
+  const standing = defaultLook();
+  if (standing) sessionLook = standing;
   // ONLY THE INDEX IS AWAITED. Forgetting the session is a few kilobytes and
   // has to be done before the start screen returns, or a session that was just
   // ended would still offer to resume; the photographs' bytes are unreachable
@@ -10308,6 +10339,47 @@ function pickGrade(grade: BatchGrade) {
   batchInput.click();
 }
 
+/** The standing default-look picker, drawn each time Settings opens. Same shape
+ *  as the theme and palette pickers beside it (a radiogroup of real buttons,
+ *  state in TEXT as well as colour) — deliberately, because that pattern is on
+ *  the never-churn list. */
+function renderDefaultLookPicker(): void {
+  const host = document.getElementById("defaultLookPicker");
+  if (!host) return;
+  const active = defaultLook();
+  const choices: { key: string | null; name: string }[] = [
+    { key: null, name: "None" },
+    ...Object.keys(LOOKS).map((k) => ({ key: k, name: BUILTIN_NAMES[k] ?? k })),
+  ];
+  host.replaceChildren(
+    ...choices.map((c) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "pal-opt";
+      b.setAttribute("role", "radio");
+      b.setAttribute("aria-checked", String(c.key === active));
+      const name = document.createElement("span");
+      name.className = "pal-name";
+      name.textContent = c.name;
+      b.append(name);
+      b.addEventListener("click", () => {
+        try {
+          if (c.key) localStorage.setItem(DEFAULT_LOOK_KEY, c.key);
+          else localStorage.removeItem(DEFAULT_LOOK_KEY);
+        } catch {
+          /* private mode — the choice holds for this session and no longer */
+        }
+        // Takes effect on the next photo that opens fresh. The photograph on
+        // screen is NOT touched: changing a setting must never restyle the
+        // picture somebody is looking at.
+        sessionLook = c.key;
+        renderDefaultLookPicker();
+      });
+      return b;
+    }),
+  );
+}
+
 function openBatchDialog() {
   // Your current edit — only real when a photo is open; otherwise say why not.
   ($("bcCurrent") as HTMLButtonElement).hidden = !current;
@@ -10333,12 +10405,19 @@ function openBatchDialog() {
   ($("bcNoSlots") as HTMLElement).hidden = filled > 0;
   bcSlots.hidden = filled === 0;
   // Built-in looks.
+  // THE STANDING DEFAULT FIRST, and named as such. A reader who has set one is
+  // usually reaching for it here too, and it was somewhere in a list of seven.
+  const standing = defaultLook();
+  const order = Object.keys(LOOKS).sort((a, b) => Number(b === standing) - Number(a === standing));
   bcLooks.replaceChildren(
-    ...Object.keys(LOOKS).map((key) => {
+    ...order.map((key) => {
       const b = document.createElement("button");
       b.type = "button";
       b.className = "batch-choice slim";
-      b.innerHTML = `<strong>${BUILTIN_NAMES[key] ?? key}</strong>`;
+      // User-facing names only — built with textContent, never markup.
+      const strong = document.createElement("strong");
+      strong.textContent = (BUILTIN_NAMES[key] ?? key) + (key === standing ? " — your default" : "");
+      b.append(strong);
       b.addEventListener("click", () => pickGrade({ kind: "builtin", key }));
       return b;
     }),
@@ -11165,7 +11244,10 @@ function grayWorldWB(img: DecodedImage): [number, number, number] {
     infoCueDown.classList.toggle("on", max > 8 && infoBody.scrollTop < max - 8);
   };
   infoBody.addEventListener("scroll", updateInfoCues, { passive: true });
-  const openInfo = () => { dlg.showModal(); requestAnimationFrame(updateInfoCues); };
+  // Drawn on every open rather than once at startup: it is the only place this
+  // setting is visible, and drawing it here cannot run before the look table it
+  // reads has been built.
+  const openInfo = () => { renderDefaultLookPicker(); dlg.showModal(); requestAnimationFrame(updateInfoCues); };
   openInfoDialog = openInfo; // registered for the 🛰 dialog's "Open Settings"
 
   $("infoBtn").addEventListener("click", openInfo);
