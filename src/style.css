@@ -1362,6 +1362,37 @@ body.dropping::after {
 }
 .session-done:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .session-done[disabled] { opacity: 0.6; cursor: default; }
+/* THE VERDICT, REACHABLE BY FINGER. The keys are the fast way and they are a
+   keyboard's way; this app is used on a tablet, and a decision that can only be
+   made by pressing P is a decision most of its readers cannot make at all.
+   Same pill as Done beside it, same 44px floor. */
+.session-verdicts { display: flex; gap: 6px; flex: none; margin-left: auto; }
+.session-verdict {
+  flex: none;
+  width: auto;
+  min-height: 44px;
+  padding: 5px 14px;
+  font-size: 0.8125rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--txt);
+  cursor: pointer;
+}
+.session-verdict:active { background: var(--surface-3); }
+@media (hover: hover) {
+  .session-verdict:hover { background: var(--surface-3); border-color: var(--line-2); }
+}
+.session-verdict:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.session-verdict[disabled] { opacity: 0.6; cursor: default; }
+/* Pressed is not a tint: the border fills, the weight moves AND the label says
+   so. Three carriers, the same rule the quick look's badges follow. */
+.session-verdict[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  font-weight: 700;
+}
+.session-verdict[aria-pressed="true"]::after { content: " \2713"; }
 /* How far through a long open we are. A count alone answers "how many?"; the
    bar answers "how much longer?", which is the question a 40-photo set raises.
    Determinate on purpose — the total is known from the moment the files are
@@ -1485,6 +1516,33 @@ body.dropping::after {
   pointer-events: none;
 }
 .session-thumb.provisional img { opacity: 0.82; }
+
+/* THE VERDICT ON THE TILE. Written fresh rather than borrowed from the quick
+   look: every one of those rules is scoped to .ql-cell and none of them can
+   fire on a strip button. The pattern is what carries over, not the CSS.
+   Top-right, so the "preview" tag at bottom-left still has its corner — a tile
+   can honestly be wearing both at once. */
+.session-thumb-mark {
+  position: absolute;
+  right: 3px;
+  top: 3px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font: 700 0.5625rem/1.4 var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: var(--glass-bg);
+  color: var(--glass-txt);
+  border: 1px solid var(--line-2);
+  pointer-events: none;
+}
+.session-thumb.picked { border-color: var(--accent); }
+.session-thumb.picked .session-thumb-mark { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+/* Rejected: dimmed AND dashed AND labelled — three carriers, never colour
+   alone, and the picture stays legible enough to change your mind by. */
+.session-thumb.rejected { border-style: dashed; border-color: var(--line-2); }
+.session-thumb.rejected img { opacity: 0.38; }
+.session-thumb.rejected .session-thumb-name { text-decoration: line-through; }
 
 /* A photo that is on screen but whose copy has not finished going to disk.
    Dimmed and not switchable — switching to it would have nothing to decode

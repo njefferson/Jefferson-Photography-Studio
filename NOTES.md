@@ -12814,3 +12814,72 @@ nothing auto-answers it.
 Measured in both themes at 430 px and 1280 px: one labelled radiogroup, eight
 real radio buttons, every one clearing 44 px, the chosen one saying "your
 default" in words as well as in colour, and axe clean in Settings.
+
+
+## The decision the session could not record, 2026-09-14
+
+The quick look can pick and reject; the session, which is where the deciding
+actually happens, could not. A reader looking at each photo at fit size above the
+strip and deciding there had nowhere to put the answer, and the quick look's own
+picks were thrown away on the way in — pick four out of forty, press Keep, and
+arrive at a session where nothing is picked.
+
+`PhotoMeta.mark` is `"pick" | "reject"` or absent, written by `Session.setMark`,
+which is `setThumb`'s shape: read the row, put it back whole, one
+strict-durability transaction. Absent on every row written before this existed,
+which reads as undecided, which is what those photos are. A verdict that does
+not survive a reload is a highlight, not a decision.
+
+**THE MARK IS AN INPUT TO THE STRIP RECONCILE, never painted beside it.**
+`updateSessionStrip` rewrites every tile's whole class string and removes any tag
+it did not put there, and it runs on every switch, every add and every thumbnail
+that lands. Anything drawn onto a tile from outside survives until the next arrow
+press and then vanishes. So the per-tile paint was lifted out into
+`paintSessionTile`, the verdict joins the class string it builds, and the word
+tag has its own class so the "preview" block cannot take it off — a tile can
+honestly be wearing both at once. Marking repaints ONE tile by its id, through
+that same function, so the fast path cannot produce DOM the reconcile would
+undo. The counts ride in `#sessionMeta`, which is the `role=status` the reconcile
+rewrites unconditionally; announcing them anywhere else would have lasted one
+press.
+
+THE QUICK LOOK'S VERDICT TRAVELS IN THE ROW THE PHOTO IS WRITTEN WITH, not
+written over it afterwards. A `setMark` fired after `Session.addPhoto` looks for
+a row the strict write has not committed yet, finds nothing, and silently does
+nothing — `setThumb` has the same shape and the same silence. So the hand-over
+map changed from `Map<File, ArrayBuffer>` to a small object carrying the picture
+AND the verdict, in all four places it is typed, and an entry is now made for
+every kept photo rather than only those whose strip picture had been built.
+
+A MARK IS NOT AN EDIT. Not in `EditParams`, not in the undo stack, not in
+`LiveEdit`, so the five-places rule does not apply and Undo leaves it alone. U is
+its only way off, as in the grid. Pressing the same verdict again takes it off,
+also as in the grid: one vocabulary for one decision, in both places it can be
+made.
+
+REACHABLE BY FINGER, not only by key. These apps are used on a tablet, and a
+decision that can only be made by pressing P is one most readers cannot make at
+all. Two real buttons in the session head, 44 px, labelled in words, pressed
+state carried by border, weight AND a tick. **They cost nothing in chrome**: the
+strip measured 140 px at 430 px wide and 140 px at 900 px, before and after, and
+the head does not wrap at either. That is the measurement §7e asks for, and it is
+the one that has gone the other way before.
+
+The keys sit on the document under the arrow handler's exact guard set — no
+modifier, no open dialog, not while the crop tools are armed, not from inside an
+input, only from the photo or the strip, only with two real photos or more.
+
+FOUR HARNESS FAULTS, every one of them the instrument. A programmatic click does
+not move the focus, so after touching a slider the focus was still in that slider
+and the app correctly refused the keys — the walk now blurs first, which is the
+state a reader is in after tapping the photograph. The exposure slider is `expo`,
+not `exposure`. The resume button is `resumeSession`, not `resumeBtn`. And check
+13 read "every verdict button clears 44 px", which is TRUE of a build with no
+verdict buttons at all — it counts them now. Twelve of fifteen checks fail
+against the build before this change; the three that pass are the
+no-regression ones.
+
+Measured in both themes: real buttons labelled in words, the one you are on
+reading as pressed, the verdict as a WORD on the tile, a rejected tile differing
+by line style as well as dimming, the counts announced through a live region that
+already existed, and axe clean over the strip.
