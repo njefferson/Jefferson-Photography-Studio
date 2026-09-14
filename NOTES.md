@@ -1127,6 +1127,121 @@ the build. Sequential on purpose: run at once, the other walks become the thing
 The three slow ones are a11y (69s, seven pages in both themes), export-report
 (69s) and tile-truth (71s); the rest are under half a minute each.
 
+## The correction strength would not stay where it was put, 2026-09-14
+
+**THE REPORT WAS RIGHT IN ITS FIRST SENTENCE AND THREE TURNS WENT ELSEWHERE.**
+"Blue circles instead of fixed hotspots" named the hot-spot correction; it was
+read as healed dust spots after a screenshot showed the Corrections panel open
+on Dust & spots, and two failed fixes went into the heal path before the reader
+said plainly that turning the hot-spot strength down fixes it. The lesson is not
+subtle: the reporter had already named both the cause and the remedy.
+
+**MEASURED ON THE READER'S OWN FRAME** (NIR_1376.NEF, Z 50, NIKKOR Z DX 50-250mm
+at 57mm f/8 — the first real file with EXIF this work has had, since all 44
+practice DNGs carry none). The correction at strength 1 changes the centre by
+**-6 red, +5 green, +3 blue**, falling to nothing by two-thirds of the way out.
+An eleven-point red-to-green swing at the centre, which on a flat bright field
+reads as a cyan disc.
+
+**AND A LOWER SHIPPED DEFAULT WOULD BE THE WRONG FIX.** Sweeping the strength on
+that frame, the radial red-green spread from centre to edge falls monotonically
+as strength RISES: 32.3 at 0, 29.1 at 0.25, 25.9 at 0.5, 22.8 at 0.75, 19.7 at 1,
+13.7 at 1.5. By the measure the profile is calibrated against, more correction is
+flatter. Both readings are true at once — the ring average is dominated by sky
+and foliage, while the artefact lives in bright grass that is already near
+neutral, where the same radial push has nothing to cancel and shows as colour.
+Which of the two matters is a judgement about the reader's own photographs.
+
+**SO THE FIX IS TO REMEMBER THEIR ANSWER, NOT TO GUESS A BETTER NUMBER.** Both
+cards hard-coded full strength on every open — `params.lensFix = myLens ? 1 : 0`
+and `params.hsFix = 1` — so the remedy the reader had already found was a slider
+they had to move again on every photograph. Reported from a session of
+**sixty-two**. The strength is now remembered per profile, keyed per lens AND
+aperture (`shipped:50-250@8.0`), because a strength that suits one is not a claim
+about another. Written on `change` and never on `input`, or a drag stores every
+value it passed through. Full strength is stored as ABSENCE, so putting it back
+leaves nothing behind and the map cannot only grow.
+
+**Also confirmed dead, on the reader's file:** the lens correction's centre gains
+came back red 1.022x, blue 0.943x, **blue over red 0.92x — close to neutral**, so
+the arithmetic-from-the-honest-range theory that opened this investigation was
+wrong. Nothing in the lens or hot-spot path changed in the 52-commit promote
+either; `pipeline.ts`, `hotspot.ts`, `hotspotProfiles.ts` and `lensstore.ts` are
+identical to what production was already running, and every lens commit predates
+it.
+
+**Instrument errors, four in one investigation, all caught by controls:** a
+chroma distance that divided by a green channel sitting at zero and reported
+95.7; a disc-versus-ring measurement that found its worst case in near-black
+canopy where fractions swing on rounding; a `location.reload()` that only queues
+a navigation; and a strength sweep that drove `stkMatchStrength` because it was
+the first id matching /stren/i. Every one of them produced a confident number.
+
+## Healed spots cloning the wrong colour — REPRODUCED, NOT FIXED, 2026-09-14
+
+**THE REPORT WAS ABOUT HEALED DUST SPOTS, and the first two hours went to the
+wrong defect.** "Hot-spots" was read as the IR LENS hot-spot and a whole lens
+section was built for the §7f report before a screenshot showed the Corrections
+panel open on Dust & spots and a soft cyan disc sitting in bright infrared
+grass. The lens work is kept because a lens question will come and the report
+could not answer one either — but it was not the question asked, and the term
+means both things in this app.
+
+**THE STRUCTURAL CAUSE IS REAL AND WAS FOUND BY READING.** `findHealSource`
+scores every candidate patch on LUMA ALONE: a surround SAD over the annulus plus
+a smoothness term inside the disc, both from `lumaAccessor`, with no colour term
+anywhere. That is a visible-light assumption. The luma weights are
+0.21/0.72/0.07, so green carries nearly three quarters of the number while red
+and blue carry the false colour — in a channel-swapped infrared frame two
+regions can match in brightness and be opposite in hue, and the search clones
+one into the other and scores it well.
+
+**REPRODUCED on a practice frame**, `tools/heal-source-walk.mjs`: a healed disc
+came out **rgb(122,14,11) against a surround of rgb(128,33,26)** — red matches
+within 5%, green and blue are less than half. That is the mechanism, visible, in
+a region bright enough to have a colour.
+
+**AND TWO ATTEMPTED FIXES BOTH FAILED, MEASURED.**
+
+- **A chroma term in the score.** A `chromaAccessor` returning each channel as a
+  fraction of the three, added to the annulus SAD at a weight of 900 — enough
+  to dominate the luma term several times over. A/B over six chosen bright taps:
+  worst **0.095 on both builds, at the same tap**; two taps marginally better,
+  two marginally worse. Noise. Reverted.
+- **A wider candidate search**, 6 distances x 24 angles against the shipped
+  3 x 16. Worst went **0.150 to 0.164** and the chosen sources moved further
+  away, which is further from similar. Reverted.
+
+The likely reading of both results is that the candidate set has no
+chromatically-matching member to promote: 48 offsets in a ring 2.4-4.6 radii out
+are all on the same side of whatever boundary the spot sits near, so weighting
+colour only reorders equally wrong options and widening reaches worse ones. That
+is a hypothesis and it is written as one — the next attempt should test it
+directly rather than adjust the score again.
+
+**WHAT SHIPPED INSTEAD: the report can now answer it from the reader's own
+photograph.** Every healed spot is listed with how far its patch came from, in
+radii, and the colour distance between the destination's annulus and the
+source's annulus measured on the buffer the heal actually reads. Clean heals on
+practice frames report 0.001.
+
+**ONE NUMBER WORTH KEEPING: 0.001 in the raw buffer became 0.095 on the canvas.**
+The source search compares the linear decode; the reader sees the frame after a
+channel swap and a saturating look. A residual the search treats as an excellent
+match is amplified into a visible cast. Any fix that only tightens the raw-buffer
+match may still leave a visible disc, and any measurement taken only on the raw
+buffer will say the heal is fine.
+
+**The walk is left FAILING on purpose.** It has found a real defect and the
+defect is not fixed; a threshold moved up to make the sweep green would be the
+sweep lying. `tools/walk-all.mjs` will report 1 of 16 failing until this is
+repaired, and that is the honest state.
+
+**Not reproduced: the cyan disc itself.** No practice frame at any tap tried
+produces one. The frames are different scenes, and the report is from a
+62-photograph session on a device. The walk stands as a regression guard on the
+heal's colour behaviour, NOT as evidence about that report.
+
 ## Blue circles where a hot-spot was corrected, 2026-09-14
 
 **REPORTED FROM PRODUCTION at 2.46.6, and the correction maths is byte-identical

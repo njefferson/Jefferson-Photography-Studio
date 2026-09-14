@@ -351,6 +351,10 @@ function updateHotspotUI() {
     `${short} · ${src} · ${knows}${note ? ` — ${note}` : ""}${params.hsBypass ? " · bypassed" : ""}`;
 }
 
+hsUi.strength.addEventListener("change", () => {
+  rememberStrength(lensStrengthKey(), Number(hsUi.strength.value));
+  updateHotspotUI();
+});
 hsUi.strength.addEventListener("input", () => {
   params.hsFix = Number(hsUi.strength.value);
   syncLensStrength();
@@ -456,6 +460,73 @@ function lensCurveFor(imported: ImportedFile): LensCurve | null {
   return { kr: colour?.kr, kb: colour?.kb, bump: shipped?.bump };
 }
 
+/** WHAT EACH HEAL ACTUALLY CLONED, measured on the buffer the heal reads.
+ *
+ *  Colour distance is each channel as a fraction of the three — bounded in
+ *  0..1 whatever the channels do. A ratio against green is the obvious
+ *  alternative and it explodes exactly where this matters: a red-flooded
+ *  infrared decode can hold green at zero, and a first attempt at this
+ *  measurement reported a distance of 95.7 that was produced entirely by the
+ *  divisor. Above about 0.05 the patch starts reading as a different colour
+ *  from what surrounds it; the numbers are printed so that line can be moved
+ *  by measurement rather than argued about. */
+function healDiagnostic(): string {
+  const spots = params.spots ?? [];
+  if (!current) return "nothing open";
+  if (!spots.length) return "none on this photograph";
+  const src = previewSrc;
+  if (!src) return `${spots.length} — the source buffer is not in memory to measure them`;
+  const W = src.width, H = src.height;
+  const px = (x: number, y: number): [number, number, number] | null => {
+    const xi = Math.round(x), yi = Math.round(y);
+    if (xi < 0 || yi < 0 || xi >= W || yi >= H) return null;
+    const i = (yi * W + xi) * 4;
+    if (src.linear) return [src.linear[i], src.linear[i + 1], src.linear[i + 2]];
+    if (src.pixels) return [src.pixels[i], src.pixels[i + 1], src.pixels[i + 2]];
+    if (src.linear16) return [fromHalf(src.linear16[i]), fromHalf(src.linear16[i + 1]), fromHalf(src.linear16[i + 2])];
+    return null;
+  };
+  /** Mean colour of the annulus just outside a disc — the same ring the source
+   *  search votes on, so this reports what that search was looking at. */
+  const ringMean = (cx: number, cy: number, rPx: number): [number, number, number] | null => {
+    let r = 0, g = 0, b = 0, n = 0;
+    for (let a = 0; a < 24; a++) {
+      const t = (a / 24) * Math.PI * 2;
+      for (const k of [1.2, 1.35, 1.5]) {
+        const p2 = px(cx + Math.cos(t) * rPx * k, cy + Math.sin(t) * rPx * k);
+        if (!p2) continue;
+        r += p2[0]; g += p2[1]; b += p2[2]; n++;
+      }
+    }
+    return n ? [r / n, g / n, b / n] : null;
+  };
+  const frac = (m: [number, number, number]) => {
+    const t = m[0] + m[1] + m[2];
+    return t > 1e-9 ? [m[0] / t, m[1] / t, m[2] / t] : [1 / 3, 1 / 3, 1 / 3];
+  };
+  const out: string[] = [];
+  let worst = 0;
+  for (const sp of spots.slice(0, 12)) {
+    const rPx = Math.max(1, sp.r * W);
+    const cx = sp.x * W, cy = sp.y * H;
+    const sxp = (sp.x + sp.dx) * W, syp = (sp.y + sp.dy) * H;
+    const d = Math.hypot(sp.dx * W, sp.dy * H);
+    const dest = ringMean(cx, cy, rPx), from = ringMean(sxp, syp, rPx);
+    let note = "not measurable";
+    if (dest && from) {
+      const a = frac(dest), b = frac(from);
+      const dist = (Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2])) / 2;
+      if (dist > worst) worst = dist;
+      note = `colour ${dist.toFixed(3)}${dist >= 0.05 ? " — CLONED FROM A DIFFERENT COLOUR" : ""}`;
+    }
+    out.push(`${(d / rPx).toFixed(1)}r away, ${note}`);
+  }
+  return (
+    `${spots.length}${spots.length > 12 ? " (first 12)" : ""} · worst colour distance ${worst.toFixed(3)} · ` +
+    out.join(" | ")
+  );
+}
+
 /** WHICH PROFILE IS CORRECTING THE OPEN PHOTOGRAPH, AND WHERE EACH HALF CAME
  *  FROM. The two halves can come from two different profiles — the reader's own
  *  measurement supplies the colour and the shipped one the brightness — so
@@ -527,7 +598,7 @@ function initMyLens(_img: DecodedImage, _imported: ImportedFile) {
   // moves. Cleared when nothing matched, so the previous photo's lens cannot
   // leak onto this one. Both halves go up together — initHotspot has already
   // run and settled the shipped match.
-  params.lensFix = myLens ? 1 : 0;
+  params.lensFix = myLens ? (rememberedStrength("own:" + myLens.p.key) ?? 1) : 0;
   params.lensBypass = false;
   syncLensStrength();
   syncLensTexture();
@@ -539,6 +610,14 @@ myLensUi.strength.addEventListener("input", () => {
   if (!myLens) return;
   params.lensFix = Number(myLensUi.strength.value);
   syncMyLens(); // draw() coalesces the drag into one undo step, like every slider
+});
+// REMEMBERED ON `change`, NOT ON `input` — a drag fires input per pixel, and
+// writing storage on each one would store every value the slider passed
+// through on the way to the one that was meant.
+myLensUi.strength.addEventListener("change", () => {
+  if (!myLens) return;
+  rememberStrength("own:" + myLens.p.key, Number(myLensUi.strength.value));
+  updateMyLensUI();
 });
 myLensUi.bypass.addEventListener("click", () => {
   if (!myLens) return;
@@ -560,10 +639,75 @@ function initHotspot(_img: DecodedImage, _imported: ImportedFile) {
   const p = Hotspot.findShipped(currentExif);
   const short = Hotspot.shortFor(currentExif?.lens);
   hotspotState = p && short ? { p, short, source: "exif" } : null;
-  params.hsFix = 1;
+  params.hsFix = rememberedStrength(hotspotState ? "shipped:" + hotspotState.short + "@" + (currentExif?.fNumber ? (currentExif.fNumber[0] / currentExif.fNumber[1]).toFixed(1) : "?") : null) ?? 1;
   params.hsBypass = false;
   updateHotspotUI();
   updateLensCmp();
+}
+
+/** THE CORRECTION STRENGTH THE READER CHOSE FOR THIS LENS, REMEMBERED.
+ *
+ *  It was hard-coded to 1 on every open — `params.lensFix = myLens ? 1 : 0` and
+ *  `params.hsFix = 1` — so turning it down never survived moving to the next
+ *  photograph. Reported from a session of SIXTY-TWO frames, where the remedy
+ *  the reader had already found was a slider they then had to move sixty-two
+ *  times, once per photo, to keep it.
+ *
+ *  WHY THE DEFAULT IS NOT SIMPLY LOWERED INSTEAD. Swept on the reported frame,
+ *  the radial red-green spread from centre to edge falls monotonically as
+ *  strength rises — 32.3 at 0, 19.7 at 1, 13.7 at 1.5 — so by the measure the
+ *  profile is calibrated against, MORE correction is flatter, and a lower
+ *  shipped default would be worse on a flat field. What the reader is reacting
+ *  to is not that average: the correction is a radial push applied to whatever
+ *  is there, and in a bright field that is already near neutral it reads as a
+ *  cyan disc while the ring average, dominated by sky and foliage, is still
+ *  red. Both are true, and which one matters is the reader's call on their own
+ *  photographs — so this remembers their answer rather than guessing a better
+ *  number for them.
+ *
+ *  KEYED PER PROFILE, because a strength that suits a 50-250 at f/8 is not a
+ *  claim about any other lens, and one global number would silently carry it
+ *  across. Same shape as the standing default look. */
+const LENS_STRENGTH_KEY = "ips-lens-strength";
+
+function lensStrengthMap(): Record<string, number> {
+  try {
+    const raw = localStorage.getItem(LENS_STRENGTH_KEY);
+    const m = raw ? JSON.parse(raw) : {};
+    return m && typeof m === "object" ? (m as Record<string, number>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** The remembered strength for a profile, or null to open at full. */
+function rememberedStrength(key: string | null): number | null {
+  if (!key) return null;
+  const v = lensStrengthMap()[key];
+  return Number.isFinite(v) && v >= 0 && v <= 1.5 ? v : null;
+}
+
+function rememberStrength(key: string | null, v: number): void {
+  if (!key || !Number.isFinite(v)) return;
+  try {
+    const m = lensStrengthMap();
+    // Full strength is the default, so it is stored as ABSENCE rather than as
+    // 1 — otherwise a reader who tries a lower value and puts it back leaves a
+    // row behind that means the same as no row, and the map only ever grows.
+    if (Math.abs(v - 1) < 1e-6) delete m[key];
+    else m[key] = v;
+    localStorage.setItem(LENS_STRENGTH_KEY, JSON.stringify(m));
+  } catch {
+    /* private window: the slider still works, it just will not be remembered */
+  }
+}
+
+/** The key a strength is remembered against: the reader's own measurement when
+ *  they have one for this frame, otherwise the shipped profile. */
+function lensStrengthKey(): string | null {
+  if (myLens) return "own:" + myLens.p.key;
+  if (hotspotState) return "shipped:" + hotspotState.short + "@" + (currentExif?.fNumber ? (currentExif.fNumber[0] / currentExif.fNumber[1]).toFixed(1) : "?");
+  return null;
 }
 
 /** The open photograph's EXIF, read ONCE. Both lens cards want the lens, the
@@ -1741,6 +1885,17 @@ function wireVersionMenu() {
       // honest bin sits in 0.772..1.460, which at full strength is already
       // 1.9x blue over red — so a blue disc is reachable from correct data at
       // too much strength, and the number says which of those it is.
+      // EVERY HEALED SPOT, AND WHERE ITS PATCH CAME FROM. Reported because a
+      // heal that lands the wrong colour is invisible to every other line here
+      // and cannot be reproduced without the reader's own photograph: the
+      // offset IS the diagnosis. `findHealSource` scores candidates on LUMA
+      // alone — a surround match plus an inside-the-disc smoothness term — so
+      // in a channel-swapped infrared frame, where brightness is nearly
+      // independent of hue, it can clone a chromatically opposite patch and
+      // score it well. This measures that directly, from this photograph's own
+      // pixels: how far each source sits from its destination, and how far
+      // apart the two neighbourhoods are in colour.
+      { k: "Healed spots", v: healDiagnostic() },
       { k: "Lens correction", v: lensDiagnostic() },
       { k: "Centre gains", v: lensCentreDiagnostic() },
       { k: "Default look", v: defaultLook() ? (BUILTIN_NAMES[defaultLook()!] ?? defaultLook()!) : "none — photos open ungraded" },
