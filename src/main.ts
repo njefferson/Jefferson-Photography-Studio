@@ -63,6 +63,18 @@ declare const __APP_VERSION__: string;
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
+/* THE FILE-PICKER STATE LIVES AT THE TOP, and that is load-bearing rather than
+   tidy. Functions hoist; `const` and `let` do not, and the earliest picker is
+   registered around line 3580 while these sat with their helpers two thousand
+   lines below. The whole app died at boot with "Cannot access … before
+   initialization" — every check in the walk failed at once, including opening a
+   photo, which reads as eleven unrelated defects rather than one dead module. */
+let pickerOpens = 0;
+let pickerReturns = 0;
+let wedgeReported = false;
+const pickerHandlers = new Map<string, (files: File[]) => void>();
+
+
 // Discrete build stamp in the header — so a troubleshooting screenshot always
 // says which build it came from (a stale PWA cache can otherwise hide which
 // code is actually running on the device).
@@ -77,8 +89,6 @@ const panel = $("panel") as HTMLElement;
 const panelBody = $("panelBody") as HTMLElement;
 const cueUp = $("panelUp") as HTMLDivElement;
 const cueDown = $("panelDown") as HTMLDivElement;
-const fileInput = $("file") as HTMLInputElement;
-const welcomeFileInput = $("welcomeFile") as HTMLInputElement;
 
 // No WebGL2 -> a clear explanation with options instead of a blank page. The
 // throw halts this module; the static overlay needs no scripting to stay up.
@@ -1946,6 +1956,13 @@ function wireVersionMenu() {
       // to load" and "it never upgraded at all" look identical, and they mean
       // opposite things. This says which happened, on the device it happened on.
       { k: "Editing copy", v: editingCopyLine() },
+      // EVERY PICKER OPENED, AND HOW MANY CAME BACK. Reported because the one
+      // failure this app could not see from the inside was a file picker that
+      // never returned: every Open button then did nothing when pressed, and
+      // there was no way to tell that from the app simply being ignored. Two
+      // outstanding is the signature, and this line says it in the report
+      // rather than leaving the next session to reason about a description.
+      { k: "File pickers", v: pickerLine() },
       // Kept rather than shown once and lost — see recordFailure.
       { k: "Last failure", v: lastFailure },
     ]);
@@ -3579,10 +3596,8 @@ stkShadow.addEventListener("click", () => {
 // Import your own picture as a sticker (session-only runtime asset). This is
 // how a photorealistic cut-out you supply gets blended + matched like the
 // built-ins. Resets on reload (not precached), which the note explains.
-const stickerImport = $("stickerImport") as HTMLInputElement;
-stickerImport.addEventListener("change", async () => {
-  const f = stickerImport.files?.[0];
-  stickerImport.value = "";
+registerPicker("stickerImport", (files) => { void (async () => {
+  const f = files[0];
   if (!f || !current) return;
   try {
     // <img> + decode(), not createImageBitmap — iOS Safari rotates the latter 90°
@@ -3618,7 +3633,7 @@ stickerImport.addEventListener("change", async () => {
   } catch {
     toast("That picture couldn't be read — try a PNG or JPEG.", 3000);
   }
-});
+})(); });
 
 function deleteSelectedSticker() {
   const list = params.stickers ?? [];
@@ -5551,6 +5566,152 @@ let nativeReport = "not attempted yet";
  *  "it broke with nothing else happening" are different bugs and the difference
  *  is invisible an hour later. */
 let lastFailure = "none this session";
+/* ── THE FILE PICKER, AND WHY THIS IS NOT A PLAIN `.click()` ──────────────────
+ *
+ * REPORTED: batch process, the Files picker opens, Search, a letter typed, the
+ * scope selector appears — and the picker closes by itself. From then on NO file
+ * could be opened from any entry point until the app was force-quit.
+ *
+ * On iOS/iPadOS in an installed app, a document picker dismissed through that
+ * path can leave WebKit believing a picker is still presented for the input
+ * element it was opened from. Every later `.click()` on that element is then
+ * ignored — no error, no event, nothing. The element is dead for the life of the
+ * page, and quitting the app is the only reset, which is what was found by hand.
+ *
+ * TEN LONG-LIVED INPUTS, FIVE CLICKED IN CODE, AND NOT ONE `cancel` HANDLER.
+ * That was the state of it: when a picker closed with nothing, this app was not
+ * told, learned nothing, and presented the same dead element next time.
+ *
+ * So: the element is REPLACED with a fresh clone immediately before the picker
+ * opens, inside the reader's tap gesture — a wedged one is thrown away rather
+ * than clicked again — and `cancel` is heard, so a dismissal is a fact the app
+ * has rather than silence.
+ *
+ * WHAT IS VERIFIED AND WHAT IS NOT, because this matters more than usual here.
+ * Every measurement in this repository is Chromium, and this is a WebKit
+ * presentation bug in standalone mode: the walk can prove all ten paths still
+ * open and still deliver files, and that a deliberately wedged element recovers
+ * on the next attempt. It cannot prove the stuck picker clears on the device.
+ * That is what the counter below is for — so a second occurrence arrives as
+ * evidence instead of another description of a screen. */
+
+/** True while at least one picker has been opened and has not come back. Two of
+ *  those in a row is the signature of the wedge. */
+function pickerOutstanding(): number {
+  return Math.max(0, pickerOpens - pickerReturns);
+}
+
+function pickerLine(): string {
+  if (!pickerOpens) return "not opened this session";
+  const out = pickerOutstanding();
+  return `${pickerOpens} opened, ${pickerReturns} came back` +
+    (out >= 2 ? ` · ${out} NEVER RETURNED — the picker is wedged, which is the state that needs the app restarted`
+      : out === 1 ? " · 1 still open" : "");
+}
+
+/** THE WAY OUT, WHICH WAS FORCE-QUIT AND SHOULD NEVER HAVE BEEN.
+ *
+ *  Once the picker is wedged, every Open button in the app does nothing when
+ *  pressed. Nothing said so, so the app read as broken rather than stuck and the
+ *  only remedy was one a reader had to invent: quit and reopen.
+ *
+ *  Reloading the page is the same reset without leaving the app, so that is
+ *  offered here, once, at the moment the app can first tell. Said in terms of
+ *  what happened rather than of inputs and pickers — "the Files window did not
+ *  come back" is the thing that was seen. */
+function reportWedgedPicker(): void {
+  if (wedgeReported) return;
+  wedgeReported = true;
+  recordFailure("the file picker did not come back", new Error(pickerLine()));
+  void askDialog(
+    "The Files window did not come back",
+    "Two attempts to open files have gone unanswered, which leaves every Open button in the app doing nothing when you press it. "
+    + "This is iOS holding on to a file window that has already closed — nothing you did, and nothing here can prise it loose. "
+    + "Reloading clears it and keeps you in the app; your photos and edits are stored and will still be here afterwards.",
+    "Reload now",
+    "Not yet",
+  ).then((r) => {
+    if (r === "ok") location.reload();
+    else wedgeReported = false; // said no: offer again on the next dead press
+  });
+}
+
+/** ONE REGISTRY, BECAUSE HALF THE INPUTS ARE NOT CLICKED IN CODE.
+ *
+ *  Five are driven with `.click()`; the other five sit inside a <label>, so the
+ *  reader's tap reaches the element directly and no code of ours runs first.
+ *  Both kinds are reused, and both wedge. So the handler lives here against the
+ *  id rather than on the element, and the element itself is disposable —
+ *  whichever way a picker is opened, it opens on one that has never been used. */
+
+function armPicker(el: HTMLInputElement, id: string): HTMLInputElement {
+  el.addEventListener("change", () => {
+    pickerReturns++;
+    const files = Array.from(el.files ?? []);
+    // Cleared so the same set can be picked again — a value left behind means
+    // the second pick of one folder fires no change at all.
+    el.value = "";
+    if (files.length) pickerHandlers.get(id)?.(files);
+  });
+  // Safari 16.4+ and every other current engine. Older ones simply never fire
+  // it, which leaves the counter reading "still open" — honest, and the same
+  // answer it gave before this existed.
+  el.addEventListener("cancel", () => { pickerReturns++; });
+  return el;
+}
+
+/** Swap in a never-used element and return it. Cheap enough to do on every tap:
+ *  a bare <input type=file> clone with no children. */
+function freshPicker(id: string): HTMLInputElement | null {
+  const old = document.getElementById(id) as HTMLInputElement | null;
+  if (!old) return null;
+  const fresh = old.cloneNode(false) as HTMLInputElement;
+  fresh.value = "";
+  old.replaceWith(fresh);
+  return armPicker(fresh, id);
+}
+
+function registerPicker(id: string, onFiles: (files: File[]) => void): void {
+  pickerHandlers.set(id, onFiles);
+  const el = document.getElementById(id) as HTMLInputElement | null;
+  if (el) armPicker(el, id);
+}
+
+function countOpen(): void {
+  // BEFORE the picker opens, so one that never returns is still counted — the
+  // whole point is to notice the ones that do not come back.
+  pickerOpens++;
+  if (pickerOutstanding() >= 2) reportWedgedPicker();
+}
+
+/** Open the picker for `id`, on a fresh element. Must be called synchronously
+ *  inside the tap or iOS ignores the click — the rule the quick-look button
+ *  beside it already carries. */
+function openPicker(id: string): void {
+  const el = freshPicker(id);
+  if (!el) { recordFailure("opening the file picker", new Error(`no input #${id}`)); return; }
+  countOpen();
+  el.click();
+}
+
+/* AND THE LABEL-WRAPPED ONES, WHICH NO CODE OF OURS OPENS.
+ *
+ * `pointerdown` lands before the label forwards its activation to the input, so
+ * the element is swapped out from under the tap that is about to use it. The
+ * clone stays inside the same <label>, so the forwarding still finds it. This
+ * is the only way to give a label-driven input the same fresh-every-time
+ * guarantee without turning every one of them into a button — which would have
+ * moved five real controls and their labels for a reason the reader cannot
+ * see. */
+document.addEventListener("pointerdown", (e) => {
+  const label = (e.target as HTMLElement | null)?.closest?.("label");
+  if (!label) return;
+  const input = label.querySelector('input[type="file"]') as HTMLInputElement | null;
+  if (!input?.id || !pickerHandlers.has(input.id)) return;
+  freshPicker(input.id);
+  countOpen();
+}, true);
+
 function recordFailure(what: string, err: unknown, file?: { name?: string; kind?: string; bytes?: Uint8Array }): void {
   const msg = (err as Error)?.message ?? String(err);
   const where = file ? ` · ${file.name ?? "?"} (${file.kind ?? "?"}, ${file.bytes ? Math.round(file.bytes.length / 1e6) + " MB" : "size unknown"})` : "";
@@ -7305,9 +7466,7 @@ function establishFreshEdit() {
 // have anywhere to land. A single input pointed at by two `for=` labels put the
 // ring on whichever one happened to contain it, which was never the one being
 // looked at. See NOTES: neither was reachable by keyboard at all before this.
-async function openFromInput(input: HTMLInputElement) {
-  const files = Array.from(input.files ?? []);
-  input.value = ""; // allow re-picking the same file(s) later
+async function openPickedFromFiles(files: File[]) {
   if (!files.length) return;
   try {
     await openPicked(files);
@@ -7318,9 +7477,9 @@ async function openFromInput(input: HTMLInputElement) {
     updateWelcomeReturn();
   }
 }
-for (const el of [fileInput, welcomeFileInput]) {
-  el.addEventListener("change", () => void openFromInput(el));
-}
+// Through the registry, not onto the element: these two are label-wrapped, so
+// the tap reaches the input directly and the element it reaches is a fresh one.
+for (const id of ["file", "welcomeFile"]) registerPicker(id, (files) => void openPickedFromFiles(files));
 
 // --- The conventions a reader brings with them ----------------------------
 // Everything the platform gives for free was already right here: every dialog
@@ -9518,8 +9677,6 @@ setUpdateCost(() => {
 });
 let quickGen = 0; // bumped on open/close to abort an in-flight decode loop
 
-const quickInput = $("quickFiles") as HTMLInputElement;
-const welcomeQuickInput = $("welcomeQuickFiles") as HTMLInputElement;
 const quickLook = $("quickLook") as HTMLDialogElement;
 // Escape (native dialog cancel -> close) must free previews exactly like the
 // Close button; closeQuickLook empties quickItems BEFORE calling close(), so
@@ -9987,15 +10144,7 @@ async function keepQuickLook() {
 
 // Same shape as openFromInput above: the header button drives `quickInput`
 // with .click(), and the welcome screen's label owns its own input.
-async function quickFromInput(input: HTMLInputElement) {
-  const files = Array.from(input.files ?? []);
-  input.value = ""; // allow re-picking the same set later
-  if (!files.length) return;
-  await openQuickLook(files);
-}
-for (const el of [quickInput, welcomeQuickInput]) {
-  el.addEventListener("change", () => void quickFromInput(el));
-}
+for (const id of ["quickFiles", "welcomeQuickFiles"]) registerPicker(id, (files) => void openQuickLook(files));
 qlKeep.addEventListener("click", keepQuickLook);
 $("qlClose").addEventListener("click", closeQuickLook);
 // One button, and what it clears depends on what there is to clear: picks
@@ -11201,7 +11350,6 @@ function uniqueName(name: string, taken: Set<string>): string {
   return out;
 }
 
-const batchInput = $("batchFiles") as HTMLInputElement;
 const busyStop = $("busyStop") as HTMLButtonElement;
 const busyContinue = $("busyContinue") as HTMLButtonElement;
 const recoverBtn = $("recoverBatch") as HTMLButtonElement;
@@ -11414,7 +11562,7 @@ const BUILTIN_NAMES: Record<string, string> = {
 function pickGrade(grade: BatchGrade) {
   chosenGrade = grade;
   batchDlg.close();
-  batchInput.click();
+  openPicker("batchFiles");
 }
 
 /** The standing default-look picker, drawn each time Settings opens. Same shape
@@ -11513,22 +11661,20 @@ $("bcAuto").addEventListener("click", () => pickGrade({ kind: "auto" }));
 // system's and cannot be made bigger; this app's own grid is full-screen, and
 // before this it was reachable only from the start screen. Same tap-gesture
 // rule as bcQuick below: click the input synchronously or iOS ignores it.
-$("barQuickBtn").addEventListener("click", () => quickInput.click());
+$("barQuickBtn").addEventListener("click", () => openPicker("quickFiles"));
 
 $("bcQuick").addEventListener("click", () => {
   // Not developing a .zip after all — just look. Stay in the tap gesture so
   // iOS opens the picker.
   batchDlg.close();
-  quickInput.click();
+  openPicker("quickFiles");
 });
 for (const id of ["batchCancel", "batchCloseTop"]) $(id).addEventListener("click", () => batchDlg.close());
 batchDlg.addEventListener("click", (e) => {
   if (e.target === batchDlg) batchDlg.close(); // tap outside to dismiss
 });
 
-batchInput.addEventListener("change", async () => {
-  const files = Array.from(batchInput.files ?? []);
-  batchInput.value = ""; // let the same set be re-picked later
+registerPicker("batchFiles", (files) => { void (async () => {
   if (!files.length) return;
   // The grade chosen in the dialog; a bare change event (shouldn't happen)
   // falls back to the honest equivalents of the old behaviour.
@@ -11564,7 +11710,7 @@ batchInput.addEventListener("change", async () => {
   batchSettings = { grade, format: ui.exFormat.value as ExportFormat, scale: Number(ui.exScale.value), quality: exportQuality(), lut, lutMissing, recipe };
   batchRemaining = [];
   runBatch(files);
-});
+})(); });
 
 busyContinue.addEventListener("click", () => {
   const files = batchRemaining;
@@ -11797,13 +11943,11 @@ lookPasteDlg.addEventListener("click", (e) => {
 });
 
 // Import a look file directly (no photo-picker detour).
-const lookFileInput = $("lookFile") as HTMLInputElement;
-$("lookImportBtn").addEventListener("click", () => lookFileInput.click());
-lookFileInput.addEventListener("change", async () => {
-  const f = lookFileInput.files?.[0];
-  lookFileInput.value = ""; // let the same file be re-picked later
+$("lookImportBtn").addEventListener("click", () => openPicker("lookFile"));
+registerPicker("lookFile", (files) => { void (async () => {
+  const f = files[0];
   if (f) receiveLookText(await f.text(), "look file");
-});
+})(); });
 
 // The receive dialog — every channel (link, file, code) lands here.
 const lookRecvDlg = $("lookRecvDlg") as HTMLDialogElement;
@@ -11864,7 +12008,6 @@ lookRecvDlg.addEventListener("click", (e) => {
 // honesty). The LUT applies as the LAST colour stage (gl.ts / pipeline.ts);
 // import, apply and remove are each ONE atomic undo step. ---
 
-const lutFileInput = $("lutFile") as HTMLInputElement;
 const lutActive = $("lutActive") as HTMLDivElement;
 const lutActiveName = $("lutActiveName") as HTMLSpanElement;
 const lutStrength = $("lutStrength") as HTMLInputElement;
@@ -11892,10 +12035,9 @@ function applyLutToEdit(lut: NonNullable<EditParams["lut"]>) {
   flushRecord();
 }
 
-$("lutImportBtn").addEventListener("click", () => lutFileInput.click());
-lutFileInput.addEventListener("change", async () => {
-  const f = lutFileInput.files?.[0];
-  lutFileInput.value = ""; // allow re-picking the same file
+$("lutImportBtn").addEventListener("click", () => openPicker("lutFile"));
+registerPicker("lutFile", (files) => { void (async () => {
+  const f = files[0];
   if (!f) return;
   if (f.size > CUBE_FILE_MAX) {
     alert("That .cube file is too large — files up to 8 MB (grid size 65) are supported.");
@@ -11929,7 +12071,7 @@ lutFileInput.addEventListener("change", async () => {
     toast(`LUT saved — "${name}" (${parsed.size}³). Open a photo, then Apply it below.`, 3200);
   }
   void renderLutList();
-});
+})(); });
 
 lutStrength.addEventListener("input", () => {
   if (!params.lut) return;
