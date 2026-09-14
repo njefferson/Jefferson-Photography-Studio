@@ -614,6 +614,27 @@ export function proxyFactorFor(src: Source, srcW: number, srcH: number): number 
   return "cfa" in src ? 2 : Math.max(1, Math.max(srcW, srcH) / PREVIEW_MAX);
 }
 
+/** WILL THIS EXPORT RE-READ THE FILE rather than use the decode on screen?
+ *
+ *  The same two tests `getSource` makes, without doing any of the reading: a NEF
+ *  always, a DNG when it carries a mosaiced image. It matters to the caller
+ *  because a mosaiced export needs nothing from the decoded frame but its size,
+ *  so holding that frame for the length of an export keeps ~84 MB of
+ *  half-resolution float alive for no reason — and the app's memory envelope is
+ *  the one that already forced the full-resolution working copy off. */
+export function sourceIsMosaiced(file: ImportedFile): boolean {
+  try {
+    if (file.kind === "nef") return true;
+    if (file.kind === "dng") {
+      const ifds = new Tiff(file.bytes).allIfds();
+      return !!ifds.find((d) => d.num(254)[0] === 0 && d.num(262)[0] === 32803 && (d.num(259)[0] === 7 || d.num(259)[0] === 1));
+    }
+  } catch {
+    /* unreadable metadata — treat it as the safe answer and keep the frame */
+  }
+  return false;
+}
+
 export function getSource(file: ImportedFile, current: DecodedImage): Source {
   if (file.kind === "nef") {
     const ifds = new Tiff(file.bytes).allIfds();

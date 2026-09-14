@@ -3,6 +3,7 @@ import { importFile, type ImportedFile, type ImageKind } from "./import";
 import { wireForceUpdate, wireUpdateStrip, setUpdateCost } from "./swupdate";
 import { type DecodedImage, pickLargestPreview, linearAt } from "./decode";
 import { decodeOffThread, decodeLanes, decodeLaneTarget, type DecodeTiming } from "./decodeClient";
+import { sourceIsMosaiced } from "./export";
 import { Renderer, type EditParams } from "./gl";
 import { exportImage, saveBlob, lastExportProfile, getSource, proxyFactorFor, type ExportFormat } from "./export";
 import { buildLinearSourceInBands } from "./gpuexport";
@@ -10139,46 +10140,142 @@ async function saveBusyPending() {
   hideBusy();
 }
 
-ui.exBtn.addEventListener("click", async () => {
+// --- Export, beside the reader rather than over them -----------------------
+//
+// THE EXPORT ITSELF IS UNCHANGED: the same `exportImage`, the same options, the
+// same decision about whether it can run on several threads, and — measured —
+// the same bytes out. What changed is that it no longer takes the screen.
+//
+// It was already TWO PRESSES on every platform: the old flow rendered the file,
+// wrote "Ready — name · size" and waited for Save, because saving has to happen
+// inside a gesture for the iPad's share sheet to open at all. The only thing the
+// modal dialog added was that nothing else could be done in between.
+const exportStrip = $("exportStrip") as HTMLElement;
+const exportStripText = $("exportStripText") as HTMLElement;
+const exportStripActions = $("exportStripActions") as HTMLElement;
+const exportSave = $("exportSave") as HTMLButtonElement;
+const exportRetry = $("exportRetry") as HTMLButtonElement;
+const exportDismiss = $("exportDismiss") as HTMLButtonElement;
+
+/** The finished file, waiting for a gesture to save it. Deliberately NOT
+ *  `pendingSave`: that one belongs to the busy dialog, which Batch, session-end
+ *  and resume still use, and `hideBusy` clears it. */
+let pendingExport: { blob: Blob; name: string } | null = null;
+
+function showExportStrip(text: string, opts: { actions?: boolean; save?: boolean; retry?: boolean } = {}): void {
+  exportStripText.textContent = text;
+  exportStrip.hidden = false;
+  exportStripActions.hidden = !opts.actions;
+  exportSave.hidden = !opts.save;
+  exportRetry.hidden = !opts.retry;
+}
+
+function clearExportStrip(): void {
+  pendingExport = null;
+  exportStrip.hidden = true;
+  exportStripActions.hidden = true;
+}
+
+exportDismiss.addEventListener("click", clearExportStrip);
+
+exportSave.addEventListener("click", async () => {
+  if (!pendingExport || exportSave.disabled) return;
+  // Re-entrancy guard, the same one busySave carries: a double tap while the
+  // share sheet opens used to run the handler twice.
+  exportSave.disabled = true;
+  try {
+    const how = await saveBlob(pendingExport.blob, pendingExport.name);
+    if (how === "cancelled") return; // the sheet was closed on purpose — keep the file
+    clearExportStrip();
+  } catch (err) {
+    recordFailure("saving an export", err);
+    showExportStrip(`Could not save it: ${(err as Error).message}`, { actions: true, save: true });
+  } finally {
+    exportSave.disabled = false;
+  }
+});
+
+async function runExport(): Promise<void> {
   if (!current || !currentFile) return;
-  ui.exBtn.disabled = true;
-  showBusy("Exporting… 0%");
+  if (heapNearFull()) {
+    showExportStrip("This device is low on memory right now. Close a few tabs, or end the session and open the photo on its own.", { actions: true });
+    return;
+  }
+  // EVERYTHING THE EXPORT READS, READ NOW. The editor stays live while this
+  // runs, so `params` — one object that is mutated in place — the rotation, the
+  // flip, the look and the lens curve would otherwise be read mid-flight from
+  // whatever photo the reader has moved on to.
+  const file = currentFile;
+  const snapParams = cloneParams(params);
+  const opts = {
+    format: ui.exFormat.value as ExportFormat,
+    scale: Number(ui.exScale.value),
+    quality: exportQuality(),
+    rotate: renderer.rotation,
+    flip: renderer.flip,
+    watermark: bundledSource, // practice photos carry the corner mark; the user's photos never do
+    lookRecipe: recipeForExport(currentLook()),
+    stickerAssets: { ...stickerAssets }, // baked in; the reader may place more while this runs
+  };
+  const lens = currentLensCurve();
+  // A MOSAICED RAW IS RE-READ FROM THE FILE, so the export needs nothing from
+  // the decoded frame but its size — and holding the frame would keep ~84 MB of
+  // half-resolution float alive for the whole run, beside the next photo's own.
+  // Narrowed exactly as exportBands already narrows it for its workers.
+  const frame: DecodedImage = sourceIsMosaiced(file)
+    ? ({ width: current.width, height: current.height, isRaw: current.isRaw } as DecodedImage)
+    : current;
+  // WHY THIS ONE WILL BE SLOW, said only where it is actually knowable at the
+  // press. The parallel export refuses a photo carrying healed spots, stickers
+  // or a warp, and refuses TIFF — those are facts about the edit. It ALSO
+  // refuses an output too small to be worth splitting, and the output size is
+  // the export's own arithmetic (crop, straighten, rotation, scale), not
+  // anything this handler can work out.
+  //
+  // AN EARLIER VERSION GUESSED IT, passing the half-size preview's pixel count
+  // to canRunParallel, and printed "on one thread" over an export the app's own
+  // report then said had run on three. A label that is wrong about the thing it
+  // exists to explain is worse than no label.
+  const oneThread =
+    (snapParams.spots?.length ?? 0) > 0 ||
+    (snapParams.stickers?.length ?? 0) > 0 ||
+    !!snapParams.warp ||
+    opts.format !== "jpeg";
+
+  ui.exBtn.disabled = true; // ONE AT A TIME: at most one extra frame is ever held
+  const releaseWake = keepAwake();
+  showExportStrip(`Exporting ${file.name}… 0%${oneThread ? " — on one thread" : ""}`);
   try {
     const result = await exportImage(
-      currentFile,
-      current,
-      params,
-      {
-        format: ui.exFormat.value as ExportFormat,
-        scale: Number(ui.exScale.value),
-        quality: exportQuality(),
-        rotate: renderer.rotation,
-        flip: renderer.flip,
-        watermark: bundledSource, // practice photos carry the corner mark; the user's photos never do
-        lookRecipe: recipeForExport(currentLook()),
-        stickerAssets, // bake placed stickers into the export source
-      },
+      file,
+      frame,
+      snapParams,
+      opts,
       (f) => {
-        busyText.textContent = `Exporting… ${Math.round(f * 100)}%`;
+        showExportStrip(`Exporting ${file.name}… ${Math.round(f * 100)}%${oneThread ? " — on one thread" : ""}`);
       },
       // The raw export re-decodes from the file, so the measured correction has
       // to travel with it or the saved image would not match the screen.
-      currentLensCurve(),
+      lens,
     );
-    pendingSave = result;
+    pendingExport = result;
     // The measured size, so the Quality slider has something to be judged
     // against: change it, export, watch this number move. Measured, never
     // estimated — the file is already made by the time this is written.
-    busyText.textContent = `Ready — ${result.name} · ${fmtExportSize(result.blob.size)}`;
-    busySpinner.hidden = true;
-    busyActions.hidden = false;
+    showExportStrip(`Ready — ${result.name} · ${fmtExportSize(result.blob.size)}`, { actions: true, save: true });
   } catch (err) {
-    hideBusy();
-    alert("Export failed: " + (err as Error).message);
+    // Kept rather than shown once and lost: an alert is gone the moment it is
+    // dismissed, and no export path recorded a failure before this.
+    recordFailure("exporting a photo", err, { name: file.name, kind: file.kind });
+    showExportStrip(`Export failed: ${(err as Error).message}`, { actions: true, retry: true });
   } finally {
     ui.exBtn.disabled = false;
+    releaseWake();
   }
-});
+}
+
+ui.exBtn.addEventListener("click", () => void runExport());
+exportRetry.addEventListener("click", () => void runExport());
 
 // --- Batch / mass processing ------------------------------------------------
 // Apply the current on-screen LOOK (creative grade only — see currentLook()) to

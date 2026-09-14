@@ -12960,3 +12960,78 @@ is held and must not claim otherwise. And P was pressed on a photo the walk had
 already picked, which TOOK THE PICK OFF and left the check measuring an undecided
 photo; it ensures the verdict now instead of toggling it. Five of nine checks
 fail against the build before this change.
+
+
+## Export stops owning the screen, 2026-09-14
+
+Exporting a keeper put a modal dialog over the whole app for the length of the
+run, which on a 5-megapixel frame is six seconds parallel and fifteen on one
+thread. Export-as-you-go was the thing that made the reader stop exporting as
+they went.
+
+THE EXPORT ITSELF IS UNCHANGED — same `exportImage`, same options, same decision
+about threads, and proven to be the same bytes. What changed is the container:
+the busy dialog is gone from this path, replaced by a line that floats over the
+photo. `#busy` stays for Batch, session end and resume.
+
+IT WAS ALREADY TWO PRESSES on every platform. Rendering finished, the dialog
+wrote "Ready — name · size" and waited for Save, because saving has to happen
+inside a gesture or the share sheet will not open. The only thing the modal
+added was that nothing else could be done in between. The patch note says that,
+rather than claiming a second press as new.
+
+EVERYTHING THE EXPORT READS IS READ AT THE PRESS: a copy of the parameters (one
+object, mutated in place by every slider), the options, the rotation and flip,
+the look recipe, the lens curve, and the file. For a mosaiced raw the decoded
+frame is narrowed to its dimensions, exactly as the parallel export already
+narrows it for its workers, so a NEF or DNG export does not keep ~84 MB of
+half-resolution float alive beside the next photo's own.
+
+**THE LINE CANNOT LIVE IN THE EXPORT TAB, and the first version did.** The whole
+point is that the reader carries on working, and carrying on working means
+changing panel tabs — which put the progress AND the finished file behind a tab
+nobody had a reason to go back to. It was the walk that found it: the harness
+switched to Basic to drag a slider and then could not reach Save. It is a HUD
+over the photo now, on glass tokens like the mode banners beside it, and it is
+asserted to still be there after a tab change.
+
+**AND THE LABEL LIED ABOUT THREADS.** "On one thread" was printed by asking
+`canRunParallel` with the half-size preview's pixel count, because the real
+output size is the export's own arithmetic. The app's own report then said that
+export ran on THREE. The claim is now made only from what is knowable at the
+press — healed spots, stickers, a warp, or TIFF, which are the reasons a keeper
+actually runs single-threaded — and it was checked against the profile.
+
+THE OUTPUT GATE, and what it took to make it mean anything:
+
+- Against the build before this change, through the old modal flow: the same
+  file, byte for byte, sha256 `602e2db1…`.
+- On the new build, while the reader switches photo, turns it 90°, presses a
+  different look and drags the exposure slider mid-run — measured at 30% through
+  a fifteen-second export: the same file again.
+- **A PARALLEL EXPORT CANNOT PROVE THIS.** Each worker gets a structured COPY of
+  the edit, so a mid-run mutation cannot reach it and a plant that relies on one
+  shows nothing. Two plants ran green against correct code for exactly that
+  reason before it was noticed. The gate now heals a spot first, which is what
+  makes the parallel path refuse the job, and runs the plants on one thread.
+- **And the interference has to touch something the export reads LATE.**
+  Everything else is folded in before the per-pixel pass starts. `params.glow`
+  is read per pixel through a closure, and its map is only built when glow is
+  already on — so glow is turned on before the press and off during the run.
+- With the copy replaced by the live object, on one thread, with that
+  interference: a different file, `def15292…` against `2733a5f6…`. The copy is
+  load-bearing and now proven to be.
+
+A FAILED EXPORT explains itself on the line, offers Try again, leaves the Export
+button usable, and is remembered in the report — no export path called
+`recordFailure` before this; failures were an `alert` that is gone the moment it
+is dismissed.
+
+Still broken and said so in the patch note: a photo carrying healed spots,
+stickers or a warp runs its per-pixel pass on the main thread with 16-row
+yields, so the sliders stutter while it goes. Measured here: 15.1s for 5.2 MP,
+4.9s of that paused over 117 yields.
+
+NEEDS THE OWNER'S HANDS, not verifiable here: the Save tap on an iPad opening
+the share sheet with no render between the tap and the sheet, and what the
+memory looks like beside three or four decode lanes on that device.
