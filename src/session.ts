@@ -197,12 +197,17 @@ export async function setThumb(id: string, thumb: ArrayBuffer): Promise<void> {
 
 /** Materialise one photo's source bytes (its chunks, in order). Only ever one
  *  photo's bytes are in RAM at a time — the caller decodes then drops them. */
-export async function getBytes(id: string): Promise<Uint8Array> {
+export async function getBytes(id: string, onRows?: (n: number) => void): Promise<Uint8Array> {
   const db = await open();
   try {
     const rows = await req<{ idx: number; bytes: ArrayBuffer }[]>(
       db.transaction(CHUNKS).objectStore(CHUNKS).getAll(IDBKeyRange.bound([id, 0], [id, Infinity])),
     );
+    // HOW MANY ROWS THIS READ CROSSED, handed to the caller rather than left in
+    // a module variable: two reads run at once whenever the editor opens a photo
+    // while the thumbnail pass is working, and a shared global would report
+    // whichever finished last. Reporting only — nothing here reads it back.
+    onRows?.(rows.length);
     rows.sort((a, b) => a.idx - b.idx);
     let total = 0;
     for (const r of rows) total += r.bytes.byteLength;

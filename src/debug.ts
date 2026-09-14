@@ -316,6 +316,115 @@ async function storage(): Promise<void> {
   }
 }
 
+/** READING ONE PHOTO BACK OUT OF A BIG SESSION.
+ *
+ *  A session stores every photograph as 30 KB rows keyed [photo, index], and
+ *  opening one reads its rows back with a single key-range query. A 170-photo
+ *  set therefore asks for about 850 rows out of roughly 145,000. Whether that
+ *  costs the same as asking for 850 rows out of 850 is a question about the
+ *  ENGINE'S INDEX, and nothing in the app could answer it: the report can say
+ *  how long a read took on the device, but not whether the number would have
+ *  been smaller in an emptier store.
+ *
+ *  SO THE ROWS HERE ARE TINY — 64 bytes, not 30 KB. Writing a real 4 GB session
+ *  is not something to do to somebody's device, and it would measure the wrong
+ *  thing anyway: moving the bytes is already known to cost what it costs, and
+ *  the open question is what it costs to FIND them. Tiny rows leave the index
+ *  behaviour and nothing else.
+ *
+ *  Its own button, because building the store takes a while and the ordinary
+ *  run should stay quick. Everything it makes is deleted before it returns. */
+async function readingFromABigStore(): Promise<void> {
+  const BIG = "ips-speedtest-bigread", SMALL = "ips-speedtest-oneread";
+  const PHOTOS = 170, PER = 850, BATCH = 5000, RUNS = 3;
+  const ROW = new Uint8Array(64);
+  const mid = (xs: number[]) => { const v = [...xs].sort((a, b) => a - b); return (v[(v.length - 1) >> 1] + v[v.length >> 1]) / 2; };
+  const p = note("Reading from a big session… building the store first.");
+  const made: string[] = [];
+  const openDb = (name: string) =>
+    new Promise<IDBDatabase>((res, rej) => {
+      const rq = indexedDB.open(name, 1);
+      rq.onupgradeneeded = () => rq.result.createObjectStore("c", { keyPath: ["p", "i"] });
+      rq.onsuccess = () => { made.push(name); res(rq.result); };
+      rq.onerror = () => rej(rq.error);
+    });
+  const fill = (db: IDBDatabase, photos: number, onProgress?: (done: number, total: number) => void) =>
+    new Promise<void>(async (res, rej) => {
+      const total = photos * PER;
+      let written = 0;
+      try {
+        while (written < total) {
+          const upto = Math.min(total, written + BATCH);
+          await new Promise<void>((ok, no) => {
+            const t = db.transaction("c", "readwrite");
+            t.oncomplete = () => ok(); t.onerror = () => no(t.error); t.onabort = () => no(t.error);
+            const st = t.objectStore("c");
+            for (let n = written; n < upto; n++) st.add({ p: Math.floor(n / PER), i: n % PER, b: ROW.slice().buffer });
+          });
+          written = upto;
+          onProgress?.(written, total);
+        }
+        res();
+      } catch (e) { rej(e as Error); }
+    });
+  const readOne = (db: IDBDatabase, photo: number) =>
+    new Promise<number>((res, rej) => {
+      const t0 = performance.now();
+      const rq = db.transaction("c").objectStore("c").getAll(IDBKeyRange.bound([photo, 0], [photo, Infinity]));
+      rq.onsuccess = () => {
+        // ASSERT WHAT CAME BACK. A range that matched nothing returns instantly
+        // and would read as the fastest result in the table.
+        if ((rq.result as unknown[]).length !== PER) { rej(new Error(`read ${(rq.result as unknown[]).length} rows, expected ${PER}`)); return; }
+        res(performance.now() - t0);
+      };
+      rq.onerror = () => rej(rq.error);
+    });
+  const wipe = async () => {
+    for (const name of made) {
+      await new Promise<void>((res) => { const rq = indexedDB.deleteDatabase(name); rq.onsuccess = () => res(); rq.onerror = () => res(); rq.onblocked = () => res(); });
+    }
+  };
+  // Held out here so the finally can CLOSE them before deleting: an open
+  // connection blocks deleteDatabase, which then fires onblocked and leaves the
+  // database sitting on the reader's device until the tab is closed. Measured —
+  // the failure path left both of them behind.
+  let bigDb: IDBDatabase | null = null;
+  let smallDb: IDBDatabase | null = null;
+  try {
+    const big = await openDb(BIG);
+    bigDb = big;
+    await fill(big, PHOTOS, (done, total) => { p.textContent = `Reading from a big session… ${Math.round((done / total) * 100)}% built.`; });
+    const small = await openDb(SMALL);
+    smallDb = small;
+    await fill(small, 1);
+    p.textContent = "Reading from a big session… measuring.";
+    const bigMs: number[] = [], smallMs: number[] = [];
+    // Alternated, so a device that gets busier part way through does not hand
+    // the whole of that to one side.
+    for (let r = 0; r < RUNS; r++) {
+      if (r % 2 === 0) { bigMs.push(await readOne(big, Math.floor(PHOTOS / 2))); smallMs.push(await readOne(small, 0)); }
+      else { smallMs.push(await readOne(small, 0)); bigMs.push(await readOne(big, Math.floor(PHOTOS / 2))); }
+      await tick();
+    }
+    const mb = mid(bigMs), msm = mid(smallMs);
+    p.remove();
+    const ratio = msm > 0 ? mb / msm : 1;
+    const verdict = ratio >= 1.5
+      ? `Finding them among ${(PHOTOS * PER).toLocaleString()} rows costs ${ratio.toFixed(1)}× what finding them in an empty store costs, so on this device a long session really does make every photo slower to open, before a single byte is decoded.`
+      : `Finding them among ${(PHOTOS * PER).toLocaleString()} rows costs about the same as finding them in an empty store (${ratio.toFixed(2)}×), so on this device the size of the session is NOT what makes opening a photo slow. Look elsewhere.`;
+    row("Finding one photo's pieces", `${mb.toFixed(1)} ms in a big session, ${msm.toFixed(1)} ms in an empty one`,
+      `A session keeps each photograph as ~850 separate pieces and asks for them back in one query. ${verdict} The pieces here are 64 bytes rather than the real 30 KB on purpose: this is the cost of FINDING them, not of moving them.`,
+      `big ${bigMs.map((x) => x.toFixed(1) + " ms").join(", ")} · empty ${smallMs.map((x) => x.toFixed(1) + " ms").join(", ")}`);
+  } catch (e) {
+    p.remove();
+    row("Finding one photo's pieces", "not run", `Storage refused the test (${(e as Error).message}).`);
+  } finally {
+    try { bigDb?.close(); } catch { /* already gone */ }
+    try { smallDb?.close(); } catch { /* already gone */ }
+    await wipe(); // never leave a test database on somebody's device
+  }
+}
+
 /** COULD THE EXPORT RUN ON THE GRAPHICS CHIP INSTEAD? Asked here because it
  *  cannot be asked anywhere else.
  *
@@ -1077,6 +1186,19 @@ async function fullResolutionPreview(): Promise<void> {
     row("Could the live view run at full resolution", "not run", `${(e as Error).message}.`);
   }
 }
+
+($("dBigRead") as HTMLButtonElement).addEventListener("click", async (e) => {
+  const btn = e.currentTarget as HTMLButtonElement;
+  btn.disabled = true;
+  const was = btn.textContent;
+  btn.textContent = "Running…";
+  await readingFromABigStore();
+  btn.textContent = was;
+  btn.disabled = false;
+  const copyBtn = $("dCopyAll") as HTMLButtonElement;
+  copyBtn.hidden = false;
+  copyBtn.onclick = () => copy(textArea.value + "\nSpeed\n" + out.join("\n") + "\n", copyBtn, "Copy the results");
+});
 
 ($("dRun") as HTMLButtonElement).addEventListener("click", async (e) => {
   const btn = e.currentTarget as HTMLButtonElement;

@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#1a1a1a" />
+    <meta name="robots" content="noindex" />
+    <meta name="description" content="Where the session-as-a-conveyor work has got to: what has shipped, what is on staging, what is waiting for a device pass, and what was found and not fixed." />
+    <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192-light.png" />
+    <title>Session work — where it has got to</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; padding: 2rem 1.2rem 4rem; min-height: 100vh;
+        background: radial-gradient(120% 90% at 50% 0%, var(--bg-2), var(--bg));
+        color: var(--txt);
+        font: 1rem/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      }
+      main { max-width: 700px; margin: 0 auto; }
+      a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+      .backlink { display: inline-flex; align-items: center; min-height: 44px; text-decoration: none; }
+      h1 { font-size: 1.6rem; margin: 0.4rem 0 0.6rem; letter-spacing: -0.02em; }
+      h2 { font-size: 1.05rem; margin: 2.2rem 0 0.6rem; padding-top: 1.2rem; border-top: 1px solid var(--line); }
+      p, li { color: var(--txt); }
+      ul { padding-left: 1.1rem; }
+      li { margin: 0.5rem 0; }
+      .lede { color: var(--txt-2); }
+      /* THE STATE IS A WORD, first, before any colour or weight. Read aloud, in
+         grayscale, or by somebody who cannot separate the two tints, the list
+         still says which stage is where. */
+      .state {
+        display: inline-block; min-width: 8.5em; margin-right: 0.35em;
+        font-weight: 700; letter-spacing: 0.01em;
+      }
+      .state::after { content: " —"; }
+      .done .state { color: var(--txt); }
+      .now .state { color: var(--accent); }
+      .waiting .state { color: var(--txt); text-decoration: underline; text-underline-offset: 3px; }
+      .later .state { color: var(--txt-3); font-weight: 600; }
+      .facts { margin: 0; padding: 0; list-style: none; }
+      .facts li { display: flex; flex-wrap: wrap; gap: 0.2rem 0.6rem; }
+      .facts b { min-width: 11rem; font-weight: 600; color: var(--txt-2); }
+      code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; }
+      .yours {
+        margin: 1rem 0; padding: 1rem 1.1rem;
+        border: 2px solid var(--line-2); border-radius: 12px; background: var(--surface);
+      }
+      .yours h2 { margin-top: 0; padding-top: 0; border-top: 0; }
+      footer { margin-top: 2.6rem; color: var(--txt-3); font-size: 0.85rem; }
+      @media (prefers-contrast: more) { :root { --txt-3: var(--txt-2); } }
+      @media (max-width: 460px) { .state { min-width: 0; display: block; } .facts b { min-width: 0; width: 100%; } }
+    </style>
+    <link rel="stylesheet" href="./palette.css" />
+    <script>
+      try {
+        var d = document.documentElement, s = localStorage;
+        var t = s.getItem("studio-theme");
+        if (t !== "dawn" && t !== "dark") t = matchMedia("(prefers-color-scheme: light)").matches ? "dawn" : "dark";
+        if (t === "dawn") d.setAttribute("data-theme", "dawn");
+        var p = s.getItem("studio-palette");
+        if (p && /^(paper|mono|soft)$/.test(p)) d.setAttribute("data-palette", p);
+        var m = document.querySelector('meta[name=theme-color]');
+        var bg = getComputedStyle(d).getPropertyValue("--bg").trim();
+        if (m && bg) m.setAttribute("content", bg);
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <main>
+      <a class="backlink" href="./index.html">&#8249; Studio</a>
+      <h1>Session work — where it has got to</h1>
+      <p class="lede">
+        Moving between photos in a long session takes seconds, and exporting a keeper
+        takes over the screen while it runs. The work below treats those as one thing:
+        the session is built to hold <em>one</em> photo set up for editing, and it is
+        used to pass a few hundred through. Everything the passing-through needs already
+        exists in the app, in the tools that keep nothing — the deciding keys are in
+        Quick look, unattended work is in Batch, and a non-blocking export is in Macro
+        Studio. Most of what follows moves those in, rather than inventing anything.
+      </p>
+      <p class="lede">This page is updated in place. The link does not change.</p>
+
+      <h2>Where the builds are</h2>
+      <ul class="facts">
+        <li><b>Production</b> <span>v2.43, at <code>fc839f2</code>. It has not moved since.</span></li>
+        <li><b>On staging</b> <span>v2.43, the head of the working branch — 39 commits ahead of production.</span></li>
+        <li><b>Last verified green</b> <span><code>efd971a</code>: build clean, the Quick look keys walk five of five, the class-width walk clean, axe clean in both themes. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
+        <li><b>Version after this batch</b> <span>still 2.43 — nothing here is a capability release yet. The first is 2.44.</span></li>
+      </ul>
+
+      <div class="yours">
+        <h2>Waiting on you</h2>
+        <ul>
+          <li>
+            <strong>A pass on staging.</strong> 39 commits are sitting on the
+            staging branch and have never had a go to production. That is the whole of
+            the Help rewrite, the install and uninstall instructions, the device naming,
+            the manifest screenshots, the lens-durability panel, the macro practice
+            burst, and now the Quick look keys.
+          </li>
+          <li>
+            <strong>Three switches in the big session, then copy the report.</strong>
+            Open the 170-photo session, move between three photos, then press the version
+            number and copy the report. It now carries a <em>Last switch</em> line that
+            says where every part of those seconds went. Whether the next piece of work is
+            worth doing at all depends on what that line says — the container this was
+            built in cannot answer it, because its disk, its cores and its graphics are
+            not yours.
+          </li>
+          <li>
+            <strong>Three decisions</strong>, each answerable in a word. They are written
+            out in the plan and repeated in the chat that points here.
+          </li>
+        </ul>
+      </div>
+
+      <h2>The stages</h2>
+      <ul>
+        <li class="done"><span class="state">Shipped to staging</span>
+          <strong>The deciding keys work the moment Quick look opens.</strong>
+          P, X, U and C were correct from the day they landed and could not be reached:
+          they listen on the grid, and the grid never had the keyboard until a photo had
+          been tapped — which is itself the pick.
+        </li>
+        <li class="now"><span class="state">Building now</span>
+          <strong>The switch says where its seconds went, and this page exists.</strong>
+          The version report gains a <em>Last switch</em> line whose parts add up to the
+          whole, and an <em>Edits held in memory</em> count. The test page gains a
+          measurement of what it costs to find one photo's pieces in a big session.
+          Nothing the app does changes.
+        </li>
+        <li class="waiting"><span class="state">Waiting on you</span>
+          <strong>The photo you are opening jumps the decode queue.</strong>
+          Only if your three reports say the wait is the queue. If they say something
+          else, this is dropped and the something else is what gets worked on.
+        </li>
+        <li class="later"><span class="state">Not started</span>
+          <strong>A default look, set once.</strong>
+          Every photo opens wearing it, in every session, until you change it.
+        </li>
+        <li class="later"><span class="state">Not started</span>
+          <strong>Pick and reject on the photo you are looking at.</strong>
+          The same two words and the same two keys Quick look already uses, on the
+          session, surviving a reload, and reachable by finger as well as by key.
+        </li>
+        <li class="later"><span class="state">Not started</span>
+          <strong>Deciding lets the app put the photo down.</strong>
+          Marking a photo you are finished with frees what it is holding. Coming back
+          reopens it from the saved copy, which the app says rather than leaves you to
+          discover.
+        </li>
+        <li class="later"><span class="state">Not started</span>
+          <strong>Export stops owning the screen.</strong>
+          The same export, the same two presses, with the editor still live while it
+          runs.
+        </li>
+        <li class="later"><span class="state">Not started</span>
+          <strong>Everything you exported saves in one go.</strong>
+          Finished exports collect until you ask for them, as one file or one zip.
+        </li>
+      </ul>
+
+      <h2>Found, and not fixed</h2>
+      <p class="lede">
+        Things measured on the way through that are real and are not being repaired by
+        this work. They are written down so they are not re-discovered as new.
+      </p>
+      <ul>
+        <li>
+          <strong>Finding a photo's pieces is not what makes a big session slow, on the
+          machine this was measured on.</strong> Picking 850 stored pieces out of 144,500
+          took 9.2&nbsp;ms against 6.8&nbsp;ms out of an empty store. Worth re-running on
+          your own device from the test page, because that is the one that matters.
+        </li>
+        <li>
+          <strong>A Quick look preview does not record which look it was rendered
+          under.</strong> Open the grid while a photo is showing under a look and the
+          stored picture wears that look, under a key that says nothing about it. The
+          escape is the grid's own <em>Build these again</em>. The repair costs every
+          stored preview on the device once, so it is its own piece of work.
+        </li>
+        <li>
+          <strong>Turning Restore depth on or off does not redraw the strip.</strong>
+          Every tile then shows a claim about the photo that is no longer true, until
+          something else redraws it.
+        </li>
+        <li>
+          <strong>The strip is rebuilt on every thumbnail that lands</strong>, and each
+          rebuild forces the browser to lay the row out twice. On a long set that is a
+          few hundred layouts nobody asked for. Now measured rather than assumed — it was
+          2&nbsp;ms per switch on a six-photo set here, and the number that matters is the
+          one from a long session.
+        </li>
+        <li>
+          <strong>An edited photo is never let go of.</strong> Every photo visited in a
+          session keeps its full working state, including the ones you are finished with.
+          That is what the fifth stage is for; until then, the count is at least visible
+          in the report.
+        </li>
+        <li>
+          <strong>A photo that has been healed, stickered or warped exports on one
+          thread.</strong> The parallel export refuses those, so they are as slow as they
+          ever were.
+        </li>
+        <li>
+          <strong>The accessibility walk still lives outside the repository.</strong> It
+          is rebuilt and run before each of these goes to staging, and its result is
+          written into the notes, but nothing in the repository holds it.
+        </li>
+      </ul>
+
+      <footer>
+        <p>
+          Everything here happens on your device. This page is a record of work in
+          progress and carries nothing about your photographs.
+        </p>
+      </footer>
+    </main>
+  </body>
+</html>
