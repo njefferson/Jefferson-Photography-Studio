@@ -12683,3 +12683,78 @@ exactly one stop after open, the focus is inside the grid, the grid's aria-label
 still names the keys, the focus comes back after compare, and axe reports no
 serious or critical violations in the quick look. The tab-stop check was forced
 to fail once in-process before it was trusted.
+
+
+## Nothing could say where the five seconds went, 2026-09-14
+
+A 170-photo session on a twelve-core desktop takes five to seven seconds to move
+between photos. The test page's own numbers from that device add up to about
+1.3 s: a raw decodes in 69 ms, a tile builds in 22 ms, a full-resolution frame in
+about a second, upload and draw in 20. Four to five seconds a switch were
+unaccounted for, and nothing in the app could say whose they were.
+
+WHAT WAS ALREADY BEING MEASURED AND COULD NOT BE SEEN. `showDecoded` has timed
+its five phases — hot spot, upload, zoom, glow, local — since it was written, and
+pushed them onto `window.__show`, which nothing in the app, the tools or the test
+page has ever read. The numbers existed; they could not be got at from the device
+that produced them. They now feed the report and the window global is gone.
+
+THE PARTS HAVE TO BE DISJOINT OR THE SUM MEANS NOTHING. A `PerformanceObserver`
+over the whole switch reports `showDecoded`'s own synchronous work as a long
+task — so "held by other work" would count it a second time, and the parts would
+no longer add up to the whole while every number in them looked plausible. It is
+therefore counted ONLY where it overlaps an await window: storage, and the
+decode. The report now says how much of the WAIT the main thread was busy with
+something else, which is the question that matters (the background thumbnail
+pass builds every picture with a per-pixel loop on this thread).
+
+The other half of that: long tasks are reported from 50 ms up, so the number is a
+floor. And where the browser has no long-task support at all the report says so
+rather than printing 0 ms, which would be a different claim.
+
+MEASURED THE INSTRUMENT BEFORE TRUSTING IT. On a six-photo practice set the parts
+came to 526 ms against a whole of 527 (0.2% apart), `showDecoded`'s own five came
+to 70 against 71 (1.4%), and the reported whole fitted inside the 541 ms the
+harness measured from outside the call. Then a 400 ms AWAITED delay was planted
+in `Session.getBytes`: the reading bucket moved and the decode and showing
+buckets did not. An awaited delay rather than a busy loop on purpose — a busy
+loop is itself a long task, and would have moved two buckets on a correct build.
+
+TWO HARNESS FAULTS, both of which reported a correct build as broken. A tile is
+DISABLED while its photo is still being written, and a disabled button's
+`click()` does nothing at all, so the first run waited for a switch that had
+never been asked for. And the report is COLUMN-ALIGNED, not `key: value`, so the
+line matcher found nothing on a build that was printing the line perfectly. Both
+were the instrument; neither was the app.
+
+WHAT THE FIRST NUMBERS SAY, on a container, which is not the device that matters:
+reading 340 stored pieces took 163–267 ms, the decode waited 0 ms and ran 114–254
+ms on a worker, showing took 71–99 ms, and settling — `activateCurrent`, which is
+`establishFreshEdit` plus the stored edit — took about 165 ms, which is the
+single largest part on a small set. The strip reconcile was 2 ms on six photos
+and is the one to re-read on a long one, because it runs on every thumbnail that
+lands and forces two layouts each time.
+
+**AND THE SESSION'S SIZE IS NOT WHERE THE TIME GOES, on this machine at least.**
+A new test-page measurement builds a throwaway store of 144,500 rows — 170
+photos' worth of 850 pieces each — and asks for one photo's pieces out of it
+against the same query on an empty store: 9.2 ms against 6.8 ms. The rows are 64
+bytes rather than the real 30 KB on purpose, which isolates the cost of FINDING
+the pieces from the cost of moving them; writing a real 4 GB session is not a
+thing to do to somebody's device and would have measured the other question.
+Whatever makes a long session slow, it is not the key range. The probe has its
+own button because building the store takes a minute, it asserts the row count
+that came back (a range that matched nothing returns instantly and would read as
+the fastest result in the table — proved by planting a short range), and it
+deletes both databases before it returns.
+
+THAT LAST PART WAS WRONG FIRST TIME AND IS WORTH KEEPING. `deleteDatabase` is
+BLOCKED by an open connection: it fires `onblocked` and the database stays on the
+device. The failure path left both test databases behind, because the connections
+were only closed on the success path. They are closed in a `finally` now, before
+the delete.
+
+`public/conveyor-status.html` is the live status page for this run of work
+(Doctrine §7i). It is in `public/`, so it deploys with the app and is precached
+by the service worker, and it is checked at 400 px and 1280 px in both themes
+with axe clean. Every stage's state is a WORD before it is a colour or a weight.

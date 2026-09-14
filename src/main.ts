@@ -2,7 +2,7 @@ import "./style.css";
 import { importFile, type ImportedFile, type ImageKind } from "./import";
 import { wireForceUpdate, wireUpdateStrip, setUpdateCost } from "./swupdate";
 import { type DecodedImage, pickLargestPreview, linearAt } from "./decode";
-import { decodeOffThread, decodeLanes, decodeLaneTarget } from "./decodeClient";
+import { decodeOffThread, decodeLanes, decodeLaneTarget, type DecodeTiming } from "./decodeClient";
 import { Renderer, type EditParams } from "./gl";
 import { exportImage, saveBlob, lastExportProfile, getSource, proxyFactorFor, type ExportFormat } from "./export";
 import { buildLinearSourceInBands } from "./gpuexport";
@@ -1680,6 +1680,12 @@ function wireVersionMenu() {
       // that arrives, and a stopwatch cannot say which part; this can, from the
       // device it actually happened on.
       { k: "Last export", v: exportSplit() },
+      // WHERE THE LAST SWITCH'S SECONDS WENT, the same question as the line
+      // above asked of the other end of the loop. A long session makes moving
+      // between photos slow and nothing in the app could say which part of it
+      // was slow — the parts are disjoint and add up to the whole.
+      { k: "Last switch", v: switchSplit() },
+      { k: "Edits held in memory", v: editsHeldLine() },
       // WHICH COPY OF THE PHOTOGRAPH IS BEING EDITED, and what it cost to get
       // there. The editor shows the half-size copy first and replaces it with
       // the full-resolution one a moment later; from outside, "it took a while
@@ -6658,6 +6664,12 @@ $("homeBtn").addEventListener("click", goHome);
 welcomeClose.addEventListener("click", returnToEditor);
 welcomeBack.addEventListener("click", returnToEditor);
 
+/** WHERE showDecoded's OWN TIME WENT on the last photo shown. These five were
+ *  already being measured; they were pushed onto a window global that nothing in
+ *  the app or the tools ever read, so the numbers existed and could not be seen
+ *  from the device they were measured on. */
+let lastShowPhases: { hotspot: number; upload: number; zoom: number; glow: number; local: number; px: number } | null = null;
+
 /** Show an already-decoded image: upload it, build its reference maps and set
  *  the view. Does NOT touch the edit — callers follow with either a fresh
  *  baseline (establishFreshEdit) or a restored one (restoreLiveEdit). Shared by
@@ -6700,8 +6712,7 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
   const __e = performance.now();
   renderer.setLocalMap(buildLocalMap((x, y) => linearAt(img, x, y), img.width, img.height));
   const __f = performance.now();
-  ((window as unknown as Record<string, unknown>).__show ??= []) as number[];
-  ((window as unknown as Record<string, unknown>).__show as unknown[]).push({ hotspot: __b - __a, upload: __c - __b, zoom: __d - __c, glow: __e - __d, local: __f - __e, px: img.width * img.height });
+  lastShowPhases = { hotspot: __b - __a, upload: __c - __b, zoom: __d - __c, glow: __e - __d, local: __f - __e, px: img.width * img.height };
   panel.hidden = false;
   welcome.hidden = true;
   lesson.hidden = true;
@@ -7282,6 +7293,7 @@ function restoreLiveEdit(st: LiveEdit) {
  *  any durably-stored edit (from a resumed session) on top. */
 function activateCurrent(id: string) {
   const st = liveEdits.get(id);
+  lastActivateFresh = !st; // a first visit does far more work than a return one
   // Set the active id BEFORE any capture below, so seeding this photo's entry
   // targets THIS photo — not the one we just switched away from.
   activePhotoId = id;
@@ -7309,6 +7321,91 @@ function activateCurrent(id: string) {
   updateSessionStrip();
 }
 
+/** Whether the last activateCurrent was a first visit (a fresh baseline and a
+ *  stored edit to lay over it) or a return to a photo already in memory. */
+let lastActivateFresh = false;
+
+/** WHERE A PHOTO SWITCH'S SECONDS WENT, on the device it happened on. Built the
+ *  way ExportProfile is (src/export.ts) and for the same reason: "moving to the
+ *  next photo takes five to seven seconds" is the report that arrives, and a
+ *  stopwatch cannot say which part of it is which. The parts are disjoint by
+ *  construction, so they can be added up and checked against the whole.
+ *
+ *  REPORTING ONLY. Nothing here may change what is read, decoded, shown or
+ *  drawn: a measurement that moves the thing it measures is not one. */
+interface SwitchProfile {
+  total: number;
+  getBytes: number;
+  /** How many stored chunk rows the read crossed — 30 KB each, so a 25 MB photo
+   *  is about 850 of them, and a long session holds a hundred thousand. */
+  chunkRows: number;
+  decodeQueued: number;
+  decodeRun: number;
+  decodeOffThread: boolean;
+  show: number;
+  hotspot: number;
+  upload: number;
+  zoom: number;
+  glow: number;
+  local: number;
+  activate: number;
+  strip: number;
+  fresh: boolean;
+  /** ms the main thread was held by work that is NOT this switch, while this
+   *  switch was waiting on storage or a decode. null where the browser cannot
+   *  report long tasks at all, which is not the same answer as zero. */
+  otherWork: number | null;
+  megapixels: number;
+  sessionSize: number;
+  editsHeld: number;
+  thumbsInFlight: number;
+  lanes: number;
+  queueDepth: number;
+}
+let lastSwitchProfile: SwitchProfile | null = null;
+
+/** Long tasks that ran while the switch was WAITING on something. A long task
+ *  on the main thread during an await is somebody else's work delaying this
+ *  photo — the background thumbnail pass builds each picture with a per-pixel
+ *  loop on this thread, and nothing in the app could say whether that was
+ *  landing inside a switch or not. This says so instead of assuming it.
+ *
+ *  COUNTED ONLY WHERE IT OVERLAPS AN AWAIT, so it cannot double-count the
+ *  switch's own synchronous work: showDecoded's texture upload and reference
+ *  maps are long tasks too, and an observer run across the whole switch reports
+ *  them twice — once as themselves and once as "held by other work" — after
+ *  which the parts no longer sum to the whole and the instrument is lying in
+ *  exactly the way it exists to catch.
+ *
+ *  A long task is only reported from 50 ms up, so this is a floor. */
+function watchLongTasks(): { heldDuring: (from: number, to: number) => number | null } {
+  const spans: { start: number; end: number }[] = [];
+  let obs: PerformanceObserver | null = null;
+  const take = (entries: PerformanceEntryList) => {
+    for (const e of entries) spans.push({ start: e.startTime, end: e.startTime + e.duration });
+  };
+  try {
+    obs = new PerformanceObserver((list) => take(list.getEntries()));
+    obs.observe({ entryTypes: ["longtask"] });
+  } catch {
+    obs = null; // no longtask support here — the report says so rather than "0 ms"
+  }
+  return {
+    heldDuring(from, to) {
+      if (!obs) return null;
+      // ENTRIES ARRIVE IN A QUEUED TASK, so an observer disconnected the moment
+      // the awaits end has not been handed the last of them yet. takeRecords is
+      // the synchronous half of that same queue.
+      take(obs.takeRecords());
+      obs.disconnect();
+      obs = null;
+      let held = 0;
+      for (const s of spans) held += Math.max(0, Math.min(s.end, to) - Math.max(s.start, from));
+      return held;
+    },
+  };
+}
+
 /** Switch the editor to another session photo (decoded on demand from storage,
  *  so only ever one photo's pixels are in RAM). */
 async function switchToPhoto(id: string) {
@@ -7317,13 +7414,53 @@ async function switchToPhoto(id: string) {
   if (!view) return;
   captureActiveEdit();
   showBusy("Loading…");
+  // Read before the work starts: these are the conditions the switch ran under,
+  // and every one of them has moved by the time it finishes.
+  const watch = watchLongTasks();
+  const lanesAt = decodeLanes();
+  const thumbsAt = thumbsInFlight.size;
+  const decode: { t: DecodeTiming | null } = { t: null };
+  let rows = 0;
+  const t0 = performance.now();
   try {
-    const bytes = await Session.getBytes(id);
+    const bytes = await Session.getBytes(id, (n) => { rows = n; });
+    const t1 = performance.now();
     const imported: ImportedFile = { name: view.name, kind: view.kind, bytes, looksTranscoded: false };
-    const img = await decodeOffThread(imported);
+    const img = await decodeOffThread(imported, { onTiming: (t) => { decode.t = t; } });
+    const t2 = performance.now();
     showDecoded(img, imported);
+    const t3 = performance.now();
     activateCurrent(id);
+    const t4 = performance.now();
+    const ph = lastShowPhases;
+    lastSwitchProfile = {
+      total: t4 - t0,
+      getBytes: t1 - t0,
+      chunkRows: rows,
+      decodeQueued: decode.t?.queued ?? 0,
+      decodeRun: decode.t?.run ?? t2 - t1,
+      decodeOffThread: decode.t?.offThread ?? false,
+      show: t3 - t2,
+      hotspot: ph?.hotspot ?? 0,
+      upload: ph?.upload ?? 0,
+      zoom: ph?.zoom ?? 0,
+      glow: ph?.glow ?? 0,
+      local: ph?.local ?? 0,
+      // The strip reconcile runs INSIDE activateCurrent, so it is taken out of
+      // that number rather than added beside it.
+      activate: t4 - t3 - lastStripMs,
+      strip: lastStripMs,
+      fresh: lastActivateFresh,
+      otherWork: watch.heldDuring(t0, t2), // the two await windows, end to end
+      megapixels: (img.width * img.height) / 1e6,
+      sessionSize: sessionPhotos.filter((p) => p.id !== "lone").length,
+      editsHeld: liveEdits.size,
+      thumbsInFlight: thumbsAt,
+      lanes: lanesAt,
+      queueDepth: decode.t?.depth ?? 0,
+    };
   } catch (err) {
+    watch.heldDuring(t0, performance.now()); // disconnect the observer on the way out
     recordFailure("opening a photo", err, { name: view.name, kind: view.kind });
     alert("Couldn't open that photo: " + (err as Error).message);
   } finally {
@@ -8144,7 +8281,11 @@ wireSliderReset();
  *  The strip takes real layout room: it publishes its measured height on the
  *  stage (--session-h + .has-session), and the CSS shrinks the photo's fit box
  *  to the space ABOVE it — the strip must never cover the picture. */
+/** How long the last updateSessionStrip call took, start to finish. */
+let lastStripMs = 0;
+
 function updateSessionStrip() {
+  const __strip0 = performance.now();
   const keepScroll = sessionThumbs.scrollLeft;
   const real = sessionPhotos.filter((p) => p.id !== "lone");
   // The strip is for switching — only meaningful from two photos up. While a
@@ -8155,6 +8296,7 @@ function updateSessionStrip() {
     sessionProgress.hidden = true;
     sessionDone.disabled = false;
     stageEl.classList.remove("has-session");
+    lastStripMs = performance.now() - __strip0; // the strip is hidden, and that is still a measurement
     return;
   }
   sessionStrip.hidden = false;
@@ -8264,8 +8406,12 @@ function updateSessionStrip() {
   // can still move the scroll.
   sessionThumbs.scrollLeft = keepScroll;
   stageEl.classList.add("has-session");
+  // offsetHeight forces a layout, and so does revealActiveThumb below — this
+  // function runs on every switch, every add and every thumbnail that lands, so
+  // what it costs on a long set is worth being able to read rather than guess.
   stageEl.style.setProperty("--session-h", `${sessionStrip.offsetHeight}px`);
   revealActiveThumb();
+  lastStripMs = performance.now() - __strip0;
 }
 
 /** The photo the strip was last scrolled to. updateSessionStrip runs on every
@@ -8418,6 +8564,40 @@ async function endSession() {
 }
 
 /** The last export's own timing, for the diagnostic — one line, no filenames. */
+/** WHERE THE LAST PHOTO SWITCH WENT, in one line that can be copied out of the
+ *  report. Every part was measured on this device inside the same switch, and
+ *  they add up to the whole — SwitchProfile says why "held by other work" cannot
+ *  overlap the rest. */
+function switchSplit(): string {
+  const p = lastSwitchProfile;
+  if (!p) return "none this session";
+  // Milliseconds below a second: rounding 340 ms to "0.3s" throws away the digit
+  // that separates a cost worth chasing from one that is not.
+  const t = (ms: number) => (ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)}s`);
+  const other =
+    p.otherWork === null
+      ? "this browser cannot report what else held the main thread"
+      : `other work held the main thread ${t(p.otherWork)} of the wait`;
+  return (
+    `${p.megapixels.toFixed(1)} MP in ${t(p.total)} — reading ${t(p.getBytes)} over ${p.chunkRows} stored pieces` +
+    `, decode waited ${t(p.decodeQueued)} then ran ${t(p.decodeRun)} ${p.decodeOffThread ? "on a worker" : "on the main thread"}` +
+    `, showing ${t(p.show)} (hot spot ${t(p.hotspot)}, upload ${t(p.upload)}, zoom ${t(p.zoom)}, glow ${t(p.glow)}, local ${t(p.local)})` +
+    `, settling ${t(p.activate)}, strip ${t(p.strip)}` +
+    ` — ${p.fresh ? "first visit" : "been here before"}, ${other}` +
+    `; ${p.sessionSize} photos, ${p.thumbsInFlight} thumbnail${p.thumbsInFlight === 1 ? "" : "s"} being built` +
+    `, ${p.lanes || "no"} decoder${p.lanes === 1 ? "" : "s"} running, ${p.queueDepth} decode${p.queueDepth === 1 ? "" : "s"} already waiting`
+  );
+}
+
+/** How many photos are holding a full working state in memory, against how many
+ *  are in the session. The number the session's own memory behaviour is judged
+ *  by, and until now nothing could see it. */
+function editsHeldLine(): string {
+  const real = sessionPhotos.filter((p) => p.id !== "lone").length;
+  if (!real) return "no session open";
+  return `${liveEdits.size} of ${real}`;
+}
+
 function exportSplit(): string {
   const p = lastExportProfile();
   if (!p) return "none this session";
