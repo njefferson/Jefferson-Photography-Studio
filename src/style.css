@@ -1388,7 +1388,9 @@ body.dropping::after {
   border: 1px solid var(--line-2);
   box-shadow: 0 3px 14px rgba(0, 0, 0, 0.45);
 }
-#exportStrip p { margin: 0; font-size: 0.8125rem; font-weight: 600; line-height: 1.3; color: var(--glass-txt); }
+/* The line carries two sentences when exports are waiting: what just happened,
+   and how many are still to be handed over. */
+#exportStrip p { margin: 0; font-size: 0.8125rem; font-weight: 600; line-height: 1.35; color: var(--glass-txt); white-space: pre-line; }
 .export-hud-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 9px; }
 .export-hud-actions button {
   flex: 0 1 auto;
