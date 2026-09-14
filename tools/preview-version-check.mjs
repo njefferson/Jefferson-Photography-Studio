@@ -38,6 +38,7 @@ const WHOLE = [
   "src/pipeline.ts",       // the edit applied to it
   "src/lensstore.ts",      // which correction matches a photograph
   "src/hotspotProfiles.ts",// and the profiles that ship with the app
+  "src/stamp.ts",          // the hash two parts of the key are built with
 ];
 const DIRS = ["src/raw"];  // the raw decoders, every file
 const REGIONS = [

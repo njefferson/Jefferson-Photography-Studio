@@ -23,6 +23,14 @@
 //     correction, so re-measuring a lens makes every cached picture a portrait
 //     of the old correction. That is not hypothetical: a re-measurement this
 //     month took a device from 11 profiles carrying colour to 71.
+//   - the CREATIVE GRADE changed. A grid tile is rendered under the live look,
+//     swap, bias and lift — that is the whole point of it, and it is the thing
+//     the reader is deciding against. This was the one item the list above
+//     CLAIMED to be complete without: scan a folder under Mono, press
+//     Aerochrome, scan it again, and every tile came back Mono. Worse than a
+//     wrong picture, because the strip-sized twin in the same row is what
+//     "Keep in a session" hands across, and the session then stamps it with the
+//     CURRENT grade — so the tile is marked true and can never be found stale.
 //
 // A miss costs exactly what the old behaviour cost, so the worst case is what
 // every case used to be.
@@ -33,13 +41,18 @@ import { profilesStamp } from "./lensstore";
  *  profiles, a different preview size. The gate named above will refuse the
  *  commit if you forget; it exists because a cache keyed on a number nobody
  *  remembers to bump is a cache that serves the wrong picture for ever. */
-export const PREVIEW_PIPELINE = 2;
+export const PREVIEW_PIPELINE = 3;
 
 const DB = "ips-previews";
 const STORE = "previews";
 /** Above this, the least recently used go. A 512px preview and its 260px twin
  *  come to roughly 60 KB together, so this is about 30 MB of pictures — a few
- *  big folders, kept, and nothing unbounded. */
+ *  big folders, kept, and nothing unbounded.
+ *
+ *  The grade in the key means one file can hold a row per look the reader has
+ *  scanned it under, which is what the LRU is for: a folder walked through four
+ *  looks keeps the four that were asked for and drops the folder nobody has
+ *  opened since. A miss costs exactly what every scan used to cost. */
 const MAX_ROWS = 500;
 
 export interface PreviewPair {
@@ -75,18 +88,23 @@ function req<T>(rq: IDBRequest): Promise<T> {
   });
 }
 
-/** The identity of one picked file's preview under the current everything. */
-export function previewKey(f: File, edge: number, lens = profilesStamp()): string {
-  return [PREVIEW_PIPELINE, edge, lens, f.size, f.lastModified, f.name].join("|");
+/** The identity of one picked file's preview under the current everything.
+ *
+ *  `grade` is REQUIRED and has no default, unlike `lens`. A default here would
+ *  let a caller that has not thought about the grade produce the old key
+ *  silently, which is exactly how the grade came to be missing from it: the
+ *  parameter that is easy to omit is the one that gets omitted. */
+export function previewKey(f: File, edge: number, grade: string, lens = profilesStamp()): string {
+  return [PREVIEW_PIPELINE, edge, lens, grade, f.size, f.lastModified, f.name].join("|");
 }
 
 /** The stored pair, or null — a miss is ordinary and never an error: private
  *  browsing, a cleared store, a first visit and a changed file all land here. */
-export async function getPreview(f: File, edge: number, lens?: string): Promise<PreviewPair | null> {
+export async function getPreview(f: File, edge: number, grade: string, lens?: string): Promise<PreviewPair | null> {
   let db: IDBDatabase | null = null;
   try {
     db = await open();
-    const key = previewKey(f, edge, lens);
+    const key = previewKey(f, edge, grade, lens);
     const row = await req<Row | undefined>(db.transaction(STORE).objectStore(STORE).get(key));
     if (!row || !row.grid) return null;
     // Touch it, so a folder you keep coming back to outlives one you looked at
@@ -118,12 +136,12 @@ function touch(db: IDBDatabase, key: string): Promise<void> {
 /** Keep one file's pair. Failure is silent BY DESIGN: a preview that could not
  *  be stored costs a decode next time and nothing else, and a reader whose
  *  storage is full must not be told about a cache they never asked for. */
-export async function putPreview(f: File, edge: number, pair: PreviewPair, lens?: string): Promise<void> {
+export async function putPreview(f: File, edge: number, pair: PreviewPair, grade: string, lens?: string): Promise<void> {
   let db: IDBDatabase | null = null;
   try {
     db = await open();
     const row: Row = {
-      key: previewKey(f, edge, lens),
+      key: previewKey(f, edge, grade, lens),
       grid: pair.grid,
       strip: pair.strip,
       used: Date.now(),

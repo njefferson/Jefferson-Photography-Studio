@@ -30,6 +30,7 @@ import * as Hotspot from "./hotspot";
 import { wireLensRig } from "./lensrig";
 import { findTilt } from "./straighten";
 import { getPreview, putPreview, prunePreviews, clearPreviews, previewStats } from "./previewcache";
+import { fnv1a } from "./stamp";
 import * as LensStore from "./lensstore";
 import { readExifSubset, type ExifSubset } from "./exif";
 import { setupInstalledShare, setupInstallFromApp, toast } from "./share";
@@ -2109,7 +2110,26 @@ ui.irLift.addEventListener("click", () => {
   autoLift = !autoLift;
   localStorage.setItem("ips-autolift", autoLift ? "1" : "0");
   updateLiftUI();
-  if (!current) return;
+  if (current) applyOrRemoveLift();
+  // THE TILES ARE CLAIMS ABOUT THIS TOO — the strength slider beside this
+  // button has said so since it was built, and this one did not. Every photo
+  // not yet opened is rendered through the lift at tile time, so a toggle
+  // changes what all of them will show, and the open photo's own curve has
+  // just been written or taken away above. Before this, the strip went on
+  // showing the other state for the rest of the session, and nothing could
+  // ever find it: a tile is only redrawn when its stamp stops matching, and
+  // the stamp was never re-asked.
+  //
+  // LAST, and outside the early return it replaced, so it reads `params` and
+  // the live snapshot AFTER this press has changed them rather than relying on
+  // its own debounce to outrun the lines below it.
+  restripForGrade();
+});
+
+/** What the toggle does to the OPEN photo. Lifted out of the handler so the
+ *  strip redraw can be the last line of it rather than the first, which is the
+ *  only order in which it reads the state this press produced. */
+function applyOrRemoveLift(): void {
   if (autoLift) {
     const did = applyLift(activeLook !== null);
     // Silent when it does something: the button shows its own state and every
@@ -2125,7 +2145,7 @@ ui.irLift.addEventListener("click", () => {
   syncToUI();
   draw();
   flushRecord(); // one press = one undo step
-});
+}
 updateLiftUI();
 
 ui.swapBtn.addEventListener("click", () => {
@@ -7739,9 +7759,19 @@ async function makeThumb(img: DecodedImage, MAX = 260, lens?: LensCurve | null, 
     // params handed every tile another frame's correction, and tapping it
     // re-solved and showed something different. That is exactly the defect the
     // thumbnails were fixed for once before (a thumb must match its open).
-    tone: [...TONE_DEFAULT],
-    sky: [0, 1, 1],
-    foliage: [0, 1, 1],
+    //
+    // CONDITIONAL ON `own`, WHICH IT WAS NOT. Clearing these three
+    // unconditionally fixed the `!own` case and broke the other one in the same
+    // line: a photo that HAS been opened carries its own solved curve in
+    // own.params, and this threw it away — while the re-solve below is gated on
+    // `!own` and could not put it back. Restore depth is on by default, so that
+    // was every opened photo: the tile went flat the moment the photo was
+    // tapped, which reads as the app quietly undoing something. The values here
+    // are this frame's own answer; only the live ones were ever another
+    // frame's.
+    tone: own ? [...own.params.tone] : [...TONE_DEFAULT],
+    sky: own ? [...own.params.sky] : [0, 1, 1],
+    foliage: own ? [...own.params.foliage] : [0, 1, 1],
   };
   if (autoLift && !own) {
     const solved = solveLift(activeLook !== null, img, p);
@@ -8127,7 +8157,12 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
         slot.thumbUrl = URL.createObjectURL(new Blob([done.thumb], { type: "image/jpeg" }));
         slot.thumbState = "real";
         // The grid rendered this one under the live grade, which for a photo
-        // arriving in the session is also what opening it will apply.
+        // arriving in the session is also what opening it will apply. That
+        // sentence was only true of a FRESH render until the quick look's
+        // preview store learned about the grade: a cache hit came back under
+        // whatever look it was first scanned with, and this line then stamped
+        // it as current — marking a stale picture true, where nothing could
+        // ever find it again.
         slot.thumbGrade = stampFor(slot);
       }
 
@@ -8396,6 +8431,19 @@ function gradeStamp(): string {
  *  somewhere else. A photo that has been opened, or that came back with a
  *  stored edit from a resumed session, has its own answer — use it. */
 function ownEdit(view: { id: string; edit: string | null }): Snapshot | null {
+  // THE OPEN PHOTO'S OWN EDIT IS THE LIVE ONE, NOT A SNAPSHOT OF IT. `liveEdits`
+  // is SEEDED on arrival (activateCurrent) and rewritten only on the way OUT
+  // (captureActiveEdit), so for the photo actually open it holds the state as
+  // it was when the reader got there and nothing refreshes it while they work —
+  // flushRecord moves the undo stack, not this.
+  //
+  // Reading it here made the open photo's own tile the one tile a look could
+  // not reach: its stamp was computed from the arrival state, so it never
+  // moved, restripForGrade never marked it stale, and it went on showing where
+  // the reader came in while every other tile in the strip followed the press.
+  // The tile of the photograph you are looking at is the one a reader checks a
+  // look against first.
+  if (view.id === activePhotoId) return snapshot();
   const live = liveEdits.get(view.id);
   if (live) return live.snapshot;
   if (view.edit) {
@@ -8408,10 +8456,26 @@ function ownEdit(view: { id: string; edit: string | null }): Snapshot | null {
  *  a photo not yet opened — the live one, because that is what opening it will
  *  apply (establishFreshEdit re-applies the active look). One stamp either
  *  way, so a first visit that lands on the same creative state as the tile
- *  already showed does not invalidate it. */
+ *  already showed does not invalidate it.
+ *
+ *  THE TWO CASES ARE RENDERED FROM DIFFERENT THINGS, so they cannot be stamped
+ *  the same way. A tile with no own edit is drawn through the lift's session
+ *  controls (makeThumb solves it right there), so those belong in its stamp. A
+ *  tile WITH one is drawn from that photo's own stored curve, which the session
+ *  controls do not touch — stamping it with them made every opened photo in the
+ *  set look stale the instant the toggle moved, which is a strip-wide redraw
+ *  that changes nothing, on a tablet, where it is visible work.
+ *
+ *  So the three fields the lift writes go in HERE and never in `stampOf`.
+ *  `stampOf` is shared with the look-mark question, and `markLook` takes its
+ *  stamp AFTER applyLook has run the lift — a lift curve inside it would make
+ *  `looksUntouched` false on arrival at every other frame and silently stop
+ *  `carryLook` carrying the session look, which is the standing default look. */
 function stampFor(view: { id: string; edit: string | null }): string {
   const own = ownEdit(view);
-  return own ? stampOf(own.params, own.activeLook, own.lookBias) : gradeStamp();
+  if (!own) return gradeStamp();
+  const p = own.params;
+  return stampOf(p, own.activeLook, own.lookBias, false) + "|" + JSON.stringify([p.tone, p.sky, p.foliage]);
 }
 
 /** A look (or any grade move) changed: every tile is now showing a picture the
@@ -9344,16 +9408,23 @@ async function openQuickLook(files: File[]) {
   // picture is a picture OF; read once here rather than per file, because it
   // cannot change while this loop runs.
   const lensStamp = LensStore.profilesStamp();
+  // AND ONE FINGERPRINT OF THE GRADE, for the same reason and read the same
+  // way. Every tile is rendered under the live creative state — `makeThumb`
+  // with no `own` edit clones it — so a picture kept from an earlier sitting is
+  // a picture of THAT state, not this one. It cannot change while this loop
+  // runs: the grid is a modal dialog and every look button is behind it.
+  const gradeStampAt = fnv1a(gradeStamp());
   for (const f of files) {
     if (gen !== quickGen) return; // closed or restarted under us
     let thumbUrl = "";
     let ok = false;
     let stripThumb: ArrayBuffer | null = null;
-    // ALREADY RENDERED, ON THIS DEVICE, FROM THIS FILE. Keyed on the file's own
-    // name, length and modified time, on this build's pipeline and on the
-    // profiles above — so the same folder comes back at once and a changed
-    // anything renders again. `rebuilding` is the reader's override.
-    const cached = bypass ? null : await getPreview(f, QUICK_EDGE, lensStamp).catch(() => null);
+    // ALREADY RENDERED, ON THIS DEVICE, FROM THIS FILE, UNDER THIS GRADE. Keyed
+    // on the file's own name, length and modified time, on this build's
+    // pipeline, on the profiles above and on the grade — so the same folder
+    // comes back at once and a changed anything renders again. `rebuilding` is
+    // the reader's override.
+    const cached = bypass ? null : await getPreview(f, QUICK_EDGE, gradeStampAt, lensStamp).catch(() => null);
     if (cached && cached.grid.byteLength) {
       thumbUrl = URL.createObjectURL(new Blob([cached.grid], { type: "image/jpeg" }));
       ok = true;
@@ -9378,7 +9449,7 @@ async function openQuickLook(files: File[]) {
         stripThumb = await makeThumb(img, 260, lensCurveFor(imported)).catch(() => null);
         // Kept for next time. Not awaited: the reader is watching the grid
         // fill, and a write to storage is not part of that.
-        if (stripThumb) void putPreview(f, QUICK_EDGE, { grid: thumb, strip: stripThumb }, lensStamp);
+        if (stripThumb) void putPreview(f, QUICK_EDGE, { grid: thumb, strip: stripThumb }, gradeStampAt, lensStamp);
       }
       // img + the imported bytes fall out of scope here; only the small JPEG
       // preview is retained, so RAM stays bounded to N thumbnails.
