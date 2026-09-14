@@ -1011,6 +1011,20 @@ user-scalable=no.
 
 ## Shipped (roadmap archive)
 
+- [x] **2.45 — exporting as you go, without stopping** — SHIPPED 2026-09-14 to
+  staging, awaiting the on-device pass. Two parts. EXPORT STOPPED OWNING THE
+  SCREEN: the same export, the same two presses, with the editor live while it
+  runs — move to another photo, turn it, grade it, drag a slider, and the file
+  being written is still the one the press was for, proven byte for byte against
+  the old modal flow and against a plant that reads the live edit instead of the
+  copy. Progress and the finished file live on a line over the photograph rather
+  than inside the Export tab, because carrying on working means changing tabs. A
+  failure explains itself, offers Try again and is remembered in the report. AND
+  FINISHED EXPORTS COLLECT: every one is kept in its own store, survives a
+  reload, and hands over in a single press — the file itself when there is one,
+  a zip when there are more. Its own database, so saving a batch cannot sweep a
+  morning's keepers. Still slow and said plainly: a healed, stickered or warped
+  photo exports on one thread.
 - [x] **2.44 — deciding in the session, and the app acting on it** — SHIPPED
   2026-09-14 to staging, awaiting the on-device pass. Three parts. A standing
   DEFAULT LOOK in Settings, so a reader who grades everything the same way stops
@@ -13035,3 +13049,50 @@ yields, so the sliders stutter while it goes. Measured here: 15.1s for 5.2 MP,
 NEEDS THE OWNER'S HANDS, not verifiable here: the Save tap on an iPad opening
 the share sheet with no render between the tap and the sheet, and what the
 memory looks like beside three or four decode lanes on that device.
+
+
+## Exports that wait for you, 2026-09-14
+
+Exporting as you go means a share-sheet tap per photo, which is what stops people
+doing it. Finished exports are kept now and handed over in one press.
+
+ITS OWN DATABASE, and that is the whole design. `batchstore` already had exactly
+the right shape — small rows, one strict transaction per file, survives a crash —
+so the database NAME is a parameter now and `frameStore(name)` binds a set of
+functions to one. The module's own exports stay bound to the batch store, so
+nothing that already called them changed at all. Sharing the store was the
+alternative and it is a trap: saving a batch clears the frames it bundled, and
+doing that to a morning's keepers because they happened to live in the same
+place is a button whose output no longer matches its label.
+
+NAMES ARE MADE UNIQUE AGAINST WHAT IS STORED, not against the session. The meta
+store's key is the name and it is an `add`, which aborts the WHOLE transaction on
+a duplicate — so exporting the same photo twice, or exporting today a photo
+exported yesterday and not yet saved, would have thrown the finished bytes away.
+`runBatch` already seeds its `taken` set from the store for this reason; this
+does the same.
+
+EVERY EXPORT, not only the picked ones. A verdict and having exported something
+are separate facts, and collecting only picks would quietly lose the others.
+
+**TWO BUTTONS FOR ONE FILE, found by the walk.** After a single export the line
+offered "Save image" AND "Save the 1 export", which are the same file by two
+names, above a count that described it twice. Save-all now appears only once
+there is something waiting BESIDES the file on offer, and the count line with it.
+Dismiss puts the line away and keeps the file — dismissing a status line is not a
+decision to throw away something you made.
+
+WHAT THE WALK ASSERTS: the file is in the store rather than merely claimed on a
+line; two exports are kept whether picked or not; they are in `ips-exports` and
+the batch store is empty; a reload still offers them, in their own words rather
+than as "an interrupted batch"; two hand over as one zip whose header really is a
+zip holding two entries; saving clears the collection; one hands over as the
+image and never as a zip of one; the same photo exported twice is kept twice
+under different names; and clearing the batch store leaves the exports alone.
+Three of twelve fail against the build before this change, and the rest cannot
+run at all there.
+
+AND THE HARNESS WAS WRONG TWICE MORE. A reload leaves the START SCREEN — the
+session is offered, not resumed — so there was no panel to press Export in; and
+after the single-file rule changed, the check that clicked Save-all had to go
+through Dismiss, which is the only state where a collection of one exists.

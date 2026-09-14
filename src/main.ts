@@ -10,7 +10,7 @@ import { buildLinearSourceInBands } from "./gpuexport";
 import { fromHalf } from "./half";
 import { findLocation, stripLocation } from "./gps";
 import { writeZip, crc32 } from "./zip";
-import { putFrame, eachFrame, frameMetas, frameCount, clearFrames } from "./batchstore";
+import { putFrame, eachFrame, frameMetas, frameCount, clearFrames, frameStore } from "./batchstore";
 import * as Session from "./session";
 import { keepAwake } from "./wakelock";
 import { TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, bandWeight, rgb2hsv, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, type MaskLayer, type CropRect } from "./pipeline";
@@ -10156,27 +10156,97 @@ const exportStripActions = $("exportStripActions") as HTMLElement;
 const exportSave = $("exportSave") as HTMLButtonElement;
 const exportRetry = $("exportRetry") as HTMLButtonElement;
 const exportDismiss = $("exportDismiss") as HTMLButtonElement;
+const exportSaveAll = $("exportSaveAll") as HTMLButtonElement;
 
 /** The finished file, waiting for a gesture to save it. Deliberately NOT
  *  `pendingSave`: that one belongs to the busy dialog, which Batch, session-end
  *  and resume still use, and `hideBusy` clears it. */
 let pendingExport: { blob: Blob; name: string } | null = null;
 
+/** EXPORTS COLLECT UNTIL YOU ASK FOR THEM, in their own database.
+ *
+ *  Exporting as you go means a dozen share-sheet taps in a morning, which is
+ *  what stops people doing it. Every finished export is kept here — every one,
+ *  not only the picked ones: a verdict is a separate fact from having exported
+ *  something — and handed over in a single press when the reader wants them.
+ *
+ *  ITS OWN DATABASE, not the batch one. Saving a batch clears the frames it
+ *  bundled, and doing that to a morning's keepers because they shared a store
+ *  would be a button whose output no longer matches its label. */
+const EXPORTS = frameStore("ips-exports");
+let exportCount = 0;
+
 function showExportStrip(text: string, opts: { actions?: boolean; save?: boolean; retry?: boolean } = {}): void {
-  exportStripText.textContent = text;
+  // THE FILE IN HAND IS ALSO IN THE COLLECTION, so neither the count nor the
+  // second button may describe it a second time. One export, just finished, is
+  // "Ready — name · size" and one Save button; a collection is only a
+  // collection once there is something in it besides the one on offer.
+  const alsoWaiting = exportCount - (pendingExport ? 1 : 0);
+  exportStripText.textContent = text + (alsoWaiting > 0 ? `\n${exportCount} exported, not yet saved` : "");
   exportStrip.hidden = false;
-  exportStripActions.hidden = !opts.actions;
+  exportStripActions.hidden = !opts.actions && alsoWaiting <= 0;
   exportSave.hidden = !opts.save;
   exportRetry.hidden = !opts.retry;
+  exportSaveAll.hidden = alsoWaiting <= 0;
+  exportSaveAll.textContent = exportCount === 1 ? "Save the waiting export" : `Save all ${exportCount} exports`;
 }
 
+/** Put the line away. The COLLECTED exports are untouched — they are files the
+ *  reader has made and not yet saved, and dismissing a status line is not a
+ *  decision to throw those away. */
 function clearExportStrip(): void {
   pendingExport = null;
+  if (exportCount) { showExportStrip(`${exportCount} exported, not yet saved`, { actions: true }); return; }
   exportStrip.hidden = true;
   exportStripActions.hidden = true;
 }
 
 exportDismiss.addEventListener("click", clearExportStrip);
+
+/** Hand the collection over: one file as itself, two or more as a zip. A zip of
+ *  one is a thing the reader then has to unpack for no reason. */
+exportSaveAll.addEventListener("click", async () => {
+  if (exportSaveAll.disabled) return;
+  exportSaveAll.disabled = true;
+  const was = exportStripText.textContent;
+  try {
+    const entries: { name: string; size: number; crc: number; data: Blob }[] = [];
+    await EXPORTS.eachFrame((f) => entries.push({ name: f.name, size: f.size, crc: f.crc, data: new Blob(f.parts) }));
+    if (!entries.length) { exportCount = 0; clearExportStrip(); return; }
+    const one = entries.length === 1;
+    const blob = one ? entries[0].data : writeZip(entries, new Date());
+    const name = one ? entries[0].name : `IR-exports-${entries.length}.zip`;
+    const how = await saveBlob(blob, name);
+    if (how === "cancelled") { exportStripText.textContent = was; return; } // kept, and still offered
+    await EXPORTS.clearFrames().catch(() => {});
+    exportCount = 0;
+    clearExportStrip();
+  } catch (err) {
+    recordFailure("saving the collected exports", err);
+    showExportStrip(`Could not save them: ${(err as Error).message}`, { actions: true });
+  } finally {
+    exportSaveAll.disabled = false;
+  }
+});
+
+/** Keep one finished export. Names are made unique against WHAT IS ALREADY
+ *  STORED, not just against this session: the store survives a reload by
+ *  design, so exporting the same photo tomorrow would otherwise hit the meta
+ *  store's unique key, abort the whole transaction and throw the finished bytes
+ *  away. */
+async function collectExport(result: { blob: Blob; name: string }, srcName: string, srcSize: number): Promise<void> {
+  try {
+    const bytes = new Uint8Array(await result.blob.arrayBuffer());
+    const taken = new Set((await EXPORTS.frameMetas()).map((m) => m.name));
+    const name = uniqueName(result.name, taken);
+    await EXPORTS.putFrame({ name, crc: crc32(bytes), size: bytes.length, srcName, srcSize }, bytes);
+    exportCount = await EXPORTS.frameCount();
+  } catch (err) {
+    // Storage full, or refused: the file is still in hand and still saveable
+    // one at a time, so this must not take the export down with it.
+    if (!isQuotaError(err)) recordFailure("keeping an export for later", err);
+  }
+}
 
 exportSave.addEventListener("click", async () => {
   if (!pendingExport || exportSave.disabled) return;
@@ -10184,8 +10254,14 @@ exportSave.addEventListener("click", async () => {
   // share sheet opens used to run the handler twice.
   exportSave.disabled = true;
   try {
-    const how = await saveBlob(pendingExport.blob, pendingExport.name);
+    const saved = pendingExport;
+    const how = await saveBlob(saved.blob, saved.name);
     if (how === "cancelled") return; // the sheet was closed on purpose — keep the file
+    // Saved on its own, so it is no longer waiting: the count has to stop
+    // claiming it. Cheapest honest way is to re-read the store after removing
+    // it, and removing one file is not something the store does — so the whole
+    // collection is re-counted from what it actually holds.
+    exportCount = await EXPORTS.frameCount().catch(() => exportCount);
     clearExportStrip();
   } catch (err) {
     recordFailure("saving an export", err);
@@ -10259,6 +10335,7 @@ async function runExport(): Promise<void> {
       lens,
     );
     pendingExport = result;
+    await collectExport(result, file.name, file.bytes.length);
     // The measured size, so the Quality slider has something to be judged
     // against: change it, export, watch this number move. Measured, never
     // estimated — the file is already made by the time this is written.
@@ -10827,6 +10904,15 @@ recoverBtn.addEventListener("click", async () => {
     }
   } catch {
     /* IndexedDB unavailable — batches still run, just without crash recovery */
+  }
+  // AND THE OTHER STORE, in its own words. Exports left unsaved are not an
+  // interrupted batch and must not be described as one — they are files the
+  // reader made on purpose and has not handed over yet.
+  try {
+    exportCount = await EXPORTS.frameCount();
+    if (exportCount) showExportStrip(`${exportCount} exported, not yet saved`, { actions: true });
+  } catch {
+    /* no IndexedDB — exports still save one at a time */
   }
 })();
 

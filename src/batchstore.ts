@@ -30,9 +30,9 @@ const META = "meta";
 const CHUNKS = "chunks";
 const CHUNK = 30 * 1024;
 
-function open(): Promise<IDBDatabase> {
+function open(db: string = DB): Promise<IDBDatabase> {
   return new Promise((res, rej) => {
-    const rq = indexedDB.open(DB, 2);
+    const rq = indexedDB.open(db, 2);
     rq.onupgradeneeded = () => {
       const db = rq.result;
       // v1 stored whole frames as single rows — exactly the sidecar trap
@@ -48,9 +48,9 @@ function open(): Promise<IDBDatabase> {
 
 /** Store one finished frame atomically (meta + chunks in one strict-durability
  *  transaction): after this resolves, the frame is really on disk. */
-export async function putFrame(meta: FrameMeta, bytes: Uint8Array): Promise<void> {
+export async function putFrame(meta: FrameMeta, bytes: Uint8Array, dbName: string = DB): Promise<void> {
   const { name } = meta;
-  const db = await open();
+  const db = await open(dbName);
   try {
     await new Promise<void>((res, rej) => {
       const t = db.transaction([META, CHUNKS], "readwrite", { durability: "strict" } as IDBTransactionOptions);
@@ -77,8 +77,8 @@ function req<T>(rq: IDBRequest): Promise<T> {
   });
 }
 
-export async function frameMetas(): Promise<FrameMeta[]> {
-  const db = await open();
+export async function frameMetas(dbName: string = DB): Promise<FrameMeta[]> {
+  const db = await open(dbName);
   try {
     return await req<FrameMeta[]>(db.transaction(META).objectStore(META).getAll());
   } finally {
@@ -86,8 +86,8 @@ export async function frameMetas(): Promise<FrameMeta[]> {
   }
 }
 
-export async function frameCount(): Promise<number> {
-  const db = await open();
+export async function frameCount(dbName: string = DB): Promise<number> {
+  const db = await open(dbName);
   try {
     return await req<number>(db.transaction(META).objectStore(META).count());
   } finally {
@@ -95,8 +95,8 @@ export async function frameCount(): Promise<number> {
   }
 }
 
-export async function clearFrames(): Promise<void> {
-  const db = await open();
+export async function clearFrames(dbName: string = DB): Promise<void> {
+  const db = await open(dbName);
   try {
     await new Promise<void>((res, rej) => {
       const t = db.transaction([META, CHUNKS], "readwrite");
@@ -112,8 +112,8 @@ export async function clearFrames(): Promise<void> {
 
 /** Visit every stored frame, materializing ONE frame's chunks at a time so a
  *  big batch never has all its bytes in RAM at once. */
-export async function eachFrame(fn: (f: FrameMeta & { parts: ArrayBuffer[] }) => void): Promise<void> {
-  const db = await open();
+export async function eachFrame(fn: (f: FrameMeta & { parts: ArrayBuffer[] }) => void, dbName: string = DB): Promise<void> {
+  const db = await open(dbName);
   try {
     const metas = await req<FrameMeta[]>(db.transaction(META).objectStore(META).getAll());
     for (const m of metas) {
@@ -125,4 +125,24 @@ export async function eachFrame(fn: (f: FrameMeta & { parts: ArrayBuffer[] }) =>
   } finally {
     db.close();
   }
+}
+
+/** THE SAME STORE, UNDER ANOTHER NAME.
+ *
+ *  Exports collected as the reader goes need exactly this: small rows, one
+ *  strict transaction per file, survives a crash. What they must NOT share is
+ *  the DATABASE — saving a batch clears the frames it bundled, and doing that to
+ *  a morning's keepers because they happened to live in the same place would be
+ *  a button whose output no longer matches its label. One constant, two stores.
+ *
+ *  The module's own exports stay bound to the batch database, so nothing that
+ *  already calls them changes at all. */
+export function frameStore(dbName: string) {
+  return {
+    putFrame: (meta: FrameMeta, bytes: Uint8Array) => putFrame(meta, bytes, dbName),
+    frameMetas: () => frameMetas(dbName),
+    frameCount: () => frameCount(dbName),
+    clearFrames: () => clearFrames(dbName),
+    eachFrame: (fn: (f: FrameMeta & { parts: ArrayBuffer[] }) => void) => eachFrame(fn, dbName),
+  };
 }
