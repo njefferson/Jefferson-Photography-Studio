@@ -12758,3 +12758,59 @@ the delete.
 (Doctrine §7i). It is in `public/`, so it deploys with the app and is precached
 by the service worker, and it is checked at 400 px and 1280 px in both themes
 with axe clean. Every stage's state is a WORD before it is a colour or a weight.
+
+
+## A look you press once a set, remembered, 2026-09-14
+
+Every photo opening ungraded is right for somebody meeting the app; it is not
+right for somebody who puts the same grade on everything they shoot, and that
+reader was pressing the same button once per set, forever. `ips-default-look` is
+that press, kept.
+
+IT IS NOT AN EDIT FIELD AND DOES NOT RIDE A SAVED LOOK, so the five-places rule
+does not apply to it. It seeds `sessionLook` at boot, and from there it is the
+exact path a pressed look already takes: `establishFreshEdit` reads `sessionLook`
+into `activeLook`, applies it, and then clears the undo stack and takes the Reset
+baseline — so the automatic lands on a VISIBLE control (the look button reads as
+pressed, and `updateLookUI` runs), costs no undo step, survives Reset, and leaves
+Hold: Untouched showing the bare decode. Those are the three tests Doctrine §14
+sets, and a default look passes all three without any new machinery.
+
+THE RE-SEED GOES IN `resetSessionState`, NOT IN `endSession`. Four paths tear a
+session down — the Done button, opening a single file, opening a folder over an
+existing session, and the gallery — and only one of them is Done. An earlier
+draft of this put it in `endSession`, where a reader who pressed a look and then
+opened a new folder without pressing Done would have kept the pressed look
+instead of returning to their default. Check 8 of the walk is that exact seam,
+and it goes through the app's own "Start a new session" dialog.
+
+AND ONLY WHEN A DEFAULT IS SET. With no preference the re-seed does nothing, so
+the behaviour the app has always had — press a look on one set and the next set
+still wears it — is untouched. That is check 11, and it fails if the re-seed is
+made unconditional.
+
+A SAVED SLOT CANNOT BE A DEFAULT and the picker does not offer one:
+`applySavedLook` sets `activeLook = null`, so there is nothing for `sessionLook`
+to hold. The batch dialog now lists the default first and says which it is; it
+has no selection state to preselect, so being first and named is the whole of
+what it can honestly do.
+
+THE WALK ASSERTS THE BUTTON AND THE PICTURE, per the rule this file already
+carries. The canvas is created with `preserveDrawingBuffer`, so the frame can be
+read straight back and averaged. **Check 10 passed against the pre-stage build
+for the wrong reason** until it was pinned: it compared a default-look frame
+against a no-default frame taken AFTER a look had been pressed by hand, and on a
+build with no default at all those two still differ. Pinned to the as-opened
+frame from check 1, it fails on the old build and passes on the new one. Six of
+eleven checks fail before the change.
+
+TWO HARNESS FAULTS, both about where controls live. The look buttons are inside
+the IR tab, so they cannot be clicked until that tab is showing — though which
+look is ACTIVE reads correctly either way, because the class is on the button
+whether its panel is showing or not. And opening files over a session of two or
+more asks first, in the app's own `<dialog>` rather than a browser confirm, so
+nothing auto-answers it.
+
+Measured in both themes at 430 px and 1280 px: one labelled radiogroup, eight
+real radio buttons, every one clearing 44 px, the chosen one saying "your
+default" in words as well as in colour, and axe clean in Settings.
