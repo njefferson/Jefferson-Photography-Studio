@@ -87,7 +87,7 @@ try {
   const showing = grab(/showing ([\d.]+\s*(?:ms|s))/);
   const settle  = grab(/settling ([\d.]+\s*(?:ms|s))/);
   const strip   = grab(/strip ([\d.]+\s*(?:ms|s))/);
-  const phases  = ["hot spot","upload","zoom","glow","local"].map(k => grab(new RegExp(k.replace(" ","\\s") + " ([\\d.]+\\s*(?:ms|s))")));
+  const phases  = ["hot spot","upload","zoom","glow","local","rest"].map(k => grab(new RegExp(k.replace(" ","\\s") + " ([\\d.]+\\s*(?:ms|s))")));
 
   check("3 every bucket is named and parses",
     [total,reading,waited,ran,showing,settle,strip,...phases].every(v => typeof v === "number"), true);
@@ -101,24 +101,35 @@ try {
   console.log(`        parts ${sum.toFixed(0)} ms vs whole ${total.toFixed(0)} ms — ${(drift*100).toFixed(1)}% apart`);
   check("7 the parts add up to the whole within 5%", drift < 0.05, true);
 
-  // A PERCENTAGE IS THE WRONG SHAPE FOR A SMALL SUM, and this check spent weeks
-  // proving it: five parts each reported to a whole millisecond can differ from
-  // their rounded total by up to five milliseconds no matter how correct the
-  // instrument is, and on a 67 ms total five milliseconds IS 7.5%. It failed at
-  // 4.5% against its own 5% limit on a loaded container, passed on re-run, and
-  // that is a threshold too tight to be a gate rather than a defect.
+  // THE TOLERANCE WAS CHASING A DEFECT IN THE INSTRUMENT, TWICE.
   //
-  // Measured over four runs: 1.9%, 1.9%, 1.8%, 2.1% — so the proportional part
-  // stays at 5%, which is well clear of the real spread, and an ABSOLUTE floor
-  // of 6 ms (five roundings plus one) covers the case where the total is small
-  // enough that rounding dominates. Both are derived from how the numbers are
-  // reported, not picked to make a red check green.
+  // This check asserted that showing's named parts add up to showing, and they
+  // could not: `show` is measured across the whole of `showDecoded`, while the
+  // five phases covered only its middle. The location guard, the canvas label
+  // and the tool disarm run before the first phase clock starts; unhiding the
+  // panel, leaving learn mode and rebuilding the zoom control run after the
+  // last one stops. That head and tail is real work belonging to no phase.
+  //
+  // It passed on an idle machine because both are fast, and went red whenever
+  // the container was loaded — which produced exactly the wrong repair each
+  // time. First the tolerance went to 5%; then, when a 4.5% failure re-ran
+  // green, an absolute 6 ms floor was added under a comment about millisecond
+  // ROUNDING. Rounding was never the mechanism, so the floor was fitted to a
+  // story rather than derived: the sweep failed again on the first full run
+  // after it, and a re-run passed, which is what a tolerance covering the wrong
+  // variable always does.
+  //
+  // The app reports `rest` now — the head and tail, measured — so six parts
+  // partition the whole by construction and this is exact. The slack left is
+  // the call boundary either side of `showDecoded`, sub-millisecond, and six
+  // numbers each rounded to a whole millisecond: 6 ms, which is the one part of
+  // the old comment that was right about its own variable.
   const phSum = phases.reduce((a,c)=>a+c,0);
   const phGap = Math.abs(phSum - showing);
   const phDrift = phGap / Math.max(1, showing);
-  const phAllow = Math.max(6, showing * 0.05);
-  console.log(`        showing's five parts ${phSum.toFixed(0)} ms vs ${showing.toFixed(0)} ms — ${phGap.toFixed(0)} ms, ${(phDrift*100).toFixed(1)}% (allowed ${phAllow.toFixed(0)} ms)`);
-  check("8 showing's own five parts add up to showing, within rounding", phGap <= phAllow, true);
+  const phAllow = 6;  // six whole-millisecond roundings; NOT a fraction of the total any more
+  console.log(`        showing's six parts ${phSum.toFixed(0)} ms vs ${showing.toFixed(0)} ms — ${phGap.toFixed(0)} ms, ${(phDrift*100).toFixed(1)}% (allowed ${phAllow.toFixed(0)} ms)`);
+  check("8 showing's own six parts add up to showing, within rounding", phGap <= phAllow, true);
 
   console.log(`        outside the call ${outside} ms, reported ${total.toFixed(0)} ms`);
   check("9 the reported whole fits inside the time actually spent", total <= outside + 5, true);

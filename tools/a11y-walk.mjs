@@ -43,6 +43,7 @@ import { chromium } from "/home/user/Jefferson-Photography-Studio/node_modules/p
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { repo, surfaces, allowed, check as checkSurfaces } from "./surfaces.mjs";
+import { sweepRenders } from "./palette-spec.mjs";
 
 const PORT = (process.argv.find((a) => a.startsWith("--port=")) || "--port=8131").split("=")[1];
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -245,6 +246,41 @@ try {
       if (!near(m.unpressed, m.accent, 24)) ok(`[${theme}] and its unpressed neighbour is not`);
       else fail(`[${theme}] the unpressed neighbour is the accent too — pressed says nothing`);
     } finally { await page.close(); }
+  }
+  // ── 4 ────────────────────────────────────────────────────────────────────
+  //
+  // THE COMMITTED PALETTE SPEC'S `_renders` LIST, RE-MEASURED.
+  //
+  // `palettes/studio.json` tells the hub's palette gate which text-on-accent-
+  // wash pairings this app actually paints; every pairing NOT on that list has
+  // its floor downgraded from a failure to a forecast. So a short list is not a
+  // smaller gate, it is a quieter one — add a hint to a selected row, forget to
+  // regenerate, and the contrast failure it introduces is reported as a screen
+  // nobody has built.
+  //
+  // palette-spec-check.mjs covers the other half without a browser: it holds
+  // the spec to the sha256 of public/palette.css. It cannot see this half,
+  // because `_renders` is measured from the whole app rather than from the
+  // colour tokens — which is why it belongs here, in the walk that already has
+  // a browser open on every surface.
+  //
+  // The sweep is IMPORTED from the generator rather than reimplemented. Two
+  // implementations of one measurement is how a check comes to agree with
+  // itself and with nothing else.
+  console.log("\n4 — the palette spec still describes what the app paints");
+  {
+    const spec = JSON.parse(readFileSync(join(repo, "palettes/studio.json"), "utf8"));
+    const swept = await sweepRenders(browser, PORT);
+    for (const t of swept.trouble) fail(`the sweep could not account for ${t}`);
+    for (const k of swept.skipped) note(`off-role, recorded not dropped: ${k}`);
+    const had = new Set(spec._renders ?? []);
+    const now = new Set(swept.pairs);
+    const added = [...now].filter((x) => !had.has(x)).sort();
+    const gone = [...had].filter((x) => !now.has(x)).sort();
+    for (const a of added) fail(`the app paints ${a} and palettes/studio.json does not list it — regenerate the spec`);
+    for (const g of gone) fail(`palettes/studio.json lists ${g} and the app no longer paints it — regenerate the spec`);
+    if (!added.length && !gone.length && !swept.trouble.length)
+      ok(`all ${now.size} measured pairings match palettes/studio.json`);
   }
 } finally {
   await browser.close();
