@@ -200,3 +200,30 @@ a plausible colour and every sweep that reads the DOM agreed with them.
 **Resolution:** all three now take `--glass-txt`, and `tools/token-check.mjs`
 refuses any commit where a bare `var()` names a property nothing defines. It is
 in `.branch-guard`'s `also=` and was planted red before being trusted.
+
+### F-11 · The crop bar's controls had never been in the hit sweep — FIXED (2026-09-14)
+`#cropTools` only exists once you enter crop or straighten, and the walk's
+hit-area sweep measures what is on screen — so a whole panel of controls, on the
+app's most touch-driven surface, had never been measured. Pointed at it for the
+first time: **Reset and Done were 28px tall**, and the ratio chips measured
+**43px reachable** against a 44 floor.
+Everything around them was correct, which is what made it invisible — the chips
+buy their target with a `::before` extension and the straighten nudges declare
+`min-height` outright, so nothing about the bar looked unconsidered.
+**Resolution:** `#cropTools button:not(.ratio-chip)` declares `min-height: 44px`
+(an extension was the wrong tool — the row-gap is 10px, so the ±8 these needed
+would overlap the neighbour, and the bar steps the view back by its measured
+height so a taller pill is safe). The chips go from 32 to 34 with the same ±6
+extension: 46 reachable, where 32 gave 43 because the two hit tests either side
+do not both reach the extension's outermost pixel — an exact-44 design with no
+margin loses one to rounding. And **section 2 of `tools/a11y-walk.mjs` now
+enters both geometry modes**, so the class stops being invisible.
+Measured after: Reset 85x44, Done 56x44, every chip ≥ 44 at 430px and 900px.
+
+### F-12 · A `padding` on `#cropDone` that never applied — FIXED (2026-09-14)
+`#cropTools button` is one id and one element and outranks a bare `#cropDone`,
+so the `padding: 7px 18px` written to make the primary exit wider had never once
+taken effect. Same species as F-10: a declaration that renders nothing and reads
+as intent.
+**Resolution:** removed rather than re-specified. What shipped for the life of
+the bar is `6px 12px`, and that is the size this button has always been.
