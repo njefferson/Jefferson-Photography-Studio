@@ -527,7 +527,89 @@ user-scalable=no.
 > short bold title so the parser stays reliable. Editing this list updates
 > the app on the next deploy. Both the roadmap and the patch notes (last
 > commits) refresh automatically on push.
-> Shipped items move to the "## The patch notes labelled three releases with a commit count, 2026-09-14
+> Shipped items move to the "## The accessibility sweep is in the repository, and its list refuses now, 2026-09-14
+
+**IT WAS THE LAST INSTRUMENT THAT WAS NOT.** The sweep was rebuilt in the session
+scratchpad before each release, its result written into these notes, and nothing
+in the repository held it — so a session that did not know it existed shipped
+without it, and a container going away took it with it. Both this file and the
+live status page carried that as an open debt for weeks. It is
+`tools/a11y-walk.mjs` now, beside the two walks that moved for the same reason.
+
+**MOVING THE FILE WAS THE SMALL HALF.** The scratchpad version carried this, in
+its own words, above a hardcoded list:
+
+    A NEW SURFACE JOINS THIS LIST IN THE SAME COMMIT THAT CREATES IT, or it
+    ships unmeasured — which is how .ql-btn stayed 34px for as long as it did.
+
+True, and it refused nothing. Measured on the run that replaced it: **ir.html
+declares fifteen dialogs and the sweep opened three**; the axe pass ran on
+`ir.html` alone while **seven pages deploy**. The instruction had been read and
+obeyed by whoever wrote it and by nobody since, which is the whole of this
+family's escalation argument — `branch-guard` and `plan-guard` are the same
+shape.
+
+`tools/surfaces.mjs` is the one enumeration and it is an ASSERTION, checked
+**both ways against the BUILD** rather than against the source tree, because
+`notes.html` does not exist as a file — vite generates it at build time, so a
+list built from the repository would be missing a page that ships. A page or
+dialog that deploys undeclared fails; a declaration that no longer deploys fails
+too, because a removed surface leaves its entry behind and the next reader
+trusts it. Four plants, each made to fail before the list was trusted: a dropped
+dialog, a page that no longer exists, a page removed from the list, a dialog
+listed that is not in the markup. `class-width-walk.mjs` imports the same list —
+it had four page names hardcoded while seven deploy, so three pages were never
+walked and nothing said so.
+
+**WHAT THE FIRST FULL RUN FOUND, and the comment that had already excused it.**
+`style.css` carried, above a rule scoped to one dialog:
+
+    ...every other dialog's buttons are a measured, shipped surface and are not
+    being churned from this change.
+
+They were not measured. With the whole list in hand the sweep found **six
+buttons at 35px on two decision dialogs** — `#locDlg`'s four, which ask a reader
+to choose what happens to the location written into their photograph, and
+`#askDlg`'s two. On a tablet, by finger, against a 44px floor. The rule is
+generic now (`dialog button { min-height: 44px }`), which `min-height` makes
+safe: it only ever raises, so it reaches exactly the controls that were short
+and leaves every one already clearing the floor alone. Negative control: put the
+floor back to 34 and the sweep reports six failures across three dialogs and two
+widths; restore it and all pass.
+
+**Two of the first run's ten findings were the instrument, and both corrections
+are the standard rather than a way past it.**
+
+- **Inline in a sentence is exempt.** SC 2.5.8 excepts a target "in a sentence,
+  or whose size is otherwise constrained by the line-height of non-target
+  text" — enlarging a link in the middle of a paragraph breaks the paragraph.
+  The sweep matched every `a[href]` including prose links. Tested structurally
+  rather than by tag, because this app has a `<button>` styled as a link
+  mid-sentence (`#bcQuick`) and it is the same case: laid out inline, and
+  sharing its parent with real text. **Five elements are exempt across all seven
+  pages and every one prints on every run** — an exemption nobody sees is the
+  difference between "the sweep found nothing" and "the sweep looked at
+  nothing", and only the printed list tells them apart.
+- **A button labelled at open time is empty when opened cold**, and an empty
+  button measures its padding. `#askDlg`'s two came back 41x19 that way and read
+  as a finding. The walk seeds them with **"OK"**, which is the shortest label
+  `askDialog` is actually called with, so the measurement is the tightest real
+  case rather than a flattering one — and it says on every run which buttons it
+  seeded. With the real label they measure 77x35, which is how the genuine
+  height shortfall surfaced.
+
+**Found, not fixed, and it may matter more than it looks.** The scratchpad
+`verdicts.mjs` check 10 is intermittent, and this run showed the mechanism: the
+mark lost is always the one set immediately before the reload (`-,-,Pick,-`
+against `-,Reject,Pick,-` — the Pick, set earlier, survives). `Session.setMark`
+is a durable write and the reload can beat it. It reproduces on the pre-change
+build, so it is not from this work. **The reason to look at it: iPadOS discards
+background tabs and reloads them**, so "pressed X and the page reloaded in the
+same instant" is not a contrived sequence on the target device — it is what a
+long culling session looks like. Fixing it is a design decision (block, or
+write on `pagehide`), not a tail-end patch.
+
+## The patch notes labelled three releases with a commit count, 2026-09-14
 
 **FOUND BY VERIFYING A DEPLOY, not by looking for it.** Comparing the bundle the
 runner built against the one built here, to prove the deployed code was the code
