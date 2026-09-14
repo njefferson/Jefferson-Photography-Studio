@@ -45,3 +45,13 @@ also=tools/hub-surface-gates.mjs
 # before the first bullet, and the in-app Roadmap went from 18 items to 0 across
 # five commits, to staging and to production, with nothing anywhere going red.
 also=tools/notes-check.mjs
+
+# Run on every commit: the hub commit is written in two files — `.doctrine-sync`
+# (what this repo has RECONCILED with) and the `uses: .../hub-gates.yml@<sha>`
+# pin (what CI RUNS the shared gates from). They are the same fact and they
+# drift silently, because adopting is one command and editing a workflow is
+# another and nothing about the tree looks different afterwards. What it costs:
+# CI keeps running the gates from an older commit, every one goes green, and a
+# rule added to the hub in between is enforced nowhere while the marker says it
+# has been read. This repo had no marker at all and a pin four weeks behind.
+also=tools/hub-pin-check.mjs

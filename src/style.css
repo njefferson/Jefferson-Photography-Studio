@@ -181,16 +181,9 @@ body {
   flex: none;
 }
 .info-btn:active { background: var(--surface-3); }
-/* Discrete build stamp beside the tool name — small and muted, but always on
-   screen so a troubleshooting screenshot records which build it came from. */
-.ver-tag {
-  font: 500 0.6875rem/1 var(--mono, ui-monospace, monospace);
-  color: var(--txt-3);
-  letter-spacing: 0.02em;
-  margin-left: 2px;
-  flex: none;
-  user-select: text;
-}
+/* The build stamp's look moved to src/verstamp.css, imported by the module
+   that writes it — this file is not loaded by Macro Studio, so the rules here
+   reached one of the two apps that show a stamp. */
 
 /* ---- Buttons ---- */
 /* A BUTTON LABEL IS NOT PROSE, AND ON IOS A LONG PRESS SELECTS IT. Three of
@@ -2953,26 +2946,6 @@ small { font-size: max(0.6875rem, 0.8em); }
 
 
 /* ---- The version menu, and the test page it leads to ---- */
-/* The version tag is a button now, so it needs a real target and a focus ring;
-   it keeps the quiet look it had as a label. */
-.ver-tag {
-  /* Sizes to its own text. As a <span> it did that for free; as a <button> it
-     inherited a block display from the bar's button styling and stretched to
-     204px, landing on top of Home and swallowing its taps — the button could
-     not be pressed at all, and the walk caught it. */
-  display: inline-flex;
-  align-items: center;
-  width: auto;
-  flex: 0 0 auto;
-  background: none;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  min-height: 44px;
-  padding: 0 8px;
-  cursor: pointer;
-}
-@media (hover: hover) { .ver-tag:hover { border-color: var(--line-2); color: var(--txt-2); } }
-.ver-tag:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .ver-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 10px 0 6px; }
 .ver-link {
   display: inline-flex;

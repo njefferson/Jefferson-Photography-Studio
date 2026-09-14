@@ -6,12 +6,19 @@ import { wireThemePicker } from "../theme";
 import { wirePalettePicker } from "../palette";
 import { wireDeviceCopy } from "../platform";
 import { wireForceUpdate, wireUpdateStrip } from "../swupdate";
+import { writeVersionStamp } from "../verstamp";
 
 // Macro focus-stacking mode. Loads a focus-shift JPEG set, blends it into one
 // all-in-focus frame, and lets you compare and save. The heavy engine lives in
 // stack.ts; this file is UI + orchestration only.
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+
+// The build stamp, at boot — Doctrine §7b. This app shipped without one for its
+// whole life, so a screenshot of a stacking problem could not say which build
+// made it, and a stale cached shell was indistinguishable from a current one.
+writeVersionStamp();
+
 
 const filesInput = $("files") as HTMLInputElement;
 const dropZone = $("dropZone");
