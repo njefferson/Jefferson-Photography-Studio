@@ -225,6 +225,10 @@
         <div id="sessionStrip" hidden aria-label="Photo session">
           <div class="session-head">
             <span id="sessionMeta" role="status" aria-live="polite" aria-atomic="true"></span>
+            <div class="session-verdicts">
+              <button id="sessionPick" type="button" class="session-verdict" aria-pressed="false" title="Keep this one — P">Pick</button>
+              <button id="sessionReject" type="button" class="session-verdict" aria-pressed="false" title="Not this one — X">Reject</button>
+            </div>
             <button id="stripHere" type="button" class="session-here" hidden title="Scroll the strip back to the photo you are viewing">&#8629; Back to current</button>
             <button id="sessionDone" type="button" class="session-done" title="End the session and free its storage">Done</button>
           </div>
