@@ -1,5 +1,3 @@
 # Written by tools/preview-version-check.mjs --record. Not hand-edited.
-version=2
-hash=6d2a4448630622ee
-# Recorded WITHOUT a version bump. The evidence the pictures did not change:
-proven=src/decode.ts gained linearAt by MOVE from src/main.ts, and src/main.ts now imports it: the function body is character for character the one that was there (verified by diff of the two revisions), and every caller resolves to the same code. src/debug.ts is the test page only. No preview is rendered differently: the thumbnail path calls the same function it always called, and tools/preview-version-check's own sources are otherwise untouched.
+version=3
+hash=bee62e5a6a520807

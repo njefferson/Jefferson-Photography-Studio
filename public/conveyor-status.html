@@ -84,8 +84,8 @@
       <ul class="facts">
         <li><b>Production</b> <span>v2.43, at <code>fc839f2</code>. It has not moved since.</span></li>
         <li><b>On staging</b> <span>v2.46, the head of the working branch. Everything on it has been pushed there and none of it has been to production.</span></li>
-        <li><b>Last verified green</b> <span><code>c00ed08</code>: build clean, and every walk green — the Quick look keys, the switch instrument against a planted delay, the verdicts fifteen of fifteen, the default look eleven of eleven, the class-width walk, the whole journey from the start screen to a saved export, and axe in both themes. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
-        <li><b>Version after this batch</b> <span>2.46. Three capability releases: 2.44 is the deciding, 2.45 the exporting, 2.46 acting on what you picked.</span></li>
+        <li><b>Last verified green</b> <span><code>99e8a0f</code>: build clean, and every walk green — the new tile-truth walk (eight of its checks red against the build before it, all green after), the Quick look keys, the switch instrument against a planted delay, the default look, the class-width walk, the whole journey from the start screen to a saved export, the export gate byte for byte, and axe in both themes. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
+        <li><b>Version after this batch</b> <span>2.46. Three capability releases: 2.44 is the deciding, 2.45 the exporting, 2.46 acting on what you picked. What has landed since is fixes, which take the increment digit and no version bump.</span></li>
       </ul>
 
       <div class="yours">
@@ -174,6 +174,18 @@
           itself, offers Try again, and is remembered in the report.
         </li>
         <li class="done"><span class="state">Shipped to staging</span>
+          <strong>Four ways a tile lied about the photograph.</strong>
+          The tiles are how you decide, so a tile is a promise about what tapping it
+          will show. Four things broke that promise and all four are fixed together.
+          A quick look kept its rendered tiles on the device and handed them back
+          under a <em>different</em> look, saying so in its own words. Opening a
+          photograph flattened its own tile. Restore depth changed what every tile in
+          the strip would show and redrew none of them. And a look pressed on the
+          photograph you were looking at reached every tile except that one. Each is a
+          picture that was wrong rather than code that was, which is why green gates
+          never saw them; the walk that does now lives in the repo.
+        </li>
+        <li class="done"><span class="state">Shipped to staging</span>
           <strong>Export the photos you picked.</strong>
           The Export panel says how many are picked and exports them all in one
           press, into the same collection that hands over as one file or one zip.
@@ -205,18 +217,6 @@
           machine this was measured on.</strong> Picking 850 stored pieces out of 144,500
           took 9.2&nbsp;ms against 6.8&nbsp;ms out of an empty store. Worth re-running on
           your own device from the test page, because that is the one that matters.
-        </li>
-        <li>
-          <strong>A Quick look preview does not record which look it was rendered
-          under.</strong> Open the grid while a photo is showing under a look and the
-          stored picture wears that look, under a key that says nothing about it. The
-          escape is the grid's own <em>Build these again</em>. The repair costs every
-          stored preview on the device once, so it is its own piece of work.
-        </li>
-        <li>
-          <strong>Turning Restore depth on or off does not redraw the strip.</strong>
-          Every tile then shows a claim about the photo that is no longer true, until
-          something else redraws it.
         </li>
         <li>
           <strong>The strip is rebuilt on every thumbnail that lands</strong>, and each
