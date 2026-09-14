@@ -244,6 +244,15 @@ they OWN the finger gesture like every other drag control. Do NOT set
 `pan-y` (it handed the drag to the panel scroller; a finger on the thumb
 scrolled instead of moving it — owner-caught on the iPad 2026-07-19). The
 panel still scrolls from label text + the gaps between rows.
+A ROVING TABINDEX NEEDS AN INITIALISER, and it is not decoration: the pattern
+is one tab stop for a whole grid with arrows moving within it, so every cell is
+born tabIndex -1 and something has to promote one of them. The quick look
+shipped the pattern without that call and the grid's own keys were unreachable
+for it (2026-09-14, below). The precedent that was already right is setPanelTab,
+called at init. Keep the focusQuickCursor call in openQuickLook's tile loop and
+the one on the compare dialog's close; do not "fix" it by giving tiles a
+positive tabIndex instead, which is the thing the roving pattern exists to
+avoid.
 
 AUDIT ITEMS CLOSED WITH THE PALETTE RELEASE (2026-07-30):
 - LINKS ARE UNDERLINED AT REST. This was a real WCAG 1.4.1 failure, not a
@@ -12615,3 +12624,62 @@ as a bundled macro practice set (the IR side has 44 practice DNGs and the macro
 side has none, which is why its manifest screenshot shows an empty panel), and
 whether a stacked result may be used as that screenshot. Both publish the
 owner's own photographs in a public repo under their name.
+
+
+## The deciding keys could not be reached at all, 2026-09-14
+
+P, X, U and C landed in the quick look on 2026-09-12 and were correct from the
+first line: the handler reads the right keys, marks the right item and paints
+the right cell. They were also unreachable. The listener is on `#qlGrid`, so it
+hears a key only when the focus is INSIDE the grid — and `openQuickLook` calls
+`showModal()` before a single tile exists, which leaves the browser to put the
+focus on the first focusable thing in the dialog: `#qlClose`, a SIBLING of the
+grid. Every tile is born `tabIndex -1`, and the one function that promotes one
+of them, `focusQuickCursor`, had no caller at open. So the keys did nothing
+until a tile was clicked — and clicking a tile is itself the pick. They could
+only ever repeat a decision already made by hand.
+
+`quickCursor` was never reset at open either, so a second folder in one sitting
+began with the cursor pointing into the folder before it; past the end of a
+shorter set the handler reads `undefined` and does nothing at all.
+
+THREE MOVES, no new machinery. Reset the cursor beside `quickItems = []`. Put
+the cursor and the focus on the first tile that has a picture in it — only the
+first, because after that the reader owns where the focus is and a set still
+filling in must never pull it back, and because a placeholder tile for a file
+that would not decode is disabled and cannot hold focus. Return the focus to the
+grid when the compare dialog closes. That last one matters on its own: a native
+dialog restores the focus to whatever had it before `showModal`, which for the C
+key is the tile it was pressed from (right), and for the "Compare two" BUTTON is
+that button — outside the grid, where the keys do not reach. One listener on the
+dialog's `close` covers every route including Escape, guarded by a flag so it
+does not move the focus into a grid that is being torn down.
+
+**A DIALOG'S `open` ATTRIBUTE IS GONE ONE TASK BEFORE ITS `close` EVENT FIRES.**
+`close()` drops the attribute and restores the focus synchronously, then QUEUES
+the event. The walk polled for the attribute and pressed a key immediately, so
+it was reading the moment before any close handler had run — and reported a
+correct build as broken, twice, deterministically, while an otherwise identical
+probe passed. What separated them was a single `evaluate` round trip: the probe
+happened to give the queued task time to run. The fix belongs in the harness —
+yield one frame and one task after the attribute clears, which is the boundary
+itself rather than a guess at a duration. No reader can press a key inside that
+window.
+
+`tools/quicklook-keys-walk.mjs` is COMMITTED rather than left in a scratchpad,
+for the reason `class-width-walk.mjs` gives in its own header. It presses keys
+with no prior click, which is the only way to tell the two states apart, and it
+never calls `.focus()` itself — doing that would put the focus exactly where the
+defect prevents it from going, and the walk would pass against the broken build.
+Verified failing on the build before the fix (four of five checks; the fifth was
+an end-state assertion that a broken build satisfies for the wrong reason, and
+was rewritten as a transition so it cannot). Verified failing again, five of
+five, on a plant that removes both focus calls. THE FIRST PLANT DID NOT COMPILE
+— an unused-variable error — which is the trap that makes a negative control
+pass against correct code; it was rewritten to build before it was trusted.
+
+Also measured, both themes, in the scratchpad a11y walk: the roving tabindex has
+exactly one stop after open, the focus is inside the grid, the grid's aria-label
+still names the keys, the focus comes back after compare, and axe reports no
+serious or critical violations in the quick look. The tab-stop check was forced
+to fail once in-process before it was trusted.
