@@ -126,7 +126,15 @@
             <button id="cropReset" type="button">Reset</button>
             <button id="cropDone" class="primary" type="button">Done</button>
           </div>
-          <input id="straighten" type="range" min="-45" max="45" step="0.1" value="0" aria-label="Straighten" />
+          <!-- A tenth of a degree by finger. The slider covers ninety degrees
+               across a few hundred pixels, so one pixel of drag is about a third
+               of a degree — fine for finding the angle, no use for landing on
+               it. Hold either one to keep going. -->
+          <div class="crop-fine">
+            <button id="straightenDown" type="button" aria-label="Turn a tenth of a degree anticlockwise">&minus;0.1&deg;</button>
+            <input id="straighten" type="range" min="-45" max="45" step="0.1" value="0" aria-label="Straighten" />
+            <button id="straightenUp" type="button" aria-label="Turn a tenth of a degree clockwise">+0.1&deg;</button>
+          </div>
           <div id="cropRatios" role="group" aria-label="Crop aspect ratio"></div>
         </div>
         <div id="histWrap" hidden aria-label="Live RGB histogram">
@@ -184,6 +192,7 @@
             <button id="exportSave" type="button">Save image</button>
             <button id="exportSaveAll" type="button" hidden>Save all exports</button>
             <button id="exportRetry" type="button" hidden>Try again</button>
+            <button id="exportStop" type="button" hidden>Stop</button>
             <button id="exportDismiss" type="button">Dismiss</button>
           </div>
         </div>
@@ -603,6 +612,14 @@
                  line over the photo is the push — here is the file you just
                  made — and it can be dismissed; this is the pull, in the panel
                  you already open to export, and it stays until they are saved. -->
+            <!-- ACT ON THE PICKS. Marking photos was half a workflow until
+                 this: one press puts every picked photo through the same export
+                 the button below runs, each with its own edit, and they collect
+                 for a single hand-over. -->
+            <div id="exportPickedRow" class="export-waiting" hidden>
+              <p class="note" id="exportPickedText" role="status" aria-live="polite"></p>
+              <button id="exportPickedBtn" type="button" class="primary">Export all</button>
+            </div>
             <div id="exportWaitingRow" class="export-waiting" hidden>
               <p class="note" id="exportWaitingText" role="status" aria-live="polite"></p>
               <button id="exportWaitingSave" type="button">Save them all</button>

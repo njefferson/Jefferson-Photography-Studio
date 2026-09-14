@@ -1041,10 +1041,15 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
     repeating-linear-gradient(to right, rgba(255, 255, 255, 0.4) 0 1px, transparent 1px calc(100% / 3)),
     repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.4) 0 1px, transparent 1px calc(100% / 3));
 }
-#cropOverlay.focus-straighten #cropGuides { /* finer alignment grid to level against */
+/* TWELFTHS WHILE STRAIGHTENING, not sixths. A horizon is levelled against the
+   nearest line to it, so the useful thing is having one CLOSE — twice as many
+   lines halves the worst distance from any edge in the frame to something to
+   judge it against. At a lower alpha, because twice the lines at the same
+   weight is twice the ink over the photograph. */
+#cropOverlay.focus-straighten #cropGuides {
   background-image:
-    repeating-linear-gradient(to right, rgba(255, 255, 255, 0.28) 0 1px, transparent 1px calc(100% / 6)),
-    repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.28) 0 1px, transparent 1px calc(100% / 6));
+    repeating-linear-gradient(to right, rgba(255, 255, 255, 0.22) 0 1px, transparent 1px calc(100% / 12)),
+    repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.22) 0 1px, transparent 1px calc(100% / 12));
 }
 #cropTools {
   position: absolute;
@@ -1067,8 +1072,19 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 #cropTools .crop-row { display: flex; align-items: center; gap: 10px; }
 /* Crop mode reuses the pill for just its label + Reset — the straighten slider
    and its readout belong to Straighten mode only. */
-#cropTools.tool-crop #straighten,
+#cropTools.tool-crop .crop-fine,
 #cropTools.tool-crop #straightenVal { display: none; }
+/* The slider with a tenth-of-a-degree button either side of it. */
+.crop-fine { display: flex; align-items: center; gap: 8px; width: 100%; }
+.crop-fine input[type="range"] { flex: 1; }
+#cropTools .crop-fine button {
+  flex: none;
+  min-height: 44px;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  touch-action: none; /* it owns the press, like every other drag control here */
+}
 #cropTools .crop-lbl { flex: 1; font-size: 0.8125rem; font-weight: 600; color: var(--txt-1); }
 #cropTools input[type="range"] { width: 100%; margin: 0; }
 #straightenVal { font-size: 0.75rem; font-variant-numeric: tabular-nums; color: var(--txt-1); flex: none; min-width: 4ch; text-align: right; }
