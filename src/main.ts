@@ -14,7 +14,7 @@ import { writeZip, crc32 } from "./zip";
 import { putFrame, eachFrame, frameMetas, frameCount, clearFrames, frameStore } from "./batchstore";
 import * as Session from "./session";
 import { keepAwake } from "./wakelock";
-import { TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, bandWeight, rgb2hsv, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, type MaskLayer, type CropRect } from "./pipeline";
+import { lensGain, LENS_GAIN_HI, LENS_GAIN_LO, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, bandWeight, rgb2hsv, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, type MaskLayer, type CropRect } from "./pipeline";
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, type HealSpot } from "./heal";
 import { makeStickerAsset, stickerRect, stickerWorldCorners, stickerXform, compositeStickersIntoRect8, compositeStickersIntoRectF32, compositeStickersOverlay8, type StickerAsset } from "./sticker";
 import { makeWarpField, encodeWarp, paintWarp, warpIsEmpty as warpFieldEmpty, type WarpField, type WarpTool } from "./warp";
@@ -454,6 +454,56 @@ function lensCurveFor(imported: ImportedFile): LensCurve | null {
   const colour = measured ?? (Hotspot.hasColour(shipped) ? shipped : null);
   if (!colour && !shipped?.bump) return null;
   return { kr: colour?.kr, kb: colour?.kb, bump: shipped?.bump };
+}
+
+/** WHICH PROFILE IS CORRECTING THE OPEN PHOTOGRAPH, AND WHERE EACH HALF CAME
+ *  FROM. The two halves can come from two different profiles — the reader's own
+ *  measurement supplies the colour and the shipped one the brightness — so
+ *  naming only "the lens" would hide the case where they disagree. */
+function lensDiagnostic(): string {
+  if (!current) return "nothing open";
+  const mine = myLens?.p ?? null;
+  const shipped = hotspotState?.p ?? null;
+  if (!mine && !shipped) return "no profile matched this photograph";
+  const colour = mine ?? (Hotspot.hasColour(shipped) ? shipped : null);
+  const where = (p: LensStore.StoredProfile | null) =>
+    !p ? "none" : `${p.model} ${p.fl}mm${Number.isFinite(p.ap) ? ` f/${p.ap}` : ""}${p.source ? ` · ${p.frames} ${p.source} frame${p.frames === 1 ? "" : "s"}` : " · shipped"}`;
+  const same = colour && shipped && colour === shipped;
+  return (
+    `strength ${params.lensFix}${params.lensBypass ? " · BYPASSED" : ""}` +
+    ` · colour from ${where(colour)}` +
+    (same ? " · brightness from the same profile" : ` · brightness from ${where(shipped)}`) +
+    (mine ? ` · ${myLens!.note || "exact match"}` : "")
+  );
+}
+
+/** WHAT THE CORRECTION DOES TO THE MIDDLE OF THE FRAME, which is the only place
+ *  a hot-spot lives and the only number that answers "why is it a blue circle".
+ *  Read through the same `lensGain` the pipeline uses rather than from the
+ *  stored bins, so it reports what LANDS and not what was measured — strength,
+ *  bypass and the 0.5..2 clamp all included. */
+function lensCentreDiagnostic(): string {
+  if (!current) return "nothing open";
+  const c = currentLensCurve();
+  if (!c) return "no correction on this photograph";
+  const s = params.lensBypass ? 0 : params.lensFix;
+  const kr = c.kr, kb = c.kb, bump = c.bump;
+  if (!kr || !kb || kr.length < 1) return `brightness only · centre ${bump ? lensGain(1 + bump[0], s).toFixed(3) : "1.000"}x`;
+  const gr = lensGain(kr[0], s), gb = lensGain(kb[0], s);
+  const gc = bump ? lensGain(1 + bump[0], s) : 1;
+  const ratio = gr > 1e-6 ? gb / gr : Infinity;
+  // Named rather than left as a bare number: the ratio is the finding, and a
+  // report that makes the reader judge whether 1.9 is a lot has not reported.
+  const verdict =
+    ratio >= 1.6 ? " — THE MIDDLE IS BEING PUSHED STRONGLY BLUE" :
+    ratio >= 1.25 ? " — the middle is being pushed noticeably blue" :
+    ratio <= 0.8 ? " — the middle is being pushed red" : " — close to neutral";
+  const clamped = [gr, gb, gc].filter((g) => g >= LENS_GAIN_HI - 1e-9 || g <= LENS_GAIN_LO + 1e-9).length;
+  return (
+    `red ${gr.toFixed(3)}x · blue ${gb.toFixed(3)}x · brightness ${gc.toFixed(3)}x` +
+    ` · blue over red ${ratio.toFixed(2)}x${verdict}` +
+    (clamped ? ` · ${clamped} of 3 hit the safety clamp — the measurement is out of range` : "")
+  );
 }
 
 /** The curve for the frame the reader has open — both halves, from the two
@@ -1680,6 +1730,19 @@ function wireVersionMenu() {
     text.value = await buildDiagnostic(__APP_VERSION__, [
       { k: "Open now", v: current ? `a photo is open${real >= 2 ? ` in a session of ${real}` : ""}` : "nothing open" },
       { k: "Restore depth", v: autoLift ? `on at ${Math.round(liftAmount * 100)}% strength` : "off" },
+      // THE LENS CORRECTION, IN THE NUMBERS IT ACTUALLY APPLIES. The report had
+      // nothing about lenses at all, so "the hot-spot came out a blue circle"
+      // could not be answered from a paste — only by asking the reader to
+      // describe a screen, which §7f exists to stop.
+      //
+      // The centre gains are the whole diagnosis. A hot-spot is red-strong, so
+      // the correction pulls red DOWN and pushes blue UP; the ratio between
+      // them at r = 0 is how blue the middle of the frame is being made. Every
+      // honest bin sits in 0.772..1.460, which at full strength is already
+      // 1.9x blue over red — so a blue disc is reachable from correct data at
+      // too much strength, and the number says which of those it is.
+      { k: "Lens correction", v: lensDiagnostic() },
+      { k: "Centre gains", v: lensCentreDiagnostic() },
       { k: "Default look", v: defaultLook() ? (BUILTIN_NAMES[defaultLook()!] ?? defaultLook()!) : "none — photos open ungraded" },
       { k: "Kept previews", v: kept.rows ? `${kept.rows} (${(kept.bytes / 1e6).toFixed(1)} MB)` : "none" },
       // REPORTED, NEVER STARTED (decodeClient.decodeLanes) — a report that spawns
