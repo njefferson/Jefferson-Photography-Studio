@@ -1,3 +1,4 @@
+import { writeVersionStamp } from "./verstamp";
 import "./style.css";
 import { importFile, type ImportedFile, type ImageKind } from "./import";
 import { wireForceUpdate, wireUpdateStrip, setUpdateCost } from "./swupdate";
@@ -66,8 +67,7 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 // says which build it came from (a stale PWA cache can otherwise hide which
 // code is actually running on the device).
 {
-  const verTag = document.getElementById("verTag");
-  if (verTag) verTag.textContent = `v${__APP_VERSION__}`;
+  writeVersionStamp();
   wireVersionMenu();
 }
 
