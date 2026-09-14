@@ -65,3 +65,12 @@ also=tools/hub-pin-check.mjs
 # the palette spec to notice, which is a browser run — this is a text scan that
 # refuses the commit.
 also=tools/token-check.mjs
+
+# Run on every commit: palettes/studio.json is GENERATED from public/palette.css
+# by a browser, so it is committed like the branch guard's own hook — and like
+# every committed artefact it can go stale in the tree while CI stays green,
+# measuring a palette nobody sees. Regenerating needs a browser and a served
+# build, which no hook has; noticing that the source moved and the artefact did
+# not needs neither. The other half of that artefact, the `_renders` list, is
+# measured from the whole app and is re-measured by section 4 of the a11y walk.
+also=tools/palette-spec-check.mjs
