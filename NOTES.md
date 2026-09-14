@@ -1046,6 +1046,31 @@ of, which is hub §119's closing point arriving from the other direction.
 And a section boundary is load-bearing markup when something parses the file —
 appending to a document that is also an input is a code change wearing prose.
 
+## The sweep is fifteen walks and one command now, 2026-09-14
+
+**FOUR WALKS WERE IN THE REPOSITORY AND ROUGHLY EIGHTEEN WERE NOT**, including
+`export-bytes` — the gate that proves an export is byte-identical — and
+`a11y-verdicts`, which is the only thing holding hub §293. Each was rebuilt in a
+session scratchpad before a release and held nowhere, so a session that did not
+know one existed shipped without it, and a container going away took it with it.
+Ten moved in: export-bytes, journey, rotation, release, verdicts, collect,
+export-ui, export-report, switch-instrument and a11y-verdicts. Each carries a
+header saying what it is the only instrument for. One-release probes stay in the
+scratchpad, which is what a scratchpad is for.
+
+**AND THE SWEEP ITSELF WAS A SESSION TYPING TEN COMMANDS FROM MEMORY**, which
+means the sweep was whatever that session remembered — and a walk it forgot was
+indistinguishable from a walk that passed. `tools/walk-all.mjs` runs every
+`*-walk.mjs` on disk, so adding one to `tools/` adds it to the sweep with nothing
+to remember. It refuses to start when nothing is serving `dist`, because fifteen
+walks each failing to connect is six minutes of output that says nothing about
+the build. Sequential on purpose: run at once, the other walks become the thing
+`switch-instrument` is measuring.
+
+**Measured on the run that added it: fifteen walks, 354 seconds, all green.**
+The three slow ones are a11y (69s, seven pages in both themes), export-report
+(69s) and tile-truth (71s); the rest are under half a minute each.
+
 ## A verdict pressed as the tab goes away, 2026-09-14
 
 **FIXED.** `Session.setMark` opens a database, reads a row and puts it back under
