@@ -14830,3 +14830,39 @@ profile's wording as if it were live state. The second planted a profile with
 colour when the profile's camera string and the file's make-plus-model differ.
 Worth knowing in its own right: a profile carrying a camera string that does not
 exactly match the files contributes nothing but brightness.
+
+## Functions state their contract now, 2026-09-15
+
+**Owner rule.** What a function takes, what it does, what it gives back — and
+what the result has to satisfy or who consumes it. The last clause is the one
+that catches regressions.
+
+**Measured when the rule arrived: 10 of 246 exported functions stated one.** The
+comments here are good and they carry WHY a thing exists and what the alternative
+cost; that is history, and history is not a contract. `bumpFrom` had a careful
+paragraph about what it derives and never said its result must pass
+`bumpProblem`. A later commit tightened `bumpProblem`, nothing connected the two,
+and a measured lens silently stopped working for three days.
+
+`tools/contract-check.mjs` runs on every commit via `.branch-guard` and checks
+the three mechanical parts: a doc block above every exported function, every
+parameter named in it, and a statement of what comes back. The fourth part — the
+invariant or the caller — is a CHECKLIST in CLAUDE.md, because no parser can tell
+a real invariant from a sentence shaped like one.
+
+**The backlog is declared, not patterned.** `.contract-allow` holds the 219
+functions written before the rule, checked both ways and printed on every run, so
+it can only shrink. `src/lensstore.ts` — where the bug was — is off the list: all
+fifteen of its exported functions carry contracts naming what their results must
+satisfy and which other function depends on them.
+
+**A gate refusal handled the long way round, deliberately.** This change is
+comments only, and the built bundle is BYTE-IDENTICAL — verified by building with
+and without the new comments and comparing: `ir-9CNid2S6.js` both times. So
+`preview-version-check` was a false positive: it hashes SOURCE text while its
+stated question is whether the picture a cached preview returns still matches
+what this build would make. The right answer to that question is a hash of the
+built artefact. It was still obeyed rather than edited — changing a control so
+one's own commit passes is the same act whatever the justification, and a
+one-time preview re-render is a small price. **Improving the gate to hash the
+build is the owner's call, recorded here rather than taken.**
