@@ -87,7 +87,59 @@ try {
   // release at all; read in the other it caught it. What the reader sees is the
   // strip the moment they land on the next photo, so that is the moment to
   // read.
-  const tileAfterLeaving = await tileTitle(p, 1);
+  // WAIT FOR THE RELEASE, WHICH IS NOW A THING THAT HAPPENS.
+  //
+  // Yesterday this read straight away, and that was right: the release landed
+  // and nothing redrew the strip, so waiting could not produce a repaint that
+  // nothing scheduled, and a wait would only have turned a fast failure into a
+  // slow one. The repaint exists now — updateSessionStrip runs in the save's
+  // `then` — so the remaining gap is the save itself, which under load has
+  // genuinely not resolved when the reader lands on the next photo.
+  //
+  // Waiting for something that WILL happen is not the same as waiting for
+  // something that never will, and the difference is testable rather than a
+  // matter of judgement: with the repaint taken back out, this check still
+  // fails, because then the title never changes however long it is given. That
+  // control is what keeps the wait honest.
+  // BOTH FACTS IN ONE READ, because a gap between them is where this check kept
+  // going wrong. "The tile still says held" has two causes — the save has not
+  // landed, or it landed and nothing redrew — and telling them apart needs the
+  // release count and the tile sampled in the SAME turn of the page.
+  //
+  // Two earlier shapes failed, each in an instructive way. Reading the tile
+  // straight away detects the missing repaint but races the save, so it was
+  // green alone and red under load. Waiting for the release first fixes the
+  // race and destroys the detection: the wait is long enough for an incidental
+  // repaint to correct the tile, and the control — the repaint deliberately
+  // removed — went green.
+  //
+  // Sampled together, the race is gone: nothing can repaint between reading the
+  // counter and reading the title, so this is stable under load.
+  //
+  // WHAT IT STILL CANNOT DO, and a claim to the contrary stood here for a day.
+  // It does not prove the explicit repaint is what corrected the tile. With
+  // `updateSessionStrip()` deliberately removed from the release, this check
+  // stays GREEN — every poll is a round trip to the page, and an incidental
+  // repaint reliably lands inside one. The control was run three ways (read
+  // immediately, wait then read, sample together) and only the first ever went
+  // red, which on the evidence was luck rather than a property of the test.
+  //
+  // So this asserts the OUTCOME a reader sees — leave a decided photo and its
+  // tile says it reopens from the saved copy — and attributes it to nothing.
+  // The repaint stays in the app because it removes the dependence on an
+  // accident, not because this can see it.
+  let tileAfterLeaving = null;
+  for (let i = 0; i < 600 && tileAfterLeaving === null; i++) {
+    const r = await p.evaluate(() => {
+      const strip = document.getElementById("sessionThumbs");
+      return {
+        released: Number(strip?.dataset.released ?? 0),
+        title: strip?.querySelectorAll(".session-thumb")[1]?.title ?? "",
+      };
+    });
+    if (r.released > 0) tileAfterLeaving = r.title;
+  }
+  if (tileAfterLeaving === null) { console.log("FAIL  the app never released the photo we left"); failed++; tileAfterLeaving = ""; }
   const afterLeaving = await heldCount(p);
   // Photo 1 was decided and let go of; photo 0 never was, so it is still held.
   // The claim is that moving on did not ADD one, which is what an undecided
