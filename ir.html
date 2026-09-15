@@ -268,35 +268,74 @@
         <!-- Segmented tab grid: six core adjustment tabs in a 2x3 grid, with
              Corrections and Crop & straighten as full-width footer rows below them.
              Active tab is remembered per session (main.ts). -->
-        <!-- SIXTY-THREE EXPLANATORY NOTES LIVED PERMANENTLY IN THIS PANEL —
-             1,540 words, including a 125-word paragraph about lens tinting
-             sitting next to a slider somebody is trying to drag. They are worth
-             having: on a first visit they are how the controls get learned. They
-             are not worth having on the fiftieth. So they are a toggle, on to
-             begin with, and remembered once turned off. -->
-        <button id="panelNotes" type="button" class="panel-notes-toggle" aria-pressed="true"
-                title="Show or hide the explanations beside each control">Explanations</button>
-        <div id="panelTabs" class="panel-tabs" role="tablist" aria-label="Editor sections">
-          <button id="ptab-basic" aria-controls="sec-basic" class="ptab active" type="button" data-tab="basic" role="tab" aria-selected="true">Basic</button>
-          <button id="ptab-ir" aria-controls="sec-ir" class="ptab" type="button" data-tab="ir" role="tab" aria-selected="false">IR</button>
-          <button id="ptab-bw" aria-controls="sec-bw" class="ptab" type="button" data-tab="bw" role="tab" aria-selected="false">B&amp;W</button>
-          <button id="ptab-color" aria-controls="sec-color" class="ptab" type="button" data-tab="color" role="tab" aria-selected="false">Color</button>
-          <button id="ptab-tone" aria-controls="sec-tone" class="ptab" type="button" data-tab="tone" role="tab" aria-selected="false">Tone</button>
-          <button id="ptab-masks" aria-controls="sec-masks" class="ptab" type="button" data-tab="masks" role="tab" aria-selected="false">Masks</button>
-          <button id="ptab-export" aria-controls="sec-export" class="ptab" type="button" data-tab="export" role="tab" aria-selected="false">Export</button>
-          <button id="ptab-corrections" aria-controls="sec-corrections" class="ptab" type="button" data-tab="corrections" role="tab" aria-selected="false">Corrections</button>
-          <button id="ptab-crop" aria-controls="sec-crop" class="ptab" type="button" data-tab="crop" role="tab" aria-selected="false">Crop &amp; straighten</button>
-          <!-- The Creative row (row 4): Grade + Stickers + Warp complete the
-               4x3 tab grid. -->
-          <button id="ptab-grade" aria-controls="sec-grade" class="ptab" type="button" data-tab="grade" role="tab" aria-selected="false">Grade</button>
-          <button id="ptab-stickers" aria-controls="sec-stickers" class="ptab" type="button" data-tab="stickers" role="tab" aria-selected="false">Stickers</button>
-          <button id="ptab-warp" aria-controls="sec-warp" class="ptab" type="button" data-tab="warp" role="tab" aria-selected="false">Warp</button>
-        </div>
-        <div class="section-head">
-          <h2 id="sectionTitle" class="section-title">Basic</h2>
-          <p id="sectionSub" class="section-sub">White balance, exposure &amp; detail</p>
-        </div>
         <div id="panelBody" class="panel-body">
+        <!-- THE CHOOSER SCROLLS WITH THE WORK, and the heading pins.
+             Measured on an iPad in landscape: the panel is 619px tall and this
+             grid was 215 of it, with the section heading taking 56 more — 323px
+             of chrome to reach 296px of content that had 951px to scroll
+             through. The chooser was bigger than the thing it chooses.
+             It cannot be made smaller: twelve tabs, three columns, 44px targets
+             IS 215px, and the only ways down are shorter targets or hidden
+             tabs. So it is not pinned any more. Every tab is visible when you
+             are at the top picking one, and it slides away once you are
+             working; the heading below stays stuck to the top so you never lose
+             which tab you are in — and carries the "Sections" button that puts
+             the chooser back, so the cost of scrolling it away is one press. -->
+        <div id="panelTabs" class="panel-tabs" role="tablist" aria-label="Editor sections">
+            <button id="ptab-basic" aria-controls="sec-basic" class="ptab active" type="button" data-tab="basic" role="tab" aria-selected="true">Basic</button>
+            <button id="ptab-ir" aria-controls="sec-ir" class="ptab" type="button" data-tab="ir" role="tab" aria-selected="false">IR</button>
+            <button id="ptab-bw" aria-controls="sec-bw" class="ptab" type="button" data-tab="bw" role="tab" aria-selected="false">B&amp;W</button>
+            <button id="ptab-color" aria-controls="sec-color" class="ptab" type="button" data-tab="color" role="tab" aria-selected="false">Color</button>
+            <button id="ptab-tone" aria-controls="sec-tone" class="ptab" type="button" data-tab="tone" role="tab" aria-selected="false">Tone</button>
+            <button id="ptab-masks" aria-controls="sec-masks" class="ptab" type="button" data-tab="masks" role="tab" aria-selected="false">Masks</button>
+            <button id="ptab-export" aria-controls="sec-export" class="ptab" type="button" data-tab="export" role="tab" aria-selected="false">Export</button>
+            <button id="ptab-corrections" aria-controls="sec-corrections" class="ptab" type="button" data-tab="corrections" role="tab" aria-selected="false">Corrections</button>
+            <button id="ptab-crop" aria-controls="sec-crop" class="ptab" type="button" data-tab="crop" role="tab" aria-selected="false">Crop &amp; straighten</button>
+            <!-- The Creative row (row 4): Grade + Stickers + Warp complete the
+                 4x3 tab grid. -->
+            <button id="ptab-grade" aria-controls="sec-grade" class="ptab" type="button" data-tab="grade" role="tab" aria-selected="false">Grade</button>
+            <button id="ptab-stickers" aria-controls="sec-stickers" class="ptab" type="button" data-tab="stickers" role="tab" aria-selected="false">Stickers</button>
+            <button id="ptab-warp" aria-controls="sec-warp" class="ptab" type="button" data-tab="warp" role="tab" aria-selected="false">Warp</button>
+          </div>
+          <!-- IT RIDES WITH THE CHOOSER, because it is a chooser-level
+               preference — set once, remembered, and never wanted while a
+               slider is being dragged. It was a full-width 52px row of
+               PERMANENT chrome at the top of the panel; pinning it to the
+               heading instead only moved that cost, and on the iPad sidebar
+               (~350px) it pushed the heading onto a second line the moment the
+               Sections button appeared, so the heading grew 62px -> 114px
+               mid-scroll. Here it costs nothing pinned, and Sections brings it
+               back with the grid.
+               SIXTY-THREE EXPLANATORY NOTES LIVE IN THIS PANEL — 1,540 words,
+               including a 125-word paragraph about lens tinting sitting next to
+               a slider somebody is trying to drag. On a first visit they are how
+               the controls get learned; on the fiftieth they are in the way. So
+               they are a toggle, on to begin with, remembered once turned off.
+               ITS STATE IS THE WORD, not the shade. The on state used to read
+               "Explanations" — a bare noun, left-aligned in a full-width box,
+               which is the shape of a section LABEL and not of a control. The
+               only thing then separating on from off was --txt-2 against
+               --txt-3: two greys, carrying a state with no other carrier at all.
+               main.ts writes `on`/`off` into the .seg. -->
+          <div class="panel-prefs">
+            <button id="panelNotes" type="button" class="panel-notes-toggle" aria-pressed="true"
+                    title="Show or hide the explanations beside each control"><span
+              >Explanations</span> <span id="panelNotesState" class="seg">on</span></button>
+          </div>
+          <!-- THE HEADING IS WHAT STAYS. It is the only thing on screen saying
+               which tab you are in once the grid has scrolled away, so it is the
+               one piece of chrome worth pinning — and it carries "Sections", the
+               way back to the chooser, which is the whole cost of letting that
+               grid scroll: one press instead of a scroll. It appears only once
+               there is something above to go back to. -->
+          <div class="section-head">
+            <div class="section-head-txt">
+              <h2 id="sectionTitle" class="section-title">Basic</h2>
+              <p id="sectionSub" class="section-sub">White balance, exposure &amp; detail</p>
+            </div>
+            <button id="sectionBack" type="button" class="section-back" hidden
+                    title="Back to the list of sections">&#8963;&#8202;Sections</button>
+          </div>
           <div id="panelUp" class="scroll-cue up" hidden><span>&#9650;</span></div>
 
           <!-- ===== BASIC ===== -->

@@ -14336,3 +14336,111 @@ CSS looking for "12" — the browser had already resolved `calc(100% / 12)`, so 
 found nothing and reported a grid that had changed as one that had not. Rewritten
 to read the resolved period, it looked for pixels; the period comes back as
 `8.33333%`. Counted from the percentage it reads twelve, both axes, both themes.
+
+## The panel spent more height choosing than working, 2026-09-15
+
+Measured at iPad landscape, 1024x768. The panel is 619 px. Pinned above the
+scroller: the Explanations row 52, the tab grid 215, the section heading 56 —
+**323 px of chrome to reach 296 px of content**, with 951 px still to scroll
+through. The chooser was larger than the thing it chooses, and a control landed
+half over the fold almost wherever you stopped.
+
+The grid cannot be made smaller. Twelve tabs, three columns and a 44 px target
+IS 215 px, and the only ways down from there are a smaller target or a hidden
+tab. So it is **not pinned any more.** It and the heading moved inside
+`#panelBody`; the grid scrolls away with the work and the heading pins to the top
+of the scroller, opaque and spanning the body's padding so content passes under
+it rather than being sliced in mid-air. **Scroller content 296 -> 557 px.**
+
+The cost of that is a trip back up to change tab, and it is paid on the heading:
+a **Sections** button, 44 px, appearing at the same scrollTop as the up cue and
+driven by the same line, because two conditions for one fact is how they come to
+disagree. `setPanelTab` already zeroes `scrollTop`, so switching tab re-hides it
+with nothing added there.
+
+**The heading reserves the height that button will need.** Built without that, it
+went 54 px to 62 on the iPad and 32 to 58 on a phone at the moment scrolling
+started — a pinned bar that grows as you scroll past it shoves the text you are
+reading. `min-height` covers it, and `--section-head-h` is now MEASURED off the
+element by a `ResizeObserver` rather than typed into two rules.
+
+**Explanations went to the chooser, not to the heading.** Pinning it there only
+moved the 52 px, and on the iPad sidebar — ~350 px, narrower than a phone's
+full-width panel — the title plus Sections plus Explanations did not fit on one
+line, so the heading wrapped to 114 px the moment Sections appeared. It is a
+chooser-level preference, set once and remembered, and it belongs where the grid
+is. The heading row is `nowrap` now so nothing can put the wrap back quietly.
+
+## Seventy-one controls nothing had ever measured, 2026-09-15
+
+A tab that is not selected is `hidden`, so its controls are not rendered and have
+no geometry — and the a11y walk had only ever entered the tab the app boots into.
+It enters all twelve now. First run: **71 controls under the 44 px floor**,
+including `#exBtn` — Export & Save, the app's primary action — at 34, because 8 px
+of padding round a 0.8125rem line is 34 px and that is what the base `select,
+button` rule produced. The floor lives on that base rule now; a floor can only
+grow a control, so everything already clearing 44 kept the size it had.
+
+Three chips needed more than the floor. `.mix-chip` was 34 with a +-5 px `::before`
+hit extension, `.slot-more` 40 with +-6 — both measuring their bare box, because
+**an extension only works where there is empty space to extend into**, and in a
+gapped row of controls the neighbour's own box takes it. `.hsl-chip` went 28 -> 44
+and the row wraps; eight swatches at 44 do not fit one panel row, and a row that
+wraps beats a swatch nobody can hit. Third and fourth instances of this trap here.
+
+The check was made to fail once before it was trusted: `.hsl-chip` planted back
+at 28 px in the BUILT stylesheet, run, named at both widths on the Color tab,
+restored byte-identical.
+
+## Two defects no gate here can see, 2026-09-15
+
+**Both scroll cues had shipped as a flat 10 px pill with the arrow drawn outside
+it, underneath.** `.scroll-cue` is `display: flex` with `height: 0` — on purpose,
+so the cue floats without taking space in the flow — and a flex container's
+default `align-items: stretch` sizes its item to its CONTAINER. The pill was
+stretched to zero: all 10 px of it was padding and border. `align-items:
+flex-start` sizes it from its own content; 10 px -> 27.
+
+It survived every release because every gate here measures CONTROLS — hit area,
+accessible name, role, contrast — and the cue is `pointer-events: none` with no
+role and no name. Marking something decorative removes it from the population
+every instrument samples.
+
+**And the explanations toggle wrote `"Explanations"` when on, `"Explanations
+off"` when off.** `aria-pressed` was correct, so axe was right to pass it. But
+the ON state was a bare noun, left-aligned in a full-width bordered box at the
+top of a panel, which is the shape of a section label and not of a control — and
+the only thing then separating the two states was `--txt-2` against `--txt-3`.
+Two greys. The state is the `.seg` word now, `on` / `off`, the same
+state-as-text pattern the look buttons use and the never-churn list blesses; the
+greying stays as a second cue and never the only one.
+
+Also: `#exBtn` had 6 px under it, its own margin collapsed against the note's, so
+the Batch-process sentence read as stuck to the edge of a filled full-width
+block. `#panel section > button.primary` gets 16/12 — 18 px of air, measured.
+
+**THE WALK HAS A FIFTH SECTION NOW, so the first of those cannot come back.**
+Every element that PAINTS — a visible background or border — and holds its own
+text is asserted to have room for it: `scrollHeight` against `clientHeight`,
+which is the vertical twin of the heading check, and excludes real scrollers by
+their own `overflow`. Whether anybody can press it is not part of the question,
+which is the point.
+
+**Its threshold is measured, not chosen.** The first version did the arithmetic
+itself — font-size times 1.1 plus padding plus borders — and put nine tab
+buttons at 104x44 one pixel under a "need" of 45: nine false positives against
+one real find. Asking the browser instead fixed that and left a different
+problem, a >1px test reporting every glyph whose line box runs a hair past its
+padding. Measured: the collapsed cue wants 21px in 8, a shortfall of **13**,
+while the zoom buttons want 45 in 42 (**3**) and a `.seg` chip wants 14 in 12
+(**2**). A container-collapsed box is an order-of-magnitude mismatch, so the
+gate sits at 6, in the gap. Made to fail once: the old `align-items: stretch`
+planted back into the BUILT stylesheet, named as `span 44x10, content wants 21
+in 8` and nothing else, then restored byte-identical.
+
+The heading check rides the per-tab loop and runs in both scroll states, because
+the tight one only exists after an interaction.
+
+Hub LESSONS §309 carries what generalises: adding surfaces widens a sweep along
+one axis only, and none of these three would have been found by visiting more
+pages.

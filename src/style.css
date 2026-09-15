@@ -215,6 +215,15 @@ select, button {
   border-radius: 9px;
   padding: 8px;
   font: 0.8125rem/1.2 var(--ui);
+  /* THE FLOOR LIVES HERE, because 8px of padding round a 0.8125rem line is a
+     34px control and that is what the panel was full of. Measured the first
+     time anything looked: SEVENTY-ONE controls under 44 across the twelve
+     tabs — Export & Save among them, at 34px, which is this app's primary
+     action. They were invisible to the accessibility sweep because a tab that
+     is not selected is `hidden`, the same way crop mode was.
+     A floor can only grow a control, so anything already clearing 44 keeps the
+     size it was given. */
+  min-height: 44px;
 }
 button:active { background: var(--surface-3); }
 /* Toggled-on controls (looks, swap, toggles, pressed bar buttons). */
@@ -549,7 +558,14 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   position: relative;
   width: auto; /* the generic panel button is full-width; chips wrap in a row */
   flex: none;
-  min-height: 34px;
+  /* 44 IN THE BOX, not 34 plus an extension that cancels itself. The ±5px
+     ::before here made 44 on paper and measured 34: the chips sit in a gapped
+     row, so each one's extension is covered by its NEIGHBOUR'S, and a probe at
+     the edge returns the neighbour rather than the chip. Two controls each
+     reaching into the other's space give neither of them the reach.
+     Same lesson as .ratio-chip, which hit the floor exactly and lost a pixel to
+     rounding: aim past the floor, and put it where nothing can take it away. */
+  min-height: 44px;
   padding: 6px 12px;
   border-radius: 8px;
   border: 1px solid var(--line-2);
@@ -558,7 +574,6 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   font: 500 0.75rem/1.2 var(--ui);
   cursor: pointer;
 }
-.mix-chip::before { content: ""; position: absolute; inset: -5px; } /* 44px hit extension */
 .mix-chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
 
 /* Sticker picker hierarchy — the three tiers must read as distinct levels (owner,
@@ -687,8 +702,14 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 .lut-row button::before { content: ""; position: absolute; inset: -6px; } /* 44px hit extension */
 /* The per-slot ⋯ button: compact like its Save/Load siblings, with the house
    invisible hit-area extension to the 44px minimum. */
-.slot-more { position: relative; min-width: 40px; }
-.slot-more::before { content: ""; position: absolute; inset: -6px; }
+/* 44 WIDE IN THE BOX. The ±6px ::before below made 52 on paper and measured 40:
+   it sits at the end of a gapped row beside Save and Load, whose own boxes now
+   fill their side of that gap, so the probe at its left edge returns the
+   neighbour. Third instance of the same thing today — .ratio-chip lost a pixel
+   to rounding, .mix-chip's extensions cancelled against each other's, and this
+   one is cancelled by a plain sibling. An extension only works where there is
+   empty space to extend INTO, and in a row of controls there is not. */
+.slot-more { position: relative; min-width: 44px; }
 
 /* Batch-start chooser: pick the grade that goes on every photo. */
 #batchDlg { max-height: min(86vh, calc(100dvh - 2rem)); }
@@ -2219,8 +2240,10 @@ label.open-btn, label.bar-btn {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 5px;
-  padding: 12px 12px 0;
-  flex: none;
+  /* Inside the scroller now, so it carries no side padding of its own — the
+     body already has it — and the bottom gap is what separates it from the
+     heading that pins below. */
+  padding: 4px 0 10px;
 }
 .ptab {
   width: 100%;
@@ -2243,10 +2266,72 @@ label.open-btn, label.bar-btn {
    (see the media query below), so this grouping is a wide-layout fact, not a
    guarantee — the tabs are labelled, and the row a tab sits in is not what
    tells you what it does. */
-.section-head { flex: none; padding: 12px 14px 8px; }
+/* PINNED TO THE TOP OF THE SCROLLER, now that the chooser scrolls past it.
+   The heading is the only thing on screen that says which tab you are in once
+   the grid has gone, so it is the one piece of chrome worth the height. Opaque,
+   and spanning the body's padding, so content passing underneath is covered
+   rather than showing through it. */
+.section-head {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--surface);
+  margin: 0 -14px;
+  padding: 10px 14px 8px;
+  /* A ROW, because the two controls that ride it would each otherwise cost a
+     full-width line of permanent chrome. It wraps rather than crushing the
+     title: at a phone width the sub-line is dropped (see the narrow media
+     query) and the buttons take the second line if they still do not fit. */
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 10px;
+  /* THE HEIGHT IT WILL HAVE WHEN SCROLLED, held from the first frame. Sections
+     appears at scrollTop 12 and it is a 44px target, so without this the pinned
+     bar jumped 54px -> 62px here and 32px -> 58px on a phone at the moment you
+     started scrolling, shoving the content you were reading. Reserved instead:
+     44 of target plus the 18 of padding above. */
+  min-height: 62px;
+}
+.section-head-txt { flex: 1 1 auto; min-width: 0; }
+.section-title, .section-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* THE SUB-LINE GIVES WAY TO THE BUTTON, rather than being quietly clipped.
+   Sections appears exactly when the row runs out of width — on the iPad sidebar
+   its 89px left the Grade tab's sub 10px short, "…grain & vignette" ending in an
+   ellipsis nobody would have looked for. It is elaboration, and by the time you
+   have scrolled far enough to want the button you have been in the tab long
+   enough not to need it. The title, which is the fact, stays. Nothing moves:
+   .section-head reserves the button's height from the first frame. */
+.section-head.chose .section-sub { display: none; }
 .section-title { margin: 0; font: 600 0.9375rem/1.2 var(--display); color: var(--txt); }
 .section-sub { margin: 2px 0 0; font-size: 0.75rem; line-height: 1.35; color: var(--txt-3); }
+/* THE HEADING CARRIES ONE CONTROL, and the row must not wrap.
+   It carried two, and on the iPad sidebar — ~350px, narrower than a phone's
+   full-width panel — the title plus 89px of "Sections" plus 150px of
+   "Explanations" did not fit, so the heading went 62px to 114px at the exact
+   moment Sections appeared. A pinned bar that grows 52px as you scroll past it
+   is worse than the row it replaced. Explanations went back to the chooser;
+   this stays nowrap so nothing can reintroduce the wrap silently. */
+.section-back {
+  flex: none;
+  width: auto;
+  white-space: nowrap;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line-2);
+  background: transparent;
+  color: var(--txt-2);
+  font: 500 0.78125rem/1.2 var(--ui);
+  touch-action: manipulation;
+}
+.section-back:active { background: var(--surface-3); }
 .panel-body {
+  /* SET FROM THE ELEMENT, not typed. The scroll cue has to clear the pinned
+     heading, and the heading's height now depends on whether its row wraps —
+     so main.ts measures .section-head and writes this. The value here is the
+     unwrapped height, used only for the frame before the observer first runs. */
+  --section-head-h: 60px;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -2348,6 +2433,11 @@ label.open-btn, label.bar-btn {
 #panel label small { color: var(--txt-3); font-weight: 400; }
 #panel .band label, #panel .subcard label { min-height: 40px; }
 #panel section > button { margin: 6px 0; }
+/* THE PRIMARY ACTION GETS AIR. Its own 6px margin collapses against the 6px on
+   the .note below it, so the "also applies to Batch process" sentence read as
+   attached to the edge of Export & Save — one filled full-width block with a
+   line of grey text stuck to it. */
+#panel section > button.primary { margin: 16px 0 12px; }
 #panel .mask-add button, #panel .mask-editor-actions button, #panel .slot button, #panel .looks-grid button { margin: 0; }
 
 /* A native dialog: the dialog IS the centred card slot (auto-centred by the
@@ -2514,9 +2604,11 @@ label.open-btn, label.bar-btn {
 .a2hs button { width: auto; padding: 5px 10px; font-size: 0.8125rem; }
 .a2hs .a2hs-close { background: none; border: none; color: var(--txt-3); font-size: 0.875rem; cursor: pointer; padding: 12px; margin: -12px; }
 .hsl-chips { display: flex; gap: 8px; margin: 10px 0; flex-wrap: wrap; justify-content: center; }
+/* 44, and they wrap: eight swatches at 44 do not fit one panel row, and a row
+   that wraps is better than a swatch nobody can hit. */
 .hsl-chip {
-  width: 28px;
-  height: 28px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   border: 2px solid rgba(255, 255, 255, 0.15);
   padding: 0;
@@ -2624,7 +2716,7 @@ label.open-btn, label.bar-btn {
      accessibility failure for another. Four columns is three rows and 140px,
      so the target is honoured and the strip costs 16px more than the 28px
      version it replaces rather than 72px. */
-  .panel-tabs { grid-template-columns: repeat(4, 1fr); padding: 8px 10px 0; gap: 4px; }
+  .panel-tabs { grid-template-columns: repeat(4, 1fr); padding: 4px 0 8px; gap: 4px; }
   /* Vertical padding is NOT reduced here. The base rule spends 15px a side to
      reach a 44px target and says so; this override cut it to 7px and took the
      tabs to 28px — so the touch floor held at every width EXCEPT the one where
@@ -2635,6 +2727,15 @@ label.open-btn, label.bar-btn {
      narrow layout its width. */
   .ptab { padding-left: 4px; padding-right: 4px; }
   .panel-body { padding: 2px 10px 12px; }
+  /* THE HEADING SPANS THIS PADDING, NOT THE WIDE ONE. Its negative margin has
+     to match whatever .panel-body is spending here, or the pinned bar either
+     stops short of the edge or overhangs it — and either way content scrolling
+     under it shows past its corner. */
+  .section-head { margin: 0 -10px; padding: 8px 10px 6px; min-height: 58px; }
+  /* THE SUB-LINE GOES, so the heading row stays one line with its two controls
+     on it. The title still names the tab and the tab itself is still lit in the
+     grid; the sub-line is the elaboration, and it is the part that can go. */
+  .section-sub { display: none; }
   #panel label { min-height: 40px; padding: 4px 0 6px; }
   #panel .band label, #panel .subcard label { min-height: 36px; }
   #stage { padding: 8px; }
@@ -2688,6 +2789,14 @@ label.open-btn, label.bar-btn {
   position: sticky;
   display: flex;
   justify-content: flex-end;
+  /* NOT `stretch`, which is the default. This is a flex container with
+     `height: 0` — deliberately, so the cue floats without taking space in the
+     flow — and a stretched flex item is sized to its CONTAINER. So the pill was
+     stretched to zero: 10px tall, all of it padding and border, with the arrow
+     drawn OUTSIDE it underneath. That is the flat pill with a triangle hanging
+     off it that shipped, on both cues, for as long as they have existed.
+     `flex-start` sizes the item from its own content instead. */
+  align-items: flex-start;
   padding-right: 8px;
   height: 0;
   overflow: visible;
@@ -2709,7 +2818,14 @@ label.open-btn, label.bar-btn {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
   white-space: nowrap;
 }
-.scroll-cue.up { top: 4px; }
+/* BELOW THE PINNED HEADING, not on top of it. The up-cue sticks to the top of
+   the scroller and so does the section heading, so with the heading pinned the
+   two landed in the same place and the arrow sat on the word "Export". Its own
+   comment says it is placed where nothing is written — that was true while
+   nothing else was pinned there.
+   The offset is the heading's height, declared once beside it and used by both,
+   because two numbers for one measurement is how they come to disagree. */
+.scroll-cue.up { top: calc(var(--section-head-h) + 4px); z-index: 4; }
 .scroll-cue.down { bottom: 10px; }
 .scroll-cue.down span { transform: translateY(-100%); }
 
@@ -3289,11 +3405,26 @@ li.plat-you { font-weight: 600; }
 .help-sec > summary:focus-visible { outline: 2px solid var(--focus, currentColor); outline-offset: 2px; border-radius: 6px; }
 
 /* The explanations toggle, and the panel without them. */
+/* The chooser's own preference row: under the tab grid, inside the scroller,
+   right-aligned so it reads as an aside to the grid rather than a first item. */
+.panel-prefs { display: flex; justify-content: flex-end; padding: 0 0 8px; }
+/* IT LIVES WITH THE CHOOSER NOW. It was `display: block; width: 100%;
+   text-align: left` — a bare word, left-aligned, in a full-width bordered box
+   at the top of the panel, which is the shape of a section LABEL rather than a
+   control, and it cost 52px of permanent chrome for a preference set once.
+   Its state is the .seg word beside it (main.ts), not the shade of its text:
+   --txt-2 against --txt-3 is two greys, and colour alone carrying a state is a
+   fail state here. The greying stays as a SECOND cue, never the only one. */
 .panel-notes-toggle {
-  display: block;
-  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  /* The base `select, button` rule is `width: 100%`, so dropping the explicit
+     one here left it full-width anyway — a bordered box spanning the panel,
+     which is the label shape this was moved out of. */
+  width: auto;
   min-height: 44px;
-  margin: 0 0 8px;
+  margin: 0;
   padding: 6px 12px;
   border-radius: 10px;
   border: 1px solid var(--line-2);
