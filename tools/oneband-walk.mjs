@@ -111,6 +111,20 @@ try {
   check("2 the button exists and says what it will do next", label, "Back to the camera's colour");
   check("3 pressing it CHANGES THE PICTURE, not just the label", moved > 12, true);
 
+  // THE SECOND PRESS, which nothing asserted and which did not work.
+  // Check 3 proved the first press changes the picture; the label flipped on
+  // every press after that and the picture never moved again. A toggle is two
+  // states, and a walk that only exercises the first one measures half a
+  // control — the same half-measurement as check 2 asserting the label.
+  await p.evaluate(() => document.getElementById("lookForceBalance")?.click());
+  await p.waitForTimeout(1600);
+  const backAgain = await shot();
+  check("3b and pressing it again puts the picture back", 
+    Math.abs(backAgain.r - before.r) < 6 && Math.abs(backAgain.b - before.b) < 6, true);
+  console.log(`        back      rgb(${backAgain.r},${backAgain.g},${backAgain.b}) — opened at rgb(${before.r},${before.g},${before.b})`);
+  await p.evaluate(() => document.getElementById("lookForceBalance")?.click());
+  await p.waitForTimeout(1600);
+
   await p.keyboard.press("Control+z");
   await p.waitForTimeout(1200);
   const undone = await shot();

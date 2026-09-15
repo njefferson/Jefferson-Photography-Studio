@@ -1769,14 +1769,27 @@ telling you the repaint is missing.
 Fixed in the app — `updateSessionStrip()` inside the `then`, at the moment the
 answer changes — and the wait came back out of the walk.
 
-**And the walk needed one more correction to be able to see it at all.** With
-the wait removed it still passed against the unfixed app, because `heldCount`
-opens and closes the version dialog first, and that round trip is a repaint plus
-the better part of a second — long enough to correct a stale strip before the
-check meant to catch it looks. The tile is read FIRST now, which is also what
-the reader sees: the strip the moment they land on the next photo. Read in that
-order the walk fails on the unfixed build and passes on the fixed one, on an
-idle machine, with no load required.
+**CORRECTION, 2026-09-15 — the paragraph that stood here claimed too much.** It
+said the walk "fails on the unfixed build and passes on the fixed one, on an
+idle machine, with no load required". That was true of the run it was written
+from and is not a property of the test. Re-run the next day, the control — the
+repaint deliberately removed — comes back GREEN in all three shapes the check
+has taken: read immediately, wait for the release then read, and sample the
+release count and the title together in one page turn. Every poll is a round
+trip, and an incidental repaint reliably lands inside one.
+
+So the check asserts the OUTCOME a reader sees — leave a decided photo and its
+tile says it reopens from the saved copy — and attributes it to nothing. The
+atomic sample is still the right shape, because it is the only one that is
+stable under load: reading immediately races the save, and waiting first lets a
+repaint in. `updateSessionStrip()` stays in the release because it removes the
+dependence on an accident, not because anything here can see it do so.
+
+**The general form, which is the part worth keeping:** an instrument outside the
+page cannot attribute an effect that something else in the page also produces.
+A control that will not go red is not a weak control — it is the test telling
+you it cannot answer the question being asked of it, and the honest response is
+to narrow the claim rather than to keep hunting for a shape that gets lucky.
 
 ## The crop bar had never been measured, 2026-09-14
 
