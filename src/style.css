@@ -582,7 +582,15 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
    STICKER = plain (add-only, never a persistent selected state). The ✓ text
    prefix carries selection independent of colour (grayscale-safe). */
 #stickerGroups { border-bottom: 1px solid var(--line); padding-bottom: 10px; margin-bottom: 8px; }
-#stickerGroups .mix-chip { min-height: 40px; padding: 8px 15px; font-size: 0.8125rem; font-weight: 600; }
+/* 44, NOT 40. This is the top tier of the sticker picker's three, and it was
+   written to look bigger than the category chips below it — which it does, on
+   width and weight. The min-height was the one part of "bigger" that made it
+   SMALLER than the floor, and an id selector beats the .mix-chip class, so the
+   floor never reached these four. They were also the last thing in the panel to
+   be measured: the row is `hidden` until the sticker catalogue loads, so a
+   sweep that clicks the tab and looks 260ms later finds nothing here and says
+   every control passed. */
+#stickerGroups .mix-chip { min-height: 44px; padding: 8px 15px; font-size: 0.8125rem; font-weight: 600; }
 #stickerCats .mix-chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--txt); }
 
 /* The add-a-sticker grid: a thumbnail of each piece with its label beneath, so
@@ -3409,16 +3417,15 @@ li.plat-you { font-weight: 600; }
    right-aligned so it reads as an aside to the grid rather than a first item. */
 .panel-prefs { display: flex; justify-content: flex-end; padding: 0 0 8px; }
 /* IT LIVES WITH THE CHOOSER NOW. It was `display: block; width: 100%;
-   text-align: left` — a bare word, left-aligned, in a full-width bordered box
-   at the top of the panel, which is the shape of a section LABEL rather than a
-   control, and it cost 52px of permanent chrome for a preference set once.
-   Its state is the .seg word beside it (main.ts), not the shade of its text:
-   --txt-2 against --txt-3 is two greys, and colour alone carrying a state is a
-   fail state here. The greying stays as a SECOND cue, never the only one. */
+   text-align: left` — a full-width bordered box at the top of the panel, and it
+   cost 52px of permanent chrome for a preference set once. Now it scrolls away
+   with the grid it belongs to and takes only the width of its own words.
+   ITS STATE IS THE LABEL (main.ts sets it), not the shade of its text: --txt-2
+   against --txt-3 is two greys, and colour alone carrying a state is a fail
+   state here. The greying stays as a SECOND cue, never the only one. */
 .panel-notes-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
   /* The base `select, button` rule is `width: 100%`, so dropping the explicit
      one here left it full-width anyway — a bordered box spanning the panel,
      which is the label shape this was moved out of. */
