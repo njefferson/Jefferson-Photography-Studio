@@ -14866,3 +14866,41 @@ built artefact. It was still obeyed rather than edited — changing a control so
 one's own commit passes is the same act whatever the justification, and a
 one-time preview re-render is a small price. **Improving the gate to hash the
 build is the owner's call, recorded here rather than taken.**
+
+## The waiting-export line, said twice and said every launch, 2026-09-15
+
+**Reported from the device with a screenshot: the same sentence printed twice,
+on the start screen, over the button that opens a photo, on every open.**
+
+**Said twice, and the comment forbidding it was already there.**
+`showExportStrip` builds the waiting sentence itself from `exportCount`, and
+says so in capitals directly above itself — that no caller may pass it in,
+because one already had and the line came out twice. The start-up caller at
+`src/main.ts` then passed `"${exportCount} exported, not yet saved"` in as its
+text, and the function appended its own identical copy underneath. A reader with
+one unsaved file was told twice and counted two.
+
+That is this session's contract rule with the bill attached, on the same day it
+was written: a rule stated in prose, in the right place, in capitals, stopped
+nothing. The caller now passes an empty string, and the walk below refuses the
+old shape.
+
+**Said every launch.** `clearExportStrip` hid the line for the session only, so
+an unsaved export re-announced itself on every open. It is remembered now, keyed
+to HOW MANY are waiting, and the key is cleared at zero. The third case is the
+one worth keeping: a NEW export brings the line back, because dismissing a line
+is not an instruction to hide a file the reader has never seen. The easy fix —
+one dismissed flag — hides it for ever, and would have shipped without that
+case in the walk.
+
+**`tools/waiting-export-walk.mjs`, and it joins the sweep automatically** since
+walk-all globs `*-walk.mjs`. Made to fail first: against the build before the
+fix it reports the doubled line on launch 1, the nag on launch 2, and the
+doubled line again on launch 3 — three failures, matching the screenshot.
+
+**One instrument correction.** The first plant guessed the export store's schema
+(`ips-exports` v1, a `frames` store) and the walk passed vacuously — nothing was
+planted, so nothing was shown, and launch 1 read "not mentioned at all". The
+real shape is v2 with a `meta` store keyed on `name`, which is what `frameCount`
+counts. A walk that plants its own fixture has to be checked for whether the
+plant took.

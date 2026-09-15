@@ -11042,7 +11042,16 @@ let exportCount = 0;
  *  THE FILE IN HAND IS ALSO IN THE COLLECTION, so neither the count nor the
  *  second button may describe it either. One export, just finished, is
  *  "Ready — name · size" and one Save button; a collection is only a collection
- *  once there is something in it besides the one on offer. */
+ *  once there is something in it besides the one on offer.
+ *
+ *  Takes `text`, the sentence about the file just finished — EMPTY when there is
+ *  no such file, never the waiting sentence — and `opts`, which of the buttons
+ *  to offer: `actions` for the row at all, `save`, `retry`, `stop`.
+ *  Shows the floating line, or hides it when there turns out to be nothing to
+ *  say. Returns nothing.
+ *  The waiting sentence and the Save-all button are built HERE from
+ *  `exportCount`, so they cannot disagree with each other; a caller that
+ *  supplies either gets it printed twice. */
 function showExportStrip(text: string, opts: { actions?: boolean; save?: boolean; retry?: boolean; stop?: boolean } = {}): void {
   const alsoWaiting = exportCount - (pendingExport ? 1 : 0);
   const lines = [text.trim(), alsoWaiting > 0 ? `${exportCount} exported, not yet saved` : ""].filter(Boolean);
@@ -11062,8 +11071,15 @@ function showExportStrip(text: string, opts: { actions?: boolean; save?: boolean
  *  away and then immediately show it again whenever anything was collected,
  *  which is not something a button called Dismiss can do. The files are kept —
  *  dismissing a status line is not a decision to throw away something you made —
- *  and the way back to them is the row in the Export panel. */
+ *  and the way back to them is the row in the Export panel.
+ *
+ *  Takes nothing. Hides the line, forgets any file being offered, and records
+ *  the dismissal so it does not come back on the next launch for the same set
+ *  of files. Returns nothing.
+ *  The files themselves are untouched — `updateExportWaitingRow` still shows
+ *  them in the Export panel, which is the way back. */
 function clearExportStrip(): void {
+  rememberDismissal(exportCount);
   pendingExport = null;
   exportStrip.hidden = true;
   exportStripActions.hidden = true;
@@ -11072,6 +11088,35 @@ function clearExportStrip(): void {
 }
 
 exportDismiss.addEventListener("click", clearExportStrip);
+
+const DISMISS_KEY = "ips-exports-dismissed";
+
+/** Remember that the reader has put the waiting-exports line away.
+ *  Takes `count`, how many exports were waiting at the moment they dismissed it.
+ *  Stores that number, or forgets the whole thing when nothing is waiting, and
+ *  returns nothing.
+ *  PAIRED WITH `launchDismissed`, which is the only reader of this value — the
+ *  two must agree on the key and on what the number means, or the line either
+ *  nags for ever or hides a file the reader has not seen. Clearing at zero is
+ *  what stops a dismissal at one export from silently hiding the NEXT one. */
+function rememberDismissal(count: number): void {
+  try {
+    if (count > 0) localStorage.setItem(DISMISS_KEY, String(count));
+    else localStorage.removeItem(DISMISS_KEY);
+  } catch { /* private window: the line simply returns next launch */ }
+}
+
+/** Whether the waiting-exports line was already dismissed for this exact set.
+ *  Takes `count`, how many exports are waiting right now.
+ *  Returns true when the reader dismissed the line while that same number was
+ *  waiting — so it stays away on the next launch — and false whenever the
+ *  number has changed, because a new export is news and has never been seen.
+ *  Read at start-up only. A push during the session shows regardless: dismissing
+ *  a line is not a standing instruction to hide the file you just made. */
+function launchDismissed(count: number): boolean {
+  try { return localStorage.getItem(DISMISS_KEY) === String(count); }
+  catch { return false; }
+}
 
 /** THE WAY BACK, in the panel the reader already opens to export. The floating
  *  line is the push — here is the file you just made; this is the pull — here is
@@ -11928,7 +11973,12 @@ recoverBtn.addEventListener("click", async () => {
   // reader made on purpose and has not handed over yet.
   try {
     exportCount = await EXPORTS.frameCount();
-    if (exportCount) showExportStrip(`${exportCount} exported, not yet saved`, { actions: true });
+    // EMPTY TEXT ON PURPOSE. showExportStrip owns the waiting sentence and says
+    // so above itself; this caller passed its own copy in and the strip appended
+    // the identical line underneath, so a reader with one unsaved file was told
+    // twice and counted two. The comment forbidding exactly this was already
+    // there — prose alone did not stop it.
+    if (exportCount && !launchDismissed(exportCount)) showExportStrip("", { actions: true });
   } catch {
     /* no IndexedDB — exports still save one at a time */
   }
