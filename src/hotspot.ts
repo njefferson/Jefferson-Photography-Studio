@@ -61,6 +61,55 @@ export function hasColour(p: StoredProfile | null): boolean {
   return !!p && p.kr.some((v) => Math.abs(v - 1) > 1e-4);
 }
 
+/** WHICH PROFILE SUPPLIES WHICH HALF OF THE LENS CORRECTION.
+ *
+ *  Takes `measured`, the reader's own profile for this frame's EXIF (null when
+ *  they have none), and `shipped`, the profile from the table that ships with
+ *  the app (null when nothing matched).
+ *  Returns `{ colour, bump, brightness }` — the profile whose `kr`/`kb` to
+ *  apply, the radial brightness curve to apply, and the profile that curve came
+ *  from so a report can NAME it. Any of the three may be null.
+ *
+ *  THE RESULT IS WHAT EVERY RENDER PATH MUST USE — the open photograph's GPU
+ *  upload (`syncLensTexture`), the thumbnails (`lensCurveFor`), the export, and
+ *  both halves of the diagnostic. Three of those carried their own copy of this
+ *  rule and one of them had a different rule, which is the defect this exists to
+ *  make impossible: a reader's measurement with no brightness curve took the
+ *  open photograph's brightness correction away while the thumbnails kept it,
+ *  so the strip showed a corrected hot-spot and the photograph above it did not.
+ *
+ *  The rule, and both clauses are load-bearing. ONE PROFILE, WHOLE: a
+ *  measurement that carries a brightness curve supersedes the shipped one in
+ *  full, because taking half of each means two ideas of where the frame's centre
+ *  is. AND NEVER LOSE A HALF NOBODY MEASURED: a measurement's `bump` comes back
+ *  as a RANGE rather than a correction and is often absent, and "supersedes in
+ *  full" must not mean superseding a correction that exists with one that does
+ *  not. Both profiles are matched against the same frame's EXIF, so the fallback
+ *  is never another lens.
+ *
+ *  Colour is withheld from a shipped profile that has none rather than applied
+ *  as a flat 1 — see `hasColour`. */
+export function lensHalves(
+  measured: StoredProfile | null | undefined,
+  shipped: StoredProfile | null | undefined,
+): {
+  colour: StoredProfile | null;
+  bump: ArrayLike<number> | null;
+  brightness: StoredProfile | null;
+} {
+  const mine = measured ?? null;
+  const theirs = shipped ?? null;
+  // `brightness` is worked out HERE and not by the caller, because the caller
+  // that worked it out for itself was the diagnostic, and it named the shipped
+  // profile while the render used the reader's. One rule, one answer, one place.
+  const brightness = mine?.bump ? mine : theirs?.bump ? theirs : null;
+  return {
+    colour: mine ?? (hasColour(theirs) ? theirs : null),
+    bump: brightness?.bump ?? null,
+    brightness,
+  };
+}
+
 /** One bin's gamma-space bump as the linear-space bump that costs the same
  *  light at mid-grey, where a correctly exposed flat sits.
  *
