@@ -125,7 +125,16 @@ export function bumpProblem(a: unknown, n: number): string | null {
   return bandProblem("brightness", a, n, 0, 4);
 }
 
+/** What the last read had to set aside, for the diagnostic report. A profile
+ *  that vanishes without a word is the defect this pair of counters exists to
+ *  make visible — the reader has no other way to know their measurement is not
+ *  being used. */
+export let droppedProfiles = 0;
+export let droppedBumps = 0;
+
 function read(): StoredProfile[] {
+  droppedProfiles = 0;
+  droppedBumps = 0;
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return [];
@@ -134,9 +143,37 @@ function read(): StoredProfile[] {
     // READ IS WHERE A CORRUPT PROFILE ACTUALLY ENTERS. It used to check that kr
     // and kb were arrays and nothing about what was in them, so a stored curve
     // with a zero or a null in it was handed to the pipeline as a measurement.
-    return (v as StoredProfile[]).filter((p) =>
-      p && !colourProblem(p.kr, NBINS) && !colourProblem(p.kb, NBINS)
-        && (p.bump === undefined || !bumpProblem(p.bump, NBINS)));
+    //
+    // A BAD BRIGHTNESS CURVE DROPS THE BRIGHTNESS CURVE, NOT THE MEASUREMENT.
+    // This used to refuse the whole profile when `bump` failed — and `bump` is
+    // the half this file's own header calls a range rather than a correction,
+    // while kr/kb are the half it calls well determined and APPLIED. So a fault
+    // in the part that is not applied by default destroyed the part that is,
+    // and it did it SILENTLY: the reader measured a lens, saw it save, and the
+    // correction never came back. Reported as hot-spot removal that had worked
+    // like magic and then stopped.
+    //
+    // The two doors also disagreed, which is what let a bad curve in. `bumpFrom`
+    // builds the curve from `falloff` and accepts any falloff of two bands or
+    // more, so it returns a curve of THAT length; saveFromPayload validated kr
+    // and kb and never looked at what it had just derived; and read demanded
+    // exactly NBINS. A payload whose falloff was not 80 bands long — an older
+    // rig, which this same function already tolerates elsewhere by design —
+    // saved cleanly and was then invisible for ever.
+    const out: StoredProfile[] = [];
+    for (const p of v as StoredProfile[]) {
+      if (!p || colourProblem(p.kr, NBINS) || colourProblem(p.kb, NBINS)) {
+        droppedProfiles++;
+        continue;
+      }
+      if (p.bump !== undefined && bumpProblem(p.bump, NBINS)) {
+        droppedBumps++;
+        out.push({ ...p, bump: undefined });
+        continue;
+      }
+      out.push(p);
+    }
+    return out;
   } catch {
     return []; // a private window, cleared storage, or something else's key
   }
@@ -295,7 +332,13 @@ export function saveFromPayload(payload: {
       ap: m[3] ? Number(m[3]) || NaN : NaN,
       kr: p.kr,
       kb: p.kb,
-      bump: bumpFrom(p.falloff, p.bump_range),
+      // VALIDATED AT THE DOOR IT IS CREATED AT. Derived here and judged on
+      // read, with nothing checking it in between, is how a profile came to be
+      // saved and then refused for ever. A curve that will not pass the reader
+      // is not stored: the colour half is the measurement's real contribution
+      // and it goes in either way.
+      bump: (() => { const b = bumpFrom(p.falloff, p.bump_range);
+                     return b && !bumpProblem(b, NBINS) ? b : undefined; })(),
       frames: p.frames ?? 0,
       source: p.source ?? "",
       camera: payload.camera ?? "",
@@ -316,10 +359,19 @@ export function saveFromPayload(payload: {
  *  shape comes from `falloff`, which carries hot-spot and vignette together:
  *  its excess over the reference ring, scaled so the centre lands on the low end
  *  of the range, is the hot-spot's part of it. Without a falloff there is no
- *  shape to scale and nothing is applied, rather than a guess at one. */
-function bumpFrom(falloff?: number[], range?: number[]): number[] | undefined {
+ *  shape to scale and nothing is applied, rather than a guess at one.
+ *
+ *  NBINS EXACTLY, because the curve it returns is indexed per radial bin and
+ *  that is the contract the reader enforces. This used to accept any falloff of
+ *  two bands or more and return a curve of THAT length, while the reader
+ *  refused anything that was not NBINS — so a payload from a rig with a
+ *  different band count saved cleanly and was then refused on every read, and
+ *  refused WHOLESALE, taking the colour curves with it. A measured lens stopped
+ *  working and nothing said so. tools/lens-store-check.mjs holds the two ends
+ *  together now. */
+export function bumpFrom(falloff?: number[], range?: number[]): number[] | undefined {
   const lo = range?.[0];
-  if (!Array.isArray(falloff) || falloff.length < 2 || !(typeof lo === "number") || !(lo > 0)) return undefined;
+  if (!Array.isArray(falloff) || falloff.length !== NBINS || !(typeof lo === "number") || !(lo > 0)) return undefined;
   const peak = falloff[0] - 1;
   if (!(peak > 1e-6)) return undefined;
   const scale = lo / peak;

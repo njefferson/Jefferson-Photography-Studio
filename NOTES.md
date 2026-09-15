@@ -14778,3 +14778,55 @@ over the CDP bridge and did 225 full re-renders per frame; it timed out twice
 before producing a single line. Reduced in-page to six numbers per evaluation
 and 25 probes per frame. When a measurement takes ten minutes to say nothing,
 the instrument is the thing to fix first.
+
+## A measured lens that saved fine and then never loaded, 2026-09-15
+
+**Reported as hot-spot removal that had worked like magic and then stopped.**
+The lens code had not changed in days — `5b5cfa7` (2026-09-12) is the last commit
+that touched it, and it is the one that did this.
+
+**Two doors that did not agree.** A stored profile's brightness curve is DERIVED
+on save by `bumpFrom` and JUDGED on read by `bumpProblem`. `bumpFrom` accepted
+any `falloff` of two bands or more and returned a curve of THAT length;
+`saveFromPayload` validated `kr` and `kb` and never looked at what it had just
+derived; and `read()` refused anything that was not exactly `NBINS`. So a payload
+whose falloff was not 80 bands — an older rig, which the same function
+deliberately tolerates elsewhere by design — **saved cleanly and was refused on
+every read afterwards.**
+
+**And refused WHOLESALE.** `bump` is the half this file's own header calls a
+range rather than a correction, and explicitly NOT applied; `kr`/`kb` are the
+half it calls well determined and APPLIED. A fault in the part that is not used
+by default destroyed the part that is — with no message, because the reader was
+a `.filter`. The shipped profile then took over, so the app still showed
+"Hold: No lens fix" and still corrected something. That is why it read as the
+correction having gone weak rather than as a measurement having vanished.
+
+**Three changes.** `bumpFrom` now requires exactly `NBINS`, so the two doors
+agree by construction. `saveFromPayload` validates what it derived rather than
+storing a curve the reader will refuse. And `read()` drops a bad brightness
+curve and KEEPS the profile, so a measurement already stored on a device comes
+back to life on this release rather than needing to be measured again.
+
+**Made to fail first, and the discriminator was not the obvious one.** A lens fix
+being live says nothing about WHOSE profile it is — the shipped one takes over
+silently, which is the whole reason this was invisible. The signal is `#hsCard`:
+main.ts shows the shipped profile's card only when the reader has no matched
+measurement of their own. With a 64-band bump planted: on the build before the
+fix the card appears (measurement lost), on this one it does not (measurement
+kept, colour half correcting the photo). The control — the identical profile with
+an 80-band bump — passes on both.
+
+**`tools/lens-store-check.mjs` holds the two ends together on every commit**, via
+`.branch-guard`'s `also=`. Both functions are pure, so it needs no browser and
+costs milliseconds; it bundles the real ones with esbuild rather than copying
+them. On the code before the fix it fails at every falloff length except 80.
+
+**Two instrument corrections worth keeping.** The first assertion read
+`lensCmpBtn.title`, which `updateLensCmp` only rewrites when the button is
+SHOWN — so it was reading static markup from `ir.html` and reporting the shipped
+profile's wording as if it were live state. The second planted a profile with
+`camera: "NIKON Z 50"` and lost its colour curves to `forCamera`, which blanks
+colour when the profile's camera string and the file's make-plus-model differ.
+Worth knowing in its own right: a profile carrying a camera string that does not
+exactly match the files contributes nothing but brightness.
