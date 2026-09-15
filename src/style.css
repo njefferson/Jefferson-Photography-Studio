@@ -723,17 +723,11 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 #infoDlg li strong { color: var(--txt); font-variant-numeric: tabular-nums; }
 .info-ver { margin: -6px 0 10px; font: 0.6875rem/1.4 var(--mono); letter-spacing: 0.04em; color: var(--txt-3); }
 #infoDlg h3.rm-head { margin: 4px 0 8px; font: 600 0.875rem/1.2 var(--display); }
-.more-row { margin: -8px 0 16px; font-size: 0.75rem; }
-.more-row a {
-  color: var(--accent);
-  text-decoration: none;
-  /* Own-row link: the inline exception does not apply. inline-flex grows the
-     hit area without moving the text (same fix as the hub's footer links). */
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-}
-.more-row a:active { text-decoration: underline; }
+/* .more-row moved to verdlg.css — it is shared chrome, and it lived here, which
+   is a stylesheet Macro Studio does not load. Adding the accessibility and
+   licence rows to that app produced two 19px links against a 44px floor, found
+   by the walk. Third time in this repository: the build stamp and the update
+   strip were the first two. */
 /* The way out to the personal hub. It used to be a fourth grey line among the
    .more-row links and nobody could find it; as a bordered row wearing the hub's
    mark it reads as a destination, which is what it is. */

@@ -1,5 +1,8 @@
 import { writeVersionStamp } from "./verstamp";
 import "./style.css";
+// The shared chrome stylesheet. The editor does not use verdlg.ts yet — see the
+// note there — but it uses .more-row, which now lives beside it.
+import "./verdlg.css";
 import { importFile, type ImportedFile, type ImageKind } from "./import";
 import { wireForceUpdate, wireUpdateStrip, setUpdateCost } from "./swupdate";
 import { type DecodedImage, pickLargestPreview, linearAt } from "./decode";

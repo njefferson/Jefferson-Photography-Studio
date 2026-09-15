@@ -1973,6 +1973,94 @@ survived — it always did, and the walk reported REUSED eight times about code
 that was working. An expando property is not cloned. The failing check was
 right that something was wrong and wrong about what: the instrument.
 
+## Macro Studio — not right yet
+
+The list the app shows behind its build stamp. §7d asks patch notes to carry
+what is STILL BROKEN, not only what changed, and this app had no such surface at
+all. Every line here is a limitation the app already states somewhere in its own
+help — this makes it one list, in the place a reader looks when something seems
+wrong, from one source.
+
+Checkbox bullets, parsed at build time by `checklist()` in vite.config.ts, same
+as the editor's roadmap. Tick one when it stops being true.
+
+- [ ] **JPEG and PNG only** — a focus-shift burst shot as raw has to be exported
+  to JPEG first. The stacker never sees the raw data.
+- [ ] **Nothing is kept** — there is no session to come back to. Close the tab or
+  press New set and the frames are gone; the saved image is the only thing that
+  survives, so save before leaving.
+- [ ] **The screen shows a preview, not the file** — the stack on screen is built
+  at a reduced size so it lands in seconds. Export full-res renders it again at
+  the frames' own size and takes about a minute.
+- [ ] **No alignment control** — frames are aligned automatically or not at all.
+  A burst that drifted too far cannot be nudged by hand.
+- [ ] **No practice set of its own** — the editor ships 44 practice photographs
+  to learn on; this app's Try a practice set fetches one small burst, and there
+  is nothing to try a second technique against.
+
+## Macro Studio gets the baseline it never had, 2026-09-15
+
+**This repository has two apps and the standing baseline is per APP.** §7d asks
+for patch notes including what is still broken; §7e for the accessibility
+statement and the licence and a way to report a problem; §7f for a text
+diagnostic. The editor has had all of them for releases. Macro Studio had a
+version stamp — added yesterday, after shipping without one for its whole life —
+and nothing behind it.
+
+The hub's per-app list is explicit that it has been wrong in both directions and
+that a session should **check the repo rather than the line**. Checked: every
+one of those was missing here, measured by opening the app rather than by
+reading a file.
+
+**`src/verdlg.ts` + `src/verdlg.css`** — a shared "This build" panel, opened
+from the stamp:
+
+- **what changed**, from `__CHANGELOG__`, which vite already generates from the
+  git log and the editor already renders. One source, two readers, rather than a
+  second list that can disagree with the first.
+- **what is not right yet**, from a `## Macro Studio — not right yet` section in
+  this file, parsed by the same `checklist()` the roadmap uses. §7d asks for
+  this and it is the half that gets dropped: a release note listing only
+  improvements reads as a claim that everything else works.
+- **the §7f report**, and a link to the test page.
+
+The Help panel gained the accessibility statement, the licence, and a
+"Something's wrong — the report to send" button.
+
+**NOT adopted by the editor**, and the module says so in its own header. `ir.html`
+carries its own `#verDlg` markup and wiring with a Lens button this has no notion
+of; folding that in belongs in the next change that opens it, not in a release
+fixing something else.
+
+### Four defects, all found by gates, all introduced by this change
+
+**The report named the wrong app.** `buildDiagnostic` hardcoded "Infrared
+Photography Studio" — true while the editor was its only caller. Macro Studio's
+first report opened by naming the other app. A report whose first line is wrong
+about which app produced it is worse than no report: everything under it is then
+read against the wrong one. The name is a parameter now, defaulted so the
+editor's call site is unchanged.
+
+**Two new links at 19px.** The accessibility and licence rows use `.more-row`,
+styled in `style.css` — which Macro Studio does not load. **Third time in this
+repository**: the build stamp and the update strip were the first two. The rule
+MOVED to `verdlg.css` rather than being copied into `macro.css`, because two
+stylesheets with one rule is how "which is current" acquires two answers.
+
+**A dialog built in script was invisible to the surface gate.**
+`tools/surfaces.mjs` checks declarations against the built MARKUP, and this
+dialog is appended at boot, so declaring it read as an entry pointing at
+nothing — the gate telling the truth about what it could see and returning the
+wrong answer. It checks the built SCRIPTS for the id now when no markup has it,
+which keeps both directions: a declaration must correspond to something that
+deploys, and cannot be satisfied by nothing.
+
+**And one line of the not-right-yet list was wrong when written.** It said
+nothing measures this app on the device; `macro.html` has been in the a11y
+walk's surface list all along. Corrected before it shipped, which is the only
+reason it is a footnote rather than a finding — a list of known limitations is
+read as authoritative, and an invented one is worse than a missing one.
+
 ## Shipped (roadmap archive)
 
 - [x] **Four ways a tile lied about its photograph** — SHIPPED 2026-09-14 to
