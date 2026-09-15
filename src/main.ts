@@ -463,6 +463,11 @@ function updateMyLensUI() {
         ` which carry the camera's own processing as well as the lens;` +
         ` a raw-measured profile is supplying the colour instead`
       : "") +
+    (halves.outreached
+      ? ` — it is measured too far from this frame to answer for it, so the profile` +
+        ` that came with the app is being used instead. Measure this lens near the` +
+        ` settings you shoot and yours takes over again.`
+      : "") +
     (myLens.note ? ` — ${myLens.note}` : "") +
     (params.lensBypass ? " · bypassed" : "");
 }
@@ -599,6 +604,15 @@ function lensDiagnostic(): string {
       ? ` · YOUR ${halves.heldBack.source || "stored"}-measured colour is held back:` +
         ` it measured the camera's rendering as well as the lens, and a raw-measured` +
         ` profile is available — brightness still comes from yours`
+      : "") +
+    // STOOD DOWN ON FIT, which is a different reason from provenance and has to
+    // read as one: the reader's measurement is fine, it is just not a
+    // measurement OF THIS FRAME. The two reaches are printed because "too far"
+    // is a comparison, and a verdict without both numbers cannot be argued with.
+    (halves.outreached && mine
+      ? ` · YOUR PROFILE STANDS DOWN ON FIT: measured at ${mine.fl}mm` +
+        `${Number.isFinite(mine.ap) ? ` f/${mine.ap}` : ""}, reaching ${mine.reach?.toFixed(2)}` +
+        ` where the shipped table reaches ${shipped?.reach?.toFixed(2)} (one stop is 0.35)`
       : "") +
     // A measurement set aside on read is invisible to the reader by
     // construction: the app falls back and keeps working. Say it here.

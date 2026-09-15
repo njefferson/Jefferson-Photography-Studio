@@ -75,6 +75,16 @@ export interface StoredProfile {
   /** Present when this is a blend of two measurements rather than one of them,
    *  so the panel can say so and a test can tell the two apart. */
   blend?: { loFl: number; hiFl: number; t: number };
+  /** HOW FAR THE MATCHER HAD TO REACH to answer for this frame, as a log
+   *  distance: aperture ratio plus however far outside the set's focal range the
+   *  frame falls, zero when the set brackets it. One stop is 0.347.
+   *
+   *  Set by the matcher, never stored, and undefined when the frame carries no
+   *  focal length — there is no reach to report without something to measure
+   *  against, and a missing measurement must not read as a good one. It exists
+   *  so precedence can weigh FIT as well as ownership: a store holding one
+   *  profile answered for every frame, at any aperture, at full strength. */
+  reach?: number;
 }
 
 /** THE SHAPE A CURVE HAS TO HAVE TO BE APPLIED AT ALL.
@@ -512,6 +522,9 @@ function matchAny(list: StoredProfile[], ex: ExifSubset | null): StoredProfile |
   // and add without a fudge factor.
   let best: StoredProfile[] = [];
   let bestCost = Infinity;
+  // Declared here so every return below carries it. The returns ABOVE this
+  // point are the ones with nothing to measure — no lens, no profiles, no focal
+  // length — and they deliberately carry no reach at all.
   for (const [k, list2] of sets) {
     const apCost = k === "?" || !Number.isFinite(ap) ? 0.4 : Math.abs(Math.log(Number(k) / ap));
     const fls = list2.map((q) => q.fl);
@@ -522,21 +535,22 @@ function matchAny(list: StoredProfile[], ex: ExifSubset | null): StoredProfile |
   }
 
   // 2. within it, bracket the frame's focal length and blend.
+  const reached = (p: StoredProfile): StoredProfile => ({ ...p, reach: bestCost });
   const by = [...best].sort((a, z) => a.fl - z.fl);
-  if (by.length === 1) return by[0];
-  if (fl <= by[0].fl) return by[0];
-  if (fl >= by[by.length - 1].fl) return by[by.length - 1];
+  if (by.length === 1) return reached(by[0]);
+  if (fl <= by[0].fl) return reached(by[0]);
+  if (fl >= by[by.length - 1].fl) return reached(by[by.length - 1]);
   let lo = by[0], hi = by[by.length - 1];
   for (let i = 0; i < by.length - 1; i++) {
     if (fl >= by[i].fl && fl <= by[i + 1].fl) { lo = by[i]; hi = by[i + 1]; break; }
   }
-  if (lo === hi || lo.fl === hi.fl) return lo;
+  if (lo === hi || lo.fl === hi.fl) return reached(lo);
   const t = logMix(fl, lo.fl, hi.fl);
   // Landing exactly on an anchor is not a blend of anything. Returning a
   // synthetic "blended 0% / 100%" is arithmetically identical and reads to the
   // reader as if the app could not tell where the frame was.
-  if (t <= 0) return lo;
-  if (t >= 1) return hi;
+  if (t <= 0) return reached(lo);
+  if (t >= 1) return reached(hi);
   const n = Math.min(lo.kr.length, hi.kr.length, lo.kb.length, hi.kb.length);
   const kr: number[] = [], kb: number[] = [];
   for (let i = 0; i < n; i++) {
@@ -592,6 +606,7 @@ function matchAny(list: StoredProfile[], ex: ExifSubset | null): StoredProfile |
     camera: lo.camera || hi.camera,
     measured: lo.measured || hi.measured,
     blend: { loFl: lo.fl, hiFl: hi.fl, t },
+    reach: bestCost,
   };
 }
 /** How to describe a match to the reader.

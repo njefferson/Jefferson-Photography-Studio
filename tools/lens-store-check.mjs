@@ -288,5 +288,68 @@ const shippedBumpOnly = prof({ bump: BUMP });
   }
 }
 
+{
+  // A MEASUREMENT TAKEN FAR FROM THE FRAME IS NOT A MEASUREMENT OF THE FRAME.
+  //
+  // With one profile in the store, `matchAny` returned it whatever the frame —
+  // `if (by.length === 1) return by[0]` — so a measurement at 50mm f/13 was
+  // applied to a 57mm f/8 frame at full strength, while a table with 44 anchors
+  // for that lens sat beside it able to interpolate to the frame exactly. The
+  // panel said so in its note and applied it anyway.
+  //
+  // BOTH HALVES STAND DOWN HERE, unlike the provenance rule above, and the
+  // shipped table says why: on the 50-250 at 50mm the centre bump is 0.0241 at
+  // f/8 and 0.0502 at f/13. Brightness is MORE aperture-dependent than colour,
+  // not less — a hot-spot is what stopping down does — so a curve measured a
+  // stop and a half away over-corrects the middle about twofold.
+  //
+  // The reader keeps the benefit of the doubt: their own body and their own copy
+  // of the lens are a real advantage, so this only fires when they are reaching
+  // more than a stop AND the table is at least half a stop closer.
+  const LENS2 = "TEST REACH 50-250mm";
+  const mk = (fl, ap, o = {}) => ({
+    key: `${fl}@${ap}`, model: LENS2, fl, ap, kr: KR_REAL, kb: KR_REAL,
+    bump: curve2(0.05), frames: 2, source: "raw", camera: "BODY", measured: "x", ...o,
+  });
+  const curve2 = (peak) => Array.from({ length: NBINS }, (_, i) => Math.max(0, peak * (1 - i / 20)));
+  // NO make/model ON THE FRAME. `forCamera` withholds colour when both cameras
+  // are known and differ, and a fixture whose camera string does not match the
+  // one `cameraOf` builds gets its colour blanked — which reads as "no colour
+  // matched" and fails this case for a reason that is not the one under test.
+  // It did exactly that on the first run.
+  const frame = (fl, ap) => ({ lens: LENS2, focalLength: [fl, 1], fNumber: [ap, 1] });
+
+  // BOTH SIDES ARE `raw` ON PURPOSE, so this is about reach and nothing else —
+  // otherwise the provenance rule above would hold the colour back and the case
+  // would pass for a reason it is not testing.
+  const store = [mk(50, 13)];
+  const table = [mk(50, 8, { key: "s50f8" }), mk(130, 8, { key: "s130f8" })];
+  {
+    const h = lensHalves(matchIn(store, frame(57, 8)), matchIn(table, frame(57, 8)));
+    h.colour && h.colour.key !== "50@13"
+      ? ok("a measurement a stop and a half away stands down to the closer table")
+      : fail("a 50mm f/13 measurement is being applied to a 57mm f/8 frame — the table brackets it exactly");
+    h.brightness && h.brightness.key !== "50@13"
+      ? ok("...and its brightness curve stands down too, which is the more aperture-dependent half")
+      : fail("the far measurement's brightness curve is still being applied");
+  }
+  {
+    // Close enough: the reader's own body and lens copy win.
+    const near = [mk(50, 9)];
+    const h = lensHalves(matchIn(near, frame(52, 8)), matchIn(table, frame(52, 8)));
+    h.colour && h.colour.key === "50@9"
+      ? ok("a measurement within a stop is still the reader's own")
+      : fail("a near measurement must not be displaced — the reader's body and lens copy are a real advantage");
+  }
+  {
+    // Nothing closer to fall back to: keep the reader's rather than lose it.
+    const far = [mk(50, 22)];
+    const h = lensHalves(matchIn(far, frame(57, 8)), null);
+    h.colour && h.colour.key === "50@22"
+      ? ok("no table to fall back to: the far measurement is still better than nothing")
+      : fail("standing down in favour of no correction at all is the worse answer");
+  }
+}
+
 console.log(bad ? `\n${bad} failed\n` : "\nthe save door and the read door agree, and every render path takes the same halves\n");
 process.exit(bad ? 1 : 0);
