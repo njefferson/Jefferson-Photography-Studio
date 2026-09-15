@@ -957,6 +957,23 @@ interface Look {
    *  foliage lands crimson; Goldie also lifts green so it lands gold. */
   wbBias?: [number, number, number];
   tint?: [number, number, number];
+  /** Per-colour hue/sat/lum, 8 bands x 3 at HSL_CENTERS — the same 24-number
+   *  array a saved look carries. AEROCHROME IS A SEPARATION, NOT A CAST, and
+   *  this is the only knob in the pipeline that can deliver one.
+   *
+   *  Measured before this existed: a wbBias is a DIAGONAL gain, so it
+   *  multiplies every pixel by the same three factors and moves the whole hue
+   *  distribution together. Solved against the EIR target on five camera JPEGs
+   *  and five raws, the best any diagonal gain could do was put foliage at
+   *  289-298deg and sky at 240-254deg — about 50deg apart, against targets
+   *  130deg apart (foliage magenta 330, sky cyan 200). It is not a tuning
+   *  problem; a rank-preserving transform cannot open an angle between two
+   *  populations that start nearly coincident. That is why `red` and `goldie`
+   *  are right to use wbBias — they shift everything one way — and why
+   *  Aerochrome never worked with one.
+   *
+   *  applyLook resets this to hslDefault() unless a look supplies it. */
+  hsl?: number[];
   glow?: number;
   /** Per-kind, because raw and camera-rendered files arrive in DIFFERENT
    *  STATES and one cast correction cannot serve both. A raw opens on the
@@ -965,13 +982,33 @@ interface Look {
    *  balance. Measured on the five reported frames plus a raw control: the
    *  bias that moves a JPEG from two hues to three takes the raw control from
    *  four hues at 43% down to three at 77%. Overrides the look-level wbBias. */
-  raw: { sat: number; contrast: number; wbBias?: [number, number, number] };
-  jpeg: { sat: number; contrast: number; wbBias?: [number, number, number] };
+  raw: { sat: number; contrast: number; wbBias?: [number, number, number]; hsl?: number[] };
+  jpeg: { sat: number; contrast: number; wbBias?: [number, number, number]; hsl?: number[] };
 }
 const LOOKS: Record<string, Look> = {
   // Gentle contrast by default: it never crushes shadow detail (road shade,
   // dark foliage). Scenes with big empty dark skies take Contrast up well.
-  aero: { swapRB: true, toggleSwap: true, hue: 0, raw: { sat: 3.0, contrast: 1.15 }, jpeg: { sat: 1.35, contrast: 1.12 } },
+  // AEROCHROME'S STEP 3, and it is a SEPARATION rather than a cast.
+  // Route 1 is: usable white balance, swap R/B, correct the resulting cast,
+  // contrast last. This look had no step 3 at all — the comment below about a
+  // bare swap resolving to [1,1,1] is what that produced on a camera JPEG.
+  //
+  // Measured on five camera JPEGs and five raws: a wbBias (a DIAGONAL gain,
+  // which is what `red` and `goldie` use) could at best put foliage 289-298deg
+  // and sky 240-254deg — about 50deg apart against targets 130deg apart. A
+  // diagonal gain multiplies every pixel by the same three factors, so it
+  // cannot open an angle between two populations; no value of it ever could.
+  // The per-colour mixer can, because a band shift acts differentially on
+  // nearby hues: it took one frame from 36deg of separation to 95deg.
+  //
+  // JPEG ONLY. A raw renders foliage near 177deg and sky near 0deg with this
+  // look — about 177deg apart, and that rendering is confirmed correct, so the
+  // raw side carries nothing. Shifts are Blue -45, Purple +20, Magenta +60 at
+  // HSL_CENTERS [240, 280, 320], the medians from refining against the target
+  // on the real renderer frame by frame.
+  aero: { swapRB: true, toggleSwap: true, hue: 0, raw: { sat: 3.0, contrast: 1.15 },
+          jpeg: { sat: 1.35, contrast: 1.12,
+                  hsl: [0,1,1, 0,1,1, 0,1,1, 0,1,1, 0,1,1, -45,1,1, 20,1,1, 60,1,1] } },
   red: { swapRB: true, toggleSwap: true, hue: 0, wbBias: [0.78, 1.02, 1.35], raw: { sat: 1.8, contrast: 1.4 }, jpeg: { sat: 1.3, contrast: 1.2 } },
   goldie: { swapRB: true, toggleSwap: true, hue: 0, wbBias: [0.78, 1.22, 1.4], raw: { sat: 1.7, contrast: 1.35 }, jpeg: { sat: 1.2, contrast: 1.2 } },
   natural: { swapRB: false, toggleSwap: true, hue: 0, raw: { sat: 1.2, contrast: 1.15 }, jpeg: { sat: 1.1, contrast: 1.15 } },
@@ -1130,7 +1167,16 @@ function applyLook(name: keyof typeof LOOKS) {
   params.toneG = [...TONE_DEFAULT];
   params.toneB = [...TONE_DEFAULT];
   params.lum = 1;
-  params.hsl = hslDefault();
+  {
+    // PER KIND, and only the JPEG side is set. A raw already renders with a big
+    // hue separation — measured with Aerochrome, foliage lands near 177deg and
+    // sky near 0deg, about 177deg apart — and that rendering is the one the
+    // owner has confirmed as correct, so nothing here touches it. A one-band
+    // camera JPEG lands foliage and sky 17-36deg apart, which is the flat
+    // purple, and that is what these shifts open.
+    const h = strength.hsl ?? look.hsl;
+    params.hsl = h && h.length === 24 ? [...h] : hslDefault();
+  }
   params.bwOn = false;
   params.bwMix = [1, 1, 1];
   params.grade = [...GRADE_DEFAULT];
