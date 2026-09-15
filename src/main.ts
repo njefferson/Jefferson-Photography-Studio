@@ -7491,39 +7491,59 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
  *  denoise — the LIGHTER TOUCH. Pixel data is never mutated; every value
  *  lands on a slider, and the true untouched state is one press away
  *  (Hold: Untouched) or reachable by zeroing the sliders. */
+/** WHAT OPENING A PHOTOGRAPH APPLIES BEFORE ANYBODY TOUCHES ANYTHING.
+ *
+ *  Takes `img`, a decoded photograph.
+ *  Returns the four values the standing ruling fixes per file kind — white
+ *  balance, exposure, highlight recovery and the channel swap. Denoise is NOT
+ *  here: both callers want it and they measure it differently on purpose (a
+ *  260px tile is not denoised at all), which is a difference by decision rather
+ *  than by drift.
+ *
+ *  BOTH CALLERS MUST USE IT, and that is the whole point. `establishFreshEdit`
+ *  applies this to the open photograph and `makeThumb` renders a tile for a
+ *  photograph nobody has opened — and a tile is a CLAIM about what opening will
+ *  do. They were two copies of one ruling, and the moment the ruling changed for
+ *  camera-rendered files only one copy heard about it: the tile kept rendering a
+ *  JPEG at gray-world balance, with the channel swap inherited from whichever
+ *  photograph happened to be open, while opening the same file gave wb [1,1,1]
+ *  and no swap. Thumbnail and photograph stopped matching, which is the exact
+ *  defect the tile walk already exists for.
+ *
+ *  RAW measures itself: gray-world balance, auto exposure, and recovery only
+ *  where a camera matrix says the numbers are sensor values. CAMERA-RENDERED
+ *  opens as the camera made it — no balance, no exposure move, no recovery —
+ *  because it was already developed through the camera's own preset. */
+function freshBaseline(img: DecodedImage): {
+  wb: [number, number, number];
+  exposure: number;
+  recover: number;
+  swapRB: boolean;
+} {
+  const wb: [number, number, number] = img.isRaw ? grayWorldWB(img) : [1, 1, 1];
+  return {
+    wb,
+    exposure: img.isRaw ? autoExposure(img, wb) : 1,
+    recover: img.isRaw ? (img.camMatrix ? autoRecover(img) : 0) : 0,
+    // THE CHANNEL SWAP IS A CHOICE, NOT A STARTING STATE. `EditParams` defaults
+    // it true, so every photograph opened with red and blue already exchanged.
+    // A raw absorbs that — it arrives unbalanced, gray-world balances it first,
+    // and the swap lands on channels something has pulled apart. A
+    // camera-rendered file has no balance by design, so the swap is performed on
+    // a finished rendering with nothing before it and no cast correction after:
+    // step 2 of the channel-swap route with steps 1 and 3 missing, and the flat
+    // purple this file's own look table already names.
+    swapRB: img.isRaw,
+  };
+}
+
 function establishFreshEdit() {
   const src = current!;
-  if (src.isRaw) {
-    params.wb = grayWorldWB(src);
-    params.exposure = autoExposure(src, params.wb);
-    params.recover = src.camMatrix ? autoRecover(src) : 0;
-  } else {
-    params.wb = [1, 1, 1];
-    params.exposure = 1;
-    params.recover = 0;
-  }
-  // THE CHANNEL SWAP IS A CHOICE, NOT A STARTING STATE — and on a camera JPEG
-  // it was on before anybody chose it.
-  //
-  // `EditParams` defaults `swapRB: true`, so every photo opened with red and
-  // blue already exchanged. On a raw that is absorbed: the file arrives
-  // unbalanced, gray-world balances it first, and the swap lands on channels
-  // something has already pulled apart. On a CAMERA-RENDERED file there is no
-  // balance — it opens at wb [1,1,1] on purpose, as the camera made it — so the
-  // swap is performed on the camera's finished rendering with nothing before it
-  // and no cast correction after it. That is step 2 of the channel-swap route
-  // with steps 1 and 3 missing, and the result is the flat purple this file's
-  // own look table already names. Measured on two reported frames: hue 257 with
-  // the swap, hue 343 without, and 343 is what their thumbnails show because
-  // makeThumb never had it.
-  //
-  // It also breaks the standing ruling for what opening applies: a
-  // camera-rendered file opens AS THE CAMERA MADE IT, measured denoise only. A
-  // channel swap is not denoise.
-  //
-  // Raw keeps the swap it has always had: that rendering is confirmed correct
-  // and this is not the change to alter it in.
-  params.swapRB = src.isRaw;
+  const base = freshBaseline(src);
+  params.wb = base.wb;
+  params.exposure = base.exposure;
+  params.recover = base.recover;
+  params.swapRB = base.swapRB;
   params.denoise = estimateDenoise(src);
   lookBias = [1, 1, 1];
   lookWb = null;
@@ -8429,7 +8449,12 @@ async function makeThumb(img: DecodedImage, MAX = 260, lens?: LensCurve | null, 
   // the tile is a claim about what opening it WILL do: its own measured balance
   // and exposure, under the live look, which is what establishFreshEdit
   // applies.
-  const gw = own ? own.params.wb : grayWorldWB(img);
+  // THE SAME BASELINE THE OPEN APPLIES, not a second copy of the ruling. This
+  // line used to be `grayWorldWB(img)` unconditionally — correct for a raw and
+  // wrong for a camera-rendered file, which opens at wb [1,1,1] as the camera
+  // made it. See freshBaseline.
+  const base = own ? null : freshBaseline(img);
+  const gw = own ? own.params.wb : base!.wb;
   const bias = own ? ([1, 1, 1] as [number, number, number]) : lookBias;
   const wb: [number, number, number] = [
     clamp(gw[0] * bias[0], 0.02, 16),
@@ -8447,9 +8472,16 @@ async function makeThumb(img: DecodedImage, MAX = 260, lens?: LensCurve | null, 
     lensBypass: own ? own.params.lensBypass : false,
     forceBalance: own ? (own.params.forceBalance ?? false) : false,
     wb,
-    exposure: own ? own.params.exposure : autoExposure(img, wb),
+    exposure: own ? own.params.exposure : base!.exposure,
     denoise: 0,
-    recover: own ? (own.params.recover ?? 0) : img.camMatrix ? autoRecover(img) : 0,
+    recover: own ? (own.params.recover ?? 0) : base!.recover,
+    // INHERITED FROM WHICHEVER PHOTOGRAPH WAS OPEN, WHICH IS A DIFFERENT FRAME'S
+    // ANSWER. `cloneParams(params)` above carries the live swap onto a tile for a
+    // file nobody has opened, so a camera JPEG's tile was swapped whenever a raw
+    // was on screen and the same file opened unswapped. The tile is a claim about
+    // what opening WILL do, so it takes the claim from the same place the open
+    // does. A photograph with its own edit keeps its own answer.
+    swapRB: own ? own.params.swapRB : base!.swapRB,
     masks: [],
     spots: [],
     glow: 0,
