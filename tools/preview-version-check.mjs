@@ -38,6 +38,14 @@ const WHOLE = [
   "src/pipeline.ts",       // the edit applied to it
   "src/lensstore.ts",      // which correction matches a photograph
   "src/hotspotProfiles.ts",// and the profiles that ship with the app
+  // WHICH HALF OF A MATCH IS ACTUALLY APPLIED — `lensHalves` decides whether the
+  // colour comes from the reader's measurement or from the shipped table, and
+  // whether a brightness curve is used at all. It was added here on the day the
+  // four render paths stopped each answering that for themselves, and this list
+  // did not hear: a preview rendered under the old rule would be served under
+  // the new one, which is exactly what the list exists to prevent. Same shape as
+  // the defect it was written to fix, one file along.
+  "src/hotspot.ts",        // and which half of it is applied
   "src/stamp.ts",          // the hash two parts of the key are built with
 ];
 const DIRS = ["src/raw"];  // the raw decoders, every file

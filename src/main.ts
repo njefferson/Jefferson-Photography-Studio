@@ -446,11 +446,23 @@ function updateMyLensUI() {
   myLensUi.bypass.setAttribute("aria-pressed", String(params.lensBypass));
   const p = myLens.p;
   const from = p.source ? ` from ${p.frames} ${p.source} frame${p.frames === 1 ? "" : "s"}` : "";
-  const knows = p.bump?.some((v) => v > 0)
-    ? Hotspot.hasColour(p) ? "brightness and colour" : "brightness"
-    : "colour";
+  // WHAT IT IS ACTUALLY SUPPLYING, not what it contains. These are different
+  // whenever provenance holds the colour back, and the card naming the second
+  // while the picture shows the first is the shape this panel has been wrong in
+  // before. `lensHalves` is asked; nothing is re-derived here.
+  const halves = Hotspot.lensHalves(p, hotspotState?.p ?? null);
+  const gives = [
+    halves.brightness === p && p.bump?.some((v) => v > 0) ? "brightness" : null,
+    halves.colour === p ? "colour" : null,
+  ].filter(Boolean);
+  const knows = gives.length ? gives.join(" and ") : "nothing on this frame";
   myLensUi.status.textContent =
-    `${p.model} · measured at ${p.fl}mm${Number.isFinite(p.ap) ? ` f/${p.ap}` : ""}${from} · ${knows}` +
+    `${p.model} · measured at ${p.fl}mm${Number.isFinite(p.ap) ? ` f/${p.ap}` : ""}${from} · supplying ${knows}` +
+    (halves.heldBack === p
+      ? ` — its colour is held back because it was measured on camera-rendered frames,` +
+        ` which carry the camera's own processing as well as the lens;` +
+        ` a raw-measured profile is supplying the colour instead`
+      : "") +
     (myLens.note ? ` — ${myLens.note}` : "") +
     (params.lensBypass ? " · bypassed" : "");
 }
@@ -543,15 +555,18 @@ function healDiagnostic(): string {
 }
 
 /** WHICH PROFILE IS CORRECTING THE OPEN PHOTOGRAPH, AND WHERE EACH HALF CAME
- *  FROM. The two halves can come from two different profiles — the reader's own
- *  measurement supplies the colour and the shipped one the brightness — so
- *  naming only "the lens" would hide the case where they disagree. */
+ *  FROM. The two halves can come from two different profiles, and which one
+ *  supplies which is `Hotspot.lensHalves` — asked ONCE here and never worked out
+ *  again, because a report that derives it for itself is how this line came to
+ *  name a brightness source while the line below it read a centre gain of
+ *  1.000x. Naming only "the lens" would hide the case where they disagree. */
 function lensDiagnostic(): string {
   if (!current) return "nothing open";
   const mine = myLens?.p ?? null;
   const shipped = hotspotState?.p ?? null;
   if (!mine && !shipped) return "no profile matched this photograph";
-  const colour = mine ?? (Hotspot.hasColour(shipped) ? shipped : null);
+  const halves = Hotspot.lensHalves(mine, shipped);
+  const colour = halves.colour;
   const where = (p: LensStore.StoredProfile | null) =>
     !p ? "none" : `${p.model} ${p.fl}mm${Number.isFinite(p.ap) ? ` f/${p.ap}` : ""}${p.source ? ` · ${p.frames} ${p.source} frame${p.frames === 1 ? "" : "s"}` : " · shipped"}`;
   // NAME THE PROFILE THE BRIGHTNESS ACTUALLY COMES FROM, which is not always the
@@ -560,7 +575,7 @@ function lensDiagnostic(): string {
   // curve that lands — so the report said a brightness source was correcting the
   // frame and then said the centre gain was 1.000x, and both were printed as
   // facts. The source is worked out by the same `lensHalves` the render uses.
-  const brightness = Hotspot.lensHalves(mine, shipped).brightness;
+  const brightness = halves.brightness;
   const same = brightness && colour && brightness === colour;
   // THE COUNTERS ARE PER-READ AND read() RESETS THEM, so reading them cold
   // reports whatever the last read happened to be. Re-read for this frame so the
@@ -576,6 +591,15 @@ function lensDiagnostic(): string {
         ? " · brightness from the same profile"
         : ` · brightness from ${where(brightness)}`) +
     (mine ? ` · ${myLens!.note || "exact match"}` : "") +
+    // WHY YOUR OWN MEASUREMENT IS NOT THE ONE CORRECTING THIS FRAME. Standing a
+    // profile down without saying so is the same silence that let a measured
+    // lens stop working with nothing said; the reader has no other way to learn
+    // that the profile the card names is not the profile in the picture.
+    (halves.heldBack
+      ? ` · YOUR ${halves.heldBack.source || "stored"}-measured colour is held back:` +
+        ` it measured the camera's rendering as well as the lens, and a raw-measured` +
+        ` profile is available — brightness still comes from yours`
+      : "") +
     // A measurement set aside on read is invisible to the reader by
     // construction: the app falls back and keeps working. Say it here.
     (lost
