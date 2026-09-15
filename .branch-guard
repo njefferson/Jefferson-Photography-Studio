@@ -74,3 +74,11 @@ also=tools/token-check.mjs
 # not needs neither. The other half of that artefact, the `_renders` list, is
 # measured from the whole app and is re-measured by section 4 of the a11y walk.
 also=tools/palette-spec-check.mjs
+
+# Run on every commit: the lens profile store's two doors. A brightness curve is
+# DERIVED on save and JUDGED on read, and nothing held the two to each other —
+# so a payload whose falloff was not NBINS long saved cleanly and was refused on
+# every read afterwards, wholesale, taking the colour curves with it. A measured
+# lens quietly stopped correcting anything and the app said nothing. Both
+# functions are pure, so this needs no browser and costs milliseconds.
+also=tools/lens-store-check.mjs
