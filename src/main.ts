@@ -958,8 +958,15 @@ interface Look {
   wbBias?: [number, number, number];
   tint?: [number, number, number];
   glow?: number;
-  raw: { sat: number; contrast: number };
-  jpeg: { sat: number; contrast: number };
+  /** Per-kind, because raw and camera-rendered files arrive in DIFFERENT
+   *  STATES and one cast correction cannot serve both. A raw opens on the
+   *  camera's own white balance (or gray-world) with its channels still to be
+   *  pulled apart; a camera JPEG is already rendered THROUGH that white
+   *  balance. Measured on the five reported frames plus a raw control: the
+   *  bias that moves a JPEG from two hues to three takes the raw control from
+   *  four hues at 43% down to three at 77%. Overrides the look-level wbBias. */
+  raw: { sat: number; contrast: number; wbBias?: [number, number, number] };
+  jpeg: { sat: number; contrast: number; wbBias?: [number, number, number] };
 }
 const LOOKS: Record<string, Look> = {
   // Gentle contrast by default: it never crushes shadow detail (road shade,
@@ -996,7 +1003,7 @@ let lookWb: [number, number, number] | null = null;
 function applyLook(name: keyof typeof LOOKS) {
   const look = LOOKS[name];
   const strength = current?.camMatrix ? look.raw : look.jpeg;
-  const bias = look.wbBias ?? [1, 1, 1];
+  const bias: [number, number, number] = strength.wbBias ?? look.wbBias ?? [1, 1, 1];
   // Strip the previous look's bias to get the white balance underneath.
   const base: [number, number, number] = [
     params.wb[0] / lookBias[0], params.wb[1] / lookBias[1], params.wb[2] / lookBias[2],
@@ -1071,7 +1078,7 @@ function applyLook(name: keyof typeof LOOKS) {
   // identity check, and that flag was only ever written on a first visit: see
   // fileIsOneBand, which asks the question of the photograph instead.
   if (balancing && current && !oneBand) {
-    const gw = grayWorldWB(current);
+    const gw = openWB(current);
     base[0] = gw[0]; base[1] = gw[1]; base[2] = gw[2];
     lookWb = [gw[0], gw[1], gw[2]];
   } else if (balancing && lookWb && base.every((v, i) => step(v, lookWb![i]))) {
@@ -7423,7 +7430,7 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
 function establishFreshEdit() {
   const src = current!;
   if (src.isRaw) {
-    params.wb = grayWorldWB(src);
+    params.wb = openWB(src);
     params.exposure = autoExposure(src, params.wb);
     params.recover = src.camMatrix ? autoRecover(src) : 0;
   } else {
@@ -8336,7 +8343,7 @@ async function makeThumb(img: DecodedImage, MAX = 260, lens?: LensCurve | null, 
   // the tile is a claim about what opening it WILL do: its own measured balance
   // and exposure, under the live look, which is what establishFreshEdit
   // applies.
-  const gw = own ? own.params.wb : grayWorldWB(img);
+  const gw = own ? own.params.wb : openWB(img);
   const bias = own ? ([1, 1, 1] as [number, number, number]) : lookBias;
   const wb: [number, number, number] = [
     clamp(gw[0] * bias[0], 0.02, 16),
@@ -11364,7 +11371,7 @@ function neutralLook(): SavedLook {
  *  creative grade. Mirrors autoAdjust() + loadSlot()/pressLook(), without
  *  touching the live on-screen edit. Masks never carry (composition-specific). */
 function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["lut"] = null): EditParams {
-  let wb = grayWorldWB(img);
+  let wb = openWB(img);
   let look: SavedLook;
   if (grade.kind === "builtin") {
     // Resolve exactly like pressing the look button on this photo: strength
@@ -12364,7 +12371,7 @@ function lumNormalize(g: number[]): [number, number, number] {
 /** White balance + exposure + noise-matched denoise (+ highlight recovery on
  *  clipped camera-native raw) in one shot — the same baseline open applies. */
 function autoAdjust(img: DecodedImage) {
-  params.wb = grayWorldWB(img);
+  params.wb = openWB(img);
   params.exposure = autoExposure(img, params.wb);
   params.denoise = estimateDenoise(img);
   params.recover = img.camMatrix ? autoRecover(img) : 0;
@@ -12538,6 +12545,34 @@ function grayWorldWB(img: DecodedImage): [number, number, number] {
   b = Math.max(1e-4, b / n);
   const mean = (r + g + b) / 3;
   return lumNormalize([mean / r, mean / g, mean / b]);
+}
+
+/** WHAT THE FILE OPENS AS — the camera's own white balance when it recorded
+ *  one, gray-world only when it did not.
+ *
+ *  This is the owner's rule of 2026-07-24 — "white balance opens AS SHOT, no
+ *  automatic gray-world WB at import, ever" — finally meaning what it says. It
+ *  was implemented as NEUTRAL SLIDERS, which is not as-shot, and nothing read
+ *  the file's own multipliers until now.
+ *
+ *  Why it matters here more than in an ordinary editor: infrared capture
+ *  depends on a custom white balance measured once, in camera, off sunlit
+ *  foliage. That preset is what makes the raw gradeable at all — without it the
+ *  file is a red wall and the red/blue channel swap has nothing to separate.
+ *  Read out of this repo's own files, a Z 50 NEF and five camera JPEGs from the
+ *  same body carry the IDENTICAL 0x000C [1.8574, 1.4668, 1, 1]: one preset,
+ *  constant across a shoot. Gray-world re-derives a different answer for every
+ *  frame from that frame's content, so a woodland frame and an open-sky frame
+ *  from one shoot land in different places — which is the problem "Restore
+ *  depth" exists to paper over.
+ *
+ *  Gray-world stays for files that carry nothing (the 44 practice DNGs are
+ *  minimal hand-written files with no such tag) and for the places that WANT a
+ *  content-derived answer: the IR tab's Auto WB, whose stated job is to
+ *  rebalance to this photo's own neutral, and the sky mask's internal estimate.
+ *  Normalised the same way, so it is a drop-in for the value it replaces. */
+function openWB(img: DecodedImage): [number, number, number] {
+  return img.camWb ? lumNormalize(img.camWb) : grayWorldWB(img);
 }
 
 // ⓘ What's new — the last 5 user-facing updates, injected at build time, each
