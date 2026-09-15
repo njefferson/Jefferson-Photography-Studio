@@ -66,10 +66,12 @@ export function hasColour(p: StoredProfile | null): boolean {
  *  Takes `measured`, the reader's own profile for this frame's EXIF (null when
  *  they have none), and `shipped`, the profile from the table that ships with
  *  the app (null when nothing matched).
- *  Returns `{ colour, bump, brightness, heldBack }` — the profile whose `kr`/`kb`
- *  to apply, the radial brightness curve to apply, the profile that curve came
- *  from so a report can NAME it, and the reader's profile whose colour was
- *  withheld on provenance (null when none was). Any of them may be null.
+ *  Returns `{ colour, bump, brightness, heldBack, outreached }` — the profile
+ *  whose `kr`/`kb` to apply, the radial brightness curve to apply, the profile
+ *  that curve came from so a report can NAME it, the reader's profile whose
+ *  colour was withheld on provenance, and whether the reader's profile stood
+ *  down entirely because it was measured too far from this frame. Any of them
+ *  may be null or false.
  *
  *  THE RESULT IS WHAT EVERY RENDER PATH MUST USE — the open photograph's GPU
  *  upload (`syncLensTexture`), the thumbnails (`lensCurveFor`), the export, and
@@ -90,6 +92,26 @@ export function hasColour(p: StoredProfile | null): boolean {
  *
  *  Colour is withheld from a shipped profile that has none rather than applied
  *  as a flat 1 — see `hasColour`.
+ *
+ *  AND FIT DECIDES BOTH HALVES, because a measurement taken far from the frame
+ *  is not a measurement of the frame. A store holding one profile answered for
+ *  every frame at any aperture at full strength (`matchAny`: a set of one is
+ *  returned whatever the distance), so a measurement at 50mm f/13 landed on a
+ *  57mm f/8 frame while a table with 44 anchors for that lens sat beside it able
+ *  to interpolate exactly. `reach` is the matcher's own log distance — aperture
+ *  ratio plus however far outside the measured focal range the frame falls — so
+ *  the two are compared in the same units the matcher already chose the set in.
+ *
+ *  BOTH halves stand down here, where provenance stands down colour alone, and
+ *  the shipped table says why: on the 50-250 at 50mm the centre bump is 0.0241
+ *  at f/8 and 0.0502 at f/13. A hot-spot IS what stopping down does, so
+ *  brightness is the more aperture-dependent half, not the safer one.
+ *
+ *  The reader keeps the benefit of the doubt — their own body and their own copy
+ *  of the lens are a real advantage — so this fires only when they are reaching
+ *  more than a stop AND the table is at least half a stop closer. Never in
+ *  favour of nothing: with no shipped match, a far measurement still beats no
+ *  correction at all.
  *
  *  AND PROVENANCE DECIDES THE COLOUR HALF, because ownership is not quality.
  *  `kr`/`kb` are ratios between channels across the field, and a ratio measured
@@ -122,9 +144,19 @@ export function lensHalves(
   bump: ArrayLike<number> | null;
   brightness: StoredProfile | null;
   heldBack: StoredProfile | null;
+  outreached: boolean;
 } {
-  const mine = measured ?? null;
+  const rough = measured ?? null;
   const theirs = shipped ?? null;
+  // ONE STOP is a ratio of root two in aperture, which is what `reach` measures
+  // in. Half a stop of margin keeps a near-tie with the reader rather than
+  // flipping to the table for a hundredth of a log unit.
+  const ONE_STOP = Math.log(Math.SQRT2);
+  const outreached =
+    !!rough && !!theirs &&
+    typeof rough.reach === "number" && typeof theirs.reach === "number" &&
+    rough.reach > ONE_STOP && theirs.reach <= rough.reach - ONE_STOP / 2;
+  const mine = outreached ? null : rough;
   // Only stands down when there is something better to stand down TO: a shipped
   // profile that is raw AND actually knows a colour. Withholding the reader's
   // colour in favour of nothing would leave the frame uncorrected, which is a
@@ -142,6 +174,7 @@ export function lensHalves(
     bump: brightness?.bump ?? null,
     brightness,
     heldBack,
+    outreached,
   };
 }
 

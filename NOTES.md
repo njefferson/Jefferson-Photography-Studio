@@ -15235,3 +15235,57 @@ meant to fix, one file along.
 whatever the frame (`matchIn`: `if (by.length === 1) return by[0]`), so a
 measurement at f/13 lands on an f/8 frame at full strength. On this frame the
 reader's brightness curve reads 0.0501 where the shipped blend reads 0.0208.
+
+## A measurement far from the frame is not a measurement of the frame, 2026-09-15
+
+**Owner's call, taken after the provenance fix: fall back to the shipped table
+beyond about a stop.** With one profile in the store, `matchAny` returned it
+whatever the frame — `if (by.length === 1) return by[0]` — so a measurement at
+50mm f/13 answered for a 57mm f/8 frame at full strength, while a table with 44
+anchors for that lens sat beside it able to interpolate exactly. The panel's note
+said how far it had reached and applied it anyway.
+
+**The matcher already computed the distance and threw it away.** `matchAny`
+scores each aperture set as `apCost + flCost`, both log ratios — aperture ratio
+plus however far outside the set's measured focal range the frame falls, zero
+when the set brackets it. That number picked the set and was then discarded.
+It is attached to the match as `reach` now, set by the matcher and never stored,
+like `otherCamera` beside it. **Undefined when the frame carries no focal
+length**, because there is nothing to measure against and a missing measurement
+must not read as a good one.
+
+**BOTH halves stand down here, where provenance stands down colour alone**, and
+the shipped table is what settles it: on the 50-250 at 50mm the centre bump is
+**0.0241 at f/8 and 0.0502 at f/13**. A hot-spot IS what stopping down does, so
+brightness is the MORE aperture-dependent half, not the safer one. A curve
+measured a stop and a half away over-corrects the middle about twofold.
+
+**One stop, with half a stop of margin.** `ONE_STOP = ln(√2) = 0.347`. The rule
+fires only when the reader is reaching past that AND the table is at least half a
+stop closer — a near-tie keeps the reader's own body and lens copy, which are a
+real advantage. **Never in favour of nothing**: with no shipped match at all, a
+far measurement still beats no correction.
+
+**Replayed against the real store** (the 22 profiles, as they were before they
+were cleared), and the two rules fire separately and for the right reasons:
+
+- 57mm f/8 — yours reach 0.62, table 0.00 → stands down on fit. This is the
+  reported frame: blue/red back to 0.92, bump 0.0208.
+- 50mm f/13 — yours reach 0.00, an exact match → fit is fine, and the colour is
+  held back on PROVENANCE instead.
+- 60mm f/16 — yours reach 0.18, inside a stop → fit is fine, provenance again.
+- 120mm f/22 — yours reach 0.36 → stands down on fit.
+
+Both surfaces say which of the two happened and print both reaches, because "too
+far" is a comparison and a verdict without the numbers cannot be argued with.
+
+**The instrument was wrong twice before the result was.** The first fixture gave
+the frame a `make`/`model` that did not match the profile's `camera` string, so
+`forCamera` blanked the colour and the case failed for a reason it was not
+testing — `cameraOf` joins make and model, and a fixture has to match that or
+carry neither. The second was the report script, not the app: it decided whose
+profile had won by comparing `key`, and the reader's store and the shipped table
+use the SAME key format — `50-250@50@f13.0` on both sides — so an exact-setting
+match read as the reader's when it was the table's. Identity, not name.
+
+20 of 20 walks green. `PREVIEW_PIPELINE` 14 to 15.
