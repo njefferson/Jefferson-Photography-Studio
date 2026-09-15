@@ -15109,3 +15109,48 @@ both-anchors-zero case are asserted, so the fix cannot have been a one-way
 loosening.
 
 20 of 20 walks green. `PREVIEW_PIPELINE` 11 to 12.
+
+## The tile kept its own copy of the open-time ruling, 2026-09-15
+
+**Reported with a screenshot: the JPG thumbnail and the image no longer match.**
+Caused by the fix three commits earlier, and by the half of it that was not
+made.
+
+`establishFreshEdit` was changed so a camera-rendered file opens as the camera
+made it — `wb [1,1,1]`, exposure 1, no recovery, no channel swap. `makeThumb`
+holds the SAME ruling for a photograph nobody has opened, because **a tile is a
+claim about what opening will do**, and its copy did not hear:
+
+- `const gw = own ? own.params.wb : grayWorldWB(img)` — gray-world
+  unconditionally, which is right for a raw and wrong for a JPEG.
+- `exposure` and `recover` likewise measured rather than left alone.
+- `swapRB` **not set at all**, so it came through `cloneParams(params)` from
+  whichever photograph happened to be OPEN — a different frame's answer.
+
+The comment above that code already stated the contract it was breaking: *the
+tile is a claim about what opening it WILL do … which is what establishFreshEdit
+applies.* Same shape as `lensHalves` a few hours earlier, and the third time in
+one day: one ruling, two copies, one of them updated.
+
+`freshBaseline(img)` is that ruling once now. Denoise stays per-caller and is
+commented as a decision — a 260px tile is not denoised — rather than drift.
+
+**TWO JPEGS CANNOT SEE THE SWAP HALF.** With both files camera-rendered, the open
+photograph is itself unswapped, so the tile inherits the right answer by accident.
+Measured on a plant of the old code: **two JPEGs 14 degrees apart, a MIXED set —
+a raw open with its swap live, a JPEG's tile built underneath it — 74 degrees**,
+tile hue 269 against 343. The mixed set is the session the defect was reported
+from, and it is in the walk now. The fix gives 0 degrees on both.
+
+**AND THE INSTRUMENT LIED ONCE, IN THE WAY WORTH KNOWING.** The first plant did
+not compile — an unused variable — so `npm run build` failed, `dist/` kept the
+PREVIOUS bundle, and the walk ran against the fixed code and reported a pass. A
+negative control that passes is not evidence the plant was wrong; it is a reason
+to check the build exited zero. `&&` between the build and the walk is the whole
+guard, and it was missing from the command that ran them.
+
+Threshold set from the measurement rather than guessed: a tile and its open are
+two renders of one frame by one pipeline, so they agree or something diverged —
+0 measured on the fix, 14 and 74 on the plants, gate at 5.
+
+20 of 20 walks green. `PREVIEW_PIPELINE` 12 to 13.
