@@ -14904,3 +14904,53 @@ planted, so nothing was shown, and launch 1 read "not mentioned at all". The
 real shape is v2 with a `meta` store keyed on `name`, which is what `frameCount`
 counts. A walk that plants its own fixture has to be checked for whether the
 plant took.
+
+## Camera JPEGs opened with a channel swap nobody asked for, 2026-09-15
+
+**Reported with two screenshots: the strip of thumbnails looked like infrared
+photographs and the picture above them was a flat purple wash.**
+
+**Not a regression from the colour work.** Measured against a build of `6acd35c`,
+the commit before the Aerochrome change: `rgb(119,86,205)`, hue 257, byte for byte
+the same. This predates all of it.
+
+**`EditParams` defaulted `swapRB: true`**, so every photo opened with red and
+blue already exchanged. A raw absorbs that — it arrives unbalanced, gray-world
+balances it, and the swap lands on channels something has pulled apart. A
+CAMERA-RENDERED file has no balance by design, opening at `wb [1,1,1]` as the
+camera made it, so the swap ran on the camera's finished rendering with nothing
+before it and no cast correction after: **step 2 of the channel-swap route with
+steps 1 and 3 missing**, which is the flat purple this app's own look table
+already names.
+
+It also breaks the standing ruling for what opening applies. A camera-rendered
+file opens AS THE CAMERA MADE IT, measured denoise only — and a channel swap is
+not denoise.
+
+**Measured, per file kind, both ways:**
+
+- `NIR_2821.JPG` — swap on hue 257, swap off hue **343**; the file's own pixels
+  are hue 343
+- `NIR_2813.JPG` — swap on hue 256, swap off hue **344**
+- `NIR_1376.NEF` and `NIR_0063.dng` — near-neutral either way, 3-4 hues both
+  ways, because gray-world has already balanced them
+
+So `establishFreshEdit` now sets `params.swapRB = src.isRaw`. **Raw keeps the
+swap it has always opened with**: that rendering is confirmed correct and this
+was not the change to alter it in.
+
+**THE TILE WAS THE WRONG THING TO ASSERT AGAINST, and it made the first walk
+pass on the broken build.** A tile is sometimes the camera's embedded preview and
+sometimes a render of the live edit; when it is the latter it carries the same
+swap the canvas does, so the two agree and the walk learns nothing — which is
+exactly what happened, 256 against 256. The reported screenshots differed only
+because those tiles were previews (41 kept, per the device's own report). The
+walk compares the canvas against the FILE'S OWN PIXELS now, decoded in the page,
+which is the ruling stated as a number: **87 degrees apart before, 1 after.**
+The raw arm passes on both builds, so the walk is not vacuous.
+
+`tools/opens-as-shot-walk.mjs`, in the sweep automatically. Two instrument
+corrections along the way: a lone photo has no strip, so the first version found
+no tile and reported "skipped" as a pass; and the file input cannot be read back
+for the source pixels, because the app replaces it on every open (the
+picker-wedge fix), so the bytes are handed in from Node instead.
