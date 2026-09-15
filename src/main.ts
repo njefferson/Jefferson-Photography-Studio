@@ -936,6 +936,7 @@ ui.irAutoWb.addEventListener("click", () => {
   if (!current) return;
   params.wb = grayWorldWB(current);
   lookBias = [1, 1, 1];
+  lookWb = null;
   syncToUI();
   draw();
   flushRecord();
@@ -973,6 +974,19 @@ const LOOKS: Record<string, Look> = {
 // The bias currently baked into params.wb, so switching looks replaces the
 // previous look's bias instead of compounding it.
 let lookBias: [number, number, number] = [1, 1, 1];
+/** THE BALANCE applyLook ITSELF WROTE, so a second call can tell its own work
+ *  from the reader's.
+ *
+ *  `base` is derived by dividing the current wb by the look's bias, and the
+ *  "has the reader set their own balance" test compares that to neutral. That
+ *  works exactly once: after applyLook writes a gray-world balance, the base is
+ *  no longer neutral, the test says the reader set it, and no later call
+ *  re-derives anything. The control built on top of it changed its label and
+ *  left the picture alone — a toggle that goes one way.
+ *
+ *  Recorded here rather than inferred, and carried in the snapshot beside
+ *  lookBias, which exists for the same reason. */
+let lookWb: [number, number, number] | null = null;
 
 /** Whether the photo now open has all its colour in one band, and WHICH photo
  *  that was measured on. See applyLook. */
@@ -1007,7 +1021,12 @@ function applyLook(name: keyof typeof LOOKS) {
   // written to a stepped control does not come back" this file already carries
   // two notes about. A balance a reader actually set differs by far more than
   // one slider step.
-  const untouched = base.every((v) => Math.abs(v - 1) < 0.01);
+  // Neutral means the photo opened this way and nothing has touched it; equal to
+  // what this function last wrote means the app put it there, which is equally
+  // not the reader. Either way the balance is ours to re-derive.
+  const step = (a: number, b: number) => Math.abs(a - b) < 0.01;
+  const untouched = base.every((v) => step(v, 1))
+    || (!!lookWb && base.every((v, i) => step(v, lookWb![i])));
   const balancing = untouched && !!current && !current.isRaw;
   // A FALSE-COLOUR LOOK NEEDS TWO BANDS, AND SOME FILES ONLY HAVE ONE.
   //
@@ -1044,8 +1063,7 @@ function applyLook(name: keyof typeof LOOKS) {
   // ONE photograph. `forceBalance` is the reader saying which they want on THIS
   // one, and it lands on the white balance and exposure sliders exactly like
   // the automatic it replaces, so it is visible and undoable.
-  const oneBand = balancing && !!current && !params.forceBalance
-    && coolContent(current, params, look.swapRB) < COOL_BAND_FLOOR;
+  const oneBand = balancing && !params.forceBalance && oneBandFile(current, params);
   // The line this measurement also drives — the sentence saying the file has
   // only one band — is NOT remembered from here. It was, through a flag plus an
   // identity check, and that flag was only ever written on a first visit: see
@@ -1053,6 +1071,24 @@ function applyLook(name: keyof typeof LOOKS) {
   if (balancing && current && !oneBand) {
     const gw = grayWorldWB(current);
     base[0] = gw[0]; base[1] = gw[1]; base[2] = gw[2];
+    lookWb = [gw[0], gw[1], gw[2]];
+  } else if (balancing && lookWb && base.every((v, i) => step(v, lookWb![i]))) {
+    // UNDOING OUR OWN BALANCE, which nothing did. `base` is the balance divided
+    // by the look's bias, so when the gray-world branch above is skipped the
+    // base simply carries the balance forward and re-applies it — the reason
+    // "Balance it anyway" changed its label, moved `pressed`, rewrote the
+    // sentence, and left the white balance sliders sitting at 332/622/518.
+    // Three guesses went at the two tests above this before the sliders were
+    // read; the state was never in the tests.
+    //
+    // A camera-rendered file opens neutral — establishFreshEdit gives JPEG,
+    // HEIC and PNG `wb = [1,1,1]` on purpose, and `balancing` already requires
+    // a non-raw — so that is where "as the camera made it" lives. Reached only
+    // when the balance on the photo is the one THIS function wrote, so a
+    // balance the reader set is never thrown away.
+    base[0] = 1; base[1] = 1; base[2] = 1;
+    if (origParams) params.exposure = origParams.exposure;
+    lookWb = null;
   }
   params.wb = [
     clamp(base[0] * bias[0], 0.02, 16),
@@ -1181,7 +1217,7 @@ document.getElementById("lookForceBalance")?.addEventListener("click", () => {
 // the look highlight (activeLook) and the WB bias a look baked in (lookBias),
 // so undo/load restore exactly what was on screen, look button and all.
 // (Rotation and zoom are view state, not part of the edit, so they stay put.)
-type Snapshot = { params: EditParams; activeLook: string | null; lookBias: [number, number, number] };
+type Snapshot = { params: EditParams; activeLook: string | null; lookBias: [number, number, number]; lookWb?: [number, number, number] | null };
 
 function cloneParams(p: EditParams): EditParams {
   return {
@@ -1261,7 +1297,7 @@ function snapSig(s: Snapshot): string {
 }
 
 function snapshot(): Snapshot {
-  return { params: cloneParams(params), activeLook, lookBias: [...lookBias] as [number, number, number] };
+  return { params: cloneParams(params), activeLook, lookBias: [...lookBias] as [number, number, number], lookWb: lookWb ? [...lookWb] as [number, number, number] : null };
 }
 
 /** Restore a snapshot into the live editor (in place — `params` keeps identity)
@@ -1328,6 +1364,7 @@ function applySnapshot(s: Snapshot) {
   params.warp = sw && sw.du instanceof Float32Array ? sw : null;
   activeLook = s.activeLook ?? null;
   lookBias = (s.lookBias ? [...s.lookBias] : [1, 1, 1]) as [number, number, number];
+  lookWb = s.lookWb ? [...s.lookWb] as [number, number, number] : null;
   if (selectedMask >= params.masks.length) selectedMask = params.masks.length - 1;
   syncToUI();
   updateLookUI();
@@ -2304,16 +2341,39 @@ function applyLift(withColour: boolean): { pull: number; foliage: number; sky: n
  *  Cached against BOTH the image and that baseline object, so a return visit
  *  costs nothing and a genuinely new baseline can never be answered from a stale
  *  one — the failure above was a cache with no key. */
-const oneBandCache = new WeakMap<DecodedImage, { p: EditParams; v: boolean }>();
-function fileIsOneBand(img: DecodedImage | null): boolean {
-  if (!img || img.isRaw || !origParams) return false;
+/** HOW MUCH COOL BAND THIS FILE HAS, measured ONCE and kept against the image.
+ *
+ *  It is a property of the FILE, and everything that asks about it was asking
+ *  the live edit instead. That is wrong in two directions and both were live:
+ *
+ *  `lookState` read a flag only a look press wrote, so the sentence vanished on
+ *  every return visit. And `applyLook` measured `coolContent` from the current
+ *  params — so once a balance had been applied the frame really did have two
+ *  bands, the file stopped reading as one-band, and the next call balanced it
+ *  again. That is why "Balance it anyway" would not go back: it was not the
+ *  `untouched` test, it was this. A control that changes its label and leaves
+ *  the picture alone, which is the shape of defect this session has now found
+ *  four times.
+ *
+ *  Measured with whatever baseline the FIRST caller has, which is the fresh
+ *  open: applyLook runs inside establishFreshEdit before `origParams` is set,
+ *  and at that moment `params` IS this photo's untouched baseline. Every later
+ *  question gets the same answer without re-measuring anything. */
+const oneBandCache = new WeakMap<DecodedImage, boolean>();
+function oneBandFile(img: DecodedImage | null, baseline: EditParams | null): boolean {
+  if (!img || img.isRaw) return false;
   const hit = oneBandCache.get(img);
-  if (hit && hit.p === origParams) return hit.v;
+  if (hit !== undefined) return hit;
+  if (!baseline) return false;
   // Under the swap, because that is the state a colour look puts the frame in
   // and the cool band's hue is 30 degrees with it on and 210 with it off.
-  const v = coolContent(img, origParams, true) < COOL_BAND_FLOOR;
-  oneBandCache.set(img, { p: origParams, v });
+  const v = coolContent(img, baseline, true) < COOL_BAND_FLOOR;
+  oneBandCache.set(img, v);
   return v;
+}
+
+function fileIsOneBand(img: DecodedImage | null): boolean {
+  return oneBandFile(img, origParams);
 }
 
 function lookState(): void {
@@ -7318,6 +7378,7 @@ function establishFreshEdit() {
   }
   params.denoise = estimateDenoise(src);
   lookBias = [1, 1, 1];
+  lookWb = null;
   // NORMALISE THE MEASUREMENTS TO WHAT THE SLIDERS CAN HOLD, BEFORE ANYTHING
   // SOLVES AGAINST THEM. The four values above are measured at full precision;
   // every slider has a step, so `syncToUI` writes 0.44014856293231525 into a
@@ -8125,6 +8186,15 @@ async function switchToPhoto(id: string, opts?: { quiet?: boolean }) {
       saved.then(
         () => {
           if (activePhotoId !== leaving) liveEdits.delete(leaving);
+          // A COUNT OF RELEASES, ON THE STRIP ITSELF, so a check can tell the
+          // two failures apart. "The tile still says held" has two causes — the
+          // save has not landed yet, or it landed and nothing redrew — and from
+          // outside they look identical, which is why a walk for this kept
+          // going red under load and green on its own. Bumped BEFORE the
+          // repaint below, so a missing repaint leaves the count ahead of the
+          // tile and is caught with no timing assumption at all.
+          const strip = document.getElementById("sessionThumbs");
+          if (strip) strip.dataset.released = String(Number(strip.dataset.released ?? 0) + 1);
           // AND REDRAW THE STRIP, because the tile's title is built from
           // `liveEdits.has(p.id)` and this is the moment that answer changes.
           // Without it the release lands — the held count drops, the memory is
