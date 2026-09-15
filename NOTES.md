@@ -14596,3 +14596,82 @@ hue separation comes from having a second band to work with at all. A balance
 that protects the black point should give the old rendering's four-to-five hues
 without its 11-15% crush. That is a third rendering, it is not built, and which
 of the three is the DEFAULT is not a session's to choose (LESSONS §307).
+
+## The camera's own white balance, finally read, 2026-09-15
+
+**Checked against the IR workflow reference instead of reasoning from ordinary
+photo editing, after the previous proposal in this thread — "protect the black
+point during the balance" — turned out to be invented rather than derived.**
+
+Route 1, the channel swap, is four steps: open the raw with the **in-camera
+custom white balance** intact; swap red and blue; **correct the resulting cast,
+because the swap overshoots**; contrast last.
+
+**The app did steps 2 and 4.** `aero` at `src/main.ts` carried no `wbBias` at
+all where `red` has `[0.78, 1.02, 1.35]` and `goldie` `[0.78, 1.22, 1.4]` — and
+the comment beside it already named the result, *the bare swap, flat purple*.
+And nothing in `src/` read `AsShotNeutral` (0xC628) or Nikon `WB_RBLevels`
+(MakerNote 0x000C); the decoder took 0x003D for black and 0x0096 for the curve
+and stopped.
+
+**That explains the whole one-band thread.** The gray-world balance was doing
+step 3's job by accident. Removing it (`1f29118`) left the bare swap — two hues.
+Putting it back gives four to five hues and 11-15% crushed shadows: a cast
+correction improvised out of a white balance, applied to 8-bit data.
+
+**The camera recorded step 1 and both file types carry it.** Read out of the
+owner's own files: `NIR_1376.NEF` is WhiteBalance `PRESET4`, 0x000C
+`[1.8574, 1.4668, 1, 1]`; all five reported JPEGs are Z 50, `PRESET6`, and the
+**identical four numbers**. One preset, measured once on foliage, constant
+across a shoot — while gray-world re-derives a different answer per frame from
+that frame's content. **That is what "Restore depth" exists to paper over.**
+
+**Shipped: `openWB()`.** The camera's multipliers when the file has them,
+gray-world when it does not, on the four paths that mean "what opening does" —
+`establishFreshEdit`, `autoAdjust`, `makeThumb`, `batchParamsFor` — plus the
+balance a look substitutes, which would otherwise undo step 1 at the moment step
+2 runs. The IR tab's Auto WB and the sky mask keep gray-world: both want a
+content-derived answer and say so. This is the owner's rule of 2026-07-24
+finally meaning what it says; "opens AS SHOT" had been implemented as *neutral
+sliders*, which is not the same thing.
+
+**Measured, with the control.** `NIR_1376.NEF` opens at sliders **649/556/613**.
+Derived independently in Python from the raw tag — luminance-normalised
+`[1.5275, 0.8224, 1.2063]`, positions 649/556/613 — it matches to the integer.
+On the build before the change the same file opened **499/594/665**: different on
+every channel, so the test fails on the old code. All 44 practice DNGs still
+produce 30 distinct balances across 44 frames, so the gray-world fallback is
+untouched — they are minimal hand-written DNGs, 17 tags, no Exif, no such tag.
+
+## Aerochrome's missing cast correction — measured, NOT chosen, 2026-09-15
+
+Swept the bias grid against hue spread and crush. **The first sweep's winners
+all sat on the grid edge at B = 1.40, which means the optimum was never
+bracketed**; widened until it went interior at B = 2.0.
+
+Then built the candidates for real rather than trusting the slider proxy, and
+measured the five frames **plus a raw control**. That control is what settles the
+shape:
+
+- `NIR_0063` raw, no bias: 4 hues, biggest 43%
+- the same raw with `[1.3, 1, 1.7]`: 3 hues, 77% · `[1.8, 1, 2.0]`: 3 hues, 83%
+  · `[2.7, 1, 2.2]`: 2 hues, 71%
+
+**Every bias makes the raw worse.** Raw and camera-rendered files arrive in
+different states — one still to be pulled apart, one already rendered through the
+camera's balance — so one cast correction cannot serve both. `Look.raw` and
+`Look.jpeg` already split `sat` and `contrast`; **`wbBias` now rides that same
+split**, overriding the look-level one. With the bias confined to `jpeg` the raw
+control returns to 4 hues at 43%, bit-identical to no bias.
+
+**No value is set, and that is deliberate.** On the five JPEGs `[1.8, 1, 2.0]`
+takes four of five from two hues to three, and the biggest-hue share splits:
+2810 71% -> 49% and 2812 76% -> 58% better, 2811 unchanged, 2813 55% -> 68% and
+2821 61% -> 79% worse. Three frames better, two worse is a taste call on
+reader-facing rendering, not a measurement with a winner (LESSONS §307). The
+mechanism ships, every value stays absent, and behaviour is identical to today
+until the owner picks.
+
+**Held back with it:** the one-band sentence still describes the balance as what
+colours the frame. Rewriting it to describe the cast correction would describe a
+thing this build does not do.
