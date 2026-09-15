@@ -66,9 +66,10 @@ export function hasColour(p: StoredProfile | null): boolean {
  *  Takes `measured`, the reader's own profile for this frame's EXIF (null when
  *  they have none), and `shipped`, the profile from the table that ships with
  *  the app (null when nothing matched).
- *  Returns `{ colour, bump, brightness }` — the profile whose `kr`/`kb` to
- *  apply, the radial brightness curve to apply, and the profile that curve came
- *  from so a report can NAME it. Any of the three may be null.
+ *  Returns `{ colour, bump, brightness, heldBack }` — the profile whose `kr`/`kb`
+ *  to apply, the radial brightness curve to apply, the profile that curve came
+ *  from so a report can NAME it, and the reader's profile whose colour was
+ *  withheld on provenance (null when none was). Any of them may be null.
  *
  *  THE RESULT IS WHAT EVERY RENDER PATH MUST USE — the open photograph's GPU
  *  upload (`syncLensTexture`), the thumbnails (`lensCurveFor`), the export, and
@@ -88,7 +89,31 @@ export function hasColour(p: StoredProfile | null): boolean {
  *  is never another lens.
  *
  *  Colour is withheld from a shipped profile that has none rather than applied
- *  as a flat 1 — see `hasColour`. */
+ *  as a flat 1 — see `hasColour`.
+ *
+ *  AND PROVENANCE DECIDES THE COLOUR HALF, because ownership is not quality.
+ *  `kr`/`kb` are ratios between channels across the field, and a ratio measured
+ *  on a camera-RENDERED frame carries the camera matrix and its tone curve as
+ *  well as the lens — 3.5x the raw answer in red and 2.3x in blue on sixteen
+ *  frames, because the camera's own green row multiplies a camera-space residual
+ *  by 2.7 (`lensprofile.ts`). So a rendered measurement does not supply colour
+ *  over a shipped profile measured from raw.
+ *
+ *  This is not hypothetical and it is not the reader's doing. The rig called
+ *  `sniff(bytes)` without the filename; a NEF and a DNG share a TIFF magic
+ *  number; every NEF fell through to its embedded JPEG preview, so every profile
+ *  stored before that was fixed says `rendered` — INCLUDING the ones measured
+ *  from raw files — while the panel beside it said the raw was better. The
+ *  shipped table was re-measured from real raw afterwards, and those earlier
+ *  profiles were still overriding it on any device that holds them. Measured on
+ *  22 of them against their shipped counterparts: centre blue up to 20.5% apart
+ *  and always the same direction, centre red 3.3%.
+ *
+ *  BRIGHTNESS IS NOT WITHHELD. Red carries the brightness half and the tone
+ *  curve does not reach it; the same 22 profiles differ from the raw table by at
+ *  most 4.3 points there. An unstated source is treated as the weaker one — it
+ *  is not a claim of raw — and a blend across two anchors of different sources
+ *  reads `raw+rendered`, which is likewise not a claim of raw. */
 export function lensHalves(
   measured: StoredProfile | null | undefined,
   shipped: StoredProfile | null | undefined,
@@ -96,17 +121,27 @@ export function lensHalves(
   colour: StoredProfile | null;
   bump: ArrayLike<number> | null;
   brightness: StoredProfile | null;
+  heldBack: StoredProfile | null;
 } {
   const mine = measured ?? null;
   const theirs = shipped ?? null;
+  // Only stands down when there is something better to stand down TO: a shipped
+  // profile that is raw AND actually knows a colour. Withholding the reader's
+  // colour in favour of nothing would leave the frame uncorrected, which is a
+  // worse answer than the one this exists to avoid.
+  const heldBack =
+    mine && mine.source !== "raw" && theirs?.source === "raw" && hasColour(theirs)
+      ? mine
+      : null;
   // `brightness` is worked out HERE and not by the caller, because the caller
   // that worked it out for itself was the diagnostic, and it named the shipped
   // profile while the render used the reader's. One rule, one answer, one place.
   const brightness = mine?.bump ? mine : theirs?.bump ? theirs : null;
   return {
-    colour: mine ?? (hasColour(theirs) ? theirs : null),
+    colour: heldBack ? theirs : mine ?? (hasColour(theirs) ? theirs : null),
     bump: brightness?.bump ?? null,
     brightness,
+    heldBack,
   };
 }
 

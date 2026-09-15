@@ -15154,3 +15154,84 @@ two renders of one frame by one pipeline, so they agree or something diverged �
 0 measured on the fix, 14 and 74 on the plants, gate at 5.
 
 20 of 20 walks green. `PREVIEW_PIPELINE` 12 to 13.
+
+## Why a measured lens disagreed with the table that ships, 2026-09-15
+
+**Asked from the device, with the whole profile store attached: one camera, so
+why do the two differ so much?** They are not two calibrations of one lens. One
+of them was measured through a decode fault.
+
+**The provenance, read off the export and the table.** Twenty-two stored
+profiles, every one `source: "rendered"`, every one `measured: "2026-09-10"`,
+every one stamped `NIKON CORPORATION NIKON Z 50`. The shipped table: seventy-two,
+**sixty-seven of them `source: "raw"`**, all `measured: "2026-09-12"`, same camera
+string. Same rig, same lenses, two days apart, and a different kind of pixel
+underneath.
+
+**`src/lensrig.ts` already carried the diagnosis**, written when it was fixed: the
+rig called `sniff(bytes)` without the filename, a NEF and a DNG share a TIFF magic
+number, only `refineKind` tells them apart — so every NEF reached the decoder as a
+DNG, the Nikon branch never ran, and the decode fell through to the file's
+EMBEDDED JPEG PREVIEW. Sixteen raws and their camera JPEGs returned the same
+clipping to the rounding, 58.11% against "58.1%", because they were the same
+pixels. Every profile the rig had ever stored said `rendered`, including the ones
+measured from raw files, while the panel beside it said the raw was better.
+
+`src/lensprofile.ts` has the magnitude: colour measured after the camera matrix
+and its tone curve reads **3.5x the raw answer in red and 2.3x in blue**, because
+the camera's own green row multiplies a camera-space residual by 2.7.
+
+**Measured here, head to head.** Every one of the twenty-two settings has a
+shipped counterpart:
+
+- centre red `kr` — up to 3.3% apart, mean 1.8%
+- centre blue `kb` — up to **20.5%** apart, mean 5.6%, and **always the same
+  direction**: the rendered set wants more blue correction, and the gap widens
+  as the lens stops down (50-250 at 50mm: 1.161 to 1.276 across f/13 to f/22,
+  against 1.092 to 1.137 from raw)
+- centre brightness `bump` — close, at most 4.3 points apart
+
+**Replayed against the reported frame, it reproduces the report exactly.** The
+50-250 at 57mm f/8 matched the stored `50-250@50@f13.0` (rendered) at the
+remembered strength 1.13: **red 1.061 · blue 0.846 · blue/red 0.80** — the three
+numbers the device printed, to the digit. Through the raw-measured table instead:
+**1.022 · 0.943 · 0.92**. That is the washed centre, and it is not the lens.
+
+**So provenance decides the colour half now** (`Hotspot.lensHalves`). A profile
+whose `source` is not `raw` does not supply colour over a shipped profile that is
+raw AND knows a colour — never over nothing, because withholding it in favour of
+no correction is the worse answer. **Brightness is not withheld**: red carries it,
+the tone curve does not reach it, and the twenty-two differ from the table by at
+most 4.3 points there. An unstated source is treated as the weaker one, and a
+blend across anchors of two sources reads `raw+rendered`, which is likewise not a
+claim of raw.
+
+**The field was there the whole time.** `source` is stored on every profile and
+survives blending, and NOTHING read it — precedence was ownership and nothing
+else. The standing card copy said so in as many words: *used instead of the
+profile that came with the app, in full — brightness and colour both … so it has
+the better claim.* Ownership is not provenance, and that sentence is now the
+conditional it always should have been, with the card saying which halves the
+profile is actually supplying and why not the other.
+
+**AND THERE WAS NO WAY TO ACT ON ANY OF IT.** `clearProfiles()` was exported by
+the store and called by nothing; the only removal was per-profile, on the row for
+the frame currently open. Clearing a bad run meant opening one photograph per
+profile at the right focal length and aperture — twenty-two of them. *Forget every
+one of them* sits beside the backup buttons now, on the same two-press arm the
+Remove beside it uses, and says afterwards that the shipped profiles are untouched.
+
+**A gate gap found on the way, and it was one made this morning.**
+`tools/preview-version-check.mjs` watches `lensstore.ts` and `hotspotProfiles.ts`
+under the heading *which correction matches a photograph* — and `lensHalves`,
+which decides which half of that match is applied, moved into `src/hotspot.ts`
+hours earlier without joining the list. A preview rendered under the old rule
+would have been served under the new one. Same shape as the defect the move was
+meant to fix, one file along.
+
+20 of 20 walks green. `PREVIEW_PIPELINE` 13 to 14.
+
+**Not fixed here, and still the owner's:** a single stored profile is returned
+whatever the frame (`matchIn`: `if (by.length === 1) return by[0]`), so a
+measurement at f/13 lands on an f/8 frame at full strength. On this frame the
+reader's brightness curve reads 0.0501 where the shipped blend reads 0.0208.
