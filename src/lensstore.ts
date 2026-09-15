@@ -543,13 +543,40 @@ function matchAny(list: StoredProfile[], ex: ExifSubset | null): StoredProfile |
     kr.push(lo.kr[i] + (hi.kr[i] - lo.kr[i]) * t);
     kb.push(lo.kb[i] + (hi.kb[i] - lo.kb[i]) * t);
   }
-  // The bump blends on the same mix, and only when BOTH ends carry one — a
-  // blend against a missing half would quietly halve the correction.
+  // THE BUMP BLENDS ON THE SAME MIX, AND A MISSING END IS A MEASURED ZERO.
+  //
+  // This used to blend only when BOTH ends carried a curve, reasoning that a
+  // blend against a missing half would quietly halve the correction. Refusing
+  // removes ALL of it, which is the larger error and the one that was shipping:
+  // a frame at 57mm f/8 sits 14% of the way from a 50mm anchor with a real
+  // hot-spot to a 130mm anchor with none, and got no brightness correction at
+  // all while the report said a profile was correcting it.
+  //
+  // A MISSING BUMP IS NOT AN UNKNOWN. `bumpFrom` returns undefined at a range of
+  // zero or a centre no brighter than the reference ring — the rig found no
+  // hot-spot — and the generator deliberately stores nothing rather than a flat
+  // zero curve. The shipped table agrees with the physics on this: across the
+  // 44 profiles of the 50-250mm the curve APPEARS as the lens stops down and is
+  // absent wide open, which is how a hot-spot behaves (IR-SCIENCE.md §1), so the
+  // absences sit exactly where no hot-spot is expected.
+  //
+  // The one case where missing means unreadable rather than zero is a reader's
+  // own profile whose curve `read()` set aside. Blending that toward zero
+  // under-corrects; refusing it corrected nothing at all. Under-correcting
+  // leaves a disc the Hot-spot slider can finish, which is the trade the
+  // generator's own header already names.
   let bump: number[] | undefined;
-  if (lo.bump && hi.bump) {
-    const bn = Math.min(lo.bump.length, hi.bump.length);
-    bump = [];
-    for (let i = 0; i < bn; i++) bump.push(lo.bump[i] + (hi.bump[i] - lo.bump[i]) * t);
+  if (lo.bump || hi.bump) {
+    const bn = lo.bump && hi.bump
+      ? Math.min(lo.bump.length, hi.bump.length)
+      : (lo.bump ?? hi.bump)!.length;
+    const at = (p: StoredProfile, i: number) => (p.bump ? p.bump[i] : 0);
+    const out: number[] = [];
+    for (let i = 0; i < bn; i++) out.push(at(lo, i) + (at(hi, i) - at(lo, i)) * t);
+    // A blend that lands on nothing stays nothing: a flat zero curve would make
+    // the report name a brightness source that does not move a pixel, which is
+    // the contradiction this whole thread started as.
+    bump = out.some((v) => v > 1e-6) ? out : undefined;
   }
   return {
     key: `${lo.key}+${hi.key}`,
