@@ -14392,7 +14392,7 @@ The check was made to fail once before it was trusted: `.hsl-chip` planted back
 at 28 px in the BUILT stylesheet, run, named at both widths on the Color tab,
 restored byte-identical.
 
-## Two defects no gate here can see, 2026-09-15
+## One defect no gate here can see, and one taste call that was not a defect, 2026-09-15
 
 **Both scroll cues had shipped as a flat 10 px pill with the arrow drawn outside
 it, underneath.** `.scroll-cue` is `display: flex` with `height: 0` — on purpose,
@@ -14406,14 +14406,22 @@ accessible name, role, contrast — and the cue is `pointer-events: none` with n
 role and no name. Marking something decorative removes it from the population
 every instrument samples.
 
-**And the explanations toggle wrote `"Explanations"` when on, `"Explanations
-off"` when off.** `aria-pressed` was correct, so axe was right to pass it. But
-the ON state was a bare noun, left-aligned in a full-width bordered box at the
-top of a panel, which is the shape of a section label and not of a control — and
-the only thing then separating the two states was `--txt-2` against `--txt-3`.
-Two greys. The state is the `.seg` word now, `on` / `off`, the same
-state-as-text pattern the look buttons use and the never-churn list blesses; the
-greying stays as a second cue and never the only one.
+**The explanations toggle reads `"Explanations"` when on and `"Explanations
+off"` when off.** A session changed that to `"Explanations on"` / `"Explanations
+off"` on the argument that the ON state was a bare noun, left-aligned in a
+full-width bordered box at the top of a panel, which is the shape of a section
+label and not of a control. **The owner reverted it the same day and the pair
+above is the settled one — NEVER-CHURN.** It is reader-facing copy, which is a
+taste call and not a session's to make (LESSONS §307, the second time in two
+days).
+
+What survives the revert, and what the code comments now say instead: the two
+states differ in **nothing but the label**. Take the word "off" away and all
+that is left is `--txt-2` against `--txt-3` — two greys — and colour alone
+carrying a state is a fail state here. So the wording is the owner's and the
+requirement that the wordings differ is not. `aria-pressed` is correct and axe
+was always right to pass it; nothing in this repo checks whether a toggle's two
+renderings differ in anything but colour, which is the part worth knowing.
 
 Also: `#exBtn` had 6 px under it, its own margin collapsed against the note's, so
 the Batch-process sentence read as stuck to the edge of a filled full-width
@@ -14444,3 +14452,28 @@ the tight one only exists after an interaction.
 Hub LESSONS §309 carries what generalises: adding surfaces widens a sweep along
 one axis only, and none of these three would have been found by visiting more
 pages.
+
+## The tab sweep was racing the sticker catalogue, 2026-09-15
+
+**Found by the walk failing on a run that should have been a no-op**, two runs
+after it had been made to fail on a plant and twice reported every tab green.
+Four chips in `#stickerGroups` at 40px.
+
+Not flake and not a regression. `#stickerGroups .mix-chip` sets `min-height:
+40px` — an id selector, so it beats the `.mix-chip` class and the 44px floor
+never reached it. The row is the top tier of the sticker picker's three and the
+rule was written to make it read bigger than the categories below, which it does
+on width and weight; the height was the one part of "bigger" that made it
+smaller than a finger.
+
+**Why two earlier runs called it green.** That row is `hidden` until the sticker
+catalogue loads, and the per-tab loop waited a flat 260 ms after clicking. So the
+sweep measured the controls that had arrived and said every control passed —
+which is the session's own lesson one level down: a sweep reports on what it
+managed to see, and nothing in the output tells that apart from coverage. A
+sticky 260 ms is a guess about a load, and the wrong answer is silent.
+
+It settles on a COUNT now: the panel's control count read every 50 ms until it
+is unchanged three times running, capped at 2 s with a printed note if it never
+settles. Made to fail: the 40px planted back into the built stylesheet, caught
+at **both** widths — where the flat wait had caught it at one, once.

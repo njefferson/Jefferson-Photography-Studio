@@ -12829,20 +12829,22 @@ setupInstallFromApp("irInstallFromApp");
  *  turned them off has said what they want. */
 {
   const btn = document.getElementById("panelNotes") as HTMLButtonElement | null;
-  const state = document.getElementById("panelNotesState");
   const KEY = "ips-panel-notes";
   if (btn) {
     const apply = (on: boolean) => {
       document.getElementById("panel")?.classList.toggle("notes-off", !on);
       btn.setAttribute("aria-pressed", String(on));
-      // THE STATE IS A WORD IN BOTH DIRECTIONS. This wrote "Explanations" when
-      // on and "Explanations off" when off — so the ON state was a bare noun,
-      // which is the shape of a label and not of a control, and the only thing
-      // then separating the two states was --txt-2 against --txt-3: two greys.
-      // `on`/`off` in the .seg is the house state-as-text pattern (the look
-      // buttons' norm / R-B), and it survives grayscale.
-      // Writing into the span, never btn.textContent — that would delete it.
-      if (state) state.textContent = on ? "on" : "off";
+      // THESE TWO STRINGS ARE THE OWNER'S, AND A SESSION DOES NOT GET A VOTE.
+      // One changed them to "Explanations on" / "Explanations off" reasoning
+      // that a bare noun reads as a label rather than a control — a judgement
+      // about reader-facing copy, which is not a session's to make, and it was
+      // reverted on the owner's word the same day. Do not re-litigate it.
+      // What IS load-bearing and must survive any future rewording: the label
+      // is the only thing carrying the state. The two renderings differ in
+      // nothing else but --txt-2 against --txt-3, and colour alone carrying a
+      // state is a fail state here. So whatever these say, they must not say
+      // the same thing.
+      btn.textContent = on ? "Explanations" : "Explanations off";
     };
     apply(localStorage.getItem(KEY) !== "off");
     btn.addEventListener("click", () => {

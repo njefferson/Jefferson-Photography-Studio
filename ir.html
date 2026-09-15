@@ -311,16 +311,20 @@
                a slider somebody is trying to drag. On a first visit they are how
                the controls get learned; on the fiftieth they are in the way. So
                they are a toggle, on to begin with, remembered once turned off.
-               ITS STATE IS THE WORD, not the shade. The on state used to read
-               "Explanations" — a bare noun, left-aligned in a full-width box,
-               which is the shape of a section LABEL and not of a control. The
-               only thing then separating on from off was --txt-2 against
-               --txt-3: two greys, carrying a state with no other carrier at all.
-               main.ts writes `on`/`off` into the .seg. -->
+               THE TWO LABELS ARE "Explanations" AND "Explanations off", and
+               they are the owner's call, not a session's — a session briefly
+               made them "Explanations on" / "Explanations off" on the argument
+               that a bare noun reads as a label, which is a judgement about
+               reader-facing copy and therefore not its judgement to make.
+               What the session was right about is underneath and still holds:
+               whatever the words are, they must be the thing that carries the
+               state, because the ONLY other difference between these two is
+               --txt-2 against --txt-3 — two greys — and colour alone carrying a
+               state is a fail state here. main.ts sets the label; the greying is
+               a second cue and never the only one. -->
           <div class="panel-prefs">
             <button id="panelNotes" type="button" class="panel-notes-toggle" aria-pressed="true"
-                    title="Show or hide the explanations beside each control"><span
-              >Explanations</span> <span id="panelNotesState" class="seg">on</span></button>
+                    title="Show or hide the explanations beside each control">Explanations</button>
           </div>
           <!-- THE HEADING IS WHAT STAYS. It is the only thing on screen saying
                which tab you are in once the grid has scrolled away, so it is the
