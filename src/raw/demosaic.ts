@@ -21,12 +21,6 @@ export interface RawCfa {
   pattern: number[];
   black: number;
   white: number;
-  /** The white balance the CAMERA recorded, as [R, G, B] multipliers with G
-   *  normalised to 1 — NEF MakerNote 0x000C, DNG AsShotNeutral. Absent when the
-   *  file carries neither (the bundled practice DNGs are minimal hand-written
-   *  files and carry no such tag), in which case the caller falls back to
-   *  gray-world. */
-  camWb?: [number, number, number];
 }
 
 /**

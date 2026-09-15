@@ -80,6 +80,23 @@ standing rule" holds the full audit record and the NEVER-CHURN list of
 patterns already verified correct — do not "fix" those, do not regress them.
 
 ## INFRARED first — never reason from visible-light defaults (owner, 2026-07-25)
+**[`IR-SCIENCE.md`](IR-SCIENCE.md) IS THE RESEARCH FILE. READ IT BEFORE TOUCHING
+PIXELS, WHITE BALANCE, LOOKS OR DECODE.** It carries the physics, what the file
+formats actually contain, the three processing routes and which one this app
+implements, how to measure an IR rendering without fooling yourself, and the
+standing errors — each with the measurement that established it. It exists
+because this exact paragraph was not enough: sessions kept rediscovering the
+same infrared facts, shipping a regression, and rediscovering them again a week
+later. Design from IR physics first and reach for general photography only where
+it fills a gap and still applies; that file marks where those places are.
+
+**The one most likely to be rediscovered by accident: the camera CANNOT store an
+infrared white point.** Its recorded white balance is a clamp artefact, not a
+measurement, and developing a raw at it renders a magenta wall with the green
+channel at zero. The white point is found BELOW what the camera allows, from the
+data. A session read "opens as shot" as an instruction to do the opposite,
+shipped it, and took it back out the same day (IR-SCIENCE.md §3).
+
 This app processes INFRARED and full-spectrum photography ONLY. Every
 processing judgment starts from IR physics: red-channel flood, white balance
 far beyond visible norms, daylight-only shooting, hotspots, false-color
