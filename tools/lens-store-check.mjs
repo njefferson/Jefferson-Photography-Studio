@@ -219,5 +219,74 @@ const shippedBumpOnly = prof({ bump: BUMP });
     : fail(`both anchors carrying a curve must still blend, got ${both === null ? "NO CURVE" : both.toFixed(4)}`);
 }
 
+{
+  // PROVENANCE DECIDES THE COLOUR HALF.
+  //
+  // A profile measured on a camera-RENDERED frame measured the tone curve as
+  // well as the lens. kr/kb are ratios between channels across the field, and a
+  // ratio taken after the camera matrix and its tone curve is not the same
+  // quantity: measured on sixteen frames, 3.5x the raw answer in red and 2.3x
+  // in blue, because the camera's own green row multiplies a camera-space
+  // residual by 2.7 (src/lensprofile.ts).
+  //
+  // This is not hypothetical and it is not the reader's fault. The rig called
+  // `sniff(bytes)` without the filename; a NEF and a DNG share a TIFF magic
+  // number; every NEF fell through to its embedded JPEG preview. Every profile
+  // stored before that was fixed says `rendered` — including the ones measured
+  // FROM RAW FILES — while the panel beside it said the raw was better. The
+  // shipped table was re-measured from real raw afterwards, and the pre-fix
+  // profiles still on a device were overriding it, because "the reader's own
+  // supersedes the shipped one" weighed nothing but ownership.
+  //
+  // Measured on the 22 real profiles against their shipped counterparts: centre
+  // blue up to 20.5% apart and always in the same direction, centre red 3.3%,
+  // centre brightness close. So COLOUR stands down and BRIGHTNESS does not —
+  // red carries the brightness half and the tone curve does not reach it.
+  const raws = (o) => ({ ...prof(o), source: "raw" });
+  const rend = (o) => ({ ...prof(o), source: "rendered" });
+  const mineRendered = rend({ kr: KR_REAL, kb: KR_REAL, bump: BUMP2 });
+  const mineRaw = raws({ kr: KR_REAL, kb: KR_REAL, bump: BUMP2 });
+  const shippedRaw = raws({ kr: KR_FLAT.map((_, i) => 0.99 + i / 8000), kb: KR_FLAT.map((_, i) => 1.01 - i / 8000), bump: BUMP });
+  const shippedRendered = rend({ kr: shippedRaw.kr, kb: shippedRaw.kb, bump: BUMP });
+
+  {
+    // THE REPORTED CASE.
+    const h = lensHalves(mineRendered, shippedRaw);
+    h.colour === shippedRaw
+      ? ok("a rendered measurement does not supply colour over a raw shipped profile")
+      : fail("a profile measured on a camera rendering is overriding the raw-measured table — this is the washed centre");
+    h.bump === mineRendered.bump
+      ? ok("...and the reader's brightness curve is still used, which the tone curve does not reach")
+      : fail("brightness should still come from the reader's measurement");
+  }
+  {
+    // A reader who measured from RAW is at least as good as the table: whole.
+    const h = lensHalves(mineRaw, shippedRaw);
+    h.colour === mineRaw && h.bump === mineRaw.bump
+      ? ok("a raw measurement supersedes the shipped profile whole")
+      : fail("a raw measurement must supply both halves");
+  }
+  {
+    // Nothing to protect: the shipped one is rendered too.
+    const h = lensHalves(mineRendered, shippedRendered);
+    h.colour === mineRendered
+      ? ok("rendered over rendered: the reader's own still wins, there is no better source to hold")
+      : fail("a rendered shipped profile is no better than the reader's — it must not displace it");
+  }
+  {
+    // An unknown source is not a claim of raw, and is not a reason to refuse.
+    const h = lensHalves({ ...prof({ kr: KR_REAL, kb: KR_REAL }) }, shippedRaw);
+    h.colour === shippedRaw
+      ? ok("a profile that does not say how it was measured is treated as the weaker one")
+      : fail("an unstated source must not outrank a raw measurement");
+  }
+  {
+    const h = lensHalves(null, shippedRaw);
+    h.colour === shippedRaw && h.bump === shippedRaw.bump
+      ? ok("no stored profile: the shipped one supplies both halves")
+      : fail("with nothing stored the shipped profile must supply both");
+  }
+}
+
 console.log(bad ? `\n${bad} failed\n` : "\nthe save door and the read door agree, and every render path takes the same halves\n");
 process.exit(bad ? 1 : 0);

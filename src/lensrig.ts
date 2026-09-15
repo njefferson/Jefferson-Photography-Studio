@@ -21,7 +21,7 @@ import { device } from "./platform";
 import { profileFrame, averageProfiles, round5, NBINS, type FrameProfile } from "./lensprofile";
 import { readZipIndex, readZipEntry, readZipEntryPrefix, imageEntries } from "./zip";
 import { saveBlob } from "./savefile";
-import { saveFromPayload, listProfiles, removeProfile, coverage, gapsFor, exportAll, importText, type SaveChange } from "./lensstore";
+import { saveFromPayload, listProfiles, removeProfile, clearProfiles, coverage, gapsFor, exportAll, importText, type SaveChange } from "./lensstore";
 import { markBackedUp, backupState, backupSentence } from "./lensbackup";
 import { requestPersistence } from "./session";
 import { keepAwake, granted as wakeGranted, supported as wakeSupported } from "./wakelock";
@@ -70,6 +70,41 @@ export function wireLensRig(root: ParentNode): void {
   const backupBtn = $<HTMLButtonElement>("lensBackup");
   const backupCopyBtn = $<HTMLButtonElement>("lensBackupCopy");
   const restoreInput = $<HTMLInputElement>("lensRestore");
+  // FORGETTING ALL OF THEM NEEDED A REASON TO EXIST, AND IT HAS ONE.
+  // `clearProfiles` was exported by the store and called by nothing: the only
+  // way to drop a profile was "Remove" on the row for the frame currently open,
+  // so clearing a whole run meant opening one photograph per profile at the
+  // right focal length and aperture. That mattered the day a measuring run was
+  // found to have been made through a decode fault — twenty-two profiles, every
+  // one of them wanted gone, and no gesture in the app that could do it.
+  //
+  // Two presses on the button itself, like Remove beside it: a confirm box on a
+  // tablet is another thing to hit, and the arm disarms itself.
+  const forgetAllBtn = $<HTMLButtonElement>("lensForgetAll");
+  let allArmed = false;
+  const disarmAll = () => { allArmed = false; forgetAllBtn.classList.remove("primary"); forgetAllBtn.textContent = "Forget every one of them"; };
+  forgetAllBtn.addEventListener("click", () => {
+    const n = listProfiles().length;
+    if (!n) { forgetAllBtn.textContent = "there are none to forget"; setTimeout(disarmAll, 2500); return; }
+    if (!allArmed) {
+      allArmed = true;
+      forgetAllBtn.classList.add("primary");
+      // The count is in the confirm because zero and "storage refused" read the
+      // same on this panel, and because forgetting four is a different act from
+      // forgetting forty.
+      forgetAllBtn.textContent = `Forget all ${n} for good?`;
+      setTimeout(() => { if (allArmed) disarmAll(); }, 4000);
+      return;
+    }
+    clearProfiles();
+    disarmAll();
+    renderKept();
+    // Said out loud: the profiles that ship with the app are untouched, and a
+    // reader who has just deleted their own work should not have to infer that
+    // corrections still happen.
+    restoreNote.hidden = false;
+    restoreNote.textContent = `Forgot ${n} profile${n === 1 ? "" : "s"}. The profiles that came with the app are untouched and still correcting.`;
+  });
   const restoreNote = $("lensRestoreNote");
   // SAY WHAT WENT IN THE FILE. A backup is written to be trusted later, on a
   // day when the store is gone — and this wrote one with no feedback at all, so

@@ -224,6 +224,19 @@ changes additionally sweep all 44 practice raws.
   in the linearization curve `0x0096`, and Adobe's levels in DNG 50714/50717.
 - **The colour matrix is picked by illuminant**, preferring D65: IR shooting is
   daylight-only and picking the tungsten calibration bends every colour.
+- **A lens profile's `source` says what its colour is worth, and `rendered` is
+  worth much less than `raw`.** `kr`/`kb` are ratios between channels across the
+  field. Measured on a camera-rendered frame the ratio carries the camera matrix
+  and its tone curve as well as the lens — 3.5x the raw answer in red and 2.3x in
+  blue on sixteen frames, because the camera's own green row multiplies a
+  camera-space residual by 2.7. Measured on twenty-two real profiles against
+  their raw-measured counterparts: centre blue up to **20.5%** apart, always the
+  same direction, widening as the lens stops down; centre red 3.3%; centre
+  brightness at most 4.3 points, because red carries brightness and the tone
+  curve does not reach it. **This is not hypothetical**: a rig that identified a
+  NEF by bytes alone decoded every one of them to its embedded JPEG preview, and
+  a whole measuring run was stored as `rendered` while the panel said the raw was
+  better. Provenance, not ownership, decides which colour applies.
 
 ---
 
