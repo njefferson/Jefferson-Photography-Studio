@@ -115,12 +115,25 @@ function bandProblem(name: string, a: unknown, n: number, lo: number, hi: number
   }
   return null;
 }
-/** A colour curve: red or blue against green, 1 in the reference ring. */
+/** Whether a stored COLOUR curve is one this version can apply.
+ *  Takes `a`, the candidate curve as read from storage or a payload, and `n`,
+ *  the band count this build indexes by (always NBINS).
+ *  Returns null when the curve is usable, or a sentence naming what is wrong
+ *  with it, for showing to the reader.
+ *  DEPENDS BOTH WAYS: `saveFromPayload` and `read` must apply this to the SAME
+ *  curves, or a profile is stored at one door and refused at the other. */
 export function colourProblem(a: unknown, n: number): string | null {
   return bandProblem("colour", a, n, 0.2, 5);
 }
-/** A brightness curve: the hot-spot's share of the centre, 0 where there is
- *  none. */
+/** Whether a stored BRIGHTNESS curve is one this version can apply.
+ *  Takes `a`, the candidate curve, and `n`, the band count this build indexes
+ *  by (always NBINS).
+ *  Returns null when the curve is usable, or a sentence naming what is wrong.
+ *  WHATEVER `bumpFrom` RETURNS MUST PASS THIS. Those two disagreed once — this
+ *  demanded NBINS while bumpFrom returned a curve as long as whatever falloff
+ *  it was handed — and profiles saved cleanly and were then refused on every
+ *  read, silently, taking their colour curves with them. Held together now by
+ *  tools/lens-store-check.mjs. */
 export function bumpProblem(a: unknown, n: number): string | null {
   return bandProblem("brightness", a, n, 0, 4);
 }
@@ -187,20 +200,21 @@ function write(list: StoredProfile[]): boolean {
     return false; // out of quota, or storage refused — the caller must say so
   }
 }
-
+/** Every stored profile this version can use.
+ *  Takes nothing.
+ *  Returns the validated list from `read` — so a profile with an unusable
+ *  brightness curve appears here WITHOUT that curve rather than not at all.
+ *  Callers may assume every entry has usable kr/kb; they may not assume `bump`
+ *  is present. */
 export function listProfiles(): StoredProfile[] {
   return read();
 }
-
-/** A CHEAP FINGERPRINT OF EVERY STORED PROFILE, for anything that keeps a
- *  rendered picture around. A preview or a thumbnail is rendered THROUGH the
- *  reader's lens correction, so one made before a re-measurement is a portrait
- *  of the old correction — and re-measuring is not rare: one this month took a
- *  device from 11 profiles carrying colour to 71.
- *
- *  Hashed from the stored text rather than kept as a counter, because a counter
- *  has to be bumped by every writer and the writer that forgets serves stale
- *  pictures for ever. */
+/** A short string that changes whenever the stored profiles change.
+ *  Takes nothing.
+ *  Returns a stamp derived from the stored list, for cheap change detection by
+ *  anything caching a match.
+ *  It must change when a profile is added, removed or replaced, or a cache
+ *  keyed on it will serve a match from a profile that is no longer there. */
 export function profilesStamp(): string {
   let raw = "";
   try {
@@ -242,19 +256,12 @@ export interface SaveChange {
  *  gradient. EQUAL frames still replaces — re-measuring to the same depth is a
  *  deliberate refresh, and refusing it would leave no way to correct a
  *  measurement except deleting it first. */
-/** Does this profile say anything about colour, or is it a flat 1?
- *
- *  A flat 1 is not a measurement of a neutral lens — it is the recorded fact
- *  that the frames had too little green to divide by, so the colour half was
- *  withheld. On an infrared lens that is the half the whole correction exists
- *  for, and a profile carrying it is a different KIND of answer from one that
- *  does not, not a better example of the same one.
- *
- *  EXPORTED so the generator that builds the shipped table uses this rule and
- *  not its own copy of it. It had its own — frame count alone, the same rule
- *  this replaced — and regenerating the table from raw measurements therefore
- *  shipped four colourless profiles that had beaten colour-carrying ones on
- *  frame count. One rule, one implementation, both doors. */
+/** Whether a profile carries a colour measurement at all.
+ *  Takes `p`, anything with `kr` and `kb` curves.
+ *  Returns true when any band differs from 1 — a flat 1 means the measurement
+ *  found no colour rather than measuring none.
+ *  Used to rank profiles (colour beats frame count) and by `forCamera` to
+ *  decide whether there is colour worth withholding from a different body. */
 export function saysAnythingAboutColour(p: { kr: ArrayLike<number>; kb: ArrayLike<number> }): boolean {
   for (const a of [p.kr, p.kb]) for (let i = 0; i < a.length; i++) if (Math.abs(a[i] - 1) > 1e-9) return true;
   return false;
@@ -294,7 +301,17 @@ function place(list: StoredProfile[], entry: StoredProfile, falloff: ArrayLike<n
   list[at] = entry;
   return { key: entry.key, what: "replaced", wasFrames: was, frames: entry.frames };
 }
-
+/** Store the profiles from a measuring run.
+ *  Takes `payload`: the rig's block of numbers — `camera`, `measured`, a
+ *  `profiles` map of curves keyed by lens and focal length, and `lens_map` from
+ *  short names to models.
+ *  Writes the usable ones to storage, replacing an existing entry for the same
+ *  key when the new one is better (colour beats frame count).
+ *  Returns how many were saved, which keys were skipped, whether the write
+ *  succeeded, and a per-key list of what happened for reporting to the reader.
+ *  EVERY CURVE IT STORES MUST PASS THE CHECKS `read` APPLIES — colourProblem on
+ *  kr and kb, bumpProblem on the derived bump — or it saves something that will
+ *  never load. That is exactly the bug this comment is standing on. */
 export function saveFromPayload(payload: {
   camera?: string;
   measured?: string;
@@ -377,11 +394,19 @@ export function bumpFrom(falloff?: number[], range?: number[]): number[] | undef
   const scale = lo / peak;
   return falloff.map((v) => Math.max(0, Math.round((v - 1) * scale * 1e5) / 1e5));
 }
-
+/** Forget one stored profile.
+ *  Takes `key`, the profile's storage key.
+ *  Writes the list back without it; returns nothing.
+ *  Anything holding a match from that profile must re-ask, so callers refresh
+ *  through `profilesStamp` rather than keeping the old result. */
 export function removeProfile(key: string): void {
   write(read().filter((p) => p.key !== key));
 }
-
+/** Forget every stored profile.
+ *  Takes nothing, writes an empty list, returns nothing.
+ *  The reader's own measurements are gone after this and the app falls back to
+ *  the profiles that ship with it — which still correct, so nothing on screen
+ *  announces the loss unless the caller says so. */
 export function clearProfiles(): void {
   write([]);
 }
@@ -392,26 +417,14 @@ export function clearProfiles(): void {
  *  wherever it sits. */
 const logMix = (v: number, a: number, b: number) =>
   a === b ? 0 : Math.min(1, Math.max(0, Math.log(v / a) / Math.log(b / a)));
-
-/** The stored profile that best fits a photograph, or null.
- *
- *  THE LENS DOES NOT STOP AT THE FOCAL LENGTHS THAT HAPPENED TO BE MEASURED.
- *  Picking the nearest profile means a lens measured at 50mm and 250mm hands a
- *  130mm frame the 50mm curve unchanged — the hot-spot's whole character
- *  changes across a zoom, so that is a measurement applied where it does not
- *  belong. Between two measurements the curves are BLENDED, bin by bin, on a
- *  proportional focal-length axis.
- *
- *  It never extrapolates. Outside the measured range the nearest end is used
- *  as-is: a lens curve continued past where anybody looked is a guess wearing
- *  a measurement's clothes, and it would be applied silently to every frame.
- *
- *  Aperture chooses the SET first, focal length interpolates within it. A
- *  hot-spot changes more with aperture than with anything else — measured on a
- *  real lens: 0.19 at f/29 and 0.00 at f/5.3, nearly the same focal length —
- *  so blending across apertures would average two different lenses. The set
- *  nearest the frame's aperture is used, and the note says when that set was
- *  not shot at this frame's aperture. */
+/** The stored profile that fits a photograph.
+ *  Takes `ex`, the frame's EXIF subset (lens, focal length, aperture, make and
+ *  model), or null when it carries none.
+ *  Returns the best matching profile, blended across focal lengths where two
+ *  bracket the frame, with colour withheld if it was measured on a different
+ *  body — or null when nothing matches.
+ *  Reads through `read`, so a profile whose brightness curve is unusable can
+ *  still be returned here for its colour. */
 export function findProfile(ex: ExifSubset | null): StoredProfile | null {
   return matchIn(read(), ex);
 }
@@ -460,7 +473,12 @@ function forCamera(p: StoredProfile, ex: ExifSubset | null): StoredProfile {
   const flat: number[] = new Array(p.kr.length).fill(1);
   return { ...p, kr: flat, kb: [...flat], otherCamera: theirs };
 }
-
+/** The profile that fits a photograph, out of a list the caller supplies.
+ *  Takes `list`, the candidates, and `ex`, the frame's EXIF subset.
+ *  Returns the best match with `forCamera` already applied, or null.
+ *  ONE MATCHER, TWO CALLERS — the shipped table and the reader's own profiles
+ *  are the same shape and must be matched by the same rules; a second
+ *  implementation is how the shipped table came to ignore aperture. */
 export function matchIn(list: StoredProfile[], ex: ExifSubset | null): StoredProfile | null {
   const picked = matchAny(list, ex);
   return picked ? forCamera(picked, ex) : null;
@@ -549,8 +567,13 @@ function matchAny(list: StoredProfile[], ex: ExifSubset | null): StoredProfile |
     blend: { loFl: lo.fl, hiFl: hi.fl, t },
   };
 }
-
-/** How far a match had to reach, in words, so the reader can judge it. */
+/** How to describe a match to the reader.
+ *  Takes `p`, the profile that matched, and `ex`, the frame's EXIF subset.
+ *  Returns a sentence naming where the numbers came from and how exactly they
+ *  fit — the blend between focal lengths, whether the aperture was recorded,
+ *  and whether colour was withheld because the body differs.
+ *  It must stay honest about a blend: a profile applied at a focal length
+ *  nobody measured, described as a measurement, is the failure it guards. */
 export function matchNote(p: StoredProfile, ex: ExifSubset | null): string {
   const fl = ex?.focalLength && ex.focalLength[1] ? ex.focalLength[0] / ex.focalLength[1] : NaN;
   const ap = ex?.fNumber && ex.fNumber[1] ? ex.fNumber[0] / ex.fNumber[1] : NaN;
@@ -595,21 +618,11 @@ export interface LensCoverage {
   gaps: string[];
   profiles: number;
 }
-
-/** What is still missing from a set of measurements, in words, as the next trip
- *  out rather than as a complaint.
- *
- *  ONE COPY, THREE CALLERS' WORTH OF HISTORY. This lived twice — once here for
- *  the stored panel and once in the rig for the run just measured — and the two
- *  had drifted into different bugs. The panel looked only at focal lengths with
- *  exactly ONE aperture, so a real store's 130mm (f/5.3 and f/29) was never
- *  examined and the report named 135mm alone. The rig's copy reported only when
- *  NO single-aperture focal length shared with the sweep, and then named all of
- *  them — so one tied and one untied produced silence. Under-reporting a gap is
- *  worse than reporting none: the reader plans the next trip out from it.
- *
- *  `aps` are the aperture LABELS already formatted for the reader ("f/8"), so
- *  the two callers compare the same strings they print. */
+/** Which focal lengths of a lens have not been measured yet.
+ *  Takes `model`, the lens as EXIF spells it, `atFl`, the focal length the
+ *  reader is asking about, and the list of stored profiles.
+ *  Returns the gaps worth filling, for telling the reader what to shoot next.
+ *  Advice only — nothing in the pipeline reads it. */
 export function gapsFor(model: string, atFl: { fl: number; aps: string[] }[]): string[] {
   const gaps: string[] = [];
   const fls = atFl.map((e) => e.fl);
@@ -639,7 +652,12 @@ export function gapsFor(model: string, atFl: { fl: number; aps: string[] }[]): s
   }
   return gaps;
 }
-
+/** What the stored profiles add up to.
+ *  Takes nothing; reads the stored list.
+ *  Returns a per-lens summary of the focal lengths measured and how many frames
+ *  went into each, for the measuring panel.
+ *  Reporting only; it must not be used to decide whether a profile applies —
+ *  that is `matchIn`'s job and it has rules this does not. */
 export function coverage(list: StoredProfile[]): LensCoverage[] {
   const byLens = new Map<string, StoredProfile[]>();
   for (const p of list) {
@@ -680,8 +698,12 @@ export function coverage(list: StoredProfile[]): LensCoverage[] {
 // news delivered on time.
 
 const BACKUP_FORMAT = "ips-lens-backup";
-
-/** Everything kept on this device, as one file's worth of text. */
+/** The stored profiles as text the reader can keep.
+ *  Takes nothing; reads the stored list.
+ *  Returns the same block of numbers the rig emits, so a backup can be handed
+ *  straight back to `importText` on another device.
+ *  The two must stay the same shape — a backup this writes that importText
+ *  cannot read is a backup that is not one. */
 export function exportAll(): string {
   return JSON.stringify({
     format: BACKUP_FORMAT,
@@ -690,13 +712,12 @@ export function exportAll(): string {
     profiles: read(),
   });
 }
-
-/** Read a backup, or a rig payload, back in.
- *
- *  BOTH SHAPES, because the reader has two files that look like the same thing:
- *  what the rig printed after a measurement, and what this app wrote as a
- *  backup. Refusing one of them because of a header would be a distinction only
- *  the code cares about. */
+/** Restore profiles from a block of text.
+ *  Takes `text`, a payload previously written by `exportAll` or by the rig.
+ *  Parses it and stores what is usable through `saveFromPayload`.
+ *  Returns what was saved and what was skipped, with a reason per key.
+ *  Text from outside is the reason the curve checks exist: it is the one door
+ *  where a hand-edited or older-format profile actually arrives. */
 export function importText(text: string): { saved: number; skipped: string[]; ok: boolean; changes: SaveChange[] } {
   let data: unknown;
   try {

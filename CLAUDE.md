@@ -130,6 +130,33 @@ mutation — every automatic lands on a visible slider, is undoable, and the
 untouched decode stays one press away. Never add an at-open automatic that
 fails any of those three tests.
 
+## Every function states its contract (owner rule, 2026-09-15)
+**What it takes, what it does, what it gives back — and what the result has to
+satisfy or who consumes it.** That last clause is the one that catches
+regressions, and it is the one this repo was missing.
+
+This repository already comments heavily and the comments are good, but they
+carry WHY a thing exists and what the alternative cost. **History is not a
+contract.** `bumpFrom` in `src/lensstore.ts` had a careful paragraph about what
+it derives and why it refuses to guess, and never said that what it returns has
+to pass `bumpProblem`. A later commit tightened `bumpProblem`; nothing connected
+the two; profiles saved cleanly and were refused on every read afterwards,
+wholesale, and a measured lens silently stopped working. Somebody who had been
+told "the curve this returns must pass bumpProblem" would have seen it while
+typing. Measured when the rule arrived: **10 of 246 exported functions stated a
+contract.**
+
+- `tools/contract-check.mjs` runs on every commit through `.branch-guard`. It
+  checks the three mechanical parts: a `/** */` block above every exported
+  function, every parameter named in it, and a statement of what comes back.
+- **The fourth part is a CHECKLIST and cannot be parsed**: name the invariant the
+  output must hold, or the caller that depends on it. No parser tells a real
+  invariant from a sentence shaped like one. Write it anyway — it is the point.
+- **The existing backlog is a declared list** (`.contract-allow`), checked both
+  ways and printed on every run, so it can only shrink. A new exported function
+  is not on it and therefore must carry its contract. Touching a file is the
+  moment to take its functions off the list.
+
 ## Adding an EditParams field — FIVE places or undo silently breaks
 cloneParams, applySnapshot, syncFromUI, syncToUI, AND the input-listener
 array in main.ts. applySnapshot restores fields INDIVIDUALLY — a field
