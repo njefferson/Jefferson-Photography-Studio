@@ -6382,6 +6382,11 @@ function setGeoMode(mode: "crop" | "straighten" | null) {
   cropOverlay.classList.toggle("focus-straighten", geoMode === "straighten");
   geoLbl.textContent = isCrop ? "Crop" : "Straighten";
   cropResetBtn.textContent = isCrop ? "Reset crop" : "Reset";
+  // A stale "no line clear enough" belongs to the frame it was said about, and
+  // the pill's height is what the photo's reserve is measured from — so it goes
+  // on every arm and disarm rather than lingering into the next photo.
+  const cln = document.getElementById("cropLevelNote");
+  if (cln) { cln.textContent = ""; cln.hidden = true; }
   if (cropArmed) { setHslPick(false); setColorPick(false); setTat(false); setHeal(false); setHealReview(false); mUI.paint.setAttribute("aria-pressed", "false"); resetZoom(); } // picture tools are exclusive; geometry wants the whole frame in view
   // Pull the photo in from the stage edges while a geometry tool is live so the
   // corner handles never sit flush in the physical screen corners (the OS eats
@@ -6733,12 +6738,28 @@ wireNudge($("straightenUp") as HTMLButtonElement, 0.1);
  *  admission. */
 const levelBtn = document.getElementById("levelBtn") as HTMLButtonElement | null;
 const levelNote = document.getElementById("levelNote");
+// THE SAME CONTROL, IN TWO PLACES A READER LOOKS. The panel's button and the
+// one in the Straighten pill run this identical routine and make one undo step
+// either way — because arming Straighten hides the panel, so from inside the
+// tool the panel's button does not exist.
+const cropLevelBtn = document.getElementById("cropLevel") as HTMLButtonElement | null;
+const cropLevelNote = document.getElementById("cropLevelNote") as HTMLElement | null;
 function sayLevel(text: string): void {
-  if (!levelNote) return;
-  levelNote.textContent = text;
-  levelNote.hidden = !text;
+  if (levelNote) {
+    levelNote.textContent = text;
+    levelNote.hidden = !text;
+  }
+  if (cropLevelNote) {
+    // Only what the angle above does not already say. A successful level moves
+    // #straightenVal in front of the reader; saying it twice costs pill height,
+    // and the photo's reserve is measured FROM that height.
+    const worth = text && !/^Levelled by/.test(text);
+    cropLevelNote.textContent = worth ? text : "";
+    cropLevelNote.hidden = !worth;
+    remeasureCropTools();
+  }
 }
-levelBtn?.addEventListener("click", () => {
+function levelHorizon() {
   if (!current) return;
   const img = current;
   // A REDUCED COPY, because a horizon is a low-frequency thing and a 24-
@@ -6796,7 +6817,9 @@ levelBtn?.addEventListener("click", () => {
   sayLevel(put === 0
     ? `Already level — nothing to put right (${ms} ms).`
     : `Levelled by ${Math.abs(put).toFixed(1)}° — on the Straighten slider, yours to nudge or undo.`);
-});
+}
+levelBtn?.addEventListener("click", levelHorizon);
+cropLevelBtn?.addEventListener("click", levelHorizon);
 
 cropResetBtn.addEventListener("click", () => {
   if (!cropArmed) return;

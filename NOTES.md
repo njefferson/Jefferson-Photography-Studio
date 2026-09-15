@@ -14477,3 +14477,60 @@ It settles on a COUNT now: the panel's control count read every 50 ms until it
 is unchanged three times running, capped at 2 s with a printed note if it never
 settles. Made to fail: the 40px planted back into the built stylesheet, caught
 at **both** widths — where the flat wait had caught it at one, once.
+
+## The automatic one was the hardest to reach, 2026-09-15
+
+Reported as a question — where is auto rotate — and it is a fair one. Measured
+at iPad landscape:
+
+**"Level the horizon" sat at y 770 in a panel scroller that ends at 768.** It is
+the sixth control in the Crop & straighten tab, behind five 44px buttons, so it
+was the one thing on that tab nobody could see without scrolling. And arming
+Straighten sets `panel.hidden = true` (setGeoMode, deliberately — the tool wants
+the stage), so **from inside the tool the automatic angle-finder was not
+reachable at all**: Done, scroll, press, come back.
+
+The pill carries it now — `#cropLevel`, Straighten only, `.tool-crop` hides it
+the way it hides the slider row. It runs the identical routine through the
+extracted `levelHorizon()`, so there is no second copy to drift, and it is one
+undo step from either button. It costs no height: that row already stands 44px
+for Reset and Done.
+
+The "no line clear enough" message needed somewhere to go, since `#levelNote`
+lives in the hidden panel. It is a `role="status"` line in the pill that appears
+only when there is something the angle above does not already say — a successful
+level moves `#straightenVal` in front of the reader, and saying it twice costs
+pill height. It clears on every arm and disarm, because a stale verdict belongs
+to the frame it was said about. Asserted both widths: reachable at 55x44, one
+press is one undo step, the note clears on leaving.
+
+## What the pill costs the photograph, 2026-09-15 — OPEN, the owner's call
+
+Measured at iPad landscape, straighten armed, session strip open:
+
+- stage **1024x619** (the panel tucks away, so the stage goes full width)
+- pill **214px**, and **260** once the level note shows
+- photo **365x243** — 39% of the stage's height, against 648x431 while editing
+
+The photo gets SMALLER when the tool that needs it most takes over. The cause is
+not a bug: `#stage.cropping #view` reserves `10px + --croptools-h +
+--session-h`, and that reserve tracks the pill's real height on purpose, because
+a fixed one buried the bottom handles under a grown pill on portrait frames. The
+pill is 214 because it carries a label row, a fine-tune row and two wrapped rows
+of aspect chips.
+
+Full view works from inside the tool and is the present answer — 365x243 to
+817x544, measured — but it is a second press for something the mode should
+probably just do.
+
+**The stylesheet already records this as the owner's question, in those words:**
+whether a floating pill should sit OVER the photo and pass taps through. Three
+ways out, and none of them is a session's to pick:
+
+1. Float the pill over the photograph, taps passing through except on its own
+   controls. Biggest win, and the handles-under-the-pill problem comes back in a
+   new form.
+2. Drop the session strip's 110px while a geometry tool is armed. Cheapest, and
+   it costs the ability to step between photos without leaving the tool.
+3. One scrolling row of aspect chips instead of two wrapped rows — pill 214 to
+   about 110. Keeps everything reachable and makes the chips less discoverable.
