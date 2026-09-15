@@ -7,6 +7,7 @@ import { wirePalettePicker } from "../palette";
 import { wireDeviceCopy } from "../platform";
 import { wireForceUpdate, wireUpdateStrip } from "../swupdate";
 import { writeVersionStamp } from "../verstamp";
+import { wireVersionDialog } from "../verdlg";
 
 // Macro focus-stacking mode. Loads a focus-shift JPEG set, blends it into one
 // all-in-focus frame, and lets you compare and save. The heavy engine lives in
@@ -199,6 +200,10 @@ async function runStack() {
     drawImageData(result);
     const moved = res.shifts.filter((s) => s.dx || s.dy).length;
     const secs = ((performance.now() - t0) / 1000).toFixed(1);
+    // FOR THE REPORT, at the moment the numbers exist. "It was slow" is what
+    // arrives; how many frames, how many needed aligning and how long it took
+    // is what answers it, and none of that survives the function otherwise.
+    lastStackLine = `${active.length} frames, ${moved} needed aligning, ${secs}s at ${PREVIEW_LONG_EDGE}px`;
     // SAY THAT THIS IS A PREVIEW. The stack on screen is built at
     // PREVIEW_LONG_EDGE so it lands in seconds; the file you keep is rendered
     // at the frames' own size when you press Export full-res, and takes about a
@@ -276,6 +281,8 @@ for (const ev of ["pointerup", "pointercancel", "pointerleave"] as const) {
 // full-resolution stack; when it's ready the button flips to "Save image", and
 // the next (fresh) tap hands the finished file to the share sheet / download.
 let fullBlob: Blob | null = null;
+/** The last preview stack's shape and cost, kept for the §7f report. */
+let lastStackLine = "none this session";
 
 function markSaveNeedsRender() {
   fullBlob = null;
@@ -430,3 +437,19 @@ if ("serviceWorker" in navigator) {
   if (btn && note) wireForceUpdate(btn, note);
   wireUpdateStrip(); // §7h: say a new version is waiting, without being asked
 }
+
+// §7d and §7f, which this app had neither of: what changed, and the report to
+// send. The lines below are the ones only this app knows — counts and timings,
+// never a filename, because a report that carries one cannot safely be pasted
+// anywhere.
+declare const __MACRO_TODO__: { done: boolean; title: string }[];
+wireVersionDialog({
+  appName: "Macro Studio",
+  stillWrong: __MACRO_TODO__,
+  extra: () => [
+    { k: "Frames loaded", v: frames.length ? `${frames.length} (${frames.length - excluded.size} in the stack, ${excluded.size} left out)` : "none" },
+    { k: "Stacked result", v: result ? `${result.width}x${result.height}` : "none yet" },
+    { k: "Full-resolution file", v: fullBlob ? `${(fullBlob.size / 1e6).toFixed(1)} MB ready to save` : "not rendered" },
+    { k: "Last stack", v: lastStackLine },
+  ],
+});

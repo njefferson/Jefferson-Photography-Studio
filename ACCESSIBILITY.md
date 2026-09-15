@@ -227,3 +227,51 @@ taken effect. Same species as F-10: a declaration that renders nothing and reads
 as intent.
 **Resolution:** removed rather than re-specified. What shipped for the life of
 the bar is `6px 12px`, and that is the size this button has always been.
+
+### F-13 · Macro Studio had none of the standing baseline — FIXED (2026-09-15)
+One repository, two apps, and §7d/§7e/§7f are per APP. The editor has carried a
+diagnostic report since 1.20.0 and patch notes since its ⓘ was built; Macro
+Studio had a version stamp and nothing behind it, no accessibility statement, no
+licence, and no way to report a problem. The only route to a stacking question
+on a real device was to ask for a description of a screen — the thing §7f exists
+to stop.
+**Resolution:** `src/verdlg.ts` + `src/verdlg.css`, a shared "This build" panel
+opened from the stamp: what changed (from `__CHANGELOG__`, the same build-time
+git log the editor renders — one source, two readers), what is **not right yet**
+(from a NOTES.md section, parsed by the same `checklist()` the roadmap uses), and
+the §7f report with a link to the test page. The Help panel gained the
+accessibility statement, the licence, and a "Something's wrong" button.
+Not yet used by the editor, which carries its own `#verDlg` markup and a Lens
+button this has no notion of — said out loud so the next session does not assume
+otherwise.
+
+### F-14 · The report named the wrong app — FIXED (2026-09-15)
+`buildDiagnostic` hardcoded "Infrared Photography Studio" in its first line,
+true while the editor was its only caller. Macro Studio's first report opened by
+naming the other app. **A report whose opening line is wrong about which app
+produced it is worse than no report**, because everything under it is read
+against the wrong one.
+**Resolution:** the app name is a parameter, defaulted to the editor so its own
+call site is unchanged.
+
+### F-15 · Two new links at 19px against a 44px floor — FIXED (2026-09-15)
+The accessibility and licence rows added to Macro Studio used `.more-row`, which
+is styled in `src/style.css` — a stylesheet Macro Studio does not load. They
+arrived as bare 19px links. **Third time in this repository:** the build stamp
+(F-04) and the update strip were the first two, and each time the shared thing
+lived in one app's sheet.
+**Resolution:** `.more-row` MOVED to `verdlg.css`, the sheet both apps load, and
+deleted from `style.css` — two copies is how "which is current" gets two
+answers. Measured after: every control in both Macro panels ≥ 44 at 430px and
+900px.
+
+### F-16 · A dialog built in script was invisible to the surface gate — FIXED (2026-09-15)
+`tools/surfaces.mjs` checks declarations against the built MARKUP, and
+`verdlg.ts` appends its `<dialog>` at boot — so declaring it read as a stale
+entry pointing at nothing. The gate was telling the truth about what it could
+see and giving the wrong answer.
+**Resolution:** when an id is in no page's markup, the built scripts are checked
+for it. Both directions of the gate survive: a declaration must still correspond
+to something that deploys, and still cannot be satisfied by nothing. Minifiers
+rename variables, never string literals, so the id survives as text in the
+bundle.
