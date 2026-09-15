@@ -92,6 +92,8 @@ const panel = $("panel") as HTMLElement;
 const panelBody = $("panelBody") as HTMLElement;
 const cueUp = $("panelUp") as HTMLDivElement;
 const cueDown = $("panelDown") as HTMLDivElement;
+const sectionHead = document.querySelector(".section-head") as HTMLElement;
+const sectionBack = $("sectionBack") as HTMLButtonElement;
 
 // No WebGL2 -> a clear explanation with options instead of a blank page. The
 // throw halts this module; the static overlay needs no scripting to stay up.
@@ -5216,8 +5218,38 @@ function updateScrollCues() {
   const max = panelBody.scrollHeight - panelBody.clientHeight;
   cueUp.hidden = panelBody.scrollTop < 12;
   cueDown.hidden = max <= 0 || panelBody.scrollTop > max - 12;
+  // THE SAME FACT, SAID AS A CONTROL. The up arrow says there is more above;
+  // this is the thing to press about it, and what is above is the tab chooser.
+  // One driver for both, because two conditions for one fact is how they come
+  // to disagree — and setPanelTab already calls this after zeroing scrollTop,
+  // so switching tab re-hides it with nothing added there.
+  sectionBack.hidden = panelBody.scrollTop < 12;
+  // ...and the heading's sub-line steps aside for it; see the stylesheet.
+  sectionHead?.classList.toggle("chose", !sectionBack.hidden);
 }
 panelBody.addEventListener("scroll", updateScrollCues, { passive: true });
+// Back to the chooser. It is the whole cost of letting the tab grid scroll away
+// with the work: one press rather than a scroll. Not `scrollIntoView` — the
+// grid is inside this scroller, and this is what setPanelTab already does.
+sectionBack.addEventListener("click", () => {
+  panelBody.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+});
+// THE HEADING'S HEIGHT IS MEASURED, NOT TYPED. The up cue has to clear the
+// pinned heading, and that heading is a flex row that wraps at narrow widths,
+// so its height is not a constant anyone can write in the stylesheet. It was
+// written there twice, in two rules, which is how two numbers for one
+// measurement come to disagree.
+if (sectionHead && "ResizeObserver" in window) {
+  let headH = -1;
+  new ResizeObserver(() => {
+    const h = Math.round(sectionHead.getBoundingClientRect().height);
+    // Only on a CHANGE. Writing the same value every observation is how a
+    // ResizeObserver that writes a style ends up feeding itself.
+    if (h === headH) return;
+    headH = h;
+    panelBody.style.setProperty("--section-head-h", `${h}px`);
+  }).observe(sectionHead);
+}
 window.addEventListener("resize", updateScrollCues);
 window.addEventListener("resize", positionMaskOverlay);
 window.addEventListener("resize", positionCropOverlay);
@@ -12797,12 +12829,20 @@ setupInstallFromApp("irInstallFromApp");
  *  turned them off has said what they want. */
 {
   const btn = document.getElementById("panelNotes") as HTMLButtonElement | null;
+  const state = document.getElementById("panelNotesState");
   const KEY = "ips-panel-notes";
   if (btn) {
     const apply = (on: boolean) => {
       document.getElementById("panel")?.classList.toggle("notes-off", !on);
       btn.setAttribute("aria-pressed", String(on));
-      btn.textContent = on ? "Explanations" : "Explanations off";
+      // THE STATE IS A WORD IN BOTH DIRECTIONS. This wrote "Explanations" when
+      // on and "Explanations off" when off — so the ON state was a bare noun,
+      // which is the shape of a label and not of a control, and the only thing
+      // then separating the two states was --txt-2 against --txt-3: two greys.
+      // `on`/`off` in the .seg is the house state-as-text pattern (the look
+      // buttons' norm / R-B), and it survives grayscale.
+      // Writing into the span, never btn.textContent — that would delete it.
+      if (state) state.textContent = on ? "on" : "off";
     };
     apply(localStorage.getItem(KEY) !== "off");
     btn.addEventListener("click", () => {
