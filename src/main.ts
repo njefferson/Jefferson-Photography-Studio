@@ -7484,6 +7484,28 @@ function establishFreshEdit() {
     params.exposure = 1;
     params.recover = 0;
   }
+  // THE CHANNEL SWAP IS A CHOICE, NOT A STARTING STATE — and on a camera JPEG
+  // it was on before anybody chose it.
+  //
+  // `EditParams` defaults `swapRB: true`, so every photo opened with red and
+  // blue already exchanged. On a raw that is absorbed: the file arrives
+  // unbalanced, gray-world balances it first, and the swap lands on channels
+  // something has already pulled apart. On a CAMERA-RENDERED file there is no
+  // balance — it opens at wb [1,1,1] on purpose, as the camera made it — so the
+  // swap is performed on the camera's finished rendering with nothing before it
+  // and no cast correction after it. That is step 2 of the channel-swap route
+  // with steps 1 and 3 missing, and the result is the flat purple this file's
+  // own look table already names. Measured on two reported frames: hue 257 with
+  // the swap, hue 343 without, and 343 is what their thumbnails show because
+  // makeThumb never had it.
+  //
+  // It also breaks the standing ruling for what opening applies: a
+  // camera-rendered file opens AS THE CAMERA MADE IT, measured denoise only. A
+  // channel swap is not denoise.
+  //
+  // Raw keeps the swap it has always had: that rendering is confirmed correct
+  // and this is not the change to alter it in.
+  params.swapRB = src.isRaw;
   params.denoise = estimateDenoise(src);
   lookBias = [1, 1, 1];
   lookWb = null;
