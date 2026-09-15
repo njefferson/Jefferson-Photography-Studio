@@ -219,6 +219,56 @@ try {
         // Same shape as the palette sweep that only visited the state the app
         // boots into: a sweep reports on the states it visited, and nothing
         // says which ones those were.
+        // EVERY PANEL TAB, for the reason crop mode needed visiting: a tab that
+        // is not selected is `hidden`, so its controls are not rendered and this
+        // sweep has never measured one. Twelve tabs, and the first run of this
+        // found SEVENTY-ONE controls under the floor behind them — including
+        // Export & Save, the app's primary action, at 34px.
+        //
+        // A page, a dialog, a mode and a TAB are four different things, and only
+        // the first two were ever in the list.
+        if (s.file === "ir.html") {
+          const tabs = await page.evaluate(() =>
+            [...document.querySelectorAll("#panelTabs .ptab")].map((t) => t.id).filter(Boolean));
+          for (const id of tabs) {
+            const on = await page.evaluate((t) => {
+              const b2 = document.getElementById(t);
+              if (!b2) return false;
+              b2.click();
+              return b2.getAttribute("aria-selected") === "true";
+            }, id);
+            if (!on) { fail(`${s.file} ${vw}px tab #${id}: would not select, so its controls are unmeasured`); continue; }
+            await page.waitForTimeout(260);
+            const inside = await page.evaluate(HIT);
+            if (inside.small.length) fail(`${s.file} ${vw}px tab ${id}: ${inside.small.join(" · ")}`);
+            else ok(`${s.file} ${vw}px tab ${id}: all >= 44`);
+            if (inside.exempt.length) note(`inline in a sentence, exempt (SC 2.5.8): ${inside.exempt.join(" · ")}`);
+            // THE PINNED HEADING, IN BOTH OF ITS STATES. It is a nowrap row that
+            // gains a 44px button at scrollTop 12, and a row that runs out of
+            // width ellipsises in silence — measured, the Grade tab's sub-line
+            // wanted 234px of 224 and ended in "...grain & vignette" that nobody
+            // would think to look for. Checked at rest AND scrolled, because the
+            // tight state is the one that only exists after an interaction.
+            const clip = await page.evaluate(async () => {
+              const body = document.getElementById("panelBody");
+              const out = [];
+              for (const top of [0, 400]) {
+                body.scrollTop = top;
+                body.dispatchEvent(new Event("scroll"));
+                await new Promise((r) => setTimeout(r, 40));
+                for (const el of [document.getElementById("sectionTitle"), document.getElementById("sectionSub")]) {
+                  if (!el || getComputedStyle(el).display === "none") continue;
+                  if (el.scrollWidth > el.clientWidth + 1) out.push(`@${top} #${el.id} "${el.textContent}" needs ${el.scrollWidth} of ${el.clientWidth}`);
+                }
+              }
+              body.scrollTop = 0;
+              body.dispatchEvent(new Event("scroll"));
+              return out;
+            });
+            if (clip.length) fail(`${s.file} ${vw}px tab ${id}: heading clipped — ${clip.join(" · ")}`);
+          }
+        }
+
         if (s.file === "ir.html") {
           for (const [mode, id] of [["crop", "cropBtn"], ["straighten", "straightenBtn"]]) {
             const on = await page.evaluate((b) => {
@@ -315,6 +365,78 @@ try {
     for (const g of gone) fail(`palettes/studio.json lists ${g} and the app no longer paints it — regenerate the spec`);
     if (!added.length && !gone.length && !swept.trouble.length)
       ok(`all ${now.size} measured pairings match palettes/studio.json`);
+  }
+  // 5 — THE THINGS NOTHING ELSE IN HERE LOOKS AT.
+  //
+  // Every check above this one measures a CONTROL: its hit area, its name, its
+  // role, the contrast of its text. Marking an element decorative — no role, no
+  // name, `pointer-events: none` — takes it out of the population every one of
+  // those samples, and it then ships broken in plain sight.
+  //
+  // Measured: both panel scroll cues had rendered as a flat 10px pill with the
+  // arrow drawn OUTSIDE it, underneath, for the life of the feature. The cue is
+  // `display: flex` with `height: 0` (on purpose, so it floats without taking
+  // space in the flow) and a flex container's default `align-items: stretch`
+  // sizes its item to its CONTAINER — so the pill was stretched to nothing and
+  // all 10px of it was padding and border.
+  //
+  // So: anything that PAINTS — a background or a border a reader can see — is
+  // asserted to have a box big enough to paint into, whether or not anybody can
+  // press it. Deliberately about the box and not about the glyph: a glyph that
+  // overflows is the symptom, and a box collapsed by its container is the class.
+  console.log("\n5 — decoration that paints has a box to paint in");
+  {
+    const page = await browser.newPage({ viewport: { width: 900, height: 780 }, deviceScaleFactor: 2 });
+    for (const s of surfaces()) {
+      await page.goto(`${BASE}/${s.file}`, { waitUntil: "load" });
+      if (s.file === "ir.html") {
+        await page.setInputFiles("#file", ONE);
+        await page.waitForFunction(() => document.getElementById("welcome")?.hidden, null, { timeout: 300000 });
+        await page.evaluate(() => { const b = document.getElementById("panelBody"); if (b) { b.scrollTop = 400; b.dispatchEvent(new Event("scroll")); } });
+      }
+      await page.waitForTimeout(250);
+      const thin = await page.evaluate(() => {
+        const out = [];
+        for (const el of document.querySelectorAll("*")) {
+          const cs = getComputedStyle(el);
+          if (cs.visibility === "hidden" || cs.display === "none" || cs.opacity === "0") continue;
+          const paints = (cs.backgroundColor && !/rgba\(0, 0, 0, 0\)|transparent/.test(cs.backgroundColor)) ||
+            (parseFloat(cs.borderTopWidth) > 0 && !/rgba\(0, 0, 0, 0\)|transparent/.test(cs.borderTopColor));
+          if (!paints) continue;
+          const b = el.getBoundingClientRect();
+          if (!b.width && !b.height) continue;          // laid out away, not collapsed
+          // ONLY BOXES WITH THEIR OWN TEXT IN THEM. A rule, a divider, a
+          // hairline, a dot: one axis thin on purpose and nothing inside to
+          // clip. The class of bug this is for is a box that HOLDS something and
+          // was sized by its container instead of its content.
+          const mine = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
+          if (!mine) continue;
+          // ASK THE BROWSER, do not do the arithmetic. The first version of this
+          // computed what a line "needs" from font-size, padding and borders,
+          // and a 1.1 multiplier put nine tab buttons at 104x44 one pixel under
+          // a need of 45 — nine false positives against one real find. The
+          // browser already lays the content out and already knows whether it
+          // fits: scrollHeight against clientHeight is the vertical twin of the
+          // scrollWidth test the heading check uses. A real scroller is excluded
+          // by its own overflow, which is what makes it a scroller.
+          if (/auto|scroll/.test(cs.overflowY)) continue;
+          // SIX PIXELS, AND THE NUMBER IS MEASURED RATHER THAN CHOSEN. At >1px
+          // this reports the class of bug it is for AND every glyph whose line
+          // box runs a hair past its padding, which is invisible and everywhere:
+          // the collapsed cue wants 21px in 8 (a shortfall of 13), while the
+          // zoom buttons want 45 in 42 (3) and a .seg chip wants 14 in 12 (2).
+          // One real find against four that would teach the next reader to skip
+          // the section. A container-collapsed box is an order-of-magnitude
+          // mismatch, so the gate sits in the gap between 3 and 13.
+          if (el.scrollHeight <= el.clientHeight + 6) continue;
+          out.push(`${el.tagName.toLowerCase()}${el.id ? "#" + el.id : ""}${el.className && typeof el.className === "string" ? "." + el.className.trim().split(/\s+/).join(".") : ""} ${Math.round(b.width)}x${Math.round(b.height)}, content wants ${el.scrollHeight} in ${el.clientHeight}`);
+        }
+        return [...new Set(out)];
+      });
+      if (thin.length) fail(`${s.file}: painted box too small to hold what is in it — ${thin.join(" · ")}`);
+      else ok(`${s.file}: every painted box has room for its content`);
+    }
+    await page.close();
   }
 } finally {
   await browser.close();
