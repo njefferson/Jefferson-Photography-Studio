@@ -1112,6 +1112,16 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   width: min(88%, 360px);
 }
 #cropTools .crop-row { display: flex; align-items: center; gap: 10px; }
+/* Straighten only: levelling a horizon is a straighten act, and Crop's pill has
+   no angle to find. Same treatment the slider row gets. */
+#cropTools.tool-crop #cropLevel { display: none; }
+#cropTools .crop-row #cropLevel, #cropTools .crop-row #cropReset { width: auto; flex: none; padding: 0 12px; }
+.crop-level-note {
+  margin: 6px 0 0;
+  font: 0.75rem/1.35 var(--ui);
+  color: var(--glass-txt-2);
+  text-align: left;
+}
 /* Crop mode reuses the pill for just its label + Reset — the straighten slider
    and its readout belong to Straighten mode only. */
 #cropTools.tool-crop .crop-fine,

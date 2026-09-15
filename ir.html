@@ -123,9 +123,27 @@
           <div class="crop-row">
             <span class="crop-lbl" id="geoLbl">Straighten</span>
             <span id="straightenVal">0.0&deg;</span>
+            <!-- THE AUTOMATIC ONE, IN THE MODE THAT WANTS IT. "Level the
+                 horizon" lived only in the Crop & straighten tab — and
+                 measured at iPad landscape it sat at y 770 in a panel whose
+                 scroller ends at 768, so it was the one control on that tab
+                 you could not see without scrolling. Worse, arming Straighten
+                 hides the panel outright (setGeoMode), so from inside the tool
+                 the automatic angle-finder was not reachable at all: you had
+                 to press Done, scroll, press it, and come back.
+                 Same routine, same undo step; it costs no height because this
+                 row already stands 44px for Reset and Done. Straighten only —
+                 .tool-crop hides it, like the slider row. -->
+            <button id="cropLevel" type="button" title="Find the angle that levels the horizon">Level</button>
             <button id="cropReset" type="button">Reset</button>
             <button id="cropDone" class="primary" type="button">Done</button>
           </div>
+          <!-- Only after a press, and only when there is something to say the
+               angle above does not already say — chiefly that no line was clear
+               enough to level by. It grows the pill, and the pill's height is
+               what the photo's reserve tracks, so remeasureCropTools() runs
+               with it. -->
+          <p id="cropLevelNote" class="crop-level-note" role="status" aria-live="polite" hidden></p>
           <!-- A tenth of a degree by finger. The slider covers ninety degrees
                across a few hundred pixels, so one pixel of drag is about a third
                of a degree — fine for finding the angle, no use for landing on
