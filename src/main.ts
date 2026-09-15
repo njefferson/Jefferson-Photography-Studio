@@ -1078,7 +1078,7 @@ function applyLook(name: keyof typeof LOOKS) {
   // identity check, and that flag was only ever written on a first visit: see
   // fileIsOneBand, which asks the question of the photograph instead.
   if (balancing && current && !oneBand) {
-    const gw = openWB(current);
+    const gw = grayWorldWB(current);
     base[0] = gw[0]; base[1] = gw[1]; base[2] = gw[2];
     lookWb = [gw[0], gw[1], gw[2]];
   } else if (balancing && lookWb && base.every((v, i) => step(v, lookWb![i]))) {
@@ -7430,7 +7430,7 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
 function establishFreshEdit() {
   const src = current!;
   if (src.isRaw) {
-    params.wb = openWB(src);
+    params.wb = grayWorldWB(src);
     params.exposure = autoExposure(src, params.wb);
     params.recover = src.camMatrix ? autoRecover(src) : 0;
   } else {
@@ -8343,7 +8343,7 @@ async function makeThumb(img: DecodedImage, MAX = 260, lens?: LensCurve | null, 
   // the tile is a claim about what opening it WILL do: its own measured balance
   // and exposure, under the live look, which is what establishFreshEdit
   // applies.
-  const gw = own ? own.params.wb : openWB(img);
+  const gw = own ? own.params.wb : grayWorldWB(img);
   const bias = own ? ([1, 1, 1] as [number, number, number]) : lookBias;
   const wb: [number, number, number] = [
     clamp(gw[0] * bias[0], 0.02, 16),
@@ -11371,7 +11371,7 @@ function neutralLook(): SavedLook {
  *  creative grade. Mirrors autoAdjust() + loadSlot()/pressLook(), without
  *  touching the live on-screen edit. Masks never carry (composition-specific). */
 function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["lut"] = null): EditParams {
-  let wb = openWB(img);
+  let wb = grayWorldWB(img);
   let look: SavedLook;
   if (grade.kind === "builtin") {
     // Resolve exactly like pressing the look button on this photo: strength
@@ -12371,7 +12371,7 @@ function lumNormalize(g: number[]): [number, number, number] {
 /** White balance + exposure + noise-matched denoise (+ highlight recovery on
  *  clipped camera-native raw) in one shot — the same baseline open applies. */
 function autoAdjust(img: DecodedImage) {
-  params.wb = openWB(img);
+  params.wb = grayWorldWB(img);
   params.exposure = autoExposure(img, params.wb);
   params.denoise = estimateDenoise(img);
   params.recover = img.camMatrix ? autoRecover(img) : 0;
@@ -12547,33 +12547,27 @@ function grayWorldWB(img: DecodedImage): [number, number, number] {
   return lumNormalize([mean / r, mean / g, mean / b]);
 }
 
-/** WHAT THE FILE OPENS AS — the camera's own white balance when it recorded
- *  one, gray-world only when it did not.
+/* THE CAMERA CANNOT STORE AN INFRARED WHITE POINT, so its recorded white
+ * balance is NOT a usable raw multiplier. This is where a session opened raws
+ * on `camWb` and shipped a regression; the measurement that killed it:
  *
- *  This is the owner's rule of 2026-07-24 — "white balance opens AS SHOT, no
- *  automatic gray-world WB at import, ever" — finally meaning what it says. It
- *  was implemented as NEUTRAL SLIDERS, which is not as-shot, and nothing read
- *  the file's own multipliers until now.
+ *   NIR_1376.NEF at its own WB_RBLevels   rgb(158, 0, 241)  2 hues   green at ZERO
+ *   the same frame gray-world balanced    rgb(175, 178, 178) 5 hues
  *
- *  Why it matters here more than in an ordinary editor: infrared capture
- *  depends on a custom white balance measured once, in camera, off sunlit
- *  foliage. That preset is what makes the raw gradeable at all — without it the
- *  file is a red wall and the red/blue channel swap has nothing to separate.
- *  Read out of this repo's own files, a Z 50 NEF and five camera JPEGs from the
- *  same body carry the IDENTICAL 0x000C [1.8574, 1.4668, 1, 1]: one preset,
- *  constant across a shoot. Gray-world re-derives a different answer for every
- *  frame from that frame's content, so a woodland frame and an open-sky frame
- *  from one shoot land in different places — which is the problem "Restore
- *  depth" exists to paper over.
+ * A 720nm conversion needs gains outside the range a custom PRE preset can
+ * hold, so the camera clamps and stores what it could reach — which reads like
+ * an ordinary daylight balance (R 1.86, B 1.47, G 1) and develops the raw into
+ * a magenta wall. The tell is in the files: a NEF on PRESET4 and five JPEGs on
+ * PRESET6 record the IDENTICAL [1.8574, 1.4668, 1, 1] to four decimals. Two
+ * different custom presets landing on one number is a ceiling, not a
+ * coincidence.
  *
- *  Gray-world stays for files that carry nothing (the 44 practice DNGs are
- *  minimal hand-written files with no such tag) and for the places that WANT a
- *  content-derived answer: the IR tab's Auto WB, whose stated job is to
- *  rebalance to this photo's own neutral, and the sky mask's internal estimate.
- *  Normalised the same way, so it is a drop-in for the value it replaces. */
-function openWB(img: DecodedImage): [number, number, number] {
-  return img.camWb ? lumNormalize(img.camWb) : grayWorldWB(img);
-}
+ * So an infrared raw converter has to find the white point BELOW what the
+ * camera allows, from the data — which is what gray-world does here and what
+ * "no 2000K floor" has always meant. The camera's value is still read (it is
+ * evidence, and the diagnostic reports it) but nothing renders from it.
+ * Full reasoning and the rest of the IR physics: IR-SCIENCE.md. */
+
 
 // ⓘ What's new — the last 5 user-facing updates, injected at build time, each
 // carrying its real version number (v0.N = Nth update ever; 1.0+ comes from

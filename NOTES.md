@@ -14675,3 +14675,44 @@ until the owner picks.
 **Held back with it:** the one-band sentence still describes the balance as what
 colours the frame. Rewriting it to describe the cast correction would describe a
 thing this build does not do.
+
+## The camera's white balance is a clamp, not a measurement — reverted, 2026-09-15
+
+**Shipped wrong and caught the same day, on the owner's read.** The previous
+entry recorded reading NEF MakerNote 0x000C and opening raws on it. That is
+correct for a visible-light body and wrong here, and the reason is the one thing
+this whole thread kept missing: **an infrared white point is outside the range a
+custom in-camera preset can store.** The camera clamps and records what it could
+reach.
+
+Measured on `NIR_1376.NEF`:
+
+- developed at its own `[1.8574, 1.4668, 1, 1]` — **rgb(158, 0, 241)**, green at
+  **zero**, a magenta wall, two hues over 5%
+- gray-world on the same frame — **rgb(175, 178, 178)**, neutral, **five** hues
+
+The recorded value reads like an ordinary daylight balance (R 1.86, B 1.47,
+G 1), which is the clue. **The tell is that a NEF on PRESET4 and five JPEGs on
+PRESET6 record that identical number to four decimals** — two different custom
+preset slots landing on one value is a ceiling.
+
+So the white point is found BELOW what the camera allows, from the data, which
+is what gray-world does and what "no 2000K floor" has always meant. Reverted in
+full: `openWB` is gone and all five call sites are back on gray-world, the tag
+plumbing is out of `decode.ts`/`demosaic.ts`, and `src/raw/nef.ts` carries a
+comment at the MakerNote walker saying the tag is deliberately not read and why,
+so the next session meets the reason where it would write the code.
+
+**KEPT from that work, because it stands on its own:** `wbBias` now rides the
+`Look.raw`/`Look.jpeg` split alongside `sat` and `contrast`. Raw and
+camera-rendered files arrive in different states and one cast correction cannot
+serve both — measured, a bias that takes a JPEG from two hues to three takes a
+raw control from four hues at 43% to three at 77%. No look sets a value, so
+nothing renders differently.
+
+**And the real deliverable: [`IR-SCIENCE.md`](IR-SCIENCE.md).** The physics, what
+the file formats contain, the three routes and which one this app implements,
+how to measure an IR rendering without fooling yourself, what the 44 practice
+raws are and are not, and the standing errors — each with the measurement that
+established it. `CLAUDE.md` points at it from the INFRARED-first section, which
+is the paragraph that was not enough on its own.

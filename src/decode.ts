@@ -26,13 +26,6 @@ export interface DecodedImage {
   camMatrix?: number[];
   /** True when these are true (un-white-balanced) sensor values. */
   isRaw: boolean;
-  /** The white balance the CAMERA recorded, [R, G, B] with G normalised to 1.
-   *  NEF MakerNote 0x000C, DNG AsShotNeutral (50728). Absent when the file
-   *  carries neither — the bundled practice DNGs are minimal hand-written files
-   *  with 17 tags and no Exif, so they have none and keep the gray-world path.
-   *  For an infrared conversion this is not a nicety: the workflow's first step
-   *  is to open the raw with the in-camera custom white balance intact. */
-  camWb?: [number, number, number];
   /** Display rotation in 90-degree CW steps, from the file's Orientation tag. */
   rotate?: number;
   /** Honesty note for the user when the open succeeded but NOT as raw — e.g.
@@ -90,7 +83,6 @@ export async function decode(file: ImportedFile): Promise<DecodedImage> {
         linear: img.linear,
         camMatrix: camToSrgbLinear(nikonColorMatrix(cameraModel(ifds))),
         isRaw: true,
-        camWb: img.camWb ?? readAsShotWb(ifds),
         rotate: orientationToRotate(ifds),
       };
     } catch {
@@ -207,7 +199,6 @@ async function decodeDng(bytes: Uint8Array, file?: ImportedFile): Promise<Decode
       linear: img.linear,
       camMatrix: camToSrgbLinear(cm),
       isRaw: true,
-      camWb: readAsShotWb(ifds),
       rotate: orientationToRotate(ifds),
     };
   }
@@ -272,26 +263,6 @@ export function readCameraMatrix(ifds: Ifd[]): number[] | undefined {
     }
   }
   return best;
-}
-
-/** AsShotNeutral (DNG 0xC628 / 50728) as [R, G, B] multipliers, G normalised
- *  to 1. The tag is a NEUTRAL COLOUR, not a set of gains — the camera-space
- *  values that should render grey — so the multipliers are its RECIPROCALS.
- *  Getting that backwards inverts the cast instead of correcting it.
- *
- *  Adobe also defines AsShotWhiteXY (0xC629) as an alternative; only one of the
- *  two is present in a given file and 0xC628 is what Nikon-sourced DNGs carry.
- *  Absent is the normal case for the practice files here, and the caller falls
- *  back to gray-world. */
-export function readAsShotWb(ifds: Ifd[]): [number, number, number] | undefined {
-  for (const d of ifds) {
-    const n = d.num(50728);
-    if (n.length !== 3) continue;
-    if (!n.every((v) => v > 0 && Number.isFinite(v))) continue;
-    const [r, g, b] = n;
-    return [g / r, 1, g / b];
-  }
-  return undefined;
 }
 
 function isJpegComp(c: number | undefined) {
