@@ -341,6 +341,10 @@ export default defineConfig({
   define: {
     __CHANGELOG__: JSON.stringify(changelog()),
     __ROADMAP__: JSON.stringify(roadmap()),
+    // §7d's other half for Macro Studio: what is still not right. Same parser
+    // as the roadmap, a different heading — one source, in NOTES.md, rather
+    // than a list typed into a panel where nothing can notice it going stale.
+    __MACRO_TODO__: JSON.stringify(checklist(/^##\s+Macro Studio — not right yet/i).filter((i) => !i.done)),
     __APP_VERSION__: JSON.stringify(appVersion()),
   },
 });

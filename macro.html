@@ -52,7 +52,7 @@
     <div id="app">
       <header class="bar">
         <a class="home" href="./index.html" aria-label="Back to Studio">&#8249;<img class="bar-mark" src="./icons/icon-192.png" alt="" width="22" height="22" />Studio</a>
-        <span class="brand"><span class="tool-dot" aria-hidden="true"></span>Macro Studio<span id="verTag" class="ver-tag"></span></span>
+        <span class="brand"><span class="tool-dot" aria-hidden="true"></span>Macro Studio<button id="verTag" type="button" class="ver-tag" aria-haspopup="dialog" aria-label="This build — what changed, and the report to send"></button></span>
         <button id="resetBtn" class="bar-btn" type="button" hidden title="Start over with a new focus-shift set">New set</button>
         <button id="shareBtn" class="info-btn" type="button" hidden aria-label="Share this app or copy its link" title="Share this app or copy its link"><svg class="share-ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 1.6 5.2 4.4M8 1.6l2.8 2.8M8 1.6v7.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.6 6.6H3.2a1 1 0 0 0-1 1v5.6a1 1 0 0 0 1 1h9.6a1 1 0 0 0 1-1V7.6a1 1 0 0 0-1-1h-1.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         <button id="helpBtn" class="info-btn" type="button" aria-label="How it works">i</button>
@@ -186,6 +186,19 @@
           <span class="hub-go" aria-hidden="true">&rarr;</span>
         </a>
 
+        <!-- §7e: the accessibility statement and the licence, which this app
+             carried neither of. The statement is the hub's, shared by every app
+             in the family; the licence is the one this app ships under. -->
+        <p class="more-row">
+          <a href="https://noahjefferson.pages.dev/accessibility" target="_blank" rel="noopener">Accessibility &rarr;</a>
+        </p>
+        <p class="more-row">
+          <a href="https://polyformproject.org/licenses/noncommercial/1.0.0" target="_blank" rel="noopener">Licence &mdash; PolyForm Noncommercial &rarr;</a>
+        </p>
+        <div class="set-row">
+          <button id="helpDiag" type="button">Something&rsquo;s wrong &mdash; the report to send</button>
+          <small class="note">Opens a plain-text report of what this device is and how the app is set up here, ready to copy into a message, plus a page that measures how fast this device actually runs. It carries nothing about your photographs.</small>
+        </div>
         <div class="update-row">
           <button id="forceUpdate" type="button">Update to the latest version</button>
           <small class="muted" id="forceUpdateNote">Checks for a new version and reloads &mdash; use this if a new feature or fix hasn&rsquo;t shown up yet. No need to close the app.</small>

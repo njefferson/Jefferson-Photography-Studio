@@ -48,7 +48,11 @@ export const PAGES = [
       "ratioDlg", "lookDlg", "lookPasteDlg", "lookRecvDlg", "infoDlg",
       "lensDlg", "askDlg", "locDlg", "helpDlg",
     ] },
-  { file: "macro.html", dialogs: ["helpDlg"] },
+  // verDlg is BUILT IN SCRIPT, not written in macro.html — src/verdlg.ts appends
+  // it at boot. A surface the markup does not mention is exactly the kind that
+  // ships unmeasured, so it is declared here in the same commit that creates it
+  // (hub LESSONS §28, which cost a release when it was learned).
+  { file: "macro.html", dialogs: ["helpDlg", "verDlg"] },
   { file: "debug.html", dialogs: [] },
   { file: "notes.html", dialogs: [] },
   { file: "privacy.html", dialogs: [] },
@@ -90,6 +94,15 @@ export function check(dist = DIST) {
   const built = fromBuild(dist);
   const bad = [];
   const declared = new Set(PAGES.map((p) => p.file));
+  /** Does any built script create an element with this id? Deliberately a plain
+   *  substring of the emitted bundles: minification renames variables, never a
+   *  string literal, so `dlg.id = "verDlg"` survives as the text `"verDlg"`. */
+  const inScripts = (id) => {
+    const dir = join(repo, "dist/assets");
+    let files;
+    try { files = readdirSync(dir).filter((f) => f.endsWith(".js")); } catch { return false; }
+    return files.some((f) => readFileSync(join(dir, f), "utf8").includes(`"${id}"`));
+  };
 
   for (const name of built.keys()) {
     if (!declared.has(name)) bad.push(`${name} deploys and is not in PAGES — it would ship unmeasured.`);
@@ -102,7 +115,18 @@ export function check(dist = DIST) {
       if (!p.dialogs.includes(id)) bad.push(`${p.file} declares <dialog id="${id}"> and PAGES does not list it.`);
     }
     for (const id of p.dialogs) {
-      if (!ids.includes(id)) bad.push(`PAGES lists ${p.file} #${id}, which is not in the built markup.`);
+      // A DIALOG CAN BE BUILT IN SCRIPT, and this check could only see markup.
+      // src/verdlg.ts appends its <dialog> at boot, so macro.html's markup does
+      // not mention it and the declaration read as a stale entry — the gate
+      // telling the truth about what it could see, and the wrong answer.
+      //
+      // The verifiable fact for a scripted surface is that the code creating it
+      // SHIPS: if no page declares the id, the bundles must. That keeps both
+      // directions of the check — a declaration still has to correspond to
+      // something that deploys, and it still cannot be satisfied by nothing.
+      if (!ids.includes(id) && !inScripts(id)) {
+        bad.push(`PAGES lists ${p.file} #${id}, which is in neither the built markup nor any built script.`);
+      }
     }
   }
   return bad;

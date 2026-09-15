@@ -1,0 +1,105 @@
+/* THE "THIS BUILD" PANEL'S LOOK, FOR EVERY APP THAT SHOWS ONE.
+
+   It lives here, imported by verdlg.ts — the one module that builds the panel
+   also brings its look — for the reason verstamp.css beside it records at
+   length: style.css is not loaded by Macro Studio, so a panel styled there
+   would have rendered as unstyled text in the very app it was written for.
+   That is not hypothetical; it is exactly what happened to the build stamp.
+
+   Every colour is a TOKEN from public/palette.css, which every page loads, so
+   the panel follows the reader's palette and theme like the rest of the app and
+   is measured by the same contrast gate. Never an opacity for "quiet": an
+   opacity is invisible to a contrast check (§7b, and two sibling apps shipped
+   2.54:1 while their gate read 4.79:1). */
+
+.verdlg {
+  max-width: min(94vw, 640px);
+  width: 100%;
+  border: 1px solid var(--line-2);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--txt);
+  padding: 18px 18px 16px;
+  box-shadow: var(--shadow);
+}
+.verdlg::backdrop { background: rgba(0, 0, 0, 0.55); }
+.verdlg h2 { margin: 0 0 4px; font-size: 1.0625rem; }
+.verdlg-ver { margin: 0 0 14px; font: 500 0.8125rem/1.3 var(--mono, ui-monospace, monospace); color: var(--txt-2); }
+.verdlg-h { margin: 14px 0 6px; font-size: 0.875rem; }
+.verdlg-note { margin: 8px 0 0; font-size: 0.8125rem; line-height: 1.45; color: var(--txt-3); }
+
+.verdlg-log { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 6px; }
+.verdlg-log li { font-size: 0.8125rem; line-height: 1.4; }
+.verdlg-log strong { font-family: var(--mono, ui-monospace, monospace); }
+.verdlg-log small { color: var(--txt-3); }
+
+.verdlg-text {
+  width: 100%;
+  margin-top: 8px;
+  box-sizing: border-box;
+  font: 0.75rem/1.45 var(--mono, ui-monospace, monospace);
+  color: var(--txt);
+  background: var(--bg);
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  padding: 8px;
+  resize: vertical;
+}
+
+/* 44px on every control, because these apps are used by finger on a tablet —
+   the rule that has cost this family a release more than once. */
+.verdlg-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
+.verdlg-primary,
+.verdlg-close {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 9px;
+  font: 600 0.875rem/1 var(--ui, system-ui, sans-serif);
+  cursor: pointer;
+}
+.verdlg-primary { background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); }
+.verdlg-close { margin-top: 14px; width: 100%; background: var(--surface-2); color: var(--txt); border: 1px solid var(--line-2); }
+.verdlg-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 10px;
+  font-size: 0.875rem;
+  color: var(--txt);
+  border-radius: 8px;
+}
+.verdlg-primary:focus-visible,
+.verdlg-close:focus-visible,
+.verdlg-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* The textarea's label is for assistive tech only — the heading above it is
+   what a sighted reader reads, and two visible labels saying the same thing is
+   noise. Clipped rather than display:none, which would take it off the
+   accessibility tree along with the screen. */
+.verdlg-sr {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* SHARED CHROME, NOT THIS PANEL'S — and here because here is the stylesheet
+   both apps load. `.more-row` is the "Accessibility →" / "Licence →" row that
+   §7e asks every app to carry. It lived in style.css, which Macro Studio does
+   not load, so those rows arrived in that app as bare 19px links against a
+   44px floor. Moved rather than copied: two stylesheets with the same rule is
+   how "which one is current" acquires two answers. */
+.more-row { margin: -8px 0 16px; font-size: 0.75rem; }
+.more-row a {
+  color: var(--accent);
+  text-decoration: none;
+  /* Own-row link: the inline exception does not apply. inline-flex grows the
+     hit area without moving the text (same fix as the hub's footer links). */
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+.more-row a:active { text-decoration: underline; }

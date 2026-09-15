@@ -212,12 +212,26 @@ async function holdingsLine(): Promise<string> {
 
 /** Build the report. `extra` lets a page add its own lines (the editor adds
  *  what it has open, as counts). */
-export async function buildDiagnostic(version: string, extra: DiagLine[] = []): Promise<string> {
+/** WHICH APP THIS REPORT IS ABOUT, and it has to be told.
+ *
+ *  This module was written for the editor and named it in the first line, which
+ *  was true while the editor was the only caller. Macro Studio is the second,
+ *  and its first report opened with "Infrared Photography Studio" — a report
+ *  whose opening line is wrong about which app produced it is worse than no
+ *  report, because everything under it is then read against the wrong app.
+ *
+ *  Defaulted to the editor so its own call site keeps working unchanged; the
+ *  name is the caller's to state. */
+export async function buildDiagnostic(
+  version: string,
+  extra: DiagLine[] = [],
+  appName = "Infrared Photography Studio",
+): Promise<string> {
   const nav = navigator as Navigator & { standalone?: boolean; deviceMemory?: number };
   const standalone =
     window.matchMedia("(display-mode: standalone)").matches || nav.standalone === true;
   const lines: DiagLine[] = [
-    { k: "App", v: `Infrared Photography Studio v${version}` },
+    { k: "App", v: `${appName} v${version}` },
     { k: "Taken", v: new Date().toISOString() },
     { k: "Address", v: location.origin + location.pathname },
     { k: "Installed", v: standalone ? "yes — running as an installed app" : "no — running in the browser" },
