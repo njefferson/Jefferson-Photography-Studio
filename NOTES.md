@@ -14996,3 +14996,67 @@ workflow the push triggers, not just the one that deploys.
 Fixed by regenerating the tracked hook. **The durable half is the habit**: adding
 an `also=` line and regenerating the hook are one change, and the commit that
 does one without the other is the commit to refuse.
+
+## The hot-spot correction the thumbnails kept and the photograph lost, 2026-09-15
+
+**Reported with a screenshot and the diagnostic: the correction is still good on
+the thumbnail and not on the image.** It is the same shape as the camera-JPEG
+fault earlier the same day and it is a different cause — the strip and the open
+photograph are two render paths, and two paths is two chances to disagree.
+
+**THE REPORT CONTAINED THE PROOF, AND THE APP CONTRADICTED ITSELF IN TWO
+CONSECUTIVE LINES.** The lens line named a brightness source — a 50-250mm
+profile at 57mm f/8 from four raw frames — and the centre-gains line beneath it
+read **brightness 1.000x**, which is no correction at all. Both printed as facts.
+Red and blue were 1.061x and 0.846x, so the colour half was landing and the
+brightness half was not; the brightness half is the one that removes a hot-spot.
+
+**ONE RULE, WRITTEN THREE TIMES, AND ONE OF THE THREE SAID SOMETHING ELSE.**
+
+- `lensCurveFor` — thumbnails and batches — took `bump: shipped?.bump`, with a
+  comment saying "same rule as the open photograph".
+- `syncLensTexture` — the GPU upload for the open photograph — took
+  `activeProfile()?.bump`, and `activeProfile()` is the READER'S profile whenever
+  they have one. Not the same rule.
+- `currentLensCurve` — what the diagnostic reads — copied the second.
+- `lensFixLive` — what the compare button says is on — copied it too, so the
+  button described what the reader's measurement knew rather than what was being
+  applied.
+
+So a measured profile carrying colour and no brightness curve removed the
+hot-spot correction from the photograph and left it on the thumbnails. **A
+measured profile usually has no brightness curve**: `lensstore.ts`'s own header
+calls a measured `bump` a RANGE rather than a correction, `bumpFrom` derives one
+only when the payload allows it, and `read()` sets aside one it cannot use.
+
+**TWO RULINGS IN THIS FILE LOOK LIKE A CONTRADICTION AND ARE NOT.** The older one
+says a measurement supplies the colour and the shipped profile the brightness.
+The newer one says ONE PROFILE, WHOLE — the reader's supersedes the shipped one
+in full — and says why: taking half of each means two ideas of where the frame's
+centre is. The newer one was written at the moment measurements started carrying
+both halves, and it does not mean superseding a correction that exists with one
+that does not. Composed: **the reader's profile whole when it has a brightness
+curve, and the shipped brightness when it has none.** Both profiles are matched
+against the same frame's EXIF, so the fallback is never another lens.
+
+`Hotspot.lensHalves` is that rule, once, and all four sites call it. It returns
+`brightness` — the profile the curve came from — beside `bump`, because the
+diagnostic working that out for itself was the fifth copy and the reason a report
+could disagree with the render it was describing.
+
+**A COUNTER THAT NOTHING READ.** `droppedProfiles` and `droppedBumps` were added
+when the lens-store fix landed, to make a set-aside measurement visible, and were
+never wired to a surface — `grep` found the two declarations, the two resets, the
+two increments, and no reader. They are in the lens line now, after a re-read, so
+the number is about the open photograph rather than about whatever called `read`
+last.
+
+**Gate: `tools/lens-store-check.mjs`, extended.** Negative control — planting the
+old open-photograph rule fails exactly the reported case and nothing else:
+*brightness was DROPPED — this is the hot-spot going missing on the open
+photograph*. Also asserted there, because a fallback across two profiles is
+precisely where it would arrive: **the two halves agree in length (80 and 80)**.
+`compileEdit`'s `lengthsAgree` drops the brightness half without a word when they
+do not, which would have been the same absence reached a second way.
+
+20 of 20 walks green. `PREVIEW_PIPELINE` 10 to 11 — the rendering changes.

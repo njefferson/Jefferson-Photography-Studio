@@ -303,9 +303,8 @@ function activeProfile(): LensStore.StoredProfile | null {
  *  see setLensCurve. Called after BOTH matches are worked out at open, and
  *  again whenever either changes. */
 function syncLensTexture() {
-  const c = activeProfile();
-  const colour = Hotspot.hasColour(c) ? c : null;
-  renderer.setLensCurve(colour ? colour.kr : null, colour ? colour.kb : null, c?.bump ?? null);
+  const { colour, bump } = Hotspot.lensHalves(myLens?.p ?? null, hotspotState?.p ?? null);
+  renderer.setLensCurve(colour ? colour.kr : null, colour ? colour.kb : null, bump);
 }
 
 /** The shipped card's Strength governs everything the SHIPPED profile
@@ -471,9 +470,9 @@ function lensCurveFor(imported: ImportedFile): LensCurve | null {
   const measured = ex ? LensStore.findProfile(ex) : null;
   // Same rule as the open photograph: the reader's own measurement is the
   // colour when they have one, and the shipped profile is the brightness.
-  const colour = measured ?? (Hotspot.hasColour(shipped) ? shipped : null);
-  if (!colour && !shipped?.bump) return null;
-  return { kr: colour?.kr, kb: colour?.kb, bump: shipped?.bump };
+  const { colour, bump } = Hotspot.lensHalves(measured, shipped);
+  if (!colour && !bump) return null;
+  return { kr: colour?.kr, kb: colour?.kb, bump: bump ?? undefined };
 }
 
 /** WHAT EACH HEAL ACTUALLY CLONED, measured on the buffer the heal reads.
@@ -555,12 +554,33 @@ function lensDiagnostic(): string {
   const colour = mine ?? (Hotspot.hasColour(shipped) ? shipped : null);
   const where = (p: LensStore.StoredProfile | null) =>
     !p ? "none" : `${p.model} ${p.fl}mm${Number.isFinite(p.ap) ? ` f/${p.ap}` : ""}${p.source ? ` · ${p.frames} ${p.source} frame${p.frames === 1 ? "" : "s"}` : " · shipped"}`;
-  const same = colour && shipped && colour === shipped;
+  // NAME THE PROFILE THE BRIGHTNESS ACTUALLY COMES FROM, which is not always the
+  // shipped one and is sometimes neither. This line used to print the shipped
+  // profile unconditionally while `lensCentreDiagnostic` one line below read the
+  // curve that lands — so the report said a brightness source was correcting the
+  // frame and then said the centre gain was 1.000x, and both were printed as
+  // facts. The source is worked out by the same `lensHalves` the render uses.
+  const brightness = Hotspot.lensHalves(mine, shipped).brightness;
+  const same = brightness && colour && brightness === colour;
+  // THE COUNTERS ARE PER-READ AND read() RESETS THEM, so reading them cold
+  // reports whatever the last read happened to be. Re-read for this frame so the
+  // number is about this photograph's profiles and not about a stale call.
+  LensStore.findProfile(currentExif);
+  const lost = LensStore.droppedBumps + LensStore.droppedProfiles;
   return (
     `strength ${params.lensFix}${params.lensBypass ? " · BYPASSED" : ""}` +
     ` · colour from ${where(colour)}` +
-    (same ? " · brightness from the same profile" : ` · brightness from ${where(shipped)}`) +
-    (mine ? ` · ${myLens!.note || "exact match"}` : "")
+    (!brightness
+      ? " · NO BRIGHTNESS CURVE — nothing is correcting the hot-spot"
+      : same
+        ? " · brightness from the same profile"
+        : ` · brightness from ${where(brightness)}`) +
+    (mine ? ` · ${myLens!.note || "exact match"}` : "") +
+    // A measurement set aside on read is invisible to the reader by
+    // construction: the app falls back and keeps working. Say it here.
+    (lost
+      ? ` · ON READ: ${LensStore.droppedBumps} brightness curve(s) set aside, ${LensStore.droppedProfiles} profile(s) refused`
+      : "")
   );
 }
 
@@ -598,11 +618,9 @@ function lensCentreDiagnostic(): string {
  *  Bypass is a strength of 0, not a missing curve: one place decides how much
  *  of each half lands, and it is the pipeline. */
 function currentLensCurve(): LensCurve | null {
-  const c = activeProfile();
-  if (!c) return null;
-  const colour = Hotspot.hasColour(c) ? c : null;
-  if (!colour && !c.bump) return null;
-  return { kr: colour?.kr, kb: colour?.kb, bump: c.bump };
+  const { colour, bump } = Hotspot.lensHalves(myLens?.p ?? null, hotspotState?.p ?? null);
+  if (!colour && !bump) return null;
+  return { kr: colour?.kr, kb: colour?.kb, bump: bump ?? undefined };
 }
 
 /** Called at open, beside initHotspot. */
@@ -5245,10 +5263,10 @@ wireHold(lensCmpBtn, showNoLensFix);
 /** What the one active profile is correcting on this frame right now, or null
  *  when nothing is. */
 function lensFixLive(): { colour: boolean; bump: boolean } | null {
-  const c = activeProfile();
-  if (!c || params.lensBypass || (params.lensFix ?? 0) === 0) return null;
-  const colour = Hotspot.hasColour(c);
-  const bump = !!c.bump?.some((v) => v > 0);
+  if (!activeProfile() || params.lensBypass || (params.lensFix ?? 0) === 0) return null;
+  const h = Hotspot.lensHalves(myLens?.p ?? null, hotspotState?.p ?? null);
+  const colour = Hotspot.hasColour(h.colour);
+  const bump = !!h.bump && Array.prototype.some.call(h.bump, (v: number) => v > 0);
   return colour || bump ? { colour, bump } : null;
 }
 
