@@ -28,11 +28,12 @@ import { pathToFileURL } from "node:url";
 const dir = mkdtempSync(join(tmpdir(), "lensstore-"));
 const entry = join(dir, "entry.ts");
 writeFileSync(entry, `export { bumpFrom, bumpProblem } from ${JSON.stringify(join(process.cwd(), "src/lensstore.ts"))};
+export { matchIn } from ${JSON.stringify(join(process.cwd(), "src/lensstore.ts"))};
 export { lensHalves } from ${JSON.stringify(join(process.cwd(), "src/hotspot.ts"))};
 export { NBINS } from ${JSON.stringify(join(process.cwd(), "src/lensprofile.ts"))};`);
 const out = join(dir, "bundle.mjs");
 await build({ entryPoints: [entry], bundle: true, format: "esm", outfile: out, logLevel: "silent" });
-const { bumpFrom, bumpProblem, NBINS, lensHalves } = await import(pathToFileURL(out).href);
+const { bumpFrom, bumpProblem, NBINS, lensHalves, matchIn } = await import(pathToFileURL(out).href);
 
 let bad = 0;
 const fail = (s) => { bad++; console.log(`FAIL  ${s}`); };
@@ -158,6 +159,64 @@ const shippedBumpOnly = prof({ bump: BUMP });
   c.brightness === null && c.bump === null
     ? ok("no brightness curve names no source")
     : fail("a report must not name a source for a curve that is not there");
+}
+
+{
+  // A FOCAL LENGTH BETWEEN TWO ANCHORS, ONE OF WHICH MEASURED NO HOT-SPOT.
+  //
+  // The shipped table stores NOTHING for a setting where the rig found no
+  // hot-spot — `bumpFrom` returns undefined at a range of zero, and the
+  // generator's own note says a lens with no hot-spot applies no brightness
+  // correction rather than a flat zero curve. So a missing bump in that table
+  // is a measured ZERO, not an unknown, and the aperture ordering across all 44
+  // profiles of the 50-250mm says the same thing: the curve appears as the lens
+  // stops down and is absent wide open, which is how hot-spots behave.
+  //
+  // The blend refused to interpolate unless BOTH ends carried a curve, for fear
+  // of halving the correction. Refusing removes ALL of it. A frame at 57mm f/8
+  // sits 14% of the way from a 50mm anchor with a real hot-spot to a 130mm
+  // anchor with none, and got no correction at all.
+  const LENS = "TEST 50-250mm";
+  const curve = (peak) => Array.from({ length: NBINS }, (_, i) => Math.max(0, peak * (1 - i / 20)));
+  const anchor = (fl, ap, peak) => ({
+    key: `${fl}@${ap}`, model: LENS, fl, ap, kr: KR_REAL, kb: KR_REAL,
+    ...(peak === null ? {} : { bump: curve(peak) }), frames: 1, source: "raw",
+  });
+  const ex = (fl, ap) => ({ lens: LENS, focalLength: [fl, 1], fNumber: [ap, 1] });
+  const peakOf = (p) => (p && p.bump ? p.bump[0] : null);
+
+  const hot50 = anchor(50, 8, 0.0241), cold130 = anchor(130, 8, null);
+  const m = matchIn([hot50, cold130], ex(57, 8));
+  const got = peakOf(m);
+  // 57mm is log(57/50)/log(130/50) = 0.137 of the way, so 0.0241 -> ~0.0208.
+  got !== null && Math.abs(got - 0.0208) < 0.0006
+    ? ok(`57mm between a 50mm hot-spot and a 130mm with none: blended to ${got.toFixed(4)}`)
+    : fail(`57mm between a 50mm hot-spot and a 130mm with none: got ${got === null ? "NO CURVE — the whole correction dropped" : got.toFixed(4)}, expected ~0.0208`);
+
+  // The far end of the same bracket must go the other way: near the anchor that
+  // measured nothing, there must be almost nothing left.
+  const far = peakOf(matchIn([hot50, cold130], ex(125, 8)));
+  far !== null && far < 0.0241 * 0.1
+    ? ok(`125mm, next to the anchor with no hot-spot: blended down to ${far.toFixed(4)}`)
+    : fail(`125mm should blend almost to nothing, got ${far === null ? "NO CURVE" : far.toFixed(4)}`);
+
+  // Symmetric: the curve on the FAR anchor rather than the near one.
+  const rev = peakOf(matchIn([anchor(50, 8, null), anchor(130, 8, 0.05)], ex(57, 8)));
+  rev !== null && rev > 0 && rev < 0.05 * 0.3
+    ? ok(`a hot-spot on the long anchor only, blended up from zero: ${rev.toFixed(4)}`)
+    : fail(`a curve on the long anchor only should blend up from zero, got ${rev === null ? "NO CURVE" : rev.toFixed(4)}`);
+
+  // Both ends measured no hot-spot: there is nothing to apply, and inventing a
+  // flat zero curve would make the report claim a correction that does nothing.
+  peakOf(matchIn([anchor(50, 8, null), anchor(130, 8, null)], ex(57, 8))) === null
+    ? ok("neither anchor measured a hot-spot: no brightness curve at all")
+    : fail("two anchors with no hot-spot must not produce a curve");
+
+  // Unchanged behaviour where both ends carry one.
+  const both = peakOf(matchIn([anchor(50, 8, 0.02), anchor(130, 8, 0.06)], ex(57, 8)));
+  both !== null && both > 0.02 && both < 0.06
+    ? ok(`both anchors carry a hot-spot: blended between them (${both.toFixed(4)})`)
+    : fail(`both anchors carrying a curve must still blend, got ${both === null ? "NO CURVE" : both.toFixed(4)}`);
 }
 
 console.log(bad ? `\n${bad} failed\n` : "\nthe save door and the read door agree, and every render path takes the same halves\n");
