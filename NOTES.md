@@ -14867,6 +14867,8 @@ one's own commit passes is the same act whatever the justification, and a
 one-time preview re-render is a small price. **Improving the gate to hash the
 build is the owner's call, recorded here rather than taken.**
 
+**SHIPPED to production in 2.46.34** (`970f011`, 2026-09-15) — deploy run 722 green, the served cache stamp read back off jefferson-photo-studio.pages.dev rather than off the push output.
+
 ## The waiting-export line, said twice and said every launch, 2026-09-15
 
 **Reported from the device with a screenshot: the same sentence printed twice,
@@ -14904,6 +14906,8 @@ planted, so nothing was shown, and launch 1 read "not mentioned at all". The
 real shape is v2 with a `meta` store keyed on `name`, which is what `frameCount`
 counts. A walk that plants its own fixture has to be checked for whether the
 plant took.
+
+**SHIPPED to production in 2.46.34** (`970f011`, 2026-09-15) — deploy run 722 green, the served cache stamp read back off jefferson-photo-studio.pages.dev rather than off the push output.
 
 ## Camera JPEGs opened with a channel swap nobody asked for, 2026-09-15
 
@@ -14954,3 +14958,41 @@ corrections along the way: a lone photo has no strip, so the first version found
 no tile and reported "skipped" as a pass; and the file input cannot be read back
 for the source pixels, because the app replaces it on every open (the
 picker-wedge fix), so the bytes are handed in from Node instead.
+
+**SHIPPED to production in 2.46.34** (`970f011`, 2026-09-15) — deploy run 722 green, the served cache stamp read back off jefferson-photo-studio.pages.dev rather than off the push output.
+
+## Fourteen red CI runs under "all nine gates green", 2026-09-15
+
+**Found while closing out the promotion, not by anything that reported it.**
+`.branch-guard` gained `also=tools/lens-store-check.mjs` and then
+`also=tools/contract-check.mjs`, and the tracked `.githooks/pre-commit` was never
+regenerated from it. The hook is GENERATED from that file, so the two are one
+fact written twice — and the generated copy is a committed artefact like any
+other, free to go stale in the tree while everything local keeps working.
+
+**Everything local kept working.** `--install` had put a current hook in
+`.git/hooks/pre-commit` in this container, so every commit really did run all
+nine checks and every one really was green. That is what was reported, and it was
+true of this clone and of nothing else.
+
+**CI runs `--artefact`, which checks the TRACKED hook against `.branch-guard`,
+and it is step one of the job.** So it refused at the first step and **every gate
+after it never ran on a runner at all** — the exact failure `.branch-guard`'s own
+header comment describes, in the file that was out of date.
+
+Red from run 291 (`dd9cd63`, the lens fix) through run 304: fourteen consecutive
+failures across the session branch, `staging` and `main`, while four releases
+were reported verified. **`6ab4f88` and `970f011` are both on production with a
+red Gates run against them**, and nothing about the deploy said so — `deploy.yml`
+is a separate workflow and it was green every time.
+
+**LESSONS §53 named this shape and it still landed**: a session that adds a hard
+gate to a pipeline has just added a new way for its own work to silently not
+arrive, and is at its least likely to look because it watched that gate pass
+locally. The missing question is not "did the gates pass" but **"is there a run
+whose head SHA is this commit, and what did its log say"** — asked of every
+workflow the push triggers, not just the one that deploys.
+
+Fixed by regenerating the tracked hook. **The durable half is the habit**: adding
+an `also=` line and regenerating the hook are one change, and the commit that
+does one without the other is the commit to refuse.
