@@ -238,7 +238,26 @@ try {
               return b2.getAttribute("aria-selected") === "true";
             }, id);
             if (!on) { fail(`${s.file} ${vw}px tab #${id}: would not select, so its controls are unmeasured`); continue; }
-            await page.waitForTimeout(260);
+            // SETTLE ON A COUNT, NOT ON A CLOCK. A flat 260ms wait passed this
+            // tab twice while the Stickers panel's top row was still `hidden`,
+            // waiting on the sticker catalogue — so the sweep measured the
+            // controls that had arrived and reported that every control passed.
+            // Four of them were 40px. The same failure as the tabs themselves,
+            // one level down: a sweep reports on what it managed to see, and
+            // nothing in the output distinguishes that from coverage.
+            const settled = await page.evaluate(async () => {
+              const n = () => document.querySelectorAll("#panel button:not([hidden]), #panel select, #panel input").length;
+              let last = -1, same = 0;
+              for (let i = 0; i < 40; i++) {            // 40 x 50ms ceiling
+                await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 50)));
+                const c = n();
+                same = c === last ? same + 1 : 0;
+                last = c;
+                if (same >= 3) return { count: c, ms: i * 50 };
+              }
+              return { count: last, ms: 2000, capped: true };
+            });
+            if (settled.capped) note(`${id}: control count never settled, measured ${settled.count} after 2s`);
             const inside = await page.evaluate(HIT);
             if (inside.small.length) fail(`${s.file} ${vw}px tab ${id}: ${inside.small.join(" · ")}`);
             else ok(`${s.file} ${vw}px tab ${id}: all >= 44`);
