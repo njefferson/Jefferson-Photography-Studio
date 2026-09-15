@@ -82,3 +82,11 @@ also=tools/palette-spec-check.mjs
 # lens quietly stopped correcting anything and the app said nothing. Both
 # functions are pure, so this needs no browser and costs milliseconds.
 also=tools/lens-store-check.mjs
+
+# Run on every commit: every exported function says what it takes, what it does
+# and what it gives back. The repo commented richly and stated contracts almost
+# nowhere — 10 of 246 when this was added — and the gap cost a release: bumpFrom
+# never said its result has to pass bumpProblem, so tightening bumpProblem broke
+# saving and loading against each other and a measured lens stopped working with
+# nothing said. The backlog is declared in .contract-allow and can only shrink.
+also=tools/contract-check.mjs
