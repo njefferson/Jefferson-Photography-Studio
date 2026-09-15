@@ -15060,3 +15060,52 @@ precisely where it would arrive: **the two halves agree in length (80 and 80)**.
 do not, which would have been the same absence reached a second way.
 
 20 of 20 walks green. `PREVIEW_PIPELINE` 10 to 11 — the rendering changes.
+
+## A hot-spot measured at one focal length and none at the next, 2026-09-15
+
+**Found by the instrument shipped an hour earlier, on the reader's own report.**
+The new lens line read *NO BRIGHTNESS CURVE — nothing is correcting the
+hot-spot*, with no *set aside on read* clause beside it, on a frame at 57mm f/8
+that the report said was matched to a real profile. Nothing had been dropped, so
+the profile itself had no curve. The old wording would have printed a named
+brightness source and nothing else, which is what it had been doing.
+
+**A missing bump in the shipped table is a measured ZERO, not an unknown.**
+`bumpFrom` returns undefined at a range of zero or a centre no brighter than the
+reference ring, and the generator deliberately stores nothing rather than a flat
+zero curve. The table corroborates it against the physics: across the 44
+profiles of the 50-250mm the curve APPEARS as the lens stops down and is absent
+wide open — 50mm has none at f/4.5 to f/6.3 and a curve from f/7.1 up, 130mm
+none until f/13, 250mm none until f/14. Hot-spots worsen stopped down
+(IR-SCIENCE.md §1), so every absence sits where no hot-spot is expected.
+
+**The blend refused to interpolate unless both anchors carried a curve**, with a
+comment reasoning that a blend against a missing half would quietly halve the
+correction. Refusing removes all of it, which is the larger error by a factor of
+about seven on the reported frame:
+
+- 50mm f/8 carries a centre bump of 0.0241; 130mm f/8 carries none.
+- 57mm sits `log(57/50)/log(130/50)` = **13.7%** of the way between them.
+- Blended against the measured zero: **0.0208**. Refused: nothing at all.
+
+Measured across both lenses over 3304 focal-and-aperture settings: **686 of them,
+about 21%, now get a brightness correction where they previously got none** —
+centre bump min 0.0001, median 0.0111, max 0.2594. A blend that lands on nothing
+still stores nothing, so the report cannot name a source that does not move a
+pixel; that contradiction is what this whole thread began as.
+
+**The one case where missing means unreadable rather than zero** is a reader's
+own profile whose curve `read()` set aside. Blending that toward zero
+under-corrects where refusing it corrected nothing — and under-correcting leaves
+a disc the Hot-spot slider can finish, which is the trade `lensstore.ts`'s own
+header already names. Recorded rather than guarded: there is no marker
+distinguishing the two, and adding one is its own piece of work.
+
+**Gate: five more cases in `tools/lens-store-check.mjs`,** negative control
+first. Against the old blend, three failed and the first named the reported
+frame: *57mm between a 50mm hot-spot and a 130mm with none: got NO CURVE — the
+whole correction dropped, expected ~0.0208*. Both the symmetric case and the
+both-anchors-zero case are asserted, so the fix cannot have been a one-way
+loosening.
+
+20 of 20 walks green. `PREVIEW_PIPELINE` 11 to 12.
