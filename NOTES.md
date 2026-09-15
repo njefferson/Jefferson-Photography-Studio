@@ -14716,3 +14716,65 @@ how to measure an IR rendering without fooling yourself, what the 44 practice
 raws are and are not, and the standing errors — each with the measurement that
 established it. `CLAUDE.md` points at it from the INFRARED-first section, which
 is the paragraph that was not enough on its own.
+
+## Aerochrome is a SEPARATION, not a cast — fixed, 2026-09-15
+
+**The defect behind every colour complaint in this thread.** Route 1 is: usable
+white balance, swap R/B, **correct the resulting cast**, contrast last. `aero`
+had no step 3 — `red` carries `wbBias [0.78, 1.02, 1.35]`, `goldie`
+`[0.78, 1.22, 1.4]`, and `aero` carried nothing. The comment beside it already
+named the result: the bare swap, flat purple.
+
+**A wbBias could never have been the answer, and that is provable rather than a
+matter of tuning.** A wbBias is a DIAGONAL gain: it multiplies every pixel by
+the same three factors, so it moves the whole hue distribution together and
+cannot open an angle between two populations. Solved against the EIR target on
+five camera JPEGs and five raws, the best any diagonal gain reached was foliage
+289-298 degrees and sky 240-254 — about **50 degrees apart, against targets 130
+apart**. Both file kinds hit the same ceiling, and the red multiplier ran to the
+edge of every range it was given. `red` and `goldie` are right to use it: they
+shift everything one way, which is what a cast is.
+
+**The per-colour mixer can, because a band shift acts differentially on nearby
+hues.** It took one frame from 36 degrees of separation to 95. `params.hsl` (8
+bands x 3 at `HSL_CENTERS`) already existed and a SAVED look already carried it
+— but `applyLook` reset it to `hslDefault()` unconditionally, so the built-in
+look table could not express one. That was the missing expressiveness, and it
+was one line.
+
+**JPEG ONLY, and the raw side deliberately carries nothing.** Measured: a raw
+under this look lands foliage near 177 degrees and sky near 0 — about 177 apart
+— and that rendering is the one already confirmed correct. Holding it to a
+textbook target would be this session's reference overriding that. `hsl` rides
+the `Look.raw`/`Look.jpeg` split beside `sat`, `contrast` and `wbBias`, so raws
+take the `hslDefault()` path exactly as before.
+
+**Shifts: Blue -45, Purple +20, Magenta +60** at centres 240/280/320 — the
+medians from refining against the target on the real renderer, frame by frame,
+then frozen as one constant because a look is a constant and not a per-frame
+adaptation.
+
+**The five reported frames, before and after** (hues at 5% or more, then the
+biggest single hue bin):
+
+- NIR_2810 **2 hues / 71% -> 5 hues / 36%**
+- NIR_2811 2 / 66 -> 4 / 39
+- NIR_2812 2 / 76 -> 4 / 44
+- NIR_2813 2 / 55 -> 4 / 42
+- NIR_2821 2 / 61 -> 4 / 42
+
+Crushed stays at or under 1.6% and pure white is 0.0% on every one. The raw
+controls read 4 hues at 43/32/38% — unmoved.
+
+**A measurement that was too strict, said plainly.** The sky target of 200
+degrees (cyan) marks NIR_2821 as 62 degrees off, and the render of that frame is
+clearly right: blue sky against pink foliage, which is what Aerochrome is.
+Classic EIR sky is frequently deep blue rather than cyan, so the assertion band
+for sky is 65 degrees rather than the 45 used for foliage. The number was wrong,
+not the picture.
+
+**And an instrument note.** The first solver shipped 145k pixels per evaluation
+over the CDP bridge and did 225 full re-renders per frame; it timed out twice
+before producing a single line. Reduced in-page to six numbers per evaluation
+and 25 probes per frame. When a measurement takes ten minutes to say nothing,
+the instrument is the thing to fix first.
