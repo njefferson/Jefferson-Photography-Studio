@@ -14534,3 +14534,65 @@ ways out, and none of them is a session's to pick:
    it costs the ability to step between photos without leaving the tool.
 3. One scrolling row of aspect chips instead of two wrapped rows — pill 214 to
    about 110. Keeps everything reachable and makes the chips less discoverable.
+
+## The one-band thread, measured on all five frames at last, 2026-09-15
+
+**Asked: what was decided, and when did it change.** From the history, not from
+memory.
+
+**Nothing about looks was ever decided by the owner.** Three owner rulings touch
+this and all three are about OPENING a file: a saved look carries the creative
+grade only, never the per-shot white balance, "so a look drops onto any photo on
+top of its own balance" (2026-07-04); white balance opens AS SHOT, no automatic
+gray-world at import, ever (2026-07-24); camera-rendered files open as the camera
+made them, measured denoise only (2026-07-25 rev.2). The behaviour UNDER a look
+— every camera-rendered file gray-world balanced, no exception — was simply what
+the app did, and no ruling covers it.
+
+**It changed at `1f29118`, 2026-09-11 10:48 UTC**, in a session, on one
+photograph: shadows crushed falling 13% -> 3%, fifteen two-band frames unchanged.
+That same session had written `dba3962` at 03:38 ruling the forced re-balance out
+as the cause, and `cc55aee` at 04:23 naming Restore depth as what turned the sky
+yellow. Seven hours later it changed the thing its own 03:38 note had cleared.
+(Hub LESSONS §308.)
+
+**Measured now on all five reported frames, three renderings each, through the
+real app** (`readPixels` over the whole canvas, not a centre patch):
+
+- **as opened** — median 0.26-0.39, saturation 0.59-0.65, 0% crushed, and
+  **95-100% of the coloured frame in ONE hue bin.**
+- **today's default, look with the balance skipped** — median 0.23-0.44,
+  saturation 0.69-0.79, 0-1.6% crushed, **55-76% in the biggest hue bin, TWO
+  hues over 5%.**
+- **the pre-2026-09-11 rendering, "Balance it anyway"** — median 0.40-0.51,
+  saturation 0.27-0.41, 11-15% crushed on four of five, **30-52% in the biggest
+  bin, THREE TO FIVE hues over 5%.**
+
+**The hue column is the one nobody had measured, and it decides the argument.**
+Every previous round measured brightness and per-pixel saturation — the numbers
+that made today's default look better on paper, and made the old one read as
+"grey". They were measuring the wrong quantity. "Flat purple" is not a
+brightness fact or a saturation fact: it is the whole frame landing in one hue,
+and by that measure today's default gives **two** hues where the old gave **four
+or five**. A false-colour look exists to put foliage and sky in DIFFERENT hues,
+and **the gray-world balance is the mechanism that separates them.** Removing it
+removed the thing the look is for.
+
+So the standing taste — maximum saturation, gentle contrast, shadows alive —
+was read as favouring today's default because per-pixel saturation is higher.
+One hue at high saturation is a colour cast, not colour.
+
+**Also worth knowing: nothing is blowing out.** The first cut of this reported
+47-82% "blown" on today's default, which is one channel at the ceiling — ordinary
+in a saturated false-colour render, since a pure red is (255,0,0) and loses
+nothing. Pixels with the MINIMUM channel also at the ceiling, which is the only
+kind that has actually lost detail: **0.0% on every frame, every rendering.**
+The instrument was conflating saturation with clipping.
+
+**STILL OPEN — the owner's call, and now it has evidence.** The two costs are
+separable and neither current rendering separates them. The crush comes from the
+gray-world pull dropping red about sixfold with no floor under the shadows; the
+hue separation comes from having a second band to work with at all. A balance
+that protects the black point should give the old rendering's four-to-five hues
+without its 11-15% crush. That is a third rendering, it is not built, and which
+of the three is the DEFAULT is not a session's to choose (LESSONS §307).
