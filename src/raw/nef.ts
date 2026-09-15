@@ -65,13 +65,9 @@ function buildHuffLut(tree: number[]): HuffLut {
 }
 
 /** Demosaiced half-res linear proxy for live editing. */
-export function decodeNef(bytes: Uint8Array): LinearImage & { camWb?: [number, number, number] } {
+export function decodeNef(bytes: Uint8Array): LinearImage {
   const c = readNefCfa(bytes);
-  // The camera's own white balance rides out with the pixels rather than being
-  // re-read by the caller: readNefCfa has already walked the MakerNote to find
-  // the linearization curve, and decoding a 29 MB NEF twice to re-answer a
-  // question already answered is the shape of thing this repo measures.
-  return { ...demosaicBinned(c.cfa, c.width, c.height, c.pattern, c.black, c.white), camWb: c.camWb };
+  return demosaicBinned(c.cfa, c.width, c.height, c.pattern, c.black, c.white);
 }
 
 /** Full Bayer frame + metadata (for native-resolution export). */
@@ -106,7 +102,7 @@ export function readNefCfa(bytes: Uint8Array): RawCfa {
   const white =
     raw.num(50717)[0] ??
     (params.hasCurve && curveWhite > black ? curveWhite : bps === 14 ? 15520 : (1 << bps) - 1);
-  return { cfa, width, height, pattern, black, white, camWb: meta.camWb };
+  return { cfa, width, height, pattern, black, white };
 }
 
 interface NikonParams {
@@ -241,10 +237,7 @@ function nikonDecode(bytes: Uint8Array, dataOffset: number, width: number, heigh
  *  D5300 = 600, Z-series = 1008. Assuming the Z value crushed a deeply
  *  underexposed D5300 frame to near-black (owner's DSC_1709, 2026-07-25 —
  *  its Adobe DNG twin carried BlackLevel 600 and rendered fine). */
-function findLinearizationTable(
-  bytes: Uint8Array,
-  main: Reader,
-): { offset: number; le: boolean; black?: number; camWb?: [number, number, number] } {
+function findLinearizationTable(bytes: Uint8Array, main: Reader): { offset: number; le: boolean; black?: number } {
   const u32 = (o: number) => main.u32(o);
   const u16 = (o: number) => main.u16(o);
   const tagVal = (ifd: number, tag: number): number | undefined => {
@@ -277,7 +270,6 @@ function findLinearizationTable(
   const mc = mn.u16(mnIfd);
   let linOff: number | undefined;
   let black: number | undefined;
-  let camWb: [number, number, number] | undefined;
   for (let i = 0; i < mc; i++) {
     const e = mnIfd + 2 + i * 12;
     const tag = mn.u16(e);
@@ -287,31 +279,21 @@ function findLinearizationTable(
       const vo = base + mn.u32(e + 8);
       black = Math.round((mn.u16(vo) + mn.u16(vo + 2) + mn.u16(vo + 4) + mn.u16(vo + 6)) / 4);
     }
-    // THE WHITE BALANCE THE PHOTOGRAPHER MEASURED, which for an infrared
-    // conversion is the whole job: the IR workflow's first step is to open the
-    // raw with the in-camera custom white balance intact, because without it
-    // the file is a red wall and the channel swap has nothing to work with.
-    // Read out of this repo's own files: a Z 50 NEF says WhiteBalance PRESET4
-    // and 0x000C [1.8574, 1.4668, 1, 1], and five camera JPEGs from the same
-    // body say PRESET6 and the SAME four numbers — one preset, measured once on
-    // foliage, constant across a shoot. Gray-world re-derives a DIFFERENT
-    // balance for every frame from that frame's content, which is what makes a
-    // set grade inconsistently and what "Restore depth" was invented to paper
-    // over. The file carries the answer; nothing here had ever read it.
-    //
-    // ORDER IS [R, B, G, G], not RGB — Nikon's, and the trap in this tag.
-    if (tag === 0x000c && mn.u16(e + 2) === 5 && mn.u32(e + 4) >= 3) {
-      const vo = base + mn.u32(e + 8);
-      const rat = (o: number) => {
-        const d = mn.u32(o + 4);
-        return d ? mn.u32(o) / d : 0;
-      };
-      const r = rat(vo), b = rat(vo + 8), g = rat(vo + 16) || 1;
-      // Finite and positive or it is not a white balance; a bad tag must fall
-      // back to gray-world rather than render a black frame.
-      if (r > 0 && b > 0 && g > 0 && Number.isFinite(r) && Number.isFinite(b)) camWb = [r / g, 1, b / g];
-    }
+    // 0x000C (WB_RBLevels) IS IN THIS IFD AND IS DELIBERATELY NOT READ.
+    // It is the camera's own white balance, [R, B, G, G], and on a visible-
+    // light body it would be the right thing to open on. On an infrared
+    // conversion it is not: the gains an IR white point needs fall outside what
+    // a custom PRE preset can store, so the camera clamps and records what it
+    // could reach. Measured on this repo's own files — NIR_1376.NEF developed
+    // at its own [1.8574, 1.4668, 1, 1] renders rgb(158, 0, 241), green at
+    // ZERO, two hues; gray-world on the same frame gives rgb(175, 178, 178)
+    // and five. The tell that it is a ceiling rather than a measurement: a NEF
+    // on PRESET4 and five JPEGs on PRESET6 record that identical number to
+    // four decimals.
+    // So the white point is found BELOW what the camera allows, from the data.
+    // A session shipped it the other way round and took it back out the same
+    // day; the physics and the numbers are in IR-SCIENCE.md, section 3.
   }
   if (linOff === undefined) throw new Error("NEF: no LinearizationTable (0x0096).");
-  return { offset: linOff, le: mnLe, black, camWb };
+  return { offset: linOff, le: mnLe, black };
 }
