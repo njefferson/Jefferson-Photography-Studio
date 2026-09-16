@@ -21,6 +21,34 @@ Auto-loaded into every session. **Read `NOTES.md` before doing anything** — it
 is the source of truth: the "Next capability release" queue (top items first),
 settled design decisions, and measured gotchas that must not be re-learned.
 
+## KNOW THE APP. NEVER GO AND "SEE" HOW IT DOES SOMETHING (owner, 2026-09-16)
+**This app is not a foreign object to send explorers into. You wrote it.** A
+session that greps to rediscover its own pipeline order, does not know which
+files exist, and then reasons from the two functions it just read is not
+maintaining an app — it is meeting one, every time, with no memory.
+
+**The brief is PRINTED at session start**, by `.claude/hooks/session-start.sh`:
+the hub's family brief (branch, doctrine drift, the lessons index) and then
+[`tools/session-brief.mjs`](tools/session-brief.mjs), which carries this app's
+own facts — the pipeline order, the FOUR paths that each rebuild the at-open
+ruling, the five places an `EditParams` field must be added, the commit gates
+and the walks. **Every line of it is generated from the app**, because a brief
+that can go stale is the same failure one level up.
+
+**The module map is `docs/ARCHITECTURE.md` and it is GENERATED** from the
+comment each source file opens with, held to it by
+[`tools/architecture-check.mjs`](tools/architecture-check.mjs) on every commit.
+**Read it instead of grepping.** A new module cannot be added without appearing
+there, a deleted one cannot linger, and a file that does not say what it is
+fails the commit. That document was a day old and still named a look that had
+been renamed — which is why it is no longer written by hand.
+
+**What this costs when it is skipped**, measured the day the rule arrived: a
+session changed `batchParamsFor`'s channel swap on a diagnosis assembled from
+two functions, wrote a confident comment on it, built it, and the measurement
+came back byte-identical. It was backed out. A guess with good prose on it is
+still a guess, and the 150° it claimed to explain is still unexplained.
+
 ## Release flow (the owner's hard gate)
 - `main` == production (jefferson-photo-studio.pages.dev, deployed on push).
 - The `staging` branch deploys to staging.jefferson-photo-studio.pages.dev.

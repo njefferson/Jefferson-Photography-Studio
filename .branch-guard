@@ -90,3 +90,12 @@ also=tools/lens-store-check.mjs
 # saving and loading against each other and a measured lens stopped working with
 # nothing said. The backlog is declared in .contract-allow and can only shrink.
 also=tools/contract-check.mjs
+
+# Run on every commit: the module map in docs/ARCHITECTURE.md is GENERATED from
+# the comment each source file opens with, and held identical to it. A reference
+# that goes stale is worse than none, because it is consulted — that document was
+# a day old and still named a look that had been renamed, and nothing could see
+# it. Generating it means a new module cannot be added without appearing there, a
+# deleted one cannot linger, and a purpose that changes in the code changes in
+# the map. It also refuses a source file that does not say what it is.
+also=tools/architecture-check.mjs
