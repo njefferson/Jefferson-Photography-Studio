@@ -15492,3 +15492,78 @@ and the owner has no way to tell a render that settled from one that did not.
 
 Next time it runs: a raw source, a settle condition rather than a timeout, and a
 check that two candidates which set different values actually differ.
+
+## The button called Aerochrome was not Aerochrome, 2026-09-16
+
+**The label was a claim the button could not meet, and it was the only name the
+app had for that rendering.** `#lookAero` applies an R⇄B channel swap plus
+saturation, and on camera JPEGs an eight-band `hsl` correction. Aerochrome's
+three layers were sensitive to **green, red and infrared**, with a Wratten 12
+yellow filter absorbing blue entirely because all three were also blue-sensitive
+— so the film's mapping is a **three-way rotation**: red takes the infrared,
+green takes the visible red, blue takes the visible green. Row-major
+`[0,0,1, 1,0,0, 0,1,0]`. A two-channel exchange is a different operation and no
+amount of tuning turns one into the other. IR-SCIENCE.md §4b carries the sources
+and §4b-i carries what shipped.
+
+**What shipped, and what deliberately did not move.** `aero` keeps its key, its
+numbers, its per-kind split and its button id `lookAero`; only its printed name
+changed, to **Pink IR**. A new look `eir` (Kodak's own designation, Ektachrome
+Infrared) prints as **Aerochrome** and carries `swapRB: false` with the rotation
+in `mix3`. `interface Look` gained `mix3?`, and `applyLook` now honours it
+instead of wiping the mixer unconditionally — a widening, so every look that
+predates the field renders byte-identically.
+
+**THE MIXER PRESET LABELS WERE THE WRONG WAY ROUND.** The chip called
+*Aerochrome* carried `[0,1,0, 0,0,1, 1,0,0]`, which cycles the other way and is
+not any film; the chip called *Rotate* carried the actual mapping. The two labels
+exchanged and **nothing else moved** — the chips have no ids, so
+`tools/look-sheet.mjs` presses them by index and reordering would silently
+re-point every candidate that ever named one.
+
+**NO SWAP UNDER THE ROTATION.** The mixer runs immediately after the swap, so
+leaving `swapRB` on composes the two into a G⇄B exchange — measured as the fourth
+sheet candidate and the worst of them. That is why the new look carries no
+`toggleSwap`: there is nothing to flip, and its sub-label reads `rotate` rather
+than the two-segment toggle.
+
+### Three things this walked into, each of which was already broken
+
+**A batch never carried a look's colour half.** `batchParamsFor`'s builtin branch
+built from `neutralLook()` and copied six fields; `hsl` and `mix3` were not among
+them. So a `.zip` rendered a look's SHAPE without its colour correction while the
+screen rendered both, silently, because a batch frame still looked like a look.
+Only camera JPEGs were affected before now (`aero`'s raw side carries no `hsl`),
+and the new look makes it structural — its whole rendering IS its `mix3`, so
+without the fix a batch under it would carry no rotation at all. Now resolved per
+kind exactly as `applyLook` does.
+
+**The one-band sentence could not see a look that does not swap.** `lookState`
+asked `LOOKS[activeLook]?.swapRB`, which was true of every colour look in the app
+until this one. It now asks whether the look carries a MAPPING — swap **or**
+mixer — and whether one is on the frame. Without that, a one-band JPEG under the
+new look would have shown a flat green frame with no explanation.
+
+**A walk pressed a look by its LABEL.** `tools/oneband-walk.mjs` found the first
+button whose text starts with `Aerochrome`. Read off the built page after the
+rename, that is now `lookEir` — so the walk would have gone on passing while
+measuring a different look entirely. It presses `#lookAero` by id. A label is
+product copy and changes; an id is the thing being tested.
+
+### What was measured
+
+`tools/look-sheet.mjs` on a real NEF, split populations per IR-SCIENCE §6:
+`Pink IR` foliage saturation 0.51 at value 0.69 and sky 0.49 at 0.50;
+`Aerochrome` foliage 0.33 at 0.69 and sky 0.50 at 0.51. **The difference that
+decides it is not in those numbers** — under the rotation the fenceposts, the
+wire, the pole and the tree trunk stay brown, and under the swap they go pink
+with the canopy. That is the film's own pass/fail test, and nothing in this
+repository measures that population yet.
+
+**On camera JPEGs it is not solved.** All five real camera JPEGs on hand are
+one-band files, so the balance is skipped by design and the rotation renders a
+flat green wall — as `Pink IR` renders a flat purple one on the same files, for
+the same reason. *Balance it anyway* reaches it: measured on all five, the mean
+goes from roughly 40/220/0 to a neutral 105/110/100 and the hues spread. What is
+still missing is the JPEG-side cast correction, and solving it needs a **two-band
+camera JPEG**, which this repository does not have.
