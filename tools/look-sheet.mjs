@@ -34,38 +34,29 @@ const OUT = arg("out", "/tmp/claude-0/-home-user/2bd37282-d617-5a51-b357-6b20783
 // Each candidate: a name, a one-line note on what it is reaching for, and the
 // controls to touch. `set` writes a slider and fires the events the app listens
 // for; `tap` presses a button.
-// LIFEPIXEL'S PUBLISHED AEROCHROME RECIPE, READ FROM THE PAGE ITSELF.
+// THE SIX-FRAME SOLVE. Every number here is derived, and derived across six
+// raws from different scenes rather than one.
 //
-// It rotates nothing and uses no colour matrix: the plain red/blue swap, then
-// FOUR band moves in Hue/Saturation plus a Selective Color pass. Its stated
-// target, in the author's words: foliage bright red and magenta, sky a strong
-// blue saturation.
+// The matrix is the minimum-norm solution putting FOLIAGE on crimson 335 and
+// leaving BARE GROUND where it is, solved against the mean CHROMATICITY of the
+// six (direction, not brightness — absolute level is exposure and varies 4x
+// across the set while direction varies by a few per cent). The sky is not an
+// anchor: three cannot be hit at once on this sensor (IR-SCIENCE.md 4c-i), so it
+// falls where it falls and one band shift carries it.
 //
-//   1  levels, contrast, tone, and swap red/blue
-//   2  Cyan  -> hue RIGHT, until the sky is blue rather than blue-and-cyan
-//   3  Red   -> hue LEFT, so the red tones become more pronounced
-//   4  Yellow-> hue LEFT, turning the yellows red
-//   5  Selective Color on Red -> add BLACK within the red tones
+// HOLD-ONE-OUT SAYS IT GENERALISES: fitted on five frames and applied to the
+// sixth it never saw, foliage lands on hue 335 every time, worst error 1.9
+// degrees, and bare ground stays between 0.016 and 0.073 saturation.
 //
-// THE PAGE CARRIES NO NUMBERS. Every step is "move the slider", so the values
-// below are derived, not quoted: this frame's sky sits near hue 175 and its
-// foliage near 357 under the swap, and the yellow shift is fixed by the
-// instruction itself — the full distance from the yellow band to red, which is
-// also the slider's limit. Step 5 has no published amount and is taste; both
-// states are rendered.
-//
-// Step 5 is LUMINANCE, not saturation. "Adjust the Black within the Red tones"
-// darkens the reds; a note here previously called it saturation, from a
-// second-hand summary that also omitted the yellow step entirely.
+// The 32-degree shift is measured at the LOOK'S OWN STRENGTH on two frames (33
+// and 31) rather than at saturation 1, which is where the one-frame version went
+// wrong.
 const CANDIDATES = [
-  { name: "0-pink-ir", note: "the swap alone — the base the recipe starts from",
+  { name: "0-pink-ir", note: "the swap, for reference",
     steps: [["tap", "#ptab-ir"], ["tap", "#lookAero"]] },
-  { name: "1-lifepixel-full", note: "cyan +45 to blue, red -22, yellow -60 to red. No matrix, so no grain.",
-    steps: [["tap", "#ptab-ir"], ["tap", "#lookAero"], ["tap", "#ptab-color"],
-            ["hsl", "4", "45,1,1"], ["hsl", "0", "-22,1,1"], ["hsl", "2", "-60,1,1"]] },
-  { name: "2-lifepixel-full-reds-darkened", note: "the same, plus step 5 — black added within the reds (red band luminance 0.85)",
-    steps: [["tap", "#ptab-ir"], ["tap", "#lookAero"], ["tap", "#ptab-color"],
-            ["hsl", "4", "45,1,1"], ["hsl", "0", "-22,1,0.85"], ["hsl", "2", "-60,1,1"]] },
+  { name: "1-six-frame-solve", note: "the matrix solved across six raws, plus the 32-degree band shift measured at the look's real strength",
+    steps: [["tap", "#ptab-ir"], ["tap", "#lookAero"], ["tap", "#ptab-color"], ["mix3", "0", "0.991"], ["mix3", "1", "-0.064"], ["mix3", "2", "0.072"], ["mix3", "3", "-1.438"], ["mix3", "4", "1.373"], ["mix3", "5", "1.023"], ["mix3", "6", "-0.473"], ["mix3", "7", "0.811"], ["mix3", "8", "0.653"],
+            ["hsl", "3", "32,1,1"], ["hsl", "4", "32,1,1"]] },
 ];
 
 

@@ -632,6 +632,57 @@ photographed spectrum — a tungsten lamp through a slit onto a diffraction
 grating, calibrated against a CFL's known emission lines — identifies it. The
 diagnostic reports what the file can DO, which is the part the app needs.
 
+### 4c-v. SIX FRAMES, AND THE END OF "FITTED TO ONE PHOTOGRAPH"
+
+Measured 2026-09-16 on six raws from different scenes, supplied by the owner
+after every number in 4c-i through 4c-iv had been fitted to NIR_1376 alone.
+`tools/anchor-sweep.mjs` is the instrument.
+
+**READ THE DIRECTION, NOT THE LEVEL — THE FIRST LOOK AT THIS WAS WRONG.** The
+raw anchors scatter violently across the set: foliage standard deviation is
+60-70% of its mean, and the frames range from 0.805 to 0.184 on red, a factor of
+four. That is EXPOSURE. A colour matrix acts on the DIRECTION of an anchor
+vector, not its length, and normalised to chromaticity the same six frames agree:
+
+- foliage, spread as a share of the mean: **3.9% / 5.7% / 2.1%**
+- sky: **3.6% / 2.4% / 4.4%**
+- neutral: **0.6% / 1.0% / 0.7%**
+
+Bare ground is consistent to under one per cent across six different scenes.
+**So a single matrix generalises on this camera; it does not need solving per
+photograph** — which was the open question, and the answer decides the shape of
+the feature, not just its numbers.
+
+**THE SIX-FRAME MATRIX**, minimum-norm, foliage onto crimson 335 with bare
+ground held where it is, applied over the R/B swap:
+
+    [0.991, -0.064, 0.072,  -1.438, 1.373, 1.023,  -0.473, 0.811, 0.653]
+
+Largest coefficient 1.44 against a mixer that clamps at 2. Foliage lands on 335
+at saturation 0.65, neutral at 0.031, and the sky falls at 158 by consequence.
+**The band shift is 32 degrees**, measured at the LOOK'S OWN STRENGTH on two
+frames (33 and 31) rather than at saturation 1 — the error 4c-ii records.
+
+**HOLD-ONE-OUT, WHICH IS WHAT MAKES IT A CLAIM ABOUT THE CAMERA RATHER THAN
+ABOUT SIX FILES.** Fit on five frames, apply to the sixth the fit never saw:
+foliage lands on hue 335 every time, **worst error 1.9 degrees**; the sky lands
+between 157 and 159; neutral saturation stays between 0.016 and 0.073.
+
+**AND THE ONE-FRAME MATRIX WAS NOT BADLY WRONG.** Largest single-coefficient
+difference 0.177, and applied to the six-frame anchors it still puts foliage on
+335, at saturation 0.61 against 0.65, with neutral at 0.042 against 0.031. Worth
+recording because it says something about the method: anchors measured on ONE
+frame of this camera already carried most of the answer, and the six-frame fit
+tightened it rather than overturning it.
+
+**ONE FRAME IS THE OUTLIER AND IT EXPLAINS ITSELF.** NIR_1379 holds 3.0% foliage
+and 0.2% sky — there is almost nothing of either population in it. Its foliage
+chromaticity is the only one off the cluster, its channel correlations are the
+only ones outside 0.94-0.99 (0.849 and 0.784), and it is the frame that carries
+the 1.9-degree hold-one-out error. A population that is a fiftieth of a per cent
+of the frame is not a measurement. **`anchor-sweep` prints each population's
+share for exactly this reason.**
+
 ## 5. What a camera JPEG is, and why it is a different animal
 
 A camera-rendered JPEG was developed **through** the clamped custom preset, then
