@@ -159,6 +159,87 @@ try {
     if (dh > 30 || dl > 8) fail(`${label}: a batch render disagrees with opening the same file — ${dh}deg and ${dl.toFixed(1)} points`);
     else ok(`${label}: batch and open agree`);
   }
+
+  // 3. A TILE FOR A PHOTOGRAPH NOBODY HAS OPENED, UNDER THE LOOK THE SET WEARS.
+  //
+  //    Arm 2 runs on Auto on purpose, so the only thing under test there is the
+  //    baseline. THAT IS ALSO ITS BLIND SPOT, and this arm is the blind spot's
+  //    shape: the tile path reconstructs the LOOK as well as the baseline, and
+  //    it was reconstructing half of it. `makeThumb` took the channel swap from
+  //    `freshBaseline` and the mixer from whatever was live, while
+  //    `establishFreshEdit` takes both from the session look -- so under any look
+  //    whose mapping differs from the file kind's default, the tile stated an
+  //    open that will not happen. It went unseen because until `eir` the only
+  //    looks that clear the swap on a raw are the ones with saturation 0, where
+  //    a swap has nothing to move.
+  //
+  //    Pressed by ID. A label is product copy and moves; `Aerochrome` named a
+  //    different button the day a second look shipped under that name.
+  for (const [files, label] of SETS) {
+    if (files.length < 2) { console.log(`  ${label.padEnd(12)} tile arm skipped — needs two files`); continue; }
+    const page = await br.newPage({ viewport: { width: 1000, height: 820 } });
+    try {
+      await page.goto(`${BASE}/ir.html`, { waitUntil: "load" });
+      await page.setInputFiles("#file", files);
+      await page.waitForFunction(() => document.getElementById("welcome")?.hidden, null, { timeout: 300000 });
+      await page.waitForFunction(() => document.querySelectorAll("#sessionThumbs .session-thumb img[src^='blob:']").length >= 2, null, { timeout: 300000 });
+      await page.waitForTimeout(2000);
+      const was = await page.evaluate(() => document.querySelectorAll("#sessionThumbs .session-thumb img")[1]?.getAttribute("src") || "");
+
+      const pressed = await page.evaluate(() => {
+        document.getElementById("ptab-ir")?.click();
+        const b = document.getElementById("lookEir");
+        if (!b) return false;
+        b.click(); return true;
+      });
+      if (!pressed) { fail(`${label}: no #lookEir button — the walk cannot see its own case`); continue; }
+      // The strip re-renders every tile under a new look. Wait for the SECOND
+      // tile's picture to actually be a different one, not for a clock.
+      await page.waitForFunction((prev) => {
+        const im = document.querySelectorAll("#sessionThumbs .session-thumb img")[1];
+        const src = im?.getAttribute("src") || "";
+        return src.startsWith("blob:") && src !== prev;
+      }, was, { timeout: 300000 });
+      await page.waitForTimeout(1200);
+
+      const tile = await page.evaluate(`(async () => {
+        const read = ${READ};
+        const im = document.querySelectorAll("#sessionThumbs .session-thumb img")[1];
+        const src = im?.getAttribute("src") || "";
+        if (!src.startsWith("blob:")) return null;
+        const bm = await createImageBitmap(await (await fetch(src)).blob());
+        const cv = document.createElement("canvas");
+        cv.width = bm.width; cv.height = bm.height;
+        cv.getContext("2d").drawImage(bm, 0, 0);
+        return read(cv.getContext("2d").getImageData(0, 0, cv.width, cv.height).data);
+      })()`);
+      if (!tile) { fail(`${label}: the second tile has no picture to read`); continue; }
+
+      // NOW OPEN THE PHOTOGRAPH THE TILE WAS CLAIMING ABOUT.
+      await page.evaluate(() => document.querySelectorAll("#sessionThumbs .session-thumb")[1].click());
+      await page.waitForFunction(() => document.querySelectorAll("#sessionThumbs .session-thumb")[1]?.classList.contains("active"), null, { timeout: 300000 });
+      await page.waitForFunction(() => !document.getElementById("busy")?.hasAttribute("open"), null, { timeout: 300000 });
+      await page.waitForTimeout(2500);
+      const opened = await page.evaluate(`(() => {
+        const read = ${READ};
+        const c = document.querySelector("#view");
+        const g = c.getContext("webgl2") || c.getContext("webgl");
+        const b = new Uint8Array(c.width * c.height * 4);
+        g.readPixels(0, 0, c.width, c.height, g.RGBA, g.UNSIGNED_BYTE, b);
+        return read(b);
+      })()`);
+      if (!opened) { fail(`${label}: opening the second photograph gave no colour to read`); continue; }
+
+      const dh = dHue(tile.hue, opened.hue), dl = Math.abs(tile.light - opened.light);
+      console.log(`  ${label.padEnd(12)} tile  hue ${String(tile.hue).padStart(3)} (${(tile.share*100).toFixed(0)}%) light ${tile.light.toFixed(1)}%   [Aerochrome, never opened]`);
+      console.log(`  ${"".padEnd(12)} open  hue ${String(opened.hue).padStart(3)} (${(opened.share*100).toFixed(0)}%) light ${opened.light.toFixed(1)}%  \u00b7  ${dh}deg, ${dl.toFixed(1)} points apart`);
+      // A tile is 260px, nearest-sampled and JPEG-compressed against a full
+      // render, so the bars are looser than arm 2's: one bin of hue still, and
+      // twice the lightness slack.
+      if (dh > 30 || dl > 16) fail(`${label}: a tile under a look disagrees with opening the same file — ${dh}deg and ${dl.toFixed(1)} points`);
+      else ok(`${label}: tile and open agree under a look`);
+    } finally { await page.close(); }
+  }
 } finally { await br.close(); }
 console.log(bad ? `\n${bad} failed\n` : "\nevery path renders the same photograph the same way\n");
 process.exit(bad ? 1 : 0);

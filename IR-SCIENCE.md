@@ -299,10 +299,70 @@ not reproduce is the confusion this section exists to end.
 filter, the two-swap recipe, the wavelength classes and the 2000K limit are from
 retrieved search summaries of Kolari Vision, LifePixel, Lenscraft, Cuchara,
 Adobe's own community threads and the analog-film guides — **not from the primary
-pages**, which this environment's network policy blocked at fetch time. Nothing
-above has been confirmed against a rendered frame in this app. Before any of it
-becomes a look, the exact mixer values and the hue-shift targets need reading at
-the source and testing on a real raw.
+pages**, which this environment's network policy blocked at fetch time. The
+mapping itself has since been rendered and measured on a real raw (below); the
+wavelength classes and the 2000K limit have not.
+
+### 4b-i. THE APP SHIPS BOTH MAPPINGS NOW, UNDER HONEST NAMES
+
+Added 2026-09-16, the same day the research landed. **Nothing that already
+rendered one way renders another** — the change is two names and one new look.
+
+- **`aero`, printed `Pink IR`.** The R⇄B swap with saturation, and on camera
+  JPEGs the eight-band `hsl` correction. Untouched: same key, same numbers, same
+  per-kind split, same button id `lookAero`. Only the label moved, because it was
+  the only name the app had for this rendering and it was a claim the rendering
+  could not meet.
+- **`eir`, printed `Aerochrome`.** Kodak's own designation for the film
+  (Ektachrome Infrared). `swapRB: false`, `mix3: [0,0,1, 1,0,0, 0,1,0]` — the
+  rotation above, expressed in the 3×3 channel mixer, which is the only knob in
+  this pipeline that can state a mapping. `raw` takes sat 3.0 / contrast 1.15,
+  the same strengths as `Pink IR`.
+- **`MIX3_PRESETS` chips 2 and 4 exchanged LABELS.** The chip called *Aerochrome*
+  carried `[0,1,0, 0,0,1, 1,0,0]`, which cycles the other way and is not any
+  film; the one called *Rotate* carried the film's mapping. Matrices and array
+  order are untouched — the chips have no ids and are pressed by index.
+
+**NO SWAP UNDER THE ROTATION, AND THAT IS THE WHOLE DIFFERENCE.** The mixer runs
+immediately after the swap, so leaving `swapRB` on composes the two into a G⇄B
+exchange. Measured as the fourth sheet candidate and the worst of the four.
+
+**MEASURED ON A REAL NEF** (`tools/look-sheet.mjs`, split populations per
+section 6, never a whole-frame mean):
+
+- `Pink IR` — foliage saturation 0.51 at value 0.69, sky 0.49 at value 0.50.
+- `Aerochrome` — foliage 0.33 at value 0.69, sky 0.50 at value 0.51.
+
+The number that does not appear in that list is the one that matters, and it is
+visible rather than measured: **under the rotation the fenceposts, the wire, the
+pole and the tree trunk stay brown, and under the swap they go pink with the
+canopy.** That is the film's own pass/fail test — foliage to magenta, sky to
+cyan, *and soil, bark, asphalt and buildings unchanged*. A look that pinks the
+dirt is a global tint, whatever it does to the leaves. Nothing in this repository
+measures that population yet; it was read off the two renderings side by side.
+
+**A NOTE ON A NUMBER THAT MOVED.** An earlier sheet reached this rendering by
+hand — press `Aerochrome`, switch the swap off, then pick the mixer preset — and
+measured sky saturation 0.75. The shipped look measures 0.50 on the same frame.
+Neither is wrong: `applyLook` solves Restore depth against the look it is
+applying, and the by-hand route solved it against the swap-on state and then
+turned the swap off underneath the solve. The shipped number is the honest one.
+
+**ON CAMERA JPEGS IT IS NOT SOLVED, AND THAT IS SAID OUT LOUD.** All five real
+camera JPEGs on hand are one-band files (section 5), so the balance is skipped by
+design and the rotation renders a flat green wall — exactly as `Pink IR` renders
+a flat purple one on the same files, and for the same reason. Two things follow.
+First, `lookState`'s test for "is a colour look on the frame" read `.swapRB`
+alone, which was true of every colour look until this one; it now asks whether
+the look carries a MAPPING (swap **or** mixer), so the sentence explaining the
+one-band condition reaches the new look instead of leaving a green frame with no
+explanation. Second, *Balance it anyway* does reach it — measured on all five,
+the mean goes from roughly 40/220/0 to a neutral 105/110/100 and the hues spread.
+**What is still missing is the JPEG-side cast correction**, the `hsl` step 3 that
+`Pink IR` carries and this look deliberately does not: that eight-band array was
+solved against the *swap's* output and carrying it to a different mapping would
+be a guess wearing a measurement's clothes. Solving it needs a **two-band camera
+JPEG**, which this repository does not have.
 
 ## 5. What a camera JPEG is, and why it is a different animal
 

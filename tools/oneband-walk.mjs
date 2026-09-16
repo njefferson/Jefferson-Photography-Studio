@@ -50,11 +50,13 @@ try {
     const el = document.getElementById("lookState");
     return { hidden: !!el?.hidden, len: (el?.textContent || "").length };
   });
-  const press = async (label) => {
-    await p.evaluate((t) => {
-      const b2 = [...document.querySelectorAll("button")].find((x) => (x.textContent || "").trim().startsWith(t));
-      b2?.click();
-    }, label);
+  // BY ID, NOT BY LABEL. This matched the first button whose text starts with
+  // the string, which was fine while exactly one button said "Aerochrome" --
+  // and the day a second look shipped under that name, the walk would have gone
+  // on passing while measuring a different look entirely. A label is product
+  // copy and changes; an id is the thing being tested.
+  const press = async (id) => {
+    await p.evaluate((t) => document.getElementById(t)?.click(), id);
     await p.waitForTimeout(1600);
   };
   const stepTo = async (i) => {
@@ -64,7 +66,7 @@ try {
     await p.waitForTimeout(1200);
   };
 
-  await press("Aerochrome");
+  await press("lookAero");
   const first = await state();
   console.log(`        photo 0, first visit, look on: ${JSON.stringify(first)}`);
 
