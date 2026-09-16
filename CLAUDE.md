@@ -107,18 +107,18 @@ visible-light expectations. (A bright IR daytime frame was misdiagnosed as
 "a twilight scene" from exactly this error; the real bug was a decode level.)
 
 ## GO AND LEARN THE DOMAIN — DO NOT CONVERGE INSIDE THE APP (owner, 2026-09-16)
-**The failure this names, in the owner's words on the day: converging with a data
-set and never looking for whether the right question is being asked.** Four
-rounds went into why Aerochrome would not go deep red — measuring hue and
-saturation on rendered frames, tuning bands, building a comparison sheet — and
-every one of them was a measurement INSIDE the app. The answer was not in the
-app. It was that the film's three layers are sensitive to green, red and infrared
-with blue thrown away by a yellow filter, so the mapping is a three-way rotation
-and the app's two-channel swap cannot express it (IR-SCIENCE.md §4b).
+**The failure this names: converging on a data set without ever checking whether
+the right question is being asked.** Four rounds went into why Aerochrome would
+not go deep red — measuring hue and saturation on rendered frames, tuning bands,
+building a comparison sheet — and every one of them was a measurement INSIDE the
+app. The answer was not in the app. It was that the film's three layers are
+sensitive to green, red and infrared with blue thrown away by a yellow filter, so
+the mapping is a three-way rotation and the app's two-channel swap cannot express
+it (IR-SCIENCE.md §4b).
 
-**The owner had to go and search the web and paste the answer back.** That is the
-signal the rule was broken: research the owner could do in one search is research
-the session should have done before offering a single candidate.
+**One web search settled it, and the session had not run one.** That is the
+signal the rule was broken: research reachable in a single search is research the
+session does before offering a candidate, not after four rounds of tuning.
 
 So: when a question is about a real-world medium, process or piece of equipment —
 film, filters, conversions, optics, colour science — **go and read about it
