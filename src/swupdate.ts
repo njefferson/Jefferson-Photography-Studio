@@ -1,3 +1,8 @@
+// THE STANDING "A NEW VERSION IS WAITING" STRIP, for all three PWAs (Doctrine
+// §7h). One service worker at root scope serves the whole site, so this same
+// flow works from any page. An app that caches itself cannot notice it has gone
+// stale, so the new worker WAITS rather than taking over under the open page,
+// and the reader is told in words they can see.
 import "./swstrip.css";
 // Shared "Update to the latest version" wiring for all three PWAs — the Studio
 // chooser, Infrared, and Macro. One service worker at root scope serves the

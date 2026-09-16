@@ -1,3 +1,7 @@
+// MACRO FOCUS-STACKING MODE: the second discipline, its own page and its own
+// entry point. Loads a focus-shift JPEG burst, blends it into one frame through
+// stack.ts, and shares the Studio's chrome (theme, palette, share, update strip)
+// without pulling in the infrared editor.
 import "./macro.css";
 import { stackFocus, type StackFrame } from "./stack";
 import { setupInstalledShare, setupInstallFromApp } from "../share";

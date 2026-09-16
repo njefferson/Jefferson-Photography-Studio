@@ -1,3 +1,6 @@
+// THE BUILD STAMP, WRITTEN AT BOOT (Doctrine §7b) — the version visible on
+// every page, so a reader reporting a problem can say which build they are on
+// without being asked to go looking for it.
 import "./verstamp.css";
 
 declare const __APP_VERSION__: string;

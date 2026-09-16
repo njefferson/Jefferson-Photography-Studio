@@ -1,3 +1,16 @@
+// THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration
+// between them. One module-level `params: EditParams` means "how the OPEN
+// photograph renders", and every control on the page reads and writes it
+// through syncToUI/syncFromUI; looks, undo, the session strip, crop, masks,
+// healing, the lens panel, batch, export and the diagnostic all hang off that
+// one object.
+//
+// ITS SIZE IS AN ARCHITECTURAL FACT, NOT AN ACCIDENT TO APOLOGISE FOR. Thirteen
+// thousand lines with 185 mutation sites on one shared object is exactly why
+// every OTHER path that renders a photograph — the strip tile, the batch, the
+// export — has to reconstruct by hand what opening it would do, and why those
+// reconstructions drift apart. `freshBaseline` exists to be the single copy of
+// that ruling; tools/agreement-walk.mjs exists because they still disagree.
 import { writeVersionStamp } from "./verstamp";
 import "./style.css";
 // The shared chrome stylesheet. The editor does not use verdlg.ts yet — see the
