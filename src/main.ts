@@ -9307,6 +9307,19 @@ function restripForGrade(): void {
  *  places this session found a second copy of something had all drifted. */
 const sliderDefaults = new Map<string, string>();
 
+/** THE TONE CURVE'S FIVE POINTS, CAPTURED AT THE SAME MOMENT AND FOR THE SAME
+ *  REASON. They are not `input[type="range"]`, so `sliderDefaults` cannot hold
+ *  them and the gesture that returns every slider to where the photo opened had
+ *  nothing to offer the one control it could not see.
+ *
+ *  Captured as VALUES, not as TONE_DEFAULT. Restore depth solves a curve per
+ *  frame at open, so a photograph does not open on the straight line — putting a
+ *  point back to TONE_DEFAULT would mean something different from what the same
+ *  gesture means on every slider beside it, and different from Reset. Four
+ *  channels, because the reader can be editing any of them.
+ *  Indexed by the `toneChannel` the widget is showing. */
+const toneDefaults: number[][] = [];
+
 /** The two controls that are app PREFERENCES rather than part of the photo:
  *  they open at whatever was last chosen, so "back where it opened" would mean
  *  "no change". These go back to the app's own default instead. */
@@ -9317,10 +9330,24 @@ function captureSliderDefaults(): void {
     if (!el.id || el.id in PREF_SLIDER_DEFAULTS) continue;
     sliderDefaults.set(el.id, el.value);
   }
+  // Copied, not referenced: these four arrays are mutated in place by every drag
+  // on the curve, so holding the array itself would make the baseline follow the
+  // edit and the gesture would do nothing.
+  toneDefaults.length = 0;
+  for (const t of [params.tone, params.toneR, params.toneG, params.toneB]) toneDefaults.push([...t]);
 }
 
-/** Wire every slider in the panel once. Delegated, so controls built later are
- *  covered without anything having to remember to call this again. */
+/** Wire every slider in the panel once, AND the tone curve's five points, which
+ *  are the same gesture on a control that is not an input. Delegated, so controls
+ *  built later are covered without anything having to remember to call this
+ *  again.
+ *
+ *  ONE FUNCTION FOR ONE GESTURE. "Double-tap puts this back where the photo
+ *  opened" is a rule, and this session spent its length on what happens when one
+ *  rule is written in more than one place. The curve's points are wired here
+ *  rather than beside the curve for that reason: they share the delegation, the
+ *  iOS timing fallback and the one-gesture-one-undo-step flush, instead of a
+ *  second copy that can drift from the sliders it is supposed to match. */
 function wireSliderReset(): void {
   // Say so on the control itself. A gesture nobody is told about is a gesture
   // nobody uses, and this one has no visible affordance at all.
@@ -9337,7 +9364,35 @@ function wireSliderReset(): void {
     el.dispatchEvent(new Event("change", { bubbles: true }));
     flushRecord(); // one gesture, one undo step
   };
+  // The curve is drawn, not marked up, so it says what it does in a tooltip and
+  // in its own note rather than by looking like a control.
+  for (const d of toneDots) {
+    const t = document.createElementNS("http://www.w3.org/2000/svg", "title");
+    t.textContent = "Double-tap to put this point back to where the photo opened";
+    d.appendChild(t);
+  }
+  /** Which of the five points this event landed on, or -1. */
+  const dotIndex = (target: EventTarget | null): number => {
+    const el = target as Element | null;
+    if (!el || !(el instanceof Element)) return -1;
+    const dot = el.closest?.(".tone-dot");
+    return dot ? toneDots.indexOf(dot as SVGCircleElement) : -1;
+  };
+  const backTone = (i: number) => {
+    const t = activeTone();
+    const to = toneDefaults[toneChannel]?.[i];
+    if (to === undefined || t[i] === to) return;
+    t[i] = to;
+    // The curve has to stay ordered, so a neighbour may hold this point short of
+    // the baseline. That is the same answer Reset would give from here.
+    clampToneOrder();
+    syncToUI();
+    draw();
+    flushRecord(); // one gesture, one undo step
+  };
   panel.addEventListener("dblclick", (e) => {
+    const i = dotIndex(e.target);
+    if (i >= 0) { e.preventDefault(); backTone(i); return; }
     const el = (e.target as HTMLElement | null)?.closest?.('input[type="range"]') as HTMLInputElement | null;
     if (el) { e.preventDefault(); back(el); }
   });
@@ -9347,11 +9402,22 @@ function wireSliderReset(): void {
   // that gesture eating it.
   let lastId = "", lastAt = 0;
   panel.addEventListener("touchend", (e) => {
-    const el = (e.target as HTMLElement | null)?.closest?.('input[type="range"]') as HTMLInputElement | null;
-    if (!el) return;
+    // The dot's own pointer handlers capture the pointer for the drag, so the
+    // curve needs the timed path at least as much as a range input does.
+    const i = dotIndex(e.target);
+    const id = i >= 0
+      ? `tone:${toneChannel}:${i}`
+      : ((e.target as HTMLElement | null)?.closest?.('input[type="range"]') as HTMLInputElement | null)?.id;
+    if (!id) return;
     const now = Date.now();
-    if (el.id === lastId && now - lastAt < 350) { back(el); lastId = ""; lastAt = 0; }
-    else { lastId = el.id; lastAt = now; }
+    if (id === lastId && now - lastAt < 350) {
+      if (i >= 0) backTone(i);
+      else {
+        const el = document.getElementById(id) as HTMLInputElement | null;
+        if (el) back(el);
+      }
+      lastId = ""; lastAt = 0;
+    } else { lastId = id; lastAt = now; }
   }, { passive: true });
 }
 
