@@ -35,14 +35,10 @@ const OUT = arg("out", "/tmp/claude-0/-home-user/2bd37282-d617-5a51-b357-6b20783
 // controls to touch. `set` writes a slider and fires the events the app listens
 // for; `tap` presses a button.
 const CANDIDATES = [
-  { name: "0-aerochrome-button-as-is", note: "the Aerochrome look button exactly as it ships: the R/B swap, nothing else",
+  { name: "0-pink-ir", note: "the look this app has always had, now under its own name: the R/B swap with saturation",
     steps: [["tap", "#ptab-ir"], ["tap", "#lookAero"]] },
-  { name: "1-mixer-preset-labelled-Aerochrome", note: "the mixer preset CALLED Aerochrome: red<-green, green<-blue, blue<-red",
-    steps: [["tap", "#ptab-ir"], ["tap", "#lookAero"], ["tap", "#ptab-color"], ["mix", "2"]] },
-  { name: "2-mixer-preset-labelled-Rotate", note: "the preset called Rotate: red<-blue, green<-red, blue<-green — the matrix the two-swap recipe produces",
-    steps: [["tap", "#ptab-ir"], ["tap", "#lookAero"], ["tap", "#ptab-color"], ["mix", "4"]] },
-  { name: "3-rotate-without-the-look-swap", note: "the rotation alone, with the look's own R/B swap turned back off, so the rotation is not applied on top of a swap",
-    steps: [["tap", "#ptab-ir"], ["tap", "#lookAero"], ["tap", "#swapBtn"], ["tap", "#ptab-color"], ["mix", "4"]] },
+  { name: "1-aerochrome", note: "the film's own mapping: red<-infrared, green<-visible red, blue<-visible green, with no swap under it",
+    steps: [["tap", "#ptab-ir"], ["tap", "#lookEir"]] },
 ];
 
 
@@ -64,7 +60,9 @@ try {
       if (how === "mix") {
         // The preset chips are built from MIX3_PRESETS at runtime and carry no
         // ids, so they are pressed by index: 0 Identity, 1 R/B swap,
-        // 2 Aerochrome, 3 Copper, 4 Rotate.
+        // 2 Channel cycle, 3 Copper, 4 Aerochrome. The matrices never moved --
+        // indices 2 and 4 exchanged LABELS when the wrong one was found to be
+        // carrying the film's name (IR-SCIENCE.md section 4b).
         await p.evaluate((i) => document.querySelectorAll("#mix3Presets .mix-chip")[Number(i)]?.click(), sel);
       } else if (how === "tap") await p.click(sel).catch(() => {});
       else await p.evaluate(([s, v]) => {

@@ -236,6 +236,7 @@ const ui = {
   cubeBtn: $("cubeBtn") as HTMLButtonElement,
   dcpBtn: $("dcpBtn") as HTMLButtonElement,
   lookAero: $("lookAero") as HTMLButtonElement,
+  lookEir: $("lookEir") as HTMLButtonElement,
   lookRed: $("lookRed") as HTMLButtonElement,
   lookGoldie: $("lookGoldie") as HTMLButtonElement,
   lookNatural: $("lookNatural") as HTMLButtonElement,
@@ -1030,6 +1031,19 @@ interface Look {
    *
    *  applyLook resets this to hslDefault() unless a look supplies it. */
   hsl?: number[];
+  /** THE 3x3 CHANNEL MIXER A LOOK BRINGS WITH IT, row-major
+   *  [rr,rg,rb, gr,gg,gb, br,bg,bb]. It is the only knob in this pipeline that
+   *  can state a MAPPING rather than a cast: `swapRB` is one fixed two-channel
+   *  exchange and `wbBias` is a diagonal gain, and neither can say "red takes
+   *  infrared, green takes visible red, blue takes visible green" -- which is
+   *  what Aerochrome's three layers actually did (IR-SCIENCE.md section 4b).
+   *
+   *  Nine finite numbers or absent -- nothing validates it downstream:
+   *  applyLook copies it straight onto params.mix3, batchParamsFor copies it
+   *  again for a .zip, and updateMix3UI writes each entry into a slider.
+   *  applyLook resets the mixer to MIX3_DEFAULT when a look has none, so every
+   *  look that predates this field renders exactly as it did before. */
+  mix3?: number[];
   glow?: number;
   /** Per-kind, because raw and camera-rendered files arrive in DIFFERENT
    *  STATES and one cast correction cannot serve both. A raw opens on the
@@ -1065,6 +1079,30 @@ const LOOKS: Record<string, Look> = {
   aero: { swapRB: true, toggleSwap: true, hue: 0, raw: { sat: 3.0, contrast: 1.15 },
           jpeg: { sat: 1.35, contrast: 1.12,
                   hsl: [0,1,1, 0,1,1, 0,1,1, 0,1,1, 0,1,1, -45,1,1, 20,1,1, 60,1,1] } },
+  // AND THE MAPPING THE FILM ACTUALLY USED, which the look above cannot
+  // express. Aerochrome's three layers were sensitive to GREEN, RED and
+  // INFRARED, with a Wratten 12 yellow filter absorbing blue entirely because
+  // all three were also blue-sensitive -- so the mapping is a three-way
+  // rotation, red<-infrared, green<-visible red, blue<-visible green, which is
+  // row-major [0,0,1, 1,0,0, 0,1,0]. A two-channel exchange is a different
+  // operation and no amount of tuning turns one into the other
+  // (IR-SCIENCE.md section 4b carries the sources).
+  //
+  // NO `swapRB`, DELIBERATELY. The mixer runs right after the swap, so leaving
+  // the swap on would compose the two into a G<->B exchange -- measured as the
+  // fourth candidate of the look sheet and the worst of them. Measured on a
+  // real NEF as this look ships: foliage saturation 0.33 at value 0.69, sky
+  // 0.50 at value 0.51, against the swap's foliage 0.51 and sky 0.49. The
+  // number that decides it is not in that list and is not measured anywhere in
+  // this repository: under the rotation the fenceposts, the wire, the pole and
+  // the trunk stay BROWN, and under the swap they go pink with the canopy,
+  // which is the film's own pass/fail test (IR-SCIENCE.md section 4b-i).
+  //
+  // NO `hsl` ON THE JPEG SIDE either. The eight-band correction above was
+  // solved against the SWAP's output; carrying it to a different mapping would
+  // be a guess wearing a measurement's clothes.
+  eir: { swapRB: false, hue: 0, mix3: [0, 0, 1, 1, 0, 0, 0, 1, 0],
+         raw: { sat: 3.0, contrast: 1.15 }, jpeg: { sat: 1.35, contrast: 1.12 } },
   red: { swapRB: true, toggleSwap: true, hue: 0, wbBias: [0.78, 1.02, 1.35], raw: { sat: 1.8, contrast: 1.4 }, jpeg: { sat: 1.3, contrast: 1.2 } },
   goldie: { swapRB: true, toggleSwap: true, hue: 0, wbBias: [0.78, 1.22, 1.4], raw: { sat: 1.7, contrast: 1.35 }, jpeg: { sat: 1.2, contrast: 1.2 } },
   natural: { swapRB: false, toggleSwap: true, hue: 0, raw: { sat: 1.2, contrast: 1.15 }, jpeg: { sat: 1.1, contrast: 1.15 } },
@@ -1240,7 +1278,10 @@ function applyLook(name: keyof typeof LOOKS) {
   params.grainSize = 1.5;
   params.vigAmt = 0;
   params.vigMid = 0.5;
-  params.mix3 = [...MIX3_DEFAULT];
+  // A LOOK MAY BRING ITS OWN MAPPING. Every look but `eir` has none and gets
+  // the identity, which is what this line did unconditionally before -- so this
+  // is a widening, not a change: nothing that rendered one way renders another.
+  params.mix3 = look.mix3 ? [...look.mix3] : [...MIX3_DEFAULT];
   // A look replaces the whole creative state, including everything the lift
   // wrote — so re-solve against the look that is now on the frame. This is what
   // makes Aerochrome look like Aerochrome on a frame with no sky in it without
@@ -1257,6 +1298,7 @@ function applyLook(name: keyof typeof LOOKS) {
 let activeLook: string | null = null;
 const lookButtons: Record<string, HTMLButtonElement> = {
   aero: ui.lookAero,
+  eir: ui.lookEir,
   red: ui.lookRed,
   goldie: ui.lookGoldie,
   natural: ui.lookNatural,
@@ -1279,6 +1321,12 @@ function updateLookUI() {
       const normOn = active && !params.swapRB ? " on" : "";
       const swapOn = active && params.swapRB ? " on" : "";
       sub.innerHTML = `<span class="seg${normOn}">norm</span><span class="seg${swapOn}">R⇄B</span>`;
+    } else if (key === "eir") {
+      // WHY THIS ONE HAS NO TOGGLE, said on the button rather than in the Help.
+      // Every other colour look here is the R<->B swap with different numbers;
+      // this one is a three-channel rotation and pressing it again would stack
+      // the two. Text, never colour alone.
+      sub.textContent = "rotate";
     } else if (key === "hie") {
       sub.textContent = "glow";
     } else {
@@ -2490,8 +2538,16 @@ function fileIsOneBand(img: DecodedImage | null): boolean {
 function lookState(): void {
   const el = document.getElementById("lookState");
   if (!el) return;
-  const colourLook = !!activeLook && !!LOOKS[activeLook]?.swapRB;
-  const show = !!current && fileIsOneBand(current) && colourLook && params.swapRB;
+  // A COLOUR LOOK IS ONE THAT CARRIES A MAPPING, not one that carries the swap.
+  // This read `.swapRB` alone, which was true of every colour look in the app
+  // until `eir` arrived carrying a three-channel rotation instead -- and a
+  // rotation needs two bands in the file for exactly the same reason a swap
+  // does, so the sentence explaining their absence has to reach it. The seven
+  // older looks answer identically either way, which is why this is safe.
+  const lk = activeLook ? LOOKS[activeLook] : null;
+  const colourLook = !!lk && (lk.swapRB || !!lk.mix3);
+  const mapped = params.swapRB || (params.mix3 ?? MIX3_DEFAULT).some((v, i) => v !== MIX3_DEFAULT[i]);
+  const show = !!current && fileIsOneBand(current) && colourLook && mapped;
   el.hidden = !show;
   const txt = document.getElementById("lookStateTxt");
   const btn = document.getElementById("lookForceBalance") as HTMLButtonElement | null;
@@ -3019,9 +3075,17 @@ updateGradeUI();
 const MIX3_PRESETS: { label: string; m: number[] }[] = [
   { label: "Identity", m: [1, 0, 0, 0, 1, 0, 0, 0, 1] },
   { label: "R⇄B swap", m: [0, 0, 1, 0, 1, 0, 1, 0, 0] },
-  { label: "Aerochrome", m: [0, 1, 0, 0, 0, 1, 1, 0, 0] }, // red←green, green←blue, blue←red
+  // THE TWO LABELS WERE THE WRONG WAY ROUND, for as long as both existed.
+  // Aerochrome's mapping is red<-infrared, green<-visible red, blue<-visible
+  // green, which is row-major [0,0,1, 1,0,0, 0,1,0] -- the third chip below.
+  // The first cycles the other way and is not any film: it keeps its matrix
+  // and loses the claim. ORDER AND MATRICES ARE UNTOUCHED on purpose -- the
+  // chips carry no ids, so tools/look-sheet.mjs presses them by index, and
+  // moving one would quietly re-point every candidate that ever named one.
+  // (IR-SCIENCE.md section 4b.)
+  { label: "Channel cycle", m: [0, 1, 0, 0, 0, 1, 1, 0, 0] }, // red←green, green←blue, blue←red
   { label: "Copper", m: [1.1, 0.3, 0, 0.2, 0.7, 0.1, 0, 0.2, 0.8] },
-  { label: "Rotate", m: [0, 0, 1, 1, 0, 0, 0, 1, 0] }, // the other way round
+  { label: "Aerochrome", m: [0, 0, 1, 1, 0, 0, 0, 1, 0] }, // red←blue, green←red, blue←green
 ];
 const MIX3_OUT = ["Red output", "Green output", "Blue output"];
 const MIX3_IN = ["red", "green", "blue"];
@@ -8492,6 +8556,21 @@ async function makeThumb(img: DecodedImage, MAX = 260, lens?: LensCurve | null, 
   // wrong for a camera-rendered file, which opens at wb [1,1,1] as the camera
   // made it. See freshBaseline.
   const base = own ? null : freshBaseline(img);
+  // AND THE LOOK THE SET IS WEARING, because the baseline is only half the
+  // claim. establishFreshEdit applies `freshBaseline` and then, in the next two
+  // lines, applies the SESSION LOOK -- and applyLook overwrites both the channel
+  // swap and the mixer. This function stopped at the baseline, so a tile for a
+  // photograph nobody has opened stated the mapping of an open that will not
+  // happen.
+  //
+  // It was nearly invisible while every look that clears the swap also has
+  // sat 0 (B&W IR, Sepia IR, HIE B&W) -- Natural IR on a raw was already wrong
+  // and nobody could see 1.2 saturation of the other swap. The rotation makes it
+  // total: swap AND rotation compose to a G<->B exchange, so the tile would be a
+  // different picture from the one tapping it opens. `lookBias` below is the
+  // same fact about white balance, and it is taken from the look rather than the
+  // baseline for exactly this reason.
+  const sessLook = own || !sessionLook ? null : LOOKS[sessionLook] ?? null;
   const gw = own ? own.params.wb : base!.wb;
   const bias = own ? ([1, 1, 1] as [number, number, number]) : lookBias;
   const wb: [number, number, number] = [
@@ -8519,7 +8598,11 @@ async function makeThumb(img: DecodedImage, MAX = 260, lens?: LensCurve | null, 
     // was on screen and the same file opened unswapped. The tile is a claim about
     // what opening WILL do, so it takes the claim from the same place the open
     // does. A photograph with its own edit keeps its own answer.
-    swapRB: own ? own.params.swapRB : base!.swapRB,
+    swapRB: own ? own.params.swapRB : sessLook ? sessLook.swapRB : base!.swapRB,
+    // With a session look the mapping is the LOOK's; with none, the live mixer
+    // rides into the next open untouched (establishFreshEdit does not clear it),
+    // so the clone above is already the right answer and this leaves it alone.
+    ...(sessLook ? { mix3: sessLook.mix3 ? [...sessLook.mix3] : [...MIX3_DEFAULT] } : {}),
     masks: [],
     spots: [],
     glow: 0,
@@ -11651,7 +11734,22 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["l
       clamp(wb[1] * bias[1], 0.02, 16),
       clamp(wb[2] * bias[2], 0.02, 16),
     ];
-    look = { ...neutralLook(), swapRB: l.swapRB, hue: l.hue, sat: strength.sat, contrast: strength.contrast, tint: l.tint ?? [1, 1, 1], glow: l.glow ?? 0 };
+    // AND THE COLOUR HALF OF THE RECIPE, WHICH THIS DROPPED. It built from
+    // neutralLook() and copied six fields; `hsl` and `mix3` were not among
+    // them, so a batch ran a look's SHAPE without its colour correction and a
+    // .zip rendered a different picture from the screen under one name. Silent,
+    // because a batch frame still looked like a look. Only camera JPEGs were
+    // affected until now -- `aero`'s raw side carries no hsl -- and `eir` makes
+    // it structural: its whole rendering IS its mix3, so without this a batch
+    // under it would carry no rotation at all.
+    //
+    // Resolved per kind exactly as applyLook does, strength first: the same
+    // reason the per-kind split exists at all is the reason it has to be read
+    // here rather than the look-level value.
+    const lhsl = strength.hsl ?? l.hsl;
+    look = { ...neutralLook(), swapRB: l.swapRB, hue: l.hue, sat: strength.sat, contrast: strength.contrast, tint: l.tint ?? [1, 1, 1], glow: l.glow ?? 0,
+             hsl: lhsl && lhsl.length === 24 ? [...lhsl] : hslDefault(),
+             mix3: l.mix3 ? [...l.mix3] : [...MIX3_DEFAULT] };
   } else {
     look = grade.kind === "look" ? grade.look : neutralLook();
   }
@@ -11955,7 +12053,7 @@ const bcLooks = $("bcLooks") as HTMLDivElement;
 let chosenGrade: BatchGrade | null = null;
 
 const BUILTIN_NAMES: Record<string, string> = {
-  aero: "Aerochrome", red: "Aero Red", goldie: "Goldie", natural: "Natural IR",
+  aero: "Pink IR", eir: "Aerochrome", red: "Aero Red", goldie: "Goldie", natural: "Natural IR",
   mono: "B&W IR", sepia: "Sepia IR", hie: "HIE B&W",
 };
 

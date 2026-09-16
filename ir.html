@@ -389,7 +389,11 @@
             <p class="note">Swaps the red and blue channels &mdash; the building block under every colour look, not a look itself. <strong>On its own it usually goes flat and purple:</strong> set white balance first (tap foliage) or pick a look, and this becomes the switch that flips the result.</p>
             <div class="sub-title">Looks</div>
             <div class="looks-grid">
-              <button id="lookAero" type="button">Aerochrome<small class="look-sub"></small></button>
+              <!-- THE ID STAYS `lookAero`. Only the printed name moved: this
+                   look is the R&#8646;B swap with saturation, which is not what
+                   the film did, and the walks press this button by id. -->
+              <button id="lookAero" type="button">Pink IR<small class="look-sub"></small></button>
+              <button id="lookEir" type="button">Aerochrome<small class="look-sub"></small></button>
               <button id="lookRed" type="button">Aero Red<small class="look-sub"></small></button>
               <button id="lookGoldie" type="button">Goldie<small class="look-sub"></small></button>
               <button id="lookNatural" type="button">Natural IR<small class="look-sub"></small></button>
@@ -397,7 +401,7 @@
               <button id="lookSepia" type="button">Sepia IR<small class="look-sub"></small></button>
               <button id="lookHie" type="button">HIE B&amp;W<small class="look-sub"></small></button>
             </div>
-            <p class="note">Press a look again to flip its R&#8646;B channel swap &mdash; the state shows under its name.</p>
+            <p class="note">Looks showing <strong>norm / R&#8646;B</strong> under the name flip that swap when you press them again. <strong>Aerochrome</strong> shows <strong>rotate</strong> instead: it is a three-channel rotation rather than a swap, so there is nothing to flip &mdash; the swap button above and the Colour tab's channel mixer are there if you want to try one on top of the other.</p>
             <!-- The one-band notice, and the choice it used to make for you.
                  Before 2026-09-11 a camera JPEG like this was always balanced
                  under a colour look; a session then made skipping it the policy,
@@ -1246,6 +1250,13 @@
         Looks tagged <span class="badge">R&#8646;B</span> use the <strong>red&#8646;blue channel swap</strong> —
         the move that makes IR sky blue and foliage red/gold. Toggle the swap button to see its effect on any look.
         <strong>HIE glow</strong> is film-style halation — the HIE B&amp;W look uses it, and the slider layers it onto any other look too.</p>
+        <p><strong>Aerochrome and Pink IR are two different mappings, not two strengths.</strong>
+        The film's three layers were sensitive to green, red and infrared, with a yellow filter throwing blue
+        away — so its mapping is a <em>three-way rotation</em>: red takes the infrared, green takes the
+        visible red, blue takes the visible green. That is the <strong>Aerochrome</strong> look, and the mixer
+        preset of the same name on the Colour tab. <strong>Pink IR</strong> is the red&#8646;blue swap with
+        saturation — the pink-and-teal rendering this app has always had. Neither is more correct than the
+        other; they are different pictures, and both are one press away.</p>
         <p><strong>Black &amp; white</strong> (its own B&amp;W tab) — made for 720nm shots — turns the photo mono, with
         weight sliders (or a named mix) choosing how much of each channel becomes brightness. While it's on, the Color
         mixer's Luminance and <em>Drag on photo to adjust</em> brighten or darken each color's grey, like a classic
@@ -1350,7 +1361,7 @@
         papers they're named for.</p>
         <p>The <strong>Channel mixer</strong> is the full recipe behind the R&#8646;B swap: build each
         output channel (red, green, blue) from any blend of the three inputs. Start from a preset —
-        Aerochrome, Copper, a channel cycle (red to green to blue) — then fine-tune the nine sliders for invented false-color
+        Aerochrome (the film's own three-way rotation: red from blue, green from red, blue from green), Copper, a channel cycle the other way round — then fine-tune the nine sliders for invented false-color
         palettes. Unlike grain and vignette, the mixer is pure color: it bakes into both .cube and .dcp
         exports.</p>
         </details>
@@ -1498,7 +1509,7 @@
         Tap it (in the top bar next to <em>Open image(s)</em>, or on the start screen) and it first asks
         <em>what goes on every photo</em>: <strong>your current edit</strong> (the grade on screen — offered only when
         a photo is open), <strong>a saved look</strong> from My looks, <strong>a built-in look</strong> (Aerochrome,
-        Goldie, B&amp;W IR…), or <strong>Auto-balance only</strong> — no look at all, just each photo properly
+        Pink IR, B&amp;W IR…), or <strong>Auto-balance only</strong> — no look at all, just each photo properly
         white-balanced and exposed, which is the quickest way to preview a whole folder and see what you've got.
         Then pick the files. Each photo is auto-balanced on its own (its own white balance, exposure, denoise and
         lens hot-spot fix) with the chosen grade layered on top. The set comes back as one <strong>.zip</strong>
