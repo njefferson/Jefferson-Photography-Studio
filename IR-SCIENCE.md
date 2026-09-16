@@ -405,6 +405,71 @@ matrix. Both renderings were sent rather than described.
 other: a build where the lift-on renders MATCHED would be one where the re-solve
 had stopped happening.
 
+### 4b-iii. THE FILM, MEASURED — AND THE LOOK MOVED ONTO ITS ANGLES
+
+Source: *Making the most of Kodak aerochrome*, AlternativePhotography.com,
+2012-02-29, by the author writing as "lazybuddha", originally from the
+Lomography series. Two photographs survived into the PDF; the caption
+immediately above the second reads **"Red filter with Kodak Aerochrome"**, so
+that one's filter is known and the first one's is not stated.
+
+**MEASURED ON THOSE PHOTOGRAPHS** — split populations per section 6, circular
+mean and circular spread, never a whole-frame mean:
+
+- **Lighter filter** — foliage **6.2°**, spread 20.5°; sky **204.0°**, spread
+  19.8°; **separation 197.8°**. Foliage sat 0.60 at value 0.77, sky sat 0.66 at
+  value 0.32. Only **13.8%** of the frame carries no colour.
+- **Red filter** — foliage **9.0°**, spread 22.7°; sky **217.1°**, spread 13.2°;
+  **separation 208.1°**. Foliage sat 0.78, sky sat 0.92. **3.6%** colourless.
+
+**AEROCHROME FOLIAGE IS SCARLET, NOT MAGENTA**, and that is the correction this
+section exists for. The look as shipped in 2.47 rendered foliage at **325°** and
+sky at **167°** — about 40° out in BOTH populations, and on the wrong side of
+red. Pink IR, at 353° and 180°, was closer to the film than the look named after
+it. That had been reported from a photograph long before it was measured, and it
+was correct.
+
+**THE FILTER IS AN AXIS AND THE ARTICLE STATES IT.** Darker filter, darker reds
+and sky and more contrast; lighter filter, pinker reds and greener sky. The
+mechanism is exposure — the author's own guide for bright sun is f/22 at 1/125
+for yellow, f/16 for orange, f/11 for red, two stops across the axis. Different
+plants reflect infrared to different degrees and therefore render as different
+shades of red, and a lighter filter shows more of those differences: a red filter
+"will block the lighter pinks". This paragraph previously carried a caveat that
+it came from a search index rather than the page; the PDF confirms it and the
+caveat is gone.
+
+**A GLOBAL HUE SHIFT IS RULED OUT BY MEASUREMENT.** At +38° the foliage lands on
+target and the two populations MERGE — 94–98% of the coloured frame into one 30°
+bin. The separation IS the film. The app's own `hue` control is not a uniform
+rotation either: measured at +20, foliage moved +31° while sky moved −7°.
+
+**WHAT SHIPS INSTEAD: eight band hue shifts on `LOOKS.eir.raw.hsl`.** `hslAt` is
+the only knob in this pipeline that moves two populations differently. Solved
+against the film's angles on six frames, with the film's own spread as a ceiling
+rather than something to minimise — the 20° width is the point of a lighter
+filter, not an error. Hold-one-out worst error 8°, all of it the sky of one frame
+whose sky sits 6° off the others.
+
+**VERIFIED BY SUBSTITUTING BACK, not by re-running the solver's arithmetic.**
+Rendered through the real pipeline and measured the same way as the film: foliage
+2.9–5.6° against 6.2, sky 202.2–205.1° against 204.0, separation 197–201° against
+197.8. The render and the solve agree to within 1.7°, which is the whole reason
+for doing it that way.
+
+**AND THE ZEROS IN THAT ARRAY ARE LOAD-BEARING.** A first solve put bands 240 and
+280 on the ±100 clamp: these six frames carry almost nothing there, so the solver
+was free to put anything in them and did — and a photograph that DOES carry blue
+or purple would have been swung 100°. A weak penalty on shift size brought them
+home to 0 and 1. **An unconstrained parameter is noise with a slider attached.**
+
+**WHAT IS STILL NOT THE FILM, and it is no longer hue.** Foliage saturation and
+value already match (0.57 at 0.80 against the film's 0.60 at 0.77). The gap is
+how much of the frame carries NO colour: **13.8% on the film against 28–45% on
+these frames**. The film's reeds and lawn hold red where ours go to near-white.
+That is highlight behaviour — bright IR-reflective ground blowing out rather than
+holding its hue — and it is an exposure and roll-off question, not a colour one.
+
 ## 4c. THE CRUX IS NIR CONTAMINATION, AND A ROTATION ALONE CANNOT FIX IT
 
 **Researched 2026-09-16, after shipping the rotation bare and reporting that it

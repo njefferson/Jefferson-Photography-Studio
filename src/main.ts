@@ -1241,9 +1241,40 @@ const LOOKS: Record<string, Look> = {
   // carrying it to a different mapping would be a guess wearing a
   // measurement's clothes. The camera-JPEG path under this look is still
   // unsolved and needs a two-band camera JPEG to solve it on.
+  //
+  // AND THE BANDS THAT PUT IT ON THE FILM'S OWN ANGLES. Measured off the
+  // photographs in the source article (IR-SCIENCE.md 4b-iii): real Aerochrome
+  // renders foliage at 6deg and sky at 204deg under a lighter filter, 198deg
+  // apart. The matrix above, alone, rendered foliage at 325 and sky at 167 --
+  // about 40deg out in BOTH, and on the MAGENTA side of red where the film is
+  // scarlet.
+  //
+  // A GLOBAL HUE SHIFT IS NOT THE FIX AND WAS MEASURED, NOT ASSUMED. At +38deg
+  // the foliage lands on target and the two populations MERGE: 94-98% of the
+  // coloured frame collapses into one 30deg bin. Aerochrome IS the separation.
+  // `hslAt` is the only knob here that moves two populations differently, which
+  // is what the field's own comment above says it is for.
+  //
+  // Solved on six frames, hold-one-out worst error 8deg (all of it the sky of
+  // one frame whose sky sits 6deg off the others). The eight numbers are whole
+  // degrees because the band sliders step in whole degrees.
+  //
+  // THE ZEROS ARE LOAD-BEARING. A first solve put bands 240 and 280 on the
+  // +-100 clamp: these frames carry almost nothing there, so the solver was
+  // free to put anything in them and did -- and a photograph that DOES carry
+  // blue or purple would have been swung 100deg. A weak penalty on shift size
+  // brought them home. An unconstrained band is noise with a slider attached.
+  //
+  // WHAT THIS CANNOT DO: the film's foliage is 20deg WIDE, because different
+  // plants reflect infrared differently and a lighter filter shows it. Ours
+  // lands 1-4deg wide. That range is not in the data to recover -- it is the
+  // same 1-3% residual section 4c-iv is about -- so this moves the population,
+  // it does not enrich it.
   eir: { swapRB: true, hue: 0, denoise: 0.8,
          mix3: [0.99, -0.06, 0.07, -1.44, 1.37, 1.02, -0.47, 0.81, 0.65],
-         raw: { sat: 3.0, contrast: 1.15 }, jpeg: { sat: 1.35, contrast: 1.12 } },
+         raw: { sat: 3.0, contrast: 1.15,
+                hsl: [7, 1, 1, 0, 1, 1, 0, 1, 1, 54, 1, 1, 35, 1, 1, 0, 1, 1, 1, 1, 1, 43, 1, 1] },
+         jpeg: { sat: 1.35, contrast: 1.12 } },
   red: { swapRB: true, toggleSwap: true, hue: 0, wbBias: [0.78, 1.02, 1.35], raw: { sat: 1.8, contrast: 1.4 }, jpeg: { sat: 1.3, contrast: 1.2 } },
   goldie: { swapRB: true, toggleSwap: true, hue: 0, wbBias: [0.78, 1.22, 1.4], raw: { sat: 1.7, contrast: 1.35 }, jpeg: { sat: 1.2, contrast: 1.2 } },
   natural: { swapRB: false, toggleSwap: true, hue: 0, raw: { sat: 1.2, contrast: 1.15 }, jpeg: { sat: 1.1, contrast: 1.15 } },
