@@ -15421,3 +15421,36 @@ morning's entry already says to check the build exited zero. It was piped this
 time: `npm run build | tail -1 && echo OK` takes its status from `tail`, which
 always succeeds. **A pipe hides the exit code of everything upstream of it** —
 redirect to a file and read `$?` instead.
+
+## The per-colour boxes are named for subjects and keyed on hue, 2026-09-16
+
+**Found while answering how to deepen the foliage, and NOT acted on — what a
+control is called is product copy.**
+
+There are two bands and they partition the wheel (`pipeline.ts`):
+
+    const wS = bandWeight(h, swap ? 30 : 210, 55, 105);
+    const wF = 1 - wS;
+
+With the swap ON the Sky band re-centres to **30 degrees** with a 55-degree
+plateau, and Foliage is everything else. On the reported Aerochrome frame the
+tree measures hue **358.5** — 31.5 degrees from that centre, inside the plateau —
+so **the tree is in the SKY band**. The teal sky at 175.7 is 145.7 degrees away,
+outside the 105-degree edge, so **the sky is in the FOLIAGE band.**
+
+**The app already says so and I nearly advised the opposite.** `updateBandLabels`
+writes the small grey text, and with the swap on it reads *"(reds & golds —
+swapped)"* under Sky and *"(teals & blues — swapped)"* under Foliage. That is
+honest and it is exactly what the label is for. The NAMES are what mislead, and
+the comment above that function states an intent that does not hold on this look:
+"the bands FOLLOW THE SUBJECT through a channel swap" assumes the swap turns a
+blue sky gold, which is the bare-swap case — under `aero` the sky renders teal
+and the tree red, so the assignment lands the other way round.
+
+**The reading rule until this is settled: trust the small grey text, not the box
+name.** It names the colours the box is grabbing right now, which is the question
+being asked.
+
+Three ways to settle it, all copy decisions and all the owner's: leave the names
+and rely on the sub-label; rename the boxes for what they key on; or have the
+labels swap their names along with their contents.
