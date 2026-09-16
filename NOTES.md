@@ -15330,3 +15330,54 @@ Nothing to fix. The lens line on the same report confirms the release it was tak
 on is working: colour and brightness both from `57mm f/8 · 4 raw frames`, centre
 brightness **0.980x** where it read 1.000x — no correction at all — two releases
 earlier.
+
+## The agreement walk, and what it found on its first run, 2026-09-16
+
+**`tools/agreement-walk.mjs` — the instrument every other gate here could not be.**
+Each check in this repo asserts a RULE: that a function states its contract, that
+the lens store's two doors agree, that a curve blends the way it should. **None
+asserts AGREEMENT BETWEEN TWO PATHS THAT ANSWER THE SAME QUESTION**, and that is
+the failure this app keeps having. It renders one photograph two ways and
+compares.
+
+**FOUR assemblers answer "how does this photograph render", not one.** An earlier
+count in this session said one and was wrong — `grep` treated `src/main.ts` as
+binary and suppressed its matches, so `batchParamsFor` never appeared. With
+`grep -a`: `establishFreshEdit` (the open photograph), `makeThumb`'s `!own`
+branch (tiles), `openPhotoExportJob` (export — clones the live params, so it
+agrees by construction), and `batchParamsFor` (Batch process, its own copy).
+
+**IT FAILS ON THE RAW ARM, AND THE FAILURE IS REAL.** Measured:
+
+- camera JPEG — open hue 345, batch hue 345. **0 degrees apart**, 0.6 points of
+  lightness.
+- raw — open hue 195, batch hue 345. **150 degrees apart.**
+
+`batchParamsFor` takes `swapRB: look.swapRB`, and `neutralLook()` opens
+`swapRB: false`. So on **Auto** — no look — a batch renders a raw UNSWAPPED,
+while opening the same raw applies the swap, which is the standing ruling for
+raw. A raw batch-processed on Auto comes out magenta where opening it shows teal
+and red.
+
+**The walk is committed FAILING, on purpose.** It joins the sweep automatically
+(`walk-all.mjs` globs `*-walk.mjs`), so `node tools/walk-all.mjs` is red on this
+arm until the question below is answered. Softening the assertion so it passes is
+the one thing not to do: a check that found something and was then adjusted until
+it stopped is worse than no check.
+
+**WHAT IT IS WAITING ON IS A PRODUCT DECISION, not a fix.** "Auto" in Batch
+process has two defensible readings and the record cannot rank them: *as it
+opens*, so a batch reproduces the editor's per-kind baseline and a raw batches
+swapped; or *no look at all*, where the swap belongs to a look and an unswapped
+raw is correct. The first is the recommendation — every other path now answers
+"what does opening this photograph do" — but it changes what comes out of a batch
+already run, so it is the owner's.
+
+**AND THE PREDICTION WAS WRONG, WHICH IS WHY THE WALK EXISTS.** `batchParamsFor`
+sets `wb = grayWorldWB(img)` with no `isRaw` branch anywhere in the function, and
+that was expected to show on the JPEG arm as a second balance on top of the
+camera's own. The dominant hue did not move at all. **The SHARE did** — 95% of
+the coloured frame in one bin when opened against **27%** after a batch — so
+something real is happening that the check, which compares only which bin is
+biggest, does not catch. The JPEG arm's pass is not yet worth much and the metric
+needs the share in it before it is.
