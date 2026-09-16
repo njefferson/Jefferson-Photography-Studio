@@ -15454,3 +15454,41 @@ being asked.
 Three ways to settle it, all copy decisions and all the owner's: leave the names
 and rely on the sub-label; rename the boxes for what they key on; or have the
 labels swap their names along with their contents.
+
+## A look choice is shown, not described — the rule and the half-built tool, 2026-09-16
+
+**Owner rule, 2026-09-16: when a decision is between LOOKS, render the candidates
+and send the pictures.** A numbered list with a recommendation is the right shape
+for a question about behaviour and the wrong shape for a question about colour —
+the owner is being asked to judge an appearance, and prose about hue and
+saturation is not an appearance. Written into `CLAUDE.md` so it outlives this
+session, because a rule that lives only in a reply is a rule the next session
+never sees.
+
+`tools/look-sheet.mjs` is the instrument: it renders variants of one frame
+through the real pipeline and writes a PNG each. **Every candidate is expressed
+as controls the reader also has** — a rendering reachable only by editing the
+look table is not something they can try, adjust or undo, so offering one would
+be offering a choice that does not exist on the device.
+
+**ITS FIRST RUN IS NOT TRUSTWORTHY AND NOTHING WAS SENT.** Three faults, all in
+the instrument:
+
+- **Wrong source.** It ran on a camera JPEG while the reference frame is a RAW.
+  Those take different paths through `aero` — different per-kind strength, and a
+  JPEG opens unbalanced by design — so the sheet answered about the wrong file.
+- **Three candidates came out BYTE-IDENTICAL** (sha `e204c8e3e407`) across three
+  different Sky-band settings, so the band sliders were not reaching the render
+  even though they are wired to `syncFromUI` in the input-listener array. Not yet
+  explained.
+- **The baseline differs from the others by a tab press alone**, which nothing in
+  the pipeline can do — so one of those screenshots was almost certainly taken
+  before the look had finished settling. The 900ms wait after the last step is a
+  guess, and a guessed wait is the same defect as a guessed sleep.
+
+**Sending it anyway would have been worse than sending nothing.** A misleading
+comparison on a TASTE decision does not just waste a look — it moves the answer,
+and the owner has no way to tell a render that settled from one that did not.
+
+Next time it runs: a raw source, a settle condition rather than a timeout, and a
+check that two candidates which set different values actually differ.
