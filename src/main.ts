@@ -503,6 +503,91 @@ function lensCurveFor(imported: ImportedFile): LensCurve | null {
  *  divisor. Above about 0.05 the patch starts reading as a different colour
  *  from what surrounds it; the numbers are printed so that line can be moved
  *  by measurement rather than argued about. */
+/** HOW MUCH INDEPENDENT COLOUR THIS CAMERA'S CONVERSION LEFT IN THE FILE.
+ *
+ *  Three sessions measured this in throwaway scripts on 2026-09-16 and none of
+ *  them survived their own `/tmp` directory, so it lives in the app now.
+ *
+ *  IT REPORTS CORRELATION, NOT RATIOS, AND THE FIRST VERSION GOT THAT WRONG.
+ *  That version compared channel MEANS on the decode and read this camera as
+ *  "590nm class" — which cannot be right, since a 590nm conversion renders
+ *  golden-yellow foliage after a swap and these files render pink. The fault was
+ *  the quantity, not the threshold: a mean-to-mean ratio is dominated by the
+ *  per-channel GAIN the conversion and the camera impose, and a gain is exactly
+ *  what white balance removes. Measured both ways on one raw, green and blue sit
+ *  37.9% apart on the decode and 0.6% apart after balancing — same file, same
+ *  channels, two numbers that disagree by sixty times, because one of them is
+ *  measuring the balance.
+ *
+ *  Correlation is scale-free: multiply a channel by anything and it does not
+ *  move. So it measures what actually matters here — whether green varies
+ *  INDEPENDENTLY of blue from one material to the next, which is the only thing
+ *  a colour mixer can work with. Two channels that agree once a single gain is
+ *  removed carry one signal between them, however far apart their means sit.
+ *
+ *  THAT IS THE NUMBER THAT BOUNDS EVERY LOOK IN THIS APP. When green and blue
+ *  are perfectly correlated, no 3x3 mixer can place foliage, sky and bare ground
+ *  independently — the impossibility IR-SCIENCE.md section 4c-i measured, and the
+ *  reason every route through the mixer grains while every route through hue
+ *  alone stays pale (4c-ii).
+ *
+ *  AND IT DOES NOT GUESS A CUTOFF. An earlier draft printed a nanometre class and
+ *  was wrong the first time it ran. Nothing in a photograph names a cutoff: the
+ *  conversion is a physical filter swap the camera never learns about, so EXIF
+ *  cannot carry it. The converter's own record, or a photographed spectrum,
+ *  identifies it; this says what the file can DO, which is the part the app
+ *  actually needs.
+ *
+ *  Returns one line for the diagnostic report, or a sentence saying why there is
+ *  nothing to measure. Its only caller is the report's `extra` list. */
+function conversionDiagnostic(): string {
+  const img = current;
+  if (!img) return "nothing open";
+  // A camera-rendered file has been through the camera's own colour pipeline, so
+  // this would measure that pipeline rather than the conversion.
+  if (!img.isRaw) return "needs a raw file — a camera JPEG has already been through the camera's own colour processing";
+  // ~40k samples whatever the frame's size: stable, and cheap enough that
+  // opening the report never stalls.
+  const step = Math.max(1, Math.floor(Math.sqrt((img.width * img.height) / 40000)));
+  const R: number[] = [], G: number[] = [], B: number[] = [];
+  for (let y = 0; y < img.height; y += step) {
+    for (let x = 0; x < img.width; x += step) {
+      const [lr, lg, lb] = linearAt(img, x, y);
+      R.push(lr); G.push(lg); B.push(lb);
+    }
+  }
+  const n = R.length;
+  if (n < 100) return "too few pixels to measure";
+  const corr = (a: number[], b: number[]) => {
+    let ma = 0, mb = 0;
+    for (let i = 0; i < n; i++) { ma += a[i]; mb += b[i]; }
+    ma /= n; mb /= n;
+    let sab = 0, saa = 0, sbb = 0;
+    for (let i = 0; i < n; i++) {
+      const da = a[i] - ma, db = b[i] - mb;
+      sab += da * db; saa += da * da; sbb += db * db;
+    }
+    const d = Math.sqrt(saa * sbb);
+    return d > 1e-12 ? sab / d : 1;
+  };
+  const gb = corr(G, B), rg = corr(R, G), rb = corr(R, B);
+  const rOther = Math.max(rg, rb);
+  // Coarse, and said to be. One camera is a data point, not a calibration.
+  const reading = gb >= 0.98
+    ? "green and blue carry one signal between them — a mixer cannot separate them, whatever it is set to"
+    : gb >= 0.9
+      ? "green and blue are close to one signal — a mixer has very little to work with"
+      : "green and blue carry separate signals — a mixer has real room here";
+  const redNote = rOther <= 0.9
+    ? "red stands apart from both"
+    : "red tracks the others closely, so there is little false colour to find";
+  return (
+    `green/blue correlation ${gb.toFixed(3)} · red/green ${rg.toFixed(3)} · red/blue ${rb.toFixed(3)} — ` +
+    `${reading}; ${redNote}. This says what the file can do, not which cutoff it was converted at — ` +
+    `only the converter's record or a photographed spectrum names that`
+  );
+}
+
 function healDiagnostic(): string {
   const spots = params.spots ?? [];
   if (!current) return "nothing open";
@@ -2133,6 +2218,9 @@ function wireVersionMenu() {
       { k: "Healed spots", v: healDiagnostic() },
       { k: "Lens correction", v: lensDiagnostic() },
       { k: "Centre gains", v: lensCentreDiagnostic() },
+      // What the conversion left in the file, which nothing in this app could
+      // say before and three scratch scripts had to work out by hand.
+      { k: "Conversion", v: conversionDiagnostic() },
       { k: "Default look", v: defaultLook() ? (BUILTIN_NAMES[defaultLook()!] ?? defaultLook()!) : "none — photos open ungraded" },
       { k: "Kept previews", v: kept.rows ? `${kept.rows} (${(kept.bytes / 1e6).toFixed(1)} MB)` : "none" },
       // REPORTED, NEVER STARTED (decodeClient.decodeLanes) — a report that spawns

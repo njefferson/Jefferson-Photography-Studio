@@ -581,6 +581,57 @@ route through the mixer grains and every route through hue alone stays pale.
 cyan out until it is blue; section 4b's reference says deep cyan. Different
 pictures, both defensible, and choosing is not a measurement.
 
+### 4c-iv. ONE NUMBER UNDER ALL OF IT: THE CHANNELS ARE NOT INDEPENDENT
+
+Measured 2026-09-16 and reported by the app itself from this release on — the
+"Conversion" line of the diagnostic, `conversionDiagnostic` in `src/main.ts`,
+asserted by `tools/conversion-walk.mjs`.
+
+**Correlation between the channels, on the decode, on NIR_1376.NEF:**
+
+- green / blue **0.991**
+- red / green **0.993**
+- red / blue **0.975**
+
+**All three channels carry essentially one signal.** Red is not more independent
+than green and blue are from each other — red/green is the HIGHEST of the three.
+That is the infrared flood: everything in the frame tracks it together.
+
+**CORRELATION, BECAUSE MEANS MEASURE THE WRONG THING.** The first version of this
+measurement compared channel MEANS and read this camera as "590nm class", which
+cannot be right: a 590nm conversion renders golden-yellow foliage after a swap
+and these files render pink. A mean-to-mean ratio is dominated by the per-channel
+GAIN the conversion and the camera impose, and a gain is exactly what white
+balance removes. The same file, the same two channels: **37.9% apart on the
+decode, 0.6% apart after balancing** — a sixtyfold disagreement, because one of
+those numbers is measuring the balance. Correlation is scale-free and does not
+move when a channel is multiplied by anything.
+
+**THIS CORRECTS 4c-i's EXPLANATION, NOT ITS RESULT.** That section said green and
+blue "carry nearly the same information" and treated it as a property of those
+two. It is a property of all three, and what makes the anchor matrix
+near-singular is that every population is built from one underlying signal plus a
+small residual. The impossibility stands; the reason is broader than stated.
+
+**AND IT PUTS THREE SEPARATE FINDINGS UNDER ONE FACT.** The false colour these
+files can carry lives in the one to two per cent that is NOT shared between
+channels, amplified about threefold by a look's saturation. So:
+
+- the mixer route **grains** — it amplifies residuals, and residuals are where
+  the sensor noise lives (4c-i's speckle);
+- the hue route **stays pale** — there is almost nothing to rotate (4c-ii);
+- and **no 3x3 can place three targets** — the anchors are near-coplanar (4c-i).
+
+Three mysteries, one measurement.
+
+**IT DOES NOT NAME A CUTOFF AND THE APP DOES NOT EITHER.** An earlier draft
+printed a nanometre class and was wrong the first time it ran. Nothing in a
+photograph names a cutoff: the conversion is a physical filter swap the camera
+never learns about, so EXIF cannot carry it. The converter's own record, or a
+photographed spectrum — a tungsten lamp through a slit onto a diffraction
+grating, calibrated against a CFL's known emission lines — identifies it. The
+diagnostic reports what the file can DO, which is the part the app needs.
+
 ## 5. What a camera JPEG is, and why it is a different animal
 
 A camera-rendered JPEG was developed **through** the clamped custom preset, then
