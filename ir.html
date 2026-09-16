@@ -453,7 +453,7 @@
               <button id="lookSepia" type="button">Sepia IR<small class="look-sub"></small></button>
               <button id="lookHie" type="button">HIE B&amp;W<small class="look-sub"></small></button>
             </div>
-            <p class="note">Looks showing <strong>norm / R&#8646;B</strong> under the name flip that swap when you press them again. <strong>Aerochrome</strong> shows <strong>rotate</strong> instead: it is a three-channel rotation rather than a swap, so there is nothing to flip &mdash; the swap button above and the Colour tab's channel mixer are there if you want to try one on top of the other.</p>
+            <p class="note">Looks showing <strong>norm / R&#8646;B</strong> under the name flip that swap when you press them again. <strong>Aerochrome</strong> shows <strong>film</strong> instead: the swap is part of its recipe rather than an option on top of it, so there is nothing to flip &mdash; the swap button above and the Colour tab's channel mixer are there if you want to take it apart yourself.</p>
             <!-- The one-band notice, and the choice it used to make for you.
                  Before 2026-09-11 a camera JPEG like this was always balanced
                  under a colour look; a session then made skipping it the policy,
@@ -1318,11 +1318,14 @@
         <strong>HIE glow</strong> is film-style halation — the HIE B&amp;W look uses it, and the slider layers it onto any other look too.</p>
         <p><strong>Aerochrome and Pink IR are two different mappings, not two strengths.</strong>
         The film's three layers were sensitive to green, red and infrared, with a yellow filter throwing blue
-        away — so its mapping is a <em>three-way rotation</em>: red takes the infrared, green takes the
-        visible red, blue takes the visible green. That is the <strong>Aerochrome</strong> look, and the mixer
-        preset of the same name on the Colour tab. <strong>Pink IR</strong> is the red&#8646;blue swap with
-        saturation — the pink-and-teal rendering this app has always had. Neither is more correct than the
-        other; they are different pictures, and both are one press away.</p>
+        away, so no two-channel swap can express what it did. The <strong>Aerochrome</strong> look is the swap
+        plus a nine-number channel mix measured against six real frames &mdash; deep magenta foliage over a teal
+        sky. It also asks for a little more noise reduction than your photo measured for itself, because the
+        colour and the grain in an infrared frame come out of the same place and rise together; the Denoise
+        slider shows it and you can pull it back. <strong>Pink IR</strong> is the red&#8646;blue swap with
+        saturation &mdash; the pink-and-teal rendering this app has always had. Neither is more correct than the
+        other; they are different pictures, and both are one press away. The film's own bare three-way rotation
+        is still on the Colour tab as the mixer preset called Aerochrome, if you want it without the rest.</p>
         <p><strong>Black &amp; white</strong> (its own B&amp;W tab) — made for 720nm shots — turns the photo mono, with
         weight sliders (or a named mix) choosing how much of each channel becomes brightness. While it's on, the Color
         mixer's Luminance and <em>Drag on photo to adjust</em> brighten or darken each color's grey, like a classic
