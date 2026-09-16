@@ -19,11 +19,16 @@
 // It renders. It does not choose. What each candidate costs — what it does to
 // the sky while it fixes the foliage — belongs in the report beside the pictures.
 import { chromium } from "playwright-core";
-import { mkdirSync, existsSync } from "node:fs";
+import { mkdirSync, existsSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 const arg = (k, d) => (process.argv.find((a) => a.startsWith(`--${k}=`)) || `--${k}=${d}`).split("=").slice(1).join("=");
 const PORT = arg("port", "8131");
 const BASE = `http://127.0.0.1:${PORT}`;
-const FILE = arg("file", "/tmp/claude-0/-home-user/2bd37282-d617-5a51-b357-6b20783a5840/scratchpad/real/NIR_2821.JPG");
+// A REAL RAW. The first run used a camera JPEG and answered about the wrong
+// file: a JPEG takes the other side of every per-kind split in `aero` and opens
+// unbalanced by design. The 44 practice DNGs are minimal hand-written files
+// (IR-SCIENCE.md section 7) and are the wrong instrument for a colour question.
+const FILE = arg("file", "/tmp/claude-0/-home-user/2bd37282-d617-5a51-b357-6b20783a5840/scratchpad/real/NIR_1376.NEF");
 const OUT = arg("out", "/tmp/claude-0/-home-user/2bd37282-d617-5a51-b357-6b20783a5840/scratchpad/looksheet");
 
 // Each candidate: a name, a one-line note on what it is reaching for, and the
@@ -67,9 +72,29 @@ try {
       }, [sel, val]);
       await p.waitForTimeout(450);
     }
-    await p.waitForTimeout(900);
+    // SETTLE ON A CONDITION, NOT A CLOCK. The 900ms wait this replaces is what
+    // captured the baseline mid-render, and a guessed wait is the same defect as
+    // a guessed sleep: it learns nothing about the thing it waits for. Two
+    // consecutive readings of the canvas that agree means the render is done.
+    let last = "", settled = false;
+    for (let i = 0; i < 40; i++) {
+      const sig = await p.evaluate(() => {
+        const cv = document.querySelector("#view");
+        const g = cv.getContext("webgl2") || cv.getContext("webgl");
+        const b = new Uint8Array(cv.width * cv.height * 4);
+        g.readPixels(0, 0, cv.width, cv.height, g.RGBA, g.UNSIGNED_BYTE, b);
+        let h = 2166136261;
+        for (let k = 0; k < b.length; k += 4 * 31) { h ^= b[k]; h = Math.imul(h, 16777619); }
+        return String(h >>> 0);
+      });
+      if (sig === last) { settled = true; break; }
+      last = sig;
+      await p.waitForTimeout(250);
+    }
+    if (!settled) console.log(`  ${c.name}: never settled — this picture is not trustworthy`);
     const path = `${OUT}/${c.name}.png`;
     await p.locator("#view").screenshot({ path });
+    c.sha = createHash("sha256").update(readFileSync(path)).digest("hex").slice(0, 12);
     // The numbers beside the picture, on the populations rather than the frame:
     // a mean over a false-colour IR frame lands on grey (IR-SCIENCE section 6).
     const m = await p.evaluate(() => {
@@ -95,4 +120,26 @@ try {
     console.log(`${c.name.padEnd(24)} foliage sat ${m.redS.toFixed(2)} value ${m.redV.toFixed(2)}  ·  sky sat ${m.tealS.toFixed(2)} value ${m.tealV.toFixed(2)}  — ${c.note}`);
   }
 } finally { await br.close(); }
-console.log(`\n${CANDIDATES.length} candidates written to ${OUT}\n`);
+
+// THE SELF-CHECK, AND IT IS THE POINT OF THE TOOL. Two candidates that set
+// different values must RENDER differently. The first run handed over three
+// pictures that were byte-identical across three different Sky-band settings and
+// said nothing — a sheet whose differences are not real is a check that passes
+// against the defect, except what it misleads is a taste decision, where being
+// wrong moves the answer rather than just missing it.
+let twins = 0;
+for (let i = 0; i < CANDIDATES.length; i++) {
+  for (let j = i + 1; j < CANDIDATES.length; j++) {
+    const a = CANDIDATES[i], b = CANDIDATES[j];
+    if (JSON.stringify(a.steps) === JSON.stringify(b.steps)) continue; // same recipe, same picture: fine
+    if (a.sha && a.sha === b.sha) {
+      twins++;
+      console.log(`\nIDENTICAL: "${a.name}" and "${b.name}" set different values and rendered the same picture (${a.sha}).`);
+      console.log(`  Those controls are not reaching the render. The sheet is NOT valid — do not hand it over.`);
+    }
+  }
+}
+console.log(twins
+  ? `\n${twins} pair(s) identical. ${OUT} is written but must not be presented as a comparison.\n`
+  : `\n${CANDIDATES.length} candidates, all distinct, written to ${OUT}\n`);
+process.exit(twins ? 1 : 0);
