@@ -35,10 +35,16 @@ const OUT = arg("out", "/tmp/claude-0/-home-user/2bd37282-d617-5a51-b357-6b20783
 // controls to touch. `set` writes a slider and fires the events the app listens
 // for; `tap` presses a button.
 const CANDIDATES = [
-  { name: "0-pink-ir", note: "the look this app has always had, now under its own name: the R/B swap with saturation",
+  { name: "0-pink-ir", note: "the swap, for reference: warm rgb 177,102,105",
     steps: [["tap", "#ptab-ir"], ["tap", "#lookAero"]] },
-  { name: "1-aerochrome", note: "the film's own mapping: red<-infrared, green<-visible red, blue<-visible green, with no swap under it",
+  { name: "1-aerochrome-as-it-ships", note: "the rotation with the green row at 1.0 — warm rgb 177,131,128, a third of the colour diluted away",
     steps: [["tap", "#ptab-ir"], ["tap", "#lookEir"]] },
+  { name: "2-green-row-085", note: "the rotation with Green-output-from-red pulled to 0.85",
+    steps: [["tap", "#ptab-ir"], ["tap", "#lookEir"], ["tap", "#ptab-color"], ["mix3", "3", "0.85"]] },
+  { name: "3-green-row-070", note: "…to 0.70",
+    steps: [["tap", "#ptab-ir"], ["tap", "#lookEir"], ["tap", "#ptab-color"], ["mix3", "3", "0.70"]] },
+  { name: "4-green-row-055", note: "…to 0.55",
+    steps: [["tap", "#ptab-ir"], ["tap", "#lookEir"], ["tap", "#ptab-color"], ["mix3", "3", "0.55"]] },
 ];
 
 
@@ -57,7 +63,19 @@ try {
     await p.waitForFunction(() => document.getElementById("welcome")?.hidden, null, { timeout: 300000 });
     await p.waitForTimeout(2200);
     for (const [how, sel, val] of c.steps) {
-      if (how === "mix") {
+      if (how === "mix3") {
+        // ONE MIXER SLIDER BY INDEX, row-major: 0-2 red output, 3-5 green,
+        // 6-8 blue. Index 3 is "Green output from red", which is the entry the
+        // measurement named — the rotation sends the IR-flooded channel there
+        // and it dilutes the reds it sits under.
+        await p.evaluate(([i, v]) => {
+          const el = document.querySelectorAll("#mix3Grid input[type=range]")[Number(i)];
+          if (!el) return;
+          el.value = v;
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+          el.dispatchEvent(new Event("change", { bubbles: true }));
+        }, [sel, val]);
+      } else if (how === "mix") {
         // The preset chips are built from MIX3_PRESETS at runtime and carry no
         // ids, so they are pressed by index: 0 Identity, 1 R/B swap,
         // 2 Channel cycle, 3 Copper, 4 Aerochrome. The matrices never moved --
