@@ -184,6 +184,25 @@ missing there is silently dropped by Undo/Reset (bit us on `recover`,
   NEEDS THE OWNER'S HANDS on the real iPad (share sheet, pinch feel, install
   flows, Safari-only storage behavior — all measurements so far are Chromium).
 
+## A LOOK CHOICE IS SHOWN, NEVER DESCRIBED (owner rule, 2026-09-16)
+When a decision is about how a photograph LOOKS — which rendering ships, how deep
+a red goes, what a look's numbers should be — **render the candidates and send
+the pictures.** A numbered list of options with a recommendation is the right
+shape for a question about behaviour and the wrong shape for a question about
+colour: the owner is being asked to judge an appearance, and prose about hue and
+saturation is not an appearance.
+
+`tools/look-sheet.mjs` renders variants of one frame through the real pipeline
+and writes a PNG per candidate, so the comparison is the app's own output rather
+than a description of it. Use it, or something that renders; never substitute
+adjectives.
+
+**This does not make the choice.** Naming what each candidate costs is part of
+the report — which frames it helps, which it hurts, what it does to the sky while
+it fixes the foliage. Picking between them is the owner's, and a measurement can
+narrow the options without choosing (Doctrine, and IR-SCIENCE.md section 8's last
+standing error).
+
 ## Working preferences
 - Mobile-first: one step at a time; avoid desktop-required steps unless every
   alternative is exhausted. No drafts or pseudo-code — iterate privately,
