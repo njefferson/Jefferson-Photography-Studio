@@ -1095,7 +1095,7 @@ interface Look {
   /** Repeat presses flip the R<->B swap (colour looks only). */
   toggleSwap?: boolean;
   hue: number;
-  /** Multiplies the current white balance — Aero Red over-cools so post-swap
+  /** Multiplies the current white balance — Red over-cools so post-swap
    *  foliage lands crimson; Goldie also lifts green so it lands gold. */
   wbBias?: [number, number, number];
   tint?: [number, number, number];
@@ -12366,7 +12366,7 @@ const bcLooks = $("bcLooks") as HTMLDivElement;
 let chosenGrade: BatchGrade | null = null;
 
 const BUILTIN_NAMES: Record<string, string> = {
-  aero: "Pink IR", eir: "Aerochrome", red: "Aero Red", goldie: "Goldie", natural: "Natural IR",
+  aero: "Pink IR", eir: "Aerochrome", red: "Red", goldie: "Goldie", natural: "Natural IR",
   mono: "B&W IR", sepia: "Sepia IR", hie: "HIE B&W",
 };
 

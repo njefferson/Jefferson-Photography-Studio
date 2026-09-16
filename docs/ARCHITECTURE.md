@@ -179,7 +179,7 @@ decoder, re-verify against LibRaw before pushing.
 
 Raw-vs-JPEG strengths differ deliberately (camera JPEGs already carry color
 rendering; raw-strength saturation goes garish on them). `wbBias` looks
-(Aero Red, Goldie) multiply the CURRENT WB and must not compound — `lookBias`
+(Red, Goldie) multiply the CURRENT WB and must not compound — `lookBias`
 tracks and removes the previous bias. Aerochrome intentionally uses GENTLE
 contrast (1.15): the owner prefers shadow detail preserved; scenes with big
 empty dark skies can take Contrast up manually. We measured (dark-fraction,

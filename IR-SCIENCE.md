@@ -287,7 +287,7 @@ and the audit is worth keeping:
   app cannot reach them, but their RENDERING is a nameable target.
 - **HIE** — Kodak High Speed Infrared, the black-and-white film with the
   characteristic halation. The app has `HIE B&W`.
-- **`Aero Red`, `Goldie`, `Natural IR`** — this app's own names, not field terms.
+- **`Red`, `Goldie`, `Natural IR`** — this app's own names, not field terms.
   Worth knowing when reading a tutorial that uses none of them.
 
 **The bare swap has no film name.** It is called a channel swap, or false colour,
