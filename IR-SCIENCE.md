@@ -496,42 +496,69 @@ neutral saturation 0.05 from 0.06. Three degrees.
   itself — if it needs fixing it needs denoise or chroma smoothing, not a
   smaller matrix.
 
-### 4c-ii. AND THE ROUTE THAT USES NO MATRIX AT ALL
+### 4c-ii. THE ROUTE THAT USES NO MATRIX, AND WHAT IT PROVED ABOUT THIS CAMERA
 
-Added 2026-09-16. LifePixel's published Aerochrome tutorial does **not** rotate
-channels and does not touch a colour matrix beyond the plain swap. Its route:
+Read first-hand 2026-09-16 from LifePixel's "How to Emulate the look of
+Aerochrome Film" (Dan Wampler). An earlier version of this section was written
+from a search summary and was wrong in two places; both are corrected below.
 
-1. Levels, contrast and tone first.
-2. The plain **red/blue swap** — step 2 of Route 1, nothing more.
-3. **The sky:** after a swap a Super Color frame has blue AND cyan in the sky,
-   and the look wants only blue. Select the **cyan** band in Hue/Saturation and
-   move its **hue to the right** until the cyan is gone.
-4. **The foliage:** select the **red** band and take its hue **left**, into the
-   bright Aerochrome red.
-5. Fine-tune with per-colour SATURATION, or Selective Color on red and blue.
+**The author's stated target:** foliage bright red and magenta, sky a strong
+blue saturation.
 
-**Rendered here as two band moves on the existing swap look** — red band -22
-degrees, aqua band +45, both derived from where this frame's populations
-actually sit (foliage near 357, sky near 175) rather than chosen. Measured:
-foliage sat 0.51 unchanged, sky sat 0.56 at value 0.47.
+**The recipe, complete. It rotates nothing and uses no colour matrix.**
 
-**ITS REAL ADVANTAGE IS THE GRAIN IT DOES NOT HAVE.** Nothing subtracts one
-noisy channel from another, so the speckle the solved matrix pays for in a dark
-sky (section 4c-i) is simply absent. The sky renders smooth.
+1. Start from a **Super Color** conversion. Levels, contrast, tone, and swap the
+   red and blue channels.
+2. Hue/Saturation, **Cyan** band: hue to the RIGHT. A Super Color frame has both
+   blue and cyan in the sky after a swap and the look wants only blue.
+3. Hue/Saturation, **Red** band: hue to the LEFT, so the reds become pronounced.
+4. Hue/Saturation, **Yellow** band: hue to the LEFT, turning the yellows red.
+5. **Selective Color on Red: adjust the BLACK within the red tones.**
 
-**AND THE TWO SOURCES DISAGREE ABOUT THE SKY.** LifePixel says the target is
-BLUE and that the cyan should be driven out of it. The reference in section 4b
-says deep cyan. Both are defensible and they are different pictures; which one
-is Aerochrome is a judgement, not a measurement, and it is the owner's.
+**THE PAGE CARRIES NO NUMBERS.** Every step is "move the slider", and the author
+says outright that it will not work with every image and that each one needs
+different adjustments. So any value here is derived, never quoted. The two
+corrections to the second-hand version: step 4 was missing entirely, and step 5
+is LUMINANCE — adding black to the reds — not saturation, which is what a
+summary-derived note here previously claimed.
 
-**WHAT IS NOT YET DONE ON THIS ROUTE:** step 5. Only hue was moved here, so the
-foliage is still salmon rather than crimson — the red band's SATURATION is what
-carries it the rest of the way, and it costs nothing in grain.
+**Rendered faithfully on NIR_1376.NEF**, values derived from where this frame's
+populations sit (sky near 175, foliage near 357) and from the instruction itself
+for the yellow shift (the full distance to red, which is also the slider limit):
+cyan +45, red -22, yellow -60, and red luminance 0.85 for step 5.
 
-**Read second-hand.** `www.lifepixel.com` is blocked by this environment's
-egress proxy; the steps above came back through the search index and the page's
-own numeric values have not been read. Ask for the host and read it before
-treating any number here as the tutorial's.
+**AND IT CANNOT REACH ITS OWN TARGET HERE. FOLIAGE SATURATION IS 0.51 BEFORE THE
+RECIPE AND 0.51 AFTER.** Every step is a hue ROTATION; not one of them adds
+saturation. Step 5 moves value 0.70 to 0.66 and nothing else. "Bright red and
+magenta" is not something a hue shift can manufacture — the colour has to be in
+the file already.
+
+### 4c-iii. WHICH CONVERSION CLASS THIS CAMERA IS, SETTLED BY MEASUREMENT
+
+Section 1 records that how far the channels can be pulled apart is a fixed
+property of the conversion and never records WHICH. The anchors in 4c-i settle
+it: **green and blue agree to within 0.6% in all three populations** (foliage
+0.2401/0.2407, sky 0.2677/0.2621, neutral 0.3477/0.3470). That is the signature
+of a DEEP cutoff, where very little visible differentiation survives — not the
+590nm Super Color class LifePixel's tutorial assumes, which keeps substantial
+visible red.
+
+**This is the fact under both routes, and it explains the choice between them.**
+
+- The no-matrix route is clean — nothing subtracts one noisy channel from
+  another, so a dark sky renders smooth — and its foliage stays salmon, because
+  there is little colour in the file for a hue shift to move.
+- The solved matrix reaches foliage saturation 0.67 and a cyan sky, and pays for
+  it in chroma grain, because manufacturing that separation means subtracting two
+  channels that are 99.4% the same.
+
+**You can have the saturation or you can have the clean sky.** That is not a
+tuning trade-off to be optimised away; it is the cutoff, and it is why every
+route through the mixer grains and every route through hue alone stays pale.
+
+**And the sources disagree about the sky regardless.** LifePixel says drive the
+cyan out until it is blue; section 4b's reference says deep cyan. Different
+pictures, both defensible, and choosing is not a measurement.
 
 ## 5. What a camera JPEG is, and why it is a different animal
 

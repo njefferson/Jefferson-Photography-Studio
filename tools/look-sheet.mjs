@@ -34,26 +34,38 @@ const OUT = arg("out", "/tmp/claude-0/-home-user/2bd37282-d617-5a51-b357-6b20783
 // Each candidate: a name, a one-line note on what it is reaching for, and the
 // controls to touch. `set` writes a slider and fires the events the app listens
 // for; `tap` presses a button.
-// THREE ROUTES SIDE BY SIDE, one of which is not a matrix at all.
+// LIFEPIXEL'S PUBLISHED AEROCHROME RECIPE, READ FROM THE PAGE ITSELF.
 //
-// LifePixel's published Aerochrome tutorial does NOT rotate channels: levels and
-// contrast, then the plain red/blue swap, then two hue-band moves — the cyan
-// band pushed toward blue for the sky, the red band pushed the other way into
-// Aerochrome red for the foliage. No negative coefficients anywhere, so none of
-// the chroma grain the solved matrix pays for (IR-SCIENCE.md section 4c-i).
+// It rotates nothing and uses no colour matrix: the plain red/blue swap, then
+// FOUR band moves in Hue/Saturation plus a Selective Color pass. Its stated
+// target, in the author's words: foliage bright red and magenta, sky a strong
+// blue saturation.
 //
-// The shifts below are measured, not chosen: Pink IR puts this frame's foliage
-// near hue 357 and its sky near 175, and the targets are crimson 335 and blue
-// 220.
+//   1  levels, contrast, tone, and swap red/blue
+//   2  Cyan  -> hue RIGHT, until the sky is blue rather than blue-and-cyan
+//   3  Red   -> hue LEFT, so the red tones become more pronounced
+//   4  Yellow-> hue LEFT, turning the yellows red
+//   5  Selective Color on Red -> add BLACK within the red tones
+//
+// THE PAGE CARRIES NO NUMBERS. Every step is "move the slider", so the values
+// below are derived, not quoted: this frame's sky sits near hue 175 and its
+// foliage near 357 under the swap, and the yellow shift is fixed by the
+// instruction itself — the full distance from the yellow band to red, which is
+// also the slider's limit. Step 5 has no published amount and is taste; both
+// states are rendered.
+//
+// Step 5 is LUMINANCE, not saturation. "Adjust the Black within the Red tones"
+// darkens the reds; a note here previously called it saturation, from a
+// second-hand summary that also omitted the yellow step entirely.
 const CANDIDATES = [
-  { name: "0-pink-ir", note: "the swap alone, which is the base LifePixel starts from",
+  { name: "0-pink-ir", note: "the swap alone — the base the recipe starts from",
     steps: [["tap", "#ptab-ir"], ["tap", "#lookAero"]] },
-  { name: "1-lifepixel-two-band-shifts", note: "the swap plus two hue moves: red band -22 toward crimson, aqua band +45 toward blue. No matrix, no grain.",
+  { name: "1-lifepixel-full", note: "cyan +45 to blue, red -22, yellow -60 to red. No matrix, so no grain.",
     steps: [["tap", "#ptab-ir"], ["tap", "#lookAero"], ["tap", "#ptab-color"],
-            ["hsl", "0", "-22,1,1"], ["hsl", "4", "45,1,1"]] },
-  { name: "2-solved-matrix", note: "the solved two-anchor matrix plus its 36-degree band shift, for comparison",
-    steps: [["tap", "#ptab-ir"], ["tap", "#lookAero"], ["tap", "#ptab-color"], ["mix3", "0", "0.998"], ["mix3", "1", "-0.005"], ["mix3", "2", "0.007"], ["mix3", "3", "-1.382"], ["mix3", "4", "1.196"], ["mix3", "5", "1.163"], ["mix3", "6", "-0.405"], ["mix3", "7", "0.706"], ["mix3", "8", "0.691"],
-            ["hsl", "3", "36,1,1"], ["hsl", "4", "36,1,1"]] },
+            ["hsl", "4", "45,1,1"], ["hsl", "0", "-22,1,1"], ["hsl", "2", "-60,1,1"]] },
+  { name: "2-lifepixel-full-reds-darkened", note: "the same, plus step 5 — black added within the reds (red band luminance 0.85)",
+    steps: [["tap", "#ptab-ir"], ["tap", "#lookAero"], ["tap", "#ptab-color"],
+            ["hsl", "4", "45,1,1"], ["hsl", "0", "-22,1,0.85"], ["hsl", "2", "-60,1,1"]] },
 ];
 
 
