@@ -15381,3 +15381,43 @@ the coloured frame in one bin when opened against **27%** after a batch — so
 something real is happening that the check, which compares only which bin is
 biggest, does not catch. The JPEG arm's pass is not yet worth much and the metric
 needs the share in it before it is.
+
+## Double-tap reaches the tone curve's points, 2026-09-16
+
+**Asked for: the same double-tap-to-return the sliders have.** Wired into
+`wireSliderReset` rather than beside the curve, because "double-tap puts this
+back where the photo opened" is a RULE, and this session was spent on what
+happens when one rule is written in two places. The points share the delegation,
+the iOS timing fallback and the one-gesture-one-undo-step flush.
+
+**Back to where the photo OPENED, not to `TONE_DEFAULT`.** Restore depth solves a
+curve per frame at open, so a photograph does not open on the straight line; a
+point returning to the diagonal would mean something different from the same
+gesture on the slider beside it, and different from Reset. `toneDefaults` is
+captured in `captureSliderDefaults`, at the same moment and for the same reason
+as the sliders — **copied, not referenced**, because those four arrays are
+mutated in place by every drag, so holding the array would make the baseline
+follow the edit and the gesture would do nothing.
+
+**`tools/double-tap-walk.mjs` covers the sliders too, which had never been
+checked.** The gesture has no visible affordance — nothing on screen differs
+between wired and not — and it had shipped since 2026-09-09 on one manual try.
+Negative control: with the reset removed, the tone arm fails and the slider arm
+still passes.
+
+**THE WALK WAS WRONG TWICE BEFORE THE APP WAS WRONG ONCE, and both are the same
+mistake.** It asked for the Basic tab and `#sat` is on Color, so the slider was
+hidden, its box came back at the origin, and the taps went to the top-left corner
+of the page — Playwright said "element is not visible" in its own log and the
+walk's output said the feature was broken. Then it tapped the tone point at the
+coordinates it read BEFORE the drag; the dot had moved 40px, which is what the
+drag was for, and both taps landed on a grid line. A stale coordinate and a
+hidden control both read exactly like a broken feature.
+
+**AND THE SAME BUILD TRAP AS THIS MORNING, THROUGH A DIFFERENT DOOR.** The first
+plant did not typecheck, `npm run build` failed, `dist/` kept the good bundle and
+the walk passed against it — reported as a plant that proved nothing. This
+morning's entry already says to check the build exited zero. It was piped this
+time: `npm run build | tail -1 && echo OK` takes its status from `tail`, which
+always succeeds. **A pipe hides the exit code of everything upstream of it** —
+redirect to a file and read `$?` instead.
