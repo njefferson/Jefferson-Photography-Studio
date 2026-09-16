@@ -60,21 +60,34 @@
           <button id="infoBtn" class="info-btn" type="button" aria-label="About this app — what's new, settings, and reporting a problem">i</button>
           <button id="verTag" class="ver-tag" type="button" aria-haspopup="dialog" title="Build version — and the tools for when something is wrong"></button>
         </span>
-        <button id="homeBtn" class="bar-btn" type="button" title="Back to the start screen (keeps your session open)" aria-label="Home">
+        <!-- NO TOOLTIPS IN THIS BAR. Every one of them was a sentence only a
+             mouse could read, on an app built for a tablet; what they said that
+             the labels do not is in Help, where both platforms see it.
+             tools/control-check.mjs refuses the shape now. -->
+        <button id="homeBtn" class="bar-btn" type="button" aria-label="Home">
           <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M3 11l9-8 9 8" /><path d="M5 10v10h5v-6h4v6h5V10" /></svg>
           Home
         </button>
         <span class="bar-actions-wrap"><span class="bar-actions">
-          <button id="undoBtn" class="bar-btn" type="button" disabled title="Undo one edit step">&#8630; Undo</button>
-          <button id="redoBtn" class="bar-btn" type="button" disabled title="Redo the last undone step">&#8631; Redo</button>
-          <button id="resetBtn" class="bar-btn" type="button" disabled title="Reset the whole edit to how the photo first opened">Reset</button>
-          <button id="origBtn" class="bar-btn" type="button" title="Press and hold to compare with how the photo opened">Hold: Original</button>
-          <button id="untouchedBtn" class="bar-btn" type="button" title="Press and hold to see the photo exactly as decoded, nothing applied">Hold: Untouched</button>
-          <!-- Only present when a lens correction is actually on this frame, so
-               its presence is how the reader knows one was applied at all. -->
-          <button id="lensCmpBtn" class="bar-btn" type="button" hidden title="Press and hold to see this photo without the automatic lens correction">Hold: No lens fix</button>
-          <button id="histBtn" class="bar-btn" type="button" aria-pressed="true" title="Show or hide the live histogram">Histogram</button>
-          <button id="fullViewBtn" class="bar-btn" type="button" aria-pressed="false" title="See the photo on its own, with nothing over it — Escape or a tap returns">Full view</button>
+          <button id="undoBtn" class="bar-btn" type="button" disabled>&#8630; Undo</button>
+          <button id="redoBtn" class="bar-btn" type="button" disabled>&#8631; Redo</button>
+          <button id="resetBtn" class="bar-btn" type="button" disabled>Reset</button>
+          <!-- ONE BEFORE/AFTER CONTROL, which is what Lightroom, Capture One
+               and Snapseed each ship. "Before" rather than "Original": once
+               Hold: Untouched left this row, "Original" starts to read as the
+               original FILE, and before/after is the word all three use.
+               Holding the photograph itself does the same thing (400ms) and has
+               always done; the button is the signpost for a gesture nothing
+               else advertises. The other two were not before/after at all and
+               have moved beside what they explain — see the Basic and
+               Corrections tabs. (Owner direction, 2026-09-16.) -->
+          <button id="origBtn" class="bar-btn" type="button">Hold: Before</button>
+          <button id="histBtn" class="bar-btn" type="button" aria-pressed="true">Histogram</button>
+          <!-- No `title`: the mode prints "Tap anywhere or press Escape to go
+               back" on the photograph every time it is entered (#fullViewHint),
+               so the tooltip restated on a hover what the screen already says
+               to everyone. -->
+          <button id="fullViewBtn" class="bar-btn" type="button" aria-pressed="false">Full view</button>
           <button id="helpBtn" class="bar-btn" type="button">Help</button>
           <!-- THE SHARE BUTTON IS NOT HERE ANY MORE. It read "Share" in the bar
                beside the photograph being edited and shared the APP's link; the
@@ -363,8 +376,7 @@
                state is a fail state here. main.ts sets the label; the greying is
                a second cue and never the only one. -->
           <div class="panel-prefs">
-            <button id="panelNotes" type="button" class="panel-notes-toggle" aria-pressed="true"
-                    title="Show or hide the explanations beside each control">Explanations</button>
+            <button id="panelNotes" type="button" class="panel-notes-toggle toggle" aria-pressed="true">Explanations on</button>
           </div>
           <!-- THE HEADING IS WHAT STAYS. It is the only thing on screen saying
                which tab you are in once the grid has scrolled away, so it is the
@@ -394,13 +406,31 @@
             <p class="note">Tip: tap foliage in the image to set white balance.</p>
             <label>Recover highlights <input id="recover" type="range" min="0" max="1" step="0.01" value="0" /></label>
             <p class="note">Pulls genuinely blown (sensor-clipped) areas toward clean neutral for your current white balance &mdash; it re-aims live as you rebalance. Set automatically at open when the frame has clipping; 0 = untouched.</p>
+            <!-- A DIAGNOSTIC, NOT A PROMISE, and it took the owner to say so.
+                 This was carried for a long time as the standing PROOF that
+                 opening a photograph did not touch pixels — which it never was:
+                 it renders the same decode either way with four sliders zeroed,
+                 and those four are already visible and already undoable, so
+                 dragging them to zero shows the same thing. The real promise is
+                 a sentence, and it is the line below this button.
+
+                 What it IS good for is telling whether a frame that opens wrong
+                 is the FILE or the AUTOMATIC, which is a question IR-SCIENCE.md
+                 has had to answer twice. That is a diagnostic, and a diagnostic
+                 belongs beside the controls it diagnoses rather than in the top
+                 bar next to the before/after. No commercial editor offers a bare
+                 decode as a compare state at all; theirs already include the
+                 default rendering. (Owner, 2026-09-16.) -->
+            <p class="note"><strong>Your original file is never changed.</strong> Everything on this photograph is a setting you can move, and Reset puts them all back.</p>
+            <button id="untouchedBtn" type="button">Hold: the bare decode</button>
+            <p class="note">Press and hold to see this photograph as the file decoded, with the four automatics above taken off &mdash; white balance, exposure, denoise and highlight recovery. It is for working out whether a frame that opens looking wrong is the file or one of those four.</p>
             <hr class="divider" />
             <div class="sub-title">Detail</div>
             <label>Denoise <input id="dn" type="range" min="0" max="1" step="0.01" value="0" /></label>
             <label>Sharpen <input id="sharpen" type="range" min="0" max="1" step="0.01" value="0" /></label>
             <label>Texture <input id="texture" type="range" min="-1" max="1" step="0.01" value="0" /></label>
             <p class="note">Denoise is set automatically from the photo's measured noise. Sharpen crisps up fine edges; Texture brings out surface structure (pull left to smooth). Both keep colors put.</p>
-            <p class="note footnote">Raw photos open auto-balanced (white balance, exposure, denoise &mdash; and blown-highlight recovery when needed); camera-rendered photos (JPEG/HEIC) open as the camera made them, denoise only. Hold: Untouched shows the bare decode. No 2000K floor.</p>
+            <p class="note footnote">Raw photos open auto-balanced (white balance, exposure, denoise &mdash; and blown-highlight recovery when needed); camera-rendered photos (JPEG/HEIC) open as the camera made them, denoise only. Your original file is never changed. <strong>Hold: the bare decode</strong> (Basic tab) shows the photograph with those automatics off. No 2000K floor.</p>
           </section>
 
           <!-- ===== IR ===== -->
@@ -561,6 +591,16 @@
             <label>Hot-spot size <input id="hotspotSize" type="range" min="0.15" max="1" step="0.01" value="0.5" /></label>
             <label>Hot-spot colour <input id="hotspotColor" type="range" min="-0.5" max="0.5" step="0.01" value="0" /></label>
                         <label>Vignette <input id="vignette" type="range" min="-1" max="1" step="0.01" value="0" /></label>
+            <!-- PRESENT ONLY WHEN A CORRECTION IS ACTUALLY ON THIS FRAME, so
+                 its presence is how you know one was applied at all. It moved
+                 out of the top bar because it is a diagnostic for THIS
+                 correction rather than a before/after for the edit — Capture
+                 One's published "before" keeps lens corrections, which is the
+                 evidence it was never part of one. Its sentence was a `title`,
+                 which is a hover and does not exist on a tablet; it is a note
+                 now. -->
+            <button id="lensCmpBtn" type="button" hidden>Hold: without the lens fix</button>
+            <p class="note" id="lensCmpNote" hidden></p>
             <button id="lensMeasureBtn" type="button">Measure your lens&hellip;</button>
             <p class="note">Setting these by eye on every photograph is the fallback. Measuring works your own lens&rsquo;s hot-spot out from photographs of empty sky &mdash; it needs no photo open, so it is on the start screen and in Settings too.</p>
             <div class="subcard" id="hsCard">
@@ -1092,7 +1132,7 @@
         <div class="set-row pal-row">
           <h4 class="pal-head" id="defLookHead">Look every photo opens with</h4>
           <div id="defaultLookPicker" class="pal-picker pal-picker-inline look-default" role="radiogroup" aria-labelledby="defLookHead"></div>
-          <small class="note">Applies as each photo first opens, in every session, until you change it. Pressing a look still changes it for the rest of that set; Reset keeps it; and Hold: Untouched still shows the photo exactly as the file decoded.</small>
+          <small class="note">Applies as each photo first opens, in every session, until you change it. Pressing a look still changes it for the rest of that set; Reset keeps it; and <strong>Hold: the bare decode</strong> on the Basic tab still shows the photograph as the file decoded.</small>
         </div>
       <div class="set-row">
         <button id="setLocTip" type="button" class="toggle" aria-pressed="true"><span aria-hidden="true">&#128752;</span> Location tip</button>
@@ -1237,7 +1277,7 @@
           <li><strong>Quick look a folder</strong> (top bar, and on the start screen) when you just want to <em>see</em> what's in a set:
           an instant grid of auto-balanced previews, nothing saved. Tap the keepers and <strong>Keep in a session</strong>
           sends them straight into an editable session.</li>
-          <li>On open, <strong>raw photos are auto-balanced</strong> (white balance, exposure, denoise, blown-highlight recovery when the frame needs it, and <strong>Restore depth</strong>); JPEG/HEIC open as the camera rendered them, with measured denoise only &mdash; until you pick a Look, which balances them first, because a false-colour look needs colours something has already pulled apart. A camera file with all its colour in ONE band is the exception: balancing it invents the second band by crushing red, so the app leaves it alone, says so beside the looks, and offers <strong>Balance it anyway</strong> if you want that rendering on that photograph. Every one of those lands on a slider you can see and undo, and <strong>Hold: Untouched</strong> shows the bare decode any time.</li>
+          <li>On open, <strong>raw photos are auto-balanced</strong> (white balance, exposure, denoise, blown-highlight recovery when the frame needs it, and <strong>Restore depth</strong>); JPEG/HEIC open as the camera rendered them, with measured denoise only &mdash; until you pick a Look, which balances them first, because a false-colour look needs colours something has already pulled apart. A camera file with all its colour in ONE band is the exception: balancing it invents the second band by crushing red, so the app leaves it alone, says so beside the looks, and offers <strong>Balance it anyway</strong> if you want that rendering on that photograph. Every one of those lands on a slider you can see and undo, your original file is never changed, and <strong>Hold: the bare decode</strong> on the Basic tab shows the photograph with those automatics off any time.</li>
           <li><strong>Tap foliage</strong> in the photo to fine-tune white balance — the classic IR move. Tapping a blown-out spot is refused and says so: there is no colour recorded in it to balance from.</li>
           <li><strong>The usual shortcuts work.</strong> <strong>Cmd/Ctrl&#8202;+&#8202;Z</strong> undoes and <strong>Cmd&#8202;+&#8202;Shift&#8202;+&#8202;Z</strong> (or <strong>Ctrl&#8202;+&#8202;Y</strong>) redoes. You can <strong>drag photos onto the window</strong> or <strong>paste</strong> one to open it. <strong>Esc</strong> closes any panel, and on a home-screen install the <strong>Back</strong> gesture closes the panel instead of leaving the app.</li>
           <li><strong>Double-tap any slider</strong> to put it back where the photo opened. Most of them don't start at zero — white balance, exposure and denoise open at values measured from your frame — so this returns that one slider to its opening value, the way <strong>Reset</strong> does for all of them at once. Quality goes back to its usual setting instead, since that one is yours rather than the photo's. Restore depth strength goes back to 100% — the full correction worked out for the frame in front of you, which is where every photo opens.</li>
@@ -1250,7 +1290,7 @@
         <ul>
           <li><strong>Tap</strong> the photo — set white balance from that point (aim at foliage). While a picture tool is armed — Heal, a color pick, brush painting or drag-to-adjust — that tool takes the tap instead.</li>
           <li><strong>Pinch</strong> — zoom (up to 8&times;); drag to pan while zoomed. No touchscreen? Use the <strong>+ / &minus; / Fit</strong> buttons in the photo's bottom-right corner, or the mouse wheel over the photo — both work even while you're brushing, so you can zoom right in to edit up close.</li>
-          <li><strong>Press &amp; hold</strong> the photo (or the <em>Hold: Original</em> button) — compare with how the photo opened. <em>Hold: Untouched</em> shows the bare decode with nothing applied.</li>
+          <li><strong>Press &amp; hold</strong> the photo (or the <em>Hold: Before</em> button) — compare with how the photograph opened, which is the before/after every editor has. Two more holds live beside what they explain rather than in the bar: <em>Hold: the bare decode</em> on the Basic tab, under the automatics it takes off, and <em>Hold: without the lens fix</em> on the Corrections tab, which is only there when a lens correction is actually on the frame.</li>
         </ul>
         </details>
         <details class="help-sec">
