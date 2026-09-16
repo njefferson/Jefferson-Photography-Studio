@@ -683,6 +683,51 @@ the 1.9-degree hold-one-out error. A population that is a fiftieth of a per cent
 of the frame is not a measurement. **`anchor-sweep` prints each population's
 share for exactly this reason.**
 
+### 4c-vi. THE GRAIN IS THE SIGNAL'S OWN, AND TWO REMEDIES ARE RULED OUT
+
+Measured 2026-09-16 on two of the owner's frames, under the six-frame matrix, at
+the look's real strength. Chroma spread OVER LEVEL in the sky — a smooth region,
+so its spread is noise rather than subject — never absolute spread, for the
+reason 4c-i records.
+
+**SUBTRACTING NEAR-INFRARED BEFORE THE MATRIX CANNOT HELP, ALGEBRAICALLY.** A
+linear subtraction composes with the matrix: "subtract a times blue, then apply
+M" IS a different 3x3, and the minimum-norm solve already searched that entire
+space. The earlier `-0.30` candidate (4c-ii) looked better than the bare rotation
+because it changed the COLOUR; its grain was never measured and no claim about it
+was made.
+
+**RAISING DENOISE DOES NOTHING TO THE RATIO.** `src/raw/denoise.ts` runs on the
+decoded data before the edit chain, so it cleans what reaches the mixer — the
+right place to attack, and it still does not work:
+
+- NIR_1480: **0.498** at the opening denoise of 0.51, **0.504** at 0.80
+- NIR_1534: **0.677** at the opening denoise of 0.60, **0.685** at 0.80
+
+It lowers absolute chroma and absolute noise together (74.4 to 70.9, sd 37.1 to
+35.7), so the ratio is untouched. **The look does not want a denoise floor.**
+
+**AND THE CONTROL ARM OVERTURNS THE FRAMING THIS STARTED WITH.** The bare swap at
+matched denoise is not cleaner than the matrix:
+
+- NIR_1480: swap **0.614**, matrix **0.498** — the SWAP is worse
+- NIR_1534: swap **0.631**, matrix **0.677** — close
+
+So the matrix does not manufacture grain. What made it look grainier in 4c-i's
+picture was AMPLITUDE: it roughly doubles sky chroma (74 against 40) at the same
+noise-to-signal ratio, so the absolute noise doubles with it, and absolute noise
+is what the eye sees. **The colour and the grain come out of the same 1-3%
+residual (4c-iv) and scale together.** Describing it as "the matrix grains" was
+imprecise, and the control arm is what caught it — without the swap-at-matched-
+denoise reading, every remedy would have been aimed at the wrong thing.
+
+**WHAT IS LEFT.** Every lever tried so far is a per-pixel one, and a per-pixel
+operation cannot separate colour from its own noise when they arrive in the same
+numbers. The one axis untried is SPATIAL: chroma smoothing after the mixer — blur
+colour, keep luminance sharp, the reason JPEG subsamples chroma. Noise is
+high-frequency and the wanted colour largely is not, which is the only difference
+between them that remains. Nothing in this pipeline does it today.
+
 ## 5. What a camera JPEG is, and why it is a different animal
 
 A camera-rendered JPEG was developed **through** the clamped custom preset, then
