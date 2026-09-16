@@ -496,6 +496,43 @@ neutral saturation 0.05 from 0.06. Three degrees.
   itself — if it needs fixing it needs denoise or chroma smoothing, not a
   smaller matrix.
 
+### 4c-ii. AND THE ROUTE THAT USES NO MATRIX AT ALL
+
+Added 2026-09-16. LifePixel's published Aerochrome tutorial does **not** rotate
+channels and does not touch a colour matrix beyond the plain swap. Its route:
+
+1. Levels, contrast and tone first.
+2. The plain **red/blue swap** — step 2 of Route 1, nothing more.
+3. **The sky:** after a swap a Super Color frame has blue AND cyan in the sky,
+   and the look wants only blue. Select the **cyan** band in Hue/Saturation and
+   move its **hue to the right** until the cyan is gone.
+4. **The foliage:** select the **red** band and take its hue **left**, into the
+   bright Aerochrome red.
+5. Fine-tune with per-colour SATURATION, or Selective Color on red and blue.
+
+**Rendered here as two band moves on the existing swap look** — red band -22
+degrees, aqua band +45, both derived from where this frame's populations
+actually sit (foliage near 357, sky near 175) rather than chosen. Measured:
+foliage sat 0.51 unchanged, sky sat 0.56 at value 0.47.
+
+**ITS REAL ADVANTAGE IS THE GRAIN IT DOES NOT HAVE.** Nothing subtracts one
+noisy channel from another, so the speckle the solved matrix pays for in a dark
+sky (section 4c-i) is simply absent. The sky renders smooth.
+
+**AND THE TWO SOURCES DISAGREE ABOUT THE SKY.** LifePixel says the target is
+BLUE and that the cyan should be driven out of it. The reference in section 4b
+says deep cyan. Both are defensible and they are different pictures; which one
+is Aerochrome is a judgement, not a measurement, and it is the owner's.
+
+**WHAT IS NOT YET DONE ON THIS ROUTE:** step 5. Only hue was moved here, so the
+foliage is still salmon rather than crimson — the red band's SATURATION is what
+carries it the rest of the way, and it costs nothing in grain.
+
+**Read second-hand.** `www.lifepixel.com` is blocked by this environment's
+egress proxy; the steps above came back through the search index and the page's
+own numeric values have not been read. Ask for the host and read it before
+treating any number here as the tutorial's.
+
 ## 5. What a camera JPEG is, and why it is a different animal
 
 A camera-rendered JPEG was developed **through** the clamped custom preset, then
