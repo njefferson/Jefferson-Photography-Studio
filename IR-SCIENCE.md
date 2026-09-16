@@ -141,6 +141,32 @@ Fails when residual channel differentiation is insufficient, or when foliage was
 clipped in capture: clipped IR foliage has no data underneath and the swap turns
 it to flat cyan.
 
+**KNOWN GAP: this app's `aero` does not reach the film's depth, and more
+saturation cannot get it there.** Kodak EIR renders healthy foliage a deep
+magenta red. Measured on a reported frame, `LOOKS.aero` lands it at
+`rgb(173, 104, 106)` — hue 358.5, which is already pure red, at HSV saturation
+0.40 and **value 0.68**.
+
+The per-colour bands clamp saturation in HSV:
+
+    s = Math.min(1, s * (1 + (sky[1] - 1) * wS) * (1 + (fol[1] - 1) * wF));
+
+so once `s` reaches 1 the control is spent and further travel does nothing, which
+is what a maxed slider that changed nothing feels like. `LOOKS.aero` has already
+multiplied saturation before the band sees it (3.0 on raw), so the band can
+arrive with almost no headroom.
+
+**Past that point the limiter is VALUE, not saturation.** Fully saturating that
+same pixel gives `rgb(173, 0, 0)` — a real red, but capped at V 0.68 by the
+brightness the foliage arrived with, and the film's crimson sits below it.
+Saturation and lightness are not independent here, and reasoning about the colour
+AS IT IS rather than about where saturating takes it gets this backwards.
+
+So closing the gap is not a slider that needs more range. It is a question about
+where the red's value should come from — the look's own numbers, the tone curve,
+or step 3 of the route above, the cast correction the swap needs anyway. All
+three are look design, which is the owner's, and none is proposed here.
+
 **Route 2 — profile-based (the Rob Shea method).** Build the colour transform
 from a profile made against the IR raw's own custom white balance rather than
 fighting a visible-light pipeline channel by channel. Wider and more stable
