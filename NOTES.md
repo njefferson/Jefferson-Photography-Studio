@@ -15289,3 +15289,44 @@ use the SAME key format — `50-250@50@f13.0` on both sides — so an exact-sett
 match read as the reader's when it was the table's. Identity, not name.
 
 20 of 20 walks green. `PREVIEW_PIPELINE` 14 to 15.
+
+## The thumbnail that looked a darker red — NOT a defect, 2026-09-16
+
+**Reported as a question rather than a fault, and it was the right question:**
+four reports today of a tile disagreeing with the photograph were real defects,
+so the instinct had earned its keep. This one is perception.
+
+**Measured off the reported screenshot, splitting the two populations rather than
+averaging the frame:**
+
+- red foliage — photograph `rgb(173,104,106)` hue 358.5, lightness 52.7%,
+  saturation 43.5%; tile `rgb(179,109,110)` hue 0.0, lightness **55.1%**,
+  saturation 42.7%. The tile's red is **2.4 points LIGHTER**, not darker, and
+  1.5 degrees round the wheel — inside JPEG chroma subsampling at 260px.
+- teal sky, as the control — 175.7 against 175.3. **0.4 degrees.**
+
+**Why it reads darker anyway**, in order of size. The tile sits in a near-black
+strip while the photograph sits on mid-grey against a sky filling 59% of it, and
+the same patch against a darker surround reads darker and more saturated. The
+tile is about an eighth of the photograph's area on screen and the tree fills 34%
+of it against 22%, because the tile carries no letterboxing. And the selection
+ring is a light hairline tight around it, which lifts the local contrast of
+everything inside.
+
+**The real candidate was checked and ruled out.** The photograph is a WebGL canvas
+and the tile is a JPEG in an `<img>`; on a P3 iPhone an untagged JPEG treated as
+sRGB against a wider-gamut canvas would produce exactly this appearance. The
+control forbids it: a gamut mismatch cannot move foliage 1.5 degrees and sky 0.4.
+
+**THE FIRST MEASUREMENT NEARLY REPORTED A DEFECT, and the mistake is worth more
+than the answer.** Averaging the whole frame gave a mean hue of **162 degrees
+against 35** — a 127-degree disagreement. It is noise: the frame is teal and red
+in near-equal weight, so the mean sits on grey and its hue is set by whichever
+population is a few pixels larger. `IR-SCIENCE.md` §6 already said to measure the
+quantity being asked about; it now also says that the mean of a bimodal
+distribution measures neither mode, which is the form it took here.
+
+Nothing to fix. The lens line on the same report confirms the release it was taken
+on is working: colour and brightness both from `57mm f/8 · 4 raw frames`, centre
+brightness **0.980x** where it read 1.000x — no correction at all — two releases
+earlier.

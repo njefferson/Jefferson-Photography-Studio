@@ -197,6 +197,18 @@ first cut of this measurement reported 47–82% "blown"; measured properly,
 pixels that had actually lost detail to white were **0.0% on every frame and
 every rendering.**
 
+**A WHOLE-FRAME MEAN IS NOT A MEASUREMENT OF EITHER POPULATION.** A false-colour
+IR frame is bimodal by construction — that is the entire point of section 2 — so
+foliage and sky sit on roughly opposite sides of the wheel in comparable numbers,
+the mean lands near grey, and its hue is decided by whichever population happens
+to be a few pixels larger. Measured on one frame rendered two ways: the mean hue
+read **162 degrees against 35**, a 127-degree disagreement that reads as a serious
+defect and is noise. Split on the two populations the physics already separates
+and the same two renderings agree to **1.5 degrees on the foliage and 0.4 on the
+sky**. Split first, then measure, and carry the population you are NOT asking
+about as the control — if it moves too, the difference is not where you think it
+is.
+
 **Always carry a raw control.** Tuning on camera JPEGs alone produced a
 correction that helped them and damaged raw files, and only the control showed
 it.
