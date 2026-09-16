@@ -20,9 +20,16 @@
 //    and it is a FLOOR over the photograph's own measurement rather than a
 //    setting. Checks 4-6 cover the floor and both directions of leaving it.
 //
-// Checks 7 and 8 are the ones the rest exist to support: render the shipped
-// look, hash the canvas, then reproduce the sheet's recipe BY HAND on a second
-// page and hash again.
+// Checks 10a-c are now the ones that matter most: the look's two populations
+// land on the angles measured off real Aerochrome (IR-SCIENCE.md 4b-iii), and
+// stay apart. 10c looks redundant and is not -- a global hue shift puts the
+// foliage exactly on target and MERGES the populations, so a check on position
+// alone would pass the one candidate that is most obviously not the film.
+//
+// Checks 7 and 8 render the shipped look, hash the canvas, then reproduce the
+// whole recipe BY HAND on a second page and hash again. The recipe now includes
+// the eight band shifts, driven through the reader's own chips and slider --
+// which is also how check 11's claim is earned rather than asserted.
 //
 // WITH RESTORE DEPTH OFF THEY ARE BYTE-IDENTICAL, and that is check 7 -- the
 // mapping, the swap and the denoise floor all ship exactly as they were
@@ -81,6 +88,15 @@ const PAIR = [EX + "NIR_0063.dng", EX + "NIR_0627.dng"];
 // The approved arm, exactly as it was driven on the sheets.
 const MATRIX = [0.99, -0.06, 0.07, -1.44, 1.37, 1.02, -0.47, 0.81, 0.65];
 const FLOOR = 0.8;
+// The film's own angles, measured off the source article's photographs
+// (IR-SCIENCE.md 4b-iii). Check 10 holds the look to them.
+const FILM = { fol: 6.2, sky: 204.0, sep: 197.8 };
+const TOL = 12;      // degrees; hold-one-out worst error on the solve was 8
+const MIN_SEP = 150; // a global hue shift collapses the two into one bin
+// The eight band hue shifts the look declares, in HSL_CENTERS order
+// (red, orange, yellow, green, aqua, blue, purple, magenta).
+const BANDS = [7, 0, 0, 54, 35, 0, 1, 43];
+const BAND_LIMIT = 60; // the reader's own Hue slider is min -60 max 60
 
 let failed = 0;
 const check = (name, got, want) => {
@@ -213,6 +229,18 @@ try {
       m.forEach((v, i) => { const el = sl[i]; if (!el) return; el.value = String(v); el.dispatchEvent(new Event("input", { bubbles: true })); });
     }, MATRIX);
     await settle(p);
+    // AND THE EIGHT BANDS, driven through the reader's own chips and slider.
+    // Two things at once: the equivalence below stays a real claim now that the
+    // look carries bands, AND every value the look declares is proved reachable
+    // by hand. A look that puts the app somewhere its own controls cannot reach
+    // is a state nobody can undo or understand.
+    for (let b = 0; b < 8; b++) {
+      if (BANDS[b] === 0) continue;
+      await p.evaluate((i) => document.querySelectorAll("#hslChips button")[i].click(), b);
+      await p.evaluate((v) => { const el = document.getElementById("hslHue");
+        el.value = String(v); el.dispatchEvent(new Event("input", { bubbles: true })); }, BANDS[b]);
+    }
+    await settle(p);
     await setDn(p, Math.max(measured, FLOOR));
     const h = await hash(p);
     await ctx.close();
@@ -224,6 +252,53 @@ try {
   check("7   with Restore depth off, the button IS the approved recipe, byte for byte",
     bareShipped, bareRecipe);
   console.log(`        (canvas hash ${bareShipped})`);
+
+  // ---- 10. THE TWO POPULATIONS LAND ON THE FILM. The check the whole band
+  // solve exists to satisfy, and the one a global hue shift fails even while
+  // putting the foliage exactly on target.
+  {
+    const { p, ctx } = await open();
+    await press(p, "lookEir");
+    const m = await p.evaluate(() => {
+      const cv = document.querySelector("#view");
+      const g = cv.getContext("webgl2") || cv.getContext("webgl");
+      const W = cv.width, H = cv.height, b = new Uint8Array(W * H * 4);
+      g.readPixels(0, 0, W, H, g.RGBA, g.UNSIGNED_BYTE, b);
+      const fol = [], sky = [];
+      const step = Math.max(1, Math.floor(Math.min(W, H) / 300));
+      for (let y = 0; y < H; y += step) for (let x = 0; x < W; x += step) {
+        const i = ((H - 1 - y) * W + x) * 4, r = b[i], gg = b[i + 1], bb = b[i + 2];
+        const mx = Math.max(r, gg, bb), mn = Math.min(r, gg, bb), d = mx - mn;
+        if (mx < 26 || d / mx < 0.18) continue;
+        let h; if (mx === r) h = ((gg - bb) / d) % 6; else if (mx === gg) h = (bb - r) / d + 2; else h = (r - gg) / d + 4;
+        h = (((h * 60) % 360) + 360) % 360;
+        if (h >= 300 || h < 60) fol.push(h); else if (h >= 140 && h <= 260) sky.push(h);
+      }
+      const circ = (a) => {
+        let sx = 0, cx = 0;
+        for (const h of a) { sx += Math.sin(h * Math.PI / 180); cx += Math.cos(h * Math.PI / 180); }
+        return (Math.atan2(sx / a.length, cx / a.length) * 180 / Math.PI + 360) % 360;
+      };
+      return { fol: fol.length ? circ(fol) : null, sky: sky.length ? circ(sky) : null,
+               nf: fol.length, ns: sky.length };
+    });
+    await ctx.close();
+    const off = (a, b) => { let d = Math.abs(a - b) % 360; return d > 180 ? 360 - d : d; };
+    check("10a the foliage lands on the film's angle",
+      m.fol != null && off(m.fol, FILM.fol) <= TOL, true);
+    console.log(`        (foliage ${m.fol == null ? "none" : m.fol.toFixed(1)}, film ${FILM.fol}, n=${m.nf})`);
+    check("10b the sky lands on the film's angle",
+      m.sky != null && off(m.sky, FILM.sky) <= TOL, true);
+    console.log(`        (sky ${m.sky == null ? "none" : m.sky.toFixed(1)}, film ${FILM.sky}, n=${m.ns})`);
+    check("10c ...and the two stay apart, which is what the film IS",
+      m.fol != null && m.sky != null && ((m.sky - m.fol + 360) % 360) >= MIN_SEP, true);
+    if (m.fol != null && m.sky != null)
+      console.log(`        (separation ${((m.sky - m.fol + 360) % 360).toFixed(1)}, film ${FILM.sep})`);
+  }
+
+  check("11  every band the look declares is reachable on the reader's own slider",
+    BANDS.every((v) => Math.abs(v) <= BAND_LIMIT), true);
+  console.log(`        (largest ${Math.max(...BANDS.map(Math.abs))}, slider limit ${BAND_LIMIT})`);
 
   const liftShipped = await armShipped(true);
   const liftRecipe = await armRecipe(true);

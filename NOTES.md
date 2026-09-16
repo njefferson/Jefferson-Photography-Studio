@@ -15752,3 +15752,69 @@ not a second copy of it — the same extraction `freshBaseline` already is for t
 at-open baseline. The pieces are `grayWorldWB`, `autoExposure` and
 `oneBandFile`, and the one trap is that `applyLook` derives its exposure from
 `params.wb` AFTER the look's bias, not from the gray-world result.
+
+## Aerochrome is on the film's own angles now, 2026-09-16
+
+**The look shipped in 2.47 was measurably not Aerochrome, and the article's own
+photographs are what settled it.** Two survived into the PDF; the caption
+immediately above the second reads "Red filter with Kodak Aerochrome", so one
+frame's filter is known.
+
+**MEASURED ON THE FILM** (split populations, circular mean and spread, per
+IR-SCIENCE.md §6):
+
+- lighter filter — foliage **6.2°**, sky **204.0°**, separation **197.8°**
+- red filter — foliage **9.0°**, sky **217.1°**, separation **208.1°**
+
+**What 2.47 rendered:** foliage **325°**, sky **167°**. About 40° out in BOTH
+populations and on the MAGENTA side of red where the film is scarlet. Pink IR, at
+353° and 180°, was closer to the film than the look named after it — which had
+been reported off a photograph long before anything measured it, and was right.
+
+**THE LESSON IS THE ONE THE STANDING RULE NAMES.** Every previous round compared
+the app against the app: hue and saturation on rendered frames, band sweeps, a
+comparison sheet of our own output. All of it inside. The answer was in the film,
+and one PDF of one article settled in minutes what four rounds of tuning had not.
+
+**A GLOBAL HUE SHIFT IS RULED OUT, BY MEASUREMENT.** At +38° the foliage lands
+exactly on target and the two populations MERGE — 94–98% of the coloured frame
+into a single 30° bin. Aerochrome IS the separation. The app's `hue` control is
+not a uniform rotation either: at +20 the foliage moved +31° while the sky moved
+−7°, which is why a single number could never have served both.
+
+**WHAT SHIPS: eight band hue shifts on `LOOKS.eir.raw.hsl`**, solved on six
+frames against the film's angles, with the film's own 20° spread as a CEILING
+rather than something to minimise — that width is different plants reflecting
+infrared differently, which the article names as the point of a lighter filter.
+Hold-one-out worst error 8°, all of it the sky of one frame sitting 6° off the
+others.
+
+**Verified by substituting back**, not by re-running the solver's arithmetic:
+rendered through the real pipeline and measured like the film, foliage 2.9–5.6°
+against 6.2, sky 202.2–205.1° against 204.0, separation 197–201° against 197.8.
+Render and solve agree to within 1.7°, which is the whole reason for doing it
+that way.
+
+**THE ZEROS IN THAT ARRAY ARE LOAD-BEARING.** The first solve put bands 240 and
+280 on the ±100 clamp: these frames carry almost nothing there, so the solver was
+free to put anything in them and did — and a photograph that DOES carry blue or
+purple would have been swung 100°. A weak penalty on shift size brought them home
+to 0 and 1. **An unconstrained parameter is noise with a slider attached**, and
+it looks exactly like a fitted one in the output.
+
+**Two new checks, both seen failing first** against a bundle with the bands
+stripped back to 2.47: the two populations land on the film's angles (10a, 10b)
+and stay apart (10c). 10c looks redundant and is not — the global-hue candidate
+puts the foliage exactly on target, so a check on position alone would pass the
+one thing most obviously not the film. Check 11 asserts every declared band is
+reachable on the reader's own ±60 slider; the unregularised solve would have
+failed it at 91 and 100. Check 7 now drives the bands through the reader's own
+chips, so the equivalence claim stays real and reachability is earned rather than
+asserted.
+
+**WHAT IS STILL NOT THE FILM, AND IT IS NO LONGER HUE.** Foliage saturation and
+value already match — 0.57 at 0.80 against the film's 0.60 at 0.77. The gap is
+how much of the frame carries no colour at all: **13.8% on the film against
+28–45% on these frames**. The film's reeds and lawn hold red where ours go to
+near-white. That is bright IR-reflective ground blowing out instead of holding
+its hue — highlight roll-off and exposure, not colour. Next piece of work.
