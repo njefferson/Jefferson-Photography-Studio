@@ -34,17 +34,24 @@ const OUT = arg("out", "/tmp/claude-0/-home-user/2bd37282-d617-5a51-b357-6b20783
 // Each candidate: a name, a one-line note on what it is reaching for, and the
 // controls to touch. `set` writes a slider and fires the events the app listens
 // for; `tap` presses a button.
+// THE FOUR-STEP RECIPE, ONE STEP AT A TIME (IR-SCIENCE.md section 4c). The
+// rotation shipped bare and read pale; these are the two steps it was missing,
+// swept separately and together, plus Rob Shea's published "G Split" variant.
+// Mixer indices are row-major: 2 = red-from-blue, 3 = green-from-red,
+// 5 = green-from-blue, 6 = blue-from-red, 7 = blue-from-green, 8 = blue-from-blue.
 const CANDIDATES = [
-  { name: "0-pink-ir", note: "the swap, for reference: warm rgb 177,102,105",
+  { name: "0-pink-ir", note: "the swap, for reference — warm rgb 177,102,105",
     steps: [["tap", "#ptab-ir"], ["tap", "#lookAero"]] },
-  { name: "1-aerochrome-as-it-ships", note: "the rotation with the green row at 1.0 — warm rgb 177,131,128, a third of the colour diluted away",
+  { name: "1-rotation-bare", note: "step 2 only, which is what shipped — warm rgb 177,131,128",
     steps: [["tap", "#ptab-ir"], ["tap", "#lookEir"]] },
-  { name: "2-green-row-085", note: "the rotation with Green-output-from-red pulled to 0.85",
-    steps: [["tap", "#ptab-ir"], ["tap", "#lookEir"], ["tap", "#ptab-color"], ["mix3", "3", "0.85"]] },
-  { name: "3-green-row-070", note: "…to 0.70",
-    steps: [["tap", "#ptab-ir"], ["tap", "#lookEir"], ["tap", "#ptab-color"], ["mix3", "3", "0.70"]] },
-  { name: "4-green-row-055", note: "…to 0.55",
-    steps: [["tap", "#ptab-ir"], ["tap", "#lookEir"], ["tap", "#ptab-color"], ["mix3", "3", "0.55"]] },
+  { name: "2-rotation-plus-nir-030", note: "step 3: subtract 0.30 of the blue input from the green and blue outputs",
+    steps: [["tap", "#ptab-ir"], ["tap", "#lookEir"], ["tap", "#ptab-color"], ["mix3", "5", "-0.30"], ["mix3", "8", "-0.30"]] },
+  { name: "3-rotation-plus-hsl", note: "step 4 only: reds carry the foliage (sat 1.6), aqua sets the sky (sat 1.3, lum 0.75)",
+    steps: [["tap", "#ptab-ir"], ["tap", "#lookEir"], ["tap", "#ptab-color"], ["hsl", "0", "0,1.6,1"], ["hsl", "4", "0,1.3,0.75"]] },
+  { name: "4-rotation-nir-030-and-hsl", note: "steps 3 and 4 together — the whole recipe",
+    steps: [["tap", "#ptab-ir"], ["tap", "#lookEir"], ["tap", "#ptab-color"], ["mix3", "5", "-0.30"], ["mix3", "8", "-0.30"], ["hsl", "0", "0,1.6,1"], ["hsl", "4", "0,1.3,0.75"]] },
+  { name: "5-rob-shea-g-split", note: "a published variant: the R/B swap with green replaced by half red and half blue, which collapses the frame onto the magenta-cyan axis",
+    steps: [["tap", "#ptab-ir"], ["tap", "#lookEir"], ["tap", "#ptab-color"], ["mix", "1"], ["mix3", "3", "0.5"], ["mix3", "4", "0"], ["mix3", "5", "0.5"]] },
 ];
 
 
@@ -63,7 +70,25 @@ try {
     await p.waitForFunction(() => document.getElementById("welcome")?.hidden, null, { timeout: 300000 });
     await p.waitForTimeout(2200);
     for (const [how, sel, val] of c.steps) {
-      if (how === "mix3") {
+      if (how === "hsl") {
+        // ONE COLOUR BAND: pick the chip, then its three sliders. Bands are
+        // 0 Red, 1 Orange, 2 Yellow, 3 Green, 4 Aqua, 5 Blue, 6 Purple,
+        // 7 Magenta. Under the rotation the vegetation lands in RED (measured
+        // hue near 0) and the sky in AQUA (near 185), so those are the two the
+        // practitioner recipe reaches for: reds carry foliage saturation, aqua
+        // and blue set the sky's depth. Value is "hue,sat,lum".
+        await p.evaluate(([i, v]) => {
+          document.querySelectorAll("#hslChips .hsl-chip")[Number(i)]?.click();
+          const [h, sa, lu] = String(v).split(",");
+          for (const [id, val] of [["hslHue", h], ["hslSat", sa], ["hslLum", lu]]) {
+            const el = document.getElementById(id);
+            if (!el || val === undefined) continue;
+            el.value = val;
+            el.dispatchEvent(new Event("input", { bubbles: true }));
+            el.dispatchEvent(new Event("change", { bubbles: true }));
+          }
+        }, [sel, val]);
+      } else if (how === "mix3") {
         // ONE MIXER SLIDER BY INDEX, row-major: 0-2 red output, 3-5 green,
         // 6-8 blue. Index 3 is "Green output from red", which is the entry the
         // measurement named — the rotation sends the IR-flooded channel there

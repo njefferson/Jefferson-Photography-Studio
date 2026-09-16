@@ -364,6 +364,76 @@ solved against the *swap's* output and carrying it to a different mapping would
 be a guess wearing a measurement's clothes. Solving it needs a **two-band camera
 JPEG**, which this repository does not have.
 
+## 4c. THE CRUX IS NIR CONTAMINATION, AND A ROTATION ALONE CANNOT FIX IT
+
+**Researched 2026-09-16, after shipping the rotation bare and reporting that it
+looked worse than the swap.** It did look worse. It was also a quarter of the
+recipe, and the missing three quarters are written down by the people who do
+this for a living. Section 4b establishes WHAT the film's mapping was; this
+section is why reproducing that mapping on a converted camera is not enough.
+
+**THE FILM'S THREE LAYERS WERE SEPARATE. A CONVERTED SENSOR'S ARE NOT.**
+Aerochrome registered red, green and NIR as three independent records. A
+converted digital sensor registers **red + NIR, green + NIR and blue + NIR** —
+the infrared flood is present in every channel, because no mass-market filter
+transmits red, green and NIR while excluding the rest of the visible band. So a
+channel rotation permutes three CONTAMINATED channels. It cannot separate what
+the film separated optically, and no value of it ever will.
+
+**MEASURED ON A REAL NEF, AND THIS IS EXACTLY THAT EFFECT.** Warm population
+(the vegetation), same frame, same white balance sliders in both cases:
+
+- under the R/B swap: rgb **177, 102, 105** — saturation 0.424
+- under the bare rotation: rgb **177, 131, 128** — saturation 0.277
+
+The red is IDENTICAL. What the rotation does is lift green and blue UNDERNEATH
+the reds, because `green <- red` pours the IR-flooded channel into green and
+vegetation is exactly where infrared is highest. **The reds are not lost, they
+are diluted from below.** A session measured this and concluded the mapping was
+wrong; the mapping is right and the contamination is the thing to remove.
+
+**THE FULL RECIPE IS FOUR STEPS.**
+
+1. **A usable white balance** — custom WB on foliage in full sun at capture, or
+   gray-world in post. Section 3 is why the camera's own is not one.
+2. **The two swaps** — red/blue, then blue/green. In channel-mixer terms, first
+   `Red = 0,0,100` with `Blue = 100,0,0`; then `Blue = 0,100,0` with
+   `Green = 0,0,100`. They compose to row-major `[0,0,1, 1,0,0, 0,1,0]`, which is
+   section 4b's rotation reached from the other direction — two independent
+   sources give the same matrix.
+3. **Subtract the NIR contamination**, with NEGATIVE mixer coefficients. This is
+   the step nobody's tutorial spells out and the one Hidden Realms names as the
+   crux. Its own proposal — "-100 percent for blue" on each output — is
+   explicitly untested by its author, and taken literally it zeroes the red
+   output, which under this mapping IS the blue input. So it is a DIRECTION to
+   sweep, not a number to copy.
+4. **An HSL pass after the swaps** — reds and oranges carry the foliage
+   saturation, aqua and blue pull the sky back to a deep cyan or navy. Every
+   practitioner source ends here, and `LOOKS.aero` already does exactly this
+   shape on its JPEG side.
+
+**AND THE NUMBER THAT SAYS WHEN IT HAS BECOME A TINT IS THE SKY'S VALUE.**
+Measured across a green-row sweep on one frame: the sky sat at value 0.50-0.52
+through every candidate that still read as a look, and jumped to **0.76** on the
+two that had turned the whole frame magenta - sky included. Foliage saturation
+rose monotonically across all of them and said nothing about which was which.
+Report the sky's value beside every candidate; it is the discriminator section
+4b asked for and could not name.
+
+**Sources.** The layer structure and the yellow filter are section 4b's. This
+section's claims come from: Hidden Realms, "The crux of emulating Kodak color
+infrared" (the contamination argument and the negative-coefficient proposal,
+which that page marks untested); Kolari Vision's 550nm processing tutorial (the
+two swaps with their exact mixer values, and the hue/saturation pass on blues
+and cyans afterwards); Rob Shea Photography's colour-infrared Photoshop actions
+(three named variants — a plain R/B swap, an R/B swap with green taken from red,
+and an R/B swap with green SPLIT 50/50 between red and blue); and an Aerochrome
+Lightroom-preset guide for the finishing rule that reds and oranges carry foliage
+saturation while aqua and blue set the sky. **Rob Shea's "G Split" is worth
+testing on its own** - replacing green with the mean of red and blue collapses
+the frame toward the red-blue axis, which is the magenta/cyan axis Aerochrome
+lives on, and it is expressible in this app's mixer as `[0,0,1, 0.5,0,0.5, 1,0,0]`.
+
 ## 5. What a camera JPEG is, and why it is a different animal
 
 A camera-rendered JPEG was developed **through** the clamped custom preset, then
