@@ -683,12 +683,12 @@ the 1.9-degree hold-one-out error. A population that is a fiftieth of a per cent
 of the frame is not a measurement. **`anchor-sweep` prints each population's
 share for exactly this reason.**
 
-### 4c-vi. THE GRAIN IS THE SIGNAL'S OWN, AND TWO REMEDIES ARE RULED OUT
+### 4c-vi. THE GRAIN IS THE SIGNAL'S OWN, AND ONE REMEDY IS RULED OUT
 
-Measured 2026-09-16 on two of the owner's frames, under the six-frame matrix, at
-the look's real strength. Chroma spread OVER LEVEL in the sky — a smooth region,
-so its spread is noise rather than subject — never absolute spread, for the
-reason 4c-i records.
+Measured 2026-09-16 on two frames from the test set, under the six-frame matrix,
+at the look's real strength, and RENDERED — every figure here sits on a picture
+of the pixels it was taken from. Measured over LEVEL throughout, never absolute
+spread, for the reason 4c-i records.
 
 **SUBTRACTING NEAR-INFRARED BEFORE THE MATRIX CANNOT HELP, ALGEBRAICALLY.** A
 linear subtraction composes with the matrix: "subtract a times blue, then apply
@@ -697,29 +697,80 @@ space. The earlier `-0.30` candidate (4c-ii) looked better than the bare rotatio
 because it changed the COLOUR; its grain was never measured and no claim about it
 was made.
 
-**RAISING DENOISE DOES NOTHING TO THE RATIO.** `src/raw/denoise.ts` runs on the
-decoded data before the edit chain, so it cleans what reaches the mixer — the
-right place to attack, and it still does not work:
+**FIRST, THE MEASUREMENT THAT PRODUCED THE REST OF THIS SECTION WAS WRONG, AND
+THE PICTURES ARE WHAT CAUGHT IT.** The numbers below replace an earlier set; the
+paragraphs they overturned are kept as 4c-vii because the way they failed is
+worth more than the numbers were.
 
-- NIR_1480: **0.498** at the opening denoise of 0.51, **0.504** at 0.80
-- NIR_1534: **0.677** at the opening denoise of 0.60, **0.685** at 0.80
+Two instruments failed in the same direction — both counted the photograph and
+called it noise.
 
-It lowers absolute chroma and absolute noise together (74.4 to 70.9, sd 37.1 to
-35.7), so the ratio is untouched. **The look does not want a denoise floor.**
+- **The region finder could not tell cyan sky from cyan foliage.** It scored
+  blocks by hue, and under this matrix the foliage renders cyan too, so on
+  NIR_1534 it chose a hillside with complete confidence and the sheet went out
+  labelled "sky crop". Flatness is the right test twice over: a smooth block is
+  what sky IS, and a smooth block is where speckle is visible rather than being
+  mistaken for detail. Blocks are now scored by luminance spread over level,
+  lowest wins, with a brightness floor so a black shadow cannot win by being
+  empty.
+- **A chroma spread over a block is mostly the subject.** A branch against sky
+  moves chroma far more than any speckle does, which is how a canopy scores
+  "grainier" than a smooth field while looking like a tree. Grain is HIGH
+  FREQUENCY: measure each pixel's chroma against the mean of its 5x5
+  neighbourhood and count only the residual.
+- **But so is an edge, and that was the second failure.** A box mean at a hard
+  boundary leaves a large residual, so the first high-pass version scored a
+  planted magenta/cyan edge with no noise in it at all at **7.4%**. The MEDIAN of
+  the residuals is what is reported now — edge pixels are a small minority while
+  speckle is on every pixel, so the median sees the speckle and the edge cannot
+  move it. Planted cases: flat reads 0.00, a noiseless hard edge reads 0.00, the
+  noise sigma doubles and the reading doubles, and an edge with noise reads the
+  same as the noise alone. The test failed on the edge case before it passed,
+  which is the only reason the median is there.
 
-**AND THE CONTROL ARM OVERTURNS THE FRAMING THIS STARTED WITH.** The bare swap at
-matched denoise is not cleaner than the matrix:
+Two figures per arm, both over exactly the pixels in the panel that carries them:
+**colour** is mean chroma magnitude, and **speckle** is that median high-pass
+chroma residual as a percentage of luminance level.
 
-- NIR_1480: swap **0.614**, matrix **0.498** — the SWAP is worse
-- NIR_1534: swap **0.631**, matrix **0.677** — close
+**RAISING DENOISE WORKS, AND THE EARLIER READING THAT IT DID NOTHING WAS THE
+INSTRUMENT.** `src/raw/denoise.ts` runs on the decoded data before the edit
+chain, so it cleans what reaches the mixer — the right place to attack, and it
+does in fact attack it. On NIR_1480's flattest block (luma spread over level
+0.089, so genuinely smooth):
 
-So the matrix does not manufacture grain. What made it look grainier in 4c-i's
-picture was AMPLITUDE: it roughly doubles sky chroma (74 against 40) at the same
-noise-to-signal ratio, so the absolute noise doubles with it, and absolute noise
-is what the eye sees. **The colour and the grain come out of the same 1-3%
-residual (4c-iv) and scale together.** Describing it as "the matrix grains" was
-imprecise, and the control arm is what caught it — without the swap-at-matched-
-denoise reading, every remedy would have been aimed at the wrong thing.
+- matrix at the opening denoise — colour **31.4**, speckle **6.04%**
+- matrix at denoise 0.80 — colour **26.9**, speckle **3.61%**
+
+**A 40% cut in speckle for 14% of the colour**, and it is visible in the sky of
+the full frame rather than only in the number. Per unit of colour it moves
+**0.192 to 0.134**. NIR_1534 moves the same way, 14.73% to 11.10%.
+
+**THE SWAP IS LOWER IN BOTH, AND THE RATIO IS WHAT MATTERS.** At matched denoise
+the bare swap carries less speckle AND less colour:
+
+- NIR_1480 — swap **4.03%** speckle at colour **20.5**, against matrix **6.04%**
+  at colour **31.4**
+- NIR_1534 — swap **9.32%** at colour **33.6**, against matrix **14.73%** at
+  colour **60.0**
+
+Per unit of colour those are **0.197 against 0.192** on NIR_1480 and **0.277
+against 0.246** on NIR_1534 — the matrix is level with the swap on one frame and
+slightly BETTER on the other. Denoised to 0.80 the two land on the same figure to
+three decimals on NIR_1480, **0.134 each**. **So the ratio is a property of the
+data and not of the mapping**, which is what this section always claimed; the
+earlier numbers simply could not support it. What the matrix does is raise
+amplitude — roughly double the colour, and the absolute noise doubles with it,
+and absolute noise is what the eye sees. **The colour and the grain come out of
+the same 1-3% residual (4c-iv) and scale together.**
+
+**AND NIR_1534 CANNOT SETTLE ANYTHING ABOUT GRAIN.** Its flattest block scores
+0.277 luma spread over level against NIR_1480's 0.089 — there is no smooth region
+in that frame, and the canopy the finder settles on is mostly real detail. Its
+speckle figures are comparable ACROSS ARMS, because every arm is measured on the
+same pixels, and are not comparable to another photograph's.
+
+**SUBTRACTING NEAR-INFRARED BEFORE THE MATRIX STILL CANNOT HELP.** That argument
+is algebraic and no measurement touches it; it is above and it stands.
 
 **WHAT IS LEFT.** Every lever tried so far is a per-pixel one, and a per-pixel
 operation cannot separate colour from its own noise when they arrive in the same
@@ -727,6 +778,32 @@ numbers. The one axis untried is SPATIAL: chroma smoothing after the mixer — b
 colour, keep luminance sharp, the reason JPEG subsamples chroma. Noise is
 high-frequency and the wanted colour largely is not, which is the only difference
 between them that remains. Nothing in this pipeline does it today.
+
+### 4c-vii. THE OVERTURNED NUMBERS, KEPT ON PURPOSE
+
+4c-vi originally read that raising denoise did nothing to the ratio (NIR_1480
+0.498 at the opening denoise against 0.504 at 0.80) and that the bare swap was
+WORSE than the matrix on one frame (0.614 against 0.498). Both are wrong, and
+both came from the same mistake: a chroma spread taken over a hue-selected block
+is dominated by the photograph in it, so the readings moved with the subject and
+barely with the noise.
+
+**The conclusion drawn from them was nonetheless correct**, which is the part
+worth keeping. "The matrix does not manufacture grain — it is amplitude at the
+same ratio" survived the correction intact and is now supported by figures that
+can actually carry it. A right answer resting on a broken measurement is not a
+right answer yet, and nothing distinguishes the two from inside the session that
+produced them.
+
+**What distinguished them was rendering the pictures.** The claim was about how
+photographs look and it was made out of a single number; the ratios had been
+written up and the images declined on the grounds that 0.498 against 0.504 is not
+something a picture shows. The first sheet rendered showed a denoise arm visibly
+smoother than the arm the number called identical, and a crop labelled sky that
+was plainly a hillside. **Neither error was reachable from the numbers**, and
+both were obvious in the first second of looking.
+
+---
 
 ## 5. What a camera JPEG is, and why it is a different animal
 
