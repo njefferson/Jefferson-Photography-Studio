@@ -1129,6 +1129,35 @@ interface Look {
    *  applyLook resets the mixer to MIX3_DEFAULT when a look has none, so every
    *  look that predates this field renders exactly as it did before. */
   mix3?: number[];
+  /** A FLOOR ON DENOISE, NOT A SETTING -- `params.denoise = max(measured,
+   *  this)`. Absent on every look but `eir`, which changes nothing for them.
+   *
+   *  It is a floor because denoise is MEASURED PER PHOTOGRAPH
+   *  (`estimateDenoise`, and `establishFreshEdit` normalises it to what the
+   *  slider can hold). An absolute value would LOWER denoise on a frame that
+   *  measured 0.9, which is the opposite of what a look asking for cleanup
+   *  wants; a floor keeps the per-file measurement wherever it is already
+   *  stronger. On both frames this was chosen from, the measurement was 0.51
+   *  and 0.60, so floor and absolute agree on everything that has been seen.
+   *
+   *  WHY A LOOK MAY TOUCH A PER-SHOT CORRECTION AT ALL. Denoise is corrective
+   *  and sits with white balance on the excluded side of the SavedLook line --
+   *  but the colour and the grain in an infrared frame come out of the SAME
+   *  1-3% residual between the channels and scale together (IR-SCIENCE.md
+   *  section 4c-vi), so a look that doubles the colour doubles the speckle
+   *  with it. The cleanup belongs to the look because the noise does.
+   *
+   *  What the result must satisfy: `applyLook` writes it onto
+   *  `params.denoise` and records it in `lookDenoise`, so leaving the look
+   *  restores `measuredDenoise` -- and a value the reader moved by hand is
+   *  never overwritten. `batchParamsFor` applies the same floor, or a .zip
+   *  renders grainier than the screen under one name. `makeThumb` does NOT:
+   *  a 260px tile is not denoised at all, by decision.
+   *
+   *  NOT ON `SavedLook`, deliberately. A saved look drops onto any photograph
+   *  and carries no measurement to floor against, so it would put 0.8 onto a
+   *  clean frame that measured 0.3. */
+  denoise?: number;
   glow?: number;
   /** Per-kind, because raw and camera-rendered files arrive in DIFFERENT
    *  STATES and one cast correction cannot serve both. A raw opens on the
@@ -1164,29 +1193,56 @@ const LOOKS: Record<string, Look> = {
   aero: { swapRB: true, toggleSwap: true, hue: 0, raw: { sat: 3.0, contrast: 1.15 },
           jpeg: { sat: 1.35, contrast: 1.12,
                   hsl: [0,1,1, 0,1,1, 0,1,1, 0,1,1, 0,1,1, -45,1,1, 20,1,1, 60,1,1] } },
-  // AND THE MAPPING THE FILM ACTUALLY USED, which the look above cannot
-  // express. Aerochrome's three layers were sensitive to GREEN, RED and
-  // INFRARED, with a Wratten 12 yellow filter absorbing blue entirely because
-  // all three were also blue-sensitive -- so the mapping is a three-way
-  // rotation, red<-infrared, green<-visible red, blue<-visible green, which is
-  // row-major [0,0,1, 1,0,0, 0,1,0]. A two-channel exchange is a different
-  // operation and no amount of tuning turns one into the other
-  // (IR-SCIENCE.md section 4b carries the sources).
+  // AEROCHROME, AS IT WAS CHOSEN OFF RENDERED SHEETS RATHER THAN ARGUED FOR.
   //
-  // NO `swapRB`, DELIBERATELY. The mixer runs right after the swap, so leaving
-  // the swap on would compose the two into a G<->B exchange -- measured as the
-  // fourth candidate of the look sheet and the worst of them. Measured on a
-  // real NEF as this look ships: foliage saturation 0.33 at value 0.69, sky
-  // 0.50 at value 0.51, against the swap's foliage 0.51 and sky 0.49. The
-  // number that decides it is not in that list and is not measured anywhere in
-  // this repository: under the rotation the fenceposts, the wire, the pole and
-  // the trunk stay BROWN, and under the swap they go pink with the canopy,
-  // which is the film's own pass/fail test (IR-SCIENCE.md section 4b-i).
+  // The film's three layers were sensitive to GREEN, RED and INFRARED, with a
+  // Wratten 12 yellow filter absorbing blue entirely because all three were
+  // also blue-sensitive, so the mapping the film performed is a three-way
+  // rotation -- red<-infrared, green<-visible red, blue<-visible green, which
+  // is row-major [0,0,1, 1,0,0, 0,1,0] (IR-SCIENCE.md section 4b). That
+  // rotation is what this look SHIPPED, and it is still on the `Aerochrome`
+  // chip in MIX3_PRESETS for anyone who wants the film's own mapping bare.
   //
-  // NO `hsl` ON THE JPEG SIDE either. The eight-band correction above was
-  // solved against the SWAP's output; carrying it to a different mapping would
-  // be a guess wearing a measurement's clothes.
-  eir: { swapRB: false, hue: 0, mix3: [0, 0, 1, 1, 0, 0, 0, 1, 0],
+  // WHAT SHIPS HERE IS NOT THAT ROTATION. It is the matrix solved against
+  // anchors measured on SIX of the owner's frames -- hold-one-out worst error
+  // 1.9deg -- and the anchors were measured POST-WHITE-BALANCE AND POST-SWAP,
+  // so the matrix is the second half of a two-step mapping whose first step is
+  // the R<->B exchange. That is why `swapRB` is TRUE here, where the bare
+  // rotation needed it false: with the rotation the two compose into a G<->B
+  // exchange and ruin each other, and with this matrix the swap is the
+  // operation it was solved on top of. Turn the swap off and the nine numbers
+  // below mean nothing -- they were never solved for that input.
+  //
+  // CHOSEN BY LOOKING, which is the part that matters. Four arms were rendered
+  // on two frames, full-frame and at 1:1, and picked from the pictures: this
+  // matrix against the bare swap, each at the opening denoise and at 0.80. The
+  // swap is quieter only because it is paler -- per unit of colour the two are
+  // level (0.192 against 0.197 on one frame, 0.246 against 0.277 on the other),
+  // and denoised they land on the same figure to three decimals. IR-SCIENCE.md
+  // section 4c-vi carries the numbers and section 4c-vii carries the earlier,
+  // wrong ones.
+  //
+  // THE NINE NUMBERS ARE SNAPPED TO THE MIXER'S OWN 0.01 STEP, not written at
+  // the solve's full precision (0.991, -0.064, 0.072, -1.438, 1.373, 1.023,
+  // -0.473, 0.811, 0.653). The sheets were rendered by driving those sliders,
+  // which snap on assignment, so the snapped numbers are the ones that made the
+  // picture that was approved -- and `updateMix3UI` round-trips them. This file
+  // already carries two other notes saying a full-precision value written to a
+  // stepped control does not come back; this is the third.
+  //
+  // `denoise: 0.8` IS A FLOOR (see Look.denoise). The colour and the grain come
+  // out of the same residual, so the mapping that doubles the colour doubles
+  // the speckle with it; measured, 0.80 cuts the speckle 40% for 14% of the
+  // colour, and the sky of the full frame is where you see it.
+  //
+  // NO `toggleSwap`: a repeat press would flip the swap this matrix was solved
+  // on top of. NO `hsl` ON THE JPEG SIDE either -- the eight-band correction
+  // above was solved against the SWAP's output with no mixer after it, and
+  // carrying it to a different mapping would be a guess wearing a
+  // measurement's clothes. The camera-JPEG path under this look is still
+  // unsolved and needs a two-band camera JPEG to solve it on.
+  eir: { swapRB: true, hue: 0, denoise: 0.8,
+         mix3: [0.99, -0.06, 0.07, -1.44, 1.37, 1.02, -0.47, 0.81, 0.65],
          raw: { sat: 3.0, contrast: 1.15 }, jpeg: { sat: 1.35, contrast: 1.12 } },
   red: { swapRB: true, toggleSwap: true, hue: 0, wbBias: [0.78, 1.02, 1.35], raw: { sat: 1.8, contrast: 1.4 }, jpeg: { sat: 1.3, contrast: 1.2 } },
   goldie: { swapRB: true, toggleSwap: true, hue: 0, wbBias: [0.78, 1.22, 1.4], raw: { sat: 1.7, contrast: 1.35 }, jpeg: { sat: 1.2, contrast: 1.2 } },
@@ -1212,6 +1268,22 @@ let lookBias: [number, number, number] = [1, 1, 1];
  *  Recorded here rather than inferred, and carried in the snapshot beside
  *  lookBias, which exists for the same reason. */
 let lookWb: [number, number, number] | null = null;
+
+/** THIS PHOTOGRAPH'S OWN MEASURED DENOISE, snapped to the slider's step, taken
+ *  by `establishFreshEdit` BEFORE the session look is applied -- so a look
+ *  carrying a denoise floor has something to be a floor OVER, and leaving that
+ *  look has something to go back to. Null before any photograph is open.
+ *
+ *  It has to be the post-`syncFromUI` value, not the raw `estimateDenoise`
+ *  return: the slider has a 0.01 step, and the same rounding that once left the
+ *  lift solving against a measurement while a toggle solved against its rounded
+ *  copy would leave the restore below landing one step off where the photo
+ *  opened. */
+let measuredDenoise: number | null = null;
+/** THE DENOISE applyLook ITSELF WROTE, for the same reason `lookWb` exists: a
+ *  later call has to tell its own work from a value the reader dragged. Null
+ *  when the look on the frame carries no floor. */
+let lookDenoise: number | null = null;
 
 /** Whether the photo now open has all its colour in one band, and WHICH photo
  *  that was measured on. See applyLook. */
@@ -1367,6 +1439,39 @@ function applyLook(name: keyof typeof LOOKS) {
   // the identity, which is what this line did unconditionally before -- so this
   // is a widening, not a change: nothing that rendered one way renders another.
   params.mix3 = look.mix3 ? [...look.mix3] : [...MIX3_DEFAULT];
+  // AND A LOOK MAY RAISE THE DENOISE FLOOR, which is the one per-shot
+  // correction a look is allowed to touch -- because in an infrared frame the
+  // colour and the grain come out of the same 1-3% residual between the
+  // channels and scale together, so the mapping that doubles the colour doubles
+  // the speckle with it (IR-SCIENCE.md section 4c-vi). Every other corrective
+  // (balance, exposure, recovery) stays the photograph's own.
+  //
+  // A FLOOR, never a setting: `max(measured, look)`. An absolute would lower
+  // denoise on a frame that measured higher than the look asks for.
+  //
+  // AND IT IS UNDONE ON THE WAY OUT. `lookDenoise` is what THIS function last
+  // wrote, the same device `lookWb` is, so leaving a look that carries a floor
+  // for one that does not puts the photograph's own measurement back. A value
+  // the reader dragged is never overwritten in either direction.
+  //
+  // HALF A STEP, not `step()`. The denoise slider's step IS 0.01, so the
+  // 0.01 tolerance the balance test uses cannot tell one deliberate nudge from
+  // the float noise it exists to absorb -- and being wrong here means silently
+  // discarding a value somebody set by hand.
+  {
+    const same = (a: number, b: number) => Math.abs(a - b) < 0.005;
+    const ours = lookDenoise != null && same(params.denoise, lookDenoise);
+    if (look.denoise != null) {
+      const fresh = measuredDenoise == null || same(params.denoise, measuredDenoise);
+      if (ours || fresh) {
+        params.denoise = Math.max(measuredDenoise ?? params.denoise, look.denoise);
+        lookDenoise = params.denoise;
+      }
+    } else {
+      if (ours && measuredDenoise != null) params.denoise = measuredDenoise;
+      lookDenoise = null;
+    }
+  }
   // A look replaces the whole creative state, including everything the lift
   // wrote — so re-solve against the look that is now on the frame. This is what
   // makes Aerochrome look like Aerochrome on a frame with no sky in it without
@@ -1408,10 +1513,15 @@ function updateLookUI() {
       sub.innerHTML = `<span class="seg${normOn}">norm</span><span class="seg${swapOn}">R⇄B</span>`;
     } else if (key === "eir") {
       // WHY THIS ONE HAS NO TOGGLE, said on the button rather than in the Help.
-      // Every other colour look here is the R<->B swap with different numbers;
-      // this one is a three-channel rotation and pressing it again would stack
-      // the two. Text, never colour alone.
-      sub.textContent = "rotate";
+      // Every other colour look here is the R<->B swap with different numbers.
+      // This one is the swap AND a nine-number mixer solved on top of it, so
+      // the swap is not a choice inside this look -- flipping it would leave
+      // the matrix acting on an input it was never solved for. Text, never
+      // colour alone.
+      //
+      // The label said "rotate" while the look carried the film's bare
+      // three-channel rotation. It no longer does.
+      sub.textContent = "film";
     } else if (key === "hie") {
       sub.textContent = "glow";
     } else {
@@ -1461,7 +1571,18 @@ document.getElementById("lookForceBalance")?.addEventListener("click", () => {
 // the look highlight (activeLook) and the WB bias a look baked in (lookBias),
 // so undo/load restore exactly what was on screen, look button and all.
 // (Rotation and zoom are view state, not part of the edit, so they stay put.)
-type Snapshot = { params: EditParams; activeLook: string | null; lookBias: [number, number, number]; lookWb?: [number, number, number] | null };
+type Snapshot = { params: EditParams; activeLook: string | null; lookBias: [number, number, number]; lookWb?: [number, number, number] | null;
+  // THE TWO DENOISE FACTS, HERE FOR THE REASON `lookWb` IS. A look may raise a
+  // floor over the photograph's own measurement, and undoing it, or coming back
+  // to a photo that is still in the session, has to hand the right number back.
+  //
+  // `restoreLiveEdit` is the path that needs it: returning to a photo already
+  // open restores its live edit WITHOUT running `establishFreshEdit`, so
+  // `measuredDenoise` would still hold whichever frame was last opened fresh --
+  // and leaving Aerochrome would then restore a different photograph's number.
+  // Exactly the shape of the five-places rule in CLAUDE.md, with the live-edit
+  // record as the sixth place.
+  measuredDenoise?: number | null; lookDenoise?: number | null };
 
 function cloneParams(p: EditParams): EditParams {
   return {
@@ -1541,7 +1662,8 @@ function snapSig(s: Snapshot): string {
 }
 
 function snapshot(): Snapshot {
-  return { params: cloneParams(params), activeLook, lookBias: [...lookBias] as [number, number, number], lookWb: lookWb ? [...lookWb] as [number, number, number] : null };
+  return { params: cloneParams(params), activeLook, lookBias: [...lookBias] as [number, number, number], lookWb: lookWb ? [...lookWb] as [number, number, number] : null,
+           measuredDenoise, lookDenoise };
 }
 
 /** Restore a snapshot into the live editor (in place — `params` keeps identity)
@@ -1609,6 +1731,14 @@ function applySnapshot(s: Snapshot) {
   activeLook = s.activeLook ?? null;
   lookBias = (s.lookBias ? [...s.lookBias] : [1, 1, 1]) as [number, number, number];
   lookWb = s.lookWb ? [...s.lookWb] as [number, number, number] : null;
+  // ABSENT IS NOT THE SAME AS NULL for the measurement. A stored edit written by
+  // a build before this field existed carries neither, and the restore path runs
+  // `establishFreshEdit` first -- so the live value is this photograph's own and
+  // is the better answer than nothing. The look's floor does default to null: a
+  // snapshot that does not name one was taken when none was in force, and the
+  // conservative reading of an older one is that a denoise on screen stays put.
+  if (s.measuredDenoise != null) measuredDenoise = s.measuredDenoise;
+  lookDenoise = s.lookDenoise ?? null;
   if (selectedMask >= params.masks.length) selectedMask = params.masks.length - 1;
   syncToUI();
   updateLookUI();
@@ -7801,6 +7931,14 @@ function establishFreshEdit() {
   // full-precision value written to a stepped control does not come back.
   syncToUI();
   syncFromUI();
+  // THE PHOTOGRAPH'S OWN DENOISE, taken here and not two lines earlier. A look
+  // carrying a floor needs something to floor OVER and something to hand back
+  // when it is left, and it has to be the SNAPPED value the slider holds --
+  // `estimateDenoise` returns full precision and the round trip above is what
+  // the reader can actually see. Set before the session look is applied below,
+  // which is the whole point of its position.
+  measuredDenoise = params.denoise;
+  lookDenoise = null;
   // Part of the opened baseline, so it runs BEFORE origParams and the Reset
   // snapshot below are taken: Hold: Original and Reset both mean "the photo as
   // it opened", and this is now part of how it opened. Visible on the Tone and
@@ -11856,6 +11994,10 @@ function neutralLook(): SavedLook {
 function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["lut"] = null): EditParams {
   let wb = grayWorldWB(img);
   let look: SavedLook;
+  /** The denoise floor the chosen grade asks for, or null. Only a BUILT-IN look
+   *  can carry one; a saved look drops onto any photograph and has no
+   *  measurement to floor against. */
+  let dnFloor: number | null = null;
   if (grade.kind === "builtin") {
     // Resolve exactly like pressing the look button on this photo: strength
     // by source kind, WB bias multiplied onto the photo's own auto WB.
@@ -11883,13 +12025,20 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["l
     look = { ...neutralLook(), swapRB: l.swapRB, hue: l.hue, sat: strength.sat, contrast: strength.contrast, tint: l.tint ?? [1, 1, 1], glow: l.glow ?? 0,
              hsl: lhsl && lhsl.length === 24 ? [...lhsl] : hslDefault(),
              mix3: l.mix3 ? [...l.mix3] : [...MIX3_DEFAULT] };
+    // AND ITS DENOISE FLOOR, for the same reason the two lines above carry
+    // `hsl` and `mix3`: what the screen renders under a name and what a .zip
+    // renders under that name have to be one picture. `SavedLook` has no
+    // denoise field on purpose (see Look.denoise), so this rides beside the
+    // look rather than inside it.
+    dnFloor = l.denoise ?? null;
   } else {
     look = grade.kind === "look" ? grade.look : neutralLook();
   }
   const p: EditParams = {
     wb,
     exposure: autoExposure(img, wb),
-    denoise: estimateDenoise(img),
+    // THE SAME FLOOR applyLook APPLIES, over this photograph's own measurement.
+    denoise: Math.max(estimateDenoise(img), dnFloor ?? 0),
     // THE SAME AUTOMATICS AN OPEN APPLIES. Highlight recovery was missing here
     // and nowhere else — a single open sets it, and so does the strip
     // thumbnail; batch was the only path that did not, so a frame with real

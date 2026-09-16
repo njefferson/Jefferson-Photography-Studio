@@ -305,6 +305,12 @@ wavelength classes and the 2000K limit have not.
 
 ### 4b-i. THE APP SHIPS BOTH MAPPINGS NOW, UNDER HONEST NAMES
 
+> **SUPERSEDED IN PART, later the same day — see 4b-ii.** What `eir` carries is
+> no longer the bare rotation described below, and its swap is no longer off.
+> The rotation itself, the names, and the mixer-chip correction all still stand,
+> and the rotation is still on the `Aerochrome` chip. Kept rather than rewritten
+> because the measurements below are what a later choice was made against.
+
 Added 2026-09-16, the same day the research landed. **Nothing that already
 rendered one way renders another** — the change is two names and one new look.
 
@@ -363,6 +369,41 @@ the mean goes from roughly 40/220/0 to a neutral 105/110/100 and the hues spread
 solved against the *swap's* output and carrying it to a different mapping would
 be a guess wearing a measurement's clothes. Solving it needs a **two-band camera
 JPEG**, which this repository does not have.
+
+### 4b-ii. AND WHAT THE BUTTON ACTUALLY SHIPS, CHOSEN BY LOOKING
+
+Same day, after 4c-vi. The bare rotation of 4b-i is the film's mapping and is
+still on the `Aerochrome` mixer chip; it is not what the look button does.
+
+**`LOOKS.eir` carries the swap AND a solved nine-number mixer on top of it:**
+
+- `swapRB: true` — the reverse of 4b-i, and not a reversal of its argument. 4b-i
+  is about the BARE ROTATION, which composes with a swap into a G⇄B exchange.
+  This matrix was solved against anchors measured POST-WHITE-BALANCE AND
+  POST-SWAP, so the swap is the first half of the mapping it completes. Turn the
+  swap off under these nine numbers and they act on an input they were never
+  solved for.
+- `mix3: [0.99, -0.06, 0.07, -1.44, 1.37, 1.02, -0.47, 0.81, 0.65]` — solved
+  against anchors from SIX frames, hold-one-out worst error 1.9° (4c-v).
+- `denoise: 0.8` — a floor over the photograph's own measurement, for the reason
+  4c-vi gives: the colour and the grain come out of the same residual and rise
+  together, so the mapping that doubles the colour doubles the speckle with it.
+
+**SNAPPED TO THE MIXER'S 0.01 STEP.** The solve gave 0.991, -0.064, 0.072,
+-1.438, 1.373, 1.023, -0.473, 0.811, 0.653, and the sheets were rendered by
+DRIVING THE SLIDERS, which snap on assignment. The snapped numbers are the ones
+that made the approved picture; the full-precision ones would be a rendering
+nobody has seen.
+
+**AND THE BUTTON IS NOT PIXEL-FOR-PIXEL THE SHEET.** With Restore depth off the
+two are byte-identical — canvas hash `808ed2ea` on `NIR_0063.dng`. With it on
+they differ, because `applyLook` re-solves the lift against the look now on the
+frame and writing numbers into mixer sliders is not pressing a look, so the
+sheets carry a lift solved for Pink IR and the button carries one solved for this
+matrix. Both renderings were sent rather than described.
+`tools/aerochrome-walk.mjs` asserts the identity one way and the difference the
+other: a build where the lift-on renders MATCHED would be one where the re-solve
+had stopped happening.
 
 ## 4c. THE CRUX IS NIR CONTAMINATION, AND A ROTATION ALONE CANNOT FIX IT
 
