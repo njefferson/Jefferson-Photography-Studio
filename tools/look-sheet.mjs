@@ -34,41 +34,25 @@ const OUT = arg("out", "/tmp/claude-0/-home-user/2bd37282-d617-5a51-b357-6b20783
 // Each candidate: a name, a one-line note on what it is reaching for, and the
 // controls to touch. `set` writes a slider and fires the events the app listens
 // for; `tap` presses a button.
-// SOLVED, NOT SWEPT. The matrix in candidate 2 is the solution of three
-// measured anchors against stated targets, not a value somebody liked the look
-// of. Measured at the point the mixer runs, on this frame: foliage
-// (0.3272, 0.2401, 0.2407), sky (0.2126, 0.2677, 0.2621), neutral
-// (0.3414, 0.3477, 0.3470).
+// THREE ROUTES SIDE BY SIDE, one of which is not a matrix at all.
 //
-// THE SOLVE'S OWN FINDING IS THAT ALL THREE CANNOT BE HIT. Those anchors are
-// nearly coplanar -- green and blue agree to 0.6 per cent in every population,
-// which is the NIR contamination as a number -- so the exact three-anchor matrix
-// needs coefficients up to 22.65 against a mixer that clamps at 2. Two anchors
-// are therefore the most a 3x3 can carry, and foliage+neutral is the pairing
-// that stays in range (1.39) without putting a purple cast on rock and bark,
-// which is what foliage+sky does. The sky lands at 156 by consequence and ONE
-// band shift of +44 degrees carries it to cyan 200.
+// LifePixel's published Aerochrome tutorial does NOT rotate channels: levels and
+// contrast, then the plain red/blue swap, then two hue-band moves — the cyan
+// band pushed toward blue for the sky, the red band pushed the other way into
+// Aerochrome red for the foliage. No negative coefficients anywhere, so none of
+// the chroma grain the solved matrix pays for (IR-SCIENCE.md section 4c-i).
 //
-// Verified before it was rendered: predicted foliage 335 / sky 156 / neutral
-// unchanged, measured 332 / 158 / saturation 0.05 from 0.06. A model that
-// predicts the render to three degrees.
-//
-// TWO THINGS THE FIRST SOLVE GOT WRONG, BOTH FOUND BY MEASURING RATHER THAN
-// REASONING. The band shift was solved at saturation 1 and the look runs at 3.0,
-// where the sky lands 8 degrees further round: it is 36, not 44. And a norm
-// penalty was expected to cut the chroma grain in the sky, on the argument that
-// smaller coefficients amplify less noise. Measured at the look's real strength,
-// sky chroma spread over level went from 0.24 at lambda 1e-5 to 0.38 at 1e-3 —
-// the penalty shrinks the wanted chroma faster than the noise, so it makes the
-// grain RELATIVELY worse. The unpenalised solve is the better one and the grain
-// wants a different lever entirely.
+// The shifts below are measured, not chosen: Pink IR puts this frame's foliage
+// near hue 357 and its sky near 175, and the targets are crimson 335 and blue
+// 220.
 const CANDIDATES = [
-  { name: "0-pink-ir", note: "the swap, for reference",
+  { name: "0-pink-ir", note: "the swap alone, which is the base LifePixel starts from",
     steps: [["tap", "#ptab-ir"], ["tap", "#lookAero"]] },
-  { name: "1-aerochrome-as-it-ships", note: "the bare rotation, which is what is in the app now",
-    steps: [["tap", "#ptab-ir"], ["tap", "#lookEir"]] },
-  { name: "2-solved", note: "the solved matrix over the swap, plus the 36-degree band shift solved at the look\u0027s real strength",
-    steps: [["tap", "#ptab-ir"], ["tap", "#lookAero"], ["tap", "#ptab-color"], ["mix3", "0", "1.000"], ["mix3", "1", "-0.006"], ["mix3", "2", "0.006"], ["mix3", "3", "-1.387"], ["mix3", "4", "1.199"], ["mix3", "5", "1.166"], ["mix3", "6", "-0.407"], ["mix3", "7", "0.707"], ["mix3", "8", "0.692"],
+  { name: "1-lifepixel-two-band-shifts", note: "the swap plus two hue moves: red band -22 toward crimson, aqua band +45 toward blue. No matrix, no grain.",
+    steps: [["tap", "#ptab-ir"], ["tap", "#lookAero"], ["tap", "#ptab-color"],
+            ["hsl", "0", "-22,1,1"], ["hsl", "4", "45,1,1"]] },
+  { name: "2-solved-matrix", note: "the solved two-anchor matrix plus its 36-degree band shift, for comparison",
+    steps: [["tap", "#ptab-ir"], ["tap", "#lookAero"], ["tap", "#ptab-color"], ["mix3", "0", "0.998"], ["mix3", "1", "-0.005"], ["mix3", "2", "0.007"], ["mix3", "3", "-1.382"], ["mix3", "4", "1.196"], ["mix3", "5", "1.163"], ["mix3", "6", "-0.405"], ["mix3", "7", "0.706"], ["mix3", "8", "0.691"],
             ["hsl", "3", "36,1,1"], ["hsl", "4", "36,1,1"]] },
 ];
 
