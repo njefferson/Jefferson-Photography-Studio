@@ -35,17 +35,16 @@ const OUT = arg("out", "/tmp/claude-0/-home-user/2bd37282-d617-5a51-b357-6b20783
 // controls to touch. `set` writes a slider and fires the events the app listens
 // for; `tap` presses a button.
 const CANDIDATES = [
-  { name: "0-as-it-ships", note: "Aerochrome exactly as it is today — the baseline every other frame is judged against",
+  { name: "0-aerochrome-button-as-is", note: "the Aerochrome look button exactly as it ships: the R/B swap, nothing else",
     steps: [["tap", "#ptab-ir"], ["tap", "#lookAero"]] },
-  { name: "1-value-from-the-look", note: "the red taken DOWN in brightness, which is where the film's crimson lives",
-    steps: [["tap", "#ptab-ir"], ["tap", "#lookAero"], ["tap", "#ptab-color"], ["set", "#skyLum", "0.72"]] },
-  { name: "2-saturation-only", note: "the band pushed to its ceiling and nothing else — what the slider alone can reach",
-    steps: [["tap", "#ptab-ir"], ["tap", "#lookAero"], ["tap", "#ptab-color"], ["set", "#skySat", "2"]] },
-  { name: "3-both", note: "saturation up and value down together, since the two are not independent",
-    steps: [["tap", "#ptab-ir"], ["tap", "#lookAero"], ["tap", "#ptab-color"], ["set", "#skySat", "2"], ["set", "#skyLum", "0.72"]] },
-  { name: "4-contrast-instead", note: "depth from global contrast rather than from the band — cheaper, and it moves the sky too",
-    steps: [["tap", "#ptab-ir"], ["tap", "#lookAero"], ["tap", "#ptab-color"], ["set", "#con", "1.45"]] },
+  { name: "1-mixer-preset-labelled-Aerochrome", note: "the mixer preset CALLED Aerochrome: red<-green, green<-blue, blue<-red",
+    steps: [["tap", "#ptab-ir"], ["tap", "#lookAero"], ["tap", "#ptab-color"], ["mix", "2"]] },
+  { name: "2-mixer-preset-labelled-Rotate", note: "the preset called Rotate: red<-blue, green<-red, blue<-green — the matrix the two-swap recipe produces",
+    steps: [["tap", "#ptab-ir"], ["tap", "#lookAero"], ["tap", "#ptab-color"], ["mix", "4"]] },
+  { name: "3-rotate-without-the-look-swap", note: "the rotation alone, with the look's own R/B swap turned back off, so the rotation is not applied on top of a swap",
+    steps: [["tap", "#ptab-ir"], ["tap", "#lookAero"], ["tap", "#swapBtn"], ["tap", "#ptab-color"], ["mix", "4"]] },
 ];
+
 
 mkdirSync(OUT, { recursive: true });
 if (!existsSync(FILE)) { console.log(`no frame at ${FILE}`); process.exit(1); }
@@ -62,7 +61,12 @@ try {
     await p.waitForFunction(() => document.getElementById("welcome")?.hidden, null, { timeout: 300000 });
     await p.waitForTimeout(2200);
     for (const [how, sel, val] of c.steps) {
-      if (how === "tap") await p.click(sel).catch(() => {});
+      if (how === "mix") {
+        // The preset chips are built from MIX3_PRESETS at runtime and carry no
+        // ids, so they are pressed by index: 0 Identity, 1 R/B swap,
+        // 2 Aerochrome, 3 Copper, 4 Rotate.
+        await p.evaluate((i) => document.querySelectorAll("#mix3Presets .mix-chip")[Number(i)]?.click(), sel);
+      } else if (how === "tap") await p.click(sel).catch(() => {});
       else await p.evaluate(([s, v]) => {
         const el = document.querySelector(s);
         if (!el) return;

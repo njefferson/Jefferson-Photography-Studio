@@ -249,6 +249,52 @@ DNG Profile Editor. Section 3's claim that an infrared white point must be found
 BELOW what ordinary tools allow is the same finding arrived at from the other
 direction.
 
+**CONFIRMED TWICE, INDEPENDENTLY.** A second source states the same mapping in
+the same terms — infrared to red, visible red to green, visible green to blue —
+and names the alternative techniques around it. Two sources arriving at an
+identical three-way rotation is what moves this from "read somewhere" to a fact
+worth building on.
+
+**MEASURED ON A REAL RAW, 2026-09-16** (`NIR_1376.NEF`, rendered through the app,
+foliage and sky populations split per section 6):
+
+- the Aerochrome BUTTON as it ships (R/B swap only) — foliage sat 0.51 value
+  0.69, sky sat 0.49 value 0.50
+- the mixer preset LABELLED `Aerochrome` — foliage sat 0.23 value 0.82, sky sat
+  0.31 value 0.69
+- the mixer preset labelled `Rotate` — foliage sat 0.26 value 0.80, sky sat 0.34
+  value 0.71
+- `Rotate` with the look's own swap turned back OFF, so the rotation is not
+  stacked on a swap — foliage sat 0.32 value 0.69, **sky sat 0.75** value 0.51
+
+The last row is the one to notice: taking the swap off before the rotation more
+than doubles the sky's saturation against every other candidate. The rotation
+applied ON TOP of a swap is two mappings composed, which is not what either
+recipe describes.
+
+**WHAT IS NAMED IN THE FIELD, AND WHAT THIS APP HAS.** The owner asked directly,
+and the audit is worth keeping:
+
+- **Aerochrome / EIR** — the film and its mapping. The app has a button by that
+  name that performs a two-channel swap, which is NOT that mapping.
+- **Trichrome** — a real named technique: three exposures through IR, red and
+  green filters combined into one frame. Needs three captures, so it is a
+  capture-and-combine feature rather than a look. Not in the app.
+- **Lomochrome Purple** — a film that replaces the green layer's dyes with
+  purple/magenta, giving a superficially Aerochrome-like but distinct signature.
+  A nameable target. Not in the app.
+- **IR Chrome / Candy Chrome** — Kolari's optical filters. Capture-side, so the
+  app cannot reach them, but their RENDERING is a nameable target.
+- **HIE** — Kodak High Speed Infrared, the black-and-white film with the
+  characteristic halation. The app has `HIE B&W`.
+- **`Aero Red`, `Goldie`, `Natural IR`** — this app's own names, not field terms.
+  Worth knowing when reading a tutorial that uses none of them.
+
+**The bare swap has no film name.** It is called a channel swap, or false colour,
+and the pink-foliage/cyan-sky result is simply what a 590/665-class conversion
+gives after one swap with the third leg missing. Naming it after a film it does
+not reproduce is the confusion this section exists to end.
+
 **PROVENANCE, AND WHAT IS NOT YET VERIFIED.** The layer structure, the yellow
 filter, the two-swap recipe, the wavelength classes and the 2000K limit are from
 retrieved search summaries of Kolari Vision, LifePixel, Lenscraft, Cuchara,
