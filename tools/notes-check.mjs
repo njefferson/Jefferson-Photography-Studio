@@ -47,6 +47,26 @@ function checklist(headingRe) {
   return items;
 }
 
+/** Every top-level checkbox bullet under the heading `re`, WITH ITS BOX STATE.
+ *
+ *  Takes the same heading pattern `checklist` takes.
+ *  Returns `[{ done, text }]` in file order, or `[]` when the heading is
+ *  missing — the heading's own presence is asserted separately above, so this
+ *  never needs to distinguish "no heading" from "no bullets". The tick check
+ *  below is its only caller and reads `done`; `checklist` stays the text-only
+ *  view because the two vite.config.ts parsers it mirrors are text-only. */
+function boxes(re) {
+  const start = lines.findIndex((l) => re.test(l));
+  if (start < 0) return [];
+  const out = [];
+  for (let i = start + 1; i < lines.length; i++) {
+    if (/^##\s/.test(lines[i])) break;
+    const m = lines[i].match(/^-\s+\[([ xX])\]\s+(.+)$/);
+    if (m) out.push({ done: m[1] !== " ", text: m[2] });
+  }
+  return out;
+}
+
 let failed = 0;
 const check = (name, got, want) => {
   const ok = got === want;
@@ -77,6 +97,24 @@ else {
   console.log(`          archive: ${shipped.length} item(s)`);
   check("the shipped archive parses to something notes.html can show", shipped.length > 0, true);
 }
+
+// THE ROADMAP IS WHAT IS COMING, NOT WHAT CAME (owner rule, 2026-09-16). A
+// shipped item MOVES to the archive below, and its record reaches the reader
+// through the patch notes; leaving it ticked here puts a finished thing in a
+// list somebody opened to find out what is NEXT.
+//
+// EIGHT HAD COLLECTED, and no gate could see them because the two parsers
+// disagree about the same section: vite.config.ts's `roadmap()` takes every
+// bullet whatever its box, while `notesPage()` filters `!i.done` for that same
+// heading. One file, two answers — so the ⓘ dialog showed the ticked ones and
+// the public page did not, and nothing was wrong enough to notice. This is the
+// half that can refuse.
+const ticked = boxes(/^##\s+Next capability release/i).filter((b) => b.done);
+if (ticked.length) {
+  console.log("          still ticked in the roadmap — move each to the archive:");
+  for (const t of ticked) console.log(`            - ${t.text.slice(0, 66)}`);
+}
+check("the roadmap holds only OPEN items", ticked.length, 0);
 
 // A bullet with no title renders as a blank row. The parser takes the bold span
 // or the text before the first em-dash; both empty is a row with nothing in it.

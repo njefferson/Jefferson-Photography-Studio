@@ -76,17 +76,39 @@
           <button id="histBtn" class="bar-btn" type="button" aria-pressed="true" title="Show or hide the live histogram">Histogram</button>
           <button id="fullViewBtn" class="bar-btn" type="button" aria-pressed="false" title="See the photo on its own, with nothing over it — Escape or a tap returns">Full view</button>
           <button id="helpBtn" class="bar-btn" type="button">Help</button>
-          <button id="shareBtn" class="bar-btn" type="button" hidden title="Share this app or copy its link"><svg class="share-ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 1.6 5.2 4.4M8 1.6l2.8 2.8M8 1.6v7.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.6 6.6H3.2a1 1 0 0 0-1 1v5.6a1 1 0 0 0 1 1h9.6a1 1 0 0 0 1-1V7.6a1 1 0 0 0-1-1h-1.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Share</button>
+          <!-- THE SHARE BUTTON IS NOT HERE ANY MORE. It read "Share" in the bar
+               beside the photograph being edited and shared the APP's link; the
+               only thing that said so was a `title`, which is a hover tooltip
+               and does not exist on a touch screen. So on the device it was
+               built for, the label was one word and the word was wrong. It
+               lives in the ⓘ dialog now, under Settings, saying what it
+               shares. (Owner report, 2026-09-16.) -->
           <span class="bar-sep" aria-hidden="true"></span>
-          <button class="bar-btn" id="batchBtn" type="button" title="Develop a whole set unattended → one .zip">
-            Batch process
+          <!-- NOT "BATCH PROCESS". Those two words describe what Quick look
+               does -- take a batch of photographs and process them -- and they
+               were spent on the rare one, whose actual job is to run a whole set
+               through unattended and hand back a .zip. The label says the job
+               now; the tooltip that used to say it is a hover, and a hover does
+               not exist on a touch screen. (Owner report, 2026-09-16.) -->
+          <button class="bar-btn" id="batchBtn" type="button">
+            Develop unattended
           </button>
-          <button class="bar-btn" id="barQuickBtn" type="button" title="See a whole folder as a grid of previews — nothing saved">
-            Quick look
+          <!-- NO `title` ON EITHER OF THESE TWO ANY MORE. What each does had
+               been left to a hover, which does not exist on a tablet; the label
+               says it, and Help carries the rest where both platforms can read
+               it. "a folder" is the word that was doing the work in the
+               tooltip. -->
+          <button class="bar-btn" id="barQuickBtn" type="button">
+            Quick look a folder
           </button>
-          <button class="bar-btn" id="barLensBtn" type="button" title="Work out your converted lens's hot-spot from photographs of empty sky">
-            Measure lens
-          </button>
+          <!-- "MEASURE LENS" IS NOT IN THE BAR ANY MORE. It is a setup job you
+               do once per lens, from photographs of empty sky, and it sat in a
+               row of things you do to the photograph in front of you. THREE
+               OTHER DOORS ALREADY LED HERE and still do: "Measure your lens…"
+               on the start screen, the Measure button on the My-lens card in
+               the IR tab (beside the sliders it affects), and the version
+               dialog. Nothing was lost by taking the fourth out of the bar.
+               (Owner report, 2026-09-16.) -->
           <label class="open-btn bar-primary" title="Edit one photo — or several as a session">
             Open image(s)
             <input id="file" class="file-input" type="file" accept=".dng,.nef,.zip,.ipslook,image/*" multiple />
@@ -232,7 +254,7 @@
           <p class="welcome-open-hint" data-only-plat="ios" hidden><strong>If the Files picker sits there after you tap Open:</strong> that wait is iOS fetching your photos out of iCloud, before this app is handed anything. A file with a cloud badge, or one that says &ldquo;Waiting&hellip;&rdquo;, is not on this <span data-device-noun>device</span> yet. Download the folder in Files first and it opens straight away — see <strong>Help &rarr; Why the Files picker hangs</strong>.</p>
           <label class="welcome-batch" id="welcomeQuickBtn"><input id="welcomeQuickFiles" class="file-input" type="file" accept=".dng,.nef,.zip,.ipslook,image/*" multiple />Quick look a folder…</label>
           <p class="welcome-batch-hint">An instant grid of a whole folder. Nothing is saved.</p>
-          <button class="welcome-batch" id="welcomeBatchBtn" type="button">Batch process a set…</button>
+          <button class="welcome-batch" id="welcomeBatchBtn" type="button">Develop a whole set unattended — one .zip…</button>
           <p class="welcome-batch-hint">Develops a whole set into one .zip, unattended.</p>
           <button class="welcome-batch" id="welcomeLensBtn" type="button">Measure your lens&hellip;</button>
           <p class="welcome-batch-hint">Works out your lens&rsquo;s bright centre, from your own sky frames.</p>
@@ -718,7 +740,7 @@
             <label class="check-row"><input id="exRecipe" type="checkbox" checked /> JPEGs carry their look recipe <small>(anyone opening one here gets offered your look)</small></label>
             <p id="exWmNote" class="wm-note" hidden>Practice photos export with the small Studio mark in the corner — your own photos never do.</p>
             <button id="exBtn" type="button" class="primary">Export &amp; Save</button>
-            <small class="note">These Format &amp; Resolution settings also apply to <strong>Batch process</strong> (top bar).</small>
+            <small class="note">These Format &amp; Resolution settings also apply to <strong>Develop unattended</strong> (top bar).</small>
             <small class="note">JPEGs save as <strong>Display&nbsp;P3</strong> — the exact colors you see here, carried in the wide-gamut container Apple devices use natively. TIFF stays sRGB, the safest hand-off into other editors.</small>
             <hr class="divider" />
             <div class="sub-title">My looks <span>saved on this device</span></div>
@@ -912,7 +934,7 @@
 
     <dialog id="batchDlg">
       <div class="dlg-bar">
-        <h2>Batch process — what goes on every photo?</h2>
+        <h2>Develop unattended — what goes on every photo?</h2>
         <button id="batchCloseTop" type="button" class="dlg-x" aria-label="Cancel">&#10005;</button>
       </div>
       <div class="dlg-body">
@@ -1049,6 +1071,10 @@
       <div class="set-row">
         <button id="infoDiag" type="button">Something&rsquo;s wrong &mdash; the report to send</button>
         <small class="note">Opens a plain-text report of what this device is and how the app is set up here, ready to copy into a message, plus a page that measures how fast this device actually runs. It carries nothing about your photos.</small>
+      </div>
+      <div class="set-row" id="shareRow" data-share-row hidden>
+        <button id="shareBtn" type="button"><svg class="share-ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 1.6 5.2 4.4M8 1.6l2.8 2.8M8 1.6v7.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.6 6.6H3.2a1 1 0 0 0-1 1v5.6a1 1 0 0 0 1 1h9.6a1 1 0 0 0 1-1V7.6a1 1 0 0 0-1-1h-1.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Share this app</button>
+        <small class="note">Sends a link to <strong>the app itself</strong> &mdash; never a photo. Your photos are on this device and nothing here uploads them. It appears only in the installed app, where the browser's own Share button is out of reach; to share a <em>look</em> you have made, use the &#8943; button on its slot under My looks.</small>
       </div>
       <div class="set-row">
         <button id="forceUpdate" type="button">Update to the latest version</button>
@@ -1417,7 +1443,7 @@
 
         <p><strong>.cube</strong> bakes your color look for Photoshop/video apps &mdash; including any imported LUT,
         so the file is your full on-screen look. You can also <strong>import</strong> any .cube LUT and blend it over
-        your grade with a strength slider; a saved look remembers its LUT, and it rides into Batch process too.
+        your grade with a strength slider; a saved look remembers its LUT, and it rides into Develop unattended too.
         <strong>.dcp</strong> is a Lightroom camera profile (beta) &mdash; it can't carry imported LUTs (it's a camera
         profile, not a look file). Denoise, glow, sharpen, texture, clarity, dehaze, masks and heals are spatial effects and can't ride along in profiles.</p>
         </details>
@@ -1502,10 +1528,10 @@
 
         </details>
         <details class="help-sec">
-          <summary>Batch process — develop a whole set at once</summary>
+          <summary>Develop unattended — a whole set at once, into one .zip</summary>
 
         <p><strong>Open image(s)</strong> is for <em>editing</em> (one photo, or a few as a session);
-        <strong>Batch process</strong> is for <em>output</em> — it develops a whole set unattended and hands you a .zip.
+        <strong>Develop unattended</strong> (it was called Batch process) is for <em>output</em> — it develops a whole set and hands you a .zip.
         Tap it (in the top bar next to <em>Open image(s)</em>, or on the start screen) and it first asks
         <em>what goes on every photo</em>: <strong>your current edit</strong> (the grade on screen — offered only when
         a photo is open), <strong>a saved look</strong> from My looks, <strong>a built-in look</strong> (Aerochrome,

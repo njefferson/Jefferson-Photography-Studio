@@ -1,0 +1,13 @@
+# CONTROLS WHOSE LABEL HONESTLY CANNOT CARRY THE WHOLE SENTENCE.
+#
+# One `page#id` per line, then an em-dash and the REASON. Checked both ways by
+# tools/control-check.mjs — a line for a control that no longer fails is a
+# failure itself, so this file can only shrink by somebody deleting a line.
+# Every reason prints on every run: a list that hides what it excuses is a list
+# nobody audits.
+
+ir.html#verTag — The label IS the version number, which is the point of it: a build stamp you can read at a glance and tap for the diagnostics behind it. It carries aria-haspopup="dialog" so assistive tech announces that it opens something, and the ⓘ beside it is the signposted route to the same tools. Spelling the tooltip into the bar would put a sentence where a version number belongs.
+
+ir.html#askOk — Written at call time. #askDlg is the app's own confirm dialog: its heading, its body and BOTH button labels are set by whatever is asking, so a sweep that opens it cold reads two empty buttons. The label is never empty in front of a reader.
+
+ir.html#askCancel — Written at call time, the other half of #askOk above.
