@@ -434,6 +434,68 @@ testing on its own** - replacing green with the mean of red and blue collapses
 the frame toward the red-blue axis, which is the magenta/cyan axis Aerochrome
 lives on, and it is expressible in this app's mixer as `[0,0,1, 0.5,0,0.5, 1,0,0]`.
 
+### 4c-i. SOLVING IT, AND WHAT THE SOLVE PROVED IMPOSSIBLE
+
+Added 2026-09-16, after every earlier candidate came from moving a control and
+reading the result. **A 3x3 colour matrix is determined by three anchors** — say
+what foliage, sky and a neutral material must become, and the matrix that does it
+is a linear solve. So: measure the anchors at the point the mixer runs, state the
+targets, solve.
+
+**The anchors, measured on NIR_1376.NEF** in the state where nothing after the
+mixer is doing anything (Restore depth off, saturation and contrast at 1), read
+off the canvas and linearised:
+
+- foliage `(0.3272, 0.2401, 0.2407)` — 9.9% of the frame
+- sky `(0.2126, 0.2677, 0.2621)` — 21.3%
+- neutral `(0.3414, 0.3477, 0.3470)` — 56.4%
+
+**THE SOLVE'S FIRST RESULT IS AN IMPOSSIBILITY, AND IT IS THE USEFUL ONE.** Those
+three vectors are nearly coplanar: `det = 1.42e-4` against row norms near 0.5, a
+normalised determinant of `1.17e-3`. Green and blue agree to within 0.6% in ALL
+THREE populations. That is section 4c's NIR contamination as a number — both
+channels are dominated by the same infrared flood, so they carry nearly the same
+information. **The exact three-anchor matrix needs coefficients up to 22.65
+against a mixer that clamps at 2.** No adjustment of the mixer can put all three
+populations where Aerochrome puts them, on this camera's data. That sentence is
+not reachable by sweeping.
+
+**So the mixer carries two anchors and a hue band carries the third.** All three
+pairings solved, minimum-norm:
+
+- **foliage + neutral** — max coefficient **1.39, in range**, sky falls at hue
+  156 / sat 0.36 by consequence. THIS IS THE ONE.
+- foliage + sky — 1.44, in range, but neutral lands at hue 262 / sat 0.23:
+  purple rock and bark, which is the reference's own failing case (section 4b).
+- sky + neutral — 2.35, out of range.
+
+**The numbers, fitted to ONE FRAME.** Matrix, row-major, applied over the R/B
+swap: `[0.998, -0.005, 0.007, -1.382, 1.196, 1.163, -0.405, 0.706, 0.691]`,
+then a **+36 degree hue shift on the Green and Aqua bands** to carry the sky to
+cyan 200. Only one real raw is on disk; the 44 practice DNGs are hand-written
+minimal files (section 7) and are the wrong instrument for a colour question. A
+matrix fitted to one photograph is fitted to that photograph, and this one has
+not been checked against a second.
+
+**PREDICTED AND MEASURED, WHICH IS WHAT MAKES IT A SOLVE.** Predicted foliage
+335, sky 156 before the band shift, neutral unchanged. Measured 332, 158, and
+neutral saturation 0.05 from 0.06. Three degrees.
+
+**TWO THINGS THE FIRST SOLVE GOT WRONG, BOTH CAUGHT BY MEASURING.**
+
+- **The band shift was solved at the wrong saturation.** At saturation 1 the sky
+  needs +44 degrees; at the look's own 3.0 it lands further round and needs
+  **+36**. Solve a correction where it will actually be applied.
+- **A norm penalty was expected to cut the chroma grain, and does the opposite.**
+  The argument was that smaller coefficients amplify less noise. Measured at the
+  look's real strength, sky chroma spread over level: **0.24 at lambda 1e-5,
+  0.38 at 1e-3.** The absolute spread barely moved (26.6 to 31.3) while the
+  wanted chroma fell a quarter, so the penalty makes the grain RELATIVELY worse.
+  Max-coefficient is not a proxy for grain. The unpenalised solve is the better
+  one, and the visible speckle in a dark sky is the price of the operation
+  itself — if it needs fixing it needs denoise or chroma smoothing, not a
+  smaller matrix.
+
 ## 5. What a camera JPEG is, and why it is a different animal
 
 A camera-rendered JPEG was developed **through** the clamped custom preset, then
