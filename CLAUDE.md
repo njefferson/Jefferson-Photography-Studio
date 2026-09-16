@@ -128,7 +128,29 @@ should be doing. `WebSearch` works here; `WebFetch` is subject to the
 environment's network policy, and a blocked host is a QUESTION to ask in the
 moment, never a reason to fall back on what the model remembers.
 
-## Known things first — mine the references before implementing (owner, 2026-07-25)
+## Known things first — mine the references before implementing (owner, 2026-07-25;
+## restated 2026-09-16 as a CADENCE, not just a principle)
+**STOP BEFORE EACH NEW THING AND GO LOOK.** Not when stuck, not after a round of
+tuning fails — BEFORE. The check is one search and it is cheap; the alternative
+is deriving by hand something a field settled decades ago and calling the
+derivation progress.
+
+Said three times in this repository now, which is what makes it a cadence rule
+rather than a principle: "known things first" (2026-07-25), "go and learn the
+domain" (2026-09-16), and this. **The session that hears it again writes it
+down; it is not a decision to put to the owner.**
+
+**What it just cost, twice in one day.** Four rounds of tuning went into why
+Aerochrome would not go deep red, all of them measurements of the app's own
+output; one article settled it. Then the NEXT thing — bright foliage washing out
+to white — was about to be attacked by hand, and one search named it: a tone
+curve applied INDEPENDENTLY PER CHANNEL desaturates highlights toward white,
+which is the standard approach in most raw software and is exactly what
+`src/pipeline.ts` does at the `out[0..2] = toGamma((n - 0.5) * con + 0.5)` lines.
+Luminance-only contrast keeps the colour and clamps harshly instead; the
+blend between the two is a parameter that colour pipelines already expose. None
+of that needed deriving and all of it was one query away.
+
 Raw processing is a solved field; the owner is not the discovery mechanism
 for lessons it learned twenty years ago. Before implementing ANY raw
 behavior (levels, curves, matrices, highlight handling, metadata), find what
