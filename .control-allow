@@ -11,3 +11,30 @@ ir.html#verTag — The label IS the version number, which is the point of it: a 
 ir.html#askOk — Written at call time. #askDlg is the app's own confirm dialog: its heading, its body and BOTH button labels are set by whatever is asking, so a sweep that opens it cold reads two empty buttons. The label is never empty in front of a reader.
 
 ir.html#askCancel — Written at call time, the other half of #askOk above.
+
+# --- controls that exist only in a state a cold sweep cannot manufacture -----
+# Each reason names WHAT would put the control on screen, so the next session
+# can drive it instead of inheriting the excuse. These are not "not looked at
+# yet": each needs a condition outside the app's own controls.
+
+index.html#swStripGo — The update strip, which appears only when a second service worker is installed and waiting. tools/ has a walk that drives a REAL second worker by rewriting the served sw.js; wiring that into this sweep is the way to reach it, not a wider selector.
+index.html#swStripLater — The other half of the update strip above.
+ir.html#swStripGo — The update strip on the editor page; same condition as index.html's.
+ir.html#swStripLater — The other half of the editor's update strip.
+index.html#shareBtn — Revealed by setupInstalledShare only when the page is running as an INSTALLED standalone app. A browser tab is by definition not that, so a headless sweep can never see it; the walk would have to fake the display-mode media query, which would be measuring the fake.
+ir.html#locTip — The location tip, shown only when the opened file carries GPS data. Reachable by adding a GPS-bearing fixture to tools/fixtures and opening it.
+ir.html#tatBanner — An armed-tool banner over the photograph; appears only while that tool is armed with a stroke in progress.
+ir.html#healBanner — Shown while Heal spots is armed.
+ir.html#healReviewBanner — Shown only after an automatic spot sweep has found something to review, so it needs a frame with real dust in it.
+ir.html#exportSave — In the export strip, which exists only after an export has finished. Reachable by running one, at the cost of a full-resolution encode per sweep.
+ir.html#exportSaveAll — The other half of the export strip above.
+ir.html#exportRetry — In the export strip, and only after an export has FAILED. Reachable by planting a failure, which is its own piece of work.
+ir.html#exportStop — In the export strip while an export is running.
+ir.html#exportDismiss — In the export strip once there is something to dismiss.
+ir.html#colorBanner — An armed-tool banner over the photograph, shown while the colour picker is armed on the canvas.
+ir.html#welcomeBack — On the start screen, and only when there is a photograph open BEHIND it to go back to. A cold start has nothing to return to, so the control correctly does not exist.
+ir.html#resumeSession — On the start screen, and only when a previous session is in storage. Reachable by opening a set, reloading, and sweeping the second load.
+ir.html#recoverBatch — On the start screen, and only when an interrupted batch left finished frames behind. It needs a batch killed mid-run to exist at all.
+ir.html#cropLevel — Measured with the crop tool armed: display:none. It is in #cropTools, whose two arms (crop, straighten) do not put the same controls on screen, and this sweep presses the crop one. One more press reaches it once somebody names the control that arms the other.
+ir.html#straightenDown — In #cropTools and laid out 0x0 with the crop arm pressed — an ancestor is display:none. Same cause as #cropLevel above.
+ir.html#straightenUp — The other half of #straightenDown.

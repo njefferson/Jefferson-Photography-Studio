@@ -5399,13 +5399,31 @@ function lensFixLive(): { colour: boolean; bump: boolean } | null {
   return colour || bump ? { colour, bump } : null;
 }
 
-/** Show the button when there is something to compare, and say what is on. */
+/** Show the button when there is something to compare, and say what is on.
+ *
+ *  Takes nothing; reads the live profile state through `lensFixLive()`.
+ *  Returns nothing. Both the button and the sentence beside it are hidden
+ *  together when no correction is on this frame — the button's PRESENCE is how
+ *  a reader learns a correction was applied at all, so a visible button with no
+ *  sentence, or a sentence with no button, is each a lie of a different kind.
+ *
+ *  IN A NOTE, NOT A `title`. It was a tooltip, which is a hover, and there is
+ *  no hover on the tablet this app is built for — so the one sentence saying a
+ *  correction had been applied was invisible on the device that needed it.
+ *  tools/control-check.mjs refuses that shape now. */
 function updateLensCmp() {
   const live = lensFixLive();
+  const note = document.getElementById("lensCmpNote");
   lensCmpBtn.hidden = !live;
+  if (note) note.hidden = !live;
   if (!live) return;
   const what = live.colour && live.bump ? "brightness and colour" : live.bump ? "brightness" : "colour";
-  lensCmpBtn.title = `A lens correction is on this photo (${what}, from ${myLens ? "your own measurement" : "the profile that came with the app"}). Press and hold to see it without.`;
+  if (note) {
+    note.textContent =
+      `A lens correction is on this photograph — ${what}, from ` +
+      `${myLens ? "your own measurement" : "the profile that came with the app"}. ` +
+      `Press and hold the button above to see the photograph without it.`;
+  }
 }
 
 // Panel scroll cues: arrows appear when there is more panel above/below.
@@ -13284,16 +13302,19 @@ setupInstallFromApp("irInstallFromApp");
       document.getElementById("panel")?.classList.toggle("notes-off", !on);
       btn.setAttribute("aria-pressed", String(on));
       // THESE TWO STRINGS ARE THE OWNER'S, AND A SESSION DOES NOT GET A VOTE.
-      // One changed them to "Explanations on" / "Explanations off" reasoning
-      // that a bare noun reads as a label rather than a control — a judgement
-      // about reader-facing copy, which is not a session's to make, and it was
-      // reverted on the owner's word the same day. Do not re-litigate it.
+      // The pair was "Explanations" / "Explanations off" and is now
+      // "Explanations on" / "Explanations off" — CHANGED ON THE OWNER'S CALL,
+      // 2026-09-16, reported as looking like a button that would open
+      // explanations rather than a switch that has a state. A session proposed
+      // exactly this once before and was overruled, correctly: reader-facing
+      // copy is not a session's judgement to make. It is settled now, so do not
+      // re-litigate it in either direction.
       // What IS load-bearing and must survive any future rewording: the label
       // is the only thing carrying the state. The two renderings differ in
       // nothing else but --txt-2 against --txt-3, and colour alone carrying a
       // state is a fail state here. So whatever these say, they must not say
       // the same thing.
-      btn.textContent = on ? "Explanations" : "Explanations off";
+      btn.textContent = on ? "Explanations on" : "Explanations off";
     };
     apply(localStorage.getItem(KEY) !== "off");
     btn.addEventListener("click", () => {

@@ -146,8 +146,15 @@ measured denoise (owner-tuned 2026-07-12: barely clears the grain, nothing
 more) + Recover-highlights 0.7 iff the frame has real clipping (calibrated;
 industry-normal per LR-class default rendering). CAMERA-RENDERED (JPEG/HEIC/
 PNG/previews): as the camera made them, measured denoise ONLY (lighter touch,
-owner call 2026-07-25). Reset returns to this baseline; Hold: Untouched shows
-the bare decode. What stays banned FOREVER (Doctrine §14): silent PIXEL
+owner call 2026-07-25). Reset returns to this baseline; the Basic tab's
+"Hold: the bare decode" shows the photograph with those four automatics off.
+**THE PROMISE IS A SENTENCE, NOT A BUTTON (owner, 2026-09-16).** This ruling used
+to name Hold: Untouched as the standing PROOF that nothing was mutated, and it
+never was one: it renders the same decode either way with four sliders zeroed,
+and those four are visible and undoable, so dragging them to zero shows the same
+thing. The true claim is *your original file is never changed*, it is said in
+words on the Basic tab, and the hold is a DIAGNOSTIC — for telling whether a
+frame that opens looking wrong is the file or one of the automatics. What stays banned FOREVER (Doctrine §14): silent PIXEL
 mutation — every automatic lands on a visible slider, is undoable, and the
 untouched decode stays one press away. Never add an at-open automatic that
 fails any of those three tests.
