@@ -533,15 +533,36 @@ saturation. Step 5 moves value 0.70 to 0.66 and nothing else. "Bright red and
 magenta" is not something a hue shift can manufacture — the colour has to be in
 the file already.
 
-### 4c-iii. WHICH CONVERSION CLASS THIS CAMERA IS, SETTLED BY MEASUREMENT
+### 4c-iii. WHAT THE FILES SAY ABOUT THE CONVERSION, AND WHAT THEY CANNOT SAY
 
 Section 1 records that how far the channels can be pulled apart is a fixed
-property of the conversion and never records WHICH. The anchors in 4c-i settle
-it: **green and blue agree to within 0.6% in all three populations** (foliage
-0.2401/0.2407, sky 0.2677/0.2621, neutral 0.3477/0.3470). That is the signature
-of a DEEP cutoff, where very little visible differentiation survives — not the
-590nm Super Color class LifePixel's tutorial assumes, which keeps substantial
-visible red.
+property of the conversion and never records WHICH. The anchors in 4c-i narrow
+it. **They do not settle it, and an earlier version of this section said they
+did — it read "a DEEP cutoff", which is more than the measurement supports.**
+
+The anchors say TWO separate things and they pull in different directions:
+
+- **Red separates strongly from green and blue** — foliage R 0.3272 against G/B
+  near 0.240. That separation is the entire reason these files carry usable
+  false colour at all, and a genuinely deep conversion would not have it.
+- **Green and blue do not separate from each other** — 0.2401/0.2407,
+  0.2677/0.2621, 0.3477/0.3470. Agreement to within 0.6% in all three
+  populations. That collapse is what makes the Aerochrome matrix
+  ill-conditioned (4c-i) and it is why no 3x3 can place all three anchors.
+
+Strong red with green and blue collapsed together is a **mid-to-deep**
+signature, the 665-720nm region — not 720nm-and-up, and plainly not 590nm: the
+Super Color class LifePixel's tutorial assumes renders GOLDEN-YELLOW foliage
+after a swap (Kolari's own description of it), and these frames render pink.
+
+**AND A FILE-BASED INFERENCE CANNOT IDENTIFY A CUTOFF, ONLY BRACKET ONE.** What
+actually settles it is the converter's own record of the filter they installed —
+nothing in EXIF carries it, because the conversion is a physical filter swap the
+camera knows nothing about — or a photographed spectrum: a tungsten lamp through
+a slit onto a diffraction grating, with a CFL shot through the same rig to
+calibrate the scale against its known emission lines. Kolari's per-cutoff
+appearance descriptions are the comparator for the bracket; they are not an
+identification.
 
 **This is the fact under both routes, and it explains the choice between them.**
 
