@@ -1,3 +1,6 @@
+// THE "THIS BUILD" PANEL — what changed, and the report to send (Doctrine §7d,
+// §7f). Used by the chooser and macro pages; the infrared editor carries its own
+// copy inside its ⓘ dialog.
 import "./verdlg.css";
 import { buildDiagnostic, type DiagLine } from "./diagnostic";
 
