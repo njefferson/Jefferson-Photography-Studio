@@ -50,16 +50,26 @@ const OUT = arg("out", "/tmp/claude-0/-home-user/2bd37282-d617-5a51-b357-6b20783
 // band shift of +44 degrees carries it to cyan 200.
 //
 // Verified before it was rendered: predicted foliage 335 / sky 156 / neutral
-// unchanged, measured 332 / 158 / saturation 0.05 from 0.06, and 202 after the
-// shift. A model that predicts the render to three degrees.
+// unchanged, measured 332 / 158 / saturation 0.05 from 0.06. A model that
+// predicts the render to three degrees.
+//
+// TWO THINGS THE FIRST SOLVE GOT WRONG, BOTH FOUND BY MEASURING RATHER THAN
+// REASONING. The band shift was solved at saturation 1 and the look runs at 3.0,
+// where the sky lands 8 degrees further round: it is 36, not 44. And a norm
+// penalty was expected to cut the chroma grain in the sky, on the argument that
+// smaller coefficients amplify less noise. Measured at the look's real strength,
+// sky chroma spread over level went from 0.24 at lambda 1e-5 to 0.38 at 1e-3 —
+// the penalty shrinks the wanted chroma faster than the noise, so it makes the
+// grain RELATIVELY worse. The unpenalised solve is the better one and the grain
+// wants a different lever entirely.
 const CANDIDATES = [
   { name: "0-pink-ir", note: "the swap, for reference",
     steps: [["tap", "#ptab-ir"], ["tap", "#lookAero"]] },
   { name: "1-aerochrome-as-it-ships", note: "the bare rotation, which is what is in the app now",
     steps: [["tap", "#ptab-ir"], ["tap", "#lookEir"]] },
-  { name: "2-solved", note: "the solved matrix over the swap, plus the one band shift the solve says the sky needs",
+  { name: "2-solved", note: "the solved matrix over the swap, plus the 36-degree band shift solved at the look\u0027s real strength",
     steps: [["tap", "#ptab-ir"], ["tap", "#lookAero"], ["tap", "#ptab-color"], ["mix3", "0", "1.000"], ["mix3", "1", "-0.006"], ["mix3", "2", "0.006"], ["mix3", "3", "-1.387"], ["mix3", "4", "1.199"], ["mix3", "5", "1.166"], ["mix3", "6", "-0.407"], ["mix3", "7", "0.707"], ["mix3", "8", "0.692"],
-            ["hsl", "3", "44,1,1"], ["hsl", "4", "44,1,1"]] },
+            ["hsl", "3", "36,1,1"], ["hsl", "4", "36,1,1"]] },
 ];
 
 
