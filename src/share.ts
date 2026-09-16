@@ -94,12 +94,26 @@ export async function shareApp(): Promise<void> {
 }
 
 /** Reveal the given button and wire it to shareApp(), but only when the page is
- *  running as an installed standalone app. A no-op in the browser and if the
- *  button isn't on the page. */
+ *  running as an installed standalone app.
+ *
+ *  Takes `btnId`, the id of the share button on this page.
+ *  Returns nothing. A no-op in the browser and if the button isn't on the page,
+ *  so the button MUST ship `hidden` — every caller relies on this function being
+ *  the only thing that reveals it, and a button revealed in a browser tab
+ *  promises a share sheet that is not there.
+ *
+ *  AND THE ROW AROUND IT, when the button carries an explanation rather than
+ *  standing alone in a bar. A `.set-row` in the Infrared app's info dialog is a
+ *  button plus a `<small>` saying what it does; unhiding only the button would
+ *  leave the sentence showing in a browser tab beside no control. Opt-in via
+ *  `data-share-row` on the enclosing element, so a bare bar button (the Studio
+ *  launcher's) is unaffected. */
 export function setupInstalledShare(btnId: string): void {
   const btn = document.getElementById(btnId);
   if (!btn || !isStandaloneApp()) return;
   btn.hidden = false;
+  const row = btn.closest<HTMLElement>("[data-share-row]");
+  if (row) row.hidden = false;
   btn.addEventListener("click", () => {
     void shareApp();
   });

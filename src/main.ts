@@ -5278,7 +5278,11 @@ const openLens = () => {
 // A LENS IS NOT A PHOTOGRAPH, so every route to this works with nothing open:
 // the start screen, the version panel, and the Corrections card for when you
 // are already looking at the sliders it replaces.
-for (const id of ["welcomeLensBtn", "barLensBtn", "verLens", "lensMeasureBtn"]) {
+// `barLensBtn` was here and is gone with the button: measuring a lens is a
+// once-per-lens setup job and the top bar is for what you do to the photograph
+// in front of you (owner report, 2026-09-16). A dead id in a list is the stale
+// thing this repo keeps paying for, so it leaves in the same commit.
+for (const id of ["welcomeLensBtn", "verLens", "lensMeasureBtn"]) {
   document.getElementById(id)?.addEventListener("click", openLens);
 }
 wireLensRig(lensDlg);
@@ -5295,9 +5299,32 @@ helpDlg.addEventListener("click", (e) => {
 });
 // Tutorials moved off the top bar into Help — this opens the start screen, where
 // the example lessons live (goHome keeps any live photo/session parked behind).
+//
+// AND IT HAS TO ARRIVE AT THEM. goHome() alone puts the start screen up at its
+// TOP, and the practice grid is the last thing on that card — below a divider,
+// the install strip and a scroll cue — so pressing a button that says
+// "Tutorials — learn by doing on real infrared photos" closed the editor and
+// showed the landing screen, with the tutorials off-screen and nothing saying
+// where they were. Reported as being dumped back on the landing screen, which
+// is precisely what it did. (Owner report, 2026-09-16.)
 $("helpTutorials").addEventListener("click", () => {
   helpDlg.close();
   goHome();
+  // Next frame: goHome unhides the welcome card, and scrolling to something
+  // inside an element that is still `hidden` scrolls to nothing.
+  //
+  // SCROLLED AND FOCUSED, not one or the other. Scrolling moves the picture and
+  // leaves the keyboard and the screen reader where they were; focusing the
+  // first tile is what makes the sentence above it ("tap a practice photo")
+  // true for every input method. `preventScroll` because the scroll is already
+  // being done deliberately, to the lead-in line rather than to the tile.
+  requestAnimationFrame(() => {
+    const grid = document.getElementById("galleryList");
+    const lead = document.querySelector(".ex-title") as HTMLElement | null;
+    const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    (lead ?? grid)?.scrollIntoView({ block: "start", behavior: still ? "auto" : "smooth" });
+    (grid?.querySelector("button") as HTMLButtonElement | null)?.focus({ preventScroll: true });
+  });
 });
 
 // Press-and-hold comparison with the as-imported original (auto WB/exposure/
@@ -10869,7 +10896,7 @@ const LESSONS: { title: string; tab: PanelTab; steps: string[] }[] = [
     steps: [
       "Quick look (top bar) is for SEEING a folder: pick one and you get a grid of properly balanced previews, made on the spot and kept nowhere. Nothing is saved and nothing is changed.",
       "Tap the keepers in that grid, then Keep in a session — they come straight through into an editable session without being developed a second time.",
-      "Batch process (top bar) is the other one: it DEVELOPS a whole set unattended and hands you a single .zip. It first asks what goes on every photo — your current edit, a saved look, a built-in look, or auto-balance only.",
+      "Develop unattended (top bar) is the other one: it DEVELOPS a whole set without you watching and hands you a single .zip. It first asks what goes on every photo — your current edit, a saved look, a built-in look, or auto-balance only.",
       "Every photo in a batch is still balanced on its own — its own white balance, exposure, denoise, highlight recovery, lens hot-spot fix and Restore depth — with the look layered on top. So it suits a shoot in one style rather than copying one exact frame.",
       "The .zip is written at the Format and Resolution set on this tab. Check them before a long run.",
       "Nothing is lost if you stop: leave mid-run and keep what is done, Continue picks up the rest, and if the app closes mid-batch the start screen offers to recover the finished images next time.",
