@@ -106,6 +106,28 @@ diagnose against IR references and the file's own metadata, never against
 visible-light expectations. (A bright IR daytime frame was misdiagnosed as
 "a twilight scene" from exactly this error; the real bug was a decode level.)
 
+## GO AND LEARN THE DOMAIN — DO NOT CONVERGE INSIDE THE APP (owner, 2026-09-16)
+**The failure this names, in the owner's words on the day: converging with a data
+set and never looking for whether the right question is being asked.** Four
+rounds went into why Aerochrome would not go deep red — measuring hue and
+saturation on rendered frames, tuning bands, building a comparison sheet — and
+every one of them was a measurement INSIDE the app. The answer was not in the
+app. It was that the film's three layers are sensitive to green, red and infrared
+with blue thrown away by a yellow filter, so the mapping is a three-way rotation
+and the app's two-channel swap cannot express it (IR-SCIENCE.md §4b).
+
+**The owner had to go and search the web and paste the answer back.** That is the
+signal the rule was broken: research the owner could do in one search is research
+the session should have done before offering a single candidate.
+
+So: when a question is about a real-world medium, process or piece of equipment —
+film, filters, conversions, optics, colour science — **go and read about it
+first**, from sources, and write what is found into `IR-SCIENCE.md` with the
+source named. A measurement of the app's own output cannot tell you what the app
+should be doing. `WebSearch` works here; `WebFetch` is subject to the
+environment's network policy, and a blocked host is a QUESTION to ask in the
+moment, never a reason to fall back on what the model remembers.
+
 ## Known things first — mine the references before implementing (owner, 2026-07-25)
 Raw processing is a solved field; the owner is not the discovery mechanism
 for lessons it learned twenty years ago. Before implementing ANY raw

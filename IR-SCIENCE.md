@@ -177,6 +177,87 @@ the owner's Lightroom-iOS DNGs embed such a profile.
 
 ---
 
+## 4b. WHAT THE FILM ACTUALLY DID, AND WHY A TWO-CHANNEL SWAP IS NOT IT
+
+**Researched 2026-09-16, after four rounds of trying to reach Aerochrome by
+adjusting saturation inside the app. The answer was never in the app.** Recorded
+here so no session reaches for a slider again before reading this.
+
+**AEROCHROME'S THREE LAYERS ARE SENSITIVE TO GREEN, RED AND INFRARED — not to
+blue, green and red.** One layer is dye-sensitised to the near-infrared band, one
+to visible red, and the top one to visible green. **All three are also sensitive
+to blue**, which is why the film REQUIRES a yellow filter on the lens (Kodak
+Wratten 12) to absorb blue entirely. Blue light is not mapped anywhere. It is
+thrown away before it reaches the film.
+
+So the film's mapping, in terms of what lands in each printed colour, is a
+THREE-WAY ROTATION with blue discarded:
+
+    red output   <- infrared
+    green output <- visible red
+    blue output  <- visible green
+
+**The app's `R⇄B` swap is a two-channel exchange and leaves green where it is:**
+
+    red output   <- blue        green output <- green        blue output <- red
+
+Those are different operations, and the difference is the whole green/blue leg.
+It is the structural reason an Aerochrome-labelled render here lands teal-skied
+and pale rather than deep-blue-skied and crimson — the film puts VISIBLE GREEN
+into the blue output, and a plain swap puts visible red there.
+
+**The digital recipe every source gives is two swaps, which compose to exactly
+that rotation.** Red↔Blue to get red foliage, then Blue↔Green to take the sky
+from cyan to blue. Composed: `R_out = B_in`, `G_out = R_in`, `B_out = G_in` —
+row-major `[0,0,1, 1,0,0, 0,1,0]`.
+
+**THE APP ALREADY SHIPS THAT MATRIX AND `LOOKS.aero` DOES NOT USE IT.**
+`MIX3_PRESETS` in `src/main.ts` carries the full 3x3 mixer on the Colour tab
+with five presets, and its own comment calls the swap "the one-tap special case":
+
+    { label: "R⇄B swap",   m: [0, 0, 1, 0, 1, 0, 1, 0, 0] }
+    { label: "Aerochrome", m: [0, 1, 0, 0, 0, 1, 1, 0, 0] }
+    { label: "Rotate",     m: [0, 0, 1, 1, 0, 0, 0, 1, 0] }
+
+**`Rotate` is the matrix the documented digital recipe produces. The preset
+LABELLED `Aerochrome` is the other rotation.** Whether the label is on the wrong
+one of the two is OPEN and must be settled by rendering both, not by argument —
+which rotation is right depends on which input channel carries the infrared after
+the camera's custom white balance, and that is a property of this conversion, not
+a thing to derive on paper.
+
+**The conversion class matters and sets what is possible.** 590nm passes a lot of
+visible light and is the false-colour choice; 665nm is the flexible middle;
+720nm blocks nearly all visible light and is the monochrome look, where false
+colour is possible but limited. A body that shows RED in the viewfinder is in the
+590/665 class — it passes visible red alongside infrared, which is what floods
+the red channel. Sources report that after a standard swap on a 590nm camera
+foliage commonly lands orange or copper rather than ruby, and the named fix is an
+HSL hue shift of the yellows and oranges toward red.
+
+**A physical filter is the other route entirely.** Kolari's IR Chrome is fused
+glass that passes the balance of visible and infrared the film's layers wanted,
+so the Aerochrome palette arrives straight out of the camera with NO channel
+swap and no heavy editing. That is a capture-side answer; this app is
+post-capture and cannot reach it, which is worth knowing before promising a
+rendering that a filter buys optically.
+
+**Corroborated: the 2000K floor is real and documented.** Lightroom and ACR will
+not set a colour temperature below 2000K, which is too high for infrared, and the
+standard workaround in the field is a custom camera profile built with Adobe's
+DNG Profile Editor. Section 3's claim that an infrared white point must be found
+BELOW what ordinary tools allow is the same finding arrived at from the other
+direction.
+
+**PROVENANCE, AND WHAT IS NOT YET VERIFIED.** The layer structure, the yellow
+filter, the two-swap recipe, the wavelength classes and the 2000K limit are from
+retrieved search summaries of Kolari Vision, LifePixel, Lenscraft, Cuchara,
+Adobe's own community threads and the analog-film guides — **not from the primary
+pages**, which this environment's network policy blocked at fetch time. Nothing
+above has been confirmed against a rendered frame in this app. Before any of it
+becomes a look, the exact mixer values and the hue-shift targets need reading at
+the source and testing on a real raw.
+
 ## 5. What a camera JPEG is, and why it is a different animal
 
 A camera-rendered JPEG was developed **through** the clamped custom preset, then
