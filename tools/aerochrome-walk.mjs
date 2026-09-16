@@ -1,0 +1,299 @@
+#!/usr/bin/env node
+// THE AEROCHROME BUTTON SHIPS WHAT WAS APPROVED, STATED AS A TEST.
+//
+// The look was chosen off rendered sheets, and the sheets were NOT made by
+// pressing this button. They were made by pressing Pink IR and then writing a
+// solved nine-number matrix into the channel-mixer sliders. Everything between
+// that recipe and `LOOKS.eir` is an opportunity to ship a different photograph
+// under the approved name, and three of those opportunities are real:
+//
+//  - THE SWAP. The matrix was solved against anchors measured POST-SWAP, so it
+//    is the second half of a two-step mapping. The look that preceded it -- the
+//    film's bare three-channel rotation -- needed the swap OFF, and that is the
+//    value `LOOKS.eir` carried. Flip it and the nine numbers act on an input
+//    they were never solved for, with nothing going red.
+//  - THE STEP. The mixer sliders are `min -2 max 2 step 0.01`, so writing
+//    0.991 into one leaves 0.99 behind. The sheets came through those sliders,
+//    so the SNAPPED numbers are the approved ones. Check 2 reads the nine
+//    values back out of the DOM rather than trusting the spec about that.
+//  - THE DENOISE. It is a per-shot correction that no look had ever touched,
+//    and it is a FLOOR over the photograph's own measurement rather than a
+//    setting. Checks 4-6 cover the floor and both directions of leaving it.
+//
+// Checks 7 and 8 are the ones the rest exist to support: render the shipped
+// look, hash the canvas, then reproduce the sheet's recipe BY HAND on a second
+// page and hash again.
+//
+// WITH RESTORE DEPTH OFF THEY ARE BYTE-IDENTICAL, and that is check 7 -- the
+// mapping, the swap and the denoise floor all ship exactly as they were
+// approved.
+//
+// WITH IT ON THEY MUST NOT BE, and that is check 8, which looks backwards and
+// is not. `applyLook` re-solves the lift against the look now on the frame --
+// deliberately, so Aerochrome looks like Aerochrome on a frame with no sky in
+// it without a second press -- and the recipe route never re-solved it, because
+// writing numbers into the mixer sliders is not pressing a look. So the
+// approved sheets carry a lift solved for PINK IR while the shipped button
+// carries one solved for the matrix. Two consequences, both stated rather than
+// assumed: the shipped look is not pixel-for-pixel the sheet, which is why it
+// was re-rendered and shown again; and a build where these two hashes MATCHED
+// would be one where the re-solve had stopped happening, which is the
+// regression this check exists to catch.
+//
+// Check 9 asserts that leaving the look on a photograph you have come back to
+// hands back THAT photograph's measurement, not the one before it -- with 9a as
+// the control that the two frames measure differently enough (0.46 and 0.22,
+// the widest gap on the practice shelf) for 9b to mean anything.
+//
+// IT DOES NOT PROVE THE SNAPSHOT CARRY, AND THAT IS SAID HERE BECAUSE IT WAS
+// ASSUMED ONCE. `restoreLiveEdit` restores a photograph's live edit WITHOUT
+// re-running `establishFreshEdit`, so the remembered measurement can belong to
+// whichever frame was last opened fresh; the two denoise facts now ride the
+// snapshot beside the look's white balance, which rides it for the same reason.
+// The plant that removes that restore from the built bundle leaves this check
+// GREEN -- on the route below the app takes the fresh-open branch and
+// re-measures anyway. So the carry is a correctness fix with a comment and no
+// test, and the route that would exercise it has not been found yet.
+//
+// NOT COVERED HERE: the batch path's floor (`batchParamsFor`). It is not
+// reachable from the page, and the comparison that would reach it -- batch
+// output against the screen -- differs for a second reason already on the
+// books, the unconditional gray-world balance. Said out loud rather than
+// asserted weakly.
+//
+//   python3 -m http.server 8131 --directory dist   (in another shell)
+//   node tools/aerochrome-walk.mjs
+//
+// Drives a real browser and decodes a RAW, so it is not in .branch-guard's
+// `also=`. Run it before a release, or through tools/walk-all.mjs.
+import { chromium } from "/home/user/Jefferson-Photography-Studio/node_modules/playwright-core/index.mjs";
+
+const PORT = (process.argv.find(a => a.startsWith("--port=")) || "--port=8131").split("=")[1];
+const EX = "/home/user/Jefferson-Photography-Studio/public/examples/";
+const RAW = EX + "NIR_0063.dng";
+// TWO FRAMES FOR CHECK 9, and check 9a is the control that says they are
+// different enough for it to mean anything.
+// Measured across the ten bundled practice raws: 0.46 and 0.22, the widest gap
+// on the shelf. NIR_0102 was the first pick and reads 0.55 -- close enough to
+// 0.46 that a stepTo which had not actually moved yet looked like agreement.
+const PAIR = [EX + "NIR_0063.dng", EX + "NIR_0627.dng"];
+
+// The approved arm, exactly as it was driven on the sheets.
+const MATRIX = [0.99, -0.06, 0.07, -1.44, 1.37, 1.02, -0.47, 0.81, 0.65];
+const FLOOR = 0.8;
+
+let failed = 0;
+const check = (name, got, want) => {
+  const ok = JSON.stringify(got) === JSON.stringify(want);
+  if (!ok) failed++;
+  console.log(`${ok ? "ok  " : "FAIL"}  ${name}`);
+  console.log(`        got ${JSON.stringify(got)} want ${JSON.stringify(want)}`);
+};
+
+const b = await chromium.launch({
+  executablePath: "/opt/pw-browsers/chromium",
+  args: ["--use-gl=swiftshader", "--enable-unsafe-swiftshader"],
+});
+try {
+  // A PAGE WITH A PHOTOGRAPH ON IT, from a clean context every time: the
+  // session look is seeded out of localStorage, and a walk that inherited one
+  // would be pressing a second look on top of a first.
+  const open = async () => {
+    const ctx = await b.newContext({ viewport: { width: 1280, height: 950 } });
+    const p = await ctx.newPage();
+    p.on("dialog", d => d.accept());
+    await p.goto(`http://127.0.0.1:${PORT}/ir.html`);
+    await p.setInputFiles("#file", [RAW]);
+    await p.waitForFunction(() => document.getElementById("welcome")?.hidden, null, { timeout: 300000 });
+    await p.waitForFunction(() => !document.getElementById("busy")?.hasAttribute("open"), null, { timeout: 300000 });
+    await settle(p);
+    return { p, ctx };
+  };
+
+  // SETTLE ON THE PIXELS, never on a clock. Hash the canvas until two reads
+  // agree; a timer would be a guess about a decode whose cost is the file's.
+  async function settle(p) {
+    let last = "", stable = 0;
+    for (let i = 0; i < 80; i++) {
+      const h = await hash(p);
+      if (h === last) { if (++stable >= 2) return true; } else { stable = 0; last = h; }
+      await p.waitForTimeout(200);
+    }
+    console.log("        (never settled -- the reading below is not trustworthy)");
+    return false;
+  }
+  const hash = (p) => p.evaluate(() => {
+    const cv = document.querySelector("#view");
+    const g = cv.getContext("webgl2") || cv.getContext("webgl");
+    const buf = new Uint8Array(cv.width * cv.height * 4);
+    g.readPixels(0, 0, cv.width, cv.height, g.RGBA, g.UNSIGNED_BYTE, buf);
+    let h = 2166136261;
+    for (let k = 0; k < buf.length; k += 4) { h ^= buf[k]; h = Math.imul(h, 16777619); h ^= buf[k + 1]; h = Math.imul(h, 16777619); h ^= buf[k + 2]; h = Math.imul(h, 16777619); }
+    return (h >>> 0).toString(16);
+  });
+
+  // READ THE CONTROLS, not the internals: what the sliders hold is what the
+  // reader can see and what the render is made of.
+  const mixer = (p) => p.evaluate(() =>
+    [...document.querySelectorAll("#mix3Grid input[type=range]")].map(e => Number(e.value)));
+  const dn = (p) => p.evaluate(() => Number(document.getElementById("dn").value));
+  const swap = (p) => p.evaluate(() =>
+    document.getElementById("swapBtn")?.getAttribute("aria-pressed") === "true");
+  const press = async (p, id) => {
+    await p.evaluate(t => document.getElementById(t)?.click(), id);
+    await settle(p);
+  };
+  const setDn = async (p, v) => {
+    await p.evaluate((x) => {
+      const el = document.getElementById("dn");
+      el.value = String(x);
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    }, v);
+    await settle(p);
+  };
+
+  // ---- 0. THE CONTROL. Without this every check below could pass on an
+  // instrument that reads the same nine numbers whatever is pressed.
+  const a = await open();
+  const measured = await dn(a.p);
+  check("0a  a fresh raw opens with the mixer at identity",
+    await mixer(a.p), [1, 0, 0, 0, 1, 0, 0, 0, 1]);
+  check("0b  its denoise is measured, not zero and not the floor",
+    measured > 0 && measured < FLOOR, true);
+
+  await press(a.p, "lookAero");
+  check("0c  Pink IR carries no mixer of its own",
+    await mixer(a.p), [1, 0, 0, 0, 1, 0, 0, 0, 1]);
+  check("0d  ...and does not touch the measured denoise", await dn(a.p), measured);
+
+  // ---- 1-6. THE SHIPPED LOOK.
+  await press(a.p, "lookEir");
+  check("1   Aerochrome turns the R<->B swap ON, which the matrix needs", await swap(a.p), true);
+  check("2   the nine mixer values read back off the DOM as declared",
+    await mixer(a.p), MATRIX);
+  check("3   ...so every one of them survives the slider's 0.01 step",
+    MATRIX.every(v => Math.abs(v * 100 - Math.round(v * 100)) < 1e-9), true);
+  check("4   denoise is raised to the floor", await dn(a.p), Math.max(measured, FLOOR));
+
+  await press(a.p, "lookAero");
+  check("5   leaving it puts the photograph's own measurement back", await dn(a.p), measured);
+
+  // THE READER'S OWN VALUE IS NOT OURS TO THROW AWAY. One slider step away from
+  // the measurement, which is the smallest deliberate move there is and the one
+  // a 0.01 tolerance would have eaten.
+  const byHand = Math.round((measured + 0.01) * 100) / 100;
+  await setDn(a.p, byHand);
+  await press(a.p, "lookEir");
+  check("6a  a denoise set by hand is not raised by the look", await dn(a.p), byHand);
+  await press(a.p, "lookAero");
+  check("6b  ...and is not thrown away by leaving it either", await dn(a.p), byHand);
+  await a.ctx.close();
+
+  // ---- 7, 8. THE EQUIVALENCE, both ways round.
+  //
+  // The two arms differ by ONE act: one presses the button, the other presses
+  // Pink IR and writes the nine numbers into the mixer by hand, which is
+  // exactly how the sheets were made.
+  const armShipped = async (liftOn) => {
+    const { p, ctx } = await open();
+    if (!liftOn) await press(p, "irLift");
+    await press(p, "lookEir");
+    await setDn(p, Math.max(measured, FLOOR));
+    const h = await hash(p);
+    await ctx.close();
+    return h;
+  };
+  const armRecipe = async (liftOn) => {
+    const { p, ctx } = await open();
+    if (!liftOn) await press(p, "irLift");
+    await press(p, "lookAero");
+    await p.evaluate((m) => {
+      const sl = document.querySelectorAll("#mix3Grid input[type=range]");
+      m.forEach((v, i) => { const el = sl[i]; if (!el) return; el.value = String(v); el.dispatchEvent(new Event("input", { bubbles: true })); });
+    }, MATRIX);
+    await settle(p);
+    await setDn(p, Math.max(measured, FLOOR));
+    const h = await hash(p);
+    await ctx.close();
+    return h;
+  };
+
+  const bareShipped = await armShipped(false);
+  const bareRecipe = await armRecipe(false);
+  check("7   with Restore depth off, the button IS the approved recipe, byte for byte",
+    bareShipped, bareRecipe);
+  console.log(`        (canvas hash ${bareShipped})`);
+
+  const liftShipped = await armShipped(true);
+  const liftRecipe = await armRecipe(true);
+  check("8   ...and with it on they differ, because the look re-solves the lift",
+    liftShipped !== liftRecipe, true);
+  console.log(`        (button ${liftShipped}, recipe ${liftRecipe})`);
+
+  // ---- 9. THE MEASUREMENT FOLLOWS THE PHOTOGRAPH, not the session.
+  const two = await b.newContext({ viewport: { width: 1280, height: 950 } });
+  const q = await two.newPage();
+  q.on("dialog", d => d.accept());
+  await q.goto(`http://127.0.0.1:${PORT}/ir.html`);
+  await q.setInputFiles("#file", PAIR);
+  await q.waitForFunction((n) => document.querySelectorAll("#sessionThumbs .session-thumb").length === n, PAIR.length, { timeout: 300000 });
+  await q.waitForFunction(() => document.getElementById("welcome")?.hidden, null, { timeout: 300000 });
+  await settle(q);
+  // WAIT FOR THE TILE TO BE ACTIVE FIRST. Settling on the canvas is not enough
+  // on its own: if the click has not started the decode yet the canvas is
+  // already stable AT THE OLD PHOTOGRAPH, so settle returns at once and every
+  // reading below belongs to the frame you were trying to leave. That is what
+  // made the first version of check 9a report one frame's denoise twice.
+  // WAIT ON THE PIXELS CHANGING, not on a class and not on a clock.
+  //
+  // Settling alone is not enough: if the click has not started the decode yet
+  // the canvas is already stable AT THE OLD PHOTOGRAPH, so settle returns at
+  // once and every reading below belongs to the frame you were trying to leave.
+  // That is what made the first version of 9a report one frame's denoise twice.
+  //
+  // Waiting for the tile to carry `active` is not enough either -- it timed out
+  // for five minutes here, so whatever marks the active tile in this strip is
+  // not that, and a walk should not encode a guess about someone else's class
+  // names. The canvas changing IS the event: a different photograph is on
+  // screen exactly when the pixels are no longer the ones that were there.
+  const stepTo = async (i) => {
+    const before = await hash(q);
+    // A REAL MOUSE CLICK, not `element.click()` in an evaluate. The strip's
+    // tiles are <button>s that listen on pointer events, so a synthetic click
+    // dispatches and nothing happens -- measured: the denoise slider stayed on
+    // the first frame's 0.46 through a hundred seconds of polling, and moved to
+    // the second frame's 0.22 the moment a real click landed.
+    const tiles = await q.$$("#sessionThumbs .session-thumb");
+    if (!tiles[i]) { failed++; console.log(`FAIL  step to photo ${i}: no such tile`); return; }
+    await tiles[i].scrollIntoViewIfNeeded();
+    await tiles[i].click();
+    let moved = false;
+    for (let k = 0; k < 400; k++) {
+      if (await hash(q) !== before) { moved = true; break; }
+      await q.waitForTimeout(250);
+    }
+    if (!moved) { failed++; console.log(`FAIL  step to photo ${i}: the canvas never changed`); }
+    await q.waitForFunction(() => !document.getElementById("busy")?.hasAttribute("open"), null, { timeout: 120000 });
+    await settle(q);
+  };
+  const dnA = await dn(q);
+  await stepTo(1);
+  const dnB = await dn(q);
+  check("9a  the two frames measure different denoise, so 9b is not vacuous",
+    Math.abs(dnA - dnB) > 0.005, true);
+  console.log(`        (first ${dnA}, second ${dnB})`);
+
+  await stepTo(0);
+  await press(q, "lookEir");
+  await stepTo(1);          // a fresh open, which is what overwrote the memory
+  await stepTo(0);          // ...and back, by the live-edit path
+  await press(q, "lookAero");
+  check("9b  leaving the look on a revisited photo restores ITS OWN measurement",
+    await dn(q), dnA);
+  await two.close();
+} finally {
+  await b.close();
+}
+console.log(failed ? `\n${failed} FAILED` : "\nthe Aerochrome button ships what was approved");
+process.exit(failed ? 1 : 0);

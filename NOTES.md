@@ -15628,3 +15628,127 @@ summary inside a collapsed `<details>` renders as nothing.
 opened the same afternoon: `Hold: Untouched` and `Full view` each leave real
 meaning in a tooltip, and the bar's hold-to-compare buttons are being reconsidered
 as one control. Recording them rather than declaring them away.
+
+## Aerochrome is the matrix now, and a look may raise denoise, 2026-09-16
+
+**Three decisions came back off rendered sheets, and this is what they changed.**
+Raise denoise to about 0.8; the matrix arm is Aerochrome; keep the teal sky and go
+from there. Nothing here was argued into place — four arms were rendered on two
+frames, full-frame and at 1:1, and picked by looking.
+
+**WHAT `LOOKS.eir` NOW CARRIES.**
+
+- `swapRB: true`, where it was false. The matrix was solved against anchors
+  measured POST-WHITE-BALANCE AND POST-SWAP, so it is the second half of a
+  two-step mapping whose first step is the R⇄B exchange. The bare three-way
+  rotation it replaces needed the swap OFF for the opposite reason — swap plus
+  rotation compose into a G⇄B exchange and ruin each other.
+- `mix3: [0.99, -0.06, 0.07, -1.44, 1.37, 1.02, -0.47, 0.81, 0.65]` — the
+  six-frame solve, hold-one-out worst error 1.9°.
+- `denoise: 0.8`, a floor rather than a setting.
+- The film's own bare rotation is still on the `Aerochrome` mixer chip, and
+  IR-SCIENCE.md §4b still carries why it is the film's mapping. It is not gone;
+  it is not what the button does.
+
+**THE NINE NUMBERS ARE SNAPPED TO THE MIXER'S 0.01 STEP.** The solve produced
+0.991, -0.064, 0.072, -1.438, 1.373, 1.023, -0.473, 0.811, 0.653 — and the sheets
+were rendered by DRIVING THOSE SLIDERS, which snap on assignment. So the snapped
+numbers are the ones that made the picture, and shipping the full-precision ones
+would have shipped a rendering nobody had seen. This is the third note in this
+repository saying a full-precision value written to a stepped control does not
+come back. It is asserted rather than trusted: the walk reads the nine values
+back out of the DOM.
+
+**A LOOK MAY NOW RAISE DENOISE, WHICH NO LOOK COULD.** Denoise is a per-shot
+correction and sits with white balance on the excluded side of the SavedLook line.
+The reason this one crosses it: in an infrared frame the colour and the grain come
+out of the SAME 1-3% residual between the channels and scale together
+(IR-SCIENCE.md §4c-vi), so the mapping that doubles the colour doubles the speckle
+with it. The cleanup belongs to the look because the noise does.
+
+- **A FLOOR, `max(measured, look)`.** An absolute would LOWER denoise on a frame
+  that measured 0.9. On both frames this was chosen from, the measurement was 0.51
+  and 0.60, so floor and absolute agree on everything that has been seen.
+- **Undone on the way out.** `lookDenoise` records what `applyLook` itself wrote —
+  the same device `lookWb` is — so leaving Aerochrome puts the photograph's own
+  measurement back, and a value moved by hand is never overwritten in either
+  direction.
+- **Half a step, not `step()`.** The denoise slider's step IS 0.01, so the 0.01
+  tolerance the balance test uses cannot tell one deliberate nudge from the float
+  noise it exists to absorb — and being wrong there means silently discarding a
+  number somebody set.
+- **`batchParamsFor` applies the same floor**, beside where it already resolves
+  `hsl` and `mix3`, for the reason the comment there already gives: a .zip and the
+  screen have to be one picture under one name.
+- **NOT on `SavedLook`**, and not in `makeThumb` (a 260px tile is not denoised at
+  all, by decision) — so `stampOf` is untouched and the preview pipeline version
+  does not move.
+
+**THE BUTTON IS NOT PIXEL-FOR-PIXEL THE SHEET, AND THE WALK SAYS SO IN BOTH
+DIRECTIONS.** With Restore depth OFF the shipped look and the sheet's hand-driven
+recipe are BYTE-IDENTICAL — canvas hash `808ed2ea` on NIR_0063. With it on they
+differ, because `applyLook` re-solves the lift against the look now on the frame
+and writing numbers into the mixer sliders is not pressing a look, so the sheets
+carry a lift solved for Pink IR. `tools/aerochrome-walk.mjs` asserts the identity
+one way and the difference the other: a build where the lift-on hashes MATCHED
+would be one where the re-solve had stopped happening. Both renderings were sent
+rather than described.
+
+**The walk was seen failing before it was trusted**, against a bundle planted with
+the swap off, the floor at 0.3 and one matrix digit moved: checks 1, 2, 4 and 7
+went red and the rest stayed green. Two instrument faults were found the same
+way and are worth carrying: the strip's tiles are `<button>`s that listen on
+POINTER events, so `element.click()` inside an evaluate dispatches and nothing
+happens — the walk polled a hundred seconds watching the first frame's 0.46 and
+called it agreement, and a real mouse click moved it to 0.22 at once. And a
+walk that settles on the canvas after such a click settles instantly on the
+photograph it was trying to leave, so the step waits for the pixels to CHANGE
+first.
+
+**ONE FIX IN THIS RELEASE HAS NO TEST, AND IT IS THIS ONE.** `restoreLiveEdit`
+restores a photograph's live edit without re-running `establishFreshEdit`, so
+the remembered measurement can belong to whichever frame was last opened fresh.
+The two denoise facts now ride the `Snapshot` for that reason. Check 9 was
+written to cover it and does not: with the restore REMOVED from the built
+bundle the check still passes, because on that route the app takes the
+fresh-open branch and re-measures. So it is a correctness fix with a comment,
+an argument and no assertion, and the route that would exercise it has not been
+found. Written down rather than claimed, because the first draft of this section
+claimed it.
+
+**What the batch floor does NOT have.** `batchParamsFor` is not reachable from the
+page, and the comparison that would reach it — batch output against the screen —
+differs for a second reason already on the books, the unconditional gray-world
+balance. Said out loud in the walk's header rather than asserted weakly.
+
+## The camera-JPEG tile disagrees under the new Aerochrome — OPEN, 2026-09-16
+
+**Found by `tools/agreement-walk.mjs` on the build that ships the matrix, and
+deliberately not fixed in that release** (owner call: get the NEF path working
+first). Recorded here so it is a known open defect rather than a surprise.
+
+**What it says.** Under Aerochrome, a tile for a camera-rendered JPEG nobody has
+opened reads hue 165 (97% in one bin) while opening the same file reads hue 315
+(40%) — **150 degrees apart**. The raw arm of the same check agrees exactly
+(0 degrees), which is why the NEF path shipped.
+
+**It is a gap the new look EXPOSES rather than one it creates.** `applyLook`
+gray-world balances a camera-rendered file under a colour look; `makeThumb`
+without a stored edit gives it `wb [1,1,1]` and only overrides the SWAP and the
+MIXER from the session look. That difference was always there and was worth 30
+degrees under the bare rotation, because a rotation on an unbalanced JPEG and a
+rotation on a balanced one land in nearby bins. With the swap back on and a
+nine-number mixer over it, the same difference in balance is worth 150.
+
+**Measured both ways before it was called mine.** The previous `eir` was planted
+back into the built bundle and the walk re-run: the camera-JPEG tile arm PASSED
+there (30 degrees) and the raw batch arm failed identically (150 degrees, open
+hue 195 against batch 345, 2.2 points). So one of the two failures is new and one
+is not, and the old one is the unconditional gray-world balance in
+`batchParamsFor` that this file already carries as an open item.
+
+**The fix, when it is chased.** `makeThumb` needs the look's balance decision,
+not a second copy of it — the same extraction `freshBaseline` already is for the
+at-open baseline. The pieces are `grayWorldWB`, `autoExposure` and
+`oneBandFile`, and the one trap is that `applyLook` derives its exposure from
+`params.wb` AFTER the look's bias, not from the gray-world result.
