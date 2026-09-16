@@ -554,20 +554,6 @@ user-scalable=no.
   channel-swap / IR-WB); (2) is the first cut "stickers + grade on any JPEG/HEIC"
   or the full editor; (3) name/route/icon and whether it installs from the same
   chooser. Ships on its own once scoped — unrelated to the sticker betas.
-- [x] **Full-bleed alignment view — the tilted photo fills the screen** — owner-caught on device
-  2026-07-16 (with the crop go-to-main; screenshot IMG_6201, Straighten @ 23.6°).
-  While a geometry tool is armed, rotating and pinch-zooming CLIPS the photo
-  inside the `#view` box: the tilted/zoomed photo is letterboxed and cut by
-  `#view`'s rounded-rect edges, so black wedges show at the rotated corners and
-  the alignment grid floats over the black margins — the picture is "boxed"
-  instead of filling the screen. Mechanism: the armed preview renders into the
-  contained `#view` canvas (`object-fit:contain`), so a tilted + `viewZoom`
-  photo doesn't fill the axis-aligned `#view`. Owner's call: this gets fixed when
-  the image is simply made completely visible below everything — i.e. it's
-  SUBSUMED by the "Crop view: let the photo overflow instead of boxing it" and
-  "Big image: the photo fills the app" items below (the photo becomes the
-  full-bleed background and the tilt/zoom view stops clipping). No fix in
-  isolation; presentation-only, nothing touches the pipeline or export.
 - [ ] **Big image: the photo fills the app, menus float over it** — owner
   direction 2026-07-16, given as the owner ended the session and moved to a new one.
   STILL AN IDEA — the owner says so plainly, expect design questions. The vision: the
@@ -810,204 +796,6 @@ user-scalable=no.
   The decision that comes with it is the owner's: a drawn export cannot be
   byte-identical to today's, because a graphics chip computes in float where the
   processor uses doubles. It would match the PREVIEW instead.
-
-- [x] **Stop calling every device an iPad** — SHIPPED 2026-09-13. The app said
-  "iPad" in copy any browser on any machine reads, because it was built on one
-  and the language followed its author rather than its reader.
-  **One module answers the device question now: `src/platform.ts`.** It existed
-  in THREE places before — the install prompt's own `isIOS`, the export path's
-  `downloadIsUseless`, and the diagnostic's `deviceLine` — each written
-  separately, each slightly different, and no two of them wrong the same way
-  (hub LESSONS §243 is this shape). All three ask the module; nothing else
-  matches a browser string.
-  The one fact it turns on: iPadOS Safari reports `MacIntel` and a Macintosh
-  browser string on purpose, so only `maxTouchPoints` separates an iPad (5)
-  from a Mac (0). Tested against fourteen real browser strings
-  (scratchpad `plattest.mjs`) including that pair, which differ ONLY in that
-  number; planting `iPadInDesktopMode = false` fails exactly one case.
-  Three shapes of copy, decided per sentence:
-  (1) just a noun -> `<span data-device-noun>device</span>`, filled in with the
-  device's real name and shipping with the right word already in it, so a
-  script that never runs still leaves a correct sentence;
-  (2) only true on one platform -> `data-only-plat="ios"`, shipped HIDDEN and
-  revealed on a match — the welcome screen's iCloud/Files paragraph was the
-  first thing every reader on every machine saw, and it is an iOS story;
-  (3) reference material a reader may want for a machine they are not holding
-  (the install and uninstall lists, the Files-picker section) -> stays whole
-  for everyone, with the reader's own row marked in WORDS ("you're on this")
-  plus weight, never a fill, and the Help section carrying a scope line.
-  The install rows also carry `data-browser` where it matters, because on a Mac
-  running Chrome the Safari row is not the reader's row.
-  Verified in a browser as four devices (scratchpad `devicewalk.mjs` for
-  Infrared, `macrodev.mjs` for Macro): the noun, the hidden note, and exactly
-  the right marked rows. Both plants — ignoring the browser constraint, and
-  revealing the note always — fail it. **The first two plants PASSED and meant
-  nothing: each left a variable unused, so `tsc --noEmit` failed the build and
-  the walk ran against the old dist.** A plant that does not compile is not a
-  negative control.
-  Also platform-branched: the lens rig's auto-lock instruction, which named an
-  iPad Settings path to everybody and now names the path for the machine in
-  hand, or none at all where it does not know one.
-
-- [x] **Install and UNINSTALL instructions for every platform, not just iPad** —
-  SHIPPED 2026-09-13. The ⓘ explained adding to a home screen on iOS and
-  nothing else, and said nothing at all about getting back out.
-  Both halves are lists now, on all three surfaces — Infrared's Help, Macro's
-  Help, and the launcher — covering iPhone/iPad, Android, Chrome or Edge on a
-  computer, Safari on a Mac, and Firefox (which cannot install one, said
-  plainly rather than left out).
-  **Uninstall leads with why it is not obvious:** an installed web app is not a
-  shortcut, so unpinning it from a taskbar or dock does not remove it — then
-  the route per platform, and what removal does and does not touch. It is the
-  half nobody writes and the half somebody needs when they are already annoyed.
-  Every row carries `data-plat` (and `data-browser` where the row is
-  browser-specific), so the device work above marks the reader's own row while
-  leaving the list whole — a reader is often setting up a machine other than
-  the one they are holding, and hiding the rest would answer the wrong
-  question.
-
-- [x] **A pass on the words themselves** — SHIPPED 2026-09-13.
-  **MEASURED PER SCREEN, never as a total.** The instrument counts words that
-  are actually painted, because the two ways of getting this wrong both
-  overstate: summing twelve panel tabs reports 1,540 words for a screen showing
-  about a hundred, and counting a CLOSED `<details>` adds copy nobody can see —
-  Chromium still reports a painted box for its children, which inflated the IR
-  tab by 59 words until the counter was fixed. Every number below is one screen
-  as a reader meets it.
-  **Start screen: 228 -> 149.** Five ways in, each with a full paragraph
-  explaining it, and each of those paragraphs restating what the screen it
-  opens already says at greater length. One line each now — enough to choose.
-  Nothing was lost: the batch dialog's lead, the lens dialog's `<details>` and
-  the quick-look grid's own help all carry the detail, where it applies.
-  **Corrections tab: 371 -> 248.** Its 125-word hot-spot-colour note was the
-  longest in the app, sitting beside the slider it describes, duplicating a
-  group note ten lines above it AND the Help entry. One note for the three
-  sliders now, keeping the only thing the long one knew that the short one did
-  not: which way to push, and that it depends on the look.
-  **Crop 189 -> 125, export 270 -> 250, IR 285 -> 257.** Every tab is now under
-  260 with explanations ON, and the Explanations toggle still takes them all
-  away for a reader who has learned the controls.
-  **Help was NOT cut, on the owner's call** — it is reference somebody opens on
-  purpose, and length is not its problem. What was wrong there was one section,
-  "Looks & adjustments", holding 991 words on four unrelated subjects behind a
-  single heading: 2.7x the next longest, with no way in but the top. Split into
-  four sub-headings with every word kept, and the Help filter now opens the
-  SUB-section holding the match rather than only its parent — without that, a
-  search leaves the reader looking at four closed headings.
-  Two platform-specific things moved rather than shrank: the welcome screen's
-  iCloud paragraph is now shown only on iOS, and the Files-picker Help section
-  says at the top that it is an iPhone and iPad matter.
-
-- [x] **High-contrast modes — forced-colors and prefers-contrast** — SHIPPED
-  2026-09-13. Of the five places this app shows "this one is selected", FOUR
-  already changed text weight as well as fill and survived a forced-colors
-  strip. The fifth was the **session strip** — which photograph you are editing
-  was a background fill alone, so in high contrast it said nothing, and it is
-  the worst of the five to lose. Selected states now also carry an outline in
-  the system highlight colour. The scope was measured rather than assumed: the
-  note that prompted it said every active state was affected, and one was.
-  The first version of the test passed with the fix turned off, because it
-  happened to check one of the four that were already fine.
-
-- [x] **Manifest screenshots** — SHIPPED 2026-09-13, all three apps, both
-  shapes, shot headlessly from the app itself so they cannot drift from what it
-  looks like. **Not precached** — the browser's install dialog reads them and
-  the app never does, so bundling them put half a megabyte into every install
-  and every release's fresh cache, and `addAll` is all-or-nothing, which makes
-  them half a megabyte of new ways for an install to fail on a thin connection.
-  Same exclusion the social-share images already had.
-  **`tools/manifest-shots-check.mjs` is the gate, and it reads the BYTES.**
-  Every field in a screenshot entry is a claim — that the file is there, that it
-  is the type and the SIZE it says — and a wrong one is refused in silence: the
-  browser drops the entry and shows the plain prompt, which is indistinguishable
-  from never having added screenshots. It parses the JPEG segment chain for the
-  real dimensions, checks both directions, and refuses a manifest that offers
-  only one form factor. Wired into `.branch-guard`'s `also=`.
-  **Two of the six were caught showing the wrong thing before they shipped.**
-  The launcher pair had the first-visit welcome dialog open over the tool cards
-  — a modal is not the product — and the Macro pair started as an error message,
-  because the shot script fed a RAW to a tool that takes JPEGs. The launcher
-  walk now refuses to save a frame with `dialog[open]` in it, and the Macro one
-  refuses a frame still on the start panel.
-
-- [x] **Lens profiles that cannot vanish** — SHIPPED 2026-09-13. Two of the
-  three parts were already built: the export the reader keeps, and a panel note
-  that prints the BROWSER'S OWN answer about whether it intends to keep the
-  storage rather than a generic caution.
-  **What was missing was the only question the reader actually has:** have the
-  measurements on this device ever left it. "Save a backup" printed on every
-  visit says the same thing to somebody who backed up five minutes ago and to
-  somebody who has measured eleven lenses and never taken a copy.
-  **It records the STAMP, not a flag or a date** — `profilesStamp()` already
-  hashes the stored text for the preview cache, so a stamp that still matches
-  means the file the reader holds IS what is on the device, and the moment they
-  measure anything new it stops matching by itself with nothing to remember to
-  update. A boolean would read "backed up" for ever after one press; the state
-  machine has four values and `stale` is the one that matters.
-  Marked only when a copy actually left — a cancelled share sheet is not a
-  backup and an empty export is not a backup of anything. Shown after a run
-  keeps a profile, which is the moment there is something new to lose, and in
-  the panel note, where `.needs-backup` is a left rule and weight rather than a
-  colour so it survives grayscale and a forced-colors strip.
-  Asserted twice: the four states driven through real storage (scratchpad
-  `backupstate.mjs`, 7 checks) and the three on screen through the real panel
-  (`backupwalk.mjs`). Both plants compile and both are caught — the
-  boolean-flag design fails 2 of 7, and forgetting to re-render after a backup
-  fails the walk.
-  **And the third part: Help now carries an account of what survives what** —
-  what is kept on this device, what clears it (website data, deleting an
-  installed app, a browser needing the room, a private window), and what
-  survives all of it. It names the iOS rule explicitly: Safari clears a site's
-  storage after about a week unless it is installed to the home screen.
-  **The fixture cost a round.** Profiles carry NBINS=80 radial bins and `read()`
-  silently drops anything else, so a 24-bin fixture made all seven checks report
-  an empty device — a green-looking "empty, empty, empty" that was the test
-  data, not the code.
-  **AND THE REPO'S OWN GATE REFUSED THE FIRST COMMIT, RIGHTLY.** The bookkeeping
-  was written inside `lensstore.ts`, which `tools/preview-version-check.mjs`
-  hashes because a quick-look preview is rendered THROUGH the reader's lens
-  correction. Taking the bump it asked for would have thrown away every preview
-  every reader has cached, to record a change that cannot alter a pixel. It
-  lives in `src/lensbackup.ts` instead — the file it came out of says in its own
-  header that it only keeps and matches, and whether a copy exists elsewhere is
-  a different question asked by a different part of the screen. A gate that
-  refuses is also a design review.
-
-- [x] **The version menu runs the full width of the screen** — SHIPPED
-  2026-09-13, reported the same day. `#verDlg` carried no width of its own, so
-  it fell through to the shared `calc(100% - 36px)`: **1244px of 1280 on a
-  desktop and 784 of 820 on a tablet**, against 640 for Help and the lens panel
-  and 520 for every short dialog. Measured across all fifteen dialogs — the only
-  other three at 100% are the library, Quick look and the compare view, which
-  are full-screen deliberately. It joins the `#helpDlg, #lensDlg` rule at
-  `min(640px, 92vw)` rather than getting a third expression; it carries a
-  twelve-row report, so it takes the wider of the two sizes. Checked for
-  overflow at 1280, 820 and 390 wide: nothing sticks out and the page never
-  scrolls sideways.
-  **AND THE SAME LOOK FOUND ITS NEIGHBOUR.** In that dialog's action row, "Test
-  this device" is an `<a>` and "Measure your lens" is a `<button>`, both wearing
-  `.ver-link` — and the base rule is `select, button { width: 100% }`, keyed on
-  the TAG. So one came out 141px and the other 604px, side by side, looking like
-  two different kinds of control. This stylesheet already states the principle
-  forty lines further down, about a `<label>` silently opting OUT of the same
-  tag-keyed width; this was the same fault in the other direction. The class
-  sets `width: auto` and both are 141px and 143px now, at 44px tall.
-  **`tools/class-width-walk.mjs` is the instrument, and it is in the REPO.**
-  It renders all four pages, opens every dialog, and flags any class worn by two
-  different TAGS in one container whose widths differ by more than 60px —
-  because whether the tag rule or the class rule wins is a cascade question no
-  grep can answer. It finds nothing across the app today, and removing
-  `width: auto` from `.ver-link` makes it print a 463px spread, so its green
-  means something. Not in `.branch-guard`'s `also=`: it drives a browser against
-  a served build. Run it before a UI release, beside the a11y walk.
-  It is tracked rather than left in the scratchpad because it took four attempts
-  and the next session to meet this defect would otherwise build it again.
-  **Two of those four attempts are worth keeping.** A plant applied with `sed`
-  to the first `width: auto` in the file landed 1,977 lines away from the rule
-  it was meant to disable, and the walk's green measured nothing; and anchoring
-  on the rule's closing brace found the one INSIDE its own comment, because the
-  comment quotes `select, button { width: 100% }`. Plant by a unique anchor, and
-  print what was planted.
 
 ## The in-app Roadmap went to zero and five commits shipped it, 2026-09-14
 
@@ -5406,6 +5194,219 @@ read as authoritative, and an invented one is worse than a missing one.
   GitHub **Settings → Social preview** upload is a manual UI step (Cloudflare
   picks the og:image up automatically). Not a capability — ships as an increment
   (no VERSION bump).
+
+- [x] **Full-bleed alignment view — CLOSED, not shipped: subsumed by the full-bleed track** — owner-caught on device
+  2026-07-16 (with the crop go-to-main; screenshot IMG_6201, Straighten @ 23.6°).
+  While a geometry tool is armed, rotating and pinch-zooming CLIPS the photo
+  inside the `#view` box: the tilted/zoomed photo is letterboxed and cut by
+  `#view`'s rounded-rect edges, so black wedges show at the rotated corners and
+  the alignment grid floats over the black margins — the picture is "boxed"
+  instead of filling the screen. Mechanism: the armed preview renders into the
+  contained `#view` canvas (`object-fit:contain`), so a tilted + `viewZoom`
+  photo doesn't fill the axis-aligned `#view`. Owner's call: this gets fixed when
+  the image is simply made completely visible below everything — i.e. it's
+  SUBSUMED by the "Crop view: let the photo overflow instead of boxing it" and
+  "Big image: the photo fills the app" items below (the photo becomes the
+  full-bleed background and the tilt/zoom view stops clipping). No fix in
+  isolation; presentation-only, nothing touches the pipeline or export.
+
+- [x] **Stop calling every device an iPad** — SHIPPED 2026-09-13. The app said
+  "iPad" in copy any browser on any machine reads, because it was built on one
+  and the language followed its author rather than its reader.
+  **One module answers the device question now: `src/platform.ts`.** It existed
+  in THREE places before — the install prompt's own `isIOS`, the export path's
+  `downloadIsUseless`, and the diagnostic's `deviceLine` — each written
+  separately, each slightly different, and no two of them wrong the same way
+  (hub LESSONS §243 is this shape). All three ask the module; nothing else
+  matches a browser string.
+  The one fact it turns on: iPadOS Safari reports `MacIntel` and a Macintosh
+  browser string on purpose, so only `maxTouchPoints` separates an iPad (5)
+  from a Mac (0). Tested against fourteen real browser strings
+  (scratchpad `plattest.mjs`) including that pair, which differ ONLY in that
+  number; planting `iPadInDesktopMode = false` fails exactly one case.
+  Three shapes of copy, decided per sentence:
+  (1) just a noun -> `<span data-device-noun>device</span>`, filled in with the
+  device's real name and shipping with the right word already in it, so a
+  script that never runs still leaves a correct sentence;
+  (2) only true on one platform -> `data-only-plat="ios"`, shipped HIDDEN and
+  revealed on a match — the welcome screen's iCloud/Files paragraph was the
+  first thing every reader on every machine saw, and it is an iOS story;
+  (3) reference material a reader may want for a machine they are not holding
+  (the install and uninstall lists, the Files-picker section) -> stays whole
+  for everyone, with the reader's own row marked in WORDS ("you're on this")
+  plus weight, never a fill, and the Help section carrying a scope line.
+  The install rows also carry `data-browser` where it matters, because on a Mac
+  running Chrome the Safari row is not the reader's row.
+  Verified in a browser as four devices (scratchpad `devicewalk.mjs` for
+  Infrared, `macrodev.mjs` for Macro): the noun, the hidden note, and exactly
+  the right marked rows. Both plants — ignoring the browser constraint, and
+  revealing the note always — fail it. **The first two plants PASSED and meant
+  nothing: each left a variable unused, so `tsc --noEmit` failed the build and
+  the walk ran against the old dist.** A plant that does not compile is not a
+  negative control.
+  Also platform-branched: the lens rig's auto-lock instruction, which named an
+  iPad Settings path to everybody and now names the path for the machine in
+  hand, or none at all where it does not know one.
+
+- [x] **Install and UNINSTALL instructions for every platform, not just iPad** —
+  SHIPPED 2026-09-13. The ⓘ explained adding to a home screen on iOS and
+  nothing else, and said nothing at all about getting back out.
+  Both halves are lists now, on all three surfaces — Infrared's Help, Macro's
+  Help, and the launcher — covering iPhone/iPad, Android, Chrome or Edge on a
+  computer, Safari on a Mac, and Firefox (which cannot install one, said
+  plainly rather than left out).
+  **Uninstall leads with why it is not obvious:** an installed web app is not a
+  shortcut, so unpinning it from a taskbar or dock does not remove it — then
+  the route per platform, and what removal does and does not touch. It is the
+  half nobody writes and the half somebody needs when they are already annoyed.
+  Every row carries `data-plat` (and `data-browser` where the row is
+  browser-specific), so the device work above marks the reader's own row while
+  leaving the list whole — a reader is often setting up a machine other than
+  the one they are holding, and hiding the rest would answer the wrong
+  question.
+
+- [x] **A pass on the words themselves** — SHIPPED 2026-09-13.
+  **MEASURED PER SCREEN, never as a total.** The instrument counts words that
+  are actually painted, because the two ways of getting this wrong both
+  overstate: summing twelve panel tabs reports 1,540 words for a screen showing
+  about a hundred, and counting a CLOSED `<details>` adds copy nobody can see —
+  Chromium still reports a painted box for its children, which inflated the IR
+  tab by 59 words until the counter was fixed. Every number below is one screen
+  as a reader meets it.
+  **Start screen: 228 -> 149.** Five ways in, each with a full paragraph
+  explaining it, and each of those paragraphs restating what the screen it
+  opens already says at greater length. One line each now — enough to choose.
+  Nothing was lost: the batch dialog's lead, the lens dialog's `<details>` and
+  the quick-look grid's own help all carry the detail, where it applies.
+  **Corrections tab: 371 -> 248.** Its 125-word hot-spot-colour note was the
+  longest in the app, sitting beside the slider it describes, duplicating a
+  group note ten lines above it AND the Help entry. One note for the three
+  sliders now, keeping the only thing the long one knew that the short one did
+  not: which way to push, and that it depends on the look.
+  **Crop 189 -> 125, export 270 -> 250, IR 285 -> 257.** Every tab is now under
+  260 with explanations ON, and the Explanations toggle still takes them all
+  away for a reader who has learned the controls.
+  **Help was NOT cut, on the owner's call** — it is reference somebody opens on
+  purpose, and length is not its problem. What was wrong there was one section,
+  "Looks & adjustments", holding 991 words on four unrelated subjects behind a
+  single heading: 2.7x the next longest, with no way in but the top. Split into
+  four sub-headings with every word kept, and the Help filter now opens the
+  SUB-section holding the match rather than only its parent — without that, a
+  search leaves the reader looking at four closed headings.
+  Two platform-specific things moved rather than shrank: the welcome screen's
+  iCloud paragraph is now shown only on iOS, and the Files-picker Help section
+  says at the top that it is an iPhone and iPad matter.
+
+- [x] **High-contrast modes — forced-colors and prefers-contrast** — SHIPPED
+  2026-09-13. Of the five places this app shows "this one is selected", FOUR
+  already changed text weight as well as fill and survived a forced-colors
+  strip. The fifth was the **session strip** — which photograph you are editing
+  was a background fill alone, so in high contrast it said nothing, and it is
+  the worst of the five to lose. Selected states now also carry an outline in
+  the system highlight colour. The scope was measured rather than assumed: the
+  note that prompted it said every active state was affected, and one was.
+  The first version of the test passed with the fix turned off, because it
+  happened to check one of the four that were already fine.
+
+- [x] **Manifest screenshots** — SHIPPED 2026-09-13, all three apps, both
+  shapes, shot headlessly from the app itself so they cannot drift from what it
+  looks like. **Not precached** — the browser's install dialog reads them and
+  the app never does, so bundling them put half a megabyte into every install
+  and every release's fresh cache, and `addAll` is all-or-nothing, which makes
+  them half a megabyte of new ways for an install to fail on a thin connection.
+  Same exclusion the social-share images already had.
+  **`tools/manifest-shots-check.mjs` is the gate, and it reads the BYTES.**
+  Every field in a screenshot entry is a claim — that the file is there, that it
+  is the type and the SIZE it says — and a wrong one is refused in silence: the
+  browser drops the entry and shows the plain prompt, which is indistinguishable
+  from never having added screenshots. It parses the JPEG segment chain for the
+  real dimensions, checks both directions, and refuses a manifest that offers
+  only one form factor. Wired into `.branch-guard`'s `also=`.
+  **Two of the six were caught showing the wrong thing before they shipped.**
+  The launcher pair had the first-visit welcome dialog open over the tool cards
+  — a modal is not the product — and the Macro pair started as an error message,
+  because the shot script fed a RAW to a tool that takes JPEGs. The launcher
+  walk now refuses to save a frame with `dialog[open]` in it, and the Macro one
+  refuses a frame still on the start panel.
+
+- [x] **Lens profiles that cannot vanish** — SHIPPED 2026-09-13. Two of the
+  three parts were already built: the export the reader keeps, and a panel note
+  that prints the BROWSER'S OWN answer about whether it intends to keep the
+  storage rather than a generic caution.
+  **What was missing was the only question the reader actually has:** have the
+  measurements on this device ever left it. "Save a backup" printed on every
+  visit says the same thing to somebody who backed up five minutes ago and to
+  somebody who has measured eleven lenses and never taken a copy.
+  **It records the STAMP, not a flag or a date** — `profilesStamp()` already
+  hashes the stored text for the preview cache, so a stamp that still matches
+  means the file the reader holds IS what is on the device, and the moment they
+  measure anything new it stops matching by itself with nothing to remember to
+  update. A boolean would read "backed up" for ever after one press; the state
+  machine has four values and `stale` is the one that matters.
+  Marked only when a copy actually left — a cancelled share sheet is not a
+  backup and an empty export is not a backup of anything. Shown after a run
+  keeps a profile, which is the moment there is something new to lose, and in
+  the panel note, where `.needs-backup` is a left rule and weight rather than a
+  colour so it survives grayscale and a forced-colors strip.
+  Asserted twice: the four states driven through real storage (scratchpad
+  `backupstate.mjs`, 7 checks) and the three on screen through the real panel
+  (`backupwalk.mjs`). Both plants compile and both are caught — the
+  boolean-flag design fails 2 of 7, and forgetting to re-render after a backup
+  fails the walk.
+  **And the third part: Help now carries an account of what survives what** —
+  what is kept on this device, what clears it (website data, deleting an
+  installed app, a browser needing the room, a private window), and what
+  survives all of it. It names the iOS rule explicitly: Safari clears a site's
+  storage after about a week unless it is installed to the home screen.
+  **The fixture cost a round.** Profiles carry NBINS=80 radial bins and `read()`
+  silently drops anything else, so a 24-bin fixture made all seven checks report
+  an empty device — a green-looking "empty, empty, empty" that was the test
+  data, not the code.
+  **AND THE REPO'S OWN GATE REFUSED THE FIRST COMMIT, RIGHTLY.** The bookkeeping
+  was written inside `lensstore.ts`, which `tools/preview-version-check.mjs`
+  hashes because a quick-look preview is rendered THROUGH the reader's lens
+  correction. Taking the bump it asked for would have thrown away every preview
+  every reader has cached, to record a change that cannot alter a pixel. It
+  lives in `src/lensbackup.ts` instead — the file it came out of says in its own
+  header that it only keeps and matches, and whether a copy exists elsewhere is
+  a different question asked by a different part of the screen. A gate that
+  refuses is also a design review.
+
+- [x] **The version menu runs the full width of the screen** — SHIPPED
+  2026-09-13, reported the same day. `#verDlg` carried no width of its own, so
+  it fell through to the shared `calc(100% - 36px)`: **1244px of 1280 on a
+  desktop and 784 of 820 on a tablet**, against 640 for Help and the lens panel
+  and 520 for every short dialog. Measured across all fifteen dialogs — the only
+  other three at 100% are the library, Quick look and the compare view, which
+  are full-screen deliberately. It joins the `#helpDlg, #lensDlg` rule at
+  `min(640px, 92vw)` rather than getting a third expression; it carries a
+  twelve-row report, so it takes the wider of the two sizes. Checked for
+  overflow at 1280, 820 and 390 wide: nothing sticks out and the page never
+  scrolls sideways.
+  **AND THE SAME LOOK FOUND ITS NEIGHBOUR.** In that dialog's action row, "Test
+  this device" is an `<a>` and "Measure your lens" is a `<button>`, both wearing
+  `.ver-link` — and the base rule is `select, button { width: 100% }`, keyed on
+  the TAG. So one came out 141px and the other 604px, side by side, looking like
+  two different kinds of control. This stylesheet already states the principle
+  forty lines further down, about a `<label>` silently opting OUT of the same
+  tag-keyed width; this was the same fault in the other direction. The class
+  sets `width: auto` and both are 141px and 143px now, at 44px tall.
+  **`tools/class-width-walk.mjs` is the instrument, and it is in the REPO.**
+  It renders all four pages, opens every dialog, and flags any class worn by two
+  different TAGS in one container whose widths differ by more than 60px —
+  because whether the tag rule or the class rule wins is a cascade question no
+  grep can answer. It finds nothing across the app today, and removing
+  `width: auto` from `.ver-link` makes it print a 463px spread, so its green
+  means something. Not in `.branch-guard`'s `also=`: it drives a browser against
+  a served build. Run it before a UI release, beside the a11y walk.
+  It is tracked rather than left in the scratchpad because it took four attempts
+  and the next session to meet this defect would otherwise build it again.
+  **Two of those four attempts are worth keeping.** A plant applied with `sed`
+  to the first `width: auto` in the file landed 1,977 lines away from the rule
+  it was meant to disable, and the walk's green measured nothing; and anchoring
+  on the rule's closing brace found the one INSIDE its own comment, because the
+  comment quotes `select, button { width: 100% }`. Plant by a unique anchor, and
+  print what was planted.
 
 ## Desktop-mouse round + the flat-frame finding, 2026-09-08
 
@@ -15567,3 +15568,63 @@ the same reason. *Balance it anyway* reaches it: measured on all five, the mean
 goes from roughly 40/220/0 to a neutral 105/110/100 and the hues spread. What is
 still missing is the JPEG-side cast correction, and solving it needs a **two-band
 camera JPEG**, which this repository does not have.
+
+## Four controls the owner had to find by hand, 2026-09-16
+
+Reported from the device, one after another, in a single sitting: a **Share**
+button in the top bar beside the photograph being edited, which shared the
+APP's link; **Tutorials** in Help, which closed the editor and left the reader
+on the landing screen; **Batch process**, whose two words describe what Quick
+look does and which is really a rare unattended job; and **Measure lens**,
+sitting in a row of things you do to the open photograph.
+
+**Nothing in this repository could have found any of them, and that is the
+finding.** The accessibility walk measures CONFORMANCE — contrast, hit area, a
+name being PRESENT — and all four passed it, because each had a name and the
+name was simply wrong for what it did. Three of the four share one mechanism:
+the sentence that would have made the label honest was in a **`title`**, which
+is a hover, and there is no hover on a tablet.
+
+### What changed
+
+- **Share** left the bar for the ⓘ dialog's Settings, reading *Share this app*
+  with a note saying it sends a link to the app and never a photo. It still
+  appears only in the installed app, where the browser's own Share button is
+  out of reach; `setupInstalledShare` now reveals the explanatory row with it
+  (`data-share-row`), so the sentence never shows in a browser tab beside no
+  control.
+- **Tutorials** scrolls the practice grid into view and focuses its first tile.
+  `goHome()` alone puts the start screen up at its TOP and that grid is the last
+  thing on the card — below a divider, the install strip and a scroll cue.
+- **Batch process** is **Develop unattended** everywhere it is named, and
+  **Quick look** is **Quick look a folder**. Neither carries a `title` now.
+- **Measure lens** left the bar. THREE other doors already led to the rig and
+  still do: the start screen, the My-lens card beside the sliders it affects,
+  and the version dialog. Its dead id left `main.ts`'s wiring list in the same
+  commit.
+
+### The gate: `tools/control-check.mjs`
+
+Opens every page and every dialog from `tools/surfaces.mjs`, presses every panel
+tab, and inventories **every control in the app** — 416 of them across 7 pages —
+printing the lot grouped by surface, so reviewing them is one read of one page
+rather than a person tapping through the app.
+
+It refuses two things. **The tooltip rule**: any word a `title` says that the
+visible label and `aria-label` do not is a word the reader this app is built for
+will never see. **And a control with no name at all.** Honest exceptions are
+declared in `.control-allow` with their reasons, checked both ways and printed
+on every run.
+
+**Narrowed by measurement, not by taste.** The first run reported 50 identical
+lines and a control count of 526, because the dedup key included the SURFACE and
+the top bar was counted once per tab and once per dialog. Keyed on the control
+instead: 416 controls, 8 findings. A repeated failure is the shape that says the
+instrument is wrong before the finding is. It also reported a nameless
+`<summary>` that was its own fault — `innerText` is the RENDERED text and a
+summary inside a collapsed `<details>` renders as nothing.
+
+**It is committed RED, on two findings**, both inside a design question the owner
+opened the same afternoon: `Hold: Untouched` and `Full view` each leave real
+meaning in a tooltip, and the bar's hold-to-compare buttons are being reconsidered
+as one control. Recording them rather than declaring them away.
