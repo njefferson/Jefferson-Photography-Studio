@@ -2139,6 +2139,89 @@ Infrared Photography" and "Accurate White Balance in Color Infrared
 Photography". Transcripts pulled with yt-dlp after the player API refused the
 container's address; the site's article text carries none of the method.
 
+### 9i. FOLIAGE TONALITY — WHAT THE DENOISER COSTS, AND WHICH LEVER IS REAL
+
+Reported from the device: under Aerochrome the foliage is the right colour and
+"a blob of it". No detail inside the canopy. Measured on the lone oak frame,
+whose canopy is 1.57 million pixels — 30% of the frame — classified once on the
+shipped render and held fixed across every case below. Fine texture is a canopy
+pixel against the mean of four canopy neighbours four pixels away, in 0–255
+luma, through the real pipeline with the real look.
+
+**THE DENOISER TAKES 23% OF IT, AND THE WIDENING IS A THIRD OF THAT.**
+
+- 40.15 with the luminance bilateral off entirely — the ceiling.
+- 34.11 under the 5×5 filter this app shipped until 2026-09-16.
+- 30.76 under the 13×13 that replaced it, which section 4c-xxii is about.
+
+The commit that widened it said detail was not the price and that the busiest
+part of the picture measured the same as before. That was a busy-block metric on
+a different frame. On foliage it is false, and the report came back from the
+device before the measurement did.
+
+**THE CANOPY IS NOT CLIPPED AND THE LOOK IS NOT CRUSHING IT** — 1.1% of foliage
+pixels sit at or above 250 in red, and the look *widens* the canopy's tonal
+range rather than compressing it (10th-to-90th spread 125 with the look against
+65 without). So the missing thing is texture and modelling, and neither exposure
+nor the mixer is where it went.
+
+**THE MEASUREMENT THAT KILLED THE OBVIOUS LEVER.** The white-foliage method in
+the reference video takes the foliage hue's saturation down in the colour mixer
+and then pushes that same hue's *luminance* up. This app has that control —
+eight bands of hue, saturation and luminance, and Aerochrome leaves all eight
+luminances at exactly 1. Lifting the canopy's own three bands (red, orange,
+magenta) as a ladder:
+
+- 1.06 → texture +5.9%, canopy mean luma +5.9%
+- 1.10 → +9.6%, +9.6%
+- 1.14 → +12.9%, +13.1%
+- 1.18 → +15.6%, +16.2%
+- 1.22 → +17.7%, +19.0%
+
+**Texture per unit luma is flat at 0.254 across the whole ladder and falls above
+1.10.** Every point of texture it appears to add is brightness. A brighter
+population measures more local variation for free, which is why the ratio column
+exists — and the video's own words for the control, *so it pops a little bit
+more*, describe a brightness lever rather than a detail one. Reading it as a
+detail fix was this repository's error, not the source's.
+
+**THE TWO LEVERS THAT ARE REAL,** measured on both populations, because a
+local-contrast change cannot be judged on the tree alone:
+
+- **Denoise strength.** Floor 0.80 → 0.45: canopy texture 30.78 → 34.03, +11.6%
+  per unit brightness, with the canopy's mean luma unmoved (121.1 → 120.0). The
+  sky pays 4.3% — a verified sky block's pale luminance speckle rises 2.645 →
+  2.758, against a residual the widening had already cut 76%.
+- **Mid-frequency local contrast** (`texture`, `src/raw/detail.ts`): a band-pass
+  between the two detail blurs folded back as a hue-preserving luminance gain,
+  which is Lightroom's Texture slider. At 0.25 on top of the knee: 35.25, +16.0%
+  per unit luma, canopy luma 119.5 — it does not brighten at all. The sky pays
+  another 1.9%, 6.2% in total.
+
+Together they recover 48% of the canopy's loss for 6.2% of the sky's gain. At
+0.40 it is 56% for 7.3%; the slider reaches it and the reader can.
+
+**THE RADIUS IS THE WRONG LEVER, MEASURED RATHER THAN ARGUED.** Sweeping the
+bilateral to 11×11, 9×9 and 7×7 with sigma held at R/2 so only the extent moves:
+the narrowest recovers 29% of the canopy's loss and hands back 28% of the sky's
+gain. That is very nearly the widening's own trade run backwards. Strength and
+local contrast both beat it because neither touches the kernel the sky fix
+depends on.
+
+**WHAT THIS DOES NOT FIX, AND IT IS VISIBLE IN EVERY CROP.** The trunk and the
+main branches render the same crimson as the leaves. Real Aerochrome renders bark
+dark and close to neutral, because bark reflects little infrared. The reference
+video's subtractive-colour method is the field's answer — the canopy's colour
+casts onto the structure, so its complement goes into the shadows only and the
+bark goes neutral — and this app has the control: `grade` carries separate
+shadow, midtone and highlight tints. **Measured at the canopy's own output hue
+plus 180° (6.4° → 186°) and amount 0.18, it changes the render by 2 points of
+red and nothing else, and the trunk stays crimson.** The reason is that the trunk
+here is not a luminance shadow; it is a midtone at the canopy's hue, so a shadow
+tint at that strength cannot reach it. Not shipped on that evidence rather than
+shipped on the method's authority. The amount, and whether the midtone band is
+the right one, is a measurement that has not been made.
+
 ---
 
 ---
