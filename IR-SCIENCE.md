@@ -2449,13 +2449,31 @@ mean. On three practice frames the bitmap found a region with no chroma in
 either look, which is a `buildSkyMask` finding rather than a sky, and is not
 measured further here.
 
+**THOSE ARE THE PROTOTYPE'S NUMBERS, AND THE SHIPPED STAGE READS LOWER.** The
+ten-frame sweep smoothed the rendered planes with a dense 17 px box (R8) to
+choose the radius; the shipped map is a 22 px texel box bilinearly upsampled,
+a wider kernel. Measured on the same population of NIR_3406 through the export
+path itself, the shipped stage reads **15.9 → 2.2** at the 12 px lag with the
+mean held 36.9 → 37.0 — a quarter of Pink IR's bare sky, not half. The 2.50
+patch note carries the prototype's 4.7, which understates what shipped. A
+control anchored on the prototype's figure refused the shipped reading once
+for exactly this reason; the anchor that holds on the shipped path is the mean,
+not a residual measured with a different kernel.
+
 **THE OBVIOUS ALTERNATIVE, MEASURED AND REJECTED FIRST.** A sky mask's own
 `saturation` at 0.35 cuts the same residual 73% — and takes the sky's mean
 chroma 36.9 → 10.9 with it. The blue and the noise are the same quantity;
 scaling removes both. 4c-xi's headline already said the blue is 1.4% of the
 sensor's range. The control that catches this — the mean must HOLD — is printed
-beside every row above, and `addMask(4)` defaults that saturation to 1.3, so
-pressing Add Sky today makes the mottle worse by about a third.
+beside every row above, and `addMask(4)` defaults that saturation to 1.3 — a
+deliberate default, recorded in the code as taste. Measured on the same
+population with every arm through the shipped path: the mask multiplies the
+residual by about 1.7 whichever way the stage is set — stage off 15.9 → 27.3,
+stage on 2.2 → 3.7, Pink IR (no stage) 8.7 → 12.4 — and lifts the mean chroma
+50%. So Add Sky still costs in RATIO, but with the stage in, Aerochrome after
+Add Sky (3.7) sits well under Pink IR's bare sky (8.7), and the default stands.
+The "about a third" an earlier draft of this paragraph carried came from the
+lag-4 whole-sky instrument hub §320 retired, which under-reads.
 
 **AND THE SHIPPED PATH FAILED ITS OWN CONTROL ONCE, WHICH IS THE PART WORTH
 KEEPING.** Rendered through the actual export path, the sky's mean chroma read
