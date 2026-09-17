@@ -12013,7 +12013,17 @@ type BatchGrade =
   // A look grade may carry an imported LUT: lutData when it comes from the
   // live edit (already in RAM), or a lutId/lutStrength ref from a saved slot
   // (resolved from IndexedDB ONCE at batch start — see the change handler).
-  | { kind: "look"; look: SavedLook; lutData?: EditParams["lut"]; lutId?: string; lutStrength?: number }
+  // `hasLook` is the SCREEN'S OWN ANSWER to "is a look on this frame", carried
+  // rather than re-derived. It exists because the batch used to infer it from
+  // the grade's shape — any grade that was not Auto counted as a look — and
+  // "Copy the current edit" on a photograph with nothing dialled in is a grade
+  // that is not Auto and is not a look. Measured on a practice raw: that batch
+  // frame came out with both depth bands at their 2.0 ceiling and its largest
+  // hue bin at 345 against the screen's 195, because the colour half of the
+  // depth lift fired on an unlooked frame — the exact case solveLift's own
+  // comment records as "not a correction, it is a new default". Absent means
+  // true, so a saved or built-in look needs no annotation.
+  | { kind: "look"; look: SavedLook; hasLook?: boolean; lutData?: EditParams["lut"]; lutId?: string; lutStrength?: number }
   | { kind: "builtin"; key: keyof typeof LOOKS }
   | { kind: "auto" };
 
@@ -12036,7 +12046,35 @@ function neutralLook(): SavedLook {
  *  creative grade. Mirrors autoAdjust() + loadSlot()/pressLook(), without
  *  touching the live on-screen edit. Masks never carry (composition-specific). */
 function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["lut"] = null): EditParams {
-  let wb = grayWorldWB(img);
+  // THE SAME FOUR VALUES OPENING THE FILE WOULD APPLY, from the one function
+  // that states them. This assembler used to re-derive them and drifted on
+  // three: it gray-world balanced every file, including a camera-rendered one
+  // that opens at [1,1,1]; it moved exposure on a file that opens at 1; and it
+  // left the channel swap to the grade, so an Auto batch of a raw ran with the
+  // swap OFF while the same raw on screen ran with it ON. Measured on a
+  // practice raw: hue 255 out of the batch against 195 on the screen, with 40
+  // of 46 fields already identical and `swapRB` the only substantive one left.
+  const base = freshBaseline(img);
+  // AND SNAPPED TO WHAT THE SLIDERS CAN HOLD, because the open path snaps and
+  // this one did not. `establishFreshEdit` measures at full precision and then
+  // runs syncToUI(); syncFromUI(), which writes each measurement into a stepped
+  // control and reads the rounded number back — so the photograph on screen is
+  // wearing 0.44, never 0.44014856293231525. A batch of the same file wore the
+  // measurement, and on a frame whose colour sits in three nearly equal hue
+  // bands that was enough to reorder them: measured on a practice raw, the
+  // screen's largest band was 195 degrees at 34.2% with 345 at 29.0%, and the
+  // batch of the same file put 345 first at 34.1% with 195 at 30.6%. Handing
+  // the batch the live params instead put 195 back on top, which is what says
+  // the residue was the rounding and not the pipeline. Same rule as the
+  // existing note in establishFreshEdit: a full-precision value written to a
+  // stepped control does not come back.
+  const snapPos = (v: number, lo: number, hi: number) => fromPos(toPos(v, lo, hi), lo, hi);
+  const snapStep = (v: number, step: number) => Math.round(v / step) * step;
+  let wb: [number, number, number] = [
+    snapPos(base.wb[0], WB_LO, WB_HI),
+    snapPos(base.wb[1], WB_LO, WB_HI),
+    snapPos(base.wb[2], WB_LO, WB_HI),
+  ];
   let look: SavedLook;
   /** The denoise floor the chosen grade asks for, or null. Only a BUILT-IN look
    *  can carry one; a saved look drops onto any photograph and has no
@@ -12078,17 +12116,29 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["l
   } else {
     look = grade.kind === "look" ? grade.look : neutralLook();
   }
+  // IS A LOOK ACTUALLY ON THIS FRAME — the question the screen answers with
+  // `activeLook !== null`, asked here the same way rather than inferred from
+  // the grade's shape. See the comment on BatchGrade for what inferring it
+  // cost.
+  const hasLook = grade.kind === "builtin" || (grade.kind === "look" && grade.hasLook !== false);
   const p: EditParams = {
     wb,
-    exposure: autoExposure(img, wb),
+    exposure: snapPos(base.exposure, EX_LO, EX_HI),
     // THE SAME FLOOR applyLook APPLIES, over this photograph's own measurement.
-    denoise: Math.max(estimateDenoise(img), dnFloor ?? 0),
+    denoise: snapStep(Math.max(estimateDenoise(img), dnFloor ?? 0), 0.01), // the #dn slider's own step
     // THE SAME AUTOMATICS AN OPEN APPLIES. Highlight recovery was missing here
     // and nowhere else — a single open sets it, and so does the strip
     // thumbnail; batch was the only path that did not, so a frame with real
     // clipping came out of a batch unrecovered.
-    recover: img.camMatrix ? autoRecover(img) : 0,
-    swapRB: look.swapRB,
+    recover: snapStep(base.recover, 0.01),
+    // THE GRADE OWNS THE SWAP UNLESS THERE IS NO GRADE. A chosen look carries
+    // its own field — including "copy the current edit", where the reader may
+    // have toggled the swap by hand and copying the edit has to mean copying
+    // it. Auto is the only grade that carries nothing, and it used to read this
+    // off `neutralLook()`, where it is hardcoded false: an Auto develop of a
+    // raw came out unswapped while the same raw on screen was swapped. The file
+    // kind decides it there, which is what opening the photograph does.
+    swapRB: grade.kind === "auto" ? base.swapRB : look.swapRB,
     hue: look.hue,
     sat: look.sat,
     contrast: look.contrast,
@@ -12143,7 +12193,7 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["l
   // materials into the sky and foliage bands — the auto-balance-only choice
   // gets the tonal half alone, matching a bare open.
   if (autoLift) {
-    const solved = solveLift(grade.kind !== "auto", img, p);
+    const solved = solveLift(hasLook, img, p);
     const lift = solved && scaleLift(solved, liftAmount);
     if (lift) { p.tone = lift.tone as typeof p.tone; p.sky = lift.sky as typeof p.sky; p.foliage = lift.foliage as typeof p.foliage; }
   }
@@ -12451,7 +12501,7 @@ function openBatchDialog() {
     const strong = document.createElement("strong");
     strong.textContent = slotLabel(i, look) + (look.lutId ? " · LUT" : "");
     b.append(strong);
-    b.addEventListener("click", () => pickGrade({ kind: "look", look, lutId: look.lutId, lutStrength: look.lutStrength }));
+    b.addEventListener("click", () => pickGrade({ kind: "look", look, hasLook: true, lutId: look.lutId, lutStrength: look.lutStrength }));
     bcSlots.append(b);
   }
   ($("bcNoSlots") as HTMLElement).hidden = filled > 0;
@@ -12481,7 +12531,7 @@ function openBatchDialog() {
 
 $("batchBtn").addEventListener("click", openBatchDialog);
 $("welcomeBatchBtn").addEventListener("click", openBatchDialog);
-$("bcCurrent").addEventListener("click", () => pickGrade({ kind: "look", look: currentLook(), lutData: params.lut ?? undefined }));
+$("bcCurrent").addEventListener("click", () => pickGrade({ kind: "look", look: currentLook(), hasLook: activeLook !== null, lutData: params.lut ?? undefined }));
 $("bcAuto").addEventListener("click", () => pickGrade({ kind: "auto" }));
 // Quick look from the editor's own top bar. The system file picker is the
 // system's and cannot be made bigger; this app's own grid is full-screen, and

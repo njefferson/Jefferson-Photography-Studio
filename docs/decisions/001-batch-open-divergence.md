@@ -1,4 +1,7 @@
-# 001 · A batched raw and the same raw opened are 150° apart
+# 001 · A .zip developed unattended now matches what you saw on screen
+
+*Filed while it was called "a batched raw and the same raw opened are 150°
+apart", which is what it measured before anyone knew what it was.*
 
 ## Context
 
@@ -49,6 +52,15 @@ by field, and find which fields differ. Chosen because two diagnoses have alread
 been asserted from reading and both were wrong; the next step must produce
 evidence, not a hypothesis.
 
+**DONE, 2026-09-17, and it took four measurements to get to a cause.** Arm A
+eliminated the pairing: the canvas showed `NIR_0063.dng` and the batch frame read
+was `NIR_0063.jpg`, the same photograph. Arm B eliminated the renderer: exporting
+the OPEN photograph runs `compileEdit` on the CPU with the live params, and it
+read hue 195 and lightness 38.6 — identical to the canvas, which draws through
+`gl.ts`. So the two implementations of the edit agree, and resolution is not the
+confound either. Arm C printed both parameter sets field by field. Arm D drove the
+batch the way the app drives it, and that is where the ground moved.
+
 Make `batchParamsFor` call `freshBaseline` for its Auto case, closing the
 assembler gap structurally rather than per-field. Correct in principle and still
 the likely eventual shape — but it was attempted in the form of the swap field
@@ -77,6 +89,56 @@ explanation. The fix was written, commented, built, and the walk came back
 confirmed `runBatch` does call `batchParamsFor`, so it was not dead code, and
 **why that edit changed nothing is itself unexplained and is the sharpest clue
 available.**
+
+## Outcome
+
+**Shipped 2026-09-17. The 150° was four faults compounding, and the first one was
+in the instrument.**
+
+`pickGrade` sets the chosen grade and THEN opens the file picker. The walk wrote
+to `#batchFiles` first, so the picker callback ran with no grade chosen and took
+its fallback — `{ kind: "look", look: currentLook() }` whenever a photograph is
+open. **The walk therefore never once ran the Auto batch it reported.** That also
+settles the clue this record called the sharpest available: the swap fix measured
+as changing nothing because it changed the built-in/auto assembly, and the walk
+was running the look branch. The diagnosis was right and the test was reading a
+different path.
+
+With the grade actually chosen, three real faults were left, each measured:
+
+- `batchParamsFor` re-derived the opening ruling instead of using
+  `freshBaseline`, the function that exists to be the one copy of it. It
+  gray-world balanced every file including camera-rendered ones that open at
+  `[1,1,1]`, moved exposure on a file that opens at 1, and took the channel swap
+  from `neutralLook()`, where it is hardcoded false — so an Auto batch of a raw
+  ran with the swap OFF while the screen had it on. Measured: batch hue 255
+  against the screen's 195.
+- `withColour` was inferred from the grade's shape, `grade.kind !== "auto"`. So
+  "copy the current edit" with nothing dialled in counted as a look, and the
+  colour half of the depth lift fired on an unlooked frame with both bands driven
+  to their 2.0 ceiling — the case `solveLift`'s own comment records as "not a
+  correction, it is a new default", measured at 44 of 44 practice frames. That is
+  the 150° itself: batch hue 345 against the screen's 195, 2.2 points of
+  lightness apart. The grade carries `hasLook` now, which is the screen's own
+  `activeLook !== null`, rather than being guessed from the shape.
+- `batchParamsFor` never snapped its measurements to what the sliders hold, while
+  `establishFreshEdit` does (`syncToUI(); syncFromUI()`). On a frame whose colour
+  sits in three nearly equal hue bands — 195 at 34.2%, 345 at 29.0%, 15 at
+  27.4% — that unsnapped drift was enough to reorder them. Forcing the live
+  params into the batch put 195 back on top, which is what identified the residue
+  as the rounding rather than the pipeline.
+
+After: all four arms of the walk read 0° apart, and 0.0 to 0.2 points of
+lightness. Before: camera JPEG 30° and 1.8 points on Auto, raw 60° on Auto, raw
+150° and 2.2 points under "copy the current edit".
+
+**What turned out wrong in this record.** Its Options section led with the
+two-renderer story, and that was a plausible reading of `export.ts` and `gl.ts`
+that measured false in one run. Its Rejected section had the channel swap down as
+measured wrong; the swap was right and the measurement was broken. Roadmap item
+011's duplication of the edit across two implementations is still a real
+liability — it is just not this defect, and it now has a measurement saying the
+two agree on at least one frame.
 
 ## Rank
 
