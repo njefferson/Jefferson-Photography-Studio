@@ -978,6 +978,55 @@ correlated mottle at exactly two to four pixels. Nothing downstream of the
 demosaic can undo a structure the demosaic invented. **That is where the next
 look belongs, and it is not a filter.**
 
+### 4c-xi. NOTHING IS ZEROED UPSTREAM — THE SKY'S BLUE IS 1.4% OF THE SENSOR'S RANGE
+
+Measured 2026-09-17 on the reported frame, going up the pipeline rather than
+down, on the hypothesis that pixels were being clamped away in the decode. They
+are not, and the numbers say what is happening instead.
+
+**THE BLACK CLAMP DESTROYS NOTHING.** `demosaicBinned` normalises every sample as
+`max(0, (v - black) * scale)`, and that clamp is a real one — clipping negatives
+after black subtraction biases noise to average positive rather than to zero, which
+is a documented cause of shadow haze. Instrumented and counted on two frames:
+**zero samples of 20.8 million are at or below black**, in any channel. Black is
+1008, white 15520, and the lowest value anywhere in the file is 1009. Nothing in
+the decode is zeroing anything.
+
+**WHAT THE FILE ACTUALLY CARRIES IN A SKY.** Over the frame's top-left eighth,
+above the black point: red 363..1011, green 174..525, blue **89..296**. Against a
+full range of 14512 that is 4.5%, 2.4% and **1.4%**. The distinct-level counts
+rule out quantisation as well — 196 distinct blue values in that patch, not a
+handful.
+
+So the sky's blue is one and a half per cent of what the sensor can hold, and the
+rendering lifts it to roughly a third of display brightness. Everything rides that
+gain.
+
+**AND THE PREVIEW AND THE EXPORT DEMOSAIC DIFFERENTLY, WHICH IS NOT THE CAUSE
+EITHER.** `demosaicBinned` turns one 2x2 quad into one pixel and averages only the
+two greens — red and blue are single photosites with no averaging at all — while
+`demosaicPixelLinearInto` averages two or four neighbouring samples wherever the
+channel is not native. The export is therefore strictly better-conditioned on
+blue, and exporting the frame and comparing the same sky at the same scene scale
+shows **the same mottle**. The difference is real and it is not the mechanism.
+
+**WHICH RETURNS THIS TO 4c-iii, WHOSE LAST PARAGRAPH ALREADY SAID IT.** The matrix
+manufactures a cyan sky by differencing channels the app measures at 0.979 to
+0.994 correlation on this frame. A difference of two nearly identical, small,
+noisy numbers is mostly noise, and the ablation agrees: putting the mixer back to
+Identity is the single biggest improvement of any stage, moving the sky's
+evenness from 0.65 to 0.74 where saturation, contrast and the band stage move it
+not at all. You can have the saturation or you can have the clean sky.
+
+**THE ONE LEVER NOT YET TRIED IS SCALE, AND 4c-vi NAMED IT FIRST.** The chroma
+stage built in 4c-viii works on the bilateral's own 5x5, and the mottle is
+structured at two to four pixels — a window that small cannot flatten structure
+that nearly fills it. Blurring colour at a genuinely larger radius while keeping
+luminance sharp is what 4c-vi's closing paragraph asked for and what this
+implementation did not deliver. That is the next variable, and it is a cost
+question rather than a correctness one: a wide spatial pass per pixel is not free
+on a tablet.
+
 ### 4c-vii. THE OVERTURNED NUMBERS, KEPT ON PURPOSE
 
 4c-vi originally read that raising denoise did nothing to the ratio (NIR_1480
