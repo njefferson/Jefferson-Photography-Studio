@@ -151,6 +151,7 @@ uniform float u_outAspect;   // output (cropped) frame aspect, for the vignette
 uniform vec2 u_outPx;        // output frame size in pixels, for grain coords
 uniform float u_denoise; // 0..1 bilateral strength (see raw/denoise.ts)
 uniform float u_chroma;  // 0..1 how far COLOUR is mixed to the plain 5x5 blur (raw/denoise.ts)
+uniform float u_despeckle; // 0..1 decision-based median on the centre pixel (raw/denoise.ts)
 uniform float u_sharpen; // 0..1 capture sharpening (high-freq) — see raw/detail.ts
 uniform float u_texture; // -1..1 mid-freq local contrast — see raw/detail.ts
 uniform vec2 u_texel;    // 1/textureSize
@@ -204,6 +205,34 @@ vec2 warpUv(vec2 uv){
   return uv + d * u_warpScale;
 }
 vec3 fetchLin(vec2 uv){ vec3 s = texture(u_tex, warpUv(uv)).rgb; return u_linear ? s : toLinear(s); }
+
+// MEDIAN OF NINE, the same nineteen-pair network as raw/denoise.ts. There is no
+// sorting in GLSL and there does not need to be: a fixed network is branchless,
+// costs the same on every pixel, and is the arrangement the CPU side uses, so
+// the two cannot drift by one being cleverer than the other.
+float median9(float a0, float a1, float a2, float a3, float a4, float a5, float a6, float a7, float a8) {
+  float t;
+  t = min(a1, a2); a2 = max(a1, a2); a1 = t;
+  t = min(a4, a5); a5 = max(a4, a5); a4 = t;
+  t = min(a7, a8); a8 = max(a7, a8); a7 = t;
+  t = min(a0, a1); a1 = max(a0, a1); a0 = t;
+  t = min(a3, a4); a4 = max(a3, a4); a3 = t;
+  t = min(a6, a7); a7 = max(a6, a7); a6 = t;
+  t = min(a1, a2); a2 = max(a1, a2); a1 = t;
+  t = min(a4, a5); a5 = max(a4, a5); a4 = t;
+  t = min(a7, a8); a8 = max(a7, a8); a7 = t;
+  t = min(a0, a3); a3 = max(a0, a3); a0 = t;
+  t = min(a5, a8); a8 = max(a5, a8); a5 = t;
+  t = min(a4, a7); a7 = max(a4, a7); a4 = t;
+  t = min(a3, a6); a6 = max(a3, a6); a3 = t;
+  t = min(a1, a4); a4 = max(a1, a4); a1 = t;
+  t = min(a2, a5); a5 = max(a2, a5); a2 = t;
+  t = min(a4, a7); a7 = max(a4, a7); a4 = t;
+  t = min(a4, a2); a2 = max(a4, a2); a4 = t;
+  t = min(a6, a4); a4 = max(a6, a4); a6 = t;
+  t = min(a4, a2); a2 = max(a4, a2); a4 = t;
+  return a4;
+}
 
 vec3 rgb2hsv(vec3 c){
   vec4 K = vec4(0.0, -1.0/3.0, 2.0/3.0, -1.0);
@@ -368,6 +397,38 @@ void main() {
 
   // Denoise FIRST, on linear sensor data, before the big IR gains amplify the
   // noise. Same 5x5 brightness-adaptive bilateral as raw/denoise.ts.
+  // DESPECKLE FIRST, AND THE ORDER IS THE POINT. lc below is the centre's
+  // luma and every neighbour's weight is measured against it, so a centre that
+  // is an impulse makes every neighbour look wrong and collapses the bilateral
+  // onto the very pixel that should have gone. A bilateral preserves outliers by
+  // construction — see raw/denoise.ts and IR-SCIENCE.md 4c-ix — which is why
+  // neither smoother below can reach a pale dot in a deep sky and this can.
+  //
+  // A DECISION, NOT A FILTER, and PER CHANNEL. Identical rule and constant to
+  // raw/denoise.ts: the centre must be the extreme of its own 3x3 AND sit
+  // further from that window's median than k times the window's spread.
+  vec3 ctr = c;
+  if (u_despeckle > 0.0 && v_uv.x >= u_split) {
+    float k = 0.45 * (1.0 - u_despeckle) + 0.02; // keep in sync with raw/denoise.ts
+    vec3 n[9];
+    int q = 0;
+    for (int dy = -1; dy <= 1; dy++) {
+      for (int dx = -1; dx <= 1; dx++) {
+        n[q] = fetchLin(v_uv + vec2(float(dx), float(dy)) * u_texel);
+        q++;
+      }
+    }
+    vec3 lo = n[0], hi = n[0];
+    for (int j = 1; j < 9; j++) { lo = min(lo, n[j]); hi = max(hi, n[j]); }
+    vec3 med = vec3(
+      median9(n[0].r, n[1].r, n[2].r, n[3].r, n[4].r, n[5].r, n[6].r, n[7].r, n[8].r),
+      median9(n[0].g, n[1].g, n[2].g, n[3].g, n[4].g, n[5].g, n[6].g, n[7].g, n[8].g),
+      median9(n[0].b, n[1].b, n[2].b, n[3].b, n[4].b, n[5].b, n[6].b, n[7].b, n[8].b));
+    bvec3 extreme = bvec3(c.r <= lo.r || c.r >= hi.r, c.g <= lo.g || c.g >= hi.g, c.b <= lo.b || c.b >= hi.b);
+    bvec3 far = greaterThan(abs(c - med), k * (hi - lo));
+    ctr = mix(c, med, vec3(extreme.x && far.x, extreme.y && far.y, extreme.z && far.z));
+    c = ctr;
+  }
   if ((u_denoise > 0.0 || u_chroma > 0.0) && v_uv.x >= u_split) {
     // A FLOOR RATHER THAN A BRANCH when the luminance half is off — same reason
     // as raw/denoise.ts: sigma 0 makes the centre tap 0 * Infinity.
@@ -380,7 +441,8 @@ void main() {
     float gw = 0.0;
     for (int dy = -2; dy <= 2; dy++) {
       for (int dx = -2; dx <= 2; dx++) {
-        vec3 s = fetchLin(v_uv + vec2(float(dx), float(dy)) * u_texel);
+        // The centre tap is the corrected pixel, for the same reason lc is.
+        vec3 s = (dx == 0 && dy == 0) ? ctr : fetchLin(v_uv + vec2(float(dx), float(dy)) * u_texel);
         float rel = (dot(s, LUMA_W) - lc) / (lc + 0.02);
         float sp = exp(-float(dx*dx + dy*dy) / 4.5);
         float w = sp * exp(-rel * rel * inv2s2);
@@ -845,7 +907,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -1238,6 +1300,7 @@ export class Renderer {
     gl.uniform1i(this.loc.u_maskViz, maskViz);
     gl.uniform1f(this.loc.u_denoise, p.denoise);
     gl.uniform1f(this.loc.u_chroma, p.chroma ?? 0);
+    gl.uniform1f(this.loc.u_despeckle, p.despeckle ?? 0);
     gl.uniform1f(this.loc.u_sharpen, p.sharpen ?? 0);
     gl.uniform1f(this.loc.u_texture, p.texture ?? 0);
     gl.uniform3f(this.loc.u_tint, p.tint[0], p.tint[1], p.tint[2]);

@@ -384,7 +384,7 @@ export async function exportImage(
   // Denoise first, then sharpen/texture — the same order the shader runs them
   // (raw neighbourhood -> denoised centre -> detail gain). Both are no-ops when
   // their slider is 0, so a plain edit keeps the 1x-decode fast path.
-  const denoised = makeRowDenoiser(warped, srcW, srcH, params.denoise, proxyFactor, params.chroma ?? 0);
+  const denoised = makeRowDenoiser(warped, srcW, srcH, params.denoise, proxyFactor, params.chroma ?? 0, params.despeckle ?? 0);
   const sampleLinear = makeRowDetail(warped, denoised, srcW, srcH, params.sharpen ?? 0, params.texture ?? 0, proxyFactor);
   // Scaled exports (50% / 25%) BOX-FILTER instead of decimating: each output
   // pixel averages an ss×ss grid of source taps placed in OUTPUT space and

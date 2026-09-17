@@ -940,6 +940,44 @@ Sources: *Noise Reduction Using Enhanced Bilateral Filter*
 *Adaptive median filter salt and pepper noise suppression*
 (https://www.nature.com/articles/s41598-024-66649-y).
 
+### 4c-x. THE MEDIAN IS BUILT AND DOES NOT REACH IT EITHER — IT IS NOT IMPULSE NOISE
+
+4c-ix named a median as the documented remedy for impulse noise and it was right
+about the remedy and wrong about the diagnosis. The stage is built — a
+decision-based median, per channel, on the centre pixel before the bilateral
+reads it, in both renderers with the same nineteen-pair network — and at full
+strength it leaves this sky visually unchanged.
+
+**The control is live, which had to be established before the result meant
+anything.** A sky block's bytes differ at every setting. The first threshold
+mapping did NOT: it was `0.25/s²`, and since a pixel that IS the extreme of its
+own window can be at most one window-spread from that window's median, every
+position below strength 0.5 could never fire. That is a slider with a dead zone
+reading as a stage that does nothing, and it was caught by hashing rather than by
+looking. The mapping is linear from 0.47 to 0.02 now and the whole travel moves
+the picture.
+
+**So the artefact is not impulse noise, and the failure of the median is what
+says so.** A median-of-9 replaces a pixel that stands alone against its
+neighbours. At 1:1 this sky is not stray dots on a smooth field — it is a dense
+mottle, roughly half the pixels, structured at **two to four pixels** rather than
+one. A 3x3 window is filled by the texture, so its median is another sample of
+the same distribution and replacing the centre with it changes nothing.
+
+**Three filters have now been measured against it and none reaches it**: the
+5x5 bilateral at full strength, the chroma mix at full strength, and the
+decision-based median at full strength. They fail for three different reasons —
+outlier preservation, luminance preservation, and window size — and the pattern
+across those three failures is the finding: **the structure is correlated at the
+scale of the sensor's colour mosaic, not at the scale of a pixel.**
+
+That points upstream of every stage tested here, at the demosaic of a channel the
+conversion has left almost nothing to record: blue is sampled at one photosite in
+four, and interpolating a near-empty, noisy channel across that grid produces
+correlated mottle at exactly two to four pixels. Nothing downstream of the
+demosaic can undo a structure the demosaic invented. **That is where the next
+look belongs, and it is not a filter.**
+
 ### 4c-vii. THE OVERTURNED NUMBERS, KEPT ON PURPOSE
 
 4c-vi originally read that raising denoise did nothing to the ratio (NIR_1480

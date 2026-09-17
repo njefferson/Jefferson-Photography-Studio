@@ -429,8 +429,8 @@
             <label>Denoise <input id="dn" type="range" min="0" max="1" step="0.01" value="0" /></label>
             <label>Colour noise <input id="chroma" type="range" min="0" max="1" step="0.01" value="0" aria-describedby="chromaNote" /></label>
             <small id="chromaNote" class="note">Smooths <strong>colour</strong> only and leaves the brightness detail alone &mdash; the blotchy patches a strong false-colour look can raise out of a clean-looking frame. Leaves texture where Denoise would soften it.</small>
-            <label>Colour noise <input id="chroma" type="range" min="0" max="1" step="0.01" value="0" aria-describedby="chromaNote" /></label>
-            <small id="chromaNote" class="note">Smooths <strong>colour</strong> only and leaves the brightness detail alone &mdash; the blotchy patches a strong false-colour look can raise out of a clean-looking frame. Leaves texture where Denoise would soften it.</small>
+            <label>Speckle <input id="despeckle" type="range" min="0" max="1" step="0.01" value="0" aria-describedby="despeckleNote" /></label>
+            <small id="despeckleNote" class="note">Removes single stray <strong>dots</strong> &mdash; the pale pepper an infrared sky picks up where the filter leaves one channel almost nothing to record. It only touches a pixel that stands alone against its neighbours, so texture and edges are left where they are. Neither Denoise nor Colour noise can reach these: both keep a lone odd pixel on purpose.</small>
             <label>Sharpen <input id="sharpen" type="range" min="0" max="1" step="0.01" value="0" /></label>
             <label>Texture <input id="texture" type="range" min="-1" max="1" step="0.01" value="0" /></label>
             <p class="note">Denoise is set automatically from the photo's measured noise. Sharpen crisps up fine edges; Texture brings out surface structure (pull left to smooth). Both keep colors put.</p>
