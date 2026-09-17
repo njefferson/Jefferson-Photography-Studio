@@ -605,7 +605,7 @@ cannot describe something the code does not say about itself.
 - **`src/color.ts`** (69 lines) — Camera color science.
 - **`src/cubeimport.ts`** (136 lines) — .cube (Adobe/Resolve 3D LUT) IMPORT parser.
 - **`src/dcp.ts`** (247 lines) — DNG Camera Profile (.dcp) export for Lightroom / Camera Raw.
-- **`src/debug.ts`** (1228 lines) — The test page behind the version number.
+- **`src/debug.ts`** (1288 lines) — The test page behind the version number.
 - **`src/decode.ts`** (326 lines) — Image decoding. Three real paths, no big WASM dependency: - JPEG/PNG: native bitmap decode.
 - **`src/decode.worker.ts`** (39 lines) — Decoding, off the main thread.
 - **`src/decodeClient.ts`** (243 lines) — Main-thread side of the decode workers.

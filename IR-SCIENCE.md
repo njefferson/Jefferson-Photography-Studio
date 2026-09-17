@@ -1056,6 +1056,40 @@ the structure rather than sitting inside it.
 texture, the edges and the grain that carries detail are the bilateral's business
 and this never sees them.
 
+### 4c-xiii. A FIXED COLOUR-NOISE FLOOR BUYS ONE FRAME'S SKY WITH EVERY OTHER FRAME'S EDGES
+
+Swept 2026-09-17 across every real frame available — two raws and two camera
+JPEGs from the same outing — at 0, 0.15, 0.25, 0.4, 0.6 and 1. Two readings per
+frame per step: a SKY block, and the frame's own highest-chroma-variance block,
+both as the tenth percentile of chroma over the median. A floor has to clear the
+mottle where there is mottle and leave everything else alone, so both halves are
+measured rather than the first one only.
+
+**Only one of the four frames needs it.** The reported raw goes 0.65, 0.68, 0.71,
+0.73, 0.75, then back to 0.72 at full — a knee around 0.4 to 0.6 — with its sky's
+median chroma pinned at 85 throughout, so the colour is not being drained. The
+other raw sits at 0.91 with the stage off and never moves: that sky does not have
+the defect. Both camera JPEGs are flat too, 0.82 unchanged across the sweep.
+
+**And the busy block pays on every frame.** Its median chroma RISES with the
+setting — 50 to 55 to 70 to 115 on the reported raw, 75 to 93 to 109 on a camera
+JPEG — which is the wide blur averaging colour across high-contrast boundaries
+and pushing edge pixels' saturation up. At 0.15 it does not move; at 0.25 it is
+about a tenth; by 0.4 it is half again.
+
+So a fixed look-level floor would improve one sky measurably and put edge bleeding
+on three frames that gain nothing from it. **A constant is the wrong shape for
+this**, and the sweep is what says so rather than taste.
+
+**WHAT THE DATA POINTS AT INSTEAD.** The defect tracks how little the quiet
+channel carries, which is a property of the photograph and which this app already
+knows how to measure per frame — `estimateDenoise` does exactly that for
+luminance and lands on a visible, undoable slider. A measured per-photograph
+colour-noise value would give the reported frame its 0.4 and leave the other three
+at nothing, which is what the numbers above ask for. That is a change to what
+opens (Doctrine section 14: visible, undoable, and the bare decode one press
+away) and therefore the owner's to call, not a session's.
+
 ### 4c-vii. THE OVERTURNED NUMBERS, KEPT ON PURPOSE
 
 4c-vi originally read that raising denoise did nothing to the ratio (NIR_1480

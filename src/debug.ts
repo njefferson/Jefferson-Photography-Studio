@@ -19,6 +19,7 @@ import { decodeOffThread, decodeLanes } from "./decodeClient";
 import { sniff } from "./import";
 import { workerCount } from "./exportparallel";
 import { linearAt } from "./decode";
+import { makeRowDenoiser } from "./raw/denoise";
 import { compileEdit, TONE_DEFAULT, GRADE_DEFAULT, MIX3_DEFAULT, hslDefault, CROP_DEFAULT, type EditParams } from "./pipeline";
 import { exportImage } from "./export";
 import { drawFrame, canDrawFrame, buildLinearSource } from "./gpuexport";
@@ -643,6 +644,64 @@ async function buildingATile(): Promise<void> {
   }
 }
 
+/** WHAT THE COLOUR-NOISE SLIDER COSTS, ON THIS DEVICE.
+ *
+ *  Asked because the stage was widened without being timed, and "forty-nine
+ *  extra taps per pixel" is an arithmetic fact rather than an answer: what it
+ *  costs depends on the cache behaviour of a real chip, and the container this
+ *  was written in cannot stand in for a tablet.
+ *
+ *  It times the DENOISE STAGE ITSELF rather than a whole render, because that is
+ *  the only part the widening touched — the same `makeRowDenoiser` an export
+ *  wraps around its source, pulled over a fixed block of pixels at the same
+ *  luminance strength, once with the colour half off and once with it at full.
+ *  The ratio between the two is the thing to read; the absolute numbers scale
+ *  with whatever else the device is doing.
+ *
+ *  Returns nothing and adds two rows. Consumed by the reader deciding whether to
+ *  leave the slider above zero on a big export. */
+async function whatColourNoiseCosts(): Promise<void> {
+  const p = note("Timing the colour-noise stage…");
+  try {
+    const res = await fetch("./examples/NIR_0063.dng");
+    if (!res.ok) throw new Error("practice photo not available offline");
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    const img = await decodeOffThread({ name: "test.dng", kind: sniff(bytes), bytes, looksTranscoded: false });
+    // A block, not the whole frame: the point is cost per pixel and a 21-megapixel
+    // pass on a tablet is not something a test page should ask for.
+    const W = Math.min(640, img.width), H = Math.min(480, img.height);
+    const px = W * H;
+    const REPS = 3;
+    const mid = (xs: number[]) => { const a = [...xs].sort((x, y) => x - y); return (a[(a.length - 1) >> 1] + a[a.length >> 1]) / 2; };
+    const time = (chroma: number): number[] => {
+      const runs: number[] = [];
+      for (let r = 0; r < REPS; r++) {
+        // A FRESH SAMPLER EACH RUN, because the row cache inside it is the thing
+        // being measured as much as the arithmetic is.
+        const d = makeRowDenoiser((x, y) => linearAt(img, x, y), img.width, img.height, 0.8, 1, chroma, 0);
+        const t0 = performance.now();
+        let sink = 0;
+        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) sink += d(x, y)[0];
+        runs.push(performance.now() - t0);
+        if (sink === -1) throw new Error("unreachable"); // keep the loop from being optimised away
+      }
+      return runs;
+    };
+    const off = time(0);
+    const on = time(1);
+    const mo = mid(off), mn = mid(on);
+    const per = (m: number) => `${(m / px * 1e6).toFixed(0)} ms per megapixel`;
+    row("Denoise with colour noise OFF", ms(mo), `${per(mo)}, over a ${W}x${H} block of a ${(img.width * img.height / 1e6).toFixed(1)}-megapixel photograph. This is the 5x5 brightness filter alone, which is what every raw already pays.`,
+      off.map((x) => Math.round(x) + " ms").join(", "));
+    row("…and with it at full", ms(mn), `${per(mn)} — ${(mn / Math.max(mo, 0.001)).toFixed(1)}x the line above. The colour half samples a 7x7 grid spaced two apart to reach a mottle three to five pixels across, which is forty-nine taps on top of the twenty-five. A full-frame export of this photograph would be about ${((mn - mo) / px * img.width * img.height / 1000).toFixed(1)} s of extra work.`,
+      on.map((x) => Math.round(x) + " ms").join(", "));
+    p.remove();
+  } catch (e) {
+    p.remove();
+    row("What colour noise costs", "not run", `The practice photo could not be used (${(e as Error).message}).`);
+  }
+}
+
 /** DOES THIS DEVICE COMPUTE THE SAME EXPORT AS THAT ONE?
  *
  *  Asked because a claim was made without it. "The exported file is identical on
@@ -1214,6 +1273,7 @@ async function fullResolutionPreview(): Promise<void> {
   await exportOnTheGpu();
   await decoding();
   await buildingATile();
+  await whatColourNoiseCosts();
   await sameEverywhere();
   await drawnVersusComputed();
   await aCanvasTheSizeOfTheFrame();
