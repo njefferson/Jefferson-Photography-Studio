@@ -885,6 +885,61 @@ colour, keep luminance sharp, the reason JPEG subsamples chroma. Noise is
 high-frequency and the wanted colour largely is not, which is the only difference
 between them that remains. Nothing in this pipeline does it today.
 
+### 4c-ix. THE PALE PEPPER IN A DEEP SKY IS IMPULSE NOISE, AND NEITHER SMOOTHER CAN TOUCH IT
+
+Measured 2026-09-17 on a raw shot the day before, at **ISO 100**, plus the frame
+this repository already carried. Both have it. The instrument found it on neither
+until the metric and the magnification were both fixed, which is the first thing
+this section records.
+
+**THE TWO WAYS THE INSTRUMENT HID IT.** A fitted screenshot of the whole frame is
+a downscale, and a downscale averages single-pixel dots out of existence — the
+render looked clean at 724px and is dense with pepper at 1:1. And the metric was
+the share of pixels carrying NO hue, which is an absolute; these dots are not
+achromatic, they are pale and far less saturated than the sky around them. A
+whole ablation was run and reported against a frame described as not having the
+artefact, and it had it.
+
+**THE READING THAT SEPARATES A PEPPERED SKY FROM A CLEAN ONE** is the tenth
+percentile of chroma over the median, inside one sky block. A sky with an even
+colour reads near 0.94. Both of these frames read 0.65 to 0.72 in every sky block
+measured, and the ratio worsens as the sky deepens.
+
+**NO STAGE OF THE LOOK CREATES IT.** Ablated one at a time, reading that ratio:
+with no look at all the ratio is already 0.67, so it is in the decode. Restore
+depth off leaves it at 0.65. Saturation 1 leaves it at 0.68. Contrast 1 leaves it
+at 0.66. Only the mixer moves it, 0.65 to 0.74, which is its large coefficients
+amplifying channel noise rather than making it. Saturation makes it VISIBLE, and
+the two are different claims.
+
+**ISO 100, so it is not gain noise.** It is shot noise on a starved channel: an
+infrared conversion blocks visible light from the blue photosite, so in a deep sky
+the quiet channel is recording almost nothing whatever the sensitivity is set to,
+and the relative noise on it is largest exactly where the sky is deepest. That is
+a property of the conversion, not of the exposure, and no shooting change reaches
+it.
+
+**AND NEITHER SMOOTHER IN THIS APP TOUCHES IT.** Denoise at 1.00 leaves the sky
+unchanged. The chroma stage of 4c-viii at 1.00 leaves it unchanged — measured at
+1:1 and looked at, both.
+
+**The reason is documented rather than derived, and it names the remedy.** A
+bilateral's range weight is what preserves edges, and a single pixel unlike its
+neighbours is an edge as far as that weight is concerned: its weight collapses and
+the pixel keeps itself. **A bilateral preserves outliers by construction**, which
+is why salt-and-pepper noise is recorded in the literature as surviving bilateral
+filtering. The standard remedy for impulse noise is a MEDIAN — a rank statistic
+rather than a weighted mean, which is resistant to extreme values by the same
+arithmetic that makes the mean vulnerable to them. The chroma stage inherits this
+because it is mixed toward a mean of the same neighbourhood.
+
+Sources: *Noise Reduction Using Enhanced Bilateral Filter*
+(https://www.csie.ntu.edu.tw/~fuh/personal/NoiseReductionUsingEnhancedBilateralFilter.pdf);
+*The Bilateral Median Filter*
+(https://www.researchgate.net/publication/2869398_The_Bilateral_Median_Filter);
+*Adaptive median filter salt and pepper noise suppression*
+(https://www.nature.com/articles/s41598-024-66649-y).
+
 ### 4c-vii. THE OVERTURNED NUMBERS, KEPT ON PURPOSE
 
 4c-vi originally read that raising denoise did nothing to the ratio (NIR_1480

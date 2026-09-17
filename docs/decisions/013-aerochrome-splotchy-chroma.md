@@ -143,7 +143,37 @@ stage has to be.
 are separable, the reported defect is in production now, and bundling two colour
 changes makes neither measurable.
 
-**AND A SECOND ARTEFACT ARRIVED, WHICH THIS REPOSITORY CANNOT REPRODUCE — 2026-09-17.**
+**THE PREVIOUS ENTRY WAS WRONG ABOUT THE FIXTURE, AND THE CORRECTION IS THE
+FINDING — 2026-09-17, later the same day.** It said the raw in the scratchpad did
+not have the grey speckle. It does. Two instrument faults hid it, and both are
+worth more than the conclusion they broke: a fitted screenshot of a whole frame is
+a downscale and averages single-pixel dots away, so the render looked clean at
+724px and is dense with pepper at 1:1; and the metric was the share of pixels with
+NO hue, an absolute, while these dots are merely pale and much less saturated than
+the sky around them. A whole ablation was run and reported against a frame said to
+lack the artefact.
+
+**The reading that works** is the tenth percentile of chroma over the median
+inside a sky block: near 0.94 on an even sky, 0.65 to 0.72 on both of these
+frames, worsening with sky depth. See IR-SCIENCE.md 4c-ix for the numbers, the
+ablation and the sources.
+
+**What it settles.** No stage of the look creates it — with no look at all the
+ratio is already 0.67. ISO 100, so not gain noise: it is shot noise on the channel
+an infrared conversion starves, which is why it is worst where the sky is deepest
+and why no shooting change reaches it. **And neither smoother in this app touches
+it**, denoise at 1.00 or the new chroma stage at 1.00, measured at 1:1 and looked
+at. A bilateral's range weight treats a lone unlike pixel as an edge and keeps it,
+so it preserves outliers by construction; the documented remedy for impulse noise
+is a median, a rank statistic rather than a weighted mean. The chroma stage
+inherits the flaw because it mixes toward a mean of the same neighbourhood.
+
+**So the Colour noise slider is not the answer to this one**, and a floor on the
+look would not have helped — which answers the standing question about a floor
+with a measurement rather than a preference, at least for this artefact.
+
+**The superseded entry, kept because the way it failed is the point —
+"this repository cannot reproduce it", 2026-09-17.**
 Three frames from the device show a different thing from the one measured above:
 the sky peppered with pale ACHROMATIC dots, densest where the sky is deepest and
 gone where it goes pale near the horizon, with the rest of each picture clean.
