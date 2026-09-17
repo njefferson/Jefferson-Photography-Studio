@@ -868,6 +868,41 @@ user-scalable=no.
   byte-identical to today's, because a graphics chip computes in float where the
   processor uses doubles. It would match the PREVIEW instead.
 
+## The oneband walk hangs, it is not from today, and nobody had written it down, 2026-09-17
+
+**RED ON WHAT STAGING ALREADY CARRIES, and it was reported in chat and recorded
+nowhere.** That second half is the reason this section exists at all: a walk
+found failing, established as somebody else's, and then left in a message
+nobody will scroll back to is a finding that has to be paid for again.
+
+**The symptom.** `tools/oneband-walk.mjs` hangs in `stepTo`, at the
+`waitForFunction` on line 64 that waits for `#busy` to close after clicking the
+second session thumbnail. It times out at the full 300 seconds. The walk's
+collected console log comes back EMPTY, so the page said nothing at all while it
+sat there.
+
+**Whose it is, established rather than assumed.** Three runs, all identical:
+twice against `58f8241` (the lens-correction normalising term), once against a
+clean build of `d9901ad` in a separate worktree. `d9901ad` is docs-only on top of
+`e619365`, which is what `staging` holds — so the failure predates today's pixel
+change and is not from it. It has been red for at least as long as staging has
+been where it is.
+
+**What is known and what is not.** The click LANDS — the failure is at the wait,
+not inside the `evaluate` that clicks — so the walk reaches the second photo and
+the photo never finishes, or the busy dialog never closes. Which of those it is
+has NOT been established. Nobody should read this section as a diagnosis; it
+records a symptom and an owner, and the root cause is still open.
+
+**The method, because establishing this took three runs and the next person
+should not reinvent it.** `tools/walk-all.mjs` takes `--only=<names>` and
+`--port=<n>`. A suspect walk is bisected by checking an older commit out into a
+`git worktree`, symlinking `node_modules` into it, building there, serving that
+`dist` on a SECOND port, and running the one walk against each in turn. Two
+builds on two ports is what turns "this walk is failing" into "this walk was
+already failing", and it is the difference between fixing something and
+apologising for something that was never yours.
+
 ## The in-app Roadmap went to zero and five commits shipped it, 2026-09-14
 
 **A SESSION APPENDING TO THIS FILE BROKE THE DIALOG THIS FILE FEEDS.** The ⓘ
