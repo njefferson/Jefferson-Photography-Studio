@@ -539,6 +539,42 @@ user-scalable=no.
 > different approach and mindset"). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
+- [ ] **A photograph that fills the screen with no way back out** <!-- decision: 012 --> — reported
+  from the iPad 2026-09-17: a photograph in the full view appeared zoomed in, and
+  neither zooming out nor scrolling brought the rest of it back. Two failures, and
+  the second is the serious one — a reader who cannot get back to the whole
+  photograph has lost it, with nothing on screen saying so. On the code as
+  written this should not be reachable: `#view` is absolutely positioned with
+  `max-width`/`max-height` and `margin: auto`, which is contain; `applySize` sets
+  only the canvas's intrinsic size; view zoom is clamped to `[1, 8]` with 1 as
+  fit, and there is a Fit button. So something measured is wrong, and the
+  candidates — zoom carried over from the previous photograph, `--session-h`
+  measuring against a box bigger than what is visible, a crop changing the
+  canvas's aspect, or the PAGE being zoomed rather than the canvas — cannot be
+  told apart in a screenshot. Instrument first; make the escape unconditional
+  either way. See `docs/decisions/012-full-view-must-fit-and-always-escape.md`.
+- [ ] **Aerochrome is the right colour and comes out splotchy** <!-- decision: 013 --> — reported
+  from the iPad 2026-09-17 with two frames, on the look that shipped the same day:
+  the colour is right, the foliage breaks into hard-edged patches and the gravel
+  carries a coarse mottle. Searched before touching anything, and it named the
+  mechanism: the standard order is to reduce COLOUR noise first and hard, because
+  colour blotches rarely carry real information, while luminance speckle overlaps
+  real texture in foliage and deserves a lighter hand. This app has ONE denoise, a
+  luma-guided bilateral, and no chroma stage at all — and then applies a mixer
+  with coefficients over 1.4 and a 3x saturation on top of whatever chroma noise
+  is left. First measurement is a sheet of the same frame at several saturations,
+  to say how much of the splotch is amplification. The sources go into
+  `IR-SCIENCE.md`. See `docs/decisions/013-aerochrome-splotchy-chroma.md`.
+- [ ] **A quick look you cannot stop, and a session that renders it all again** <!-- decision: 014 --> — reported
+  from the iPad 2026-09-17. There is no way to stop a quick look building its
+  grid, so no way to say done and get the memory back; and after Keep in a
+  session it looked as though every photograph was rendered a second time. The
+  handoff that exists to prevent exactly that carries a picture per kept photo,
+  but only for the ones whose strip picture had been built — the rest arrive with
+  nothing and get decoded again. This is the third report in this neighbourhood,
+  which is the argument for counting the decodes on both sides of the keep before
+  changing anything rather than rewriting the handoff a second time. See
+  `docs/decisions/014-quick-look-stop-and-release.md`.
 - [ ] **Creative — a third app for regular photos** — owner direction 2026-07-19 <!-- decision: 002 -->
   ("a separate page next to infrared and macro, called creative, for regular
   photos, installable separately… same things we're building here… I suppose I
