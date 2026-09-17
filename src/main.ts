@@ -8950,6 +8950,40 @@ async function makeThumb(img: DecodedImage, MAX = 260, lens?: LensCurve | null, 
     sky: own ? [...own.params.sky] : [0, 1, 1],
     foliage: own ? [...own.params.foliage] : [0, 1, 1],
   };
+  // A LOOK NEEDS A WHITE BALANCE TO WORK ON, AND A CAMERA-RENDERED FILE OPENS
+  // WITHOUT ONE — and this function is the half of that rule that stopped doing
+  // it. `applyLook` gray-world balances a non-raw before applying a look and
+  // re-derives exposure to go with it, because a false-colour look on a JPEG
+  // otherwise applies its swap to channels nothing has pulled apart; the comment
+  // there still says "makeThumb has always done both together, which is why the
+  // tile looked right while the photo did not". That stopped being true when
+  // this function started taking its baseline from `freshBaseline`, which gives
+  // a camera-rendered file [1,1,1] — correct for a tile with no look on it, and
+  // the removal of the balance a look needs.
+  //
+  // MEASURED, under Aerochrome on a camera JPEG nobody had opened: the tile came
+  // out at wb [1,1,1] and exposure 1 while opening the same file gave wb
+  // [0.209, 1.270, 0.638] and exposure 2.49, and the tile's largest hue band sat
+  // 150 degrees from the photograph's — 39 of 46 fields identical and the
+  // balance carrying all of it. The raw arm of the same test was 0 degrees
+  // throughout, because a raw is gray-world balanced by `freshBaseline` anyway
+  // and there was nothing for this to remove.
+  //
+  // The one-band test and the exposure re-derive both come with it, for the
+  // reasons `applyLook` states at length: a camera JPEG can arrive with nothing
+  // in the cool band, where balancing manufactures a second band by crushing red
+  // sixfold; and a balance without a matching exposure just makes the picture
+  // dark. `forceBalance` is false on a tile because nobody has opened the photo
+  // to set it, which is the same state `applyLook` calls untouched.
+  if (sessLook && !own && !img.isRaw && !oneBandFile(img, p)) {
+    const gw = grayWorldWB(img);
+    p.wb = [
+      clamp(gw[0] * bias[0], 0.02, 16),
+      clamp(gw[1] * bias[1], 0.02, 16),
+      clamp(gw[2] * bias[2], 0.02, 16),
+    ];
+    p.exposure = autoExposure(img, p.wb);
+  }
   if (autoLift && !own) {
     const solved = solveLift(activeLook !== null, img, p);
     const lift = solved && scaleLift(solved, liftAmount);
