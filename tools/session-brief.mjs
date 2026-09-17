@@ -34,8 +34,16 @@ const assemblers = ["establishFreshEdit", "makeThumb", "batchParamsFor", "openPh
   .filter((f) => main.includes(`function ${f}`) || main.includes(`${f} =`));
 say(`\nFOUR PATHS RENDER A PHOTOGRAPH AND EACH REBUILDS THE AT-OPEN RULING:`);
 for (const a of assemblers) say(`  ${a}`);
-say(`  freshBaseline() is meant to be the ONE copy of that ruling. They still`);
-say(`  disagree — tools/agreement-walk.mjs measures it, and two arms are red.`);
+// A BRIEF CANNOT KNOW A WALK'S RESULT, AND THIS LINE CLAIMED TO. It read "and
+// two arms are red" as a hand-typed string, in the one file whose whole
+// justification is that every line of it is generated from the app. The
+// agreement walk went green and the brief kept printing red at the top of every
+// session — a second answer to a question the walk already answers, and the one
+// nobody re-derives. It states the fact it CAN generate (the paths, and that
+// freshBaseline is meant to be the single copy) and names the instrument
+// without asserting its verdict.
+say(`  freshBaseline() is meant to be the ONE copy of that ruling. Whether they`);
+say(`  agree today is tools/agreement-walk.mjs's answer, not this file's.`);
 
 // 3. ADDING AN EditParams FIELD. Five places, and undo breaks silently on a miss.
 const five = ["cloneParams", "applySnapshot", "syncFromUI", "syncToUI"].filter((f) => main.includes(f));
