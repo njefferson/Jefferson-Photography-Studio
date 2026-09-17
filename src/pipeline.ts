@@ -27,6 +27,17 @@ export interface EditParams {
    *  math, so it is skipped in the .cube LUT bake for the same reason. 0 is
    *  bit-identical to no chroma stage at all. */
   chroma?: number;
+  /** 0..1 how readily a pixel that is the EXTREME of its own 3x3 and far from
+   *  that window's median is replaced by the median — a decision-based median,
+   *  not a median filter: at any strength the great majority of pixels are left
+   *  exactly as they were, which is what keeps fine detail. It exists because
+   *  neither smoother above can reach impulse noise at all: a bilateral's range
+   *  weight treats a lone unlike pixel as an edge and keeps it, by construction
+   *  (IR-SCIENCE.md 4c-ix). Runs FIRST, on the linear data, before the
+   *  bilateral reads the centre — the order is load-bearing. Not part of
+   *  compileEdit's per-pixel math and skipped in the .cube LUT like the other
+   *  two. 0 changes nothing. */
+  despeckle?: number;
   /** 0..1 highlight recovery — pulls genuinely sensor-clipped pixels toward
    *  post-white-balance NEUTRAL, scaled by clip severity. Runs AFTER WB and
    *  BEFORE the camera matrix, where "blown = neutral" is actually defined —

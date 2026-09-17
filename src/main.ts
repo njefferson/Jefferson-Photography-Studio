@@ -173,6 +173,7 @@ const params: EditParams = {
   contrast: 1,
   denoise: 0,
   chroma: 0,
+  despeckle: 0,
   tint: [1, 1, 1],
   glow: 0,
   sky: [0, 1, 1],
@@ -217,6 +218,7 @@ const ui = {
   expo: $("expo") as HTMLInputElement,
   dn: $("dn") as HTMLInputElement,
   chroma: $("chroma") as HTMLInputElement,
+  despeckle: $("despeckle") as HTMLInputElement,
   recover: $("recover") as HTMLInputElement,
   autoBtn: $("autoBtn") as HTMLButtonElement,
   irAutoWb: $("irAutoWb") as HTMLButtonElement,
@@ -995,6 +997,7 @@ function syncFromUI() {
   params.texture = Number(ui.texture.value);
   params.denoise = Number(ui.dn.value);
   params.chroma = Number(ui.chroma.value);
+  params.despeckle = Number(ui.despeckle.value);
   params.recover = Number(ui.recover.value);
   params.sky = [Number(ui.skyHue.value), Number(ui.skySat.value), Number(ui.skyLum.value)];
   params.foliage = [Number(ui.folHue.value), Number(ui.folSat.value), Number(ui.folLum.value)];
@@ -1029,6 +1032,7 @@ function syncToUI() {
   ui.expo.value = String(toPos(params.exposure, EX_LO, EX_HI));
   ui.dn.value = String(params.denoise);
   ui.chroma.value = String(params.chroma ?? 0);
+  ui.despeckle.value = String(params.despeckle ?? 0);
   ui.recover.value = String(params.recover ?? 0);
   ui.swapBtn.setAttribute("aria-pressed", String(params.swapRB));
   ui.hue.value = String(params.hue);
@@ -1642,6 +1646,7 @@ function cloneParams(p: EditParams): EditParams {
     contrast: p.contrast,
     denoise: p.denoise,
     chroma: p.chroma ?? 0,
+    despeckle: p.despeckle ?? 0,
     tint: [...p.tint] as [number, number, number],
     glow: p.glow,
     sky: [...p.sky] as [number, number, number],
@@ -1729,6 +1734,7 @@ function applySnapshot(s: Snapshot) {
   params.contrast = c.contrast;
   params.denoise = c.denoise;
   params.chroma = c.chroma ?? 0;
+  params.despeckle = c.despeckle ?? 0;
   params.tint = c.tint;
   params.glow = c.glow;
   params.sky = c.sky;
@@ -2342,7 +2348,7 @@ panelTabsEl.addEventListener("keydown", (e) => {
   setPanelTab((saved && (PANEL_TABS as readonly string[]).includes(saved) ? saved : "basic") as PanelTab);
 }
 
-for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.dn, ui.chroma, ui.recover, ui.hue, ui.sat, ui.con, ui.glow, ui.lum,
+for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.dn, ui.chroma, ui.despeckle, ui.recover, ui.hue, ui.sat, ui.con, ui.glow, ui.lum,
   ui.hotspot, ui.hotspotSize, ui.hotspotColor, ui.vignette, ui.clarity, ui.dehaze, ui.sharpen, ui.texture,
   ui.skyHue, ui.skySat, ui.skyLum, ui.folHue, ui.folSat, ui.folLum, ...ui.tones]) {
   el.addEventListener("input", syncFromUI);
@@ -9005,6 +9011,9 @@ async function makeThumb(img: DecodedImage, MAX = 260, lens?: LensCurve | null, 
     // away the high-frequency colour this removes, so running it would cost a
     // neighbourhood pass per tile to change nothing anybody can see.
     chroma: 0,
+    // Nor despeckled: a stray pixel in the full frame is a fraction of one tile
+    // pixel, and the downscale has already averaged it away.
+    despeckle: 0,
     recover: own ? (own.params.recover ?? 0) : base!.recover,
     // INHERITED FROM WHICHEVER PHOTOGRAPH WAS OPEN, WHICH IS A DIFFERENT FRAME'S
     // ANSWER. `cloneParams(params)` above carries the live swap onto a tile for a
@@ -12267,6 +12276,10 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["l
     // solved: developing with "copy the current edit" does not carry a colour
     // noise setting the reader dialled in by hand.
     chroma: 0,
+    // And no despeckle, for the same reason: it is per-shot corrective, a
+    // develop starts it where a fresh open does, and `SavedLook` carries no
+    // field for it.
+    despeckle: 0,
     // THE SAME AUTOMATICS AN OPEN APPLIES. Highlight recovery was missing here
     // and nowhere else — a single open sets it, and so does the strip
     // thumbnail; batch was the only path that did not, so a frame with real
