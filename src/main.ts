@@ -201,6 +201,7 @@ const params: EditParams = {
   bwOn: false,
   bwMix: [1, 1, 1],
   grade: [...GRADE_DEFAULT],
+  shadowSat: 0,
   grainAmt: 0,
   grainSize: 1.5,
   vigAmt: 0,
@@ -238,6 +239,7 @@ const ui = {
   dehaze: $("dehaze") as HTMLInputElement,
   sharpen: $("sharpen") as HTMLInputElement,
   texture: $("texture") as HTMLInputElement,
+  shadowSat: $("shadowSat") as HTMLInputElement,
   skyHue: $("skyHue") as HTMLInputElement,
   skySat: $("skySat") as HTMLInputElement,
   skyLum: $("skyLum") as HTMLInputElement,
@@ -1054,6 +1056,7 @@ function syncFromUI() {
   params.dehaze = Number(ui.dehaze.value);
   params.sharpen = Number(ui.sharpen.value);
   params.texture = Number(ui.texture.value);
+  params.shadowSat = Number(ui.shadowSat.value);
   params.denoise = Number(ui.dn.value);
   params.chroma = Number(ui.chroma.value);
   params.despeckle = Number(ui.despeckle.value);
@@ -1110,6 +1113,7 @@ function syncToUI() {
   ui.dehaze.value = String(params.dehaze);
   ui.sharpen.value = String(params.sharpen);
   ui.texture.value = String(params.texture);
+  ui.shadowSat.value = String(params.shadowSat ?? 0);
   ui.skyHue.value = String(params.sky[0]);
   ui.skySat.value = String(params.sky[1]);
   ui.skyLum.value = String(params.sky[2]);
@@ -1837,6 +1841,7 @@ function cloneParams(p: EditParams): EditParams {
     bwOn: !!p.bwOn,
     bwMix: [...(p.bwMix ?? [1, 1, 1])] as [number, number, number],
     grade: [...(p.grade ?? GRADE_DEFAULT)],
+    shadowSat: p.shadowSat ?? 0,
     grainAmt: p.grainAmt ?? 0,
     grainSize: p.grainSize ?? 1.5,
     vigAmt: p.vigAmt ?? 0,
@@ -1921,6 +1926,7 @@ function applySnapshot(s: Snapshot) {
   params.bwOn = c.bwOn;
   params.bwMix = c.bwMix;
   params.grade = c.grade?.length === 7 ? c.grade : [...GRADE_DEFAULT];
+  params.shadowSat = c.shadowSat ?? 0;
   params.grainAmt = c.grainAmt ?? 0;
   params.grainSize = c.grainSize ?? 1.5;
   params.vigAmt = c.vigAmt ?? 0;
@@ -2087,6 +2093,7 @@ function lookFrom(params: EditParams): SavedLook {
     bwOn: params.bwOn,
     bwMix: [...params.bwMix] as [number, number, number],
     grade: [...(params.grade ?? GRADE_DEFAULT)],
+    shadowSat: params.shadowSat ?? 0,
     grainAmt: params.grainAmt ?? 0,
     grainSize: params.grainSize ?? 1.5,
     vigAmt: params.vigAmt ?? 0,
@@ -2507,7 +2514,7 @@ panelTabsEl.addEventListener("keydown", (e) => {
 }
 
 for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.dn, ui.chroma, ui.despeckle, ui.recover, ui.hue, ui.sat, ui.con, ui.glow, ui.lum,
-  ui.hotspot, ui.hotspotSize, ui.hotspotColor, ui.vignette, ui.clarity, ui.dehaze, ui.sharpen, ui.texture,
+  ui.hotspot, ui.hotspotSize, ui.hotspotColor, ui.vignette, ui.clarity, ui.dehaze, ui.sharpen, ui.texture, ui.shadowSat,
   ui.skyHue, ui.skySat, ui.skyLum, ui.folHue, ui.folSat, ui.folLum, ...ui.tones]) {
   el.addEventListener("input", syncFromUI);
 }
@@ -8316,6 +8323,7 @@ function establishFreshEdit() {
     bwOn: false,
     bwMix: [1, 1, 1],
     grade: [...GRADE_DEFAULT],
+    shadowSat: 0,
     grainAmt: 0,
     grainSize: 1.5,
     vigAmt: 0,
@@ -12345,7 +12353,7 @@ function neutralLook(): SavedLook {
     toneR: [...TONE_DEFAULT] as [number, number, number, number, number],
     toneG: [...TONE_DEFAULT] as [number, number, number, number, number],
     toneB: [...TONE_DEFAULT] as [number, number, number, number, number],
-    lum: 1, clarity: 0, dehaze: 0, sharpen: 0, texture: 0, hsl: hslDefault(),
+    lum: 1, clarity: 0, dehaze: 0, sharpen: 0, texture: 0, shadowSat: 0, hsl: hslDefault(),
     bwOn: false, bwMix: [1, 1, 1],
     grade: [0, 0, 0, 0, 0, 0, 0], grainAmt: 0, grainSize: 1.5, vigAmt: 0, vigMid: 0.5,
     mix3: [1, 0, 0, 0, 1, 0, 0, 0, 1],

@@ -509,6 +509,9 @@
 
           <!-- ===== GRADE (Creative) ===== -->
           <section class="section" role="tabpanel" id="sec-grade" aria-labelledby="ptab-grade" data-tab="grade" hidden>
+            <div class="sub-title">Colour out of the shadows</div>
+            <label>Shadow colour <input id="shadowSat" type="range" min="0" max="1" step="0.01" value="0" /></label>
+            <p class="note">Takes colour <strong>out</strong> of the dark end, leaving the brightness alone. In infrared this is what makes a tree's <strong>bark read as bark</strong>: trunks and limbs reflect almost no infrared, so a false-colour look drives the little colour they do carry to the same red as the leaves. Pull this up and the structure goes grey while the canopy stays put. It can never <em>add</em> colour &mdash; shade that is already grey stays grey at any setting, which is the difference between this and the wheels below.</p>
             <p class="note">Tint the shadows, midtones and highlights each on their own wheel &mdash; drag the dot out from the centre (direction picks the colour, distance the strength), or use the sliders. Tones color and B&amp;W photos alike.</p>
             <div id="gradeWheels"></div>
             <label>Balance <input id="gradeBal" type="range" min="-1" max="1" step="0.01" value="0" /></label>

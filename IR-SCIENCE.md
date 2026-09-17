@@ -2269,10 +2269,32 @@ frame that wants it.
 
 **WHAT THE BARK ACTUALLY NEEDS** is a luminance-weighted **saturation
 reduction** — multiplicative, so a near-black pixel stays near-black instead of
-gaining a hue it did not have. The app has no such control: `hslAt`'s bands carry
-saturation but are selected by HUE, and the trunk shares the canopy's hue exactly,
-which is the whole problem. That is a new pipeline stage rather than a constant,
-and it is written down here rather than guessed at.
+gaining a hue it did not have. `hslAt`'s bands carry saturation but are selected
+by HUE, and the trunk shares the canopy's hue exactly, which is the whole problem.
+
+**BUILT 2026-09-17 as `shadowSat` — the Shadow colour slider on the Grade tab,
+off by default.** It scales the distance from luma (the same operator `sat` uses)
+by `1 − amount · (1 − smooth01(0.05, 0.6, L))` — the shadow grade band's own
+reach, so a reader who learns one control knows the other. Measured through the
+shipped stage on two frames, mean HSV saturation per population:
+
+- Oak: dark-coloured (bark) −10.3%, −20.6%, −33.3%, −49.9%, −66.4% at amounts
+  0.25 to 1.00; bright-coloured (leaves) −2.5%, −4.7%, −7.0%, −9.5%, −11.6%.
+- **Carport, the frame that killed the additive tint: its 836,808 dark NEUTRAL
+  pixels read 0.0029 as it ships and 0.0025, 0.0021 … as the amount rises.** They
+  get CLEANER. The additive tint took the same population to 0.989.
+
+That asymmetry is the whole design and it is not a tuning result: scaling cannot
+create saturation where there is none, so grey shade is safe at every amount by
+construction rather than by calibration.
+
+**ITS REAL LIMITATION, seen in the crops and not in those numbers.** The control
+is selected by luminance ALONE, so on a frame with a deep sky it desaturates the
+sky's dark end too — visible at 0.45 on the oak, where the blue goes slightly
+grey. The oak's "dark-coloured" population includes that sky, so part of the
+−20.6% is sky rather than bark. The sky is the one thing that does NOT share the
+canopy's hue, so a second weight on distance from the sky band would separate
+them; that is the next piece rather than this one.
 
 **THE GENERAL LESSON, AND IT IS THE ONE THIS REPOSITORY KEEPS PAYING FOR.** The
 oak crop at 0.70 looked like a finished fix. One more frame, chosen because its
@@ -2282,6 +2304,122 @@ disagrees with the one that motivated it — not on a second frame of the same
 subject.
 
 ---
+
+---
+
+### 9k. WHY AEROCHROME IS NOISY AND PINK IR IS NOT — IT IS ONE ROW OF THE MIXER
+
+Reported from the device 2026-09-17 with two screenshots of one frame: Pink IR's
+sky smooth, Aerochrome's covered in coarse coloured blobs, building clipped to
+flat red. The question was why one look can be clean and the other cannot.
+
+**THE TWO SCREENSHOTS EXONERATE THE TWO OBVIOUS SUSPECTS BY THEMSELVES.** Read
+out of `LOOKS` rather than assumed: Pink IR (`aero`) is `swapRB` with
+`raw: { sat: 3.0, contrast: 1.15 }` and nothing else. Aerochrome (`eir`) is the
+same 3.0 and the same 1.15, plus `mix3`, eight `hsl` band shifts, a denoise floor
+and a texture amount. So saturation is not the difference. And denoise STRENGTH
+is not either: Pink IR carries no floor at all, runs at the photograph's own
+measured value — 0.377 on the frame below, against Aerochrome's 0.45 floor — and
+it is the clean one.
+
+**THE ARITHMETIC, WRITTEN BEFORE THE RUN.** `mix3` is row-major. On an infrared
+frame the three channels are nearly equal (the colour is a 1–3% residual, 4c-xxi),
+so a row's SIGNAL gain is about its sum while its NOISE gain is its norm:
+
+- red `[0.99, −0.06, 0.07]` — signal 1.00, noise ×0.99 uncorrelated to ×1.12
+  correlated. Harmless.
+- **green `[−1.44, 1.37, 1.02]` — signal 0.95, noise ×2.23 to ×3.83.** A
+  difference of two large opposite-signed numbers.
+- blue `[−0.47, 0.81, 0.65]` — signal 0.99, noise ×1.14 to ×1.93.
+
+**THE FIRST INSTRUMENT WAS BLIND AND ITS OWN GATE REFUSED IT.** A chroma residual
+averaged over 652,339 sky pixels at a four-pixel lag read Pink IR 9.26 against
+Aerochrome 10.48 — 1.13×, on a difference anybody can see. Two errors, neither
+about colour: the blobs live in the darkest third of the sky and the other
+two-thirds diluted them, and at 1:1 the blobs are 10–25 px across so a pixel and
+its four-pixel neighbour sit inside the SAME blob. Rebuilt with a lag sweep, the
+dark third reported separately and the 95th percentile beside the RMS, it reads
+**2.03×** and the peak sits at a 12-pixel lag — which is the blob size, measured
+rather than guessed. Hub LESSONS §320. **Four earlier rejections in 4c-x through
+4c-xx were made on a statistic of the same construction, so none of them is
+safe.**
+
+**THE DECOMPOSITION, dark third of the sky, chroma residual p95 at the worst lag,
+NIR_3406:**
+
+- Pink IR — 9.8, the reference.
+- Aerochrome as it ships — 20.0, **2.03×**. Excess over Pink IR: 10.2.
+- **mixer at identity — 6.9, 0.70×.** Below Pink IR. The mixer accounts for the
+  whole gap and then some.
+- bands at default — 22.0, 2.24×. The band shifts are mildly HELPING; removing
+  them makes it worse.
+- **denoise floor back at 0.80 — 18.2, 1.86×.** Recovers 1.8 of the 10.2 excess,
+  so lowering the floor cost **17.6% of this artefact** — measured on chroma,
+  where it had been signed off on a luma residual at +4.3%. The same scale error
+  one level down.
+- **texture 0 — 20.0, 2.03×. Identical.** The texture amount contributes nothing
+  here, which is the right answer for a hue-preserving luminance band-pass
+  measured on a chroma-only statistic.
+- mixer rows scaled to unit norm — 11.7, 1.19×. **Removes 81% of the excess while
+  keeping each row's DIRECTION**, which is the direct confirmation of the
+  prediction: the noise is the row norms.
+- saturation 1.5 instead of 3.0 — 5.4, 0.55×. Below Pink IR.
+
+**AND UNIT-NORM IS NOT A FREE FIX.** It keeps each row's direction and changes
+their relative magnitudes, so the rendered mean chroma more than doubles (46.6 to
+101.2 on the same sky). It is a different look, not a cleaner version of this one.
+
+**THE STRUCTURAL ANSWER, and it is not a tuning problem.** Decompose a row into
+its component along (1,1,1) and its component orthogonal to it: the achromatic
+response is the sum, the COLOUR response is the orthogonal part, and the noise is
+the quadrature of both. Aerochrome's green row has an orthogonal component of
+norm 2.15 — and that component is simultaneously what separates the two
+populations and what multiplies the residual. Saturation does the same thing to
+both halves. So **within this pipeline the separation and the noise cannot be
+decoupled downstream**: every knob that buys the film's angle buys the grain with
+it, in the same proportion, which is why Pink IR gets to be clean and this look
+does not.
+
+The only place they come apart is UPSTREAM — make the residual cleaner before
+anything amplifies it. That is record `013`, and 4c-xx's rejection of the colour
+blur was made on the blind statistic, so it is re-opened rather than inherited.
+
+**AND THE COLOUR BLUR IS NOT THE ANSWER — AT STRENGTH IT IS THE CAUSE.** The app
+already has a chroma stage, and 4c-xx rejected it on the blind statistic, so it
+was re-asked with the instrument that works. Same frame, same dark third, p95 at
+the worst lag, on top of the shipped look:
+
+- chroma 0.2 — 18.2, 1.85× (Aerochrome alone is 2.03×). A slight improvement.
+- chroma 0.4 — 19.0, 2.00×. Back where it started.
+- chroma 0.7 — 24.7, **2.63×**.
+- chroma 1.0 — 32.6, **3.47×**.
+- chroma 1.0 with despeckle 0.5 — 32.5, 3.47×. The despeckler adds nothing.
+- despeckle 0.5 alone — 20.1, 2.05×. Nothing.
+
+**A colour blur averages chroma over a neighbourhood, which does not remove
+chroma error — it CONSOLIDATES it into patches the size of its own window.** That
+is the mechanism behind 4c-xii and 4c-xx and nobody had a statistic that could
+see it: the fine-grain chroma figure falls, which is the "number it improves",
+while the 10–25 px patches the eye actually objects to get larger and stronger.
+The two readings are not in conflict and never were. `Aerochrome` carries
+`chroma: 0` today, so nothing is shipped wrong — but 013's standing note that the
+plain global colour blur "measurably clears the sky it was built for" is
+withdrawn, and the trade it describes is not a trade.
+
+**WHAT IS LEFT, after five candidates and two of my own changes.** Nothing
+downstream of the mixer fixes this: the blur makes it worse, the despeckler does
+nothing, and the two knobs that do fix it — the mixer and saturation — are the
+look's identity. The remaining live candidates are a mixer re-solve that trades
+separation for noise (a look choice, and it must still pass the film-angle checks
+10a–c), or an EDGE-AWARE chroma filter at the patch scale rather than a blur,
+which is a different stage from the one this app has. The existing one is the
+wrong tool, not the wrong strength.
+
+**NOT THE SAME DEFECT AS 4c-xxii AND §319, and both live in the sky.** That one
+was pale LUMINANCE speckle, three to five pixels, fixed by widening the
+bilateral's spatial window. This one is coloured, 10–25 px, and sits in the dark
+third. Two artefacts in one region; the luminance fix is not overturned by any of
+the above.
 
 ---
 

@@ -35,6 +35,12 @@ export type SavedLook = {
   bwMix: [number, number, number];
   /** Color grade wheels [hueS, amtS, hueM, amtM, hueH, amtH, balance]. */
   grade: number[];
+  /** Shadow desaturation 0..1 — colour taken OUT of the dark end (see
+   *  EditParams.shadowSat). It rides a saved look because it is a creative
+   *  choice with no per-photograph measurement behind it: dropping it onto
+   *  another frame does what it says there too, unlike `denoise`, which is
+   *  measured per file and therefore stays off a SavedLook. */
+  shadowSat: number;
   grainAmt: number;
   grainSize: number;
   vigAmt: number;
@@ -124,6 +130,7 @@ export function coerceLook(s: unknown): SavedLook | null {
             i === 6 ? clamped(x, 0, -1, 1) : i % 2 === 0 ? clamped(x, 0, 0, 360) : clamped(x, 0, 0, 1),
           )
         : [0, 0, 0, 0, 0, 0, 0],
+    shadowSat: clamped(o.shadowSat, 0, 0, 1),
     grainAmt: clamped(o.grainAmt, 0, 0, 1),
     grainSize: clamped(o.grainSize, 1.5, 1, 3),
     vigAmt: clamped(o.vigAmt, 0, -1, 1),
@@ -170,6 +177,7 @@ export function encodeLookPayload(look: SavedLook, name?: string): string {
     bwOn: look.bwOn,
     bwMix: look.bwMix.map(round4),
     grade: look.grade.map(round4),
+    shadowSat: round4(look.shadowSat),
     grainAmt: round4(look.grainAmt),
     grainSize: round4(look.grainSize),
     vigAmt: round4(look.vigAmt),

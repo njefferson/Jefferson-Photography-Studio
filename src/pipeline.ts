@@ -175,6 +175,32 @@ export interface EditParams {
    *  baked into .cube; .dcp cannot carry it (dcp.ts doesn't run
    *  compileEdit). Neutral = all amounts 0 (GRADE_DEFAULT). */
   grade?: number[];
+  /** Shadow desaturation 0..1: takes the COLOUR out of the dark end, weighted
+   *  by display luminance with the SAME smoothstep the shadow grade band uses
+   *  (`1 - smooth01(0.05, 0.6, L)`), so a reader who learns one control's reach
+   *  knows the other's. Balance is deliberately NOT shared: a knob on the Grade
+   *  tab silently changing this one's reach is a coupling nobody would predict.
+   *
+   *  MULTIPLICATIVE, and that is the whole reason it exists. `grade`'s shadow
+   *  wheel ADDS a pure-chroma offset, so on a near-black pixel it clamps one
+   *  channel to zero and leaves the other two positive — measured, 858,273
+   *  pixels of grey roof shade went from saturation 0.005 to 0.989 at hue 201.
+   *  Scaling the distance from luma (the same operator `sat` uses) cannot do
+   *  that: zero saturation stays zero at every amount, and the same 858,273
+   *  pixels come out CLEANER. IR-SCIENCE.md section 9j has both measurements.
+   *
+   *  What it is for: infrared bark. Bark reflects almost no infrared, so real
+   *  Aerochrome renders trunk and limbs dark and near-neutral, while this app's
+   *  `sat` of 3.0 drives whatever small chroma the dark structure carries to the
+   *  canopy's own crimson. The trunk cannot be selected by HUE — it shares the
+   *  leaves' hue exactly, which is why `hslAt`'s saturation cannot reach it —
+   *  so luminance is the only handle, and that is what this is.
+   *
+   *  Runs AFTER bwOn and immediately BEFORE the grade, so a tint the reader
+   *  then adds lands on a neutral shadow instead of fighting a saturated one.
+   *  Per-pixel display-space colour -> baked into .cube; the shader's
+   *  u_shadowSat block is the mirror and must move with it. Neutral = 0. */
+  shadowSat?: number;
   /** Film grain 0..1 (amount) + size 1..3 (grain scale, resolution-
    *  proportional: cell size = grainSize * outputHeight / 1200 px).
    *  Deterministic value noise (hash2d/grainNoise below) added to the FINAL
@@ -1128,6 +1154,7 @@ export function compileEdit(
   const m0 = mix3[0], m1 = mix3[1], m2 = mix3[2];
   const m3 = mix3[3], m4 = mix3[4], m5 = mix3[5];
   const m6 = mix3[6], m7 = mix3[7], m8 = mix3[8];
+  const shSat = Math.min(1, Math.max(0, p.shadowSat ?? 0));
   const grade = p.grade ?? GRADE_DEFAULT;
   const gAmtS = grade[1] ?? 0, gAmtM = grade[3] ?? 0, gAmtH = grade[5] ?? 0;
   const gradeOn = gAmtS !== 0 || gAmtM !== 0 || gAmtH !== 0;
@@ -1361,6 +1388,19 @@ export function compileEdit(
       out[0] = L;
       out[1] = L;
       out[2] = L;
+    }
+    // Shadow desaturation: the colour OUT of the dark end, scaled rather than
+    // tinted, so a pixel with no colour cannot gain one. Same smoothstep reach
+    // as the shadow grade band below, at a fixed balance -- see
+    // EditParams.shadowSat for why the balance is not shared and what this is
+    // for. Before the grade on purpose: any tint the reader adds then lands on
+    // a neutral shadow. Same in the shader.
+    if (shSat > 0) {
+      const L = out[0] * 0.2126 + out[1] * 0.7152 + out[2] * 0.0722;
+      const k = 1 - shSat * (1 - smooth01(0.05, 0.6, L));
+      out[0] = L + (out[0] - L) * k;
+      out[1] = L + (out[1] - L) * k;
+      out[2] = L + (out[2] - L) * k;
     }
     // Color grade: split-tone wheels. One pure-chroma tint per tonal band,
     // weighted by smoothstep bands over the display luminance; balance

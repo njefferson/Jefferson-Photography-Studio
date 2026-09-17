@@ -137,6 +137,9 @@ uniform bool u_hslOn;        // 8-channel HSL mixer active
 uniform vec3 u_hsl[8];       // per band: (hueShiftDeg, satScale, lumScale)
 uniform bool u_bwOn;         // black & white: channel-weighted mono
 uniform vec3 u_bwMix;        // B&W channel weights (normalised in-shader)
+uniform float u_shadowSat;   // 0..1 shadow desaturation — see
+                             //   EditParams.shadowSat: MULTIPLIED, never
+                             //   tinted, so a grey shadow cannot gain a colour
 uniform bool u_gradeOn;      // any wheel amount non-zero
 uniform vec3 u_gradeTintS;   // pure-chroma tint vectors, precomputed on the
 uniform vec3 u_gradeTintM;   //   CPU by pipeline.ts gradeTintVec so both
@@ -719,6 +722,16 @@ void main() {
   // global lum). Weights are normalised, so only their ratio matters.
   // Identical math to compileEdit in pipeline.ts.
   if (u_bwOn) g = vec3(dot(g, u_bwMix) / max(1e-4, u_bwMix.r + u_bwMix.g + u_bwMix.b));
+  // Shadow desaturation: the colour OUT of the dark end. Scales the distance
+  // from luma (the same operator u_sat uses), so saturation zero stays zero at
+  // every amount — which the additive grade below cannot promise. Same
+  // smoothstep reach as that grade's shadow band, at a fixed balance.
+  // Matches compileEdit; EditParams.shadowSat says why it is here.
+  if (u_shadowSat > 0.0) {
+    float Ls = dot(g, LUMA_W);
+    float ks = 1.0 - u_shadowSat * (1.0 - smoothstep(0.05, 0.6, Ls));
+    g = vec3(Ls) + (g - vec3(Ls)) * ks;
+  }
   // Color grade: split-tone wheels — one pure-chroma tint per tonal band,
   // weighted by smoothstep bands over the display luminance; balance shifts
   // the shadow/highlight crossovers. AFTER B&W (so it tones mono too),
@@ -932,7 +945,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -1376,6 +1389,10 @@ export class Renderer {
     // Color grade wheels: the tint vectors are precomputed HERE by the same
     // pipeline.ts gradeTintVec the CPU path uses, so both sides add
     // bit-identical numbers (parity by construction, not coincidence).
+    // Clamped on BOTH sides to the same range compileEdit clamps to, because a
+    // uniform is the one place a stray value reaches the GPU without passing
+    // through the slider that bounds it.
+    gl.uniform1f(this.loc.u_shadowSat, Math.min(1, Math.max(0, p.shadowSat ?? 0)));
     const grade = p.grade ?? GRADE_DEFAULT;
     const gradeOn = !gradeIsNeutral(p.grade);
     gl.uniform1i(this.loc.u_gradeOn, gradeOn ? 1 : 0);
