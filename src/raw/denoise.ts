@@ -12,6 +12,10 @@
 const R = 2; // 5x5 window
 const REC = [0.2126, 0.7152, 0.0722];
 
+/** Clamp to the slider's own 0..1 range. Takes a number; returns it bounded,
+ *  so a per-channel bias can never ask for a sigma outside the designed curve. */
+const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
+
 /** exp(-(dx^2+dy^2) / (2 * 1.5^2)) spatial weights, precomputed. */
 const SPATIAL: number[] = [];
 for (let dy = -R; dy <= R; dy++) {
@@ -119,15 +123,50 @@ export function makeRowDenoiser(
   step = 1,
   chroma = 0,
   despeckle = 0,
+  chBias: readonly [number, number, number] = [1, 1, 1],
 ): LinearSampler {
-  if (strength <= 0 && chroma <= 0 && despeckle <= 0) return sample;
+  // PER-CHANNEL STRENGTH, AND WHY THE WEIGHT IS STILL SHARED.
+  //
+  // The noise in an infrared frame is not spread evenly across the channels and
+  // never was: the conversion floods red and starves blue, so blue arrives with
+  // 1.44x to 1.96x green's relative noise on every raw measured, gray-world then
+  // lifts it hardest, and the look's mixer differences the channels — leaving
+  // the original blue responsible for 99.8%, 71.9% and 42.5% of the noise
+  // variance in the three output rows (IR-SCIENCE.md 4c-xvi). The despeckle
+  // block below has said this since it was written, for its own stage only.
+  //
+  // `chBias` scales the strength per channel. The RANGE WEIGHT stays shared —
+  // one `exp()` per tap, exactly as before — and each channel is instead blended
+  // between its own centre value and that shared filtered mean. An edge is a
+  // property of the scene rather than of a channel, three range terms would cost
+  // three transcendentals per tap in a 25-tap kernel on every pixel of a
+  // 21-megapixel export, and the blend buys the same thing for nothing.
+  //
+  // Its one honest limit: a strong edge in red protects blue from smoothing even
+  // where blue is pure noise.
+  //
+  // BIT-IDENTICAL WHEN THE THREE ARE EQUAL. `sMax` is then `strength`, every
+  // blend factor is 1, and the returned value is the bilateral mean itself — so
+  // the default [1,1,1] cannot change a single pixel of what shipped.
+  const chS: [number, number, number] = [
+    clamp01(strength * chBias[0]),
+    clamp01(strength * chBias[1]),
+    clamp01(strength * chBias[2]),
+  ];
+  const sMax = Math.max(chS[0], chS[1], chS[2]);
+  const chK: [number, number, number] = sMax > 0
+    ? [chS[0] / sMax, chS[1] / sMax, chS[2] / sMax]
+    : [1, 1, 1];
+  const biased = chK[0] !== 1 || chK[1] !== 1 || chK[2] !== 1;
+  if (sMax <= 0 && chroma <= 0 && despeckle <= 0) return sample;
   // A FLOOR RATHER THAN A BRANCH when the luminance half is off. sigma 0 makes
   // inv2s2 infinite and the centre tap's `rel` is exactly 0, so the weight there
   // would be 0 * Infinity — NaN, once per pixel. A sigma this small underflows
   // every other tap's exp() to zero and leaves the centre at 1, which IS the
   // "leave luminance alone" case, arrived at by arithmetic instead of by an
   // `if` inside a twenty-five-tap loop.
-  const sigma = strength > 0 ? rangeSigma(strength) : 1e-6;
+  // The most aggressive channel sets the kernel; the others blend back from it.
+  const sigma = sMax > 0 ? rangeSigma(sMax) : 1e-6;
   const inv2s2 = 1 / (2 * sigma * sigma);
 
   // Preview runs this bilateral on a downscaled proxy, tapping in proxy texels
@@ -371,7 +410,13 @@ export function makeRowDenoiser(
     // `chroma` 0 IS BIT-IDENTICAL TO WHAT THIS RETURNED BEFORE, and that is the
     // point of mixing from the bilateral's own chroma rather than from the
     // centre pixel's: at 0 the two halves recombine into exactly `sum / wsum`.
-    const mr = sr / wsum, mg = sg / wsum, mb = sb / wsum;
+    let mr = sr / wsum, mg = sg / wsum, mb = sb / wsum;
+    if (biased) {
+      // Each channel between its own centre value and the shared filtered mean.
+      mr = mid[0] + (mr - mid[0]) * chK[0];
+      mg = mid[1] + (mg - mid[1]) * chK[1];
+      mb = mid[2] + (mb - mid[2]) * chK[2];
+    }
     if (chroma <= 0) {
       scratch[0] = mr; scratch[1] = mg; scratch[2] = mb;
       return scratch;
