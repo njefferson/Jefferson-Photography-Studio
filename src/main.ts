@@ -807,6 +807,42 @@ myLensUi.forget.addEventListener("click", () => {
   syncMyLens();
 });
 
+/** WHICH FILE IS OPEN, AND WHETHER IT IS A RAW, on the photograph itself.
+ *
+ *  Takes the decoded image (for `isRaw`, which is what the pipeline actually
+ *  branches on) and the imported file (for `kind` and `name`, which is what the
+ *  reader recognises). Returns nothing; it writes `#fileKind`'s text and its
+ *  `data-raw` attribute and unhides it.
+ *
+ *  WHAT THE RESULT HAS TO SATISFY: the element is a `role="status"` HUD over the
+ *  photograph, so the text must carry the meaning on its own — `#fileKind`'s CSS
+ *  deliberately has no caution colour, because the palette has no such token and
+ *  a hue would be the only carrier of it if it did. It must also stay short
+ *  enough for a phone; `max-width: 45%` clips rather than reflows the picture.
+ *
+ *  WHY IT EXISTS, reported from the device 2026-09-17: a raw and its camera JPEG
+ *  copy sat together in the picker, the JPEG was opened by mistake, and nothing
+ *  on the editing screen said so — the app admitted it only in the diagnostic
+ *  report. A camera JPEG renders very differently under a colour look, so which
+ *  one is open is the first thing worth knowing and was the one thing not shown.
+ *
+ *  `isRaw` decides the words rather than the extension, because that is the flag
+ *  the decode and the at-open ruling branch on; the extension is shown beside it
+ *  so the line matches what the reader picked. When the two would disagree the
+ *  flag wins and the extension is just a name. */
+function showFileKind(img: DecodedImage, imported: ImportedFile): void {
+  const el = document.getElementById("fileKind");
+  if (!el) return;
+  const EXT: Record<string, string> = { nef: "NEF", dng: "DNG", tiff: "TIF", jpeg: "JPG", png: "PNG" };
+  // An unrecognised container (HEIC arrives this way) still has a filename, and
+  // the reader's own extension is a better label than the word "unknown".
+  const fromName = (imported.name.match(/\.([A-Za-z0-9]{1,5})$/)?.[1] ?? "").toUpperCase();
+  const ext = EXT[imported.kind] ?? fromName ?? "";
+  el.textContent = img.isRaw ? `${ext} · raw`.trim() : `${ext ? ext + " · " : ""}not raw`;
+  el.setAttribute("data-raw", img.isRaw ? "yes" : "no");
+  el.hidden = false;
+}
+
 /** Called once per newly-opened photo, right after decode. Takes the decoded
  *  image and the imported file (neither is read — they mark the call site) and
  *  returns nothing; it sets `hotspotState`, `params.hsFix` and `params.hsBypass`
@@ -7972,6 +8008,7 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
   // upload otherwise.)
   const __a = performance.now();
   readOpenExif(imported); // once, for both cards
+  showFileKind(img, imported);
   initHotspot(img, imported);
   initMyLens(img, imported);
   const __b = performance.now();
