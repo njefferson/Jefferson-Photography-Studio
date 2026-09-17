@@ -1821,6 +1821,176 @@ changes additionally sweep all 44 practice raws.
   are called, are the owner's. A measurement can narrow the options and must not
   choose between them.
 
+## 9. THE HOT SPOT IS ADDED LIGHT, AND THIS APP CORRECTS IT AS A RATIO
+
+**Read this before changing anything about the measured lens correction.** All of
+it was looked up rather than derived, and two rounds of reasoning from the app's
+own output produced two wrong answers before anybody went and read. The section
+is written the way §4b was: what the sources say, then what this app does
+differently, then the measurement.
+
+### 9a. What the artefact physically is
+
+It is **stray light added to the picture**, not a loss of transmission. Kolari's
+account of the mechanism: light "bounces back from the sensor into the lens, and
+gets reflected back towards the sensor where it gets focused by the aperture into
+a hotspot". LifePixel's primer gives the other two causes — the matte coating
+inside the lens barrel, designed to absorb stray light, reflecting it instead in
+IR; and the coatings on the elements themselves behaving unlike they do in
+visible light.
+
+Four consequences, each of which the app's design touches:
+
+- **Its strength tracks the scene's own light.** Kolari, from their own test:
+  "The less light there was in the scene, the less pronounced the hotspot got."
+  So it is neither a fixed quantity of light nor a fixed fraction of each pixel —
+  it comes from the whole frame's illumination via a round trip.
+- **It worsens as the lens is stopped down**, because the aperture is what
+  focuses the returning light. The state of a lens is an aperture ceiling, not a
+  pass or a fail.
+- **It carries a colour shift as well as a brightness lift.** Rob Shea's
+  description is "circles of over-exposure and color shift"; LifePixel's is
+  "sometimes a color shift also occurs within the hotspot". Neither names a
+  direction, and the direction measured on this camera's own flats is recorded in
+  9d below as a measurement rather than as field knowledge.
+- **It is not reliably circular and not reliably centred.** LifePixel: the spot
+  is "sometimes in the shape of aperture leaves". Kolari: "the hotspot is not
+  always perfectly centered, and if you take portrait images, you need to be
+  careful to rotate the correction image the right way!!"
+
+### 9b. The published correction, and the term this app dropped
+
+Two reference implementations correct a flat field, and **each one picks a
+normalisation anchor and says which**. That choice is the part this app never
+made.
+
+**Kolari normalises to the flat's AVERAGE** ("Coping with Infrared Hotspots
+Using Astrophotography Techniques"):
+
+    corrected = image x (average flat frame / flat frame)
+
+A flat is shot at the same aperture and filtration as the subject, through a
+diffuser, and a library is kept per lens / filter / aperture combination. It is
+applied in Photoshop or Affinity through Divide and Multiply blend modes.
+
+**RawTherapee normalises to the flat's CENTRE.** From RawPedia's Clip Control
+section: the factor by which an area is corrected "is proportional to how much
+darker the corresponding area in the flat-field image is relative to the measured
+exposure of the center of the flat-field image". Note the direction — it lifts
+the periphery and leaves the centre alone. **That anchor cannot be used for a hot
+spot**: the hot spot IS the centre, so anchoring there would raise the whole
+frame to match it. Kolari's average anchor is the one that fits this artefact,
+and the reason is worth keeping because the two look interchangeable until you
+ask which end of the curve is trustworthy.
+
+**This app has neither.** It divides by the curve and by no reference level, so
+the correction moves the frame's overall colour balance as well as redistributing
+it — measured in 9d.
+
+### 9c. Where a flat-field correction belongs, and what it is known to break
+
+**RawPedia states the placement in one sentence:** "Flat-field correction is
+performed only on linear raw data in the beginning of the imaging pipeline and
+does not introduce gamma-induced shifts. Thus in RawTherapee flat-field
+correction can be applied to raw files only."
+
+Three other references agree on the shape. The DNG spec carries lens shading as a
+GainMap in OpcodeList2 — linear raw, after black subtraction, before demosaic;
+OpcodeList3 is the list applied after demosaic. Lightroom applies lens profiles
+during raw conversion, before creative edits. darktable's default order is
+demosaic, denoise (profiled), lens correction, and its scene-referred workflow
+exists to "perform as many operations as possible in a linear RGB color space,
+only compressing the tones ... at the end of the pixelpipe", because that makes
+it "much easier to produce predictable processing algorithms with a minimum of
+artifacts".
+
+**The invariant all four share is that the correction finishes before the
+grade.** This app's measured curve runs immediately before the camera matrix, the
+R-B swap, a hue rotation, the look's saturation and its mixer — inside the grade,
+not before it.
+
+Failure modes the references name, rather than ones found here:
+
+- **Clipping.** RawPedia: "Applying a flat-field image can cause nearly-
+  overexposed areas in the image to become overexposed due to the correction."
+  RawTherapee ships a Clip Control slider for it, computed against the raw white
+  level. This app has no equivalent.
+- **Scene dependence.** Kolari: "If there is more IR content in one image than
+  the other, and if the hot spot is not entirely corrected," a curve adjustment
+  is added to the flat frame layer. A single stored strength is not enough.
+- **What the flat actually depends on.** RawPedia lists camera, lens, **focal
+  distance**, aperture, and lens tilt/shift. This app matches focal *length* and
+  aperture; focal distance is unmatched.
+- **The flat is deliberately smoothed before use.** RawPedia's default Blur
+  Radius is 32, "usually sufficient to get rid of localized variations of raw
+  data due to noise"; radius 0 is reserved for dust removal and carries the
+  flat's own noise into the picture.
+
+One thing the reference **validates**: RawTherapee's auto-match key is camera
+make, model, lens, focal length and aperture, resolved by nearest in time among
+exact matches and otherwise by nearest in lens and aperture. That is the same
+two-stage shape `matchIn` in `src/lensstore.ts` already implements.
+
+### 9d. What this app does, measured on its own shipped table
+
+- The colour curve is applied at **full strength automatically** from an EXIF
+  match, on every raw file, with no per-image scale.
+- It is indexed with `floor(r * n)` over **80 hard radial bins and no
+  interpolation** — the opposite of the deliberate smoothing above.
+- Its radius is measured from the **frame's geometric centre on uncropped uv**,
+  against Kolari on centring and rotation and LifePixel on aperture-shaped spots.
+- **It is not area-neutral.** Divided by its own area-weighted mean the residual
+  cast would be zero; as shipped it moves the whole frame's red-against-blue by
+  **+1.49%** on the blend matched to the lone-oak frame (50-250 at 57mm f/8,
+  86% of the 50mm profile and 14% of the 130mm), by **+3.79%** on the worst
+  shipped profile, and by more than 2% on **14 of the 72** profiles that carry
+  colour. Gray-world white balance is measured before this stage runs, so nothing
+  downstream puts it back.
+- **On this camera's flats the centre measures relatively bluer and less red**
+  against green — kr 0.9785 at the centre against 1.0251 at the corner, kb 1.0609
+  against 0.9704. That is this table's measurement, not a field fact; no source
+  found names a direction. It is consistent with scattered light being bluer than
+  the direct image, which would be expected of a round trip off the sensor, but
+  nothing here establishes that.
+- Through the swap and the look, that correction removes **37%** of the foliage's
+  red-against-blue inside the middle of the frame and **18%** further out, on the
+  lone-oak frame under Aerochrome. Rendered on and off from the app itself.
+
+### 9e. And the field's first answer is not a correction at all
+
+Rob Shea: "Mild hot spots can be addressed easily in Lightroom or Photoshop.
+Severe hot spots can be very challenging to fix. In the long run, you will be
+better off shooting your infrared images with a lens that does not produce hot
+spots." LifePixel: "the only solution is to simply use a different lens
+altogether."
+
+When it IS corrected in post, the published recipe is **local, feathered and
+manual**, and consistent across sources: a radial filter centred on the spot with
+the mask inverted and roughly 50% feather; Exposure down until the centre matches
+its surroundings; **Clarity and Dehaze up** to clear the haze the spot creates;
+**Saturation up** to match the rest of the frame. Reaching for Dehaze is the
+field arriving empirically at veil removal, and this app already has a
+hue-preserving luminance veil subtraction in its dehaze stage.
+
+**Note the direction of that last slider.** The practitioner recipe RAISES
+saturation inside the hot spot. This app's correction lowers it.
+
+The workflow reference this file is the companion to reaches the same conclusion
+from the capture side and states it more bluntly: the hot spot is unrecoverable
+in post, it is not vignetting inverted, and no flat-field correction survives a
+channel swap. Nobody found in this research ships an automatic, full-strength,
+profile-driven hot-spot correction. This app does.
+
+### 9f. What was NOT read
+
+Two sources were refused by this session's egress and the gap is recorded rather
+than papered over. Rob Shea's own hot-spot articles are video wrappers whose
+method lives entirely in YouTube embeds, and both that host and his main domain
+were unreachable — so his actual technique was never read, only his written
+framing of the problem. Jim Kasson's "Infrared hotspotting: the last word" was
+also unreachable, and is the most rigorous measurement source the search turned
+up. Either could sharpen the anchor and strength choices above.
+
 ---
 
 ## Sources

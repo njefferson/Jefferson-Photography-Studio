@@ -575,6 +575,21 @@ user-scalable=no.
   which is the argument for counting the decodes on both sides of the keep before
   changing anything rather than rewriting the handoff a second time. See
   `docs/decisions/014-quick-look-stop-and-release.md`.
+- [ ] **The centre of the picture washes out — the lens correction, against the reference** <!-- decision: 015 --> — reported
+  from the iPad 2026-09-17 on the lone oak under Aerochrome, and the report named
+  the cause correctly. Rendered on and off from the app itself, the measured lens
+  correction removes 37% of the foliage's red-against-blue in the middle of the
+  frame and 18% further out; separating the halves, the brightness bump does
+  almost nothing and the colour curve does all of it. The reading behind it is in
+  `IR-SCIENCE.md` §9: the hot spot is added light whose strength tracks the
+  scene's own, and both published corrections normalise the flat to a reference
+  level — Kolari to its average, RawTherapee to its centre — while this app
+  normalises to nothing, which moves the whole frame's red-against-blue by up to
+  3.79% before any look runs. First change is the smallest one: restore the
+  average anchor and interpolate the 80 hard bins, both reference behaviour, with
+  the shipped profile arrays untouched. Clip control, a per-image strength and
+  moving the stage out of the creative chain follow, each with its own record.
+  See `docs/decisions/015-lens-correction-against-the-reference.md`.
 - [ ] **Creative — a third app for regular photos** — owner direction 2026-07-19 <!-- decision: 002 -->
   ("a separate page next to infrared and macro, called creative, for regular
   photos, installable separately… same things we're building here… I suppose I
