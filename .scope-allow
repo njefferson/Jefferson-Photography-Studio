@@ -1,0 +1,75 @@
+# Every knob says whether it acts on the whole photograph or on a selection.
+# tools/scope-check.mjs checks it BOTH ways and refuses a whole-frame entry
+# that does not say why. The owner's rule, said twice: do not apply to the
+# photo as a whole when it should be surgical and precise instead, especially
+# when it is already easy to separate.
+#
+# A reason beginning OWED is an admission, not a defence: the knob is
+# whole-frame today and should not be. That is the point of writing it here —
+# the list is the standing record of what is owed, in front of whoever adds
+# the next knob.
+#
+#   name = whole-frame : why every pixel is right here
+#   name = selection   : aimed at a mask, a hue band or a region
+#   name = not-pixels  : geometry, files, flags, UI state
+
+EditParams.wb = whole-frame : a white point is a property of the light, not of a region
+EditParams.exposure = whole-frame : one gain on the whole frame is what exposure means
+EditParams.swapRB = whole-frame : a channel mapping is the frame's colour space, not a region's
+EditParams.sat = whole-frame : global by definition; per-population saturation is hsl and the masks
+EditParams.contrast = whole-frame : a tone response applies to the whole frame by construction
+EditParams.denoise = whole-frame : OWED: the sky and the canopy want opposite strengths and this gives them one. Measured 2026-09-17 — the floor that cleans a sky costs a canopy 23% of its texture
+EditParams.chroma = whole-frame : OWED: a sky has no chroma detail to protect and a leaf edge does, and this cannot tell them apart. IR-SCIENCE 9k — at strength it makes the patches it was meant to remove
+EditParams.despeckle = whole-frame : a lone stray pixel is the same defect wherever it is, and the test is local already
+EditParams.recover = whole-frame : keyed on each pixel's own clipping, so it is already inert where nothing is blown
+EditParams.tint = whole-frame : a cast correction is a property of the whole rendering
+EditParams.glow = whole-frame : a bloom is a property of the whole image, and it is luminance-keyed
+EditParams.sky = selection
+EditParams.foliage = selection
+EditParams.tone = whole-frame : a tone curve is the frame's transfer function; per-region tone is the masks' brightness and contrast
+EditParams.toneR = whole-frame : same as tone, per channel
+EditParams.toneG = whole-frame : same as tone, per channel
+EditParams.toneB = whole-frame : same as tone, per channel
+EditParams.lum = whole-frame : a final luminance gamma on the finished frame
+EditParams.masks = not-pixels
+EditParams.hotspot = whole-frame : OWED: radial geometry is not a population. It treats sky and foliage at the same radius identically, which is the whole of the owner's 2026-09-17 report
+EditParams.hotspotSize = whole-frame : a parameter of hotspot, which carries the reason
+EditParams.hotspotColor = whole-frame : a parameter of hotspot, which carries the reason
+EditParams.vignette = whole-frame : a creative darkening of the frame's edge is geometric on purpose
+EditParams.lensFix = whole-frame : OWED: the measured lens correction is radial and blind to what sits at that radius. IR-SCIENCE 9k and decision 015
+EditParams.lensBypass = not-pixels
+EditParams.forceBalance = not-pixels
+EditParams.hsFix = whole-frame : OWED: same radial blindness as lensFix, on the brightness half
+EditParams.hsBypass = not-pixels
+EditParams.hsl = selection
+EditParams.bwOn = whole-frame : a mono conversion is a decision about the whole photograph
+EditParams.bwMix = whole-frame : the channel weights of that mono conversion
+EditParams.mix3 = whole-frame : a 3x3 mapping IS the frame's colour transform; aiming it would make it a different stage
+EditParams.grade = whole-frame : luminance-banded on purpose — split toning selects by tone, which is what the bands are
+EditParams.shadowSat = whole-frame : OWED: luminance-banded, so a deep sky's dark end pays for a tree's bark. IR-SCIENCE 9j names the fix as a second weight on distance from the sky band
+EditParams.grainAmt = whole-frame : film grain is uniform by definition
+EditParams.grainSize = whole-frame : a parameter of grainAmt
+EditParams.vigAmt = whole-frame : a creative vignette is geometric on purpose
+EditParams.vigMid = whole-frame : a parameter of vigAmt
+EditParams.clarity = whole-frame : OWED: local contrast against a blurred reference built from the WHOLE frame, so a hot spot inside that reference is normalised against itself
+EditParams.dehaze = whole-frame : OWED: same shared reference map as clarity
+EditParams.sharpen = whole-frame : capture sharpening is a property of the lens and sensor, so it applies everywhere
+EditParams.texture = whole-frame : OWED: a sky has no surface structure to recover and pays for the canopy's. Measured 2026-09-17
+EditParams.spots = selection
+EditParams.stickers = selection
+EditParams.crop = not-pixels
+EditParams.straighten = not-pixels
+EditParams.warp = not-pixels
+EditParams.lut = whole-frame : a third-party LUT is a whole-frame transform by its own file format
+Look.swapRB = whole-frame : see EditParams.swapRB — a look only chooses the value
+Look.toggleSwap = not-pixels
+Look.hue = whole-frame : a global hue rotation; the per-band version is hsl
+Look.wbBias = whole-frame : a diagonal gain on the white point, which is global by construction
+Look.tint = whole-frame : see EditParams.tint
+Look.hsl = selection
+Look.mix3 = whole-frame : see EditParams.mix3
+Look.denoise = whole-frame : OWED: a look raising one strength for the whole frame is what cost the canopy its texture
+Look.texture = whole-frame : OWED: see EditParams.texture — the look sets one amount for sky and canopy alike
+Look.glow = whole-frame : see EditParams.glow
+Look.raw = not-pixels
+Look.jpeg = not-pixels
