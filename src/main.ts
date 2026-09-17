@@ -2368,6 +2368,12 @@ function wireVersionMenu() {
     text.value = await buildDiagnostic(__APP_VERSION__, [
       { k: "Open now", v: current ? `a photo is open${real >= 2 ? ` in a session of ${real}` : ""}` : "nothing open" },
       { k: "Restore depth", v: autoLift ? `on at ${Math.round(liftAmount * 100)}% strength` : "off" },
+      // THE VIEW, because a photograph that fills the screen with no way out
+      // looks the same in a screenshot whichever of four states caused it.
+      { k: "View", v: viewDiagnostic() },
+      { k: "Canvas", v: canvasDiagnostic() },
+      { k: "Strip reserves", v: stripReservesDiagnostic() },
+      { k: "Page zoom", v: pageZoomDiagnostic() },
       // THE LENS CORRECTION, IN THE NUMBERS IT ACTUALLY APPLIES. The report had
       // nothing about lenses at all, so "the hot-spot came out a blue circle"
       // could not be answered from a paste — only by asking the reader to
@@ -5805,6 +5811,89 @@ function applyZoom() {
 function resetZoom() {
   zoom = 1;
   applyZoom();
+}
+
+// --- THE VIEW'S OWN STATE, FOR THE REPORT (Doctrine §7f) -------------------
+//
+// A photograph filled the screen on an iPad with no way back out, and nothing
+// in this app could say which of four states produced it — leftover zoom, the
+// strip reserving a height the canvas is not measured against, a crop changing
+// the canvas's aspect, or the PAGE being zoomed rather than the photograph.
+// **All four look identical in a picture of a screen**, which is exactly the
+// case §7f exists for: ask for the text, never the screenshot. The lens lines
+// below in the same report were added for the same reason, after "the hot-spot
+// came out a blue circle" could not be answered from a paste.
+//
+// Each line is written so the ABNORMAL reading names itself in words. A report
+// that prints four numbers leaves the diagnosis to whoever remembers what they
+// should be; a report that says the page is zoomed has done the work.
+//
+// NOTHING THE READER WROTE IS IN ANY OF THEM. Zoom, pan, pixel sizes and the
+// visual viewport are facts about the device and the view, not about a
+// photograph — no name, no metadata, no edit value. That is asserted rather
+// than assumed: the session walk opens a named practice file and greps the
+// built report for its name.
+
+/** How far the photograph is magnified and where it has been dragged to.
+ *
+ *  Takes nothing; reads the live `zoom`/`panX`/`panY` the pinch, the wheel and
+ *  the zoom buttons all share. Returns one line for the report, or "nothing
+ *  open" when there is no photograph — the empty case is where a report usually
+ *  lies, so it is stated rather than printed as zeros. Consumed by the
+ *  diagnostic assembly; the invariant it has to hold is that a reading of
+ *  exactly 100% means the whole photograph is on screen, which is what makes
+ *  any other value the answer to "why can I only see part of it". */
+function viewDiagnostic(): string {
+  if (!current) return "nothing open";
+  const pct = Math.round(zoom * 100);
+  if (zoom <= 1.001) return `${pct}% — at fit, the whole photograph on screen`;
+  return `${pct}% — ZOOMED IN, panned ${Math.round(panX)},${Math.round(panY)}px · Fit is in the zoom control`;
+}
+
+/** The canvas's own size against the box it has to fit inside.
+ *
+ *  Takes nothing; reads `canvas` (whose pixel size `Renderer.applySize` sets to
+ *  the image times the crop) and `stageEl`. Returns the intrinsic size, the
+ *  size it is actually drawn at, and the stage's — and says so in words when
+ *  the drawn picture is larger than the stage, which is the state that cannot
+ *  happen while the contain rules in `#view` are doing their job. Consumed by
+ *  the diagnostic assembly. */
+function canvasDiagnostic(): string {
+  if (!current) return "nothing open";
+  const r = canvas.getBoundingClientRect();
+  const st = stageEl.getBoundingClientRect();
+  const over = r.width > st.width + 1 || r.height > st.height + 1;
+  return `${canvas.width}x${canvas.height} pixels, drawn at ${Math.round(r.width)}x${Math.round(r.height)} inside a stage of ${Math.round(st.width)}x${Math.round(st.height)}`
+    + (over ? " — DRAWN LARGER THAN THE STAGE, so part of it is off the edge" : "");
+}
+
+/** What the session strip is taking off the photograph's height.
+ *
+ *  Takes nothing; reads the `--session-h` custom property the strip writes onto
+ *  the stage, which is what `#view`'s `max-height` is measured against. Returns
+ *  the reserved height, or that there is no strip. Consumed by the diagnostic
+ *  assembly; it is here because a strip that reports a height it is not
+ *  actually occupying moves the fit box without moving anything visible. */
+function stripReservesDiagnostic(): string {
+  if (!stageEl.classList.contains("has-session")) return "no session strip on screen";
+  const v = getComputedStyle(stageEl).getPropertyValue("--session-h").trim();
+  return `${v || "unset"} of the stage reserved for the strip`;
+}
+
+/** Whether the PAGE is zoomed rather than the photograph.
+ *
+ *  Takes nothing; reads `window.visualViewport`, which is the only thing that
+ *  separates a pinch the app handled from one the browser did. Returns the
+ *  scale and the visual viewport's size against the window's, and says in words
+ *  when the two disagree. Consumed by the diagnostic assembly — and it is the
+ *  line that decides whether the next step is in this app at all or in how iOS
+ *  Safari reports its viewports. */
+function pageZoomDiagnostic(): string {
+  const vv = window.visualViewport;
+  if (!vv) return "not reported by this browser";
+  const scaled = Math.abs(vv.scale - 1) > 0.01;
+  return `${vv.scale.toFixed(2)}x · visible ${Math.round(vv.width)}x${Math.round(vv.height)} against a window of ${innerWidth}x${innerHeight}`
+    + (scaled ? " — THE PAGE IS ZOOMED, not the photograph" : "");
 }
 
 // --- Zoom controls that need neither a mouse wheel nor pinch. The buttons and

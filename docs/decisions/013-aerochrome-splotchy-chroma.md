@@ -72,6 +72,39 @@ trade the sources describe and warn against.
 
 ## Options
 
+**THE SHEET IS RENDERED, 2026-09-17, AND IT SPLITS THE DEFECT IN TWO.** Five
+candidates on a real raw, every step a control on the device, shown 1:1 at the
+frame's splotchiest 600x450 block — found by chroma variance and then held fixed,
+so every step of the ladder shows the same piece of the same photograph.
+
+At saturation 3.0 the sky carries visible speckle and the foliage stipples into
+hard red and white flecks; at 2.0 and 1.5 both soften; at 1.0 the sky is clean and
+the foliage is smooth. So the splotch IS amplification, and the amount is large.
+
+**The shipped look with the existing denoise at its maximum is indistinguishable
+from the shipped look.** That arm was included to find out whether the
+luminance-guided bilateral could reach this at all. It cannot, and that closes the
+cheapest possible fix before it was attempted.
+
+**But there are two artefacts and only one of them is chroma noise.** The sky
+speckle is chroma noise amplified, which is what a chroma stage is for. The
+foliage stipple is saturation driving adjacent leaves to the gamut edge so they
+snap to pure red or pure white, losing the mid-tones between them — per-pixel
+clipping, which a spatial chroma blur will soften but not undo. **A fix aimed only
+at noise will clean the sky and leave the leaves flecked**, and that has to be
+said before it is built rather than discovered after.
+
+What the naive fix costs, stated because it is not free: pulling saturation back
+does not change which colours the look makes, it drains them. The colourless share
+of the whole frame moves 4.9% at 3.0, 8.8% at 2.0, 12.5% at 1.5 and 19.2% at 1.0,
+and the largest hue bin's share of the coloured pixels moves 56% to 63%.
+
+**And the per-kind split decides whether any of this applies.** `raw.sat` is 3.0
+and `jpeg.sat` is 1.35, so a camera JPEG never sees the amplification. The same
+ladder on a real camera JPEG moves its colourless share 2.4% to 5.9% across the
+whole range and its largest bin not at all. Which file kind a splotch report came
+from is the first question, not a detail.
+
 **A chroma-specific denoise before saturation, separate in strength from the
 luminance one.** Chosen, because it is what the field does and what the frames
 call for. The existing bilateral stays as the luminance hand; the new stage works
