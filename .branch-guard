@@ -110,3 +110,17 @@ also=tools/architecture-check.mjs
 # ABOUT the item that claims it — a backfill filed two of eleven under each
 # other's keys while every existence check stayed green.
 also=tools/decisions-check.mjs
+
+# Run on every commit: every knob declares whether it acts on the whole
+# photograph or on a selection, and a whole-frame one says WHY. The owner's rule
+# said twice — do not apply to the photo as a whole when it should be surgical,
+# especially when the thing is already easy to separate — and it was prose both
+# times. What that cost, measured 2026-09-17: three whole-frame constants shipped
+# in one day, each through eleven gates and five browser walks, because not one
+# of them asks whether the knob should have been aimed. Meanwhile src/sky.ts has
+# exported buildSkyMask for months and no look or correction uses it. A DECLARED
+# LIST rather than a pattern, because no parser tells a legitimately global knob
+# from a lazily global one — exposure IS global, a sky's colour noise is not. A
+# reason beginning OWED is an admission and the list is the standing record of
+# them.
+also=tools/scope-check.mjs
