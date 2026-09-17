@@ -18,7 +18,16 @@
 //    values back out of the DOM rather than trusting the spec about that.
 //  - THE DENOISE. It is a per-shot correction that no look had ever touched,
 //    and it is a FLOOR over the photograph's own measurement rather than a
-//    setting. Checks 4-6 cover the floor and both directions of leaving it.
+//    setting. Checks 5-6 cover the floor and both directions of leaving it,
+//    ON A FRAME THE FLOOR BINDS ON -- see FLOOR_RAW, which is the thing this
+//    walk got wrong: it compared the frame's measurement against its own copy
+//    of the floor, so when the floor moved below that measurement the control
+//    kept printing ok while the check under it asserted nothing.
+//  - THE LOCAL CONTRAST. The other half of the same decision: the floor cleans
+//    the sky and flattens the canopy, so the look brings a mid-frequency
+//    contrast amount to give the modelling back. Checks 4a-d cover it in both
+//    directions, and check 7's recipe arm drives it through the reader's own
+//    slider, which is what makes the equivalence a real claim.
 //
 // Checks 10a-c are now the ones that matter most: the look's two populations
 // land on the angles measured off real Aerochrome (IR-SCIENCE.md 4b-iii), and
@@ -87,7 +96,20 @@ const PAIR = [EX + "NIR_0063.dng", EX + "NIR_0627.dng"];
 
 // The approved arm, exactly as it was driven on the sheets.
 const MATRIX = [0.99, -0.06, 0.07, -1.44, 1.37, 1.02, -0.47, 0.81, 0.65];
-const FLOOR = 0.8;
+// The denoise floor and the local contrast that gives back what the floor
+// costs. Two halves of one decision, so they are read as a pair: 0.80 flattened
+// the canopy (texture 30.78 against 40.15 with the denoiser off) and 0.45 with
+// 0.25 of mid-frequency contrast recovers 48% of that for 6.2% of the sky's
+// speckle gain. See Look.texture in src/main.ts.
+const FLOOR = 0.45;
+const TEXTURE = 0.25;
+// THE FLOOR CHECKS NEED A FRAME THE FLOOR ACTUALLY BINDS ON, which is why they
+// do not use RAW. NIR_0063 measures 0.46 -- above the floor -- so `max(measured,
+// FLOOR)` is just the measurement there and checks 4 and 5 would assert nothing
+// while printing ok. That is exactly how this walk stayed green through the
+// floor moving: check 0b compared the measurement against the walk's own stale
+// constant. 0.22 is the lowest of the ten bundled practice raws.
+const FLOOR_RAW = EX + "NIR_0627.dng";
 // The film's own angles, measured off the source article's photographs
 // (IR-SCIENCE.md 4b-iii). Check 10 holds the look to them.
 const FILM = { fol: 6.2, sky: 204.0, sep: 197.8 };
@@ -114,12 +136,12 @@ try {
   // A PAGE WITH A PHOTOGRAPH ON IT, from a clean context every time: the
   // session look is seeded out of localStorage, and a walk that inherited one
   // would be pressing a second look on top of a first.
-  const open = async () => {
+  const open = async (file = RAW) => {
     const ctx = await b.newContext({ viewport: { width: 1280, height: 950 } });
     const p = await ctx.newPage();
     p.on("dialog", d => d.accept());
     await p.goto(`http://127.0.0.1:${PORT}/ir.html`);
-    await p.setInputFiles("#file", [RAW]);
+    await p.setInputFiles("#file", [file]);
     await p.waitForFunction(() => document.getElementById("welcome")?.hidden, null, { timeout: 300000 });
     await p.waitForFunction(() => !document.getElementById("busy")?.hasAttribute("open"), null, { timeout: 300000 });
     await settle(p);
@@ -153,21 +175,24 @@ try {
   const mixer = (p) => p.evaluate(() =>
     [...document.querySelectorAll("#mix3Grid input[type=range]")].map(e => Number(e.value)));
   const dn = (p) => p.evaluate(() => Number(document.getElementById("dn").value));
+  const tex = (p) => p.evaluate(() => Number(document.getElementById("texture").value));
   const swap = (p) => p.evaluate(() =>
     document.getElementById("swapBtn")?.getAttribute("aria-pressed") === "true");
   const press = async (p, id) => {
     await p.evaluate(t => document.getElementById(t)?.click(), id);
     await settle(p);
   };
-  const setDn = async (p, v) => {
-    await p.evaluate((x) => {
-      const el = document.getElementById("dn");
+  const setSlider = async (p, id, v) => {
+    await p.evaluate(([i, x]) => {
+      const el = document.getElementById(i);
       el.value = String(x);
       el.dispatchEvent(new Event("input", { bubbles: true }));
       el.dispatchEvent(new Event("change", { bubbles: true }));
-    }, v);
+    }, [id, v]);
     await settle(p);
   };
+  const setDn = (p, v) => setSlider(p, "dn", v);
+  const setTex = (p, v) => setSlider(p, "texture", v);
 
   // ---- 0. THE CONTROL. Without this every check below could pass on an
   // instrument that reads the same nine numbers whatever is pressed.
@@ -175,36 +200,57 @@ try {
   const measured = await dn(a.p);
   check("0a  a fresh raw opens with the mixer at identity",
     await mixer(a.p), [1, 0, 0, 0, 1, 0, 0, 0, 1]);
-  check("0b  its denoise is measured, not zero and not the floor",
-    measured > 0 && measured < FLOOR, true);
+  check("0b  its denoise is measured, and no look has touched it",
+    measured > 0, true);
+  check("0b2 ...and it opens with no local contrast on it", await tex(a.p), 0);
 
   await press(a.p, "lookAero");
   check("0c  Pink IR carries no mixer of its own",
     await mixer(a.p), [1, 0, 0, 0, 1, 0, 0, 0, 1]);
   check("0d  ...and does not touch the measured denoise", await dn(a.p), measured);
+  check("0d2 ...nor the local contrast", await tex(a.p), 0);
 
-  // ---- 1-6. THE SHIPPED LOOK.
+  // ---- 1-3. THE SHIPPED LOOK.
   await press(a.p, "lookEir");
   check("1   Aerochrome turns the R<->B swap ON, which the matrix needs", await swap(a.p), true);
   check("2   the nine mixer values read back off the DOM as declared",
     await mixer(a.p), MATRIX);
   check("3   ...so every one of them survives the slider's 0.01 step",
     MATRIX.every(v => Math.abs(v * 100 - Math.round(v * 100)) < 1e-9), true);
-  check("4   denoise is raised to the floor", await dn(a.p), Math.max(measured, FLOOR));
-
+  check("4a  the look brings its local contrast with it", await tex(a.p), TEXTURE);
   await press(a.p, "lookAero");
-  check("5   leaving it puts the photograph's own measurement back", await dn(a.p), measured);
+  check("4b  ...and leaving it puts the photograph back to none", await tex(a.p), 0);
+
+  // A VALUE THE READER SET IS NOT OURS TO THROW AWAY, in either direction --
+  // the same pair of claims the denoise floor carries below, and the reason
+  // both use half a slider step rather than the 0.01 the slider moves in.
+  await setTex(a.p, 0.6);
+  await press(a.p, "lookEir");
+  check("4c  a texture set by hand is not overwritten by the look", await tex(a.p), 0.6);
+  await press(a.p, "lookAero");
+  check("4d  ...and is not thrown away by leaving it either", await tex(a.p), 0.6);
+  await a.ctx.close();
+
+  // ---- 4-6. THE FLOOR, ON A FRAME IT BINDS ON. See FLOOR_RAW.
+  const f = await open(FLOOR_RAW);
+  const measuredFloor = await dn(f.p);
+  check("5a  the floor frame measures BELOW the floor, or nothing below means anything",
+    measuredFloor > 0 && measuredFloor < FLOOR, true);
+  await press(f.p, "lookEir");
+  check("5b  denoise is raised to the floor", await dn(f.p), Math.max(measuredFloor, FLOOR));
+  await press(f.p, "lookAero");
+  check("5c  leaving it puts the photograph's own measurement back", await dn(f.p), measuredFloor);
 
   // THE READER'S OWN VALUE IS NOT OURS TO THROW AWAY. One slider step away from
   // the measurement, which is the smallest deliberate move there is and the one
   // a 0.01 tolerance would have eaten.
-  const byHand = Math.round((measured + 0.01) * 100) / 100;
-  await setDn(a.p, byHand);
-  await press(a.p, "lookEir");
-  check("6a  a denoise set by hand is not raised by the look", await dn(a.p), byHand);
-  await press(a.p, "lookAero");
-  check("6b  ...and is not thrown away by leaving it either", await dn(a.p), byHand);
-  await a.ctx.close();
+  const byHand = Math.round((measuredFloor + 0.01) * 100) / 100;
+  await setDn(f.p, byHand);
+  await press(f.p, "lookEir");
+  check("6a  a denoise set by hand is not raised by the look", await dn(f.p), byHand);
+  await press(f.p, "lookAero");
+  check("6b  ...and is not thrown away by leaving it either", await dn(f.p), byHand);
+  await f.ctx.close();
 
   // ---- 7, 8. THE EQUIVALENCE, both ways round.
   //
@@ -241,6 +287,10 @@ try {
         el.value = String(v); el.dispatchEvent(new Event("input", { bubbles: true })); }, BANDS[b]);
     }
     await settle(p);
+    // AND THE LOCAL CONTRAST, driven through the reader's own slider. Same two
+    // claims the bands carry: the equivalence stays real now that the look
+    // brings a texture amount, and that amount is proved reachable by hand.
+    await setTex(p, TEXTURE);
     await setDn(p, Math.max(measured, FLOOR));
     const h = await hash(p);
     await ctx.close();

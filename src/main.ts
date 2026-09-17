@@ -1238,6 +1238,38 @@ interface Look {
    *  and carries no measurement to floor against, so it would put 0.8 onto a
    *  clean frame that measured 0.3. */
   denoise?: number;
+  /** MID-FREQUENCY LOCAL CONTRAST THE LOOK BRINGS BACK, because the look is
+   *  what took it away. Absent on every look but `eir`.
+   *
+   *  It is here for one reason: `denoise` above is a FLOOR a look raises, and
+   *  raising it costs the canopy its modelling. Measured on the lone oak's
+   *  1.57M-pixel canopy through the real pipeline, fine texture reads 40.15
+   *  with the denoiser off, 34.03 at 0.45 and 30.78 at 0.80 — so the floor that
+   *  cleans the sky flattens the tree, and a look that asks for the cleanup
+   *  owes the structure back. `texture` is the field's own lever for exactly
+   *  that (raw/detail.ts): a band-pass between the two detail blurs folded back
+   *  as a HUE-PRESERVING luminance gain, which is Lightroom's Texture slider
+   *  and what every reference workflow reaches for on foliage.
+   *
+   *  WHY NOT THE HUE BAND'S LUMINANCE, which is what the reference video
+   *  actually demonstrates. Measured as a ladder — 1.00, 1.06, 1.10, 1.14,
+   *  1.18, 1.22 on the canopy's own three bands — the texture figure rises
+   *  5.9%, 9.6%, 12.9%, 15.6%, 17.7% and the canopy's MEAN LUMA rises 5.9%,
+   *  9.6%, 13.1%, 16.2%, 19.0%. Texture per unit luma is flat at 0.254 across
+   *  the whole ladder and FALLS above 1.10. It is a brightness control, and the
+   *  video's own words for it — so it pops a little bit more — say so. A
+   *  brighter population measures more local variation for free, which is the
+   *  trap the ratio exists to catch.
+   *
+   *  What the result must satisfy: `applyLook` writes it onto `params.texture`
+   *  and records it in `lookTexture`, so leaving the look puts the reader's own
+   *  value back and a value they dragged is never overwritten. It is NOT a
+   *  floor like denoise — there is no per-photograph measurement to floor
+   *  against, so 0 is the honest baseline it replaces. `batchParamsFor` leaves
+   *  tiles at 0 ON PURPOSE and the two facts are one fact: a 260px tile is not
+   *  denoised either, so it never lost the structure this gives back. Change
+   *  one and the other stops being true. */
+  texture?: number;
   glow?: number;
   /** Per-kind, because raw and camera-rendered files arrive in DIFFERENT
    *  STATES and one cast correction cannot serve both. A raw opens on the
@@ -1310,10 +1342,35 @@ const LOOKS: Record<string, Look> = {
   // already carries two other notes saying a full-precision value written to a
   // stepped control does not come back; this is the third.
   //
-  // `denoise: 0.8` IS A FLOOR (see Look.denoise). The colour and the grain come
+  // `denoise` IS A FLOOR (see Look.denoise). The colour and the grain come
   // out of the same residual, so the mapping that doubles the colour doubles
-  // the speckle with it; measured, 0.80 cuts the speckle 40% for 14% of the
+  // the speckle with it; measured, the floor cuts the speckle 40% for 14% of the
   // colour, and the sky of the full frame is where you see it.
+  //
+  // THE FLOOR WAS 0.80 AND IT FLATTENED THE TREE. Reported from the device as
+  // foliage the right colour and "a blob of it", and measured on the lone oak's
+  // canopy — 1.57M pixels, 30% of the frame — fine texture reads 40.15 with the
+  // denoiser off, 34.11 under the 5x5 luminance filter this app shipped until
+  // 2026-09-16, and 30.76 under the 13x13 that replaced it. The filter costs the
+  // canopy 23% of its modelling and the widening is a third of that; the commit
+  // that widened it said detail was not the price, which was a busy-block metric
+  // on a different frame and is false on foliage.
+  //
+  // 0.45 AT THE FLOOR, MEASURED ON BOTH POPULATIONS. Canopy texture 30.78 to
+  // 34.03, +11.6% per unit brightness with the canopy's mean luma unmoved
+  // (121.1 to 120.0) — so it is modelling, not exposure. The sky pays: the pale
+  // luminance speckle the 13x13 was added for rises 4.3%, from 2.645 to 2.758
+  // on a verified sky block, against a residual that widening had already cut
+  // 76%. `texture: 0.25` then gives back what the floor still costs (see
+  // Look.texture) for another 1.9% of the sky. Together they recover 48% of the
+  // canopy's loss for 6.2% of the sky's gain.
+  //
+  // THE RADIUS IS THE WRONG LEVER AND WAS MEASURED, NOT ASSUMED. Sweeping the
+  // bilateral to 11x11, 9x9 and 7x7 with sigma held at R/2: the narrowest
+  // recovers 29% of the canopy's loss and hands back 28% of the sky's gain,
+  // which is very nearly the trade the widening made in reverse. Strength and
+  // local contrast both beat it because neither touches the kernel the sky fix
+  // depends on.
   //
   // NO `toggleSwap`: a repeat press would flip the swap this matrix was solved
   // on top of. NO `hsl` ON THE JPEG SIDE either -- the eight-band correction
@@ -1350,7 +1407,7 @@ const LOOKS: Record<string, Look> = {
   // lands 1-4deg wide. That range is not in the data to recover -- it is the
   // same 1-3% residual section 4c-iv is about -- so this moves the population,
   // it does not enrich it.
-  eir: { swapRB: true, hue: 0, denoise: 0.8,
+  eir: { swapRB: true, hue: 0, denoise: 0.45, texture: 0.25,
          mix3: [0.99, -0.06, 0.07, -1.44, 1.37, 1.02, -0.47, 0.81, 0.65],
          raw: { sat: 3.0, contrast: 1.15,
                 hsl: [7, 1, 1, 0, 1, 1, 0, 1, 1, 54, 1, 1, 35, 1, 1, 0, 1, 1, 1, 1, 1, 43, 1, 1] },
@@ -1395,6 +1452,14 @@ let measuredDenoise: number | null = null;
  *  later call has to tell its own work from a value the reader dragged. Null
  *  when the look on the frame carries no floor. */
 let lookDenoise: number | null = null;
+
+/** What `applyLook` last wrote onto `params.texture`, so leaving a look that
+ *  brings local contrast back puts the reader's own value there instead — and a
+ *  value they dragged themselves is never overwritten. The same device
+ *  `lookDenoise` and `lookWb` are, and needed for the same reason: the look is
+ *  allowed to touch this, so it has to be able to tell its own writing from
+ *  somebody else's. */
+let lookTexture: number | null = null;
 
 /** Whether the photo now open has all its colour in one band, and WHICH photo
  *  that was measured on. See applyLook. */
@@ -1583,6 +1648,33 @@ function applyLook(name: keyof typeof LOOKS) {
       lookDenoise = null;
     }
   }
+  // AND THE STRUCTURE THAT FLOOR COSTS, GIVEN BACK. Two halves of one decision:
+  // raising the denoise floor cleans the sky and flattens the canopy, so the
+  // look that raises it carries the mid-frequency local contrast to put the
+  // modelling back (Look.texture has the measurements).
+  //
+  // NOT A FLOOR, unlike denoise: there is no per-photograph measurement to
+  // floor against — `texture` starts at 0 and 0 is the baseline this replaces.
+  // So the test is only whether the value on the photograph is ours or
+  // untouched, and a value the reader dragged survives either way.
+  //
+  // HALF A SLIDER STEP, for the reason the denoise block above gives: the
+  // texture slider steps in 0.01, so a 0.01 tolerance cannot tell a deliberate
+  // nudge from float noise, and being wrong here silently discards somebody's
+  // setting.
+  {
+    const same = (a: number, b: number) => Math.abs(a - b) < 0.005;
+    const ours = lookTexture != null && same(params.texture, lookTexture);
+    if (look.texture != null) {
+      if (ours || same(params.texture, 0)) {
+        params.texture = look.texture;
+        lookTexture = params.texture;
+      }
+    } else {
+      if (ours) params.texture = 0;
+      lookTexture = null;
+    }
+  }
   // A look replaces the whole creative state, including everything the lift
   // wrote — so re-solve against the look that is now on the frame. This is what
   // makes Aerochrome look like Aerochrome on a frame with no sky in it without
@@ -1693,7 +1785,13 @@ type Snapshot = { params: EditParams; activeLook: string | null; lookBias: [numb
   // and leaving Aerochrome would then restore a different photograph's number.
   // Exactly the shape of the five-places rule in CLAUDE.md, with the live-edit
   // record as the sixth place.
-  measuredDenoise?: number | null; lookDenoise?: number | null };
+  measuredDenoise?: number | null; lookDenoise?: number | null;
+  // AND THE LOOK'S LOCAL CONTRAST, for the same reason and in the same place.
+  // `params.texture` is restored by the clone above; `lookTexture` is the record
+  // of whether that value is the look's or the reader's, and without it an undo
+  // past a look leaves the app unable to tell -- so leaving the look would
+  // either keep a 0.25 nobody asked for or discard one somebody dragged.
+  lookTexture?: number | null };
 
 function cloneParams(p: EditParams): EditParams {
   return {
@@ -1776,7 +1874,7 @@ function snapSig(s: Snapshot): string {
 
 function snapshot(): Snapshot {
   return { params: cloneParams(params), activeLook, lookBias: [...lookBias] as [number, number, number], lookWb: lookWb ? [...lookWb] as [number, number, number] : null,
-           measuredDenoise, lookDenoise };
+           measuredDenoise, lookDenoise, lookTexture };
 }
 
 /** Restore a snapshot into the live editor (in place — `params` keeps identity)
@@ -1854,6 +1952,7 @@ function applySnapshot(s: Snapshot) {
   // conservative reading of an older one is that a denoise on screen stays put.
   if (s.measuredDenoise != null) measuredDenoise = s.measuredDenoise;
   lookDenoise = s.lookDenoise ?? null;
+  lookTexture = s.lookTexture ?? null;
   if (selectedMask >= params.masks.length) selectedMask = params.masks.length - 1;
   syncToUI();
   updateLookUI();
@@ -8144,6 +8243,7 @@ function establishFreshEdit() {
   // which is the whole point of its position.
   measuredDenoise = params.denoise;
   lookDenoise = null;
+  lookTexture = null;
   // Part of the opened baseline, so it runs BEFORE origParams and the Reset
   // snapshot below are taken: Hold: Original and Reset both mean "the photo as
   // it opened", and this is now part of how it opened. Visible on the Tone and
@@ -9093,6 +9193,13 @@ async function makeThumb(img: DecodedImage, MAX = 260, lens?: LensCurve | null, 
     clarity: 0,
     dehaze: 0,
     sharpen: 0,
+    // ZERO EVEN WHEN THE LOOK CARRIES ONE, and that is the same fact as
+    // `denoise: 0` above rather than a second decision. Aerochrome brings
+    // `texture` to give back the modelling its denoise floor costs (Look.texture)
+    // -- and a 260px tile is not denoised at all, so it never paid that cost.
+    // Running the mid-frequency high-pass here would be adding structure to a
+    // downscale that has already averaged the band it works in away. Change one
+    // of these two lines and the other stops being true.
     texture: 0,
     grainAmt: 0,
     vigAmt: 0,
