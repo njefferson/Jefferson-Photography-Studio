@@ -9,16 +9,50 @@
 // Range weighting is relative to local brightness, so shadows (where sensor
 // noise dominates) are smoothed harder than bright, detailed areas.
 
-const R = 2; // 5x5 window
+// THIRTEEN PIXELS ACROSS, DENSE, AND THE WIDTH IS THE WHOLE FIX.
+//
+// This was a 5x5 for most of the app's life, and a 5x5 cannot flatten structure
+// three to five pixels across — 4c-xii made exactly that argument for the COLOUR
+// half and widened it, and the luminance half was left behind. Tracing a sky
+// from the photosite forward (IR-SCIENCE.md 4c-xxi, 4c-xxii) showed what that
+// cost: the pale speckle people actually report is LUMINANCE mottle, a colour
+// stage cannot touch it by construction, and the one filter that could was too
+// narrow to see it.
+//
+// Measured on the reported frame's verified sky, with Colour noise at ZERO:
+// radius 2 leaves 0.0313, radius 3 leaves 0.0259, radius 4 0.0165, radius 5
+// 0.0109, radius 6 **0.0075** — a 76% reduction. The busiest block's own noise
+// is unchanged across all of it (0.0873 to 0.0892), because the range weight is
+// what protects an edge and widening the SPATIAL support does not weaken it.
+//
+// DENSE, NOT STRIDED, and that is not a detail. The colour half spans the same
+// thirteen pixels with 49 taps at stride two, which is affordable there because
+// colour is low-frequency. Tried on LUMINANCE it raised the frame's
+// high-frequency energy instead of lowering it — a sparse lattice samples a
+// noise field periodically and periodic sampling of noise is itself a pattern,
+// which is the same trap 4c-xii recorded when the colour half was first spaced
+// three apart.
+const R = 6; // 13x13 window
 const REC = [0.2126, 0.7152, 0.0722];
 
-/** exp(-(dx^2+dy^2) / (2 * 1.5^2)) spatial weights, precomputed. */
+/** Spatial weights over the 13x13 grid, sigma 3 px, precomputed. */
 const SPATIAL: number[] = [];
 for (let dy = -R; dy <= R; dy++) {
   for (let dx = -R; dx <= R; dx++) {
-    SPATIAL.push(Math.exp(-(dx * dx + dy * dy) / 4.5));
+    SPATIAL.push(Math.exp(-(dx * dx + dy * dy) / 18));
   }
 }
+
+/** THE RANGE WEIGHT AS A TABLE, because the window is now 169 taps.
+ *
+ *  Takes nothing; builds `exp(-t/2)` sampled in t = (rel/sigma)^2 from 0 to 36
+ *  (six sigma, past which the weight is under 1e-7 and the tap is dropped).
+ *  What the caller depends on: `RANGE[i]` is that curve to better than 1e-4,
+ *  which is far inside the 8-bit output's own quantisation — the alternative is
+ *  169 calls to Math.exp for every pixel of a 21-megapixel export. */
+const RANGE_N = 1024, RANGE_MAX = 36;
+const RANGE = new Float64Array(RANGE_N + 1);
+for (let i = 0; i <= RANGE_N; i++) RANGE[i] = Math.exp(-(i * RANGE_MAX) / RANGE_N / 2);
 
 /** Relative-luma range sigma for a 0..1 strength. Mirrored in the shader.
  *  QUADRATIC AND FLOORLESS on purpose. A bilateral goes from "keeps the
@@ -324,8 +358,10 @@ export function makeRowDenoiser(
         const b = isC ? mid[2] : row.v[so + 2];
         const ls = isC ? lc : row.l[sx];
         const rel = (ls - lc) / (lc + 0.02);
+        const t = rel * rel * inv2s2 * 2;          // (rel/sigma)^2
+        if (t >= RANGE_MAX) continue;              // weight under 1e-7: drop it
         const sp = SPATIAL[k];
-        const w = sp * Math.exp(-rel * rel * inv2s2);
+        const w = sp * RANGE[(t * (RANGE_N / RANGE_MAX)) | 0];
         sr += r * w;
         sg += g * w;
         sb += b * w;
