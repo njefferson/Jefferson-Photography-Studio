@@ -439,12 +439,18 @@ void main() {
     float wsum = 0.0;
     vec3 gsum = vec3(0.0);
     float gw = 0.0;
-    for (int dy = -2; dy <= 2; dy++) {
-      for (int dx = -2; dx <= 2; dx++) {
+    // THIRTEEN PIXELS ACROSS, DENSE — identical to raw/denoise.ts, and the
+    // width is the fix rather than an optimisation. A 5x5 cannot flatten the
+    // three-to-five-pixel luminance mottle in a deep infrared sky; the colour
+    // half was widened to this span for that reason and the luminance half was
+    // left behind (IR-SCIENCE.md 4c-xxii). Dense, not strided: a sparse lattice
+    // samples a noise field periodically and that is itself a pattern.
+    for (int dy = -6; dy <= 6; dy++) {
+      for (int dx = -6; dx <= 6; dx++) {
         // The centre tap is the corrected pixel, for the same reason lc is.
         vec3 s = (dx == 0 && dy == 0) ? ctr : fetchLin(v_uv + vec2(float(dx), float(dy)) * u_texel);
         float rel = (dot(s, LUMA_W) - lc) / (lc + 0.02);
-        float sp = exp(-float(dx*dx + dy*dy) / 4.5);
+        float sp = exp(-float(dx*dx + dy*dy) / 18.0);
         float w = sp * exp(-rel * rel * inv2s2);
         sum += s * w;
         wsum += w;
