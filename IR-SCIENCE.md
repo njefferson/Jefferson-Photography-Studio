@@ -1090,6 +1090,85 @@ at nothing, which is what the numbers above ask for. That is a change to what
 opens (Doctrine section 14: visible, undoable, and the bare decode one press
 away) and therefore the owner's to call, not a session's.
 
+### 4c-xiv. A PER-PHOTOGRAPH COLOUR-NOISE MEASUREMENT DOES NOT SEPARATE EITHER
+
+4c-xiii ended by pointing at a measured per-frame value, on the grounds that
+`estimateDenoise` already does exactly that for luminance. It was built and run
+over FIFTEEN real frames — nine Z50 raws and six camera JPEGs — and it does not
+work. Recorded here rather than left as a pointer, because the pointer reads as a
+plan and the next session would build it again.
+
+**Three statistics were tried, in the order they suggest themselves.**
+
+A whole-frame median of the colour residual — each sample's chroma against the
+mean chroma of eight neighbours six pixels out, normalised by luminance, which is
+the footprint the stage itself smooths over. It reads BACKWARDS. The frame that
+needs the correction is the LOWEST of the four calibration frames at 0.036, and
+the three that need nothing read 0.053, 0.070 and 0.075.
+
+Residual over signal, and the channel correlation the amplification actually
+tracks. Neither separates: the two raws read 0.052 and 0.079 on the ratio, in the
+wrong order, and their correlations are 0.979 and 0.976 — the same number.
+
+**Per BLOCK rather than per frame**, on the reasoning that the defect is regional
+and a whole-frame median cannot see a region. On the four calibration frames it
+finally orders correctly: 0.321 for the frame that needs it against 0.240, 0.132
+and 0.129. Then eleven more frames were added and it collapsed. NIR_1582 reads
+**0.3192 against 0.3210** — six thousandths apart, and only one of the two is
+known to need anything. Five frames sit between the calibration pair.
+
+**The reason it cannot work, stated so it is not re-derived.** A frame that is
+grainy EVERYWHERE and a frame with one bad region produce the same high
+percentile. The frames that crowd the threshold have medians of 0.19 to 0.25
+against the defective frame's 0.049 — they are uniformly noisy, not regionally
+defective. A single number per photograph cannot express "clean except for one
+part of it", and that is what this defect is.
+
+A composite does separate — the squared percentile over the median puts the
+defective frame at 2.09 and every other frame at 0.84 or below. It is not
+recorded as a candidate because it was chosen after looking at the numbers and
+there is exactly ONE frame in the set known to need the correction. Separating one
+positive from fourteen negatives with a statistic picked afterwards is a fit, not
+a measurement, and this repository already has a decision record about adding
+fitted constants to a look made of fitted constants.
+
+### 4c-xv. CORRELATED IS NOT NEUTRAL, AND THE GATE THAT LOOKED LIKE IT WORKED
+
+4c-xi measured the sky's channels at 97.9-99.4% correlated. That was read, here,
+as meaning the deep sky is nearly colourless in the raw — and from that came a
+local gate for the colour stage: act where there is little colour to lose, stand
+back where there is a lot, which would treat the sky and leave the edges that a
+fixed floor bleeds. The whole-frame distribution appeared to confirm it, with a
+gap from 0.230 to 0.523 in the defective frame and nothing below 0.44 in the two
+raws that need nothing.
+
+**It is wrong, and the arithmetic says why in one line.** Correlation is about
+whether two channels TRACK each other across the frame, not whether they are
+equal at a pixel. R = 40xB is perfectly correlated and violently non-neutral,
+which is exactly what an infrared raw is: the red channel floods and every pixel
+is red-dominant, the sky included.
+
+**Measured, after the gate was built and swept.** Splitting the frame in thirds
+and reading the quantity the stage keys on: the defective frame's sky band reads
+0.588 at the fifth percentile and 0.691 at the median — the HIGHEST of the three
+bands, not the lowest. The near-neutral tail that the whole-frame percentiles
+showed is somewhere else in the picture entirely.
+
+**AND THE SWEEP LOOKED LIKE A SUCCESS.** With the gate in, the busy block that
+had climbed 50 to 115 under a fixed floor went 50, 50, 50, 48 — the edge bleeding
+gone completely — and the other raw's went 113 to 110 instead of rising. Read on
+its own that is the exact result the gate was built for. It is not. The sky it was
+supposed to fix moved 0.65 to 0.67 where the fixed floor reached 0.75, and both
+camera JPEGs returned byte-identical readings at every step of the sweep,
+including full strength.
+
+**The stage was not selecting. It was off.** Only about 5% of the defective frame
+sits below the knee and NOTHING in either camera JPEG does, so the cost vanished
+because the effect vanished with it. A gate that removes an artefact by removing
+the operation reports as a fix in every number except the one it was for — which
+is why the frame's own regions had to be measured separately before the sweep was
+believed, and were not.
+
 ### 4c-vii. THE OVERTURNED NUMBERS, KEPT ON PURPOSE
 
 4c-vi originally read that raising denoise did nothing to the ratio (NIR_1480
