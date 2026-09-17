@@ -1478,6 +1478,68 @@ is the product. Whether denoising AFTER the amplification would help is untested
 and has its own obvious cost — at that point the thing being smoothed is the
 look's real colour as well as its noise.
 
+### 4c-xxii. FIXED — THE PALE SPECKLE IS LUMINANCE, AND THE LUMINANCE FILTER WAS STILL 5x5
+
+The defect reported from the device on 2026-09-17 and chased through eight failed
+remedies. The trace in 4c-xxi printed the answer in a column nobody read: **the
+final residual is 29.3% ACHROMATIC.** Pale is what achromatic looks like. A
+colour stage cannot touch it by construction — it keeps luminance from the
+bilateral and smooths only chroma — and the bilateral was still a 5x5 window.
+
+**4c-xii had already made the argument, for the other half.** It widened the
+COLOUR mean to a thirteen-pixel span because the mottle is three to five pixels
+across and a five-pixel window cannot flatten something that nearly fills it.
+That reasoning applies word for word to luminance, and the luminance half was
+left at 5x5 for another eleven subsections.
+
+**TWO GATES RAN BEFORE ANY CODE MOVED, and the first one killed the plan it was
+written for.** The plan of the hour was that the colour stage smooths the wrong
+DIRECTIONS — chroma defined in camera-native space with Rec.709 weights on
+unbalanced data — and should smooth the basis the downstream chain amplifies.
+Measured on the traced patch: of the visible colour noise after the mixer, the
+share carried by the component the stage KEEPS is **11.9%**. Eighty-eight per
+cent is in the chroma it already removes, so the basis was never the problem and
+the substitution was not built. Then: the stage's own 7x7 stride-2 kernel removes
+**82.8%** of what it is given. The colour path was working the whole time.
+
+**WHAT SHIPPED.** `R` in `src/raw/denoise.ts` from 2 to 6 — a 13x13 window, sigma
+3 — with the shader matched. The range weight became a 1024-entry table because
+169 taps cannot each call `Math.exp`.
+
+**DENSE, NOT STRIDED, and that was measured rather than assumed.** Tried first at
+stride two, matching the colour half's grid: the frame's high-frequency energy
+went UP, not down. A sparse lattice samples a noise field periodically and
+periodic sampling of noise is a pattern — the same trap 4c-xii records from when
+the colour half was first spaced three apart.
+
+**THE RADIUS SWEEP**, sky patch, achromatic residual, Colour noise at zero:
+radius 2 (25 taps) 0.0313, radius 3 (49) 0.0259, radius 4 (81) 0.0165, radius 5
+(121) 0.0109, radius 6 (169) **0.0075**.
+
+**THE RESULT, on the reported frame's verified sky region, Colour noise at ZERO:**
+
+- pale/achromatic residual 0.0313 to **0.0075**, down 76%
+- colour residual 0.0491 to **0.0136**, down 72%
+- sky evenness 0.66 to **0.82**, where an even sky reads about 0.94 and a
+  peppered one 0.65
+- the sky's median chroma unchanged at 85, and its colourless share still 0% —
+  nothing is drained
+- the busiest block's own noise unchanged, 0.0873 to 0.0892, because the RANGE
+  weight is what protects an edge and widening the SPATIAL support does not
+  weaken it
+
+**AND IT RETIRES THE COLOUR-NOISE TRADE.** With the luminance filter doing its
+job, adding Colour noise 0.4 makes the sky WORSE — 0.0075 to 0.0106 — while still
+costing the busy block 80% more colour. The slider is no longer the lever for
+this defect and the edge bleeding 4c-xiii measured is no longer a price anyone
+has to pay.
+
+**WHAT IT COSTS, measured, and it is the real objection.** 649 ms per megapixel
+to 2387 — **3.7x** on this one stage of the CPU export path. The shader does 169
+texture fetches where it did 25. That is the price of the fix and it is stated
+rather than buried; the device test page (section 7j) is what measures whether an
+iPad finds it acceptable, and the radius is one constant if it does not.
+
 ### 4c-vii. THE OVERTURNED NUMBERS, KEPT ON PURPOSE
 
 4c-vi originally read that raising denoise did nothing to the ratio (NIR_1480
