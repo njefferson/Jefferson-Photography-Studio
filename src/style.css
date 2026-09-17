@@ -836,6 +836,37 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   user-select: none;
   -webkit-touch-callout: none;
 }
+/* WHAT KIND OF FILE IS OPEN, on the photograph itself.
+   Top RIGHT because the histogram owns top left and the zoom controls own
+   bottom right, so this is the one free corner and nothing has to move.
+   Glass tokens, like every other HUD over the photo: --glass-bg and
+   --glass-txt are theme-invariant, which a floating panel has to be because
+   it composites over the picture rather than over a surface.
+   THE MEANING IS IN THE WORDS, not the colour — there is no caution token in
+   the palette and a hue would be the only carrier if there were, so this says
+   "not raw" in text and reads the same in grayscale. Never intercepts taps. */
+#fileKind {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 6;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: var(--glass-bg);
+  border: 1px solid rgba(150, 150, 170, 0.4);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  pointer-events: none;
+  font: 600 0.6875rem/1.3 var(--mono, ui-monospace, monospace);
+  letter-spacing: 0.02em;
+  color: var(--glass-txt);
+  max-width: 45%;
+  text-align: right;
+}
+/* A raw file is the expected case, so it states itself and stays quiet. */
+#fileKind[data-raw="yes"] { color: var(--glass-txt-2); font-weight: 500; }
+
 /* Floating histogram HUD: near-black glass, never intercepts taps. */
 #histWrap {
   position: absolute;

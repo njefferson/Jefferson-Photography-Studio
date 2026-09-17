@@ -193,6 +193,18 @@
         <div id="histWrap" hidden aria-label="Live RGB histogram">
           <canvas id="histogram" width="256" height="96" title="Tap to hide — use the Histogram button to bring it back"></canvas>
         </div>
+        <!-- WHICH FILE IS OPEN, AND WHETHER IT IS A RAW. Reported from the
+             device, 2026-09-17: a raw and its camera JPEG copy sat side by side
+             in the picker, the JPEG was opened by mistake, and nothing on the
+             editing screen said so — the only place the app admitted it was the
+             diagnostic report. A camera JPEG renders very differently under a
+             colour look (it has already been through the camera's own colour
+             processing and can arrive with all its colour in one band), so
+             which one is open is the first thing worth knowing and was the one
+             thing not shown.
+             role=status with aria-live so the change announces on open rather
+             than only being visible; it is not a control and takes no taps. -->
+        <div id="fileKind" role="status" aria-live="polite" hidden></div>
         <!-- Zoom controls: work with no mouse wheel and no pinch (a desktop/laptop
              without either had NO way to zoom in to brush up close — owner,
              2026-07-21). They also work while a brush tool is armed, when the
