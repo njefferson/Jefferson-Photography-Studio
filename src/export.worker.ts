@@ -15,7 +15,7 @@
 import { exportImage, type ExportOptions, type BandResult } from "./export";
 import type { ImportedFile } from "./import";
 import type { DecodedImage } from "./decode";
-import type { EditParams, LensCurve } from "./pipeline";
+import type { BrushMask, EditParams, LensCurve } from "./pipeline";
 
 export interface BandRequest {
   id: number;
@@ -26,6 +26,7 @@ export interface BandRequest {
   params: EditParams;
   opts: ExportOptions;
   lens: LensCurve | null;
+  sky: BrushMask | null;
 }
 
 interface WorkerScope {
@@ -49,6 +50,7 @@ ctx.addEventListener("message", (e: MessageEvent) => {
         // — a message per row would cost more than it tells anybody.
         (f) => { if (f === 1 || Math.round(f * 20) !== Math.round((f - 0.05) * 20)) ctx.postMessage({ id: req.id, progress: f }); },
         req.lens,
+        req.sky,
       );
       const buf = res.data?.buffer;
       ctx.postMessage({ id: req.id, done: res }, buf ? [buf as ArrayBuffer] : []);

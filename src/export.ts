@@ -2,7 +2,7 @@
 // uses a half-res proxy), applies the exact edit pipeline on the CPU, and saves
 // a JPEG or 16-bit TIFF to the device.
 
-import { compileEdit, toLinear8, cropToDisplayUvInto, CROP_DEFAULT, applyCreativeVignette, applyGrain, grainCellPx, type EditParams, type LensCurve } from "./pipeline";
+import { compileEdit, toLinear8, cropToDisplayUvInto, CROP_DEFAULT, applyCreativeVignette, applyGrain, grainCellPx, type BrushMask, type EditParams, type LensCurve } from "./pipeline";
 import { demosaicPixelLinearInto, type RawCfa } from "./raw/demosaic";
 import { readMosaicedCfa } from "./raw/dngRaw";
 import { readNefCfa } from "./raw/nef";
@@ -16,6 +16,7 @@ import { healPatches8, healPatchesFromSampler, wrapWithPatches } from "./heal";
 import { stickerPatches, makeStickerOverlaySampler, type StickerAsset } from "./sticker";
 import { warpSampler, warpIsEmpty } from "./warp";
 import { buildGlowMap, sampleGlow, GLOW_GAIN } from "./glow";
+import { buildSkyMap } from "./skymap";
 import { buildLocalMap } from "./localmap";
 import { SRGB_ICC, DISPLAY_P3_ICC, srgbDisplayToP3Display, embedIccInJpeg } from "./icc";
 import { readExifSubset, buildExifApp1, embedExifInJpeg, ifd0ExtraEntries, exifIfdEntries, externSize, type ExifSubset, type TiffEntry } from "./exif";
@@ -194,11 +195,11 @@ export function lastExportProfile(): ExportProfile | null {
 // union return, so no caller has to prove which one it got.
 export function exportImage(
   file: ImportedFile, current: DecodedImage, params: EditParams,
-  opts: ExportOptions & { raw: true }, onProgress?: (fraction: number) => void, lens?: LensCurve | null,
+  opts: ExportOptions & { raw: true }, onProgress?: (fraction: number) => void, lens?: LensCurve | null, sky?: BrushMask | null,
 ): Promise<BandResult>;
 export function exportImage(
   file: ImportedFile, current: DecodedImage, params: EditParams,
-  opts: ExportOptions, onProgress?: (fraction: number) => void, lens?: LensCurve | null,
+  opts: ExportOptions, onProgress?: (fraction: number) => void, lens?: LensCurve | null, sky?: BrushMask | null,
 ): Promise<ExportResult>;
 export async function exportImage(
   file: ImportedFile,
@@ -213,6 +214,13 @@ export async function exportImage(
    *  belongs to the photograph and the strength rides in `params.lensFix`, so
    *  this is the same split the pipeline uses everywhere else. */
   lens?: LensCurve | null,
+  /** The photograph's sky bitmap for `params.skySmooth`, built once at open
+   *  from the gray-world render (main.ts, beside the local map) and handed in
+   *  for the same reason the lens curve is: it belongs to the photograph, an
+   *  export does not go through the renderer, and rebuilding it here would be a
+   *  second implementation of a selection the preview already made. Null when
+   *  no sky was found, which turns the stage off at every amount. */
+  sky?: BrushMask | null,
 ): Promise<ExportResult | BandResult> {
   const __t: ExportProfile = { megapixels: 0, total: 0, source: 0, pixels: 0, watermark: 0, encode: 0, tag: 0, yields: 0, yieldMs: 0, threads: 1 };
   const __mark = (k: keyof ExportProfile, from: number) => { __t[k] += performance.now() - from; };
@@ -295,7 +303,6 @@ export async function exportImage(
   // same way it gets everything else. It used to wrap the raw sampler here,
   // which worked and meant the export had its own copy of a correction the
   // preview applied somewhere else entirely — two implementations of one idea.
-  const edit = compileEdit(params, "cfa" in src ? src.cam : undefined, srcW / srcH, localMap, lens ?? null);
   const out = new Float32Array(3);
   // Creative vignette + film grain — the FINAL image ops, applied to each
   // display-space pixel AFTER edit() and BEFORE the P3/16-bit write, on
@@ -386,6 +393,18 @@ export async function exportImage(
   // their slider is 0, so a plain edit keeps the 1x-decode fast path.
   const denoised = makeRowDenoiser(warped, srcW, srcH, params.denoise, proxyFactor, params.chroma ?? 0, params.despeckle ?? 0);
   const sampleLinear = makeRowDetail(warped, denoised, srcW, srcH, params.sharpen ?? 0, params.texture ?? 0, proxyFactor);
+  // THE SKY MAP, from THE SAME PRE-PASSED SAMPLER the pixels come through — not
+  // the raw source. Built from the raw source it targeted a sky 16% more
+  // saturated than the rendered one (skymap.ts has the numbers), because the
+  // bilateral lowers a noisy sky's chroma and a raw render does not know that.
+  // Built here rather than handed in, so a worker band and the main thread each
+  // derive it from the same sampler and the same params. Skipped when the
+  // amount is off or no sky was found, which is what makes it cost nothing on
+  // the frames that do not need it.
+  const skyMap = (params.skySmooth ?? 0) > 0 && sky
+    ? buildSkyMap(sampleLinear, srcW, srcH, params, "cfa" in src ? src.cam : undefined, srcW / srcH, localMap, lens ?? null, sky)
+    : null;
+  const edit = compileEdit(params, "cfa" in src ? src.cam : undefined, srcW / srcH, localMap, lens ?? null, skyMap);
   // Scaled exports (50% / 25%) BOX-FILTER instead of decimating: each output
   // pixel averages an ss×ss grid of source taps placed in OUTPUT space and
   // mapped through toSrcF — so the filter stays correct under crop, rotation,
@@ -465,7 +484,7 @@ export async function exportImage(
           // whole only when the decode IS the source (JPEG, HEIC, a preview,
           // a lossy-linear DNG), which is the same test getSource makes.
           "cfa" in src ? { width: current.width, height: current.height, isRaw: current.isRaw } : current,
-          params, opts, lens ?? null, w, h, job, onProgress);
+          params, opts, lens ?? null, sky ?? null, w, h, job, onProgress);
         data = split.data;
         __t.threads = split.threads;
         ranParallel = true;

@@ -39,6 +39,9 @@ import { generateCube } from "./lut";
 import { generateDcp } from "./dcp";
 import { buildGlowMap } from "./glow";
 import { buildLocalMap } from "./localmap";
+import { buildSkyMap } from "./skymap";
+import { makeRowDenoiser } from "./raw/denoise";
+import { makeRowDetail } from "./raw/detail";
 import { buildSkyMask, SKY_MIN_COVERAGE } from "./sky";
 import { buildDiagnostic } from "./diagnostic";
 import { Tiff } from "./raw/tiff";
@@ -202,6 +205,7 @@ const params: EditParams = {
   bwMix: [1, 1, 1],
   grade: [...GRADE_DEFAULT],
   shadowSat: 0,
+  skySmooth: 0,
   grainAmt: 0,
   grainSize: 1.5,
   vigAmt: 0,
@@ -240,6 +244,7 @@ const ui = {
   sharpen: $("sharpen") as HTMLInputElement,
   texture: $("texture") as HTMLInputElement,
   shadowSat: $("shadowSat") as HTMLInputElement,
+  skySmooth: $("skySmooth") as HTMLInputElement,
   skyHue: $("skyHue") as HTMLInputElement,
   skySat: $("skySat") as HTMLInputElement,
   skyLum: $("skyLum") as HTMLInputElement,
@@ -1057,6 +1062,7 @@ function syncFromUI() {
   params.sharpen = Number(ui.sharpen.value);
   params.texture = Number(ui.texture.value);
   params.shadowSat = Number(ui.shadowSat.value);
+  params.skySmooth = Number(ui.skySmooth.value);
   params.denoise = Number(ui.dn.value);
   params.chroma = Number(ui.chroma.value);
   params.despeckle = Number(ui.despeckle.value);
@@ -1114,6 +1120,7 @@ function syncToUI() {
   ui.sharpen.value = String(params.sharpen);
   ui.texture.value = String(params.texture);
   ui.shadowSat.value = String(params.shadowSat ?? 0);
+  ui.skySmooth.value = String(params.skySmooth ?? 0);
   ui.skyHue.value = String(params.sky[0]);
   ui.skySat.value = String(params.sky[1]);
   ui.skyLum.value = String(params.sky[2]);
@@ -1274,6 +1281,12 @@ interface Look {
    *  denoised either, so it never lost the structure this gives back. Change
    *  one and the other stops being true. */
   texture?: number;
+  /** Sky colour smoothing the look carries (EditParams.skySmooth). A SELECTION,
+   *  not a whole-frame knob — it acts through the sky bitmap built at open and
+   *  is inert on a frame with no sky. Creative, so it rides a saved look and is
+   *  simply written like `grade`; unlike `denoise` it has no per-photograph
+   *  measurement to floor against and nothing to hand back on leaving. */
+  skySmooth?: number;
   glow?: number;
   /** Per-kind, because raw and camera-rendered files arrive in DIFFERENT
    *  STATES and one cast correction cannot serve both. A raw opens on the
@@ -1411,7 +1424,7 @@ const LOOKS: Record<string, Look> = {
   // lands 1-4deg wide. That range is not in the data to recover -- it is the
   // same 1-3% residual section 4c-iv is about -- so this moves the population,
   // it does not enrich it.
-  eir: { swapRB: true, hue: 0, denoise: 0.45, texture: 0.25,
+  eir: { swapRB: true, hue: 0, denoise: 0.45, texture: 0.25, skySmooth: 1,
          mix3: [0.99, -0.06, 0.07, -1.44, 1.37, 1.02, -0.47, 0.81, 0.65],
          raw: { sat: 3.0, contrast: 1.15,
                 hsl: [7, 1, 1, 0, 1, 1, 0, 1, 1, 54, 1, 1, 35, 1, 1, 0, 1, 1, 1, 1, 1, 43, 1, 1] },
@@ -1456,6 +1469,41 @@ let measuredDenoise: number | null = null;
  *  later call has to tell its own work from a value the reader dragged. Null
  *  when the look on the frame carries no floor. */
 let lookDenoise: number | null = null;
+
+/** The look's sky selection for the open photograph (skymap.ts), built at
+ *  open; null when the heuristic found no clear sky, which turns the stage off
+ *  at every amount. */
+let skyBitmap: BrushMask | null = null;
+/** The edit the current sky map was built for, so a draw that changes nothing
+ *  the map depends on does not rebuild it. Cleared on open. */
+let skyMapKey = "";
+
+/** Keep the renderer's sky chroma map matching the live edit.
+ *  Takes nothing; reads `params`, `current` and `skyBitmap`; uploads a fresh
+ *  map when the amount is on and the edit moved, clears it when it is off.
+ *  What it must satisfy: the map handed to the GPU was built from THESE params
+ *  with `skySmooth` zeroed (buildSkyMap does that), so preview and export blend
+ *  toward the same target — the agreement walk is what checks it. Rebuilds are
+ *  keyed on the params minus this field and minus the spatial-only ones the
+ *  map does not read, so dragging the amount itself costs nothing. */
+function syncSkyMap(): void {
+  if (!current || !skyBitmap || (params.skySmooth ?? 0) <= 0) {
+    if (skyMapKey) { renderer.setSkyMap(null); skyMapKey = ""; }
+    return;
+  }
+  const { skySmooth: _s, masks: _m, spots: _sp, stickers: _st, crop: _c, straighten: _str, warp: _w, grainAmt: _g, vigAmt: _v, ...rest } = params as EditParams & Record<string, unknown>;
+  const key = JSON.stringify(rest);
+  if (key === skyMapKey) return;
+  skyMapKey = key;
+  const img = current;
+  // THE SAME PRE-PASS THE PIXELS COME THROUGH. The open image IS the preview's
+  // proxy (a half-res bin for a raw), so step 1 here is what the shader taps.
+  // Built from the raw decode instead, the map targeted a sky 16% more
+  // saturated than the rendered one — skymap.ts has the measurement.
+  const raw = (x: number, y: number) => linearAt(img, x, y);
+  const pre = makeRowDetail(raw, makeRowDenoiser(raw, img.width, img.height, params.denoise, 1, params.chroma ?? 0, params.despeckle ?? 0), img.width, img.height, params.sharpen ?? 0, params.texture ?? 0, 1);
+  renderer.setSkyMap(buildSkyMap(pre, img.width, img.height, params, img.camMatrix, img.width / Math.max(1, img.height), undefined, currentLensCurve(), skyBitmap));
+}
 
 /** What `applyLook` last wrote onto `params.texture`, so leaving a look that
  *  brings local contrast back puts the reader's own value there instead — and a
@@ -1619,6 +1667,12 @@ function applyLook(name: keyof typeof LOOKS) {
   // the identity, which is what this line did unconditionally before -- so this
   // is a widening, not a change: nothing that rendered one way renders another.
   params.mix3 = look.mix3 ? [...look.mix3] : [...MIX3_DEFAULT];
+  // The sky's colour smoothing is the look's to set, like the mixer: a false-
+  // colour look is what amplifies the sky's residual thirteenfold (IR-SCIENCE
+  // 4c-xxi), so the look that does that carries the stage that takes it back.
+  // Measured on the frames with the defect: Aerochrome's sky 15.9 -> 4.7 where
+  // Pink IR reads 8.7, mean colour held. Inert on a frame with no sky.
+  params.skySmooth = look.skySmooth ?? 0;
   // AND A LOOK MAY RAISE THE DENOISE FLOOR, which is the one per-shot
   // correction a look is allowed to touch -- because in an infrared frame the
   // colour and the grain come out of the same 1-3% residual between the
@@ -1842,6 +1896,7 @@ function cloneParams(p: EditParams): EditParams {
     bwMix: [...(p.bwMix ?? [1, 1, 1])] as [number, number, number],
     grade: [...(p.grade ?? GRADE_DEFAULT)],
     shadowSat: p.shadowSat ?? 0,
+    skySmooth: p.skySmooth ?? 0,
     grainAmt: p.grainAmt ?? 0,
     grainSize: p.grainSize ?? 1.5,
     vigAmt: p.vigAmt ?? 0,
@@ -1927,6 +1982,7 @@ function applySnapshot(s: Snapshot) {
   params.bwMix = c.bwMix;
   params.grade = c.grade?.length === 7 ? c.grade : [...GRADE_DEFAULT];
   params.shadowSat = c.shadowSat ?? 0;
+  params.skySmooth = c.skySmooth ?? 0;
   params.grainAmt = c.grainAmt ?? 0;
   params.grainSize = c.grainSize ?? 1.5;
   params.vigAmt = c.vigAmt ?? 0;
@@ -2094,6 +2150,7 @@ function lookFrom(params: EditParams): SavedLook {
     bwMix: [...params.bwMix] as [number, number, number],
     grade: [...(params.grade ?? GRADE_DEFAULT)],
     shadowSat: params.shadowSat ?? 0,
+    skySmooth: params.skySmooth ?? 0,
     grainAmt: params.grainAmt ?? 0,
     grainSize: params.grainSize ?? 1.5,
     vigAmt: params.vigAmt ?? 0,
@@ -2283,6 +2340,7 @@ function draw() {
     }
     syncSpotsToTexture(); // heals live in the texture; keep it matching params
     syncWarpField(); // the warp field lives in a texture too
+    syncSkyMap(); // the sky's smoothed chroma is a map of THIS edit
     // While a geometry tool is armed, render the WHOLE tilted photo (an outset
     // "fit" view so a rotated photo isn't clipped by the frame); the crop box
     // overlays it and the real crop only takes effect on exit. See setGeoMode.
@@ -2514,7 +2572,7 @@ panelTabsEl.addEventListener("keydown", (e) => {
 }
 
 for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.dn, ui.chroma, ui.despeckle, ui.recover, ui.hue, ui.sat, ui.con, ui.glow, ui.lum,
-  ui.hotspot, ui.hotspotSize, ui.hotspotColor, ui.vignette, ui.clarity, ui.dehaze, ui.sharpen, ui.texture, ui.shadowSat,
+  ui.hotspot, ui.hotspotSize, ui.hotspotColor, ui.vignette, ui.clarity, ui.dehaze, ui.sharpen, ui.texture, ui.shadowSat, ui.skySmooth,
   ui.skyHue, ui.skySat, ui.skyLum, ui.folHue, ui.folSat, ui.folLum, ...ui.tones]) {
   el.addEventListener("input", syncFromUI);
 }
@@ -8127,6 +8185,16 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
   renderer.setGlowMap(buildGlowMap((x, y) => linearAt(img, x, y), img.width, img.height));
   const __e = performance.now();
   renderer.setLocalMap(buildLocalMap((x, y) => linearAt(img, x, y), img.width, img.height));
+  // THE SKY BITMAP FOR skySmooth, built once per photograph from the gray-world
+  // render so it never drifts as the photo is graded — the same rule the Sky
+  // mask follows (regenerateSkyMask). Separate from any mask the reader adds:
+  // this one is the LOOK's selection, and it exists whether or not the Masks
+  // tab has been opened.
+  {
+    const res = buildSkyMask((x, y) => linearAt(img, x, y), img.width, img.height, 0, img.camMatrix ?? null, grayWorldWB(img), BRUSH_MAX_EDGE, 1, 0.5);
+    skyBitmap = res.found ? res.mask : null;
+    skyMapKey = "";
+  }
   const __f = performance.now();
   // (recorded at the end of this function, so `rest` can carry the tail too)
   panel.hidden = false;
@@ -8324,6 +8392,7 @@ function establishFreshEdit() {
     bwMix: [1, 1, 1],
     grade: [...GRADE_DEFAULT],
     shadowSat: 0,
+    skySmooth: 0,
     grainAmt: 0,
     grainSize: 1.5,
     vigAmt: 0,
@@ -12117,6 +12186,7 @@ async function exportPicked(): Promise<void> {
           job.file, job.frame, job.params, job.opts,
           (f) => showExportStrip(`Exporting ${where} — ${view.name}… ${Math.round(f * 100)}%${slow}`, { actions: true, stop: true }),
           job.lens,
+          job.sky,
         );
         const out = new Uint8Array(await result.blob.arrayBuffer());
         await EXPORTS.putFrame(
@@ -12226,6 +12296,8 @@ exportSave.addEventListener("click", async () => {
  *  on to. */
 function openPhotoExportJob(): {
   file: ImportedFile; frame: DecodedImage; params: EditParams; lens: LensCurve | null;
+  /** The photograph's sky selection for `params.skySmooth`, or null when none was found. */
+  sky: BrushMask | null;
   // NOT the bare ExportOptions: that type also describes the one-band shape a
   // worker asks for, and naming it here made the compiler read a whole-file
   // export as a band. This is a finished file, and says so.
@@ -12250,7 +12322,7 @@ function openPhotoExportJob(): {
   const frame: DecodedImage = sourceIsMosaiced(file)
     ? ({ width: current.width, height: current.height, isRaw: current.isRaw } as DecodedImage)
     : current;
-  return { file, frame, params: cloneParams(params), opts, lens: currentLensCurve() };
+  return { file, frame, params: cloneParams(params), opts, lens: currentLensCurve(), sky: skyBitmap };
 }
 
 async function runExport(): Promise<void> {
@@ -12290,6 +12362,8 @@ async function runExport(): Promise<void> {
       // The raw export re-decodes from the file, so the measured correction has
       // to travel with it or the saved image would not match the screen.
       lens,
+      // And the sky selection, for the same reason.
+      skyBitmap,
     );
     pendingExport = result;
     await collectExport(result, file.name, file.bytes.length);
@@ -12353,7 +12427,7 @@ function neutralLook(): SavedLook {
     toneR: [...TONE_DEFAULT] as [number, number, number, number, number],
     toneG: [...TONE_DEFAULT] as [number, number, number, number, number],
     toneB: [...TONE_DEFAULT] as [number, number, number, number, number],
-    lum: 1, clarity: 0, dehaze: 0, sharpen: 0, texture: 0, shadowSat: 0, hsl: hslDefault(),
+    lum: 1, clarity: 0, dehaze: 0, sharpen: 0, texture: 0, shadowSat: 0, skySmooth: 0, hsl: hslDefault(),
     bwOn: false, bwMix: [1, 1, 1],
     grade: [0, 0, 0, 0, 0, 0, 0], grainAmt: 0, grainSize: 1.5, vigAmt: 0, vigMid: 0.5,
     mix3: [1, 0, 0, 0, 1, 0, 0, 0, 1],
@@ -12686,6 +12760,11 @@ async function runBatch(files: File[]) {
         // lenses and focal lengths, and one match for the whole run would
         // silently apply one lens's colour to another lens's frames.
         const batchLens = lensCurveFor(imported);
+        // The sky selection is per photograph too, built the way the open builds
+        // it; a set can hold frames with and without a sky.
+        const batchSkyRes = (batchParamsFor(img, grade, batchSettings?.lut ?? null).skySmooth ?? 0) > 0
+          ? buildSkyMask((x, y) => linearAt(img, x, y), img.width, img.height, 0, img.camMatrix ?? null, grayWorldWB(img), BRUSH_MAX_EDGE, 1, 0.5)
+          : null;
         const result = await exportImage(
           imported,
           img,
@@ -12693,6 +12772,7 @@ async function runBatch(files: File[]) {
           { format, scale, quality, rotate: img.rotate ?? 0, lookRecipe: batchSettings?.recipe },
           (fr) => { busyText.textContent = `Processing ${i + 1} / ${files.length} — ${f.name} · ${Math.round(fr * 100)}%`; },
           batchLens,
+          batchSkyRes?.found ? batchSkyRes.mask : null,
         );
         // Persist immediately (crash-safe), keep nothing in RAM. Stored in
         // small chunks — see batchstore.ts for why never one big value.

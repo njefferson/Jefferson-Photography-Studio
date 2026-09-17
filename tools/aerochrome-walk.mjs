@@ -103,6 +103,11 @@ const MATRIX = [0.99, -0.06, 0.07, -1.44, 1.37, 1.02, -0.47, 0.81, 0.65];
 // speckle gain. See Look.texture in src/main.ts.
 const FLOOR = 0.45;
 const TEXTURE = 0.25;
+// The sky's colour smoothing the look carries — the one stage that acts
+// AFTER the amplification and only inside the sky (IR-SCIENCE 4c-xxi's open
+// question, 9k's measurement). Measured on the frames that have the defect:
+// Aerochrome's sky 15.9 -> 4.7 where Pink IR reads 8.7, mean colour held.
+const SKY = 1;
 // THE FLOOR CHECKS NEED A FRAME THE FLOOR ACTUALLY BINDS ON, which is why they
 // do not use RAW. NIR_0063 measures 0.46 -- above the floor -- so `max(measured,
 // FLOOR)` is just the measurement there and checks 4 and 5 would assert nothing
@@ -176,6 +181,7 @@ try {
     [...document.querySelectorAll("#mix3Grid input[type=range]")].map(e => Number(e.value)));
   const dn = (p) => p.evaluate(() => Number(document.getElementById("dn").value));
   const tex = (p) => p.evaluate(() => Number(document.getElementById("texture").value));
+  const skyv = (p) => p.evaluate(() => Number(document.getElementById("skySmooth").value));
   const swap = (p) => p.evaluate(() =>
     document.getElementById("swapBtn")?.getAttribute("aria-pressed") === "true");
   const press = async (p, id) => {
@@ -193,6 +199,7 @@ try {
   };
   const setDn = (p, v) => setSlider(p, "dn", v);
   const setTex = (p, v) => setSlider(p, "texture", v);
+  const setSky = (p, v) => setSlider(p, "skySmooth", v);
 
   // ---- 0. THE CONTROL. Without this every check below could pass on an
   // instrument that reads the same nine numbers whatever is pressed.
@@ -218,8 +225,10 @@ try {
   check("3   ...so every one of them survives the slider's 0.01 step",
     MATRIX.every(v => Math.abs(v * 100 - Math.round(v * 100)) < 1e-9), true);
   check("4a  the look brings its local contrast with it", await tex(a.p), TEXTURE);
+  check("4a2 ...and its sky colour smoothing", await skyv(a.p), SKY);
   await press(a.p, "lookAero");
   check("4b  ...and leaving it puts the photograph back to none", await tex(a.p), 0);
+  check("4b2 ...the sky smoothing too", await skyv(a.p), 0);
 
   // A VALUE THE READER SET IS NOT OURS TO THROW AWAY, in either direction --
   // the same pair of claims the denoise floor carries below, and the reason
@@ -291,6 +300,7 @@ try {
     // claims the bands carry: the equivalence stays real now that the look
     // brings a texture amount, and that amount is proved reachable by hand.
     await setTex(p, TEXTURE);
+    await setSky(p, SKY);
     await setDn(p, Math.max(measured, FLOOR));
     const h = await hash(p);
     await ctx.close();

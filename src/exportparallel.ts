@@ -30,7 +30,7 @@
 // In every one of those the caller runs the export exactly as it always did.
 import type { ImportedFile } from "./import";
 import type { DecodedImage } from "./decode";
-import type { EditParams, LensCurve } from "./pipeline";
+import type { BrushMask, EditParams, LensCurve } from "./pipeline";
 import type { ExportOptions, BandResult } from "./export";
 
 /** Enough pixels that starting workers is worth it. Below this the whole export
@@ -167,6 +167,7 @@ export async function exportBands(
   params: EditParams,
   opts: ExportOptions,
   lens: LensCurve | null,
+  sky: BrushMask | null,
   outW: number,
   outH: number,
   job: ParallelJob,
@@ -228,6 +229,7 @@ export async function exportBands(
           params,
           opts: { ...opts, band: { from, to }, stickerAssets: undefined },
           lens,
+          sky,
         });
       }));
     }

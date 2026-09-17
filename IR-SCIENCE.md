@@ -2415,6 +2415,69 @@ separation for noise (a look choice, and it must still pass the film-angle check
 which is a different stage from the one this app has. The existing one is the
 wrong tool, not the wrong strength.
 
+### 9l. SHIPPED — DENOISE AFTER THE AMPLIFICATION, INSIDE THE SKY. 4c-xxi'S OPEN QUESTION, ANSWERED
+
+4c-xxi ended: *whether denoising AFTER the amplification would help is untested
+and has its own obvious cost — at that point the thing being smoothed is the
+look's real colour as well as its noise.* Built and measured 2026-09-17. **It
+helps, and the cost vanishes when the stage is confined to the sky**, which has
+no real colour detail to lose. That confinement was the owner's instruction —
+sample everything that is sky — and it is what turns the file's open question
+into a control.
+
+**THE STAGE** (`src/skymap.ts`, `EditParams.skySmooth`): the RENDERED sky's
+opponent chroma is box-averaged into a 128-texel map, per edit, through
+`compileEdit` with the stage itself zeroed; the pixel's chroma is then blended
+toward that map by the sky bitmap's own weight, luma exactly preserved. The
+bitmap is `buildSkyMask`'s, built once per photograph from the gray-world render
+so the selection cannot drift as the photo is graded. The GPU samples the same
+bytes as an RGB8 texture and the export samples them bilinearly — the local-map
+pattern, so the two agree to filtering error. Dense, not strided: the 22 px
+texel footprint IS the smoothing radius, and the lattice trap 4c-xii and 4c-xxii
+record never enters it. Aerochrome carries it at 1; Pink IR, which has no
+mixer, does not need it.
+
+**MEASURED ACROSS TEN FRAMES, dark third of the sky, chroma residual p95 at the
+artefact's 12 px scale, both controls in front of every row.** Three frames have
+the defect — Aerochrome above Pink IR — and on all three the stage takes it
+below Pink IR at the shipped radius: **15.9 → 4.7 (Pink 8.7)**, 4.4 → 1.7 (Pink
+2.1), 8.7 → 3.4 (Pink 4.6), mean chroma held to 0% and luma changed by exactly
+zero. On four frames Aerochrome's sky was ALREADY cleaner than Pink IR's (0.36×,
+0.67×, 0.86×, 0.93×), so the defect is frame-dependent and the stage is
+unneeded there — and harmless, since it only ever moves chroma toward its own
+mean. On three practice frames the bitmap found a region with no chroma in
+either look, which is a `buildSkyMask` finding rather than a sky, and is not
+measured further here.
+
+**THE OBVIOUS ALTERNATIVE, MEASURED AND REJECTED FIRST.** A sky mask's own
+`saturation` at 0.35 cuts the same residual 73% — and takes the sky's mean
+chroma 36.9 → 10.9 with it. The blue and the noise are the same quantity;
+scaling removes both. 4c-xi's headline already said the blue is 1.4% of the
+sensor's range. The control that catches this — the mean must HOLD — is printed
+beside every row above, and `addMask(4)` defaults that saturation to 1.3, so
+pressing Add Sky today makes the mottle worse by about a third.
+
+**AND THE SHIPPED PATH FAILED ITS OWN CONTROL ONCE, WHICH IS THE PART WORTH
+KEEPING.** Rendered through the actual export path, the sky's mean chroma read
+27.4 → 31.8, +16%: the map had been built from the RAW source while the pixels
+it blends into come through the denoise and detail pre-pass, and the bilateral
+lowers a noisy sky's chroma — so the map targeted a different sky. The
+measurement harness had never shown this because it built its map from the
+pre-passed render. Both paths now build the map from the same pre-passed
+sampler the pixels use, and the control reads 27.4 → 27.4. Two errors in the
+control itself along the way, both coordinate conventions: "outside the mask"
+defined by the nearest texel where the stage blends by bilinear weight (704
+fringe bytes), and the harness passing `x/W` where the export passes
+`(x+0.5)/W` (2 bytes). With both matched: **0 bytes changed outside the sky
+across 2,196,335 pixels.**
+
+**WHAT IT DOES NOT DO.** It is a sky stage. The gravel mottle 013 also names,
+and any coloured patchiness off the bitmap, are untouched by construction; and
+a frame whose sky the heuristic does not find gets nothing. The lattice, the
+scale and the mean are the three things every earlier remedy in 4c-x through
+4c-xx got wrong at least once, and each is now a printed control rather than a
+sentence.
+
 **NOT THE SAME DEFECT AS 4c-xxii AND §319, and both live in the sky.** That one
 was pale LUMINANCE speckle, three to five pixels, fixed by widening the
 bilateral's spatial window. This one is coloured, 10–25 px, and sits in the dark
