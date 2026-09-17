@@ -909,6 +909,69 @@ smoother than the arm the number called identical, and a crop labelled sky that
 was plainly a hillside. **Neither error was reachable from the numbers**, and
 both were obvious in the first second of looking.
 
+### 4c-viii. THE FIELD ALREADY SPLIT THIS, AND THE LADDER SAYS THE SPLOTCH IS AMPLIFICATION
+
+**Looked up before anything was touched, 2026-09-17**, after the splotch was
+reported from the device on the shipped Aerochrome. 4c-vi's closing paragraph had
+already reasoned its way to a spatial chroma operation; what it did not have was
+that the field settled this decades ago and states it as a processing ORDER.
+
+**Reduce colour noise first, and hard.** Colour blotches rarely carry real
+information, so strong chrominance reduction costs almost nothing; luminance
+speckle overlaps genuine texture in hair, fabric and foliage and deserves a much
+lighter hand. RawTherapee exposes the refinement as a chrominance CURVE — the
+reduction varies with the pixel's own chroma, strong where saturation is low and
+weak where it is high. And a tone or contrast control applied per channel
+produces mottling at higher values, which is the same artefact arriving by a
+different road.
+
+**What that says about this app, exactly.** There is ONE denoise. It is a 5x5
+bilateral on linear sensor data whose range weighting is on relative LUMA
+(`src/raw/denoise.ts`), and there is no chroma-specific stage anywhere in the
+pipeline. Aerochrome then applies a mixer with coefficients as large as -1.44 and
+a saturation of 3.0. So a 3x amplification lands on chroma noise that nothing
+removed, on frames where the red channel is flooded and the quiet blue and green
+channels are the ones carrying the noise.
+
+**THE LADDER, RENDERED, and it separates two artefacts that were being called one
+thing.** Five candidates on a real raw, every step a control on the device, 1:1 at
+the frame's splotchiest 600x450 block (found by chroma variance, then held fixed
+across the ladder):
+
+At saturation 3.0 the sky is peppered with speckle and the foliage stipples into
+hard red and white flecks. At 2.0 both soften; at 1.5 further; at 1.0 the sky is
+clean and the foliage is smooth pink. **The shipped look with the existing denoise
+at its maximum, 1.00, is indistinguishable from the shipped look** — the
+luminance-guided bilateral does not touch either artefact, which is the fourth
+arm's whole purpose and it answers 4c-vi's open question about whether the
+existing lever could reach this. It cannot.
+
+The colourless share over the whole frame moves 4.9% -> 8.8% -> 12.5% -> 19.2%
+down the ladder, and the largest hue bin's share moves 56% -> 63%: pulling
+saturation back does not change WHICH colours the look makes, it drains them.
+That is the cost of the naive fix, stated so it is not mistaken for a free one.
+
+**TWO ARTEFACTS, NOT ONE, AND ONLY THE FIRST IS CHROMA NOISE.** The sky speckle is
+chroma noise amplified and is what a chroma stage is for. The foliage stipple is
+saturation driving adjacent leaves to the gamut edge, so they snap to pure red or
+pure white and the mid-tones between them are lost — a per-pixel clipping, which a
+spatial chroma blur will soften but not undo. A fix aimed only at noise will
+improve the sky and leave the leaves flecked.
+
+**AND THE PER-KIND SPLIT MATTERS BEFORE ANY OF THIS APPLIES.** `LOOKS.eir` carries
+`raw.sat` 3.0 and `jpeg.sat` 1.35, so a camera JPEG never sees the amplification at
+all. The same ladder on a real camera JPEG moves its colourless share 2.4% ->
+5.9% across the whole range and its largest bin not at all — a different frame
+with a different problem. Any report of splotch has to say which file kind it came
+from before it is diagnosed.
+
+Sources: RawPedia, Noise Reduction (https://rawpedia.rawtherapee.com/Noise_Reduction);
+Adobe, Sharpening and noise reduction in Camera Raw
+(https://helpx.adobe.com/camera-raw/desktop/using/sharpening-noise-reduction-camera-raw.html);
+pixls.us, "what is the best way to boost the colors (saturation)"
+(https://discuss.pixls.us/t/what-is-the-best-way-to-boost-the-colors-saturation/6935).
+
+
 ---
 
 ## 5. What a camera JPEG is, and why it is a different animal
