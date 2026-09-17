@@ -39,7 +39,40 @@ be the same class.
 Patch the thumbnail path's lift to match. Narrower, and leaves the two copies in
 place to diverge again.
 
+**AND IT WAS ALREADY DONE, AND IT WAS NOT THE COLOUR HALF'S CAUSE — measured
+2026-09-17.** `freshBaseline` exists and `makeThumb` was already calling it, so
+this option had nothing left to do for the tile. The colour divergence the
+agreement walk reports came from the other direction entirely: `applyLook`
+gray-world balances a camera-rendered file before applying a colour look and
+re-derives exposure to go with it, because a false-colour look on a JPEG
+otherwise applies its swap to channels nothing has pulled apart. `makeThumb` did
+both together until it moved to `freshBaseline` — which gives a camera-rendered
+file `[1,1,1]`, correct for a tile with no look and the removal of the balance a
+look needs. `applyLook`'s own comment still said "makeThumb has always done both
+together, which is why the tile looked right while the photo did not"; that
+stopped being true and nothing could see it.
+
+Measured, under Aerochrome on a camera JPEG nobody had opened: the tile at wb
+`[1,1,1]` and exposure 1 against the photograph's `[0.209, 1.270, 0.638]` and
+2.49, with 39 of 46 fields identical and the balance carrying all of it — 150° of
+hue. The raw arm read 0° throughout, because a raw is gray-world balanced by
+`freshBaseline` anyway and there was nothing for the move to remove. Fixed by
+giving `makeThumb` the same balance decision, one-band test and exposure
+re-derive that `applyLook` applies. Both tile arms are green.
+
+**What this item still holds is the HOT SPOT half**, which the colour fix says
+nothing about: the 0.052 centre-against-edge divergence, and the three builds
+where forcing the tile's `lensFix` and then its `hsFix` to 0 changed nothing.
+Different measurement, different fixture, still open.
+
 ## Rejected
+
+**The provisional preview, AGAIN, and this time it was ruled out rather than
+walked into.** The reading below is the reason this record's own trap list was
+read before the 2026-09-17 work started, and the first thing that probe asked was
+whether the tile the walk reads carries the `provisional` class at the moment it
+is read. It does not, on either file kind — the tile is this app's render and the
+150° was real. The walk had no protection against it regardless, and has one now.
 
 **"Nothing re-checks a tile's stamp when its photo gains an edit."**
 `restripForGrade` is called only on a grade move, so a call was added where the
@@ -70,6 +103,12 @@ before concluding something about its matching.**
 
 ## Rank
 
-**Seventh**, and it may merge upward into 001. Held here rather than promoted
+**Was seventh, and its colour half is shipped; what remains is the hot spot.**
+Re-rank against the other open items when that half is next picked up — a
+scale-sensitive ratio measured on a 260px tile against a 904px canvas is not yet
+a finding, and the fixture that would settle it cannot ship in this repo.
+
+The original entry, kept because it was the reasoning that held the item and it
+was right to: **seventh**, and it may merge upward into 001. Held here rather than promoted
 because the refactor it requires is load-bearing and 001's instrumentation should
 say first whether one extraction closes both.
