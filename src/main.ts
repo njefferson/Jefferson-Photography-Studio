@@ -187,10 +187,10 @@ const params: EditParams = {
   hotspot: 0,
   hotspotSize: 0.5,
   hotspotColor: 0,
-  lensFix: 1,
+  lensFix: 0,
   lensBypass: false,
   forceBalance: false,
-  hsFix: 1,
+  hsFix: 0,
   hsBypass: false,
   vignette: 0,
   clarity: 0,
@@ -773,7 +773,7 @@ function initMyLens(_img: DecodedImage, _imported: ImportedFile) {
   // moves. Cleared when nothing matched, so the previous photo's lens cannot
   // leak onto this one. Both halves go up together — initHotspot has already
   // run and settled the shipped match.
-  params.lensFix = myLens ? (rememberedStrength("own:" + myLens.p.key) ?? 1) : 0;
+  params.lensFix = myLens ? (rememberedStrength("own:" + myLens.p.key) ?? 0) : 0;
   params.lensBypass = false;
   syncLensStrength();
   syncLensTexture();
@@ -807,14 +807,37 @@ myLensUi.forget.addEventListener("click", () => {
   syncMyLens();
 });
 
-/** Called once per newly-opened photo, right after decode. Auto-selects the
- *  hot-spot profile from EXIF; if the lens can't be identified, surfaces the
- *  manual picker instead of silently skipping correction (never guess). */
+/** Called once per newly-opened photo, right after decode. Takes the decoded
+ *  image and the imported file (neither is read — they mark the call site) and
+ *  returns nothing; it sets `hotspotState`, `params.hsFix` and `params.hsBypass`
+ *  and refreshes the card, so what it leaves behind has to satisfy
+ *  `updateHotspotUI` and the four paths that rebuild the at-open ruling.
+ *
+ *  It still auto-SELECTS the profile from EXIF — if the lens cannot be
+ *  identified the manual picker is surfaced rather than the match being guessed.
+ *  **What it no longer does is auto-APPLY it.** The strength starts at zero
+ *  unless the reader has already chosen one for this lens and aperture, in
+ *  which case their choice is restored as before.
+ *
+ *  WHY, and it is not a tuning decision (IR-SCIENCE.md section 9h). A stored
+ *  per-lens correction cannot be right for every frame, because how much stray
+ *  light a lens throws depends on how much light is in the scene — said in
+ *  those terms by the photographer whose method this app was built on, who
+ *  corrected four frames out of eighty-five on a hot-spot-prone lens, by hand,
+ *  and never completely. This app applied one to every raw file the table
+ *  matched, at full strength, with nothing on screen moving. On the lone-oak
+ *  frame that cost 31% of the subject's colour.
+ *
+ *  It also put the stage on the wrong side of this app's own bargain: an
+ *  at-open automatic is visible and undoable, and this one was neither — no
+ *  slider moved, and the reader could not see it acting until it had taken a
+ *  third of their subject. The profile, the matcher and the slider all stay;
+ *  the correction waits to be asked for. */
 function initHotspot(_img: DecodedImage, _imported: ImportedFile) {
   const p = Hotspot.findShipped(currentExif);
   const short = Hotspot.shortFor(currentExif?.lens);
   hotspotState = p && short ? { p, short, source: "exif" } : null;
-  params.hsFix = rememberedStrength(hotspotState ? "shipped:" + hotspotState.short + "@" + (currentExif?.fNumber ? (currentExif.fNumber[0] / currentExif.fNumber[1]).toFixed(1) : "?") : null) ?? 1;
+  params.hsFix = rememberedStrength(hotspotState ? "shipped:" + hotspotState.short + "@" + (currentExif?.fNumber ? (currentExif.fNumber[0] / currentExif.fNumber[1]).toFixed(1) : "?") : null) ?? 0;
   params.hsBypass = false;
   updateHotspotUI();
   updateLensCmp();
@@ -1666,10 +1689,10 @@ function cloneParams(p: EditParams): EditParams {
     hotspot: p.hotspot,
     hotspotSize: p.hotspotSize,
     hotspotColor: p.hotspotColor ?? 0,
-    lensFix: p.lensFix ?? 1,
+    lensFix: p.lensFix ?? 0,
     lensBypass: p.lensBypass ?? false,
     forceBalance: p.forceBalance ?? false,
-    hsFix: p.hsFix ?? 1,
+    hsFix: p.hsFix ?? 0,
     hsBypass: p.hsBypass ?? false,
     vignette: p.vignette,
     clarity: p.clarity,
@@ -1748,12 +1771,12 @@ function applySnapshot(s: Snapshot) {
   params.hotspot = c.hotspot;
   params.hotspotSize = c.hotspotSize;
   params.hotspotColor = c.hotspotColor ?? 0;
-  params.lensFix = c.lensFix ?? 1;
+  params.lensFix = c.lensFix ?? 0;
   params.lensBypass = c.lensBypass ?? false;
   // applySnapshot restores fields INDIVIDUALLY, so one missing here is dropped
   // in silence by Undo and Reset — which is how `recover` was lost once.
   params.forceBalance = c.forceBalance ?? false;
-  params.hsFix = c.hsFix ?? 1;
+  params.hsFix = c.hsFix ?? 0;
   params.hsBypass = c.hsBypass ?? false;
   params.vignette = c.vignette;
   params.clarity = c.clarity ?? 0;
@@ -8142,10 +8165,10 @@ function establishFreshEdit() {
     hotspot: 0,
     hotspotSize: 0.5,
   hotspotColor: 0,
-  lensFix: 1,
+  lensFix: 0,
   lensBypass: false,
   forceBalance: false,
-  hsFix: 1,
+  hsFix: 0,
   hsBypass: false,
     vignette: 0,
     clarity: 0,
@@ -8997,11 +9020,12 @@ async function makeThumb(img: DecodedImage, MAX = 260, lens?: LensCurve | null, 
   const p: EditParams = {
     ...cloneParams(own ? own.params : params),
     // An own edit carries its own correction strength. Without one, the tile
-    // claims what opening the photo will do — full strength where a profile
-    // matched, and nothing where none did — rather than inheriting whatever
-    // the OPEN photo's slider happens to say, which is a different frame's
-    // answer.
-    lensFix: own ? own.params.lensFix : lens ? 1 : 0,
+    // claims what opening the photo will do — and since 2026-09-17 that is
+    // ZERO whether or not a profile matched, because the lens correction is no
+    // longer applied at open (IR-SCIENCE.md 9h). A tile that corrected while
+    // the open photograph did not would be the exact strip-against-photo
+    // disagreement `lensHalves` exists to make impossible.
+    lensFix: own ? own.params.lensFix : 0,
     lensBypass: own ? own.params.lensBypass : false,
     forceBalance: own ? (own.params.forceBalance ?? false) : false,
     wb,
@@ -12309,10 +12333,10 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["l
     hotspot: 0,
     hotspotSize: 0.5,
   hotspotColor: 0,
-  lensFix: 1,
+  lensFix: 0,
   lensBypass: false,
   forceBalance: false,
-  hsFix: 1,
+  hsFix: 0,
   hsBypass: false,
     vignette: 0,
     clarity: look.clarity,

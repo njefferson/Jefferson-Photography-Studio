@@ -130,6 +130,19 @@ interpolated, and off — full frame plus 1:1 crops of the canopy and of open sk
 A look choice is shown, never described, and no photograph changes without the
 owner's approval.
 
+**AND STOP APPLYING IT AT OPEN. Chosen, 2026-09-17.** `lensFix` and `hsFix`
+start at zero on every path that opens a photograph. The table, the matcher, the
+card and the slider all stay; a strength the reader chose for that lens and
+aperture is still remembered. The correction waits to be asked for.
+
+This is the change the reading argues for rather than the one it merely permits,
+and two independent lines reach it: the sources say a stored per-lens correction
+cannot be right for every frame, and this app's own rule says an at-open
+automatic must be visible and undoable, which this one never was.
+
+`PREVIEW_PIPELINE` moves with it, because a cached quick-look tile was rendered
+through the correction and is keyed on that number.
+
 ## Rejected
 
 **The centre anchor, as RawTherapee uses it.** It is a published normalisation
@@ -166,6 +179,13 @@ change with its own pictures; bundling them makes the result unattributable.
 behaviour the report wants falls out of correcting the artefact properly; adding
 a mask to a correction with a dropped term papers over the term.
 
+**Keeping it automatic and fixing it in place** — clip control against the raw
+white level, a per-image strength, moving the stage before the grade. Three
+changes, each of which changes every photograph, spent making a model better
+that every source found says is the wrong model. Clip control and the ordering
+are still worth having if the correction is ever applied broadly again; they are
+not worth having to prop up an automatic nobody in the field runs.
+
 ## Rank
 
 **Fourth.** Below 012, which takes the photograph away from the reader. Below
@@ -176,7 +196,11 @@ design directions and this is a defect with a known remedy: a published formula
 implemented with one term missing, on a stage that is on by default for every raw
 file the table matches.
 
-What comes after it, in order, each needing its own record and its own pictures:
-clip control against the raw white level; a per-image strength rather than a
-stored 1; and moving the stage out of the creative chain so the grade stops
-multiplying it.
+**What comes next is now one thing, not three.** With the correction no longer
+applied at open, clip control and the pipeline position stop being urgent — they
+are properties of a stage that is off unless asked for. What remains is telling
+the reader the hot spot is THERE: measure the frame's own white balance at the
+centre against the edge, which is Rob Shea's own test and reads roughly 1000K
+apart on a visible hot spot, and say so in words beside the slider that fixes
+it. That is the version that matches both the field and this app's promise, and
+it needs its own record and its own pictures.
