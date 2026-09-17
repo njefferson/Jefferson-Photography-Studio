@@ -251,10 +251,31 @@ knee, so the stage was off rather than selective. Recorded in 4c-xv as the shape
 of mistake it is: a gate that removes the cost by removing the operation reads as
 a fix in every number except the one it was built for.
 
-**What is NOT rejected by either.** The plain global colour blur measurably clears
-the sky it was built for, and its cost is edge bleeding that rises with strength.
-That trade is real, it is measured on both sides, and choosing where to sit on it
-is a look decision rather than a defect with a known fix.
+**WITHDRAWN 2026-09-17 — the plain global colour blur is the CAUSE at strength,
+not a trade.** This paragraph used to read that the blur measurably clears the sky
+it was built for and that choosing a strength was a look decision. Every
+measurement behind that was a fine-grain chroma figure, and that statistic has now
+been shown blind to this defect: it read the two shipped looks 1.13× apart on a
+difference plainly visible in two screenshots. Rebuilt to sweep the lag, report
+the sky's dark third separately and print the 95th percentile, it reads 2.03× —
+and the blur sweep on top of the shipped look reads 1.85× at chroma 0.2, 2.00× at
+0.4, **2.63× at 0.7 and 3.47× at 1.0**. Despeckle 0.5 reads 2.05×: nothing.
+
+A colour blur does not remove chroma error, it averages it — which consolidates
+fine grain into patches the size of its own window, and the patches are what the
+eye objects to. So the fine-grain number improving while the 1:1 crop stays
+peppered was never a contradiction. `LOOKS.eir` carries `chroma: 0`, so nothing
+shipped on the wrong side of this; what changes is that the blur is off the table
+as a remedy at any strength, and the four rejections above it were made on the
+same blind statistic and are therefore not safe rejections either.
+
+**And the cause is now located.** The mixer's green row is `[−1.44, 1.37, 1.02]`
+— signal gain 0.95, noise gain 2.23 to 3.83 — and rendering the look with the
+mixer at identity reads 0.70×, BELOW the clean reference. Saturation 1.5 instead
+of 3.0 reads 0.55×. Both knobs are the look's identity, and both amplify signal
+and noise in the same proportion, so the separation and the grain cannot be
+decoupled anywhere downstream. Full numbers in `IR-SCIENCE.md` section 9k; the
+instrument's own failure is hub LESSONS §320.
 
 ## Rank
 

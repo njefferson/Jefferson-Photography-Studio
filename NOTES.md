@@ -586,9 +586,16 @@ user-scalable=no.
   for 2% of the leaves and looks finished, and on the next frame tried it drives
   858,273 pixels of ordinary grey roof shade to saturated teal, because the tint
   is weighted by brightness alone and added rather than multiplied. What the bark
-  needs is a luminance-weighted saturation REDUCTION, which this app has no
-  control for. Sources and every number in `IR-SCIENCE.md` sections 9i and 9j.
-  See `docs/decisions/016-foliage-tonality.md`.
+  needs is a luminance-weighted saturation REDUCTION, and that control now
+  exists: **Shadow colour**, a slider on the Grade tab, off by default. It scales
+  colour down in the dark end instead of adding a complement in, so a pixel with
+  no colour cannot gain one — the same 858,273 pixels of roof shade come out
+  CLEANER at every amount, where the published fix took them to saturated teal.
+  On the oak at 0.45 it takes the bark down 20.6% for 4.7% of the leaves. Whether
+  Aerochrome should carry an amount of its own is an appearance choice with
+  candidates rendered rather than described. Sources and every number in
+  `IR-SCIENCE.md` sections 9i and 9j. See
+  `docs/decisions/016-foliage-tonality.md`.
 - [ ] **A quick look you cannot stop, and a session that renders it all again** <!-- decision: 014 --> — reported
   from the iPad 2026-09-17. There is no way to stop a quick look building its
   grid, so no way to say done and get the memory back; and after Keep in a

@@ -615,7 +615,7 @@ cannot describe something the code does not say about itself.
 - **`src/export.worker.ts`** (60 lines) — ONE BAND OF AN EXPORT, ON ANOTHER CORE.
 - **`src/exportparallel.ts`** (240 lines) — AN EXPORT, SPLIT ACROSS CORES.
 - **`src/framecache.ts`** (139 lines) — What the lens rig has already measured, so an interrupted run is not thrown away.
-- **`src/gl.ts`** (1796 lines) — WebGL2 edit pipeline.
+- **`src/gl.ts`** (1813 lines) — WebGL2 edit pipeline.
 - **`src/glow.ts`** (110 lines) — HIE-style halation glow.
 - **`src/glprobe.worker.ts`** (39 lines) — CAN A WORKER DRAW? Asked from inside one, because that is the only place the answer is true or false rather than a specification.
 - **`src/gps.ts`** (245 lines) — Location-data guard: find and remove GPS location from a photo FILE's own bytes — the original the user loaded, not the app's exports (exports are re-encoded and carry no EXIF at all today).
@@ -633,7 +633,7 @@ cannot describe something the code does not say about itself.
 - **`src/lensrig.ts`** (929 lines) — Measuring a lens, as a destination in the app.
 - **`src/lensstore.ts`** (796 lines) — Keeping a lens profile the reader measured, and putting it back to work.
 - **`src/localmap.ts`** (100 lines) — Per-image reference maps for Clarity and Dehaze (glow-map pattern: built once per image from LINEAR source data, sampled as a texture by the GPU and bilinearly by the CPU export).
-- **`src/look.ts`** (269 lines) — Shareable looks. A look is the CREATIVE grade only (see SavedLook) — small enough (~0.5 KB of JSON) to travel as a link fragment, a paste-able code, or a tiny .ipslook file, with no server and no acco
+- **`src/look.ts`** (277 lines) — Shareable looks. A look is the CREATIVE grade only (see SavedLook) — small enough (~0.5 KB of JSON) to travel as a link fragment, a paste-able code, or a tiny .ipslook file, with no server and no acco
 - **`src/lookmark.ts`** (75 lines) — The traveling recipe: every exported JPEG can carry the look that made it, as an APP11 segment ("IPSLOOK\0" + the look.ts wire-format JSON, ~600 bytes).
 - **`src/lut.ts`** (50 lines) — 3D LUT (.cube) export.
 - **`src/lut3d.ts`** (60 lines) — The trilinear formula for imported .cube 3D LUTs.
@@ -641,9 +641,9 @@ cannot describe something the code does not say about itself.
 - **`src/macro/export.worker.ts`** (23 lines) — Full-resolution stacking runs here, OFF the main thread, so the long tiled render never janks the UI (the preview stack stays on the main thread — it's quick).
 - **`src/macro/main.ts`** (460 lines) — MACRO FOCUS-STACKING MODE: the second discipline, its own page and its own entry point.
 - **`src/macro/stack.ts`** (387 lines) — Macro focus-stacking engine (JPEG-first).
-- **`src/main.ts`** (13990 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
+- **`src/main.ts`** (13998 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
 - **`src/palette.ts`** (118 lines) — Palette family picker, shared across all three pages.
-- **`src/pipeline.ts`** (1406 lines) — CPU version of the GPU edit pipeline, kept numerically identical to the fragment shader in gl.ts so exports match the on-screen preview exactly.
+- **`src/pipeline.ts`** (1446 lines) — CPU version of the GPU edit pipeline, kept numerically identical to the fragment shader in gl.ts so exports match the on-screen preview exactly.
 - **`src/platform.ts`** (181 lines) — WHAT IS ACTUALLY IN FRONT OF THE PERSON — asked once, in one place.
 - **`src/previewcache.ts`** (220 lines) — THE SAME FOLDER, OPENED AGAIN, DECODED EVERY FILE AGAIN.
 - **`src/qr.ts`** (303 lines) — Minimal QR encoder — byte mode, error-correction level M, versions 1..26 — written from the public ISO/IEC 18004 spec, no third-party code (the app's no-third-party-IP stance).
