@@ -27,26 +27,6 @@ export interface EditParams {
    *  math, so it is skipped in the .cube LUT bake for the same reason. 0 is
    *  bit-identical to no chroma stage at all. */
   chroma?: number;
-  /** Per-channel multiplier on `denoise`, measured per photograph at open.
-   *  [1,1,1] is bit-identical to the single shared strength that shipped.
-   *
-   *  WHY IT EXISTS. The noise in an infrared frame is not evenly spread: the
-   *  conversion floods red and starves blue, so blue carries 1.44x to 1.96x
-   *  green's relative noise on every raw measured, white balance then lifts it
-   *  hardest, and the look's channel mixer differences the channels — leaving
-   *  the original blue responsible for most of the noise variance in the mixed
-   *  output (IR-SCIENCE.md 4c-xvi). One shared strength spends detail in the
-   *  flooded channel, which carries nearly all of an infrared picture, to buy
-   *  smoothing in a channel that needs far more of it.
-   *
-   *  The invariant the caller depends on: the three are a RATIO, not a level.
-   *  `makeRowDenoiser` divides by the largest of them, so scaling all three by
-   *  the same factor changes nothing. The slider still sets the scale, but note
-   *  it no longer means the same amount in every channel: the largest of the
-   *  three sets the kernel, so a bias above 1 widens it for all of them and the
-   *  quieter channels blend back from a stronger mean. Like `denoise` it runs on linear data before everything
-   *  else and is not part of compileEdit's per-pixel math. */
-  chBias?: [number, number, number];
   /** 0..1 how readily a pixel that is the EXTREME of its own 3x3 and far from
    *  that window's median is replaced by the median — a decision-based median,
    *  not a median filter: at any strength the great majority of pixels are left
