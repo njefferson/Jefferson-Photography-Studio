@@ -589,11 +589,16 @@ user-scalable=no.
   average anchor and interpolate the 80 hard bins, both reference behaviour, with
   the shipped profile arrays untouched. Clip control, a per-image strength and
   moving the stage out of the creative chain follow, each with its own record.
-  **The normalising term shipped 2026-09-17** and gives the oak back 23.0% of
-  what the stage was taking, measured as two real builds; a frame with no curve
-  and a frame with an area-neutral one are bit-identical to before. Interpolation
-  was measured and not shipped — it changed nothing on this frame. Still owed:
-  clip control, a per-image strength, and moving the stage before the grade.
+  **Two changes shipped 2026-09-17.** The normalising term, which gives the oak
+  back 23.0% of what the stage was taking, measured as two real builds, with a
+  frame carrying no curve and a frame carrying an area-neutral one bit-identical
+  to before. And the correction **no longer applies at open at all** — the
+  profile is still matched and named, the slider and the picker stay, a strength
+  the reader chose is still remembered, but nothing is corrected until it is
+  asked for. Interpolation was measured and not shipped; it changed nothing on
+  this frame. What is left is telling the reader a hot spot is there rather than
+  silently correcting it: the centre-against-edge white balance test, roughly
+  1000K apart on a visible one.
   See `docs/decisions/015-lens-correction-against-the-reference.md`.
 - [ ] **Creative — a third app for regular photos** — owner direction 2026-07-19 <!-- decision: 002 -->
   ("a separate page next to infrared and macro, called creative, for regular
