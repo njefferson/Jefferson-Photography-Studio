@@ -1255,6 +1255,62 @@ unresolved and it may be the instrument rather than the prediction:
 distinguish a clean sky from no deep sky in that block, and that frame's busiest
 block elsewhere reads 0.21. Recorded as open rather than explained away.
 
+### 4c-xviii. AIMING THE BILATERAL AT THE RIGHT CHANNEL DOES NOT MAKE IT REACH
+
+Built and swept 2026-09-17 against the shipped build on four frames. The
+diagnosis in 4c-xvi holds and the remedy does not follow from it.
+
+**WHAT WAS BUILT.** `makeRowDenoiser`'s single strength became a per-channel
+one, derived per photograph from each channel's own measured noise. The range
+weight stays SHARED — one exp() per tap, as before — and each channel is instead
+blended between its own centre value and that shared filtered mean, so the
+targeting costs nothing. Mirrored in the shader. At [1,1,1] it is bit-identical,
+and a camera JPEG was measured byte-for-byte unchanged.
+
+**THE FIRST NORMALISATION WAS WRONG AND THE WAY IT WAS WRONG IS WORTH KEEPING.**
+The bias was centred on a MEAN of 1. But the blend factors are `chS / max(chS)`,
+which is invariant under scaling — so a normalisation cannot change the split at
+all, only the kernel width `rangeSigma` derives from the largest of the three.
+Centring on the mean put that width too low and the two quieter channels came out
+smoothed LESS than the slider asked for: high-frequency energy in the render rose
+in all three channels on two frames (red +49%, green +27%, blue +39% on the
+reported frame) and the sky went 0.65 to 0.59. Normalising to a MINIMUM of 1,
+so the slider's value is a floor no channel drops below, fixed that.
+
+**AND THEN IT STILL DID NOT DELIVER.** With the floor in, against the shipped
+build: the reported frame's sky 0.65 to 0.62, NIR_1582 0.20 to 0.21, NIR_1480
+0.23 to 0.22, NIR_1376 0.91 unchanged. Blue IS being smoothed harder where it
+should be — NIR_1582's high-frequency energy fell 8% in blue and 16% in red — and
+the sky moved one hundredth.
+
+**THE WALL IS THE FILTER, NOT THE AIM, AND IT WAS ALREADY MEASURED TWICE.** 4c-x
+found the decision-based median could not reach this mottle; 4c-xi found the
+narrow colour blur could not either, because the structure is three to five
+pixels across and a five-pixel window cannot flatten something that nearly fills
+it — and a bilateral's range term treats a lone unlike pixel as an edge and keeps
+it, by construction. Per-channel strength changes which channel the filter is
+pointed at. It does not change what the filter is able to reach.
+
+**WHAT THIS LEAVES, AND IT IS A NARROW AND WELL-SUPPORTED NEXT STEP.** Exactly one
+stage has ever been measured to reach this mottle: the WIDE colour blur, 7x7 at
+stride two over a thirteen-pixel span (4c-xii). It is applied to the colour
+VECTOR, which is why its cost is edge bleeding — it averages colour across
+high-contrast boundaries everywhere. The measurement in 4c-xvi says the noise is
+not in the colour vector, it is in one channel. Pointing the wide blur at the
+channel that carries the noise, rather than at colour as a whole, is one variable
+away from something already known to work, and the per-channel plumbing built
+here is the input it takes.
+
+**THE CODE WAS TAKEN BACK OUT, and the reason is worth the sentence.** It was
+first left in place but unwired, so that nothing rendered differently while the
+plumbing stayed available. TypeScript refused the build: a function nothing calls
+is an error, and that is the right answer. Inert infrastructure kept for a
+hypothetical is the thing this repository's architecture gate exists to refuse,
+and the next candidate touches the CHROMA stage rather than the bilateral, so the
+bilateral's per-channel strength would not even be the plumbing it needs. The
+working tree is byte-identical to what shipped; the implementation is in the
+history at the commit this section names, and this record is what it bought.
+
 ### 4c-vii. THE OVERTURNED NUMBERS, KEPT ON PURPOSE
 
 4c-vi originally read that raising denoise did nothing to the ratio (NIR_1480

@@ -1645,7 +1645,6 @@ function cloneParams(p: EditParams): EditParams {
     sat: p.sat,
     contrast: p.contrast,
     denoise: p.denoise,
-    chBias: [...(p.chBias ?? [1, 1, 1])] as [number, number, number],
     chroma: p.chroma ?? 0,
     despeckle: p.despeckle ?? 0,
     tint: [...p.tint] as [number, number, number],
@@ -1734,7 +1733,6 @@ function applySnapshot(s: Snapshot) {
   params.sat = c.sat;
   params.contrast = c.contrast;
   params.denoise = c.denoise;
-  params.chBias = c.chBias ?? [1, 1, 1];
   params.chroma = c.chroma ?? 0;
   params.despeckle = c.despeckle ?? 0;
   params.tint = c.tint;
@@ -8057,7 +8055,6 @@ function establishFreshEdit() {
   params.recover = base.recover;
   params.swapRB = base.swapRB;
   params.denoise = estimateDenoise(src);
-  params.chBias = estimateChannelBias(src);
   lookBias = [1, 1, 1];
   lookWb = null;
   // NORMALISE THE MEASUREMENTS TO WHAT THE SLIDERS CAN HOLD, BEFORE ANYTHING
@@ -13346,70 +13343,6 @@ function estimateDenoise(img: DecodedImage): number {
   // lands right on it), leaving all the headroom above for taste.
   const targetSigma = 0.75 * med;
   return clamp(Math.sqrt(targetSigma / 0.1), 0, 0.6);
-}
-
-/** HOW THIS PHOTOGRAPH'S NOISE IS SPLIT BETWEEN ITS CHANNELS, as a multiplier on
- *  the Denoise slider — `estimateDenoise`'s own method run on R, G and B
- *  separately instead of collapsed to luma.
- *
- *  Takes `img`, a decoded photograph. Returns three multipliers whose mean is 1.
- *  The invariant `makeRowDenoiser` depends on: these are a RATIO and not a level.
- *  It divides by the largest, so the overall amount of smoothing stays whatever
- *  the Denoise slider says; only the split between channels comes from here.
- *
- *  WHY A RATIO AND NOT A LEVEL. A per-photograph LEVEL was built and rejected
- *  twice (IR-SCIENCE.md 4c-xiii, 4c-xiv) — over fifteen frames a single number
- *  cannot tell a photograph that is grainy throughout from one that is clean
- *  except for its sky. The split between channels is a different quantity and it
- *  is stable where the level was not: blue measured noisiest on every raw, by
- *  1.44x to 1.96x over green.
- *
- *  RETURNS [1,1,1] UNCHANGED for anything that is not a camera raw, and for any
- *  frame where a channel measures no noise at all. That second case is not a
- *  clean channel, it is a DESTROYED one: `linearAt` floors at 1e-4, so a channel
- *  the camera crushed to zero in the shadows returns a constant whose median
- *  neighbour-difference is zero. Both camera JPEGs measured that way, and it is
- *  why they never showed this defect — the channel was gone before the app saw
- *  the file. Biasing on a floored reading would be biasing on an artefact. */
-function estimateChannelBias(img: DecodedImage): [number, number, number] {
-  const flat: [number, number, number] = [1, 1, 1];
-  if (!img.isRaw) return flat;
-  const { width, height } = img;
-  const step = Math.max(1, Math.floor(Math.min(width, height) / 200));
-  const n: number[] = [];
-  for (let ch = 0; ch < 3; ch++) {
-    const all: number[] = [];
-    for (let y = 0; y < height; y += step) {
-      for (let x = 0; x < width; x += step) all.push(linearAt(img, x, y)[ch]);
-    }
-    all.sort((a, b) => a - b);
-    const thr = all[Math.floor(all.length * 0.4)];
-    const diffs: number[] = [];
-    for (let y = 0; y < height - 1; y += step) {
-      for (let x = 0; x < width - 1; x += step) {
-        const a = linearAt(img, x, y)[ch];
-        const b = linearAt(img, x + 1, y)[ch];
-        const m = (a + b) / 2;
-        if (m > thr) continue;
-        diffs.push(Math.abs(a - b) / (m + 1e-4));
-      }
-    }
-    if (!diffs.length) return flat;
-    diffs.sort((a, b) => a - b);
-    n.push(diffs[Math.floor(diffs.length / 2)]);
-  }
-  const sum = n[0] + n[1] + n[2];
-  // A channel reading no noise is a floored channel, not a clean one.
-  if (!(sum > 1e-6) || n.some((v) => v <= 1e-6)) return flat;
-  // MEAN OF 1, CENTRED ON THE SLIDER — and that is not the same as conserving
-  // the total, which an earlier version of this comment claimed. `rangeSigma` is
-  // 0.1*s^2, so lifting the noisiest channel above the slider's value widens the
-  // kernel for EVERY channel, and the quieter ones then blend back from a
-  // stronger mean rather than a weaker one. The slider still sets the scale; it
-  // no longer means exactly the same amount in each channel, which is the point
-  // of the field. Bounded because a wild ratio would be a measurement failure
-  // rather than a photograph — the nine frames measured span 0.75 to 1.42.
-  return n.map((v) => clamp((3 * v) / sum, 0.5, 1.5)) as [number, number, number];
 }
 
 /** Exposure so the bright end of the image (post WB + camera matrix) ~= 0.85. */
