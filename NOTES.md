@@ -563,8 +563,12 @@ user-scalable=no.
   luma-guided bilateral, and no chroma stage at all — and then applies a mixer
   with coefficients over 1.4 and a 3x saturation on top of whatever chroma noise
   is left. First measurement is a sheet of the same frame at several saturations,
-  to say how much of the splotch is amplification. The sources go into
-  `IR-SCIENCE.md`. See `docs/decisions/013-aerochrome-splotchy-chroma.md`.
+  to say how much of the splotch is amplification. **The sky half shipped
+  2026-09-17**: its colour is smoothed after the look amplifies it, inside the
+  sky's own selection, mean colour kept — the file's one untested direction,
+  made free by acting on the sky only. The gravel half stays open. The sources
+  go into `IR-SCIENCE.md` (9l for what shipped). See
+  `docs/decisions/013-aerochrome-splotchy-chroma.md`.
 - [ ] **The foliage is the right colour and reads as a blob** <!-- decision: 016 --> — reported
   from the iPad 2026-09-17 on the Aerochrome look, asking how to get the detail
   back the way the film looks or the way people who edit these files normally do
