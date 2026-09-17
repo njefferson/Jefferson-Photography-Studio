@@ -143,6 +143,43 @@ stage has to be.
 are separable, the reported defect is in production now, and bundling two colour
 changes makes neither measurable.
 
+**AND A SECOND ARTEFACT ARRIVED, WHICH THIS REPOSITORY CANNOT REPRODUCE — 2026-09-17.**
+Three frames from the device show a different thing from the one measured above:
+the sky peppered with pale ACHROMATIC dots, densest where the sky is deepest and
+gone where it goes pale near the horizon, with the rest of each picture clean.
+That is not the coloured hue speckle the chroma stage was built against.
+
+The pipeline was ablated one stage at a time on the raw in the scratchpad — no
+look at all, as shipped, Restore depth off, saturation 1, contrast 1, and the
+mixer back to Identity — scanning a column of blocks down the sky and reporting
+each block's luminance against the share of its pixels carrying no hue.
+
+**The frame does not have the signature.** As shipped, the top three sky blocks
+read 0.00% with no hue, median chroma 95 to 126 and rising with depth; the
+rendered picture's sky is clean. The only blocks with any colourless share are the
+bright foreground at 76 to 80% luminance, which is the highlight roll-off already
+recorded as its own item and is the opposite end of the scale from the reported
+artefact. The camera JPEG in the scratchpad is worse as a fixture: it is a
+one-band file and renders under this look as a green monochrome, so it answers a
+different question entirely.
+
+**So the ablation is unspent, not failed.** It runs, its control arm is honest and
+its readings are sound; it has no frame to run on. What this item needs next is
+one raw that shows the grey sky speckle, in the scratchpad, where the 44 practice
+DNGs cannot help (IR-SCIENCE.md section 7) and neither can a screen photograph.
+Guessing the stage from the code without it is the move this record already
+carries two entries against.
+
+**One thing the code makes worth checking FIRST when such a frame arrives**, so it
+is written down rather than rediscovered: `src/pipeline.ts`'s band stage clamps
+each channel with `Math.max(0, ...)` before `rgb2hsv` and then rebuilds the pixel
+with `hsv2rgb`, so a channel the mixer pushed below zero is not merely clipped —
+the pixel's hue and saturation are recomputed from a number that is no longer its
+own. `LOOKS.eir.mix3` carries -1.44, -0.47 and -0.06, and saturation 3.0 runs
+before that stage and pushes more pixels past zero. A deep sky in a swapped
+infrared frame is where the quiet channel sits closest to zero. That is a
+hypothesis with a mechanism, and it stays a hypothesis.
+
 ## Rejected
 
 **Turn the saturation down.** The colour was approved by looking, on the owner's
