@@ -61,6 +61,36 @@ for (const w of walks) {
   say(`  ${w.replace("-walk.mjs", "").padEnd(22)} ${first.replace(/^\/\/ ?/, "").slice(0, 78)}`);
 }
 
+// 6b. WHAT IS ON THE SCHEDULE, IN RANK ORDER, WITH ITS REASONING.
+//
+// An idea arriving in discussion has to be comparable against what is already
+// scheduled and against what was decided before. That is only possible if a
+// session KNOWS the schedule at the moment the idea arrives, which it did not:
+// the roadmap is 250 lines deep in a 15,000-line file and nothing opened it.
+// Titles and record paths only — the records themselves are read when an idea
+// actually touches one.
+const roadmapLines = read("NOTES.md").split("\n");
+const rStart = roadmapLines.findIndex((l) => /^##\s+Next capability release/i.test(l));
+const items = [];
+if (rStart >= 0) {
+  for (let i = rStart + 1; i < roadmapLines.length; i++) {
+    if (/^##\s/.test(roadmapLines[i])) break;
+    const m = roadmapLines[i].match(/^-\s+\[([ xX])\]\s+(.+)$/);
+    if (!m) continue;
+    const key = (m[2].match(/<!--\s*decision:\s*(\d{3})\s*-->/) ?? [])[1];
+    const title = (m[2].match(/\*\*(.+?)\*\*/) ?? [, m[2].slice(0, 60)])[1];
+    items.push({ key, title });
+  }
+}
+if (items.length) {
+  say(`\nTHE SCHEDULE — ${items.length} open, in RANK ORDER (file order is the rank):`);
+  items.forEach((it, i) => say(`  ${String(i + 1).padStart(2)}. ${it.key ?? "---"}  ${it.title.slice(0, 68)}`));
+  say(`  Each is docs/decisions/<key>-*.md — what was researched, what it was`);
+  say(`  weighed against, what was REJECTED and why, and where it ranks. A new`);
+  say(`  idea gets compared against these BEFORE it is judged, and a roadmap item`);
+  say(`  without a record is refused by tools/decisions-check.mjs on commit.`);
+}
+
 // 7. THE RESEARCH FILE. The domain is looked up, never derived (Doctrine §11e).
 say(`\nDOMAIN: IR-SCIENCE.md is the research file and the domain is LOOKED UP, not`);
 say(`  derived — Doctrine §11e. A measurement of this app's own output cannot`);

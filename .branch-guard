@@ -99,3 +99,14 @@ also=tools/contract-check.mjs
 # deleted one cannot linger, and a purpose that changes in the code changes in
 # the map. It also refuses a source file that does not say what it is.
 also=tools/architecture-check.mjs
+
+# Run on every commit: every open roadmap item carries a decision record — what
+# was researched, what it was weighed against, what was REJECTED and why, and
+# where it ranks. The shape is MADR's. It exists because an idea had nothing
+# structured to be compared against: a fitted array went into a look system
+# already known to be a pile of fitted constants with nothing at decision time
+# saying so, and one defect was diagnosed three times in one evening with every
+# rejected diagnosis thrown away. Both directions, and the record has to be
+# ABOUT the item that claims it — a backfill filed two of eleven under each
+# other's keys while every existence check stayed green.
+also=tools/decisions-check.mjs
