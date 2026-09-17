@@ -565,6 +565,25 @@ user-scalable=no.
   is left. First measurement is a sheet of the same frame at several saturations,
   to say how much of the splotch is amplification. The sources go into
   `IR-SCIENCE.md`. See `docs/decisions/013-aerochrome-splotchy-chroma.md`.
+- [ ] **The foliage is the right colour and reads as a blob** <!-- decision: 016 --> — reported
+  from the iPad 2026-09-17 on the Aerochrome look, asking how to get the detail
+  back the way the film looks or the way people who edit these files normally do
+  it. Measured on the lone oak's canopy — 1.57 million pixels, 30% of the frame:
+  fine texture reads 40.15 with the denoiser off, 34.11 under the 5x5 filter this
+  app shipped until the day before, and 30.76 under the 13x13 that replaced it.
+  The denoiser costs the canopy 23% of its modelling and the widening is a third
+  of that, on a commit that said detail was not the price. Two halves shipped as
+  one: the look's floor drops to 0.45 (+11.6% texture per unit brightness, the
+  canopy's own brightness unmoved) and the look carries 0.25 of mid-frequency
+  local contrast to give back what the floor still costs (+16.0% in total). The
+  sky pays 6.2% of a speckle residual the widening had already cut 76%. The
+  reference video's own foliage lever — the hue band's luminance — was measured
+  and REJECTED: texture per unit luma is flat at 0.254 across a six-step ladder,
+  so every point it appears to add is brightness. Still not fixed and visible in
+  every crop: the trunk renders the same crimson as the leaves, and the
+  subtractive-colour tint at the measured complement does not reach it because
+  the trunk is a midtone rather than a shadow. Sources and every number in
+  `IR-SCIENCE.md` section 9i. See `docs/decisions/016-foliage-tonality.md`.
 - [ ] **A quick look you cannot stop, and a session that renders it all again** <!-- decision: 014 --> — reported
   from the iPad 2026-09-17. There is no way to stop a quick look building its
   grid, so no way to say done and get the memory back; and after Keep in a
