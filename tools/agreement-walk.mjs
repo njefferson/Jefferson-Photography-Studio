@@ -242,8 +242,41 @@ try {
       }, was, { timeout: 300000 });
       await page.waitForTimeout(1200);
 
+      // A TILE SHOWS THE CAMERA'S OWN PREVIEW UNTIL THIS APP HAS RENDERED ITS
+      // OWN, and the wait above cannot tell the two apart: it only asks that the
+      // blob URL changed, which a re-issued provisional picture satisfies too.
+      // Decision 007 records a number published from exactly that mistake — it
+      // came out 0.2726 and 0.2730 on two different photographs, which is what a
+      // measurement of the camera's rendering looks like rather than of this
+      // app's. The strip already says which it is, in a class.
+      const settled = await page
+        .waitForFunction(
+          () => {
+            const el = document.querySelectorAll("#sessionThumbs .session-thumb")[1];
+            return !!el && !el.className.includes("provisional");
+          },
+          null,
+          { timeout: 300000 },
+        )
+        .then(() => true)
+        .catch(() => false);
+      if (!settled) {
+        fail(`${label}: the second tile never stopped being the camera's provisional picture — nothing below it would be about this app`);
+        continue;
+      }
+      await page.waitForTimeout(600);
+
+      // AND IT HAS TO BE THE PHOTOGRAPH THAT GETS OPENED. Index 1 is used for
+      // both, so this holds today; it is asserted because arm 2 spent its whole
+      // life pairing by two different orderings and nothing said so.
+      const tileName = await page.evaluate(
+        () => document.querySelectorAll("#sessionThumbs .session-thumb")[1]?.getAttribute("title") || "",
+      );
+
       const tile = await page.evaluate(`(async () => {
         const read = ${READ};
+        const el = document.querySelectorAll("#sessionThumbs .session-thumb")[1];
+        if (el && el.className.includes("provisional")) return null;
         const im = document.querySelectorAll("#sessionThumbs .session-thumb img")[1];
         const src = im?.getAttribute("src") || "";
         if (!src.startsWith("blob:")) return null;
@@ -260,6 +293,14 @@ try {
       await page.waitForFunction(() => document.querySelectorAll("#sessionThumbs .session-thumb")[1]?.classList.contains("active"), null, { timeout: 300000 });
       await page.waitForFunction(() => !document.getElementById("busy")?.hasAttribute("open"), null, { timeout: 300000 });
       await page.waitForTimeout(2500);
+      const openName = await page.evaluate(
+        () => document.querySelector(".session-thumb.active")?.getAttribute("title") || "",
+      );
+      const stem = (n) => n.split(" \u2014 ")[0].trim();
+      if (stem(tileName) !== stem(openName)) {
+        fail(`${label}: the tile read was ${tileName} and the photograph opened was ${openName} — the arm is comparing two different files`);
+        continue;
+      }
       const opened = await page.evaluate(`(() => {
         const read = ${READ};
         const c = document.querySelector("#view");

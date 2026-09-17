@@ -705,6 +705,21 @@ user-scalable=no.
   ever switched; reading `#fileName`, which is not what names the open photo;
   and a MutationObserver watching `src` ATTRIBUTES when a redraw replaces the
   whole `<img>` node.
+   **THE COLOUR HALF OF THIS IS SHIPPED, 2026-09-17, and it was not the baseline.**
+   `makeThumb` already used `freshBaseline`, so the extraction this item names
+   would not have touched it. What was missing was the balance a LOOK needs:
+   `applyLook` gray-world balances a camera-rendered file before applying a
+   colour look and re-derives exposure with it, and the tile path stopped doing
+   that when it moved to `freshBaseline` — correct for a tile with no look, and
+   the removal of the balance a look depends on. Measured under Aerochrome on a
+   camera JPEG nobody had opened: tile wb [1,1,1] and exposure 1 against the
+   photograph's [0.209, 1.270, 0.638] and 2.49, 39 of 46 fields identical, and
+   the tile's largest hue band 150 degrees from the photograph's. Fixed, and the
+   agreement walk's tile arm is green on both file kinds for the first time.
+   **What is still open here is the HOT SPOT half** — the 0.052 centre-against-edge
+   divergence and the three builds where forcing `lensFix` and `hsFix` to 0
+   changed nothing. That is a different measurement on a different fixture and
+   the colour fix says nothing about it.
 - [ ] **Opening a set on several cores** — measured 2026-09-13, and the first <!-- decision: 008 -->
   version of this item blamed the wrong thing (see "the tile audit was wrong").
   What is true: every photograph is decoded by ONE worker, one after another,
@@ -1863,6 +1878,19 @@ reason it is a footnote rather than a finding — a list of known limitations is
 read as authoritative, and an invented one is worse than a missing one.
 
 ## Shipped (roadmap archive)
+
+- [x] **A tile in the strip now matches the photograph it opens into, under a look** — SHIPPED
+  2026-09-17 to staging, awaiting the on-device pass. Under Aerochrome, the tile
+  for a camera JPEG you had not opened showed a different picture from the one
+  tapping it gave you — 150 degrees of colour apart, which is most of the way
+  round. A colour look needs a white balance to work on, and a camera file opens
+  without one, so the app balances it when the look goes on; the strip had
+  stopped doing the same thing and was showing the look applied to an unbalanced
+  frame. Raw tiles were never affected. The check that compares every way of
+  seeing one photograph now passes on all six of its arms for the first time,
+  and it gained two guards it did not have: it can no longer read the camera's
+  own provisional picture by mistake, and it can no longer compare one
+  photograph's tile against a different photograph.
 
 - [x] **A .zip developed unattended now matches what you saw on screen** <!-- decision: 001 --> — SHIPPED
   2026-09-17 to staging, awaiting the on-device pass. A set developed unattended
