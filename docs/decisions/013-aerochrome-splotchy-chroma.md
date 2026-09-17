@@ -229,6 +229,33 @@ diagnoses got written in one evening on a different item.
 it looks like; they cannot say whether the patches survive at sat 1.0, which is
 one render away and is the first measurement.
 
+## Rejected, measured 2026-09-17
+
+**A per-photograph measured strength.** 4c-xiii proposed it and 4c-xiv killed it.
+Built, and swept over fifteen real frames: a whole-frame median reads BACKWARDS,
+and a per-block high percentile orders the four calibration frames correctly and
+then collapses at fifteen, with a frame that needs nothing reading within six
+thousandths of the frame that does. A single number per photograph cannot say
+"clean except for one part", and that is the defect's shape. A composite that does
+separate is a fit over one positive example and is refused for the same reason
+this record exists.
+
+**A local gate on chroma magnitude.** The chrominance-curve shape named under
+Looked up, built for the theory that a deep infrared sky is nearly colourless in
+the raw. The theory is wrong: 4c-xi's 97.9% is inter-channel CORRELATION, not
+per-pixel neutrality, and the defective frame's sky band measures the HIGHEST
+local chroma in the frame. Swept with the gate in, the edge bleeding disappeared
+completely and both camera JPEGs returned byte-identical readings at every
+step — because only about 5% of one frame and none of the others sat below the
+knee, so the stage was off rather than selective. Recorded in 4c-xv as the shape
+of mistake it is: a gate that removes the cost by removing the operation reads as
+a fix in every number except the one it was built for.
+
+**What is NOT rejected by either.** The plain global colour blur measurably clears
+the sky it was built for, and its cost is edge bleeding that rises with strength.
+That trade is real, it is measured on both sides, and choosing where to sit on it
+is a look decision rather than a defect with a known fix.
+
 ## Rank
 
 **Second.** It is in production, it is about the look currently being judged, and
