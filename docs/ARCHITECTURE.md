@@ -615,7 +615,7 @@ cannot describe something the code does not say about itself.
 - **`src/export.worker.ts`** (60 lines) — ONE BAND OF AN EXPORT, ON ANOTHER CORE.
 - **`src/exportparallel.ts`** (240 lines) — AN EXPORT, SPLIT ACROSS CORES.
 - **`src/framecache.ts`** (139 lines) — What the lens rig has already measured, so an interrupted run is not thrown away.
-- **`src/gl.ts`** (1771 lines) — WebGL2 edit pipeline.
+- **`src/gl.ts`** (1784 lines) — WebGL2 edit pipeline.
 - **`src/glow.ts`** (110 lines) — HIE-style halation glow.
 - **`src/glprobe.worker.ts`** (39 lines) — CAN A WORKER DRAW? Asked from inside one, because that is the only place the answer is true or false rather than a specification.
 - **`src/gps.ts`** (245 lines) — Location-data guard: find and remove GPS location from a photo FILE's own bytes — the original the user loaded, not the app's exports (exports are re-encoded and carry no EXIF at all today).
@@ -648,7 +648,7 @@ cannot describe something the code does not say about itself.
 - **`src/previewcache.ts`** (220 lines) — THE SAME FOLDER, OPENED AGAIN, DECODED EVERY FILE AGAIN.
 - **`src/qr.ts`** (303 lines) — Minimal QR encoder — byte mode, error-correction level M, versions 1..26 — written from the public ISO/IEC 18004 spec, no third-party code (the app's no-third-party-IP stance).
 - **`src/raw/demosaic.ts`** (117 lines) — Bayer demosaic + black/white-level normalization -> linear RGB.
-- **`src/raw/denoise.ts`** (341 lines) — Edge-preserving denoise (5x5 bilateral) on LINEAR sensor data.
+- **`src/raw/denoise.ts`** (388 lines) — Edge-preserving denoise (5x5 bilateral) on LINEAR sensor data.
 - **`src/raw/detail.ts`** (239 lines) — Detail: capture sharpening (high frequency) + Texture (mid frequency), on LINEAR data, mirroring the denoise pattern (raw/denoise.ts).
 - **`src/raw/dngRaw.ts`** (124 lines) — Decode a mosaiced (Bayer) DNG whose raw image is lossless-JPEG compressed (Compression 7, PhotometricInterpretation 32803 = CFA).
 - **`src/raw/lj92.ts`** (240 lines) — Lossless JPEG (ITU-T T.81, process 14 / SOF3) decoder — pure TypeScript.
