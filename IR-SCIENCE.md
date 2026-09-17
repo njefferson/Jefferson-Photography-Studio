@@ -1233,27 +1233,36 @@ the camera has already crushed the quiet channels to nothing in the shadows. The
 camera JPEGs never showed this mottle because there is no channel noise left to
 amplify — the channel is gone before the app sees the file.
 
-### 4c-xvii. THE DEFECT IS NOT ONE FRAME, AND TWO WORSE ONES HAD NEVER BEEN OPENED
+### 4c-xvii. WITHDRAWN — THE "TWO WORSE FRAMES" WERE FOLIAGE READ BY A SKY METRIC
 
-Ground truth measured 2026-09-17 on three frames nobody had examined, because a
-per-channel prediction ranked them above the reported frame and treating an
-unmeasured frame as a negative is the mistake 4c-xv had just recorded.
+**This section claimed two frames nobody had opened were considerably more
+mottled than the reported one, and it is wrong.** It is left here as a correction
+rather than deleted, because the claim reached a commit message and was used to
+argue that a per-channel prediction "separates".
 
-Sky evenness with the colour stage off: NIR_1582 reads **0.20** with 6.7% of the
-block carrying no hue, NIR_1480 reads **0.23** with 6.9%, against the REPORTED
-frame's 0.65 with 0% and the clean raw's 0.91. Two frames are substantially worse
-than the one that prompted all of this work.
+What it said: NIR_1582 read sky evenness 0.20 and NIR_1480 0.23, against the
+reported frame's 0.65 and a clean raw's 0.91; and that across the three
+"affected" frames the predicted mixer-row noise ordered monotonically with
+severity, four of five correct.
 
-**The prediction orders them.** Across the three affected frames, sky evenness
-0.20 / 0.23 / 0.65 maps to predicted mixer-row noise 0.290 / 0.192 / 0.159 —
-monotonic, worse sky to higher prediction. Four of the five frames with ground
-truth order correctly.
+**What the instrument actually did.** `floor.mjs` reads a FIXED block at canvas
+coordinates 100,100. In the reported frame that is sky. Rendered at 1:1 and
+LOOKED AT on 2026-09-17, the same block in NIR_1582 is treetops — branches and
+leaves, no sky in it at all. Foliage has high chroma variance by nature, so a low
+tenth-percentile-over-median there is a fact about leaves. The frame's sky is a
+small patch at the top right that the block never touches.
 
-**The one miss is NIR_1502**, predicted second and reading a clean 0.92. It is
-unresolved and it may be the instrument rather than the prediction:
-`floor.mjs` reads a FIXED block at one corner of the canvas, so it cannot
-distinguish a clean sky from no deep sky in that block, and that frame's busiest
-block elsewhere reads 0.21. Recorded as open rather than explained away.
+**So three things fall with it.** Those two frames are NOT established as worse
+than the reported one — they are unmeasured. The monotonic ordering that appeared
+to validate the prediction was an ordering over foliage readings. And the
+separation claim reduces to what it was before: exactly one frame with ground
+truth that shows the defect, one raw and three camera files that do not.
+
+**The general fault, for the third time this week in this file.** An instrument
+that assumes where something is in the frame is measuring composition, not the
+photograph — the same shape as 4c-xiii's fixed floor and hub lesson 317's fitted
+screenshot. A region metric has to FIND its region, per frame, and be shown the
+region it found. This one was never shown.
 
 ### 4c-xviii. AIMING THE BILATERAL AT THE RIGHT CHANNEL DOES NOT MAKE IT REACH
 
@@ -1310,6 +1319,78 @@ and the next candidate touches the CHROMA stage rather than the bilateral, so th
 bilateral's per-channel strength would not even be the plumbing it needs. The
 working tree is byte-identical to what shipped; the implementation is in the
 history at the commit this section names, and this record is what it bought.
+
+### 4c-xix. A CHROMA OPERATION CANNOT BE AIMED AT A CHANNEL — CHROMA IS THE DIFFERENCE
+
+Built and swept 2026-09-17, three builds on three ports so no test-only control
+reached a shipped page. The wide colour blur's per-channel weight vector, at
+three settings: unaimed, aimed by each frame's measured per-channel noise, and
+the diagnostic extreme that drives the quiet channels to nothing.
+
+**THE PREMISE.** 4c-xvi measured the noise into one channel, and the wide blur's
+only cost is edge bleeding because it mixes the whole colour VECTOR toward a
+plain Gaussian. Blurring the starved channel's colour should cost nothing;
+blurring the flooded one's is what bleeds. So aiming should buy the same sky at
+a fraction of the edge cost.
+
+**IT BUYS NOTHING AND COSTS SLIGHTLY MORE.** On the reported frame, at every
+strength, the sky reading is IDENTICAL across all three aims — 0.71, 0.73, 0.75
+at Colour noise 0.25, 0.4, 0.6 — while the busiest block's median chroma rises
+with the aim: 70, 73, 75 at 0.4 and 89, 91, 94 at 0.6. Twelve consistent
+measurements, and the 1:1 crops of the aimed and unaimed skies are
+indistinguishable.
+
+**AND THE REASON IS DEFINITIONAL, WHICH IS WHY IT SHOULD HAVE BEEN SEEN FIRST.**
+Chroma IS the difference between the channels. Moving the channels by different
+amounts does not aim a chroma operation at one of them — it MANUFACTURES chroma.
+At an edge, where all three channels swing together, treating them unequally
+splits them apart, and the metric reads that as exactly what it is: more colour
+where there was less. The per-channel targeting that 4c-xvi's measurement calls
+for cannot be expressed in a stage whose whole subject is the inter-channel
+difference. Where it COULD be expressed is the luminance filter — and 4c-xviii
+measured that and found the filter cannot reach the mottle at any aim.
+
+**THE LUMA ARITHMETIC, KEPT BECAUSE IT WAS RIGHT EVEN THOUGH THE STAGE WAS NOT.**
+A per-channel colour blend does not preserve luminance. `(m - lm)` and `(b - lb)`
+each have a REC-weighted sum of zero, so the scalar blend that ships preserves it
+exactly and for free; a per-channel blend does not, and the residual luma has to
+be subtracted back. Tested directly on `makeRowDenoiser` rather than on a render:
+with the restoration the luma change is 3.2e-18, without it 9.2e-6 — a factor of
+three billion, and the version without it is 0.033% of the sky's luma.
+
+**AND THE TEST THAT FOUND THAT WAS ITSELF WRONG FIRST**, which is the transferable
+part. The first version rendered a sky block and compared its MEAN luma across
+builds. It passed against the deliberately broken build, because the drift is
+per-pixel and close to zero-mean, so averaging two hundred thousand pixels
+cancels it. Made to fail once, it did not fail — and that is the only reason the
+instrument was replaced with a per-pixel comparison. A second fault was in the
+framing: the first per-pixel test measured RENDERED luma, which cannot answer
+this at all, because the look's mixer deliberately turns colour into luminance
+downstream. The invariant is about the stage's own output in linear pre-matrix
+space, and it has to be tested there.
+
+### 4c-xx. THE WIDE COLOUR BLUR DOES NOT CLEAN THE SKY — IT IMPROVES A NUMBER
+
+Seen in the 1:1 crops on 2026-09-17, and it corrects what 4c-xii implied.
+
+4c-xii recorded the wide blur as the one stage that REACHES this mottle, on the
+strength of the sky reading moving 0.65 to 0.73 at Colour noise 0.4. Rendered at
+1:1 on the reported frame, that sky is still heavily peppered with pale speckle.
+The improvement is real and it is statistical; it is not a clean sky, and nobody
+had looked at it at full magnification.
+
+**So the standing claim that one stage reaches this defect is weaker than it
+reads.** Every stage measured so far — the decision-based median (4c-x), the
+narrow colour blur (4c-xi), per-channel strength on the bilateral (4c-xviii), and
+aiming the wide blur (4c-xix) — leaves the mottle visible at 1:1. The wide blur
+moves the metric furthest and still leaves it there.
+
+**AND THE SECOND FRAME IN THE SHEET SETTLES NOTHING, BECAUSE ITS BLOCK IS NOT
+SKY.** NIR_1582's readings come from a block that the 1:1 crop shows to be
+treetops (4c-xvii). The wide blur's success on the ONE frame whose sky has been
+seen has therefore not been shown to generalise to any other frame — not because
+another frame contradicts it, but because no other frame's sky has been measured
+at all.
 
 ### 4c-vii. THE OVERTURNED NUMBERS, KEPT ON PURPOSE
 
