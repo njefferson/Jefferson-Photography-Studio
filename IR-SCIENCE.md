@@ -2043,16 +2043,16 @@ buys no picture today and it costs a texture-filtering change in the shader.
 Rob Shea and David Kennard are both read in full now — 9h below, and the
 Kennard material throughout this section. **Jim Kasson's "Infrared hotspotting:
 the last word" is still not.** `blog.kasson.com` answers 403 to this container,
-and he is the only source found likely to have MEASURED whether the hot spot
+and that source is the only one found likely to have MEASURED whether the hot spot
 scales with scene brightness, with aperture and per channel, with numbers rather
 than descriptions. Every statement here about scene dependence rests on Kolari's
 qualitative test and Rob Shea's observation that the right correction moves with
 the light; a measurement would settle it. `www.edwardnoble.com`, the third
 hot-spot lens database, is also still refused.
 
-### 9h. ROB SHEA'S METHOD, FROM THE VIDEOS — AND HE SAYS THE APP'S APPROACH DOES NOT WORK
+### 9h. ROB SHEA'S METHOD, FROM THE VIDEOS — AND IT SAYS THE APP'S APPROACH DOES NOT WORK
 
-His two hot-spot articles are three sentences of text around a YouTube embed, so
+Both hot-spot articles are three sentences of text around a YouTube embed, so
 this is transcribed from the videos themselves: "How to Fix Infrared Lens Hot
 Spots" (`sD5iJeHcLJE`, 2020) and "Fix Hot Spots, Fujifilm GF 35-70, Lightroom
 Classic" (`QwuAlEDl3a0`, 2024). Both were read in full rather than sampled.
@@ -2060,7 +2060,7 @@ Classic" (`QwuAlEDl3a0`, 2024). Both were read in full rather than sampled.
 **THE SENTENCE THAT BEARS HARDEST ON THIS APP.** Of the 2024 video, on a lens
 with a mild hot spot: *"You're not going to be able to maybe create a single
 hotspot corrector. You've noticed that each one of these is a little bit
-different because it depends on the lighting conditions."* He is describing
+different because it depends on the lighting conditions."* That describes
 exactly what this app does — one stored correction per lens and aperture,
 applied automatically — and saying it cannot be done, because the right
 correction moves with the light in the scene. That is the same limitation Kolari
@@ -2073,7 +2073,7 @@ This app corrects every raw file the table matches, at full strength.
 
 **THE HOT SPOT IS A WHITE-BALANCE SHIFT, AND THAT IS ALSO THE TEST.** *"A hot
 spot can change your exposure but can actually also change the white balance of
-the shot and affect colors and saturation."* His detection method is to click the
+the shot and affect colors and saturation."* The detection method given is to click the
 white-balance picker on cloud at the frame's edge, then on cloud at the centre,
 and read the two temperatures: 3700K against 4700K on one frame, 3650K against
 "about a thousand kelvin off" on another. **Roughly 1000K between centre and
@@ -2083,11 +2083,11 @@ run on its own and does not.
 **IT IS CONCENTRIC RINGS, NOT ONE BLOB.** *"A number of concentric rings — maybe
 even four different concentric rings here. You've got this bright sun spot in the
 center, you've got a little spot around it, the corona if you will, and then
-another ring out here and then a really big ring out here."* He corrects them
+another ring out here and then a really big ring out here."* The video corrects them
 with several radial masks worked **outside in**, because their effects stack.
 
 **AND IT IS INVISIBLE WITHOUT A VISUALISER — WHICH IS WHY THIS ONLY SHOWS UNDER
-AEROCHROME.** He builds one deliberately: a full-frame linear-gradient mask with
+AEROCHROME.** The 2024 video builds one deliberately: a full-frame linear-gradient mask with
 saturation at 100 and dehaze at 100, switched on to find the hot spot and off to
 judge the result. *"Remember, I'm looking at this with the saturation and the
 dehaze cranked up to show me sort of the worst case scenario."* This app's
@@ -2101,11 +2101,11 @@ neutral one.
 to be the most impacted"*; exposure is zeroed out for the outer rings and only
 matters near the centre. In 2024: *"typically exposure... and then the other one
 is going to be color, temp, and tint"*, with exposure adjustments *"typically
-negative 0.2 to 0.2 or smaller"*. Saturation occasionally. He never removes it
+negative 0.2 to 0.2 or smaller"*. Saturation occasionally. The spot is never removed
 completely: *"I'm rarely going to be able to eliminate them completely, but
 that's okay."*
 
-**FOR A SEVERE ONE HE ABANDONS GEOMETRY ALTOGETHER.** The advanced method is
+**FOR A SEVERE ONE THE METHOD ABANDONS GEOMETRY ALTOGETHER.** The advanced route is
 Photoshop's Select > Color Range on **sampled colours** — pick the hot spot's own
 colour at the centre, add with the plus picker, tune fuzziness and range — then
 Color Balance, Exposure and Hue/Saturation adjustment layers through that mask,
@@ -2114,7 +2114,7 @@ own colour, not a radius. **This app already has that machinery**: a colour mask
 (type 3) whose weight is a chroma-key on the pixel's own display-space hue and
 saturation.
 
-**HIS RANKING OF REMEDIES, in his order.** Use a different lens. Convert to black
+**THE RANKING OF REMEDIES, in the order given.** Use a different lens. Convert to black
 and white if the hot spot is a saturation hot spot rather than a brightness one.
 Minor fixes in Lightroom with a radial filter. Major fixes in Photoshop with the
 colour-range mask and adjustment layers. *"At the end of the day it's going to be
@@ -2124,11 +2124,11 @@ this a lot."*
 **APERTURE: IT TIGHTENS AS WELL AS STRENGTHENS.** From f/2.8 to f/22 the spot
 *"becomes more intense and more visible and more focused in the center"* — so a
 profile measured at one aperture has the wrong RADIUS at another, not merely the
-wrong amplitude. And his diffraction article closes the loop on which apertures
+wrong amplitude. And the diffraction article closes the loop on which apertures
 matter: the Airy disk is `2.44 x wavelength x f-stop`, so at the same f-stop
 850nm gives a disk twice the size 425nm does, and the sharpest apertures move
 from f/5.6-f/8 in visible light to f/8 at 590nm, f/4-f/5.6 at 720nm and f/4 at
-850nm. His own conclusion on the GF 35-70: a faint hot spot at f/11, obvious at
+850nm. The conclusion drawn there on the GF 35-70: a faint hot spot at f/11, obvious at
 f/32, *"since diffraction on my GFX50S starts at F8 and is heavy at F11, I'm not
 likely to shoot this lens at F11 or higher anyway, where the hotspots are the
 most noticeable."* **The apertures where the hot spot is worst are apertures

@@ -68,20 +68,20 @@ WORK.** Rob Shea's method is video-only; both hot-spot videos were transcribed
 and read in full (IR-SCIENCE.md 9h). On a lens with a mild hot spot: "You're not
 going to be able to maybe create a single hotspot corrector. You've noticed that
 each one of these is a little bit different because it depends on the lighting
-conditions." He is describing one stored correction per lens and aperture, which
-is what this app ships. He also corrected 4 of 85 edited frames on that lens;
-this app corrects every raw file the table matches. His detection test is a
+conditions." That describes one stored correction per lens and aperture, which
+is what this app ships. The same video corrects 4 of 85 edited frames on that lens;
+this app corrects every raw file the table matches. The detection test given is a
 white-balance pick at the edge against one at the centre, and a visible hot spot
-measures roughly 1000K between them. His corrections are temperature first,
+measures roughly 1000K between them. The corrections made are temperature first,
 exposure second and tiny (-0.2 to +0.2 EV), never complete, and for a severe spot
-he abandons geometry entirely for a chroma-key on the artefact's own colour.
+the method abandons geometry entirely for a chroma-key on the artefact's own colour.
 None of that changes the dropped term below, which is a defect in its own right;
 all of it bears on the per-image strength ranked underneath it.
 
 Sources: kolarivision.com (the hotspot science page and the astrophotography
 correction method), rawpedia.rawtherapee.com (Flat-Field), docs.darktable.org
 (the pixelpipe and module order), lifepixel.com (the primer's hot-spot chapter),
-robsheaphotography.com and his two hot-spot videos, transcribed with yt-dlp,
+robsheaphotography.com and its two hot-spot videos, transcribed with yt-dlp,
 libraw.org and the DNG specification. Jim Kasson's "Infrared hotspotting: the
 last word" is the one source still unreachable, recorded as unread in §9f; it is
 the only one likely to carry a measurement of how the spot scales with scene
