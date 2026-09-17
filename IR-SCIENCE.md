@@ -2012,6 +2012,26 @@ Clip control against the raw white level, a per-image strength, and moving the
 stage out of the creative chain are all still owed; they are ranked in
 `docs/decisions/015-lens-correction-against-the-reference.md`.
 
+**AND THE CORRECTION STOPPED BEING AUTOMATIC, 2026-09-17.** The second change,
+and the one the reading actually argued for: `lensFix` and `hsFix` now start at
+ZERO on every path that opens a photograph — the live params, `initHotspot`, the
+reader's own profile, `cloneParams`, `applySnapshot` and the tile path in
+`batchParamsFor`. The profile is still MATCHED from EXIF and named on the card;
+the manual picker still appears when the lens cannot be identified; a strength
+the reader has already chosen for that lens and aperture is still remembered and
+restored. What is gone is applying it to every raw file at full strength with
+nothing on screen moving.
+
+Two independent reasons, and they arrive at the same place. The sources say a
+stored per-lens correction cannot be right for every frame, because the artefact
+scales with the light in the scene (9a, 9h). And this app's own rule says an
+at-open automatic is visible and undoable — this one was neither, which is why
+it took a third of a subject's colour before anybody could see it acting.
+
+`PREVIEW_PIPELINE` moved to 23 with it: a quick-look preview is rendered through
+the correction and is keyed on that number, so every cached tile from before
+would otherwise have gone on showing the corrected picture for ever.
+
 **And the bin interpolation was measured and NOT shipped.** Resampled twenty
 ways it changed this frame's numbers by nothing at four significant figures,
 because it only acts at ring boundaries and this frame shows no banding. Eighty
