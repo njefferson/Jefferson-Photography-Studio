@@ -1392,6 +1392,92 @@ seen has therefore not been shown to generalise to any other frame — not becau
 another frame contradicts it, but because no other frame's sky has been measured
 at all.
 
+### 4c-xxi. THE SKY TRACED FROM THE PHOTOSITE FORWARD — THE DENOISER ALREADY WINS, AND THE LOOK MULTIPLIES WHAT IS LEFT BY THIRTEEN
+
+Run 2026-09-17 on the owner's instruction, which was a correction of METHOD: stop
+working the tip of the branch until it is pulp and then moving one joint up. This
+file had twelve subsections on this defect and every one of them attempted a
+remedy at or near the END of the pipeline, while 4c-ix's own line — with no look
+at all the ratio is already 0.67, *so it is in the decode* — sat unfollowed.
+
+**HOW IT WAS DONE, because the method is the transferable part.** The whole
+pipeline runs in node: `raw/nef.ts`, `raw/demosaic.ts`, `pipeline.ts` and
+`sky.ts` are all free of browser APIs. `pipeline.ts` was COPIED to a scratchpad,
+twenty taps inserted at the stage boundaries, and that copy bundled — the
+repository was never modified. The tapped pipeline was then checked against the
+UNMODIFIED one over 76800 pixels: **worst difference 0.00e+0, exact.** The sky
+region came from the app's own `buildSkyMask` and was RENDERED AND LOOKED AT
+before one statistic was taken, which is the step whose absence produced the
+withdrawn claim in 4c-xvii.
+
+**THE QUANTITY** is the high-frequency residual relative to the local mean, per
+channel: each pixel minus the mean of its own neighbourhood, so the sky's real
+gradient drops out, divided by that local mean, so a pure GAIN cannot move it. A
+stage that only multiplies cannot change this number; a stage that DIFFERENCES
+channels can. White balance is the built-in control — a pure per-channel gain —
+and it moves the number not at all, which is what says the instrument works.
+
+**THE TRACE.** Relative residual, mean of the three channels:
+
+- raw photosites 0.0079, and this is the ONE number that is not what it looks
+  like: it rises to 0.0300 at black subtraction, x3.8, because the 1008-count
+  pedestal leaves the DENOMINATOR. Nothing is created there. 0.0300 is the
+  sky's true signal-to-noise — red 2.4%, green 2.2%, **blue 4.3%**.
+- the demosaic changes it not at all
+- **the denoiser takes it to 0.0059 — it removes 80% of the mottle**
+- dehaze, clarity, white balance, exposure, highlight recovery and both lens
+  corrections: unchanged, to four decimal places, every one
+- camera matrix **x1.82**, and the achromatic share falls 37% to 10% — the matrix
+  turns common-mode noise into colour
+- mix3 **x1.79**
+- **saturation x3.31**, and it is the largest single step in the pipeline
+- contrast and gamma x1.06; the HSL band mixer x1.14
+- final 0.0778 — and red alone reads **0.1749**, which is the pale speckle
+
+**So the look multiplies the surviving noise by 13.1.**
+
+**ABLATED ON THE SAME METRIC**, because an ablation and a trace that use different
+instruments cannot be compared — which is how the last one went wrong. Final
+relative residual against the shipped look:
+
+- saturation 3.0 to 1.0 — **0.16x**
+- camera matrix off — 0.24x
+- swapRB off — 0.28x
+- mix3 to identity — 0.33x
+- contrast 1.15 to 1.0 — 0.39x
+- the HSL band shifts off — 0.87x
+
+**AND THIS CORRECTS 4c-ix.** That section ablated saturation and reported it left
+the ratio at 0.68 against 0.65 — no help — and concluded saturation only makes the
+defect VISIBLE. On the metric that tracks the defect people actually see,
+saturation is the single largest amplifier in the pipeline and removing it takes
+84% of the mottle with it. 4c-ix's instrument was the tenth percentile of chroma
+over the median, which is a chroma-evenness statistic and is not sensitive to a
+channel's relative variation; that is a third instrument in this file measuring
+something adjacent to the question.
+
+**THE HSL MIXER DOES SOMETHING ELSE, AND THE PICTURES SHOW IT WHERE THE NUMBERS
+NEARLY MISS IT.** It changes the mottle's CHARACTER rather than its size — the
+patch goes from pink-and-green to orange-and-blue, and blue's relative residual
+rises from 0.0026 to 0.0267, tenfold, for a x1.14 change in the mean. The look's
+`raw.hsl` carries per-band hue shifts of 54, 35 and 43 degrees, and a hue shift
+applied across an eight-band boundary turns noise in hue into large colour jumps.
+
+**WHAT THIS CHANGES ABOUT WHERE TO WORK.** Eight remedies have been tried and all
+eight tried to remove more noise BEFORE the amplification, at a point where the
+denoiser has already taken out four fifths of it and what remains is 0.6% of the
+signal. The amplification that follows is 13x. The structural observation the
+trace makes, and which none of the eight could have found, is that **this app
+denoises first and amplifies afterwards** — so the stage is cleaning a signal that
+is then multiplied, and every further gain at that end is a gain on the small
+number rather than the large one.
+
+**What it does NOT establish**, stated so it is not read as a recommendation:
+turning saturation down is not a fix, it is a different photograph, and the look
+is the product. Whether denoising AFTER the amplification would help is untested
+and has its own obvious cost — at that point the thing being smoothed is the
+look's real colour as well as its noise.
+
 ### 4c-vii. THE OVERTURNED NUMBERS, KEPT ON PURPOSE
 
 4c-vi originally read that raising denoise did nothing to the ratio (NIR_1480
