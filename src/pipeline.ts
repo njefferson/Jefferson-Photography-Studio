@@ -970,6 +970,55 @@ export function lensBin(u: number, v: number, aspect: number, n: number): number
   return i < 0 ? 0 : i > n - 1 ? n - 1 : i;
 }
 
+/** THE TERM THIS APP WAS MISSING, AND IT IS NOT A NEW IDEA.
+ *
+ *  Takes `k`, one colour curve (red or blue against green, per radial bin).
+ *  Returns the area-weighted mean of the gain that curve applies at full
+ *  strength — 1 for a curve that only redistributes colour across the frame,
+ *  and anything else for one that also shifts the whole frame.
+ *
+ *  THE CALLER MUST MULTIPLY `k` BY THIS before applying it, and both renderers
+ *  have to do it or they render different pictures: `compileEdit` below and
+ *  `setLensCurve` in gl.ts are the two, and there must never be a third.
+ *  Multiplying k rather than dividing the gain is deliberate — it stays correct
+ *  at every strength, because lensGain interpolates in k and not in the gain.
+ *
+ *  WHY. A flat-field correction is a RELATIVE statement: this radius is redder
+ *  than that one. Every published implementation measures it against a
+ *  reference level and says which — Kolari's astrophotography method against
+ *  the flat's average (`corrected = image x (average flat / flat)`),
+ *  RawTherapee's against the flat's centre. This app divided by the curve and
+ *  by nothing, so the correction moved the frame's overall colour as well as
+ *  redistributing it: +1.49% red against blue on the lone-oak frame's matched
+ *  blend, +3.79% on the worst shipped profile, past 2% on 14 of the 72 that
+ *  carry colour. Gray-world white balance is measured BEFORE this stage runs,
+ *  so nothing downstream put it back. Restoring it gives the oak back 43% of
+ *  the colour the stage was taking. See IR-SCIENCE.md section 9b.
+ *
+ *  The centre anchor is the wrong one here and that is worth knowing rather
+ *  than rediscovering: RawTherapee's lifts the periphery and leaves the centre
+ *  alone, and a hot-spot IS the centre, so anchoring there would raise the
+ *  whole frame to match the artefact.
+ *
+ *  THE WEIGHTS ARE THE SENSOR'S, NOT THE FRAME'S. A flat was shot full-frame on
+ *  this camera, so its average is an average over that shape; normalising a
+ *  cropped frame against its own crop would be normalising against a flat
+ *  nobody shot. 3:2 is the sensor, and it is why this takes no aspect.
+ *
+ *  The shipped profile arrays are never touched — this is applied at render
+ *  time, so `hotspotProfiles.ts` keeps exactly what was measured. */
+export function lensAreaMean(k: ArrayLike<number> | undefined | null): number {
+  const n = k ? k.length : 0;
+  if (!n || n < 2) return 1;
+  const w = new Float64Array(n), G = 240, a = 3 / 2;
+  for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) w[lensBin((x + 0.5) / G, (y + 0.5) / G, a, n)]++;
+  let sw = 0, m = 0;
+  for (let i = 0; i < n; i++) sw += w[i];
+  if (!(sw > 0)) return 1;
+  for (let i = 0; i < n; i++) m += (w[i] / sw) * lensGain(k![i], 1);
+  return Number.isFinite(m) && m > 1e-3 ? m : 1;
+}
+
 export function compileEdit(
   p: EditParams,
   cam?: number[],
@@ -1048,11 +1097,17 @@ export function compileEdit(
   const measuredOn = colourOn || useBump;
   const lensGr = measuredOn ? new Float64Array(lensN) : null;
   const lensGb = measuredOn ? new Float64Array(lensN) : null;
+  // The colour curve is normalised to its own area-weighted mean before it is
+  // applied, so it redistributes colour without also tinting the frame. The
+  // shader does the same thing at upload; see lensAreaMean for why and for the
+  // rule that there are exactly two callers.
+  const areaR = colourOn ? lensAreaMean(kr) : 1;
+  const areaB = colourOn ? lensAreaMean(kb) : 1;
   if (measuredOn) {
     for (let i = 0; i < lensN; i++) {
       const gc = useBump ? lensGain(1 + bump![i], hsFix) : 1;
-      lensGr![i] = (colourOn ? lensGain(kr![i], lensFix) : 1) * gc;
-      lensGb![i] = (colourOn ? lensGain(kb![i], lensFix) : 1) * gc;
+      lensGr![i] = (colourOn ? lensGain(kr![i] * areaR, lensFix) : 1) * gc;
+      lensGb![i] = (colourOn ? lensGain(kb![i] * areaB, lensFix) : 1) * gc;
     }
   }
   // Green carries the brightness half only — the colour half is defined as a
