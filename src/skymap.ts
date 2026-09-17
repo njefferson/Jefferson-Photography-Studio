@@ -1,0 +1,140 @@
+// The sky's colour, smoothed AFTER the look has amplified it — a small map
+// rebuilt per edit, blended back in by the sky's own selection. IR-SCIENCE.md
+// section 4c-xxi named this the one untested direction and its cost; section
+// 9k measured why the cost vanishes inside a sky mask.
+//
+// THE MECHANISM, read out of the file rather than derived. An infrared frame's
+// colour is a 1–3% residual between nearly identical channels. The denoiser
+// takes four fifths of the noise out of that residual and the look then
+// multiplies what survives by thirteen (4c-xxi) — every remedy before this one
+// worked on the small number. This works on the large one: it smooths the
+// RENDERED chroma. The stated cost of doing that — "the thing being smoothed is
+// the look's real colour as well as its noise" — is real everywhere except in a
+// sky, which has no real colour detail. So the smooth is confined to the sky's
+// own bitmap and costs the rest of the frame nothing.
+//
+// MEASURED 2026-09-17 on the frames that have the defect, dark third of the
+// sky, chroma residual at the artefact's own 12 px scale: Aerochrome 15.9 →
+// 4.7 on the reported frame (Pink IR reads 8.7), 4.4 → 1.7 and 8.7 → 3.4 on
+// two more, with the mean chroma held to 0% and luma changed by exactly zero.
+// A sky mask's saturation, the obvious alternative, cut the residual 73% and
+// took the blue with it (mean 36.9 → 10.9) — the same quantity, scaled.
+//
+// THE SHAPE IS THE LOCAL-MAP PATTERN (localmap.ts): a coarse map the GPU
+// samples as a texture and the CPU export samples bilinearly, so both sides
+// blend toward the SAME bytes and stay within filtering error of each other.
+// Two differences, both deliberate. It is rebuilt PER EDIT rather than per
+// image, because it is a map of the output — which is why it stays small. And
+// the downsample IS the smooth: at 128 texels across, one texel averages a
+// 20–25 px footprint of a 2800 px frame, which is the measured radius, so no
+// further pass is needed and a strided kernel — the lattice trap 4c-xii and
+// 4c-xxii both record — never enters it.
+import { compileEdit, SKY_CHROMA_RANGE, type EditParams, type BrushMask, type LensCurve, type LocalMap, type SkyMap } from "./pipeline";
+export { sampleSkyMap, decSkyChroma, type SkyMap } from "./pipeline";
+
+const REC = [0.2126, 0.7152, 0.0722];
+/** Map width in texels. One texel of a 2800 px frame is ~22 px, which is the
+ *  measured smoothing radius; smaller would blur the sky's real gradient,
+ *  larger would leave the patches. */
+export const SKY_MAP_W = 128;
+/** Sub-samples per texel edge. A texel's footprint is box-averaged from this
+ *  many PRE-PASSED samples on each axis — four, not the ~480 in the footprint,
+ *  because each sample already carries the denoiser's own average, the texel's
+ *  average is smoothed again by bilinear upsampling, and the sky is smooth by
+ *  nature. Dense within the texel, never strided across it. Four is what
+ *  keeps a rebuild per edit affordable once the sampler is the denoiser. */
+const SUB = 2;
+
+const encC = (v: number) => Math.round(((Math.min(SKY_CHROMA_RANGE, Math.max(-SKY_CHROMA_RANGE, v)) / SKY_CHROMA_RANGE) * 0.5 + 0.5) * 255);
+
+/**
+ * Build the sky chroma map for one edit.
+ * @param sample  linear RGB at full-res image pixel (x,y) AFTER THE PRE-PASS —
+ *                the denoised, detailed sampler the pixels this map is blended
+ *                into came through. MEASURED, not assumed: built from the raw
+ *                source instead, the map targeted a sky 16% more saturated
+ *                than the rendered one (mean chroma 27.4 → 31.8), because the
+ *                bilateral lowers a noisy sky's chroma and the raw render does
+ *                not know that. Same pre-pass in, same sky out.
+ * @param srcW,srcH  full image dimensions.
+ * @param p  the edit — rendered with `skySmooth` forced to 0, so the map is
+ *           built from the look's own output and never from itself.
+ * @param cam,aspect,local,lens  exactly what compileEdit takes, passed through.
+ * @param sky  the sky bitmap built once per image by buildSkyMask.
+ * @returns the map, or null when the bitmap selects nothing.
+ * What the result must satisfy: every texel's (a, b) is the MEAN chroma of the
+ * rendered sky over that texel's footprint with luma discarded, so blending a
+ * pixel's chroma toward it preserves the sky's mean colour by construction —
+ * the control that the saturation route failed (9k). `weight` is 0 wherever
+ * the bitmap is, so `compileEdit` and the shader leave every non-sky pixel
+ * byte-identical.
+ */
+export function buildSkyMap(
+  sample: (x: number, y: number) => ArrayLike<number>,
+  srcW: number,
+  srcH: number,
+  p: EditParams,
+  cam: number[] | undefined,
+  aspect: number,
+  local: LocalMap | undefined,
+  lens: LensCurve | null | undefined,
+  sky: BrushMask,
+): SkyMap | null {
+  const W = SKY_MAP_W;
+  const H = Math.max(8, Math.round((W * srcH) / srcW));
+  // NO SKY, NO MAP — and a map of zeros would still cost a texture upload and
+  // a blend per pixel for nothing.
+  let any = false;
+  for (let i = 0; i < sky.data.length; i++) if (sky.data[i] > 8) { any = true; break; }
+  if (!any) return null;
+  // Rendered WITHOUT this stage. compileEdit reads `skySmooth` from the params
+  // it is given, so the copy here is what stops the map depending on itself.
+  const edit = compileEdit({ ...p, skySmooth: 0 }, cam, aspect, local, lens);
+  const out = new Float32Array(3);
+  const rgb = new Uint8Array(W * H * 3);
+  for (let ty = 0; ty < H; ty++) {
+    for (let tx = 0; tx < W; tx++) {
+      const u = (tx + 0.5) / W, v = (ty + 0.5) / H;
+      const wgt = brushAt(sky, u, v);
+      const o = (ty * W + tx) * 3;
+      if (wgt < 1 / 255) { rgb[o] = encC(0); rgb[o + 1] = encC(0); rgb[o + 2] = 0; continue; }
+      // Box-average the texel's footprint AFTER rendering each sub-sample:
+      // the quantity being averaged is the OUTPUT chroma, after the look has
+      // amplified it, which is the whole point of the stage (4c-xxi).
+      let sa = 0, sb = 0, n = 0;
+      for (let j = 0; j < SUB; j++) {
+        const sy = Math.min(srcH - 1, Math.floor(((ty + (j + 0.5) / SUB) * srcH) / H));
+        for (let i = 0; i < SUB; i++) {
+          const sx = Math.min(srcW - 1, Math.floor(((tx + (i + 0.5) / SUB) * srcW) / W));
+          const s = sample(sx, sy);
+          edit(s[0], s[1], s[2], out, 0, (sx + 0.5) / srcW, (sy + 0.5) / srcH);
+          const L = out[0] * REC[0] + out[1] * REC[1] + out[2] * REC[2];
+          sa += out[0] - L; sb += out[2] - L; n++;
+        }
+      }
+      rgb[o] = encC(sa / n);
+      rgb[o + 1] = encC(sb / n);
+      rgb[o + 2] = Math.round(wgt * 255);
+    }
+  }
+  return { width: W, height: H, rgb };
+}
+
+/** The sky bitmap's weight at image-uv, the same bilinear-on-texel-centres
+ *  read the pipeline's brush sampler makes. Kept here rather than imported so
+ *  this module does not reach into pipeline.ts's private helpers; the arithmetic
+ *  is the documented one (pipeline.ts sampleBrush) and must stay so, or the map's
+ *  weight and the shader's mask read would disagree at a feathered edge. */
+function brushAt(b: BrushMask, u: number, v: number): number {
+  const fx = Math.min(1, Math.max(0, u)) * b.w - 0.5;
+  const fy = Math.min(1, Math.max(0, v)) * b.h - 0.5;
+  const ix = Math.floor(fx), iy = Math.floor(fy);
+  const tx = fx - ix, ty = fy - iy;
+  const cx = (i: number) => Math.max(0, Math.min(b.w - 1, i));
+  const cy = (i: number) => Math.max(0, Math.min(b.h - 1, i));
+  const x0 = cx(ix), x1 = cx(ix + 1), y0 = cy(iy), y1 = cy(iy + 1);
+  const s = (x: number, y: number) => b.data[y * b.w + x];
+  const top = s(x0, y0) * (1 - tx) + s(x1, y0) * tx;
+  const bot = s(x0, y1) * (1 - tx) + s(x1, y1) * tx;
+  return (top * (1 - ty) + bot * ty) / 255;
+}

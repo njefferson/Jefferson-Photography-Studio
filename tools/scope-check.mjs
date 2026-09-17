@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // EVERY KNOB DECLARES WHETHER IT TOUCHES THE WHOLE PHOTOGRAPH OR A SELECTION.
 //
-// The owner's rule, said twice: do not apply a correction to the photo as a
-// whole when it should be surgical and precise instead — ESPECIALLY when the
-// thing being corrected is already easy to separate. It was prose both times,
-// and prose does not refuse a commit.
+// The standing rule, stated twice this week in this repository: a correction is
+// not applied to the whole photograph when it should act on a selection —
+// ESPECIALLY when the thing being corrected is already easy to separate. It was
+// prose both times, and prose does not refuse a commit.
 //
 // WHAT THAT COST, measured 2026-09-17. Three whole-frame constants shipped in
 // one day — a denoise floor, a mid-frequency texture amount and a shadow
@@ -148,9 +148,9 @@ for (const v of declared.values()) if (counts[v.scope] !== undefined) counts[v.s
 console.log(`\n=== scope gate · ${knobs.length} knobs ===\n`);
 if (problems.length) {
   for (const p of problems) console.log(`FAIL  ${p}`);
-  console.log(`\n  ${problems.length} problem${problems.length === 1 ? "" : "s"}. The rule this enforces, in the owner's words:`);
-  console.log(`  do not apply to the photo as a whole when it should be surgical and`);
-  console.log(`  precise instead, especially when it is already easy to separate.`);
+  console.log(`\n  ${problems.length} problem${problems.length === 1 ? "" : "s"}. The rule this enforces: a correction is not`);
+  console.log(`  applied to the whole photograph when it should act on a selection --`);
+  console.log(`  especially when the thing it corrects is already easy to separate.`);
   console.log(`\n  \`node tools/scope-check.mjs --list\` prints a seed.\n`);
   process.exit(1);
 }

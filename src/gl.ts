@@ -5,7 +5,7 @@
 
 // Single source of truth for edit parameters lives in pipeline.ts so the GPU
 // preview and CPU export can never drift apart.
-import { toneEvaluator, toneIsIdentity, maskIsActive, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, LENS_GAIN_LO, LENS_GAIN_HI, lensAreaMean, type EditParams, type LocalMap, type CropRect } from "./pipeline";
+import { toneEvaluator, toneIsIdentity, maskIsActive, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, LENS_GAIN_LO, LENS_GAIN_HI, lensAreaMean, type EditParams, type LocalMap, type SkyMap, type CropRect } from "./pipeline";
 import { toHalfBuffer } from "./half";
 export type { EditParams };
 
@@ -137,6 +137,10 @@ uniform bool u_hslOn;        // 8-channel HSL mixer active
 uniform vec3 u_hsl[8];       // per band: (hueShiftDeg, satScale, lumScale)
 uniform bool u_bwOn;         // black & white: channel-weighted mono
 uniform vec3 u_bwMix;        // B&W channel weights (normalised in-shader)
+uniform sampler2D u_skyTex;  // RGB8 per-edit sky chroma map (skymap.ts):
+                             //   R,G = opponent chroma encoded ±0.5 -> 0..255,
+                             //   B = the sky bitmap's weight
+uniform float u_skySmooth;   // 0..1 amount — see EditParams.skySmooth
 uniform float u_shadowSat;   // 0..1 shadow desaturation — see
                              //   EditParams.shadowSat: MULTIPLIED, never
                              //   tinted, so a grey shadow cannot gain a colour
@@ -745,6 +749,23 @@ void main() {
                         + wM * u_gradeAmt.y * u_gradeTintM
                         + wH * u_gradeAmt.z * u_gradeTintH), 0.0, 1.0);
   }
+  // Sky colour smoothing: blend chroma toward the coarse map of the sky's own
+  // rendered chroma, by the sky bitmap's weight, luma exactly preserved. After
+  // the grade, before lum and the LUT. Decode mirrors pipeline.ts decSkyChroma
+  // with SKY_CHROMA_RANGE 0.5. Matches compileEdit.
+  if (u_skySmooth > 0.0) {
+    vec3 sm = texture(u_skyTex, v_uv).rgb;
+    float ks = u_skySmooth * sm.b;
+    if (ks > 0.0) {
+      float Lk = dot(g, LUMA_W);
+      vec2 tgt = (sm.rg * 2.0 - 1.0) * 0.5;
+      float na = (g.r - Lk) + (tgt.x - (g.r - Lk)) * ks;
+      float nb = (g.b - Lk) + (tgt.y - (g.b - Lk)) * ks;
+      g.r = Lk + na;
+      g.b = Lk + nb;
+      g.g = (Lk - LUMA_W.r * g.r - LUMA_W.b * g.b) / LUMA_W.g;
+    }
+  }
   // Global luminance rides on top of the tone curve (endpoints pinned).
   if (u_lum != 1.0) g = pow(clamp(g, 0.0, 1.0), vec3(1.0 / u_lum));
 
@@ -887,6 +908,8 @@ export class Renderer {
   private brushTex: WebGLTexture;
   private brushSig = ""; // re-upload the packed brush texture only when it changes
   private localTex: WebGLTexture;
+  private skyTex: WebGLTexture;
+  private skyOn = false;
   private warpTex!: WebGLTexture;
   private warpOn = false;
   private overlayTex!: WebGLTexture; // on-top sticker overlay (unit 8)
@@ -945,7 +968,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -1013,6 +1036,13 @@ export class Renderer {
 
     // Clarity/dehaze reference maps (unit 4); a single zero texel until an
     // image's map is set (the shader branch is off while the sliders are 0).
+    this.skyTex = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, this.skyTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB8, 1, 1, 0, gl.RGB, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 0]));
     this.localTex = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, this.localTex);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -1120,6 +1150,22 @@ export class Renderer {
   }
 
   /** Upload the per-image clarity/dehaze maps (or clear with null). */
+  /** Upload the per-edit sky chroma map, or clear it. LINEAR-filtered on the
+   *  encoded bytes, then decoded in the shader — the same order sampleSkyMap
+   *  uses, so the two agree to filtering error. A null map turns the stage off
+   *  regardless of the amount, which is how a frame with no sky costs nothing. */
+  setSkyMap(m: SkyMap | null) {
+    const gl = this.gl;
+    gl.bindTexture(gl.TEXTURE_2D, this.skyTex);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    this.skyOn = !!m;
+    if (!m) {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB8, 1, 1, 0, gl.RGB, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 0]));
+      return;
+    }
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB8, m.width, m.height, 0, gl.RGB, gl.UNSIGNED_BYTE, new Uint8Array(m.rgb));
+  }
+
   setLocalMap(m: LocalMap | null) {
     const gl = this.gl;
     gl.bindTexture(gl.TEXTURE_2D, this.localTex);
@@ -1418,6 +1464,10 @@ export class Renderer {
     gl.uniform1f(this.loc.u_grainCell, grainCellPx(p.grainSize ?? 1.5, outH));
     gl.uniform1f(this.loc.u_vigAmt, p.vigAmt ?? 0);
     gl.uniform1f(this.loc.u_vigMid, p.vigMid ?? 0.5);
+    gl.uniform1f(this.loc.u_skySmooth, this.skyOn ? Math.min(1, Math.max(0, p.skySmooth ?? 0)) : 0);
+    gl.uniform1i(this.loc.u_skyTex, 11);
+    gl.activeTexture(gl.TEXTURE11);
+    gl.bindTexture(gl.TEXTURE_2D, this.skyTex);
     gl.uniform1f(this.loc.u_localScale, this.localScale);
     gl.uniform1i(this.loc.u_localTex, 4);
     gl.activeTexture(gl.TEXTURE4);

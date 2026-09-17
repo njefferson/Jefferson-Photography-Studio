@@ -201,6 +201,17 @@ export interface EditParams {
    *  Per-pixel display-space colour -> baked into .cube; the shader's
    *  u_shadowSat block is the mirror and must move with it. Neutral = 0. */
   shadowSat?: number;
+  /** Sky colour smoothing 0..1: the sky's RENDERED chroma is blended toward a
+   *  coarse per-edit map of itself (skymap.ts), by the sky bitmap's own weight,
+   *  luma untouched. Denoise AFTER the amplification, which IR-SCIENCE 4c-xxi
+   *  named as the one untested direction — and confined to the sky, which is
+   *  what removes its stated cost (9k). A SELECTION, not a whole-frame knob:
+   *  outside the bitmap every pixel is byte-identical at every amount.
+   *  Measured on the frames with the defect: chroma residual at the artefact's
+   *  12 px scale 15.9 → 4.7 where Pink IR reads 8.7, mean chroma held to 0%.
+   *  Per-pixel but map-dependent, so it is baked into .cube only as the
+   *  identity; the map is per photograph and a LUT cannot carry it. */
+  skySmooth?: number;
   /** Film grain 0..1 (amount) + size 1..3 (grain scale, resolution-
    *  proportional: cell size = grainSize * outputHeight / 1200 px).
    *  Deterministic value noise (hash2d/grainNoise below) added to the FINAL
@@ -431,6 +442,39 @@ export function sampleLocalMap(m: LocalMap, u: number, v: number): [number, numb
   };
   const dec = (enc: number) => { const t = enc / 255; return t * t * m.scale; };
   return [dec(bil(0)), dec(bil(1))];
+}
+
+/** The per-edit sky chroma map built by skymap.ts: opponent chroma of the
+ *  RENDERED sky, box-averaged into a coarse grid and encoded to 8 bits, with the
+ *  sky bitmap's weight in the third byte. The GPU samples the same bytes as an
+ *  RGB8 texture; `sampleSkyMap` is the CPU read, in the same filter-then-decode
+ *  order, so both sides blend toward the same target to filtering error. */
+export interface SkyMap {
+  width: number;
+  height: number;
+  /** RGB interleaved, 3 bytes per texel: [aEnc, bEnc, weight]. */
+  rgb: Uint8Array;
+}
+/** Display-space chroma is bounded well inside ±0.5 for any sky; the encode
+ *  maps ±this to 0..255. The shader decodes with the same constant. */
+export const SKY_CHROMA_RANGE = 0.5;
+/** Decode one encoded chroma byte (filtered or not) to display units. */
+export const decSkyChroma = (e: number) => ((e / 255) * 2 - 1) * SKY_CHROMA_RANGE;
+/** Bilinear sample of the ENCODED sky map `m` at image-uv (`u`, `v`), then
+ *  decode. Returns [a, b, weight]. compileEdit blends a pixel's chroma toward
+ *  (a, b) by weight·amount and never touches luma; weight is 0 off the sky
+ *  bitmap, so a non-sky pixel is returned unchanged by construction. */
+export function sampleSkyMap(m: SkyMap, u: number, v: number): [number, number, number] {
+  const x = Math.min(m.width - 1.001, Math.max(0, u * m.width - 0.5));
+  const y = Math.min(m.height - 1.001, Math.max(0, v * m.height - 0.5));
+  const x0 = Math.floor(x), y0 = Math.floor(y);
+  const fx = x - x0, fy = y - y0;
+  const at = (xx: number, yy: number, c: number) => m.rgb[(yy * m.width + xx) * 3 + c];
+  const bil = (c: number) => {
+    const a = at(x0, y0, c), b = at(x0 + 1, y0, c), d = at(x0, y0 + 1, c), e = at(x0 + 1, y0 + 1, c);
+    return a + (b - a) * fx + (d - a) * fy + (a - b - d + e) * fx * fy;
+  };
+  return [decSkyChroma(bil(0)), decSkyChroma(bil(1)), bil(2) / 255];
 }
 
 export const MAX_MASKS = 8;
@@ -1057,6 +1101,12 @@ export function compileEdit(
    *  Strength comes from `p.lensFix`; see LensCurve above for why they are
    *  carried separately. */
   lens?: LensCurve | null,
+  /** The per-edit sky chroma map (skymap.ts), when `p.skySmooth` is on and the
+   *  photograph has a sky. Omit for tiles, measurements and the LUT bake —
+   *  the same callers that omit `local`, for the same reason: a per-edit map
+   *  is a cost those paths do not pay, and a 260 px tile is below the scale of
+   *  the artefact this removes. */
+  skyMap?: SkyMap | null,
 ): (r: number, g: number, b: number, out: Float32Array, glow?: number, u?: number, v?: number) => void {
   const a = (p.hue * Math.PI) / 180;
   const cos = Math.cos(a);
@@ -1155,6 +1205,7 @@ export function compileEdit(
   const m3 = mix3[3], m4 = mix3[4], m5 = mix3[5];
   const m6 = mix3[6], m7 = mix3[7], m8 = mix3[8];
   const shSat = Math.min(1, Math.max(0, p.shadowSat ?? 0));
+  const skyAmt = skyMap ? Math.min(1, Math.max(0, p.skySmooth ?? 0)) : 0;
   const grade = p.grade ?? GRADE_DEFAULT;
   const gAmtS = grade[1] ?? 0, gAmtM = grade[3] ?? 0, gAmtH = grade[5] ?? 0;
   const gradeOn = gAmtS !== 0 || gAmtM !== 0 || gAmtH !== 0;
@@ -1415,6 +1466,24 @@ export function compileEdit(
       out[0] = Math.min(1, Math.max(0, out[0] + cS * gTintS[0] + cM * gTintM[0] + cH * gTintH[0]));
       out[1] = Math.min(1, Math.max(0, out[1] + cS * gTintS[1] + cM * gTintM[1] + cH * gTintH[1]));
       out[2] = Math.min(1, Math.max(0, out[2] + cS * gTintS[2] + cM * gTintM[2] + cH * gTintH[2]));
+    }
+    // Sky colour smoothing: blend this pixel's chroma toward the coarse map of
+    // the sky's own rendered chroma, by the sky bitmap's weight, luma exactly
+    // preserved. After the grade so the map (built from the same stages) and
+    // the pixel agree on what colour the sky IS; before lum and the LUT so
+    // those see one consistent sky. Spatial (needs uv) — skipped in the LUT
+    // bake like every other map. Same in the shader.
+    if (skyAmt > 0 && u !== undefined && v !== undefined) {
+      const [sa, sb, sw] = sampleSkyMap(skyMap!, u, v);
+      const k = skyAmt * sw;
+      if (k > 0) {
+        const L = out[0] * 0.2126 + out[1] * 0.7152 + out[2] * 0.0722;
+        const na = (out[0] - L) + (sa - (out[0] - L)) * k;
+        const nb = (out[2] - L) + (sb - (out[2] - L)) * k;
+        out[0] = L + na;
+        out[2] = L + nb;
+        out[1] = (L - 0.2126 * out[0] - 0.0722 * out[2]) / 0.7152;
+      }
     }
     // Global luminance — the very last step of the app's own grade, matching
     // the shader's u_lum.

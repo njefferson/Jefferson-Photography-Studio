@@ -277,6 +277,35 @@ and noise in the same proportion, so the separation and the grain cannot be
 decoupled anywhere downstream. Full numbers in `IR-SCIENCE.md` section 9k; the
 instrument's own failure is hub LESSONS §320.
 
+## Outcome, part one — the sky half, 2026-09-17
+
+**Resolved for the sky by `skySmooth`** (`src/skymap.ts`, commit on the
+`claude/infrared-editor-bugs-ux-t3fe29` branch the same day): the rendered sky's
+chroma is smoothed AFTER the look amplifies it, inside `buildSkyMask`'s own
+selection, luma untouched, mean chroma preserved by construction. That is
+4c-xxi's one untested direction with its stated cost removed by the owner's
+instruction to act on the sky and nothing else. Measured on the three frames of
+ten that show the defect: residual 15.9 → 4.7 where Pink IR reads 8.7, 4.4 → 1.7,
+8.7 → 3.4; 0 bytes changed outside the sky; mean 27.4 → 27.4. Aerochrome carries
+it at 1. IR-SCIENCE.md 9l has every number and the two harness errors that
+preceded it.
+
+**What turned out wrong on the way.** The first shipped build targeted a sky
+16% more saturated than the rendered one, because the map was built from the
+raw source while the pixels come through the pre-pass; the harness had not
+shown it because the harness built its map from the pre-passed render. Caught
+by the shipped-path control before it reached staging. Both paths now build
+from the same sampler.
+
+**Still open — the other half of this record.** The gravel and any coloured
+mottle OFF the sky bitmap are untouched by construction, and this record stays
+open for them. The withdrawn claim above stands: the colour blur is not the
+remedy for those either. What is known now that was not: the amplification is
+saturation first and the mixer second (4c-xxi's ablation), the defect is
+frame-dependent (four of ten frames had Aerochrome cleaner than Pink IR
+already), and a fix that works is one that acts on a SELECTION. The gravel
+needs its own.
+
 ## Rank
 
 **Second.** It is in production, it is about the look currently being judged, and

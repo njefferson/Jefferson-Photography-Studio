@@ -41,6 +41,10 @@ export type SavedLook = {
    *  another frame does what it says there too, unlike `denoise`, which is
    *  measured per file and therefore stays off a SavedLook. */
   shadowSat: number;
+  /** Sky colour smoothing 0..1 (EditParams.skySmooth). Creative; rides a
+   *  saved look like shadowSat, and acts through the photograph's own sky
+   *  selection wherever it lands. */
+  skySmooth: number;
   grainAmt: number;
   grainSize: number;
   vigAmt: number;
@@ -131,6 +135,7 @@ export function coerceLook(s: unknown): SavedLook | null {
           )
         : [0, 0, 0, 0, 0, 0, 0],
     shadowSat: clamped(o.shadowSat, 0, 0, 1),
+    skySmooth: clamped(o.skySmooth, 0, 0, 1),
     grainAmt: clamped(o.grainAmt, 0, 0, 1),
     grainSize: clamped(o.grainSize, 1.5, 1, 3),
     vigAmt: clamped(o.vigAmt, 0, -1, 1),
@@ -178,6 +183,7 @@ export function encodeLookPayload(look: SavedLook, name?: string): string {
     bwMix: look.bwMix.map(round4),
     grade: look.grade.map(round4),
     shadowSat: round4(look.shadowSat),
+    skySmooth: round4(look.skySmooth),
     grainAmt: round4(look.grainAmt),
     grainSize: round4(look.grainSize),
     vigAmt: round4(look.vigAmt),
