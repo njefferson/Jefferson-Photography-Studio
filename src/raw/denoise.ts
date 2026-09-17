@@ -81,9 +81,16 @@ export function makeRowDenoiser(
   height: number,
   strength: number,
   step = 1,
+  chroma = 0,
 ): LinearSampler {
-  if (strength <= 0) return sample;
-  const sigma = rangeSigma(strength);
+  if (strength <= 0 && chroma <= 0) return sample;
+  // A FLOOR RATHER THAN A BRANCH when the luminance half is off. sigma 0 makes
+  // inv2s2 infinite and the centre tap's `rel` is exactly 0, so the weight there
+  // would be 0 * Infinity — NaN, once per pixel. A sigma this small underflows
+  // every other tap's exp() to zero and leaves the centre at 1, which IS the
+  // "leave luminance alone" case, arrived at by arithmetic instead of by an
+  // `if` inside a twenty-five-tap loop.
+  const sigma = strength > 0 ? rangeSigma(strength) : 1e-6;
   const inv2s2 = 1 / (2 * sigma * sigma);
 
   // Preview runs this bilateral on a downscaled proxy, tapping in proxy texels
@@ -163,6 +170,10 @@ export function makeRowDenoiser(
     let sg = 0;
     let sb = 0;
     let wsum = 0;
+    let gr = 0;
+    let gg = 0;
+    let gb = 0;
+    let gsum = 0;
     let k = 0;
     for (let dy = -R; dy <= R; dy++) {
       const row = getRow(y + tapOff[dy + R]);
@@ -176,16 +187,51 @@ export function makeRowDenoiser(
         const b = row.v[so + 2];
         const ls = row.l[sx];
         const rel = (ls - lc) / (lc + 0.02);
-        const w = SPATIAL[k] * Math.exp(-rel * rel * inv2s2);
+        const sp = SPATIAL[k];
+        const w = sp * Math.exp(-rel * rel * inv2s2);
         sr += r * w;
         sg += g * w;
         sb += b * w;
         wsum += w;
+        // THE SAME NEIGHBOURHOOD, WEIGHTED THE OTHER WAY. Spatial only, with no
+        // range term at all: a plain Gaussian of the 5x5, which is what the
+        // colour half is mixed toward below. It costs four adds per tap and not
+        // one extra sample or exponential, because the taps are already here.
+        gr += r * sp;
+        gg += g * sp;
+        gb += b * sp;
+        gsum += sp;
       }
     }
-    scratch[0] = sr / wsum;
-    scratch[1] = sg / wsum;
-    scratch[2] = sb / wsum;
+    // LUMINANCE FROM THE EDGE-PRESERVING MEAN, COLOUR FROM THE PLAIN ONE.
+    //
+    // The two are separated because they are not the same problem, which the
+    // field settled long before this app existed (IR-SCIENCE.md 4c-viii): colour
+    // blotches carry almost no real information, so they can be smoothed hard,
+    // while luminance speckle overlaps genuine texture in foliage and needs a
+    // light hand. Darktable's recipe is the same idea spelled differently — two
+    // lowpass instances blending on the Lab a and b channels and leaving L.
+    //
+    // WHAT IT MEASURED HERE. Aerochrome multiplies colour by three on top of a
+    // mixer with coefficients over 1.4, and this pipeline had no chroma stage at
+    // all, so the amplification landed on chroma noise nothing had removed: a
+    // 1:1 crop showed the sky peppered with speckle that the existing bilateral
+    // at FULL strength did not touch.
+    //
+    // `chroma` 0 IS BIT-IDENTICAL TO WHAT THIS RETURNED BEFORE, and that is the
+    // point of mixing from the bilateral's own chroma rather than from the
+    // centre pixel's: at 0 the two halves recombine into exactly `sum / wsum`.
+    const mr = sr / wsum, mg = sg / wsum, mb = sb / wsum;
+    if (chroma <= 0) {
+      scratch[0] = mr; scratch[1] = mg; scratch[2] = mb;
+      return scratch;
+    }
+    const lm = REC[0] * mr + REC[1] * mg + REC[2] * mb;
+    const br = gr / gsum, bg = gg / gsum, bb = gb / gsum;
+    const lb = REC[0] * br + REC[1] * bg + REC[2] * bb;
+    scratch[0] = lm + (mr - lm) + ((br - lb) - (mr - lm)) * chroma;
+    scratch[1] = lm + (mg - lm) + ((bg - lb) - (mg - lm)) * chroma;
+    scratch[2] = lm + (mb - lm) + ((bb - lb) - (mb - lm)) * chroma;
     return scratch;
   };
 }

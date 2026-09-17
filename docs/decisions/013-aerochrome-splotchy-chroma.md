@@ -106,8 +106,30 @@ whole range and its largest bin not at all. Which file kind a splotch report cam
 from is the first question, not a detail.
 
 **A chroma-specific denoise before saturation, separate in strength from the
-luminance one.** Chosen, because it is what the field does and what the frames
-call for. The existing bilateral stays as the luminance hand; the new stage works
+luminance one. BUILT AND MEASURED, 2026-09-17 — one variable, saturation
+untouched.** It reuses the existing bilateral's own 5x5 neighbourhood and
+accumulates a second, spatial-only mean beside it: luminance from the
+edge-preserving bilateral as before, colour mixed toward the plain blur. Four
+adds per tap, no extra samples, no extra exponential, and 0 recombines into
+exactly the old output. Both renderers carry it — `src/raw/denoise.ts` and the
+shader in `src/gl.ts`, which is a third pair of hand-synchronised math and a cost
+worth naming.
+
+At 0.25 and 0.50 the sky's coarse speckle is largely gone and the foliage keeps
+its texture, with the colourless share steady near 5% across the whole ladder —
+the colour is not drained, which is the whole difference from pulling saturation
+back.
+
+**Its failure mode appears at 1.00 and names the next variable**: leaf and sky
+boundaries grow a fine blue-and-red pepper, because luminance is kept sharp while
+colour is a plain blur, so a dark gap between leaves keeps its brightness and
+takes the average colour around it. Unguided chroma smoothing bleeding across a
+high-contrast edge. The remedy — a much looser range term on the chroma half, so
+it stops crossing luma edges — is deliberately NOT in this pass, because it is the
+second variable and the first has not been judged yet.
+
+The original reasoning, kept: chosen because it is what the field does and what
+the frames call for. The existing bilateral stays as the luminance hand; the new stage works
 on the colour difference channels and can be strong, because colour blotches carry
 no detail. Scoped as a pipeline stage with a matching shader, since `pipeline.ts`
 and `gl.ts` must compute the same picture.

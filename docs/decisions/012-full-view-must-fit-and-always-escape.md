@@ -42,6 +42,27 @@ Safari reports visual versus layout viewport is documented behaviour and must be
 read, not derived. That is the one candidate on this list that is about the
 platform rather than about this app.
 
+**EVIDENCE FROM THE DEVICE, 2026-09-17, and it narrows this sharply.** A screen
+photograph taken right after keeping a quick look's pictures into a session shows
+the photograph occupying a shallow horizontal band at the top of the screen with
+its top and bottom CUT OFF rather than scaled down, the session strip below it,
+and the zoom control reading **100% with a Fit button beside it**.
+
+Two branches die on that reading. Leftover view zoom is out — 100% is fit, and
+the zoom transform is not what is cropping it. Page zoom is unlikely for the same
+reason, though only the report can rule it out. What is left is the canvas being
+drawn larger than the box it is meant to fit inside, and the timing points at
+which box: the strip had just appeared and was still filling, which is exactly
+when `--session-h` is being written and `#view`'s `max-height` is measured against
+it. **That is what the new `Canvas` line in the report says in words** — "DRAWN
+LARGER THAN THE STAGE, so part of it is off the edge" — so the next occurrence is
+one paste away from being settled.
+
+It is still not settled, and the temptation to fix it from here is the thing this
+record exists to resist: a screen photograph cannot distinguish a stale
+`--session-h`, a strip whose height is read before it has laid out, and a stage
+whose own box is wrong. The report can.
+
 ## Weighed against
 
 Overlaps **003, "Big image: the photo fills the app, menus float over it"**, and

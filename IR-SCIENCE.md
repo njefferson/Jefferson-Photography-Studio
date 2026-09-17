@@ -965,6 +965,30 @@ all. The same ladder on a real camera JPEG moves its colourless share 2.4% ->
 with a different problem. Any report of splotch has to say which file kind it came
 from before it is diagnosed.
 
+**THE STAGE IS BUILT AND MEASURED, 2026-09-17, one variable moved.** A `chroma`
+strength, saturation untouched at 3.0. It reuses the bilateral's own 5x5
+neighbourhood and accumulates a second, spatial-only mean alongside it: luminance
+comes from the edge-preserving bilateral as before, colour is mixed toward the
+plain blur. No extra taps and no extra exponential — four adds per tap — and at
+0 the two halves recombine into exactly the old result, which is asserted by
+construction rather than by a test.
+
+What the ladder shows on a real raw, 1:1 at the same block: at 0.25 and 0.50 the
+sky's coarse speckle is largely gone and the foliage keeps its texture, with the
+colourless share of the frame steady near 5% right across the ladder — the colour
+is NOT drained, which is what separates this from pulling saturation back (19% at
+saturation 1.0).
+
+**AND ITS FAILURE MODE IS VISIBLE AT THE TOP OF THE RANGE, which names the next
+variable.** At 1.00 the leaf and sky boundaries grow a fine blue-and-red pepper:
+the luminance is kept sharp while the colour is a plain blur, so a dark gap
+between leaves keeps its dark brightness and takes the average colour of the red
+leaves and blue sky around it. That is unguided chroma smoothing bleeding across
+a high-contrast edge, and the remedy is the one deliberately left out of this
+pass — a range term on the chroma half too, much looser than the luminance one,
+so it stops crossing luma edges. It is not needed at 0.50 and it is obvious at
+1.00.
+
 Sources: RawPedia, Noise Reduction (https://rawpedia.rawtherapee.com/Noise_Reduction);
 Adobe, Sharpening and noise reduction in Camera Raw
 (https://helpx.adobe.com/camera-raw/desktop/using/sharpening-noise-reduction-camera-raw.html);
