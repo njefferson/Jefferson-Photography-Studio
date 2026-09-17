@@ -49,6 +49,47 @@ two functions, wrote a confident comment on it, built it, and the measurement
 came back byte-identical. It was backed out. A guess with good prose on it is
 still a guess, and the 150° it claimed to explain is still unexplained.
 
+## HOW AN IDEA BECOMES WORK (owner instruction, 2026-09-17)
+An idea from discussion does not go straight onto the roadmap. It goes:
+**research it, write the record, then add the bullet, then rank it.**
+
+**The record is `docs/decisions/NNN-slug.md`** and it carries six sections —
+Context; **Looked up** (what was researched outside this repo and what it said,
+or why nothing outside bears on it); **Weighed against** (what already on the
+schedule this overlaps, and what was done before on it, by `NOTES.md` heading);
+**Options**, chosen first; **Rejected**, each with why it was rejected; and
+**Rank**, where it sits and why relative to its neighbours. An archived item
+gains **Outcome**: the commit, and what turned out wrong.
+
+**The shape is MADR's** (adr.github.io/madr), not one invented here, and its
+centre is the rejected options. That source's own reason: most decisions are
+interesting because there were two or three viable options, and recording only
+the winner discards the analysis.
+
+**The roadmap in `NOTES.md` is the index and the rank** — file order IS priority,
+which was already the convention. Each open bullet carries
+`<!-- decision: NNN -->` on its FIRST line, where the parser can see it and the
+reader cannot; the ⓘ dialog renders only the bold span, and the built bundle was
+checked to contain zero keys.
+
+**[`tools/decisions-check.mjs`](tools/decisions-check.mjs) refuses the commit**
+when an open item has no record, a record is claimed by nobody, a record is
+about a DIFFERENT item than the one claiming it, or a section has no body. The
+schedule then prints at session start, in rank order, so a new idea can be
+compared against it at the moment it arrives.
+
+**Why it exists, measured 2026-09-16.** A fitted eight-band array was added to a
+look system already known to be a scatter of fitted constants, and nothing at
+decision time said so. The same evening, one defect was diagnosed three times —
+gray-world, the channel swap, the depth lift — each abandoned in a chat sentence,
+none recorded, so a fourth attempt would have started from zero for the fourth
+time. That defect is now record 001 with its rejected diagnoses written down.
+
+**And the gate caught its own author.** The backfill assigned keys in roadmap
+order and wrote the records in a different order, filing two of eleven under each
+other's keys. Every existence check was green. The title check exists because of
+it: a gate that only counts says a filing cabinet is full.
+
 ## Release flow (the owner's hard gate)
 - `main` == production (jefferson-photo-studio.pages.dev, deployed on push).
 - The `staging` branch deploys to staging.jefferson-photo-studio.pages.dev.

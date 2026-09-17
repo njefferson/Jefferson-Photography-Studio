@@ -539,7 +539,19 @@ user-scalable=no.
 > different approach and mindset"). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
-- [ ] **Creative — a third app for regular photos** — owner direction 2026-07-19
+- [ ] **A batched raw and the same raw opened are 150 degrees apart** <!-- decision: 001 --> — measured
+  by `tools/agreement-walk.mjs` and red in production. On Auto, with NO look
+  applied, opening a raw reads hue 195 and batching the same file reads 345 —
+  150 degrees and 2.2 points of lightness apart. "Develop unattended" is the
+  feature, so a set developed unattended may not be the rendering the reader saw.
+  Three diagnoses have been asserted and two are measured wrong: the
+  unconditional gray-world balance (both paths gray-world a raw, so it is not
+  that) and the channel swap (the fix was coded and the output came back
+  byte-identical, which is itself the sharpest clue available). The next step is
+  to INSTRUMENT the batch path and compare the resolved `EditParams` field by
+  field before changing anything — two diagnoses from reading have already been
+  wrong. See `docs/decisions/001-batch-open-divergence.md`.
+- [ ] **Creative — a third app for regular photos** — owner direction 2026-07-19 <!-- decision: 002 -->
   ("a separate page next to infrared and macro, called creative, for regular
   photos, installable separately… same things we're building here… I suppose I
   will want a whole image editor there eventually"). A NEW entry point beside the
@@ -554,7 +566,7 @@ user-scalable=no.
   channel-swap / IR-WB); (2) is the first cut "stickers + grade on any JPEG/HEIC"
   or the full editor; (3) name/route/icon and whether it installs from the same
   chooser. Ships on its own once scoped — unrelated to the sticker betas.
-- [ ] **Big image: the photo fills the app, menus float over it** — owner
+- [ ] **Big image: the photo fills the app, menus float over it** — owner <!-- decision: 003 -->
   direction 2026-07-16, given as the owner ended the session and moved to a new one.
   STILL AN IDEA — the owner says so plainly, expect design questions. The vision: the
   open photo is the BACKGROUND everywhere in the app, not boxed inside a stage.
@@ -574,7 +586,7 @@ user-scalable=no.
   photo, or pass through where empty? NON-GOAL: nothing here touches the pipeline
   or export — it's a presentation/layout direction. Scope as its own design pass
   (likely several); the crop overflow-view ships first and proves the model.
-- [ ] **Full-bleed crop — the photo flows behind the crop tools** — owner design
+- [ ] **Full-bleed crop — the photo flows behind the crop tools** — owner design <!-- decision: 004 -->
   **PILOT SHIPPED 2026-09-10, and this stays open because the design questions
   are not answered.** What landed: with a geometry tool armed the canvas reaches
   the top and both side edges (safe-area only), the 8px border-radius is gone,
@@ -602,7 +614,7 @@ user-scalable=no.
   clamps to the photo). Non-trivial: canvas sizing, the box↔photo mapping, pinch
   anchoring, and the OS-edge insets (`.cropping`) all assume the contained
   `#view`. Scope as its own UI release; decide it alongside the clamp fix.
-- [ ] **More composition overlays** — owner ask 2026-07-16, optional, for anyone
+- [ ] **More composition overlays** <!-- decision: 005 --> — owner ask 2026-07-16, optional, for anyone
   who wants them: beyond the rule-of-thirds grid, offer selectable composition
   guides while cropping — golden-ratio (phi) grid, golden spiral, the diagonal
   method, a finer grid, and a centre cross. Thirds stays the default. Build
@@ -616,12 +628,12 @@ user-scalable=no.
   them subtle (match `--line`), per-focus, and remember the last choice in
   localStorage like the panel tab. Non-goal: nothing touches the pipeline or
   export — overlay-only, exactly like the thirds grid.
-- [ ] **Mask by subject / background** — auto-select the subject or the
+- [ ] **Mask by subject / background** — auto-select the subject or the <!-- decision: 006 -->
   background (owner request 2026-07-05). Honest scoping: true subject/background
   segmentation needs an on-device ML model (WebGPU — the "frontier" backlog
   item); there is no classical stand-in the way sky had one. Architect as a mask
   type so it slots into the same engine when ready.
-- [ ] **Tiles for a photo you have not opened yet** — measured 2026-09-12 and
+- [ ] **Tiles for a photo you have not opened yet** — measured 2026-09-12 and <!-- decision: 007 -->
   written up under "the strip's tiles". A tile for a photo you HAVE opened
   matches the photograph to 0.004 on a centre-against-edge measure; one you have
   not is 0.052 off, on a flat with a 43% hot spot. The lens correction is not
@@ -705,7 +717,7 @@ user-scalable=no.
   ever switched; reading `#fileName`, which is not what names the open photo;
   and a MutationObserver watching `src` ATTRIBUTES when a redraw replaces the
   whole `<img>` node.
-- [ ] **Opening a set on several cores** — measured 2026-09-13, and the first
+- [ ] **Opening a set on several cores** — measured 2026-09-13, and the first <!-- decision: 008 -->
   version of this item blamed the wrong thing (see "the tile audit was wrong").
   What is true: every photograph is decoded by ONE worker, one after another,
   and the lens rig sends ninety flats through the same door. What is NOT the
@@ -746,7 +758,7 @@ user-scalable=no.
   passed against the planted defect because it only counted tiles, and ending a
   session asks with a native `confirm()`, which Playwright DISMISSES by default
   — so the teardown branch never ran while reporting a failure about the app.
-- [ ] **The editor's WORKING COPY at native resolution** — never call this "full
+- [ ] **The editor's WORKING COPY at native resolution** — never call this "full <!-- decision: 009 -->
   size" to the owner: the export panel already owns that phrase, its scale
   control reads "Full (native)" and a Quality slider sits at 92 beside it, and a
   crop already changes the output's dimensions. NOTHING in that panel changes.
@@ -768,7 +780,7 @@ user-scalable=no.
   photograph renders pixel for pixel as it did. Whether those operators should
   work at native scale is a SEPARATE product question with a slider-meaning
   change attached. Original note follows.
-- [ ] **(superseded detail) The live view at full resolution** —
+- [ ] **(superseded detail) The live view at full resolution** — <!-- decision: 010 -->
   measured 2026-09-13 and the premise for the proxy may have expired. The editor
   works on a downscaled copy because a full-resolution render was too costly when
   that was decided; drawing a screen-sized frame from a full-resolution texture
@@ -782,7 +794,7 @@ user-scalable=no.
   defect where a tile or an export disagrees with the photograph. The test page
   reports the memory per device, so the decision has numbers. Do this BEFORE the
   drawn export below — it subsumes most of it.
-- [ ] **The export drawn rather than computed** — **ships in 3.0 with the item
+- [ ] **The export drawn rather than computed** — **ships in 3.0 with the item <!-- decision: 011 -->
   above, the two together (owner declaration, 2026-09-13)** — scoped 2026-09-13,
   waiting on numbers from the device. The live view already runs the entire edit as shaders
   in `gl.ts`; `export.ts` implements every one of them again in TypeScript, and
