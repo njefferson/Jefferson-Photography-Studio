@@ -137,7 +137,41 @@ export function makeRowDenoiser(
   // keeps the sampling byte-identical.
   const tapOff = new Int32Array(R * 2 + 1);
   for (let d = -R; d <= R; d++) tapOff[d + R] = Math.round(d * step);
-  const rowSpan = tapOff[R * 2] * 2 + 4;
+  // THE COLOUR HALF SAMPLES WIDER, AND THE WIDTH IS THE WHOLE POINT OF IT.
+  //
+  // The first version of the chroma mix reused the bilateral's own 5x5 because
+  // that cost nothing — and it reached nothing either. The mottle in a deep
+  // infrared sky is structured at three to five pixels, so a window five wide is
+  // trying to flatten something that nearly fills it, and at full strength it
+  // left that sky visibly unchanged (IR-SCIENCE.md 4c-xi). 4c-vi had asked for a
+  // spatial chroma operation and this was not one.
+  //
+  // SEVEN BY SEVEN AT STRIDE TWO, and the stride is where the first attempt went
+  // wrong. A 5x5 spaced THREE apart spans the same thirteen pixels for half the
+  // taps, and it was tried: it removed the mottle and left a fine regular
+  // cross-hatch in its place, because a sparse lattice with three-pixel gaps
+  // samples a noise field periodically and periodic sampling of noise IS a
+  // pattern. Visible in the picture at full strength and invisible in every
+  // number the sheet reports, which is the reason the pictures are the test.
+  //
+  // Stride two leaves one-pixel gaps and forty-nine taps over the same span. It
+  // is double the cost of the sparse version and still a fifth of the 169 a
+  // dense 13x13 would need, which is what makes a radius this large affordable
+  // at all: this runs once per output pixel of a 21-megapixel export.
+  //
+  // `step` rides along for the same reason the luminance taps carry it: the
+  // preview runs on a downscaled proxy, so the export has to spread its taps by
+  // the same factor to smooth the same footprint of the photograph.
+  const CR = 3;
+  const CHROMA_STRIDE = 2;
+  const chromaOff = new Int32Array(CR * 2 + 1);
+  for (let d = -CR; d <= CR; d++) chromaOff[d + CR] = Math.round(d * step * CHROMA_STRIDE);
+  // Sigma two in TAP units, so the falloff matches the wider grid rather than
+  // being the luminance kernel's shape stretched over it.
+  const CHROMA_SPATIAL: number[] = [];
+  for (let dy = -CR; dy <= CR; dy++) for (let dx = -CR; dx <= CR; dx++) CHROMA_SPATIAL.push(Math.exp(-(dx * dx + dy * dy) / 8));
+  const widest = chroma > 0 ? chromaOff[CR * 2] : tapOff[R * 2];
+  const rowSpan = widest * 2 + 4;
 
   interface Row {
     y: number;
@@ -296,14 +330,27 @@ export function makeRowDenoiser(
         sg += g * w;
         sb += b * w;
         wsum += w;
-        // THE SAME NEIGHBOURHOOD, WEIGHTED THE OTHER WAY. Spatial only, with no
-        // range term at all: a plain Gaussian of the 5x5, which is what the
-        // colour half is mixed toward below. It costs four adds per tap and not
-        // one extra sample or exponential, because the taps are already here.
-        gr += r * sp;
-        gg += g * sp;
-        gb += b * sp;
-        gsum += sp;
+      }
+    }
+    // THE COLOUR MEAN, ON ITS OWN WIDER GRID. Spatial weights only and no range
+    // term at all — a plain Gaussian over a thirteen-pixel span, which is what
+    // the colour half is mixed toward below. Forty-nine taps, skipped entirely
+    // when the colour half is off.
+    if (chroma > 0) {
+      let kk = 0;
+      for (let dy = -CR; dy <= CR; dy++) {
+        const row = getRow(y + chromaOff[dy + CR]);
+        for (let dx = -CR; dx <= CR; dx++, kk++) {
+          let sx = cx + chromaOff[dx + CR];
+          if (sx < 0) sx = 0;
+          else if (sx >= width) sx = width - 1;
+          const so = at(row, sx);
+          const sp = CHROMA_SPATIAL[kk];
+          gr += row.v[so] * sp;
+          gg += row.v[so + 1] * sp;
+          gb += row.v[so + 2] * sp;
+          gsum += sp;
+        }
       }
     }
     // LUMINANCE FROM THE EDGE-PRESERVING MEAN, COLOUR FROM THE PLAIN ONE.
