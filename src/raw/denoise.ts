@@ -33,6 +33,42 @@ export function rangeSigma(strength: number): number {
   return 0.1 * strength * strength;
 }
 
+/** MEDIAN OF NINE, and the reason there is a separate stage at all.
+ *
+ *  Takes nine values. Returns the fifth smallest, by a fixed network of
+ *  min/max pairs rather than a sort — no branches, no allocation, and the same
+ *  nineteen comparisons every time, which is what the fragment shader can also
+ *  run (there is no sorting in GLSL). Consumed by `despeckleCentre` below.
+ *
+ *  WHY A MEDIAN AND NOT ANOTHER SMOOTHER. A bilateral's range weight is what
+ *  preserves edges, and a single pixel unlike its neighbours IS an edge by that
+ *  weight: its own weight stays at one while every neighbour's collapses, so the
+ *  pixel keeps itself. **A bilateral preserves outliers by construction**, which
+ *  is why salt-and-pepper noise is recorded in the literature as surviving
+ *  bilateral filtering, and it is why neither the luminance half above nor the
+ *  colour half below moved the pale pepper in a deep infrared sky at full
+ *  strength. A median is a RANK statistic: it cannot be dragged by a value
+ *  however extreme, which is the same arithmetic that makes a mean vulnerable to
+ *  one. See IR-SCIENCE.md 4c-ix. */
+function median9(v: Float64Array): number {
+  // THE STANDARD NETWORK, WRITTEN OUT RATHER THAN DERIVED. Nineteen compare-and-
+  // swap pairs that leave the median at index 4 — the arrangement is not
+  // something to invent, and a hand-rolled one that is wrong is wrong on a
+  // minority of pixels and looks fine. The same order is used in the shader,
+  // where there is no sorting at all.
+  const s2 = (a: number, b: number) => {
+    if (v[b] < v[a]) { const t = v[a]; v[a] = v[b]; v[b] = t; }
+  };
+  s2(1, 2); s2(4, 5); s2(7, 8);
+  s2(0, 1); s2(3, 4); s2(6, 7);
+  s2(1, 2); s2(4, 5); s2(7, 8);
+  s2(0, 3); s2(5, 8); s2(4, 7);
+  s2(3, 6); s2(1, 4); s2(2, 5);
+  s2(4, 7); s2(4, 2); s2(6, 4);
+  s2(4, 2);
+  return v[4];
+}
+
 /** A linear-RGB sample at an integer source pixel.
  *
  *  THE RETURNED ARRAY MAY BE REUSED BY THE NEXT CALL, and every caller here
@@ -82,8 +118,9 @@ export function makeRowDenoiser(
   strength: number,
   step = 1,
   chroma = 0,
+  despeckle = 0,
 ): LinearSampler {
-  if (strength <= 0 && chroma <= 0) return sample;
+  if (strength <= 0 && chroma <= 0 && despeckle <= 0) return sample;
   // A FLOOR RATHER THAN A BRANCH when the luminance half is off. sigma 0 makes
   // inv2s2 infinite and the centre tap's `rel` is exactly 0, so the weight there
   // would be 0 * Infinity — NaN, once per pixel. A sigma this small underflows
@@ -161,11 +198,75 @@ export function makeRowDenoiser(
 
   // One array for the life of this sampler — see LinearSampler on why.
   const scratch: [number, number, number] = [0, 0, 0];
+  // The centre pixel's three channels, after the despeckle decision. Held for
+  // the life of the sampler so the decision does not allocate per pixel.
+  const mid: [number, number, number] = [0, 0, 0];
+  const win = new Float64Array(9);
   return (x, y) => {
     const cRow = getRow(y);
     const cx = x < 0 ? 0 : x >= width ? width - 1 : x;
-    at(cRow, cx);
-    const lc = cRow.l[cx];
+    const co = at(cRow, cx);
+    mid[0] = cRow.v[co]; mid[1] = cRow.v[co + 1]; mid[2] = cRow.v[co + 2];
+    // DESPECKLE THE CENTRE FIRST, BEFORE ANYTHING READS IT — and the order is
+    // the whole point rather than a tidiness. `lc` below is the centre's luma
+    // and every neighbour's weight is measured against it, so a centre that is
+    // an impulse makes every neighbour look wrong and collapses the bilateral
+    // onto the very pixel that should have gone. Correcting it here fixes the
+    // dot for the one output pixel it IS the centre of, which is every dot.
+    //
+    // A DECISION, NOT A FILTER. The literature's decision-based median switches
+    // between the identity and the median per pixel rather than medianing
+    // everything, because a plain median eats fine detail wherever there is no
+    // impulse to remove. Two tests have to agree before a pixel is touched: it
+    // is the extreme of its own 3x3, and it sits further from that window's
+    // median than the threshold allows. Detail is a run of pixels, and a run is
+    // not the extreme of its own neighbourhood.
+    //
+    // PER CHANNEL, because the noise is per channel: an infrared conversion
+    // starves one photosite, so in a deep sky that channel is recording almost
+    // nothing and its shot noise is what lands as a pale dot. Restoring that
+    // channel to its local median is the correction; leaving the other two
+    // alone is what keeps the pixel's own colour.
+    if (despeckle > 0) {
+      // THE THRESHOLD, AND ITS RANGE IS MEASURED RATHER THAN CHOSEN. A pixel
+      // that IS the extreme of its own window can be at most (hi - lo) from
+      // that window's median, so any k at or above 1 is a slider position that
+      // can never fire — the first mapping here was 0.25/s², which put
+      // everything below strength 0.5 in exactly that dead zone and read as the
+      // whole stage doing nothing. Linear from 0.47 down to 0.02 keeps the
+      // whole travel live. Relative to the window's own spread, so it means the
+      // same thing in a dark sky and a bright one.
+      const k = 0.45 * (1 - despeckle) + 0.02;
+      for (let ch = 0; ch < 3; ch++) {
+        let n = 0, lo = Infinity, hi = -Infinity;
+        for (let dy = -1; dy <= 1; dy++) {
+          const row = getRow(y + tapOff[dy + R]);
+          for (let dx = -1; dx <= 1; dx++) {
+            let sx = cx + tapOff[dx + R];
+            if (sx < 0) sx = 0;
+            else if (sx >= width) sx = width - 1;
+            const v = row.v[at(row, sx) + ch];
+            win[n++] = v;
+            if (v < lo) lo = v;
+            if (v > hi) hi = v;
+          }
+        }
+        const c = mid[ch];
+        const med = median9(win); // sorts `win` in place; nothing below reads it
+        // Extreme of its own window, and far enough from that window's middle.
+        if ((c <= lo || c >= hi) && Math.abs(c - med) > k * (hi - lo)) mid[ch] = med;
+      }
+    }
+    // NEVER WRITTEN BACK INTO THE ROW CACHE, and that is deliberate. A corrected
+    // pixel stored there would be read as a NEIGHBOUR by the next output pixel,
+    // making the filter recursive and its result dependent on which rows happen
+    // to be resident — the cache is an optimisation and may re-sample a row at
+    // any time, so the same photograph would render differently depending on the
+    // scan order. The correction belongs to the pixel being written and to
+    // nothing else.
+    const lc = despeckle > 0
+      ? mid[0] * REC[0] + mid[1] * REC[1] + mid[2] * REC[2]
+      : cRow.l[cx];
     let sr = 0;
     let sg = 0;
     let sb = 0;
@@ -182,10 +283,12 @@ export function makeRowDenoiser(
         if (sx < 0) sx = 0;
         else if (sx >= width) sx = width - 1;
         const so = at(row, sx);
-        const r = row.v[so];
-        const g = row.v[so + 1];
-        const b = row.v[so + 2];
-        const ls = row.l[sx];
+        // The centre tap is the corrected pixel, for the same reason `lc` is.
+        const isC = despeckle > 0 && sx === cx && row === cRow;
+        const r = isC ? mid[0] : row.v[so];
+        const g = isC ? mid[1] : row.v[so + 1];
+        const b = isC ? mid[2] : row.v[so + 2];
+        const ls = isC ? lc : row.l[sx];
         const rel = (ls - lc) / (lc + 0.02);
         const sp = SPATIAL[k];
         const w = sp * Math.exp(-rel * rel * inv2s2);
