@@ -106,13 +106,33 @@ free. The video's own words for it say so, and reading it as a detail fix was
 this repository's error rather than the source's. Shipping it would have been
 +15.6% on a number and a brighter tree.
 
-**The shadow subtractive tint, at the value measured.** The canopy's output hue
-is 6.4°, so the complement is 186°; at amount 0.18 into the shadow band the
-render moves by 2 points of red and nothing else, and the trunk stays exactly
-the crimson it was. The trunk is not a luminance shadow — it is a midtone at the
-canopy's own hue — so a shadow tint at that strength cannot reach it. Not
-shipped, and the finding is recorded in section 9i rather than shipped on the
-method's authority. The bark colour is real and is not fixed by this item.
+**The shadow subtractive tint — and this one was measured twice, because the
+first measurement would have shipped a defect.** The canopy's output hue is
+5.8°, so the complement is 186°. On the oak it does exactly what the method
+says: at balance 0 the dark structure loses 3.6%, 7.7%, 14.0%, 20.1% and 24.8%
+of its saturation at amounts 0.18, 0.35, 0.55, 0.70 and 0.80, while the bright
+leaves lose 0.5%, 1.0%, 1.5%, 1.9% and 2.2% — eleven times more effect on the
+bark than on the leaves, and at 0.70 the crop shows trunk and limbs reading as
+dark wood with the canopy visibly unchanged. That was a finished-looking fix.
+
+**Then the second frame.** The tint is weighted by LUMA ALONE and is ADDITIVE in
+display RGB, so it lands on every dark thing in a photograph and asks nothing
+about hue. On the carport frame, 858,273 dark pixels that carry no colour as it
+ships — deep roof shade and the aircraft — measure saturation 0.005 at hue 359,
+and with the tint at 0.70 measure **0.989 at hue 201**. Grey shade driven to
+saturated teal, because adding a luma-free tint vector to a near-black pixel
+clamps one channel to zero and leaves the other two positive.
+
+So it is rejected at every amount, not at 0.18. The method is sound and it is a
+**per-photograph hand edit**: in the source's own workflow a photographer picks
+the amount while looking at that frame, and a look constant is a claim about
+every frame including the ones whose shadows are a roof. The control stays where
+it is, on the Grade tab's shadow wheel. What the bark actually needs is a
+luminance-weighted saturation REDUCTION — multiplicative, so near-black stays
+near-black — and the app has no such control, because `hslAt`'s saturation is
+selected by hue and the trunk shares the canopy's hue exactly. That is a new
+pipeline stage rather than a constant. Every number is in `IR-SCIENCE.md`
+section 9j.
 
 **Per-channel black and white points**, Kennard's curves pass. Measured at
 +3.0% canopy texture, the weakest of the three, and this repository already

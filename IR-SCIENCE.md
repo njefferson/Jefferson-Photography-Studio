@@ -2210,17 +2210,76 @@ depends on.
 
 **WHAT THIS DOES NOT FIX, AND IT IS VISIBLE IN EVERY CROP.** The trunk and the
 main branches render the same crimson as the leaves. Real Aerochrome renders bark
-dark and close to neutral, because bark reflects little infrared. The reference
-video's subtractive-colour method is the field's answer — the canopy's colour
-casts onto the structure, so its complement goes into the shadows only and the
-bark goes neutral — and this app has the control: `grade` carries separate
-shadow, midtone and highlight tints. **Measured at the canopy's own output hue
-plus 180° (6.4° → 186°) and amount 0.18, it changes the render by 2 points of
-red and nothing else, and the trunk stays crimson.** The reason is that the trunk
-here is not a luminance shadow; it is a midtone at the canopy's hue, so a shadow
-tint at that strength cannot reach it. Not shipped on that evidence rather than
-shipped on the method's authority. The amount, and whether the midtone band is
-the right one, is a measurement that has not been made.
+dark and close to neutral, because bark reflects little infrared: all three film
+layers get almost nothing there, so it falls toward dark grey rather than toward
+a hue. This app's `raw.sat` of 3.0 multiplies whatever small chroma the dark
+structure carries and drives it to the canopy's own colour. Section 9j is the
+measurement of the field's fix for it, and why it is not in the look.
+
+### 9j. THE SUBTRACTIVE SHADOW TINT WORKS ON THE TREE AND WRECKS THE NEXT FRAME
+
+The reference video's subtractive-colour method is the field's answer to crimson
+bark: the canopy's colour casts onto the structure, so find the cast's hue, add
+180°, and put the complement into the **shadows only**. The structure goes
+neutral and the canopy stands off it. This app has the control — `grade` carries
+separate shadow, midtone and highlight tints, and Aerochrome leaves all three at
+zero.
+
+**Read out of `src/pipeline.ts` rather than assumed.** The shadow weight is
+`wS = 1 − smooth01(0.05, 0.6 + 0.2·balance, L)`, and the tint is **additive in
+display RGB**: `out += wS · amount · GRADE_K · tintVec(hue)` with `GRADE_K`
+0.35, where `tintVec` is the hue's full-saturation RGB with its Rec.709 luma
+subtracted out — so it shifts colour without moving luminance. Amount and
+balance are two separate knobs.
+
+**ON THE OAK IT DOES EXACTLY WHAT THE METHOD SAYS.** The canopy's output hue is
+5.8°, so the complement is 186°. Two populations inside the canopy's own box,
+classified once — 396,132 dark structure pixels and 304,637 bright leaf pixels —
+and the tint separates them cleanly at balance 0:
+
+- 0.18 → structure saturation −3.6%, leaves −0.5%
+- 0.35 → −7.7%, −1.0%
+- 0.55 → −14.0%, −1.5%
+- 0.70 → −20.1%, −1.9%
+- 0.80 → −24.8%, −2.2%
+
+Eleven times more effect on the bark than on the leaves, and at 0.70 the crop
+shows trunk and limbs reading as dark wood with the canopy visibly unchanged.
+Pushing the balance to +0.6 buys almost nothing more on the structure (−20.1%
+against −21%) and costs the leaves 8.4%, which is visible as a paler canopy — so
+balance 0 is the setting, and the first value tried, 0.18, was simply far too
+small to see.
+
+**AND THEN THE SECOND FRAME.** The tint is weighted by **luma alone** and asks
+nothing about hue, so it lands on every dark thing in a photograph. On the
+carport frame, dark pixels that carry no colour as the frame ships — 858,273 of
+them, deep shade under the roof and the aircraft itself — measure saturation
+**0.005 at hue 359**, and with the tint at 0.70 they measure **0.989 at hue
+201**. Ordinary grey shade driven to saturated teal. The mechanism is that the
+tint is additive and those pixels are near black: adding roughly
+(−0.72, +0.18, +0.28)·0.245 to a pixel at 0.02 clamps red to zero and leaves
+green and blue positive, which is saturation 1 by definition.
+
+**So it is not shipped, at any amount.** The method is sound and it is a
+**per-photograph hand edit** — in the source's own workflow a photographer picks
+the amount while looking at that frame. A look applies one constant to every
+frame, including frames whose shadows are a roof rather than a tree. The control
+stays exactly where it is, on the Grade tab's shadow wheel, reachable for the
+frame that wants it.
+
+**WHAT THE BARK ACTUALLY NEEDS** is a luminance-weighted **saturation
+reduction** — multiplicative, so a near-black pixel stays near-black instead of
+gaining a hue it did not have. The app has no such control: `hslAt`'s bands carry
+saturation but are selected by HUE, and the trunk shares the canopy's hue exactly,
+which is the whole problem. That is a new pipeline stage rather than a constant,
+and it is written down here rather than guessed at.
+
+**THE GENERAL LESSON, AND IT IS THE ONE THIS REPOSITORY KEEPS PAYING FOR.** The
+oak crop at 0.70 looked like a finished fix. One more frame, chosen because its
+shadows are not foliage, turned it into a defect affecting 858,000 pixels. A look
+constant is a claim about every photograph, so it is measured on a frame that
+disagrees with the one that motivated it — not on a second frame of the same
+subject.
 
 ---
 

@@ -580,10 +580,15 @@ user-scalable=no.
   reference video's own foliage lever — the hue band's luminance — was measured
   and REJECTED: texture per unit luma is flat at 0.254 across a six-step ladder,
   so every point it appears to add is brightness. Still not fixed and visible in
-  every crop: the trunk renders the same crimson as the leaves, and the
-  subtractive-colour tint at the measured complement does not reach it because
-  the trunk is a midtone rather than a shadow. Sources and every number in
-  `IR-SCIENCE.md` section 9i. See `docs/decisions/016-foliage-tonality.md`.
+  every crop: the trunk renders the same crimson as the leaves. The published
+  subtractive-colour fix was measured and REJECTED at every amount, and the
+  second measurement is why — on the oak it takes the bark's saturation down 20%
+  for 2% of the leaves and looks finished, and on the next frame tried it drives
+  858,273 pixels of ordinary grey roof shade to saturated teal, because the tint
+  is weighted by brightness alone and added rather than multiplied. What the bark
+  needs is a luminance-weighted saturation REDUCTION, which this app has no
+  control for. Sources and every number in `IR-SCIENCE.md` sections 9i and 9j.
+  See `docs/decisions/016-foliage-tonality.md`.
 - [ ] **A quick look you cannot stop, and a session that renders it all again** <!-- decision: 014 --> — reported
   from the iPad 2026-09-17. There is no way to stop a quick look building its
   grid, so no way to say done and get the memory back; and after Keep in a
