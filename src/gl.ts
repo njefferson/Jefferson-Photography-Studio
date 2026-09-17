@@ -450,12 +450,25 @@ void main() {
         wsum += w;
         // The same taps weighted spatially only — the plain blur the colour
         // half is mixed toward. Identical math to raw/denoise.ts.
-        gsum += s * sp;
-        gw += sp;
+        // (the colour mean has its own wider grid below)
       }
     }
     vec3 m = sum / wsum;
     if (u_chroma > 0.0) {
+      // THE COLOUR MEAN, ON ITS OWN WIDER GRID — identical to raw/denoise.ts.
+      // 7x7 at stride two, spanning thirteen pixels, because the mottle it has
+      // to reach is three to five across and the bilateral's five-pixel window
+      // cannot flatten it. Stride THREE was tried first and left a fine regular
+      // cross-hatch: sampling a noise field periodically is itself a pattern.
+      // Forty-nine fetches, only when the colour half is on.
+      for (int dy = -3; dy <= 3; dy++) {
+        for (int dx = -3; dx <= 3; dx++) {
+          vec3 s2 = fetchLin(v_uv + vec2(float(dx * 2), float(dy * 2)) * u_texel);
+          float sp2 = exp(-float(dx*dx + dy*dy) / 8.0);
+          gsum += s2 * sp2;
+          gw += sp2;
+        }
+      }
       // Luminance from the edge-preserving mean, colour from the plain one.
       // Identical to raw/denoise.ts, and at u_chroma 0 the two halves recombine
       // into exactly m — which is why the branch above returns it untouched.

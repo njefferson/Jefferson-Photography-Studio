@@ -1027,6 +1027,35 @@ implementation did not deliver. That is the next variable, and it is a cost
 question rather than a correctness one: a wide spatial pass per pixel is not free
 on a tablet.
 
+### 4c-xii. THE COLOUR BLUR WIDENED TO THE MOTTLE'S OWN SCALE, AND WHAT IT COSTS
+
+4c-xi's closing line named scale as the one untried lever. Widened 2026-09-17 and
+measured on the reported frame.
+
+**THE FIRST WIDENING WAS WRONG IN A WAY ONLY THE PICTURE COULD SHOW.** A 5x5 grid
+spaced THREE apart spans thirteen pixels for the same twenty-five taps a dense 5x5
+costs, which is what makes a radius that large affordable. It removed the mottle
+and left **a fine regular cross-hatch** in its place: sampling a noise field on a
+sparse periodic lattice is itself a pattern. Every number the sheet reports
+improved — the colourless share fell 18.7% to 15.6% — and the sheet could not see
+the artefact at all.
+
+**Seven by seven at stride two** spans the same thirteen pixels with one-pixel
+gaps, at forty-nine taps. The cross-hatch is faint rather than absent; a dense
+13x13 would remove it entirely at 169 taps per output pixel, which is not
+affordable in a stage that runs once per pixel of a 21-megapixel export.
+
+What it delivers on the reported sky: at 0.25 and 0.50 the pale pepper is
+substantially gone and the sky reads as a soft gradient; at 1.00 it is smoother
+again with a faint residual lattice visible at 1:1 and not at viewing size.
+Colourless share 18.7% to 16.0% across the ladder — and, unlike the narrow
+version, the numbers move at all, which is the first sign the stage is reaching
+the structure rather than sitting inside it.
+
+**Luminance is untouched throughout**, which is the whole design: the leaf
+texture, the edges and the grain that carries detail are the bilateral's business
+and this never sees them.
+
 ### 4c-vii. THE OVERTURNED NUMBERS, KEPT ON PURPOSE
 
 4c-vi originally read that raising denoise did nothing to the ratio (NIR_1480
