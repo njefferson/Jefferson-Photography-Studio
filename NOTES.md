@@ -539,18 +539,6 @@ user-scalable=no.
 > different approach and mindset"). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
-- [ ] **A batched raw and the same raw opened are 150 degrees apart** <!-- decision: 001 --> — measured
-  by `tools/agreement-walk.mjs` and red in production. On Auto, with NO look
-  applied, opening a raw reads hue 195 and batching the same file reads 345 —
-  150 degrees and 2.2 points of lightness apart. "Develop unattended" is the
-  feature, so a set developed unattended may not be the rendering the reader saw.
-  Three diagnoses have been asserted and two are measured wrong: the
-  unconditional gray-world balance (both paths gray-world a raw, so it is not
-  that) and the channel swap (the fix was coded and the output came back
-  byte-identical, which is itself the sharpest clue available). The next step is
-  to INSTRUMENT the batch path and compare the resolved `EditParams` field by
-  field before changing anything — two diagnoses from reading have already been
-  wrong. See `docs/decisions/001-batch-open-divergence.md`.
 - [ ] **Creative — a third app for regular photos** — owner direction 2026-07-19 <!-- decision: 002 -->
   ("a separate page next to infrared and macro, called creative, for regular
   photos, installable separately… same things we're building here… I suppose I
@@ -1875,6 +1863,26 @@ reason it is a footnote rather than a finding — a list of known limitations is
 read as authoritative, and an invented one is worse than a missing one.
 
 ## Shipped (roadmap archive)
+
+- [x] **A .zip developed unattended now matches what you saw on screen** <!-- decision: 001 --> — SHIPPED
+  2026-09-17 to staging, awaiting the on-device pass. A set developed unattended
+  could come out a different photograph from the same file opened by hand: on a
+  raw, the largest colour band sat 150 degrees away from the screen's, and a
+  camera JPEG came out balanced and brightened when opening it does neither.
+  Four faults, and the first was in the test that was meant to catch the others —
+  it had never once run the Auto develop it reported, because the batch takes its
+  grade before the files and the test handed over the files first. Under that,
+  three real ones: the develop rebuilt the opening ruling by hand instead of
+  using the one function that states it, so raws lost their red/blue swap and
+  camera files were balanced twice over; "copy the current edit" with nothing
+  dialled in counted as a look, which fired the colour half of Restore depth at
+  its ceiling on a photograph wearing no look; and the develop never rounded its
+  own measurements to what the sliders hold, so it rendered a photograph the
+  sliders could not express. All four arms of the agreement walk now read 0
+  degrees apart and within 0.2 points of lightness. See
+  `docs/decisions/001-batch-open-divergence.md` for what was measured, including
+  the two diagnoses this record had written down as wrong that turned out to be
+  the test's fault rather than the code's.
 
 - [x] **Four ways a tile lied about its photograph** — SHIPPED 2026-09-14 to
   staging, awaiting the on-device pass. Every one of them is a picture that was

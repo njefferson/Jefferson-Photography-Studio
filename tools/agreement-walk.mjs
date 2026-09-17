@@ -95,69 +95,109 @@ try {
     })()`);
     if (!open) { fail(`${label}: the open photograph has no colour to read`); continue; }
 
-    // 2. BATCH PROCESS over the SAME files, on Auto — no look, so the only thing
-    //    under test is the baseline each path applies to the file. A look would
-    //    mask it, because a look legitimately owns the swap and the grade.
-    await page.evaluate(() => { indexedDB.deleteDatabase("ips-batch"); });
-    await page.waitForTimeout(400);
-    await page.setInputFiles("#batchFiles", files);
-    await page.waitForFunction(() => document.getElementById("batchDlg")?.open, null, { timeout: 60000 })
-      .catch(() => {});
-    const started = await page.evaluate(() => {
-      const b = document.getElementById("bcAuto");
-      if (!b || b.hidden) return false;
-      b.click(); return true;
-    });
-    if (!started) { fail(`${label}: could not start a batch on Auto — the walk cannot see its own case`); continue; }
-    // Poll the STORE, not a message: the run is done when the frames are on disk.
-    await page.waitForFunction((want) => new Promise((res) => {
-      const rq = indexedDB.open("ips-batch");
-      rq.onerror = () => res(false);
-      rq.onsuccess = () => {
-        const db = rq.result;
-        if (!db.objectStoreNames.contains("meta")) { db.close(); return res(false); }
-        const c = db.transaction("meta").objectStore("meta").count();
-        c.onsuccess = () => { const n = c.result; db.close(); res(n >= want); };
-        c.onerror = () => { db.close(); res(false); };
-      };
-    }), files.length, { timeout: 600000 }).catch(() => {});
+    // WHICH PHOTOGRAPH IS ON THE CANVAS. The batch store is keyed on name, so
+    // getAll() comes back in filename order, which is not the order the session
+    // opens in — and nothing here ever checked that the frame being compared
+    // was the frame being shown. It happened to be the same file; a walk that
+    // is right by luck is a walk that will be wrong silently.
+    const openName = await page.evaluate(
+      () => document.querySelector(".session-thumb.active")?.getAttribute("title") || "",
+    );
+    if (!openName) { fail(`${label}: cannot tell which photograph is on the canvas`); continue; }
+    // The tile's title is the filename plus, sometimes, a status the strip is
+    // showing ("— still saving"). Cut that before the extension, or the stem is
+    // right only while the suffix happens to carry no dot of its own.
+    const stem = (n) => n.split(" \u2014 ")[0].trim().replace(/\.[^.]+$/, "");
 
-    const batch = await page.evaluate(`(async () => {
-      const read = ${READ};
-      const db = await new Promise((res, rej) => {
-        const rq = indexedDB.open("ips-batch");
-        rq.onsuccess = () => res(rq.result); rq.onerror = () => rej(rq.error);
-      });
-      const metas = await new Promise((res) => {
-        const r = db.transaction("meta").objectStore("meta").getAll();
-        r.onsuccess = () => res(r.result); r.onerror = () => res([]);
-      });
-      if (!metas.length) { db.close(); return null; }
-      const name = metas[0].name;
-      const chunks = await new Promise((res) => {
-        const r = db.transaction("chunks").objectStore("chunks")
-          .getAll(IDBKeyRange.bound([name, 0], [name, Infinity]));
-        r.onsuccess = () => res(r.result); r.onerror = () => res([]);
-      });
-      db.close();
-      if (!chunks.length) return null;
-      chunks.sort((a, z) => a.idx - z.idx);
-      let total = 0; for (const c of chunks) total += c.bytes.byteLength;
-      const all = new Uint8Array(total);
-      let at = 0; for (const c of chunks) { all.set(new Uint8Array(c.bytes), at); at += c.bytes.byteLength; }
-      const bm = await createImageBitmap(new Blob([all]));
-      const cv = document.createElement("canvas"); cv.width = bm.width; cv.height = bm.height;
-      cv.getContext("2d").drawImage(bm, 0, 0);
-      return { name, ...read(cv.getContext("2d").getImageData(0, 0, cv.width, cv.height).data) };
-    })()`);
+    // 2. BATCH PROCESS over the SAME files, ON AUTO AND ON "copy the current
+    //    edit" — two grades, because they are two different rulings and this
+    //    walk used to run NEITHER of them knowingly.
+    //
+    //    THE ORDER IS THE TEST. `pickGrade` sets the chosen grade and THEN opens
+    //    the file picker; writing to #batchFiles first runs the picker callback
+    //    with no grade chosen, and it falls back to { kind: "look", look:
+    //    currentLook() } whenever a photograph is open. So this walk spent its
+    //    whole life reporting an Auto batch while running a look grade — which
+    //    is also why a fix to the Auto assembly measured as changing nothing:
+    //    the branch it changed was never reached. Open the dialog, press the
+    //    grade, then hand over the files, exactly as a reader does.
+    for (const [gradeId, gradeLabel] of [["bcAuto", "Auto"], ["bcCurrent", "copy the current edit"]]) {
+      await page.evaluate(() => { indexedDB.deleteDatabase("ips-batch"); });
+      await page.waitForTimeout(600);
+      await page.evaluate(() => document.getElementById("batchBtn")?.click());
+      await page.waitForFunction(() => document.getElementById("batchDlg")?.open, null, { timeout: 30000 })
+        .catch(() => {});
+      const started = await page.evaluate((id) => {
+        const b = document.getElementById(id);
+        if (!b || b.hidden) return false;
+        b.click(); return true;
+      }, gradeId);
+      if (!started) { fail(`${label} / ${gradeLabel}: could not choose that grade — the walk cannot see its own case`); continue; }
+      await page.setInputFiles("#batchFiles", files);
 
-    if (!batch) { fail(`${label}: no batch output to read — the walk cannot see its own case`); continue; }
-    const dh = dHue(open.hue, batch.hue), dl = Math.abs(open.light - batch.light);
-    console.log(`  ${label.padEnd(12)} open  hue ${String(open.hue).padStart(3)} (${(open.share*100).toFixed(0)}%) light ${open.light.toFixed(1)}%`);
-    console.log(`  ${"".padEnd(12)} batch hue ${String(batch.hue).padStart(3)} (${(batch.share*100).toFixed(0)}%) light ${batch.light.toFixed(1)}%  ·  ${dh}deg, ${dl.toFixed(1)} points apart`);
-    // 30deg is one bin: inside it the two agree on which bin is biggest.
-    if (dh > 30 || dl > 8) fail(`${label}: a batch render disagrees with opening the same file — ${dh}deg and ${dl.toFixed(1)} points`);
-    else ok(`${label}: batch and open agree`);
+      // POLL THE STORE, and poll it from a place that can actually await. A
+      // Promise handed to waitForFunction is never awaited — the object itself
+      // is truthy, so such a poll passes on its first tick and the store gets
+      // read before the batch has written anything. page.evaluate DOES await,
+      // so the count is asked for there and the waiting is done out here.
+      let have = 0;
+      for (let i = 0; i < 600; i++) {
+        have = await page.evaluate(() => new Promise((res) => {
+          const rq = indexedDB.open("ips-batch");
+          rq.onerror = () => res(0);
+          rq.onsuccess = () => {
+            const db = rq.result;
+            if (!db.objectStoreNames.contains("meta")) { db.close(); return res(0); }
+            const c = db.transaction("meta").objectStore("meta").count();
+            c.onsuccess = () => { const n = c.result; db.close(); res(n); };
+            c.onerror = () => { db.close(); res(0); };
+          };
+        }));
+        if (have >= files.length) break;
+        await page.waitForTimeout(1000);
+      }
+
+      const batch = await page.evaluate(`(async (want) => {
+        const read = ${READ};
+        const db = await new Promise((res, rej) => {
+          const rq = indexedDB.open("ips-batch");
+          rq.onsuccess = () => res(rq.result); rq.onerror = () => rej(rq.error);
+        });
+        const metas = await new Promise((res) => {
+          const r = db.transaction("meta").objectStore("meta").getAll();
+          r.onsuccess = () => res(r.result); r.onerror = () => res([]);
+        });
+        const stem = (n) => n.replace(/\\.[^.]+$/, "");
+        const m = metas.find((x) => stem(x.name) === want);
+        if (!m) { db.close(); return { missing: metas.map((x) => x.name) }; }
+        const chunks = await new Promise((res) => {
+          const r = db.transaction("chunks").objectStore("chunks")
+            .getAll(IDBKeyRange.bound([m.name, 0], [m.name, Infinity]));
+          r.onsuccess = () => res(r.result); r.onerror = () => res([]);
+        });
+        db.close();
+        if (!chunks.length) return { missing: [m.name + " (no chunks)"] };
+        chunks.sort((a, z) => a.idx - z.idx);
+        let total = 0; for (const c of chunks) total += c.bytes.byteLength;
+        const all = new Uint8Array(total);
+        let at = 0; for (const c of chunks) { all.set(new Uint8Array(c.bytes), at); at += c.bytes.byteLength; }
+        const bm = await createImageBitmap(new Blob([all]));
+        const cv = document.createElement("canvas"); cv.width = bm.width; cv.height = bm.height;
+        cv.getContext("2d").drawImage(bm, 0, 0);
+        return { name: m.name, ...read(cv.getContext("2d").getImageData(0, 0, cv.width, cv.height).data) };
+      })(${JSON.stringify(stem(openName))})`);
+
+      if (!batch || batch.missing) {
+        fail(`${label} / ${gradeLabel}: no batch frame for ${openName} — the store holds ${JSON.stringify(batch?.missing ?? [])}`);
+        continue;
+      }
+      const dh = dHue(open.hue, batch.hue), dl = Math.abs(open.light - batch.light);
+      console.log(`  ${label.padEnd(12)} open  ${openName} hue ${String(open.hue).padStart(3)} (${(open.share*100).toFixed(0)}%) light ${open.light.toFixed(1)}%`);
+      console.log(`  ${"".padEnd(12)} batch ${batch.name} hue ${String(batch.hue).padStart(3)} (${(batch.share*100).toFixed(0)}%) light ${batch.light.toFixed(1)}%  ·  ${gradeLabel} · ${dh}deg, ${dl.toFixed(1)} points apart`);
+      // 30deg is one bin: inside it the two agree on which bin is biggest.
+      if (dh > 30 || dl > 8) fail(`${label} / ${gradeLabel}: a batch render disagrees with opening the same file — ${dh}deg and ${dl.toFixed(1)} points`);
+      else ok(`${label} / ${gradeLabel}: batch and open agree`);
+    }
   }
 
   // 3. A TILE FOR A PHOTOGRAPH NOBODY HAS OPENED, UNDER THE LOOK THE SET WEARS.
