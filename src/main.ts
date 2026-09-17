@@ -172,6 +172,7 @@ const params: EditParams = {
   sat: 1,
   contrast: 1,
   denoise: 0,
+  chroma: 0,
   tint: [1, 1, 1],
   glow: 0,
   sky: [0, 1, 1],
@@ -215,6 +216,7 @@ const ui = {
   wbB: $("wbB") as HTMLInputElement,
   expo: $("expo") as HTMLInputElement,
   dn: $("dn") as HTMLInputElement,
+  chroma: $("chroma") as HTMLInputElement,
   recover: $("recover") as HTMLInputElement,
   autoBtn: $("autoBtn") as HTMLButtonElement,
   irAutoWb: $("irAutoWb") as HTMLButtonElement,
@@ -992,6 +994,7 @@ function syncFromUI() {
   params.sharpen = Number(ui.sharpen.value);
   params.texture = Number(ui.texture.value);
   params.denoise = Number(ui.dn.value);
+  params.chroma = Number(ui.chroma.value);
   params.recover = Number(ui.recover.value);
   params.sky = [Number(ui.skyHue.value), Number(ui.skySat.value), Number(ui.skyLum.value)];
   params.foliage = [Number(ui.folHue.value), Number(ui.folSat.value), Number(ui.folLum.value)];
@@ -1025,6 +1028,7 @@ function syncToUI() {
   ui.wbB.value = String(toPos(params.wb[2], WB_LO, WB_HI));
   ui.expo.value = String(toPos(params.exposure, EX_LO, EX_HI));
   ui.dn.value = String(params.denoise);
+  ui.chroma.value = String(params.chroma ?? 0);
   ui.recover.value = String(params.recover ?? 0);
   ui.swapBtn.setAttribute("aria-pressed", String(params.swapRB));
   ui.hue.value = String(params.hue);
@@ -1637,6 +1641,7 @@ function cloneParams(p: EditParams): EditParams {
     sat: p.sat,
     contrast: p.contrast,
     denoise: p.denoise,
+    chroma: p.chroma ?? 0,
     tint: [...p.tint] as [number, number, number],
     glow: p.glow,
     sky: [...p.sky] as [number, number, number],
@@ -1723,6 +1728,7 @@ function applySnapshot(s: Snapshot) {
   params.sat = c.sat;
   params.contrast = c.contrast;
   params.denoise = c.denoise;
+  params.chroma = c.chroma ?? 0;
   params.tint = c.tint;
   params.glow = c.glow;
   params.sky = c.sky;
@@ -2336,7 +2342,7 @@ panelTabsEl.addEventListener("keydown", (e) => {
   setPanelTab((saved && (PANEL_TABS as readonly string[]).includes(saved) ? saved : "basic") as PanelTab);
 }
 
-for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.dn, ui.recover, ui.hue, ui.sat, ui.con, ui.glow, ui.lum,
+for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.dn, ui.chroma, ui.recover, ui.hue, ui.sat, ui.con, ui.glow, ui.lum,
   ui.hotspot, ui.hotspotSize, ui.hotspotColor, ui.vignette, ui.clarity, ui.dehaze, ui.sharpen, ui.texture,
   ui.skyHue, ui.skySat, ui.skyLum, ui.folHue, ui.folSat, ui.folLum, ...ui.tones]) {
   el.addEventListener("input", syncFromUI);
@@ -8995,6 +9001,10 @@ async function makeThumb(img: DecodedImage, MAX = 260, lens?: LensCurve | null, 
     wb,
     exposure: own ? own.params.exposure : base!.exposure,
     denoise: 0,
+    // Nor colour-smoothed, for the same reason: a 260px tile has already thrown
+    // away the high-frequency colour this removes, so running it would cost a
+    // neighbourhood pass per tile to change nothing anybody can see.
+    chroma: 0,
     recover: own ? (own.params.recover ?? 0) : base!.recover,
     // INHERITED FROM WHICHEVER PHOTOGRAPH WAS OPEN, WHICH IS A DIFFERENT FRAME'S
     // ANSWER. `cloneParams(params)` above carries the live swap onto a tile for a
@@ -12249,6 +12259,14 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["l
     exposure: snapPos(base.exposure, EX_LO, EX_HI),
     // THE SAME FLOOR applyLook APPLIES, over this photograph's own measurement.
     denoise: snapStep(Math.max(estimateDenoise(img), dnFloor ?? 0), 0.01), // the #dn slider's own step
+    // COLOUR NOISE IS PER-SHOT CORRECTIVE, like white balance and denoise, so a
+    // develop starts it at zero exactly as a fresh open does. `SavedLook` has no
+    // field for it on purpose (same reason it has none for denoise): a look
+    // drops onto any photograph and an absolute colour-smoothing value would put
+    // a heavy hand on a clean frame. The consequence, recorded rather than
+    // solved: developing with "copy the current edit" does not carry a colour
+    // noise setting the reader dialled in by hand.
+    chroma: 0,
     // THE SAME AUTOMATICS AN OPEN APPLIES. Highlight recovery was missing here
     // and nowhere else — a single open sets it, and so does the strip
     // thumbnail; batch was the only path that did not, so a frame with real

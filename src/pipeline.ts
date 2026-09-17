@@ -17,6 +17,16 @@ export interface EditParams {
   /** 0..1 bilateral strength, applied to LINEAR data BEFORE everything else
    *  (see raw/denoise.ts) — not part of compileEdit's per-pixel math. */
   denoise: number;
+  /** 0..1 how far COLOUR is mixed toward a plain blur of the same 5x5 that
+   *  `denoise` bilaterally filters — the LUMINANCE half keeps the bilateral's
+   *  edge-preserving mean either way. Its own strength because the two are not
+   *  the same problem: colour blotches carry almost no real information and can
+   *  be smoothed hard, while luminance speckle overlaps genuine texture in
+   *  foliage (IR-SCIENCE.md 4c-viii). Like `denoise`, it runs on the linear
+   *  data before everything else and is NOT part of compileEdit's per-pixel
+   *  math, so it is skipped in the .cube LUT bake for the same reason. 0 is
+   *  bit-identical to no chroma stage at all. */
+  chroma?: number;
   /** 0..1 highlight recovery — pulls genuinely sensor-clipped pixels toward
    *  post-white-balance NEUTRAL, scaled by clip severity. Runs AFTER WB and
    *  BEFORE the camera matrix, where "blown = neutral" is actually defined —

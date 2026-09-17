@@ -26,6 +26,19 @@ thumbnail pass will decode them. How many that is on a real folder is not known.
 The intended outcome: a quick look the reader can end, and a keep that does not
 re-render what was just rendered.
 
+**EVIDENCE FROM THE DEVICE, 2026-09-17.** A screen photograph taken right after
+keeping a quick look's pictures into a session shows the strip reading
+**"viewing 1 · adding 6 of 48"** with five tiles drawn and the rest still empty
+placeholders carrying only their file names. So the second half of this report is
+confirmed as a real observation rather than an impression: after the keep, the
+session is working through all forty-eight again.
+
+What it does NOT say is how many of those forty-eight arrived with a picture
+already built and were re-rendered anyway, against how many arrived with nothing
+because the quick look had not reached them. Those are the two numbers this item
+turns on and a photograph cannot carry either. It also shows the cost plainly:
+forty-eight frames is minutes of work with no way to stop it.
+
 ## Looked up
 
 Nothing external, and the reason is specific rather than dismissive: both halves
