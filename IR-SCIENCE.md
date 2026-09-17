@@ -1540,6 +1540,53 @@ texture fetches where it did 25. That is the price of the fix and it is stated
 rather than buried; the device test page (section 7j) is what measures whether an
 iPad finds it acceptable, and the radius is one constant if it does not.
 
+### 4c-xxiii. SKY BESIDE FOLIAGE: NOT BLEEDING, AND THE STARVATION IS FRAME-DEPENDENT
+
+Asked from the device after 4c-xxii shipped: is the widened filter reaching into
+the foliage and turning the sky beside a tree grey? Two mechanisms produce that
+appearance and they are opposites, so both were measured rather than chosen
+between.
+
+**BLEEDING — taps crossing the boundary, foliage pulled into sky pixels. It is
+not happening.** That is a BIAS and would raise the sky's mean brightness near
+the edge. Measured in distance bands from the foliage boundary, old filter
+against new: 0.6329 to 0.6332, 0.6327 to 0.6332, 0.6301 to 0.6302, unchanged in
+every band. The range weight is doing its job.
+
+**AND THE FIRST CUT OF THAT MEASUREMENT WAS CONFOUNDED**, which is worth keeping.
+Binning by distance from foliage also bins by sky DEPTH — on that frame the band
+60px from any foliage is the dark top of the sky (luma 0.494) and the 1-3px band
+is near the horizon (0.633). Deep sky is noisier whatever is beside it. The
+comparison only means something inside one narrow brightness slice.
+
+**STARVATION — the range term rejecting those taps, so a pixel among branches has
+few usable samples and keeps its speckle.** Real in principle, and on the
+reported frame it measures: speckle improves 4.1x in open sky but only 2.4x where
+the window is mostly foliage, leaving sky-in-the-branches 2.0x noisier than open
+sky where it had been 1.17x. Nothing got worse in absolute terms — 0.0077 to
+0.0032 — but the CONTRAST with its surroundings nearly doubled, which is how a
+defect becomes newly visible after everything around it is cleaned.
+
+**IT DOES NOT GENERALISE, AND THAT IS THE FINDING.** On two other frames the
+gradient is absent: NIR_1582 improves 1.92x among foliage against 2.02x in open
+sky, and NIR_1480 improves 2.15x against 1.86x — the branch-adjacent sky doing
+slightly BETTER. One frame in three. Not established as a cause of anything, and
+recorded that way rather than as a mechanism, because generalising a gradient
+from one frame is the mistake 4c-xvii already cost this file once.
+
+**WHAT THE PIPELINE CAN AND CANNOT REACH.** On a default open, glow, clarity,
+dehaze and vignette are all zero, and detail and sharpen are zero. The ONLY
+spatial stage running is the denoiser, at thirteen pixels — six each side.
+Nothing in the pipeline can produce a halo further out than that. An effect
+following a tree's outline at tens of pixels is either in the photograph — bright
+infrared foliage genuinely scatters into the sky beside it — or in the per-pixel
+hue stages, and it is not the smoothing.
+
+**AND A FITTED SCREENSHOT CANNOT SETTLE IT** (hub lesson 317). A fit-to-screen
+view is a downscale: it averages away per-pixel structure and can suggest
+structure that is not there. The sky beside the crown needs the raw or a 1:1 crop
+before anything further is claimed about that photograph.
+
 ### 4c-vii. THE OVERTURNED NUMBERS, KEPT ON PURPOSE
 
 4c-vi originally read that raising denoise did nothing to the ratio (NIR_1480
