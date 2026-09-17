@@ -5,7 +5,7 @@
 
 // Single source of truth for edit parameters lives in pipeline.ts so the GPU
 // preview and CPU export can never drift apart.
-import { toneEvaluator, toneIsIdentity, maskIsActive, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, LENS_GAIN_LO, LENS_GAIN_HI, type EditParams, type LocalMap, type CropRect } from "./pipeline";
+import { toneEvaluator, toneIsIdentity, maskIsActive, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, LENS_GAIN_LO, LENS_GAIN_HI, lensAreaMean, type EditParams, type LocalMap, type CropRect } from "./pipeline";
 import { toHalfBuffer } from "./half";
 export type { EditParams };
 
@@ -847,10 +847,16 @@ export class Renderer {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB32F, 1, 1, 0, gl.RGB, gl.FLOAT, new Float32Array([1, 1, 0]));
       return;
     }
+    // Normalised to its own area-weighted mean on the way into the texture, so
+    // the curve redistributes colour without tinting the frame. compileEdit
+    // does the same thing when it assembles its gains — lensAreaMean's contract
+    // says these are the only two places allowed to, and they must agree.
+    const areaR = cN > 1 ? lensAreaMean(kr) : 1;
+    const areaB = cN > 1 ? lensAreaMean(kb) : 1;
     const data = new Float32Array(n * 3);
     for (let i = 0; i < n; i++) {
-      data[i * 3] = cN > 1 ? kr![i] : 1;
-      data[i * 3 + 1] = cN > 1 ? kb![i] : 1;
+      data[i * 3] = cN > 1 ? kr![i] * areaR : 1;
+      data[i * 3 + 1] = cN > 1 ? kb![i] * areaB : 1;
       data[i * 3 + 2] = useB ? bump![i] : 0;
     }
     this.lensN = n;

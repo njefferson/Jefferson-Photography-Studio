@@ -1981,6 +1981,43 @@ in post, it is not vignetting inverted, and no flat-field correction survives a
 channel swap. Nobody found in this research ships an automatic, full-strength,
 profile-driven hot-spot correction. This app does.
 
+### 9g. WHAT SHIPPED, AND WHAT IT MEASURED
+
+The normalising term went in on 2026-09-17, in both renderers, from one exported
+helper (`lensAreaMean` in `src/pipeline.ts`) that states in its contract that
+`compileEdit` and `gl.ts`'s `setLensCurve` are the only two callers allowed and
+must agree. The curve is multiplied by its own area-weighted mean before it is
+applied; the shipped profile arrays are untouched.
+
+**The weights are the SENSOR's, not the frame's**, which is a decision rather
+than a detail: a flat was shot full-frame, so its average is an average over
+that shape, and normalising a cropped frame against its own crop would be
+normalising against a flat nobody shot.
+
+Measured as two real builds of the same source tree, the lone-oak frame under
+Aerochrome at open, foliage red-against-blue, correction off as 100%: before
+88.56 (77.4%), after 94.49 (82.6%). **The change gives back 23.0% of what the
+stage was taking.** An earlier figure of 43% was read off half-size views with a
+different pixel population and is superseded by this one.
+
+Two things had to be bit-identical and were, to zero: a frame with no matched
+curve, and a frame whose curve is already area-neutral. The frame with a real
+curve differs by 3.05e-1 at worst, which is the change itself.
+
+**What it does NOT fix.** The remaining 17.4% is the correction doing what the
+flat measured, and that is the strength. Kolari's limitation applies and this
+app still has no answer to it — a stored 1 cannot be right for every frame when
+how much stray light a frame carries depends on how much light is in the scene.
+Clip control against the raw white level, a per-image strength, and moving the
+stage out of the creative chain are all still owed; they are ranked in
+`docs/decisions/015-lens-correction-against-the-reference.md`.
+
+**And the bin interpolation was measured and NOT shipped.** Resampled twenty
+ways it changed this frame's numbers by nothing at four significant figures,
+because it only acts at ring boundaries and this frame shows no banding. Eighty
+hard steps still have no support in any reference and it stays owed, but it
+buys no picture today and it costs a texture-filtering change in the shader.
+
 ### 9f. What was NOT read
 
 Two sources were refused by this session's egress and the gap is recorded rather
