@@ -1169,6 +1169,92 @@ the operation reports as a fix in every number except the one it was for — whi
 is why the frame's own regions had to be measured separately before the sweep was
 believed, and were not.
 
+### 4c-xvi. THE NOISE IS PER CHANNEL, AND THIS PIPELINE IS WELL PLACED TO TREAT IT
+
+Read 2026-09-17 after the host was unblocked: LibRaw's *Channel Noise and Raw
+Converters* (www.libraw.org/articles/channel-noise-and-raw-converters.html),
+which compares dcraw, Adobe Camera Raw and Raw Photo Processor on one
+deliberately underexposed target at ISO 100.
+
+**WHAT IT ESTABLISHES.** Channels carry different noise by construction — the
+sensitivity difference between colour channels gives different per-channel detail
+and therefore different noise, and the Bayer array's doubled green photosites cut
+green's noise by about 1.4x, widening the gap further. The effect is worst in
+shadows, where signal-to-noise is lowest. Its closing section names this
+application almost exactly: feeding a contrasty channel into a CHANNEL MIXER on a
+landscape with sky makes the sky noisy, and the quiet channel is the AUXILIARY
+colour that creates a sky's fine gradations — so when the auxiliary channel is
+noisy, the gradations go murky.
+
+That is 4c-xi's measurement arriving from outside. `LOOKS.eir.mix3` IS a channel
+mixer; the sky's gradation IS manufactured from the channel with almost nothing
+in it. The roles are inverted for infrared — blue is the auxiliary here and red is
+the flooded one — and the mechanism is identical.
+
+**THE PART THAT WOULD HAVE BROKEN A PER-CHANNEL DESIGN, AND DOES NOT BREAK THIS
+ONE.** The article measures AHD demosaicing MIXING noise between channels: green
+comes out noisier because interpolation pulls in neighbouring channels, and red
+comes out cleaner for the same reason. Adobe Camera Raw shows low-frequency noise
+in green that the article says was carried in from red. A converter doing that has
+no clean per-channel noise left to treat by the time anything can act.
+
+**Checked here rather than assumed, and this pipeline does not do it.**
+`demosaicBinned` collapses each 2x2 quad to one pixel and averages only the two
+GREENS; red and blue are single photosites. `demosaicPixelLinearInto` averages
+same-coloured neighbours in a 3x3. Neither mixes across channels. White balance is
+three independent multiplies (`pipeline.ts`), not the combined balance-and-profile
+matrix the article names as the other mixing path, and the camera matrix runs
+AFTER the denoiser. So the channels arrive at `makeRowDenoiser` with their noise
+still separated, which is the condition per-channel treatment needs.
+
+Binning also means the preview's red and blue each come from ONE photosite, so
+per-channel work on the binned image is close to what a reader comment on that
+article calls the right answer — noise reduction before debayering — without the
+restructuring.
+
+**WHAT IT DOES NOT SAY.** It does not prescribe per-channel noise-reduction
+STRENGTH. It is a comparison of converters, and its practical conclusion is that
+the differences between converters are large enough to choose one over another.
+Per-channel strength is this repository's inference from it, not the article's
+recommendation, and it is recorded that way on purpose.
+
+**MEASURED HERE THE SAME DAY, nine frames.** Blue is the noisiest channel on every
+raw — 1.44x to 1.96x green — and gray-world lifts blue hardest on every one
+(1.52 to 1.85) while pulling red down (0.54 to 0.78). Pushed through the real swap
+and mixer, the original blue contributes 99.8%, 71.9% and 42.5% of the noise
+variance in the three output rows.
+
+**AND THE CAMERA JPEGS CANNOT BE MEASURED THIS WAY, WHICH IS ITSELF THE ANSWER FOR
+THEM.** Two of three read a median neighbour-difference of exactly zero in green
+and blue. That is a floor artefact — `linearAt` clamps at 1e-4, and a channel
+crushed to zero returns a constant whose median difference is zero. Their gains
+say why: red 0.050 against green 1.315, so red is roughly 26x green in mean and
+the camera has already crushed the quiet channels to nothing in the shadows. The
+camera JPEGs never showed this mottle because there is no channel noise left to
+amplify — the channel is gone before the app sees the file.
+
+### 4c-xvii. THE DEFECT IS NOT ONE FRAME, AND TWO WORSE ONES HAD NEVER BEEN OPENED
+
+Ground truth measured 2026-09-17 on three frames nobody had examined, because a
+per-channel prediction ranked them above the reported frame and treating an
+unmeasured frame as a negative is the mistake 4c-xv had just recorded.
+
+Sky evenness with the colour stage off: NIR_1582 reads **0.20** with 6.7% of the
+block carrying no hue, NIR_1480 reads **0.23** with 6.9%, against the REPORTED
+frame's 0.65 with 0% and the clean raw's 0.91. Two frames are substantially worse
+than the one that prompted all of this work.
+
+**The prediction orders them.** Across the three affected frames, sky evenness
+0.20 / 0.23 / 0.65 maps to predicted mixer-row noise 0.290 / 0.192 / 0.159 —
+monotonic, worse sky to higher prediction. Four of the five frames with ground
+truth order correctly.
+
+**The one miss is NIR_1502**, predicted second and reading a clean 0.92. It is
+unresolved and it may be the instrument rather than the prediction:
+`floor.mjs` reads a FIXED block at one corner of the canvas, so it cannot
+distinguish a clean sky from no deep sky in that block, and that frame's busiest
+block elsewhere reads 0.21. Recorded as open rather than explained away.
+
 ### 4c-vii. THE OVERTURNED NUMBERS, KEPT ON PURPOSE
 
 4c-vi originally read that raising denoise did nothing to the ratio (NIR_1480
