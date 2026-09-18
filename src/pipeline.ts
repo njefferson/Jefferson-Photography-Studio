@@ -592,13 +592,18 @@ export function smooth01(edge0: number, edge1: number, x: number): number {
 }
 
 /** Bilinear sample of a bitmap mask (0..1) at image-uv — brush (type 2) and sky
- *  (type 4). Replicates the GPU's LINEAR texture sampling EXACTLY: WebGL samples
+ *  (type 4). Takes `b`, the mask, and `u`, `v` in image uv (0..1); returns the
+ *  mask's value there, 0..1. What the result must satisfy: it is what the
+ *  shader's LINEAR sampler reads at the same uv, to filtering error — the
+ *  agreement walk holds the CPU export to the GPU on it, and the lift's sky
+ *  measurement (main.ts measureFrame) reads the sky's population through it.
+ *  Replicates the GPU's LINEAR texture sampling EXACTLY: WebGL samples
  *  at texel coordinate `u*size - 0.5` (texel centres) with CLAMP_TO_EDGE, not
  *  `u*(size-1)`. The two conventions agree only at u=0.5, so at a soft mask edge
  *  under a strong local adjustment the half-texel gap otherwise pushed a handful
  *  of edge pixels past the parity bar (found by the sky-mask harness, 2026-07-06
  *  — the sky's gaussian-feathered edge exposes what brush strokes mostly hid). */
-function sampleBrush(b: BrushMask, u: number, v: number): number {
+export function sampleBrush(b: BrushMask, u: number, v: number): number {
   const fx = Math.min(1, Math.max(0, u)) * b.w - 0.5;
   const fy = Math.min(1, Math.max(0, v)) * b.h - 0.5;
   const ix = Math.floor(fx), iy = Math.floor(fy);
@@ -921,10 +926,14 @@ export function hsv2rgb(h: number, s: number, v: number): [number, number, numbe
  *  none: a grey wall, a white cloud, an overcast sky, bare ground stay as the
  *  rotation left them, whatever the Sky and Foliage sliders ask for. Fitted
  *  constants, measured 2026-09-18 on five raws through the app's own export
- *  (IR-SCIENCE.md section 4b-vi carries the populations).
+ *  (IR-SCIENCE.md section 4b-vi): the colourless population sits under 0.06
+ *  in DISPLAY saturation and the foliage from 0.39 up, and this stage reads
+ *  LINEAR saturation before contrast and gamma, where display 0.061 is 0.13
+ *  and display 0.128 is 0.26 — so the whole colourless population is under
+ *  the gate and the whole foliage population over it.
  *  The shader reads the same two numbers by name. */
-export const SAT_GUARD_LO = 0.10;
-export const SAT_GUARD_HI = 0.20;
+export const SAT_GUARD_LO = 0.13;
+export const SAT_GUARD_HI = 0.26;
 
 /** THE SKY'S OWN GATE, for `skySat` — the same idea in DISPLAY space, because
  *  the sky stage runs after gamma: a sky pixel whose HSV saturation is under

@@ -30,7 +30,7 @@ import { writeZip, crc32 } from "./zip";
 import { putFrame, eachFrame, frameMetas, frameCount, clearFrames, frameStore } from "./batchstore";
 import * as Session from "./session";
 import { keepAwake } from "./wakelock";
-import { lensGain, LENS_GAIN_HI, LENS_GAIN_LO, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, bandWeight, rgb2hsv, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, type MaskLayer, type CropRect, BRUSH_MAX_EDGE } from "./pipeline";
+import { sampleBrush, lensGain, LENS_GAIN_HI, LENS_GAIN_LO, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, bandWeight, rgb2hsv, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, type MaskLayer, type CropRect, BRUSH_MAX_EDGE } from "./pipeline";
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, type HealSpot } from "./heal";
 import { makeStickerAsset, stickerRect, stickerWorldCorners, stickerXform, compositeStickersIntoRect8, compositeStickersIntoRectF32, compositeStickersOverlay8, type StickerAsset } from "./sticker";
 import { makeWarpField, encodeWarp, paintWarp, warpIsEmpty as warpFieldEmpty, type WarpField, type WarpTool } from "./warp";
@@ -2789,6 +2789,17 @@ function wireVersionMenu() {
 const FLAT_LUM_REF = 0.44;
 const FLAT_WARM_REF = 0.35;
 const FLAT_COOL_REF = 0.5;
+// SINCE 019 THE COLOUR HALF COMPOSES WITH THE LOOK AND AIMS AT PORTIONS. It
+// used to start from neutral bands and write its own answer over whatever the
+// look had set, and its cool half pushed the Sky HUE band — teals and blues
+// wherever they are. Now it starts from the look's own amounts (the Foliage
+// band and the Sky saturation of the look, or neutral with no look) and only
+// TOPS UP: the warm half through the Foliage band, gated by bandGain so a
+// grey stays grey, and the sky through `skySat` — where the sky IS, read
+// through the sky bitmap — so a frame with no sky, or an overcast one, gets
+// no sky boost at all. The references are the same numbers; what they are
+// measured on changed: FLAT_COOL_REF is now the SKY's mean saturation by
+// place, not the cool hue half's.
 const FLAT_TONE_MAX = 0.22; // the tone points clamp at ±0.25 of their default
 // "Shadows alive", as a measurement rather than a taste guess: the pull may not
 // take the frame's lower quartile below half of where it started. Relative on
@@ -2822,14 +2833,15 @@ let liftAmount = 1;
  *  targets keeps the solve idempotent and keeps every intermediate value on the
  *  same sliders — half strength is half the tone pull and half the extra
  *  saturation, not a different correction. */
-function scaleLift<T extends { tone: number[]; foliage: number[]; sky: number[]; pull: number }>(r: T, amt: number): T {
+function scaleLift<T extends { tone: number[]; foliage: number[]; sky: number[]; skySat: number; pull: number }>(r: T, amt: number, base: LiftBase = liftBaseNeutral()): T {
   if (amt >= 1) return r;
   const mix = (from: number, to: number) => from + (to - from) * amt;
   return {
     ...r,
     tone: r.tone.map((v, i) => mix(TONE_DEFAULT[i], v)),
-    foliage: [r.foliage[0], mix(1, r.foliage[1]), r.foliage[2]],
-    sky: [r.sky[0], mix(1, r.sky[1]), r.sky[2]],
+    foliage: [r.foliage[0], mix(base.foliage[1], r.foliage[1]), r.foliage[2]],
+    sky: [r.sky[0], mix(base.sky[1], r.sky[1]), r.sky[2]],
+    skySat: mix(base.skySat, r.skySat),
     pull: r.pull * amt,
   };
 }
@@ -2843,10 +2855,32 @@ const FLAT_SHADOW_FLOOR = 0.02;
 const LIFT_GRID = 64;
 const LIFT_BISECT = 6;
 const FLAT_BAND_MAX = 2; // the sky/foliage saturation sliders' own ceiling
+const SKY_SAT_MAX = 2;   // the Sky saturation slider's own ceiling (EditParams.skySat)
 /** A band with nothing done to it: hue shift 0, saturation 1, lightness 1 —
  *  the same triple `pcReset` writes and the same one `makeThumb` starts from.
  *  Named because three places were spelling it out and a fourth needed it. */
 const BAND_NEUTRAL: [number, number, number] = [0, 1, 1];
+/** Where the lift starts from: the look's own per-population amounts, so the
+ *  lift tops up rather than overwrites. Neutral with no look. */
+interface LiftBase { foliage: [number, number, number]; sky: [number, number, number]; skySat: number }
+const liftBaseNeutral = (): LiftBase => ({ foliage: [...BAND_NEUTRAL], sky: [...BAND_NEUTRAL], skySat: 0 });
+/** The lift's starting point for `img` under the built-in look `name` (null:
+ *  no look). Takes the photograph (for its kind: raw or camera-rendered, the
+ *  look's per-kind block) and the look's key. Returns the look's Foliage and
+ *  Sky bands and its Sky saturation, or neutral. What the result must
+ *  satisfy: it equals what applyLook writes onto params for that look, or
+ *  the lift would top up from the wrong place and the tile, the batch and the
+ *  screen would disagree. */
+function liftBaseFor(img: DecodedImage, name: string | null): LiftBase {
+  const l = name ? LOOKS[name] : null;
+  if (!l) return liftBaseNeutral();
+  const strength = img.camMatrix ? l.raw : l.jpeg;
+  return {
+    foliage: strength.foliage ? [...strength.foliage] : [...BAND_NEUTRAL],
+    sky: strength.sky ? [...strength.sky] : [...BAND_NEUTRAL],
+    skySat: l.skySat ?? 0,
+  };
+}
 
 /** Median luminance and per-band saturation of the frame as the given params
  *  render it — sampled on a coarse grid through the SAME compileEdit the
@@ -2874,24 +2908,28 @@ function coolContent(img: DecodedImage, p: EditParams, swapRB = p.swapRB): numbe
   return measureFrame(neutral, img, 96).coolSat;
 }
 
-function measureFrame(p: EditParams, img: DecodedImage, divisions = LIFT_GRID): { lumP50: number; lumP25: number; warmSat: number; coolSat: number } {
+function measureFrame(p: EditParams, img: DecodedImage, divisions = LIFT_GRID, skyMask: BrushMask | null = null): { lumP50: number; lumP25: number; warmSat: number; coolSat: number; skySat: number } {
   const step = Math.max(1, Math.floor(Math.min(img.width, img.height) / divisions));
   // The lens curve too: this measures what the pipeline produces, and the
-  // correction is part of it.
-  const edit = compileEdit(p, img.camMatrix, img.width / Math.max(1, img.height), undefined, currentLensCurve());
+  // correction is part of it. With a sky bitmap the edit runs with a position,
+  // so the sky's own saturation stage (skySat) is in what is measured — the
+  // lift solves that stage against the SKY population, by place, below.
+  const edit = compileEdit(p, img.camMatrix, img.width / Math.max(1, img.height), undefined, currentLensCurve(), null, skyMask);
   const px = new Float32Array(3);
   const lums: number[] = [];
-  let warmW = 0, warmS = 0, coolW = 0, coolS = 0;
+  let warmW = 0, warmS = 0, coolW = 0, coolS = 0, skyW = 0, skyS = 0;
   for (let y = 0; y < img.height; y += step) {
     for (let x = 0; x < img.width; x += step) {
       const [r, g, b] = linearAt(img, x, y);
-      edit(r, g, b, px, 0, undefined, undefined);
+      const u = (x + 0.5) / img.width, v = (y + 0.5) / img.height;
+      edit(r, g, b, px, 0, skyMask ? u : undefined, skyMask ? v : undefined);
       const cr = clamp(px[0], 0, 1), cg = clamp(px[1], 0, 1), cb = clamp(px[2], 0, 1);
       lums.push(0.2126 * cr + 0.7152 * cg + 0.0722 * cb);
       const [h, sat] = rgb2hsv(cr, cg, cb);
       const wS = bandWeight(h, p.swapRB ? 30 : 210, 55, 105);
       coolW += wS; coolS += sat * wS;
       warmW += 1 - wS; warmS += sat * (1 - wS);
+      if (skyMask && sampleBrush(skyMask, u, v) > 0.5) { skyW++; skyS += sat; }
     }
   }
   lums.sort((a, b) => a - b);
@@ -2900,6 +2938,7 @@ function measureFrame(p: EditParams, img: DecodedImage, divisions = LIFT_GRID): 
     lumP25: lums[Math.floor(lums.length * 0.25)] ?? 0,
     warmSat: warmW > 0 ? warmS / warmW : 0,
     coolSat: coolW > 0 ? coolS / coolW : 0,
+    skySat: skyW > 0 ? skyS / skyW : 0,
   };
 }
 
@@ -2914,7 +2953,7 @@ function flatTone(k: number): [number, number, number, number, number] {
  *  the values to apply — or null when the frame already measures where a frame
  *  with open sky lands, which is the no-op case and must stay one. Pure: it
  *  changes nothing, so open, applyLook and the toggle can all use it. */
-function solveLift(withColour: boolean, img: DecodedImage, params: EditParams): { tone: [number, number, number, number, number]; foliage: [number, number, number]; sky: [number, number, number]; pull: number } | null {
+function solveLift(withColour: boolean, img: DecodedImage, params: EditParams, skyMask: BrushMask | null = null, base0: LiftBase = liftBaseNeutral()): { tone: [number, number, number, number, number]; foliage: [number, number, number]; sky: [number, number, number]; skySat: number; pull: number } | null {
   // Measure the frame WITHOUT a lift on it. The creative grade — tone included
   // — carries across opens by design, so `params.tone` on a fresh open is
   // whatever the last photo ended with; measuring that and then deciding
@@ -2935,9 +2974,10 @@ function solveLift(withColour: boolean, img: DecodedImage, params: EditParams): 
   // different answer from the one the photo opened with. A toggle whose two
   // states disagree is the bug; making all three start from neutral is what
   // makes the solve idempotent.
-  base.sky = [...BAND_NEUTRAL] as typeof base.sky;
-  base.foliage = [...BAND_NEUTRAL] as typeof base.foliage;
-  const before = measureFrame(base, img);
+  base.sky = [...base0.sky] as typeof base.sky;
+  base.foliage = [...base0.foliage] as typeof base.foliage;
+  base.skySat = base0.skySat;
+  const before = measureFrame(base, img, LIFT_GRID, skyMask);
   // Only ever pull DOWN and push UP: a frame already at or past the reference
   // is left exactly as it is rather than being dragged to the average.
   //
@@ -2951,12 +2991,16 @@ function solveLift(withColour: boolean, img: DecodedImage, params: EditParams): 
   // such dependency — a frame opens too bright or it does not.
   const needsTone = before.lumP50 > FLAT_LUM_REF + 0.01;
   const needsWarm = withColour && before.warmSat < FLAT_WARM_REF - 0.01;
-  const needsCool = withColour && before.coolSat < FLAT_COOL_REF - 0.01;
-  if (!needsTone && !needsWarm && !needsCool) {
+  // The sky by PLACE: only with a bitmap, only where one found a sky, and
+  // only when that sky has some colour to scale (an overcast reads near 0 and
+  // is left alone — the gate in the stage would leave it anyway).
+  const needsSky = withColour && !!skyMask && before.skySat > 1e-4 && before.skySat < FLAT_COOL_REF - 0.01;
+  if (!needsTone && !needsWarm && !needsSky) {
     // Nothing to do for THIS frame — but the tone it inherited may be a lift
     // solved for a different one, so hand back the neutral curve rather than
-    // leaving that in place.
-    return { tone: [...TONE_DEFAULT] as [number, number, number, number, number], foliage: [...base.foliage] as [number, number, number], sky: [...base.sky] as [number, number, number], pull: 0 };
+    // leaving that in place. The bands and the sky's amount go back to the
+    // look's own.
+    return { tone: [...TONE_DEFAULT] as [number, number, number, number, number], foliage: [...base.foliage] as [number, number, number], sky: [...base.sky] as [number, number, number], skySat: base0.skySat, pull: 0 };
   }
   const trial = cloneParams(base);
   const shadowFloor = Math.max(FLAT_SHADOW_FLOOR, before.lumP25 * FLAT_SHADOW_KEEP);
@@ -2966,7 +3010,7 @@ function solveLift(withColour: boolean, img: DecodedImage, params: EditParams): 
     for (let i = 0; i < LIFT_BISECT; i++) {
       const mid = (lo + hi) / 2;
       trial.tone = flatTone(mid);
-      const m = measureFrame(trial, img);
+      const m = measureFrame(trial, img, LIFT_GRID, skyMask);
       // Two stopping conditions: the median reaching the reference, and the
       // shadows not being crushed to get there — whichever binds first.
       if (m.lumP50 > FLAT_LUM_REF && m.lumP25 > shadowFloor) lo = mid;
@@ -2975,53 +3019,64 @@ function solveLift(withColour: boolean, img: DecodedImage, params: EditParams): 
     k = lo;
   }
   trial.tone = flatTone(k);
-  const after = measureFrame(trial, img);
+  const after = measureFrame(trial, img, LIFT_GRID, skyMask);
   const solve = (measured: number, ref: number) => (measured > 1e-4 ? clamp(ref / measured, 1, FLAT_BAND_MAX) : 1);
+  // The sky's amount scales chroma by (1 + skySat), so the top-up that reaches
+  // the reference from a measured mean is a ratio on (1 + skySat), never below
+  // the look's own amount and never past the slider's ceiling.
+  const solveSky = (from: number, measured: number) => (measured > 1e-4 ? clamp((1 + from) * FLAT_COOL_REF / measured - 1, base0.skySat, SKY_SAT_MAX) : from);
   if (withColour) {
-    trial.foliage = [base.foliage[0], solve(after.warmSat, FLAT_WARM_REF), base.foliage[2]];
-    trial.sky = [base.sky[0], solve(after.coolSat, FLAT_COOL_REF), base.sky[2]];
-    const check = measureFrame(trial, img);
+    trial.foliage = [base.foliage[0], clamp(base.foliage[1] * solve(after.warmSat, FLAT_WARM_REF), 1, FLAT_BAND_MAX), base.foliage[2]];
+    trial.sky = [...base.sky] as typeof trial.sky; // the Sky HUE band is the look's and the reader's; the lift no longer writes it
+    if (needsSky) trial.skySat = solveSky(base.skySat, after.skySat);
+    const check = measureFrame(trial, img, LIFT_GRID, skyMask);
     trial.foliage[1] = clamp(trial.foliage[1] * solve(check.warmSat, FLAT_WARM_REF), 1, FLAT_BAND_MAX);
-    trial.sky[1] = clamp(trial.sky[1] * solve(check.coolSat, FLAT_COOL_REF), 1, FLAT_BAND_MAX);
+    if (needsSky) trial.skySat = solveSky(trial.skySat ?? base0.skySat, check.skySat);
   }
   return {
     tone: trial.tone as [number, number, number, number, number],
     foliage: trial.foliage as [number, number, number],
     sky: trial.sky as [number, number, number],
+    skySat: trial.skySat ?? base0.skySat,
     pull: k,
   };
 }
 
 /** What the lift last wrote, so turning it off can put back what it replaced —
  *  and so a value the reader has since changed BY HAND is left alone. */
-let liftApplied: { tone: string; foliage: string; sky: string; prevTone: number[]; prevFoliage: number[]; prevSky: number[] } | null = null;
+let liftApplied: { tone: string; foliage: string; sky: string; skySat: string; prevTone: number[]; prevFoliage: number[]; prevSky: number[]; prevSkySat: number } | null = null;
 
 /** Run the lift on the current photo. Returns what it did, for the caller to
  *  report (or not — at open it is silent; the sliders show it). */
 function applyLift(withColour: boolean): { pull: number; foliage: number; sky: number } | null {
   if (!current) return null;
-  const solved = solveLift(withColour, current, params);
+  // From the look's own amounts, and with the sky by place: the coarse bitmap
+  // is built here if the worker's selection has not landed yet, so the answer
+  // at open is the same answer a moment later.
+  const base = liftBaseFor(current, withColour ? activeLook : null);
+  const solved = solveLift(withColour, current, params, withColour ? skyMaskFor(current) : null, base);
   if (!solved) { liftApplied = null; liftState(false, withColour); return null; }
-  const r = scaleLift(solved, liftAmount);
-  const noop = r.pull === 0 && r.foliage[1] === 1 && r.sky[1] === 1;
+  const r = scaleLift(solved, liftAmount, base);
+  const noop = r.pull === 0 && r.foliage[1] === base.foliage[1] && r.skySat === base.skySat;
   liftApplied = {
     // What the frame is WITHOUT a lift, which is what turning it off should
     // give back — not whatever curve the previous photo happened to leave
     // behind. Solving and reverting have to agree on that, or the toggle is not
     // a round trip (it was not: turning it off put another photo's curve on
     // this one, and the two states could not be compared).
-    // All three neutral, for the reason in solveLift: the lift now solves from
-    // neutral bands, so turning it off has to give neutral bands back or the
-    // toggle is not a round trip.
-    prevTone: [...TONE_DEFAULT], prevFoliage: [...BAND_NEUTRAL], prevSky: [...BAND_NEUTRAL],
-    tone: r.tone.join(","), foliage: r.foliage.join(","), sky: r.sky.join(","),
+    // The bands and the sky's amount go back to the LOOK'S OWN (019): the
+    // lift solves from them and tops up, so turning it off has to give the
+    // look's values back or the toggle is not a round trip.
+    prevTone: [...TONE_DEFAULT], prevFoliage: [...base.foliage], prevSky: [...base.sky], prevSkySat: base.skySat,
+    tone: r.tone.join(","), foliage: r.foliage.join(","), sky: r.sky.join(","), skySat: String(r.skySat),
   };
   params.tone = r.tone;
   params.foliage = r.foliage;
   params.sky = r.sky;
+  params.skySat = r.skySat;
   if (noop) { liftApplied = null; liftState(false, withColour); return null; }
   liftState(true, withColour);
-  return { pull: r.pull, foliage: r.foliage[1], sky: r.sky[1] };
+  return { pull: r.pull, foliage: r.foliage[1], sky: r.skySat };
 }
 
 /** SAY WHEN THE FILE CANNOT CARRY THE LOOK. Silence here means handing over a
@@ -3187,6 +3242,7 @@ function removeLift(): void {
   if (untouched(params.tone, a.tone)) params.tone = [...a.prevTone] as typeof params.tone;
   if (untouched(params.foliage, a.foliage)) params.foliage = [...a.prevFoliage] as typeof params.foliage;
   if (untouched(params.sky, a.sky)) params.sky = [...a.prevSky] as typeof params.sky;
+  if (untouched([params.skySat ?? 0], a.skySat)) params.skySat = a.prevSkySat;
 }
 
 // The toggle. Pressed = this frame is adapted; press again and it is not — the
@@ -9512,9 +9568,10 @@ async function makeThumb(img: DecodedImage, MAX = 260, lens?: LensCurve | null, 
     p.exposure = autoExposure(img, p.wb);
   }
   if (autoLift && !own) {
-    const solved = solveLift(activeLook !== null, img, p);
-    const lift = solved && scaleLift(solved, liftAmount);
-    if (lift) { p.tone = lift.tone as typeof p.tone; p.sky = lift.sky as typeof p.sky; p.foliage = lift.foliage as typeof p.foliage; }
+    const base = liftBaseFor(img, activeLook);
+    const solved = solveLift(activeLook !== null, img, p, activeLook !== null ? skyMaskFor(img) : null, base);
+    const lift = solved && scaleLift(solved, liftAmount, base);
+    if (lift) { p.tone = lift.tone as typeof p.tone; p.sky = lift.sky as typeof p.sky; p.foliage = lift.foliage as typeof p.foliage; p.skySat = lift.skySat; }
   }
   // THE PHOTO'S DISPLAY ROTATION, which this never applied. `img.rotate` is the
   // EXIF Orientation tag as 90-degree CW steps, and the main view has always
@@ -12687,7 +12744,13 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["l
              sky: strength.sky ? [...strength.sky] as [number, number, number] : [0, 1, 1],
              foliage: strength.foliage ? [...strength.foliage] as [number, number, number] : [0, 1, 1],
              hsl: lhsl && lhsl.length === 24 ? [...lhsl] : hslDefault(),
-             mix3: l.mix3 ? [...l.mix3] : [...MIX3_DEFAULT] };
+             mix3: l.mix3 ? [...l.mix3] : [...MIX3_DEFAULT],
+             // AND THE STAGES A LOOK CARRIES BESIDE ITS COLOUR, which this also
+             // dropped: the sky's smoothing, depth and saturation and the local
+             // contrast the look brings back. Without them a batch under
+             // Aerochrome rendered its sky unsmoothed and its canopy flatter
+             // than the screen, under the same name (2026-09-18).
+             skySmooth: l.skySmooth ?? 0, skyDepth: l.skyDepth ?? 0, skySat: l.skySat ?? 0, texture: l.texture ?? 0 };
     // AND ITS DENOISE FLOOR, for the same reason the two lines above carry
     // `hsl` and `mix3`: what the screen renders under a name and what a .zip
     // renders under that name have to be one picture. `SavedLook` has no
@@ -12786,9 +12849,10 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["l
   // materials into the sky and foliage bands — the auto-balance-only choice
   // gets the tonal half alone, matching a bare open.
   if (autoLift) {
-    const solved = solveLift(hasLook, img, p);
-    const lift = solved && scaleLift(solved, liftAmount);
-    if (lift) { p.tone = lift.tone as typeof p.tone; p.sky = lift.sky as typeof p.sky; p.foliage = lift.foliage as typeof p.foliage; }
+    const base: LiftBase = hasLook ? { foliage: [...look.foliage] as [number, number, number], sky: [...look.sky] as [number, number, number], skySat: look.skySat ?? 0 } : liftBaseNeutral();
+    const solved = solveLift(hasLook, img, p, hasLook ? skyMaskFor(img) : null, base);
+    const lift = solved && scaleLift(solved, liftAmount, base);
+    if (lift) { p.tone = lift.tone as typeof p.tone; p.sky = lift.sky as typeof p.sky; p.foliage = lift.foliage as typeof p.foliage; p.skySat = lift.skySat; }
   }
   return p;
 }

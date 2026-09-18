@@ -750,6 +750,88 @@ instrument, which was green on all three.
    edge from the guide — a 25 px ramp across a hard edge comes back 4 px
    wide, the probe's control — and the mask is solid to the roofline.
 
+### 4b-vi. SATURATION BY POPULATION — FOLIAGE, SKY, AND NOTHING THAT HAS NO COLOUR
+
+**The report, 2026-09-18, from staging 2.50.10 on the device:** the look's
+saturation reads too high across the whole frame; it needs aiming at the
+foliage and at the sky as two separate amounts; and anything that has no
+colour must be left as it is. The framing behind it, restated the same hour:
+think about what needs to happen to which PORTION of the photograph, never
+about the whole. That framing is the rule for everything below.
+
+**What the look actually did**, read from `LOOKS.eir` and both pipelines: a
+GLOBAL saturation of 3.0 on every raw pixel (faded only under luma 0.2), then
+a POWER curve of 2 on the aqua and blue chips of the eight-band mixer,
+`s^(1/2)`, which lifts the palest pixels most — 0.02 leaves the chip at 0.14.
+The foliage's own bands sat at 1; its colour came entirely from the global
+gain, and so did the colour on everything else.
+
+**Measured, on the app's own 50% export of five raws** (`satpop.mjs`,
+populations classified on the look's BARE mapping — Saturation 1, chips 1,
+sky stages 0 — and read back under the shipped look; HSV saturation in
+display space; off-sky pixels darker than value 0.05 excluded, because a
+near-black pixel with one channel clamped to zero reads saturation 1 and means
+nothing, which the first run did not know):
+
+- **The colourless population** — off the sky, saturation under 0.06 on the
+  bare mapping — sat at 0.031–0.035 on every frame. Under the shipped look it
+  read 0.155 (NIR_3406), 0.211 (1376), 0.237 (1651), 0.190 (2082), 0.183
+  (0063), with 36–65% of those pixels above 0.15, the threshold at which a
+  cast is plainly a colour. That is the complaint, as a number.
+- **The foliage** — the bare mapping's own red, hue 320°..40°, off the sky —
+  is already coloured BEFORE any gain: 0.594 (3406), 0.386 (1376), 0.416
+  (1651), 0.422 (2082), 0.647 (0063). The rotation gives it that; the global
+  gain took it to 0.59–0.82 and clipped it.
+- **The sky, by place** (node's `buildSkyMask`, weight over 0.85): bare 0.122
+  (3406), 0.306 (1376), 0.271 (1651), 0.038 (2082, overcast), 0.113 (0063);
+  shipped 0.573, 0.958, 0.890, 0.259, 0.577. The overcast sky went from grey
+  to blue-grey; the pale skies went to 0.58 and the blue ones to 0.9+.
+
+**So the three populations are separable, and by different properties.**
+Foliage by WHAT IT IS (hue, and it arrives with colour); the sky by WHERE IT
+IS (the selection built at open — 4b-v); the colourless by WHAT THEY LACK
+(saturation under 0.06 on the bare mapping). A single gain cannot see any of
+that, which is why the global 3.0 coloured the gravel with the trees.
+
+**The mechanism (decision 019).**
+
+- **Global saturation 1** in the look; the aqua and blue chips back to 1.
+- **Foliage through the Colour tab's Foliage band**, the look's own amount,
+  and every band BOOST gated on the pixel's own chroma — `bandGain` in
+  `pipeline.ts`, the same function by name in the shader: none of the boost
+  under `SAT_GUARD_LO`, all of it over `SAT_GUARD_HI`, HSV saturation in
+  LINEAR light at the band stage. Reductions are not gated; taking colour out
+  of a neutral costs nothing.
+- **The sky through the selection**, a Sky saturation slider beside Sky
+  depth (`skySat`): each sky pixel's chroma scaled about its luma where the
+  refined bitmap says sky, gated on the pixel's own saturation in DISPLAY
+  space (`SKY_SAT_GATE_LO..HI`, the stage runs after gamma), so a cloud, a
+  haze and an overcast sky stay as grey as they are and nothing outside the
+  sky is touched. After the smoothing blend (the map's target is the
+  unboosted sky) and before the depth, with which it commutes.
+- **Restore depth composes instead of overwriting.** Its colour half used
+  to solve both HUE bands from neutral and write over whatever the look set;
+  its cool half was a sky by hue. It now starts from the look's own amounts
+  and tops up — the warm half through the Foliage band, gated; the sky
+  through `skySat`, measured on the sky population BY PLACE through the sky
+  bitmap — so a frame with no sky, or an overcast one, gets no sky boost.
+  Same references (0.35 warm, 0.50 sky); what they are measured on changed.
+- **A built-in look's sky stages and texture now reach a batch at all.**
+  `batchParamsFor` built a built-in look from `neutralLook()` plus its colour
+  fields and never copied `skySmooth`, `skyDepth` or `texture`, so a .zip
+  under Aerochrome rendered its sky unsmoothed and its canopy flatter than the
+  screen under the same name. Found while adding `skySat` beside them.
+
+**Where the gates sit, and why.** The band gate reads LINEAR HSV saturation
+before contrast and gamma; the classification above is in display space.
+For a small saturation the two relate as `s_display = 1 − (1 − s_linear)^(1/2.2)`:
+linear 0.13 is display 0.061 and linear 0.26 is display 0.128. So
+`SAT_GUARD_LO..HI = 0.13..0.26` puts the whole colourless population (display
+under 0.06) below the gate and the whole foliage population (display 0.39
+and up) above it, with the ramp across the pale ground between. The sky's
+gate is set in display space from the sky quantiles of the canvas instrument
+(below).
+
 ## 4c. THE CRUX IS NIR CONTAMINATION, AND A ROTATION ALONE CANNOT FIX IT
 
 **Researched 2026-09-16, after shipping the rotation bare and reporting that it
