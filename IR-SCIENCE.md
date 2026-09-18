@@ -555,6 +555,64 @@ keeps branches and clouds out of it. A depth carried by that selection and
 that gate reaches the sky's value without the band's reach into the ground.
 Its prototype and what it measured are the next paragraph.
 
+**THE MASK DEPTH, PROTOTYPED TWICE THE SAME DAY (not shipped; the patches are
+in the session scratchpad, the numbers are here).** A multiplier on the pixel
+after the smoothing blend, `1 − depth · mask · gate`, depth 0.5, in both
+pipelines, rendered on the same seven frames through the same harness.
+
+- *Prototype 1 — the mask and the stage's chroma gate only.* Reaches the film
+  where the mask is right: 3406 sky value 0.76 → 0.40, 1376 0.55 → 0.38, 1644
+  0.65 → 0.42, 0063 0.89 → 0.51; concrete, field and foliage untouched on those
+  frames (neutrals 0.4% darkened on 1376, 0.3% on 0063). And darkens the wrong
+  thing where the mask is wrong: NIR_0627 has no sky, `buildSkyMask` gives it
+  58% anyway, and its blurred red background went from value 0.42 to 0.28 with
+  28% of its neutrals darkened — the map's target there IS the background's
+  own chroma, so the stage's gate passes everything.
+- *Prototype 2 — the same, weighted by the pixel's own hue (175–245°, fading
+  over 25°) and chroma (12–36/255).* Fixes the false positive outright: 0627
+  0.1% of the frame moved, foliage 0.42 → 0.42; every frame's grey neutrals
+  0.0% darkened; foliage value unchanged to two decimals on all seven. Sky
+  value 3406 0.43, 1376 0.39, 1644 0.42, 0063 0.51, 2082 0.59, 1651 0.62.
+  Combined with the band saturation: 3406 0.56 at 0.41, 1376 0.81 at 0.40, 1644
+  0.87 at 0.43 — the film's 0.66 at 0.32 within a tenth on both axes for the
+  first time. Speckle instrument unchanged (3406 5.1% at 0.205). On the
+  EXPORT (same instrument as above, Pink IR's 16.8 anchor held in the same
+  run): NIR_3406 stage off → on 17.4 → 1.6, NIR_1376 5.7 → 1.2 — but the
+  mean chroma halves with it (80.5 → 40.0, 69.1 → 34.3), because a multiplier
+  on the pixel scales chroma with luma. The residual's share of the sky's
+  chroma is what it was; the number is smaller because the sky is darker.
+
+**AND THE PICTURES SAY IT CANNOT SHIP ON TODAY'S MASK.** Three costs, all
+visible on the sheets, none of them in the film instrument's numbers:
+- **A rim at every sky boundary.** The mask is a 384 px bitmap feathered at
+  0.5, upsampled seven times to the working copy; the depth rides its ramp,
+  and the horizon haze just above NIR_3406's roofline sits below the chroma
+  gates, so a pale band stays where the sky above it went dark. NIR_1376 shows
+  it as a lighter halo around the oak's crown, NIR_2082 along every roof and
+  wire. A luma multiplier cannot hide a soft mask the way a chroma blend can.
+- **Speckle on a hazy sky.** NIR_2082's overcast sky reads saturation 0.21;
+  its pixels' hue and chroma are noise around that, so a depth keyed on either
+  darkens half of them and leaves the rest — a snowstorm of pale dots over
+  grey. The band luminance at 0.5 does the same there, for the same reason.
+  The film would not darken an overcast sky at all (white light records
+  through every layer); the proxy for "blue sky" here is chroma, and a pale
+  sky's chroma is not a signal at pixel scale.
+- **A seam under a cloud.** NIR_1651: the cloud is spared by the gates and the
+  clear sky beneath it is not, and the boundary between them is the gate's
+  width, not the cloud's edge.
+
+**So the value half is a SELECTION problem before it is a colour one.** What
+it needs, in order: the sky bitmap refined to the working copy's edges (a
+guided or edge-aware upsample of `buildSkyMask`'s output against the frame's
+own luma, so the ramp follows the roofline rather than a 384 px feather); the
+depth keyed on the map's LOCAL sky chroma — the 128-texel target the stage
+already carries — rather than the pixel's, so a hazy sky is left pale as a
+whole and a deep one darkened as a whole, with no per-pixel lottery; and a
+window on that local chroma that leaves an overcast sky alone, which is the
+film's physics rather than a taste. Recorded in decision 017 as the route,
+ranked behind the saturation half and beside 006 (mask by subject), whose
+selection this is.
+
 ## 4c. THE CRUX IS NIR CONTAMINATION, AND A ROTATION ALONE CANNOT FIX IT
 
 **Researched 2026-09-16, after shipping the rotation bare and reporting that it

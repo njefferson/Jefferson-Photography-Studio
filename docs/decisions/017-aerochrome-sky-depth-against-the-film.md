@@ -63,14 +63,21 @@ darkens the sky by darkening everything.
 
 ## Options
 
-1. **Solve the look's Sky band saturation and luminance against the film**, the
-   way 4b-iii solved the hue bands: targets 0.66 at 0.32 (lighter filter, the
-   reference the angles were solved to) on the six solve frames, hold-one-out,
-   with the film's spread as a ceiling; verified by substituting back through
-   the real pipeline and measuring as the film was measured; rendered as a
-   sheet beside the shipped look before anything ships; the sky residual
-   measured with the stage on beside each candidate. In-house method, and the
-   lever the field uses.
+1. **Saturation by the look's aqua and blue bands, value by a depth carried by
+   the sky SELECTION** — the two halves separated by measurement on
+   2026-09-18 (`IR-SCIENCE.md` §4b-iv). The band's saturation is a power
+   curve, so one setting collapses the frames' spread: power 2 puts three of
+   seven skies in the film's window and moves the pale four halfway, foliage
+   and hue untouched, the export's sky residual LOWER than shipped (17.4 → 3.3
+   on the defect frame against 21.9 → 4.0), the speckle unchanged. That half
+   is ready; which picture ships is the owner's, from the sheets. The value
+   half cannot be a band (see Rejected) and is a selection problem first: the
+   sky bitmap refined to the working copy's edges, a depth keyed on the map's
+   LOCAL sky chroma rather than the pixel's, and a window that leaves an
+   overcast sky pale. Prototyped twice; reaches 0.40–0.51 on clear skies at
+   the film's saturation, export residual halving with the sky's chroma (17.4
+   → 1.6 on the defect frame, mean chroma 80.5 → 40.0); not shippable on the
+   384 px feathered mask.
 2. Move Restore depth's cool-band reference to the film's 0.66 and add a
    luminance target.
 3. Anchor auto-exposure below the sky.
@@ -87,6 +94,35 @@ darkens the sky by darkening everything.
   property of the look, not of the exposure.
 - **4, curves**: darkens everything to darken the sky, and per-channel curves
   desaturate highlights toward white — the exact trade 016 measured.
+- **The band's luminance for the value half — measured and rejected
+  2026-09-18.** Luminance 0.5 on the aqua and blue bands lands the sky at
+  0.31–0.50 and darkens by more than a tenth 41% of NIR_1376, 55% of NIR_3406
+  and 42% of NIR_1651; decomposed by chroma as shipped, the bulk is the pale
+  IR-bright field, the concrete apron and the horizon haze, which share the
+  sky's hue band at a chroma no gate separates from a pale sky. A saturation
+  weighting (darktable's colour-equaliser threshold) spares the greys and not
+  those. A hue band cannot tell a pale-blue field from a pale-blue sky.
+- **A mask-carried depth on TODAY'S mask — prototyped twice and rejected for
+  shipping, 2026-09-18.** Reaches the film's value where the mask is right and
+  costs three things the pictures show and the film instrument cannot: a pale
+  rim at every sky boundary (the 384 px feathered bitmap's ramp, and the
+  horizon haze falling below the chroma gates), a snowstorm of pale dots on an
+  overcast sky (a depth keyed on a pixel's own hue or chroma darkens half of a
+  hazy sky's pixels and leaves the rest), and a seam under a cloud. The
+  hue-and-chroma-gated version fixed the mask's false positive on a frame with
+  no sky (NIR_0627, 58% "sky" by the mask, 0.1% of the frame moved) and left
+  every grey neutral at 0.0% darkened, so the gating is right; the selection
+  under it is not fine enough for a luma multiplier.
+
+## Measured, 2026-09-18
+
+Seven frames, Restore depth on, through the app, film instrument, hold-one-out;
+the sheets sent the same day carry A, the saturation candidate, the band
+luminance at 0.5 and the gated mask prototype on every frame, numbers under
+each. Every figure is in `IR-SCIENCE.md` §4b-iv. The saturation half awaits
+the owner's pick from the pictures; the value half is re-ranked behind a
+boundary-accurate sky selection, which is the selection 006 (mask by subject)
+also needs.
 
 ## Rank
 
