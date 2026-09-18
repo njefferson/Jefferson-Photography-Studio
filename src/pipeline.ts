@@ -486,6 +486,9 @@ export interface SkyMap {
    *  least half sky — the palest part of the sky the grey guard must NOT
    *  spare. For the record and the diagnostic (skymap.ts). */
   paleTexel: number;
+  /** The palest single texel at least half sky, same scale — a cloud when
+   *  there is one, the hot-spot centre when there is not. */
+  minTexel: number;
 }
 /** Display-space chroma is bounded well inside ±0.5 for any sky; the encode
  *  maps ±this to 0..255. The shader decodes with the same constant. */

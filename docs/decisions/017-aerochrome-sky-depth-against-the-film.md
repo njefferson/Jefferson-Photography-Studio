@@ -222,8 +222,14 @@ depth can be answered from a pasted report. Read off that line at the look's
 sky saturation of 1.0: 2082 (overcast) 0.018, 3406 0.074, 0063 0.119, 1651
 0.145, 1376 0.221, 1644 0.319; 0627, the no-sky frame whose bitmap fires, reads
 0.453 and keys to 0 on its hue. The window is 0.035–0.065 — overcast to 0,
-every blue sky to 1 at the look's own amount. The grey guard's window is set
-from the palest-texel reading in the same run.
+every blue sky to 1 at the look's own amount. The grey guard moved the same
+way and further: absolute (0.06–0.14) it had three of five blue skies' palest
+twentieth on its ramp (3406 0.027, 1651 0.076, 0063 0.081 at the look's
+amount) — blocks, the thing it was built to prevent — so it is RELATIVE now,
+the texel's shown chroma over the sky's mean, 0.10–0.25, under which every
+measured sky's palest twentieth sits with room (0.36, 0.52, 0.56, 0.68,
+0.81) and a white cloud, near 0, does not. A relative guard does not move
+when the look's scale does, which is the property the absolute one lacked.
 
 What turned out wrong, beyond the number: a window fitted to one stage's
 output is re-scaled silently by any change to the stages in front of it, and

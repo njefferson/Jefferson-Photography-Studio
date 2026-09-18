@@ -78,11 +78,18 @@ export const SKY_DEPTH_CHROMA_HI = 0.065;
  *  side — so a bitmap that fired on a blurred red background keys to nothing. */
 const hueWeight = (h: number) => smooth01(150, 175, h) * (1 - smooth01(245, 270, h));
 /** The one thing still decided per texel: a texel whose mean colour is GREY —
- *  a white cloud inside the bitmap — is spared. A blue sky's palest texel sits
- *  far above this (NIR_3406's hot-spot centre reads about 0.27), a cloud far
- *  below, so no texel of a clear sky is ever on the ramp. */
-export const SKY_DEPTH_GREY_LO = 0.06;
-export const SKY_DEPTH_GREY_HI = 0.14;
+ *  a white cloud inside the bitmap — is spared. Grey RELATIVE TO ITS OWN SKY:
+ *  the texel's shown chroma over the photograph's mean shown chroma, so the
+ *  guard does not move when the look's scale does. It was absolute (0.06–0.14)
+ *  and cut against a 0.27 hot-spot centre under global saturation 3; on the
+ *  2026-09-18 look that centre reads 0.027 and three of five blue skies had
+ *  their palest twentieth on the ramp — blocks, exactly what the guard was
+ *  built to avoid. Read off the report at the look's sky saturation, the
+ *  palest twentieth of each blue sky sits at 0.36 (3406, the hot-spot centre),
+ *  0.52 (1651), 0.56 (1376), 0.68 (0063) and 0.81 (1644) of its sky's mean; a
+ *  white cloud is near 0. The ramp sits under all of them with room. */
+export const SKY_DEPTH_GREY_LO = 0.10;
+export const SKY_DEPTH_GREY_HI = 0.25;
 
 const encC = (v: number) => Math.round(((Math.min(SKY_CHROMA_RANGE, Math.max(-SKY_CHROMA_RANGE, v)) / SKY_CHROMA_RANGE) * 0.5 + 0.5) * 255);
 
@@ -109,7 +116,8 @@ const encC = (v: number) => Math.round(((Math.min(SKY_CHROMA_RANGE, Math.max(-SK
  *   `chroma` the number the window read it from — the sky's mean rendered
  *   chroma as the sky saturation stage will show it (display units) — and
  *   `paleTexel` the 5th-percentile texel chroma on that scale among texels
- *   at least half sky, which is what the grey guard's window is set from.
+ *   at least half sky and `minTexel` the palest one, which are what the grey
+ *   guard's window (relative to `chroma`) is set from.
  * What the result must satisfy: every texel's (a, b) is the MASK-WEIGHTED
  * mean chroma of the rendered sky over that texel's footprint with luma
  * discarded and non-finite samples dropped, so blending a pixel's chroma
@@ -210,20 +218,22 @@ export function buildSkyMap(
   }
   // The grey guard reads each texel's chroma on the same scale as the key —
   // as the stage will show it, the photograph's one factor on the texel's own
-  // mean — or a look that moves the sky's colour onto that stage puts every
-  // texel of a clear sky onto the guard's ramp and the depth comes out in
-  // blocks. `paleTexel` is the 5th percentile of the sky's texels, the number
-  // the guard's window is set from.
+  // mean — and RELATIVE to the photograph's mean, so a look that moves the
+  // sky's colour onto that stage cannot put every texel of a clear sky onto
+  // the guard's ramp (it did, absolute: blocks). `paleTexel` and `minTexel`
+  // are the sky's palest twentieth and palest texel, for setting the window.
   const shown: number[] = [];
+  const rel = 1 / Math.max(1e-3, chroma);
   for (let i = 0; i < W * H; i++) {
     if (rgba[i * 4 + 2] === 0 && texChroma[i] === 0) continue; // no sky sample: stays 0
     const tc = Math.min(1, texChroma[i] * k);
     if (rgba[i * 4 + 2] >= 128) shown.push(tc);
-    rgba[i * 4 + 3] = Math.round(255 * key * smooth01(SKY_DEPTH_GREY_LO, SKY_DEPTH_GREY_HI, tc));
+    rgba[i * 4 + 3] = Math.round(255 * key * smooth01(SKY_DEPTH_GREY_LO, SKY_DEPTH_GREY_HI, tc * rel));
   }
   shown.sort((a, b) => a - b);
   const paleTexel = shown.length ? shown[Math.floor(shown.length * 0.05)] : 0;
-  return { width: W, height: H, rgba, key, chroma, paleTexel };
+  const minTexel = shown.length ? shown[0] : 0;
+  return { width: W, height: H, rgba, key, chroma, paleTexel, minTexel };
 }
 
 /** The sky bitmap's weight at image-uv, the same bilinear-on-texel-centres

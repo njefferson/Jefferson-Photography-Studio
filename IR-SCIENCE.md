@@ -762,8 +762,12 @@ stage's factor on the mean colour, about its luma), the version report prints
 the numbers (a "Sky map" line: key, chroma, palest sky texel, both windows),
 and the window was re-cut from those numbers: overcast 0.018 against blue
 skies 0.074–0.319 at the look's sky saturation, window 0.035–0.065; the
-no-sky frame reads 0.453 and is refused by the hue band. Decision record
-017, Outcome part four, has the per-frame table in prose.
+no-sky frame reads 0.453 and is refused by the hue band. The per-texel grey
+guard is RELATIVE to the sky's mean now (0.10–0.25 of it): absolute, it had
+the palest twentieth of three blue skies on its ramp at the new scale, and a
+guard that spares part of a clear sky is the block artefact the key was made
+per photograph to avoid. Decision record 017, Outcome part four, has the
+per-frame numbers in prose.
 
 ### 4b-vi. SATURATION BY POPULATION — FOLIAGE, SKY, AND NOTHING THAT HAS NO COLOUR
 
