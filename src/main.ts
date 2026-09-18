@@ -1513,6 +1513,13 @@ let skyMapKey = "";
  *  keyed on the params minus this field and minus the spatial-only ones the
  *  map does not read, so dragging the amount itself costs nothing. */
 function syncSkyMap(): void {
+  if (current && skyBitmap && !skyFine && (params.skyDepth ?? 0) > 0) {
+    // First edit with a depth on this photograph: the coarse bitmap's feather
+    // is fine under a chroma blend and a pale rim under a luma multiplier.
+    const img = current;
+    skyFine = refineSkyMask(skyBitmap, buildSkyGuide((x, y) => linearAt(img, x, y), img.width, img.height, grayWorldWB(img)));
+    renderer.setSkyFine(skyFine);
+  }
   if (!current || !skyBitmap || ((params.skySmooth ?? 0) <= 0 && (params.skyDepth ?? 0) <= 0)) {
     if (skyMapKey) { renderer.setSkyMap(null); skyMapKey = ""; }
     return;
@@ -8287,11 +8294,12 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
   // tab has been opened.
   {
     skyBitmap = skyMaskFor(img);
-    // AND ITS REFINEMENT to the photograph's edges, for the depth: the coarse
-    // bitmap's feather is fine under a chroma blend and a pale rim under a
-    // luma multiplier (skyfine.ts).
-    skyFine = skyBitmap ? refineSkyMask(skyBitmap, buildSkyGuide((x, y) => linearAt(img, x, y), img.width, img.height, grayWorldWB(img))) : null;
-    renderer.setSkyFine(skyFine);
+    // Its REFINEMENT to the photograph's edges (skyfine.ts) is built on first
+    // need — the first edit that carries a sky depth — not here: it costs
+    // about half a second of this machine's time on a 21-megapixel frame, and
+    // a photograph opened under any other look never pays it.
+    skyFine = null;
+    renderer.setSkyFine(null);
     skyMapKey = "";
   }
   const __f = performance.now();
