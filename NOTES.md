@@ -716,23 +716,12 @@ user-scalable=no.
   them subtle (match `--line`), per-focus, and remember the last choice in
   localStorage like the panel tab. Non-goal: nothing touches the pipeline or
   export — overlay-only, exactly like the thirds grid.
-- [ ] **Aerochrome's sky is bright and pale where the film's is dark and saturated** <!-- decision: 017 --> —
-  measured 2026-09-18 while holding Restore depth to the film: every setting
-  lands on the film's hue angles, but the sky reads saturation 0.38–0.76 at
-  value 0.64–0.89 where the film reads 0.66 at 0.32. The hue bands were solved
-  onto the film; the sky's depth never was, and it is the largest measured gap
-  left in the look. **Solved 2026-09-18 on seven frames, and the two halves came
-  apart. PART ONE SHIPPED the same day:** the look's aqua and blue bands carry
-  a saturation power of 2 (three skies in the film's window, the pale four
-  halfway, the export's residual on the defect frame LOWER, foliage and hue
-  untouched; `aerochrome-walk` 10d holds it). Value is not a band: the band's luminance darkens the pale
-  field, the concrete and the haze that share the sky's hue, and a depth
-  carried by today's 384 px sky mask leaves a rim at every roofline and a
-  snowstorm on an overcast sky. The value half waits on a boundary-accurate sky
-  selection keyed on the sky's local chroma — `IR-SCIENCE.md` §4b-iv. See
-  `docs/decisions/017-aerochrome-sky-depth-against-the-film.md`.
 - [ ] **Mask by subject / background** — auto-select the subject or the <!-- decision: 006 -->
-  background (owner request 2026-07-05). Honest scoping: true subject/background
+  background (owner request 2026-07-05).
+  **Part of the machinery exists now (2026-09-18):** `src/skyfine.ts` refines
+  the sky bitmap to the picture's edges with a guided filter, once per
+  photograph, and the Sky depth stage rides it. A subject mask would take the
+  same refinement over a different seed; the seed is what is still missing. Honest scoping: true subject/background
   segmentation needs an on-device ML model (WebGPU — the "frontier" backlog
   item); there is no classical stand-in the way sky had one. Architect as a mask
   type so it slots into the same engine when ready.
@@ -2028,6 +2017,26 @@ reason it is a footnote rather than a finding — a list of known limitations is
 read as authoritative, and an invented one is worse than a missing one.
 
 ## Shipped (roadmap archive)
+
+- [x] **Aerochrome's sky is bright and pale where the film's is dark and saturated** <!-- decision: 017 --> — SHIPPED
+  2026-09-18 to staging, awaiting the on-device pass. The film's sky is dark and
+  blue; Aerochrome's was bright and pale. Two halves, shipped a day apart. The
+  saturation half (2.50.10, on production): the look's aqua and blue bands
+  carry a saturation power of 2, three of seven practice skies inside the
+  film's window and the pale ones halfway, foliage and hue untouched, the
+  exported sky on the frame that used to come out blotchy cleaner than
+  before. The value half (2.51): a new Sky depth control darkens a blue sky
+  and nothing else — the app's sky selection is refined to the picture's own
+  edges with a guided filter before the depth uses it, and whether a sky is
+  darkened at all is decided once for the whole sky from its colour, so an
+  overcast sky stays pale and a white cloud is spared. Measured on seven
+  frames: sky value 0.76 → 0.42 on the widest sky at depth 0.5 (the film reads
+  0.32), saturation, foliage, greys, pale ground and concrete unmoved, the
+  overcast and the no-sky frame untouched. Three wrong builds on the way, each
+  caught by a picture or an instrument rather than the film numbers — the
+  record and IR-SCIENCE.md §4b-iv/v carry them. Still not the film: the depth
+  amount is the owner's from the sheets, and a frame whose top edge is cloud
+  (NIR_1651) gets almost no depth because the sky bitmap finds only the cloud.
 
 - [x] **A tile in the strip now matches the photograph it opens into, under a look** — SHIPPED
   2026-09-17 to staging, awaiting the on-device pass. Under Aerochrome, the tile
