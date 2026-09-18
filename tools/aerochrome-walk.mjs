@@ -497,6 +497,27 @@ try {
   check("11b ...and so are the global and the two band saturations",
     GLOBAL_SAT >= GLOBAL_SAT_RANGE[0] && GLOBAL_SAT <= GLOBAL_SAT_RANGE[1] && [FOL_SAT, SKY_SAT].every((v) => v >= BAND_SAT_RANGE[0] && v <= BAND_SAT_RANGE[1]), true);
 
+  // 12 — THE LOOK'S OWN FINISHING PANEL (decision 022): it opens on the press,
+  // its controls are the tabs' own (a drag on the mirror moves the real slider
+  // and the picture), and it closes leaving a way back. MADE TO FAIL FIRST
+  // against the build before the panel existed.
+  {
+    const { p, ctx } = await open();
+    await press(p, "lookEir");
+    check("12a the finishing panel opens on Aerochrome", await p.evaluate(() => !document.getElementById("finishPanel")?.hidden), true);
+    const before = await hash(p);
+    await setSlider(p, "finish-skySatSel", 0.5);
+    check("12b ...and its Sky saturation moves the real slider", await p.evaluate(() => Number(document.getElementById("skySatSel")?.value)), 0.5);
+    check("12c ...and the picture", (await hash(p)) !== before, true);
+    await setSlider(p, "skySatSel", 1.2);
+    check("12d ...and the real slider moves the mirror back", await p.evaluate(() => Number(document.getElementById("finish-skySatSel")?.value)), 1.2);
+    await press(p, "finishClose");
+    check("12e ...and it closes, leaving a way back under the looks", await p.evaluate(() => !!document.getElementById("finishPanel")?.hidden && !document.getElementById("finishOpen")?.hidden), true);
+    await press(p, "lookAero");
+    check("12f ...and a look without steps offers no panel", await p.evaluate(() => !!document.getElementById("finishPanel")?.hidden && !!document.getElementById("finishOpen")?.hidden), true);
+    await ctx.close();
+  }
+
   const liftShipped = await armShipped(true);
   const liftRecipe = await armRecipe(true);
   check("8   ...and with it on they differ, because the look re-solves the lift",

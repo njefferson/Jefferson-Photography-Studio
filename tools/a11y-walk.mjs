@@ -149,6 +149,10 @@ try {
         if (s.file === "ir.html") {
           await page.setInputFiles("#file", ONE);
           await page.waitForFunction(() => document.getElementById("welcome")?.hidden, null, { timeout: 300000 });
+          // AND WITH A LOOK ON, so its finishing panel (decision 022) is a measured
+          // surface: axe and the hit areas see the panel open, as a reader does.
+          await page.evaluate(() => document.getElementById("lookEir")?.click());
+          await page.waitForTimeout(2000);
           await page.waitForTimeout(2500);
         }
         await page.addScriptTag({ content: axeSrc });
@@ -174,6 +178,10 @@ try {
         if (s.file === "ir.html") {
           await page.setInputFiles("#file", ONE);
           await page.waitForFunction(() => document.getElementById("welcome")?.hidden, null, { timeout: 300000 });
+          // AND WITH A LOOK ON, so its finishing panel (decision 022) is a measured
+          // surface: axe and the hit areas see the panel open, as a reader does.
+          await page.evaluate(() => document.getElementById("lookEir")?.click());
+          await page.waitForTimeout(2000);
           await page.waitForTimeout(2000);
         }
         const { small, exempt } = await page.evaluate(HIT);

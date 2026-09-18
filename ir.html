@@ -346,6 +346,23 @@
              working; the heading below stays stuck to the top so you never lose
              which tab you are in — and carries the "Sections" button that puts
              the chooser back, so the cost of scrolling it away is one press. -->
+        <!-- THE LOOK'S OWN FINISHING PANEL (decision 022). A look is a start,
+             and the adjustments that finish it per photograph were spread over
+             four tabs while the method has an order. This gathers the look's
+             declared steps in that order, each a second control bound to the
+             same slider the tab carries — the tabs keep theirs, a batch look
+             stands on its declared values alone. Opens when a look with steps
+             is applied; the close button hides it and "Finish this look" under
+             the looks brings it back. A region, not a dialog: the photograph
+             stays in view and nothing is modal about finishing it. -->
+        <section id="finishPanel" class="finish" role="region" aria-labelledby="finishTitle" hidden>
+          <div class="finish-head">
+            <div id="finishTitle" class="sub-title">Finish the look</div>
+            <button id="finishClose" type="button" aria-label="Close the finishing panel">&#10005;</button>
+          </div>
+          <p class="note" id="finishIntro" role="status" aria-live="polite"></p>
+          <div id="finishSteps"></div>
+        </section>
         <div id="panelTabs" class="panel-tabs" role="tablist" aria-label="Editor sections">
             <button id="ptab-basic" aria-controls="sec-basic" class="ptab active" type="button" data-tab="basic" role="tab" aria-selected="true">Basic</button>
             <button id="ptab-ir" aria-controls="sec-ir" class="ptab" type="button" data-tab="ir" role="tab" aria-selected="false">IR</button>
@@ -476,6 +493,7 @@
               <button id="lookHie" type="button">HIE B&amp;W<small class="look-sub"></small></button>
             </div>
             <p class="note">Looks showing <strong>norm / R&#8646;B</strong> under the name flip that swap when you press them again. <strong>Aerochrome</strong> shows <strong>film</strong> instead: the swap is part of its recipe rather than an option on top of it, so there is nothing to flip &mdash; the swap button above and the Colour tab's channel mixer are there if you want to take it apart yourself.</p>
+            <button id="finishOpen" type="button" class="accent-outline full-btn" hidden>Finish this look</button>
             <!-- The one-band notice, and the choice it used to make for you.
                  Before 2026-09-11 a camera JPEG like this was always balanced
                  under a colour look; a session then made skipping it the policy,

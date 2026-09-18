@@ -79,3 +79,4 @@ Look.texture = whole-frame : OWED: see EditParams.texture — the look sets one 
 Look.glow = whole-frame : see EditParams.glow
 Look.raw = not-pixels
 Look.jpeg = not-pixels
+Look.finish = not-pixels
