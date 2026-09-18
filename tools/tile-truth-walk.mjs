@@ -375,7 +375,16 @@ try {
             (i === 2 ? "  <- open" : i < 2 ? "  <- opened and left" : "  <- never opened"),
         ),
       );
-      check("C1 the three unopened tiles change", picture.slice(3).filter((m) => m > 3).length, 3);
+      // THE TOGGLE REACHES EVERY UNOPENED TILE, and moves the ones it has
+      // something to put back on. Restore depth is a TOP-UP since 2026-09-18:
+      // it starts from the look's own amounts and adds only where a frame
+      // measures short, so a frame that already measures where it should be is
+      // untouched by design — NIR_1638 under Pink IR redraws and moves 0. The
+      // old check counted three moved pictures and read that as the toggle not
+      // reaching the tile; the redraw is what says it reached, the movement
+      // says it had something to do there.
+      check("C1 the three unopened tiles are redrawn for the toggle", redrawn.slice(3).filter(Boolean).length, 3);
+      check("C1b ...and the ones the lift had something to put back on move", picture.slice(3).filter((m) => m > 3).length >= 1, true);
       check("C2 so does the open photo's, whose curve was just taken away", picture[2] > 3, true);
       // COUNTED, not "are these two untouched". Zero redraws passes that on a
       // build where the toggle redraws nothing at all, which is the defect.

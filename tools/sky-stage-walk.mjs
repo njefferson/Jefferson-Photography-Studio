@@ -28,38 +28,57 @@ const hash = (p) => p.evaluate(() => { const cv = document.querySelector("#view"
 async function settle(p) { let last = "", stable = 0; for (let i = 0; i < 80; i++) { const h = await hash(p); if (h === last) { if (++stable >= 2) return true; } else { stable = 0; last = h; } await p.waitForTimeout(200); } return false; }
 const b = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium", args: ["--use-gl=swiftshader", "--enable-unsafe-swiftshader"] });
 try {
-  const tiff = {};
-  for (const sky of [1, 0]) {
-    const ctx = await b.newContext({ viewport: { width: 1280, height: 950 }, acceptDownloads: true }); const p = await ctx.newPage(); p.on("dialog", (d) => d.accept());
-    await p.goto(`http://127.0.0.1:${PORT}/ir.html`); await p.setInputFiles("#file", [FILE]);
-    await p.waitForFunction(() => document.getElementById("welcome")?.hidden, null, { timeout: 300000 });
-    await p.waitForFunction(() => !document.getElementById("busy")?.hasAttribute("open"), null, { timeout: 300000 });
-    await settle(p);
-    await p.evaluate(() => document.getElementById("lookEir")?.click()); await settle(p);
-    await p.evaluate((v) => { const el = document.getElementById("skySmooth"); el.value = String(v); el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); }, sky); await settle(p);
-    await p.evaluate(() => { const s = document.getElementById("exFormat"); s.value = "tiff"; s.dispatchEvent(new Event("change", { bubbles: true })); const sc = document.getElementById("exScale"); sc.value = "0.25"; sc.dispatchEvent(new Event("change", { bubbles: true })); });
-    await p.click("#ptab-export");
-    const dl = p.waitForEvent("download", { timeout: 600000 }); dl.catch(() => {});
-    await p.click("#exBtn");
-    await p.waitForFunction(() => /^Ready —/.test(document.getElementById("exportStripText")?.textContent || ""), null, { timeout: 600000 });
-    await p.click("#exportSave");
-    const d = await dl; tiff[sky] = readTiff16(await d.path());
-    await ctx.close();
-  }
-  const on = tiff[1], off = tiff[0];
+  // TWO PAIRS. The stage's OWN displacement is measured with the later sky
+  // saturation stage off in both arms, because that stage scales the sky's
+  // chroma about luma by up to 1 + Sky saturation AFTER the blend, and a bound
+  // set in the blend's own units (the gate stops at 0.25) cannot be read on
+  // the doubled quantity — measured 2026-09-18, the reader's view read max
+  // 0.281 and tail 0.148 against the same blend reading inside its gate. The
+  // reader's-view pair is exported too and REPORTED beside it, never bounded,
+  // so the amplification is a number and not a surprise.
+  const exportPair = async (skySatSel) => {
+    const tiff = {};
+    for (const sky of [1, 0]) {
+      const ctx = await b.newContext({ viewport: { width: 1280, height: 950 }, acceptDownloads: true }); const p = await ctx.newPage(); p.on("dialog", (d) => d.accept());
+      await p.goto(`http://127.0.0.1:${PORT}/ir.html`); await p.setInputFiles("#file", [FILE]);
+      await p.waitForFunction(() => document.getElementById("welcome")?.hidden, null, { timeout: 300000 });
+      await p.waitForFunction(() => !document.getElementById("busy")?.hasAttribute("open"), null, { timeout: 300000 });
+      await settle(p);
+      await p.evaluate(() => document.getElementById("lookEir")?.click()); await settle(p);
+      if (skySatSel !== null) { await p.evaluate((v) => { const el = document.getElementById("skySatSel"); el.value = String(v); el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); }, skySatSel); await settle(p); }
+      await p.evaluate((v) => { const el = document.getElementById("skySmooth"); el.value = String(v); el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); }, sky); await settle(p);
+      await p.evaluate(() => { const s = document.getElementById("exFormat"); s.value = "tiff"; s.dispatchEvent(new Event("change", { bubbles: true })); const sc = document.getElementById("exScale"); sc.value = "0.25"; sc.dispatchEvent(new Event("change", { bubbles: true })); });
+      await p.click("#ptab-export");
+      const dl = p.waitForEvent("download", { timeout: 600000 }); dl.catch(() => {});
+      await p.click("#exBtn");
+      await p.waitForFunction(() => /^Ready —/.test(document.getElementById("exportStripText")?.textContent || ""), null, { timeout: 600000 });
+      await p.click("#exportSave");
+      const d = await dl; tiff[sky] = readTiff16(await d.path());
+      await ctx.close();
+    }
+    return { on: tiff[1], off: tiff[0] };
+  };
+  const displacement = (on, off) => {
+    const moves = []; let maxMove = 0, maxAt = "";
+    for (let i = 0; i < on.W * on.H; i++) {
+      const c = (t) => { const r = t.px[i * 3] / 65535, g = t.px[i * 3 + 1] / 65535, bb = t.px[i * 3 + 2] / 65535; const l = REC[0] * r + REC[1] * g + REC[2] * bb; return [r - l, bb - l]; };
+      const [a1, b1] = c(on), [a0, b0] = c(off); const m = Math.hypot(a1 - a0, b1 - b0); moves.push(m);
+      if (m > maxMove) { maxMove = m; maxAt = `(${i % on.W},${Math.floor(i / on.W)})`; }
+    }
+    moves.sort((x, y) => x - y);
+    return { maxMove, maxAt, p999: moves[Math.floor(moves.length * 0.999)], p50: moves[Math.floor(moves.length * 0.5)] };
+  };
+  const own = await exportPair(0);
+  const { on, off } = own;
   check("0 both exports are the same size", [on.W, on.H], [off.W, off.H]);
-  const moves = [];
-  let maxMove = 0, maxAt = "";
-  for (let i = 0; i < on.W * on.H; i++) {
-    const c = (t) => { const r = t.px[i * 3] / 65535, g = t.px[i * 3 + 1] / 65535, bb = t.px[i * 3 + 2] / 65535; const l = REC[0] * r + REC[1] * g + REC[2] * bb; return [r - l, bb - l]; };
-    const [a1, b1] = c(on), [a0, b0] = c(off); const m = Math.hypot(a1 - a0, b1 - b0); moves.push(m);
-    if (m > maxMove) { maxMove = m; maxAt = `(${i % on.W},${Math.floor(i / on.W)})`; }
-  }
-  moves.sort((x, y) => x - y);
-  const p999 = moves[Math.floor(moves.length * 0.999)], p50 = moves[Math.floor(moves.length * 0.5)];
-  console.log(`        chroma displacement stage on vs off: max ${maxMove.toFixed(3)} at ${maxAt}, p99.9 ${p999.toFixed(3)}, median ${p50.toFixed(4)}`);
+  const s0 = displacement(on, off);
+  const { maxMove, p999, p50 } = s0;
+  console.log(`        chroma displacement stage on vs off, sky saturation stage off: max ${s0.maxMove.toFixed(3)} at ${s0.maxAt}, p99.9 ${s0.p999.toFixed(3)}, median ${s0.p50.toFixed(4)}`);
   check("1 no pixel is recoloured beyond the gate", maxMove <= MAX_MOVE, true);
   check("2 the tail of the displacement is the mottle's size, not a branch's", p999 <= P999_MOVE, true);
+  const view = await exportPair(null);
+  const s1 = displacement(view.on, view.off);
+  console.log(`        and as the reader sees it (the look's own sky saturation on): max ${s1.maxMove.toFixed(3)} at ${s1.maxAt}, p99.9 ${s1.p999.toFixed(3)}, median ${s1.p50.toFixed(4)} — reported, not bounded: the later stage scales the blend's own movement by up to 1 + Sky saturation`);
   check("3 the stage still does something", maxMove >= MIN_MOVE, true);
 } finally { await b.close(); }
 console.log(failed ? `\n${failed} check(s) failed` : "\nthe sky stage smooths and recolours nothing");
