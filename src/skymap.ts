@@ -45,20 +45,31 @@ export const SKY_MAP_W = 128;
  *  keeps a rebuild per edit affordable once the sampler is the denoiser. */
 const SUB = 2;
 
-/** The DEPTH's keying window on a texel's mean rendered chroma (HSV max−min
- *  of the mask-weighted mean colour, display space): no depth below LO, full
- *  above HI. Measured 2026-09-18 with the aqua and blue saturation the look
- *  ships: an overcast sky (NIR_2082) reads 0.27, a frame with no sky whose
- *  bitmap fires anyway (NIR_0627) 0.31, the clear skies 0.43–0.57. The film
- *  does not darken an overcast sky — white light records through every layer —
- *  so this is physics before it is taste; and it lives HERE, per texel, rather
- *  than per pixel, so a hazy sky's pixels stay pale together instead of half
- *  of them: keyed per pixel, NIR_2082 snowed (IR-SCIENCE 4b-iv). */
+/** The DEPTH's keying window on the SKY'S mean rendered chroma — ONE number
+ *  per photograph and edit, the HSV max−min of the bitmap-weighted mean colour
+ *  over every sky texel, display space: no depth below LO, full above HI.
+ *  Measured 2026-09-18 with the aqua and blue saturation the look ships: an
+ *  overcast sky (NIR_2082) reads 0.27, a frame with no sky whose bitmap fires
+ *  anyway (NIR_0627) 0.31, the clear skies 0.43–0.57. The film does not darken
+ *  an overcast sky — white light records through every layer — so this is
+ *  physics before it is taste. AND IT IS PER PHOTOGRAPH ON PURPOSE: keyed per
+ *  pixel, NIR_2082 snowed; keyed per TEXEL, a clear sky's own chroma gradient
+ *  became the depth map — NIR_3406's hot-spot centre stayed pale inside a
+ *  ring of dark texel blocks, and 2082's overcast grew dark blocks wherever
+ *  one texel crossed the window (IR-SCIENCE 4b-v). A sky's chroma varies
+ *  across a frame by more than any window is wide; the decision has to be
+ *  made once for the sky it describes. */
 export const SKY_DEPTH_CHROMA_LO = 0.32;
 export const SKY_DEPTH_CHROMA_HI = 0.42;
-/** And on the texel's hue — the sky's band, 175–245° fading over 25° each
+/** And on the sky's mean hue — the sky's band, 175–245° fading over 25° each
  *  side — so a bitmap that fired on a blurred red background keys to nothing. */
 const hueWeight = (h: number) => smooth01(150, 175, h) * (1 - smooth01(245, 270, h));
+/** The one thing still decided per texel: a texel whose mean colour is GREY —
+ *  a white cloud inside the bitmap — is spared. A blue sky's palest texel sits
+ *  far above this (NIR_3406's hot-spot centre reads about 0.27), a cloud far
+ *  below, so no texel of a clear sky is ever on the ramp. */
+export const SKY_DEPTH_GREY_LO = 0.06;
+export const SKY_DEPTH_GREY_HI = 0.14;
 
 const encC = (v: number) => Math.round(((Math.min(SKY_CHROMA_RANGE, Math.max(-SKY_CHROMA_RANGE, v)) / SKY_CHROMA_RANGE) * 0.5 + 0.5) * 255);
 
@@ -78,8 +89,10 @@ const encC = (v: number) => Math.round(((Math.min(SKY_CHROMA_RANGE, Math.max(-SK
  * @param sky  the sky bitmap built once per image by buildSkyMask.
  * @returns the map, or null when the bitmap selects nothing. Four bytes per
  *   texel: encoded chroma a and b, the bitmap's mean weight, and the depth
- *   key — SKY_DEPTH_CHROMA_LO/HI on the texel's mean rendered chroma times
- *   the hue band, 0 wherever the texel has no sky sample.
+ *   key — the PHOTOGRAPH's key (SKY_DEPTH_CHROMA_LO/HI on the sky's mean
+ *   rendered chroma, times the sky's hue band) times the texel's grey guard
+ *   (SKY_DEPTH_GREY_LO/HI on its own mean chroma), 0 wherever the texel has
+ *   no sky sample. `key` carries the photograph's number for the record.
  * What the result must satisfy: every texel's (a, b) is the MASK-WEIGHTED
  * mean chroma of the rendered sky over that texel's footprint with luma
  * discarded and non-finite samples dropped, so blending a pixel's chroma
@@ -113,6 +126,10 @@ export function buildSkyMap(
   const edit = compileEdit({ ...p, skySmooth: 0, skyDepth: 0 }, cam, aspect, local, lens);
   const out = new Float32Array(3);
   const rgba = new Uint8Array(W * H * 4);
+  // Per-texel mean chroma for the grey guard, and the photograph's sums for
+  // the one key, both filled in the loop and resolved after it.
+  const texChroma = new Float32Array(W * H);
+  let gr = 0, gg = 0, gb = 0, gw = 0;
   for (let ty = 0; ty < H; ty++) {
     for (let tx = 0; tx < W; tx++) {
       const o = (ty * W + tx) * 4;
@@ -146,16 +163,26 @@ export function buildSkyMap(
       rgba[o] = encC(sa / wsum);
       rgba[o + 1] = encC(sb / wsum);
       rgba[o + 2] = Math.round((wall / n) * 255);
-      // The depth key, from the texel's MEAN rendered colour: is this a blue
-      // sky at all. Clamped to the display range first — the mean of clamped
-      // samples is what the eye averages.
+      // The texel's MEAN rendered colour, clamped to the display range first —
+      // the mean of clamped samples is what the eye averages — for its grey
+      // guard, and into the photograph's own mean for the one key.
       const cr = Math.min(1, Math.max(0, mr / wsum)), cg = Math.min(1, Math.max(0, mg / wsum)), cb = Math.min(1, Math.max(0, mb / wsum));
-      const [hh] = rgb2hsv(cr, cg, cb);
-      const chroma = Math.max(cr, cg, cb) - Math.min(cr, cg, cb);
-      rgba[o + 3] = Math.round(255 * smooth01(SKY_DEPTH_CHROMA_LO, SKY_DEPTH_CHROMA_HI, chroma) * hueWeight(hh));
+      texChroma[ty * W + tx] = Math.max(cr, cg, cb) - Math.min(cr, cg, cb);
+      gr += cr * wsum; gg += cg * wsum; gb += cb * wsum; gw += wsum;
     }
   }
-  return { width: W, height: H, rgba };
+  // THE KEY, once per photograph: is the sky, taken as a whole, a blue sky.
+  let key = 0;
+  if (gw > 0) {
+    const cr = gr / gw, cg = gg / gw, cb = gb / gw;
+    const [hh] = rgb2hsv(cr, cg, cb);
+    key = smooth01(SKY_DEPTH_CHROMA_LO, SKY_DEPTH_CHROMA_HI, Math.max(cr, cg, cb) - Math.min(cr, cg, cb)) * hueWeight(hh);
+  }
+  for (let i = 0; i < W * H; i++) {
+    if (rgba[i * 4 + 2] === 0 && texChroma[i] === 0) continue; // no sky sample: stays 0
+    rgba[i * 4 + 3] = Math.round(255 * key * smooth01(SKY_DEPTH_GREY_LO, SKY_DEPTH_GREY_HI, texChroma[i]));
+  }
+  return { width: W, height: H, rgba, key };
 }
 
 /** The sky bitmap's weight at image-uv, the same bilinear-on-texel-centres
