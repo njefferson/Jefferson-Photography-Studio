@@ -654,7 +654,7 @@ user-scalable=no.
   candidates rendered rather than described. Sources and every number in
   `IR-SCIENCE.md` sections 9i and 9j. See
   `docs/decisions/016-foliage-tonality.md`.
-- [ ] **A quick look you cannot stop, and a session that renders it all again** <!-- decision: 014 --> — reported
+- [ ] **A quick look you cannot stop, and a session that renders it all again** <!-- decision: 014 --> — reported Reported a second time 2026-09-18 from a PC on staging 2.51.2; the record carries a candidate mechanism to count against.
   from the iPad 2026-09-17. There is no way to stop a quick look building its
   grid, so no way to say done and get the memory back; and after Keep in a
   session it looked as though every photograph was rendered a second time. The

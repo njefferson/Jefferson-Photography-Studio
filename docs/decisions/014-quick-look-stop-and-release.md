@@ -33,6 +33,24 @@ placeholders carrying only their file names. So the second half of this report i
 confirmed as a real observation rather than an impression: after the keep, the
 session is working through all forty-eight again.
 
+**SECOND DEVICE REPORT, 2026-09-18, a Windows PC on staging 2.51.2**, with a
+screenshot taken while the kept set was loading: two tiles developed, three
+showing the camera's preview, every later tile a file name — the grid's
+just-rendered pictures not carried forward, again.
+
+**A CANDIDATE MECHANISM, read in `src/main.ts` the same day and UNMEASURED.**
+`keepQuickLook` carries every kept item in `ready` with `thumb: it.stripThumb`,
+present only for the items the grid rendered to strip size. `addToSession`
+marks a carried tile `real` and stamps it with `stampFor(slot)`, which for a
+photo with no edit of its own is `gradeStamp()` — and that stamp includes
+`autoLift` and `liftAmount`. The first photo opens mid-import and its look
+application re-solves the lift, so `liftAmount` can move under every tile
+already stamped; `restripForGrade` defers while `adding` is set and then marks
+every tile whose stamp differs as `waiting`, and `realThumbnails` renders them
+again. If that holds, the count below will show carried tiles re-rendered in
+proportion to the lift moving, not to the grid having stopped early. A
+hypothesis for the count to confirm or kill, not a finding.
+
 What it does NOT say is how many of those forty-eight arrived with a picture
 already built and were re-rendered anyway, against how many arrived with nothing
 because the quick look had not reached them. Those are the two numbers this item
@@ -101,7 +119,7 @@ redraws for reasons other than decoding.
 
 ## Rank
 
-**Third.** It costs memory and time on the device and it is a repeat in a place
+**Eighth in the file order** (after 021, 019, 018, 023, 012, 013 and 016; this section read "Third" until 2026-09-18, when the order above it had grown). The reasoning stands: It costs memory and time on the device and it is a repeat in a place
 already fixed once, which makes it likelier than most items to be a real defect
 rather than a design direction. Below the full-view item, which takes the
 photograph away, and below the splotchy Aerochrome, which is about a look that
