@@ -283,6 +283,10 @@ try {
   check("4a  the look brings its local contrast with it", await tex(a.p), TEXTURE);
   check("4a2 ...and its sky colour smoothing", await skyv(a.p), SKY);
   check("4a3 ...and its sky depth", await depthv(a.p), DEPTH);
+  // THE LOOK'S OWN AMOUNTS, read with Restore depth OFF: with it on, the lift
+  // starts from these and tops them up per frame (019), so the slider can
+  // read higher than the look declares and still be right.
+  await press(a.p, "irLift");
   check("4a4 ...its global saturation of 1 (the colour goes where the colour is)", await satv(a.p), GLOBAL_SAT);
   check("4a5 ...the foliage band's own amount", await folv(a.p), FOL_SAT);
   check("4a6 ...and the sky's own amount, through the selection", await skyBv(a.p), SKY_SAT);
