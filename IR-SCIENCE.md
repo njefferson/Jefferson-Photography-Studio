@@ -702,9 +702,28 @@ shipped 2.50.10 look at depth 0 on this build):
   0.192; 2082 identical), and the hot spot's pale centre on 3406 stays where
   it was: the lens's added light is not the depth's to remove, and the
   reader's lens correction is still the tool for it.
+- **On the exported file** (9l-iii's instrument, Pink IR's 16.8 anchor held
+  in the same run, the look carrying the depth in every Aerochrome arm):
+  NIR_3406 smoothing off → on 9.1 → 1.7, mean chroma 42.1; NIR_1376 2.9 →
+  1.2, mean 35.6. Against 2.50.10's 17.4 → 3.3 at mean 80.5 the residual and
+  the mean both halve with the sky's luma, as 4b-iv's prototype said they
+  would: the residual's share of the sky's chroma is what it was.
 - **Cost:** on this machine, for a 21-megapixel frame, the bitmap 160 ms,
-  the guide 210 ms, the refinement 200 ms at 1024×682 — paid once per
-  photograph, on the first edit that carries a depth, never at open.
+  the guide 210 ms, the refinement 200 ms at 1024×682.
+
+**WHERE IT IS BUILT, on the owner's question of the same day — before any
+correction, and available to whatever comes later.** The selection is built
+by the decode worker, on the lane that decoded the photograph, from a
+1024 px copy taken BEFORE the decode's buffer is transferred back: the
+picture is posted first, the selection a moment later in a second message
+on the same lane, so the photograph is on the screen as soon as it is decoded
+and its selection is ready before the reader touches anything, off the main
+thread (`decode.worker.ts`, `decodeClient.ts`, `DecodedImage.skySel`). It is
+built at gray-world balance and nothing else, so no exposure, correction or
+look ever moves it. Every path that means "the sky" derives its bitmap from
+that same copy — the open photograph, a tile, a batch frame — so the bytes
+agree whichever path a photograph came through; the one that does not yet is
+the reader's own Sky mask on the Masks tab, which is decision 018.
 
 **WHAT TURNED OUT WRONG ON THE WAY, in the order it was found.** Three
 builds, each caught by a picture or an instrument rather than by the film

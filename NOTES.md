@@ -573,6 +573,16 @@ user-scalable=no.
   measures the exported file whole (§9l-ii). The gravel half stays open. The
   sources go into `IR-SCIENCE.md` (9l for what shipped). See
   `docs/decisions/013-aerochrome-splotchy-chroma.md`.
+- [ ] **One sky selection, built at open, for every sky-aware tool** <!-- decision: 018 --> —
+  asked 2026-09-18: should the sky selection be set before any corrections
+  and be available to later operations. It is, for the look's stages, the
+  tile and the batch: the decode worker builds the bitmap and its refinement
+  to the picture's edges from the undegraded decode a moment after the
+  picture itself. Two consumers still do not read it — the reader's own Sky
+  mask rebuilds a coarse bitmap of its own and never sees the refined edge,
+  and no per-population strength (denoise, colour noise, texture, the hot-spot
+  and lens corrections, all OWED in the scope gate) uses it yet. See
+  `docs/decisions/018-one-sky-selection-for-every-sky-aware-tool.md`.
 - [ ] **The foliage is the right colour and reads as a blob** <!-- decision: 016 --> — reported
   from the iPad 2026-09-17 on the Aerochrome look, asking how to get the detail
   back the way the film looks or the way people who edit these files normally do

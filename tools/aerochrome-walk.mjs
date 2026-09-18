@@ -114,11 +114,12 @@ const SKY = 1;
 // and an overcast sky are left alone. The film's sky reads 0.32.
 const DEPTH = 0.5;
 // 10e: the sky's VALUE on RAW after the Look press — mean HSV value of the
-// population 10b measures — must sit under SKY_VAL_MAX. MADE TO FAIL FIRST:
-// with NO_DEPTH=1 the walk zeroes the Sky depth slider after the press and
-// this check reads the undarkened sky; that reading and the candidate's are
-// in the comment beside the constant once measured.
-const SKY_VAL_MAX = 0.60;
+// population 10b measures — must sit under SKY_VAL_MAX. MADE TO FAIL FIRST,
+// 2026-09-18: with NO_DEPTH=1 the walk zeroes the Sky depth slider after the
+// press and this check read 0.878; with the look's depth of 0.5 it reads
+// 0.500. The ceiling sits 0.04 over the depth's reading, so a depth quietly
+// dropped from the look fails here while 10d's saturation still passes.
+const SKY_VAL_MAX = 0.54;
 const NO_DEPTH = !!process.env.NO_DEPTH;
 // THE FLOOR CHECKS NEED A FRAME THE FLOOR ACTUALLY BINDS ON, which is why they
 // do not use RAW. NIR_0063 measures 0.46 -- above the floor -- so `max(measured,

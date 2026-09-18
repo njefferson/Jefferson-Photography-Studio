@@ -511,6 +511,11 @@ export const MAX_BITMAP_MASKS = 4;
 /** A painted brush mask: a single-channel 0..255 weight bitmap at a small
  *  working resolution (bilinearly sampled). `rev` bumps on each stroke so undo
  *  equality can compare cheaply without serialising the pixels. */
+/** Working resolution of a painted or detected mask bitmap: the longer edge of
+ *  every BrushMask the app packs into its mask texture, so they are all one
+ *  size. The sky selection's coarse bitmap is built at this size too. */
+export const BRUSH_MAX_EDGE = 384;
+
 export interface BrushMask {
   w: number;
   h: number;

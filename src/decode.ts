@@ -12,10 +12,31 @@ import { Tiff, type Ifd } from "./raw/tiff";
 import { decodeMosaicedDng } from "./raw/dngRaw";
 import { decodeNef } from "./raw/nef";
 import { camToSrgbLinear, nikonColorMatrix } from "./color";
+import type { BrushMask } from "./pipeline";
+
+/** The photograph's sky selection, built once from the undegraded decode —
+ *  gray-world balance only, no exposure, correction or look — so it never
+ *  moves as the photograph is graded (skyfine.ts). `mask` is the 384 px
+ *  bitmap `buildSkyMask` grows (null when no clear sky was found), `fine` its
+ *  refinement to the picture's edges. Every sky-aware operation reads this one
+ *  selection: the look's smoothing and depth, the tile, the batch export. */
+export interface SkySelection {
+  mask: BrushMask | null;
+  fine: BrushMask | null;
+}
 
 export interface DecodedImage {
   width: number;
   height: number;
+  /** The sky selection, once it has been built — by the decode worker on the
+   *  lane that decoded this photograph (a moment after the picture itself,
+   *  so the picture never waits on it), or on this thread when no worker is
+   *  running. Absent until then; `skySelReady` says when. */
+  skySel?: SkySelection;
+  /** Resolves with the selection when the worker posts it, or null if the
+   *  lane died first — the caller then builds it on this thread. Absent when
+   *  the decode was not asked for a selection. */
+  skySelReady?: Promise<SkySelection | null>;
   /** 8-bit gamma-encoded RGBA (JPEG/preview/lossy-linear path). */
   pixels?: Uint8ClampedArray;
   /** Linear float RGBA (mosaiced-raw path). Present instead of `pixels`. */
@@ -41,6 +62,49 @@ export interface DecodedImage {
  *  and because a function inside the page module cannot be timed by the test
  *  page or moved into a worker. A copy of it in either place would be a second
  *  implementation of the one thing that must not have two. */
+/** Clamp `v` into [lo, hi]. */
+const clampNum = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+/**
+ * Normalise a gain triple to unit luma.
+ * @param g  three channel gains.
+ * @returns the gains scaled so their Rec.709 luma is 1, each clamped to
+ *   0.02..16 — the range every white-balance slider in the app accepts, so a
+ *   result here can always be written straight into `params.wb`.
+ */
+export function lumNormalize(g: number[]): [number, number, number] {
+  const l = 0.2126 * g[0] + 0.7152 * g[1] + 0.0722 * g[2] || 1;
+  return [clampNum(g[0] / l, 0.02, 16), clampNum(g[1] / l, 0.02, 16), clampNum(g[2] / l, 0.02, 16)];
+}
+
+/**
+ * Gray-world white balance over a subsampled grid, in linear space.
+ * @param img  the decoded photograph (raw or already-profiled).
+ * @returns luma-normalised gains that make the frame's channel means equal —
+ *   the balance the sky selection, the auto-baseline and a look's own balance
+ *   all start from, so it is the one balance the selection is allowed to be
+ *   built at (a selection built at the live edit would drift with the grade).
+ */
+export function grayWorldWB(img: DecodedImage): [number, number, number] {
+  const { width, height } = img;
+  let r = 0, g = 0, b = 0, n = 0;
+  const step = Math.max(1, Math.floor(Math.min(width, height) / 256));
+  for (let y = 0; y < height; y += step) {
+    for (let x = 0; x < width; x += step) {
+      const [pr, pg, pb] = linearAt(img, x, y);
+      r += pr;
+      g += pg;
+      b += pb;
+      n++;
+    }
+  }
+  r = Math.max(1e-4, r / n);
+  g = Math.max(1e-4, g / n);
+  b = Math.max(1e-4, b / n);
+  const mean = (r + g + b) / 3;
+  return lumNormalize([mean / r, mean / g, mean / b]);
+}
+
 export function linearAt(img: DecodedImage, x: number, y: number): [number, number, number] {
   const i = (y * img.width + x) * 4;
   if (img.linear) {
