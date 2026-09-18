@@ -1151,6 +1151,8 @@ function syncToUI() {
   updateMix3UI(); // hoisted; channel mixer follows undo/redo/loads too
   updateStickerUI(); // hoisted; sticker controls follow undo/redo/session restore
   syncLutUI(); // hoisted; reflects params.lut so undo/redo/reset/loads all update the LUT row
+  syncMirrors(); // the finishing panel's second controls follow the tabs' own
+
 }
 
 // The per-color bands follow the subject through a channel swap (the swap
@@ -1193,8 +1195,19 @@ ui.irAutoWb.addEventListener("click", () => {
 // the full-strength recipe, JPEGs a gentler one — camera JPEGs already carry
 // colour rendering, so the raw-strength saturation goes garish on them.
 // Looks never touch WB/exposure (those are per-shot; use Auto / tap foliage).
+/** One finishing step of a look (decision 022): the id of an existing control —
+ *  a range input or a button — the name the panel shows for it, and the one
+ *  line of why, from the research. */
+interface FinishStep { id: string; name: string; why: string }
+
 interface Look {
   swapRB: boolean;
+  /** THE LOOK'S OWN FINISHING STEPS (decision 022): the controls that finish
+   *  this look per photograph, in the method's order. The panel that opens on
+   *  apply hosts a second control for each, bound to the same field the tab
+   *  carries; a look without steps opens nothing. A batch never sees the panel,
+   *  so the look's declared values must stand on their own. */
+  finish?: FinishStep[];
   /** Repeat presses flip the R<->B swap (colour looks only). */
   toggleSwap?: boolean;
   hue: number;
@@ -1325,6 +1338,20 @@ interface Look {
   raw: { sat: number; contrast: number; wbBias?: [number, number, number]; hsl?: number[]; sky?: [number, number, number]; foliage?: [number, number, number] };
   jpeg: { sat: number; contrast: number; wbBias?: [number, number, number]; hsl?: number[]; sky?: [number, number, number]; foliage?: [number, number, number] };
 }
+/** AEROCHROME'S FINISHING STEPS, in the method's order (IR-SCIENCE 4b-vi, 9c,
+ *  9h; decision 022): the correction before anything is judged, then the
+ *  sky's two amounts through its selection, the foliage's amount, the
+ *  per-photograph top-up, and a mask for anything beyond. Each line of why is
+ *  the research's, not a slogan. */
+const EIR_FINISH: FinishStep[] = [
+  { id: "hsStrength", name: "Lens colour correction", why: "First, before anything is judged: a hot spot is a white-balance shift of about a thousand kelvin between the centre and the edge, and this look magnifies it. Set it looking at the sky's corners." },
+  { id: "skySatSel", name: "Sky saturation", why: "The sky's own colour, where the sky is; a cloud, a haze and an overcast sky keep their grey. The film's sky reads 0.66 to 0.92." },
+  { id: "skyDepth", name: "Sky depth", why: "Darker where the sky is a blue sky — the film's is dark as well as blue. Ships at 0: a daylight sky at the film's value reads as night on a screen." },
+  { id: "folSat", name: "Foliage amount", why: "The infrared-bright foliage's own colour and nothing else's. The film's foliage is scarlet at 0.60 to 0.78." },
+  { id: "irLift", name: "Restore depth", why: "The per-photograph top-up toward the film's references; off shows the look's own numbers." },
+  { id: "addSky", name: "Add a Sky mask", why: "For anything beyond: warmth, brightness and contrast on the sky alone, on the Masks tab." },
+];
+
 const LOOKS: Record<string, Look> = {
   // Gentle contrast by default: it never crushes shadow detail (road shade,
   // dark foliage). Scenes with big empty dark skies take Contrast up well.
@@ -1451,7 +1478,7 @@ const LOOKS: Record<string, Look> = {
   // lands 1-4deg wide. That range is not in the data to recover -- it is the
   // same 1-3% residual section 4c-iv is about -- so this moves the population,
   // it does not enrich it.
-  eir: { swapRB: true, hue: 0, denoise: 0.45, texture: 0.25, skySmooth: 1, skyDepth: 0, skySat: 1.0,
+  eir: { swapRB: true, hue: 0, denoise: 0.45, texture: 0.25, skySmooth: 1, skyDepth: 0, skySat: 1.0, finish: EIR_FINISH,
          mix3: [0.99, -0.06, 0.07, -1.44, 1.37, 1.02, -0.47, 0.81, 0.65],
          // THE COLOUR GOES WHERE THE COLOUR IS, and to what is a PORTION of the
          // photograph. Global saturation 1: the 3.0 that used to be here coloured
@@ -1874,6 +1901,7 @@ function pressLook(key: string) {
     draw();
   } else {
     activeLook = key;
+    openFinish(key);
     applyLook(key);
   }
   sessionLook = activeLook; // chosen here, and it follows you through the set
@@ -2596,6 +2624,117 @@ let activePanelTab: PanelTab = "basic";
 let overlayReady = false;
 let stickerReady = false; // set true once the sticker block below has run
 let warpReady = false; // set true once the warp block below has run
+
+
+// ===== THE LOOK'S OWN FINISHING PANEL (decision 022) =====
+// A look is a start; the steps that finish it per photograph were spread over
+// four tabs while the method has an order. The panel hosts a SECOND control for
+// each declared step, bound to the same field the tab carries: a mirror writes
+// the tab's own input and dispatches its events, so every listener, the undo
+// history and the sync run exactly as for a drag on the tab — and syncMirrors
+// keeps the mirrors current when the tab's own control, an undo or a look moves
+// the field. Nothing here is a fifth place a field lives; the field lives where
+// it did.
+const finishPanel = $("finishPanel") as HTMLElement;
+const finishTitle = $("finishTitle") as HTMLElement;
+const finishIntro = $("finishIntro") as HTMLElement;
+const finishSteps = $("finishSteps") as HTMLElement;
+const finishClose = $("finishClose") as HTMLButtonElement;
+const finishOpen = $("finishOpen") as HTMLButtonElement;
+const mirrorWatch: MutationObserver[] = [];
+
+/** The name a look's button prints, for the panel's title. */
+function lookLabel(key: keyof typeof LOOKS): string {
+  const btn = document.getElementById("look" + key.charAt(0).toUpperCase() + key.slice(1));
+  return btn?.childNodes[0]?.textContent?.trim() || key;
+}
+
+/** Build the panel's rows for a look: one mirror per declared step, bound to
+ *  the tab's own control by id. A step whose control does not exist is skipped
+ *  rather than rendered dead. */
+function renderFinish(key: keyof typeof LOOKS): void {
+  for (const o of mirrorWatch) o.disconnect();
+  mirrorWatch.length = 0;
+  finishSteps.replaceChildren();
+  for (const st of LOOKS[key].finish ?? []) {
+    const primary = document.getElementById(st.id) as HTMLInputElement | HTMLButtonElement | null;
+    if (!primary) continue;
+    const row = document.createElement("div");
+    row.className = "finish-step";
+    if (primary instanceof HTMLInputElement) {
+      const label = document.createElement("label");
+      label.append(st.name + " ");
+      const m = document.createElement("input");
+      m.type = "range"; m.id = "finish-" + st.id; m.dataset.mirror = st.id;
+      m.min = primary.min; m.max = primary.max; m.step = primary.step; m.value = primary.value; m.disabled = primary.disabled;
+      m.addEventListener("input", () => { primary.value = m.value; primary.dispatchEvent(new Event("input", { bubbles: true })); });
+      m.addEventListener("change", () => { primary.dispatchEvent(new Event("change", { bubbles: true })); });
+      label.append(m);
+      row.append(label);
+    } else {
+      const m = document.createElement("button");
+      m.type = "button"; m.id = "finish-" + st.id; m.dataset.mirror = st.id;
+      m.className = primary.classList.contains("toggle") ? "toggle full-btn" : "full-btn";
+      m.textContent = st.name;
+      if (primary.hasAttribute("aria-pressed")) m.setAttribute("aria-pressed", primary.getAttribute("aria-pressed") ?? "false");
+      m.disabled = primary.disabled;
+      m.addEventListener("click", () => primary.click());
+      const o = new MutationObserver(() => syncMirrors());
+      o.observe(primary, { attributes: true, attributeFilter: ["aria-pressed", "disabled"] });
+      mirrorWatch.push(o);
+      row.append(m);
+    }
+    const why = document.createElement("p");
+    why.className = "note";
+    why.textContent = st.why;
+    row.append(why);
+    finishSteps.append(row);
+  }
+}
+
+/** Bring every mirror to its control's current state. Called at the end of
+ *  syncToUI, on any input the tabs' own controls raise while the panel is
+ *  open, and when a mirrored button's pressed state changes. */
+function syncMirrors(): void {
+  if (finishPanel.hidden) return;
+  finishSteps.querySelectorAll<HTMLElement>("[data-mirror]").forEach((m) => {
+    const primary = document.getElementById(m.dataset.mirror ?? "") as HTMLInputElement | HTMLButtonElement | null;
+    if (!primary) return;
+    if (m instanceof HTMLInputElement && primary instanceof HTMLInputElement) { m.value = primary.value; m.disabled = primary.disabled; }
+    else if (m instanceof HTMLButtonElement) {
+      if (primary.hasAttribute("aria-pressed")) m.setAttribute("aria-pressed", primary.getAttribute("aria-pressed") ?? "false");
+      m.disabled = primary.disabled;
+    }
+  });
+}
+
+/** Open the panel for a look with steps; a look without any closes it. Opens
+ *  without taking focus — the reader pressed a look, and the status line says
+ *  the panel is there. */
+function openFinish(key: keyof typeof LOOKS): void {
+  const steps = LOOKS[key].finish ?? [];
+  if (!steps.length) { finishPanel.hidden = true; finishOpen.hidden = true; return; }
+  renderFinish(key);
+  const name = lookLabel(key);
+  finishTitle.textContent = `Finish ${name}`;
+  finishIntro.textContent = `${name} is on. A look is a start; these finish it for this photograph, in the method's order.`;
+  finishPanel.hidden = false;
+  finishOpen.hidden = true;
+  syncMirrors();
+  panelBody.scrollTop = 0;
+}
+
+/** Hide the panel and offer the way back under the looks, while a look with
+ *  steps is on. */
+function closeFinish(): void {
+  finishPanel.hidden = true;
+  finishOpen.hidden = !(activeLook && (LOOKS[activeLook].finish ?? []).length);
+}
+
+finishClose.addEventListener("click", () => { closeFinish(); if (!finishOpen.hidden) finishOpen.focus(); });
+finishOpen.addEventListener("click", () => { if (activeLook) { openFinish(activeLook); finishClose.focus(); } });
+// A drag on a tab's own slider while the panel is open moves its mirror too.
+panelBody.addEventListener("input", (e) => { if (!finishPanel.hidden && e.target instanceof HTMLInputElement && !e.target.dataset.mirror) syncMirrors(); });
 
 function setPanelTab(tab: PanelTab) {
   if (!PANEL_TABS.includes(tab)) return;
@@ -10867,6 +11006,7 @@ async function endSession() {
   // remove it short of opening something new (decision 020).
   renderer.clear();
   zoomCtl.hidden = true; // the zoom controls belong to a photograph, and there is none
+  closeFinish(); // and the finishing panel belonged to a look on one
   panel.hidden = true;
   welcome.hidden = false;
   hint.hidden = false;

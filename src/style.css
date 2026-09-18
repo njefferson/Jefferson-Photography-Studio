@@ -3486,3 +3486,13 @@ li.plat-you { font-weight: 600; }
 .panel-notes-toggle:active { background: var(--surface-3); }
 /* Only the explanatory prose goes — never a label, a value, or a warning. */
 #panel.notes-off .note { display: none; }
+
+/* THE LOOK'S OWN FINISHING PANEL (decision 022): a region at the top of the
+   panel body, tokens only so both themes hold; the close target is 44px. */
+.finish { margin: 0 0 12px; padding: 10px 12px 4px; border: 1px solid var(--line-2); border-radius: 10px; }
+.finish-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.finish-head .sub-title { margin: 0; }
+#finishClose { min-width: 44px; min-height: 44px; padding: 0; }
+.finish-step { margin: 2px 0 6px; }
+.finish-step .note { margin-top: 0; }
+#finishOpen { margin-top: 6px; }
