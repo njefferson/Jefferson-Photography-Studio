@@ -566,8 +566,12 @@ user-scalable=no.
   to say how much of the splotch is amplification. **The sky half shipped
   2026-09-17**: its colour is smoothed after the look amplifies it, inside the
   sky's own selection, mean colour kept — the file's one untested direction,
-  made free by acting on the sky only. The gravel half stays open. The sources
-  go into `IR-SCIENCE.md` (9l for what shipped). See
+  made free by acting on the sky only. **And on 2026-09-18 that stage was
+  found corrupting every TIFF export** — a channel a hundredth past the range
+  wrapped in the 16-bit write; cyan branches, yellow sky, clean on screen and
+  in JPEGs — fixed by clamping the stage and the write, with a walk that
+  measures the exported file whole (§9l-ii). The gravel half stays open. The
+  sources go into `IR-SCIENCE.md` (9l for what shipped). See
   `docs/decisions/013-aerochrome-splotchy-chroma.md`.
 - [ ] **Aerochrome's sky is bright and pale where the film's is dark and saturated** <!-- decision: 017 --> —
   measured 2026-09-18 while holding Restore depth to the film: every setting

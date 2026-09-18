@@ -458,6 +458,14 @@ export interface SkyMap {
 /** Display-space chroma is bounded well inside ±0.5 for any sky; the encode
  *  maps ±this to 0..255. The shader decodes with the same constant. */
 export const SKY_CHROMA_RANGE = 0.5;
+/** The sky stage's gate on chroma distance (display units, same scale as the
+ *  map): full blend below LO, none above HI, Hermite between. Measured on the
+ *  frames that set them: the mottle's residual to the sky's mean is a few
+ *  hundredths (p95 of the neighbour difference 0.06–0.09), a branch or a leaf
+ *  against the sky is 0.4–0.6 away. Shared with gl.ts, which hard-codes the
+ *  same two numbers in its shader; change both or neither. */
+export const SKY_GATE_LO = 0.12;
+export const SKY_GATE_HI = 0.25;
 /** Decode one encoded chroma byte (filtered or not) to display units. */
 export const decSkyChroma = (e: number) => ((e / 255) * 2 - 1) * SKY_CHROMA_RANGE;
 /** Bilinear sample of the ENCODED sky map `m` at image-uv (`u`, `v`), then
@@ -1473,16 +1481,41 @@ export function compileEdit(
     // the pixel agree on what colour the sky IS; before lum and the LUT so
     // those see one consistent sky. Spatial (needs uv) — skipped in the LUT
     // bake like every other map. Same in the shader.
+    //
+    // GATED ON THE PIXEL'S OWN DISTANCE FROM THE TARGET, and this is not a
+    // refinement. Without it the stage acted on every pixel the soft 384 px
+    // sky bitmap gave any weight to: measured 2026-09-18 on the EXPORT of a
+    // practice frame with oaks against the sky, every branch and leaf gap the
+    // mask leaked into went saturated blue and cyan, and where a texel's
+    // target was not the sky the sky itself went pink or yellow-green. The
+    // preview hid it at screen scale. A sky pixel with mottle on it sits a few
+    // hundredths from the sky's mean chroma; a branch or a leaf sits half a
+    // range away. So the blend fades out between SKY_GATE_LO and SKY_GATE_HI
+    // of chroma distance, and a target that is not a number is no target.
     if (skyAmt > 0 && u !== undefined && v !== undefined) {
       const [sa, sb, sw] = sampleSkyMap(skyMap!, u, v);
-      const k = skyAmt * sw;
-      if (k > 0) {
+      if (sw > 0) {
         const L = out[0] * 0.2126 + out[1] * 0.7152 + out[2] * 0.0722;
-        const na = (out[0] - L) + (sa - (out[0] - L)) * k;
-        const nb = (out[2] - L) + (sb - (out[2] - L)) * k;
-        out[0] = L + na;
-        out[2] = L + nb;
-        out[1] = (L - 0.2126 * out[0] - 0.0722 * out[2]) / 0.7152;
+        const ca = out[0] - L, cb = out[2] - L;
+        const d = Math.hypot(sa - ca, sb - cb);
+        const k = skyAmt * sw * (1 - smooth01(SKY_GATE_LO, SKY_GATE_HI, d));
+        if (k > 0 && Number.isFinite(k)) {
+          const na = ca + (sa - ca) * k;
+          const nb = cb + (sb - cb) * k;
+          // CLAMPED, because the export writes these as 16-bit integers with
+          // no clamp of its own and the preview's framebuffer clamps silently.
+          // Unclamped, a sky pixel at blue 0.98 nudged to 1.01 was stored as
+          // 0.01 and a branch whose solved green went a little negative was
+          // stored as 1.0 — yellow-green sky and cyan branches in every TIFF
+          // export, invisible on screen and in a JPEG (measured 2026-09-18:
+          // 13,809 pixels of one 700 px export moved by more than half the
+          // chroma range, with the blend bounded at 0.12). Luma is preserved
+          // exactly only where nothing clamps, which is everywhere the stage
+          // is meant to act.
+          out[0] = Math.min(1, Math.max(0, L + na));
+          out[2] = Math.min(1, Math.max(0, L + nb));
+          out[1] = Math.min(1, Math.max(0, (L - 0.2126 * out[0] - 0.0722 * out[2]) / 0.7152));
+        }
       }
     }
     // Global luminance — the very last step of the app's own grade, matching

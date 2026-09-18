@@ -62,12 +62,15 @@ const encC = (v: number) => Math.round(((Math.min(SKY_CHROMA_RANGE, Math.max(-SK
  * @param cam,aspect,local,lens  exactly what compileEdit takes, passed through.
  * @param sky  the sky bitmap built once per image by buildSkyMask.
  * @returns the map, or null when the bitmap selects nothing.
- * What the result must satisfy: every texel's (a, b) is the MEAN chroma of the
- * rendered sky over that texel's footprint with luma discarded, so blending a
- * pixel's chroma toward it preserves the sky's mean colour by construction —
- * the control that the saturation route failed (9k). `weight` is 0 wherever
- * the bitmap is, so `compileEdit` and the shader leave every non-sky pixel
- * byte-identical.
+ * What the result must satisfy: every texel's (a, b) is the MASK-WEIGHTED
+ * mean chroma of the rendered sky over that texel's footprint with luma
+ * discarded and non-finite samples dropped, so blending a pixel's chroma
+ * toward it preserves the sky's mean colour by construction — the control
+ * that the saturation route failed (9k) — and a texel on the canopy's edge
+ * carries the sky's colour, not the leaves'. `weight` is the mean mask weight
+ * of the texel's samples and is 0 wherever the bitmap is, so `compileEdit` and
+ * the shader leave every non-sky pixel byte-identical; what they do with a
+ * pixel the soft mask leaks onto is their gate's business (SKY_GATE_LO/HI).
  */
 export function buildSkyMap(
   sample: (x: number, y: number) => ArrayLike<number>,
@@ -94,27 +97,36 @@ export function buildSkyMap(
   const rgb = new Uint8Array(W * H * 3);
   for (let ty = 0; ty < H; ty++) {
     for (let tx = 0; tx < W; tx++) {
-      const u = (tx + 0.5) / W, v = (ty + 0.5) / H;
-      const wgt = brushAt(sky, u, v);
       const o = (ty * W + tx) * 3;
-      if (wgt < 1 / 255) { rgb[o] = encC(0); rgb[o + 1] = encC(0); rgb[o + 2] = 0; continue; }
-      // Box-average the texel's footprint AFTER rendering each sub-sample:
-      // the quantity being averaged is the OUTPUT chroma, after the look has
-      // amplified it, which is the whole point of the stage (4c-xxi).
-      let sa = 0, sb = 0, n = 0;
+      // Average the texel's footprint AFTER rendering each sub-sample — the
+      // quantity averaged is the OUTPUT chroma, after the look has amplified
+      // it, which is the whole point of the stage (4c-xxi) — and WEIGHT EACH
+      // SAMPLE BY THE MASK AT ITS OWN POSITION. A texel straddling the edge of
+      // a canopy used to average leaves into the sky's target; measured on an
+      // export, the sky beside the crown went pink toward it. A sample the
+      // pipeline cannot render (not a number) is not a sample. The texel's own
+      // weight is the mean of its samples' mask weights, which is what the
+      // shader and compileEdit blend by.
+      let sa = 0, sb = 0, wsum = 0, wall = 0, n = 0;
       for (let j = 0; j < SUB; j++) {
         const sy = Math.min(srcH - 1, Math.floor(((ty + (j + 0.5) / SUB) * srcH) / H));
         for (let i = 0; i < SUB; i++) {
           const sx = Math.min(srcW - 1, Math.floor(((tx + (i + 0.5) / SUB) * srcW) / W));
+          const wgt = brushAt(sky, (sx + 0.5) / srcW, (sy + 0.5) / srcH);
+          n++; wall += wgt;
+          if (wgt < 1 / 255) continue;
           const s = sample(sx, sy);
           edit(s[0], s[1], s[2], out, 0, (sx + 0.5) / srcW, (sy + 0.5) / srcH);
           const L = out[0] * REC[0] + out[1] * REC[1] + out[2] * REC[2];
-          sa += out[0] - L; sb += out[2] - L; n++;
+          const a = out[0] - L, b = out[2] - L;
+          if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
+          sa += a * wgt; sb += b * wgt; wsum += wgt;
         }
       }
-      rgb[o] = encC(sa / n);
-      rgb[o + 1] = encC(sb / n);
-      rgb[o + 2] = Math.round(wgt * 255);
+      if (wsum <= 0) { rgb[o] = encC(0); rgb[o + 1] = encC(0); rgb[o + 2] = 0; continue; }
+      rgb[o] = encC(sa / wsum);
+      rgb[o + 1] = encC(sb / wsum);
+      rgb[o + 2] = Math.round((wall / n) * 255);
     }
   }
   return { width: W, height: H, rgb };
