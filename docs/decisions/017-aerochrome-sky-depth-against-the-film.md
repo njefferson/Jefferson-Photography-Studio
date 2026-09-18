@@ -152,6 +152,39 @@ copy's edges by a guided filter against its luma, a depth keyed on the map's
 LOCAL sky chroma with a window that leaves an overcast sky pale, a Sky depth
 slider, `skyDepth` on the look. The selection is the one 006 needs too.
 
+## Outcome, part two — the value half, 2026-09-18
+
+**Built as the record said it needed, on the branch the same day** (three
+commits ending at the one that carries `VERSION` 2.51): the sky bitmap
+refined to the picture's edges by a guided filter (`src/skyfine.ts` — He,
+Sun and Tang; a three-channel guide of red share, blue share and gamma luma;
+the bitmap read as a hard selection so the filter grows its own edge), the
+depth keyed ONCE per photograph on its sky's mean rendered chroma with a
+per-texel grey guard for clouds (`src/skymap.ts`, the map's fourth byte), and
+one multiplier after the smoothing blend in `compileEdit` and the shader.
+`skyDepth` is a look field and a **Sky depth** slider beside Sky colour
+smoothing; Aerochrome carries the amount the owner picks from the sheets.
+
+**Measured** (IR-SCIENCE.md §4b-v, depth 0.5): sky value 3406 0.76 → 0.42,
+1376 0.56 → 0.40, 0063 0.88 → 0.50, 1644 0.65 → 0.42 against the film's 0.32;
+saturation, foliage, greys, the pale field and the concrete unmoved; the
+overcast (2082) and the no-sky frame (0627) untouched by construction; the
+rim added at 3406's roofline +0.043 (the refined edge's own ten working
+pixels) against +0.130 before the refinement was fixed; speckle unchanged.
+
+**What turned out wrong on the way, and none of it was visible to the film
+instrument:** a key per texel painted a clear sky's own gradient as blocks; a
+luma guide left a halo round a crown and a colour guide a pale band above a
+roofline; a feathered input taught the filter the sky's gradient. Each was
+caught by a sheet or by an instrument built for it (`rim.mjs`,
+`maskprobe.mjs`). The numbers behind "green" were green all three times.
+
+**Still not the film:** the value lands at 0.40–0.50 at depth 0.5 against
+0.32 — the amount is the owner's from the sheets — and NIR_1651's sky is not
+darkened because `buildSkyMask` finds only the cloud strip along its top
+edge (9.7% of the frame), which is the bitmap's limit on a cloud-topped frame
+and a different piece of work.
+
 ## Rank
 
 Part one shipped. The open remainder sits directly above 006 (mask by

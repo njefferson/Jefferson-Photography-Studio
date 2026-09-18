@@ -674,6 +674,63 @@ where the coarse bitmap's rim would be widest. `PREVIEW_PIPELINE` 30.
 (`skysolve-measure.mjs` with a Sky depth override; the reference is the
 shipped 2.50.10 look at depth 0 on this build):
 
+- **Sky value at depth 0.5** (film 0.32): NIR_3406 0.76 → 0.42, NIR_1376 0.56
+  → 0.40, NIR_0063 0.88 → 0.50, NIR_1644 0.65 → 0.42. Saturation unchanged on
+  every frame (the depth is a multiplier on the pixel; HSV saturation does
+  not move), so the saturation half's three-of-seven stands.
+- **Left alone, as designed:** NIR_2082's overcast (key 0: its sky's mean
+  chroma 0.27 sits under the window) and NIR_0627, the no-sky frame whose
+  bitmap fires on a blurred red background (hue band 0) — 0.0% of either
+  frame darkened. NIR_1651 barely moves (0.65 → 0.65) for a different reason:
+  `buildSkyMask` finds 9.7% of that frame, the cloud-topped strip at the top
+  edge, and not the blue sky beside the tree. That is the bitmap's limit on
+  a frame whose top edge is cloud, and it is recorded here rather than worked
+  around.
+- **Nothing else moves.** Greys darkened by more than a tenth: 0.0% on five
+  frames, 0.4% on 1376, 2.1% on 1644; foliage saturation and value unchanged
+  to two decimals on all seven; the pale IR-bright field of 1376 and the
+  concrete apron of 3406 — the band's casualties in 4b-iv — untouched, which
+  is the whole difference between a selection and a band.
+- **The rim, by the instrument built for it** (`rim.mjs`: luma 4 px above the
+  sky's lower boundary against 40 px above, the boundary found on the
+  reference render, controls a flat field and a planted 6 px band): 3406
+  +0.043 mean (+0.079 at the 90th percentile) added over the photograph's own
+  +0.022; 1376 +0.032 (+0.047). That residual is the refined edge's own width
+  — a guide pixel is 2.7 working pixels, so the edge steps over about ten —
+  and reads as a soft edge at the roofline on the sheet, not a band.
+- **Speckle unchanged** (3406 5.56% → 4.78% of the sky at excess 0.205 →
+  0.192; 2082 identical), and the hot spot's pale centre on 3406 stays where
+  it was: the lens's added light is not the depth's to remove, and the
+  reader's lens correction is still the tool for it.
+- **Cost:** on this machine, for a 21-megapixel frame, the bitmap 160 ms,
+  the guide 210 ms, the refinement 200 ms at 1024×682 — paid once per
+  photograph, on the first edit that carries a depth, never at open.
+
+**WHAT TURNED OUT WRONG ON THE WAY, in the order it was found.** Three
+builds, each caught by a picture or an instrument rather than by the film
+instrument, which was green on all three.
+1. *The key per texel.* The first build keyed the depth on each 128-texel's
+   own mean chroma against a 0.32–0.42 window, and a clear sky's own chroma
+   gradient became the depth map: NIR_3406's hot-spot centre stayed pale
+   inside a ring of dark texel blocks, NIR_2082's overcast grew dark blocks
+   wherever one texel crossed the window, NIR_1376 mottled. The film
+   instrument read 3406 at 0.53 and said nothing else. A sky's chroma varies
+   across a frame by more than any window is wide; the key is per photograph
+   now, and only a GREY texel (a cloud, chroma under 0.06–0.14) is spared on
+   its own.
+2. *The guide.* Luma alone read the bright sky round 1376's crown as the
+   crown's side and left a halo; colour shares alone (red, blue) read the pale
+   haze above 3406's roofline as roof and left a pale band (rim +0.130). Both
+   at once — the per-window fit takes whichever separates there — and the
+   crown is crisp and the haze is sky.
+3. *The input.* Fed the FEATHERED bitmap, the guided filter kept the feather
+   wherever its window did not reach an edge, and learned the sky's gradient
+   as "less sky": the refined mask sloped to 0.85 over the 200 px above the
+   roofline (`maskprobe.mjs`, which writes the coarse and refined masks as
+   pictures). Read as a hard selection cut at half, the filter grows its own
+   edge from the guide — a 25 px ramp across a hard edge comes back 4 px
+   wide, the probe's control — and the mask is solid to the roofline.
+
 ## 4c. THE CRUX IS NIR CONTAMINATION, AND A ROTATION ALONE CANNOT FIX IT
 
 **Researched 2026-09-16, after shipping the rotation bare and reporting that it
