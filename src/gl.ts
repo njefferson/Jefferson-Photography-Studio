@@ -5,7 +5,7 @@
 
 // Single source of truth for edit parameters lives in pipeline.ts so the GPU
 // preview and CPU export can never drift apart.
-import { toneEvaluator, toneIsIdentity, maskIsActive, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, LENS_GAIN_LO, LENS_GAIN_HI, lensAreaMean, type EditParams, type LocalMap, type SkyMap, type BrushMask, type CropRect } from "./pipeline";
+import { toneEvaluator, toneIsIdentity, maskIsActive, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, LENS_GAIN_LO, LENS_GAIN_HI, SAT_GUARD_LO, SAT_GUARD_HI, lensAreaMean, type EditParams, type LocalMap, type SkyMap, type BrushMask, type CropRect } from "./pipeline";
 import { toHalfBuffer } from "./half";
 export type { EditParams };
 
@@ -79,6 +79,8 @@ precision highp float;
 // either way — a shader is a string to it.
 const float LENS_GAIN_LO = ${LENS_GAIN_LO.toFixed(6)};
 const float LENS_GAIN_HI = ${LENS_GAIN_HI.toFixed(6)};
+const float SAT_GUARD_LO = ${SAT_GUARD_LO.toFixed(6)};
+const float SAT_GUARD_HI = ${SAT_GUARD_HI.toFixed(6)};
 in vec2 v_uv;
 in vec2 v_cropUv;
 out vec4 frag;
@@ -260,6 +262,12 @@ float bandWeight(float hue, float center, float plateau, float edge){
   float d = abs(hue - center);
   d = min(d, 360.0 - d);
   return 1.0 - smoothstep(plateau, edge, d);
+}
+// pipeline.ts bandGain, line for line: a boost is guarded by the pixel's own
+// saturation (SAT_GUARD_LO..HI), a reduction is not.
+float bandGain(float k, float w, float s){
+  float g = 1.0 + (k - 1.0) * w;
+  return g > 1.0 ? 1.0 + (g - 1.0) * smoothstep(SAT_GUARD_LO, SAT_GUARD_HI, s) : g;
 }
 // Grain hash + value noise — the VERBATIM twin of pipeline.ts hash2d /
 // grainNoise (uint multiply wraps exactly like Math.imul; >> matches >>>).
@@ -621,7 +629,7 @@ void main() {
     float wS = bandWeight(h, u_swap ? 30.0 : 210.0, 55.0, 105.0);
     float wF = 1.0 - wS;
     h += u_sky.x * wS + u_fol.x * wF;
-    float s = min(1.0, hsv.y * (1.0 + (u_sky.y - 1.0) * wS) * (1.0 + (u_fol.y - 1.0) * wF));
+    float s = min(1.0, hsv.y * bandGain(u_sky.y, wS, hsv.y) * bandGain(u_fol.y, wF, hsv.y));
     float v = hsv.z * (1.0 + (u_sky.z - 1.0) * wS) * (1.0 + (u_fol.z - 1.0) * wF);
     c = hsv2rgb(vec3(fract(h / 360.0), s, v));
   }

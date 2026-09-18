@@ -539,6 +539,18 @@ user-scalable=no.
 > different approach and mindset"). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
+- [ ] **Aerochrome's saturation by population: foliage and sky each their own amount, nothing colourless touched** <!-- decision: 019 --> —
+  reported 2026-09-18 from staging 2.50.10: the look's saturation reads too
+  high across the whole frame, it needs aiming at the foliage and at the sky
+  as two separate amounts, and anything that has no colour must be left as it
+  is. What the look did: a global saturation of 3.0 on every raw pixel, and a
+  power curve of 2 on the aqua and blue chips that lifted the palest blues
+  most — so bare ground, grey walls, an overcast sky and clouds all took
+  colour. The fix: global saturation 1, the Colour tab's own Sky and Foliage
+  bands carry the look's amounts, and every band BOOST is gated on the
+  pixel's own chroma (`bandGain`, `SAT_GUARD_LO..HI`) in both pipelines. The
+  amounts are chosen from rendered sheets; the record carries the research
+  and the rejected routes (`docs/decisions/019-aerochrome-colour-by-population.md`).
 - [ ] **A photograph that fills the screen with no way back out** <!-- decision: 012 --> — reported
   from the iPad 2026-09-17: a photograph in the full view appeared zoomed in, and
   neither zooming out nor scrolling brought the rest of it back. Two failures, and
@@ -2044,9 +2056,15 @@ read as authoritative, and an invented one is worse than a missing one.
   0.32), saturation, foliage, greys, pale ground and concrete unmoved, the
   overcast and the no-sky frame untouched. Three wrong builds on the way, each
   caught by a picture or an instrument rather than the film numbers — the
-  record and IR-SCIENCE.md §4b-iv/v carry them. Still not the film: the depth
-  amount is the owner's from the sheets, and a frame whose top edge is cloud
-  (NIR_1651) gets almost no depth because the sky bitmap finds only the cloud.
+  record and IR-SCIENCE.md §4b-iv/v carry them. Still not the film: a frame
+  whose top edge is cloud (NIR_1651) gets almost no depth because the sky
+  bitmap finds only the cloud. AND THE FILM'S VALUE IS NOT THE TARGET, judged
+  on the device from the sheets the same day: a daylight sky taken to the
+  scan's value reads as night, and the pale centre of a clear sky in these
+  frames is the lens's hot spot, which the lens colour correction evens when
+  it is turned up. So the look ships the depth at 0 and the slider stays —
+  any amount is one drag away and undoable — and the look's saturation moved
+  to the two populations instead (019).
 
 - [x] **A tile in the strip now matches the photograph it opens into, under a look** — SHIPPED
   2026-09-17 to staging, awaiting the on-device pass. Under Aerochrome, the tile
