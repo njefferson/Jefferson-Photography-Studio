@@ -2698,6 +2698,27 @@ likely to shoot this lens at F11 or higher anyway, where the hotspots are the
 most noticeable."* **The apertures where the hot spot is worst are apertures
 infrared should not be shot at.** This app's shipped table runs to f/29.
 
+**THE NUMBERS FOR THIS BODY, from the calculator itself (diffraction.cam, Rob
+Shea; read 2026-09-18 from the page and its script — the fetch tool's own
+layer had refused the host, curl through the session proxy did not).** Its
+Diffraction ratio is the Airy disk over the pixel pitch, `2 × 1.22 × f ×
+wavelength ÷ pitch`, judged at every wavelength the chosen filter passes:
+Safe at 3 or under everywhere, Caution at 3.75 or under, Avoid at 4.5 or over
+anywhere, each rounded to the third stop. **Every infrared filter on that page
+passes 1000 nm** — 590, 665, 720, 830 high-pass and full spectrum all end at
+the same column — so the LONGEST wavelength binds and the conversion's cutoff,
+which the file cannot name (4c-iii), does not change the answer. **Nikon Z 50:
+pitch 4.22 µm** (20.9 MP, 5568 × 3712 on 23.5 × 15.7 mm). Converted, at 1000
+nm: **Safe to f/5, Caution to f/6.3, Avoid from f/8.** Unconverted (hot mirror,
+470–720 nm): f/7.1, f/9, f/11. Nikon D5300, the other body this app knows:
+3.92 µm, so f/4.5, f/5.6, f/7.1 converted. The caveat is the page's own
+convention: it counts 1000 nm as passed where a silicon sensor's response is
+already fading, so these are the conservative end. The diagnostic report now
+carries the frame's aperture against these three numbers, read from the
+file's EXIF and the body's pitch, never guessed; the frame that prompted this
+was f/4.5, inside the limit, and the shipped hot-spot table still runs to
+f/29.
+
 **Sources**: robsheaphotography.com, the two videos above plus "Diffraction in
 Infrared Photography" and "Accurate White Balance in Color Infrared
 Photography". Transcripts pulled with yt-dlp after the player API refused the

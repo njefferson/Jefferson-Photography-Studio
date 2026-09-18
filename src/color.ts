@@ -25,6 +25,25 @@ export const NIKON_D5300_COLOR_MATRIX = [
 /** Matrix for a native NEF, which carries no ColorMatrix tags — chosen by the
  *  file's own Model string so a NEF and its Adobe DNG twin render alike.
  *  Fallback: Z 50, the owner's primary body. */
+/**
+ * The sensor's pixel pitch for a camera model, in microns — the number the
+ * diffraction limit is measured against (IR-SCIENCE.md §9h: the Airy disk at
+ * the longest infrared wavelength over this pitch).
+ * @param model  the EXIF model string, e.g. "NIKON Z 50".
+ * @returns the pitch in µm for a body on record, or undefined — NEVER a
+ *   default, because the caller makes a claim about the reader's frame from
+ *   it and a guessed body is a guessed claim. Values from diffraction.cam
+ *   (Rob Shea), read 2026-09-18: Z 50 4.22 (5568 px over 23.5 mm), D5300 3.92.
+ * Consumer: apertureDiagnostic in main.ts, which prints "not on record" when
+ * this returns undefined.
+ */
+export function sensorPitchMicrons(model?: string): number | undefined {
+  if (!model) return undefined;
+  if (/Z ?50\b/i.test(model)) return 4.22;
+  if (/D5300/i.test(model)) return 3.92;
+  return undefined;
+}
+
 export function nikonColorMatrix(model?: string): number[] {
   if (model && /D5300/i.test(model)) return NIKON_D5300_COLOR_MATRIX;
   return NIKON_Z50_COLOR_MATRIX;

@@ -31,6 +31,7 @@ import { putFrame, eachFrame, frameMetas, frameCount, clearFrames, frameStore } 
 import * as Session from "./session";
 import { keepAwake } from "./wakelock";
 import { sampleBrush, skyBandCentre, lensGain, LENS_GAIN_HI, LENS_GAIN_LO, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, bandWeight, rgb2hsv, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, type MaskLayer, type CropRect, BRUSH_MAX_EDGE, type SkyMap } from "./pipeline";
+import { sensorPitchMicrons } from "./color";
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, type HealSpot } from "./heal";
 import { makeStickerAsset, stickerRect, stickerWorldCorners, stickerXform, compositeStickersIntoRect8, compositeStickersIntoRectF32, compositeStickersOverlay8, type StickerAsset } from "./sticker";
 import { makeWarpField, encodeWarp, paintWarp, warpIsEmpty as warpFieldEmpty, type WarpField, type WarpTool } from "./warp";
@@ -569,6 +570,32 @@ function lensCurveFor(imported: ImportedFile): LensCurve | null {
  *
  *  Returns one line for the diagnostic report, or a sentence saying why there is
  *  nothing to measure. Its only caller is the report's `extra` list. */
+/** The frame's aperture against the converted body's diffraction limit — one
+ *  line for the report, so a soft frame explains itself. The limit is the
+ *  calculator's (IR-SCIENCE.md §9h): Airy disk `2.44 × λ × f` over the pixel
+ *  pitch at the longest infrared wavelength the page counts, 1000 nm; Safe at a
+ *  ratio of 3, Caution 3.75, Avoid 4.5, each snapped to the third stop as the
+ *  page does. Reads the aperture from the file's EXIF and the pitch from the
+ *  body on record; says so, in words, when either is missing — never a guess.
+ *  Consumer: the diagnostic report's "Aperture" row. */
+function apertureDiagnostic(): string {
+  if (!current) return "nothing open";
+  const fn = currentExif?.fNumber;
+  const f = fn && fn[1] ? fn[0] / fn[1] : 0;
+  if (!(f > 0)) return "not in the file — the camera wrote no aperture, so the diffraction limit cannot be checked";
+  const pitch = sensorPitchMicrons(currentExif?.model);
+  const fs = `ƒ/${f.toFixed(f < 10 ? 1 : 0).replace(/\.0$/, "")}`;
+  if (!pitch) return `${fs} · this camera's pixel pitch is not on record, so the diffraction limit cannot be checked`;
+  const THIRDS = [1, 1.1, 1.3, 1.4, 1.6, 1.8, 2, 2.2, 2.5, 2.8, 3.2, 3.6, 4, 4.5, 5, 5.6, 6.3, 7.1, 8, 9, 10.1, 11, 12.7, 14.3, 16, 18, 20.2, 22, 25.4, 28.5, 32];
+  const at = (ratio: number) => (ratio * pitch) / 2.44; // the f-number where the Airy disk at 1000 nm is `ratio` pitches wide
+  const below = (x: number) => [...THIRDS].reverse().find((t) => t <= x + 1e-9) ?? THIRDS[0];
+  const above = (x: number) => THIRDS.find((t) => t >= x - 1e-9) ?? THIRDS[THIRDS.length - 1];
+  const safe = below(at(3)), caution = below(at(3.75)), avoid = above(at(4.5));
+  const where = f <= at(3) + 1e-9 ? "inside" : f <= at(3.75) + 1e-9 ? "in the caution band of" : "past";
+  const body = currentExif?.model?.replace(/^NIKON\s+/i, "Nikon ") ?? "this body";
+  return `${fs} · ${where} the ${body}'s infrared diffraction limit (safe to ƒ/${safe}, caution to ƒ/${caution}, visible softening from ƒ/${avoid} — the Airy disk at 1000 nm, 2.44 × λ × ƒ, against a ${pitch} µm pitch; diffraction.cam)`;
+}
+
 function conversionDiagnostic(): string {
   const img = current;
   if (!img) return "nothing open";
@@ -2858,6 +2885,9 @@ function wireVersionMenu() {
       // apart the two neighbourhoods are in colour.
       { k: "Healed spots", v: healDiagnostic() },
       { k: "Lens correction", v: lensDiagnostic() },
+      // WHICH SIDE OF THE BODY'S DIFFRACTION LIMIT THE FRAME WAS SHOT ON — a soft
+      // frame explains itself, from its own EXIF and the body's pitch (§9h).
+      { k: "Aperture", v: apertureDiagnostic() },
       { k: "Centre gains", v: lensCentreDiagnostic() },
       // What the conversion left in the file, which nothing in this app could
       // say before and three scratch scripts had to work out by hand.

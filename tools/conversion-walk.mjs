@@ -29,6 +29,7 @@ const RAW = arg("file", "/tmp/claude-0/-home-user/2bd37282-d617-5a51-b357-6b2078
 const CONTROL = new URL("../dist/examples/NIR_0063.dng", import.meta.url).pathname;
 
 let bad = 0;
+let lastAperture = null; // set by readConversion, per file
 const check = (name, got, want) => {
   const ok = typeof want === "function" ? want(got) : JSON.stringify(got) === JSON.stringify(want);
   if (!ok) bad++;
@@ -62,6 +63,12 @@ async function readConversion(br, file) {
       .catch(() => {});
     const line = await p.evaluate(() =>
       (document.getElementById("verDlgText")?.value || "").split("\n").find((l) => l.startsWith("Conversion")) || null);
+    // The Aperture row beside it: the frame's ƒ-number against the body's
+    // diffraction limit (apertureDiagnostic, IR-SCIENCE.md §9h). Read here
+    // because this walk already opens a real raw and a practice DNG, which are
+    // exactly the line's two branches — an aperture on record, and none.
+    lastAperture = await p.evaluate(() =>
+      (document.getElementById("verDlgText")?.value || "").split("\n").find((l) => l.startsWith("Aperture")) || null);
     return line;
   } finally {
     await p.close();
@@ -75,8 +82,17 @@ try {
     process.exit(2);
   }
   const real = await readConversion(br, RAW);
-  console.log(`\n  real raw   ${real}\n`);
+  const realAperture = lastAperture;
+  console.log(`\n  real raw   ${real}\n             ${realAperture}\n`);
   check("the report carries a Conversion line at all", !!real, true);
+  // APERTURE, the real raw: an ƒ-number from the file, a verdict against the
+  // body's limit, and the three thresholds the calculator gives the Z 50 —
+  // safe to ƒ/5, caution to ƒ/6.3, visible softening from ƒ/8 (4.22 µm pitch at
+  // 1000 nm). Made to fail first against the build before the row existed.
+  check("the Aperture line reads the frame's ƒ-number and a verdict", realAperture,
+    (l) => /^Aperture\s+ƒ\/[\d.]+ · (inside|in the caution band of|past) the Nikon Z 50's infrared diffraction limit/.test(l || ""));
+  check("and names the Z 50's three thresholds from the calculator", realAperture,
+    (l) => /safe to ƒ\/5, caution to ƒ\/6\.3, visible softening from ƒ\/8/.test(l || ""));
   const nums = (real || "").match(/correlation ([\d.]+) .* red\/green ([\d.]+) .* red\/blue ([\d.]+)/);
   check("it reports all three correlations", !!nums, true);
   if (nums) {
@@ -103,6 +119,10 @@ try {
 
   if (existsSync(CONTROL)) {
     const other = await readConversion(br, CONTROL);
+    // APERTURE, the practice DNG: hand-written, no EXIF aperture — the line must
+    // say so in words rather than guess a body or an ƒ-number.
+    check("the Aperture line says the practice DNG carries no aperture", lastAperture,
+      (l) => /^Aperture\s+not in the file/.test(l || ""));
     console.log(`\n  control    ${other}\n`);
     check("a different file reads differently — the line is a measurement, not a constant", other !== real, true);
   } else {
