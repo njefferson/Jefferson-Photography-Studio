@@ -861,12 +861,37 @@ edit (2023-09-04) is built on "a variety of advanced masking techniques";
 and a 2020 video swaps colour through Lightroom's LOCAL hue adjustment — a
 masked hue shift — rather than a global one. The shape is the same as
 019's: the sky and the foliage are portions of the picture, each treated
-inside its own mask. The steps themselves are on robsheaphotography.com,
-which the session's egress proxy refuses (a 308 whose target is blocked),
-and YouTube's player API refuses the transcript route the hot-spot research
-used (9h) with a proxy 403 and a sign-in check — so the specific mask types
-and the adjustments inside each are NOT recorded here yet. That is a
-blocked host, not a finding; ask for the host and read the post.
+inside its own mask.
+
+The host was added the same afternoon and the posts were read: every one
+of them is a paragraph and an embedded video, so the steps live in the
+videos. His course outline (courses.robsheaphotography.com, "Mastering
+Infrared Photography in Lightroom Classic") is the nearest thing to a
+written table of contents for the method, and its chapters are: White
+Balance (why profiles; installing them; setting a white balance in
+infrared); Color Swapping (Lightroom Classic enhanced profiles, a hue-shift
+variant, Photoshop actions); the Tone Curve panel for contrast and grading;
+"Vibrance, Saturation, Color Hot Spots" as one lesson; the Color Grading
+panel; two complete edits (profiles, hue shift); and a Masks chapter. So
+saturation, vibrance and the colour half of the hot spot are taught
+together, and masks come after the global look — the same order 019 lands
+on. His 2026-04-26 video, "Lightroom Saturation vs Vibrance", argues from
+tests that Adobe's own description of the two sliders is not how they
+behave; that is the exact question this section's gates answer for this
+app, and it is worth watching by anyone who can.
+
+**The captions cannot be read from this container.** The watch pages and
+the caption endpoint answer, but the player refuses every caption request
+from this address with a sign-in check ("confirm you're not a bot"), which
+is keyed on the proxy's address and not on a host anyone can add; the
+proxy log shows its bot-check calls to android.clients.google.com and
+www.google.com refused as well. yt-dlp with a JavaScript runtime and
+alternative player clients fails the same way. The video ids are
+O7Ggs3rTTS0 (the colour edit with masks, 2021-12-23), U7Km8kuzGi0 (the
+850 nm full edit, 2023-09-04), StrCcAgRC70 (colour swap by local hue,
+2020-06-17), 4nX8KxCAz4s (saturation vs vibrance, 2026-04-26) and
+lh4XFGlagoU (several colours in one frame). Their transcripts, pulled on a
+machine that YouTube trusts, are the missing half of this paragraph.
 
 ## 4c. THE CRUX IS NIR CONTAMINATION, AND A ROTATION ALONE CANNOT FIX IT
 

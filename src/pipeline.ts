@@ -964,6 +964,26 @@ export function bandGain(k: number, w: number, s: number): number {
   return g > 1 ? 1 + (g - 1) * smooth01(SAT_GUARD_LO, SAT_GUARD_HI, s) : g;
 }
 
+/** WHERE THE SKY BAND SITS ON THE WHEEL, for the two per-colour bands and
+ *  for anything that measures a frame by them (main.ts measureFrame).
+ *  Takes `swapRB`, the edit's swap flag, and `mix3`, its 3x3 mixer (undefined
+ *  or identity when none). Returns the hue, in degrees, that the Sky band
+ *  centres on; the Foliage band is the other half.
+ *  A plain R<->B swap reflects every hue (h -> 240 - h), so the sky that sits
+ *  at 210 unswapped sits at 30 swapped, and the band re-centres to stay glued
+ *  to the same subject. A LOOK WITH A 3x3 MIXER IS NOT A REFLECTION: Aerochrome
+ *  swaps and then rotates three ways, and its sky lands back at 204 (film
+ *  angle, IR-SCIENCE 4b-iii) with its foliage at 335 — so under a mixer the
+ *  swapped centre put the "Foliage" band on the SKY and the "Sky" band on the
+ *  foliage, and the look's foliage amount coloured the sky (measured
+ *  2026-09-18, IR-SCIENCE 4b-vi). With a mixer active the bands read the
+ *  wheel as displayed. What the result must satisfy: the shader computes the
+ *  same centre from u_swap and u_mix3On, and updateBandLabels names the same
+ *  halves, or the slider titled Foliage moves something that is not foliage. */
+export function skyBandCentre(swapRB: boolean, mix3: number[] | undefined): number {
+  return swapRB && mix3IsIdentity(mix3) ? 30 : 210;
+}
+
 /** Band weight: 1 inside the plateau, smoothstep falloff to 0. */
 export function bandWeight(hue: number, center: number, plateau: number, edge: number): number {
   let d = Math.abs(hue - center);
@@ -1426,8 +1446,10 @@ export function compileEdit(
       const cb = Math.max(0, nb);
       let [h, s, v] = rgb2hsv(cr, cg, cb);
       // R<->B swap reflects hue (h -> 240 - h); re-centre so the sky band
-      // stays glued to the same subject in both swap states.
-      const wS = bandWeight(h, swap ? 30 : 210, 55, 105);
+      // stays glued to the same subject in both swap states — unless a 3x3
+      // mixer has rotated the wheel again, when the bands read it as
+      // displayed (skyBandCentre has the measurement).
+      const wS = bandWeight(h, skyBandCentre(swap, p.mix3), 55, 105);
       const wF = 1 - wS;
       h += sky[0] * wS + fol[0] * wF;
       // A boost acts only where there is colour to boost (bandGain's guard);
