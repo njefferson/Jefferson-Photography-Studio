@@ -607,8 +607,8 @@ cannot describe something the code does not say about itself.
 - **`src/dcp.ts`** (247 lines) — DNG Camera Profile (.dcp) export for Lightroom / Camera Raw.
 - **`src/debug.ts`** (1288 lines) — The test page behind the version number.
 - **`src/decode.ts`** (390 lines) — Image decoding. Three real paths, no big WASM dependency: - JPEG/PNG: native bitmap decode.
-- **`src/decode.worker.ts`** (57 lines) — Decoding, off the main thread.
-- **`src/decodeClient.ts`** (267 lines) — Main-thread side of the decode workers.
+- **`src/decode.worker.ts`** (64 lines) — Decoding, off the main thread.
+- **`src/decodeClient.ts`** (268 lines) — Main-thread side of the decode workers.
 - **`src/diagnostic.ts`** (262 lines) — The text report (Doctrine §7f).
 - **`src/exif.ts`** (258 lines) — Keep the honest EXIF subset in exports: capture date/time, camera and lens, and the exposure triangle — read from the ORIGINAL file and written into exported JPEG/TIFF as a freshly BUILT block.
 - **`src/export.ts`** (800 lines) — Full-resolution export.
