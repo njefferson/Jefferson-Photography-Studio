@@ -569,6 +569,15 @@ user-scalable=no.
   made free by acting on the sky only. The gravel half stays open. The sources
   go into `IR-SCIENCE.md` (9l for what shipped). See
   `docs/decisions/013-aerochrome-splotchy-chroma.md`.
+- [ ] **Aerochrome's sky is bright and pale where the film's is dark and saturated** <!-- decision: 017 --> —
+  measured 2026-09-18 while holding Restore depth to the film: every setting
+  lands on the film's hue angles, but the sky reads saturation 0.38–0.76 at
+  value 0.64–0.89 where the film reads 0.66 at 0.32. The hue bands were solved
+  onto the film; the sky's depth never was, and it is the largest measured gap
+  left in the look. The lever is the look's own Sky band (saturation and
+  luminance), solved the way the hue bands were, after the sky-smoothing stage's
+  removed fraction is known with Restore depth on. See
+  `docs/decisions/017-aerochrome-sky-depth-against-the-film.md`.
 - [ ] **The foliage is the right colour and reads as a blob** <!-- decision: 016 --> — reported
   from the iPad 2026-09-17 on the Aerochrome look, asking how to get the detail
   back the way the film looks or the way people who edit these files normally do
