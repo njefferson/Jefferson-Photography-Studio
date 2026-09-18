@@ -212,6 +212,13 @@ export interface EditParams {
    *  Per-pixel but map-dependent, so it is baked into .cube only as the
    *  identity; the map is per photograph and a LUT cannot carry it. */
   skySmooth?: number;
+  /** Sky depth 0..1 — darkens the sky toward the film's value (Aerochrome's
+   *  sky reads 0.32 on the film against 0.55–0.89 here, IR-SCIENCE 4b-iv). A
+   *  SELECTION: it acts through the sky bitmap refined to the photograph's
+   *  edges (skyfine.ts) and the sky map's own keying byte, so a pixel outside
+   *  the sky, a grey, a cloud and an overcast sky are left byte-identical.
+   *  Creative; rides a saved look like skySmooth. */
+  skyDepth?: number;
   /** Film grain 0..1 (amount) + size 1..3 (grain scale, resolution-
    *  proportional: cell size = grainSize * outputHeight / 1200 px).
    *  Deterministic value noise (hash2d/grainNoise below) added to the FINAL
@@ -446,14 +453,16 @@ export function sampleLocalMap(m: LocalMap, u: number, v: number): [number, numb
 
 /** The per-edit sky chroma map built by skymap.ts: opponent chroma of the
  *  RENDERED sky, box-averaged into a coarse grid and encoded to 8 bits, with the
- *  sky bitmap's weight in the third byte. The GPU samples the same bytes as an
- *  RGB8 texture; `sampleSkyMap` is the CPU read, in the same filter-then-decode
- *  order, so both sides blend toward the same target to filtering error. */
+ *  sky bitmap's weight in the third byte and the DEPTH's keying in the fourth
+ *  (how much of a blue sky the texel's mean colour is — skymap.ts). The GPU
+ *  samples the same bytes as an RGBA8 texture; `sampleSkyMap` is the CPU read,
+ *  in the same filter-then-decode order, so both sides blend toward the same
+ *  target to filtering error. */
 export interface SkyMap {
   width: number;
   height: number;
-  /** RGB interleaved, 3 bytes per texel: [aEnc, bEnc, weight]. */
-  rgb: Uint8Array;
+  /** RGBA interleaved, 4 bytes per texel: [aEnc, bEnc, weight, depthKey]. */
+  rgba: Uint8Array;
 }
 /** Display-space chroma is bounded well inside ±0.5 for any sky; the encode
  *  maps ±this to 0..255. The shader decodes with the same constant. */
@@ -469,20 +478,22 @@ export const SKY_GATE_HI = 0.25;
 /** Decode one encoded chroma byte (filtered or not) to display units. */
 export const decSkyChroma = (e: number) => ((e / 255) * 2 - 1) * SKY_CHROMA_RANGE;
 /** Bilinear sample of the ENCODED sky map `m` at image-uv (`u`, `v`), then
- *  decode. Returns [a, b, weight]. compileEdit blends a pixel's chroma toward
- *  (a, b) by weight·amount and never touches luma; weight is 0 off the sky
- *  bitmap, so a non-sky pixel is returned unchanged by construction. */
-export function sampleSkyMap(m: SkyMap, u: number, v: number): [number, number, number] {
+ *  decode. Returns [a, b, weight, depthKey]. compileEdit blends a pixel's
+ *  chroma toward (a, b) by weight·amount and never touches luma; weight is 0
+ *  off the sky bitmap, so a non-sky pixel is returned unchanged by
+ *  construction. depthKey (0..1) is the map's own say on whether this texel is
+ *  a blue sky at all; the depth multiplies by it. */
+export function sampleSkyMap(m: SkyMap, u: number, v: number): [number, number, number, number] {
   const x = Math.min(m.width - 1.001, Math.max(0, u * m.width - 0.5));
   const y = Math.min(m.height - 1.001, Math.max(0, v * m.height - 0.5));
   const x0 = Math.floor(x), y0 = Math.floor(y);
   const fx = x - x0, fy = y - y0;
-  const at = (xx: number, yy: number, c: number) => m.rgb[(yy * m.width + xx) * 3 + c];
+  const at = (xx: number, yy: number, c: number) => m.rgba[(yy * m.width + xx) * 4 + c];
   const bil = (c: number) => {
     const a = at(x0, y0, c), b = at(x0 + 1, y0, c), d = at(x0, y0 + 1, c), e = at(x0 + 1, y0 + 1, c);
     return a + (b - a) * fx + (d - a) * fy + (a - b - d + e) * fx * fy;
   };
-  return [decSkyChroma(bil(0)), decSkyChroma(bil(1)), bil(2) / 255];
+  return [decSkyChroma(bil(0)), decSkyChroma(bil(1)), bil(2) / 255, bil(3) / 255];
 }
 
 export const MAX_MASKS = 8;
@@ -1115,6 +1126,10 @@ export function compileEdit(
    *  is a cost those paths do not pay, and a 260 px tile is below the scale of
    *  the artefact this removes. */
   skyMap?: SkyMap | null,
+  /** The sky bitmap refined to the photograph's edges (skyfine.ts), for
+   *  `p.skyDepth`; the depth is off without it. A tile passes the coarse
+   *  bitmap, which at 260 px is finer than the tile. */
+  skyFine?: BrushMask | null,
 ): (r: number, g: number, b: number, out: Float32Array, glow?: number, u?: number, v?: number) => void {
   const a = (p.hue * Math.PI) / 180;
   const cos = Math.cos(a);
@@ -1214,6 +1229,7 @@ export function compileEdit(
   const m6 = mix3[6], m7 = mix3[7], m8 = mix3[8];
   const shSat = Math.min(1, Math.max(0, p.shadowSat ?? 0));
   const skyAmt = skyMap ? Math.min(1, Math.max(0, p.skySmooth ?? 0)) : 0;
+  const depthAmt = skyMap && skyFine ? Math.min(1, Math.max(0, p.skyDepth ?? 0)) : 0;
   const grade = p.grade ?? GRADE_DEFAULT;
   const gAmtS = grade[1] ?? 0, gAmtM = grade[3] ?? 0, gAmtH = grade[5] ?? 0;
   const gradeOn = gAmtS !== 0 || gAmtM !== 0 || gAmtH !== 0;
@@ -1492,9 +1508,9 @@ export function compileEdit(
     // hundredths from the sky's mean chroma; a branch or a leaf sits half a
     // range away. So the blend fades out between SKY_GATE_LO and SKY_GATE_HI
     // of chroma distance, and a target that is not a number is no target.
-    if (skyAmt > 0 && u !== undefined && v !== undefined) {
-      const [sa, sb, sw] = sampleSkyMap(skyMap!, u, v);
-      if (sw > 0) {
+    if ((skyAmt > 0 || depthAmt > 0) && u !== undefined && v !== undefined) {
+      const [sa, sb, sw, sd] = sampleSkyMap(skyMap!, u, v);
+      if (skyAmt > 0 && sw > 0) {
         const L = out[0] * 0.2126 + out[1] * 0.7152 + out[2] * 0.0722;
         const ca = out[0] - L, cb = out[2] - L;
         const d = Math.hypot(sa - ca, sb - cb);
@@ -1516,6 +1532,17 @@ export function compileEdit(
           out[2] = Math.min(1, Math.max(0, L + nb));
           out[1] = Math.min(1, Math.max(0, (L - 0.2126 * out[0] - 0.0722 * out[2]) / 0.7152));
         }
+      }
+      // SKY DEPTH: one multiplier on the pixel, through the REFINED bitmap
+      // (skyfine.ts — the coarse one's feather left a pale rim along every
+      // roofline under a luma multiplier) and the map's keying byte (skymap.ts
+      // — the texel's mean rendered colour has to be a blue sky, so an
+      // overcast or a hazy sky is left pale AS A WHOLE rather than half of its
+      // pixels; keyed per pixel it snowed). After the blend, so the two read
+      // the same sky. Same in the shader.
+      if (depthAmt > 0 && sd > 0) {
+        const f = 1 - depthAmt * sd * sampleBrush(skyFine!, u, v);
+        out[0] *= f; out[1] *= f; out[2] *= f;
       }
     }
     // Global luminance — the very last step of the app's own grade, matching

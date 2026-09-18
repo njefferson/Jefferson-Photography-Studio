@@ -168,6 +168,7 @@ export async function exportBands(
   opts: ExportOptions,
   lens: LensCurve | null,
   sky: BrushMask | null,
+  skyFine: BrushMask | null,
   outW: number,
   outH: number,
   job: ParallelJob,
@@ -230,6 +231,7 @@ export async function exportBands(
           opts: { ...opts, band: { from, to }, stickerAssets: undefined },
           lens,
           sky,
+          skyFine,
         });
       }));
     }

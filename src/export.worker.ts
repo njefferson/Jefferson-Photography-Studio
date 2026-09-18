@@ -27,6 +27,7 @@ export interface BandRequest {
   opts: ExportOptions;
   lens: LensCurve | null;
   sky: BrushMask | null;
+  skyFine: BrushMask | null;
 }
 
 interface WorkerScope {
@@ -51,6 +52,7 @@ ctx.addEventListener("message", (e: MessageEvent) => {
         (f) => { if (f === 1 || Math.round(f * 20) !== Math.round((f - 0.05) * 20)) ctx.postMessage({ id: req.id, progress: f }); },
         req.lens,
         req.sky,
+        req.skyFine,
       );
       const buf = res.data?.buffer;
       ctx.postMessage({ id: req.id, done: res }, buf ? [buf as ArrayBuffer] : []);
