@@ -59,5 +59,15 @@ try {
   // the build before the clear.
   const stage = await p.evaluate(() => { const cv = document.getElementById("view"); const g = cv.getContext("webgl2") || cv.getContext("webgl"); if (!g || !cv.width) return 0; const px = new Uint8Array(cv.width * cv.height * 4); g.readPixels(0, 0, cv.width, cv.height, g.RGBA, g.UNSIGNED_BYTE, px); let s = 0; for (let i = 3; i < px.length; i += 4) s += px[i]; return s; });
   check("and the stage behind it is empty", stage, 0);
+  // AND A PHOTOGRAPH OPENS AGAIN AFTER DONE. The clear that empties the stage
+  // zeroes the renderer's image size, and every draw path returns early on a
+  // zero size until the next upload sets it — so the case the clear created is
+  // "open after Done", which this walk had never done. The read-back is the
+  // same alpha sum: a drawn photograph is millions.
+  await p.setInputFiles("#file", [SET[0]]);
+  await p.waitForFunction(()=>document.getElementById("welcome")?.hidden, null, {timeout:300000});
+  await p.waitForFunction(()=>!document.getElementById("busy")?.hasAttribute("open"),null,{timeout:300000});
+  const again = await p.evaluate(() => { const cv = document.getElementById("view"); const g = cv.getContext("webgl2") || cv.getContext("webgl"); if (!g || !cv.width) return 0; const px = new Uint8Array(cv.width * cv.height * 4); g.readPixels(0, 0, cv.width, cv.height, g.RGBA, g.UNSIGNED_BYTE, px); let s = 0; for (let i = 3; i < px.length; i += 4) s += px[i]; return s; });
+  check("a photograph opens again after Done and is drawn", again > 1000000, true);
 } finally { await b.close(); }
 console.log(failed?`\n${failed} failed`:"\nall checks passed"); process.exit(failed?1:0);
