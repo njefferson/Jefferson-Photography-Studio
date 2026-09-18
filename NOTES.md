@@ -1439,6 +1439,30 @@ same instant" is not a contrived sequence on the target device — it is what a
 long culling session looks like. Fixing it is a design decision (block, or
 write on `pagehide`), not a tail-end patch.
 
+## The film reference: Aerochrome developed outside the app, 2026-09-18
+
+**The question was whether the look could be made WITHOUT the app, and what
+that would show.** It can, from the raw, with the app's decoders and nothing of
+its pipeline, and the render is `tools/film-reference.mjs` — seven frames, two
+filters, the same film instrument on the app's column and the reference's, one
+sheet. IR-SCIENCE.md 4b-vii carries the method, the measured sign of the
+chroma axis (the first run rendered a blue tree under a red sky), the ground
+gray-world, the infrared-poor key on the app's own sky selection, the fitted
+constants with their readings, and what it shows.
+
+**The one finding that changes the schedule:** the sky is where the app is
+furthest from the film, and the data supports the film's sky through the
+app's own selection — the reference reaches sat 0.61–0.65 at value 0.35–0.51
+against the film's 0.66 at 0.32 on every clear sky, where the app as pressed
+reads 0.10–0.50 at 0.52–0.93. The levers exist in the app; the look's amounts
+do not use them. That is decision 019 with a measured target.
+
+**Not reachable by any mapping:** bright foliage and grass go white in both
+columns (22–59% colourless against the film's 13.8%) because the axis reads
+zero where sunlit foliage floods all three channels. The reference's hue is
+imposed by membership — no per-plant spread — which is why it is a reference
+and not a candidate.
+
 ## A change to two test walks was the newest patch note, 2026-09-18
 
 **What was wrong.** The top line of "What's new" — in the ⓘ dialog and on
