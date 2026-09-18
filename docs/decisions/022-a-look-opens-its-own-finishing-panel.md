@@ -82,3 +82,21 @@ profile Amount), fujixweekly.com (recipes), the course outline as recorded.
 First (2026-09-18): the panel is the shape every finishing step lands in,
 so it is built before the steps it will hold are finished — 019's amounts,
 021's correction, 018's mask all arrive into it.
+
+## Outcome
+
+Option 1, on the branch 2026-09-18 as 2.51. Each look declares `finish`, a
+list of steps (an existing control's id, a name, one line of why); Aerochrome
+declares six in the method's order and the others none. On apply the panel
+opens at the top of the panel body as a region (not a dialog: the photograph
+stays in view), hosting a second control per step bound to the tab's own —
+a mirror writes the tab's input and dispatches its events, so every listener,
+the undo history and the sync run as for a drag on the tab, and the tabs'
+own controls, undo and a look press move the mirrors back. It closes on its
+own control and reopens from "Finish this look" under the looks. What turned
+out wrong on the way: the first version of the walk's check read a missing
+panel as open, because "not hidden" of nothing is true — the check asks for
+the elements now, and was watched red on the build before the panel (12a,
+12a2) and green after; and the close control took the panel's full width
+until it was given its own. Not built: steps for the other looks, and the
+warmth the tablet recipe used, which is 019's next question.
