@@ -463,6 +463,11 @@ export interface SkyMap {
   height: number;
   /** RGBA interleaved, 4 bytes per texel: [aEnc, bEnc, weight, depthKey]. */
   rgba: Uint8Array;
+  /** The photograph's own depth key, 0..1 — how much of a blue sky its sky
+   *  is, decided once (skymap.ts). The texel bytes carry it times each
+   *  texel's grey guard; this is the number itself, for the record and the
+   *  diagnostic. */
+  key: number;
 }
 /** Display-space chroma is bounded well inside ±0.5 for any sky; the encode
  *  maps ±this to 0..255. The shader decodes with the same constant. */

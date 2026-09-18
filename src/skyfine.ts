@@ -9,10 +9,12 @@
 // ECCV 2010 / TPAMI 2013, the field's tool for joint upsampling and mask
 // feathering): inside every window the output is a LINEAR FUNCTION OF THE
 // GUIDE, so it inherits the guide's edges and keeps the mask's own values
-// away from them, and it is O(N) through summed-area tables. The guide is two
-// channels of the gray-world-balanced linear frame — gamma luma and blue
-// share — because in an infrared frame a bright sky and IR-bright foliage sit
-// close in luma and far apart in colour, which is the fact buildSkyMask's own
+// away from them, and it is O(N) through summed-area tables. The guide is
+// COLOUR, not luma — the red share and the blue share of the gray-world-
+// balanced linear frame — because in an infrared frame luma is the wrong
+// cue: IR-bright foliage is as bright as the sky or brighter, and a first
+// guide that carried luma read the bright sky around a crown as the crown's
+// side and left a pale halo round it. Colour is the fact buildSkyMask's own
 // cluster rests on. Built once per photograph beside the bitmap, sampled
 // bilinearly by the shader (u_skyFineTex) and by compileEdit (the brush
 // sampler), never rebuilt per edit.
@@ -25,24 +27,22 @@ import type { BrushMask } from "./pipeline";
  *  weight the depth rode on in the prototypes. */
 export const SKY_FINE_EDGE = 1024;
 /** Guided-filter window radius in guide pixels. The bitmap's feathered edge,
- *  upsampled, spans roughly this many; a smaller window cannot pull it to the
- *  photograph's edge, a larger one lets the sky's own gradient leak into the
- *  fit. */
-export const SKY_FINE_RADIUS = 6;
+ *  upsampled, spans a few tens of these; the window has to reach across that
+ *  ramp to pull it to the photograph's edge, and a window wider still lets
+ *  the sky's own gradient leak into the fit. */
+export const SKY_FINE_RADIUS = 12;
 /** Regularisation on the guide's covariance, in guide units squared (both
  *  channels run 0..1). Smaller follows fainter edges and admits more noise. */
 export const SKY_FINE_EPS = 0.005;
-const REC = [0.2126, 0.7152, 0.0722];
 
-/** The two-channel guide the refinement follows: gamma-encoded luma normalised
- *  to the frame's own bright end, and blue share, both at the refined mask's
- *  scale. */
+/** The two-channel COLOUR guide the refinement follows — red share and blue
+ *  share after gray-world balance, both 0..1, at the refined mask's scale. */
 export interface SkyGuide {
   w: number;
   h: number;
-  /** Gamma luma, 0..1 against the frame's 99.5th percentile. */
+  /** Red share R/(R+G+B). */
   l: Float32Array;
-  /** Blue share B/(R+G+B) after gray-world balance, 0..1. */
+  /** Blue share B/(R+G+B). */
   c: Float32Array;
 }
 
@@ -55,9 +55,10 @@ export interface SkyGuide {
  *            so the guide does not move as the photograph is graded).
  * @returns the guide at the refined scale (longer edge SKY_FINE_EDGE or the
  *   image's own if smaller), each guide pixel the box mean of its source block.
- * What the result must satisfy: `l` and `c` are finite and within 0..1 at
- * every pixel, and `w`/`h` are what `refineSkyMask` sizes its output to — a
- * guide from one photograph must never be used to refine another's bitmap.
+ * What the result must satisfy: `l` (red share) and `c` (blue share) are
+ * finite and within 0..1 at every pixel, and `w`/`h` are what `refineSkyMask`
+ * sizes its output to — a guide from one photograph must never be used to
+ * refine another's bitmap.
  */
 export function buildSkyGuide(
   sample: (x: number, y: number) => ArrayLike<number>,
@@ -84,17 +85,11 @@ export function buildSkyGuide(
       const i = y * w + x;
       if (n === 0) { l[i] = 0; c[i] = 0; continue; }
       r /= n; g /= n; b /= n;
-      const lum = Math.max(0, REC[0] * r + REC[1] * g + REC[2] * b);
-      l[i] = Math.pow(lum, 1 / 2.2);
       const sum = Math.max(1e-9, Math.max(0, r) + Math.max(0, g) + Math.max(0, b));
+      l[i] = Math.min(1, Math.max(0, r / sum));
       c[i] = Math.min(1, Math.max(0, b / sum));
     }
   }
-  // Normalise luma to the frame's bright end, so a dark frame's edges count as
-  // much as a bright one's against the same eps.
-  const sorted = Float32Array.from(l).sort();
-  const hi = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.995))] || 1;
-  for (let i = 0; i < l.length; i++) l[i] = Math.min(1, l[i] / hi);
   return { w, h, l, c };
 }
 
