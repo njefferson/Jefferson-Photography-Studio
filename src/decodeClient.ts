@@ -27,8 +27,8 @@
 // those is ~330 MB, which is inside the same envelope the parallel export
 // spends and was measured against. Safari reports no memory at all, so a device
 // that does not say gets the conservative number rather than the optimistic one.
-import type { SkySelection } from "./decode";
-import { prepareSkySource, buildSkySelectionFrom } from "./skyfine";
+import { prepareSkySource, type SkySource } from "./skyfine";
+import { requestSkySelection } from "./skyClient";
 import { decode as decodeHere, type DecodedImage } from "./decode";
 import type { ImportedFile } from "./import";
 
@@ -66,9 +66,9 @@ export interface DecodeOptions {
    *  and a queue where everything is urgent is the queue we already had. */
   front?: boolean;
   /** Build the photograph's sky selection with the decode (DecodedImage.skySel):
-   *  the worker posts it a moment after the picture, on the same lane, and
-   *  `skySelReady` resolves when it lands. Passed by the paths that open a
-   *  photograph for editing; a tile or a batch never asks. */
+   *  the decode hands back the copy it is built from, the sky worker builds it,
+   *  and `skySelReady` resolves when it lands. Passed by the paths that open a
+   *  photograph for editing and by the batch; a tile never asks. */
   sky?: boolean;
 }
 
@@ -84,8 +84,6 @@ type Pending = {
 interface Lane {
   worker: Worker;
   pending: Map<number, Pending>;
-  /** Selections owed for pictures already handed back, by job id. */
-  skyWaiters: Map<number, (s: SkySelection | null) => void>;
 }
 
 const lanes: Lane[] = [];
@@ -116,17 +114,8 @@ function spawn(): Lane | null {
   } catch {
     return null;
   }
-  const lane: Lane = { worker, pending: new Map(), skyWaiters: new Map() };
-  worker.onmessage = (e: MessageEvent<{ id: number; ok?: boolean; img?: DecodedImage; message?: string; sky?: SkySelection | null }>) => {
-    // The selection, a moment after its picture (null when it could not be
-    // built): hand it to whoever is holding the picture and stop — this id
-    // has already been resolved.
-    if ("sky" in e.data) {
-      const w = lane.skyWaiters.get(e.data.id);
-      lane.skyWaiters.delete(e.data.id);
-      w?.(e.data.sky ?? null);
-      return;
-    }
+  const lane: Lane = { worker, pending: new Map() };
+  worker.onmessage = (e: MessageEvent<{ id: number; ok?: boolean; img?: DecodedImage; message?: string; skySrc?: SkySource | null }>) => {
     const p = lane.pending.get(e.data.id);
     if (!p) return;
     lane.pending.delete(e.data.id);
@@ -135,7 +124,9 @@ function spawn(): Lane | null {
     p.onTiming?.({ queued: p.startedAt - p.queuedAt, run: performance.now() - p.startedAt, depth: p.depth, offThread: true });
     if (e.data.ok && e.data.img) {
       const img = e.data.img;
-      if (p.sky) img.skySelReady = new Promise<SkySelection | null>((res) => lane.skyWaiters.set(e.data.id, res)).then((sel) => { if (sel) img.skySel = sel; return sel; });
+      // The copy the selection is built from came back beside the picture;
+      // the sky worker builds it while the picture is already on screen.
+      if (e.data.skySrc) img.skySelReady = requestSkySelection(e.data.skySrc).then((sel) => { if (sel) img.skySel = sel; return sel; });
       p.resolve(img);
     } else p.reject(new Error(e.data.message ?? "decode failed"));
     pump();
@@ -148,10 +139,6 @@ function spawn(): Lane | null {
   const kill = (message: string) => {
     const dead = [...lane.pending.values()];
     lane.pending.clear();
-    // A selection this lane owed is not coming: say so, and the holder of the
-    // picture builds it on this thread instead.
-    for (const w of lane.skyWaiters.values()) w(null);
-    lane.skyWaiters.clear();
     const i = lanes.indexOf(lane);
     if (i >= 0) lanes.splice(i, 1);
     try { lane.worker.terminate(); } catch { /* already gone */ }
@@ -233,7 +220,7 @@ function decodeOnThisThread(
   file: ImportedFile, onTiming: ((t: DecodeTiming) => void) | undefined, queuedAt: number, depth: number, sky?: boolean,
 ): Promise<DecodedImage> {
   const startedAt = performance.now();
-  const p = decodeHere(file).then((img) => { if (sky) { const sel = buildSkySelectionFrom(prepareSkySource(img)); img.skySel = sel; img.skySelReady = Promise.resolve(sel); } return img; });
+  const p = decodeHere(file).then((img) => { if (sky) img.skySelReady = requestSkySelection(prepareSkySource(img)).then((sel) => { if (sel) img.skySel = sel; return sel; }); return img; });
   if (onTiming) {
     const done = () => onTiming({ queued: startedAt - queuedAt, run: performance.now() - startedAt, depth, offThread: false });
     p.then(done, done);

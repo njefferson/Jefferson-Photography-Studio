@@ -16,21 +16,21 @@
 // which is the big one (a 20MP frame is ~250 MB of Float32 and must not be
 // cloned).
 //
-// AND THE SKY SELECTION, when the decode was asked for one: a 1024 px copy is
-// taken BEFORE the buffer is transferred, the picture is posted, and the
-// selection (the bitmap and its refinement to the picture's edges,
-// skyfine.ts) follows in a second message — so the photograph is on the
-// screen as soon as it is decoded and its selection is ready a moment later,
-// off the main thread, before the reader touches anything.
+// AND THE COPY THE SKY SELECTION IS BUILT FROM, when the decode was asked for
+// one: a 1024 px copy taken BEFORE the buffer is transferred, handed back
+// beside the picture for the sky worker (sky.worker.ts) to turn into the
+// selection. Not built here: a decode lane that spent half a second on a
+// selection after every opened photograph held up the decode a verdict
+// pressed as the page went away was waiting on. Decode lanes decode.
 
 import { decode } from "./decode";
-import { prepareSkySource, buildSkySelectionFrom } from "./skyfine";
+import { prepareSkySource } from "./skyfine";
 import type { ImportedFile } from "./import";
 
 interface Job {
   id: number;
   file: ImportedFile;
-  /** Build the sky selection after the picture (DecodeOptions.sky). */
+  /** Hand back the copy the sky selection is built from (DecodeOptions.sky). */
   sky?: boolean;
 }
 
@@ -38,25 +38,12 @@ self.onmessage = async (e: MessageEvent<Job>) => {
   const { id, file, sky } = e.data;
   try {
     const img = await decode(file);
-    const src = sky ? prepareSkySource(img) : null;
+    const skySrc = sky ? prepareSkySource(img) : null;
     const transfer: Transferable[] = [];
     if (img.pixels) transfer.push(img.pixels.buffer);
     if (img.linear) transfer.push(img.linear.buffer);
-    (self as unknown as Worker).postMessage({ id, ok: true, img }, transfer);
-    if (src) {
-      // Its own try: the picture is already delivered, so a selection that
-      // fails to build must still ANSWER (null) or the holder of the picture
-      // waits for it forever and builds nothing.
-      try {
-        const sel = buildSkySelectionFrom(src);
-        const t: Transferable[] = [];
-        if (sel.mask) t.push(sel.mask.data.buffer);
-        if (sel.fine) t.push(sel.fine.data.buffer);
-        (self as unknown as Worker).postMessage({ id, sky: sel }, t);
-      } catch {
-        (self as unknown as Worker).postMessage({ id, sky: null });
-      }
-    }
+    if (skySrc) transfer.push(skySrc.rgb.buffer);
+    (self as unknown as Worker).postMessage({ id, ok: true, img, skySrc }, transfer);
   } catch (err) {
     (self as unknown as Worker).postMessage({ id, ok: false, message: (err as Error).message });
   }
