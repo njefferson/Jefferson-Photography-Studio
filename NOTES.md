@@ -1449,6 +1449,24 @@ same instant" is not a contrived sequence on the target device — it is what a
 long culling session looks like. Fixing it is a design decision (block, or
 write on `pagehide`), not a tail-end patch.
 
+## Thumbnails that stop arriving are a read that has not finished, 2026-09-18
+
+Reported from a Windows PC on staging 2.51.2: the first tiles of a 47-photo
+session developed, three more showed the camera's preview, and every tile
+after that stayed a file name. The report carried nothing about it — "Last
+failure none", decoders idle — because the import loop reads the files one
+after another with `file.arrayBuffer()` and no timeout, so a read that
+neither finishes nor throws (a cloud placeholder not yet downloaded, a drive
+that has gone away) stalls the loop silently: the strip's own count line says
+"adding 12 of 47 — name" for as long as it lasts, off the edge of that
+screenshot, and no other surface says anything. The report now carries an
+**Adding photos** line — which file is being read, its index of the total,
+and the seconds spent on it — so the next such report names the file rather
+than the symptom. Not changed: the read has no timeout and skips nothing,
+because a slow read is not a failed one and a skipped photo is data lost;
+whether to time it out and say so on the tile is a decision when the file
+that stalled is known.
+
 ## The frame's aperture against the body's diffraction limit, 2026-09-18
 
 The diagnostic report carries an **Aperture** line beside the lens entry:
