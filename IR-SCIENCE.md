@@ -2515,3 +2515,64 @@ what this app does to a file, this file wins and the measurement is named.
 Raw behaviour generally — levels, curves, matrices, highlight handling,
 metadata — follows dcraw/LibRaw and the DNG spec, and deviating from reference
 behaviour needs a written reason recorded in `NOTES.md`.
+
+### 9m. RESTORE DEPTH UNDER AEROCHROME — WHAT THE APP'S OWN BUTTONS DO, AND A PREMISE WITHDRAWN
+
+**Every sky figure in 9k and 9l was measured with Restore depth OFF.** The
+harnesses built their Aerochrome from a parameter literal with `tone`, `sky` and
+`foliage` at neutral, while the app re-solves the lift on every Look press
+(`applyLook` → `applyLift`, `main.ts`) and it is on by default. Line 398 above
+and `aerochrome-walk` checks 7/8 had already recorded that the button and the
+approved sheets differ for exactly this reason. So 9k/9l describe a rendering
+the device does not show by default; the fraction the stage removes is expected
+to hold and has not been measured with the lift on (the export-path run for
+that is owed and waits on the choice below).
+
+**A premise stated and then withdrawn, 2026-09-18.** Reading `solveLift`: the
+colour half boosts the foliage band up to `FLAT_WARM_REF = 0.35` and the sky
+band up to `FLAT_COOL_REF = 0.50`, never down, and 4b records the shipped look
+measuring sky saturation 0.50 — so it was inferred that Aerochrome's sky
+saturation IS the lift's target. Rendered through the app's own controls on
+four frames, that does not hold: under the shipped button the colour half fired
+on ONE of the four (NIR_0063, Sky slider 1.10), and on NIR_3406 the lift changed
+the measured sky saturation 0.28 → 0.39 with the Sky slider at exactly 1 — the
+TONE half, through contrast. The harness's first control was anchored on that
+inference and refused the run; the rows are read here as what they directly
+are (slider readbacks and canvas hashes from the app), not as a measurement of
+the residual.
+
+**Four candidates, each expressed as controls the reader has** (the look-sheet
+rule), rendered on NIR_3406, NIR_0063, NIR_1651 (the three frames with the sky
+defect) and NIR_1376 (none):
+
+- **A, shipped** — press Aerochrome; the lift re-solves against the look.
+  Sky slider: 1.00 / 1.10 / 1.00 / 1.00. Foliage slider: 1.00 on all four.
+- **B, the approved sheets' route** — press Pink IR (lift solves for Pink IR),
+  then write the recipe into the mixer, bands, Texture, Sky smoothing and
+  Denoise by hand; no re-solve. Sky slider: 1.00 / 1.85 / 1.11 / 1.41. Foliage:
+  1.07 / 1.37 / 1.00 / 1.00. Mean canvas chroma on NIR_0063 131 against A's 70.
+  Pink IR's own rendering sits below the references in the bands the lift
+  measures, so the solve pushes the bands hard, and Aerochrome's matrix and
+  band shifts then amplify that push. The sheets that were approved carried
+  this.
+- **C, tone half only** — press Aerochrome, then Sky and Foliage saturation
+  back to 1. Identical to A by hash on NIR_3406, NIR_1651 and NIR_1376; differs
+  from A on NIR_0063 only by the 1.10.
+- **D, off** — press Aerochrome, then Restore depth off. Identical to A by hash
+  on NIR_1376 (nothing to lift); identical to C on NIR_0063 (the tone half did
+  nothing there; the whole lift was the 1.10 sky boost); differs from A on
+  NIR_3406 and NIR_1651 by the tone half alone.
+
+**So under the shipped button, Restore depth on these frames is mostly the tone
+half**, and the colour half is close to inert — it fires where Aerochrome's
+own rendering measures below the references, which the film-angle look rarely
+does. The large colour difference is between A and B: the approved sheets were
+a much more saturated rendering than the button ships, and nothing has chosen
+between them. The pictures went to the owner with these readbacks under each;
+the choice is a look choice and is not made here.
+
+**The canvas residual column of that run is NOT the export instrument** and is
+not reported: on the 1400 px practice DNGs its teal population read 52 where
+the export-path instrument of 9l reads 4.4 on the same frame — a different
+population, not a scale. Residuals on the chosen candidate come from the
+export path (9l's method), with the lift state printed in the control block.
