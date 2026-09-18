@@ -556,6 +556,15 @@ user-scalable=no.
   neutrals protected by what they lack. Both pipelines. The amounts are
   chosen from rendered sheets; the record carries the research and the
   rejected routes (`docs/decisions/019-aerochrome-colour-by-population.md`).
+- [ ] **Done leaves the last photograph drawn behind the start screen** <!-- decision: 020 --> —
+  reported 2026-09-18 from staging 2.50.10: ending a session clears it and
+  shows the start screen, and the last photograph edited stays drawn behind
+  the menu with no way back to it and no way to remove it short of opening
+  something new. `endSession` nulls the photograph, hides the panel and shows
+  the welcome, and never clears the stage, so the renderer keeps the last
+  frame it drew. The fix is to clear the stage in the same teardown, and a
+  journey-walk check that presses Done and asserts an empty stage
+  (`docs/decisions/020-done-leaves-the-last-photograph-behind-the-start-screen.md`).
 - [ ] **A photograph that fills the screen with no way back out** <!-- decision: 012 --> — reported
   from the iPad 2026-09-17: a photograph in the full view appeared zoomed in, and
   neither zooming out nor scrolling brought the rest of it back. Two failures, and
