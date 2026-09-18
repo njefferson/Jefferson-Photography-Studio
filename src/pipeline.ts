@@ -219,6 +219,16 @@ export interface EditParams {
    *  the sky, a grey, a cloud and an overcast sky are left byte-identical.
    *  Creative; rides a saved look like skySmooth. */
   skyDepth?: number;
+  /** Sky saturation 0..2 — how much MORE colour the sky gets, as a multiplier
+   *  on its chroma about luma (0 none, 1 twice). A SELECTION, because the sky
+   *  is a PORTION of the photograph and not a hue: it acts through the sky
+   *  bitmap refined to the photograph's edges (skyfine.ts) and is gated on
+   *  each pixel's own saturation (SKY_SAT_GATE_LO..HI), so sky that has no
+   *  colour — a cloud, a haze, an overcast day — gets none, and nothing
+   *  outside the sky is touched at all. The Colour tab's Sky band is the other
+   *  thing: teals and blues wherever they are. Decision 019.
+   *  Creative; rides a saved look like skySmooth. */
+  skySat?: number;
   /** Film grain 0..1 (amount) + size 1..3 (grain scale, resolution-
    *  proportional: cell size = grainSize * outputHeight / 1200 px).
    *  Deterministic value noise (hash2d/grainNoise below) added to the FINAL
@@ -916,6 +926,15 @@ export function hsv2rgb(h: number, s: number, v: number): [number, number, numbe
 export const SAT_GUARD_LO = 0.10;
 export const SAT_GUARD_HI = 0.20;
 
+/** THE SKY'S OWN GATE, for `skySat` — the same idea in DISPLAY space, because
+ *  the sky stage runs after gamma: a sky pixel whose HSV saturation is under
+ *  SKY_SAT_GATE_LO gets none of the boost, over SKY_SAT_GATE_HI all of it. Set
+ *  between what a cloud and a haze read and what a blue sky reads under the
+ *  look's bare mapping, measured 2026-09-18 (IR-SCIENCE.md section 4b-vi).
+ *  The shader reads the same two numbers by name. */
+export const SKY_SAT_GATE_LO = 0.04;
+export const SKY_SAT_GATE_HI = 0.12;
+
 /** One band's multiplier on a pixel's saturation.
  *  Takes `k`, the band's saturation slider (1 = none); `w`, the band's weight at
  *  the pixel's hue (bandWeight); and `s`, the pixel's own HSV saturation at
@@ -1268,6 +1287,9 @@ export function compileEdit(
   const shSat = Math.min(1, Math.max(0, p.shadowSat ?? 0));
   const skyAmt = skyMap ? Math.min(1, Math.max(0, p.skySmooth ?? 0)) : 0;
   const depthAmt = skyMap && skyFine ? Math.min(1, Math.max(0, p.skyDepth ?? 0)) : 0;
+  // The sky's saturation needs the refined selection and nothing else — no
+  // map, because it targets no colour; it scales the pixel's own.
+  const skySatAmt = skyFine ? Math.min(2, Math.max(0, p.skySat ?? 0)) : 0;
   const grade = p.grade ?? GRADE_DEFAULT;
   const gAmtS = grade[1] ?? 0, gAmtM = grade[3] ?? 0, gAmtH = grade[5] ?? 0;
   const gradeOn = gAmtS !== 0 || gAmtM !== 0 || gAmtH !== 0;
@@ -1548,8 +1570,8 @@ export function compileEdit(
     // hundredths from the sky's mean chroma; a branch or a leaf sits half a
     // range away. So the blend fades out between SKY_GATE_LO and SKY_GATE_HI
     // of chroma distance, and a target that is not a number is no target.
-    if ((skyAmt > 0 || depthAmt > 0) && u !== undefined && v !== undefined) {
-      const [sa, sb, sw, sd] = sampleSkyMap(skyMap!, u, v);
+    if ((skyAmt > 0 || depthAmt > 0 || skySatAmt > 0) && u !== undefined && v !== undefined) {
+      const [sa, sb, sw, sd] = skyMap ? sampleSkyMap(skyMap, u, v) : [0, 0, 0, 0];
       if (skyAmt > 0 && sw > 0) {
         const L = out[0] * 0.2126 + out[1] * 0.7152 + out[2] * 0.0722;
         const ca = out[0] - L, cb = out[2] - L;
@@ -1580,6 +1602,25 @@ export function compileEdit(
       // overcast or a hazy sky is left pale AS A WHOLE rather than half of its
       // pixels; keyed per pixel it snowed). After the blend, so the two read
       // the same sky. Same in the shader.
+      // SKY SATURATION: more colour where the sky IS — the refined selection —
+      // and only where there is colour to add: the gate reads this pixel's
+      // own saturation, so a cloud, a haze and an overcast sky stay as grey
+      // as they are. AFTER the blend on purpose: the map's target is the
+      // unboosted sky, and blending toward it afterwards would take the boost
+      // back out. Before the depth, with which it commutes. Same in the shader.
+      if (skySatAmt > 0) {
+        const fw = sampleBrush(skyFine!, u, v);
+        if (fw > 0) {
+          const gate = smooth01(SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, rgb2hsv(out[0], out[1], out[2])[1]);
+          if (gate > 0) {
+            const L = out[0] * 0.2126 + out[1] * 0.7152 + out[2] * 0.0722;
+            const k = 1 + skySatAmt * fw * gate;
+            out[0] = Math.min(1, Math.max(0, L + (out[0] - L) * k));
+            out[1] = Math.min(1, Math.max(0, L + (out[1] - L) * k));
+            out[2] = Math.min(1, Math.max(0, L + (out[2] - L) * k));
+          }
+        }
+      }
       if (depthAmt > 0 && sd > 0) {
         const f = 1 - depthAmt * sd * sampleBrush(skyFine!, u, v);
         out[0] *= f; out[1] *= f; out[2] *= f;

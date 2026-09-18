@@ -123,7 +123,7 @@ export function buildSkyMap(
   if (!any) return null;
   // Rendered WITHOUT this stage. compileEdit reads `skySmooth` from the params
   // it is given, so the copy here is what stops the map depending on itself.
-  const edit = compileEdit({ ...p, skySmooth: 0, skyDepth: 0 }, cam, aspect, local, lens);
+  const edit = compileEdit({ ...p, skySmooth: 0, skyDepth: 0, skySat: 0 }, cam, aspect, local, lens);
   const out = new Float32Array(3);
   const rgba = new Uint8Array(W * H * 4);
   // Per-texel mean chroma for the grey guard, and the photograph's sums for

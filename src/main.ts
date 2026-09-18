@@ -208,6 +208,7 @@ const params: EditParams = {
   shadowSat: 0,
   skySmooth: 0,
   skyDepth: 0,
+  skySat: 0,
   grainAmt: 0,
   grainSize: 1.5,
   vigAmt: 0,
@@ -248,6 +249,7 @@ const ui = {
   shadowSat: $("shadowSat") as HTMLInputElement,
   skySmooth: $("skySmooth") as HTMLInputElement,
   skyDepth: $("skyDepth") as HTMLInputElement,
+  skySatSel: $("skySatSel") as HTMLInputElement,
   skyHue: $("skyHue") as HTMLInputElement,
   skySat: $("skySat") as HTMLInputElement,
   skyLum: $("skyLum") as HTMLInputElement,
@@ -1067,6 +1069,7 @@ function syncFromUI() {
   params.shadowSat = Number(ui.shadowSat.value);
   params.skySmooth = Number(ui.skySmooth.value);
   params.skyDepth = Number(ui.skyDepth.value);
+  params.skySat = Number(ui.skySatSel.value);
   params.denoise = Number(ui.dn.value);
   params.chroma = Number(ui.chroma.value);
   params.despeckle = Number(ui.despeckle.value);
@@ -1126,6 +1129,7 @@ function syncToUI() {
   ui.shadowSat.value = String(params.shadowSat ?? 0);
   ui.skySmooth.value = String(params.skySmooth ?? 0);
   ui.skyDepth.value = String(params.skyDepth ?? 0);
+  ui.skySatSel.value = String(params.skySat ?? 0);
   ui.skyHue.value = String(params.sky[0]);
   ui.skySat.value = String(params.sky[1]);
   ui.skyLum.value = String(params.sky[2]);
@@ -1297,6 +1301,11 @@ interface Look {
    *  edges and the sky map's own keying, and is inert on a frame with no blue
    *  sky. Creative; rides a saved look. */
   skyDepth?: number;
+  /** Sky saturation the look carries (EditParams.skySat): more colour where
+   *  the sky IS, through the same refined selection, gated on each pixel's
+   *  own colour. The sky is a portion of the photograph, so its amount lives
+   *  here and not on the hue band (decision 019). Creative; rides a saved look. */
+  skySat?: number;
   glow?: number;
   /** Per-kind, because raw and camera-rendered files arrive in DIFFERENT
    *  STATES and one cast correction cannot serve both. A raw opens on the
@@ -1439,16 +1448,20 @@ const LOOKS: Record<string, Look> = {
   // lands 1-4deg wide. That range is not in the data to recover -- it is the
   // same 1-3% residual section 4c-iv is about -- so this moves the population,
   // it does not enrich it.
-  eir: { swapRB: true, hue: 0, denoise: 0.45, texture: 0.25, skySmooth: 1, skyDepth: 0,
+  eir: { swapRB: true, hue: 0, denoise: 0.45, texture: 0.25, skySmooth: 1, skyDepth: 0, skySat: 1.0,
          mix3: [0.99, -0.06, 0.07, -1.44, 1.37, 1.02, -0.47, 0.81, 0.65],
-         // THE COLOUR GOES WHERE THE COLOUR IS. Global saturation 1: the 3.0
-         // that used to be here coloured everything, bare ground and grey walls
-         // and overcast sky with the foliage, and the aqua and blue chips' power
-         // curve lifted the palest blues most. The foliage and sky bands carry
-         // the look's saturation now, each its own amount, and bandGain's guard
-         // keeps both off anything without colour. Numbers from the 2026-09-18
-         // population measurement (IR-SCIENCE.md 4b-vi), chosen from pictures.
-         raw: { sat: 1.0, contrast: 1.15, sky: [0, 2.0, 1], foliage: [0, 2.0, 1],
+         // THE COLOUR GOES WHERE THE COLOUR IS, and to what is a PORTION of the
+         // photograph. Global saturation 1: the 3.0 that used to be here coloured
+         // everything — bare ground, grey walls, an overcast sky — with the
+         // foliage, and the aqua and blue chips' power curve lifted the palest
+         // blues most. Now the foliage BAND carries the foliage's amount (a
+         // population by what it is: the infrared-bright red after the swap),
+         // bandGain's guard keeps it off anything without colour, and the sky's
+         // amount is `skySat` above — where the sky IS, through the selection
+         // built at open, gated the same way, because the sky is a place in the
+         // picture and not a hue. Numbers from the 2026-09-18 population
+         // measurement (IR-SCIENCE.md 4b-vi), chosen from pictures.
+         raw: { sat: 1.0, contrast: 1.15, foliage: [0, 2.0, 1],
                 hsl: [7, 1, 1, 0, 1, 1, 0, 1, 1, 54, 1, 1, 35, 1, 1, 0, 1, 1, 1, 1, 1, 43, 1, 1] },
          jpeg: { sat: 1.35, contrast: 1.12 } },
   red: { swapRB: true, toggleSwap: true, hue: 0, wbBias: [0.78, 1.02, 1.35], raw: { sat: 1.8, contrast: 1.4 }, jpeg: { sat: 1.3, contrast: 1.2 } },
@@ -1527,7 +1540,7 @@ let skyMapKey = "";
  *  keyed on the params minus this field and minus the spatial-only ones the
  *  map does not read, so dragging the amount itself costs nothing. */
 function syncSkyMap(): void {
-  if (current && skyBitmap && !skyFine && (params.skyDepth ?? 0) > 0) {
+  if (current && skyBitmap && !skyFine && ((params.skyDepth ?? 0) > 0 || (params.skySat ?? 0) > 0)) {
     // First edit with a depth on this photograph: the coarse bitmap's feather
     // is fine under a chroma blend and a pale rim under a luma multiplier.
     const img = current;
@@ -1541,7 +1554,7 @@ function syncSkyMap(): void {
     if (skyMapKey) { renderer.setSkyMap(null); skyMapKey = ""; }
     return;
   }
-  const { skySmooth: _s, skyDepth: _d, masks: _m, spots: _sp, stickers: _st, crop: _c, straighten: _str, warp: _w, grainAmt: _g, vigAmt: _v, ...rest } = params as EditParams & Record<string, unknown>;
+  const { skySmooth: _s, skyDepth: _d, skySat: _ss, masks: _m, spots: _sp, stickers: _st, crop: _c, straighten: _str, warp: _w, grainAmt: _g, vigAmt: _v, ...rest } = params as EditParams & Record<string, unknown>;
   const key = JSON.stringify(rest);
   if (key === skyMapKey) return;
   skyMapKey = key;
@@ -1726,6 +1739,8 @@ function applyLook(name: keyof typeof LOOKS) {
   // And its depth — the value half of the same solve (IR-SCIENCE 4b-iv),
   // through the refined sky selection. Inert on a frame with no blue sky.
   params.skyDepth = look.skyDepth ?? 0;
+  // And the sky's own colour (019): where the sky is, gated on what has colour.
+  params.skySat = look.skySat ?? 0;
   // AND A LOOK MAY RAISE THE DENOISE FLOOR, which is the one per-shot
   // correction a look is allowed to touch -- because in an infrared frame the
   // colour and the grain come out of the same 1-3% residual between the
@@ -1951,6 +1966,7 @@ function cloneParams(p: EditParams): EditParams {
     shadowSat: p.shadowSat ?? 0,
     skySmooth: p.skySmooth ?? 0,
     skyDepth: p.skyDepth ?? 0,
+    skySat: p.skySat ?? 0,
     grainAmt: p.grainAmt ?? 0,
     grainSize: p.grainSize ?? 1.5,
     vigAmt: p.vigAmt ?? 0,
@@ -2038,6 +2054,7 @@ function applySnapshot(s: Snapshot) {
   params.shadowSat = c.shadowSat ?? 0;
   params.skySmooth = c.skySmooth ?? 0;
   params.skyDepth = c.skyDepth ?? 0;
+  params.skySat = c.skySat ?? 0;
   params.grainAmt = c.grainAmt ?? 0;
   params.grainSize = c.grainSize ?? 1.5;
   params.vigAmt = c.vigAmt ?? 0;
@@ -2207,6 +2224,7 @@ function lookFrom(params: EditParams): SavedLook {
     shadowSat: params.shadowSat ?? 0,
     skySmooth: params.skySmooth ?? 0,
     skyDepth: params.skyDepth ?? 0,
+    skySat: params.skySat ?? 0,
     grainAmt: params.grainAmt ?? 0,
     grainSize: params.grainSize ?? 1.5,
     vigAmt: params.vigAmt ?? 0,
@@ -2628,7 +2646,7 @@ panelTabsEl.addEventListener("keydown", (e) => {
 }
 
 for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.dn, ui.chroma, ui.despeckle, ui.recover, ui.hue, ui.sat, ui.con, ui.glow, ui.lum,
-  ui.hotspot, ui.hotspotSize, ui.hotspotColor, ui.vignette, ui.clarity, ui.dehaze, ui.sharpen, ui.texture, ui.shadowSat, ui.skySmooth, ui.skyDepth,
+  ui.hotspot, ui.hotspotSize, ui.hotspotColor, ui.vignette, ui.clarity, ui.dehaze, ui.sharpen, ui.texture, ui.shadowSat, ui.skySmooth, ui.skyDepth, ui.skySatSel,
   ui.skyHue, ui.skySat, ui.skyLum, ui.folHue, ui.folSat, ui.folLum, ...ui.tones]) {
   el.addEventListener("input", syncFromUI);
 }
@@ -8337,7 +8355,7 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
         // main-thread task the reader did not ask for: a verdict pressed as
         // the page went away landed behind it and was lost
         // (verdict-durability-walk check 4, red with the redraw, 2026-09-18).
-        if ((params.skySmooth ?? 0) > 0 || (params.skyDepth ?? 0) > 0) {
+        if ((params.skySmooth ?? 0) > 0 || (params.skyDepth ?? 0) > 0 || (params.skySat ?? 0) > 0) {
           syncSkyMap();
           draw();
         }
@@ -8548,6 +8566,7 @@ function establishFreshEdit() {
     shadowSat: 0,
     skySmooth: 0,
     skyDepth: 0,
+    skySat: 0,
     grainAmt: 0,
     grainSize: 1.5,
     vigAmt: 0,
@@ -9520,7 +9539,7 @@ async function makeThumb(img: DecodedImage, MAX = 260, lens?: LensCurve | null, 
   // finer of the two. Without this a tile under Aerochrome would show a sky
   // half again as bright as the photograph's, and the agreement walk would
   // say so.
-  const tileSky = ((p.skySmooth ?? 0) > 0 || (p.skyDepth ?? 0) > 0) ? skyMaskFor(img) : null;
+  const tileSky = ((p.skySmooth ?? 0) > 0 || (p.skyDepth ?? 0) > 0 || (p.skySat ?? 0) > 0) ? skyMaskFor(img) : null;
   const tileSample = (x: number, y: number) => linearAt(img, Math.min(img.width - 1, Math.floor(x / s)), Math.min(img.height - 1, Math.floor(y / s)));
   const tileMap = tileSky ? buildSkyMap(tileSample, w, h, p, img.camMatrix, w / h, undefined, lens ?? null, tileSky) : null;
   const edit = compileEdit(p, img.camMatrix, w / h, undefined, lens ?? null, tileMap, tileSky);
@@ -12595,7 +12614,7 @@ function neutralLook(): SavedLook {
     toneG: [...TONE_DEFAULT] as [number, number, number, number, number],
     toneB: [...TONE_DEFAULT] as [number, number, number, number, number],
     lum: 1, clarity: 0, dehaze: 0, sharpen: 0, texture: 0, shadowSat: 0, skySmooth: 0, hsl: hslDefault(),
-    skyDepth: 0,
+    skyDepth: 0, skySat: 0,
     bwOn: false, bwMix: [1, 1, 1],
     grade: [0, 0, 0, 0, 0, 0, 0], grainAmt: 0, grainSize: 1.5, vigAmt: 0, vigMid: 0.5,
     mix3: [1, 0, 0, 0, 1, 0, 0, 0, 1],
@@ -12937,10 +12956,10 @@ async function runBatch(files: File[]) {
         // decode worker from the same copy — when the look carries a sky
         // stage; a batch is developed at full size, where the coarse
         // bitmap's rim would be at its widest, so the refinement matters here.
-        const wantSky = (batchP.skySmooth ?? 0) > 0 || (batchP.skyDepth ?? 0) > 0;
+        const wantSky = (batchP.skySmooth ?? 0) > 0 || (batchP.skyDepth ?? 0) > 0 || (batchP.skySat ?? 0) > 0;
         const batchSel = wantSky ? (img.skySel ?? (await img.skySelReady) ?? buildSkySelectionFrom(prepareSkySource(img))) : null;
         const batchSkyMask = batchSel?.mask ?? null;
-        const batchSkyFine = batchSel && (batchP.skyDepth ?? 0) > 0 ? batchSel.fine : null;
+        const batchSkyFine = batchSel && ((batchP.skyDepth ?? 0) > 0 || (batchP.skySat ?? 0) > 0) ? batchSel.fine : null;
         const result = await exportImage(
           imported,
           img,

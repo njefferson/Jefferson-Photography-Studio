@@ -20,8 +20,13 @@ overcast sky and clouds all took colour. The foliage's own bands sat at 1;
 its colour came entirely from the global gain.
 
 Intended outcome: the look's saturation lands on the foliage and on the sky,
-each set separately and each visible on the reader's own Sky and Foliage
-sliders, and a pixel that arrives without colour leaves without colour.
+each set separately and each visible on a slider of its own, and a pixel
+that arrives without colour leaves without colour. **The framing that
+settles the shape is the one that produced the idea: think about what
+needs to happen to which PORTION of the photograph, never about the whole.**
+The sky is a place in the picture; the foliage is a population by what it
+is; the neutrals are a population by what they lack. Each gets its own
+treatment and nothing acts on the frame.
 
 ## Looked up
 
@@ -35,13 +40,16 @@ chroma and hue, and Lightroom's is the colour range mask and Select Sky. So
 the mechanism is a gate on the pixel's own chroma, combined with a hue or a
 position, and the question is only where the gate's numbers sit.
 
-**The app already has the two populations as controls.** The Colour tab's
-Sky and Foliage bands each own half the hue wheel, follow the channel swap,
-and multiply saturation about the pixel's own — so a truly neutral pixel is
-already untouched by them, and only a NEAR-neutral one (a cast of 0.03 that
-a gain of 3 makes 0.09) is not. What was missing is the gate: a boost that
-fades to nothing below a chroma floor. That is `bandGain` in
-`src/pipeline.ts`, mirrored by name in the shader.
+**The app already has the foliage as a control, and the sky as a place.**
+The Colour tab's Foliage band owns the warm half of the hue wheel, follows
+the channel swap, and multiplies saturation about the pixel's own — so a
+truly neutral pixel is already untouched by it, and only a NEAR-neutral one
+(a cast of 0.03 that a gain of 3 makes 0.09) is not. What was missing is the
+gate: a boost that fades to nothing below a chroma floor. That is `bandGain`
+in `src/pipeline.ts`, mirrored by name in the shader. And the sky selection
+built at open (017, 018) is exactly "where the sky is": Sky colour smoothing
+and Sky depth already act through it, and its saturation joins them as
+`skySat`, gated on each pixel's own colour so a cloud stays a cloud.
 
 ## Weighed against
 
@@ -63,25 +71,34 @@ fades to nothing below a chroma floor. That is `bandGain` in
 
 ## Options
 
-1. **The look drives the existing Sky and Foliage bands, global saturation
-   1, the aqua and blue chips back to 1, and every band BOOST is gated by the
-   pixel's own chroma** (`SAT_GUARD_LO..HI`, HSV saturation in linear light
-   at the band stage — none of the boost below the floor, all of it above
-   the ceiling). Reductions stay ungated: taking colour out of a neutral
-   costs nothing. The two amounts are the look's `raw.sky` and
-   `raw.foliage` triplets, chosen from rendered sheets; the reader sees them
-   on the Colour tab and moves either.
-2. The sky's amount through the sky SELECTION (a third slider beside Sky
-   depth), the foliage through its hue band.
+1. **Global saturation 1, the aqua and blue chips back to 1; the foliage's
+   amount on the existing Foliage band with every band BOOST gated by the
+   pixel's own chroma** (`bandGain`, `SAT_GUARD_LO..HI`, HSV saturation in
+   linear light at the band stage — none of the boost below the floor, all
+   of it above the ceiling; reductions stay ungated, because taking colour
+   out of a neutral costs nothing); **and the sky's amount through the sky
+   SELECTION** — a Sky saturation slider beside Sky depth, `skySat`, scaling
+   each sky pixel's chroma about its luma where the refined bitmap says sky,
+   gated on the pixel's own saturation (`SKY_SAT_GATE_LO..HI`, display
+   space) so a cloud, a haze and an overcast sky stay grey. The two amounts
+   are the look's `raw.foliage` triplet and `skySat`, chosen from rendered
+   sheets; the reader sees both and moves either.
+2. The sky's amount on the Colour tab's Sky hue band instead of the
+   selection, gated the same way.
 3. Keep the global gain and add the gate to it.
 4. Gate the eight-band chips' power curve the same way.
 
 ## Rejected
 
-- **2**: two "Sky saturation" sliders with different meanings in one app,
-  and an overcast sky is grey — a selection would colour it, a chroma gate
-  leaves it. The hue band with the gate gives a blue sky more blue and a grey
-  one nothing, which is the rule as stated.
+- **2**: a hue band is not a place. "Teals and blues wherever they are"
+  reaches water, shade with a blue cast and a blue car, and it was the
+  first draft of this record — corrected the same hour on the framing
+  above, that the sky is a portion of the photograph. The selection is what
+  the app builds at open for exactly this, and smoothing and depth already
+  read it; a third sky tool on a different notion of "sky" would be the
+  inconsistency 018 exists to remove. The two sliders are named apart: the
+  band says *(teals & blues)* in its title, and the selection's note says
+  which is which.
 - **3**: a global gain with a gate still puts one amount on the foliage and
   the sky, and the report asks for two.
 - **4**: the chips' power curve was chosen for a reason that still holds

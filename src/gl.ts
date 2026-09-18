@@ -5,7 +5,7 @@
 
 // Single source of truth for edit parameters lives in pipeline.ts so the GPU
 // preview and CPU export can never drift apart.
-import { toneEvaluator, toneIsIdentity, maskIsActive, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, LENS_GAIN_LO, LENS_GAIN_HI, SAT_GUARD_LO, SAT_GUARD_HI, lensAreaMean, type EditParams, type LocalMap, type SkyMap, type BrushMask, type CropRect } from "./pipeline";
+import { toneEvaluator, toneIsIdentity, maskIsActive, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, LENS_GAIN_LO, LENS_GAIN_HI, SAT_GUARD_LO, SAT_GUARD_HI, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, lensAreaMean, type EditParams, type LocalMap, type SkyMap, type BrushMask, type CropRect } from "./pipeline";
 import { toHalfBuffer } from "./half";
 export type { EditParams };
 
@@ -81,6 +81,8 @@ const float LENS_GAIN_LO = ${LENS_GAIN_LO.toFixed(6)};
 const float LENS_GAIN_HI = ${LENS_GAIN_HI.toFixed(6)};
 const float SAT_GUARD_LO = ${SAT_GUARD_LO.toFixed(6)};
 const float SAT_GUARD_HI = ${SAT_GUARD_HI.toFixed(6)};
+const float SKY_SAT_GATE_LO = ${SKY_SAT_GATE_LO.toFixed(6)};
+const float SKY_SAT_GATE_HI = ${SKY_SAT_GATE_HI.toFixed(6)};
 in vec2 v_uv;
 in vec2 v_cropUv;
 out vec4 frag;
@@ -141,6 +143,7 @@ uniform bool u_bwOn;         // black & white: channel-weighted mono
 uniform vec3 u_bwMix;        // B&W channel weights (normalised in-shader)
 uniform sampler2D u_skyFineTex; // R8 per-image sky bitmap refined to the picture's edges (skyfine.ts)
 uniform float u_skyDepth;       // 0..1 — see EditParams.skyDepth; 0 without a map or a refined bitmap
+uniform float u_skySat;         // 0..2 — see EditParams.skySat; 0 without a refined bitmap
 uniform sampler2D u_skyTex;  // RGB8 per-edit sky chroma map (skymap.ts):
                              //   R,G = opponent chroma encoded ±0.5 -> 0..255,
                              //   B = the sky bitmap's weight
@@ -769,7 +772,7 @@ void main() {
   // sky and is left alone; a mottled sky pixel is hundredths away and is
   // smoothed. Without this the export of an oak against the sky went blue
   // along every branch (2026-09-18).
-  if (u_skySmooth > 0.0 || u_skyDepth > 0.0) {
+  if (u_skySmooth > 0.0 || u_skyDepth > 0.0 || u_skySat > 0.0) {
     vec4 sm = texture(u_skyTex, v_uv);
     if (u_skySmooth > 0.0 && sm.b > 0.0) {
       float Lk = dot(g, LUMA_W);
@@ -784,6 +787,19 @@ void main() {
         g.r = clamp(Lk + nw.x, 0.0, 1.0);
         g.b = clamp(Lk + nw.y, 0.0, 1.0);
         g.g = clamp((Lk - LUMA_W.r * g.r - LUMA_W.b * g.b) / LUMA_W.g, 0.0, 1.0);
+      }
+    }
+    // SKY SATURATION — see compileEdit: more colour where the sky is, through
+    // the refined bitmap, gated on the pixel's own saturation so a cloud or an
+    // overcast sky stays grey. After the blend, before the depth.
+    if (u_skySat > 0.0) {
+      float fw = texture(u_skyFineTex, v_uv).r;
+      if (fw > 0.0) {
+        float gate = smoothstep(SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, rgb2hsv(max(g, 0.0)).y);
+        if (gate > 0.0) {
+          float Ls = dot(g, LUMA_W);
+          g = clamp(Ls + (g - Ls) * (1.0 + u_skySat * fw * gate), 0.0, 1.0);
+        }
       }
     }
     // SKY DEPTH — see compileEdit: one multiplier through the REFINED bitmap
@@ -996,7 +1012,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -1203,7 +1219,7 @@ export class Renderer {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, m.width, m.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(m.rgba));
   }
 
-  /** Upload the per-image refined sky bitmap (skyfine.ts) for `skyDepth`, or
+  /** Upload the per-image refined sky bitmap (skyfine.ts) for `skyDepth` and `skySat`, or
    *  clear it. LINEAR-filtered like the brush sampler compileEdit reads it
    *  with, so the two agree to filtering error. Null turns the depth off
    *  regardless of the amount, exactly as a null map does the smoothing. */
@@ -1522,6 +1538,7 @@ export class Renderer {
     gl.activeTexture(gl.TEXTURE11);
     gl.bindTexture(gl.TEXTURE_2D, this.skyTex);
     gl.uniform1f(this.loc.u_skyDepth, this.skyOn && this.fineOn ? Math.min(1, Math.max(0, p.skyDepth ?? 0)) : 0);
+    gl.uniform1f(this.loc.u_skySat, this.fineOn ? Math.min(2, Math.max(0, p.skySat ?? 0)) : 0);
     gl.uniform1i(this.loc.u_skyFineTex, 12);
     gl.activeTexture(gl.TEXTURE12);
     gl.bindTexture(gl.TEXTURE_2D, this.skyFineTex);
