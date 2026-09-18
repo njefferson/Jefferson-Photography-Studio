@@ -925,6 +925,115 @@ O7Ggs3rTTS0 (the colour edit with masks, 2021-12-23), U7Km8kuzGi0 (the
 lh4XFGlagoU (several colours in one frame). Their transcripts, pulled on a
 machine that YouTube trusts, are the missing half of this paragraph.
 
+### 4b-vii. THE FILM REFERENCE — AEROCHROME DEVELOPED OUTSIDE THE APP, ON SEVEN FRAMES
+
+Rendered 2026-09-18, to answer whether the look can be made WITHOUT the app and
+what that shows about the app. `tools/film-reference.mjs` is the instrument; it
+bundles the app's own decoders and its own sky selection from `src/` at run
+time and uses nothing of the pipeline past the decode. It renders. It is not a
+candidate for the app, for the reason in the last paragraph.
+
+**WHAT THE DATA CONTAINS, AND THE WHOLE BASIS OF THE MAPPING.** 4c-i measured
+green and blue agreeing within 0.6% in every population after white balance:
+both channels record infrared and their visible passbands lie below the
+filter's cut. So the sensor carries ONE chromatic axis — red-plus-infrared
+against infrared — where the film's three separated layers gave it two. The
+reference maps that one axis onto the film's measured populations (4b-iii) and
+invents nothing where the axis reads zero. The search run first for this
+(Kolari's 590nm page, LifePixel's Super Color page, the RGB-IR sensor
+literature) is CONSISTENT with the two-channel reading — every pixel detects
+infrared, the visible bands sit below the cut — without stating it; the
+repository's own 0.6% measurement is the evidence.
+
+**THE SIGN WAS MEASURED, NOT ASSUMED, AND THE FIRST RUN HAD IT WRONG.** The
+axis is `t = ((G+B)/2 − R) / mean`, POSITIVE toward foliage: infrared-bright
+foliage has more green-and-blue (pure infrared) than red, because visible red
+dilutes the infrared in the red channel. 4c-i's anchors read red-high for
+foliage because they were taken POST-SWAP off the canvas. The first render
+carried the anchors' sign and put a blue tree under a red sky; the picture
+said so before any number did.
+
+**THE NEUTRAL IS THE GROUND'S GRAY-WORLD, NOT THE FRAME'S.** Gray-world over
+the whole frame puts the neutral inside the sky on a sky-dominated frame —
+3406 is 28% sky and its sky's t sat within 0.06 of zero, so the sky read as
+grey. There is no infrared white point to read from the file (section 3), and
+the sky is the population the field separates by a SELECTION, so it is
+selected — with the app's own `skyfine` selection, the coarse mask refined to
+the picture's edges — and the neutral is the mean of everything outside it. The
+bare 384-texel mask with a quarter feather was tried first and left a white
+halo round every crown and roofline: the rim the refinement exists to remove,
+seen again from the other side.
+
+**A SKY IS INFRARED-POOR, AND THE SELECTION ALONE DOES NOT KNOW IT.** 0627 has
+no sky; the selection took its dark blurred background, 58% of the frame, and
+its median t read +0.07. Every real sky read −0.04 (2082's overcast) to −0.17.
+So the selection is keyed per frame on −(median t) over 0.00→0.04, and guarded
+per pixel above t +0.04 so an infrared-bright thing inside it — 1651's cloud,
+a crown against the sky — stays white. 0627 keys to 0.00 and takes no sky;
+2082 keys to 1.00 and its overcast goes fully blue, which the film reference
+photographs (both clear-sky) cannot rule on.
+
+**THE FITTED CONSTANTS, each from a reading.** Foliage membership on t from
+0.03 to 0.12: the knee above the axis noise (±0.02 after a 5×5 box on the
+LINEAR t, read on 0627 and on 3406's apron) and full by a foliage frame's 90th
+percentile (1376: 0.12; 1644: 0.09). The chroma blur is on the linear axis
+BEFORE any mapping, because the difference of two near-identical channels is
+where the noise lives — the field's placement, and the opposite of the app's,
+which smooths after the amplification. The sky's value is pulled 65% of the
+way toward the film's 0.32; foliage keeps the frame's own luma with 15% toward
+0.77.
+
+**MEASURED, the same instrument on both columns** (hue-split populations,
+circular mean, mean saturation and value, colourless share). The film: sky
+sat 0.66 at value 0.32, foliage sat 0.60 at 0.77, colourless 13.8% (yellow
+filter); sky sat 0.92, foliage 0.78, colourless 3.6% (red).
+
+- **The app as pressed** (Aerochrome, Restore depth on, nothing finished),
+  seven frames: sky sat 0.10–0.50 at value 0.52–0.93; foliage sat 0.67–0.88 at
+  value 0.35–0.64; colourless 7–51%.
+- **The reference, yellow filter:** sky sat 0.61–0.65 at value 0.35–0.51;
+  foliage sat 0.34–0.52 at value 0.36–0.59; colourless 22–59%.
+- **The reference, red filter:** sky sat 0.85–0.91 at the same values;
+  foliage sat 0.42–0.67; colourless the same.
+
+**WHAT IT SHOWS.**
+
+- **The sky is where the app is furthest from the film, and the data supports
+  the film's sky.** The reference reaches the film's saturation and lands
+  within 0.03–0.19 of its value on every clear sky — through the app's OWN
+  selection. The app's levers for this exist (the sky saturation and Sky depth
+  stages through that selection); what the look sets them to as pressed leaves
+  the sky pale and bright. That is decision 019's question with a measured
+  target attached.
+- **Bright foliage and grass go white in BOTH columns.** The film's reeds and
+  lawn hold red (13.8% colourless); here 22–59% of the frame carries no colour
+  either way, because where sunlit foliage floods all three channels the axis
+  reads zero and there is no colour in the file to develop. 4c-ii's finding —
+  the colour has to be in the file already — measured from the other
+  direction. Not reachable by any mapping.
+- **Foliage: the app over the film, the reference under it, both darker.** The
+  app's foliage saturation exceeds the film's window on five of seven frames;
+  the reference's window sits below it; both sit near value 0.4–0.6 against
+  the film's 0.77. The film's bright red is an exposure property of the layers
+  and neither column has it.
+- **0627 has no foliage, and the app painted the whole wall crimson** (foliage
+  sat 0.86 on 40% of the frame). The reference colours only the wall's
+  infrared-reflective patches, modestly. The wall is not wrong to be red —
+  paints reflect infrared — but the app's amount on a frame with nothing to
+  amplify is the 4c-vi speckle argument at frame scale.
+- **1651's cloud stays white in the reference and the panel session's Sky mask
+  took it as sky.** The guard is the difference: infrared-bright inside the
+  selection is not sky. Decision 018 is the app's version of the same fact.
+
+**WHAT THE REFERENCE IS NOT, and why it stays outside the app.** Its hue is
+IMPOSED: every foliage pixel is 6.2° and every sky pixel 204.0°, by
+membership, with the film's 20° spread absent — the article's point that
+different plants render as different shades is exactly what a one-axis mapping
+cannot carry, and the app's mixer-plus-bands route does carry some of it. It is
+a picture of the film's PALETTE on these frames' structure, for judging the
+app's distance from it; it is not a pipeline. The full sheet (the app beside
+both filters, seven rows) was sent on 2026-09-18 rather than described.
+
 ## 4c. THE CRUX IS NIR CONTAMINATION, AND A ROTATION ALONE CANNOT FIX IT
 
 **Researched 2026-09-16, after shipping the rotation bare and reporting that it
