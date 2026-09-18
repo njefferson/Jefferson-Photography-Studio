@@ -2920,6 +2920,14 @@ function wireVersionMenu() {
       // there was no way to tell that from the app simply being ignored. Two
       // outstanding is the signature, and this line says it in the report
       // rather than leaving the next session to reason about a description.
+      // A SET STILL BEING READ IN, and which file it is on. The import loop
+      // outlives its own dialog and reads the files one after another; a file
+      // whose read neither finishes nor fails — a cloud placeholder, a drive
+      // that has gone away — leaves every later tile as a name in the strip,
+      // with nothing anywhere saying why. Reported from a PC on 2026-09-18 as
+      // thumbnails not coming across; the strip's own line said "adding 12 of
+      // 47" off the edge of the screenshot, and the report said nothing.
+      { k: "Adding photos", v: adding ? `reading ${adding.index} of ${adding.total} — ${adding.name} · ${((performance.now() - adding.since) / 1000).toFixed(0)}s on this file so far` : "none in progress" },
       { k: "File pickers", v: pickerLine() },
       // Kept rather than shown once and lost — see recordFailure.
       { k: "Last failure", v: lastFailure },
@@ -9218,7 +9226,7 @@ const sessionProgressBar = $("sessionProgressBar") as HTMLDivElement;
 // showed the untouched welcome screen for the first two decodes and a
 // flickering strip after that. `adding` makes the progress the strip's subject
 // for as long as it lasts.
-let adding: { done: number; total: number; index: number; name: string } | null = null;
+let adding: { done: number; total: number; index: number; name: string; since: number } | null = null;
 // Photos whose bytes are still being written to storage. They are in the strip
 // and on screen already — measured, the strict-durability commit is ~70% of the
 // time it takes to open a set, and it does not have to be waited on before the
@@ -10055,7 +10063,7 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
     mark: undefined as SessionPhoto["mark"],
   }));
   for (const p of planned) { sessionPhotos.push(p); pendingStore.add(p.id); }
-  adding = { done: 0, total: files.length, index: 1, name: files[0]?.name ?? "" };
+  adding = { done: 0, total: files.length, index: 1, name: files[0]?.name ?? "" , since: performance.now() };
   updateSessionStrip();
   // OWNERSHIP, because this loop outlives its own dialog. It raises the spinner
   // to cover the wait for the FIRST photo and hides it the moment one is on
@@ -10114,7 +10122,7 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
       if (quotaHit) { for (const p of planned.slice(i)) dropPlanned(p.id); break; }
       const f = files[i];
       const slot = planned[i];
-      adding = { done: i, total: files.length, index: i + 1, name: f.name };
+      adding = { done: i, total: files.length, index: i + 1, name: f.name , since: performance.now() };
       if (ownsBusy && busy.open) busyText.textContent = `Adding ${files.length} photos — reading ${i + 1} of ${files.length}: ${f.name}`;
       updateSessionStrip();
       let imported: ImportedFile;
@@ -10208,7 +10216,7 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
         hideBusy(); // there is a photo on screen — nothing left to wait for
         void realThumbnails(); // from here it runs beside the loop, not after it
       }
-      adding = { done: i + 1, total: files.length, index: i + 1, name: f.name };
+      adding = { done: i + 1, total: files.length, index: i + 1, name: f.name , since: performance.now() };
       updateSessionStrip();
       await tick(); // yield so edits on the shown photo stay responsive
     }
