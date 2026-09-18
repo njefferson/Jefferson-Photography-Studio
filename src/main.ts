@@ -1305,8 +1305,13 @@ interface Look {
    *  balance. Measured on the five reported frames plus a raw control: the
    *  bias that moves a JPEG from two hues to three takes the raw control from
    *  four hues at 43% down to three at 77%. Overrides the look-level wbBias. */
-  raw: { sat: number; contrast: number; wbBias?: [number, number, number]; hsl?: number[] };
-  jpeg: { sat: number; contrast: number; wbBias?: [number, number, number]; hsl?: number[] };
+  /** Per kind: the global saturation and contrast, and optionally the two
+   *  per-colour bands (`sky`, `foliage`: [hueShift, satScale, lumScale], the
+   *  same triplets the Colour tab's sliders hold). A look that brings the bands
+   *  puts its colour where the colour is; bandGain's guard keeps it off
+   *  anything colourless, which a global gain cannot do. */
+  raw: { sat: number; contrast: number; wbBias?: [number, number, number]; hsl?: number[]; sky?: [number, number, number]; foliage?: [number, number, number] };
+  jpeg: { sat: number; contrast: number; wbBias?: [number, number, number]; hsl?: number[]; sky?: [number, number, number]; foliage?: [number, number, number] };
 }
 const LOOKS: Record<string, Look> = {
   // Gentle contrast by default: it never crushes shadow detail (road shade,
@@ -1434,10 +1439,17 @@ const LOOKS: Record<string, Look> = {
   // lands 1-4deg wide. That range is not in the data to recover -- it is the
   // same 1-3% residual section 4c-iv is about -- so this moves the population,
   // it does not enrich it.
-  eir: { swapRB: true, hue: 0, denoise: 0.45, texture: 0.25, skySmooth: 1, skyDepth: 0.5,
+  eir: { swapRB: true, hue: 0, denoise: 0.45, texture: 0.25, skySmooth: 1, skyDepth: 0,
          mix3: [0.99, -0.06, 0.07, -1.44, 1.37, 1.02, -0.47, 0.81, 0.65],
-         raw: { sat: 3.0, contrast: 1.15,
-                hsl: [7, 1, 1, 0, 1, 1, 0, 1, 1, 54, 1, 1, 35, 2, 1, 0, 2, 1, 1, 1, 1, 43, 1, 1] },
+         // THE COLOUR GOES WHERE THE COLOUR IS. Global saturation 1: the 3.0
+         // that used to be here coloured everything, bare ground and grey walls
+         // and overcast sky with the foliage, and the aqua and blue chips' power
+         // curve lifted the palest blues most. The foliage and sky bands carry
+         // the look's saturation now, each its own amount, and bandGain's guard
+         // keeps both off anything without colour. Numbers from the 2026-09-18
+         // population measurement (IR-SCIENCE.md 4b-vi), chosen from pictures.
+         raw: { sat: 1.0, contrast: 1.15, sky: [0, 2.0, 1], foliage: [0, 2.0, 1],
+                hsl: [7, 1, 1, 0, 1, 1, 0, 1, 1, 54, 1, 1, 35, 1, 1, 0, 1, 1, 1, 1, 1, 43, 1, 1] },
          jpeg: { sat: 1.35, contrast: 1.12 } },
   red: { swapRB: true, toggleSwap: true, hue: 0, wbBias: [0.78, 1.02, 1.35], raw: { sat: 1.8, contrast: 1.4 }, jpeg: { sat: 1.3, contrast: 1.2 } },
   goldie: { swapRB: true, toggleSwap: true, hue: 0, wbBias: [0.78, 1.22, 1.4], raw: { sat: 1.7, contrast: 1.35 }, jpeg: { sat: 1.2, contrast: 1.2 } },
@@ -1677,8 +1689,8 @@ function applyLook(name: keyof typeof LOOKS) {
   params.contrast = strength.contrast;
   params.tint = look.tint ?? [1, 1, 1];
   params.glow = look.glow ?? 0;
-  params.sky = [0, 1, 1];
-  params.foliage = [0, 1, 1];
+  params.sky = strength.sky ? [...strength.sky] : [0, 1, 1];
+  params.foliage = strength.foliage ? [...strength.foliage] : [0, 1, 1];
   params.tone = [...TONE_DEFAULT];
   params.toneR = [...TONE_DEFAULT];
   params.toneG = [...TONE_DEFAULT];
@@ -8319,8 +8331,16 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
         skyFine = sel ? sel.fine : null;
         renderer.setSkyFine(skyFine);
         skyMapKey = "";
-        syncSkyMap();
-        draw();
+        // DRAWN AGAIN ONLY WHEN SOMETHING ON SCREEN USES IT. With no sky stage
+        // in the edit the frame already showing is the frame this would draw,
+        // and a full redraw a second and a half after every open is a
+        // main-thread task the reader did not ask for: a verdict pressed as
+        // the page went away landed behind it and was lost
+        // (verdict-durability-walk check 4, red with the redraw, 2026-09-18).
+        if ((params.skySmooth ?? 0) > 0 || (params.skyDepth ?? 0) > 0) {
+          syncSkyMap();
+          draw();
+        }
       });
     } else {
       skyBitmap = skyMaskFor(img);
@@ -12645,6 +12665,8 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["l
     // here rather than the look-level value.
     const lhsl = strength.hsl ?? l.hsl;
     look = { ...neutralLook(), swapRB: l.swapRB, hue: l.hue, sat: strength.sat, contrast: strength.contrast, tint: l.tint ?? [1, 1, 1], glow: l.glow ?? 0,
+             sky: strength.sky ? [...strength.sky] as [number, number, number] : [0, 1, 1],
+             foliage: strength.foliage ? [...strength.foliage] as [number, number, number] : [0, 1, 1],
              hsl: lhsl && lhsl.length === 24 ? [...lhsl] : hslDefault(),
              mix3: l.mix3 ? [...l.mix3] : [...MIX3_DEFAULT] };
     // AND ITS DENOISE FLOOR, for the same reason the two lines above carry

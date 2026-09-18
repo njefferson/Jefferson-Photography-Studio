@@ -905,6 +905,34 @@ export function hsv2rgb(h: number, s: number, v: number): [number, number, numbe
   return [r + m, g + m, b + m];
 }
 
+/** THE CHROMA A SATURATION BOOST NEEDS BEFORE IT ACTS — HSV saturation in
+ *  linear light, read at the band stage: none of the boost below SAT_GUARD_LO,
+ *  all of it above SAT_GUARD_HI, Hermite between. A pixel with no colour gains
+ *  none: a grey wall, a white cloud, an overcast sky, bare ground stay as the
+ *  rotation left them, whatever the Sky and Foliage sliders ask for. Fitted
+ *  constants, measured 2026-09-18 on five raws through the app's own export
+ *  (IR-SCIENCE.md section 4b-vi carries the populations).
+ *  The shader reads the same two numbers by name. */
+export const SAT_GUARD_LO = 0.10;
+export const SAT_GUARD_HI = 0.20;
+
+/** One band's multiplier on a pixel's saturation.
+ *  Takes `k`, the band's saturation slider (1 = none); `w`, the band's weight at
+ *  the pixel's hue (bandWeight); and `s`, the pixel's own HSV saturation at
+ *  this stage, in linear light.
+ *  Returns the factor `s` is multiplied by. A boost (k > 1) is guarded by
+ *  SAT_GUARD_LO..HI on `s`, so it is 1 for a colourless pixel; a reduction
+ *  (k < 1) applies at every chroma, because taking colour out of a neutral
+ *  costs nothing and a reader lowering a band expects it everywhere.
+ *  What the result must satisfy: the shader's bandGain is this function line
+ *  for line (agreement-walk holds the two to filtering error), and
+ *  bandGain(1, w, s) === 1 for every w and s, so a look or a reader that
+ *  leaves a band alone changes nothing. */
+export function bandGain(k: number, w: number, s: number): number {
+  const g = 1 + (k - 1) * w;
+  return g > 1 ? 1 + (g - 1) * smooth01(SAT_GUARD_LO, SAT_GUARD_HI, s) : g;
+}
+
 /** Band weight: 1 inside the plateau, smoothstep falloff to 0. */
 export function bandWeight(hue: number, center: number, plateau: number, edge: number): number {
   let d = Math.abs(hue - center);
@@ -1368,7 +1396,9 @@ export function compileEdit(
       const wS = bandWeight(h, swap ? 30 : 210, 55, 105);
       const wF = 1 - wS;
       h += sky[0] * wS + fol[0] * wF;
-      s = Math.min(1, s * (1 + (sky[1] - 1) * wS) * (1 + (fol[1] - 1) * wF));
+      // A boost acts only where there is colour to boost (bandGain's guard);
+      // the guard reads THIS pixel's saturation before either band touches it.
+      s = Math.min(1, s * bandGain(sky[1], wS, s) * bandGain(fol[1], wF, s));
       v = v * (1 + (sky[2] - 1) * wS) * (1 + (fol[2] - 1) * wF);
       [nr, ng, nb] = hsv2rgb(h, s, v);
     }

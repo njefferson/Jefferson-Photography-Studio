@@ -185,9 +185,21 @@ darkened because `buildSkyMask` finds only the cloud strip along its top
 edge (9.7% of the frame), which is the bitmap's limit on a cloud-topped frame
 and a different piece of work.
 
+## Outcome, part three — the amount is 0
+
+Judged on the device from the part-two sheets, 2026-09-18: the darkened
+skies read as night. A film scan's value is a property of a transparency on
+a light table; a daylight sky at that value on a screen is not the same
+thing, and the pictures said so where the film instrument could not. The
+pale centre of a clear sky in these frames is the lens's hot spot — data,
+not a defect of the look — and the better sky was made by hand with the lens
+colour correction at 1.5 and the sky's saturation slightly down. So the look
+ships `skyDepth: 0`; the slider, the selection and the stage stay, because
+the selection is 018's foundation and any amount is one drag away. The
+saturation that part one put on the aqua and blue chips comes off again in
+019, which puts it on the sky's own band behind a chroma gate.
+
 ## Rank
 
-Part one shipped. The open remainder sits directly above 006 (mask by
-subject), because both wait on the same thing — a sky selection accurate to
-the picture's edges — and this one has the measured method and the
-instruments for it. Above it stay 012–015, which are reported defects.
+Archived; both halves are built, one shipped as tuned and one shipped at 0.
+The selection it built is what 018 and 013's gravel half stand on.

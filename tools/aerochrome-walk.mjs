@@ -111,16 +111,19 @@ const SKY = 1;
 // AND THE SKY'S DEPTH — the value half of the same solve (IR-SCIENCE 4b-iv,
 // 4b-v): one luma multiplier through the sky bitmap refined to the
 // photograph's edges and the map's own keying, so a grey, a cloud, the ground
-// and an overcast sky are left alone. The film's sky reads 0.32.
-const DEPTH = 0.5;
-// 10e: the sky's VALUE on RAW after the Look press — mean HSV value of the
-// population 10b measures — must sit under SKY_VAL_MAX. MADE TO FAIL FIRST,
-// 2026-09-18: with NO_DEPTH=1 the walk zeroes the Sky depth slider after the
-// press and this check read 0.878; with the look's depth of 0.5 it reads
-// 0.500. The ceiling sits 0.04 over the depth's reading, so a depth quietly
-// dropped from the look fails here while 10d's saturation still passes.
-const SKY_VAL_MAX = 0.54;
-const NO_DEPTH = !!process.env.NO_DEPTH;
+// and an overcast sky are left alone. THE LOOK SHIPS IT AT 0 (decision 017,
+// outcome part three): judged on the device, a daylight sky taken to the
+// film's value reads as night. The slider stays, and 10e proves it still works.
+const DEPTH = 0;
+// 10e: the Sky depth slider, set to DEPTH_TRY after the Look press, must take
+// the sky's mean HSV value (the population 10b measures) down by at least
+// SKY_VAL_DROP_MIN. MADE TO FAIL FIRST, 2026-09-18: on this frame the value
+// reads 0.878 at depth 0 and 0.500 at 0.5, a drop of 0.378; the floor sits
+// well under that and far above the 0.000 a build whose stage has gone
+// inert would read (the depth keys on the sky's rendered chroma, and a look
+// that moves that chroma out of the key's window silences the stage).
+const DEPTH_TRY = 0.5;
+const SKY_VAL_DROP_MIN = 0.25;
 // THE FLOOR CHECKS NEED A FRAME THE FLOOR ACTUALLY BINDS ON, which is why they
 // do not use RAW. NIR_0063 measures 0.46 -- above the floor -- so `max(measured,
 // FLOOR)` is just the measurement there and checks 4 and 5 would assert nothing
@@ -135,23 +138,40 @@ const TOL = 12;      // degrees; hold-one-out worst error on the solve was 8
 const MIN_SEP = 150; // a global hue shift collapses the two into one bin
 // The eight band TRIPLETS the look declares — [hue shift, saturation, luminance]
 // in HSL_CENTERS order (red, orange, yellow, green, aqua, blue, purple,
-// magenta). Hue was solved onto the film's angles (IR-SCIENCE 4b-iii); the
-// aqua and blue SATURATION is the 2026-09-18 solve (4b-iv): a power of 2,
-// which puts three of seven skies in the film's window and moves the pale
-// ones halfway, foliage and hue untouched. Luminance stays 1 everywhere —
-// the band's luminance was measured and rejected there, because it darkens
-// the pale ground and haze that share the sky's hue.
-const BANDS = [[7, 1, 1], [0, 1, 1], [0, 1, 1], [54, 1, 1], [35, 2, 1], [0, 2, 1], [1, 1, 1], [43, 1, 1]];
+// magenta). Hue was solved onto the film's angles (IR-SCIENCE 4b-iii).
+// Saturation and luminance are 1 in every band: the aqua and blue saturation
+// power of 2 that 4b-iv put here (2.50.10) came off again in 019, because a
+// power curve lifts the palest pixels most and coloured what had no colour.
+// The look's saturation is the two per-colour bands below.
+const BANDS = [[7, 1, 1], [0, 1, 1], [0, 1, 1], [54, 1, 1], [35, 1, 1], [0, 1, 1], [1, 1, 1], [43, 1, 1]];
 const NEUTRAL = (t) => t[0] === 0 && t[1] === 1 && t[2] === 1;
 // The reader's own sliders: Hue -60..60, Saturation 0..2, Luminance 0.3..1.7
 // (ir.html). Every value the look declares must be reachable by hand.
 const HUE_LIMIT = 60, SAT_RANGE = [0, 2], LUM_RANGE = [0.3, 1.7];
+// 019: THE LOOK'S SATURATION BY POPULATION. Global Saturation 1 — the 3.0
+// that used to colour every pixel is gone — and the Colour tab's Sky and
+// Foliage bands carry it, each its own amount, each a boost that
+// pipeline.ts bandGain gates on the pixel's own chroma, so a pixel with no
+// colour gains none. The amounts were chosen from rendered sheets
+// (IR-SCIENCE 4b-vi). Sliders: Saturation 0..3, each band's saturation 0..2.
+const GLOBAL_SAT = 1.0;
+const FOL_SAT = 2.0;
+const SKY_SAT = 2.0;
+const GLOBAL_SAT_RANGE = [0, 3], BAND_SAT_RANGE = [0, 2];
 // 10d: the sky's saturation on RAW after the Look press, mean HSV saturation of
 // the same population 10b measures the angle of. MADE TO FAIL FIRST, 2026-09-18:
 // the 2.50.7 look (both bands at saturation 1) read 0.393 here and the solved
 // look reads 0.570; the floor sits 0.04 under the solved reading, so a band
 // quietly reset to 1 fails this check while still passing 10b's angle.
+// RE-MEASURED for 019's bands: see the reading beside the check.
 const SKY_SAT_MIN = 0.53;
+// 10f: NOTHING WITHOUT COLOUR TAKES ANY (019). A pixel whose HSV saturation
+// under the look's bare mapping (Sky and Foliage bands at 1) is under COL_LO
+// must still read under COL_VISIBLE under the whole look, for all but
+// COL_VISIBLE_MAX of them. MADE TO FAIL FIRST on the 2.50.10 build (global
+// saturation 3 and the aqua/blue power curve): see the reading beside the
+// check. Same two thresholds as the population instrument that chose them.
+const COL_LO = 0.06, COL_VISIBLE = 0.15, COL_VISIBLE_MAX = 0.01;
 
 let failed = 0;
 const check = (name, got, want) => {
@@ -230,6 +250,9 @@ try {
   const setSky = (p, v) => setSlider(p, "skySmooth", v);
   const setDepth = (p, v) => setSlider(p, "skyDepth", v);
   const depthv = (p) => p.evaluate(() => Number(document.getElementById("skyDepth").value));
+  const satv = (p) => p.evaluate(() => Number(document.getElementById("sat").value));
+  const folv = (p) => p.evaluate(() => Number(document.getElementById("folSat").value));
+  const skyBv = (p) => p.evaluate(() => Number(document.getElementById("skySat").value));
 
   // ---- 0. THE CONTROL. Without this every check below could pass on an
   // instrument that reads the same nine numbers whatever is pressed.
@@ -257,10 +280,14 @@ try {
   check("4a  the look brings its local contrast with it", await tex(a.p), TEXTURE);
   check("4a2 ...and its sky colour smoothing", await skyv(a.p), SKY);
   check("4a3 ...and its sky depth", await depthv(a.p), DEPTH);
+  check("4a4 ...its global saturation of 1 (the colour goes where the colour is)", await satv(a.p), GLOBAL_SAT);
+  check("4a5 ...the foliage band's own amount", await folv(a.p), FOL_SAT);
+  check("4a6 ...and the sky band's own amount", await skyBv(a.p), SKY_SAT);
   await press(a.p, "lookAero");
   check("4b  ...and leaving it puts the photograph back to none", await tex(a.p), 0);
   check("4b2 ...the sky smoothing too", await skyv(a.p), 0);
   check("4b3 ...the sky depth too", await depthv(a.p), 0);
+  check("4b4 ...and both bands", [await folv(a.p), await skyBv(a.p)], [1, 1]);
 
   // A VALUE THE READER SET IS NOT OURS TO THROW AWAY, in either direction --
   // the same pair of claims the denoise floor carries below, and the reason
@@ -338,6 +365,11 @@ try {
     await setTex(p, TEXTURE);
     await setSky(p, SKY);
     await setDepth(p, DEPTH);
+    // AND THE SATURATION, through the reader's own three sliders (019): the
+    // global amount and the two bands. Pink IR left global saturation at 3.
+    await setSlider(p, "sat", GLOBAL_SAT);
+    await setSlider(p, "folSat", FOL_SAT);
+    await setSlider(p, "skySat", SKY_SAT);
     await setDn(p, Math.max(measured, FLOOR));
     const h = await hash(p);
     await ctx.close();
@@ -356,8 +388,7 @@ try {
   {
     const { p, ctx } = await open();
     await press(p, "lookEir");
-    if (NO_DEPTH) await setDepth(p, 0);
-    const m = await p.evaluate(() => {
+    const measurePops = (p) => p.evaluate(() => {
       const cv = document.querySelector("#view");
       const g = cv.getContext("webgl2") || cv.getContext("webgl");
       const W = cv.width, H = cv.height, b = new Uint8Array(W * H * 4);
@@ -382,6 +413,9 @@ try {
                skyVal: skyV.length ? skyV.reduce((a, c) => a + c, 0) / skyV.length : null,
                nf: fol.length, ns: sky.length };
     });
+    const m = await measurePops(p);
+    await setDepth(p, DEPTH_TRY);
+    const m2 = await measurePops(p);
     await ctx.close();
     const off = (a, b) => { let d = Math.abs(a - b) % 360; return d > 180 ? 360 - d : d; };
     check("10a the foliage lands on the film's angle",
@@ -397,14 +431,59 @@ try {
     check("10d the sky is as saturated as the solve made it (the film reads 0.66)",
       m.skySat != null && m.skySat >= SKY_SAT_MIN, true);
     console.log(`        (sky saturation ${m.skySat == null ? "none" : m.skySat.toFixed(3)}, floor ${SKY_SAT_MIN}, n=${m.ns})`);
-    check("10e the sky is as deep as the solve made it (the film reads 0.32)",
-      m.skyVal != null && m.skyVal <= SKY_VAL_MAX, true);
-    console.log(`        (sky value ${m.skyVal == null ? "none" : m.skyVal.toFixed(3)}, ceiling ${SKY_VAL_MAX}${NO_DEPTH ? ", Sky depth zeroed by NO_DEPTH" : ""}, n=${m.ns})`);
+    check("10e the Sky depth slider still deepens the sky (the look ships it at 0)",
+      m.skyVal != null && m2.skyVal != null && m.skyVal - m2.skyVal >= SKY_VAL_DROP_MIN, true);
+    console.log(`        (sky value ${m.skyVal == null ? "none" : m.skyVal.toFixed(3)} at depth ${DEPTH}, ${m2.skyVal == null ? "none" : m2.skyVal.toFixed(3)} at ${DEPTH_TRY}; drop floor ${SKY_VAL_DROP_MIN}, n=${m.ns})`);
+  }
+
+  // ---- 10f. NOTHING WITHOUT COLOUR TAKES ANY. The look's bare mapping (both
+  // bands at 1) says which pixels have no colour; the whole look must leave
+  // them that way. Read on the same canvas, pixel for pixel, so the two
+  // renders are compared where they are drawn.
+  {
+    const { p, ctx } = await open();
+    await press(p, "lookEir");
+    await setSlider(p, "folSat", 1);
+    await setSlider(p, "skySat", 1);
+    await p.evaluate((lo) => {
+      const cv = document.querySelector("#view");
+      const g = cv.getContext("webgl2") || cv.getContext("webgl");
+      const W = cv.width, H = cv.height, b = new Uint8Array(W * H * 4);
+      g.readPixels(0, 0, W, H, g.RGBA, g.UNSIGNED_BYTE, b);
+      const col = new Uint8Array(W * H);
+      for (let i = 0; i < W * H; i++) {
+        const r = b[i * 4], gg = b[i * 4 + 1], bb = b[i * 4 + 2], a = b[i * 4 + 3];
+        const mx = Math.max(r, gg, bb), mn = Math.min(r, gg, bb);
+        if (a && mx >= 13 && (mx - mn) / mx < lo) col[i] = 1;
+      }
+      window.__colourless = col;
+    }, COL_LO);
+    await press(p, "lookEir");
+    const r = await p.evaluate((vis) => {
+      const cv = document.querySelector("#view");
+      const g = cv.getContext("webgl2") || cv.getContext("webgl");
+      const W = cv.width, H = cv.height, b = new Uint8Array(W * H * 4);
+      g.readPixels(0, 0, W, H, g.RGBA, g.UNSIGNED_BYTE, b);
+      const col = window.__colourless; let n = 0, gained = 0;
+      for (let i = 0; i < W * H; i++) {
+        if (!col[i]) continue; n++;
+        const r = b[i * 4], gg = b[i * 4 + 1], bb = b[i * 4 + 2];
+        const mx = Math.max(r, gg, bb), mn = Math.min(r, gg, bb);
+        if (mx > 0 && (mx - mn) / mx > vis) gained++;
+      }
+      return { n, share: n ? gained / n : 0 };
+    }, COL_VISIBLE);
+    await ctx.close();
+    check("10f a pixel the mapping leaves colourless stays colourless under the whole look",
+      r.n > 0 && r.share <= COL_VISIBLE_MAX, true);
+    console.log(`        (${(100 * r.share).toFixed(2)}% of ${r.n} colourless pixels took visible colour; ceiling ${(100 * COL_VISIBLE_MAX).toFixed(0)}%)`);
   }
 
   check("11  every band the look declares is reachable on the reader's own sliders",
     BANDS.every((t) => Math.abs(t[0]) <= HUE_LIMIT && t[1] >= SAT_RANGE[0] && t[1] <= SAT_RANGE[1] && t[2] >= LUM_RANGE[0] && t[2] <= LUM_RANGE[1]), true);
   console.log(`        (largest hue ${Math.max(...BANDS.map((t) => Math.abs(t[0])))} of ${HUE_LIMIT}, saturation ${Math.min(...BANDS.map((t) => t[1]))}..${Math.max(...BANDS.map((t) => t[1]))} of ${SAT_RANGE.join("..")}, luminance ${Math.min(...BANDS.map((t) => t[2]))}..${Math.max(...BANDS.map((t) => t[2]))} of ${LUM_RANGE.join("..")})`);
+  check("11b ...and so are the global and the two band saturations",
+    GLOBAL_SAT >= GLOBAL_SAT_RANGE[0] && GLOBAL_SAT <= GLOBAL_SAT_RANGE[1] && [FOL_SAT, SKY_SAT].every((v) => v >= BAND_SAT_RANGE[0] && v <= BAND_SAT_RANGE[1]), true);
 
   const liftShipped = await armShipped(true);
   const liftRecipe = await armRecipe(true);
