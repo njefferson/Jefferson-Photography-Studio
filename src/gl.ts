@@ -629,7 +629,8 @@ void main() {
   if (u_sky != vec3(0.0, 1.0, 1.0) || u_fol != vec3(0.0, 1.0, 1.0)) {
     vec3 hsv = rgb2hsv(max(c, 0.0));
     float h = hsv.x * 360.0;
-    float wS = bandWeight(h, u_swap ? 30.0 : 210.0, 55.0, 105.0);
+    // pipeline.ts skyBandCentre: the swapped centre only while no mixer is on
+    float wS = bandWeight(h, (u_swap && !u_mix3On) ? 30.0 : 210.0, 55.0, 105.0);
     float wF = 1.0 - wS;
     h += u_sky.x * wS + u_fol.x * wF;
     float s = min(1.0, hsv.y * bandGain(u_sky.y, wS, hsv.y) * bandGain(u_fol.y, wF, hsv.y));

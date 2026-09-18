@@ -30,7 +30,7 @@ import { writeZip, crc32 } from "./zip";
 import { putFrame, eachFrame, frameMetas, frameCount, clearFrames, frameStore } from "./batchstore";
 import * as Session from "./session";
 import { keepAwake } from "./wakelock";
-import { sampleBrush, lensGain, LENS_GAIN_HI, LENS_GAIN_LO, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, bandWeight, rgb2hsv, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, type MaskLayer, type CropRect, BRUSH_MAX_EDGE } from "./pipeline";
+import { sampleBrush, skyBandCentre, lensGain, LENS_GAIN_HI, LENS_GAIN_LO, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, bandWeight, rgb2hsv, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, type MaskLayer, type CropRect, BRUSH_MAX_EDGE } from "./pipeline";
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, type HealSpot } from "./heal";
 import { makeStickerAsset, stickerRect, stickerWorldCorners, stickerXform, compositeStickersIntoRect8, compositeStickersIntoRectF32, compositeStickersOverlay8, type StickerAsset } from "./sticker";
 import { makeWarpField, encodeWarp, paintWarp, warpIsEmpty as warpFieldEmpty, type WarpField, type WarpTool } from "./warp";
@@ -1160,8 +1160,11 @@ function updateBandLabels() {
   const skySub = document.getElementById("skyBandSub");
   const folSub = document.getElementById("folBandSub");
   if (!skySub || !folSub) return;
-  skySub.textContent = params.swapRB ? "(reds & golds — swapped)" : "(teals & blues)";
-  folSub.textContent = params.swapRB ? "(teals & blues — swapped)" : "(reds & golds)";
+  // The same rule as the pipeline's skyBandCentre: a mixer (Aerochrome) puts
+  // the sky back on the blues, so the bands read the wheel as displayed.
+  const swapped = skyBandCentre(params.swapRB, params.mix3) === 30;
+  skySub.textContent = swapped ? "(reds & golds — swapped)" : "(teals & blues)";
+  folSub.textContent = swapped ? "(teals & blues — swapped)" : "(reds & golds)";
 }
 
 // Auto: brightness-preserving white balance + auto-exposure.
@@ -2926,7 +2929,7 @@ function measureFrame(p: EditParams, img: DecodedImage, divisions = LIFT_GRID, s
       const cr = clamp(px[0], 0, 1), cg = clamp(px[1], 0, 1), cb = clamp(px[2], 0, 1);
       lums.push(0.2126 * cr + 0.7152 * cg + 0.0722 * cb);
       const [h, sat] = rgb2hsv(cr, cg, cb);
-      const wS = bandWeight(h, p.swapRB ? 30 : 210, 55, 105);
+      const wS = bandWeight(h, skyBandCentre(p.swapRB, p.mix3), 55, 105);
       coolW += wS; coolS += sat * wS;
       warmW += 1 - wS; warmS += sat * (1 - wS);
       if (skyMask && sampleBrush(skyMask, u, v) > 0.5) { skyW++; skyS += sat; }

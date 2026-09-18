@@ -46,10 +46,12 @@ then the masking tools; his 850 nm monochrome full edit (2023-09-04) is a
 set of "advanced masking techniques"; and his 2020 colour swap through
 Lightroom's LOCAL hue adjustment is a masked hue shift rather than a global
 one. Same shape as this record: portions, each with its own treatment. The
-specific masks and what he does inside each are on robsheaphotography.com,
-which this session's proxy refuses, and his videos' transcripts are refused
-too — recorded in IR-SCIENCE.md 4b-vi as a blocked host to ask for, not as
-a finding.
+specific masks and what he does inside each are in his videos (the posts
+are embeds), and his course outline teaches "Vibrance, Saturation, Color
+Hot Spots" as one lesson and Masks as a chapter after the global look —
+the same order this record lands on. The captions cannot be read from this
+container (a sign-in check on the player, keyed on the address); the video
+ids are in IR-SCIENCE.md 4b-vi for a machine that can.
 
 **The app already has the foliage as a control, and the sky as a place.**
 The Colour tab's Foliage band owns the warm half of the hue wheel, follows
