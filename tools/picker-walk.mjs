@@ -159,6 +159,94 @@ try {
   });
   console.log(`        report says: ${line}`);
   check("5 the picker count is in the report", /opened|not opened/.test(line), true);
+
+  // ── 6 ──────────────────────────────────────────────────────────────────
+  // ONE WINDOW THAT NEVER CAME BACK MUST NOT KILL EVERY LATER PRESS. Measured
+  // on a phone, 2026-09-18: "4 opened, 0 came back". Press one never returned
+  // (an un-heard cancel is enough); from press two the app raised its modal
+  // offer BEFORE issuing the click, a modal makes the page inert, and every
+  // press after that was dead by the app's own hand. So: leave one open
+  // outstanding, then press again with a chooser that answers — the chooser
+  // must be asked, and once it answers the count must read nothing
+  // outstanding and the offer must not be sitting there.
+  console.log("\n6 — one window that never came back does not kill the next press");
+  await p.goto(`http://127.0.0.1:${PORT}/ir.html`);
+  await p.waitForTimeout(900);
+  // Press one, answered by NOBODY: the chooser handler is detached for it, so
+  // the app hears neither change nor cancel — the un-heard cancel, planted.
+  const chooserBefore = chooserCount;
+  p.removeAllListeners("filechooser");
+  const silent = p.waitForEvent("filechooser", { timeout: 5000 }).then((fc) => fc).catch(() => null);
+  await p.click("#barQuickBtn");
+  const fc1 = await silent;
+  check("6a the first press asked for a chooser", !!fc1, true);
+  // Press two: answered. On the old build the offer's modal opens before the
+  // click and the chooser is never asked; on the fixed build it is.
+  const asked2 = p.waitForEvent("filechooser", { timeout: 4000 }).then(async (fc) => { await fc.setFiles([]); return true; }).catch(() => false);
+  await p.click("#barQuickBtn", { force: true });
+  const gotChooser2 = await asked2;
+  check("6b the second press still opens a chooser", gotChooser2, true);
+  await p.waitForTimeout(300);
+  const after6 = await p.evaluate(() => ({
+    offerUp: !!document.querySelector("#askDlg[open]") && /Files window/.test(document.getElementById("askTitle")?.textContent || ""),
+  }));
+  check("6c the wedge offer is not up after a window that came back", after6.offerUp, false);
+  // Re-arm the answering handler for everything after this.
+  p.on("filechooser", (fc) => { chooserCount++; void fc.setFiles([]).catch(() => {}); });
+  chooserCount += chooserBefore ? 0 : 0;
+
+  // ── 7 ──────────────────────────────────────────────────────────────────
+  // AND A REAL WEDGE STILL RAISES THE OFFER — after the click, not before it.
+  // Planted the way iOS leaves it: the click dispatches, a chooser is asked
+  // for, and nothing ever comes back (the chooser handler is detached, so
+  // Playwright holds every chooser unanswered). NOT a stubbed click that
+  // dispatches a synthetic event: Chromium answers an untrusted click on a
+  // file input with an immediate `cancel`, which reads as a window that came
+  // back — the first version of this check planted that and measured nothing.
+  // Three dead presses: the offer is up after the third press and not before
+  // (the two PREVIOUS opens are the signature), and the third open was counted
+  // — the click was issued — before the offer appeared.
+  console.log("\n7 — a picker that is really dead still gets the offer, after the click");
+  await p.goto(`http://127.0.0.1:${PORT}/ir.html`);
+  await p.waitForTimeout(900);
+  p.removeAllListeners("filechooser");
+  let deadChoosers = 0;
+  p.on("filechooser", () => { deadChoosers++; }); // held, never answered
+  const offerAt = [];
+  for (let i = 0; i < 3; i++) {
+    await p.click("#barQuickBtn", { force: true });
+    await p.waitForTimeout(250);
+    offerAt.push(await p.evaluate(() => !!document.querySelector("#askDlg[open]")));
+  }
+  check("7a three dead presses each asked for a chooser", deadChoosers, 3);
+  check("7b the offer is up after the third press and not before", offerAt, [false, false, true]);
+  const line7 = await p.evaluate(() => (document.getElementById("askBody")?.textContent || "").slice(0, 60));
+  console.log(`        offer says: ${line7}…`);
+  await p.evaluate(() => document.querySelector("dialog[open]")?.close());
+  p.removeAllListeners("filechooser");
+  p.on("filechooser", (fc) => { chooserCount++; void fc.setFiles([]).catch(() => {}); });
+
+  // ── 8 ──────────────────────────────────────────────────────────────────
+  // A TOUCH THAT BECOMES A SCROLL COUNTS NOTHING. pointerdown on a label with
+  // no activation used to count an open that could never return.
+  console.log("\n8 — a touch on a label that never activates it counts no open");
+  await p.goto(`http://127.0.0.1:${PORT}/ir.html`);
+  await p.waitForTimeout(900);
+  const scrolled = await p.evaluate(async () => {
+    const label = document.getElementById("welcomeQuickFiles")?.closest("label");
+    for (let i = 0; i < 3; i++) label?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 100));
+    document.getElementById("verTag")?.click();
+    for (let i = 0; i < 100; i++) {
+      const v = document.getElementById("verDlgText")?.value || "";
+      if (v && !/Gathering/.test(v)) { document.getElementById("verClose")?.click(); return (v.match(/^File pickers\s{2,}(.+)$/m) || [])[1] ?? "(absent)"; }
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    return "(timed out)";
+  });
+  console.log(`        report says: ${scrolled}`);
+  check("8 three scroll-touches on the label count no open", /^not opened/.test(scrolled), true);
+
   console.log(`\n        ${chooserCount} real file chooser(s) opened during this walk`);
 } finally { await b.close(); }
 console.log(failed ? `\n${failed} check(s) failed` : "\nall checks passed");
