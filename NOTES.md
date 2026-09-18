@@ -578,9 +578,15 @@ user-scalable=no.
   lands on the film's hue angles, but the sky reads saturation 0.38–0.76 at
   value 0.64–0.89 where the film reads 0.66 at 0.32. The hue bands were solved
   onto the film; the sky's depth never was, and it is the largest measured gap
-  left in the look. The lever is the look's own Sky band (saturation and
-  luminance), solved the way the hue bands were, after the sky-smoothing stage's
-  removed fraction is known with Restore depth on. See
+  left in the look. **Solved 2026-09-18 on seven frames, and the two halves came
+  apart.** Saturation is the look's aqua and blue bands (a power of 2 puts three
+  skies in the film's window, moves the pale four halfway, and LOWERS the
+  export's residual on the defect frame); which picture ships is the owner's,
+  from the sheets. Value is not a band: the band's luminance darkens the pale
+  field, the concrete and the haze that share the sky's hue, and a depth
+  carried by today's 384 px sky mask leaves a rim at every roofline and a
+  snowstorm on an overcast sky. The value half waits on a boundary-accurate sky
+  selection keyed on the sky's local chroma — `IR-SCIENCE.md` §4b-iv. See
   `docs/decisions/017-aerochrome-sky-depth-against-the-film.md`.
 - [ ] **The foliage is the right colour and reads as a blob** <!-- decision: 016 --> — reported
   from the iPad 2026-09-17 on the Aerochrome look, asking how to get the detail
