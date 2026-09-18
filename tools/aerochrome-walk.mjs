@@ -504,7 +504,14 @@ try {
   {
     const { p, ctx } = await open();
     await press(p, "lookEir");
-    check("12a the finishing panel opens on Aerochrome", await p.evaluate(() => !document.getElementById("finishPanel")?.hidden), true);
+    // The element has to EXIST: on the build before the panel, "not hidden" of
+    // a missing element read true and this check passed against the defect it
+    // was written for. Every read below asks for the element first.
+    check("12a the finishing panel opens on Aerochrome", await p.evaluate(() => { const el = document.getElementById("finishPanel"); return !!el && !el.hidden; }), true);
+    const mirror = await p.evaluate(() => !!document.getElementById("finish-skySatSel"));
+    check("12a2 ...with a Sky saturation control of its own", mirror, true);
+    if (!mirror) { await ctx.close(); }
+    else {
     const before = await hash(p);
     await setSlider(p, "finish-skySatSel", 0.5);
     check("12b ...and its Sky saturation moves the real slider", await p.evaluate(() => Number(document.getElementById("skySatSel")?.value)), 0.5);
@@ -512,10 +519,11 @@ try {
     await setSlider(p, "skySatSel", 1.2);
     check("12d ...and the real slider moves the mirror back", await p.evaluate(() => Number(document.getElementById("finish-skySatSel")?.value)), 1.2);
     await press(p, "finishClose");
-    check("12e ...and it closes, leaving a way back under the looks", await p.evaluate(() => !!document.getElementById("finishPanel")?.hidden && !document.getElementById("finishOpen")?.hidden), true);
+    check("12e ...and it closes, leaving a way back under the looks", await p.evaluate(() => { const a = document.getElementById("finishPanel"), b = document.getElementById("finishOpen"); return !!a && a.hidden && !!b && !b.hidden; }), true);
     await press(p, "lookAero");
-    check("12f ...and a look without steps offers no panel", await p.evaluate(() => !!document.getElementById("finishPanel")?.hidden && !!document.getElementById("finishOpen")?.hidden), true);
+    check("12f ...and a look without steps offers no panel", await p.evaluate(() => { const a = document.getElementById("finishPanel"), b = document.getElementById("finishOpen"); return !!a && a.hidden && !!b && b.hidden; }), true);
     await ctx.close();
+    }
   }
 
   const liftShipped = await armShipped(true);
