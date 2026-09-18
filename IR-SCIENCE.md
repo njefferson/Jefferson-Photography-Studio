@@ -2571,6 +2571,40 @@ a much more saturated rendering than the button ships, and nothing has chosen
 between them. The pictures went to the owner with these readbacks under each;
 the choice is a look choice and is not made here.
 
+**HELD TO THE FILM, 2026-09-18 — and it settles between them.** The same
+split-population instrument 4b-iii used on the film's two photographs, run on
+the app's four renders (controls: A lands on the film's angles as walk 10a/b
+say; A, C and D read identically where their hashes are identical):
+
+- Hue: every candidate sits on the film's angles — foliage 0–5° against 6.2°,
+  sky 202–207° against 204°. The lift moves saturation and value, never hue.
+- Foliage saturation, film 0.60 (lighter filter) / 0.78 (red filter): A 0.63,
+  0.79, 0.65, 0.55 on NIR_3406, 0063, 1651, 1376 — the lighter-filter target
+  the look was solved to. B 0.64, 0.92, 0.78, 0.69 — the red-filter figure,
+  and past both on 0063. D 0.70, 0.73, 0.62, 0.55.
+- Sky saturation, film 0.66 / 0.92 at value 0.32: A 0.38, 0.37, 0.57, 0.76 at
+  value 0.64–0.89; B 0.41, 0.64, 0.66, 0.77. No candidate reaches the film's
+  sky and the miss is not the lift's: the film's sky is dark and saturated,
+  ours bright and pale under every setting. That is the look's sky band and
+  the roll-off question 4b-iii closes on — the next piece, not this one.
+- The film's own pass/fail (soil, asphalt, buildings unchanged), measured as
+  the chroma of the pixels colourless with the lift off: A 4.9, 1.0, 7.8, 8.2;
+  B 5.3, 1.5, 10.2, 9.5 — B colours the neutrals more on every frame, by
+  8–31%, small in absolute terms; A barely moves them from D.
+- On the defect frame, D → A: foliage value 0.58 → 0.69 (film 0.77), foliage
+  sat 0.70 → 0.63 (0.60), sky sat 0.27 → 0.38 (0.66) — each toward the film;
+  colourless share 10.1% → 19.2% against 13.8% — away, the tone half pushing
+  the pavement to white.
+
+**So A, as it ships, with Restore depth on.** It is the lighter-filter film on
+foliage and neutrals and its tone half moves the frames that need it toward
+the film. C is the same rendering. B is the red-filter photograph's foliage
+bought with coloured neutrals and an overshoot, and its extra sky saturation is
+a smaller step toward a target none of the four reaches. The two open items
+this leaves: the sky residual measured on the export path with the lift ON
+(candidate A), and the sky's saturation and value against the film, which is
+a look question with its own record to write.
+
 **The canvas residual column of that run is NOT the export instrument** and is
 not reported: on the 1400 px practice DNGs its teal population read 52 where
 the export-path instrument of 9l reads 4.4 on the same frame — a different
