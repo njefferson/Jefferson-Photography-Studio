@@ -18,7 +18,7 @@ import "./style.css";
 import "./verdlg.css";
 import { importFile, type ImportedFile, type ImageKind } from "./import";
 import { wireForceUpdate, wireUpdateStrip, setUpdateCost } from "./swupdate";
-import { type DecodedImage, pickLargestPreview, linearAt } from "./decode";
+import { type DecodedImage, pickLargestPreview, linearAt, grayWorldWB, lumNormalize } from "./decode";
 import { decodeOffThread, decodeLanes, decodeLaneTarget, type DecodeTiming } from "./decodeClient";
 import { sourceIsMosaiced, type ExportOptions } from "./export";
 import { Renderer, type EditParams } from "./gl";
@@ -30,7 +30,7 @@ import { writeZip, crc32 } from "./zip";
 import { putFrame, eachFrame, frameMetas, frameCount, clearFrames, frameStore } from "./batchstore";
 import * as Session from "./session";
 import { keepAwake } from "./wakelock";
-import { lensGain, LENS_GAIN_HI, LENS_GAIN_LO, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, bandWeight, rgb2hsv, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, type MaskLayer, type CropRect } from "./pipeline";
+import { lensGain, LENS_GAIN_HI, LENS_GAIN_LO, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, bandWeight, rgb2hsv, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, type MaskLayer, type CropRect, BRUSH_MAX_EDGE } from "./pipeline";
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, type HealSpot } from "./heal";
 import { makeStickerAsset, stickerRect, stickerWorldCorners, stickerXform, compositeStickersIntoRect8, compositeStickersIntoRectF32, compositeStickersOverlay8, type StickerAsset } from "./sticker";
 import { makeWarpField, encodeWarp, paintWarp, warpIsEmpty as warpFieldEmpty, type WarpField, type WarpTool } from "./warp";
@@ -40,7 +40,7 @@ import { generateDcp } from "./dcp";
 import { buildGlowMap } from "./glow";
 import { buildLocalMap } from "./localmap";
 import { buildSkyMap } from "./skymap";
-import { buildSkyGuide, refineSkyMask } from "./skyfine";
+import { prepareSkySource, buildSkySelectionFrom } from "./skyfine";
 import { makeRowDenoiser } from "./raw/denoise";
 import { makeRowDetail } from "./raw/detail";
 import { buildSkyMask, SKY_MIN_COVERAGE } from "./sky";
@@ -1494,9 +1494,11 @@ let skyFine: BrushMask | null = null;
  *  live edit. */
 const skyMaskOf = new WeakMap<DecodedImage, BrushMask | null>();
 function skyMaskFor(img: DecodedImage): BrushMask | null {
+  if (img.skySel) return img.skySel.mask;
   if (skyMaskOf.has(img)) return skyMaskOf.get(img) ?? null;
-  const res = buildSkyMask((x, y) => linearAt(img, x, y), img.width, img.height, 0, img.camMatrix ?? null, grayWorldWB(img), BRUSH_MAX_EDGE, 1, 0.5);
-  const m = res.found ? res.mask : null;
+  // Built the way the decode worker builds it — from the same 1024 px copy —
+  // so a tile's bitmap and the opened photograph's are the same bytes.
+  const m = buildSkySelectionFrom(prepareSkySource(img), false).mask;
   skyMaskOf.set(img, m);
   return m;
 }
@@ -1517,7 +1519,10 @@ function syncSkyMap(): void {
     // First edit with a depth on this photograph: the coarse bitmap's feather
     // is fine under a chroma blend and a pale rim under a luma multiplier.
     const img = current;
-    skyFine = refineSkyMask(skyBitmap, buildSkyGuide((x, y) => linearAt(img, x, y), img.width, img.height, grayWorldWB(img)));
+    const sel = buildSkySelectionFrom(prepareSkySource(img));
+    img.skySel = sel;
+    skyBitmap = sel.mask;
+    skyFine = sel.fine;
     renderer.setSkyFine(skyFine);
   }
   if (!current || !skyBitmap || ((params.skySmooth ?? 0) <= 0 && (params.skyDepth ?? 0) <= 0)) {
@@ -5270,7 +5275,6 @@ const mUI = {
   skyReach: $("mSkyReach") as HTMLInputElement,
   skyStatus: $("mSkyStatus") as HTMLElement,
 };
-const BRUSH_MAX_EDGE = 384; // working resolution of the painted mask bitmap
 let selectedMask = -1;
 let overlayHandles: { el: SVGCircleElement; role: string }[] = [];
 let overlayShape: SVGPolygonElement | SVGLineElement | null = null;
@@ -8293,13 +8297,36 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
   // this one is the LOOK's selection, and it exists whether or not the Masks
   // tab has been opened.
   {
-    skyBitmap = skyMaskFor(img);
-    // Its REFINEMENT to the photograph's edges (skyfine.ts) is built on first
-    // need — the first edit that carries a sky depth — not here: it costs
-    // about half a second of this machine's time on a 21-megapixel frame, and
-    // a photograph opened under any other look never pays it.
-    skyFine = null;
-    renderer.setSkyFine(null);
+    // THE SKY SELECTION — the bitmap and its refinement to the picture's
+    // edges (skyfine.ts) — is built by the decode worker on the lane that
+    // decoded this photograph, from the undegraded decode, a moment after
+    // the picture itself. When it has already landed it is taken here; when
+    // it is still on its way the sky stages stay inert until it arrives and
+    // the frame is drawn again; when the decode was never asked for one
+    // (a path that does not open the photograph for editing) the bitmap is
+    // built here as before and the refinement on the first edit that needs
+    // it (syncSkyMap).
+    if (img.skySel) {
+      skyBitmap = img.skySel.mask;
+      skyFine = img.skySel.fine;
+    } else if (img.skySelReady) {
+      skyBitmap = null;
+      skyFine = null;
+      const waited = img;
+      void img.skySelReady.then((sel) => {
+        if (current !== waited) return;
+        skyBitmap = sel ? sel.mask : skyMaskFor(waited);
+        skyFine = sel ? sel.fine : null;
+        renderer.setSkyFine(skyFine);
+        skyMapKey = "";
+        syncSkyMap();
+        draw();
+      });
+    } else {
+      skyBitmap = skyMaskFor(img);
+      skyFine = null;
+    }
+    renderer.setSkyFine(skyFine);
     skyMapKey = "";
   }
   const __f = performance.now();
@@ -9195,7 +9222,7 @@ async function switchToPhoto(id: string, opts?: { quiet?: boolean }) {
     const bytes = await Session.getBytes(id, (n) => { rows = n; });
     const t1 = performance.now();
     const imported: ImportedFile = { name: view.name, kind: view.kind, bytes, looksTranscoded: false };
-    const img = await decodeOffThread(imported, { onTiming: (t) => { decode.t = t; }, front: true });
+    const img = await decodeOffThread(imported, { onTiming: (t) => { decode.t = t; }, front: true, sky: true });
     const t2 = performance.now();
     showDecoded(img, imported);
     const t3 = performance.now();
@@ -9869,7 +9896,7 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
       let firstImg: DecodedImage | null = null;
       if (!firstNewId && (!activePhotoId || activePhotoId === "lone")) {
         try {
-          firstImg = await decodeOffThread(imported, { front: true });
+          firstImg = await decodeOffThread(imported, { front: true, sky: true });
         } catch (err) {
           skipped.push(`${f.name} (${(err as Error).message})`);
           dropPlanned(slot.id);
@@ -10844,7 +10871,7 @@ async function resumeSession() {
     const first = sessionPhotos[0];
     const bytes = await Session.getBytes(first.id);
     const imported: ImportedFile = { name: first.name, kind: first.kind, bytes, looksTranscoded: false };
-    const img = await decodeOffThread(imported, { front: true });
+    const img = await decodeOffThread(imported, { front: true, sky: true });
     showDecoded(img, imported);
     activateCurrent(first.id);
     void realThumbnails(); // finish any thumbnails the last visit never reached
@@ -12875,7 +12902,7 @@ async function runBatch(files: File[]) {
       try {
         const imported = guardLocation(await importFile(f));
         if (imported.looksTranscoded) { skipped.push(`${f.name} (arrived as flattened JPEG)`); continue; }
-        const img = await decodeOffThread(imported);
+        const img = await decodeOffThread(imported, { sky: true });
         const noLens = !batchHasLens(imported);
         // Each photo in a batch is matched on its OWN EXIF: a set can span
         // lenses and focal lengths, and one match for the whole run would
@@ -12884,15 +12911,14 @@ async function runBatch(files: File[]) {
         // The sky selection is per photograph too, built the way the open builds
         // it; a set can hold frames with and without a sky.
         const batchP = batchParamsFor(img, grade, batchSettings?.lut ?? null);
-        const batchSkyRes = (batchP.skySmooth ?? 0) > 0 || (batchP.skyDepth ?? 0) > 0
-          ? buildSkyMask((x, y) => linearAt(img, x, y), img.width, img.height, 0, img.camMatrix ?? null, grayWorldWB(img), BRUSH_MAX_EDGE, 1, 0.5)
-          : null;
-        // And its refinement to the photograph's edges, for the depth — a
-        // batch is developed at full size, where the coarse bitmap's rim
-        // would be at its widest.
-        const batchSkyFine = batchSkyRes?.found && (batchP.skyDepth ?? 0) > 0
-          ? refineSkyMask(batchSkyRes.mask, buildSkyGuide((x, y) => linearAt(img, x, y), img.width, img.height, grayWorldWB(img)))
-          : null;
+        // The sky selection — the same one the open path gets, built by the
+        // decode worker from the same copy — when the look carries a sky
+        // stage; a batch is developed at full size, where the coarse
+        // bitmap's rim would be at its widest, so the refinement matters here.
+        const wantSky = (batchP.skySmooth ?? 0) > 0 || (batchP.skyDepth ?? 0) > 0;
+        const batchSel = wantSky ? (img.skySel ?? (await img.skySelReady) ?? buildSkySelectionFrom(prepareSkySource(img))) : null;
+        const batchSkyMask = batchSel?.mask ?? null;
+        const batchSkyFine = batchSel && (batchP.skyDepth ?? 0) > 0 ? batchSel.fine : null;
         const result = await exportImage(
           imported,
           img,
@@ -12900,7 +12926,7 @@ async function runBatch(files: File[]) {
           { format, scale, quality, rotate: img.rotate ?? 0, lookRecipe: batchSettings?.recipe },
           (fr) => { busyText.textContent = `Processing ${i + 1} / ${files.length} — ${f.name} · ${Math.round(fr * 100)}%`; },
           batchLens,
-          batchSkyRes?.found ? batchSkyRes.mask : null,
+          batchSkyMask,
           batchSkyFine,
         );
         // Persist immediately (crash-safe), keep nothing in RAM. Stored in
@@ -13648,10 +13674,6 @@ function sampleForWb(img: DecodedImage, cx: number, cy: number):
 }
 
 /** Scale WB gains so a neutral keeps its luminance (no overall darkening). */
-function lumNormalize(g: number[]): [number, number, number] {
-  const l = 0.2126 * g[0] + 0.7152 * g[1] + 0.0722 * g[2] || 1;
-  return [clamp(g[0] / l, 0.02, 16), clamp(g[1] / l, 0.02, 16), clamp(g[2] / l, 0.02, 16)];
-}
 
 /** White balance + exposure + noise-matched denoise (+ highlight recovery on
  *  clipped camera-native raw) in one shot — the same baseline open applies. */
@@ -13811,26 +13833,6 @@ function clamp(v: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, v));
 }
 
-// Gray-world white balance over a subsampled grid, in linear space.
-function grayWorldWB(img: DecodedImage): [number, number, number] {
-  const { width, height } = img;
-  let r = 0, g = 0, b = 0, n = 0;
-  const step = Math.max(1, Math.floor(Math.min(width, height) / 256));
-  for (let y = 0; y < height; y += step) {
-    for (let x = 0; x < width; x += step) {
-      const [pr, pg, pb] = linearAt(img, x, y);
-      r += pr;
-      g += pg;
-      b += pb;
-      n++;
-    }
-  }
-  r = Math.max(1e-4, r / n);
-  g = Math.max(1e-4, g / n);
-  b = Math.max(1e-4, b / n);
-  const mean = (r + g + b) / 3;
-  return lumNormalize([mean / r, mean / g, mean / b]);
-}
 
 /* THE CAMERA CANNOT STORE AN INFRARED WHITE POINT, so its recorded white
  * balance is NOT a usable raw multiplier. This is where a session opened raws

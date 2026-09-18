@@ -22,6 +22,9 @@
 // edit.
 
 import type { BrushMask } from "./pipeline";
+import { linearAt, type DecodedImage, type SkySelection } from "./decode";
+import { buildSkyMask } from "./sky";
+import { BRUSH_MAX_EDGE } from "./pipeline";
 
 /** Working scale cap for the refined mask: its longer edge, in pixels. A
  *  2800 px frame gets 1024, which puts the mask's edge within about three
@@ -205,4 +208,81 @@ export function refineSkyMask(mask: BrushMask, guide: SkyGuide, r = SKY_FINE_RAD
     data[i] = Math.round(255 * Math.min(1, Math.max(0, Number.isFinite(q) ? q : 0)));
   }
   return { w, h, data };
+}
+
+/** Everything the selection is built from, at SKY_FINE_EDGE on the long
+ *  edge: linear RGB after gray-world balance is NOT applied here (the gains
+ *  ride separately, as buildSkyMask wants them), the camera matrix and the
+ *  full-size dimensions the bitmap's uv refers to. Small enough to keep after
+ *  the decode's own buffer has been transferred away. */
+export interface SkySource {
+  w: number;
+  h: number;
+  /** Linear RGB, interleaved, w*h*3. */
+  rgb: Float32Array;
+  srcW: number;
+  srcH: number;
+  cam: number[] | null;
+}
+
+/**
+ * Take the small copy the selection is built from.
+ * @param img  the decoded photograph, its buffers still present.
+ * @returns a SkySource at SKY_FINE_EDGE on the long edge, each pixel the box
+ *   mean of its source block, read straight from the linear buffer when there
+ *   is one and through `linearAt` otherwise.
+ * What the result must satisfy: it is complete before the decode's buffer is
+ * transferred — the worker calls this first and posts the picture second —
+ * and it carries enough for `buildSkySelectionFrom` to need nothing else.
+ */
+export function prepareSkySource(img: DecodedImage): SkySource {
+  const { width: srcW, height: srcH } = img;
+  const sc = Math.min(1, SKY_FINE_EDGE / Math.max(srcW, srcH));
+  const w = Math.max(1, Math.round(srcW * sc)), h = Math.max(1, Math.round(srcH * sc));
+  const rgb = new Float32Array(w * h * 3);
+  const lin = img.linear;
+  for (let y = 0; y < h; y++) {
+    const y0 = Math.floor((y * srcH) / h), y1 = Math.max(y0 + 1, Math.floor(((y + 1) * srcH) / h));
+    for (let x = 0; x < w; x++) {
+      const x0 = Math.floor((x * srcW) / w), x1 = Math.max(x0 + 1, Math.floor(((x + 1) * srcW) / w));
+      let r = 0, g = 0, b = 0, n = 0;
+      if (lin) {
+        for (let sy = y0; sy < y1; sy++) { let o = (sy * srcW + x0) * 4; for (let sx = x0; sx < x1; sx++, o += 4) { const pr = lin[o], pg = lin[o + 1], pb = lin[o + 2]; if (pr === pr && pg === pg && pb === pb) { r += pr; g += pg; b += pb; n++; } } }
+      } else {
+        for (let sy = y0; sy < y1; sy++) for (let sx = x0; sx < x1; sx++) { const q = linearAt(img, sx, sy); r += q[0]; g += q[1]; b += q[2]; n++; }
+      }
+      const o = (y * w + x) * 3;
+      if (n) { rgb[o] = r / n; rgb[o + 1] = g / n; rgb[o + 2] = b / n; }
+    }
+  }
+  return { w, h, rgb, srcW, srcH, cam: img.camMatrix ?? null };
+}
+
+/**
+ * Build the sky selection from a SkySource.
+ * @param src  from prepareSkySource, for THIS photograph.
+ * @param refine  false to stop at the coarse bitmap (a tile needs no more).
+ * @returns the coarse bitmap (null when buildSkyMask finds no clear sky) and
+ *   its refinement (null with it, and null when `refine` is false). Gray-world
+ *   gains are taken from the copy itself, the same statistic the main thread
+ *   computes over the full frame.
+ * What the result must satisfy: it is the selection `DecodedImage.skySel`
+ * carries and every sky-aware stage reads — built at gray-world balance and
+ * nothing else, so it never moves as the photograph is graded.
+ */
+export function buildSkySelectionFrom(src: SkySource, refine = true): SkySelection {
+  const { w, h, rgb } = src;
+  let r = 0, g = 0, b = 0;
+  for (let i = 0; i < w * h; i++) { r += rgb[i * 3]; g += rgb[i * 3 + 1]; b += rgb[i * 3 + 2]; }
+  r = Math.max(1e-4, r / (w * h)); g = Math.max(1e-4, g / (w * h)); b = Math.max(1e-4, b / (w * h));
+  const mean = (r + g + b) / 3;
+  const l = 0.2126 * (mean / r) + 0.7152 * (mean / g) + 0.0722 * (mean / b) || 1;
+  const cl = (v: number) => Math.max(0.02, Math.min(16, v));
+  const wb: [number, number, number] = [cl(mean / r / l), cl(mean / g / l), cl(mean / b / l)];
+  const sample = (x: number, y: number): [number, number, number] => { const o = (y * w + x) * 3; return [rgb[o], rgb[o + 1], rgb[o + 2]]; };
+  const res = buildSkyMask(sample, w, h, 0, src.cam, wb, BRUSH_MAX_EDGE, 1, 0.5);
+  if (!res.found) return { mask: null, fine: null };
+  if (!refine) return { mask: res.mask, fine: null };
+  const guide = buildSkyGuide(sample, w, h, wb);
+  return { mask: res.mask, fine: refineSkyMask(res.mask, guide) };
 }
