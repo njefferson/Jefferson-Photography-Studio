@@ -549,15 +549,6 @@ user-scalable=no.
   to the same fields, so the tabs keep theirs and a batch look still stands
   on its declared values alone
   (`docs/decisions/022-a-look-opens-its-own-finishing-panel.md`).
-- [ ] **Done leaves the last photograph drawn behind the start screen** <!-- decision: 020 --> —
-  reported 2026-09-18 from staging 2.50.10: ending a session clears it and
-  shows the start screen, and the last photograph edited stays drawn behind
-  the menu with no way back to it and no way to remove it short of opening
-  something new. `endSession` nulls the photograph, hides the panel and shows
-  the welcome, and never clears the stage, so the renderer keeps the last
-  frame it drew. The fix is to clear the stage in the same teardown, and a
-  journey-walk check that presses Done and asserts an empty stage
-  (`docs/decisions/020-done-leaves-the-last-photograph-behind-the-start-screen.md`).
 - [ ] **The lens correction belongs on the linear raw before anything else** <!-- decision: 021 --> —
   raised 2026-09-18: the hot-spot correction is applied inside the compiled
   edit, after the white balance and before the matrix, the swap and the
@@ -2076,6 +2067,20 @@ reason it is a footnote rather than a finding — a list of known limitations is
 read as authoritative, and an invented one is worse than a missing one.
 
 ## Shipped (roadmap archive)
+
+- [x] **Done leaves the last photograph drawn behind the start screen** <!-- decision: 020 --> —
+  reported 2026-09-18 from staging 2.50.10: ending a session clears it and
+  shows the start screen, and the last photograph edited stays drawn behind
+  the menu with no way back to it and no way to remove it short of opening
+  something new. `endSession` nulls the photograph, hides the panel and shows
+  the welcome, and never clears the stage, so the renderer keeps the last
+  frame it drew. The fix is to clear the stage in the same teardown, and a
+  journey-walk check that presses Done and asserts an empty stage
+  (`docs/decisions/020-done-leaves-the-last-photograph-behind-the-start-screen.md`).
+  SHIPPED to the branch 2026-09-18: `endSession` clears the stage (a `clear()` on the
+  renderer that forgets the picture and paints the canvas transparent) and hides the
+  zoom controls; the journey walk asserts an empty stage after Done, read back from
+  the canvas — 332,724,000 before the fix, 0 after.
 
 - [x] **Aerochrome's sky is bright and pale where the film's is dark and saturated** <!-- decision: 017 --> — SHIPPED
   2026-09-18 to staging, awaiting the on-device pass. The film's sky is dark and

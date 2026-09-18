@@ -52,5 +52,12 @@ try {
   await p.click("#sessionDone");
   await p.waitForFunction(()=>document.getElementById("sessionStrip").hidden, null, {timeout:120000});
   check("Done returned to the start screen", await p.isVisible("#welcome"), true);
+  // AND THE STAGE BEHIND IT IS EMPTY. The last photograph used to stay drawn
+  // under the start screen (decision 020). The canvas keeps its drawing buffer,
+  // so the read-back is the picture itself: the alpha sum of an emptied stage
+  // is 0, and a photograph left behind is millions. Made to fail first against
+  // the build before the clear.
+  const stage = await p.evaluate(() => { const cv = document.getElementById("view"); const g = cv.getContext("webgl2") || cv.getContext("webgl"); if (!g || !cv.width) return 0; const px = new Uint8Array(cv.width * cv.height * 4); g.readPixels(0, 0, cv.width, cv.height, g.RGBA, g.UNSIGNED_BYTE, px); let s = 0; for (let i = 3; i < px.length; i += 4) s += px[i]; return s; });
+  check("and the stage behind it is empty", stage, 0);
 } finally { await b.close(); }
 console.log(failed?`\n${failed} failed`:"\nall checks passed"); process.exit(failed?1:0);

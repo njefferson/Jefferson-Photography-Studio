@@ -1345,6 +1345,28 @@ export class Renderer {
    *
    *  Anything that makes a throwaway Renderer calls this in a `finally`. The
    *  app's own long-lived one never needs it. */
+  /**
+   * Empty the stage: forget the picture and paint the canvas clear, so the
+   * start screen stands on nothing — the state a fresh page is in. Every draw
+   * after this is a no-op until setImage gives it a picture again.
+   * @returns nothing.
+   * What the result must satisfy: the canvas reads back all-zero afterwards
+   * (the context keeps its drawing buffer, so a read-back is honest); endSession
+   * relies on it and the journey walk asserts it after Done. Ending a session
+   * used to leave the last photograph drawn behind the start screen, with no
+   * way back to it and no way to remove it (decision 020).
+   */
+  clear() {
+    const gl = this.gl;
+    this.imgW = 0;
+    this.imgH = 0;
+    try {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+    } catch { /* a context already lost is already clear */ }
+  }
+
   dispose() {
     const gl = this.gl;
     try {

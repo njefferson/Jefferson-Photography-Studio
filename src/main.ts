@@ -10861,6 +10861,12 @@ async function endSession() {
   updateSessionStrip(); // hides the strip and gives the stage back to the photo
   current = null;
   currentFile = null;
+  // THE STAGE IS EMPTIED WITH THE SESSION. Without this the last photograph
+  // stayed drawn behind the start screen — the app no longer knew it was
+  // there and the reader could see it, with no way back to it and no way to
+  // remove it short of opening something new (decision 020).
+  renderer.clear();
+  zoomCtl.hidden = true; // the zoom controls belong to a photograph, and there is none
   panel.hidden = true;
   welcome.hidden = false;
   hint.hidden = false;
