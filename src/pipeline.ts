@@ -938,11 +938,14 @@ export const SAT_GUARD_HI = 0.26;
 /** THE SKY'S OWN GATE, for `skySat` — the same idea in DISPLAY space, because
  *  the sky stage runs after gamma: a sky pixel whose HSV saturation is under
  *  SKY_SAT_GATE_LO gets none of the boost, over SKY_SAT_GATE_HI all of it. Set
- *  between what a cloud and a haze read and what a blue sky reads under the
- *  look's bare mapping, measured 2026-09-18 (IR-SCIENCE.md section 4b-vi).
+ *  from the sky's own saturation under the look's bare mapping, measured
+ *  2026-09-18 on five raws (IR-SCIENCE.md section 4b-vi): an overcast sky's
+ *  top decile reads 0.068 and takes 13% of the boost here, its median 0.032
+ *  takes none; the palest clear sky's median (0.109, a hot-spot centre) takes
+ *  86% and a blue sky's (0.29–0.30) all of it.
  *  The shader reads the same two numbers by name. */
-export const SKY_SAT_GATE_LO = 0.04;
-export const SKY_SAT_GATE_HI = 0.12;
+export const SKY_SAT_GATE_LO = 0.05;
+export const SKY_SAT_GATE_HI = 0.13;
 
 /** One band's multiplier on a pixel's saturation.
  *  Takes `k`, the band's saturation slider (1 = none); `w`, the band's weight at

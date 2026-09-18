@@ -829,8 +829,44 @@ linear 0.13 is display 0.061 and linear 0.26 is display 0.128. So
 `SAT_GUARD_LO..HI = 0.13..0.26` puts the whole colourless population (display
 under 0.06) below the gate and the whole foliage population (display 0.39
 and up) above it, with the ramp across the pale ground between. The sky's
-gate is set in display space from the sky quantiles of the canvas instrument
-(below).
+gate is in display space, from the sky's own saturation under the bare
+mapping on the canvas instrument (`satpop-canvas.mjs`, the app's live render
+read at every second pixel, which agrees with the export instrument to the
+second decimal once both exclude near-black pixels): by place, the overcast
+sky (2082) reads p10 0.013, median 0.032, p90 0.068; the hot-spot frame
+(3406) 0.038 / 0.109 / 0.208; 0063 0.068 / 0.119 / 0.157; the blue skies
+(1376, 1651) 0.17–0.21 / 0.29–0.30 / 0.35–0.42. `SKY_SAT_GATE_LO..HI =
+0.05..0.13` gives the overcast's top decile 13% of the boost and its median
+none, the palest clear sky's median 86%, a blue sky all of it. A pale centre
+under a hot spot takes less than its edges, which is the lens's unevenness
+made visible in chroma; the lens colour correction is the tool for that, not
+the gate.
+
+**Two instrument lessons, paid for in the same hour.** The canvas instrument
+indexed its readback with a hard-coded width while the app's canvas is the
+photograph at its working size, so its first population numbers were of the
+wrong pixels — the pictures were right, the numbers were not, and only
+comparing them against the export instrument on the same frame said so. And
+the export instrument read HSV saturation on every pixel: a near-black pixel
+with one channel clamped to zero by the rotation's negative coefficients
+reads saturation 1, so its off-sky quantiles were dominated by shadow and
+its foliage population was polluted with it. Excluding value under 0.05 put
+the two instruments within 0.01 of each other on every population.
+
+**What Rob Shea does with masks, as far as this container could read.** His
+Lightroom Classic colour-infrared workflow (post and video of 2021-12-23,
+"Edit Infrared Photography in Lightroom Classic") is white balance, then a
+colour-swap profile, then the masking tools; the 850 nm monochrome full
+edit (2023-09-04) is built on "a variety of advanced masking techniques";
+and a 2020 video swaps colour through Lightroom's LOCAL hue adjustment — a
+masked hue shift — rather than a global one. The shape is the same as
+019's: the sky and the foliage are portions of the picture, each treated
+inside its own mask. The steps themselves are on robsheaphotography.com,
+which the session's egress proxy refuses (a 308 whose target is blocked),
+and YouTube's player API refuses the transcript route the hot-spot research
+used (9h) with a proxy 403 and a sign-in check — so the specific mask types
+and the adjustments inside each are NOT recorded here yet. That is a
+blocked host, not a finding; ask for the host and read the post.
 
 ## 4c. THE CRUX IS NIR CONTAMINATION, AND A ROTATION ALONE CANNOT FIX IT
 
