@@ -44,11 +44,18 @@ self.onmessage = async (e: MessageEvent<Job>) => {
     if (img.linear) transfer.push(img.linear.buffer);
     (self as unknown as Worker).postMessage({ id, ok: true, img }, transfer);
     if (src) {
-      const sel = buildSkySelectionFrom(src);
-      const t: Transferable[] = [];
-      if (sel.mask) t.push(sel.mask.data.buffer);
-      if (sel.fine) t.push(sel.fine.data.buffer);
-      (self as unknown as Worker).postMessage({ id, sky: sel }, t);
+      // Its own try: the picture is already delivered, so a selection that
+      // fails to build must still ANSWER (null) or the holder of the picture
+      // waits for it forever and builds nothing.
+      try {
+        const sel = buildSkySelectionFrom(src);
+        const t: Transferable[] = [];
+        if (sel.mask) t.push(sel.mask.data.buffer);
+        if (sel.fine) t.push(sel.fine.data.buffer);
+        (self as unknown as Worker).postMessage({ id, sky: sel }, t);
+      } catch {
+        (self as unknown as Worker).postMessage({ id, sky: null });
+      }
     }
   } catch (err) {
     (self as unknown as Worker).postMessage({ id, ok: false, message: (err as Error).message });

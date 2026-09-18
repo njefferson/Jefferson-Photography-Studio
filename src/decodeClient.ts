@@ -117,13 +117,14 @@ function spawn(): Lane | null {
     return null;
   }
   const lane: Lane = { worker, pending: new Map(), skyWaiters: new Map() };
-  worker.onmessage = (e: MessageEvent<{ id: number; ok?: boolean; img?: DecodedImage; message?: string; sky?: SkySelection }>) => {
-    // The selection, a moment after its picture: hand it to whoever is
-    // holding the picture and stop — this id has already been resolved.
-    if (e.data.sky !== undefined) {
+  worker.onmessage = (e: MessageEvent<{ id: number; ok?: boolean; img?: DecodedImage; message?: string; sky?: SkySelection | null }>) => {
+    // The selection, a moment after its picture (null when it could not be
+    // built): hand it to whoever is holding the picture and stop — this id
+    // has already been resolved.
+    if ("sky" in e.data) {
       const w = lane.skyWaiters.get(e.data.id);
       lane.skyWaiters.delete(e.data.id);
-      w?.(e.data.sky);
+      w?.(e.data.sky ?? null);
       return;
     }
     const p = lane.pending.get(e.data.id);
