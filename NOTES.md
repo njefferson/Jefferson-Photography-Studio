@@ -539,23 +539,6 @@ user-scalable=no.
 > different approach and mindset"). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
-- [ ] **Aerochrome's saturation by population: foliage and sky each their own amount, nothing colourless touched** <!-- decision: 019 --> —
-  reported 2026-09-18 from staging 2.50.10: the look's saturation reads too
-  high across the whole frame, it needs aiming at the foliage and at the sky
-  as two separate amounts, and anything that has no colour must be left as it
-  is. What the look did: a global saturation of 3.0 on every raw pixel, and a
-  power curve of 2 on the aqua and blue chips that lifted the palest blues
-  most — so bare ground, grey walls, an overcast sky and clouds all took
-  colour. The fix follows the framing that produced the idea — what needs to
-  happen to which PORTION of the photograph, never the whole: global
-  saturation 1; the foliage's amount on the Colour tab's own Foliage band (a
-  population by what it is), with every band BOOST gated on the pixel's own
-  chroma (`bandGain`, `SAT_GUARD_LO..HI`); the sky's amount on a Sky
-  saturation slider beside Sky depth (`skySat`) — where the sky IS, through
-  the selection built at open, gated the same way so a cloud stays grey; the
-  neutrals protected by what they lack. Both pipelines. The amounts are
-  chosen from rendered sheets; the record carries the research and the
-  rejected routes (`docs/decisions/019-aerochrome-colour-by-population.md`).
 - [ ] **A look opens its own finishing panel** <!-- decision: 022 --> — proposed
   2026-09-18: when a look is applied, its own panel opens with the specific
   adjustments that finish it, in the method's order, each with one line of
@@ -588,6 +571,33 @@ user-scalable=no.
   from the pipelines, clipping bounded against the raw white level; held by
   the agreement walk on all four paths
   (`docs/decisions/021-lens-correction-belongs-on-the-linear-raw-before-anything-else.md`).
+- [ ] **Aerochrome's saturation by population: foliage and sky each their own amount, nothing colourless touched** <!-- decision: 019 --> —
+  reported 2026-09-18 from staging 2.50.10: the look's saturation reads too
+  high across the whole frame, it needs aiming at the foliage and at the sky
+  as two separate amounts, and anything that has no colour must be left as it
+  is. What the look did: a global saturation of 3.0 on every raw pixel, and a
+  power curve of 2 on the aqua and blue chips that lifted the palest blues
+  most — so bare ground, grey walls, an overcast sky and clouds all took
+  colour. The fix follows the framing that produced the idea — what needs to
+  happen to which PORTION of the photograph, never the whole: global
+  saturation 1; the foliage's amount on the Colour tab's own Foliage band (a
+  population by what it is), with every band BOOST gated on the pixel's own
+  chroma (`bandGain`, `SAT_GUARD_LO..HI`); the sky's amount on a Sky
+  saturation slider beside Sky depth (`skySat`) — where the sky IS, through
+  the selection built at open, gated the same way so a cloud stays grey; the
+  neutrals protected by what they lack. Both pipelines. The amounts are
+  chosen from rendered sheets; the record carries the research and the
+  rejected routes (`docs/decisions/019-aerochrome-colour-by-population.md`).
+- [ ] **One sky selection, built at open, for every sky-aware tool** <!-- decision: 018 --> —
+  asked 2026-09-18: should the sky selection be set before any corrections
+  and be available to later operations. It is, for the look's stages, the
+  tile and the batch: the decode worker builds the bitmap and its refinement
+  to the picture's edges from the undegraded decode a moment after the
+  picture itself. Two consumers still do not read it — the reader's own Sky
+  mask rebuilds a coarse bitmap of its own and never sees the refined edge,
+  and no per-population strength (denoise, colour noise, texture, the hot-spot
+  and lens corrections, all OWED in the scope gate) uses it yet. See
+  `docs/decisions/018-one-sky-selection-for-every-sky-aware-tool.md`.
 - [ ] **A photograph that fills the screen with no way back out** <!-- decision: 012 --> — reported
   from the iPad 2026-09-17: a photograph in the full view appeared zoomed in, and
   neither zooming out nor scrolling brought the rest of it back. Two failures, and
@@ -622,16 +632,6 @@ user-scalable=no.
   measures the exported file whole (§9l-ii). The gravel half stays open. The
   sources go into `IR-SCIENCE.md` (9l for what shipped). See
   `docs/decisions/013-aerochrome-splotchy-chroma.md`.
-- [ ] **One sky selection, built at open, for every sky-aware tool** <!-- decision: 018 --> —
-  asked 2026-09-18: should the sky selection be set before any corrections
-  and be available to later operations. It is, for the look's stages, the
-  tile and the batch: the decode worker builds the bitmap and its refinement
-  to the picture's edges from the undegraded decode a moment after the
-  picture itself. Two consumers still do not read it — the reader's own Sky
-  mask rebuilds a coarse bitmap of its own and never sees the refined edge,
-  and no per-population strength (denoise, colour noise, texture, the hot-spot
-  and lens corrections, all OWED in the scope gate) uses it yet. See
-  `docs/decisions/018-one-sky-selection-for-every-sky-aware-tool.md`.
 - [ ] **The foliage is the right colour and reads as a blob** <!-- decision: 016 --> — reported
   from the iPad 2026-09-17 on the Aerochrome look, asking how to get the detail
   back the way the film looks or the way people who edit these files normally do
