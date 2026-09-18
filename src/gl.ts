@@ -5,7 +5,7 @@
 
 // Single source of truth for edit parameters lives in pipeline.ts so the GPU
 // preview and CPU export can never drift apart.
-import { toneEvaluator, toneIsIdentity, maskIsActive, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, LENS_GAIN_LO, LENS_GAIN_HI, lensAreaMean, type EditParams, type LocalMap, type SkyMap, type CropRect } from "./pipeline";
+import { toneEvaluator, toneIsIdentity, maskIsActive, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, LENS_GAIN_LO, LENS_GAIN_HI, lensAreaMean, type EditParams, type LocalMap, type SkyMap, type BrushMask, type CropRect } from "./pipeline";
 import { toHalfBuffer } from "./half";
 export type { EditParams };
 
@@ -137,6 +137,8 @@ uniform bool u_hslOn;        // 8-channel HSL mixer active
 uniform vec3 u_hsl[8];       // per band: (hueShiftDeg, satScale, lumScale)
 uniform bool u_bwOn;         // black & white: channel-weighted mono
 uniform vec3 u_bwMix;        // B&W channel weights (normalised in-shader)
+uniform sampler2D u_skyFineTex; // R8 per-image sky bitmap refined to the picture's edges (skyfine.ts)
+uniform float u_skyDepth;       // 0..1 — see EditParams.skyDepth; 0 without a map or a refined bitmap
 uniform sampler2D u_skyTex;  // RGB8 per-edit sky chroma map (skymap.ts):
                              //   R,G = opponent chroma encoded ±0.5 -> 0..255,
                              //   B = the sky bitmap's weight
@@ -759,9 +761,9 @@ void main() {
   // sky and is left alone; a mottled sky pixel is hundredths away and is
   // smoothed. Without this the export of an oak against the sky went blue
   // along every branch (2026-09-18).
-  if (u_skySmooth > 0.0) {
-    vec3 sm = texture(u_skyTex, v_uv).rgb;
-    if (sm.b > 0.0) {
+  if (u_skySmooth > 0.0 || u_skyDepth > 0.0) {
+    vec4 sm = texture(u_skyTex, v_uv);
+    if (u_skySmooth > 0.0 && sm.b > 0.0) {
       float Lk = dot(g, LUMA_W);
       vec2 tgt = (sm.rg * 2.0 - 1.0) * 0.5;
       vec2 cur = vec2(g.r - Lk, g.b - Lk);
@@ -775,6 +777,11 @@ void main() {
         g.b = clamp(Lk + nw.y, 0.0, 1.0);
         g.g = clamp((Lk - LUMA_W.r * g.r - LUMA_W.b * g.b) / LUMA_W.g, 0.0, 1.0);
       }
+    }
+    // SKY DEPTH — see compileEdit: one multiplier through the REFINED bitmap
+    // and the map's keying byte (a blue sky, not an overcast or a grey).
+    if (u_skyDepth > 0.0 && sm.a > 0.0) {
+      g *= (1.0 - u_skyDepth * sm.a * texture(u_skyFineTex, v_uv).r);
     }
   }
   // Global luminance rides on top of the tone curve (endpoints pinned).
@@ -921,6 +928,8 @@ export class Renderer {
   private localTex: WebGLTexture;
   private skyTex: WebGLTexture;
   private skyOn = false;
+  private skyFineTex: WebGLTexture;
+  private fineOn = false;
   private warpTex!: WebGLTexture;
   private warpOn = false;
   private overlayTex!: WebGLTexture; // on-top sticker overlay (unit 8)
@@ -979,7 +988,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -1053,7 +1062,16 @@ export class Renderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB8, 1, 1, 0, gl.RGB, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 0]));
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 0, 0]));
+    // The refined sky bitmap (unit 12), per image; a single zero texel until
+    // one is set, and the depth uniform stays 0 while none is.
+    this.skyFineTex = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, this.skyFineTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 1, 1, 0, gl.RED, gl.UNSIGNED_BYTE, new Uint8Array([0]));
     this.localTex = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, this.localTex);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -1171,10 +1189,26 @@ export class Renderer {
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     this.skyOn = !!m;
     if (!m) {
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB8, 1, 1, 0, gl.RGB, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 0]));
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 0, 0]));
       return;
     }
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB8, m.width, m.height, 0, gl.RGB, gl.UNSIGNED_BYTE, new Uint8Array(m.rgb));
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, m.width, m.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(m.rgba));
+  }
+
+  /** Upload the per-image refined sky bitmap (skyfine.ts) for `skyDepth`, or
+   *  clear it. LINEAR-filtered like the brush sampler compileEdit reads it
+   *  with, so the two agree to filtering error. Null turns the depth off
+   *  regardless of the amount, exactly as a null map does the smoothing. */
+  setSkyFine(m: BrushMask | null) {
+    const gl = this.gl;
+    gl.bindTexture(gl.TEXTURE_2D, this.skyFineTex);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    this.fineOn = !!m;
+    if (!m) {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 1, 1, 0, gl.RED, gl.UNSIGNED_BYTE, new Uint8Array([0]));
+      return;
+    }
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, m.w, m.h, 0, gl.RED, gl.UNSIGNED_BYTE, new Uint8Array(m.data));
   }
 
   setLocalMap(m: LocalMap | null) {
@@ -1479,6 +1513,10 @@ export class Renderer {
     gl.uniform1i(this.loc.u_skyTex, 11);
     gl.activeTexture(gl.TEXTURE11);
     gl.bindTexture(gl.TEXTURE_2D, this.skyTex);
+    gl.uniform1f(this.loc.u_skyDepth, this.skyOn && this.fineOn ? Math.min(1, Math.max(0, p.skyDepth ?? 0)) : 0);
+    gl.uniform1i(this.loc.u_skyFineTex, 12);
+    gl.activeTexture(gl.TEXTURE12);
+    gl.bindTexture(gl.TEXTURE_2D, this.skyFineTex);
     gl.uniform1f(this.loc.u_localScale, this.localScale);
     gl.uniform1i(this.loc.u_localTex, 4);
     gl.activeTexture(gl.TEXTURE4);

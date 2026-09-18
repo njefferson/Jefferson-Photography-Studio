@@ -621,6 +621,59 @@ film's physics rather than a taste. Recorded in decision 017 as the route,
 ranked behind the saturation half and beside 006 (mask by subject), whose
 selection this is.
 
+### 4b-v. THE SKY'S VALUE, THROUGH A SELECTION ACCURATE TO THE PICTURE'S EDGES
+
+**What 4b-iv left:** the film's sky is dark as well as blue (0.32 against
+0.55–0.89 here); a band cannot darken it without the pale ground; a depth
+through the 128-texel sky weight leaves a rim along every roofline, a
+snowstorm on an overcast sky and a seam under a cloud. Three things were
+named as what it needs, and this note is the three built, on 2026-09-18.
+
+**1. The selection refined to the picture's edges — `src/skyfine.ts`.**
+`buildSkyMask`'s 384 px feathered bitmap is taken up to 1024 px on the long
+edge and snapped to the photograph's own edges with a GUIDED FILTER (He, Sun
+and Tang, *Guided Image Filtering*, ECCV 2010 / TPAMI 2013 — the field's tool
+for joint upsampling and mask feathering, and the one Adobe-class mask
+refinement rests on): in every window the output is a linear function of the
+guide, so it inherits the guide's edges and keeps the mask's values away from
+them, in O(N) through summed-area tables. **The guide is two channels of the
+gray-world-balanced frame, gamma luma and blue share**, not luma alone: in an
+infrared frame IR-bright foliage and a bright sky sit close in luma and far
+apart in colour, which is the same fact the bitmap's own cluster rests on.
+Radius 6, eps 0.005 (guide units squared); the luma channel is normalised to
+the frame's 99.5th percentile so a dark frame's edges weigh what a bright
+one's do. Built once per photograph beside the bitmap, cached per decoded
+image (a WeakMap, so a set of forty tiles never grows one twice), uploaded as
+one R8 texture and sampled by the brush sampler on the CPU — the same texel-
+centre bilinear the shader does.
+
+**2. The depth keyed on the sky's LOCAL colour, not the pixel's — the map's
+fourth byte (`src/skymap.ts`).** Every 128-texel map texel now carries, beside
+its mean chroma and the bitmap's weight, a KEYING byte from the texel's mean
+rendered colour: `smooth01(0.32, 0.42)` on its HSV chroma, times the sky's hue
+band (175–245° fading over 25°). The window's numbers are the seven frames'
+own, measured with the aqua and blue saturation the look ships: an overcast
+sky (NIR_2082) reads 0.27, a frame with no sky whose bitmap fires anyway
+(NIR_0627) 0.31, the clear skies 0.43–0.57. The film does not darken an
+overcast sky — white light records through every layer — so the window is
+physics before it is taste; and it lives per TEXEL so a hazy sky's pixels stay
+pale together instead of half of them. Keyed per pixel, NIR_2082 snowed.
+
+**3. The stage.** After the smoothing blend, one multiplier on the pixel:
+`1 − skyDepth · fine(u, v) · key(u, v)`, in `compileEdit` and the shader
+alike. `skyDepth` is a look field like `skySmooth` (Aerochrome carries 0.5),
+an `EditParams` field wired through the five places, a **Sky depth** slider
+beside Sky colour smoothing, `selection` in `.scope-allow`, and it rides a
+saved look. The tile path now builds the sky map from its own sampler at the
+tile's size and passes the coarse bitmap as the fine one (at 260 px it is the
+finer of the two), so a tile under Aerochrome agrees with the photograph; the
+batch export refines per frame, because a batch is developed at full size
+where the coarse bitmap's rim would be widest. `PREVIEW_PIPELINE` 30.
+
+**Measured on the same seven frames, Restore depth on, through the app**
+(`skysolve-measure.mjs` with a Sky depth override; the reference is the
+shipped 2.50.10 look at depth 0 on this build):
+
 ## 4c. THE CRUX IS NIR CONTAMINATION, AND A ROTATION ALONE CANNOT FIX IT
 
 **Researched 2026-09-16, after shipping the rotation bare and reporting that it

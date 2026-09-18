@@ -108,6 +108,18 @@ const TEXTURE = 0.25;
 // question, 9k's measurement). Measured on the frames that have the defect:
 // Aerochrome's sky 15.9 -> 4.7 where Pink IR reads 8.7, mean colour held.
 const SKY = 1;
+// AND THE SKY'S DEPTH — the value half of the same solve (IR-SCIENCE 4b-iv,
+// 4b-v): one luma multiplier through the sky bitmap refined to the
+// photograph's edges and the map's own keying, so a grey, a cloud, the ground
+// and an overcast sky are left alone. The film's sky reads 0.32.
+const DEPTH = 0.5;
+// 10e: the sky's VALUE on RAW after the Look press — mean HSV value of the
+// population 10b measures — must sit under SKY_VAL_MAX. MADE TO FAIL FIRST:
+// with NO_DEPTH=1 the walk zeroes the Sky depth slider after the press and
+// this check reads the undarkened sky; that reading and the candidate's are
+// in the comment beside the constant once measured.
+const SKY_VAL_MAX = 0.60;
+const NO_DEPTH = !!process.env.NO_DEPTH;
 // THE FLOOR CHECKS NEED A FRAME THE FLOOR ACTUALLY BINDS ON, which is why they
 // do not use RAW. NIR_0063 measures 0.46 -- above the floor -- so `max(measured,
 // FLOOR)` is just the measurement there and checks 4 and 5 would assert nothing
@@ -215,6 +227,8 @@ try {
   const setDn = (p, v) => setSlider(p, "dn", v);
   const setTex = (p, v) => setSlider(p, "texture", v);
   const setSky = (p, v) => setSlider(p, "skySmooth", v);
+  const setDepth = (p, v) => setSlider(p, "skyDepth", v);
+  const depthv = (p) => p.evaluate(() => Number(document.getElementById("skyDepth").value));
 
   // ---- 0. THE CONTROL. Without this every check below could pass on an
   // instrument that reads the same nine numbers whatever is pressed.
@@ -241,9 +255,11 @@ try {
     MATRIX.every(v => Math.abs(v * 100 - Math.round(v * 100)) < 1e-9), true);
   check("4a  the look brings its local contrast with it", await tex(a.p), TEXTURE);
   check("4a2 ...and its sky colour smoothing", await skyv(a.p), SKY);
+  check("4a3 ...and its sky depth", await depthv(a.p), DEPTH);
   await press(a.p, "lookAero");
   check("4b  ...and leaving it puts the photograph back to none", await tex(a.p), 0);
   check("4b2 ...the sky smoothing too", await skyv(a.p), 0);
+  check("4b3 ...the sky depth too", await depthv(a.p), 0);
 
   // A VALUE THE READER SET IS NOT OURS TO THROW AWAY, in either direction --
   // the same pair of claims the denoise floor carries below, and the reason
@@ -320,6 +336,7 @@ try {
     // brings a texture amount, and that amount is proved reachable by hand.
     await setTex(p, TEXTURE);
     await setSky(p, SKY);
+    await setDepth(p, DEPTH);
     await setDn(p, Math.max(measured, FLOOR));
     const h = await hash(p);
     await ctx.close();
@@ -338,12 +355,13 @@ try {
   {
     const { p, ctx } = await open();
     await press(p, "lookEir");
+    if (NO_DEPTH) await setDepth(p, 0);
     const m = await p.evaluate(() => {
       const cv = document.querySelector("#view");
       const g = cv.getContext("webgl2") || cv.getContext("webgl");
       const W = cv.width, H = cv.height, b = new Uint8Array(W * H * 4);
       g.readPixels(0, 0, W, H, g.RGBA, g.UNSIGNED_BYTE, b);
-      const fol = [], sky = [], skyS = [];
+      const fol = [], sky = [], skyS = [], skyV = [];
       const step = Math.max(1, Math.floor(Math.min(W, H) / 300));
       for (let y = 0; y < H; y += step) for (let x = 0; x < W; x += step) {
         const i = ((H - 1 - y) * W + x) * 4, r = b[i], gg = b[i + 1], bb = b[i + 2];
@@ -351,7 +369,7 @@ try {
         if (mx < 26 || d / mx < 0.18) continue;
         let h; if (mx === r) h = ((gg - bb) / d) % 6; else if (mx === gg) h = (bb - r) / d + 2; else h = (r - gg) / d + 4;
         h = (((h * 60) % 360) + 360) % 360;
-        if (h >= 300 || h < 60) fol.push(h); else if (h >= 140 && h <= 260) { sky.push(h); skyS.push(d / mx); }
+        if (h >= 300 || h < 60) fol.push(h); else if (h >= 140 && h <= 260) { sky.push(h); skyS.push(d / mx); skyV.push(mx / 255); }
       }
       const circ = (a) => {
         let sx = 0, cx = 0;
@@ -360,6 +378,7 @@ try {
       };
       return { fol: fol.length ? circ(fol) : null, sky: sky.length ? circ(sky) : null,
                skySat: skyS.length ? skyS.reduce((a, c) => a + c, 0) / skyS.length : null,
+               skyVal: skyV.length ? skyV.reduce((a, c) => a + c, 0) / skyV.length : null,
                nf: fol.length, ns: sky.length };
     });
     await ctx.close();
@@ -377,6 +396,9 @@ try {
     check("10d the sky is as saturated as the solve made it (the film reads 0.66)",
       m.skySat != null && m.skySat >= SKY_SAT_MIN, true);
     console.log(`        (sky saturation ${m.skySat == null ? "none" : m.skySat.toFixed(3)}, floor ${SKY_SAT_MIN}, n=${m.ns})`);
+    check("10e the sky is as deep as the solve made it (the film reads 0.32)",
+      m.skyVal != null && m.skyVal <= SKY_VAL_MAX, true);
+    console.log(`        (sky value ${m.skyVal == null ? "none" : m.skyVal.toFixed(3)}, ceiling ${SKY_VAL_MAX}${NO_DEPTH ? ", Sky depth zeroed by NO_DEPTH" : ""}, n=${m.ns})`);
   }
 
   check("11  every band the look declares is reachable on the reader's own sliders",

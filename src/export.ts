@@ -195,11 +195,11 @@ export function lastExportProfile(): ExportProfile | null {
 // union return, so no caller has to prove which one it got.
 export function exportImage(
   file: ImportedFile, current: DecodedImage, params: EditParams,
-  opts: ExportOptions & { raw: true }, onProgress?: (fraction: number) => void, lens?: LensCurve | null, sky?: BrushMask | null,
+  opts: ExportOptions & { raw: true }, onProgress?: (fraction: number) => void, lens?: LensCurve | null, sky?: BrushMask | null, skyFine?: BrushMask | null,
 ): Promise<BandResult>;
 export function exportImage(
   file: ImportedFile, current: DecodedImage, params: EditParams,
-  opts: ExportOptions, onProgress?: (fraction: number) => void, lens?: LensCurve | null, sky?: BrushMask | null,
+  opts: ExportOptions, onProgress?: (fraction: number) => void, lens?: LensCurve | null, sky?: BrushMask | null, skyFine?: BrushMask | null,
 ): Promise<ExportResult>;
 export async function exportImage(
   file: ImportedFile,
@@ -221,6 +221,9 @@ export async function exportImage(
    *  second implementation of a selection the preview already made. Null when
    *  no sky was found, which turns the stage off at every amount. */
   sky?: BrushMask | null,
+  /** Its refinement to the photograph's edges (skyfine.ts), for
+   *  `params.skyDepth`; the depth is off without it. */
+  skyFine?: BrushMask | null,
 ): Promise<ExportResult | BandResult> {
   const __t: ExportProfile = { megapixels: 0, total: 0, source: 0, pixels: 0, watermark: 0, encode: 0, tag: 0, yields: 0, yieldMs: 0, threads: 1 };
   const __mark = (k: keyof ExportProfile, from: number) => { __t[k] += performance.now() - from; };
@@ -401,10 +404,10 @@ export async function exportImage(
   // derive it from the same sampler and the same params. Skipped when the
   // amount is off or no sky was found, which is what makes it cost nothing on
   // the frames that do not need it.
-  const skyMap = (params.skySmooth ?? 0) > 0 && sky
+  const skyMap = ((params.skySmooth ?? 0) > 0 || ((params.skyDepth ?? 0) > 0 && skyFine)) && sky
     ? buildSkyMap(sampleLinear, srcW, srcH, params, "cfa" in src ? src.cam : undefined, srcW / srcH, localMap, lens ?? null, sky)
     : null;
-  const edit = compileEdit(params, "cfa" in src ? src.cam : undefined, srcW / srcH, localMap, lens ?? null, skyMap);
+  const edit = compileEdit(params, "cfa" in src ? src.cam : undefined, srcW / srcH, localMap, lens ?? null, skyMap, skyFine ?? null);
   // Scaled exports (50% / 25%) BOX-FILTER instead of decimating: each output
   // pixel averages an ss×ss grid of source taps placed in OUTPUT space and
   // mapped through toSrcF — so the filter stays correct under crop, rotation,
@@ -484,7 +487,7 @@ export async function exportImage(
           // whole only when the decode IS the source (JPEG, HEIC, a preview,
           // a lossy-linear DNG), which is the same test getSource makes.
           "cfa" in src ? { width: current.width, height: current.height, isRaw: current.isRaw } : current,
-          params, opts, lens ?? null, sky ?? null, w, h, job, onProgress);
+          params, opts, lens ?? null, sky ?? null, skyFine ?? null, w, h, job, onProgress);
         data = split.data;
         __t.threads = split.threads;
         ranParallel = true;

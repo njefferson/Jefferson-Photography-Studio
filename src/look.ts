@@ -45,6 +45,9 @@ export type SavedLook = {
    *  saved look like shadowSat, and acts through the photograph's own sky
    *  selection wherever it lands. */
   skySmooth: number;
+  /** Sky depth 0..1 (EditParams.skyDepth). Creative; rides a saved look like
+   *  skySmooth and acts through the photograph's own refined sky selection. */
+  skyDepth: number;
   grainAmt: number;
   grainSize: number;
   vigAmt: number;
@@ -136,6 +139,7 @@ export function coerceLook(s: unknown): SavedLook | null {
         : [0, 0, 0, 0, 0, 0, 0],
     shadowSat: clamped(o.shadowSat, 0, 0, 1),
     skySmooth: clamped(o.skySmooth, 0, 0, 1),
+    skyDepth: clamped(o.skyDepth, 0, 0, 1),
     grainAmt: clamped(o.grainAmt, 0, 0, 1),
     grainSize: clamped(o.grainSize, 1.5, 1, 3),
     vigAmt: clamped(o.vigAmt, 0, -1, 1),
@@ -184,6 +188,7 @@ export function encodeLookPayload(look: SavedLook, name?: string): string {
     grade: look.grade.map(round4),
     shadowSat: round4(look.shadowSat),
     skySmooth: round4(look.skySmooth),
+    skyDepth: round4(look.skyDepth),
     grainAmt: round4(look.grainAmt),
     grainSize: round4(look.grainSize),
     vigAmt: round4(look.vigAmt),
