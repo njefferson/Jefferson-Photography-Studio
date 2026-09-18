@@ -470,6 +470,91 @@ these frames**. The film's reeds and lawn hold red where ours go to near-white.
 That is highlight behaviour — bright IR-reflective ground blowing out rather than
 holding its hue — and it is an exposure and roll-off question, not a colour one.
 
+### 4b-iv. THE SKY'S DEPTH AGAINST THE FILM — SATURATION IS A BAND, VALUE IS NOT
+
+**The gap, restated from §9m and record 017.** The hue bands sit on the film to
+within 1.7°, and the sky's saturation and value do not: the film's sky (the
+lighter-filter photograph above) reads **0.66 at value 0.32**, the red-filter
+one 0.92; the app's Aerochrome, Restore depth on, read 0.17–0.83 at value
+0.55–0.89 on seven frames. Solved 2026-09-18 the way the angles were — through
+the real app, Restore depth ON (the default, re-solved on the Look press),
+measured with the film instrument (hue-split populations, circular mean,
+saturation and value of the sky population, colourless share), substituting
+back rather than trusting arithmetic. Frames: NIR_3406, NIR_1376 (real NEFs),
+NIR_0627, NIR_0063, NIR_1644, NIR_1651 (practice), and the corpus's NIR_2082.
+Every harness prints the lift's state on every row.
+
+**THE LEVER IS THE LOOK'S AQUA AND BLUE BANDS, and their two halves behave
+differently.** `hslAt` applies a band's saturation as a POWER (s^(1/ds), by
+design — it moves the s≈0.05 skies a multiplier cannot) and its luminance as a
+plain multiplier on HSV value. So one saturation setting collapses the frames'
+spread while a luminance setting scales every frame by the same factor.
+
+**Saturation, power 2 on both bands (`35,2,1` / `0,2,1`) — as shipped → solved:**
+3406 0.38 → 0.56, 1376 0.76 → 0.81, 0627 0.17 → 0.39, 0063 0.38 → 0.57, 1644
+0.83 → 0.87, 1651 0.57 → 0.70, 2082 0.21 → 0.37. Three of seven inside the film's
+window (0.60–0.94); the four pale skies move about halfway to it and stop —
+the power curve is bounded at 1 and the lift's colour half solves against
+these bands, so the arithmetic prediction (√0.38 = 0.62 on 3406) overshoots the
+render by 0.06. Hold-one-out worst error 0.29 (2082), 0.27 with it held out
+(0627): the two haziest skies. Foliage saturation and value unchanged to two
+decimals on every frame; hue angles unchanged (a saturation scale cannot move
+one). Colourless share 19.1 → 16.8% on 3406, 20.1 → 9.8% on 2082 — the haze
+gaining colour, which is what the film's 13.8% says it should.
+
+**What that costs, measured three ways, and none of them is the mottle.**
+- On the EXPORTED file (`liftexport-cand.mjs`, 9l-iii's instrument, Restore
+  depth on, the shipped look exported in the same run and reading its anchor
+  exactly — 21.9 → 4.0, Pink IR 16.8): NIR_3406 stage off → on **17.4 → 3.3**
+  against the shipped 21.9 → 4.0, mean chroma 63.6 → 80.5; NIR_1376 5.7 → 2.3
+  against 8.2 → 2.5. The residual FALLS: a power curve's slope is below 1
+  wherever the sky's saturation already sits (0.5/√s at s = 0.4 is 0.79), so
+  it compresses chroma differences as it raises the mean. 0.20× Pink IR on the
+  defect frame after the stage, from 0.24×.
+- The pale speckle where the eye sees it (`speckle.mjs`: sky pixels more than
+  0.06 luma above a 21 px mean, with a flat field and a single lifted pixel as
+  its controls): 3406 5.1% of the sky at mean excess 0.229 as shipped, 5.6% at
+  0.205 solved; 1376 8.2% → 4.4% at 0.114; 1651 2.7% → 2.8%. Unchanged. The
+  patch of pale dots above NIR_3406's roof is in the shipped render too; it
+  reads more strongly against a deeper blue, and the instrument says it is the
+  same dots at the same excess.
+- Neutrals (pixels colourless as shipped): mean luma −1.0% on 3406, −4 to −5%
+  on 1376/1644/1651, where 6–11% of them darken by more than a tenth and gain
+  chroma 19–24 — an HSV saturation boost on a blue-hued pixel lowers R and G
+  and therefore luma. On those three frames the "neutrals" are 2–5% of the
+  frame and are the hazy horizon; on 3406, where they are 19% and include the
+  concrete, the concrete moves 1%.
+
+**Value, by the band's luminance — REJECTED BY MEASUREMENT, and the reason is
+not the sky.** Luminance 0.7 lands the sky at 0.41–0.65, 0.5 at 0.31–0.50
+(1376 hits 0.31, 1644/1651 0.37, 3406 0.42, 0063 0.50). And at 0.5 it darkens
+by more than a tenth **41% of NIR_1376, 55% of NIR_3406, 42% of NIR_1651**.
+Decomposed by each darkened pixel's chroma AS SHIPPED (grey < 12/255, faint
+tint < 36, pale tint < 80, colour above): on 1376 that 41% is grey 3.8%, faint
+7.6%, **pale 10.8%**, colour 18.8%; on 3406, grey 2.1%, faint 10.8%, **pale
+23.2%**, colour 19.3%. The colour is the sky, which is the intent. The grey and
+most of the faint tint would be spared by weighting the band's luminance by
+saturation, which is what darktable's colour equalizer does (a saturation
+threshold and steepness set how much a low-saturation pixel may be changed;
+docs.darktable.org, "color equalizer") and what Lightroom's HSL does in
+effect. **The pale tint is neither.** It is NIR_1376's IR-bright field and
+NIR_3406's concrete apron and horizon haze — pale blue-white ground that
+shares the sky's hue band at a chroma no gate separates from a pale sky. A
+hue band cannot tell a pale-blue field from a pale-blue sky; nothing shaped
+like a band can. The pictures show it as a grey-blue cast over the whole
+ground of 1376 at 0.7, deepening at 0.5.
+
+**THE FIELD'S LEVER FOR THE SKY'S VALUE IS A SKY MASK, NOT A BAND.** Life Pixel
+and Kolari reach for the HSL panel's aqua and blue luminance, which is the
+lever measured above and fails the same way there; the Aerochrome-in-Lightroom
+guides that darken the sky do it through Select Sky (Cuchara Valley Landscapes,
+"Re-creating the Aerochrome film look in Lightroom", 2019; the same technique
+in Imagen's guide). This app already builds a sky selection — `buildSkyMask`,
+the bitmap the smoothing stage (§9l) blends inside, with a chroma gate that
+keeps branches and clouds out of it. A depth carried by that selection and
+that gate reaches the sky's value without the band's reach into the ground.
+Its prototype and what it measured are the next paragraph.
+
 ## 4c. THE CRUX IS NIR CONTAMINATION, AND A ROTATION ALONE CANNOT FIX IT
 
 **Researched 2026-09-16, after shipping the rotation bare and reporting that it
