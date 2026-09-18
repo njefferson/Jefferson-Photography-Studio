@@ -2,7 +2,8 @@
 // uses a half-res proxy), applies the exact edit pipeline on the CPU, and saves
 // a JPEG or 16-bit TIFF to the device.
 
-import { compileEdit, toLinear8, cropToDisplayUvInto, CROP_DEFAULT, applyCreativeVignette, applyGrain, grainCellPx, type BrushMask, type EditParams, type LensCurve } from "./pipeline";
+import { lensGains } from "./lensflat";
+import { compileEdit, toLinear8, cropToDisplayUvInto, CROP_DEFAULT, applyCreativeVignette, applyGrain, grainCellPx, type BrushMask, type EditParams, type LensCurve, lensBin } from "./pipeline";
 import { demosaicPixelLinearInto, type RawCfa } from "./raw/demosaic";
 import { readMosaicedCfa } from "./raw/dngRaw";
 import { readNefCfa } from "./raw/nef";
@@ -282,9 +283,23 @@ export async function exportImage(
   // Once per SOURCE pixel, through the row caches — so the same arithmetic
   // writing into one array rather than making twenty million of them.
   const rawOut: [number, number, number] = [0, 0, 0];
+  // THE LENS FLAT ON THE RAW, FIRST (decision 021): the same gain tables the
+  // decode laid on the working copy, at the strength the params carry now,
+  // applied per source pixel before the heal, the warp, the denoise and the
+  // detail pass — so the export's order is the preview's. An 8-bit source has
+  // no linear copy and keeps the correction inside the grade (lens passed on).
+  const flat = "cfa" in src ? lensGains(lens ?? null, params.lensBypass ? 0 : (params.lensFix ?? 0)) : null;
+  const flatAspect = srcW / Math.max(1, srcH);
   const rawSample: LinearSampler =
     "cfa" in src
-      ? (x: number, y: number) => { demosaicPixelLinearInto(src.cfa, x, y, rawOut); return rawOut; }
+      ? flat
+        ? (x: number, y: number) => {
+            demosaicPixelLinearInto(src.cfa, x, y, rawOut);
+            const i = lensBin((x + 0.5) / srcW, (y + 0.5) / srcH, flatAspect, flat.n);
+            rawOut[0] *= flat.gr[i]; rawOut[1] *= flat.gg[i]; rawOut[2] *= flat.gb[i];
+            return rawOut;
+          }
+        : (x: number, y: number) => { demosaicPixelLinearInto(src.cfa, x, y, rawOut); return rawOut; }
       : (x: number, y: number) => {
           const i = (y * src.width + x) * 4;
           rawOut[0] = toLinear8(src.pixels[i]);
@@ -405,9 +420,11 @@ export async function exportImage(
   // amount is off or no sky was found, which is what makes it cost nothing on
   // the frames that do not need it.
   const skyMap = ((params.skySmooth ?? 0) > 0 || ((params.skyDepth ?? 0) > 0 && skyFine)) && sky
-    ? buildSkyMap(sampleLinear, srcW, srcH, params, "cfa" in src ? src.cam : undefined, srcW / srcH, localMap, lens ?? null, sky)
+    ? buildSkyMap(sampleLinear, srcW, srcH, params, "cfa" in src ? src.cam : undefined, srcW / srcH, localMap, "cfa" in src ? null : lens ?? null, sky)
     : null;
-  const edit = compileEdit(params, "cfa" in src ? src.cam : undefined, srcW / srcH, localMap, lens ?? null, skyMap, skyFine ?? null);
+  // A raw's pixels already carry the flat (above), so the grade gets no curve
+  // for it; an 8-bit source still takes it here.
+  const edit = compileEdit(params, "cfa" in src ? src.cam : undefined, srcW / srcH, localMap, "cfa" in src ? null : lens ?? null, skyMap, skyFine ?? null);
   // Scaled exports (50% / 25%) BOX-FILTER instead of decimating: each output
   // pixel averages an ss×ss grid of source taps placed in OUTPUT space and
   // mapped through toSrcF — so the filter stays correct under crop, rotation,

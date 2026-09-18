@@ -89,3 +89,26 @@ default blur radius 32; this app indexes 80 hard bins without interpolation).
 Third, ahead of 019: the panel's first step is this correction, and where it
 acts decides what every later step — the selection, the sky's amounts, the
 balance — is measured on, so it moves before the amounts are finished.
+
+## Outcome
+
+Shipped to the branch 2026-09-18 as 2.52, option 1 as written: `src/lensflat.ts`
+lays the flat on the linear copy in the decode worker before the selection's
+copy and the automatics; `decodeWithLens` resolves the plan for every decode
+path; `ensureLensApplied` re-applies by ratio on draw; the export wraps its raw
+sampler; the grade carries no curve for a raw and keeps its stage for 8-bit
+sources. Held by `tools/lens-order-walk.mjs`, red on the build before.
+
+What turned out wrong: the Context's premise that the balance is found on data
+the correction then moves. The colour curves are area-normalised, so the
+balance moves 0.19% whichever side it is measured on. The order's real effect
+is the one the report that raised this item named — every later stage
+magnifies what then has to be removed — measured as the corner residual after
+the denoise: 1.033 / 1.051 (red / blue, corner over centre) before, 1.009 /
+0.965 after, on NIR_1376 at strength 1. The record also did not weigh that
+this correction had lived outside the pipeline twice before and been moved in
+for memory and composability; the ratio re-apply answers the memory objection
+and being first answers composability. Found on the way: a strength of exactly
+1 could never be remembered (stored as absence from when absence meant full).
+NOTES.md "The lens flat is laid on the linear raw at decode" carries the
+readings.

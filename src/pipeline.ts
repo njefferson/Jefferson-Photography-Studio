@@ -1208,6 +1208,40 @@ export function lensAreaMean(k: ArrayLike<number> | undefined | null): number {
   return Number.isFinite(m) && m > 1e-3 ? m : 1;
 }
 
+/** The per-bin gain tables one strength lays over a curve — THE ONE SOURCE for
+ *  both the in-grade stage below and the decode-time flat (lensflat.ts, which
+ *  re-exports this rather than carrying a copy).
+ *  @param lens  the matched curve or null.
+ *  @param strength  0 returns null: nothing lands.
+ *  @returns `{n, gr, gb, gg}` — red and blue carry the colour half times the
+ *    brightness half, green the brightness half alone — or null when no half is
+ *    usable. A colour and a brightness half of different lengths keep the
+ *    colour and drop the brightness (a bin count is a radius mapping, above).
+ *  What the result must satisfy: identical to what `measuredOn` in compileEdit
+ *    applied before this existed; the agreement walk holds the four paths. */
+export function lensGainsFor(lens: LensCurve | null | undefined, strength: number): { n: number; gr: Float32Array; gb: Float32Array; gg: Float32Array } | null {
+  if (!lens || !(strength !== 0) || !Number.isFinite(strength)) return null;
+  const kr = lens.kr, kb = lens.kb, bump = lens.bump;
+  const colourN = kr && kb ? Math.min(kr.length, kb.length) : 0;
+  const bumpN = bump ? bump.length : 0;
+  const colourOn = colourN > 1;
+  const bumpOn = bumpN > 1;
+  if (!colourOn && !bumpOn) return null;
+  const lengthsAgree = !(colourOn && bumpOn) || colourN === bumpN;
+  const useBump = bumpOn && lengthsAgree;
+  const n = colourOn ? colourN : bumpN;
+  const areaR = colourOn ? lensAreaMean(kr) : 1;
+  const areaB = colourOn ? lensAreaMean(kb) : 1;
+  const gr = new Float32Array(n), gb = new Float32Array(n), gg = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const gc = useBump ? lensGain(1 + bump![i], strength) : 1;
+    gr[i] = (colourOn ? lensGain(kr![i] * areaR, strength) : 1) * gc;
+    gb[i] = (colourOn ? lensGain(kb![i] * areaB, strength) : 1) * gc;
+    gg[i] = gc;
+  }
+  return { n, gr, gb, gg };
+}
+
 export function compileEdit(
   p: EditParams,
   cam?: number[],
@@ -1269,50 +1303,18 @@ export function compileEdit(
   // The measured curve is its own stage: it must run whether or not any of the
   // manual lens sliders are off zero.
   const lensFix = p.lensBypass ? 0 : (p.lensFix ?? 0);
-  // Both halves ride the SAME strength: one profile supplies them, so one
-  // slider moves them. `hsFix` is the shipped card's control and reaches here by
-  // being mirrored into lensFix while that card is the live one.
-  const hsFix = lensFix;
-  const kr = lens?.kr, kb = lens?.kb, bump = lens?.bump;
-  const colourN = kr && kb ? Math.min(kr.length, kb.length) : 0;
-  const bumpN = bump ? bump.length : 0;
-  const colourOn = colourN > 1 && lensFix !== 0;
-  const bumpOn = bumpN > 1 && hsFix !== 0;
-  // One bin count for the stage, so a pixel lands in the same ring for both
-  // halves.
-  //
-  // A BIN COUNT IS NOT A RESOLUTION, IT IS A RADIUS MAPPING. The shorter of the
-  // two used to win, which reads as a safe choice and is not: the bin a pixel
-  // lands in is `floor(r * n)`, so running an 80-bin curve at n = 60 does not
-  // truncate it, it STRETCHES it — the bin describing 74% of the way to the
-  // corner gets applied at the corner. Both curves are 80 bins everywhere they
-  // exist, and the store now refuses any profile that is not, so a mismatch
-  // here means one of the two is corrupt. The colour half is the reader's own
-  // measurement of their own lens, so it keeps its length and the brightness
-  // half stands down, rather than both being applied at the wrong radii.
-  const lengthsAgree = !(colourOn && bumpOn) || colourN === bumpN;
-  const useBump = bumpOn && lengthsAgree;
-  const lensN = colourOn ? colourN : bumpN;
-  const measuredOn = colourOn || useBump;
-  const lensGr = measuredOn ? new Float64Array(lensN) : null;
-  const lensGb = measuredOn ? new Float64Array(lensN) : null;
-  // The colour curve is normalised to its own area-weighted mean before it is
-  // applied, so it redistributes colour without also tinting the frame. The
-  // shader does the same thing at upload; see lensAreaMean for why and for the
-  // rule that there are exactly two callers.
-  const areaR = colourOn ? lensAreaMean(kr) : 1;
-  const areaB = colourOn ? lensAreaMean(kb) : 1;
-  if (measuredOn) {
-    for (let i = 0; i < lensN; i++) {
-      const gc = useBump ? lensGain(1 + bump![i], hsFix) : 1;
-      lensGr![i] = (colourOn ? lensGain(kr![i] * areaR, lensFix) : 1) * gc;
-      lensGb![i] = (colourOn ? lensGain(kb![i] * areaB, lensFix) : 1) * gc;
-    }
-  }
-  // Green carries the brightness half only — the colour half is defined as a
-  // ratio AGAINST green, so correcting green by it would be correcting twice.
-  const lensGg = useBump ? new Float64Array(lensN) : null;
-  if (useBump) for (let i = 0; i < lensN; i++) lensGg![i] = lensGain(1 + bump![i], hsFix);
+  // THE TABLES COME FROM lensflat.ts NOW — the same arithmetic the decode-time
+  // pass uses on a raw's linear copy (decision 021). This in-grade stage stays
+  // for the sources that have no linear copy to correct at decode (8-bit:
+  // JPEG, preview, lossy-linear DNG); a raw caller passes `lens` as null
+  // because its pixels already carry the flat. One function builds the gains
+  // for both, so a ring is the same ring in both places.
+  const lensT = lensGainsFor(lens, lensFix);
+  const measuredOn = !!lensT;
+  const lensN = lensT ? lensT.n : 0;
+  const lensGr = lensT ? lensT.gr : null;
+  const lensGb = lensT ? lensT.gb : null;
+  const lensGg = lensT ? lensT.gg : null;
   const cl = p.clarity ?? 0;
   const dz = p.dehaze ?? 0;
   const localOn = local && (cl !== 0 || dz !== 0);

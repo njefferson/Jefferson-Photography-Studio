@@ -41,7 +41,7 @@ import { profilesStamp } from "./lensstore";
  *  profiles, a different preview size. The gate named above will refuse the
  *  commit if you forget; it exists because a cache keyed on a number nobody
  *  remembers to bump is a cache that serves the wrong picture for ever. */
-export const PREVIEW_PIPELINE = 41;
+export const PREVIEW_PIPELINE = 42;
 
 const DB = "ips-previews";
 const STORE = "previews";

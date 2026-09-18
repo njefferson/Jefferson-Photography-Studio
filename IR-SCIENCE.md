@@ -2520,6 +2520,20 @@ two-stage shape `matchIn` in `src/lensstore.ts` already implements.
   red-against-blue inside the middle of the frame and **18%** further out, on the
   lone-oak frame under Aerochrome. Rendered on and off from the app itself.
 
+**SHIPPED, 2026-09-18 (decision 021, 2.52): THE FLAT IS ON THE LINEAR RAW NOW,
+BEFORE ANYTHING IS MEASURED.** The measured curve is laid on the decode's
+linear copy in the decode worker before the sky selection's copy is taken and
+before gray-world, exposure and denoise are measured; the grade carries no
+curve for a raw; an 8-bit source keeps the in-grade stage. That is 9c's
+placement. **And the paragraph above this one was wrong about what it would
+change.** The colour curves are area-normalised at application, so the
+frame-mean balance moves 0.19% whichever side of the flat it is measured on
+(0.5621 · 1.0590 · 1.7051 against 0.5617 · 1.0588 · 1.7083 on NIR_1376). What
+the order changes is the noise: laid on after the denoise the gain at a corner
+multiplies the residual the denoise left, laid on before it the denoise sees
+it. Corner over centre residual, red/blue, NIR_1376 at strength 1: 1.033 / 1.051
+before, 1.009 / 0.965 after. `tools/lens-order-walk.mjs` holds it.
+
 ### 9e. And the field's first answer is not a correction at all
 
 Rob Shea: "Mild hot spots can be addressed easily in Lightroom or Photoshop.

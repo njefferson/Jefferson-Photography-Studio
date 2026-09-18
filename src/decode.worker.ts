@@ -25,6 +25,7 @@
 
 import { decode } from "./decode";
 import { prepareSkySource } from "./skyfine";
+import { applyLensPlan, type LensPlan } from "./lensflat";
 import type { ImportedFile } from "./import";
 
 interface Job {
@@ -32,12 +33,17 @@ interface Job {
   file: ImportedFile;
   /** Hand back the copy the sky selection is built from (DecodeOptions.sky). */
   sky?: boolean;
+  /** The lens flat to lay on the linear copy first (decision 021). */
+  lens?: LensPlan | null;
 }
 
 self.onmessage = async (e: MessageEvent<Job>) => {
-  const { id, file, sky } = e.data;
+  const { id, file, sky, lens } = e.data;
   try {
     const img = await decode(file);
+    // THE FLAT FIRST, THEN THE SELECTION'S COPY: the selection and every
+    // automatic the main thread measures read corrected pixels (decision 021).
+    applyLensPlan(img, lens ?? null);
     const skySrc = sky ? prepareSkySource(img) : null;
     const transfer: Transferable[] = [];
     if (img.pixels) transfer.push(img.pixels.buffer);

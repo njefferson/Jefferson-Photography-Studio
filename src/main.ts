@@ -32,6 +32,7 @@ import * as Session from "./session";
 import { keepAwake } from "./wakelock";
 import { sampleBrush, skyBandCentre, lensGain, LENS_GAIN_HI, LENS_GAIN_LO, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, bandWeight, rgb2hsv, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, type MaskLayer, type CropRect, BRUSH_MAX_EDGE, type SkyMap } from "./pipeline";
 import { sensorPitchMicrons } from "./color";
+import { lensGains, applyLensFlat, lensPlanStamp, type LensPlan } from "./lensflat";
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, type HealSpot } from "./heal";
 import { makeStickerAsset, stickerRect, stickerWorldCorners, stickerXform, compositeStickersIntoRect8, compositeStickersIntoRectF32, compositeStickersOverlay8, type StickerAsset } from "./sticker";
 import { makeWarpField, encodeWarp, paintWarp, warpIsEmpty as warpFieldEmpty, type WarpField, type WarpTool } from "./warp";
@@ -333,7 +334,11 @@ function activeProfile(): LensStore.StoredProfile | null {
  *  One call for both, because they land on the same texture and the same bin —
  *  see setLensCurve. Called after BOTH matches are worked out at open, and
  *  again whenever either changes. */
-function syncLensTexture() {
+function syncLensTexture(img: DecodedImage | null = current) {
+  // A RAW CARRIES THE FLAT IN ITS PIXELS (decision 021), so the shader's stage
+  // gets no curve for it and stays inert; an 8-bit source has no linear copy
+  // and still takes the correction here.
+  if (img?.linear) { renderer.setLensCurve(null, null, null); return; }
   const { colour, bump } = Hotspot.lensHalves(myLens?.p ?? null, hotspotState?.p ?? null);
   renderer.setLensCurve(colour ? colour.kr : null, colour ? colour.kb : null, bump);
 }
@@ -507,6 +512,42 @@ function updateMyLensUI() {
  *  that renders a frame OTHER than the one the reader has open — thumbnails, a
  *  batch — because `myLens` belongs to the open photograph and applying it to
  *  another would put one lens's colour on another lens's frame. */
+/** The lens flat a decode lays on THIS file's linear copy before anything is
+ *  measured (decision 021): the curve matched to its EXIF and the strength the
+ *  reader last chose for that lens — the same two rules the open photograph
+ *  uses (initMyLens, initHotspot), asked here BEFORE the decode so the worker
+ *  can apply them and the sky selection and the automatics read corrected
+ *  pixels.
+ *  @param imported  the file, bytes in hand.
+ *  @returns the plan, or null when no profile matches or the strength is 0 —
+ *    a decode with nothing to lay on it.
+ *  What the result must satisfy: `strength` equals what `params.lensFix` will
+ *    be set to when this photograph opens, or `ensureLensApplied` re-runs the
+ *    pass on the first draw and the balance was measured on the wrong data. */
+function lensPlanFor(imported: ImportedFile): LensPlan | null {
+  const curve = lensCurveFor(imported);
+  if (!curve) return null;
+  let ex: ExifSubset | null = null;
+  try { ex = readExifSubset(imported.bytes); } catch { return null; }
+  const measured = ex ? LensStore.findProfile(ex) : null;
+  let strength = 0;
+  if (measured) strength = rememberedStrength("own:" + measured.key) ?? 0;
+  else {
+    const short = Hotspot.shortFor(ex?.lens);
+    const f = ex?.fNumber ? (ex.fNumber[0] / ex.fNumber[1]).toFixed(1) : "?";
+    strength = rememberedStrength(short ? "shipped:" + short + "@" + f : null) ?? 0;
+  }
+  if (!(strength > 0)) return null;
+  return { curve, strength, stamp: lensPlanStamp(curve) };
+}
+
+/** Every decode in this file goes through here, so every path — the open, the
+ *  tile, the batch, the quick look, the resume — lays the same flat on the same
+ *  file (decision 021). Same signature as decodeOffThread plus the plan. */
+function decodeWithLens(imported: ImportedFile, opts?: Parameters<typeof decodeOffThread>[1]): ReturnType<typeof decodeOffThread> {
+  return decodeOffThread(imported, { ...(opts ?? {}), lens: lensPlanFor(imported) });
+}
+
 function lensCurveFor(imported: ImportedFile): LensCurve | null {
   let ex: ExifSubset | null = null;
   try {
@@ -797,6 +838,13 @@ function lensCentreDiagnostic(): string {
  *  matches already worked out at open rather than re-read from the file.
  *  Bypass is a strength of 0, not a missing curve: one place decides how much
  *  of each half lands, and it is the pipeline. */
+/** The curve the GRADE should carry for a photograph: none for a raw, whose
+ *  pixels already hold the flat (decision 021); the matched curve for an 8-bit
+ *  source. Every compileEdit and buildSkyMap call for a picture asks this. */
+function lensForEdit(img: { linear?: Float32Array } | null | undefined, curve: LensCurve | null = currentLensCurve()): LensCurve | null {
+  return img?.linear ? null : curve;
+}
+
 function currentLensCurve(): LensCurve | null {
   const { colour, bump } = Hotspot.lensHalves(myLens?.p ?? null, hotspotState?.p ?? null);
   if (!colour && !bump) return null;
@@ -815,7 +863,7 @@ function initMyLens(_img: DecodedImage, _imported: ImportedFile) {
   params.lensFix = myLens ? (rememberedStrength("own:" + myLens.p.key) ?? 0) : 0;
   params.lensBypass = false;
   syncLensStrength();
-  syncLensTexture();
+  syncLensTexture(_img);
   updateMyLensUI();
   updateLensCmp();
 }
@@ -964,10 +1012,13 @@ function rememberStrength(key: string | null, v: number): void {
   if (!key || !Number.isFinite(v)) return;
   try {
     const m = lensStrengthMap();
-    // Full strength is the default, so it is stored as ABSENCE rather than as
-    // 1 — otherwise a reader who tries a lower value and puts it back leaves a
-    // row behind that means the same as no row, and the map only ever grows.
-    if (Math.abs(v - 1) < 1e-6) delete m[key];
+    // OFF is the default now, so OFF is what absence means. This deleted the
+    // row at exactly 1 from the days when a profile opened at full strength;
+    // once the default moved to 0 ("the correction waits to be asked for"),
+    // a reader who chose 1 got 0 on the next photograph — the one value that
+    // could never be remembered was the one most readers pick. Found by the
+    // lens-order walk (decision 021), which remembers 1 and opens again.
+    if (Math.abs(v) < 1e-6) delete m[key];
     else m[key] = v;
     localStorage.setItem(LENS_STRENGTH_KEY, JSON.stringify(m));
   } catch {
@@ -1626,7 +1677,7 @@ function syncSkyMap(): void {
   // saturated than the rendered one — skymap.ts has the measurement.
   const raw = (x: number, y: number) => linearAt(img, x, y);
   const pre = makeRowDetail(raw, makeRowDenoiser(raw, img.width, img.height, params.denoise, 1, params.chroma ?? 0, params.despeckle ?? 0), img.width, img.height, params.sharpen ?? 0, params.texture ?? 0, 1);
-  lastSkyMap = buildSkyMap(pre, img.width, img.height, params, img.camMatrix, img.width / Math.max(1, img.height), undefined, currentLensCurve(), skyBitmap);
+  lastSkyMap = buildSkyMap(pre, img.width, img.height, params, img.camMatrix, img.width / Math.max(1, img.height), undefined, lensForEdit(img), skyBitmap);
   renderer.setSkyMap(lastSkyMap);
 }
 
@@ -2465,11 +2516,34 @@ updateSlotUI(); // reflect any slots saved in a previous session
 
 let raf = 0;
 let lastToneKey = "";
+/** THE FLAT FOLLOWS THE CONTROLS, ON THE WORKING COPY ITSELF (decision 021).
+ *  The decode laid the correction on the linear copy at the remembered
+ *  strength; Strength, Bypass, Undo, Reset, a look and the bare-decode hold
+ *  all move `params.lensFix`/`lensBypass`, and this is the one place that
+ *  brings the pixels to what they say — a re-apply by ratio against what is
+ *  already in the buffer, exact, no second copy — followed by a fresh upload.
+ *  8-bit sources have no linear copy and keep the in-grade stage instead.
+ *  @returns nothing. Cheap when nothing moved: one comparison. */
+function ensureLensApplied(): void {
+  const img = current;
+  if (!img?.linear) return;
+  const curve = currentLensCurve();
+  const strength = curve && !params.lensBypass ? (params.lensFix ?? 0) : 0;
+  const stamp = curve ? lensPlanStamp(curve) : "";
+  const have = img.lensApplied ?? { stamp: "", strength: 0, gains: null };
+  if (have.stamp === stamp && have.strength === strength) return;
+  const next = lensGains(curve, strength);
+  applyLensFlat(img.linear, img.width, img.height, next, have.gains);
+  img.lensApplied = { stamp, strength, gains: next };
+  uploadPreview();
+}
+
 function draw() {
   recordSoon();
   if (raf) return;
   raf = requestAnimationFrame(() => {
     raf = 0;
+    ensureLensApplied(); // the flat on the working copy first; everything below reads it
     const key = [params.tone, params.toneR, params.toneG, params.toneB].map((t) => t.join(",")).join(";");
     if (key !== lastToneKey) {
       lastToneKey = key;
@@ -2885,6 +2959,12 @@ function wireVersionMenu() {
       // apart the two neighbourhoods are in colour.
       { k: "Healed spots", v: healDiagnostic() },
       { k: "Lens correction", v: lensDiagnostic() },
+      // WHERE THE CORRECTION ACTS, and the balance measured after it (decision
+      // 021): a raw's flat is laid on the linear copy at decode, before the
+      // gray-world balance, the exposure, the denoise measurement and the sky
+      // selection read it. The walk reads these two lines back.
+      { k: "Correction order", v: current?.linear ? `on the linear raw at decode, before the balance and the selection — ${current.lensApplied?.gains ? `strength ${current.lensApplied.strength} laid on the pixels` : "nothing laid on the pixels (no profile, or strength 0 at decode)"}` : current ? "inside the grade — an 8-bit source has no linear copy to correct first" : "nothing open" },
+      { k: "Balance", v: current ? `white balance ${params.wb.map((x) => x.toFixed(4)).join(" · ")} — the at-open gray-world unless moved since` : "nothing open" },
       // WHICH SIDE OF THE BODY'S DIFFRACTION LIMIT THE FRAME WAS SHOT ON — a soft
       // frame explains itself, from its own EXIF and the body's pitch (§9h).
       { k: "Aperture", v: apertureDiagnostic() },
@@ -3104,7 +3184,7 @@ function measureFrame(p: EditParams, img: DecodedImage, divisions = LIFT_GRID, s
   // correction is part of it. With a sky bitmap the edit runs with a position,
   // so the sky's own saturation stage (skySat) is in what is measured — the
   // lift solves that stage against the SKY population, by place, below.
-  const edit = compileEdit(p, img.camMatrix, img.width / Math.max(1, img.height), undefined, currentLensCurve(), null, skyMask);
+  const edit = compileEdit(p, img.camMatrix, img.width / Math.max(1, img.height), undefined, lensForEdit(img), null, skyMask);
   const px = new Float32Array(3);
   const lums: number[] = [];
   let warmW = 0, warmS = 0, coolW = 0, coolS = 0, skyW = 0, skyS = 0;
@@ -9507,7 +9587,7 @@ async function switchToPhoto(id: string, opts?: { quiet?: boolean }) {
     const bytes = await Session.getBytes(id, (n) => { rows = n; });
     const t1 = performance.now();
     const imported: ImportedFile = { name: view.name, kind: view.kind, bytes, looksTranscoded: false };
-    const img = await decodeOffThread(imported, { onTiming: (t) => { decode.t = t; }, front: true, sky: true });
+    const img = await decodeWithLens(imported, { onTiming: (t) => { decode.t = t; }, front: true, sky: true });
     const t2 = performance.now();
     showDecoded(img, imported);
     const t3 = performance.now();
@@ -9788,8 +9868,8 @@ async function makeThumb(img: DecodedImage, MAX = 260, lens?: LensCurve | null, 
   // say so.
   const tileSky = ((p.skySmooth ?? 0) > 0 || (p.skyDepth ?? 0) > 0 || (p.skySat ?? 0) > 0) ? skyMaskFor(img) : null;
   const tileSample = (x: number, y: number) => linearAt(img, Math.min(img.width - 1, Math.floor(x / s)), Math.min(img.height - 1, Math.floor(y / s)));
-  const tileMap = tileSky ? buildSkyMap(tileSample, w, h, p, img.camMatrix, w / h, undefined, lens ?? null, tileSky) : null;
-  const edit = compileEdit(p, img.camMatrix, w / h, undefined, lens ?? null, tileMap, tileSky);
+  const tileMap = tileSky ? buildSkyMap(tileSample, w, h, p, img.camMatrix, w / h, undefined, lensForEdit(img, lens ?? null), tileSky) : null;
+  const edit = compileEdit(p, img.camMatrix, w / h, undefined, lensForEdit(img, lens ?? null), tileMap, tileSky);
   const px = new Float32Array(3);
   const out = new Uint8ClampedArray(ow * oh * 4);
   for (let oy = 0; oy < oh; oy++) {
@@ -9952,7 +10032,7 @@ async function openSingle(file: File) {
   }
   // Track it as a (strip-less) lone photo so a follow-up multi-pick can ask
   // sensibly; it isn't persisted (nothing to resume from a single edit).
-  const img = await decodeOffThread(imported);
+  const img = await decodeWithLens(imported);
   showDecoded(img, imported);
   hideBusy(); // there is a photo on screen now — nothing left to wait for
   const id = "lone";
@@ -10182,7 +10262,7 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
       let firstImg: DecodedImage | null = null;
       if (!firstNewId && (!activePhotoId || activePhotoId === "lone")) {
         try {
-          firstImg = await decodeOffThread(imported, { front: true, sky: true });
+          firstImg = await decodeWithLens(imported, { front: true, sky: true });
         } catch (err) {
           skipped.push(`${f.name} (${(err as Error).message})`);
           dropPlanned(slot.id);
@@ -10307,7 +10387,7 @@ async function oneThumbnail(view: SessionPhoto, gen: number): Promise<void> {
   try {
     const bytes = await Session.getBytes(view.id);
     const imported: ImportedFile = { name: view.name, kind: view.kind, bytes, looksTranscoded: false };
-    const img = await decodeOffThread(imported);
+    const img = await decodeWithLens(imported);
     const own = ownEdit(view);
     // THE LENS CORRECTION WAS MISSING FROM EVERY STRIP TILE, so a tile wore
     // the hot spot the photograph itself does not have — a bright disc in the
@@ -11164,7 +11244,7 @@ async function resumeSession() {
     const first = sessionPhotos[0];
     const bytes = await Session.getBytes(first.id);
     const imported: ImportedFile = { name: first.name, kind: first.kind, bytes, looksTranscoded: false };
-    const img = await decodeOffThread(imported, { front: true, sky: true });
+    const img = await decodeWithLens(imported, { front: true, sky: true });
     showDecoded(img, imported);
     activateCurrent(first.id);
     void realThumbnails(); // finish any thumbnails the last visit never reached
@@ -11499,7 +11579,7 @@ async function openQuickLook(files: File[]) {
     try {
       if (ok) throw null; // already have it — skip the decode without duplicating the tail
       const imported = guardLocation(await importFile(f));
-      const img = await decodeOffThread(imported);
+      const img = await decodeWithLens(imported);
       const thumb = await makeThumb(img, QUICK_EDGE, lensCurveFor(imported));
       if (thumb.byteLength) {
         thumbUrl = URL.createObjectURL(new Blob([thumb], { type: "image/jpeg" }));
@@ -12253,7 +12333,7 @@ async function openGalleryPhoto(key: string) {
   try {
     const ext = tile.kind === "dng" ? "dng" : "jpg";
     const imported: ImportedFile = { name: `${key}.${ext}`, kind: tile.kind, bytes, looksTranscoded: false };
-    const img = await decodeOffThread(imported);
+    const img = await decodeWithLens(imported);
     if (gen !== galleryGen) return;
     // Only NOW — with a decodable photo in hand — end the previous session.
     // Tearing it down before the download/decode succeeded meant a failed
@@ -13204,7 +13284,7 @@ async function runBatch(files: File[]) {
       try {
         const imported = guardLocation(await importFile(f));
         if (imported.looksTranscoded) { skipped.push(`${f.name} (arrived as flattened JPEG)`); continue; }
-        const img = await decodeOffThread(imported, { sky: true });
+        const img = await decodeWithLens(imported, { sky: true });
         const noLens = !batchHasLens(imported);
         // Each photo in a batch is matched on its OWN EXIF: a set can span
         // lenses and focal lengths, and one match for the whole run would

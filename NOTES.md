@@ -539,19 +539,6 @@ user-scalable=no.
 > different approach and mindset"). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
-- [ ] **The lens correction belongs on the linear raw before anything else** <!-- decision: 021 --> —
-  raised 2026-09-18: the hot-spot correction is applied inside the compiled
-  edit, after the white balance and before the matrix, the swap and the
-  look — inside the grade — while the automatics and the sky selection are
-  measured on the uncorrected decode. IR-SCIENCE 9c has the placement from
-  four references (RawPedia, the DNG GainMap, Lightroom, darktable): linear
-  raw at the beginning of the pipeline, before the grade. The route is one
-  radial pass on the linear working copy in the decode worker (and on the
-  export's source), the uncorrected copy kept so the strength slider
-  re-applies from it, the measurements taken after it, the stage removed
-  from the pipelines, clipping bounded against the raw white level; held by
-  the agreement walk on all four paths
-  (`docs/decisions/021-lens-correction-belongs-on-the-linear-raw-before-anything-else.md`).
 - [ ] **Aerochrome's saturation by population: foliage and sky each their own amount, nothing colourless touched** <!-- decision: 019 --> —
   reported 2026-09-18 from staging 2.50.10: the look's saturation reads too
   high across the whole frame, it needs aiming at the foliage and at the sky
@@ -1467,6 +1454,67 @@ because a slow read is not a failed one and a skipped photo is data lost;
 whether to time it out and say so on the tile is a decision when the file
 that stalled is known.
 
+## The lens flat is laid on the linear raw at decode, 2026-09-18 (decision 021, 2.52)
+
+**What moved.** The measured lens curve is applied in `src/lensflat.ts` as one
+radial pass over the decode's linear copy, inside the decode worker, BEFORE
+`prepareSkySource` takes the selection's copy and before the main thread
+measures gray-world, exposure and denoise on it. Every decode goes through
+`decodeWithLens`, which resolves the curve and the remembered strength from
+the file's EXIF first (the same two rules the open photograph used:
+`initMyLens`, `initHotspot`), so the tile, the batch, the quick look and the
+resume lay the same flat as the open. The grade gets no curve for a raw
+(`lensForEdit`); the in-grade stage stays for 8-bit sources, which have no
+linear copy to correct. Strength, Bypass, Undo, Reset, a look and the hold all
+reach `ensureLensApplied` on the next draw, which re-applies by ratio against
+the gains already in the buffer and re-uploads — no second copy of an 80 MB
+frame. The export lays the same gains on its full-resolution raw sampler ahead
+of the heal, the warp, the denoise and the detail pass, and hands its grade no
+curve for a raw. `PREVIEW_PIPELINE` 41 → 42.
+
+**Held by `tools/lens-order-walk.mjs`, made to fail first** on a build of the
+commit before. It opens a real NEF whose lens matches a shipped profile, sets
+the shipped card's Strength (remembered on change), opens the same file again
+so the decode carries the plan, and reads the report's new "Correction order"
+and "Balance" lines back; the independent side decodes the same file in node
+with the app's own decoders and flat, bundled from `src/` at run time.
+
+**What turned out wrong in the record, and it is the finding.** The premise was
+9d's: the balance is found on data the correction then moves. It is not, to
+any amount that matters: the colour curves are AREA-NORMALISED at application
+(`lensAreaMean`), so a frame-mean balance reads 0.5621 · 1.0590 · 1.7051 on the
+uncorrected decode and 0.5617 · 1.0588 · 1.7083 on the corrected one — 0.19%.
+The balance check in the walk is therefore a consistency check (the app's
+number is its own gray-world of the corrected copy), not the discriminator.
+What the order changes is what the owner's framing said and the record did
+not measure: the noise. Laid on after the denoise, the flat's gain at a corner
+multiplies the residual the denoise left; laid on before it, the denoise
+measures and removes it. On NIR_1376 at strength 1, corner over centre
+residual, red/blue: **1.033 / 1.051 before, 1.009 / 0.965 after.** The lens is
+mild (±5% at the corner); a brightness curve would separate the two further.
+The bound is 1.025 and the margin is thin, on one frame, on one machine.
+
+**Two histories the record did not weigh.** The correction had been OUTSIDE the
+pipeline twice before — once on an untouched 8-bit copy, once as a multiply
+undone on every slider move — and was moved in each time for memory (a full
+raw is 330 MB), for composability, and because every slider touch walked every
+pixel (`syncMyLens`'s own comment). This placement answers the first with the
+ratio re-apply (no copy), the second by being first (it composes with
+everything by construction), and accepts the third: a strength drag costs one
+pass over the working copy and an upload. The 8-bit split — decode-time for
+raw, in-grade for camera-rendered — is the same per-kind split `aero` already
+carries.
+
+**A defect found on the way.** `rememberStrength` stored a strength of exactly
+1 as ABSENCE, from the days when a profile opened at full strength; once the
+default moved to 0, absence meant 0, so the one value most readers pick could
+never be remembered and the next photograph opened at 0. The walk remembers 1
+and opens again, which is how it was seen. Absence means 0 now.
+
+**Within float rounding, measured.** Bypass on, then off, returns the picture
+to within one 8-bit step on under 1% of pixels; a hash would call one flipped
+LSB in five million a defect, so the check is a bound, not a hash.
+
 ## The frame's aperture against the body's diffraction limit, 2026-09-18
 
 The diagnostic report carries an **Aperture** line beside the lens entry:
@@ -2216,6 +2264,31 @@ reason it is a footnote rather than a finding — a list of known limitations is
 read as authoritative, and an invented one is worse than a missing one.
 
 ## Shipped (roadmap archive)
+
+- [x] **The lens correction belongs on the linear raw before anything else** <!-- decision: 021 --> —
+  raised 2026-09-18: the hot-spot correction is applied inside the compiled
+  edit, after the white balance and before the matrix, the swap and the
+  look — inside the grade — while the automatics and the sky selection are
+  measured on the uncorrected decode. IR-SCIENCE 9c has the placement from
+  four references (RawPedia, the DNG GainMap, Lightroom, darktable): linear
+  raw at the beginning of the pipeline, before the grade. The route is one
+  radial pass on the linear working copy in the decode worker (and on the
+  export's source), the uncorrected copy kept so the strength slider
+  re-applies from it, the measurements taken after it, the stage removed
+  from the pipelines, clipping bounded against the raw white level; held by
+  the agreement walk on all four paths
+  (`docs/decisions/021-lens-correction-belongs-on-the-linear-raw-before-anything-else.md`).
+  SHIPPED to the branch 2026-09-18 as 2.52: the measured curve is one radial pass on the
+  linear working copy inside the decode worker (`src/lensflat.ts`), laid on before the sky
+  selection's copy is taken and before the balance, the exposure and the denoise are
+  measured; the grade carries no curve for a raw (the stage stays for 8-bit sources, which
+  have no linear copy); Strength, Bypass, Undo and the hold re-apply by ratio on the same
+  buffer, no second copy; the export lays the same gains on its full-resolution sampler
+  before the heal, the warp and the denoise. Held by `tools/lens-order-walk.mjs`, red on the
+  build before it. What the record had wrong: the balance premise — the colour curves are
+  area-normalised, so a frame-mean balance moves 0.19% whichever side of the flat it is
+  measured on; what the order changes is the noise the grade would have amplified, read as
+  the corner residual (below). And a strength of exactly 1 could never be remembered.
 
 - [x] **A look opens its own finishing panel** <!-- decision: 022 --> — proposed
   2026-09-18: when a look is applied, its own panel opens with the specific
