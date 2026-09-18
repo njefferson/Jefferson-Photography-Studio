@@ -853,7 +853,7 @@ reads saturation 1, so its off-sky quantiles were dominated by shadow and
 its foliage population was polluted with it. Excluding value under 0.05 put
 the two instruments within 0.01 of each other on every population.
 
-**What Rob Shea does with masks, as far as this container could read.** His
+**What Rob Shea does with masks, as far as this container could read.** Shea's
 Lightroom Classic colour-infrared workflow (post and video of 2021-12-23,
 "Edit Infrared Photography in Lightroom Classic") is white balance, then a
 colour-swap profile, then the masking tools; the 850 nm monochrome full
@@ -865,7 +865,7 @@ inside its own mask.
 
 The host was added the same afternoon and the posts were read: every one
 of them is a paragraph and an embedded video, so the steps live in the
-videos. His course outline (courses.robsheaphotography.com, "Mastering
+videos. The course outline (courses.robsheaphotography.com, "Mastering
 Infrared Photography in Lightroom Classic") is the nearest thing to a
 written table of contents for the method, and its chapters are: White
 Balance (why profiles; installing them; setting a white balance in
@@ -875,7 +875,7 @@ variant, Photoshop actions); the Tone Curve panel for contrast and grading;
 panel; two complete edits (profiles, hue shift); and a Masks chapter. So
 saturation, vibrance and the colour half of the hot spot are taught
 together, and masks come after the global look — the same order 019 lands
-on. His 2026-04-26 video, "Lightroom Saturation vs Vibrance", argues from
+on. Shea's 2026-04-26 video, "Lightroom Saturation vs Vibrance", argues from
 tests that Adobe's own description of the two sliders is not how they
 behave; that is the exact question this section's gates answer for this
 app, and it is worth watching by anyone who can.

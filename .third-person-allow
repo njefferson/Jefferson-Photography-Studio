@@ -24,3 +24,10 @@ docs/ARCHITECTURE.md | Nikon High Efficiency raw compression, plus the He of He 
 # maps are built on. A citation, not a person in this project.
 src/macro/stack.ts | cited author's surname, He & Sun 2015 (guided filter) | He
 NOTES.md | Nikon High Efficiency raw compression, the format's own name | HE
+
+# Kaiming He, first author of Guided Image Filtering (ECCV 2010 / TPAMI 2013),
+# the filter the sky selection is refined with (src/skyfine.ts). A citation.
+src/skyfine.ts | cited author's surname, He, Sun and Tang 2010 (guided filter) | He
+IR-SCIENCE.md | cited author's surname, He, Sun and Tang 2010 (guided filter) | He
+docs/decisions/017-aerochrome-sky-depth-against-the-film.md | cited author's surname, He, Sun and Tang 2010 (guided filter) | He
+docs/decisions/018-one-sky-selection-for-every-sky-aware-tool.md | cited author's surname, He, Sun and Tang 2010 (guided filter) | He
