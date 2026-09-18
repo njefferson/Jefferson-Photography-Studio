@@ -478,6 +478,10 @@ export interface SkyMap {
    *  texel's grey guard; this is the number itself, for the record and the
    *  diagnostic. */
   key: number;
+  /** The number the key was read from: the sky's mean rendered chroma as the
+   *  sky saturation stage will show it, display-space HSV max−min, 0..1. For
+   *  the record, the diagnostic and re-fitting the window (skymap.ts). */
+  chroma: number;
 }
 /** Display-space chroma is bounded well inside ±0.5 for any sky; the encode
  *  maps ±this to 0..255. The shader decodes with the same constant. */

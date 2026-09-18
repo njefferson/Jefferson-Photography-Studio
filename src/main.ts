@@ -30,7 +30,7 @@ import { writeZip, crc32 } from "./zip";
 import { putFrame, eachFrame, frameMetas, frameCount, clearFrames, frameStore } from "./batchstore";
 import * as Session from "./session";
 import { keepAwake } from "./wakelock";
-import { sampleBrush, skyBandCentre, lensGain, LENS_GAIN_HI, LENS_GAIN_LO, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, bandWeight, rgb2hsv, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, type MaskLayer, type CropRect, BRUSH_MAX_EDGE } from "./pipeline";
+import { sampleBrush, skyBandCentre, lensGain, LENS_GAIN_HI, LENS_GAIN_LO, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, bandWeight, rgb2hsv, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, type MaskLayer, type CropRect, BRUSH_MAX_EDGE, type SkyMap } from "./pipeline";
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, type HealSpot } from "./heal";
 import { makeStickerAsset, stickerRect, stickerWorldCorners, stickerXform, compositeStickersIntoRect8, compositeStickersIntoRectF32, compositeStickersOverlay8, type StickerAsset } from "./sticker";
 import { makeWarpField, encodeWarp, paintWarp, warpIsEmpty as warpFieldEmpty, type WarpField, type WarpTool } from "./warp";
@@ -39,7 +39,7 @@ import { generateCube } from "./lut";
 import { generateDcp } from "./dcp";
 import { buildGlowMap } from "./glow";
 import { buildLocalMap } from "./localmap";
-import { buildSkyMap } from "./skymap";
+import { buildSkyMap, SKY_DEPTH_CHROMA_LO, SKY_DEPTH_CHROMA_HI } from "./skymap";
 import { prepareSkySource, buildSkySelectionFrom } from "./skyfine";
 import { makeRowDenoiser } from "./raw/denoise";
 import { makeRowDetail } from "./raw/detail";
@@ -1533,6 +1533,10 @@ function skyMaskFor(img: DecodedImage): BrushMask | null {
 /** The edit the current sky map was built for, so a draw that changes nothing
  *  the map depends on does not rebuild it. Cleared on open. */
 let skyMapKey = "";
+/** The sky map the renderer holds now, kept for the diagnostic report: its key
+ *  and the chroma the key was read from are the two numbers that say whether
+ *  the Sky depth slider can do anything on this photograph. */
+let lastSkyMap: SkyMap | null = null;
 
 /** Keep the renderer's sky chroma map matching the live edit.
  *  Takes nothing; reads `params`, `current` and `skyBitmap`; uploads a fresh
@@ -1554,10 +1558,10 @@ function syncSkyMap(): void {
     renderer.setSkyFine(skyFine);
   }
   if (!current || !skyBitmap || ((params.skySmooth ?? 0) <= 0 && (params.skyDepth ?? 0) <= 0)) {
-    if (skyMapKey) { renderer.setSkyMap(null); skyMapKey = ""; }
+    if (skyMapKey) { renderer.setSkyMap(null); skyMapKey = ""; lastSkyMap = null; }
     return;
   }
-  const { skySmooth: _s, skyDepth: _d, skySat: _ss, masks: _m, spots: _sp, stickers: _st, crop: _c, straighten: _str, warp: _w, grainAmt: _g, vigAmt: _v, ...rest } = params as EditParams & Record<string, unknown>;
+  const { skySmooth: _s, skyDepth: _d, masks: _m, spots: _sp, stickers: _st, crop: _c, straighten: _str, warp: _w, grainAmt: _g, vigAmt: _v, ...rest } = params as EditParams & Record<string, unknown>;
   const key = JSON.stringify(rest);
   if (key === skyMapKey) return;
   skyMapKey = key;
@@ -1568,7 +1572,8 @@ function syncSkyMap(): void {
   // saturated than the rendered one — skymap.ts has the measurement.
   const raw = (x: number, y: number) => linearAt(img, x, y);
   const pre = makeRowDetail(raw, makeRowDenoiser(raw, img.width, img.height, params.denoise, 1, params.chroma ?? 0, params.despeckle ?? 0), img.width, img.height, params.sharpen ?? 0, params.texture ?? 0, 1);
-  renderer.setSkyMap(buildSkyMap(pre, img.width, img.height, params, img.camMatrix, img.width / Math.max(1, img.height), undefined, currentLensCurve(), skyBitmap));
+  lastSkyMap = buildSkyMap(pre, img.width, img.height, params, img.camMatrix, img.width / Math.max(1, img.height), undefined, currentLensCurve(), skyBitmap);
+  renderer.setSkyMap(lastSkyMap);
 }
 
 /** What `applyLook` last wrote onto `params.texture`, so leaving a look that
@@ -2680,6 +2685,11 @@ function wireVersionMenu() {
     text.value = await buildDiagnostic(__APP_VERSION__, [
       { k: "Open now", v: current ? `a photo is open${real >= 2 ? ` in a session of ${real}` : ""}` : "nothing open" },
       { k: "Restore depth", v: autoLift ? `on at ${Math.round(liftAmount * 100)}% strength` : "off" },
+      // THE SKY MAP'S TWO NUMBERS. The depth key is decided once per photograph
+      // from the sky's mean rendered chroma (skymap.ts); a key of 0 is why a
+      // Sky depth slider does nothing, and the chroma beside it says how far
+      // below the window that sky sits.
+      { k: "Sky map", v: lastSkyMap ? `depth key ${lastSkyMap.key.toFixed(2)} from sky chroma ${lastSkyMap.chroma.toFixed(3)} (window ${SKY_DEPTH_CHROMA_LO}–${SKY_DEPTH_CHROMA_HI}) · sky saturation ${(params.skySat ?? 0).toFixed(2)}` : "none built" },
       // THE VIEW, because a photograph that fills the screen with no way out
       // looks the same in a screenshot whichever of four states caused it.
       { k: "View", v: viewDiagnostic() },
