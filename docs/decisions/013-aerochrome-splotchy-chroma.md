@@ -318,3 +318,12 @@ did not ship.
 **And it will be SHOWN, not described** — the candidates go back as pictures on
 the owner's own frames, per the standing rule and because the last four colour
 decisions were all made by looking.
+
+**Outcome, part one, corrected 2026-09-18.** The shipped stage corrupted every
+TIFF export: a channel pushed a hundredth past 1.0 wrapped in the 16-bit write
+(yellow-green sky, cyan branches), invisible on screen and in JPEGs. The first
+diagnosis blamed the blend's reach and was wrong; the walk that measures the
+exported file whole (`tools/sky-stage-walk.mjs`) is what caught both the defect
+and the misdiagnosis. Stage output and the 16-bit write now clamp; the
+chroma-distance gate stays. IR-SCIENCE §9l-ii.
+

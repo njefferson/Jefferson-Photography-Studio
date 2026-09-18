@@ -589,9 +589,17 @@ export async function exportImage(
         applyOnTop(sx, sy); // on-top stickers over the finished look, before grain (matches the shader)
         finishPixel(x, y); // creative vignette + grain, same as the JPEG path
         const o = (y * w + x) * 3;
-        rgb[o] = out[0] * 65535 + 0.5; // round — truncation biased the 16-bit output low
-        rgb[o + 1] = out[1] * 65535 + 0.5;
-        rgb[o + 2] = out[2] * 65535 + 0.5;
+        // CLAMPED BEFORE THE 16-BIT WRITE. A Uint16Array wraps: 1.01 stores as
+        // 0.01 and −0.02 as 0.98. The JPEG path never had this because
+        // Uint8ClampedArray clamps for it, and the preview's framebuffer
+        // clamps for the screen — so a stage that let a channel drift a
+        // hundredth past the range corrupted TIFF exports alone, invisibly
+        // everywhere else (measured 2026-09-18: yellow-green sky and cyan
+        // branches, 13,809 pixels of one export a full chroma range off). Every
+        // stage now clamps its own output too; this is the floor under them.
+        rgb[o] = Math.min(1, Math.max(0, out[0])) * 65535 + 0.5; // round — truncation biased the 16-bit output low
+        rgb[o + 1] = Math.min(1, Math.max(0, out[1])) * 65535 + 0.5;
+        rgb[o + 2] = Math.min(1, Math.max(0, out[2])) * 65535 + 0.5;
       }
     }
     onProgress?.(1);

@@ -2516,6 +2516,54 @@ Raw behaviour generally — levels, curves, matrices, highlight handling,
 metadata — follows dcraw/LibRaw and the DNG spec, and deviating from reference
 behaviour needs a written reason recorded in `NOTES.md`.
 
+### 9l-ii. THE STAGE CORRUPTED EVERY TIFF EXPORT, AND THE FIRST DIAGNOSIS WAS WRONG
+
+**Found 2026-09-18 by exporting, not by measuring.** The exported TIFF of the
+practice oak frame (NIR_0063) with Aerochrome on carried saturated blue and
+cyan along every branch and leaf gap and solid yellow-green speckle across the
+bright sky; NIR_1376's sky went pink beside its crown. The preview of the same
+state was clean, and so were 9l's three controls — 0 bytes outside the mask,
+mean held, residual down 86% — every one of them measured in floating point on
+the population being fixed. Read from the file: 13,809 pixels of one 700 px
+export moved by more than half the chroma range between the stage on and off,
+max 1.011, 99.9th percentile 0.931, where the mottle being smoothed is 0.06.
+
+**The first diagnosis said the blend was acting on pixels the soft 384 px mask
+leaked onto, and a gate on the pixel's chroma distance to the target was
+written, verified in node and built. The walk read the identical 1.011 on the
+gated build.** A blend bounded at 0.12 cannot move a pixel by 1.0, so it was
+never the blend. Exported again at amount 0.01, the same pixels still moved,
+and their colour said what it was: blue 0.98 to blue 0.03, red and green
+untouched. The stage had nudged a bright pixel's blue a hundredth past 1.0
+and `export.ts` stored `value × 65535` into a `Uint16Array` with no clamp, so
+1.01 became 0.01; a branch whose solved green went a little negative wrapped
+to 1.0 and turned cyan. The preview's framebuffer clamps; the JPEG path clamps
+through `Uint8ClampedArray`; the node reproduction used the JPEG path. Every
+clean result was clean for the one reason the TIFF was not.
+
+**Fixed three ways, and all three stay.** The stage clamps its own output in
+`compileEdit` and in the shader; the 16-bit write clamps as the floor under
+every stage; and the chroma-distance gate (`SKY_GATE_LO` 0.12, `SKY_GATE_HI`
+0.25) is kept, because a branch under a leaf gap IS half a range from the sky
+and should not be pushed toward it even by 0.12 — it was right about that and
+wrong about being the cause. The map's texels are now mask-weighted means with
+non-finite samples dropped, for the same reason.
+
+**The instrument that was missing is `tools/sky-stage-walk.mjs`**: the frame
+exported twice through the real app, TIFF at 25%, and the per-pixel chroma
+displacement between the two files bounded OVER THE WHOLE FRAME — max at the
+gate, 99.9th percentile at the mottle's amplitude, and a floor so a stage that
+does nothing also fails. It read 1.011 on the shipped build, 1.011 on the
+gated build, and **0.126 / 0.084 on the clamped build** — the blend's own
+ceiling at the gate (0.12 × the largest distance it still acts on) and the
+mottle's amplitude, which is what a smoothing stage should read. The node
+controls on NIR_3406 are unchanged by the clamp: 0 bytes outside the mask,
+mean 27.4 → 27.4, residual 15.9 → 2.2. Hub LESSONS §322.
+
+**What this means for 9l's figures:** they stand — they were measured in
+floating point on the working copy, where nothing wraps. What they never
+measured was the file.
+
 ### 9m. RESTORE DEPTH UNDER AEROCHROME — WHAT THE APP'S OWN BUTTONS DO, AND A PREMISE WITHDRAWN
 
 **Every sky figure in 9k and 9l was measured with Restore depth OFF.** The
