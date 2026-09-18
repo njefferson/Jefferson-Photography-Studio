@@ -29,7 +29,7 @@
 // 20–25 px footprint of a 2800 px frame, which is the measured radius, so no
 // further pass is needed and a strided kernel — the lattice trap 4c-xii and
 // 4c-xxii both record — never enters it.
-import { compileEdit, SKY_CHROMA_RANGE, smooth01, rgb2hsv, type EditParams, type BrushMask, type LensCurve, type LocalMap, type SkyMap } from "./pipeline";
+import { compileEdit, SKY_CHROMA_RANGE, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, smooth01, rgb2hsv, type EditParams, type BrushMask, type LensCurve, type LocalMap, type SkyMap } from "./pipeline";
 export { sampleSkyMap, decSkyChroma, type SkyMap } from "./pipeline";
 
 const REC = [0.2126, 0.7152, 0.0722];
@@ -92,7 +92,9 @@ const encC = (v: number) => Math.round(((Math.min(SKY_CHROMA_RANGE, Math.max(-SK
  *   key — the PHOTOGRAPH's key (SKY_DEPTH_CHROMA_LO/HI on the sky's mean
  *   rendered chroma, times the sky's hue band) times the texel's grey guard
  *   (SKY_DEPTH_GREY_LO/HI on its own mean chroma), 0 wherever the texel has
- *   no sky sample. `key` carries the photograph's number for the record.
+ *   no sky sample. `key` carries the photograph's number for the record, and
+ *   `chroma` the number the window read it from — the sky's mean rendered
+ *   chroma as the sky saturation stage will show it (display units).
  * What the result must satisfy: every texel's (a, b) is the MASK-WEIGHTED
  * mean chroma of the rendered sky over that texel's footprint with luma
  * discarded and non-finite samples dropped, so blending a pixel's chroma
@@ -171,18 +173,31 @@ export function buildSkyMap(
       gr += cr * wsum; gg += cg * wsum; gb += cb * wsum; gw += wsum;
     }
   }
-  // THE KEY, once per photograph: is the sky, taken as a whole, a blue sky.
-  let key = 0;
+  // THE KEY, once per photograph: is the sky, taken as a whole, a blue sky —
+  // THE SKY THE READER SEES. The texels above are rendered with the sky
+  // saturation stage off, so their mean is that stage's INPUT; the stage scales
+  // chroma about luma by 1 + skySat times a gate on the pixel's own saturation
+  // (pipeline.ts, SKY_SAT_GATE_LO..HI), and a sky is one colour to that gate,
+  // so the same factor on the mean colour is the mean the stage shows, to first
+  // order. Keyed on the input instead, the Sky depth slider went dead under a
+  // look carrying global saturation 1 with its sky's colour on this stage
+  // (aerochrome-walk 10e, 2026-09-18: value 0.923 at depth 0 and at 0.5).
+  let key = 0, chroma = 0;
   if (gw > 0) {
     const cr = gr / gw, cg = gg / gw, cb = gb / gw;
-    const [hh] = rgb2hsv(cr, cg, cb);
-    key = smooth01(SKY_DEPTH_CHROMA_LO, SKY_DEPTH_CHROMA_HI, Math.max(cr, cg, cb) - Math.min(cr, cg, cb)) * hueWeight(hh);
+    const [hh, ss] = rgb2hsv(cr, cg, cb);
+    const L = cr * REC[0] + cg * REC[1] + cb * REC[2];
+    const k = 1 + Math.max(0, Math.min(2, p.skySat ?? 0)) * smooth01(SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, ss);
+    const c01 = (v: number) => Math.min(1, Math.max(0, v));
+    const br = c01(L + (cr - L) * k), bg = c01(L + (cg - L) * k), bb = c01(L + (cb - L) * k);
+    chroma = Math.max(br, bg, bb) - Math.min(br, bg, bb);
+    key = smooth01(SKY_DEPTH_CHROMA_LO, SKY_DEPTH_CHROMA_HI, chroma) * hueWeight(hh);
   }
   for (let i = 0; i < W * H; i++) {
     if (rgba[i * 4 + 2] === 0 && texChroma[i] === 0) continue; // no sky sample: stays 0
     rgba[i * 4 + 3] = Math.round(255 * key * smooth01(SKY_DEPTH_GREY_LO, SKY_DEPTH_GREY_HI, texChroma[i]));
   }
-  return { width: W, height: H, rgba, key };
+  return { width: W, height: H, rgba, key, chroma };
 }
 
 /** The sky bitmap's weight at image-uv, the same bilinear-on-texel-centres
