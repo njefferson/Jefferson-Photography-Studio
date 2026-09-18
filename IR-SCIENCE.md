@@ -525,6 +525,14 @@ gaining colour, which is what the film's 13.8% says it should.
   frame and are the hazy horizon; on 3406, where they are 19% and include the
   concrete, the concrete moves 1%.
 
+**SHIPPED, 2026-09-18, on the owner's pick from the sheets:** `LOOKS.eir.raw.hsl`
+bands 4 and 5 read `35,2,1` and `0,2,1`. `aerochrome-walk` now drives every
+band's three sliders through the reader's own chips (check 7 held byte for
+byte again once the build carried the bands — it had failed first, against
+the 2.50.7 build, as it should) and gained check 10d: the sky's mean HSV
+saturation on NIR_0063 after the Look press, 0.393 shipped → 0.570 solved,
+floor 0.53. An increment, not a capability: two numbers in a look.
+
 **Value, by the band's luminance — REJECTED BY MEASUREMENT, and the reason is
 not the sky.** Luminance 0.7 lands the sky at 0.41–0.65, 0.5 at 0.31–0.50
 (1376 hits 0.31, 1644/1651 0.37, 3406 0.42, 0063 0.50). And at 0.5 it darkens
