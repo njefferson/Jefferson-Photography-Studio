@@ -76,6 +76,6 @@ sky once per tool.
 
 ## Rank
 
-Directly under 013, because 013's gravel half is the next population
-problem and needs the same machinery, and above 016 and the reported
-defects that do not touch the pipeline's selections.
+Fifth: the panel's last step is the reader's Sky mask, and that mask draws
+its own soft edge until it reads the refined selection; behind 019 because
+the look's amounts do not wait on it.

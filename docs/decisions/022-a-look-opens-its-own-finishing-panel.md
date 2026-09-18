@@ -79,6 +79,6 @@ profile Amount), fujixweekly.com (recipes), the course outline as recorded.
 
 ## Rank
 
-Second, directly under 019 and above 020: it is the shape 019's amounts get
-finished in per scene, and it decides where the sky route lands before that
-route is built.
+First (2026-09-18): the panel is the shape every finishing step lands in,
+so it is built before the steps it will hold are finished — 019's amounts,
+021's correction, 018's mask all arrive into it.

@@ -59,6 +59,6 @@ the photograph and says so; Done ends it and must leave nothing behind.
 
 ## Rank
 
-Second, directly under 019: a certain fix with a known cause in one function,
-on a state the reader cannot leave, which is the family 012 belongs to and
-this one reproduces on every session ended.
+Second: a certain fix with a known cause in one function, done on the way
+to 022 rather than queued behind it; the reader meets this state on every
+session ended.
