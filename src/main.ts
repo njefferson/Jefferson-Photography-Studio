@@ -39,7 +39,7 @@ import { generateCube } from "./lut";
 import { generateDcp } from "./dcp";
 import { buildGlowMap } from "./glow";
 import { buildLocalMap } from "./localmap";
-import { buildSkyMap, SKY_DEPTH_CHROMA_LO, SKY_DEPTH_CHROMA_HI } from "./skymap";
+import { buildSkyMap, SKY_DEPTH_CHROMA_LO, SKY_DEPTH_CHROMA_HI, SKY_DEPTH_GREY_LO, SKY_DEPTH_GREY_HI } from "./skymap";
 import { prepareSkySource, buildSkySelectionFrom } from "./skyfine";
 import { makeRowDenoiser } from "./raw/denoise";
 import { makeRowDetail } from "./raw/detail";
@@ -2689,7 +2689,7 @@ function wireVersionMenu() {
       // from the sky's mean rendered chroma (skymap.ts); a key of 0 is why a
       // Sky depth slider does nothing, and the chroma beside it says how far
       // below the window that sky sits.
-      { k: "Sky map", v: lastSkyMap ? `depth key ${lastSkyMap.key.toFixed(2)} from sky chroma ${lastSkyMap.chroma.toFixed(3)} (window ${SKY_DEPTH_CHROMA_LO}–${SKY_DEPTH_CHROMA_HI}) · sky saturation ${(params.skySat ?? 0).toFixed(2)}` : "none built" },
+      { k: "Sky map", v: lastSkyMap ? `depth key ${lastSkyMap.key.toFixed(2)} from sky chroma ${lastSkyMap.chroma.toFixed(3)} (window ${SKY_DEPTH_CHROMA_LO}–${SKY_DEPTH_CHROMA_HI}) · palest sky texel ${lastSkyMap.paleTexel.toFixed(3)} (grey guard ${SKY_DEPTH_GREY_LO}–${SKY_DEPTH_GREY_HI}) · sky saturation ${(params.skySat ?? 0).toFixed(2)}` : "none built" },
       // THE VIEW, because a photograph that fills the screen with no way out
       // looks the same in a screenshot whichever of four states caused it.
       { k: "View", v: viewDiagnostic() },

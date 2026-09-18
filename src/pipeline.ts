@@ -482,6 +482,10 @@ export interface SkyMap {
    *  sky saturation stage will show it, display-space HSV max−min, 0..1. For
    *  the record, the diagnostic and re-fitting the window (skymap.ts). */
   chroma: number;
+  /** The 5th-percentile texel chroma, on the same scale, among texels at
+   *  least half sky — the palest part of the sky the grey guard must NOT
+   *  spare. For the record and the diagnostic (skymap.ts). */
+  paleTexel: number;
 }
 /** Display-space chroma is bounded well inside ±0.5 for any sky; the encode
  *  maps ±this to 0..255. The shader decodes with the same constant. */

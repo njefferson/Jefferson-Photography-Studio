@@ -750,6 +750,21 @@ instrument, which was green on all three.
    edge from the guide — a 25 px ramp across a hard edge comes back 4 px
    wide, the probe's control — and the mask is solid to the roofline.
 
+**The key's scale is the look's, and it moved (2026-09-18, later the same
+day).** The window above was cut on the sky's mean rendered chroma under
+global saturation 3; 4b-vi moved the look to global saturation 1 with the
+sky's colour on the sky saturation stage, which the map renders WITHOUT (it
+cannot depend on itself), so every sky read a third of what the window
+expected, keyed to 0, and the slider went dead — found by the Aerochrome
+walk's 10e, written for the depth and first run after the look moved. The
+key and the grey guard now read their chroma as the stage will show it (the
+stage's factor on the mean colour, about its luma), the version report prints
+the numbers (a "Sky map" line: key, chroma, palest sky texel, both windows),
+and the window was re-cut from those numbers: overcast 0.018 against blue
+skies 0.074–0.319 at the look's sky saturation, window 0.035–0.065; the
+no-sky frame reads 0.453 and is refused by the hue band. Decision record
+017, Outcome part four, has the per-frame table in prose.
+
 ### 4b-vi. SATURATION BY POPULATION — FOLIAGE, SKY, AND NOTHING THAT HAS NO COLOUR
 
 **The report, 2026-09-18, from staging 2.50.10 on the device:** the look's

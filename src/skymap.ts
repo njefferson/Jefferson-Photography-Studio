@@ -47,20 +47,33 @@ const SUB = 2;
 
 /** The DEPTH's keying window on the SKY'S mean rendered chroma — ONE number
  *  per photograph and edit, the HSV max−min of the bitmap-weighted mean colour
- *  over every sky texel, display space: no depth below LO, full above HI.
- *  Measured 2026-09-18 with the aqua and blue saturation the look ships: an
- *  overcast sky (NIR_2082) reads 0.27, a frame with no sky whose bitmap fires
- *  anyway (NIR_0627) 0.31, the clear skies 0.43–0.57. The film does not darken
- *  an overcast sky — white light records through every layer — so this is
+ *  over every sky texel AS THE SKY SATURATION STAGE WILL SHOW IT, display
+ *  space: no depth below LO, full above HI. The film does not darken an
+ *  overcast sky — white light records through every layer — so this is
  *  physics before it is taste. AND IT IS PER PHOTOGRAPH ON PURPOSE: keyed per
  *  pixel, NIR_2082 snowed; keyed per TEXEL, a clear sky's own chroma gradient
  *  became the depth map — NIR_3406's hot-spot centre stayed pale inside a
  *  ring of dark texel blocks, and 2082's overcast grew dark blocks wherever
  *  one texel crossed the window (IR-SCIENCE 4b-v). A sky's chroma varies
  *  across a frame by more than any window is wide; the decision has to be
- *  made once for the sky it describes. */
-export const SKY_DEPTH_CHROMA_LO = 0.32;
-export const SKY_DEPTH_CHROMA_HI = 0.42;
+ *  made once for the sky it describes.
+ *  MEASURED TWICE, because the scale moved under it. 2026-09-18 with global
+ *  saturation 3 and the sky's colour on the aqua and blue chips: overcast
+ *  (NIR_2082) 0.27, a frame with no sky whose bitmap fires anyway (NIR_0627)
+ *  0.31, the clear skies 0.43–0.57, so 0.32–0.42. The same evening the look
+ *  moved to global saturation 1 with the sky's colour on the sky saturation
+ *  stage, and read off the version report's "Sky map" line at the look's own
+ *  sky saturation of 1.0 the same skies read: 2082 0.018 (and 0.018 at any
+ *  sky saturation — the gate gives an overcast sky nothing), 3406 0.074,
+ *  0063 0.119, 1651 0.145, 1376 0.221, 1644 0.319; 0627 reads 0.453 and
+ *  keys to 0 on its HUE, which is what the hue band below is for. Under the
+ *  old window every one of them keyed to 0 and the slider was dead
+ *  (aerochrome-walk 10e). The window sits between the overcast sky and the
+ *  palest blue one with the same margin as before: 0.035–0.065 keys 2082 to
+ *  0 and every blue sky to 1 at the look's sky saturation (3406 to 0.90 with
+ *  that stage at 0, where it reads 0.059). */
+export const SKY_DEPTH_CHROMA_LO = 0.035;
+export const SKY_DEPTH_CHROMA_HI = 0.065;
 /** And on the sky's mean hue — the sky's band, 175–245° fading over 25° each
  *  side — so a bitmap that fired on a blurred red background keys to nothing. */
 const hueWeight = (h: number) => smooth01(150, 175, h) * (1 - smooth01(245, 270, h));
@@ -94,7 +107,9 @@ const encC = (v: number) => Math.round(((Math.min(SKY_CHROMA_RANGE, Math.max(-SK
  *   (SKY_DEPTH_GREY_LO/HI on its own mean chroma), 0 wherever the texel has
  *   no sky sample. `key` carries the photograph's number for the record, and
  *   `chroma` the number the window read it from — the sky's mean rendered
- *   chroma as the sky saturation stage will show it (display units).
+ *   chroma as the sky saturation stage will show it (display units) — and
+ *   `paleTexel` the 5th-percentile texel chroma on that scale among texels
+ *   at least half sky, which is what the grey guard's window is set from.
  * What the result must satisfy: every texel's (a, b) is the MASK-WEIGHTED
  * mean chroma of the rendered sky over that texel's footprint with luma
  * discarded and non-finite samples dropped, so blending a pixel's chroma
@@ -182,22 +197,33 @@ export function buildSkyMap(
   // order. Keyed on the input instead, the Sky depth slider went dead under a
   // look carrying global saturation 1 with its sky's colour on this stage
   // (aerochrome-walk 10e, 2026-09-18: value 0.923 at depth 0 and at 0.5).
-  let key = 0, chroma = 0;
+  let key = 0, chroma = 0, k = 1;
   if (gw > 0) {
     const cr = gr / gw, cg = gg / gw, cb = gb / gw;
     const [hh, ss] = rgb2hsv(cr, cg, cb);
     const L = cr * REC[0] + cg * REC[1] + cb * REC[2];
-    const k = 1 + Math.max(0, Math.min(2, p.skySat ?? 0)) * smooth01(SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, ss);
+    k = 1 + Math.max(0, Math.min(2, p.skySat ?? 0)) * smooth01(SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, ss);
     const c01 = (v: number) => Math.min(1, Math.max(0, v));
     const br = c01(L + (cr - L) * k), bg = c01(L + (cg - L) * k), bb = c01(L + (cb - L) * k);
     chroma = Math.max(br, bg, bb) - Math.min(br, bg, bb);
     key = smooth01(SKY_DEPTH_CHROMA_LO, SKY_DEPTH_CHROMA_HI, chroma) * hueWeight(hh);
   }
+  // The grey guard reads each texel's chroma on the same scale as the key —
+  // as the stage will show it, the photograph's one factor on the texel's own
+  // mean — or a look that moves the sky's colour onto that stage puts every
+  // texel of a clear sky onto the guard's ramp and the depth comes out in
+  // blocks. `paleTexel` is the 5th percentile of the sky's texels, the number
+  // the guard's window is set from.
+  const shown: number[] = [];
   for (let i = 0; i < W * H; i++) {
     if (rgba[i * 4 + 2] === 0 && texChroma[i] === 0) continue; // no sky sample: stays 0
-    rgba[i * 4 + 3] = Math.round(255 * key * smooth01(SKY_DEPTH_GREY_LO, SKY_DEPTH_GREY_HI, texChroma[i]));
+    const tc = Math.min(1, texChroma[i] * k);
+    if (rgba[i * 4 + 2] >= 128) shown.push(tc);
+    rgba[i * 4 + 3] = Math.round(255 * key * smooth01(SKY_DEPTH_GREY_LO, SKY_DEPTH_GREY_HI, tc));
   }
-  return { width: W, height: H, rgba, key, chroma };
+  shown.sort((a, b) => a - b);
+  const paleTexel = shown.length ? shown[Math.floor(shown.length * 0.05)] : 0;
+  return { width: W, height: H, rgba, key, chroma, paleTexel };
 }
 
 /** The sky bitmap's weight at image-uv, the same bilinear-on-texel-centres
