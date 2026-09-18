@@ -149,14 +149,17 @@ const NEUTRAL = (t) => t[0] === 0 && t[1] === 1 && t[2] === 1;
 // (ir.html). Every value the look declares must be reachable by hand.
 const HUE_LIMIT = 60, SAT_RANGE = [0, 2], LUM_RANGE = [0.3, 1.7];
 // 019: THE LOOK'S SATURATION BY POPULATION. Global Saturation 1 — the 3.0
-// that used to colour every pixel is gone — and the Colour tab's Sky and
-// Foliage bands carry it, each its own amount, each a boost that
-// pipeline.ts bandGain gates on the pixel's own chroma, so a pixel with no
-// colour gains none. The amounts were chosen from rendered sheets
-// (IR-SCIENCE 4b-vi). Sliders: Saturation 0..3, each band's saturation 0..2.
+// that used to colour every pixel is gone. The foliage's amount is the
+// Colour tab's Foliage band (a population by what it is), a boost that
+// pipeline.ts bandGain gates on the pixel's own chroma; the sky's amount is
+// the Sky saturation slider beside Sky depth — where the sky IS, through
+// the selection built at open, gated the same way so a cloud stays grey.
+// Nothing without colour gains any. The amounts were chosen from rendered
+// sheets (IR-SCIENCE 4b-vi). Sliders: Saturation 0..3, Foliage band 0..2,
+// Sky saturation 0..2.
 const GLOBAL_SAT = 1.0;
 const FOL_SAT = 2.0;
-const SKY_SAT = 2.0;
+const SKY_SAT = 1.0;
 const GLOBAL_SAT_RANGE = [0, 3], BAND_SAT_RANGE = [0, 2];
 // 10d: the sky's saturation on RAW after the Look press, mean HSV saturation of
 // the same population 10b measures the angle of. MADE TO FAIL FIRST, 2026-09-18:
@@ -252,7 +255,7 @@ try {
   const depthv = (p) => p.evaluate(() => Number(document.getElementById("skyDepth").value));
   const satv = (p) => p.evaluate(() => Number(document.getElementById("sat").value));
   const folv = (p) => p.evaluate(() => Number(document.getElementById("folSat").value));
-  const skyBv = (p) => p.evaluate(() => Number(document.getElementById("skySat").value));
+  const skyBv = (p) => p.evaluate(() => Number(document.getElementById("skySatSel").value));
 
   // ---- 0. THE CONTROL. Without this every check below could pass on an
   // instrument that reads the same nine numbers whatever is pressed.
@@ -282,12 +285,12 @@ try {
   check("4a3 ...and its sky depth", await depthv(a.p), DEPTH);
   check("4a4 ...its global saturation of 1 (the colour goes where the colour is)", await satv(a.p), GLOBAL_SAT);
   check("4a5 ...the foliage band's own amount", await folv(a.p), FOL_SAT);
-  check("4a6 ...and the sky band's own amount", await skyBv(a.p), SKY_SAT);
+  check("4a6 ...and the sky's own amount, through the selection", await skyBv(a.p), SKY_SAT);
   await press(a.p, "lookAero");
   check("4b  ...and leaving it puts the photograph back to none", await tex(a.p), 0);
   check("4b2 ...the sky smoothing too", await skyv(a.p), 0);
   check("4b3 ...the sky depth too", await depthv(a.p), 0);
-  check("4b4 ...and both bands", [await folv(a.p), await skyBv(a.p)], [1, 1]);
+  check("4b4 ...the foliage band and the sky's amount too", [await folv(a.p), await skyBv(a.p)], [1, 0]);
 
   // A VALUE THE READER SET IS NOT OURS TO THROW AWAY, in either direction --
   // the same pair of claims the denoise floor carries below, and the reason
@@ -369,7 +372,7 @@ try {
     // global amount and the two bands. Pink IR left global saturation at 3.
     await setSlider(p, "sat", GLOBAL_SAT);
     await setSlider(p, "folSat", FOL_SAT);
-    await setSlider(p, "skySat", SKY_SAT);
+    await setSlider(p, "skySatSel", SKY_SAT);
     await setDn(p, Math.max(measured, FLOOR));
     const h = await hash(p);
     await ctx.close();
@@ -436,15 +439,15 @@ try {
     console.log(`        (sky value ${m.skyVal == null ? "none" : m.skyVal.toFixed(3)} at depth ${DEPTH}, ${m2.skyVal == null ? "none" : m2.skyVal.toFixed(3)} at ${DEPTH_TRY}; drop floor ${SKY_VAL_DROP_MIN}, n=${m.ns})`);
   }
 
-  // ---- 10f. NOTHING WITHOUT COLOUR TAKES ANY. The look's bare mapping (both
-  // bands at 1) says which pixels have no colour; the whole look must leave
-  // them that way. Read on the same canvas, pixel for pixel, so the two
+  // ---- 10f. NOTHING WITHOUT COLOUR TAKES ANY. The look's bare mapping (the
+  // Foliage band at 1, Sky saturation at 0) says which pixels have no colour;
+  // the whole look must leave them that way. Read on the same canvas, pixel for pixel, so the two
   // renders are compared where they are drawn.
   {
     const { p, ctx } = await open();
     await press(p, "lookEir");
     await setSlider(p, "folSat", 1);
-    await setSlider(p, "skySat", 1);
+    await setSlider(p, "skySatSel", 0);
     await p.evaluate((lo) => {
       const cv = document.querySelector("#view");
       const g = cv.getContext("webgl2") || cv.getContext("webgl");

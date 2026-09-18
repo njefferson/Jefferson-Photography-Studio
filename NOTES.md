@@ -546,11 +546,16 @@ user-scalable=no.
   is. What the look did: a global saturation of 3.0 on every raw pixel, and a
   power curve of 2 on the aqua and blue chips that lifted the palest blues
   most — so bare ground, grey walls, an overcast sky and clouds all took
-  colour. The fix: global saturation 1, the Colour tab's own Sky and Foliage
-  bands carry the look's amounts, and every band BOOST is gated on the
-  pixel's own chroma (`bandGain`, `SAT_GUARD_LO..HI`) in both pipelines. The
-  amounts are chosen from rendered sheets; the record carries the research
-  and the rejected routes (`docs/decisions/019-aerochrome-colour-by-population.md`).
+  colour. The fix follows the framing that produced the idea — what needs to
+  happen to which PORTION of the photograph, never the whole: global
+  saturation 1; the foliage's amount on the Colour tab's own Foliage band (a
+  population by what it is), with every band BOOST gated on the pixel's own
+  chroma (`bandGain`, `SAT_GUARD_LO..HI`); the sky's amount on a Sky
+  saturation slider beside Sky depth (`skySat`) — where the sky IS, through
+  the selection built at open, gated the same way so a cloud stays grey; the
+  neutrals protected by what they lack. Both pipelines. The amounts are
+  chosen from rendered sheets; the record carries the research and the
+  rejected routes (`docs/decisions/019-aerochrome-colour-by-population.md`).
 - [ ] **A photograph that fills the screen with no way back out** <!-- decision: 012 --> — reported
   from the iPad 2026-09-17: a photograph in the full view appeared zoomed in, and
   neither zooming out nor scrolling brought the rest of it back. Two failures, and
