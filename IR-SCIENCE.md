@@ -2564,6 +2564,42 @@ mean 27.4 → 27.4, residual 15.9 → 2.2. Hub LESSONS §322.
 floating point on the working copy, where nothing wraps. What they never
 measured was the file.
 
+### 9l-iii. THE STAGE MEASURED ON THE EXPORTED FILE WITH RESTORE DEPTH ON — THE RENDERING THE DEVICE SHOWS
+
+**Run 2026-09-18 on the clamped build (2.50.6), through the app's own Export &
+Save**: 16-bit TIFF at 50% (a 2×2 average of the native render, `export.ts`
+ss = 2 — so not the binned working copy 9k/9l rendered, and the node figures
+are reported beside it rather than gated on), five exports per frame —
+Aerochrome with Restore depth ON at sky smoothing 1 and 0, Pink IR with the
+lift on, and the lift-OFF pair. Measured on the exported pixels over
+`buildSkyMask`'s population, dark third by the Pink IR export's luma, p95 at
+the 12 px lag. Controls first: every export the decode's size (NIR_1651's
+portrait export turned back by luma correlation 0.936 against −0.142 the other
+way), the lift-off pair showing 9l's shape (18.0 → 3.3, mean 47.3 → 47.1), and
+the mean held within 1% on all four frames with the lift on.
+
+- NIR_3406 (the defect frame): Pink IR 16.8; Aerochrome lift ON 21.9 → 4.0,
+  82% removed; lift OFF 18.0 → 3.3, 82%.
+- NIR_0063: Pink 3.6; lift ON 4.9 → 2.6, 47%; lift OFF the same.
+- NIR_1651: Pink 4.4; lift ON 10.7 → 4.8, 56%; lift OFF 13.9 → 6.0, 57%.
+- NIR_1376 (no defect): Pink 17.8; lift ON 8.2 → 2.5, 69%.
+
+**So 9m's prediction held both ways.** With Restore depth on, the stage-off
+residual sits above the lift-off reading where the lift fires (21.9 against
+18.0 on 3406; 10.7 against 13.9 on 1651 goes the other way, where the lift's
+tone half lowered the sky's contrast), and the FRACTION the stage removes is
+the same to within a point whichever way the lift is set. After the stage,
+Aerochrome's sky on the exported file reads a quarter of Pink IR's on the
+frame that was reported, and at or below Pink IR's on the other three. That is
+the number the device gets, on the rendering the device shows.
+
+**What the export path is not:** the working copy. Its stage-off residual on
+3406 reads 18.0 against the node harness's 15.9 and its mean chroma 47.3
+against 36.9, because a native render averaged 2×2 keeps more of the look's
+chroma than a render of the 2×2-binned decode. The preview and the file differ
+by that much in sky chroma before any stage runs; `agreement-walk` compares
+param paths, not scales, and this is recorded as a finding, not a defect.
+
 ### 9m. RESTORE DEPTH UNDER AEROCHROME — WHAT THE APP'S OWN BUTTONS DO, AND A PREMISE WITHDRAWN
 
 **Every sky figure in 9k and 9l was measured with Restore depth OFF.** The
