@@ -1439,6 +1439,51 @@ same instant" is not a contrived sequence on the target device — it is what a
 long culling session looks like. Fixing it is a design decision (block, or
 write on `pagehide`), not a tail-end patch.
 
+## A change to two test walks was the newest patch note, 2026-09-18
+
+**What was wrong.** The top line of "What's new" — in the ⓘ dialog and on
+`notes.html`, on production, labelled v2.51.1 — read "Two walks measure what
+they ask about". That commit (0433b30) changed `tools/sky-stage-walk.mjs` and
+`tools/tile-truth-walk.mjs` and nothing else. Nothing a reader receives moved,
+and the sentence is written for whoever maintains the walks.
+
+**Why it got through.** `filteredLog` in `vite.config.ts` kept housekeeping out
+of the notes by a SUBJECT PREFIX — `Roadmap:`, `Notes:`, `Docs:`, `Internal:`,
+`Chore:` — which is a label the author has to remember to write. The commit
+carried none. A filter keyed on a label fails open on exactly the commit nobody
+labelled, and the one it failed on had already been deployed, verified against
+the remote and the served `sw.js`, and reported as shipped; the dialog was the
+only place the defect was visible, and the dialog is not on any walk's list of
+things to read for that.
+
+**The fix reads what the commit touched.** One `git log --name-only` call
+carries each commit's file list beneath its line; a commit whose every path
+matches `INTERNAL_PATH` — `tools/`, `docs/`, `palettes/`, `presets/`,
+`asset-factory/`, `.github/`, `.claude/`, `.githooks/`, any root dotfile, any
+`.md` — is out, whatever its subject says. The prefix rule stays beside it. An
+empty path list (an empty commit; a merge shown without its diff) is internal
+too, which also drops a "Merge pull request" line should one ever land on the
+linear history. The version is now resolved only for the survivors, since it
+costs three git calls apiece, and the look-behind widened from `want·2+10` to
+`want·3+20` commits so two filters cannot starve the list.
+
+**A DENY-list, on purpose.** A root this repo grows later is treated as shipped
+and its commits show in the dialog, where a wrong line is SEEN — this entry is
+the proof that a wrong line there gets noticed. An allow-list of shipped roots
+would drop a new root's commits in silence. Same choice, same reason, as the
+hub's `binary-files.mjs` (LESSONS §243).
+
+**Measured, fail first.** A build at 0433b30 before the change carried the line
+in both app chunks and in `notes.html`, as the newest entry. After the change:
+no chunk and no page carries it; the bundle lists five entries headed by the
+2.51 release commit; `notes.html` still lists fifty, so nothing starved.
+
+**What stays prose.** The path rule decides WHETHER a commit is a patch note.
+Whether its subject is written for the reader — what changed for them, not how
+— has no parser and is the standing rule in `CLAUDE.md`. The walk commit stays
+in `main`'s history as written; rewriting production history for a subject
+line is not a session's call, and the generator no longer reads it.
+
 ## The patch notes labelled three releases with a commit count, 2026-09-14
 
 **FOUND BY VERIFYING A DEPLOY, not by looking for it.** Comparing the bundle the

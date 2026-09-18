@@ -78,24 +78,52 @@ function versionFor(fullHash: string, base = versionBaseAt(fullHash)): string {
 }
 
 /** Internal housekeeping commits (planning notes, docs, CI) are real history
- *  but not user-facing changes — they must not read as "What's new". */
+ *  but not user-facing changes — they must not read as "What's new". The
+ *  subject prefix is the author's word for it; the path rule below is the
+ *  fact, and a commit is out on either. */
 const INTERNAL_SUBJECT = /^(Roadmap|Notes|Docs|Internal|Chore):/i;
 
-/** The last `want` USER-FACING commits (internal subjects filtered out), each
- *  with its real version number. Shared by the in-app changelog and the public
- *  notes.html page. Reads extra history so the filter can't starve the list. */
+/** A path the reader never receives: the app's own checks and walks, its
+ *  records and decisions, the palette artefact, the presets, the asset
+ *  factory, CI, hooks, every root dotfile and every markdown file. A commit
+ *  that touches ONLY these changes nothing in the build, so it is not a patch
+ *  note however its subject is written — 0433b30 changed two walks under
+ *  tools/, carried no prefix, and reached production as the newest line of
+ *  "What's new". A DENY-list on purpose: a root this repo grows later
+ *  is treated as shipped and shows in the dialog, where a wrong line is seen;
+ *  an allow-list would drop its commits in silence (the hub's binary-files
+ *  lesson, §243, is the same choice for the same reason). */
+const INTERNAL_PATH = /^(tools|docs|palettes|presets|asset-factory|\.github|\.claude|\.githooks)\/|^\.[^/]+$|\.md$/;
+
+/** True when nothing the commit touched reaches the reader. An empty list (an
+ *  empty commit, or a merge shown without its diff) has nothing shipped in it
+ *  and is internal too. */
+function internalPaths(paths: string[]): boolean {
+  return paths.every((p) => INTERNAL_PATH.test(p));
+}
+
+/** The last `want` USER-FACING commits, each with its real version number:
+ *  internal subjects and commits that touched only internal paths are out.
+ *  Shared by the in-app changelog and the public notes.html page. One git call
+ *  reads the log with each commit's file list beneath its line; the version is
+ *  resolved only for the survivors, because it costs three git calls apiece.
+ *  Reads extra history so the filters can't starve the list. */
 function filteredLog(want: number) {
   try {
-    const out = git(`git log -${want * 2 + 10} --pretty=format:"%h|%H|%ad|%s" --date=short`);
-    return out
-      .split("\n")
-      .filter(Boolean)
-      .map((line) => {
-        const [hash, full, date, ...rest] = line.split("|");
-        return { hash, date, subject: rest.join("|"), version: versionFor(full) };
-      })
-      .filter((c) => !INTERNAL_SUBJECT.test(c.subject))
-      .slice(0, want);
+    const out = git(
+      `git log -${want * 3 + 20} --pretty=format:"%h|%H|%ad|%s" --date=short --name-only`,
+    );
+    const commits: { hash: string; full: string; date: string; subject: string; paths: string[] }[] = [];
+    for (const line of out.split("\n")) {
+      if (!line) continue;
+      const m = line.match(/^([0-9a-f]{7,})\|([0-9a-f]{40})\|(\d{4}-\d{2}-\d{2})\|(.*)$/);
+      if (m) commits.push({ hash: m[1], full: m[2], date: m[3], subject: m[4], paths: [] });
+      else commits[commits.length - 1]?.paths.push(line);
+    }
+    return commits
+      .filter((c) => !INTERNAL_SUBJECT.test(c.subject) && !internalPaths(c.paths))
+      .slice(0, want)
+      .map((c) => ({ hash: c.hash, date: c.date, subject: c.subject, version: versionFor(c.full) }));
   } catch {
     return [];
   }
