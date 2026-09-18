@@ -28,6 +28,7 @@
 // spends and was measured against. Safari reports no memory at all, so a device
 // that does not say gets the conservative number rather than the optimistic one.
 import { prepareSkySource, type SkySource } from "./skyfine";
+import { applyLensPlan, type LensPlan } from "./lensflat";
 import { requestSkySelection } from "./skyClient";
 import { decode as decodeHere, type DecodedImage } from "./decode";
 import type { ImportedFile } from "./import";
@@ -49,6 +50,10 @@ export interface DecodeTiming {
 }
 
 export interface DecodeOptions {
+  /** The lens flat to lay on the linear copy at decode, before the sky
+   *  selection and every automatic are measured (decision 021). The worker
+   *   applies it; the main-thread fallback applies the same. Absent = none. */
+  lens?: LensPlan | null;
   /** Called once when the decode settles, win or lose. Reporting only — it must
    *  never change what is decoded or when. */
   onTiming?: (t: DecodeTiming) => void;
@@ -97,7 +102,7 @@ const queue: {
   reject: (e: Error) => void;
   onTiming?: (t: DecodeTiming) => void;
   queuedAt: number;
-  depth: number; sky?: boolean }[] = [];
+  depth: number; sky?: boolean; lens?: LensPlan | null }[] = [];
 
 function laneCount(): number {
   const nav = typeof navigator !== "undefined" ? navigator : undefined;
@@ -181,14 +186,14 @@ function pump(): void {
     try {
       // Bytes are COPIED, not transferred: the caller still needs them to write
       // the photo into storage.
-      lane.worker.postMessage({ id, file: job.file, sky: !!job.sky });
+      lane.worker.postMessage({ id, file: job.file, sky: !!job.sky, lens: job.lens ?? null });
     } catch {
       lane.pending.delete(id);
       const i = lanes.indexOf(lane);
       if (i >= 0) lanes.splice(i, 1);
       if (!lanes.length) allDead = true;
       // Could not even post — this decode falls back, and the lane is gone.
-      decodeOnThisThread(job.file, job.onTiming, job.queuedAt, job.depth, job.sky).then(job.resolve, job.reject);
+      decodeOnThisThread(job.file, job.onTiming, job.queuedAt, job.depth, job.sky, job.lens).then(job.resolve, job.reject);
     }
   }
 }
@@ -204,9 +209,9 @@ function pump(): void {
 export function decodeOffThread(file: ImportedFile, opts?: DecodeOptions): Promise<DecodedImage> {
   ensureLanes();
   const queuedAt = performance.now();
-  if (allDead || !lanes.length) return decodeOnThisThread(file, opts?.onTiming, queuedAt, 0, opts?.sky);
+  if (allDead || !lanes.length) return decodeOnThisThread(file, opts?.onTiming, queuedAt, 0, opts?.sky, opts?.lens);
   return new Promise<DecodedImage>((resolve, reject) => {
-    const job = { file, resolve, reject, onTiming: opts?.onTiming, queuedAt, depth: queue.length, sky: opts?.sky };
+    const job = { file, resolve, reject, onTiming: opts?.onTiming, queuedAt, depth: queue.length, sky: opts?.sky, lens: opts?.lens ?? null };
     if (opts?.front) queue.unshift(job);
     else queue.push(job);
     pump();
@@ -217,10 +222,10 @@ export function decodeOffThread(file: ImportedFile, opts?: DecodeOptions): Promi
  *  go quiet on the devices that need it most. Nothing waited for a lane here, so
  *  the queued half is zero by definition rather than by omission. */
 function decodeOnThisThread(
-  file: ImportedFile, onTiming: ((t: DecodeTiming) => void) | undefined, queuedAt: number, depth: number, sky?: boolean,
+  file: ImportedFile, onTiming: ((t: DecodeTiming) => void) | undefined, queuedAt: number, depth: number, sky?: boolean, lens?: LensPlan | null,
 ): Promise<DecodedImage> {
   const startedAt = performance.now();
-  const p = decodeHere(file).then((img) => { if (sky) img.skySelReady = requestSkySelection(prepareSkySource(img)).then((sel) => { if (sel) img.skySel = sel; return sel; }); return img; });
+  const p = decodeHere(file).then((img) => { applyLensPlan(img, lens ?? null); return img; }).then((img) => { if (sky) img.skySelReady = requestSkySelection(prepareSkySource(img)).then((sel) => { if (sel) img.skySel = sel; return sel; }); return img; });
   if (onTiming) {
     const done = () => onTiming({ queued: startedAt - queuedAt, run: performance.now() - startedAt, depth, offThread: false });
     p.then(done, done);

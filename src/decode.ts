@@ -41,6 +41,10 @@ export interface DecodedImage {
   pixels?: Uint8ClampedArray;
   /** Linear float RGBA (mosaiced-raw path). Present instead of `pixels`. */
   linear?: Float32Array;
+  /** What the linear copy was corrected with at decode (the lens flat,
+   *  decision 021), so a later strength re-applies as a ratio against it.
+   *  Absent on 8-bit sources, which take the correction inside the grade. */
+  lensApplied?: import("./lensflat").LensApplied;
   /** Camera-native -> linear sRGB 3x3 (row-major), applied after white balance.
    *  Present only for camera-native raw (NEF, mosaiced DNG); absent when the
    *  source is already display/profiled (JPEG, preview, lossy-linear DNG). */
