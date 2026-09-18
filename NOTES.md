@@ -1449,6 +1449,22 @@ same instant" is not a contrived sequence on the target device — it is what a
 long culling session looks like. Fixing it is a design decision (block, or
 write on `pagehide`), not a tail-end patch.
 
+## The frame's aperture against the body's diffraction limit, 2026-09-18
+
+The diagnostic report carries an **Aperture** line beside the lens entry:
+the EXIF ƒ-number and which side of the converted body's diffraction limit it
+sits on, with the three thresholds printed. The limit is Rob Shea's
+calculator's (diffraction.cam — the fetch tool refused the host, curl through
+the session proxy read it): Airy disk over pixel pitch at the longest
+infrared wavelength it counts, 1000 nm, Safe at 3, Caution 3.75, Avoid 4.5,
+snapped to the third stop. The pitch is `sensorPitchMicrons` in
+`src/color.ts` — Z 50 4.22 µm, D5300 3.92 µm, from the page — with NO default
+body: a missing aperture or an unknown body says so in words, because the
+line is a claim about the reader's frame. For the Z 50 converted: safe to
+ƒ/5, caution to ƒ/6.3, visible softening from ƒ/8. IR-SCIENCE.md §9h carries
+the source and the numbers; `conversion-walk` asserts both branches of the
+line on a real NEF and a practice DNG.
+
 ## The Sky mask, read from the reader's side, 2026-09-18
 
 **Why a field-standard fix reached this record from a screenshot.** A Sky
