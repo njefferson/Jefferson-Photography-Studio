@@ -853,6 +853,19 @@ reads saturation 1, so its off-sky quantiles were dominated by shadow and
 its foliage population was polluted with it. Excluding value under 0.05 put
 the two instruments within 0.01 of each other on every population.
 
+**And a third, from the same instrument the next day.** Restore depth is a
+toggle, and applying a look does not reset it, so an arm that wanted it off
+pressed it without looking: the first such arm turned it off and the next
+turned it back on, and of four candidate arms two rendered WITH the per-frame
+top-up they were meant to exclude. The control state recorded under each
+render is what said so — six arms in a row reading lift false, true, false,
+true — and nothing in the pictures did, because a top-up and a stronger band
+look alike on a sheet. The arm now reads the toggle's `aria-pressed` and
+presses only when it differs from the state it asked for, and every render's
+caption carries the state read back, never the state intended. The earlier
+candidate sheets (2026-09-18, before the band-centre fix) were captioned from
+intent and are void for that reason as well.
+
 **What Rob Shea does with masks, as far as this container could read.** Shea's
 Lightroom Classic colour-infrared workflow (post and video of 2021-12-23,
 "Edit Infrared Photography in Lightroom Classic") is white balance, then a
