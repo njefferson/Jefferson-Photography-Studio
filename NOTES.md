@@ -565,6 +565,19 @@ user-scalable=no.
   frame it drew. The fix is to clear the stage in the same teardown, and a
   journey-walk check that presses Done and asserts an empty stage
   (`docs/decisions/020-done-leaves-the-last-photograph-behind-the-start-screen.md`).
+- [ ] **The lens correction belongs on the linear raw before anything else** <!-- decision: 021 --> —
+  raised 2026-09-18: the hot-spot correction is applied inside the compiled
+  edit, after the white balance and before the matrix, the swap and the
+  look — inside the grade — while the automatics and the sky selection are
+  measured on the uncorrected decode. IR-SCIENCE 9c has the placement from
+  four references (RawPedia, the DNG GainMap, Lightroom, darktable): linear
+  raw at the beginning of the pipeline, before the grade. The route is one
+  radial pass on the linear working copy in the decode worker (and on the
+  export's source), the uncorrected copy kept so the strength slider
+  re-applies from it, the measurements taken after it, the stage removed
+  from the pipelines, clipping bounded against the raw white level; held by
+  the agreement walk on all four paths
+  (`docs/decisions/021-lens-correction-belongs-on-the-linear-raw-before-anything-else.md`).
 - [ ] **A photograph that fills the screen with no way back out** <!-- decision: 012 --> — reported
   from the iPad 2026-09-17: a photograph in the full view appeared zoomed in, and
   neither zooming out nor scrolling brought the rest of it back. Two failures, and
