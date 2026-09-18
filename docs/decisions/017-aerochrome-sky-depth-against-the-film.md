@@ -124,10 +124,37 @@ the owner's pick from the pictures; the value half is re-ranked behind a
 boundary-accurate sky selection, which is the selection 006 (mask by subject)
 also needs.
 
+## Outcome, part one — the saturation half, 2026-09-18
+
+**Shipped on the owner's pick from the sheets:** the look's aqua and blue bands
+carry a saturation power of 2 (`src/main.ts` `LOOKS.eir.raw.hsl`, `35,2,1` and
+`0,2,1`). Measured through the app with Restore depth on: three of seven
+skies inside the film's window (1376 0.81, 1644 0.87, 1651 0.70 against
+0.66–0.92), the pale four halfway (3406 0.38 → 0.56, 0063 0.38 → 0.57, 0627
+0.17 → 0.39, 2082 0.21 → 0.37); foliage saturation, value and every hue angle
+unchanged to two decimals; the export's sky residual on the defect frame 17.4
+→ 3.3 against the shipped 21.9 → 4.0; the speckle unchanged. `aerochrome-walk`
+drives all three sliders of every band and holds the sky's saturation on
+NIR_0063 above 0.53 (0.393 before, 0.570 after). Every figure in
+`IR-SCIENCE.md` §4b-iv.
+
+**What turned out wrong on the way.** The plan's arithmetic overshot the
+render by 0.06 (√0.38 = 0.62 predicted on 3406, 0.56 measured): the lift's
+colour half re-solves against the bands. And the eye read the pale dots above
+3406's roof as worse under the deeper blue; two instruments said the same
+dots at the same excess. Contrast is not more speckle.
+
+**Still open — the value half.** Not a band (its luminance darkens the pale
+ground and haze that share the sky's hue) and not affordable on today's
+128-texel sky weight (a rim at every roofline, a snowstorm on an overcast
+sky, a seam under a cloud). Stage two: the sky bitmap refined to the working
+copy's edges by a guided filter against its luma, a depth keyed on the map's
+LOCAL sky chroma with a window that leaves an overcast sky pale, a Sky depth
+slider, `skyDepth` on the look. The selection is the one 006 needs too.
+
 ## Rank
 
-Directly after 013 and before 016: it is the largest measured distance to the
-film left in the look, it depends on 013's stage being in place (it is), and
-016's remaining half is a texture question that this does not touch. It waits
-on one number — the stage's removed fraction with Restore depth on — and then
-it is a solve with an existing method.
+Part one shipped. The open remainder sits directly above 006 (mask by
+subject), because both wait on the same thing — a sky selection accurate to
+the picture's edges — and this one has the measured method and the
+instruments for it. Above it stay 012–015, which are reported defects.

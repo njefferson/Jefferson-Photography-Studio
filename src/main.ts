@@ -1427,7 +1427,7 @@ const LOOKS: Record<string, Look> = {
   eir: { swapRB: true, hue: 0, denoise: 0.45, texture: 0.25, skySmooth: 1,
          mix3: [0.99, -0.06, 0.07, -1.44, 1.37, 1.02, -0.47, 0.81, 0.65],
          raw: { sat: 3.0, contrast: 1.15,
-                hsl: [7, 1, 1, 0, 1, 1, 0, 1, 1, 54, 1, 1, 35, 1, 1, 0, 1, 1, 1, 1, 1, 43, 1, 1] },
+                hsl: [7, 1, 1, 0, 1, 1, 0, 1, 1, 54, 1, 1, 35, 2, 1, 0, 2, 1, 1, 1, 1, 43, 1, 1] },
          jpeg: { sat: 1.35, contrast: 1.12 } },
   red: { swapRB: true, toggleSwap: true, hue: 0, wbBias: [0.78, 1.02, 1.35], raw: { sat: 1.8, contrast: 1.4 }, jpeg: { sat: 1.3, contrast: 1.2 } },
   goldie: { swapRB: true, toggleSwap: true, hue: 0, wbBias: [0.78, 1.22, 1.4], raw: { sat: 1.7, contrast: 1.35 }, jpeg: { sat: 1.2, contrast: 1.2 } },

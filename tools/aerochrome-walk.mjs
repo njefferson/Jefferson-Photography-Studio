@@ -120,10 +120,25 @@ const FLOOR_RAW = EX + "NIR_0627.dng";
 const FILM = { fol: 6.2, sky: 204.0, sep: 197.8 };
 const TOL = 12;      // degrees; hold-one-out worst error on the solve was 8
 const MIN_SEP = 150; // a global hue shift collapses the two into one bin
-// The eight band hue shifts the look declares, in HSL_CENTERS order
-// (red, orange, yellow, green, aqua, blue, purple, magenta).
-const BANDS = [7, 0, 0, 54, 35, 0, 1, 43];
-const BAND_LIMIT = 60; // the reader's own Hue slider is min -60 max 60
+// The eight band TRIPLETS the look declares — [hue shift, saturation, luminance]
+// in HSL_CENTERS order (red, orange, yellow, green, aqua, blue, purple,
+// magenta). Hue was solved onto the film's angles (IR-SCIENCE 4b-iii); the
+// aqua and blue SATURATION is the 2026-09-18 solve (4b-iv): a power of 2,
+// which puts three of seven skies in the film's window and moves the pale
+// ones halfway, foliage and hue untouched. Luminance stays 1 everywhere —
+// the band's luminance was measured and rejected there, because it darkens
+// the pale ground and haze that share the sky's hue.
+const BANDS = [[7, 1, 1], [0, 1, 1], [0, 1, 1], [54, 1, 1], [35, 2, 1], [0, 2, 1], [1, 1, 1], [43, 1, 1]];
+const NEUTRAL = (t) => t[0] === 0 && t[1] === 1 && t[2] === 1;
+// The reader's own sliders: Hue -60..60, Saturation 0..2, Luminance 0.3..1.7
+// (ir.html). Every value the look declares must be reachable by hand.
+const HUE_LIMIT = 60, SAT_RANGE = [0, 2], LUM_RANGE = [0.3, 1.7];
+// 10d: the sky's saturation on RAW after the Look press, mean HSV saturation of
+// the same population 10b measures the angle of. MADE TO FAIL FIRST, 2026-09-18:
+// the 2.50.7 look (both bands at saturation 1) read 0.393 here and the solved
+// look reads 0.570; the floor sits 0.04 under the solved reading, so a band
+// quietly reset to 1 fails this check while still passing 10b's angle.
+const SKY_SAT_MIN = 0.53;
 
 let failed = 0;
 const check = (name, got, want) => {
@@ -290,10 +305,14 @@ try {
     // by hand. A look that puts the app somewhere its own controls cannot reach
     // is a state nobody can undo or understand.
     for (let b = 0; b < 8; b++) {
-      if (BANDS[b] === 0) continue;
+      if (NEUTRAL(BANDS[b])) continue;
       await p.evaluate((i) => document.querySelectorAll("#hslChips button")[i].click(), b);
-      await p.evaluate((v) => { const el = document.getElementById("hslHue");
-        el.value = String(v); el.dispatchEvent(new Event("input", { bubbles: true })); }, BANDS[b]);
+      await p.evaluate((t) => {
+        for (const [id, v] of [["hslHue", t[0]], ["hslSat", t[1]], ["hslLum", t[2]]]) {
+          const el = document.getElementById(id);
+          el.value = String(v); el.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+      }, BANDS[b]);
     }
     await settle(p);
     // AND THE LOCAL CONTRAST, driven through the reader's own slider. Same two
@@ -324,7 +343,7 @@ try {
       const g = cv.getContext("webgl2") || cv.getContext("webgl");
       const W = cv.width, H = cv.height, b = new Uint8Array(W * H * 4);
       g.readPixels(0, 0, W, H, g.RGBA, g.UNSIGNED_BYTE, b);
-      const fol = [], sky = [];
+      const fol = [], sky = [], skyS = [];
       const step = Math.max(1, Math.floor(Math.min(W, H) / 300));
       for (let y = 0; y < H; y += step) for (let x = 0; x < W; x += step) {
         const i = ((H - 1 - y) * W + x) * 4, r = b[i], gg = b[i + 1], bb = b[i + 2];
@@ -332,7 +351,7 @@ try {
         if (mx < 26 || d / mx < 0.18) continue;
         let h; if (mx === r) h = ((gg - bb) / d) % 6; else if (mx === gg) h = (bb - r) / d + 2; else h = (r - gg) / d + 4;
         h = (((h * 60) % 360) + 360) % 360;
-        if (h >= 300 || h < 60) fol.push(h); else if (h >= 140 && h <= 260) sky.push(h);
+        if (h >= 300 || h < 60) fol.push(h); else if (h >= 140 && h <= 260) { sky.push(h); skyS.push(d / mx); }
       }
       const circ = (a) => {
         let sx = 0, cx = 0;
@@ -340,6 +359,7 @@ try {
         return (Math.atan2(sx / a.length, cx / a.length) * 180 / Math.PI + 360) % 360;
       };
       return { fol: fol.length ? circ(fol) : null, sky: sky.length ? circ(sky) : null,
+               skySat: skyS.length ? skyS.reduce((a, c) => a + c, 0) / skyS.length : null,
                nf: fol.length, ns: sky.length };
     });
     await ctx.close();
@@ -354,11 +374,14 @@ try {
       m.fol != null && m.sky != null && ((m.sky - m.fol + 360) % 360) >= MIN_SEP, true);
     if (m.fol != null && m.sky != null)
       console.log(`        (separation ${((m.sky - m.fol + 360) % 360).toFixed(1)}, film ${FILM.sep})`);
+    check("10d the sky is as saturated as the solve made it (the film reads 0.66)",
+      m.skySat != null && m.skySat >= SKY_SAT_MIN, true);
+    console.log(`        (sky saturation ${m.skySat == null ? "none" : m.skySat.toFixed(3)}, floor ${SKY_SAT_MIN}, n=${m.ns})`);
   }
 
-  check("11  every band the look declares is reachable on the reader's own slider",
-    BANDS.every((v) => Math.abs(v) <= BAND_LIMIT), true);
-  console.log(`        (largest ${Math.max(...BANDS.map(Math.abs))}, slider limit ${BAND_LIMIT})`);
+  check("11  every band the look declares is reachable on the reader's own sliders",
+    BANDS.every((t) => Math.abs(t[0]) <= HUE_LIMIT && t[1] >= SAT_RANGE[0] && t[1] <= SAT_RANGE[1] && t[2] >= LUM_RANGE[0] && t[2] <= LUM_RANGE[1]), true);
+  console.log(`        (largest hue ${Math.max(...BANDS.map((t) => Math.abs(t[0])))} of ${HUE_LIMIT}, saturation ${Math.min(...BANDS.map((t) => t[1]))}..${Math.max(...BANDS.map((t) => t[1]))} of ${SAT_RANGE.join("..")}, luminance ${Math.min(...BANDS.map((t) => t[2]))}..${Math.max(...BANDS.map((t) => t[2]))} of ${LUM_RANGE.join("..")})`);
 
   const liftShipped = await armShipped(true);
   const liftRecipe = await armRecipe(true);
