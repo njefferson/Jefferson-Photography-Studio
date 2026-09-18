@@ -199,6 +199,37 @@ the selection is 018's foundation and any amount is one drag away. The
 saturation that part one put on the aqua and blue chips comes off again in
 019, which puts it on the sky's own band behind a chroma gate.
 
+## Outcome, part four — the key moved with the look, 2026-09-18
+
+The depth's key was fitted to the sky's mean rendered chroma under a look that
+carried global saturation 3 with the sky's colour on the aqua and blue chips
+(overcast 0.27, clear 0.43–0.57, window 0.32–0.42). 019 moved the look to
+global saturation 1 with the sky's colour on the sky saturation stage, and
+the map is rendered with that stage OFF so it cannot depend on itself — so
+the number the key read fell to a third of what the window was cut for, every
+sky keyed to 0, and the Sky depth slider did nothing at any setting. Nothing
+failed until the Aerochrome walk was run on the new look: its check 10e read
+sky value 0.923 at depth 0 and 0.923 at depth 0.5 on NIR_0063.
+
+Two things changed. The key now reads the sky's mean colour AS THE SATURATION
+STAGE WILL SHOW IT — the stage's own factor, 1 + skySat times its gate on the
+mean colour's saturation, applied to the mean about its luma — and the per-
+texel grey guard reads its texel on the same scale, so the map still never
+renders through the stage. And the version report carries a "Sky map" line
+(key, the chroma it was read from, the palest sky texel, both windows), so the
+numbers the windows are set from are the app's own and a sky that takes no
+depth can be answered from a pasted report. Read off that line at the look's
+sky saturation of 1.0: 2082 (overcast) 0.018, 3406 0.074, 0063 0.119, 1651
+0.145, 1376 0.221, 1644 0.319; 0627, the no-sky frame whose bitmap fires, reads
+0.453 and keys to 0 on its hue. The window is 0.035–0.065 — overcast to 0,
+every blue sky to 1 at the look's own amount. The grey guard's window is set
+from the palest-texel reading in the same run.
+
+What turned out wrong, beyond the number: a window fitted to one stage's
+output is re-scaled silently by any change to the stages in front of it, and
+the only thing that saw this was a walk check that had been written and not
+yet run. The walk now runs before a look change is called done.
+
 ## Rank
 
 Archived; both halves are built, one shipped as tuned and one shipped at 0.

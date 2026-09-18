@@ -166,8 +166,13 @@ const GLOBAL_SAT_RANGE = [0, 3], BAND_SAT_RANGE = [0, 2];
 // the 2.50.7 look (both bands at saturation 1) read 0.393 here and the solved
 // look reads 0.570; the floor sits 0.04 under the solved reading, so a band
 // quietly reset to 1 fails this check while still passing 10b's angle.
-// RE-MEASURED for 019's bands: see the reading beside the check.
-const SKY_SAT_MIN = 0.53;
+// RE-MEASURED for 019's look (global saturation 1, the sky's amount on the sky
+// saturation stage at 1.0, Restore depth OFF so the reading is the look's own):
+// NIR_0063 reads 0.332 on the 2026-09-18 build with the bands aimed right, so
+// the floor is 0.29 — 0.04 under it, as before. The 0.53 that stood here was
+// the reading under global saturation 3 and went red the first time the walk
+// ran on the new look, which is the check doing its job.
+const SKY_SAT_MIN = 0.29;
 // 10f: NOTHING WITHOUT COLOUR TAKES ANY (019). A pixel whose HSV saturation
 // under the look's bare mapping (Sky and Foliage bands at 1) is under COL_LO
 // must still read under COL_VISIBLE under the whole look, for all but
