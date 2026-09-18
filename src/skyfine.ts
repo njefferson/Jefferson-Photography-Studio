@@ -10,14 +10,16 @@
 // feathering): inside every window the output is a LINEAR FUNCTION OF THE
 // GUIDE, so it inherits the guide's edges and keeps the mask's own values
 // away from them, and it is O(N) through summed-area tables. The guide is
-// COLOUR, not luma — the red share and the blue share of the gray-world-
-// balanced linear frame — because in an infrared frame luma is the wrong
-// cue: IR-bright foliage is as bright as the sky or brighter, and a first
-// guide that carried luma read the bright sky around a crown as the crown's
-// side and left a pale halo round it. Colour is the fact buildSkyMask's own
-// cluster rests on. Built once per photograph beside the bitmap, sampled
-// bilinearly by the shader (u_skyFineTex) and by compileEdit (the brush
-// sampler), never rebuilt per edit.
+// THREE channels of the gray-world-balanced linear frame — red share, blue
+// share and gamma luma — because no one of them separates a sky from all of
+// its neighbours in an infrared frame: IR-bright foliage is as bright as the
+// sky (luma alone read the bright sky round a crown as the crown's side and
+// left a halo), and pale horizon haze is as neutral as a dark roof (colour
+// alone read the haze band above a roofline as roof and left a pale rim).
+// With all three, the per-window fit uses whichever separates there. Built
+// once per photograph beside the bitmap, sampled bilinearly by the shader
+// (u_skyFineTex) and by compileEdit (the brush sampler), never rebuilt per
+// edit.
 
 import type { BrushMask } from "./pipeline";
 
@@ -31,19 +33,23 @@ export const SKY_FINE_EDGE = 1024;
  *  ramp to pull it to the photograph's edge, and a window wider still lets
  *  the sky's own gradient leak into the fit. */
 export const SKY_FINE_RADIUS = 12;
-/** Regularisation on the guide's covariance, in guide units squared (both
- *  channels run 0..1). Smaller follows fainter edges and admits more noise. */
+/** Regularisation on the guide's covariance, in guide units squared (every
+ *  channel runs 0..1). Smaller follows fainter edges and admits more noise. */
 export const SKY_FINE_EPS = 0.005;
+const REC = [0.2126, 0.7152, 0.0722];
 
-/** The two-channel COLOUR guide the refinement follows — red share and blue
- *  share after gray-world balance, both 0..1, at the refined mask's scale. */
+/** The three-channel guide the refinement follows, at the refined mask's
+ *  scale: red share and blue share after gray-world balance, and gamma luma
+ *  normalised to the frame's own bright end. */
 export interface SkyGuide {
   w: number;
   h: number;
   /** Red share R/(R+G+B). */
-  l: Float32Array;
+  r: Float32Array;
   /** Blue share B/(R+G+B). */
-  c: Float32Array;
+  b: Float32Array;
+  /** Gamma luma, 0..1 against the frame's 99.5th percentile. */
+  l: Float32Array;
 }
 
 /**
@@ -55,10 +61,9 @@ export interface SkyGuide {
  *            so the guide does not move as the photograph is graded).
  * @returns the guide at the refined scale (longer edge SKY_FINE_EDGE or the
  *   image's own if smaller), each guide pixel the box mean of its source block.
- * What the result must satisfy: `l` (red share) and `c` (blue share) are
- * finite and within 0..1 at every pixel, and `w`/`h` are what `refineSkyMask`
- * sizes its output to — a guide from one photograph must never be used to
- * refine another's bitmap.
+ * What the result must satisfy: every channel is finite and within 0..1 at
+ * every pixel, and `w`/`h` are what `refineSkyMask` sizes its output to — a
+ * guide from one photograph must never be used to refine another's bitmap.
  */
 export function buildSkyGuide(
   sample: (x: number, y: number) => ArrayLike<number>,
@@ -69,28 +74,35 @@ export function buildSkyGuide(
   const s = Math.min(1, SKY_FINE_EDGE / Math.max(srcW, srcH));
   const w = Math.max(1, Math.round(srcW * s));
   const h = Math.max(1, Math.round(srcH * s));
+  const r = new Float32Array(w * h);
+  const b = new Float32Array(w * h);
   const l = new Float32Array(w * h);
-  const c = new Float32Array(w * h);
   for (let y = 0; y < h; y++) {
     const y0 = Math.floor((y * srcH) / h), y1 = Math.max(y0 + 1, Math.floor(((y + 1) * srcH) / h));
     for (let x = 0; x < w; x++) {
       const x0 = Math.floor((x * srcW) / w), x1 = Math.max(x0 + 1, Math.floor(((x + 1) * srcW) / w));
-      let r = 0, g = 0, b = 0, n = 0;
+      let sr = 0, sg = 0, sb = 0, n = 0;
       for (let sy = y0; sy < y1; sy++) for (let sx = x0; sx < x1; sx++) {
         const q = sample(sx, sy);
         const qr = q[0] * wb[0], qg = q[1] * wb[1], qb = q[2] * wb[2];
         if (!Number.isFinite(qr) || !Number.isFinite(qg) || !Number.isFinite(qb)) continue;
-        r += qr; g += qg; b += qb; n++;
+        sr += qr; sg += qg; sb += qb; n++;
       }
       const i = y * w + x;
-      if (n === 0) { l[i] = 0; c[i] = 0; continue; }
-      r /= n; g /= n; b /= n;
-      const sum = Math.max(1e-9, Math.max(0, r) + Math.max(0, g) + Math.max(0, b));
-      l[i] = Math.min(1, Math.max(0, r / sum));
-      c[i] = Math.min(1, Math.max(0, b / sum));
+      if (n === 0) { r[i] = 0; b[i] = 0; l[i] = 0; continue; }
+      sr /= n; sg /= n; sb /= n;
+      const sum = Math.max(1e-9, Math.max(0, sr) + Math.max(0, sg) + Math.max(0, sb));
+      r[i] = Math.min(1, Math.max(0, sr / sum));
+      b[i] = Math.min(1, Math.max(0, sb / sum));
+      l[i] = Math.pow(Math.max(0, REC[0] * sr + REC[1] * sg + REC[2] * sb), 1 / 2.2);
     }
   }
-  return { w, h, l, c };
+  // Luma against the frame's own bright end, so a dark frame's edges weigh
+  // what a bright one's do against the same eps.
+  const sorted = Float32Array.from(l).sort();
+  const hi = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.995))] || 1;
+  for (let i = 0; i < l.length; i++) l[i] = Math.min(1, l[i] / hi);
+  return { w, h, r, b, l };
 }
 
 /** Box mean of `src` over a (2r+1)² window clamped at the borders, into `out`,
@@ -140,44 +152,56 @@ function maskAt(m: BrushMask, u: number, v: number): number {
  * @param r,eps  the window radius and regularisation (SKY_FINE_RADIUS/EPS).
  * @returns a BrushMask at the guide's size, 0..255, image-uv like the input,
  *   sampled by compileEdit's brush sampler and the shader's u_skyFineTex.
- * What the result must satisfy: away from any guide edge it equals the
- * upsampled bitmap (a flat window fits a = 0, b = the mask's mean), and across
- * a guide edge inside one window it steps with the guide — so a pixel on the
- * sky side of a roofline keeps the sky's weight and one across it takes the
- * roof's, whatever the feather did. A bitmap that selects nothing refines to
- * nothing; the caller's "no sky found" stays true.
+ * What the result must satisfy: the bitmap is read as a HARD selection (its
+ * feather cut at half) and the filter grows its own edge from the guide, so
+ * away from any guide edge the result is the selection's own value, 0 or 1
+ * (a flat window fits a = 0, b = that value), and across a guide edge it
+ * steps with the guide — a pixel on the sky side of a roofline keeps the
+ * sky's 1 and one across it takes the roof's 0, whatever the feather did.
+ * Fed the FEATHERED bitmap instead, the filter kept the feather wherever the
+ * window did not reach the edge and, worse, learned the sky's own gradient as
+ * "less sky" — the refined sky sloped to 0.85 over the 200 px above a
+ * roofline and the depth left a pale band there (rim +0.13, 2026-09-18). A
+ * bitmap that selects nothing refines to nothing; the caller's "no sky found"
+ * stays true.
  */
 export function refineSkyMask(mask: BrushMask, guide: SkyGuide, r = SKY_FINE_RADIUS, eps = SKY_FINE_EPS): BrushMask {
-  const { w, h, l: I1, c: I2 } = guide;
+  const { w, h, r: I1, b: I2, l: I3 } = guide;
   const n = w * h;
   const p = new Float32Array(n);
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) p[y * w + x] = maskAt(mask, (x + 0.5) / w, (y + 0.5) / h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) p[y * w + x] = maskAt(mask, (x + 0.5) / w, (y + 0.5) / h) >= 0.5 ? 1 : 0;
   const sat = new Float64Array((w + 1) * (h + 1));
   const tmp = new Float32Array(n);
   const mean = (src: Float32Array) => { const o = new Float32Array(n); boxMean(src, w, h, r, o, sat); return o; };
   const prod = (a: Float32Array, b: Float32Array) => { for (let i = 0; i < n; i++) tmp[i] = a[i] * b[i]; return mean(tmp); };
-  const m1 = mean(I1), m2 = mean(I2), mp = mean(p);
-  const c11 = prod(I1, I1), c22 = prod(I2, I2), c12 = prod(I1, I2), c1p = prod(I1, p), c2p = prod(I2, p);
-  // Per-window linear fit q = a1·I1 + a2·I2 + b: a from the 2x2 covariance
-  // (regularised by eps on the diagonal), b from the means. Written back over
-  // the correlation buffers, which are not read again.
-  const a1 = c11, a2 = c22, b = c12;
+  const m1 = mean(I1), m2 = mean(I2), m3 = mean(I3), mp = mean(p);
+  const c11 = prod(I1, I1), c22 = prod(I2, I2), c33 = prod(I3, I3);
+  const c12 = prod(I1, I2), c13 = prod(I1, I3), c23 = prod(I2, I3);
+  const c1p = prod(I1, p), c2p = prod(I2, p), c3p = prod(I3, p);
+  // Per-window linear fit q = a·I + b: a from the 3x3 covariance (eps on the
+  // diagonal) by the adjugate, b from the means. Written back over the
+  // correlation buffers, which are not read again.
+  const a1 = c11, a2 = c22, a3 = c33, b = c12;
   for (let i = 0; i < n; i++) {
-    const v11 = c11[i] - m1[i] * m1[i] + eps;
-    const v22 = c22[i] - m2[i] * m2[i] + eps;
-    const v12 = c12[i] - m1[i] * m2[i];
-    const k1 = c1p[i] - m1[i] * mp[i];
-    const k2 = c2p[i] - m2[i] * mp[i];
-    const det = v11 * v22 - v12 * v12;
-    const A1 = det > 1e-12 ? (v22 * k1 - v12 * k2) / det : 0;
-    const A2 = det > 1e-12 ? (v11 * k2 - v12 * k1) / det : 0;
-    const B = mp[i] - A1 * m1[i] - A2 * m2[i];
-    a1[i] = A1; a2[i] = A2; b[i] = B;
+    const v11 = c11[i] - m1[i] * m1[i] + eps, v22 = c22[i] - m2[i] * m2[i] + eps, v33 = c33[i] - m3[i] * m3[i] + eps;
+    const v12 = c12[i] - m1[i] * m2[i], v13 = c13[i] - m1[i] * m3[i], v23 = c23[i] - m2[i] * m3[i];
+    const k1 = c1p[i] - m1[i] * mp[i], k2 = c2p[i] - m2[i] * mp[i], k3 = c3p[i] - m3[i] * mp[i];
+    const A11 = v22 * v33 - v23 * v23, A12 = v13 * v23 - v12 * v33, A13 = v12 * v23 - v13 * v22;
+    const A22 = v11 * v33 - v13 * v13, A23 = v12 * v13 - v11 * v23, A33 = v11 * v22 - v12 * v12;
+    const det = v11 * A11 + v12 * A12 + v13 * A13;
+    let x1 = 0, x2 = 0, x3 = 0;
+    if (det > 1e-15) {
+      x1 = (A11 * k1 + A12 * k2 + A13 * k3) / det;
+      x2 = (A12 * k1 + A22 * k2 + A23 * k3) / det;
+      x3 = (A13 * k1 + A23 * k2 + A33 * k3) / det;
+    }
+    const B = mp[i] - x1 * m1[i] - x2 * m2[i] - x3 * m3[i];
+    a1[i] = x1; a2[i] = x2; a3[i] = x3; b[i] = B;
   }
-  const ma1 = mean(a1), ma2 = mean(a2), mb = mean(b);
+  const ma1 = mean(a1), ma2 = mean(a2), ma3 = mean(a3), mb = mean(b);
   const data = new Uint8Array(n);
   for (let i = 0; i < n; i++) {
-    const q = ma1[i] * I1[i] + ma2[i] * I2[i] + mb[i];
+    const q = ma1[i] * I1[i] + ma2[i] * I2[i] + ma3[i] * I3[i] + mb[i];
     data[i] = Math.round(255 * Math.min(1, Math.max(0, Number.isFinite(q) ? q : 0)));
   }
   return { w, h, data };
