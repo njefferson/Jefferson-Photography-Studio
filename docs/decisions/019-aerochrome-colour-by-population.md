@@ -123,6 +123,6 @@ and Sky depth already act through it, and its saturation joins them as
 
 ## Rank
 
-Done in the release that carries it (2.51), above everything open: it is the
-look the app is named for, on a defect reported from the device with the
-better rendering already found by hand.
+Fourth: its mechanism is on the branch; its amounts are finished inside the
+panel (022) after the correction has moved (021), from sheets rendered
+through the app's own controls, and chosen from pictures.

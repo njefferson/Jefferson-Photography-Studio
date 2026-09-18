@@ -86,6 +86,6 @@ default blur radius 32; this app indexes 80 hard bins without interpolation).
 
 ## Rank
 
-Third, under 020: a placement question the research has already answered,
-larger than 020 (it touches the decode worker, the export, the shader and the
-four reconstructions) and older than 012.
+Third, ahead of 019: the panel's first step is this correction, and where it
+acts decides what every later step — the selection, the sky's amounts, the
+balance — is measured on, so it moves before the amounts are finished.
