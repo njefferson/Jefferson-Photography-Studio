@@ -6500,11 +6500,25 @@ function pickerOutstanding(): number {
   return Math.max(0, pickerOpens - pickerReturns);
 }
 
+/** When the last picker was opened, for the focus fallback below. */
+let pickerOpenedAt = 0;
+/** How the last one came back: what it said, or which fallback heard it. */
+let pickerLastReturn = "";
+/** Code presses whose `.click()` dispatched no click event on the input — the
+ *  case where a press never reached the element at all, which is a different
+ *  bug from an element that was clicked and showed no window. */
+let pickerClicksLost = 0;
+/** Set by openPicker around its `.click()`; the input's own click listener
+ *  clears it. Still set afterwards means the click was swallowed. */
+let pickerExpecting: string | null = null;
+
 function pickerLine(): string {
-  if (!pickerOpens) return "not opened this session";
+  if (!pickerOpens && !pickerClicksLost) return "not opened this session";
   const out = pickerOutstanding();
   return `${pickerOpens} opened, ${pickerReturns} came back` +
-    (out >= 2 ? ` · ${out} NEVER RETURNED — the picker is wedged, which is the state that needs the app restarted`
+    (pickerLastReturn ? ` (last: ${pickerLastReturn})` : "") +
+    (pickerClicksLost ? ` · ${pickerClicksLost} press${pickerClicksLost === 1 ? "" : "es"} never reached the input` : "") +
+    (out >= 2 ? ` · ${out} NEVER RETURNED — the picker is wedged; reload, and if the window still does not come back, close the app fully and reopen it`
       : out === 1 ? " · 1 still open" : "");
 }
 
@@ -6514,25 +6528,48 @@ function pickerLine(): string {
  *  pressed. Nothing said so, so the app read as broken rather than stuck and the
  *  only remedy was one a reader had to invent: quit and reopen.
  *
- *  Reloading the page is the same reset without leaving the app, so that is
- *  offered here, once, at the moment the app can first tell. Said in terms of
- *  what happened rather than of inputs and pickers — "the Files window did not
- *  come back" is the thing that was seen. */
+ *  OFFERED AFTER THE CLICK, NEVER BEFORE IT. The first version raised this
+ *  dialog inside countOpen and then issued the click — and a modal dialog makes
+ *  the rest of the document inert, so the click landed on an inert input and
+ *  opened nothing. From the second press of a session onward every press was
+ *  dead by the app's own hand, whatever iOS was doing: measured on a phone,
+ *  "4 opened, 0 came back", one un-heard cancel and three self-inflicted.
+ *  So the count is taken at the click, the click is issued, and the offer
+ *  follows on a later tick; a picker that then returns closes the offer itself
+ *  (pickerReturned), because a window that came back is the proof there is no
+ *  wedge.
+ *
+ *  AND THE COPY SAYS WHAT THE DEVICE FOUND. Reloading was promised to clear it
+ *  and had never been seen to; force-closing the app is what cleared it. Both
+ *  are named, in that order. */
 function reportWedgedPicker(): void {
   if (wedgeReported) return;
   wedgeReported = true;
   recordFailure("the file picker did not come back", new Error(pickerLine()));
   void askDialog(
     "The Files window did not come back",
-    "Two attempts to open files have gone unanswered, which leaves every Open button in the app doing nothing when you press it. "
-    + "This is iOS holding on to a file window that has already closed — nothing you did, and nothing here can prise it loose. "
-    + "Reloading clears it and keeps you in the app; your photos and edits are stored and will still be here afterwards.",
+    "Two presses in a row opened no Files window, which leaves every Open button in the app doing nothing. "
+    + "This is iOS holding on to a file window that has already closed — nothing you did. "
+    + "Reloading usually clears it and keeps you in the app; if the window still does not come back after that, close Safari or the app fully (swipe it away) and open it again. "
+    + "Your photos and edits are stored and will still be here afterwards.",
     "Reload now",
     "Not yet",
   ).then((r) => {
     if (r === "ok") location.reload();
-    else wedgeReported = false; // said no: offer again on the next dead press
+    else wedgeReported = false; // said no, or the picker came back: offer again only on the next dead pair
   });
+}
+
+/** A picker came back — by what it said (`files`, `cancel`) or by the page
+ *  regaining focus after one (`focus`). RETIRES THE WHOLE OUTSTANDING COUNT
+ *  rather than decrementing it: a window that came back is proof nothing is
+ *  wedged, whatever an un-heard cancel left the count reading. One un-heard
+ *  cancel used to make every later press read as a wedge for the life of the
+ *  page. Also closes the wedge offer if it is up — it was wrong. */
+function pickerReturned(how: string): void {
+  pickerReturns = pickerOpens;
+  pickerLastReturn = how;
+  if (wedgeReported && askDlg.open) askDlg.close();
 }
 
 /** ONE REGISTRY, BECAUSE HALF THE INPUTS ARE NOT CLICKED IN CODE.
@@ -6544,19 +6581,45 @@ function reportWedgedPicker(): void {
  *  whichever way a picker is opened, it opens on one that has never been used. */
 
 function armPicker(el: HTMLInputElement, id: string): HTMLInputElement {
+  // THE OPEN IS COUNTED AT THE INPUT'S OWN CLICK, which fires for a code
+  // `.click()` and for a label forwarding its activation alike — and NOT at
+  // pointerdown, which fires for a touch that becomes a scroll and never opens
+  // anything. Counted there, one scroll across the start screen's label left a
+  // permanent phantom open behind.
+  el.addEventListener("click", () => {
+    pickerExpecting = null;
+    const priorDead = pickerOutstanding() >= 2;
+    pickerOpens++;
+    pickerOpenedAt = performance.now();
+    // The two PREVIOUS opens never returned: that is the wedge's signature.
+    // Raised after this click has been dispatched, never before it.
+    if (priorDead) setTimeout(reportWedgedPicker, 0);
+  });
   el.addEventListener("change", () => {
-    pickerReturns++;
+    pickerReturned("files");
     const files = Array.from(el.files ?? []);
     // Cleared so the same set can be picked again — a value left behind means
     // the second pick of one folder fires no change at all.
     el.value = "";
     if (files.length) pickerHandlers.get(id)?.(files);
   });
-  // Safari 16.4+ and every other current engine. Older ones simply never fire
-  // it, which leaves the counter reading "still open" — honest, and the same
-  // answer it gave before this existed.
-  el.addEventListener("cancel", () => { pickerReturns++; });
+  // Safari 16.4+ and every other current engine — and not reliably even there:
+  // an iOS action sheet dismissed at its first level fires nothing. The focus
+  // fallback below is for that.
+  el.addEventListener("cancel", () => { pickerReturned("cancel"); });
   return el;
+}
+
+/* THE FALLBACK FOR A CANCEL NOBODY HEARD. A system file window takes the page's
+ * focus and gives it back when it closes; if focus returns more than a second
+ * after an open and no `change` or `cancel` has arrived, the window came back
+ * and said nothing. Said so in the report line, as "focus", so a device that
+ * only ever returns this way is visible as such. */
+for (const [target, ev] of [[window, "focus"], [document, "visibilitychange"], [window, "pageshow"]] as const) {
+  target.addEventListener(ev, () => {
+    if (ev === "visibilitychange" && document.visibilityState !== "visible") return;
+    if (pickerOutstanding() > 0 && performance.now() - pickerOpenedAt > 1000) pickerReturned("focus");
+  });
 }
 
 /** Swap in a never-used element and return it. Cheap enough to do on every tap:
@@ -6576,21 +6639,21 @@ function registerPicker(id: string, onFiles: (files: File[]) => void): void {
   if (el) armPicker(el, id);
 }
 
-function countOpen(): void {
-  // BEFORE the picker opens, so one that never returns is still counted — the
-  // whole point is to notice the ones that do not come back.
-  pickerOpens++;
-  if (pickerOutstanding() >= 2) reportWedgedPicker();
-}
-
 /** Open the picker for `id`, on a fresh element. Must be called synchronously
  *  inside the tap or iOS ignores the click — the rule the quick-look button
- *  beside it already carries. */
+ *  beside it already carries. A click that dispatches no click event on the
+ *  input is counted as lost and recorded, because that is a different failure
+ *  from an input that was clicked and showed no window. */
 function openPicker(id: string): void {
   const el = freshPicker(id);
   if (!el) { recordFailure("opening the file picker", new Error(`no input #${id}`)); return; }
-  countOpen();
+  pickerExpecting = id;
   el.click();
+  if (pickerExpecting === id) {
+    pickerExpecting = null;
+    pickerClicksLost++;
+    recordFailure("the file picker press never reached its input", new Error(`#${id} · ${pickerLine()}`));
+  }
 }
 
 /* AND THE LABEL-WRAPPED ONES, WHICH NO CODE OF OURS OPENS.
@@ -6601,14 +6664,14 @@ function openPicker(id: string): void {
  * is the only way to give a label-driven input the same fresh-every-time
  * guarantee without turning every one of them into a button — which would have
  * moved five real controls and their labels for a reason the reader cannot
- * see. */
+ * see. The open itself is counted by the fresh element's click listener when
+ * the label forwards to it — not here, where a scroll would count too. */
 document.addEventListener("pointerdown", (e) => {
   const label = (e.target as HTMLElement | null)?.closest?.("label");
   if (!label) return;
   const input = label.querySelector('input[type="file"]') as HTMLInputElement | null;
   if (!input?.id || !pickerHandlers.has(input.id)) return;
   freshPicker(input.id);
-  countOpen();
 }, true);
 
 function recordFailure(what: string, err: unknown, file?: { name?: string; kind?: string; bytes?: Uint8Array }): void {
