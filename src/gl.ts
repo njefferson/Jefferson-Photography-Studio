@@ -753,17 +753,28 @@ void main() {
   // rendered chroma, by the sky bitmap's weight, luma exactly preserved. After
   // the grade, before lum and the LUT. Decode mirrors pipeline.ts decSkyChroma
   // with SKY_CHROMA_RANGE 0.5. Matches compileEdit.
+  // GATED on the pixel's own chroma distance from the target, 0.12..0.25 —
+  // pipeline.ts SKY_GATE_LO/HI, same numbers, same Hermite (smoothstep IS
+  // smooth01). A branch the soft mask leaks into sits half a range from the
+  // sky and is left alone; a mottled sky pixel is hundredths away and is
+  // smoothed. Without this the export of an oak against the sky went blue
+  // along every branch (2026-09-18).
   if (u_skySmooth > 0.0) {
     vec3 sm = texture(u_skyTex, v_uv).rgb;
-    float ks = u_skySmooth * sm.b;
-    if (ks > 0.0) {
+    if (sm.b > 0.0) {
       float Lk = dot(g, LUMA_W);
       vec2 tgt = (sm.rg * 2.0 - 1.0) * 0.5;
-      float na = (g.r - Lk) + (tgt.x - (g.r - Lk)) * ks;
-      float nb = (g.b - Lk) + (tgt.y - (g.b - Lk)) * ks;
-      g.r = Lk + na;
-      g.b = Lk + nb;
-      g.g = (Lk - LUMA_W.r * g.r - LUMA_W.b * g.b) / LUMA_W.g;
+      vec2 cur = vec2(g.r - Lk, g.b - Lk);
+      float ks = u_skySmooth * sm.b * (1.0 - smoothstep(0.12, 0.25, length(tgt - cur)));
+      if (ks > 0.0) {
+        vec2 nw = cur + (tgt - cur) * ks;
+        // Clamped as compileEdit clamps: the framebuffer would clamp anyway,
+        // but the LUT and lum stages below read these, and the CPU path's
+        // 16-bit write does not clamp on its own.
+        g.r = clamp(Lk + nw.x, 0.0, 1.0);
+        g.b = clamp(Lk + nw.y, 0.0, 1.0);
+        g.g = clamp((Lk - LUMA_W.r * g.r - LUMA_W.b * g.b) / LUMA_W.g, 0.0, 1.0);
+      }
     }
   }
   // Global luminance rides on top of the tone curve (endpoints pinned).
