@@ -1449,6 +1449,52 @@ same instant" is not a contrived sequence on the target device — it is what a
 long culling session looks like. Fixing it is a design decision (block, or
 write on `pagehide`), not a tail-end patch.
 
+## The Sky mask, read from the reader's side, 2026-09-18
+
+**Why a field-standard fix reached this record from a screenshot.** A Sky
+mask leaving a rim round every object and no sky between branches has a
+named remedy one search away (intersect the place mask with a colour range —
+decision 023), and both halves were already here. Nothing had asked, because
+every sky instrument in this repository reads population MEANS on the look's
+stages: a rim along a roofline moves a mean, sky missed between twigs does
+not, and the mask the reader holds was read by no instrument at all. The
+same rim was on a rendered sheet the day before, written up as an
+observation. Hub LESSONS §327 carries the rule.
+
+**`tools/mask-truth-walk.mjs` is the instrument that was missing.** It adds a
+Sky mask at its defaults under Aerochrome, reads the canvas with the coverage
+overlay shown and hidden, and solves the mask's TRUE coverage per pixel from
+the overlay's own formula — what the reader is shown, feather and all. The
+sky is then keyed by colour from inside the mask (the sky's hue band above a
+saturation floor, within the rows the mask reaches), and every sky pixel's
+distance to the nearest non-sky pixel is computed, so the numbers are:
+coverage of sky within 20 px of an edge (the rim), coverage of open sky (the
+gaps), the uncovered share with its largest connected gap, and spill onto
+what is not sky beside it. A map per frame shows uncovered sky red and spill
+yellow. Bounds are 023's targets — edge ≥ 0.85, open ≥ 0.97 — and the walk
+is RED on this build by design; that number crossing the bound is 023's
+acceptance, not a sheet. `walk-all` carries it red until then.
+
+**Readings on 2.51.1, Reach 1, Feather 0.5, the 2800 px working copy.** 1376:
+edge 77%, open 99.1%, spill 20%. 3406: edge 93%, open 99.7%, spill 62% (the
+shade structure). 0063: edge 44%. 1644: edge 38%, open 95.5%. 1651: edge 88%,
+open 69% — a fifth of its sky uncovered in one piece. Sanity: Reach 2 on
+1376 raises edge coverage to 81% and spill to 60%, so the number follows the
+control in both directions.
+
+**Four instrument errors on the way, each the standing kind.** Ungraded, an
+infrared sky is within 0.001 of grey, so the key floored at 0.08 called the
+apron and the cars sky — the walk measures under the look, where the reader
+works. The Show mask button's state is not the overlay's: a slider drag
+steps the tint aside while the button still reads pressed, and pressing it
+then restores rather than toggles — the reads follow the code's sequence.
+Setting the mask's saturation to exactly 1 to "change nothing" REMOVED it:
+`maskIsActive` drops a fully neutral mask before the shader sees it — 1.01
+keeps it. And the Colour mask's own Range drops the paler sky beside a crown
+(0.15–0.25 against a mean of 0.47), so the truth is the sky's hue band, not
+its chroma distance; the first hue-band map then keyed a cyan cast on dry
+grass as sky, which the row bound removed.
+
 ## The film reference: Aerochrome developed outside the app, 2026-09-18
 
 **The question was whether the look could be made WITHOUT the app, and what

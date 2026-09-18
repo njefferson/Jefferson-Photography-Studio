@@ -94,6 +94,12 @@ mean rendered colour). The combination is a multiply.
 - **4**: the apron, the cars and every reflection took the cold warmth with
   the sky; the reader's own report, and the reason a place gate exists.
 
+**Acceptance is a number, not a sheet:** `tools/mask-truth-walk.mjs` reads
+the mask's true coverage from the reader's side and is red on the build this
+record was written against (edge coverage 38–77% on four of five frames,
+NOTES.md "The Sky mask, read from the reader's side"). It goes green when
+the edge band is covered at ≥ 0.85 and open sky at ≥ 0.97.
+
 ## Rank
 
 Directly after 018, wherever 018 sits: it multiplies the selection 018 hands
