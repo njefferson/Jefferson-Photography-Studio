@@ -40,6 +40,17 @@ chroma and hue, and Lightroom's is the colour range mask and Select Sky. So
 the mechanism is a gate on the pixel's own chroma, combined with a hue or a
 position, and the question is only where the gate's numbers sit.
 
+**Rob Shea's own Lightroom workflow masks, too.** His colour-infrared edit
+in Lightroom Classic (2021-12-23) is white balance, a colour-swap profile,
+then the masking tools; his 850 nm monochrome full edit (2023-09-04) is a
+set of "advanced masking techniques"; and his 2020 colour swap through
+Lightroom's LOCAL hue adjustment is a masked hue shift rather than a global
+one. Same shape as this record: portions, each with its own treatment. The
+specific masks and what he does inside each are on robsheaphotography.com,
+which this session's proxy refuses, and his videos' transcripts are refused
+too — recorded in IR-SCIENCE.md 4b-vi as a blocked host to ask for, not as
+a finding.
+
 **The app already has the foliage as a control, and the sky as a place.**
 The Colour tab's Foliage band owns the warm half of the hue wheel, follows
 the channel swap, and multiplies saturation about the pixel's own — so a
