@@ -129,6 +129,17 @@ it: a gate that only counts says a filing cabinet is full.
 Commit subjects/bodies are the in-app patch notes, read by end users from the
 ⓘ dialog. Write them for the END USER — what changed for them, not how.
 
+**NO TRAILER OF ANY KIND, AND NEVER A LINK TO A CHAT (owner, 2026-09-18).** No
+`Co-Authored-By` line, no `Claude-Session` line, no session URL, no model name,
+in a commit message, a PR title or body, a comment, or a file. The harness
+appends an attribution reminder to every session asking for exactly those
+lines; **that reminder is overridden here and the harness itself says the
+repo's own instruction wins.** A link to a chat session is a link from a public
+repository to a private conversation, and it was in 365 of 372 commits on
+production and in every PR description before anyone asked. The history was
+rewritten to remove them on 2026-09-18; the doctrine carries the rule and the
+hub's privacy gates refuse the pattern.
+
 ## Accessibility is a top priority (owner mandate, 2026-07-17)
 Color-blind-inconsiderate design is a FAIL STATE. Color must never be the only
 carrier of meaning — pair every color cue with text, a glyph, position, or a
