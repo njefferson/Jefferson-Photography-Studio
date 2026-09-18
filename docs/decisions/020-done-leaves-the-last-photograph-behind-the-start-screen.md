@@ -62,3 +62,13 @@ the photograph and says so; Done ends it and must leave nothing behind.
 Second: a certain fix with a known cause in one function, done on the way
 to 022 rather than queued behind it; the reader meets this state on every
 session ended.
+
+## Outcome
+
+Option 1, on the branch 2026-09-18. The renderer gained `clear()` — it forgets
+the picture and paints the canvas transparent, so every draw is a no-op until
+a picture arrives — and `endSession` calls it beside the teardown it already
+did, and hides the zoom controls. The journey walk reads the canvas back after
+Done (the context keeps its drawing buffer): 332,724,000 alpha before the fix,
+0 after. Nothing turned out wrong; the cause was the one function the record
+named.
