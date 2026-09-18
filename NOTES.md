@@ -579,6 +579,16 @@ user-scalable=no.
   and no per-population strength (denoise, colour noise, texture, the hot-spot
   and lens corrections, all OWED in the scope gate) uses it yet. See
   `docs/decisions/018-one-sky-selection-for-every-sky-aware-tool.md`.
+- [ ] **The Sky mask reads the sky's colour as well as its place** <!-- decision: 023 --> —
+  reported 2026-09-18 from the iPad with three screenshots of one frame: the
+  Sky mask leaves a rim of unselected sky round every object and misses the
+  sky between branches; the Colour mask reaches every pixel of the sky's
+  colour and takes the apron and the cars with it. The field's answer is an
+  intersection — Lightroom's Select Sky intersected with a Color Range,
+  darktable's drawn-and-parametric — and both halves already exist here. The
+  Sky mask gains a colour gate sampled from inside its own selection, keyed
+  on a colour that does not move with the grade. See
+  `docs/decisions/023-the-sky-mask-reads-the-skys-colour-as-well-as-its-place.md`.
 - [ ] **A photograph that fills the screen with no way back out** <!-- decision: 012 --> — reported
   from the iPad 2026-09-17: a photograph in the full view appeared zoomed in, and
   neither zooming out nor scrolling brought the rest of it back. Two failures, and
