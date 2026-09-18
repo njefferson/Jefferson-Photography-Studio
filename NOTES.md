@@ -539,16 +539,6 @@ user-scalable=no.
 > different approach and mindset"). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
-- [ ] **A look opens its own finishing panel** <!-- decision: 022 --> — proposed
-  2026-09-18: when a look is applied, its own panel opens with the specific
-  adjustments that finish it, in the method's order, each with one line of
-  why. Aerochrome's controls are spread over four tabs today and the research
-  names a finishing sequence after the profile; the field has the shape
-  (a preset's own parameters panel, a profile's amount slider, a film's own
-  panel). Each look declares its steps; the panel hosts second inputs bound
-  to the same fields, so the tabs keep theirs and a batch look still stands
-  on its declared values alone
-  (`docs/decisions/022-a-look-opens-its-own-finishing-panel.md`).
 - [ ] **The lens correction belongs on the linear raw before anything else** <!-- decision: 021 --> —
   raised 2026-09-18: the hot-spot correction is applied inside the compiled
   edit, after the white balance and before the matrix, the swap and the
@@ -2067,6 +2057,24 @@ reason it is a footnote rather than a finding — a list of known limitations is
 read as authoritative, and an invented one is worse than a missing one.
 
 ## Shipped (roadmap archive)
+
+- [x] **A look opens its own finishing panel** <!-- decision: 022 --> — proposed
+  2026-09-18: when a look is applied, its own panel opens with the specific
+  adjustments that finish it, in the method's order, each with one line of
+  why. Aerochrome's controls are spread over four tabs today and the research
+  names a finishing sequence after the profile; the field has the shape
+  (a preset's own parameters panel, a profile's amount slider, a film's own
+  panel). Each look declares its steps; the panel hosts second inputs bound
+  to the same fields, so the tabs keep theirs and a batch look still stands
+  on its declared values alone
+  (`docs/decisions/022-a-look-opens-its-own-finishing-panel.md`).
+  SHIPPED to the branch 2026-09-18 as 2.51: Aerochrome declares six steps (lens colour
+  correction, Sky saturation, Sky depth, Foliage amount, Restore depth, add a Sky mask),
+  the panel opens on the look's press at the top of the panel body with a second control
+  per step bound to the tab's own, closes on its own control and reopens from "Finish
+  this look" under the looks; other looks declare none yet. Held by aerochrome-walk 12
+  (fail-first against the build before it: 12a and 12a2 red, the rest green) and the
+  accessibility walk with the panel open at both widths and both themes.
 
 - [x] **Done leaves the last photograph drawn behind the start screen** <!-- decision: 020 --> —
   reported 2026-09-18 from staging 2.50.10: ending a session clears it and
