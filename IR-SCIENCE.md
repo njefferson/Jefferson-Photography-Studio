@@ -930,13 +930,33 @@ practice raws through the app's own `folSat` slider and chosen from the
 pictures. At 1.6 the foliage population reads saturation 0.59 to 0.82 against
 the film's 0.60.
 
-**THE SKY'S AMOUNT IS STILL OPEN**, and the arms meant to settle it drove the
-Colour tab's sky hue BAND (`skySat`, `params.sky[1]`) rather than the
-selection's amount (`skySatSel`, `EditParams.skySat`) that the look declares.
-Every per-frame sky saturation taken off those renders is a measurement of the
-band. `LOOKS.eir` carries its shipped `skySat` of 1.0 until arms driven through
-the right control exist. The film targets are unchanged: sky 0.66 with a yellow
-filter, 0.92 with a red.
+**THE SKY'S AMOUNT, MEASURED THROUGH THE RIGHT CONTROL.** An earlier set of
+arms drove the Colour tab's sky hue BAND (`skySat`, `params.sky[1]`) rather
+than the selection's amount (`skySatSel`, `EditParams.skySat`) that the look
+declares; every number taken off those renders was about the band and is
+withdrawn. Re-rendered as four separate BUILDS at declared 1.0, 1.5, 1.8 and
+2.0, the film targets unchanged (sky 0.66 with a yellow filter, 0.92 with a
+red):
+
+**The declared amount is a FLOOR the Restore-depth lift raises per frame, not
+the sky's saturation.** On three of seven practice frames the lift already
+reaches the slider's cap of 2.0 whatever the look declares, so the look's
+number cannot move them at all — NIR_0063 arrives at 2 from a declared 1.0 and
+from a declared 1.8 alike. Only NIR_1376 (0.461 to 0.605 across the range) and
+NIR_1644 (0.504 to 0.642) respond meaningfully. The amount therefore WIDENS the
+spread between frames rather than narrowing it, because the weak skies have
+already spent the cap and only the deep ones have room.
+
+**And the blotch it costs rises with it, worst in corners that are already
+worst.** Twenty-four-pixel block pooling on the responding frames: NIR_1376's
+corner-against-centre improves (0.81x to 0.75x) while NIR_1644's worsens (1.49x
+to 1.74x) and NIR_1651's left corner rises 15% while its centre does not move
+at all — from a corner already 6.8x its centre before this control touches it.
+On NIR_1644 the colour gained per unit of corner residual added is 47 at 1.5,
+33 at 1.8 and 31 at 2.0, so the exchange rate is best at 1.5 and worsens by a
+third above it.
+
+
 
 **AND THE MEASUREMENT LESSON, TWICE OVER, because both halves will be met
 again.**
