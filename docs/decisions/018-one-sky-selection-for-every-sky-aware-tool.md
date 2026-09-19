@@ -79,3 +79,58 @@ sky once per tool.
 Fifth: the panel's last step is the reader's Sky mask, and that mask draws
 its own soft edge until it reads the refined selection; behind 019 because
 the look's amounts do not wait on it.
+
+## Looked at
+
+The reader's Sky-mask coverage overlay, opened as an image on both builds —
+`origin/main` in a worktree and the branch carrying this change.
+
+- **NIR_1644** — the coverage boundary is a soft curve across the treetops on
+  BOTH builds. It does not follow individual branches on either, and it was
+  looking at this rather than at a coverage figure that stopped this change
+  being reported as working. A 12-pixel guided-filter window
+  (`SKY_FINE_RADIUS` at `SKY_FINE_EDGE`) cannot resolve a conifer silhouette,
+  so "snapped to the picture's own edges" overstates what a refinement can do
+  on this subject.
+- **NIR_0063** and **NIR_1651** — same shape of boundary, same conclusion.
+
+## Progress, 2026-09-19 — shipped, and what it does and does not do
+
+Option 1 as written, on the branch: `regenerateSkyMask` still shapes the seed
+with the reader's reach and feather, then refines it with the same
+`refineSkyMask` the look's sky stages use, into a new `MaskLayer.fine`. The CPU
+samples it in `compileEdit`'s mask branch; the GPU reads it from a SECOND
+packed atlas on the same slot scheme. `PREVIEW_PIPELINE` moved to 44 because a
+tile carrying a Sky mask now renders differently.
+
+**Why a second atlas, which the record did not anticipate.** The obvious route
+was a sharper bitmap in `m.brush`. `updateBrushTexture` sizes the packed
+texture from its FIRST entry and silently `continue`s past any bitmap whose
+dimensions differ — so a 1024-edge sky mask beside a 384-edge painted mask
+would have dropped one of them from the render with nothing going red. The
+refinements get an atlas of their own instead.
+
+**IT REACHES THE RENDER, AND THE OBVIOUS METRIC CANNOT SEE IT.** mask-truth
+edge coverage, before against after: NIR_0063 44% to 45%, NIR_1644 37% to 37%,
+NIR_1651 89% to 89% — nothing beyond noise, and the two runs disagree on the
+sky-edge pixel count itself (26479 against 26475), so a one-point move is
+unreadable. That looked like a dead change.
+
+It is not. Differencing the decoded overlays pixel by pixel: **4.4% to 6.6% of
+pixels change, by a mean of 15 levels out of 255**, and on NIR_1644 **75% of
+that change sits in the busiest 10% of rows** — the tree line. Detection
+jitter cannot account for it: the sky-edge population moved by 0.015% between
+runs while 4-7% of pixels changed appearance.
+
+**So the lesson here is the metric, not the filter.** Edge COVERAGE is 023's
+question (does the mask reach the sky its colour key can see). This record's
+question is where the boundary SITS, and coverage is blind to a boundary that
+moves without changing how much it encloses. A sharpness measurement — how
+many texels the mask takes to fall from 1 to 0 across a real edge — is what
+would have answered this in one run instead of three.
+
+**Still owed before this can be archived**: that sharpness measurement, made to
+fail on the pre-018 build; the agreement walk green on the committed build
+(it added a second sampling path, which is exactly what that walk exists to
+hold together); and the commit message's "snapped to the picture's own edges"
+corrected to what the pictures support.
