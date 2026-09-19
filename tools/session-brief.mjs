@@ -106,6 +106,37 @@ if (items.length) {
   say(`  weighed against, what was REJECTED and why, and where it ranks. A new`);
   say(`  idea gets compared against these BEFORE it is judged, and a roadmap item`);
   say(`  without a record is refused by tools/decisions-check.mjs on commit.`);
+
+  // AND THE TOP ITEM'S BOUNDARIES VERBATIM (hub LESSONS 329), for the same
+  // reason 6c below prints the research file's open questions rather than its
+  // titles: a list of titles reads as "I know what is in there" and nobody
+  // opens the file. What it cost, 2026-09-19: record 019's Rejected section
+  // said "a hue band is not a place" and noted that this had been the record's
+  // own first draft, corrected within the hour. The session implementing that
+  // record built a harness driving the hue band, rendered three arms through
+  // it, and sent the owner five comparison sheets taken off the wrong control.
+  // The sentence that would have stopped it was in the file already open.
+  const top = items.find((x) => x.key);
+  if (top) {
+    const rec = (readdirSync(join(repo, "docs", "decisions")).find((f) => f.startsWith(top.key + "-")) ?? "");
+    if (rec) {
+      const text = read(join("docs", "decisions", rec));
+      const section = (h) => {
+        const m = text.match(new RegExp(`^##\\s+${h}\\b[^\\n]*\\n([\\s\\S]*?)(?=^##\\s|$(?![\\s\\S]))`, "m"));
+        return m ? m[1].trim() : "";
+      };
+      const clean = (t) => t.replace(/\*\*/g, "").replace(/`/g, "").replace(/\s+/g, " ").trim();
+      const chosen = (section("Options").split("\n").map((l) => l.trim()).filter(Boolean)[0] || "").replace(/^[-*\d.]+\s*/, "");
+      say(`\n  NEXT UP IS ${top.key}, AND ITS BOUNDARIES ARE ALREADY DECIDED:`);
+      if (chosen) say(`    chosen    ${clean(chosen).slice(0, 140)}`);
+      for (const line of section("Rejected").split("\n")) {
+        const m = /^\s*-\s+\*\*(.+?)\*\*\s*:?\s*(.*)$/.exec(line);
+        if (m) say(`    REJECTED  ${clean(m[1])} — ${clean(m[2]).slice(0, 110)}`);
+      }
+      say(`    A rejected option is a LIVE BOUNDARY, not history: it is written`);
+      say(`    down because it looks reasonable, which is why it gets reinvented.`);
+    }
+  }
 }
 
 // 6c. WHAT THE RESEARCH FILE SAYS IS STILL OPEN — VERBATIM, NOT ITS TITLES.
