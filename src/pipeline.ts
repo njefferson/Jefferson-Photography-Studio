@@ -563,6 +563,19 @@ export interface MaskLayer {
   ly: number; // linear: end y
   invert: boolean;
   brush?: BrushMask; // type 2 (painted) and type 4 (generated sky) both use this
+  /** Sky mask (type 4) ONLY: `brush` refined to the picture's own edges by the
+   *  guided filter (skyfine.ts), at SKY_FINE_EDGE rather than BRUSH_MAX_EDGE.
+   *
+   *  WHY IT IS A SECOND FIELD AND NOT JUST A SHARPER `brush`. The GPU packs
+   *  every bitmap mask into ONE RGBA texture, one mask per channel, sized from
+   *  the FIRST brush in the list — and `updateBrushTexture` skips any mask
+   *  whose dimensions differ. Writing a 1024-edge bitmap into `brush` would
+   *  therefore make a 384-edge painted mask silently vanish from the render
+   *  whenever the two were used together. The refined bitmaps get an atlas of
+   *  their own instead, on the same slot scheme.
+   *
+   *  Absent when the heuristic found no sky, and absent on every other type. */
+  fine?: BrushMask;
   rev?: number; // bumps on each brush stroke / sky regeneration (undo equality)
   /** Sky mask (type 4) "Reach": scales the heuristic's growth tolerances when
    *  regenerating the bitmap (1 = calibrated default, >1 grows more eagerly).
@@ -648,7 +661,16 @@ export function maskWeight(m: MaskLayer, u: number, v: number): number {
     // Brush (type 2) and sky (type 4): weight is the stored bitmap, bilinearly
     // sampled — identical to the shader's packed-texture read. (Colour masks,
     // type 3, never reach here; compileEdit routes them to colorMaskWeight.)
-    w = m.brush ? sampleBrush(m.brush, u, v) : 0;
+    //
+    // A SKY MASK READS ITS REFINED BITMAP (018). The reader's Sky mask used to
+    // keep the coarse heuristic's soft boundary while the LOOK's sky stages
+    // read the same seed refined to the picture's edges — one photograph with
+    // two different skies, soft under a hand-made mask and crisp under the
+    // look's depth. `fine` is that refinement; the coarse `brush` remains the
+    // fallback for a photograph whose guide could not be built, and it is what
+    // the status line still counts.
+    const bm = m.type === 4 && m.fine ? m.fine : m.brush;
+    w = bm ? sampleBrush(bm, u, v) : 0;
   }
   return m.invert ? 1 - w : w;
 }
