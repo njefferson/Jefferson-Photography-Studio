@@ -322,6 +322,40 @@ now, reading both lists out of the source.
   NEEDS THE OWNER'S HANDS on the real iPad (share sheet, pinch feel, install
   flows, Safari-only storage behavior — all measurements so far are Chromium).
 
+## READ THE RECORD BEFORE YOU TOUCH THE THING IT IS ABOUT (owner, 2026-09-19)
+**Do not start new work without reading what has already been written about it
+— the decision record, the research already gathered, the notes. The answer is
+usually already written down, by you, in the file you have open.**
+
+Before the FIRST edit: the record's **Options** (which one was chosen, and by
+what NAME), its **Rejected** (what route each one rules out), and any research
+gathered this session, including research sitting in a plan file that nobody
+re-opened.
+
+**A REJECTED OPTION IS A LIVE BOUNDARY, NOT HISTORY.** It is written down
+precisely because it looks reasonable — that is what makes it worth rejecting
+in writing rather than merely not choosing, and it is why it is the route a
+session reinvents.
+
+**What it cost, the day the rule arrived.** Record 019's Rejected section said
+*"a hue band is not a place"*, and noted that this had been the record's own
+first draft, corrected within the hour. The session implementing that record
+then built a harness that drove the hue band (`skySat`) instead of the
+selection the record chose (`skySatSel`) — two controls named one line apart in
+`syncFromUI`, differing by a three-letter suffix — rendered three arms through
+it, took every per-frame number off those renders, sent the owner five
+comparison sheets, and committed a value chosen from them. All of it had to be
+reverted. And four hours later the same session ran the Lightroom and darktable
+research on combining masks, wrote it into a plan file, and had to be told
+twice to go back and use what it had just gathered.
+
+**Two exposures, and deliberately NOT a gate.** No parser can tell reading from
+having-read, and a check claiming to would be the appearance of a fix.
+`tools/session-brief.mjs` prints the top-ranked item's chosen and rejected
+options at session start; `tools/decisions-check.mjs` prints them again on
+every commit. The sentence arrives unasked, twice, in the two places a session
+cannot avoid looking. (Hub LESSONS §329.)
+
 ## THIS IS A VISUAL APP, NOT A MATH APP (owner, 2026-09-19)
 **OPEN WHAT YOU RENDERED. A number is a pointer to where to look; it is never a
 substitute for looking and never evidence about appearance.**

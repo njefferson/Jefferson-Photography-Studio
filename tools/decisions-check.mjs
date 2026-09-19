@@ -272,6 +272,44 @@ if (!bad) ok(`every record about pictures names the frames it opened, both ways`
 if (!bad) {
   console.log("\n  rank (roadmap file order):");
   open.forEach((item, i) => console.log(`    ${String(i + 1).padStart(2)}. ${keyOf(item.text)}  ${titleOf(item.text)}`));
+
+  // ---- 5. AND THE TOP ITEM'S BOUNDARIES, PRINTED UNASKED (hub LESSONS 329).
+  //
+  // A rejected option is not history, it is a live boundary: it is written down
+  // precisely BECAUSE it looks reasonable, which is what makes it the route a
+  // session reinvents. Record 019's Rejected section said "a hue band is not a
+  // place" and noted that this had been the record's own first draft, corrected
+  // within the hour -- and the session implementing that record then built a
+  // harness that drove the hue band, rendered three arms through it, and sent
+  // five comparison sheets to the owner off the wrong control. The sentence
+  // that would have stopped it was in the file that was open.
+  //
+  // This does not refuse anything and is not declared a gate. No parser tells
+  // reading from having-read. It puts the sentence in front of whoever is about
+  // to commit, which is the one thing a parser can do here.
+  const top = open[0];
+  if (top) {
+    const k = keyOf(top.text);
+    const f = byKey.get(k);
+    if (f) {
+      const text = readFileSync(join(DIR, f), "utf8");
+      const first = (h) => {
+        const b = body(text, h);
+        if (!b) return null;
+        const line = b.split("\n").map((l) => l.trim()).filter(Boolean)[0] || "";
+        return line.replace(/^[-*\d.]+\s*/, "").replace(/\*\*/g, "").slice(0, 150);
+      };
+      const chosen = first("Options"), rejected = body(text, "Rejected");
+      console.log(`\n  before the first edit on ${k} (LESSONS 329):`);
+      if (chosen) console.log(`    chosen    ${chosen}`);
+      if (rejected) {
+        for (const line of rejected.split("\n")) {
+          const m = /^\s*-\s+\*\*(.+?)\*\*\s*:?\s*(.*)$/.exec(line);
+          if (m) console.log(`    REJECTED  ${m[1]} — ${m[2].replace(/\*\*/g, "").slice(0, 110)}`);
+        }
+      }
+    }
+  }
 }
 
 console.log(bad ? `\n${bad} FAILED\n` : "\n  every open item carries its research, what it was weighed against, and why.\n");
