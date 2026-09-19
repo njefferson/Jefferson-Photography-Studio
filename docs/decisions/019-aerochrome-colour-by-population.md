@@ -127,6 +127,53 @@ Fourth: its mechanism is on the branch; its amounts are finished inside the
 panel (022) after the correction has moved (021), from sheets rendered
 through the app's own controls, and chosen from pictures.
 
+## Measured properly, 2026-09-19 — what the sky's amount can and cannot do
+
+Re-rendered as four separate BUILDS at declared `skySat` 1.0, 1.5, 1.8 and 2.0,
+foliage 1.6 throughout, each in a git worktree so the repository being measured
+is never modified, and each driven only by the look button so the lift behaves
+as it does for a reader.
+
+**The declared amount is a FLOOR the lift raises per frame.** Three of seven
+practice frames are pinned at the slider's cap of 2.0 by the lift whatever the
+look declares, so the look's number cannot reach them: NIR_3406, NIR_0063 and
+NIR_2082 are identical on all four arms. Only NIR_1376 (0.461 → 0.605) and
+NIR_1644 (0.504 → 0.642) respond meaningfully against the film's 0.66.
+
+**So it widens the frame-to-frame spread rather than narrowing it** — 0.10 to
+0.50 at 1.0, 0.11 to 0.64 at 2.0 — because the lift has already spent the cap
+on the weak skies and only the deep ones have room to move. Whether that is
+right is the judgement: a hazy sky staying hazy is arguably correct, but it is
+the opposite of what the hue-band arms appeared to show.
+
+**The blotch cost, at the scale a blotch has.** NIR_1376's corner-against-centre
+improves (0.81x → 0.75x) and its rise is proportional to the colour gained.
+NIR_1644's worsens (1.49x → 1.74x), its left corner going 0.0094 → 0.0138 while
+its centre moves 0.0076 → 0.0083. NIR_1651's left corner rises 15% while its
+centre and right do not move at all — from a corner already 6.8x its centre
+before this control touches it. NIR_3406 is carried as a control and reads
+identically on all four arms to four decimals, which is what makes the rest of
+the movement the amount rather than the instrument.
+
+**The exchange rate.** On NIR_1644, saturation gained per unit of corner
+residual added: 47 at 1.5, 33 at 1.8, 31 at 2.0. Best at 1.5 and a third worse
+above it. That narrows the call without making it — the remaining half is
+whether the deeper blue on two frames is wanted at that price, which is an
+appearance and not a measurement.
+
+**Two instrument defects fixed rather than noted.**
+
+- Check 10d of `tools/aerochrome-walk.mjs` read the sky's saturation with
+  Restore depth ON, where the lift tops the amount to the cap — it returned
+  0.332 at a declared 1.0 and 0.332 at 1.8, asserting nothing it claimed to.
+  It now reads with the lift off, where the same frame gives 0.2576 and 0.3186,
+  and the floor is re-measured at 0.21.
+- And the mean it asserts cannot see a collapse, because the population is
+  "pixels whose saturation clears 0.18": as the amount falls fewer pixels
+  qualify and the survivors are the most saturated, so the mean goes UP. At the
+  slider's 0, 1209 pixels qualified with a HIGHER mean than the 15690 at 1.0.
+  Check 10d2 asserts the population SIZE, which is what actually falls.
+
 ## Progress, 2026-09-19 — the foliage is settled, the sky is not
 
 The mechanism landed with 2.51 and is unchanged: `LOOKS.eir` global `raw.sat`

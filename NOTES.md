@@ -1625,6 +1625,66 @@ and a declared list drifts from the thing it describes unless something holds
 them together. The version constant beside it is not that something: it only
 catches what its own hash covers, and its hash was narrowed on purpose.
 
+## The sky's amount, measured through the right control at last, 2026-09-19 (decision 019)
+
+Four arms, one BUILD each at `LOOKS.eir` `skySat` 1.0, 1.5, 1.8 and 2.0,
+foliage 1.6 throughout, nothing touched but the look button — so the lift
+behaves as it does for a reader, which a hand-set slider does not reproduce.
+
+**THE STRUCTURAL FINDING, and it changes what this control is.** The look's
+declared `skySat` is a FLOOR that the Restore-depth lift raises per frame, not
+the sky's saturation. On NIR_0063 the lift reaches the slider's cap of 2.0
+whatever the look declares — 1.0 and 1.8 both arrive at 2. Three of the seven
+practice frames are pinned that way, so the look's number cannot reach them at
+all. What is actually in force, declared 1.0 / 1.5 / 1.8 / 2.0:
+
+- NIR_3406, NIR_0063, NIR_2082 — 2.0 on every arm, pinned by the lift
+- NIR_1651 — 1.43, then 1.5, 1.8, 2.0
+- NIR_1376, NIR_1644, NIR_0627 — 1.0, 1.5, 1.8, 2.0, untouched by the lift
+
+**Sky saturation** (film 0.66 with a yellow filter, 0.92 with a red):
+
+- NIR_1644 — 0.504 / 0.580 / 0.619 / 0.642
+- NIR_1376 — 0.461 / 0.538 / 0.579 / 0.605
+- NIR_1651 — 0.236 / 0.238 / 0.247 / 0.253
+- NIR_0627 — 0.101 / 0.103 / 0.104 / 0.105
+- NIR_3406 0.319, NIR_0063 0.251, NIR_2082 0.167 — flat on all four
+
+So the amount reaches two frames. **It WIDENS the spread between frames rather
+than narrowing it** — 0.10 to 0.50 at 1.0, 0.11 to 0.64 at 2.0 — because the
+lift has already spent the cap on the weak skies and only the deep ones have
+anywhere to go. An earlier note here claimed the opposite; it was written from
+the hue-band arms.
+
+**The blotch cost, both scales, on the frames the amount reaches.** Twenty-four
+pixel block pooling for blotch, 4-pixel for grain, left/centre/right of the top
+band. NIR_3406 is the control: it is pinned at the cap, so it must not move —
+and it reads 0.0060 / 0.0093 / 0.0083 identically on all four arms, to four
+decimals, which is what makes the movement elsewhere the amount rather than the
+instrument.
+
+- NIR_1376 — centre 0.0047 / 0.0055 / 0.0060 / 0.0062; corners 0.0032 to
+  0.0039 and 0.0038 to 0.0047. Corner-against-centre IMPROVES, 0.81x to 0.75x.
+- NIR_1644 — left 0.0094 / 0.0110 / 0.0129 / 0.0138; right 0.0113 to 0.0144;
+  centre 0.0076 to 0.0083. Corner-against-centre worsens, 1.49x to 1.74x.
+- NIR_1651 — left 0.0150 / 0.0153 / 0.0165 / 0.0172 while centre and right do
+  not move at all. Its left corner is already 6.8x its centre at the shipping
+  amount, before this control touches it.
+
+**What that buys, per unit of noise.** On NIR_1644, colour gained over blotch
+added in the left corner: 1.5 returns 47 points of saturation per point of
+residual, 1.8 returns 33, and 2.0 returns 31. **The exchange rate is best at
+1.5 and worsens by a third above it.** On NIR_1376 the rise is proportional at
+every step and the corner ratio improves, so that frame does not argue against
+going higher; NIR_1644 and NIR_1651 do, and both do it in a corner that is
+already the worst part of those frames.
+
+**The instrument, said plainly because the last version of this note was
+wrong.** `--sky=` drives `skySatSel`; each frame records both the selection's
+value and the band's; each arm is a separate build in a git worktree, so the
+repository being measured is never modified; and NIR_3406's four identical
+readings are carried as a control rather than dropped.
+
 ## The foliage amount is settled; the sky's arms measured the wrong slider, 2026-09-19 (decision 019)
 
 **Foliage 1.6 ships.** Rendered as arms on seven practice raws through the app's

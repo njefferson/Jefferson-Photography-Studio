@@ -162,17 +162,26 @@ const FOL_SAT = 1.6;
 const SKY_SAT = 1.0;
 const GLOBAL_SAT_RANGE = [0, 3], BAND_SAT_RANGE = [0, 2];
 // 10d: the sky's saturation on RAW after the Look press, mean HSV saturation of
-// the same population 10b measures the angle of. MADE TO FAIL FIRST, 2026-09-18:
-// the 2.50.7 look (both bands at saturation 1) read 0.393 here and the solved
-// look reads 0.570; the floor sits 0.04 under the solved reading, so a band
-// quietly reset to 1 fails this check while still passing 10b's angle.
-// RE-MEASURED for 019's look (global saturation 1, the sky's amount on the sky
-// saturation stage at 1.0, Restore depth OFF so the reading is the look's own):
-// NIR_0063 reads 0.332 on the 2026-09-18 build with the bands aimed right, so
-// the floor is 0.29 — 0.04 under it, as before. The 0.53 that stood here was
-// the reading under global saturation 3 and went red the first time the walk
-// ran on the new look, which is the check doing its job.
-const SKY_SAT_MIN = 0.29;
+// the same population 10b measures the angle of, READ WITH RESTORE DEPTH OFF.
+//
+// RE-MEASURED 2026-09-19 through the control the look actually declares. With
+// the lift ON this check read 0.332 whether LOOKS.eir declared skySat 1.0 or
+// 1.8, because the lift tops the selection's amount up per frame and reaches
+// the slider's cap of 2 on this frame either way -- so for a day it asserted
+// nothing it claimed to. With the lift OFF, NIR_0063 reads 0.2576 at the
+// shipped 1.0 and 0.3186 at 1.8. The floor sits 0.04 under the shipped
+// reading, as before. IT MOVES WITH THE LOOK'S AMOUNT: change LOOKS.eir's
+// skySat and this must be re-measured, which is the point of it.
+const SKY_SAT_MIN = 0.21;
+// AND THE COUNT, because the mean alone cannot see a collapse. The population
+// is "pixels whose saturation clears 0.18", so as the amount falls FEWER pixels
+// qualify and the survivors are the most saturated ones -- the mean goes UP.
+// Measured: the sky's amount at the slider's 0 left 1209 qualifying pixels with
+// a HIGHER mean than the 15690 at 1.0. A floor on the mean is therefore blind
+// in exactly the direction it was written to guard, and the size is what
+// actually falls. Half the shipped count, so a real collapse fails and frame-
+// to-frame jitter does not.
+const SKY_POP_MIN = 7800;
 // 10f: NOTHING WITHOUT COLOUR TAKES ANY (019). A pixel whose HSV saturation
 // under the look's bare mapping (Sky and Foliage bands at 1) is under COL_LO
 // must still read under COL_VISIBLE under the whole look, for all but
@@ -426,6 +435,19 @@ try {
                nf: fol.length, ns: sky.length };
     });
     const m = await measurePops(p);
+    // 10d READS WITH RESTORE DEPTH OFF, and everything else reads with it on.
+    // WHY, measured 2026-09-19: with the lift on it tops the SELECTION's own
+    // amount up per frame from whatever the look declares, and on this frame it
+    // reaches the slider's cap of 2 whatever that declaration is -- so this
+    // check read 0.332 with the look declaring 1.0 and 0.332 again with it
+    // declaring 1.8. A check whose number does not move when the thing it names
+    // moves is not asserting it; it was believed to be guarding the sky's
+    // amount for a day while guarding nothing. Same door checks 4a4-4a6 use,
+    // and for the same reason. The lift goes back on before the depth test, so
+    // 10a-c and 10e keep the readings they were recorded against.
+    await press(p, "irLift");
+    const mBare = await measurePops(p);
+    await press(p, "irLift");
     await setDepth(p, DEPTH_TRY);
     const m2 = await measurePops(p);
     await ctx.close();
@@ -440,9 +462,12 @@ try {
       m.fol != null && m.sky != null && ((m.sky - m.fol + 360) % 360) >= MIN_SEP, true);
     if (m.fol != null && m.sky != null)
       console.log(`        (separation ${((m.sky - m.fol + 360) % 360).toFixed(1)}, film ${FILM.sep})`);
-    check("10d the sky is as saturated as the solve made it (the film reads 0.66)",
-      m.skySat != null && m.skySat >= SKY_SAT_MIN, true);
-    console.log(`        (sky saturation ${m.skySat == null ? "none" : m.skySat.toFixed(3)}, floor ${SKY_SAT_MIN}, n=${m.ns})`);
+    check("10d the sky is as saturated as the look declares (Restore depth off; the film reads 0.66)",
+      mBare.skySat != null && mBare.skySat >= SKY_SAT_MIN, true);
+    console.log(`        (sky saturation ${mBare.skySat == null ? "none" : mBare.skySat.toFixed(3)} bare, ${m.skySat == null ? "none" : m.skySat.toFixed(3)} lifted, floor ${SKY_SAT_MIN}, n=${mBare.ns})`);
+    check("10d2 ...and the sky POPULATION has not collapsed, which the mean cannot see",
+      mBare.ns >= SKY_POP_MIN, true);
+    console.log(`        (${mBare.ns} pixels carry the sky's colour, floor ${SKY_POP_MIN})`);
     check("10e the Sky depth slider still deepens the sky (the look ships it at 0)",
       m.skyVal != null && m2.skyVal != null && m.skyVal - m2.skyVal >= SKY_VAL_DROP_MIN, true);
     console.log(`        (sky value ${m.skyVal == null ? "none" : m.skyVal.toFixed(3)} at depth ${DEPTH}, ${m2.skyVal == null ? "none" : m2.skyVal.toFixed(3)} at ${DEPTH_TRY}; drop floor ${SKY_VAL_DROP_MIN}, n=${m.ns})`);
