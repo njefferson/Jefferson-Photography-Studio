@@ -56,3 +56,14 @@ menus eat taps meant for the photo.
 **Third.** Behind 002 because it is a direction rather than a release, and ahead
 of the capability items because its pilot has already shipped and its unanswered
 questions are blocking 004 from closing.
+
+**ASKED 2026-09-19 FROM A PC, and it belongs to this item rather than beside
+it:** whether the floating menus are REPOSITIONABLE over the photograph —
+dragged to wherever they cover the least of it — and, if they are, where a
+dragged position is remembered: per device, per session, or per photograph.
+Two things already point at it. The Straighten card's height is what the
+picture steps back by, which is why it was reported the same day as taking
+too much of the image (NOTES.md, "Eight reports from a PC"), and a card that
+floats and can be moved has no reserve to take at all. And the crop pill's own
+unanswered question above — whether it floats over the photo and passes taps
+through where empty — is the same question asked about one control.

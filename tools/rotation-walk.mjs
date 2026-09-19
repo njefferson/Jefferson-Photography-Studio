@@ -79,6 +79,27 @@ try {
   // A photo never turned is untouched.
   await stepTo(p, 2);
   check("5 a photo you never turned opens as the camera wrote it", await shape(p), asOpened);
+
+  // 6 — STRAIGHTEN, THEN RESET, GIVES THE PICTURE BACK. Moving the angle
+  // re-fits the view to the smaller inscribed crop; Reset restored the angle
+  // and the crop and left the VIEW at that zoom, so the full frame came back
+  // drawn small with empty margins round it (reported from a PC with a
+  // screenshot, 2026-09-19). Read as the canvas's own backing size, which is
+  // what the view fit sets: armed, tilted, and back.
+  const drawn = () => p.evaluate(() => { const cv = document.querySelector("#view"); return `${cv.width}x${cv.height}`; });
+  await p.click("#ptab-crop");
+  await p.evaluate(() => { const b = [...document.querySelectorAll("button")].find((x) => /^Straighten$/i.test((x.textContent || "").trim())); b?.click(); });
+  await p.waitForFunction(() => !document.getElementById("cropTools")?.hidden, null, { timeout: 30000 });
+  await p.waitForTimeout(700);
+  const armedSize = await drawn();
+  await p.evaluate(() => { const el = document.getElementById("straighten"); el.value = "7"; el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); });
+  await p.waitForTimeout(700);
+  const tiltedSize = await drawn();
+  check("6 a straighten shrinks the frame it keeps", tiltedSize !== armedSize, true);
+  await p.click("#cropReset");
+  await p.waitForTimeout(700);
+  check("7 and Reset gives the whole picture back, not the tilted window", await drawn(), armedSize);
+  await p.click("#cropDone");
   await ctx.close();
 } finally { await b.close(); }
 console.log(failed?`\n${failed} check(s) failed`:"\nall checks passed");

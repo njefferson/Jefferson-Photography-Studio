@@ -1454,6 +1454,82 @@ because a slow read is not a failed one and a skipped photo is data lost;
 whether to time it out and say so on the tile is a decision when the file
 that stalled is known.
 
+## Eight reports from a PC on staging 2.52.1, 2026-09-19
+
+Read against the code before anything was changed. Four were defects, one was
+a measurement, three were answers.
+
+**The tile redraw did not yield to the reader.** A look press marks every
+other tile's grade stamp stale and the pass then decoded the neighbours on
+every decoder lane but one, beginning a second after the press, while the
+reader was still working on the open photograph — minutes of it on a set of
+128. The tiles still have to be redrawn (a tile is a claim about what opening
+that photo will show), so the pass now waits for **1.5 seconds** of no draw
+and no photo switch before it takes a lane, and every action pushes that
+back; a set's FIRST tiles are never delayed, because nothing is on screen for
+those yet. Four seconds was tried first and was wrong the other way: it held
+the Restore depth toggle's own redraws past the point where the tile walk, or
+a reader, would call them a response. Held by `tile-truth-walk` section E,
+which presses a look and keeps a slider moving for four seconds: the build
+before redraws a tile about two seconds in, this one redraws none, and both
+builds redraw four of six once the hand stops.
+
+**Reset after a straighten left the picture small with margins.** Moving the
+angle re-fits the view to the smaller inscribed crop; Reset restored the
+angle and the crop and left the view at that zoom. Measured on the canvas's
+own backing size at 1920×1000: armed 2800×1864, tilted 7° 2322×1546, and
+Reset left it at **1975×1315** — neither. It returns to 2800×1864 now.
+`rotation-walk` checks 6 and 7, check 7 red on the build before.
+
+**The Straighten card took a quarter of the picture.** The photo's reserve is
+the card's measured height, and at the fixed 360px width the card is four
+rows on a desktop: header, the level note, the slider, and the ratio chips
+wrapped onto two lines. Above 820px the card is a grid — header on one row,
+the slider beside all seven ratio chips on the next — and every ratio is
+still visible at once, which is the standing rule on `#cropRatios`. Measured
+on a 944px stage: card **214px → 128px**, photograph **1082×720 → 1211×806**,
+a quarter more picture. A stale note from the last Level press also cleared
+when the angle moves by hand, because it is costing height while it sits
+there.
+
+**The mixer chip labelled "Aerochrome" is not the look.** It is the film's
+layer order bare — red←blue, green←red, blue←green — and bare it renders teal
+and pale; the Aerochrome look is that rotation's other half, the swap plus a
+mixer solved on six frames (IR-SCIENCE 4b-ii), and it lives on the Looks tab.
+Under the film's name the chip read as the look and was reported as "the
+colours are not swapped". It is **Film rotation** now, with a title naming
+the mapping and pointing at the Looks tab. Matrix and position untouched:
+the chips carry no ids and `tools/look-sheet.mjs` presses them by index.
+
+**Level, measured rather than tuned.** `findTilt` takes its acceptance floor
+as a parameter now, so the refusals can be read instead of argued about. The
+best line's agreement on five real frames, against a floor of 0.25:
+
+- NIR_3406, a long roofline across the frame: 0.362, and it answers, −0.49°.
+- NIR_2082, buildings: 0.100.
+- NIR_1376, a hillside horizon broken by trees: 0.024.
+- NIR_1644, a tree line: 0.016.
+- NIR_0063, a fence at an angle: 0.013.
+
+Three of the five are an ORDER OF MAGNITUDE below the floor, not just under
+it: those frames carry no long straight edge, and a floor low enough to catch
+0.024 would answer noise on every frame. So the floor is not the defect and
+was not moved — Level works where there is a line and declines in words
+where there is not, which is what it did. The parameter is the instrument.
+
+**The strength slider says what it is doing.** It does act — the lens-order
+walk sees the canvas change — but on a close-up with no sky the 16-50 profile
+at 1.5 moves the middle about 11% in brightness and a few percent in colour,
+which is easy to miss, and nothing on the card said so. The card now carries
+the same centre numbers the diagnostic prints, read through `lensGains`.
+
+**Two answers, no code.** Warmth is on every mask type and on stickers; whole
+frame it is the IR tab's Red gain and Blue gain (the white balance) and Tint,
+and no whole-frame control carries the name — a candidate, not built. A photo
+filling the screen with the menus floating over it is decision 003, with 004
+beside it; the record now also carries the question of whether those menus
+are repositionable and where a dragged position is remembered.
+
 ## The lens flat is laid on the linear raw at decode, 2026-09-18 (decision 021, 2.52)
 
 **What moved.** The measured lens curve is applied in `src/lensflat.ts` as one
