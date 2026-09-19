@@ -539,16 +539,6 @@ user-scalable=no.
 > different approach and mindset"). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
-- [ ] **One sky selection, built at open, for every sky-aware tool** <!-- decision: 018 --> —
-  asked 2026-09-18: should the sky selection be set before any corrections
-  and be available to later operations. It is, for the look's stages, the
-  tile and the batch: the decode worker builds the bitmap and its refinement
-  to the picture's edges from the undegraded decode a moment after the
-  picture itself. Two consumers still do not read it — the reader's own Sky
-  mask rebuilds a coarse bitmap of its own and never sees the refined edge,
-  and no per-population strength (denoise, colour noise, texture, the hot-spot
-  and lens corrections, all OWED in the scope gate) uses it yet. See
-  `docs/decisions/018-one-sky-selection-for-every-sky-aware-tool.md`.
 - [ ] **Masks combine: a group of components joined by add, subtract and intersect** <!-- decision: 026 -->
   asked 2026-09-19 in three parts: the masks need to combine, it should be
   possible to subtract other colours from the Sky mask, and a mask should be
@@ -2607,6 +2597,22 @@ read as authoritative, and an invented one is worse than a missing one.
 
 ## Shipped (roadmap archive)
 
+
+- [x] **One sky selection, built at open, for every sky-aware tool** <!-- decision: 018 --> —
+  asked 2026-09-18: should the sky selection be set before any corrections
+  and be available to later operations. It is, for the look's stages, the
+  tile and the batch: the decode worker builds the bitmap and its refinement
+  to the picture's edges from the undegraded decode a moment after the
+  picture itself. Two consumers still do not read it — the reader's own Sky
+  mask rebuilds a coarse bitmap of its own and never sees the refined edge,
+  and no per-population strength (denoise, colour noise, texture, the hot-spot
+  and lens corrections, all OWED in the scope gate) uses it yet. See
+  `docs/decisions/018-one-sky-selection-for-every-sky-aware-tool.md`.
+  **Shipped and verified 2026-09-19.** The reader's Sky mask reads the same
+  refined selection the look's sky stages use. Edge sharpness, rows to fall
+  from 0.9 to 0.1 coverage: NIR_1644 74 to 57, NIR_0063 30 to 17, NIR_1651
+  unchanged at 59 (the hazy control). Agreement walk green. The per-population
+  strengths the record names as OWED stay their own items.
 
 - [x] **Aerochrome's saturation by population: foliage and sky each their own amount, nothing colourless touched** <!-- decision: 019 --> —
   reported 2026-09-18 from staging 2.50.10: the look's saturation reads too

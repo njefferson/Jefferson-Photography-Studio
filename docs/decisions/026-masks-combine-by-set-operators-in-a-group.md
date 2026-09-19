@@ -54,6 +54,48 @@ because masks are continuous 0..1 and not binary.
 colour from a detected sky is, in Lightroom, a Sky component with a Color Range
 component subtracted from it, inside one group, with one adjustment.
 
+## Built already
+
+What exists that this item uses, so a second one does not get written
+(LESSONS 330). Every path here is checked to exist on every commit.
+
+- **The NOT operator is done.** `MaskLayer.invert` is on every mask type in
+  `src/pipeline.ts`, applied as the last step of the per-mask weight
+  (`return m.invert ? 1 - w : w`) and mirrored in the shader. The convention
+  puts invert at both the component and the group level; the component half
+  needs nothing built.
+- **Five selection producers, already written and already agreeing across CPU
+  and GPU.** Radial and linear geometry and the colour key live in
+  `src/pipeline.ts` (`colorMaskWeight` and the geometry branches); painted
+  bitmaps and the detected sky share `sampleBrush`; `src/sky.ts` produces the
+  sky seed. A group model needs no new selection TYPES — it needs a way to
+  compose the ones there are.
+- **Edge refinement is general and is not sky-specific.** `src/skyfine.ts`
+  (`buildSkyGuide`, `refineSkyMask`) is a guided filter over an arbitrary
+  bitmap plus a guide; 018 gave it a second caller in an afternoon. Any
+  component of a group can be refined by it, and `MaskLayer.fine` is the field
+  it lands in.
+- **The GPU slot scheme extends to a second atlas without shader surgery.**
+  `src/gl.ts` packs bitmap masks one per RGBA channel keyed by `u_maskSlot`,
+  and 018 added `updateBrushFineTexture` on the same scheme. A third atlas
+  would follow the same pattern — but note the ceiling below.
+- **Two walks already hold this ground.** `tools/agreement-walk.mjs` is what
+  proves a change to mask evaluation keeps CPU and GPU identical — 018's
+  second sampling path passed it — and `tools/mask-truth-walk.mjs` reads a
+  mask from the reader's side rather than from the code's.
+- **The measurement of a mask's edge is a scratch harness and is NOT in the
+  repo.** IR-SCIENCE 4b-v cites a scratch maskprobe (no backticks: it is not a
+  path in this repo) for the "25 px ramp comes back 4 px wide" control; it
+  lives in a session scratchpad and dies with the session. A second instrument
+  was written for 018 because of that. If this item needs to look at an edge,
+  promote one into `tools/` first rather than writing a third.
+
+**The constraint, stated here because it is the thing that will bite.**
+`MAX_BITMAP_MASKS` in `src/pipeline.ts` is 4, one per atlas channel. Today that
+caps how many bitmap MASKS a photograph can carry; under a group model it caps
+how many bitmap COMPONENTS a single adjustment can combine, which is a much
+lower ceiling in practice. Raising it is part of this item, not a footnote.
+
 ## Weighed against
 
 - **018 (just shipped)** — made the reader's Sky mask read the same refined

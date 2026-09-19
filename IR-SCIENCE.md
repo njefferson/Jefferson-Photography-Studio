@@ -745,10 +745,26 @@ instrument, which was green on all three.
 3. *The input.* Fed the FEATHERED bitmap, the guided filter kept the feather
    wherever its window did not reach an edge, and learned the sky's gradient
    as "less sky": the refined mask sloped to 0.85 over the 200 px above the
-   roofline (`maskprobe.mjs`, which writes the coarse and refined masks as
+   roofline (a scratch `maskprobe.mjs`, which writes the coarse and refined masks as
    pictures). Read as a hard selection cut at half, the filter grows its own
    edge from the guide — a 25 px ramp across a hard edge comes back 4 px
    wide, the probe's control — and the mask is solid to the roofline.
+
+   **That probe was a SCRATCH harness and is not in the repo** (this repo keeps
+   scratch harnesses in the session scratchpad on purpose). So the 4 px control
+   above is provenance, not something a later session can re-run — noted
+   2026-09-19 after a session went looking for it, did not find it, and built a
+   second instrument that measures the same edge a different way. If the edge
+   is measured again, promoting a probe into `tools/` is the thing that stops a
+   third one being written.
+
+   **The reader's Sky mask reads this refinement too, from 2026-09-19** (018).
+   Measured as the rows a column takes to fall from 0.9 to 0.1 of coverage,
+   before against after: NIR_1644 median 74 to 57 (p90 178 to 146), NIR_0063
+   median 30 to 17 (p90 166 to 137), NIR_1651 unchanged at 59 — the hazy frame
+   whose sky barely keys, which serves as the control. Feather still moves the
+   result despite the filter thresholding its input at 0.5 (68 rows at 0, 57 at
+   1, NIR_1644), so that control is not dead.
 
 **The key's scale is the look's, and it moved (2026-09-18, later the same
 day).** The window above was cut on the sky's mean rendered chroma under

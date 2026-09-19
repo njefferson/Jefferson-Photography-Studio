@@ -287,6 +287,51 @@ if (!bad) {
   // This does not refuse anything and is not declared a gate. No parser tells
   // reading from having-read. It puts the sentence in front of whoever is about
   // to commit, which is the one thing a parser can do here.
+  // ---- 5b. WHAT IS ALREADY BUILT FOR THE ITEM ABOUT TO BE WORKED.
+  //
+  // THE GAP THIS CLOSES, named by the owner 2026-09-19: a capability gets built
+  // as a dependency of a LATER capability, and when that later item finally
+  // comes up the session does not know the dependency exists and builds a
+  // second one. It is not "forgot to read the record" -- the record may not
+  // mention it, because the thing was built for a different item.
+  //
+  // Measured the day it was named. `maskprobe.mjs` was written to measure the
+  // sky refinement's EDGE, and IR-SCIENCE 4b-v cites its control reading ("a
+  // 25 px ramp across a hard edge comes back 4 px wide"). Item 018 needed
+  // exactly that measurement. The session did not find it and wrote a second
+  // instrument measuring the same edge a different way. Same day, the guided
+  // filter itself -- built for the look's sky stages -- WAS found, but only
+  // because 018's record happened to name it.
+  //
+  // So the top-ranked record must carry `## Built already`, listing what exists
+  // that this item will use, and every path it names must EXIST. Required only
+  // of the item at the TOP of the queue, which is the one about to be worked:
+  // that makes it a step before starting rather than a backfill across every
+  // open record, and it bites at exactly the moment the failure happens.
+  // Any record that carries the section has its paths checked, top or not.
+  const topKey = open[0] ? keyOf(open[0].text) : null;
+  for (const [k, f] of byKey) {
+    if (!claimed.has(k)) continue;
+    const text = readFileSync(join(DIR, f), "utf8");
+    const built = body(text, "Built already");
+    if (!built) {
+      if (k === topKey) {
+        fail(`docs/decisions/${f} is next up and has no "## Built already". `
+           + `List what EXISTS that this item will use — modules, tools, walks — before starting it, `
+           + `or a second one gets built (LESSONS 330).`);
+      }
+      continue;
+    }
+    // Every backticked path in the section must be a real file.
+    const paths = [...built.matchAll(/`([\w./-]+\.(?:ts|mjs|js|md|json|html|css))`/g)].map((m) => m[1]);
+    const missing = paths.filter((rel) => !existsSync(join(DIR, "..", "..", rel)));
+    if (missing.length) {
+      fail(`docs/decisions/${f} "## Built already" names ${missing.join(", ")}, which does not exist. `
+         + `A citation pointing at nothing is how the second instrument gets written.`);
+    }
+  }
+  if (!bad) ok(`the next item says what is already built for it, and those files exist`);
+
   const top = open[0];
   if (top) {
     const k = keyOf(top.text);
@@ -300,6 +345,14 @@ if (!bad) {
         return line.replace(/^[-*\d.]+\s*/, "").replace(/\*\*/g, "").slice(0, 150);
       };
       const chosen = first("Options"), rejected = body(text, "Rejected");
+      const built = body(text, "Built already");
+      if (built) {
+        console.log(`\n  ALREADY BUILT for ${k} — do not write a second one (LESSONS 330):`);
+        for (const line of built.split("\n")) {
+          const m = /^\s*-\s+(.*)$/.exec(line);
+          if (m) console.log(`    ${m[1].replace(/\*\*/g, "").slice(0, 120)}`);
+        }
+      }
       console.log(`\n  before the first edit on ${k} (LESSONS 329):`);
       if (chosen) console.log(`    chosen    ${chosen}`);
       if (rejected) {
