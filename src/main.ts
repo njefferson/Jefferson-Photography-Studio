@@ -3993,7 +3993,7 @@ updateGradeUI();
 // (R/G/B) is a weighted sum of the three inputs — nine sliders, laid out as
 // three rows. Preset chips seed classic false-colour remixes; the sliders
 // fine-tune. Same accessible-slider substrate as B&W weights. ---
-const MIX3_PRESETS: { label: string; title?: string; m: number[] }[] = [
+const MIX3_PRESETS: { label: string; m: number[] }[] = [
   { label: "Identity", m: [1, 0, 0, 0, 1, 0, 0, 0, 1] },
   { label: "R⇄B swap", m: [0, 0, 1, 0, 1, 0, 1, 0, 0] },
   // THE TWO LABELS WERE THE WRONG WAY ROUND, for as long as both existed.
@@ -4014,7 +4014,12 @@ const MIX3_PRESETS: { label: string; title?: string; m: number[] }[] = [
   // and was reported as "the colours are not swapped" (2026-09-19). The matrix
   // and the POSITION are untouched: the chips carry no ids and
   // tools/look-sheet.mjs presses them by index.
-  { label: "Film rotation", title: "red←blue, green←red, blue←green — Aerochrome's layer order, bare. The Aerochrome look itself is on the Looks tab.", m: [0, 0, 1, 1, 0, 0, 0, 1, 0] },
+  //
+  // AND THE SENTENCE IS IN THE CARD'S NOTE, NOT IN A TOOLTIP. It went in as a
+  // `title` first and tools/control-check.mjs refused it the same day, rightly:
+  // a title is a hover, there is no hover on a tablet, and a chip whose whole
+  // explanation lives in one is a chip that explains itself to nobody here.
+  { label: "Film rotation", m: [0, 0, 1, 1, 0, 0, 0, 1, 0] },
 ];
 const MIX3_OUT = ["Red output", "Green output", "Blue output"];
 const MIX3_IN = ["red", "green", "blue"];
@@ -4056,7 +4061,6 @@ for (const def of MIX3_PRESETS) {
   const b = document.createElement("button");
   b.type = "button";
   b.className = "mix-chip";
-  if (def.title) b.title = def.title;
   b.addEventListener("click", () => {
     params.mix3 = [...def.m];
     updateMix3UI();

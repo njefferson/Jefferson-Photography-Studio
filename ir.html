@@ -554,7 +554,7 @@
 
             <hr class="divider" />
             <div class="sub-title">Custom false color &mdash; channel mixer</div>
-            <p class="note">The full recipe behind the R&#8646;B swap: build each output channel from any blend of the red, green and blue inputs. Start from a preset, then fine-tune. Bakes into .cube and .dcp exports.</p>
+            <p class="note">The full recipe behind the R&#8646;B swap: build each output channel from any blend of the red, green and blue inputs. Start from a preset, then fine-tune. Bakes into .cube and .dcp exports. <strong>Film rotation</strong> is Aerochrome&rsquo;s layer order bare &mdash; red from blue, green from red, blue from green &mdash; which on its own renders teal and pale; the Aerochrome <em>look</em> is that plus a solved mixer, and it lives on the Looks tab.</p>
             <div id="mix3Presets" class="bw-mixes" role="group" aria-label="Channel mixer presets"></div>
             <div id="mix3Grid"></div>
             <button id="mix3Reset" type="button">Reset channel mixer</button>
@@ -629,10 +629,18 @@
             <small class="note" id="healStatus"></small>
             <hr class="divider" />
             <div class="sub-title">IR lens fixes <span>hot-spot &amp; vignette</span></div>
-            <p class="note">IR-converted lenses often brighten the centre (a &ldquo;hot-spot&rdquo;) and tint it. <strong>Hot-spot</strong> pulls the brightness down, <strong>Hot-spot size</strong> sets the circle, <strong>Hot-spot colour</strong> takes the colour out of it &mdash; which direction helps depends on the look, so nudge one way and go back if the disc gets stronger. <strong>Vignette</strong> corrects edge darkening (right) or adds it (left).</p>
-            <label>Hot-spot <input id="hotspot" type="range" min="0" max="0.8" step="0.01" value="0" /></label>
+            <!-- THE LABELS SAY WHAT THE SLIDER DOES, NOT WHAT THE DEFECT IS
+                 CALLED. "Hot-spot" on a slider that REMOVES one reads as a
+                 slider that adds one, and "Hot-spot colour" reads as the
+                 colour OF the disc rather than a control over the centre's
+                 (reported from the PC, 2026-09-19). The card's heading and
+                 this sentence already name the defect, so the controls are
+                 free to name the act. Ids, ranges and params are untouched:
+                 nothing stored or walked depends on the words. -->
+            <p class="note">IR-converted lenses often brighten the centre (a &ldquo;hot-spot&rdquo;) and tint it. <strong>Remove hot-spot</strong> pulls that brightness back down, <strong>Hot-spot size</strong> sets how wide the circle is, and <strong>Centre colour</strong> takes the tint out of it &mdash; which direction helps depends on the look, so nudge one way and go back if the disc gets stronger. <strong>Vignette</strong> corrects edge darkening (right) or adds it (left).</p>
+            <label>Remove hot-spot <input id="hotspot" type="range" min="0" max="0.8" step="0.01" value="0" /></label>
             <label>Hot-spot size <input id="hotspotSize" type="range" min="0.15" max="1" step="0.01" value="0.5" /></label>
-            <label>Hot-spot colour <input id="hotspotColor" type="range" min="-0.5" max="0.5" step="0.01" value="0" /></label>
+            <label>Centre colour <input id="hotspotColor" type="range" min="-0.5" max="0.5" step="0.01" value="0" /></label>
                         <label>Vignette <input id="vignette" type="range" min="-1" max="1" step="0.01" value="0" /></label>
             <!-- PRESENT ONLY WHEN A CORRECTION IS ACTUALLY ON THIS FRAME, so
                  its presence is how you know one was applied at all. It moved
@@ -1423,9 +1431,9 @@
         photo. An IR-converted lens sends a little more infrared straight up the middle than it does to
         the corners, so the centre of the frame is both brighter and a slightly different colour; the
         red&#8646;blue swap every colour look is built on takes that small tint and turns it into a disc
-        you cannot miss. <strong>Hot-spot</strong> (Corrections tab) pulls the brightness down and does
-        nothing at all to the colour &mdash; that is what <strong>Hot-spot colour</strong> beside it is
-        for. Set <strong>Hot-spot size</strong> so the circle covers the patch, then move Hot-spot colour
+        you cannot miss. <strong>Remove hot-spot</strong> (Corrections tab) pulls the brightness down and
+        does nothing at all to the colour &mdash; that is what <strong>Centre colour</strong> beside it is
+        for. Set <strong>Hot-spot size</strong> so the circle covers the patch, then move Centre colour
         until the disc goes flat. Which direction helps depends on the look you have on, since the look
         may have swapped the channels underneath; nudge it one way and go the other if the disc gets
         stronger. It works over exactly the same circle as the brightness fix, so the two can be set
@@ -1632,7 +1640,7 @@
         for a shoot in one style; the exact frame on screen isn't copied pixel-for-pixel.)</p>
         <p><strong>What rides along, and what doesn't:</strong> a batch carries the <em>creative</em> look only.
         <strong>Masks</strong> (radial, gradient, brush) and the <strong>IR lens fixes</strong> sliders —
-        Hot-spot, its size, and Vignette — are tied to one specific frame, so they do <em>not</em> carry into a
+        Remove hot-spot, its size, and Vignette — are tied to one specific frame, so they do <em>not</em> carry into a
         batch. Instead every photo gets its <em>own</em> hot-spot correction chosen from its EXIF lens &mdash; RAW and
         rendered files alike, and interpolated to the frame's own focal length rather than snapped to the nearest
         one measured. A photo whose lens isn't in the EXIF is processed without that fix, and the finish summary

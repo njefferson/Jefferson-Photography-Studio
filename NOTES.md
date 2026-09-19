@@ -576,6 +576,29 @@ user-scalable=no.
   Sky mask gains a colour gate sampled from inside its own selection, keyed
   on a colour that does not move with the grade. See
   `docs/decisions/023-the-sky-mask-reads-the-skys-colour-as-well-as-its-place.md`.
+- [ ] **Every control can say what it does, and a finger can reach the saying** <!-- decision: 024 --> —
+  asked 2026-09-19 from the PC, in the sitting that reported a slider named
+  after the defect rather than the act: there should be something clickable
+  or hoverable, where it makes sense, that says what each tool does. Measured
+  the same day: 103 visible notes against 76 labelled sliders, so most
+  controls already explain themselves permanently and what is missing is the
+  rule — which get a sentence, where it goes, and how a reader asks for one.
+  The field's tap-reachable form is a toggletip, not a tooltip, and this
+  repository's own gate already refuses a `title` for this use, because there
+  is no hover on a tablet. See
+  `docs/decisions/024-every-control-can-say-what-it-does-without-a-hover.md`.
+- [ ] **While you straighten: finer guides you can turn off, and a picture you can zoom and pan** <!-- decision: 025 --> —
+  asked 2026-09-19 from the PC. The overlay draws twelfths; the ask is
+  sub-lines below that with a toggle on the straighten card, because twice
+  the lines is twice the ink over the photograph. And while the tool is
+  armed one pointer moves the crop box and two pinch-zoom, with no wheel
+  handler at all — so on a machine with a mouse there is no zoom and no pan
+  while straightening, which is exactly when a tenth of a degree wants a
+  close look. Lightroom holds the spacebar to pan and zoom, cycles overlays
+  on a key, and shows a finer grid only while the angle is moving; none of
+  those inputs exists on a tablet, so each needs a control a finger reaches.
+  See
+  `docs/decisions/025-the-straightening-view-finer-guides-you-can-turn-off-and-a-picture-you-can-zoom.md`.
 - [ ] **A photograph that fills the screen with no way back out** <!-- decision: 012 --> — reported
   from the iPad 2026-09-17: a photograph in the full view appeared zoomed in, and
   neither zooming out nor scrolling brought the rest of it back. Two failures, and
@@ -1453,6 +1476,25 @@ than the symptom. Not changed: the read has no timeout and skips nothing,
 because a slow read is not a failed one and a skipped photo is data lost;
 whether to time it out and say so on the tile is a decision when the file
 that stalled is known.
+
+## A slider named after the defect, 2026-09-19
+
+Reported from the PC: the IR lens card's top slider was called "Hot-spot" and
+did not say what it did. It removes one — it pulls the centre's brightness
+down — so under that name it reads as a control that ADDS a hot spot. The
+same trap held the third slider: "Hot-spot colour" reads as the colour OF the
+disc rather than a control over the centre's. They are **Remove hot-spot**,
+**Hot-spot size** (unchanged: it is the size of the thing being removed) and
+**Centre colour** (bidirectional, so "remove" would have been a lie). The
+card's own note and the two passages in Help that name them were rewritten in
+the same commit, or the app would point at labels that no longer exist. Ids,
+ranges and params are untouched, so nothing stored, walked or saved moves.
+
+**`tools/control-check.mjs` passed all three.** Its mechanical half is the
+tooltip rule — a `title` that carries what the label lacks — and these carry
+no title; the other half, whether the visible label says what the control
+does, is taste and cannot be parsed, which is why the gate's own header says
+so and why this had to be reported by hand. That gap is decision 024.
 
 ## Eight reports from a PC on staging 2.52.1, 2026-09-19
 
