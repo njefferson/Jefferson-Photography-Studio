@@ -556,21 +556,6 @@ user-scalable=no.
   because it has no answer to whose adjustment applies when three entries
   combine into one selection. Note the 4-bitmap ceiling
   (`MAX_BITMAP_MASKS`, one per atlas channel) becomes the binding constraint.
-- [ ] **The radial mask turns** <!-- decision: 027 -->
-  asked 2026-09-19 beside the mask-combining request: the circle mask needs to
-  be rotated. It is the only selection in the app whose orientation cannot be
-  set — a radial mask is an axis-aligned ellipse, `cx`/`cy`/`rx`/`ry` with no
-  angle in either weight function, so it can be made wide or tall and never
-  tilted. The linear gradient does not have the problem because it is defined
-  by two POINTS and its direction is already free. Lightroom rotates from the
-  shape's own edge, between the four handles, with a 15-degree snap under
-  Shift; darktable uses Ctrl-drag on a node or Shift-Ctrl-scroll. **Neither
-  gesture survives a tablet** — Lightroom's whole affordance is the cursor
-  changing shape on hover, and a finger does not hover. What carries over is
-  the MODEL: the angle belongs to the shape, is adjusted on the shape, and has
-  a coarse snap, with a visible grip at the 44 px target this app is held to
-  and a panel route beside it. Ranked below 024, because a rotation grip that
-  nothing names is the failure 024 exists to fix.
 - [ ] **The Sky mask reads the sky's colour as well as its place** <!-- decision: 023 --> —
   reported 2026-09-18 from the iPad with three screenshots of one frame: the
   Sky mask leaves a rim of unselected sky round every object and misses the
@@ -593,6 +578,21 @@ user-scalable=no.
   repository's own gate already refuses a `title` for this use, because there
   is no hover on a tablet. See
   `docs/decisions/024-every-control-can-say-what-it-does-without-a-hover.md`.
+- [ ] **The radial mask turns** <!-- decision: 027 -->
+  asked 2026-09-19 beside the mask-combining request: the circle mask needs to
+  be rotated. It is the only selection in the app whose orientation cannot be
+  set — a radial mask is an axis-aligned ellipse, `cx`/`cy`/`rx`/`ry` with no
+  angle in either weight function, so it can be made wide or tall and never
+  tilted. The linear gradient does not have the problem because it is defined
+  by two POINTS and its direction is already free. Lightroom rotates from the
+  shape's own edge, between the four handles, with a 15-degree snap under
+  Shift; darktable uses Ctrl-drag on a node or Shift-Ctrl-scroll. **Neither
+  gesture survives a tablet** — Lightroom's whole affordance is the cursor
+  changing shape on hover, and a finger does not hover. What carries over is
+  the MODEL: the angle belongs to the shape, is adjusted on the shape, and has
+  a coarse snap, with a visible grip at the 44 px target this app is held to
+  and a panel route beside it. Ranked below 024, because a rotation grip that
+  nothing names is the failure 024 exists to fix.
 - [ ] **While you straighten: finer guides you can turn off, and a picture you can zoom and pan** <!-- decision: 025 --> —
   asked 2026-09-19 from the PC. The overlay draws twelfths; the ask is
   sub-lines below that with a toggle on the straighten card, because twice

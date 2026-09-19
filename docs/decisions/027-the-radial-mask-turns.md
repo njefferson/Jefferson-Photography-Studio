@@ -108,13 +108,22 @@ gesture ships a control nobody on a tablet can find.
 
 ## Rank
 
-**Below 024, above 023.** Below 024 because this adds a gesture to a surface
-whose controls do not yet explain themselves, and a rotation grip that nothing
-names is the exact failure 024 exists to fix — Lightroom gets away with a bare
-handle because a cursor explains it, and this app has no cursor. Above 023
-because 023's fix is now expressible over 026's group model as a preset rather
-than as new machinery, so its urgency dropped when 026 shipped, while this is a
-selection the reader cannot make at all today.
+**Below 023 and 024, above 025.** Below 024 because this adds a gesture to a
+surface whose controls do not yet explain themselves, and a rotation grip that
+nothing names is the exact failure 024 exists to fix — Lightroom gets away with
+a bare handle because a cursor explains it, and this app has no cursor. Below
+023 even though 026 turned 023's fix into a preset over the group model rather
+than new machinery: 023 is a REPORTED DEFECT, a sky mask missing sky in frames
+the owner was looking at, and a reported defect outranks a capability nobody
+has asked for twice. Above 025 because a mask that cannot be aimed at a
+diagonal subject is a selection the reader cannot make at all, while 025
+refines a control that already works.
+
+**The first draft of this section said "below 024, above 023" and the bullet
+was filed above 023, so the record and the queue disagreed** — and in this
+repository the roadmap's FILE ORDER is the rank, which makes that one file with
+two answers. The ordering claim was also self-contradictory: 023 already sat
+above 024, so nothing can be below one and above the other.
 
 **Not urgent enough to precede the reported defects** (013, 016, 014, 015):
 those are frames the owner is looking at that come out wrong, and this is a
