@@ -930,6 +930,8 @@ practice raws through the app's own `folSat` slider and chosen from the
 pictures. At 1.6 the foliage population reads saturation 0.59 to 0.82 against
 the film's 0.60.
 
+**BOTH AMOUNTS SETTLED 2026-09-19: foliage 1.6, sky 1.8.**
+
 **THE SKY'S AMOUNT, MEASURED THROUGH THE RIGHT CONTROL.** An earlier set of
 arms drove the Colour tab's sky hue BAND (`skySat`, `params.sky[1]`) rather
 than the selection's amount (`skySatSel`, `EditParams.skySat`) that the look
@@ -952,9 +954,19 @@ worst.** Twenty-four-pixel block pooling on the responding frames: NIR_1376's
 corner-against-centre improves (0.81x to 0.75x) while NIR_1644's worsens (1.49x
 to 1.74x) and NIR_1651's left corner rises 15% while its centre does not move
 at all — from a corner already 6.8x its centre before this control touches it.
-On NIR_1644 the colour gained per unit of corner residual added is 47 at 1.5,
-33 at 1.8 and 31 at 2.0, so the exchange rate is best at 1.5 and worsens by a
-third above it.
+**That exchange rate is WITHDRAWN.** It was computed from corner residual, and
+on opening the renders the frame where that residual was most dramatic
+(NIR_1651, 6.8x corner against centre) is indistinguishable across all four
+arms. A residual that moves is not a defect that shows. What IS visible in
+those skies is contour banding — flat plateaus with hard stepped edges — and it
+is present at the shipped 1.0 rather than arriving with the amount.
+
+**So 1.8 ships, and the reason is the lift rather than noise.** 2.0 is the
+slider's ceiling and the Restore-depth lift exists to top each frame up toward
+it individually; at a declared 2.0 every frame arrives pinned and the lift has
+nothing left to contribute for this parameter. 1.8 keeps room for it. Between
+1.8 and 2.0 there is little visible difference; between 1.0 and 1.8 there is a
+clear one on NIR_1644 and NIR_1376, which is the change this ships.
 
 
 
