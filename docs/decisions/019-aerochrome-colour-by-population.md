@@ -224,14 +224,23 @@ appearance and not a measurement.
   slider's 0, 1209 pixels qualified with a HIGHER mean than the 15690 at 1.0.
   Check 10d2 asserts the population SIZE, which is what actually falls.
 
-## Progress, 2026-09-19 — the foliage is settled, the sky is not
+## Outcome
 
-The mechanism landed with 2.51 and is unchanged: `LOOKS.eir` global `raw.sat`
-1.0, the foliage's amount on the Colour tab's Foliage band with every band
-boost gated by `bandGain`'s `SAT_GUARD_LO..HI`, and the sky's amount as
-`skySat` through the selection built at open, gated by `SKY_SAT_GATE_LO..HI`.
-What was open was the two amounts, which this record says are chosen from
-pictures once 021 had moved (it shipped as 2.52).
+**Shipped 2026-09-19 as foliage 1.6, sky 1.8.** The mechanism landed with 2.51
+and is unchanged: `LOOKS.eir` global `raw.sat` 1.0, the foliage's amount on the
+Colour tab's Foliage band with every band boost gated by `bandGain`'s
+`SAT_GUARD_LO..HI`, and the sky's amount as `skySat` through the selection
+built at open, gated by `SKY_SAT_GATE_LO..HI`. What was open was the two
+amounts, which this record says are chosen from pictures once 021 had moved
+(it shipped as 2.52).
+
+**Why 1.8 and not 2.0**, which reads marginally deeper: 2.0 is the slider's
+ceiling, and the Restore-depth lift's job is to top each frame up toward it
+individually. At a declared 2.0 every frame arrives pinned at the cap and the
+lift has nothing left to contribute for this parameter. 1.8 keeps room for it
+to work. Between the two there is little visible difference; between 1.0 and
+1.8 there is a clear one on the frames that respond, which is the change this
+ships.
 
 **Foliage: 1.6, shipped.** Rendered as arms on seven practice raws through the
 app's own `folSat` slider, which is `params.foliage[1]`, which is what

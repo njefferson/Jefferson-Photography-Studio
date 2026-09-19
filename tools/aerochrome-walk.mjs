@@ -159,7 +159,7 @@ const HUE_LIMIT = 60, SAT_RANGE = [0, 2], LUM_RANGE = [0.3, 1.7];
 // Sky saturation 0..2.
 const GLOBAL_SAT = 1.0;
 const FOL_SAT = 1.6;
-const SKY_SAT = 1.0;
+const SKY_SAT = 1.8;
 const GLOBAL_SAT_RANGE = [0, 3], BAND_SAT_RANGE = [0, 2];
 // 10d: the sky's saturation on RAW after the Look press, mean HSV saturation of
 // the same population 10b measures the angle of, READ WITH RESTORE DEPTH OFF.
@@ -172,7 +172,7 @@ const GLOBAL_SAT_RANGE = [0, 3], BAND_SAT_RANGE = [0, 2];
 // shipped 1.0 and 0.3186 at 1.8. The floor sits 0.04 under the shipped
 // reading, as before. IT MOVES WITH THE LOOK'S AMOUNT: change LOOKS.eir's
 // skySat and this must be re-measured, which is the point of it.
-const SKY_SAT_MIN = 0.21;
+const SKY_SAT_MIN = 0.28;
 // AND THE COUNT, because the mean alone cannot see a collapse. The population
 // is "pixels whose saturation clears 0.18", so as the amount falls FEWER pixels
 // qualify and the survivors are the most saturated ones -- the mean goes UP.
@@ -180,8 +180,10 @@ const SKY_SAT_MIN = 0.21;
 // a HIGHER mean than the 15690 at 1.0. A floor on the mean is therefore blind
 // in exactly the direction it was written to guard, and the size is what
 // actually falls. Half the shipped count, so a real collapse fails and frame-
-// to-frame jitter does not.
-const SKY_POP_MIN = 7800;
+// to-frame jitter does not. Measured with the lift off: 15690 qualifying pixels
+// at a declared 1.0, 17556 at the 1.8 that now ships. This moves with the
+// amount for the same reason the floor above does.
+const SKY_POP_MIN = 8700;
 // 10f: NOTHING WITHOUT COLOUR TAKES ANY (019). A pixel whose HSV saturation
 // under the look's bare mapping (Sky and Foliage bands at 1) is under COL_LO
 // must still read under COL_VISIBLE under the whole look, for all but
