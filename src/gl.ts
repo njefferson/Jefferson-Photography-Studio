@@ -5,7 +5,7 @@
 
 // Single source of truth for edit parameters lives in pipeline.ts so the GPU
 // preview and CPU export can never drift apart.
-import { toneEvaluator, toneIsIdentity, maskGroups, maskGroupIsActive, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, LENS_GAIN_LO, LENS_GAIN_HI, SAT_GUARD_LO, SAT_GUARD_HI, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, lensAreaMean, type EditParams, type LocalMap, type SkyMap, type BrushMask, type CropRect } from "./pipeline";
+import { toneEvaluator, toneIsIdentity, maskGroupsForRender, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, LENS_GAIN_LO, LENS_GAIN_HI, SAT_GUARD_LO, SAT_GUARD_HI, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, lensAreaMean, type EditParams, type LocalMap, type SkyMap, type BrushMask, type CropRect } from "./pipeline";
 import { toHalfBuffer } from "./half";
 export type { EditParams };
 
@@ -70,6 +70,17 @@ void main() {
 
 const FRAG = `#version 300 es
 precision highp float;
+// SAMPLER ARRAYS HAVE NO DEFAULT PRECISION, and a plain sampler2D does — which
+// is why this line is needed and nothing warned about its absence (026). GLSL
+// ES 3.00 gives float, int and sampler2D a default precision in the fragment
+// stage; sampler2DArray is not on that list, so declaring one without a
+// qualifier is "'sampler2DArray' : No precision specified" and the WHOLE
+// shader fails to compile. The app then reports itself unsupported and opens
+// no photograph at all — which is what the bitmap atlases did the moment they
+// became arrays, and what the new mask-slots walk caught on the run that was
+// meant only to prove the walk could fail. tsc is green either way: a shader
+// is a string to it.
+precision highp sampler2DArray;
 // Bounds for the measured lens gain — see pipeline.ts LENS_GAIN_LO/HI.
 // toFixed, NOT the bare number: GLSL will not convert an int literal to a float,
 // so an interpolated 2 gives "cannot convert from const int to const highp
@@ -115,8 +126,8 @@ uniform vec2 u_maskGeoB[8];  // (feather, invert)
 uniform vec4 u_maskAdj[8];   // (brightness, contrast, saturation, warmth)
 uniform float u_maskHue[8];  // degrees
 uniform int u_maskSlot[8];   // brush/sky: which packed channel (0..3); -1 otherwise
-uniform sampler2D u_maskTex; // brush/sky masks packed 1-per-channel (rgba = 4 max)
-uniform sampler2D u_maskFineTex; // sky masks (type 4) refined to the picture's edges, same slots
+uniform sampler2DArray u_maskTex; // brush/sky masks, four per RGBA layer (MAX_BITMAP_MASKS max)
+uniform sampler2DArray u_maskFineTex; // sky masks (type 4) refined to the picture's edges, same slots
 uniform bool u_maskFineOn;      // false when no sky mask has a refinement to read
 uniform int u_maskOp[8];     // 0 head (starts a group) · 1 subtract · 2 intersect (026)
                              // LITERAL 8, like every array above it: MAX_MASKS is a
@@ -392,10 +403,14 @@ float colorMaskWeight(int i, vec3 c){
 float maskWeightOf(int i, vec3 cKey){
   if (u_maskType[i] == 2 || u_maskType[i] == 4) {
     int s = u_maskSlot[i];
-    if (s < 0) return 0.0;              // beyond the 4-channel cap
+    if (s < 0) return 0.0;              // beyond the slot cap
+    // SLOT -> LAYER + CHANNEL. The atlas is a 2D ARRAY: four masks per RGBA
+    // layer, so slot 5 is layer 1, channel 1. Identical arithmetic in the main
+    // loop below and in the JS packers; all three must move together.
+    vec3 st = vec3(v_uv, float(s >> 2));
     float w = (u_maskType[i] == 4 && u_maskFineOn)
-      ? texture(u_maskFineTex, v_uv)[s]
-      : texture(u_maskTex, v_uv)[s];
+      ? texture(u_maskFineTex, st)[s & 3]
+      : texture(u_maskTex, st)[s & 3];
     if (u_maskGeoB[i].y > 0.5) w = 1.0 - w;  // invert
     return w;
   }
@@ -697,15 +712,16 @@ void main() {
       // Brush (painted) and sky (heuristic-generated) both read their weight
       // from the packed bitmap texture — the sky heuristic's connectivity work
       // is baked into the bitmap in JS, so there is no sky-specific shader math.
-      int s = u_maskSlot[i];       // packed channel for this mask (0..3)
-      if (s < 0) continue;         // beyond the 4-channel cap: mask is inactive
+      int s = u_maskSlot[i];       // packed slot for this mask (0..7)
+      if (s < 0) continue;         // beyond the slot cap: mask is inactive
       // A SKY MASK READS THE REFINED ATLAS (018) so the reader's own mask has
       // the same crisp boundary the look's sky stages already had. Two atlases
       // rather than one because they are different sizes and the packer skips
       // any bitmap whose dimensions differ from the first — see MaskLayer.fine.
+      vec3 st = vec3(v_uv, float(s >> 2));   // layer = slot / 4, channel = slot % 4
       w = (u_maskType[i] == 4 && u_maskFineOn)
-        ? texture(u_maskFineTex, v_uv)[s]
-        : texture(u_maskTex, v_uv)[s];
+        ? texture(u_maskFineTex, st)[s & 3]
+        : texture(u_maskTex, st)[s & 3];
       if (u_maskGeoB[i].y > 0.5) w = 1.0 - w; // invert
     } else if (u_maskType[i] == 3) {
       w = colorMaskWeight(i, cKey); // chroma-key on the fixed mask-stage colour
@@ -1121,15 +1137,24 @@ export class Renderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, identityRgbaRamp());
 
-    // Brush-mask texture (unit 3): up to 4 painted masks packed one-per-channel.
-    // Starts as a single transparent texel (all masks empty).
+    // Brush-mask atlas (unit 3): MAX_BITMAP_MASKS painted/sky masks packed four
+    // per RGBA layer of a 2D ARRAY.
+    //
+    // AN ARRAY RATHER THAN MORE 2D TEXTURES, and the reason is texture units
+    // (026). Raising the cap from 4 to 8 needs twice the packed channels, and
+    // the obvious route — a second coarse atlas and a second fine one — costs
+    // two more units. Units 0..13 are already bound here and the WebGL2
+    // FRAGMENT floor is 16, so that route lands on the floor exactly, with
+    // nothing left for the next texture anything wants. An array grows by
+    // LAYERS instead, so slots 8..11 would cost no unit at all.
+    // Starts as a single transparent texel on one layer (all masks empty).
     this.brushTex = gl.createTexture()!;
-    gl.bindTexture(gl.TEXTURE_2D, this.brushTex);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.brushTex);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.RGBA, 1, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
 
     // Refined sky-mask texture (unit 13): the same four slots as brushTex, but
     // holding each type-4 mask's `fine` bitmap at SKY_FINE_EDGE. A second atlas
@@ -1138,12 +1163,12 @@ export class Renderer {
     // for both would drop a 384 painted mask the moment a 1024 sky mask joined
     // it. Starts as a single transparent texel.
     this.brushFineTex = gl.createTexture()!;
-    gl.bindTexture(gl.TEXTURE_2D, this.brushFineTex);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.brushFineTex);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.RGBA, 1, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
 
     // Clarity/dehaze reference maps (unit 4); a single zero texel until an
     // image's map is set (the shader branch is off while the sliders are 0).
@@ -1318,31 +1343,57 @@ export class Renderer {
   /** Pack the active bitmap masks — brush (type 2) and sky (type 4) — into the
    *  RGBA brush texture, re-uploading only when their content changes. `slotOf`
    *  maps each mask's loop index to its packed channel (0..3), or -1 for a
-   *  non-bitmap mask (and for any bitmap mask beyond the 4-channel cap). This
+   *  non-bitmap mask (and for any bitmap mask beyond MAX_BITMAP_MASKS). This
    *  slot is decoupled from the global mask index, so a brush at index ≥4 still
    *  packs into a valid channel — the shader reads via u_maskSlot to match. */
+  /** How many RGBA layers the bitmap atlases need for a slot map.
+   *
+   *  Takes the slot map (one entry per uploaded mask, -1 for "not a bitmap");
+   *  returns at least 1.
+   *
+   *  What the result must satisfy: BOTH atlases are sized by this, from the
+   *  SAME map, so every layer the shader can address exists in each. Sizing
+   *  each from its own list instead lets the coarse atlas reach layer 1 while
+   *  the fine one has only layer 0 — and a sky mask in slot 4..7 would then
+   *  sample a layer that was never allocated. It is also why the count goes
+   *  into both cache signatures: a mask arriving in a higher slot changes the
+   *  coarse list, and without the count in the signature the fine atlas would
+   *  keep its stale, too-short allocation. */
+  private atlasLayers(slotOf: number[]): number {
+    let top = -1;
+    for (const s of slotOf) if (s > top) top = s;
+    return top < 0 ? 1 : (top >> 2) + 1;
+  }
+
   private updateBrushTexture(masks: EditParams["masks"], slotOf: number[]) {
     const gl = this.gl;
     const brushes = masks
       .map((m, i) => ({ m, i, slot: slotOf[i] }))
       .filter((x) => (x.m.type === 2 || x.m.type === 4) && x.m.brush && x.slot >= 0);
-    const sig = brushes.map((x) => `${x.slot}:${x.m.brush!.w}x${x.m.brush!.h}:${x.m.rev ?? 0}`).join("|");
+    const layers = this.atlasLayers(slotOf);
+    const sig = `${layers}#` + brushes.map((x) => `${x.slot}:${x.m.brush!.w}x${x.m.brush!.h}:${x.m.rev ?? 0}`).join("|");
     if (sig === this.brushSig) return;
     this.brushSig = sig;
-    gl.bindTexture(gl.TEXTURE_2D, this.brushTex);
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.brushTex);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     if (!brushes.length) {
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
+      gl.texImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.RGBA, 1, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
       return;
     }
     const bw = brushes[0].m.brush!.w, bh = brushes[0].m.brush!.h;
-    const packed = new Uint8Array(bw * bh * 4);
+    // FOUR MASKS PER LAYER: slot >> 2 is the layer and slot & 3 the channel,
+    // the same arithmetic the shader does. The count comes from atlasLayers so
+    // this atlas and the refined one are always the same depth, and it is the
+    // HIGHEST SLOT IN USE rather than MAX_BITMAP_MASKS / 4 — one mask must not
+    // make the app upload an empty second layer of a full-size bitmap.
+    const packed = new Uint8Array(bw * bh * 4 * layers);
     for (const { m, slot } of brushes) {
       const b = m.brush!;
       if (b.w !== bw || b.h !== bh) continue; // all brush masks share one size
-      for (let p = 0; p < bw * bh; p++) packed[p * 4 + slot] = b.data[p];
+      const base = (slot >> 2) * bw * bh * 4 + (slot & 3);
+      for (let p = 0; p < bw * bh; p++) packed[base + p * 4] = b.data[p];
     }
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, bw, bh, 0, gl.RGBA, gl.UNSIGNED_BYTE, packed);
+    gl.texImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.RGBA, bw, bh, layers, 0, gl.RGBA, gl.UNSIGNED_BYTE, packed);
   }
 
   /** Pack every SKY mask's refined bitmap into the second atlas, on the same
@@ -1363,24 +1414,30 @@ export class Renderer {
     const fines = masks
       .map((m, i) => ({ m, i, slot: slotOf[i] }))
       .filter((x) => x.m.type === 4 && x.m.fine && x.slot >= 0);
-    const sig = fines.map((x) => `${x.slot}:${x.m.fine!.w}x${x.m.fine!.h}:${x.m.rev ?? 0}`).join("|");
+    const layers = this.atlasLayers(slotOf);
+    const sig = `${layers}#` + fines.map((x) => `${x.slot}:${x.m.fine!.w}x${x.m.fine!.h}:${x.m.rev ?? 0}`).join("|");
     if (sig === this.brushFineSig) return;
     this.brushFineSig = sig;
     this.brushFineOn = fines.length > 0;
-    gl.bindTexture(gl.TEXTURE_2D, this.brushFineTex);
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.brushFineTex);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     if (!fines.length) {
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
+      gl.texImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.RGBA, 1, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
       return;
     }
     const fw = fines[0].m.fine!.w, fh = fines[0].m.fine!.h;
-    const packed = new Uint8Array(fw * fh * 4);
+    // THE SAME SLOT ARITHMETIC AND THE SAME DEPTH AS THE COARSE ATLAS, and it
+    // has to be: the shader reads a slot's refinement from this atlas and its
+    // coarse bitmap from that one by the identical layer/channel split, so a
+    // slot landing elsewhere here would refine one mask with another's edge.
+    const packed = new Uint8Array(fw * fh * 4 * layers);
     for (const { m, slot } of fines) {
       const f = m.fine!;
       if (f.w !== fw || f.h !== fh) continue; // one size per atlas, as above
-      for (let p = 0; p < fw * fh; p++) packed[p * 4 + slot] = f.data[p];
+      const base = (slot >> 2) * fw * fh * 4 + (slot & 3);
+      for (let p = 0; p < fw * fh; p++) packed[base + p * 4] = f.data[p];
     }
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, fw, fh, 0, gl.RGBA, gl.UNSIGNED_BYTE, packed);
+    gl.texImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.RGBA, fw, fh, layers, 0, gl.RGBA, gl.UNSIGNED_BYTE, packed);
   }
 
   /** Rebuild the tone LUTs from the five control points (cheap; on change
@@ -1694,16 +1751,22 @@ export class Renderer {
     // GROUPS, NOT MASKS (026). maskIsActive asks whether a mask's own
     // adjustment does anything — true of a head, false of EVERY component,
     // since the adjustment belongs to the group. Filtering by it first would
-    // upload the heads and silently drop what they combine with. So: group,
-    // keep the groups whose head is active, then flatten back to the flat
-    // uniform arrays the shader indexes, components following their head.
-    const groups = maskGroups(p.masks ?? []).filter(maskGroupIsActive);
+    // upload the heads and silently drop what they combine with. So the
+    // grouping, the active test AND THE CAP all come from maskGroupsForRender,
+    // which compileEdit calls too: this path capped flattened ENTRIES while
+    // that one capped GROUPS, and two caps meaning different things is a
+    // divergence waiting for somebody to raise one of them. Flattening here is
+    // unconditional now — the cap has already been applied, whole groups
+    // only — into the flat uniform arrays the shader indexes, components
+    // following their head.
+    const groups = maskGroupsForRender(p.masks);
     const masks: EditParams["masks"] = [];
-    for (const g of groups) { for (const m of g) { if (masks.length < MAX_MASKS) masks.push(m); } }
+    for (const g of groups) for (const m of g) masks.push(m);
     // Slot map: brush(2)/sky(4) masks claim packed channels 0..3 in appearance
     // order, decoupled from their global index so a bitmap mask beyond index 3
-    // still packs correctly; everything else (and any beyond 4 bitmap masks) is
-    // -1. The UI caps bitmap masks at 4, so the -1 fallthrough never fires there.
+    // still packs correctly; everything else (and any beyond MAX_BITMAP_MASKS)
+    // is -1. The UI enforces the same cap, so the -1 fallthrough never fires
+    // there. A slot is split as layer = slot >> 2, channel = slot & 3.
     const slotOf: number[] = [];
     let bitmapCount = 0;
     for (const m of masks) {
@@ -1711,6 +1774,19 @@ export class Renderer {
     }
     this.updateBrushTexture(masks, slotOf);
     this.updateBrushFineTexture(masks, slotOf);
+    // THE COVERAGE OVERLAY FOLLOWS THE GROUP, NOT THE COMPONENT (026).
+    // maskViz arrives as an index into p.masks, and the shader captures
+    // coverage at a group's HEAD — every component is skipped before that
+    // line is reached. So selecting the component you just added would light
+    // nothing and Show mask would go blank on the very mask being placed.
+    // Map any member to its head's UPLOADED index: what the overlay then
+    // shows is the combined selection, which is the question the operator was
+    // pressed to answer. A group that was filtered out, or a head pushed past
+    // MAX_MASKS, maps to -1 — the overlay is off rather than pointing at
+    // whichever mask inherited that index.
+    const vizMask = maskViz >= 0 ? (p.masks ?? [])[maskViz] : undefined;
+    const vizGroup = vizMask ? groups.find((g) => g.includes(vizMask)) : undefined;
+    gl.uniform1i(this.loc.u_maskViz, vizGroup ? masks.indexOf(vizGroup[0]) : -1);
     gl.uniform1i(this.loc.u_maskCount, masks.length);
     if (masks.length) {
       const types = new Int32Array(MAX_MASKS);
@@ -1799,9 +1875,9 @@ export class Renderer {
       gl.bindTexture(gl.TEXTURE_3D, this.lutTex);
     }
     gl.activeTexture(gl.TEXTURE13);
-    gl.bindTexture(gl.TEXTURE_2D, this.brushFineTex);
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.brushFineTex);
     gl.activeTexture(gl.TEXTURE3);
-    gl.bindTexture(gl.TEXTURE_2D, this.brushTex);
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.brushTex);
     gl.activeTexture(gl.TEXTURE2);
     gl.bindTexture(gl.TEXTURE_2D, this.toneTex);
     gl.activeTexture(gl.TEXTURE1);

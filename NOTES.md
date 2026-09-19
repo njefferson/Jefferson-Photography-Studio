@@ -556,6 +556,21 @@ user-scalable=no.
   because it has no answer to whose adjustment applies when three entries
   combine into one selection. Note the 4-bitmap ceiling
   (`MAX_BITMAP_MASKS`, one per atlas channel) becomes the binding constraint.
+- [ ] **The radial mask turns** <!-- decision: 027 -->
+  asked 2026-09-19 beside the mask-combining request: the circle mask needs to
+  be rotated. It is the only selection in the app whose orientation cannot be
+  set — a radial mask is an axis-aligned ellipse, `cx`/`cy`/`rx`/`ry` with no
+  angle in either weight function, so it can be made wide or tall and never
+  tilted. The linear gradient does not have the problem because it is defined
+  by two POINTS and its direction is already free. Lightroom rotates from the
+  shape's own edge, between the four handles, with a 15-degree snap under
+  Shift; darktable uses Ctrl-drag on a node or Shift-Ctrl-scroll. **Neither
+  gesture survives a tablet** — Lightroom's whole affordance is the cursor
+  changing shape on hover, and a finger does not hover. What carries over is
+  the MODEL: the angle belongs to the shape, is adjusted on the shape, and has
+  a coarse snap, with a visible grip at the 44 px target this app is held to
+  and a panel route beside it. Ranked below 024, because a rotation grip that
+  nothing names is the failure 024 exists to fix.
 - [ ] **The Sky mask reads the sky's colour as well as its place** <!-- decision: 023 --> —
   reported 2026-09-18 from the iPad with three screenshots of one frame: the
   Sky mask leaves a rim of unselected sky round every object and misses the
@@ -1467,6 +1482,110 @@ than the symptom. Not changed: the read has no timeout and skips nothing,
 because a slow read is not a failed one and a skipped photo is data lost;
 whether to time it out and say so on the tile is a decision when the file
 that stalled is known.
+
+## Masks combine, and the proof measured its own overlay first, 2026-09-19 (decision 026)
+
+**A mask is a GROUP now.** `params.masks` is still one flat array, but an
+entry carries `op` — 0 starts a group, 1 subtracts from it, 2 intersects it —
+and `maskGroups()` reads the array into groups, a head followed by its
+components. `groupWeight()` folds them: `w *= op === 1 ? 1 - c : c`, which is
+darktable's exclusive/inclusive algebra, reducing to the boolean set operation
+on hard masks and staying continuous on soft edges. **The adjustment belongs to
+the head**, which is what the convention gets right and what a flat array
+cannot express: when three selections combine into one, there is no honest
+answer to whose brightness applies unless the group owns it.
+
+Both paths fold identically — `compileEdit` in `src/pipeline.ts` and the
+shader's mask loop in `src/gl.ts`, which skips any entry whose `op` is not 0
+and folds the run that follows into the head. The agreement walk is what holds
+them to each other, and it is not optional on any change to mask evaluation.
+
+**A defect the operators created, found by looking at the control rather than
+the render.** The coverage overlay (Show mask) is drawn in the SHADER, and the
+shader captures coverage at a group's HEAD — every component is skipped before
+that line is reached. So `u_maskViz`, which arrives as an index into
+`params.masks`, pointed at a component the moment a reader selected the mask
+they had just added, and Show mask went blank on it. It now maps any member of
+a group to its head's uploaded index, so the overlay shows the COMBINED
+selection — which is the question the operator was pressed to answer. A group
+that was filtered out, or a head pushed past `MAX_MASKS`, maps to -1: the
+overlay goes off rather than pointing at whichever mask inherited that index.
+
+**THE FIRST PROOF OF SUBTRACT MEASURED ITS OWN OVERLAY.** The script rendered
+sky-alone, then sky-minus-colour, then sky-and-colour, and reported a mean
+moving 86.11 → 48.42 → 46.22 as the difference the operator made. It was the
+tint. The coverage tint is shader-drawn, so it lands in the framebuffer
+`readPixels` reads and not merely in the screenshot; a slider move steps it
+aside and ADDING A MASK PUTS IT BACK. State 1 was read plain and states 2 and 3
+were read through a heavy wash. The direction gave it away — subtracting must
+darken LESS, so the mean had to rise, and it fell by 37. **When a result looks
+absurd, suspect the instrument.**
+
+Two instrument errors, both now asserted rather than assumed. The tint is
+turned off ONCE by the persistent preference, before any slider is touched so
+the press flips the preference instead of restoring a tint that had stepped
+aside, and `aria-pressed` is read back and checked. And the colour mask is
+asserted KEYED through the swatch readout, which says "Hue …" only once a
+colour is stored: an unkeyed colour mask carries `satTarget` -1, selects
+nothing, and makes subtract a silent no-op that looks exactly like a feature
+that does not work.
+
+**Corrected, the numbers and the pictures agree.** NIR_1644, Aerochrome, sky
+brightness 0.35: unmasked 107.58, sky alone 86.11, sky MINUS its own colour
+99.66, sky AND its own colour 94.83. The darkening subtract gave back and the
+darkening intersect kept sum to 20.67 against sky-alone's 21.47 — `w·(1−wc) +
+w·wc = w` surfacing in the render. Record 026's "Looked at" section carries
+what the five opened frames showed.
+
+**One thing seen while looking, not fixed, named so it is not rediscovered as
+new.** Both grouped states showed blocky, stair-stepped contouring where the
+colour key rolls off across a smooth sky gradient. The colour mask was then
+rendered ALONE, with no group at all, and the contouring is identical — it is
+the colour key's own range falloff and predates this item. It is visible here
+only because brightness 0.35 is a deliberately extreme adjustment.
+
+**The mask-truth walk is unchanged, and that was checked rather than assumed.**
+It is red by design until 023, and against the readings recorded on 2.51.1:
+0063 edge 44% → 45%; 1644 edge 38% → 37%, open 95.5% → 96.8%; 1651 edge 88% →
+89%, open 69% → 71.5%. Same four failures on the same frames; the small gains
+in open coverage are 018's refined edge, not this.
+
+**`MAX_BITMAP_MASKS` is 8 now, and the atlas is a 2D ARRAY.** Four was a cap on
+bitmap MASKS per photograph; under groups it became a cap on bitmap COMPONENTS
+a single adjustment can combine, and a sky with a brush subtracted from it is
+already two — so two such groups reached the ceiling. The obvious route to
+eight, a second coarse atlas and a second refined one, costs two more texture
+units; units 0–13 are already bound here and the WebGL2 FRAGMENT floor is 16,
+so that route lands on the floor exactly with nothing left over. An array grows
+by LAYERS instead: four masks per RGBA layer, `slot >> 2` the layer and
+`slot & 3` the channel, so slots 8–11 would cost no unit at all. Both atlases
+are sized from the SAME slot map and the layer count is in both cache
+signatures — sized from their own lists, the coarse one could reach layer 1
+while the refined one had only layer 0, and a sky mask in slot 4–7 would sample
+a layer that was never allocated.
+
+**AND MAKING THE NEW WALK FAIL FIRST IS WHAT CAUGHT THE REAL DEFECT.**
+`tools/mask-slots-walk.mjs` was written to prove a bitmap mask past the fourth
+reads its own layer, and the first run — with a defect deliberately planted, the
+layer forced to 0 — did not fail the way it was meant to. It timed out on the
+welcome screen, because **`sampler2DArray` has no default precision in GLSL ES
+3.00**. A plain `sampler2D` does, which is why nothing warned: declaring an
+array sampler without a qualifier is a compile error for the WHOLE shader, the
+app reports itself unsupported, and it opens no photograph at all. `tsc` is
+green either way — a shader is a string to it. `precision highp sampler2DArray;`
+is the fix and it is one line. Had the walk been written to pass rather than to
+fail first, that would have shipped.
+
+With the precision line in and the defect still planted, the walk failed
+exactly as designed: a sky mask in slot 4 read an empty brush mask from layer
+0, the darkening vanished, and the mean landed back on the unmasked 107.58.
+With the defect removed, slot 4 renders 86.11 — the same number the same mask
+renders from slot 0. **Two instrument errors in that walk, both the standing
+kind.** The coverage tint is shader-drawn, so it is turned off and asserted off
+before any read. And the "empty brush masks change nothing" check was taken
+AFTER the sky mask joined them, so it carried that mask's own default
+saturation of 1.3 and reported a 1.96 move as the empty masks failing to be
+empty; it is read before the sky mask is added now.
 
 ## A slider named after the defect, 2026-09-19
 
