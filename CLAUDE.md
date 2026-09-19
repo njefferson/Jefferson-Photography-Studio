@@ -72,6 +72,21 @@ which was already the convention. Each open bullet carries
 reader cannot; the ⓘ dialog renders only the bold span, and the built bundle was
 checked to contain zero keys.
 
+**HOW A REPORTED DEFECT RANKS (owner, 2026-09-19).** A defect reported from
+the device is ranked **where it naturally goes**. Being reported does not
+privilege it and does not send it to the top — the queue is not a complaints
+register. **What privileges it is DEPENDENCY: if it would affect or invalidate
+work ranked above it, it is remedied first**, because everything built on top
+of it would otherwise be built on ground that is about to move.
+
+So the question at ranking time is never "who asked for this" but "would the
+items above this one have to be redone once this is fixed". 023 sits at the top
+of the queue today by exactly that test: the look's population work — 013's
+splotchy Aerochrome, 016's foliage blob — reads the sky selection, so changing
+the selection underneath them afterwards would invalidate whatever was tuned
+against the old one. Where no such dependency exists, a reported defect waits
+its turn like anything else.
+
 **[`tools/decisions-check.mjs`](tools/decisions-check.mjs) refuses the commit**
 when an open item has no record, a record is claimed by nobody, a record is
 about a DIFFERENT item than the one claiming it, or a section has no body. The

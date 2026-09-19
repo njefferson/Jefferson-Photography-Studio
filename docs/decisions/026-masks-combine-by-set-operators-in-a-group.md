@@ -196,3 +196,40 @@ would build machinery this record then replaces. Below 024 (every control can
 say what it does) because a model with operators in it is exactly the surface
 that needs controls which explain themselves, and shipping the operators first
 would add three unexplained words to a tab that already has unexplained ones.
+
+## Outcome
+
+Shipped 2026-09-19 in `936e9bd`, archived from the roadmap on promotion to
+2.53. The model is the convention's: `MaskLayer.op` says how a mask joins the
+one above it — 0 starts a group, 1 subtracts, 2 intersects — `maskGroups`
+reads the flat array into groups and `groupWeight` folds them with
+`w *= op === 1 ? 1 - c : c`, darktable's exclusive/inclusive algebra. The
+adjustment belongs to the head. Both render paths fold identically and the
+agreement walk is what holds them to each other.
+
+**What turned out wrong, and it nearly shipped.** `sampler2DArray` has no
+default precision in GLSL ES 3.00 and `sampler2D` does, so declaring the
+atlases as array samplers made the WHOLE shader fail to compile: the app
+reported itself unsupported and opened no photograph at all. `tsc` was green
+throughout — a shader is a string to it — and every commit gate is a text scan
+or a pure function, so nothing else could see it. It was caught by
+`tools/mask-slots-walk.mjs` on the run whose only purpose was to prove that
+walk could fail, and it did not fail the way the plant intended; it timed out
+on the welcome screen. Hub LESSONS 331 carries the general form: the check is
+not whether a fail-first run went red, but whether it went red in the way you
+planted.
+
+**Two other things this got wrong on the way.** The proof that subtract works
+measured its own overlay — the coverage tint is shader-drawn, so it lands in
+the pixels `readPixels` reads and not merely in a screenshot, and adding a mask
+restores a tint that a slider move had stepped aside; the reported 86 to 48
+"difference the operator made" was the tint going on. And the CPU capped mask
+GROUPS while the GPU capped flattened ENTRIES, two caps meaning different
+things, unreachable only because `addMask` stops at eight; both now come from
+`maskGroupsForRender`.
+
+**What it left open.** The colour mask's range falloff contours visibly on a
+smooth gradient — rendered with no group present to confirm it predates this
+item, so it is not a regression here. And the coverage overlay follows the
+group rather than the component, which is a fix this item made; 024 is where
+the operator controls learn to explain themselves.
