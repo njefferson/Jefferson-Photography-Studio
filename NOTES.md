@@ -1473,6 +1473,39 @@ because a slow read is not a failed one and a skipped photo is data lost;
 whether to time it out and say so on the tile is a decision when the file
 that stalled is known.
 
+## Whether the Sky mask's edge bound is reachable, swept and answered, 2026-09-19 (decision 023)
+
+**Per frame, and the two answers are different.** `SKY_GROW_TOL` swept through
+the acceptance walk at 2.5, 3.25, 4 and 5.
+
+NIR_1644 reaches the 0.85 edge bound and then stops: edge 82%, 85%, 86%, 86%,
+crossing at 3.25 and saturating, while spill climbs 23%, 26%, 29%, 30%. Past
+3.25 the tolerance buys no coverage at all and only halo.
+
+**NIR_0063 does not move: 52% at every tolerance**, spill 8% to 10%. Whatever
+limits that frame, it is not the colour tolerance.
+
+**Its missed-map shows two opposite errors on one photograph.** A wide band of
+SPILL runs the length of the treeline and well down into the crowns — the grow
+taking canopy as sky. And the sky it misses is scattered through the upper-left
+canopy: real sky seen through gaps between branches, bigger than the pinhole
+cap and **not connected to the open sky by any sky-coloured path**.
+Connectivity is the thing that makes this design work — colour alone readmits
+46% of NIR_1651's frame — and it is also exactly what stops the grow reaching
+those gaps. Raising the tolerance worsens the spill without touching them.
+
+**So 0.85 is not reachable on that frame by tuning this constant.** The honest
+options are a different mechanism for disconnected sky — the per-pixel gate
+record 023 rejected as option 4, which reaches them and readmits the apron —
+or a bound that admits what a connectivity-constrained selection can do. That
+is a real question with a curve behind it rather than an opinion, and it is
+what the next round of this item has to answer.
+
+**The tolerance stays at 2.5.** Moving to 3.25 wins NIR_1644 its bound and adds
+three points of spill to a frame already visibly taking canopy. That is a
+question about how a photograph looks, and a coverage figure does not settle
+it.
+
 ## The speckle in the Sky mask was pinholes, and the ragged edge was never there, 2026-09-19 (decision 023)
 
 **Two wrong diagnoses in a row, both corrected by magnifying the picture.**

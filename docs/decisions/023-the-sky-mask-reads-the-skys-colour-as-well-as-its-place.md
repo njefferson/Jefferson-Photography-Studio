@@ -270,6 +270,37 @@ selection the app would never produce: NIR_1651's seed read 9.7% of the frame
 against the app's own 30%. Every number taken before that fix was about a
 different photograph.
 
+**IS THE 0.85 EDGE BOUND REACHABLE? MEASURED, AND THE ANSWER IS DIFFERENT PER
+FRAME.** `SKY_GROW_TOL` swept through the acceptance walk at 2.5, 3.25, 4 and 5:
+
+- NIR_1644 reaches it — edge 82%, 85%, 86%, 86% — crossing 0.85 at 3.25 and
+  then SATURATING, while spill keeps climbing: 23%, 26%, 29%, 30%. So the
+  bound is met there at about three points of spill, and nothing past 3.25 buys
+  coverage, only halo.
+- **NIR_0063 does not move at all: 52% at every tolerance**, with spill barely
+  stirring from 8% to 10%. Tolerance is not what limits that frame.
+
+**Its missed-map says why, and the two errors are opposite.** A wide YELLOW
+band of spill runs the length of the treeline and well down into the crowns —
+the grow taking canopy as sky. And the uncovered sky is RED speckle scattered
+through the upper-left canopy: patches of real sky seen through gaps in the
+branches, larger than the pinhole cap and **not connected to the open sky by
+any sky-coloured path**. Connectivity — the thing that makes this design work
+at all, and without which colour alone readmits half of NIR_1651 — is exactly
+what prevents reaching them.
+
+So on that frame the grow over-reaches and under-reaches at once, and raising
+the tolerance makes the first worse without touching the second. **0.85 is not
+reachable there by tuning this constant**, and the honest options are a
+different mechanism for disconnected sky (the per-pixel gate this record
+rejected as option 4, which reaches them and readmits the apron) or a bound
+that admits what a connectivity-constrained selection can do.
+
+**The tolerance stays at 2.5.** Moving to 3.25 buys NIR_1644 its bound and adds
+three points of spill to a frame already visibly taking canopy; that is a
+question about how the photograph looks and it is not settled by a coverage
+figure.
+
 **What is still owed:** the boundary. The grow fixes the interior and the gaps
 and leaves the rim misplaced by a pixel or two. Composing the guided filter
 after the grow was measured both ways: it lifts NIR_1651's uncovered sky and pulls
