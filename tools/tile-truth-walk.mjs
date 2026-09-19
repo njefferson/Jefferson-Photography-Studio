@@ -391,6 +391,43 @@ try {
       // Four is the only number that is both fixes at once: everything that
       // changed was redrawn, and nothing that could not change was.
       check("C3 exactly four tiles were redrawn", redrawn.filter(Boolean).length, 4);
+
+      // ── E ────────────────────────────────────────────────────────────────
+      // THE REDRAW WAITS FOR THE READER. A look marks every other tile stale,
+      // and the pass then decoded the neighbours on every lane but one
+      // beginning a second after the press — beside the reader, who was still
+      // working on the open photograph. On a set of 128 that is minutes of the
+      // machine being busy for tiles nobody is looking at yet. So: press a
+      // look, then keep a slider moving, and no tile may be redrawn while the
+      // hand is still going; stop, and they must all arrive.
+      //
+      // MEASURED AS SRC CHANGES, not as decode counts: a redrawn tile is a new
+      // blob, which is the same thing the checks above read, and it needs no
+      // hook into the app.
+      console.log("\nE — the tile redraw waits for the reader to stop");
+      const eBefore = await readTiles(page, sel);
+      await pressLook(page, "lookEir");
+      // FOUR SECONDS OF A MOVING SLIDER, chosen from both builds' behaviour:
+      // the build before this marks the tiles stale 0.9s after the press and
+      // its first redrawn tile lands about two seconds in, so a window shorter
+      // than that would pass on the defect. Each move is ~160ms apart, well
+      // inside the app's 1.5s idle window, so a build that yields never starts.
+      const busyUntil = Date.now() + 4000;
+      let moves = 0;
+      while (Date.now() < busyUntil) {
+        await page.evaluate((v) => { const el = document.getElementById("sat"); if (el) { el.value = String(v); el.dispatchEvent(new Event("input", { bubbles: true })); } }, 1 + (moves % 5) * 0.02);
+        moves++;
+        await page.waitForTimeout(160);
+      }
+      const eBusy = await readTiles(page, sel);
+      const movedWhileBusy = eBefore.filter((t, i) => t.src !== eBusy[i].src).length;
+      note(`${moves} slider moves over 4s; tiles redrawn in that window: ${movedWhileBusy}`);
+      check("E1 no tile is redrawn while the reader's hand is still moving", movedWhileBusy, 0);
+      await settle(page, sel, { quiet: 2500, lead: 5000 });
+      const eIdle = await readTiles(page, sel);
+      const movedAfter = eBefore.filter((t, i) => t.src !== eIdle[i].src).length;
+      note(`tiles redrawn once the hand stopped: ${movedAfter} of ${eBefore.length}`);
+      check("E2 ...and they are redrawn once it stops", movedAfter >= 3, true);
     } finally {
       await ctx.close();
     }

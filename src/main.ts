@@ -373,6 +373,23 @@ function syncHotspot() {
   updateLensCmp();
 }
 
+/** WHAT THE STRENGTH IS DOING, IN NUMBERS, ON THE CARD — not only in the
+ *  diagnostic report. A correction whose effect a particular frame hides (a
+ *  close-up with no sky: 11% of brightness in the middle and a few percent of
+ *  colour) reads as a slider that does nothing, and was reported as exactly
+ *  that (2026-09-19). Read through `lensGains`, the one source the decode-time
+ *  flat and the grade both use, at the centre bin.
+ *  @returns a leading " · …" clause, or "" when nothing is landing.
+ *  Consumer: the shipped card's status line and the reader's own card's. */
+function centreEffect(): string {
+  const curve = currentLensCurve();
+  const st = params.lensBypass ? 0 : (params.lensFix ?? 0);
+  const g = lensGains(curve, st);
+  if (!g || !g.n) return "";
+  const pct = (v: number) => `${v >= 1 ? "+" : ""}${Math.round((v - 1) * 100)}%`;
+  return ` · here it moves the middle ${pct(g.gg[0])} in brightness, ${pct(g.gr[0])} red, ${pct(g.gb[0])} blue`;
+}
+
 function updateHotspotUI() {
   if (!current) { hsUi.status.textContent = "No photo loaded."; hsUi.prompt.hidden = true; return; }
   // ONE CARD AT A TIME. The reader's own measurement supersedes the shipped
@@ -399,7 +416,7 @@ function updateHotspotUI() {
   // picture which of the two kinds they have.
   const knows = Hotspot.hasColour(p) ? "brightness and colour" : "brightness only";
   hsUi.status.textContent =
-    `${short} · ${src} · ${knows}${note ? ` — ${note}` : ""}${params.hsBypass ? " · bypassed" : ""}`;
+    `${short} · ${src} · ${knows}${note ? ` — ${note}` : ""}${params.hsBypass ? " · bypassed" : ""}${centreEffect()}`;
 }
 
 hsUi.strength.addEventListener("change", () => {
@@ -2540,6 +2557,7 @@ function ensureLensApplied(): void {
 
 function draw() {
   recordSoon();
+  noteActivity(); // every slider and every tool: the tile redraw pass waits on this
   if (raf) return;
   raf = requestAnimationFrame(() => {
     raf = 0;
@@ -3975,7 +3993,7 @@ updateGradeUI();
 // (R/G/B) is a weighted sum of the three inputs — nine sliders, laid out as
 // three rows. Preset chips seed classic false-colour remixes; the sliders
 // fine-tune. Same accessible-slider substrate as B&W weights. ---
-const MIX3_PRESETS: { label: string; m: number[] }[] = [
+const MIX3_PRESETS: { label: string; title?: string; m: number[] }[] = [
   { label: "Identity", m: [1, 0, 0, 0, 1, 0, 0, 0, 1] },
   { label: "R⇄B swap", m: [0, 0, 1, 0, 1, 0, 1, 0, 0] },
   // THE TWO LABELS WERE THE WRONG WAY ROUND, for as long as both existed.
@@ -3988,7 +4006,15 @@ const MIX3_PRESETS: { label: string; m: number[] }[] = [
   // (IR-SCIENCE.md section 4b.)
   { label: "Channel cycle", m: [0, 1, 0, 0, 0, 1, 1, 0, 0] }, // red←green, green←blue, blue←red
   { label: "Copper", m: [1.1, 0.3, 0, 0.2, 0.7, 0.1, 0, 0.2, 0.8] },
-  { label: "Aerochrome", m: [0, 0, 1, 1, 0, 0, 0, 1, 0] }, // red←blue, green←red, blue←green
+  // NOT "Aerochrome", which is what this said and what it is not. This is the
+  // film's layer order BARE — red←blue, green←red, blue←green — and bare it
+  // renders teal and pale; the Aerochrome LOOK is that rotation's other half,
+  // the R⇄B swap plus a mixer solved on six frames, and it lives on the Looks
+  // tab (IR-SCIENCE.md 4b-ii). Under the film's name the chip read as the look
+  // and was reported as "the colours are not swapped" (2026-09-19). The matrix
+  // and the POSITION are untouched: the chips carry no ids and
+  // tools/look-sheet.mjs presses them by index.
+  { label: "Film rotation", title: "red←blue, green←red, blue←green — Aerochrome's layer order, bare. The Aerochrome look itself is on the Looks tab.", m: [0, 0, 1, 1, 0, 0, 0, 1, 0] },
 ];
 const MIX3_OUT = ["Red output", "Green output", "Blue output"];
 const MIX3_IN = ["red", "green", "blue"];
@@ -4030,6 +4056,7 @@ for (const def of MIX3_PRESETS) {
   const b = document.createElement("button");
   b.type = "button";
   b.className = "mix-chip";
+  if (def.title) b.title = def.title;
   b.addEventListener("click", () => {
     params.mix3 = [...def.m];
     updateMix3UI();
@@ -7915,6 +7942,11 @@ cropOverlay.addEventListener("pointercancel", endCropPointer);
  *  same operation reached two ways. */
 function applyStraighten(deg: number): void {
   if (geoMode !== "straighten") return;
+  // A NOTE FROM THE LAST LEVEL PRESS IS STALE THE MOMENT THE ANGLE MOVES BY
+  // HAND, and it is costing the photograph height while it sits there: the
+  // card's measured height is what the picture steps back by. Cleared here
+  // rather than left until the tool closes.
+  if (cropLevelNote && !cropLevelNote.hidden) sayLevel("");
   params.straighten = Math.max(-45, Math.min(45, Math.round(deg * 10) / 10));
   straightenSlider.value = String(params.straighten);
   straightenVal.textContent = `${params.straighten.toFixed(1)}°`;
@@ -8102,6 +8134,14 @@ cropResetBtn.addEventListener("click", () => {
     straightenSlider.value = "0";
     straightenVal.textContent = "0.0°";
   }
+  // AND THE VIEW IS FITTED AGAIN, which applyStraighten and levelHorizon both
+  // do after they move the box and this did not. The view kept the box-fill
+  // zoom of the SMALLER inscribed crop, so the restored full frame rendered
+  // inside a window sized for that box — a shrunken picture with empty margins
+  // round it, which is what a straighten-then-Reset looked like (reported from
+  // a PC with a screenshot, 2026-09-19).
+  viewFreezeCenter = null;
+  viewZoom = boxFillZoom();
   positionCropOverlay();
   draw();
   flushRecord();
@@ -9560,6 +9600,7 @@ function watchLongTasks(): { heldDuring: (from: number, to: number) => number | 
 /** Switch the editor to another session photo (decoded on demand from storage,
  *  so only ever one photo's pixels are in RAM). */
 async function switchToPhoto(id: string, opts?: { quiet?: boolean }) {
+  noteActivity(); // moving through the strip is the reader working, too
   if (id === activePhotoId && current) return;
   const view = sessionPhotos.find((p) => p.id === id);
   if (!view) return;
@@ -10294,6 +10335,7 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
         }
         ownsBusy = false;
         hideBusy(); // there is a photo on screen — nothing left to wait for
+        thumbIdleGate = false; // a set's FIRST tiles are never delayed
         void realThumbnails(); // from here it runs beside the loop, not after it
       }
       adding = { done: i + 1, total: files.length, index: i + 1, name: f.name , since: performance.now() };
@@ -10449,6 +10491,15 @@ async function realThumbnails(): Promise<void> {
   const lanes = Math.max(1, decodeLaneTarget() - 1);
   for (let guard = 0; guard < 10000; guard++) {
     if (gen !== thumbPass) { await Promise.allSettled([...inFlight]); return; }
+    // A REDRAW PASS WAITS FOR THE READER TO STOP. It starts no new decode while
+    // a slider is moving or a photo has just been switched; whatever is in
+    // flight finishes, and nothing follows it until the clock has been quiet
+    // for THUMB_IDLE_MS. A set's first tiles are not gated — nothing is on
+    // screen for those yet.
+    if (thumbIdleGate && performance.now() - lastActivity < THUMB_IDLE_MS) {
+      await new Promise((r) => setTimeout(r, 250));
+      continue;
+    }
     const view = inFlight.size < lanes ? nextThumbTarget() : undefined;
     if (!view) {
       if (inFlight.size) {
@@ -10460,7 +10511,7 @@ async function realThumbnails(): Promise<void> {
       // Nothing ready and nothing running. If anything is still on its way in,
       // wait for it; otherwise every thumbnail that can be made has been.
       const waiting = sessionPhotos.some((v) => v.id !== "lone" && v.thumbState !== "real" && pendingStore.has(v.id));
-      if (!waiting) return;
+      if (!waiting) { thumbIdleGate = false; return; }
       await new Promise((r) => setTimeout(r, 120));
       continue;
     }
@@ -10559,6 +10610,30 @@ function stampFor(view: { id: string; edit: string | null }): string {
  *  lands, so nothing blanks out. Debounced, because pressing through four looks
  *  in a row should redraw once, not four times. */
 let regradeTimer = 0;
+/** WHEN THE READER LAST DID SOMETHING — every draw (so every slider, every
+ *  tool) and every photo switch stamps this. The stale-tile pass below waits
+ *  for it to go quiet before taking a decoder lane.
+ *
+ *  Why: a look pressed on one photograph marks every OTHER tile's grade stamp
+ *  stale, and the pass then decoded a hundred and twenty-eight neighbours
+ *  beginning a second after the press, on every lane but one, while the reader
+ *  was still working on the open photograph (reported from a PC, 2026-09-19).
+ *  The tiles do still have to be redrawn — a tile is a claim about what
+ *  opening that photo will show — so this delays them rather than dropping
+ *  them, and any action pushes the delay out again. */
+let lastActivity = 0;
+/** How quiet it has to be. A second and a half: long enough that it never
+ *  starts between two moves of a hand on a slider (one every ~160 ms), short
+ *  enough that a reader who stops to look has the tiles a moment later. Four
+ *  seconds was tried first and was wrong in the other direction — it delayed
+ *  the tiles the Restore depth toggle had just invalidated past the point
+ *  where the tile walk, or a reader, would still call them a response. */
+const THUMB_IDLE_MS = 1500;
+/** True while the pass in flight is REDRAWING tiles that already had a picture
+ *  (a grade move); false for the pass that builds a set's FIRST tiles, which
+ *  the reader is waiting for and which is never delayed. */
+let thumbIdleGate = false;
+function noteActivity(): void { lastActivity = performance.now(); }
 function restripForGrade(): void {
   clearTimeout(regradeTimer);
   regradeTimer = window.setTimeout(() => {
@@ -10584,7 +10659,9 @@ function restripForGrade(): void {
       // tablet it is visible work.
       if (v.thumbGrade !== stampFor(v)) { v.thumbState = "waiting"; stale++; }
     }
-    if (stale) void realThumbnails();
+    // Marked now, DRAWN when the reader stops: the pass gates itself on the
+    // activity clock and every action pushes it back.
+    if (stale) { thumbIdleGate = true; void realThumbnails(); }
   }, 900);
 }
 

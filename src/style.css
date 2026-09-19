@@ -1208,6 +1208,39 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 @media (max-width: 760px) {
   #cropTools { bottom: 10px; padding: 9px 12px 11px; }
 }
+/* WIDE SCREENS GET THE CARD'S HEIGHT BACK, because the photo's reserve is the
+   card's measured height and nothing else. At the fixed 360px the card is four
+   rows on a desktop — header, the level note, the slider, and the ratio chips
+   wrapped onto two lines — and on a 944px stage that is about a quarter of the
+   picture taken by the tool (reported from a PC, 2026-09-19, with the shrunken
+   photo in the screenshot). The rows do not need stacking at 1920px; they need
+   the horizontal room the screen already has. So above 820px the card widens
+   and the slider sits BESIDE the ratio chips: two rows instead of four, and the
+   reserve halves with it.
+   EVERY RATIO STAYS VISIBLE AT ONCE — no side-scroll, the standing rule on
+   #cropRatios (2026-07-18). The chips keep flex-wrap: wrap; they are simply
+   given room enough not to use it. */
+@media (min-width: 820px) {
+  #cropTools {
+    width: min(94%, 880px);
+    display: grid;
+    grid-template-columns: minmax(260px, 1fr) auto;
+    grid-template-areas:
+      "head head"
+      "note note"
+      "fine ratios";
+    align-items: center;
+    column-gap: 14px;
+  }
+  #cropTools .crop-row { grid-area: head; }
+  #cropTools .crop-level-note { grid-area: note; }
+  #cropTools .crop-fine { grid-area: fine; }
+  #cropTools #cropRatios { grid-area: ratios; margin-top: 0; justify-content: flex-end; }
+  /* Crop mode hides the slider row, so the chips take the whole width there
+     rather than sitting in a column whose neighbour is gone. */
+  #cropTools.tool-crop { grid-template-columns: 1fr; grid-template-areas: "head" "note" "ratios"; }
+  #cropTools.tool-crop #cropRatios { justify-content: center; }
+}
 #stage.has-session #cropTools { bottom: calc(24px + var(--session-h, 110px)); }
 #hint { color: var(--txt-2); text-align: center; max-width: 40ch; margin: 0 auto; }
 #welcome {

@@ -642,7 +642,7 @@ cannot describe something the code does not say about itself.
 - **`src/macro/export.worker.ts`** (23 lines) — Full-resolution stacking runs here, OFF the main thread, so the long tiled render never janks the UI (the preview stack stays on the main thread — it's quick).
 - **`src/macro/main.ts`** (460 lines) — MACRO FOCUS-STACKING MODE: the second discipline, its own page and its own entry point.
 - **`src/macro/stack.ts`** (387 lines) — Macro focus-stacking engine (JPEG-first).
-- **`src/main.ts`** (14591 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
+- **`src/main.ts`** (14668 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
 - **`src/palette.ts`** (118 lines) — Palette family picker, shared across all three pages.
 - **`src/pipeline.ts`** (1703 lines) — CPU version of the GPU edit pipeline, kept numerically identical to the fragment shader in gl.ts so exports match the on-screen preview exactly.
 - **`src/platform.ts`** (181 lines) — WHAT IS ACTUALLY IN FRONT OF THE PERSON — asked once, in one place.
@@ -665,7 +665,7 @@ cannot describe something the code does not say about itself.
 - **`src/skymap.ts`** (257 lines) — The sky's colour, smoothed AFTER the look has amplified it — a small map rebuilt per edit, blended back in by the sky's own selection.
 - **`src/stamp.ts`** (27 lines) — ONE HASH, BECAUSE THE SECOND COPY IS WHERE THE TWO ANSWERS COME FROM.
 - **`src/sticker.ts`** (576 lines) — Sticker compositing — rhymes with heal.ts (src/heal.ts): stickers are baked INTO the linear source (pre-pipeline), so each one inherits the channel swap / WB / looks / grade / grain and lands in the I
-- **`src/straighten.ts`** (273 lines) — FINDING THE ANGLE A FRAME IS OFF BY.
+- **`src/straighten.ts`** (279 lines) — FINDING THE ANGLE A FRAME IS OFF BY.
 - **`src/swupdate.ts`** (261 lines) — THE STANDING "A NEW VERSION IS WAITING" STRIP, for all three PWAs (Doctrine §7h).
 - **`src/theme.ts`** (115 lines) — Day/night mode, shared across every page.
 - **`src/verdlg.ts`** (135 lines) — THE "THIS BUILD" PANEL — what changed, and the report to send (Doctrine §7d, §7f).

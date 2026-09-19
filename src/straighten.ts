@@ -52,8 +52,14 @@ const FLOOR = 0.25;
  *  image — the caller decides the reduction, because it already has the decoded
  *  pixels and knows how to sample them. 600-1000px on the long edge is plenty:
  *  a horizon is a low-frequency thing, and smaller is both faster and less
- *  distracted by leaves. */
-export function findTilt(lumaAt: (x: number, y: number) => number, w: number, h: number): Tilt | null {
+ *  distracted by leaves.
+ *
+ *  `floor` is how much of the frame's long edge the winning line must cover
+ *  before this answers at all, defaulting to FLOOR. A caller passing 0 gets the
+ *  best line whatever its agreement — which is how the refusals are MEASURED
+ *  rather than argued about: on five real frames only one cleared the default
+ *  (NOTES.md, 2026-09-19). The app itself passes nothing. */
+export function findTilt(lumaAt: (x: number, y: number) => number, w: number, h: number, floor = FLOOR): Tilt | null {
   if (w < 32 || h < 32) return null;
 
   // TWO box blurs first. Foliage and sensor grain are the loudest gradients in
@@ -267,6 +273,6 @@ export function findTilt(lumaAt: (x: number, y: number) => number, w: number, h:
   // A horizon right across a frame scores about 1; a hedge scores a twentieth.
   const onLine = bestCnt[bestCol * rows + bestRow - 1] + bestCnt[bestCol * rows + bestRow] + bestCnt[bestCol * rows + bestRow + 1];
   const agreement = onLine / Math.max(w, h);
-  if (agreement < FLOOR) return null; // no line dominates — say nothing rather than guess
+  if (agreement < floor) return null; // no line dominates — say nothing rather than guess
   return { degrees, agreement };
 }
