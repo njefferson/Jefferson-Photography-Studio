@@ -85,6 +85,12 @@ set was watched rendering twice in a row. This is the third report in that
 neighbourhood, which is itself the argument for measuring the handoff rather than
 patching it again.
 
+## Depends
+
+- touches 008 — 008 is about decode queued behind one worker, this is about
+  decoding what need not be decoded at all. Work avoided beats work
+  parallelised, so if this is real it changes 008's numbers.
+
 ## Options
 
 **Count the decodes, on both sides of the keep, before changing anything.**

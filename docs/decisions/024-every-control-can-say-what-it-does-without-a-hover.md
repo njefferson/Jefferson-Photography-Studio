@@ -61,6 +61,13 @@ when it is short.
   does not say what it does" is a better label. This item is for what is left
   after the label is as good as it can be.
 
+## Depends
+
+- touches 003 — a panel floating over the photograph has less room for
+  permanent notes, so which way 003 goes changes how much of this has to be on
+  demand. This item must not invent a SECOND explanation surface before 003
+  decides where the first one lives.
+
 ## Options
 
 1. **A toggletip per control that needs one, with the note as its content,

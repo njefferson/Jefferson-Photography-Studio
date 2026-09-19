@@ -108,6 +108,12 @@ disc while the ring average, dominated by sky and foliage, is still red. The
 remedy chosen then was to remember the strength slider. That is a control, not a
 correction, and this record is the second time the same thing has been reported.
 
+## Depends
+
+- needs 013 — 013 owns the chroma-noise half of what the same look does to a
+  frame, and its work changes what this stage gets measured against. That is
+  this record's own stated argument for ranking behind it.
+
 ## Options
 
 **Restore the normalisation anchor, and interpolate the bins. Chosen.** Divide

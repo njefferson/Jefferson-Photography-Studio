@@ -75,6 +75,20 @@ gesture ships a control nobody on a tablet can find.
 - **006 (mask by subject / background)** — unrelated; a different selection
   type, not a different orientation of this one.
 
+## Depends
+
+- needs 024 — this adds a gesture to a surface whose controls do not yet
+  explain themselves, and a rotation grip that nothing names is the exact
+  failure 024 exists to fix. Lightroom gets away with a bare handle because a
+  cursor explains it; this app has no cursor.
+- touches 004 — both are about angle, and 004 already owns an angle-setting
+  idiom on this device. Reuse what it settles rather than inventing a third way
+  to turn something.
+- distinct-from 026 — masks combining shipped first and is independent; nothing
+  in the group model needs to know about a component's angle.
+- distinct-from 006 — a different selection TYPE, not a different orientation
+  of this one.
+
 ## Options
 
 1. **An `angle` on the mask, set by a HANDLE the finger can see, with a coarse

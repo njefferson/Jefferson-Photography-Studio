@@ -101,7 +101,32 @@ if (rStart >= 0) {
 }
 if (items.length) {
   say(`\nTHE SCHEDULE — ${items.length} open, in RANK ORDER (file order is the rank):`);
-  items.forEach((it, i) => say(`  ${String(i + 1).padStart(2)}. ${it.key ?? "---"}  ${it.title.slice(0, 68)}`));
+  // AND WHAT HOLDS EACH ONE THERE. The rank is file order, so a bare list is a
+  // set of numbers anybody can reorder; printing "after 024" beside an item
+  // makes the order an argument that tools/decisions-check.mjs then refuses to
+  // let the file contradict. Read straight out of each record's "## Depends".
+  const edgeOf = (key) => {
+    if (!key) return [];
+    const dd = join(repo, "docs/decisions");
+    const f = existsSync(dd) ? readdirSync(dd).find((x) => x.startsWith(`${key}-`)) : null;
+    if (!f) return [];
+    const b = readFileSync(join(dd, f), "utf8")
+      .match(/^##\s+Depends\b[^\n]*\n([\s\S]*?)(?=^##\s|$(?![\s\S]))/mi);
+    if (!b) return [];
+    return [...b[1].matchAll(/^\s*-\s+needs\s+(\d{3})\b/gim)].map((m) => m[1]);
+  };
+  const needsOf = new Map(items.map((it) => [it.key, edgeOf(it.key)]));
+  const onQueue = new Set(items.map((it) => it.key));
+  items.forEach((it, i) => {
+    const after = (needsOf.get(it.key) ?? []).filter((k) => onQueue.has(k));
+    const holds = items.filter((o) => (needsOf.get(o.key) ?? []).includes(it.key)).map((o) => o.key);
+    const why = [after.length ? `after ${after.join(", ")}` : "", holds.length ? `holds ${holds.join(", ")}` : ""]
+      .filter(Boolean).join(" · ");
+    say(`  ${String(i + 1).padStart(2)}. ${it.key ?? "---"}  ${it.title.slice(0, 68)}${why ? `   [${why}]` : ""}`);
+  });
+  say(`  A bracket says what holds an item where it is. The whole graph —`);
+  say(`  obsolete items, work filed as two, contended ground — is one command:`);
+  say(`  node tools/decisions-check.mjs --graph`);
   say(`  Each is docs/decisions/<key>-*.md — what was researched, what it was`);
   say(`  weighed against, what was REJECTED and why, and where it ranks. A new`);
   say(`  idea gets compared against these BEFORE it is judged, and a roadmap item`);
