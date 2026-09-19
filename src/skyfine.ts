@@ -24,7 +24,7 @@
 import type { BrushMask } from "./pipeline";
 import { linearAt, type DecodedImage, type SkySelection } from "./decode";
 import { buildSkyMask } from "./sky";
-import { BRUSH_MAX_EDGE } from "./pipeline";
+import { BRUSH_MAX_EDGE, sampleBrush } from "./pipeline";
 
 /** Working scale cap for the refined mask: its longer edge, in pixels. A
  *  2800 px frame gets 1024, which puts the mask's edge within about three
@@ -285,4 +285,218 @@ export function buildSkySelectionFrom(src: SkySource, refine = true): SkySelecti
   if (!refine) return { mask: res.mask, fine: null };
   const guide = buildSkyGuide(sample, w, h, wb);
   return { mask: res.mask, fine: refineSkyMask(res.mask, guide) };
+}
+
+/** Outer colour tolerance for the grow, in units of the sky's own chroma
+ *  spread. Set by measurement on the three mask-truth frames: the sky's own
+ *  90th percentile sits at 1.43, 1.46 and 1.63, so a pixel four spreads out is
+ *  well past anything the seed itself contains, and the connectivity bound
+ *  rather than this number is what actually stops the grow. */
+export const SKY_GROW_TOL = 2.5;
+/** Floor on that spread, so a frame whose sky is very uniform does not produce
+ *  an impossibly tight gate. In guide units (every channel runs 0..1). */
+export const SKY_GROW_SPREAD_MIN = 0.004;
+/** Cap on it, so a frame whose seed caught a gradient does not admit the
+ *  whole photograph. */
+export const SKY_GROW_SPREAD_MAX = 0.03;
+/** A seed pixel: the coarse bitmap is read as a HARD selection at half, the
+ *  same cut refineSkyMask makes, so the two paths start from one idea of what
+ *  the seed selected. */
+const SEED_CUT = 128;
+/** Luma-gradient above which the grow may SELECT a pixel but must not continue
+ *  THROUGH it — the photograph's own edges, as a brake on the flood.
+ *
+ *  It exists because colour and connectivity alone are not enough, which was
+ *  measured rather than assumed. On NIR_1651 the sky and the hillside below
+ *  the tree share a colour, and the grow finds a path between them through the
+ *  crown: sweeping the tolerance there gives 10.6% of the frame at 1.0 and
+ *  36.5% at 1.25 — a cliff, not a slope, which is the signature of a leak
+ *  rather than of a threshold set slightly wrong. Below the cliff the grow
+ *  adds nothing at all; above it the whole lower frame floods. No tolerance
+ *  is safe, so the brake is structural.
+ *
+ *  Near buildSkyMask's own 0.045 seed-smoothness bound, which is the same idea
+ *  on the same quantity one stage earlier; this one runs on the guide's gamma
+ *  luma at 1024 rather than on normalised linear luma at 384. */
+const GRAD_STOP = 0.06;
+/** Widest soft edge Feather can ask for, in guide pixels at SKY_FINE_EDGE.
+ *  Feather 0.5, the default, is half of this.
+ *
+ *  SMALL ON PURPOSE, and 12 was tried first. The grow's boundary is already
+ *  per-pixel accurate because it IS a colour boundary, so the blur is only
+ *  there to give Feather something to do. At 12 — a 6 px radius at the
+ *  default — it ate the needles: NIR_1651 came back with a pale halo round
+ *  every branch and stepped blocks down the left edge, which is the rim
+ *  defect this whole item exists to remove, reintroduced by the softening.
+ *  An isotropic blur cannot know about edges; at this width it cannot do much
+ *  harm either. */
+const FEATHER_MAX_PX = 3;
+
+/**
+ * Grow the sky selection outward from the coarse seed, through the guide, by
+ * colour AND connectivity — the reader's Sky mask reading which pixels ARE the
+ * sky and not only where it is (decision 023).
+ *
+ * @param mask  the 384 px bitmap from buildSkyMask, for THIS photograph.
+ * @param guide  from buildSkyGuide, for the SAME photograph.
+ * @param reach  the mask's Reach, scaling the colour tolerance as it scales
+ *   buildSkyMask's own growth tolerances — 1 is the shipped default.
+ * @param feather  the mask's Feather, setting how much of the tolerance is a
+ *   ramp rather than a plateau, exactly as colorMaskWeight uses it.
+ * @returns a BrushMask at the GUIDE's size, 0..255, image-uv like the input —
+ *   the same shape refineSkyMask returns, so it drops into `MaskLayer.fine`
+ *   and is read by compileEdit's brush sampler and the shader's mask atlas
+ *   with no other change.
+ *
+ * What the result must satisfy, and why it is a grow rather than a multiply:
+ * every selected pixel is reachable from a seed pixel through a chain of
+ * pixels that each match the sky's colour. **A per-pixel multiply cannot
+ * express that, and cannot help at all** — it only ever removes weight, so it
+ * can neither fill the gaps between branches nor lift open-sky coverage,
+ * which are the defect. Measured on the three mask-truth frames before this
+ * was written: the sky the seed misses lies AGAINST the seed and is
+ * colour-close (15%, 32% and 39% of what is near it), while the colour-close
+ * pixels the mask must keep rejecting are speckle scattered through foliage
+ * and blobs disconnected from any sky. On NIR_1651 46% of the frame BEYOND
+ * the seed matches the sky's colour, against a true sky of about 13% — so
+ * colour alone readmits the hillside, and connectivity is the whole of what
+ * separates the two. That is the sky's colour AND its place, with place
+ * meaning "joined to the sky" rather than "inside a coarse bitmap".
+ *
+ * It CANNOT DRIFT WITH THE GRADE, which is the design point record 023 left
+ * to be settled — *a gate that drifts is the Colour mask's defect moved into
+ * the Sky mask*. The guarantee is STRUCTURAL rather than tested, and that is
+ * deliberate: this function's parameters are a bitmap, a guide, a reach and a
+ * feather, so it has no access to EditParams at all and no edit can reach it
+ * even by mistake. The guide itself is three channels of the gray-world
+ * balanced linear frame, built once per photograph beside the bitmap and never
+ * rebuilt per edit. The Colour mask's own key reads the display colour at the
+ * mask stage and does move; nothing of that is imported here.
+ *
+ * A BROWSER WALK FOR IT WAS WRITTEN AND THEN REMOVED, which is worth knowing
+ * before writing a second one. It built the selection under one look, rebuilt
+ * it under another, and compared the frame rendered back under the first — and
+ * it failed on correct code. Its control, the same comparison with the mask's
+ * adjustment neutral, failed too: switching a look away and back does not
+ * return the same photograph, so the walk was measuring that and not this. A
+ * test that fails for a reason other than the one it names is worse than no
+ * test. Isolating it properly needs the mask-truth walk's trick of solving
+ * coverage per pixel from two overlay reads, which is a real piece of work and
+ * buys nothing a signature already guarantees.
+ */
+export function growSkyByColour(mask: BrushMask, guide: SkyGuide, reach = 1, feather = 0.5): BrushMask {
+  const W = guide.w, H = guide.h, N = W * H;
+  const out = new Uint8Array(N);
+  // The seed, at the guide's grid, sampled BILINEARLY and then cut at half.
+  // Nearest-neighbour was tried first and is visible in the photograph: the
+  // seed is 384 px against the guide's 1024, so its own boundary arrives
+  // magnified nearly three times, and wherever the grow stops at a colour
+  // edge rather than running past it that staircase is what shows — stepped
+  // blocks down the left of NIR_1651 and along its cloud. Bilinear was
+  // avoided at first because a ramp would seed the grow with half-strength
+  // pixels along the seed's feather; that reason went when membership became
+  // binary, and the cut at SEED_CUT removes the ramp anyway.
+  const seeded = new Uint8Array(N);
+  const sr: number[] = [], sb: number[] = [];
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      if (sampleBrush(mask, (x + 0.5) / W, (y + 0.5) / H) * 255 >= SEED_CUT) {
+        const p = y * W + x;
+        seeded[p] = 1;
+        sr.push(guide.r[p]);
+        sb.push(guide.b[p]);
+      }
+    }
+  }
+  if (!sr.length) return { w: W, h: H, data: out }; // no seed: no sky, as before
+  // The sky's own centre and spread, robustly — median and MAD, the same shape
+  // buildSkyMask uses to learn its model, so one outlier band of haze cannot
+  // drag the target off the sky.
+  const med = (a: number[]): number => { const t = Float64Array.from(a).sort(); return t[t.length >> 1]; };
+  const mr = med(sr), mb = med(sb);
+  const madOf = (a: number[], m: number): number => 1.4826 * med(a.map((v) => Math.abs(v - m)));
+  const spread = Math.min(SKY_GROW_SPREAD_MAX, Math.max(SKY_GROW_SPREAD_MIN, Math.hypot(madOf(sr, mr), madOf(sb, mb))));
+  const edge = SKY_GROW_TOL * spread * Math.max(0.1, reach);
+  const plateau = edge * (1 - Math.min(1, Math.max(0, feather)));
+  /** This pixel's weight from its colour alone, 0 outside the tolerance. */
+  const weightAt = (p: number): number => {
+    const d = Math.hypot(guide.r[p] - mr, guide.b[p] - mb);
+    if (d >= edge) return 0;
+    if (d <= plateau) return 1;
+    const t = (d - plateau) / Math.max(1e-6, edge - plateau);
+    return 1 - t * t * (3 - 2 * t); // smoothstep, as smooth01 elsewhere
+  };
+  // The photograph's own edges, from the guide's luma — central differences,
+  // the same measure buildSkyMask takes on its normalised luma one stage
+  // earlier. A pixel ON an edge may be selected (the mask has to reach the
+  // edge) but is never propagated THROUGH, which is what stops the flood
+  // crossing a crown into whatever shares the sky's colour behind it.
+  const grad = new Float32Array(N);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const gx = guide.l[y * W + Math.min(W - 1, x + 1)] - guide.l[y * W + Math.max(0, x - 1)];
+      const gy = guide.l[Math.min(H - 1, y + 1) * W + x] - guide.l[Math.max(0, y - 1) * W + x];
+      grad[y * W + x] = Math.hypot(gx, gy);
+    }
+  }
+  // Flood from the seed through 4-neighbours. A pixel whose colour weight is
+  // zero is not selected AND does not propagate, so the grow stops at the
+  // photograph's own colour edges and the speckle beyond them is never
+  // reached. The queue is a typed ring: 700k pixels, one pass.
+  const queue = new Int32Array(N);
+  let head = 0, tail = 0;
+  for (let p = 0; p < N; p++) {
+    if (!seeded[p]) continue;
+    out[p] = 255; // the seed is sky by the heuristic's own finding
+    queue[tail++] = p;
+  }
+  while (head < tail) {
+    const p = queue[head++];
+    const x = p % W, y = (p / W) | 0;
+    for (let k = 0; k < 4; k++) {
+      const nx = x + (k === 0 ? -1 : k === 1 ? 1 : 0);
+      const ny = y + (k === 2 ? -1 : k === 3 ? 1 : 0);
+      if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+      const q = ny * W + nx;
+      if (out[q] || seeded[q]) continue; // already settled
+      if (weightAt(q) <= 0) continue;    // outside the sky's colour: stop here
+      // MEMBERSHIP IS BINARY; THE SOFTNESS GOES ON THE BOUNDARY BELOW.
+      // Grading each pixel by its own colour confidence instead put SPECKLE
+      // through the selection — a sky is a smooth gradient, so a wide band of
+      // it sits mid-ramp, and neighbouring pixels took visibly different
+      // weights the moment a strong adjustment was applied. Seen on NIR_1651
+      // in the app, not inferred: the darkened sky came back grainy where the
+      // old narrow selection had been clean.
+      out[q] = 255;
+      if (grad[q] < GRAD_STOP) queue[tail++] = q; // on an edge: selected, not crossed
+    }
+  }
+  // The soft edge, from the BOUNDARY rather than from colour: a separable box
+  // blur whose radius comes from Feather, which is how a region mask has
+  // always been softened here and what buildSkyMask's own feather does one
+  // stage earlier. Radius 0 leaves the selection hard.
+  const rad = Math.round(Math.min(1, Math.max(0, feather)) * FEATHER_MAX_PX);
+  if (rad <= 0) return { w: W, h: H, data: out };
+  const tmp = new Float32Array(N), acc = new Float32Array(N);
+  const span = 2 * rad + 1;
+  for (let y = 0; y < H; y++) {           // horizontal
+    let sum = 0;
+    for (let x = -rad; x <= rad; x++) sum += out[y * W + Math.min(W - 1, Math.max(0, x))];
+    for (let x = 0; x < W; x++) {
+      tmp[y * W + x] = sum / span;
+      sum -= out[y * W + Math.min(W - 1, Math.max(0, x - rad))];
+      sum += out[y * W + Math.min(W - 1, Math.max(0, x + rad + 1))];
+    }
+  }
+  for (let x = 0; x < W; x++) {           // vertical
+    let sum = 0;
+    for (let y = -rad; y <= rad; y++) sum += tmp[Math.min(H - 1, Math.max(0, y)) * W + x];
+    for (let y = 0; y < H; y++) {
+      acc[y * W + x] = sum / span;
+      sum -= tmp[Math.min(H - 1, Math.max(0, y - rad)) * W + x];
+      sum += tmp[Math.min(H - 1, Math.max(0, y + rad + 1)) * W + x];
+    }
+  }
+  for (let p = 0; p < N; p++) out[p] = Math.round(Math.min(255, Math.max(0, acc[p])));
+  return { w: W, h: H, data: out };
 }
