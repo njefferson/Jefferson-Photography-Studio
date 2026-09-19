@@ -42,7 +42,7 @@ import { generateDcp } from "./dcp";
 import { buildGlowMap } from "./glow";
 import { buildLocalMap } from "./localmap";
 import { buildSkyMap, SKY_DEPTH_CHROMA_LO, SKY_DEPTH_CHROMA_HI, SKY_DEPTH_GREY_LO, SKY_DEPTH_GREY_HI } from "./skymap";
-import { prepareSkySource, buildSkySelectionFrom } from "./skyfine";
+import { prepareSkySource, buildSkySelectionFrom, buildSkyGuide, refineSkyMask, type SkyGuide } from "./skyfine";
 import { makeRowDenoiser } from "./raw/denoise";
 import { makeRowDetail } from "./raw/detail";
 import { buildSkyMask, SKY_MIN_COVERAGE } from "./sky";
@@ -5745,6 +5745,31 @@ function addMask(type: 0 | 1 | 2 | 3 | 4) {
 // change). WB is the AUTO gray-world balance (not the live edit) so the
 // selection never drifts as the photo is graded. Copy-on-write: always assign a
 // FRESH buffer (undo snapshots share the old one) and bump `rev`.
+/** The refinement guide of a decoded photograph, built once and kept for its
+ *  life. Takes the image; returns the guide, or null when it cannot be built.
+ *
+ *  Kept because the guide is the expensive half of a refinement — three box-mean
+ *  channels at SKY_FINE_EDGE — and it does not depend on the reader's reach or
+ *  feather, so dragging either must not pay for it again. It is keyed on the
+ *  IMAGE: a guide from one photograph refining another's bitmap is the error
+ *  buildSkyGuide's own contract forbids.
+ *
+ *  What the result must satisfy: it is built from gray-world balance and the
+ *  linear decode ONLY, never the live edit, so the refined mask does not crawl
+ *  as the photograph is graded — the same rule the look's selection follows. */
+const skyGuideOf = new WeakMap<DecodedImage, SkyGuide | null>();
+function skyGuideFor(img: DecodedImage): SkyGuide | null {
+  if (skyGuideOf.has(img)) return skyGuideOf.get(img) ?? null;
+  let g: SkyGuide | null = null;
+  try {
+    g = buildSkyGuide((x, y) => linearAt(img, x, y), img.width, img.height, grayWorldWB(img));
+  } catch {
+    g = null; // a guide that cannot be built leaves the coarse bitmap in use
+  }
+  skyGuideOf.set(img, g);
+  return g;
+}
+
 function regenerateSkyMask(m: MaskLayer) {
   if (!current) return;
   const res = buildSkyMask(
@@ -5759,6 +5784,18 @@ function regenerateSkyMask(m: MaskLayer) {
     m.feather,
   );
   m.brush = res.mask; // fresh buffer from buildSkyMask — safe for copy-on-write
+  // AND THE SAME SEED REFINED TO THE PICTURE'S EDGES (018). The reader's reach
+  // and feather still shape the seed exactly as before; the guided filter then
+  // snaps that seed's boundary to the photograph's own edges, which is what the
+  // look's sky stages have always read. Before this, one photograph could carry
+  // two different skies — a soft hand-made mask and a crisp look depth — and
+  // the difference showed wherever a branch met the sky.
+  //
+  // A photograph with no guide keeps the coarse bitmap and renders as it always
+  // did; `fine` is cleared rather than left stale, because a refinement of the
+  // PREVIOUS reach would otherwise outlive the seed it came from.
+  const guide = res.found ? skyGuideFor(current) : null;
+  m.fine = guide && res.mask ? refineSkyMask(res.mask, guide) : undefined;
   m.rev = (m.rev ?? 0) + 1;
 }
 

@@ -116,6 +116,8 @@ uniform vec4 u_maskAdj[8];   // (brightness, contrast, saturation, warmth)
 uniform float u_maskHue[8];  // degrees
 uniform int u_maskSlot[8];   // brush/sky: which packed channel (0..3); -1 otherwise
 uniform sampler2D u_maskTex; // brush/sky masks packed 1-per-channel (rgba = 4 max)
+uniform sampler2D u_maskFineTex; // sky masks (type 4) refined to the picture's edges, same slots
+uniform bool u_maskFineOn;      // false when no sky mask has a refinement to read
 uniform int u_readMode;      // 1 = output the mask-stage DISPLAY colour and stop
                              //     (lets the colour mask read its own key colour)
 uniform float u_hotspot;     // IR hot-spot correction (darken centre) 0..0.8
@@ -669,7 +671,13 @@ void main() {
       // is baked into the bitmap in JS, so there is no sky-specific shader math.
       int s = u_maskSlot[i];       // packed channel for this mask (0..3)
       if (s < 0) continue;         // beyond the 4-channel cap: mask is inactive
-      w = texture(u_maskTex, v_uv)[s];
+      // A SKY MASK READS THE REFINED ATLAS (018) so the reader's own mask has
+      // the same crisp boundary the look's sky stages already had. Two atlases
+      // rather than one because they are different sizes and the packer skips
+      // any bitmap whose dimensions differ from the first — see MaskLayer.fine.
+      w = (u_maskType[i] == 4 && u_maskFineOn)
+        ? texture(u_maskFineTex, v_uv)[s]
+        : texture(u_maskTex, v_uv)[s];
       if (u_maskGeoB[i].y > 0.5) w = 1.0 - w; // invert
     } else if (u_maskType[i] == 3) {
       w = colorMaskWeight(i, cKey); // chroma-key on the fixed mask-stage colour
@@ -949,6 +957,11 @@ export class Renderer {
   private lensHasBump = false;
   private toneRgbTex: WebGLTexture;
   private brushTex: WebGLTexture;
+  private brushFineTex: WebGLTexture;
+  /** The refined atlas's upload signature and whether it holds anything — the
+   *  shader reads `u_maskFineOn` and falls back to the coarse atlas when off. */
+  private brushFineSig = "";
+  private brushFineOn = false;
   private brushSig = ""; // re-upload the packed brush texture only when it changes
   private localTex: WebGLTexture;
   private skyTex: WebGLTexture;
@@ -1013,7 +1026,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -1073,6 +1086,20 @@ export class Renderer {
     // Starts as a single transparent texel (all masks empty).
     this.brushTex = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, this.brushTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
+
+    // Refined sky-mask texture (unit 13): the same four slots as brushTex, but
+    // holding each type-4 mask's `fine` bitmap at SKY_FINE_EDGE. A second atlas
+    // rather than a bigger first one because updateBrushTexture sizes the atlas
+    // from its first entry and SKIPS any bitmap of another size — one texture
+    // for both would drop a 384 painted mask the moment a 1024 sky mask joined
+    // it. Starts as a single transparent texel.
+    this.brushFineTex = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, this.brushFineTex);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -1277,6 +1304,44 @@ export class Renderer {
       for (let p = 0; p < bw * bh; p++) packed[p * 4 + slot] = b.data[p];
     }
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, bw, bh, 0, gl.RGBA, gl.UNSIGNED_BYTE, packed);
+  }
+
+  /** Pack every SKY mask's refined bitmap into the second atlas, on the same
+   *  slots updateBrushTexture uses, and say whether the shader may read it.
+   *
+   *  Takes the mask list and the same slot map; returns nothing, and sets
+   *  `brushFineOn` — the shader falls back to the coarse atlas when it is
+   *  false, so a photograph whose guide could not be built still renders the
+   *  mask it always did rather than nothing at all.
+   *
+   *  What the result must satisfy: a slot written here holds the refinement of
+   *  the SAME mask whose coarse bitmap occupies that slot in `brushTex`, and
+   *  `brushFineOn` is true only when at least one such slot was written —
+   *  compileEdit's CPU path picks `fine` over `brush` by the same test, and the
+   *  agreement walk is what holds the two together. */
+  private updateBrushFineTexture(masks: EditParams["masks"], slotOf: number[]) {
+    const gl = this.gl;
+    const fines = masks
+      .map((m, i) => ({ m, i, slot: slotOf[i] }))
+      .filter((x) => x.m.type === 4 && x.m.fine && x.slot >= 0);
+    const sig = fines.map((x) => `${x.slot}:${x.m.fine!.w}x${x.m.fine!.h}:${x.m.rev ?? 0}`).join("|");
+    if (sig === this.brushFineSig) return;
+    this.brushFineSig = sig;
+    this.brushFineOn = fines.length > 0;
+    gl.bindTexture(gl.TEXTURE_2D, this.brushFineTex);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    if (!fines.length) {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
+      return;
+    }
+    const fw = fines[0].m.fine!.w, fh = fines[0].m.fine!.h;
+    const packed = new Uint8Array(fw * fh * 4);
+    for (const { m, slot } of fines) {
+      const f = m.fine!;
+      if (f.w !== fw || f.h !== fh) continue; // one size per atlas, as above
+      for (let p = 0; p < fw * fh; p++) packed[p * 4 + slot] = f.data[p];
+    }
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, fw, fh, 0, gl.RGBA, gl.UNSIGNED_BYTE, packed);
   }
 
   /** Rebuild the tone LUTs from the five control points (cheap; on change
@@ -1598,6 +1663,7 @@ export class Renderer {
       slotOf.push((m.type === 2 || m.type === 4) && bitmapCount < MAX_BITMAP_MASKS ? bitmapCount++ : -1);
     }
     this.updateBrushTexture(masks, slotOf);
+    this.updateBrushFineTexture(masks, slotOf);
     gl.uniform1i(this.loc.u_maskCount, masks.length);
     if (masks.length) {
       const types = new Int32Array(MAX_MASKS);
@@ -1629,6 +1695,8 @@ export class Renderer {
     gl.uniform1i(this.loc.u_glowTex, 1);
     gl.uniform1i(this.loc.u_toneTex, 2);
     gl.uniform1i(this.loc.u_maskTex, 3);
+    gl.uniform1i(this.loc.u_maskFineTex, 13);
+    gl.uniform1i(this.loc.u_maskFineOn, this.brushFineOn ? 1 : 0);
     const toneRgbOn =
       (p.toneR && !toneIsIdentity(p.toneR)) || (p.toneG && !toneIsIdentity(p.toneG)) || (p.toneB && !toneIsIdentity(p.toneB));
     gl.uniform1i(this.loc.u_toneRgbOn, toneRgbOn ? 1 : 0);
@@ -1677,6 +1745,8 @@ export class Renderer {
       gl.activeTexture(gl.TEXTURE5);
       gl.bindTexture(gl.TEXTURE_3D, this.lutTex);
     }
+    gl.activeTexture(gl.TEXTURE13);
+    gl.bindTexture(gl.TEXTURE_2D, this.brushFineTex);
     gl.activeTexture(gl.TEXTURE3);
     gl.bindTexture(gl.TEXTURE_2D, this.brushTex);
     gl.activeTexture(gl.TEXTURE2);
