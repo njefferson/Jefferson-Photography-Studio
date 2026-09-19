@@ -100,6 +100,9 @@ is the boundary.
   edges; this fixes the interior and the gaps it cannot reach. Same shader
   stage, same selection, and this follows it directly.
 - distinct-from 006 — mask by subject is a different seed, not this.
+- touches 028 — 028 is the sky this mechanism cannot enter, and it is sized by
+  what this one leaves behind: change the grow's tolerance or brake and the
+  disconnected share moves with it.
 
 ## Options
 
@@ -322,6 +325,46 @@ has only ever set the boundary blur's radius. It is a boolean now, named for
 what it answers. Verified behaviour-preserving rather than assumed: the three
 corpus frames' rendered selections are byte for byte identical before and
 after, at the shipped tolerance.
+
+**THE ACCEPTANCE NUMBER WAS MEASURING TWO POPULATIONS AT ONCE, and splitting
+them took the walk from three failures to one.** NIR_0063's 52% edge coverage
+would not move at any tolerance because the denominator mixed sky the grow
+could have grown into with sky it can never enter — a connectivity-constrained
+selection cannot cross a branch to reach the sky behind it, at any tolerance,
+by construction. `tools/mask-truth-walk.mjs` now floods from what the mask
+covers, through keyed sky, and sorts every sky pixel into REACHABLE and
+DISCONNECTED before it bounds anything. The bounds did not move — 0.85 and 0.97
+stand; lowering a bound to meet what a build already does makes the gate
+vacuous. Over reachable sky, at the shipped default Reach:
+
+- NIR_0063: edge 52% to **98%**, uncovered 7.0% to 0.1%. Both checks pass.
+- NIR_1644: edge 82% to **87%**, uncovered 1.0% to 0.6%. Both checks pass.
+- NIR_1651: edge 89% to **94%**, open sky **93.4%, unchanged, still red**.
+
+Proved by planting: `--plant-reachable` counts every keyed sky pixel as
+reachable, which is the arithmetic this file had before, and reproduces all
+three frames' old readings exactly. The disconnected share — 6.9%, 0.4% and
+1.4% — is reported and never bounded, the standing this file already gives the
+spill line, and it is decision 028's subject.
+
+**OPENING THE MAPS CORRECTED THE SPILL READING ON EVERY FRAME.** The figures
+say 8%, 23% and 55%, which reads as the mask swallowing canopy. It is not. On
+NIR_1651 the 55% is a large bright CLOUD across the top of the frame, which the
+mask selects and the walk's hue-band key rejects — the case this file's own
+header already names, at a scale nobody had looked at. On NIR_0063 and NIR_1644
+it is the pale hazy sky hugging the treeline, below the key's 0.12 saturation
+floor. There is a real thin rim of coverage on the bright IR-white shrubs at
+NIR_0063's right edge, and it is thin. **The spill number must not be read as a
+mask defect without opening the map.**
+
+**What is still owed, and it is now one thing with a picture attached:** a
+block of sky at NIR_1651's lower-right margin, about 18,933 px in one
+component, unselected, with a path of keyed sky joining it to the selection.
+That is the single remaining red check. One caution on it: reachable under the
+WALK's key is not the same as reachable by the grow — the key is a hue band on
+rendered canvas chroma, the grow works on `guide.r`/`guide.b` at 1024 behind a
+luma-gradient brake — so whether the grow is wrong to stop there, or the key is
+wrong to claim a path, needs `tools/sky-probe.mjs` rather than this walk.
 
 **What is still owed:** the boundary. The grow fixes the interior and the gaps
 and leaves the rim misplaced by a pixel or two. Composing the guided filter

@@ -31,19 +31,60 @@
 // crossing the bound is 023's acceptance, not a sheet. The instrument's own
 // sanity check is --reach: a mask grown eagerly must miss less, one shrunk
 // must miss more, or the number is not reading the mask.
+//
+// MISSED SKY IS TWO POPULATIONS AND THE FIRST VERSION AVERAGED THEM.
+// NIR_0063 read 52% edge coverage at EVERY tolerance from 2.5 to 5, because
+// that frame fails in two opposite directions at once: the grow takes a band
+// of canopy it should not, and the sky it misses is seen through gaps in the
+// branches and is joined to the open sky by no sky-coloured path at all. The
+// selection spreads only through pixels that are JOINED (decision 023), so
+// connectivity — the thing without which colour alone readmits half of
+// NIR_1651 — is exactly what forbids reaching those. Averaging the two gives a
+// number that can never go green and says nothing about either.
+//
+// So every keyed sky pixel is sorted first:
+//
+//   REACHABLE   joined to what the mask already covers by a path of keyed sky.
+//               The grow could have had it. This is what the bound is over.
+//   DISCONNECTED  no such path. Out of reach for a connectivity-constrained
+//               selection by construction — a different mechanism's job, and
+//               its own item. REPORTED, never bounded, like the spill line.
+//
+// THE SPLIT IS THE WALK'S OWN KEY ANSWERING ABOUT THE WALK'S OWN SKY, and that
+// limit is the honest claim. `sky` here is a hue band on RENDERED canvas
+// chroma; the grow keys on guide.r/guide.b at 1024 with a luma-gradient brake
+// (src/skyfine.ts). Two different keys, disagreeing at the margins, so
+// "disconnected" means disconnected under this one. A frame where the split
+// moves the verdict gets its missed map opened before the reading is believed.
+//
+// THE MAP CARRIES THE SPLIT: blue is covered sky (darker = less), RED is sky
+// the mask could have reached and did not, MAGENTA is sky nothing joins to the
+// selection, yellow is coverage spilled onto what the key calls not-sky.
+//
+// --plant-reachable forces every keyed sky pixel to count as reachable, which
+// is the arithmetic this file had before the split. It must reproduce the old
+// readings — 52% on NIR_0063 — and the unplanted run must not. A split that
+// moves no number on any frame is reading nothing, and its green means
+// nothing.
 import { chromium } from "playwright-core";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 const arg = (k, d) => (process.argv.find((a) => a.startsWith(`--${k}=`)) || `--${k}=${d}`).split("=").slice(1).join("=");
 const PORT = arg("port", "8131"), REACH = Number(arg("reach", "1")), OUT = arg("out", join(tmpdir(), "mask-truth"));
+const PLANT_REACHABLE = process.argv.includes("--plant-reachable");
 const DIR = "/home/user/Jefferson-Photography-Studio/public/examples";
 const FRAMES = arg("frames", ["NIR_0063", "NIR_1644", "NIR_1651"].map((n) => `${DIR}/${n}.dng`).join(",")).split(",");
 // 023's targets, and the readings this was written against (Aerochrome on,
 // Reach 1, Feather 0.5, the 2800 px working copy): the mask covers open sky
 // nearly whole and its edge band poorly — the rim the tablet showed.
-const EDGE_COV_MIN = 0.85; // mean coverage of sky within EDGE of something that is not sky
-const OPEN_COV_MIN = 0.97; // mean coverage of sky farther from an edge than that
+// Both are over REACHABLE sky (see the header). They have not moved: lowering a
+// bound to meet what a build already does makes the gate vacuous — it can no
+// longer catch a regression and no longer states an intention. What changed is
+// the denominator, from "every pixel the key calls sky" to "every pixel the key
+// calls sky that the selection could have grown into".
+const EDGE_COV_MIN = 0.85; // mean coverage of reachable sky within EDGE of something that is not sky
+const OPEN_COV_MIN = 0.97; // mean coverage of reachable sky farther from an edge than that
 const SKY_SAT_FLOOR = 0.12; // below this a pixel is grey, not sky: the pale sky beside a crown reads 0.15–0.25 on 1376, a cyan cast on dry grass under 0.1
 const HUE_HALF_RAD = (25 * Math.PI) / 180; // the sky's hue band, either side of its circular mean
 const EDGE_FRAC = 20 / 2800; // the edge band: 20 px on the 2800 px working copy, scaled to the canvas
@@ -55,7 +96,7 @@ const setSlider = async (p, id, v) => { await p.evaluate(([i, x]) => { const el 
 // The measurement, in the page: two reads, the coverage solved, the key applied.
 // One read of the canvas into the page's own memory, under the name given.
 const readInto = (p, key) => p.evaluate((k) => { const cv = document.querySelector("#view"); const g = cv.getContext("webgl2") || cv.getContext("webgl"); const b = new Uint8Array(cv.width * cv.height * 4); g.readPixels(0, 0, cv.width, cv.height, g.RGBA, g.UNSIGNED_BYTE, b); window.__mt = window.__mt || {}; window.__mt[k] = b; return [cv.width, cv.height]; }, key);
-const solve = (p) => p.evaluate(([SAT_FLOOR, HUE_HALF, EDGE_FRAC]) => {
+const solve = (p) => p.evaluate(([SAT_FLOOR, HUE_HALF, EDGE_FRAC, PLANT_REACHABLE]) => {
   const A = window.__mt.A, B = window.__mt.B; const cv = document.querySelector("#view"); const W = cv.width, H = cv.height, N = W * H;
   const CY = [0.20, 0.85, 1.0], LW = [0.2126, 0.7152, 0.0722];
   // 1. coverage, solved from the two reads
@@ -78,13 +119,49 @@ const solve = (p) => p.evaluate(([SAT_FLOOR, HUE_HALF, EDGE_FRAC]) => {
   const rLo = Math.max(0, rowLo - EDGE), rHi = Math.min(H - 1, rowHi + EDGE); // WebGL rows run bottom-up; both bounds are widened
   const sky = new Uint8Array(N); let skyPx = 0;
   for (let y = rLo; y <= rHi; y++) for (let x = 0; x < W; x++) { const i = y * W + x; if (cov[i] < 0) continue; const [cx, cy] = chroma(i * 4); const s = Math.hypot(cx, cy); if (s < SAT_FLOOR) continue; let dh = Math.abs(Math.atan2(cy, cx) - hue0); if (dh > Math.PI) dh = 2 * Math.PI - dh; if (dh <= HUE_HALF) { sky[i] = 1; skyPx++; } }
+  // 3b. REACHABLE vs DISCONNECTED. Flood from every sky pixel the mask already
+  // covers, through 4-neighbours, restricted to keyed sky. What the flood
+  // reaches is sky a connectivity-constrained selection could have grown into;
+  // what it does not reach is joined to the selection by no sky-coloured path
+  // and is out of this mechanism's reach by construction. Explicit stack, like
+  // the component walk below: these frames are large enough to blow a recursive
+  // one. See the header for the limit of this split — it is THIS key's answer
+  // about THIS key's sky, not the grow's.
+  const reachable = new Uint8Array(N);
+  {
+    const stack = new Int32Array(N); let sp = 0;
+    for (let i = 0; i < N; i++) if (sky[i] && cov[i] >= 0.5) { reachable[i] = 1; stack[sp++] = i; }
+    while (sp) {
+      const i = stack[--sp]; const x = i % W, y = (i / W) | 0;
+      const nb = [x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1, y > 0 ? i - W : -1, y < H - 1 ? i + W : -1];
+      for (const j of nb) if (j >= 0 && sky[j] && !reachable[j]) { reachable[j] = 1; stack[sp++] = j; }
+    }
+    // THE PLANT: every keyed sky pixel counts as reachable, which is the
+    // arithmetic this file had before the split. It must reproduce the old
+    // readings, or the split is not what changed them.
+    if (PLANT_REACHABLE) for (let i = 0; i < N; i++) if (sky[i]) reachable[i] = 1;
+  }
+  let discN = 0, discCov = 0;
+  for (let i = 0; i < N; i++) if (sky[i] && !reachable[i]) { discN++; discCov += Math.max(0, cov[i]); }
+
   // 4. distance from each sky pixel to the nearest non-sky pixel (chamfer, two passes)
   const BIG = 1e9, dist = new Float32Array(N); for (let i = 0; i < N; i++) dist[i] = sky[i] ? BIG : 0;
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; if (!sky[i]) continue; let d = dist[i]; if (x > 0) d = Math.min(d, dist[i - 1] + 1); if (y > 0) { d = Math.min(d, dist[i - W] + 1); if (x > 0) d = Math.min(d, dist[i - W - 1] + 1.414); if (x < W - 1) d = Math.min(d, dist[i - W + 1] + 1.414); } dist[i] = d; }
   for (let y = H - 1; y >= 0; y--) for (let x = W - 1; x >= 0; x--) { const i = y * W + x; if (!sky[i]) continue; let d = dist[i]; if (x < W - 1) d = Math.min(d, dist[i + 1] + 1); if (y < H - 1) { d = Math.min(d, dist[i + W] + 1); if (x < W - 1) d = Math.min(d, dist[i + W + 1] + 1.414); if (x > 0) d = Math.min(d, dist[i + W - 1] + 1.414); } dist[i] = d; }
   // 5. the numbers: coverage of sky at the edge (the rim), of open sky (the gaps), and spill onto what is not sky beside it
-  let eN = 0, eCov = 0, oN = 0, oCov = 0, soft = 0, hard = 0; const missed = new Uint8Array(N);
-  for (let i = 0; i < N; i++) { if (!sky[i]) continue; const c = cov[i]; soft += 1 - c; if (c < 0.5) { hard++; missed[i] = 1; } if (dist[i] <= EDGE) { eN++; eCov += c; } else { oN++; oCov += c; } }
+  // The edge and open figures are over REACHABLE sky; the missed map and the
+  // soft/hard shares stay over ALL keyed sky, so the whole-frame picture is
+  // still printed beside the bounded one and neither has to be inferred.
+  let eN = 0, eCov = 0, oN = 0, oCov = 0, soft = 0, hard = 0, rHard = 0, reachN = 0; const missed = new Uint8Array(N);
+  for (let i = 0; i < N; i++) {
+    if (!sky[i]) continue;
+    const c = cov[i]; soft += 1 - c;
+    if (c < 0.5) { hard++; missed[i] = 1; }
+    if (!reachable[i]) continue;
+    reachN++;
+    if (c < 0.5) rHard++;
+    if (dist[i] <= EDGE) { eN++; eCov += c; } else { oN++; oCov += c; }
+  }
   // spill: coverage of non-sky pixels within EDGE of a sky pixel (distance the other way, one cheap pass: any sky within EDGE in a cross)
   let sN = 0, sCov = 0; const R = EDGE;
   for (let y = 0; y < H; y += 2) for (let x = 0; x < W; x += 2) { const i = y * W + x; if (sky[i] || cov[i] < 0) continue; let near = false; for (let k = 1; k <= R && !near; k += 2) { if (x - k >= 0 && sky[i - k]) near = true; else if (x + k < W && sky[i + k]) near = true; else if (y - k >= 0 && sky[i - k * W]) near = true; else if (y + k < H && sky[i + k * W]) near = true; } if (near) { sN++; sCov += cov[i]; } }
@@ -96,14 +173,18 @@ const solve = (p) => p.evaluate(([SAT_FLOOR, HUE_HALF, EDGE_FRAC]) => {
   // the map: sky = blue by coverage (dark = uncovered), uncovered sky = red, spill onto non-sky = yellow tint, else grey
   const oc = document.createElement("canvas"); oc.width = W; oc.height = H; const ctx = oc.getContext("2d"); const img = ctx.createImageData(W, H);
   for (let i = 0; i < N; i++) { const o = i * 4; const l = (0.2126 * B[o] + 0.7152 * B[o + 1] + 0.0722 * B[o + 2]) * 0.55; let r = l, gg = l, bb = l; const c = Math.max(0, cov[i]);
-    if (sky[i]) { if (c >= 0.5) { r = l * 0.5; gg = l * 0.6 + 60 * c; bb = l * 0.6 + 120 * c; } else { r = 220; gg = 40; bb = 40; } }
+    if (sky[i]) {
+      if (c >= 0.5) { r = l * 0.5; gg = l * 0.6 + 60 * c; bb = l * 0.6 + 120 * c; }
+      else if (reachable[i]) { r = 220; gg = 40; bb = 40; }   // the mask could have had it
+      else { r = 190; gg = 50; bb = 215; }                     // nothing joins it to the selection
+    }
     else if (c >= 0.5) { r = l + 90 * c; gg = l + 80 * c; bb = l * 0.5; }
     img.data[o] = r; img.data[o + 1] = gg; img.data[o + 2] = bb; img.data[o + 3] = 255; }
   const flipped = ctx.createImageData(W, H); for (let y = 0; y < H; y++) flipped.data.set(img.data.subarray(y * W * 4, (y + 1) * W * 4), (H - 1 - y) * W * 4); ctx.putImageData(flipped, 0, 0);
   delete window.__mt;
   let coveredPx = 0; for (let i = 0; i < N; i++) if (cov[i] >= 0.5) coveredPx++;
-  return { W, H, rows: [H - 1 - rHi, H - 1 - rLo], covered: coveredPx, skyPx, edgePx: EDGE, edgeN: eN, edgeCov: eN ? eCov / eN : NaN, openN: oN, openCov: oN ? oCov / oN : NaN, softMissed: skyPx ? soft / skyPx : NaN, hardMissed: skyPx ? hard / skyPx : NaN, largest, spillN: sN, spill: sN ? sCov / sN : NaN, target: { hue: ((hue0 * 180) / Math.PI + 360) % 360, sat: tsat }, png: oc.toDataURL("image/png") };
-}, [SKY_SAT_FLOOR, HUE_HALF_RAD, EDGE_FRAC]);
+  return { W, H, rows: [H - 1 - rHi, H - 1 - rLo], covered: coveredPx, skyPx, edgePx: EDGE, edgeN: eN, edgeCov: eN ? eCov / eN : NaN, openN: oN, openCov: oN ? oCov / oN : NaN, softMissed: skyPx ? soft / skyPx : NaN, hardMissed: skyPx ? hard / skyPx : NaN, reachN, reachMissed: reachN ? rHard / reachN : NaN, discN, discShare: skyPx ? discN / skyPx : NaN, discCov: discN ? discCov / discN : NaN, largest, spillN: sN, spill: sN ? sCov / sN : NaN, target: { hue: ((hue0 * 180) / Math.PI + 360) % 360, sat: tsat }, png: oc.toDataURL("image/png") };
+}, [SKY_SAT_FLOOR, HUE_HALF_RAD, EDGE_FRAC, PLANT_REACHABLE]);
 const b = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium", args: ["--use-gl=swiftshader", "--enable-unsafe-swiftshader"] });
 const results = {};
 try {
@@ -149,14 +230,22 @@ try {
     writeFileSync(join(OUT, `${name}-missed.png`), Buffer.from(m.png.split(",")[1], "base64"));
     await p.locator("#view").screenshot({ path: join(OUT, `${name}-overlay.png`) });
     results[name] = { ...m, png: undefined };
-    const line = `edge (≤${m.edgePx} px) ${(100 * m.edgeCov).toFixed(0)}% of ${m.edgeN} px · open ${(100 * m.openCov).toFixed(1)}% of ${m.openN} px · uncovered ${(100 * m.hardMissed).toFixed(1)}% of ${m.skyPx} sky px (largest gap ${m.largest} px) · spill onto non-sky beside it ${(100 * m.spill).toFixed(0)}% of ${m.spillN} · ${m.W}×${m.H}`;
-    check(`${name}: sky is covered up to its edges (edge coverage ≥ ${EDGE_COV_MIN})`, m.edgeCov >= EDGE_COV_MIN, line);
-    check(`${name}: open sky is covered (≥ ${OPEN_COV_MIN})`, m.openCov >= OPEN_COV_MIN, `${(100 * m.openCov).toFixed(1)}%`);
+    const line = `edge (≤${m.edgePx} px) ${(100 * m.edgeCov).toFixed(0)}% of ${m.edgeN} px · open ${(100 * m.openCov).toFixed(1)}% of ${m.openN} px · uncovered ${(100 * m.reachMissed).toFixed(1)}% of ${m.reachN} reachable sky px (largest gap ${m.largest} px) · spill onto non-sky beside it ${(100 * m.spill).toFixed(0)}% of ${m.spillN} · ${m.W}×${m.H}`;
+    check(`${name}: reachable sky is covered up to its edges (edge coverage ≥ ${EDGE_COV_MIN})`, m.edgeCov >= EDGE_COV_MIN, line);
+    check(`${name}: reachable open sky is covered (≥ ${OPEN_COV_MIN})`, m.openCov >= OPEN_COV_MIN, `${(100 * m.openCov).toFixed(1)}%`);
+    // REPORTED, NEVER BOUNDED — the same standing this file gives the spill
+    // line, and for the same reason: it is not this mechanism's to fix. A
+    // connectivity-constrained selection cannot enter sky nothing joins to it,
+    // so a bound here would be a gate that can never go green.
+    console.log(m.discN
+      ? `      out of reach: ${(100 * m.discShare).toFixed(1)}% of ${m.skyPx} keyed sky px (${m.discN}) are joined to the selection by no sky-coloured path, mean coverage ${(100 * m.discCov).toFixed(1)}% — magenta on the missed map`
+      : `      out of reach: none — every pixel the key calls sky is joined to the selection by a sky-coloured path`);
     await ctx.close();
   }
 } finally { await b.close(); }
 writeFileSync(join(OUT, "measure.json"), JSON.stringify({ reach: REACH, results }, null, 1));
 console.log(`\nmissed maps and overlays in ${OUT}`);
-if (failed) console.log(`${failed} failed — the Sky mask misses sky its own colour key reaches; decision 023 (the mask reads the sky's colour as well as its place) is what turns this green`);
+if (PLANT_REACHABLE) console.log("\n--plant-reachable: every keyed sky pixel counted as reachable. These are the readings this file gave before the split; an unplanted run must differ.");
+if (failed) console.log(`${failed} failed — the Sky mask misses sky its own colour key reaches AND CAN GET TO; decision 023 (the mask reads the sky's colour as well as its place) is what turns this green. Sky nothing joins to the selection is reported above and is not counted here.`);
 else console.log("all checks passed");
 process.exit(failed ? 1 : 0);
