@@ -158,8 +158,8 @@ const HUE_LIMIT = 60, SAT_RANGE = [0, 2], LUM_RANGE = [0.3, 1.7];
 // sheets (IR-SCIENCE 4b-vi). Sliders: Saturation 0..3, Foliage band 0..2,
 // Sky saturation 0..2.
 const GLOBAL_SAT = 1.0;
-const FOL_SAT = 2.0;
-const SKY_SAT = 1.0;
+const FOL_SAT = 1.6;
+const SKY_SAT = 1.8;
 const GLOBAL_SAT_RANGE = [0, 3], BAND_SAT_RANGE = [0, 2];
 // 10d: the sky's saturation on RAW after the Look press, mean HSV saturation of
 // the same population 10b measures the angle of. MADE TO FAIL FIRST, 2026-09-18:

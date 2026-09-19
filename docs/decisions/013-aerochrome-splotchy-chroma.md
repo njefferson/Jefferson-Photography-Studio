@@ -327,3 +327,29 @@ exported file whole (`tools/sky-stage-walk.mjs`) is what caught both the defect
 and the misdiagnosis. Stage output and the 16-bit write now clamp; the
 chroma-distance gate stays. IR-SCIENCE §9l-ii.
 
+
+**What 019's amounts handed this record, 2026-09-19.** The look now ships
+`skySat` 1.8, and the sky's blotch was measured at two spatial scales across
+four frames to find out what that costs (NOTES.md "Aerochrome's two amounts,
+chosen from pictures"). Three things bear on this item.
+
+- **The blotch is a multiplication, and the multiplier is already near its
+  ceiling.** Pooled to 24-pixel blocks, the residual doubles to triples between
+  `skySat` 1.0 and 1.5 and then adds 6 to 12% between 1.5 and 1.8, or nothing
+  at all on NIR_1644. So the remaining splotch cannot be spent away by lowering
+  the amount without also giving back the colour; the amplification is already
+  as cheap per unit of saturation as it gets.
+- **It is not a corner defect.** Corner over centre is 0.89 / 1.01 / 1.06 on
+  NIR_3406 across the three amounts. One frame's corner is genuinely bad —
+  NIR_1651's left, 0.0158 against a centre of 0.0012 — and it reads that way at
+  the shipping amount of 1.0, before the look's amount touches it. So the
+  target for this record is frame-wide chroma denoise, not a corner-shaped
+  remedy, and that agrees with the scope gate's OWED whole-frame denoise and
+  chroma rows.
+- **One reading here is the selection's, not the noise's.** NIR_1376's CENTRE
+  band spikes to 0.0238 at `skySat` 1.8 — five times its 1.0 reading — while
+  its two corners barely move. A defect that appears in one band and scales
+  with the amount is the selection admitting cloud structure that the gate held
+  out at lower amounts, not grain being amplified. It belongs to 018 and 023
+  and is filed here so the first candidate rendered for THIS record does not
+  spend a round rediscovering it.

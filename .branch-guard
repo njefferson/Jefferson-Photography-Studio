@@ -124,3 +124,16 @@ also=tools/decisions-check.mjs
 # reason beginning OWED is an admission and the list is the standing record of
 # them.
 also=tools/scope-check.mjs
+
+# Run on every commit: every creative field a look writes is in the tile's
+# stamp. The stamp is load-bearing twice over — restripForGrade compares it to
+# find tiles showing a picture the app would no longer make, and previewKey
+# hashes it into the key a rendered preview is STORED under, on the device,
+# across releases. Decision 019 moved a look's foliage from 2.0 to 1.6 and its
+# sky saturation from 1.0 to 1.8, and gradeStamp() returned the same string as
+# before: neither field was in the list, nor were nine others. Nothing could
+# see it — preview-version-check hashes main.ts through two named functions on
+# purpose, so a look's numbers are outside its reach by design. Both lists are
+# read out of the source; an exclusion must say why the field belongs to the
+# photograph rather than the grade.
+also=tools/stamp-check.mjs

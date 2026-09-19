@@ -539,23 +539,6 @@ user-scalable=no.
 > different approach and mindset"). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
-- [ ] **Aerochrome's saturation by population: foliage and sky each their own amount, nothing colourless touched** <!-- decision: 019 --> —
-  reported 2026-09-18 from staging 2.50.10: the look's saturation reads too
-  high across the whole frame, it needs aiming at the foliage and at the sky
-  as two separate amounts, and anything that has no colour must be left as it
-  is. What the look did: a global saturation of 3.0 on every raw pixel, and a
-  power curve of 2 on the aqua and blue chips that lifted the palest blues
-  most — so bare ground, grey walls, an overcast sky and clouds all took
-  colour. The fix follows the framing that produced the idea — what needs to
-  happen to which PORTION of the photograph, never the whole: global
-  saturation 1; the foliage's amount on the Colour tab's own Foliage band (a
-  population by what it is), with every band BOOST gated on the pixel's own
-  chroma (`bandGain`, `SAT_GUARD_LO..HI`); the sky's amount on a Sky
-  saturation slider beside Sky depth (`skySat`) — where the sky IS, through
-  the selection built at open, gated the same way so a cloud stays grey; the
-  neutrals protected by what they lack. Both pipelines. The amounts are
-  chosen from rendered sheets; the record carries the research and the
-  rejected routes (`docs/decisions/019-aerochrome-colour-by-population.md`).
 - [ ] **One sky selection, built at open, for every sky-aware tool** <!-- decision: 018 --> —
   asked 2026-09-18: should the sky selection be set before any corrections
   and be available to later operations. It is, for the look's stages, the
@@ -1572,6 +1555,127 @@ filling the screen with the menus floating over it is decision 003, with 004
 beside it; the record now also carries the question of whether those menus
 are repositionable and where a dragged position is remembered.
 
+## A look's numbers could change and no tile could tell, 2026-09-19
+
+Found while landing 019's amounts, and it would have shipped them to nobody.
+
+`stampOf` in `src/main.ts` is "the part of the live creative state a thumbnail
+renders with", and it is load-bearing in two places at once: `restripForGrade`
+compares stamps to find tiles showing a picture the app would no longer make,
+and `previewKey` hashes the same string into the key a rendered preview is
+STORED under, in IndexedDB, across releases.
+
+**It was missing eleven of the fields a look writes** — `sky`, `foliage`,
+`tone`, `texture`, `skySmooth`, `skyDepth`, `skySat`, `grainAmt`, `grainSize`,
+`vigAmt`, `vigMid`. So moving the look's foliage from 2.0 to 1.6 and its sky
+saturation from 1.0 to 1.8 produced the IDENTICAL stamp. A reader who had
+opened a set before this release would have got quick-look tiles rendered under
+the old numbers, handed back from the cache, beside a main view rendered under
+the new ones — and nothing would have redrawn them, because the staleness test
+is the same string.
+
+**And no existing gate could see it.** `tools/preview-version-check.mjs` hashes
+`src/main.ts` through two named functions only (`makeThumb`, `lensCurveFor`),
+deliberately: hashing the whole file would demand a version bump on every
+commit, which teaches everyone to bump without thinking. A look's numbers sit
+outside its reach by design. The PREVIEW_PIPELINE constant is the remedy for
+exactly this and nothing pointed at it.
+
+**Fixed both ways.** The eleven fields are in `stampOf` now, PREVIEW_PIPELINE
+moved 42 to 43 so every cached preview on every device is invalidated once, and
+`stampFor`'s trailing `[tone, sky, foliage]` suffix is gone — it was carrying
+three of the eleven for own-edit photos only, which is why the gap was invisible
+on the photographs most likely to be checked.
+
+**`tools/stamp-check.mjs` is the gate**, in `.branch-guard`'s `also=` list. It
+reads BOTH lists out of the source — what `applyLook` assigns to `params.*` and
+what `stampOf` stamps — and refuses a field in the first that is not in the
+second unless it is declared as per-shot with a reason. Three are: `wb`,
+`exposure` and `denoise`, each replaced by `makeThumb` with the photograph's
+own answer before it renders. Both directions, so a rename cannot carry an
+excuse forward. **Made to fail first**: run against the pre-fix `src/main.ts`
+it reports all eleven; against the fix it reports 26 stamped and 3 per-shot.
+
+**The general shape, which is the part worth carrying to a sibling.** A string
+used as a cache key and as an equality test is a declared list of what matters,
+and a declared list drifts from the thing it describes unless something holds
+them together. The version constant beside it is not that something: it only
+catches what its own hash covers, and its hash was narrowed on purpose.
+
+## Aerochrome's two amounts, chosen from pictures, 2026-09-19 (decision 019)
+
+`LOOKS.eir` ships **foliage 1.6, sky 1.8**. The mechanism landed in 2.51; the
+amounts waited for 021 to move the lens correction, because until then every
+sheet would have been measured on data the correction was about to change.
+
+**Foliage.** At 1.6 the foliage population reads saturation 0.59 to 0.82 across
+the seven practice raws, against the film's 0.60 (IR-SCIENCE 4b-iii). It comes
+DOWN from the 2.0 the branch was carrying.
+
+**Sky, per frame, at the three amounts rendered** (film reference 0.66 with a
+yellow filter, 0.92 with a red):
+
+- NIR_3406 — 0.32 at 1.0, 0.39 at 1.5, 0.43 at 1.8
+- NIR_1376 — 0.46, 0.70, 0.79
+- NIR_1644 — 0.50, 0.73, 0.79
+- NIR_1651 — 0.23, 0.35, 0.42
+- NIR_0063 — 0.25, 0.36, 0.42
+- NIR_2082 — 0.17, 0.22, 0.25
+- NIR_0627 — 0.10, 0.15, 0.18
+
+Only NIR_1376 and NIR_1644 carry a sky deep enough to reach the film at any
+amount. The rest are haze and overcast and the saturation gate
+(`SKY_SAT_GATE_LO..HI`) holds them near grey on purpose — NIR_0627 crosses the
+whole range in 0.08. So the amount does not flatten the set to one number and
+was never going to; what it does is narrow the spread, and 1.8 narrows it more
+than 1.5 because the weak-sky frames gain proportionally more (NIR_1651 +20%,
+NIR_3406 +10% from 1.5 to 1.8) while the two strong ones gain least (+8%, +13%),
+having already reached the guard's upper range.
+
+**The splotch measurement, and the instrument error inside it.** The sky was
+reported as splotchier in the corners at the higher amount. The first
+instrument measured chroma residual against a 5x5 local mean, which cannot see
+a patch that has drifted off-colour over thirty pixels because the local mean
+drifts with it — it measures grain, and a splotch is not grain. Pooling the
+chroma into 24-pixel blocks and taking each block's distance from its 3x3 block
+neighbourhood inverts the answer. Left / centre / right in the top band:
+
+- NIR_3406 — 0.0060 / 0.0093 / 0.0083 at 1.0; 0.0105 / 0.0129 / 0.0131 at 1.5;
+  0.0133 / 0.0139 / 0.0147 at 1.8
+- NIR_1376 — 0.0032 / 0.0047 / 0.0039; 0.0099 / 0.0097 / 0.0122; 0.0078 /
+  0.0238 / 0.0103
+- NIR_1644 — 0.0094 / 0.0076 / 0.0113; 0.0204 / 0.0190 / 0.0183; 0.0210 /
+  0.0162 / 0.0185
+- NIR_1651 — 0.0158 / 0.0012 / 0.0032; 0.0294 / 0.0048 / 0.0063; 0.0387 /
+  0.0065 / 0.0094
+
+**The cost is paid between 1.0 and 1.5**, where the blotch doubles to triples
+on every frame that has a readable sky. Between 1.5 and 1.8 it adds 6 to 12%
+on NIR_3406 and nothing at all on NIR_1644. That is what makes 1.8 defensible:
+the picture the reader is being charged for arrives at 1.5, and 1.8 buys the
+colour on top of it for almost nothing.
+
+**It is not a corner phenomenon.** Corner over centre at the blotch scale is
+0.89 / 1.01 / 1.06 on NIR_3406 across the three amounts and 1.48 / 1.07 / 1.29
+on NIR_1644 — corners and centre track together. NIR_1651's left corner is
+genuinely blotchy, 0.0158 against a centre of 0.0012, and it reads that way at
+the shipping amount of 1.0, before this change touches it. The residual is in
+the data the look multiplies, not something the amount puts in the corners, so
+a corner-shaped remedy would be aimed at the wrong variable. Frame-wide chroma
+denoise (decision 013, and the scope gate's OWED whole-frame denoise and chroma
+rows) is the remedy and it is ranked.
+
+**Two things found and not fixed here.** NIR_1376's CENTRE band spikes to
+0.0238 at 1.8, five times its 1.0 reading, while its corners barely move —
+that is the shape of the selection admitting cloud structure at the higher
+amount, not of noise, and it is recorded on 013 for 018 and 023 to answer.
+NIR_0627 and NIR_2082 yield no blotch reading at all: neither top band has
+enough blocks at 80% sky purity to pool, which is itself evidence the gate is
+holding those frames grey as designed.
+
+**The instrument.** Both passes read the PNGs the comparison sheets were built
+from rather than re-rendering, so the numbers and the pictures cannot disagree.
+
 ## The lens flat is laid on the linear raw at decode, 2026-09-18 (decision 021, 2.52)
 
 **What moved.** The measured lens curve is applied in `src/lensflat.ts` as one
@@ -2387,6 +2491,27 @@ reason it is a footnote rather than a finding — a list of known limitations is
 read as authoritative, and an invented one is worse than a missing one.
 
 ## Shipped (roadmap archive)
+
+- [x] **Aerochrome's saturation by population: foliage and sky each their own amount, nothing colourless touched** <!-- decision: 019 --> —
+  reported 2026-09-18 from staging 2.50.10: the look's saturation reads too
+  high across the whole frame, it needs aiming at the foliage and at the sky
+  as two separate amounts, and anything that has no colour must be left as it
+  is. What the look did: a global saturation of 3.0 on every raw pixel, and a
+  power curve of 2 on the aqua and blue chips that lifted the palest blues
+  most — so bare ground, grey walls, an overcast sky and clouds all took
+  colour. The fix follows the framing that produced the idea — what needs to
+  happen to which PORTION of the photograph, never the whole: global
+  saturation 1; the foliage's amount on the Colour tab's own Foliage band (a
+  population by what it is), with every band BOOST gated on the pixel's own
+  chroma (`bandGain`, `SAT_GUARD_LO..HI`); the sky's amount on a Sky
+  saturation slider beside Sky depth (`skySat`) — where the sky IS, through
+  the selection built at open, gated the same way so a cloud stays grey; the
+  neutrals protected by what they lack. Both pipelines. The amounts are
+  chosen from rendered sheets; the record carries the research and the
+  rejected routes (`docs/decisions/019-aerochrome-colour-by-population.md`).
+  **Shipped 2026-09-19 as foliage 1.6, sky 1.8**, chosen from four rendered
+  arms on seven practice raws. The record's Outcome carries the per-frame
+  saturations and the corner measurement that corrected itself.
 
 - [x] **The lens correction belongs on the linear raw before anything else** <!-- decision: 021 --> —
   raised 2026-09-18: the hot-spot correction is applied inside the compiled

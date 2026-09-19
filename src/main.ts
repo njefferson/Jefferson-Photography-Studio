@@ -1573,7 +1573,7 @@ const LOOKS: Record<string, Look> = {
   // lands 1-4deg wide. That range is not in the data to recover -- it is the
   // same 1-3% residual section 4c-iv is about -- so this moves the population,
   // it does not enrich it.
-  eir: { swapRB: true, hue: 0, denoise: 0.45, texture: 0.25, skySmooth: 1, skyDepth: 0, skySat: 1.0, finish: EIR_FINISH,
+  eir: { swapRB: true, hue: 0, denoise: 0.45, texture: 0.25, skySmooth: 1, skyDepth: 0, skySat: 1.8, finish: EIR_FINISH,
          mix3: [0.99, -0.06, 0.07, -1.44, 1.37, 1.02, -0.47, 0.81, 0.65],
          // THE COLOUR GOES WHERE THE COLOUR IS, and to what is a PORTION of the
          // photograph. Global saturation 1: the 3.0 that used to be here coloured
@@ -1586,7 +1586,7 @@ const LOOKS: Record<string, Look> = {
          // built at open, gated the same way, because the sky is a place in the
          // picture and not a hue. Numbers from the 2026-09-18 population
          // measurement (IR-SCIENCE.md 4b-vi), chosen from pictures.
-         raw: { sat: 1.0, contrast: 1.15, foliage: [0, 2.0, 1],
+         raw: { sat: 1.0, contrast: 1.15, foliage: [0, 1.6, 1],
                 hsl: [7, 1, 1, 0, 1, 1, 0, 1, 1, 54, 1, 1, 35, 1, 1, 0, 1, 1, 1, 1, 1, 43, 1, 1] },
          jpeg: { sat: 1.35, contrast: 1.12 } },
   red: { swapRB: true, toggleSwap: true, hue: 0, wbBias: [0.78, 1.02, 1.35], raw: { sat: 1.8, contrast: 1.4 }, jpeg: { sat: 1.3, contrast: 1.2 } },
@@ -10537,6 +10537,18 @@ function stampOf(pr: EditParams, look: string | null, bias: [number, number, num
     look, pr.swapRB, pr.hue, pr.sat, pr.contrast, pr.tint,
     pr.glow, pr.lum, pr.toneR, pr.toneG, pr.toneB, pr.hsl,
     pr.bwOn, pr.bwMix, pr.grade, pr.mix3, bias,
+    // EVERY OTHER CREATIVE FIELD A LOOK WRITES. These eleven were missing, and
+    // the stamp is what BOTH the tile-staleness test and the preview cache key
+    // are built from — so a look whose amounts moved between releases produced
+    // the same stamp as before, restripForGrade saw nothing stale, and a warm
+    // cache served tiles rendered under the old numbers beside a main view
+    // rendered under the new ones. Found when 019's foliage went 2.0 to 1.6 and
+    // `gradeStamp` did not move. `tools/stamp-check.mjs` now holds this list to
+    // what applyLook assigns, because the next field added to a look would have
+    // gone the same way.
+    pr.sky, pr.foliage, pr.tone, pr.texture,
+    pr.skySmooth, pr.skyDepth, pr.skySat,
+    pr.grainAmt, pr.grainSize, pr.vigAmt, pr.vigMid,
     // The lift's OWN controls belong to a thumbnail's question ("is this tile
     // still a true picture of that photo") and not to the look's ("has the
     // reader graded this photo by hand since"). Including them there would read
@@ -10604,7 +10616,7 @@ function stampFor(view: { id: string; edit: string | null }): string {
   const own = ownEdit(view);
   if (!own) return gradeStamp();
   const p = own.params;
-  return stampOf(p, own.activeLook, own.lookBias, false) + "|" + JSON.stringify([p.tone, p.sky, p.foliage]);
+  return stampOf(p, own.activeLook, own.lookBias, false);
 }
 
 /** A look (or any grade move) changed: every tile is now showing a picture the
