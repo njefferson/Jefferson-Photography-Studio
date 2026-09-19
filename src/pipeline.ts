@@ -607,6 +607,14 @@ export interface MaskLayer {
    *  Absent when the heuristic found no sky, and absent on every other type. */
   fine?: BrushMask;
   rev?: number; // bumps on each brush stroke / sky regeneration (undo equality)
+  /** Sky mask (type 4) "By colour": the selection grows out of the heuristic's
+   *  seed through pixels that match the sky's own colour and are JOINED to it,
+   *  so it reaches the sky between branches, the rim against every crown, and
+   *  a cloud the seed's luma model never recognised as sky (decision 023).
+   *
+   *  Optional and read as ON when absent, so saved edits and undo snapshots
+   *  from before it migrate by doing nothing — the same shape `op` took. */
+  skyByColour?: boolean;
   /** Sky mask (type 4) "Reach": scales the heuristic's growth tolerances when
    *  regenerating the bitmap (1 = calibrated default, >1 grows more eagerly).
    *  Unused by other mask types. */
@@ -629,7 +637,7 @@ export interface MaskLayer {
 }
 
 export function neutralMask(type: 0 | 1 | 2 | 3 | 4): MaskLayer {
-  const base = { cx: 0.5, cy: 0.5, rx: 0.35, ry: 0.35, feather: 0.5, lx: 0.5, ly: 0.85, invert: false, op: 0 as const, hueTarget: 0, satTarget: -1, valTarget: 0.75, colorRange: 0.5, reach: 1, brightness: 1, contrast: 1, saturation: 1, hue: 0, warmth: 0 };
+  const base = { cx: 0.5, cy: 0.5, rx: 0.35, ry: 0.35, feather: 0.5, lx: 0.5, ly: 0.85, invert: false, op: 0 as const, hueTarget: 0, satTarget: -1, valTarget: 0.75, colorRange: 0.5, reach: 1, skyByColour: true, brightness: 1, contrast: 1, saturation: 1, hue: 0, warmth: 0 };
   if (type === 1) return { ...base, type, cx: 0.5, cy: 0.12, lx: 0.5, ly: 0.5 };
   if (type === 2) return { ...base, type, rev: 0 };
   if (type === 4) return { ...base, type, rev: 0 }; // sky: bitmap filled by the heuristic on add

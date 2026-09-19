@@ -100,8 +100,109 @@ record was written against (edge coverage 38–77% on four of five frames,
 NOTES.md "The Sky mask, read from the reader's side"). It goes green when
 the edge band is covered at ≥ 0.85 and open sky at ≥ 0.97.
 
+## Looked at
+
+Three frames, every one of them rendered and opened rather than read off a
+coverage figure — and opening them changed the conclusion twice.
+
+- **NIR_1644** (conifers against deep blue sky). The sky the seed misses is a
+  thin, continuous rim hugging every crown, and the colour-close pixels that
+  must stay rejected are speckle scattered through the foliage. The rim is
+  CONNECTED to the sky and the speckle is not, which is what made connectivity
+  the discriminator rather than colour distance.
+- **NIR_1651** — **and this frame overturned the design's first verdict.** The
+  grow took the selection from 9.8% of the frame to 56.5%, and that was
+  written up as a flood into a hillside. It is not a hillside. The frame is a
+  branch against sky with a large bright CLOUD filling the right side and the
+  bottom, and the seed misses the cloud entirely because a white cloud is far
+  from a grey-blue sky in the heuristic's own luma and colour model. The grow
+  reaching it is the reported defect being fixed, not a failure. That was only
+  visible by rendering the photograph, which had not been done — every earlier
+  round reasoned about masks over a frame nobody had looked at.
+- **NIR_0063** (sky behind a treeline). The least helped: edge-band coverage
+  45% to 52%, the interior already essentially complete at 99.9%.
+
+The walk's own missed-map on 1644 is what settled the composition question. The
+residual after the grow is a thin red rim right at the crowns with yellow spill
+immediately beside it — the boundary is MISPLACED, not merely short, which is
+the guided filter's job and not a colour test's.
+
 ## Rank
 
 Directly after 018, wherever 018 sits: it multiplies the selection 018 hands
 the mask, at the same shader stage, and building it on the coarse bitmap
 first would mean building it twice. It does not wait on 019 or 021.
+
+
+## Outcome
+
+Built 2026-09-19 as a CONNECTIVITY-CONSTRAINED GROW rather than as the
+multiply option 1 describes, and the difference is the whole of what works.
+
+**A multiply cannot help at all.** Option 1 says weight = bitmap x colourWeight
+with Reach grown generously so the gate draws the edge. The multiply half can
+only ever REMOVE weight, so on its own it can neither fill the gaps between
+branches nor lift open-sky coverage — the two halves of the defect. The growth
+half is doing all the work, and `growSkyByColour` in `src/skyfine.ts` is that
+half made explicit: it walks outward from the heuristic's seed through pixels
+that match the sky's colour AND are joined to it, on the guide, at 1024.
+
+**Connectivity is the discriminator, and it was measured before it was built.**
+The sky the seed misses lies against the seed and is colour-close — 15%, 32%
+and 39% of what is adjacent on the three frames. The colour-close pixels that
+must stay out are speckle through foliage and regions joined to nothing. On
+NIR_1651, 46% of the frame beyond the seed matches the sky's colour, so colour
+alone readmits half the picture.
+
+**A luma-gradient brake was added and is nearly inert**, which is worth
+recording so it is not mistaken for load-bearing: on NIR_1651 the leak the
+brake was meant to stop runs through a SMOOTH path, and the brake moved the
+coverage by under a point. It is kept because it costs one array and it is the
+same idea `buildSkyMask` already applies one stage earlier.
+
+**Rejected option 2 stayed rejected even though 026 removed its stated
+reason.** 026 shipped the general intersect, so "the larger piece, needs its
+own UI" no longer holds. It stays rejected on the half 026 does not touch: the
+Colour mask keys on the display colour at the mask stage and moves with the
+grade, which this record forbids. A reader who wants a hand-picked colour
+intersected can now do exactly that themselves; this is the automatic one.
+
+**The drift guarantee is structural, not tested.** `growSkyByColour` takes a
+bitmap, a guide, a reach and a feather — no access to EditParams, so no edit
+can reach it. A browser walk for it was written and removed; see that
+function's contract for why, and for the separate defect its control found.
+
+**ACCEPTANCE IS NOT REACHED, and this ships anyway.** The mask-truth walk wants
+edge >= 0.85 and open >= 0.97; it is red on three checks where it was red on
+four. Measured before and after, at the shipped default Reach:
+
+- NIR_0063: edge 45% to 52%, open 99.7% to 99.9%, uncovered 7.8% to 7.0%,
+  spill 7% to 8%.
+- NIR_1644: edge 37% to 82%, open 96.8% to 99.9%, uncovered 5.5% to 1.0%,
+  spill 12% to 23%.
+- NIR_1651: edge 89% to 88%, open 71.5% to 87.0%, uncovered 21.3% to 7.5%,
+  spill 79% to 54%.
+
+Three rounds of that came from OPENING the render rather than from the figures,
+which moved the right way throughout. Grading each pixel by its colour
+confidence put speckle through the sky; membership went binary. The first
+boundary blur was 6 px and ate the needles, putting a pale halo round every
+branch — the rim defect this item exists to remove, reintroduced by the fix for
+the speckle; it is 1-2 px now. What is still visible is a RAGGED boundary where
+the sky is noisy, which is a colour threshold on a grainy gradient made
+hard-edged by binary membership.
+
+Two cautions on reading those. The walk derives its own sky TRUTH within the
+rows the mask reaches, so a bigger mask enlarges the denominator — 1651's sky
+truth went from 174,292 px to 402,910 px between the runs, and the percentages
+are not measuring the same set. And edge coverage trades against spill by
+construction: covering more sky within 10 px of an edge means covering more of
+what is beside it, so 85% may not be reachable with a hard selection at all.
+That is a question about the BOUND, and it belongs to whoever takes this next.
+
+**What is still owed:** the boundary. The grow fixes the interior and the gaps
+and leaves the rim misplaced by a pixel or two. Composing the guided filter
+after the grow was measured both ways: it lifts NIR_1651's uncovered sky and pulls
+NIR_1644's recovered rim back out, edge 73% to 62% with spill 14% to 26% —
+measured on the graded-weight build, before binary membership landed. The crowns are the reported defect, so the fine
+boundary wins and the composed arm is not what ships.

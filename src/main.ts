@@ -42,7 +42,7 @@ import { generateDcp } from "./dcp";
 import { buildGlowMap } from "./glow";
 import { buildLocalMap } from "./localmap";
 import { buildSkyMap, SKY_DEPTH_CHROMA_LO, SKY_DEPTH_CHROMA_HI, SKY_DEPTH_GREY_LO, SKY_DEPTH_GREY_HI } from "./skymap";
-import { prepareSkySource, buildSkySelectionFrom, buildSkyGuide, refineSkyMask, type SkyGuide } from "./skyfine";
+import { prepareSkySource, buildSkySelectionFrom, buildSkyGuide, refineSkyMask, growSkyByColour, type SkyGuide } from "./skyfine";
 import { makeRowDenoiser } from "./raw/denoise";
 import { makeRowDetail } from "./raw/detail";
 import { buildSkyMask, SKY_MIN_COVERAGE } from "./sky";
@@ -5664,6 +5664,7 @@ const mUI = {
   colorSwatchText: $("mColorSwatchText") as HTMLElement,
   skyControls: $("skyControls") as HTMLElement,
   skyReach: $("mSkyReach") as HTMLInputElement,
+  skyByColour: $("mSkyByColour") as HTMLButtonElement,
   skyStatus: $("mSkyStatus") as HTMLElement,
 };
 let selectedMask = -1;
@@ -5799,8 +5800,29 @@ function regenerateSkyMask(m: MaskLayer) {
   // A photograph with no guide keeps the coarse bitmap and renders as it always
   // did; `fine` is cleared rather than left stale, because a refinement of the
   // PREVIOUS reach would otherwise outlive the seed it came from.
+  //
+  // AND BY COLOUR, WHEN THE READER LEAVES IT ON (023). The guided filter snaps
+  // the seed's BOUNDARY to the photograph's edges; it cannot put back sky the
+  // seed never reached, because it only redistributes what it is given. The
+  // grow starts from the same seed and walks outward through pixels that match
+  // the sky's colour and are joined to it, so it reaches the rim against every
+  // crown, the sky between branches, and — measured on NIR_1651 — a bright
+  // cloud filling half the frame that the seed's luma model never recognised
+  // as sky at all. It replaces the refinement rather than following it: the
+  // grow REPLACES the refinement rather than feeding it, and that was measured
+  // both ways rather than argued. Composing them — grow, then the guided
+  // filter — helps a smooth boundary and hurts a fine one, because the filter
+  // reads its input as a hard selection and re-derives the edge from a 12 px
+  // window: on NIR_1651's cloud it lifted uncovered sky from 18.2% to 6.4%,
+  // and on NIR_1644's conifer crowns it pulled the recovered rim back out,
+  // edge-band coverage 73% down to 62% with spill up from 14% to 26%. The
+  // crowns are the reported defect — a rim round every object and sky missed
+  // between branches — so the fine boundary is the one that has to win. The
+  // composed arm's numbers are in NOTES.md for whoever revisits this.
   const guide = res.found ? skyGuideFor(current) : null;
-  m.fine = guide && res.mask ? refineSkyMask(res.mask, guide) : undefined;
+  m.fine = guide && res.mask
+    ? ((m.skyByColour ?? true) ? growSkyByColour(res.mask, guide, m.reach ?? 1, m.feather) : refineSkyMask(res.mask, guide))
+    : undefined;
   m.rev = (m.rev ?? 0) + 1;
 }
 
@@ -5811,7 +5833,13 @@ function regenerateSkyMask(m: MaskLayer) {
 function updateSkyStatus() {
   const m = currentMask();
   if (!m || m.type !== 4 || !m.brush) return;
-  const d = m.brush.data;
+  // THE SELECTION THE READER ACTUALLY HAS, which is `fine` whenever there is
+  // one. Reading `brush` reports the heuristic's SEED, and with the colour
+  // grow on those are no longer the same thing — NIR_1651's seed is 30% of
+  // the frame and what the mask selects is far more, so the line said 30%
+  // whether the grow was on or off. A label that does not move when the
+  // thing it describes doubles is not a label.
+  const d = (m.fine ?? m.brush).data;
   let on = 0;
   for (let i = 0; i < d.length; i++) if (d[i] > 127) on++;
   const frac = d.length ? on / d.length : 0;
@@ -5911,6 +5939,7 @@ function updateMaskUI() {
     }
     if (m.type === 4) {
       mUI.skyReach.value = String(m.reach);
+      mUI.skyByColour.setAttribute("aria-pressed", String(m.skyByColour ?? true));
       updateSkyStatus();
     }
     mUI.invert.setAttribute("aria-pressed", String(m.invert));
@@ -5981,6 +6010,21 @@ mUI.skyReach.addEventListener("input", () => {
   regenerateSkyMask(m);
   updateSkyStatus();
   draw();
+});
+// "Follow the sky's colour" — the grow that reaches the rim, the gaps between
+// branches and a cloud the seed's luma model never called sky (023). It
+// changes the SELECTION, so the bitmap is rebuilt; Reach still scales the
+// colour tolerance as it scales the heuristic's own.
+mUI.skyByColour.addEventListener("click", () => {
+  const m = currentMask();
+  if (!m || m.type !== 4) return;
+  beginMaskAdjust();
+  m.skyByColour = !(m.skyByColour ?? true);
+  mUI.skyByColour.setAttribute("aria-pressed", String(m.skyByColour));
+  regenerateSkyMask(m);
+  updateSkyStatus();
+  draw();
+  flushRecord(); // one press is one undo step
 });
 mUI.invert.addEventListener("click", () => {
   const m = currentMask();

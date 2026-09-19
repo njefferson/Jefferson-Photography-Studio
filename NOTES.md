@@ -1483,6 +1483,117 @@ because a slow read is not a failed one and a skipped photo is data lost;
 whether to time it out and say so on the tile is a decision when the file
 that stalled is known.
 
+## The Sky mask grows into the sky's own colour, 2026-09-19 (decision 023)
+
+**The reported defect, from the iPad on 2026-09-18:** the Sky mask leaves a rim
+of unselected sky round every object and misses the sky between branches. It
+knows WHERE the sky is and not which pixels are it.
+
+**`growSkyByColour` in `src/skyfine.ts` is the fix**, and it is a GROW, not the
+multiply the record describes. Option 1 says weight = bitmap x colourWeight
+with Reach grown generously. The multiply half can only ever REMOVE weight, so
+by itself it can neither fill a gap between branches nor lift open-sky
+coverage, which are the defect. The growth half does all the work: from the
+heuristic's own seed, outward through pixels that match the sky's colour AND
+are joined to it, on the 018 guide at 1024. A "Follow the sky's colour" toggle
+on the Sky mask turns it off; it is on by default and absent means on, so
+saved edits migrate by doing nothing.
+
+**Connectivity is the discriminator and it was measured before anything was
+built.** The sky the seed misses lies AGAINST the seed and is colour-close —
+15%, 32% and 39% of what is adjacent on the three walk frames. What must stay
+rejected is speckle scattered through foliage and regions joined to nothing.
+On NIR_1651, 46% of the frame beyond the seed matches the sky's colour, so
+colour alone readmits half the picture and only "joined to the sky" separates
+them.
+
+**AND THE FRAME OVERTURNED THE FIRST VERDICT, BY BEING LOOKED AT.** The grow
+took NIR_1651 from 9.8% of the frame to 56.5%, and that was written up here as
+a flood into a hillside, with a gradient brake added to stop it. It is not a
+hillside. **The frame is a branch against sky with a large bright CLOUD filling
+the right side and the bottom**, and the seed misses the cloud entirely,
+because a white cloud sits far from a grey-blue sky in the heuristic's own luma
+and colour model. The grow reaching it is the defect being fixed. Three rounds
+of measurement had gone into masks laid over a photograph nobody had rendered.
+The brake stayed — it costs one array and mirrors what `buildSkyMask` already
+does — but it is nearly inert, moving coverage by under a point, because the
+path it was built to block is smooth.
+
+**Measured, before and after, at the shipped default Reach.** 0063: edge 45% to
+52%, open 99.7% to 99.9%, uncovered 7.8% to 7.0%, spill 7% to 8%. 1644: edge
+37% to 82%, open 96.8% to 99.9%, uncovered 5.5% to 1.0%, spill 12% to 23%.
+1651: edge 89% to 88%, open 71.5% to 87.0%, uncovered 21.3% to 7.5%, spill 79%
+to 54%. The mask-truth walk is RED on three checks where it was red on four —
+**acceptance is not reached and this ships anyway**, because the reported
+defect is measurably better and what is left is a different problem. 1644's
+edge band is now three points under its bound, and spill is the price: covering
+more sky within 10 px of an edge means covering more of what is beside it.
+
+**THREE ROUNDS OF THAT CAME FROM OPENING THE RENDER, not from the numbers.**
+The first version graded every pixel by its own colour confidence, and the app
+showed a sky full of SPECKLE — a sky is a smooth gradient, so a wide band of it
+sits mid-ramp and neighbouring pixels took visibly different weights under a
+strong adjustment. Membership went binary and the softness moved to the
+boundary. The first boundary blur was 6 px at the default Feather and ate the
+needles, putting a pale halo round every branch — the rim defect this item
+exists to remove, reintroduced by the fix for the speckle. The blur is 1–2 px
+now. Each of those was invisible in the coverage figures, which moved in the
+right direction throughout.
+
+**Two cautions on those numbers, because they are easy to over-read.** The walk
+derives its sky TRUTH within the rows the mask reaches, so a bigger mask
+enlarges its own denominator — 1651's sky truth went from 174,292 px to
+402,910 px between runs, and the percentages are not over the same set. And
+edge coverage trades against spill by construction, so the 0.85 bound may not
+be reachable with a hard selection at all; that is a question about the bound.
+
+**Composing with the guided filter was measured both ways and is NOT what
+ships.** Grow then refine lifts 1651's uncovered sky and pulls 1644's recovered
+rim back out — edge 73% down to 62%, spill 14% up to 26%, measured on the
+graded-weight build before binary membership landed. The filter reads its input as a hard selection and re-derives the edge
+from a 12 px window, which suits a smooth cloud edge and cannot follow a
+conifer crown. The crowns are the reported defect, so the fine boundary wins.
+
+**What is left, seen rather than measured:** the selection's boundary is
+RAGGED where the sky is noisy — a colour threshold on a grainy gradient, made
+hard-edged by binary membership, so it reads as a staircase down the left of
+NIR_1651. It was not the seed's 384 px upsampling, which was the first guess
+and was changed to bilinear anyway. Smoothing the guide's colour channels
+before the threshold is the obvious next move and is not done here.
+
+**The drift guarantee is structural.** `growSkyByColour` takes a bitmap, a
+guide, a reach and a feather — it has no access to `EditParams`, so no edit can
+reach it even by mistake, and the guide is three channels of the gray-world
+balanced frame built once per photograph. Record 023 asked for this to be
+settled by measurement; removing the failure mode is a stronger answer than
+measuring it.
+
+## Switching a look away and back does not return the same photograph, 2026-09-19
+
+**Found as the CONTROL of a test that was measuring the wrong thing.** A walk
+was written to prove the Sky mask's selection does not drift with the grade: it
+built the selection under Aerochrome, rebuilt it under B&W IR, and compared the
+frame rendered back under Aerochrome. It failed on correct code. Its control —
+the identical comparison with the mask's adjustment NEUTRAL, so the selection
+contributes nothing — failed too.
+
+So Aerochrome, then B&W IR, then Aerochrome again does not render the same
+photograph as Aerochrome did the first time, with no mask involved. Measured
+on NIR_1644 as a framebuffer hash: `e56cb436` before the round trip and
+`d91adb2e` after.
+
+**Not diagnosed, and not chased here.** The likely suspect is a per-frame
+adaptation inside the look landing differently on a second application, which
+is the same family as the restore-depth lift. It is recorded rather than fixed
+because it was found sideways, while building something else, and the thing it
+broke was a test rather than a photograph anyone has reported.
+
+**The walk was deleted rather than kept red.** A test that fails for a reason
+other than the one it names is worse than no test — it trains everyone to read
+red as noise. What it was chasing is guaranteed by a signature instead, and
+`growSkyByColour`'s contract carries the reasoning so a second one is not
+written.
+
 ## Masks combine, and the proof measured its own overlay first, 2026-09-19 (decision 026)
 
 **A mask is a GROUP now.** `params.masks` is still one flat array, but an
