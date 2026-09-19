@@ -1,0 +1,35 @@
+# THE UNLOOKED BACKLOG — decision records that cite a frame nobody opened.
+#
+# Hub LESSONS §328, and the owner's instruction that provoked it: this is a
+# VISUAL APP, not a MATH APP. `tools/decisions-check.mjs` requires a record
+# naming frames to carry "## Looked at" covering every frame it cites.
+#
+# This file is the backlog that predates the rule, declared per record and
+# frame, checked BOTH WAYS and printed on every run, so it can only shrink.
+# Same shape as .contract-allow and .scope-allow, and for the same reason:
+# switching a rule on across a repo that never had it either blocks all work
+# or gets switched off, and a declared list is the third option.
+#
+# A row here is an ADMISSION, never an exemption. It says: this record reached
+# a conclusion about a photograph from a number, and no render of that frame
+# was opened. Take a row off by opening the render and writing what it showed
+# under "## Looked at" — not by deleting the row.
+#
+#   <record filename>  <frame> [<frame> ...]
+
+# 001's whole subject is a divergence between two code paths measured as a
+# pixel difference, and the frame is cited as the case that diverged. Whether
+# the divergence was ever SEEN is not recorded either way.
+001-batch-open-divergence.md  NIR_0063
+
+# 017 chose a sky depth against a film scan across five frames, entirely from
+# hue and saturation readings. Its own successor record (019) says the depth
+# candidates "read as night" — a judgement made by the owner, looking, which
+# is the correction this backlog exists to make unnecessary next time.
+017-aerochrome-sky-depth-against-the-film.md  NIR_0063 NIR_0627 NIR_1376 NIR_1651 NIR_3406
+
+# 021's Outcome cites this frame for a corner-residual reading before and
+# after the correction moved. The numbers are sound and the picture was never
+# opened to confirm the difference is visible — which is exactly the trap
+# §328 names, since a residual that moves is not a defect that shows.
+021-lens-correction-belongs-on-the-linear-raw-before-anything-else.md  NIR_1376

@@ -169,6 +169,104 @@ for (const [k, f] of byKey) {
 }
 if (!bad) ok(`every record carries all ${OPEN_SECTIONS.length} sections with a body`);
 
+// ---- 3b. A RECORD ABOUT PICTURES NAMES THE PICTURES IT OPENED.
+//
+// THE OWNER'S INSTRUCTION, 2026-09-19, in those words: this is a VISUAL APP,
+// not a MATH APP. Store it as a lesson and gate decision outcomes by it.
+// (Hub LESSONS §328.)
+//
+// WHAT IT COST. A look's amounts were chosen from SEVEN rendered comparison
+// sheets. Five were sent to the owner. NONE were opened. Four rounds of
+// analysis about how the photographs look -- a named recommendation, an
+// "exchange rate" of colour gained per unit of noise, a paragraph on what each
+// candidate costs -- were written off saturation figures and a chroma residual
+// pooled into blocks. Opening all seven took one pass and found two defects
+// that were shipping: a grey asphalt car park covered in red speckle in a frame
+// summarised as "overcast, the gate holds it grey", and a foliage amount taken
+// from a range ("0.59 to 0.82") read as uniform when its top end is a flat
+// crimson mass. It also found a frame with NO SKY IN IT sitting in a seven-frame
+// sky corpus, its grey flower stems reported for days as "hazy sky staying
+// grey"; and that the residual the whole recommendation rested on is invisible
+// on the very frame where it was most dramatic.
+//
+// WHY IT IS MECHANICAL. No parser tells looking from claiming to have looked.
+// What a parser CAN do is compare two lists. A record that names frame
+// identifiers must carry "## Looked at", and every frame named ANYWHERE in the
+// record must appear in it -- measure seven, look at two, report on seven, and
+// the commit is refused. BOTH DIRECTIONS, like every other declared list in
+// this family, so the section cannot be padded with frames the record does not
+// otherwise discuss.
+//
+// AND WHY A PARAGRAPH WAS NOT ENOUGH. CLAUDE.md already carried "A LOOK CHOICE
+// IS SHOWN, NEVER DESCRIBED" -- render the candidates, send the pictures, never
+// substitute adjectives. That rule was followed to the letter: the candidates
+// were rendered and the pictures were sent. It says how to present a choice to
+// the OWNER. It never said the session must open what it rendered before
+// reasoning about it, and a rule obeyed while the failure happens inside it is
+// a rule that needed a mechanism.
+const FRAME = /\bNIR_\d{4}\b/g;
+const ALLOW = join(DIR, "..", "..", ".looked-allow");
+const allowed = new Map();
+const allowRows = [];
+if (existsSync(ALLOW)) {
+  for (const line of readFileSync(ALLOW, "utf8").split("\n")) {
+    const t = line.replace(/#.*$/, "").trim();
+    if (!t) continue;
+    const [file, ...frames] = t.split(/\s+/);
+    allowed.set(file, new Set(frames));
+    allowRows.push(`${file}: ${frames.join(" ")}`);
+  }
+}
+for (const [k, f] of byKey) {
+  if (!claimed.has(k)) continue;
+  const text = readFileSync(join(DIR, f), "utf8");
+  const looked = body(text, "Looked at");
+  // Frames named outside the "## Looked at" section itself.
+  const elsewhere = new Set([...text.replace(looked ? looked : "", "").matchAll(FRAME)].map((m) => m[0]));
+  const seen = new Set(looked ? [...looked.matchAll(FRAME)].map((m) => m[0]) : []);
+  if (!elsewhere.size && !seen.size) continue;          // not a record about pictures
+  // THE BACKLOG THAT PREDATES THE RULE, declared per record+frame in
+  // .looked-allow, checked both ways and printed on every run, so it can only
+  // shrink. Same shape as .contract-allow and .scope-allow, and for the same
+  // reason: switching a rule on across a repo that has never had it either
+  // blocks all work or gets switched off, and a declared list is the third
+  // option. A frame on this list is an ADMISSION that a record cites a
+  // measurement nobody looked at -- not an exemption from looking. Take one off
+  // by opening the render and writing what it showed.
+  for (const n of [...allowed.get(f) || []]) elsewhere.delete(n);
+  if (!elsewhere.size && !seen.size) continue;
+  if (!looked) {
+    fail(`docs/decisions/${f} names ${elsewhere.size} frame(s) and has no "## Looked at". `
+       + `A number is a pointer to where to look, never a substitute for looking (LESSONS 328).`);
+    continue;
+  }
+  const unopened = [...elsewhere].filter((n) => !seen.has(n)).sort();
+  if (unopened.length) {
+    fail(`docs/decisions/${f} measures ${unopened.join(", ")} but "## Looked at" does not name `
+       + `${unopened.length === 1 ? "it" : "them"}. Open the render and say what it showed, or stop citing the frame.`);
+  }
+  const padded = [...seen].filter((n) => !elsewhere.has(n)).sort();
+  if (padded.length) {
+    fail(`docs/decisions/${f} lists ${padded.join(", ")} under "## Looked at" and discusses `
+       + `${padded.length === 1 ? "it" : "them"} nowhere else. The section is not a checklist to pad.`);
+  }
+}
+// BOTH DIRECTIONS ON THE BACKLOG TOO: a declared pair whose record no longer
+// cites that frame is a stale excuse, and a stale excuse is how a list stops
+// shrinking without anyone noticing.
+for (const [f, frames] of allowed) {
+  if (!existsSync(join(DIR, f))) { fail(`.looked-allow names ${f}, which is not a decision record.`); continue; }
+  const text = readFileSync(join(DIR, f), "utf8");
+  const cited = new Set([...text.matchAll(FRAME)].map((m) => m[0]));
+  const stale = [...frames].filter((n) => !cited.has(n)).sort();
+  if (stale.length) fail(`.looked-allow excuses ${f} for ${stale.join(", ")}, which it no longer cites. Remove the row.`);
+}
+if (allowRows.length) {
+  console.log(`\n  unlooked backlog (${allowRows.length} record${allowRows.length === 1 ? "" : "s"}) — cited from measurement, never opened:`);
+  for (const r of allowRows) console.log(`    ${r}`);
+}
+if (!bad) ok(`every record about pictures names the frames it opened, both ways`);
+
 // ---- 4. THE RANK IS THE FILE ORDER, so it is printed rather than asserted:
 // nothing can check that a priority is CORRECT, only that it is visible.
 if (!bad) {
