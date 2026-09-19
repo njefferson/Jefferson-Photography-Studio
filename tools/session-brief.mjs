@@ -50,6 +50,15 @@ const five = ["cloneParams", "applySnapshot", "syncFromUI", "syncToUI"].filter((
 say(`\nADDING AN EditParams FIELD touches ${five.length + 1} places: ${five.join(", ")}, and the`);
 say(`  input-listener array. applySnapshot restores fields INDIVIDUALLY, so one`);
 say(`  missed there is dropped by Undo and Reset with nothing going red.`);
+// AND A SIXTH IF A LOOK WRITES IT. The tile stamp is both the staleness test and
+// the preview cache key, so a creative field it does not carry is a tile that
+// never redraws and a cached picture that outlives the build that made it. Said
+// here because the gate refuses the commit and the brief is what gets read first.
+const stamped = /function stampOf\([^]*?\n}/.exec(main);
+const nStamped = stamped ? new Set([...stamped[0].matchAll(/\bpr\.([A-Za-z_]\w*)/g)].map((m) => m[1])).size : 0;
+say(`  A field a LOOK writes has a sixth place, stampOf — ${nStamped} fields today. It is`);
+say(`  the tile-staleness test AND the preview cache key, so one it does not carry`);
+say(`  leaves stale tiles beside a redrawn photo. tools/stamp-check.mjs refuses it.`);
 
 // 4. THE MODULE MAP — generated, gated, and the answer to "where does X happen".
 const arch = read("docs/ARCHITECTURE.md");

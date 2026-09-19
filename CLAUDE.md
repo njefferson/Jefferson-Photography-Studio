@@ -295,6 +295,13 @@ missing there is silently dropped by Undo/Reset (bit us on `recover`,
 2026-07-25). Also decide explicitly whether the field rides SavedLook
 (creative grade) or is per-shot corrective (excluded, like WB).
 
+**And a SIXTH place if a look writes it: `stampOf`.** That string is the
+tile-staleness test AND the preview cache key, so a creative field it does not
+carry means the strip never redraws and a cached tile outlives the build that
+made it. It was missing eleven fields when this was found, and moving a look's
+numbers produced the identical stamp — `tools/stamp-check.mjs` refuses that
+now, reading both lists out of the source.
+
 ## Verify before claiming fixed
 - Headless Chromium harness: `npm install --no-save esbuild playwright-core`;
   the browser binary is the `/opt/pw-browsers/chromium` symlink.
