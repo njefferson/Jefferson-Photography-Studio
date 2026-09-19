@@ -62,7 +62,7 @@ permissions:
 
 jobs:
   hub-gates:
-    uses: njefferson/noahjefferson/.github/workflows/hub-gates.yml@ea5a27b814a28ef3db1ee52c54de8f8a0a218838
+    uses: njefferson/noahjefferson/.github/workflows/hub-gates.yml@0ade8387085c7a688400e3e2368a0ebeab90d3f9
     with:
       pwa: true
       textsize-paths: src/style.css src/launcher.css src/swstrip.css public/palette.css ir.html macro.html index.html debug.html privacy.html
