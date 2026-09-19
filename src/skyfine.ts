@@ -331,6 +331,11 @@ const GRAD_STOP = 0.06;
  *  An isotropic blur cannot know about edges; at this width it cannot do much
  *  harm either. */
 const FEATHER_MAX_PX = 3;
+/** Largest ENCLOSED unselected patch, in guide pixels, that counts as grain
+ *  rather than as a thing. A pinhole from noise is one to a handful of pixels;
+ *  a bird against the sky is orders of magnitude bigger, and filling it would
+ *  be selecting an object as sky. */
+const PINHOLE_MAX_PX = 24;
 
 /**
  * Grow the sky selection outward from the coarse seed, through the guide, by
@@ -471,6 +476,55 @@ export function growSkyByColour(mask: BrushMask, guide: SkyGuide, reach = 1, fea
       if (grad[q] < GRAD_STOP) queue[tail++] = q; // on an edge: selected, not crossed
     }
   }
+  // PINHOLES. Grain pushes the odd single pixel of open sky outside the colour
+  // tolerance, so the flood steps around it and leaves an unselected speck
+  // ENCLOSED by selection. Magnified 4x on NIR_1651 they are everywhere in the
+  // open sky, and under a strong adjustment they are the speckle the reader
+  // sees — the selection's boundary itself is crisp and threads between the
+  // needles correctly, which is what the same picture showed.
+  //
+  // THE FIX CANNOT MOVE THE OUTER CONTOUR, WHICH IS WHY IT IS THIS ONE. Flood
+  // the UNSELECTED pixels inward from the frame's border; anything unselected
+  // the border cannot reach is enclosed. Filling those only ever ADDS interior
+  // pixels, so the needle edge this item exists to win is untouchable by it —
+  // unlike widening the feather, which ate the needles at 6 px and put a pale
+  // halo round every branch.
+  //
+  // The size cap keeps a real object enclosed by sky — a bird, a branch tip
+  // island — from being swallowed. A pinhole is grain, a few pixels at most.
+  {
+    const outside = new Uint8Array(N);
+    const q2 = new Int32Array(N);
+    let h2 = 0, t2 = 0;
+    const pushIfOpen = (p: number) => { if (!outside[p] && out[p] < 128) { outside[p] = 1; q2[t2++] = p; } };
+    for (let x = 0; x < W; x++) { pushIfOpen(x); pushIfOpen((H - 1) * W + x); }
+    for (let y = 0; y < H; y++) { pushIfOpen(y * W); pushIfOpen(y * W + W - 1); }
+    while (h2 < t2) {
+      const p = q2[h2++], x = p % W, y = (p / W) | 0;
+      if (x > 0) pushIfOpen(p - 1);
+      if (x < W - 1) pushIfOpen(p + 1);
+      if (y > 0) pushIfOpen(p - W);
+      if (y < H - 1) pushIfOpen(p + W);
+    }
+    // Every unselected pixel the border could not reach is enclosed. Measure
+    // each enclosed component and fill the small ones.
+    const seenHole = new Uint8Array(N);
+    for (let p0 = 0; p0 < N; p0++) {
+      if (out[p0] >= 128 || outside[p0] || seenHole[p0]) continue;
+      const comp: number[] = [];
+      let h3 = 0;
+      seenHole[p0] = 1; comp.push(p0);
+      while (h3 < comp.length) {
+        const p = comp[h3++], x = p % W, y = (p / W) | 0;
+        for (const n of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, y > 0 ? p - W : -1, y < H - 1 ? p + W : -1]) {
+          if (n < 0 || seenHole[n] || outside[n] || out[n] >= 128) continue;
+          seenHole[n] = 1; comp.push(n);
+        }
+      }
+      if (comp.length <= PINHOLE_MAX_PX) for (const p of comp) out[p] = 255;
+    }
+  }
+
   // The soft edge, from the BOUNDARY rather than from colour: a separable box
   // blur whose radius comes from Feather, which is how a region mask has
   // always been softened here and what buildSkyMask's own feather does one

@@ -223,8 +223,8 @@ four. Measured before and after, at the shipped default Reach:
   spill 7% to 8%.
 - NIR_1644: edge 37% to 82%, open 96.8% to 99.9%, uncovered 5.5% to 1.0%,
   spill 12% to 23%.
-- NIR_1651: edge 89% to 88%, open 71.5% to 87.0%, uncovered 21.3% to 7.5%,
-  spill 79% to 54%.
+- NIR_1651: edge 89% to 88%, open 71.5% to 87.0% and then to 93.4% once the
+  pinholes were filled, uncovered 21.3% to 7.1%, spill 79% to 55%.
 
 Three rounds of that came from OPENING the render rather than from the figures,
 which moved the right way throughout. Grading each pixel by its colour
@@ -242,6 +242,33 @@ are not measuring the same set. And edge coverage trades against spill by
 construction: covering more sky within 10 px of an edge means covering more of
 what is beside it, so 85% may not be reachable with a hard selection at all.
 That is a question about the BOUND, and it belongs to whoever takes this next.
+
+**THE BOUNDARY WAS DIAGNOSED WRONG, AND THE CORRECTION CAME FROM MAGNIFYING
+IT.** This record said the residual was a RAGGED edge — a colour threshold on a
+grainy gradient — and the planned remedy was to smooth the guide's colour
+channels before thresholding. Both were wrong. Drawing the selection's border
+over the photograph at 1024 and then magnifying it four times shows the
+boundary threading correctly BETWEEN the needles; it is crisp. What is actually
+there is PINHOLES: single pixels of open sky pushed outside the colour
+tolerance by grain, left unselected and ENCLOSED by selection, which is what
+reads as speckle once an adjustment is applied to the mask.
+
+The remedy is therefore one that CANNOT move the outer contour: flood the
+unselected pixels inward from the frame's border and fill anything the border
+cannot reach, below a size cap so a real object enclosed by sky is not
+swallowed. It only ever adds interior pixels, so the needle edge this item
+exists to win is untouchable by it — unlike widening the feather, which ate the
+needles at 6 px. NIR_1651's boundary roughness fell from 1.2% of its border
+pixels to 0.4%, its border pixel count from 6,639 to 6,011, and the walk's open
+coverage from 87.0% to 93.4%.
+
+**And the instrument was wrong before the diagnosis was.** `tools/sky-probe.mjs`
+— promoted out of a scratchpad for this, having been written three times — hard
+coded `rotate = 0` into `buildSkyMask`. Rotation is the one input that decides
+which edge the heuristic calls the sky, so on a portrait frame it grew a
+selection the app would never produce: NIR_1651's seed read 9.7% of the frame
+against the app's own 30%. Every number taken before that fix was about a
+different photograph.
 
 **What is still owed:** the boundary. The grow fixes the interior and the gaps
 and leaves the rim misplaced by a pixel or two. Composing the guided filter

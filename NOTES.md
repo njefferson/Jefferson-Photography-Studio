@@ -1473,6 +1473,59 @@ because a slow read is not a failed one and a skipped photo is data lost;
 whether to time it out and say so on the tile is a decision when the file
 that stalled is known.
 
+## The speckle in the Sky mask was pinholes, and the ragged edge was never there, 2026-09-19 (decision 023)
+
+**Two wrong diagnoses in a row, both corrected by magnifying the picture.**
+
+The first was the INSTRUMENT. `tools/sky-probe.mjs` was promoted out of a
+scratchpad for this work — it had been written three times and thrown away
+three times, which is the trap LESSONS 330 names and which 023's own "Built
+already" section warns about in writing. The promoted copy hard coded
+`rotate = 0` into `buildSkyMask`. Rotation is the ONE input that decides which
+edge the heuristic treats as the sky, so on a portrait frame it grew a
+selection the app would never produce: NIR_1651's seed measured 9.7% of the
+frame where the app's own status line says 30%. Every number taken before that
+was about a different photograph, and the boundary it reported as clean was a
+boundary the reader never sees.
+
+The second was the DEFECT. This work was planned around a RAGGED boundary — a
+colour threshold running through grainy channels — with the remedy being to
+smooth the guide's colour channels before thresholding. Drawing the selection's
+border over the photograph and magnifying it four times shows that is not what
+is there. **The boundary is crisp and threads correctly between the needles.**
+What is there is PINHOLES: single pixels of open sky that grain pushed outside
+the colour tolerance, left unselected and enclosed by selection, which is what
+reads as speckle the moment an adjustment is applied.
+
+**So the fix is one that cannot move the outer contour**, which is the property
+that matters here: flood the unselected pixels inward from the frame's border,
+and fill anything the border cannot reach, below a size cap so a bird or a
+branch tip enclosed by sky is not swallowed. It only ever adds interior pixels.
+Widening the feather — the other obvious route — ate the needles at 6 px and
+put a pale halo round every branch, which is the defect this item exists to
+remove.
+
+**Measured.** NIR_1651: boundary roughness 1.2% of its border pixels down to
+0.4%, border pixel count 6,639 down to 6,011, and the mask-truth walk's open
+coverage 87.0% up to 93.4% with uncovered sky 7.5% down to 7.1%. NIR_1644 and
+NIR_0063 unchanged within a tenth of a point — their skies are not grainy
+enough to pinhole, which is the control.
+
+**Still red on three checks**, unchanged in shape: 0063's edge band at 52% and
+1644's at 82% against a 0.85 bound, and 1651's open sky at 93.4% against 0.97.
+Whether 0.85 is reachable at all is the open question — edge coverage trades
+against spill by construction, and 1644 sits at 82% edge with 23% spill.
+
+**`tools/sky-probe.mjs` is the instrument this left behind**, and it is in the
+repository rather than in a scratchpad this time. It bundles the app's own
+decode, seed and grow for node with esbuild and reports the selection in
+seconds instead of the minutes a browser walk costs, and it draws the
+selection's BORDER green over the photograph, because a coverage figure cannot
+say whether an edge is ragged and the figure it prints is only a pointer at
+which frame to open first. It is explicitly NOT the acceptance instrument —
+`tools/mask-truth-walk.mjs` is, and reimplementing its sky truth here would be
+a second instrument free to disagree with the first.
+
 ## The Sky mask grows into the sky's own colour, 2026-09-19 (decision 023)
 
 **The reported defect, from the iPad on 2026-09-18:** the Sky mask leaves a rim
