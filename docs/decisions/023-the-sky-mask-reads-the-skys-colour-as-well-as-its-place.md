@@ -213,7 +213,18 @@ intersected can now do exactly that themselves; this is the automatic one.
 **The drift guarantee is structural, not tested.** `growSkyByColour` takes a
 bitmap, a guide, a reach and a feather — no access to EditParams, so no edit
 can reach it. A browser walk for it was written and removed; see that
-function's contract for why, and for the separate defect its control found.
+function's contract for why.
+
+**THE DEFECT THAT WALK'S CONTROL APPEARED TO FIND IS NOT ONE.** It was recorded
+as "switching a look away and back does not return the same photograph", on two
+framebuffer hashes, and it stood in NOTES and in this function's contract for
+most of a day after the instrument that produced it had been deleted. Measured
+through `tools/look-roundtrip-walk.mjs`, which is kept for this: fourteen round
+trips over seven looks, with and without a Sky mask on the frame, every one
+byte for byte identical, and twenty away-and-back cycles with one distinct
+render and one distinct set of white-balance positions. So the deleted walk's
+control failed for a reason that is still unknown, and nothing anywhere should
+read as having explained it.
 
 **ACCEPTANCE IS NOT REACHED, and this ships anyway.** The mask-truth walk wants
 edge >= 0.85 and open >= 0.97; it is red on three checks where it was red on
@@ -300,6 +311,17 @@ that admits what a connectivity-constrained selection can do.
 three points of spill to a frame already visibly taking canopy; that is a
 question about how the photograph looks and it is not settled by a coverage
 figure.
+
+**THE GRADED COLOUR WEIGHT WAS DEAD AND IS GONE.** When membership went binary
+the function that computed each pixel's colour confidence stayed behind, and
+the flood consulted only its zero crossing — so a smoothstep was computed and
+discarded on every pixel, and Feather fed a plateau nothing read. Two things
+were false in the source while it stood: the boundary looked soft and is hard,
+and Feather looked like it moved the selection when since binary membership it
+has only ever set the boundary blur's radius. It is a boolean now, named for
+what it answers. Verified behaviour-preserving rather than assumed: the three
+corpus frames' rendered selections are byte for byte identical before and
+after, at the shipped tolerance.
 
 **What is still owed:** the boundary. The grow fixes the interior and the gaps
 and leaves the rim misplaced by a pixel or two. Composing the guided filter
