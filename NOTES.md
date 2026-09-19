@@ -549,6 +549,23 @@ user-scalable=no.
   and no per-population strength (denoise, colour noise, texture, the hot-spot
   and lens corrections, all OWED in the scope gate) uses it yet. See
   `docs/decisions/018-one-sky-selection-for-every-sky-aware-tool.md`.
+- [ ] **Masks combine: a group of components joined by add, subtract and intersect** <!-- decision: 026 -->
+  asked 2026-09-19 in three parts: the masks need to combine, it should be
+  possible to subtract other colours from the Sky mask, and a mask should be
+  invertible. Invert already exists on every mask type. The other two are one
+  thing, and both Lightroom and darktable describe the same model: a mask is a
+  GROUP of components, each joining by a set operator — Lightroom names them
+  Add / Subtract / Intersect for photographers, darktable union / intersection
+  / difference / exclusion for engineers, and the algebra is the same
+  multiplication and inverted-multiplication on soft edges. **The adjustment
+  belongs to the group, not the component**, which is where this app differs:
+  `params.masks` is a flat array and every entry carries its own brightness,
+  contrast, saturation, hue and warmth. Subtracting a colour from a detected
+  sky is the convention's own headline case. The cheap version — operators
+  between adjacent entries of the flat array — is rejected in the record
+  because it has no answer to whose adjustment applies when three entries
+  combine into one selection. Note the 4-bitmap ceiling
+  (`MAX_BITMAP_MASKS`, one per atlas channel) becomes the binding constraint.
 - [ ] **The Sky mask reads the sky's colour as well as its place** <!-- decision: 023 --> —
   reported 2026-09-18 from the iPad with three screenshots of one frame: the
   Sky mask leaves a rim of unselected sky round every object and misses the
@@ -559,6 +576,7 @@ user-scalable=no.
   Sky mask gains a colour gate sampled from inside its own selection, keyed
   on a colour that does not move with the grade. See
   `docs/decisions/023-the-sky-mask-reads-the-skys-colour-as-well-as-its-place.md`.
+
 - [ ] **Every control can say what it does, and a finger can reach the saying** <!-- decision: 024 --> —
   asked 2026-09-19 from the PC, in the sitting that reported a slider named
   after the defect rather than the act: there should be something clickable
