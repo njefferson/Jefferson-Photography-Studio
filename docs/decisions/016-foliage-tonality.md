@@ -76,6 +76,13 @@ real and is not given back here. It is why the radius is left alone.
 commit and awaiting the device pass; it is about the centre of the frame washing
 out, not about the canopy. No overlap beyond both being reported the same week.
 
+## Depends
+
+- distinct-from 013 — same look and the same day's reports, and the two must
+  not be confused: 013 owns the CHROMA blotch, this owns the LUMINANCE texture
+  inside the canopy. They touch different filters, so nothing here re-opens 013
+  or prejudges it.
+
 ## Options
 
 **Chosen: lower the look's denoise floor to 0.45 and have the look carry 0.25 of

@@ -94,6 +94,13 @@ is the boundary.
 - **The look's own sky stages** — they read the refined selection and are not
   the reader's mask; untouched by this.
 
+## Depends
+
+- needs 018 — shipped. 018 snaps the selection's BOUNDARY to the picture's
+  edges; this fixes the interior and the gaps it cannot reach. Same shader
+  stage, same selection, and this follows it directly.
+- distinct-from 006 — mask by subject is a different seed, not this.
+
 ## Options
 
 1. **The Sky mask carries a colour gate, on by default, sampled from inside

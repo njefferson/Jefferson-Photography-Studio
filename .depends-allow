@@ -1,0 +1,53 @@
+# CITED, BUT THE RELATION WAS NEVER STATED — the declared backlog of the queue's
+# dependency graph, in the shape .contract-allow, .looked-allow and .scope-allow
+# already use here: printed on every run, checked both ways, and able only to
+# shrink.
+#
+# A ROW IS AN ADMISSION. It says one record names another in prose and never
+# says what the relation IS — whether the second must come first, whether they
+# are one piece of work split in two, whether one makes the other obsolete, or
+# whether they merely look related and are deliberately not. Until that is
+# written the order between them rests on nobody's reasoning, and the rank can
+# be changed without anything noticing.
+#
+# TO REMOVE A ROW, add a "## Depends" line to the citing record:
+#   needs NNN · superseded-by NNN · together NNN · touches NNN · distinct-from NNN
+# each with its reason on the same line. Never add a row to make a run green.
+#
+# The near-term queue was transcribed rather than declared — 008, 010, 012, 014,
+# 015, 016, 023, 024, 025 and 027 all carry real edges taken from sentences
+# already in their records. What is left below is mostly the 3.0 cluster
+# (001-011) and the archived run 017-022, where the citations are real and the
+# relation needs reading before it is written.
+001 007
+002 003
+002 004
+003 004
+004 003
+005 004
+009 001
+009 007
+011 001
+011 007
+011 009
+016 014
+016 015
+017 013
+017 016
+018 006
+018 013
+018 017
+019 013
+019 017
+019 018
+019 023
+020 012
+021 015
+021 018
+022 003
+022 018
+022 019
+022 021
+026 006
+026 018
+026 023

@@ -87,6 +87,34 @@ the selection underneath them afterwards would invalidate whatever was tuned
 against the old one. Where no such dependency exists, a reported defect waits
 its turn like anything else.
 
+**AND THE ORDER IS ARGUED, NOT ASSERTED — `## Depends` (2026-09-19).** Each
+record declares its edges to other records, one line each, with the reason on
+the line: `needs NNN` (cannot be right until that is done), `superseded-by NNN`
+(that makes this obsolete), `together NNN` (one piece of work filed as two),
+`touches NNN` (shares ground; a change to one may move the other), and
+`distinct-from NNN` (looks related, deliberately is not — as load-bearing as
+any of the others, because it is the pair a session re-conflates).
+
+**Only one direction is ever declared**; both are derived and printed, because
+the question gets asked both ways — why is this ahead of that, and what is
+waiting on this. The rank print and the session brief show `[after 024]` and
+`[holds 027]` beside each item.
+
+**The gate refuses an order that contradicts the records**: an open item that
+`needs` another must sit below it, `needs` must be acyclic, and an item
+superseded by work that has SHIPPED must be archived or say what survived.
+Prose that cites another decision without declaring a relation is refused too —
+that is what grows the graph out of what is already written rather than out of
+somebody's memory — with the backlog declared in `.depends-allow`, printed every
+run, shrinking only.
+
+**`node tools/decisions-check.mjs --graph`** answers what the flat list cannot:
+what has gone obsolete, what is one piece of work filed as two, which pairs
+claim the same ground, the earliest rank each item could legally take, and
+CONTENDED GROUND — one item several others are waiting on. Its first run found
+003 and 004 touched by three near-term items each while sitting at ranks 11 and
+12, and found 010 still open at rank 18 with "superseded" in its own title.
+
 **[`tools/decisions-check.mjs`](tools/decisions-check.mjs) refuses the commit**
 when an open item has no record, a record is claimed by nobody, a record is
 about a DIFFERENT item than the one claiming it, or a section has no body. The

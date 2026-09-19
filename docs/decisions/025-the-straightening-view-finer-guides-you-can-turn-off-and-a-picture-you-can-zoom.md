@@ -61,6 +61,13 @@ belongs on the straighten card rather than on a key.
 - **`tools/rotation-walk.mjs`** — it drives straighten and asserts the Reset
   fit, so it is where these behaviours get held.
 
+## Depends
+
+- touches 003 — 003 changes what the straightening surface is.
+- touches 004 — 004 is that surface specifically. This item is the behaviour
+  inside it and can be built before or after, but its layout answers must not
+  contradict 004's.
+
 ## Options
 
 1. **The grid gains a second, lighter set of sub-lines and a toggle on the

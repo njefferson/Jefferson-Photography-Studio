@@ -28,6 +28,13 @@ facts, and the container's absolute timings are explicitly not device timings.
 Superseded by **009** and grouped with it and **011** into 3.0. Retired by the
 same work: the proxy-texel footprint, the tap scale, `proxyFactorFor`.
 
+## Depends
+
+- superseded-by 009 — this record's own first line: superseded by 009 and
+  grouped with it and 011 into 3.0. It is a detail note folded into that work,
+  not independent work of its own.
+- together 011 — grouped with 009 and 011 into one release by the same line.
+
 ## Options
 
 **Keep it as the superseded record rather than deleting it.** Chosen. The

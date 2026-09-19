@@ -31,6 +31,12 @@ an 8-core iPad takes 180, so the decode share, the part being parallelised, is a
 its smallest here. The test page reports both halves and the real split is owed
 from the device.
 
+## Depends
+
+- needs 014 — 014's own Weighed against: work avoided beats work parallelised,
+  so if 014 is real it changes this item's numbers and should be measured
+  first. Parallelising a decode this item may delete is work spent twice.
+
 ## Options
 
 **Take the device measurement and record it.** All that is left.

@@ -77,6 +77,13 @@ stays turned" (rotation and `applySize`), and the cropping inset rules in
 physical screen corner on iOS — the same class of report, from the same device,
 and it was real.
 
+## Depends
+
+- touches 003 — both are about how much of the screen the photograph occupies,
+  and 003 may move the stage's inset rules wholesale. Anything done here is done
+  knowing that.
+- touches 004 — the same rules, on the crop surface specifically.
+
 ## Options
 
 **Reproduce it first, with an instrument, and only then fix the thing the

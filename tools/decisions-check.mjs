@@ -267,11 +267,264 @@ if (allowRows.length) {
 }
 if (!bad) ok(`every record about pictures names the frames it opened, both ways`);
 
+// ---- 3c. THE QUEUE'S DEPENDENCIES, DECLARED AND CHECKED.
+//
+// The roadmap's ORDER is its priority, and until now the REASON for an order
+// lived only in prose. Nothing could read it, so nothing checked it, and the
+// order could be changed by anyone without the reasoning noticing.
+//
+// WHAT IT COST, and it is sitting in the queue rather than hypothetical: item
+// 010 is titled "(superseded detail) The live view at full resolution", its own
+// record opens with "Superseded by 009 and grouped with it and 011", and it has
+// been sitting OPEN, below eighteen other things, because nothing ever forced
+// the question. An obsolete item that nobody is required to look at is
+// indistinguishable from a real one.
+//
+// THE EDGES WERE ALREADY WRITTEN. 010 carries a supersede and a grouping; 013
+// says it overlaps the highlight roll-off work and that the two should be
+// measured together and NOT fixed in the same change; 016 says 013 looks like
+// the same defect and deliberately is not -- 013 owns the chroma blotch, 016
+// owns the luminance texture. This gives that prose a shape it can be read in.
+// It does not invent relationships.
+//
+// ONE DIRECTION IS EVER DECLARED. "A needs B" is also "B blocks A", and both
+// are printed from the one line, because the question is asked in both
+// directions -- why is this ahead of that, and what is waiting on this.
+const EDGE_KINDS = ["needs", "superseded-by", "together", "touches", "distinct-from"];
+const EDGE_RE = new RegExp(`^\\s*-\\s+(${EDGE_KINDS.join("|")})\\s+(\\d{3})\\b\\s*(?:—|--|-|:)?\\s*(.*)$`, "i");
+
+/** The edges a record declares.
+ *
+ *  Takes a record's full text; returns one entry per declared edge, each with
+ *  its `kind`, the key it points `to`, and the `why` written on the same line.
+ *
+ *  What the result must satisfy: a line that LOOKS like an edge and names an
+ *  unknown kind is not silently dropped -- section 3c below refuses it -- so
+ *  this returning nothing for a "## Depends" that has content is a failure, not
+ *  an empty graph. */
+function dependsOf(text) {
+  const b = body(text, "Depends");
+  if (!b) return [];
+  const out = [];
+  for (const line of b.split("\n")) {
+    const m = EDGE_RE.exec(line);
+    if (m) out.push({ kind: m[1].toLowerCase(), to: m[2], why: m[3].trim() });
+    else if (/^\s*-\s+\S/.test(line)) out.push({ kind: null, raw: line.trim() });
+  }
+  return out;
+}
+
+/** The decision keys a record CITES in prose, in this repo's own citation
+ *  forms only.
+ *
+ *  Takes the record text and its own key; returns the set of other keys it
+ *  names as `**NNN**`, `` `NNN` ``, "decision NNN", or a bold span opening with
+ *  the number.
+ *
+ *  What the result must satisfy, and it is the whole reason the patterns are
+ *  narrow: a first pass matched any three-digit run and pulled in IR-SCIENCE
+ *  section numbers and measured values -- 052, 064, 081 -- across most of the
+ *  records. A detector that flags noise produces a backlog nobody reads, which
+ *  is the failure hub LESSONS 332 is about. The "## Depends" section is cut out
+ *  first, so a declared edge is never its own evidence of being undeclared. */
+function citesOf(text, self) {
+  const cut = text.replace(/^##\s+Depends\b[\s\S]*?(?=^##\s|$(?![\s\S]))/mi, "");
+  const body_ = cut.replace(/^#\s+.*$/m, ""); // the title line names its own key
+  const found = new Set();
+  for (const re of [/\*\*(\d{3})\b/g, /`(\d{3})`/g, /\bdecisions?\s+(\d{3})\b/gi]) {
+    for (const m of body_.matchAll(re)) if (m[1] !== self) found.add(m[1]);
+  }
+  return found;
+}
+
+const rankOf = new Map(open.map((item, i) => [keyOf(item.text), i]));
+const isArchivedKey = new Set(archived.map((i) => keyOf(i.text)).filter(Boolean));
+const edges = new Map();   // key -> declared edges
+for (const [k, f] of byKey) {
+  if (!claimed.has(k)) continue;
+  edges.set(k, dependsOf(readFileSync(join(DIR, f), "utf8")));
+}
+
+for (const [k, list] of edges) {
+  const f = byKey.get(k);
+  for (const e of list) {
+    if (!e.kind) { fail(`docs/decisions/${f} has a "## Depends" line that names no relation: ${e.raw.slice(0, 90)}. Use one of ${EDGE_KINDS.join(", ")}.`); continue; }
+    if (e.to === k) { fail(`docs/decisions/${f} declares ${e.kind} on itself.`); continue; }
+    if (!byKey.has(e.to)) { fail(`docs/decisions/${f} declares ${e.kind} ${e.to}, which is not a record.`); continue; }
+    if (!e.why) fail(`docs/decisions/${f} declares ${e.kind} ${e.to} with no reason on the line. The reason is the point.`);
+  }
+}
+
+// A cycle in `needs` is an order nothing can satisfy, and it reads as a
+// perfectly sensible pair of sentences from inside either record.
+{
+  const seen = new Map(); // 0 visiting, 1 done
+  const path = [];
+  const walk = (k) => {
+    if (seen.get(k) === 1) return;
+    if (seen.get(k) === 0) { fail(`needs makes a cycle: ${[...path.slice(path.indexOf(k)), k].join(" -> ")}. Nothing can be built first.`); return; }
+    seen.set(k, 0); path.push(k);
+    for (const e of edges.get(k) ?? []) if (e.kind === "needs" && byKey.has(e.to)) walk(e.to);
+    path.pop(); seen.set(k, 1);
+  };
+  for (const k of edges.keys()) walk(k);
+}
+
+// THE CHECK THAT MAKES THE REASONING LOAD-BEARING: the order must not
+// contradict what the records say about it.
+for (const [k, list] of edges) {
+  if (!rankOf.has(k)) continue;                       // archived items are done
+  for (const e of list) {
+    if (e.kind === "needs") {
+      if (isArchivedKey.has(e.to)) continue;          // already shipped: satisfied
+      if (!rankOf.has(e.to)) continue;                // not on the queue at all
+      if (rankOf.get(e.to) > rankOf.get(k)) {
+        fail(`${k} needs ${e.to} and sits ABOVE it (rank ${rankOf.get(k) + 1} against ${rankOf.get(e.to) + 1}). `
+          + `Either the order is wrong or the edge is: "${e.why.slice(0, 80)}"`);
+      }
+    }
+    if (e.kind === "superseded-by" && isArchivedKey.has(e.to)) {
+      fail(`${k} is still OPEN at rank ${rankOf.get(k) + 1} and says it is superseded by ${e.to}, which has SHIPPED. `
+        + `Archive it, or drop the edge and say what survived: "${e.why.slice(0, 80)}"`);
+    }
+  }
+}
+
+// CITED IN PROSE, RELATION UNDECLARED. This is what grows the graph out of what
+// is already written instead of out of somebody's memory.
+const dependsAllowFile = join(repo, ".depends-allow");
+const dependsAllow = existsSync(dependsAllowFile)
+  ? readFileSync(dependsAllowFile, "utf8").split("\n").map((l) => l.replace(/#.*$/, "").trim()).filter(Boolean)
+  : [];
+const dependsAllowed = new Set(dependsAllow);
+const usedAllow = new Set();
+const undeclared = [];
+for (const [k, list] of edges) {
+  const f = byKey.get(k);
+  const declared = new Set(list.filter((e) => e.kind).map((e) => e.to));
+  for (const to of citesOf(readFileSync(join(DIR, f), "utf8"), k)) {
+    if (!byKey.has(to) || declared.has(to)) continue;
+    const row = `${k} ${to}`;
+    if (dependsAllowed.has(row)) { usedAllow.add(row); continue; }
+    undeclared.push(`${k} cites ${to} and declares no relation to it`);
+  }
+}
+for (const row of undeclared) fail(`${row}. Add a "## Depends" line (${EDGE_KINDS.join(" / ")}) or declare the pair in .depends-allow.`);
+for (const row of dependsAllow) {
+  if (!usedAllow.has(row)) fail(`.depends-allow excuses "${row}", which no longer cites it. Remove the row.`);
+}
+if (dependsAllow.length) {
+  console.log(`\n  undeclared pairs (${dependsAllow.length}) — cited in prose, relation never stated:`);
+  for (const r of dependsAllow) console.log(`    ${r}`);
+}
+if (!bad) ok(`every declared dependency is real, acyclic, and agrees with the order`);
+
 // ---- 4. THE RANK IS THE FILE ORDER, so it is printed rather than asserted:
 // nothing can check that a priority is CORRECT, only that it is visible.
 if (!bad) {
   console.log("\n  rank (roadmap file order):");
-  open.forEach((item, i) => console.log(`    ${String(i + 1).padStart(2)}. ${keyOf(item.text)}  ${titleOf(item.text)}`));
+  // AND WHAT HOLDS EACH ONE THERE. A rank with no reason beside it is a number
+  // somebody can change; a rank that prints "after 013" is a number with an
+  // argument attached, and the argument is checked above.
+  const blockedBy = (k) => (edges.get(k) ?? []).filter((e) => e.kind === "needs")
+    .map((e) => isArchivedKey.has(e.to) ? null : e.to).filter(Boolean);
+  const blocks = (k) => [...edges].filter(([, l]) => l.some((e) => e.kind === "needs" && e.to === k))
+    .map(([o]) => o).filter((o) => rankOf.has(o));
+  open.forEach((item, i) => {
+    const k = keyOf(item.text);
+    const after = blockedBy(k), before = blocks(k);
+    const why = [after.length ? `after ${after.join(", ")}` : "", before.length ? `holds ${before.join(", ")}` : ""]
+      .filter(Boolean).join(" · ");
+    console.log(`    ${String(i + 1).padStart(2)}. ${k}  ${titleOf(item.text)}${why ? `   [${why}]` : ""}`);
+  });
+
+  // ---- 4b. THE QUESTIONS THE ORDER CANNOT ANSWER ON ITS OWN, printed on
+  // request. `--graph` is read-only and is for a session or a person thinking
+  // about the queue rather than committing to it: where a new item has to go,
+  // what has quietly gone obsolete, what is one piece of work filed as two,
+  // and which pairs claim the same ground.
+  if (process.argv.includes("--graph")) {
+    const title = (k) => {
+      const it = [...open, ...archived].find((i) => keyOf(i.text) === k);
+      return it ? titleOf(it.text) : k;
+    };
+    const where = (k) => rankOf.has(k) ? `rank ${rankOf.get(k) + 1}` : "shipped";
+    const pairs = (kind) => {
+      const out = [];
+      for (const [k, l] of edges) for (const e of l) if (e.kind === kind) out.push([k, e.to, e.why]);
+      return out;
+    };
+
+    console.log("\n=== the queue as a graph ===");
+
+    const obsolete = pairs("superseded-by");
+    console.log(`\n  OBSOLETE OR BECOMING SO (${obsolete.length}) — the item is replaced by other work:`);
+    for (const [k, to, why] of obsolete) {
+      const state = isArchivedKey.has(to) ? "SHIPPED — archive this one or say what survived" : `${where(to)}, not yet shipped`;
+      console.log(`    ${k} (${where(k)}) superseded by ${to} [${state}]`);
+      console.log(`       ${title(k)}`);
+      console.log(`       ${why.slice(0, 100)}`);
+    }
+    if (!obsolete.length) console.log("    none declared.");
+
+    const tog = pairs("together");
+    console.log(`\n  ONE PIECE OF WORK, FILED AS TWO (${tog.length}):`);
+    for (const [k, to, why] of tog) {
+      const apart = rankOf.has(k) && rankOf.has(to) ? Math.abs(rankOf.get(k) - rankOf.get(to)) : null;
+      console.log(`    ${k} + ${to}  (${where(k)} and ${where(to)}${apart !== null ? `, ${apart} apart` : ""})`);
+      console.log(`       ${why.slice(0, 100)}`);
+    }
+    if (!tog.length) console.log("    none declared.");
+
+    const tou = pairs("touches");
+    console.log(`\n  SAME GROUND — a change to one may move the other (${tou.length}):`);
+    for (const [k, to, why] of tou) {
+      console.log(`    ${k} (${where(k)}) touches ${to} (${where(to)})`);
+      console.log(`       ${why.slice(0, 100)}`);
+    }
+    if (!tou.length) console.log("    none declared.");
+
+    // CONTENDED GROUND, derived rather than declared: one item everything else
+    // is waiting on the answer from. It falls straight out of the touches
+    // above, and it is the shape a flat list cannot show — the first run of
+    // this found 003 and 004 touched by four of the top five open items while
+    // sitting at ranks 11 and 12, which is a question about the order that
+    // nobody had been able to see.
+    const contention = new Map();
+    for (const [k, to] of tou) {
+      if (!contention.has(to)) contention.set(to, []);
+      contention.get(to).push(k);
+    }
+    const hot = [...contention].filter(([, from]) => from.length > 1)
+      .sort((a, b) => b[1].length - a[1].length);
+    console.log(`\n  CONTENDED GROUND (${hot.length}) — several items wait on what one of them settles:`);
+    for (const [to, from] of hot) {
+      const above = from.filter((k) => rankOf.has(k) && rankOf.has(to) && rankOf.get(k) < rankOf.get(to));
+      console.log(`    ${to} (${where(to)}) is touched by ${from.length}: ${from.join(", ")}`);
+      console.log(`       ${title(to)}`);
+      if (above.length) console.log(`       ${above.length} of them sit ABOVE it — they will be built against answers it has not given.`);
+    }
+    if (!hot.length) console.log("    none — no item is touched by more than one other.");
+
+    const dis = pairs("distinct-from");
+    console.log(`\n  LOOKS RELATED AND IS NOT (${dis.length}) — recorded so it is not re-conflated:`);
+    for (const [k, to, why] of dis) console.log(`    ${k} is NOT ${to} — ${why.slice(0, 95)}`);
+    if (!dis.length) console.log("    none declared.");
+
+    // WHERE A NEW ITEM GOES. The earliest rank its needs allow, so inserting is
+    // a lookup rather than an argument.
+    console.log("\n  EARLIEST RANK EACH ITEM COULD TAKE, given what it needs:");
+    for (const item of open) {
+      const k = keyOf(item.text);
+      const after = blockedBy(k);
+      const floor = after.length ? Math.max(...after.map((a) => rankOf.get(a) + 1)) + 1 : 1;
+      const now = rankOf.get(k) + 1;
+      const slack = now - floor;
+      console.log(`    ${k}  now ${String(now).padStart(2)}, earliest ${String(floor).padStart(2)}`
+        + `${slack > 0 ? `  (${slack} free)` : "  (pinned)"}`);
+    }
+    console.log("");
+  }
 
   // ---- 5. AND THE TOP ITEM'S BOUNDARIES, PRINTED UNASKED (hub LESSONS 329).
   //
