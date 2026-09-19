@@ -94,7 +94,7 @@ The reader's Sky-mask coverage overlay, opened as an image on both builds —
   on this subject.
 - **NIR_0063** and **NIR_1651** — same shape of boundary, same conclusion.
 
-## Progress, 2026-09-19 — shipped, and what it does and does not do
+## Outcome
 
 Option 1 as written, on the branch: `regenerateSkyMask` still shapes the seed
 with the reader's reach and feather, then refines it with the same
@@ -134,3 +134,35 @@ fail on the pre-018 build; the agreement walk green on the committed build
 (it added a second sampling path, which is exactly what that walk exists to
 hold together); and the commit message's "snapped to the picture's own edges"
 corrected to what the pictures support.
+
+**VERIFIED 2026-09-19, and the number that took three instruments to get.**
+
+- **Edge sharpness**, the rows a column takes to fall from 0.9 to 0.1 of
+  coverage, before against after: NIR_1644 median **74 → 57** (p90 178 → 146),
+  NIR_0063 median **30 → 17** (p90 166 → 137), NIR_1651 **59 → 59** unchanged.
+  NIR_1651 is the hazy frame whose sky barely keys, and its identical reading
+  is the accidental control: unchanged input, unchanged output.
+- **Agreement walk green** on the committed build — "every path renders the
+  same photograph the same way". That is the check this change most needed,
+  because it added a SECOND sampling path (CPU reads `MaskLayer.fine`, GPU
+  reads a second atlas), and the two provably agree.
+- **Feather is not dead.** `refineSkyMask` thresholds its input at 0.5, and
+  IR-SCIENCE 4b-v says it must, so the reader's Feather looked like it would be
+  discarded. Measured: NIR_1644 median fall 68 rows at feather 0, 57 at
+  feather 1. The control still moves the result.
+
+**What went wrong on the way, and it is the reason LESSONS 330 exists.**
+Edge COVERAGE was measured first and showed nothing (44→45%, 37→37%, 89→89%)
+because coverage is 023's question and is blind to a boundary that moves
+without enclosing more. Then the overlays were differenced, which showed the
+change was real (4.4–6.6% of pixels, 75% of it along the tree line). Only then
+was a sharpness instrument built — **and one already existed**: the scratch
+`maskprobe.mjs` behind IR-SCIENCE 4b-v's "25 px ramp comes back 4 px wide"
+control was written to measure precisely this edge. It was not in `tools/`, so
+nothing pointed at it, and a second instrument got written.
+
+**And the claim was corrected rather than left standing.** The first commit
+said the outline is "snapped to the picture's own edges". On conifers it is
+not — `SKY_FINE_RADIUS` is a fixed 12 px at 1024 and cannot resolve a needle.
+That fixed radius is the next thing, and it is what Photoshop's Smart Radius
+exists to solve.
