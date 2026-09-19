@@ -40,6 +40,42 @@ walk); the sky bitmap exists; the sky's own mean colour is already measured
 at open by the sky map (IR-SCIENCE.md 4b-v: the key is fitted on the sky's
 mean rendered colour). The combination is a multiply.
 
+## Built already
+
+What exists that the REMAINING half of this item will use, so a second one does
+not get written (LESSONS 330). The first half shipped 2026-09-19; what is left
+is the boundary.
+
+- **The grow itself is built.** `growSkyByColour` in `src/skyfine.ts` walks out
+  of the heuristic's seed through pixels matching the sky's colour and joined
+  to it, on the guide, at 1024. Membership is binary and the softness is a
+  separable box blur on the boundary; both of those shapes were arrived at by
+  rendering and are not free parameters to re-derive.
+- **The guide is built and cached per photograph.** `buildSkyGuide` and
+  `skyGuideFor` (a WeakMap in `src/main.ts`) give three channels of the
+  gray-world-balanced linear frame at `SKY_FINE_EDGE`. Any further work on the
+  boundary reads these, not the decoded frame, and gets grade-invariance free.
+- **The guided filter is built and its trade is measured.** `refineSkyMask` in
+  the same file snaps a selection to the picture's edges. Composing it AFTER
+  the grow was measured both ways and is NOT what ships: it helps a smooth
+  cloud edge and pulls a conifer rim back out. Do not re-run that experiment
+  blind — the numbers are in the Outcome below.
+- **The acceptance instrument is built.** `tools/mask-truth-walk.mjs` reads the
+  mask from the reader's side and writes a missed-map per frame, uncovered sky
+  red and spill yellow. Its maps are what showed the residual is a MISPLACED
+  rim rather than a short one. It needs no work.
+- **A node harness for the selection exists in the session scratchpad and is
+  NOT in the repo**, the same trap 018 hit. It bundles `src/sky.ts`,
+  `src/skyfine.ts` and `src/decode.ts` with esbuild for node and measures
+  coverage without a browser, in seconds rather than minutes. If the boundary
+  work needs iteration, promote it into `tools/` first rather than writing a
+  third one.
+- **The scope gate names the consumers.** `tools/scope-check.mjs` lists the
+  per-population strengths still marked OWED — denoise, chroma, texture, the
+  hot-spot and lens corrections — every one of which would read this selection
+  once it is good enough. That list is why the boundary matters beyond the
+  reader's own mask.
+
 ## Weighed against
 
 - **018, one sky selection for every sky-aware tool** — the mask reading the

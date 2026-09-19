@@ -539,34 +539,24 @@ user-scalable=no.
 > different approach and mindset"). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
-- [ ] **Masks combine: a group of components joined by add, subtract and intersect** <!-- decision: 026 -->
-  asked 2026-09-19 in three parts: the masks need to combine, it should be
-  possible to subtract other colours from the Sky mask, and a mask should be
-  invertible. Invert already exists on every mask type. The other two are one
-  thing, and both Lightroom and darktable describe the same model: a mask is a
-  GROUP of components, each joining by a set operator — Lightroom names them
-  Add / Subtract / Intersect for photographers, darktable union / intersection
-  / difference / exclusion for engineers, and the algebra is the same
-  multiplication and inverted-multiplication on soft edges. **The adjustment
-  belongs to the group, not the component**, which is where this app differs:
-  `params.masks` is a flat array and every entry carries its own brightness,
-  contrast, saturation, hue and warmth. Subtracting a colour from a detected
-  sky is the convention's own headline case. The cheap version — operators
-  between adjacent entries of the flat array — is rejected in the record
-  because it has no answer to whose adjustment applies when three entries
-  combine into one selection. Note the 4-bitmap ceiling
-  (`MAX_BITMAP_MASKS`, one per atlas channel) becomes the binding constraint.
-- [ ] **The Sky mask reads the sky's colour as well as its place** <!-- decision: 023 --> —
+- [ ] **The Sky mask reads the sky's colour as well as its place** <!-- decision: 023 -->
   reported 2026-09-18 from the iPad with three screenshots of one frame: the
   Sky mask leaves a rim of unselected sky round every object and misses the
-  sky between branches; the Colour mask reaches every pixel of the sky's
-  colour and takes the apron and the cars with it. The field's answer is an
-  intersection — Lightroom's Select Sky intersected with a Color Range,
-  darktable's drawn-and-parametric — and both halves already exist here. The
-  Sky mask gains a colour gate sampled from inside its own selection, keyed
-  on a colour that does not move with the grade. See
-  `docs/decisions/023-the-sky-mask-reads-the-skys-colour-as-well-as-its-place.md`.
-
+  sky between branches, because it knows WHERE the sky is and not which pixels
+  are it. **The first half shipped 2026-09-19** — the selection now grows out
+  of the heuristic's seed through every pixel that matches the sky's own colour
+  and is JOINED to it, on the 018 guide, with a "Follow the sky's colour"
+  toggle that is on by default. Measured before and after: NIR_1644's edge band
+  37% to 82% covered and its uncovered sky 5.5% to 1.0%, NIR_1651's uncovered
+  sky 21.3% to 7.5%, NIR_0063's edge band 45% to 52%.
+  **STILL OPEN because its own acceptance is a number and that number is still
+  red.** `tools/mask-truth-walk.mjs` wants the edge band covered at 0.85 and
+  open sky at 0.97 and fails three checks. What is left is the BOUNDARY: a
+  pixel straddling sky and branch has a mixed colour no hard test admits, so
+  the rim sits a pixel or two wrong, and the selection's edge comes out ragged
+  where a sky is grainy. Also unsettled and measurable rather than askable —
+  whether 0.85 is reachable at all, since edge coverage trades against spill by
+  construction (1644 sits at 82% edge with 23% spill).
 - [ ] **Every control can say what it does, and a finger can reach the saying** <!-- decision: 024 --> —
   asked 2026-09-19 from the PC, in the sitting that reported a slider named
   after the defect rather than the act: there should be something clickable
@@ -2826,6 +2816,38 @@ reason it is a footnote rather than a finding — a list of known limitations is
 read as authoritative, and an invented one is worse than a missing one.
 
 ## Shipped (roadmap archive)
+
+- [ ] **Masks combine: a group of components joined by add, subtract and intersect** <!-- decision: 026 -->
+  asked 2026-09-19 in three parts: the masks need to combine, it should be
+  possible to subtract other colours from the Sky mask, and a mask should be
+  invertible. Invert already exists on every mask type. The other two are one
+  thing, and both Lightroom and darktable describe the same model: a mask is a
+  GROUP of components, each joining by a set operator — Lightroom names them
+  Add / Subtract / Intersect for photographers, darktable union / intersection
+  / difference / exclusion for engineers, and the algebra is the same
+  multiplication and inverted-multiplication on soft edges. **The adjustment
+  belongs to the group, not the component**, which is where this app differs:
+  `params.masks` is a flat array and every entry carries its own brightness,
+  contrast, saturation, hue and warmth. Subtracting a colour from a detected
+  sky is the convention's own headline case. The cheap version — operators
+  between adjacent entries of the flat array — is rejected in the record
+  because it has no answer to whose adjustment applies when three entries
+  combine into one selection. Note the 4-bitmap ceiling
+  (`MAX_BITMAP_MASKS`, one per atlas channel) becomes the binding constraint.
+  **Shipped and verified 2026-09-19.** A mask joins the one above it by a set
+  operator — on its own, subtract from it, or only where both — with the
+  adjustment belonging to the group's head, which is what Lightroom and
+  darktable both do and the only arrangement that answers whose adjustment
+  applies when three selections combine into one. The mask list says which
+  masks are joined, in words. Show mask shows the COMBINED selection when a
+  joined mask is picked, where it used to go blank on the mask just added.
+  `MAX_BITMAP_MASKS` went 4 to 8 on a 2D-array atlas, an array rather than two
+  more textures because units 0-13 were already bound against a WebGL2
+  fragment floor of 16. Agreement walk green on both paths.
+  **The defect it nearly shipped**: `sampler2DArray` has no default precision
+  in GLSL ES 3.00 where `sampler2D` does, so the whole shader failed to compile
+  and the app opened nothing — caught by `tools/mask-slots-walk.mjs` on the run
+  that was only meant to prove the walk could fail. Hub LESSONS 331.
 
 
 - [x] **One sky selection, built at open, for every sky-aware tool** <!-- decision: 018 --> —
