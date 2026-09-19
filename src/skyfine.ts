@@ -346,8 +346,10 @@ const PINHOLE_MAX_PX = 24;
  * @param guide  from buildSkyGuide, for the SAME photograph.
  * @param reach  the mask's Reach, scaling the colour tolerance as it scales
  *   buildSkyMask's own growth tolerances — 1 is the shipped default.
- * @param feather  the mask's Feather, setting how much of the tolerance is a
- *   ramp rather than a plateau, exactly as colorMaskWeight uses it.
+ * @param feather  the mask's Feather, setting the boundary blur's radius, up
+ *   to FEATHER_MAX_PX. It does NOT move the colour tolerance and has not since
+ *   membership became binary — the ramp it used to set was computed and never
+ *   read. Selection is all-or-nothing and the softness is on the boundary.
  * @returns a BrushMask at the GUIDE's size, 0..255, image-uv like the input —
  *   the same shape refineSkyMask returns, so it drops into `MaskLayer.fine`
  *   and is read by compileEdit's brush sampler and the shader's mask atlas
@@ -382,12 +384,21 @@ const PINHOLE_MAX_PX = 24;
  * before writing a second one. It built the selection under one look, rebuilt
  * it under another, and compared the frame rendered back under the first — and
  * it failed on correct code. Its control, the same comparison with the mask's
- * adjustment neutral, failed too: switching a look away and back does not
- * return the same photograph, so the walk was measuring that and not this. A
- * test that fails for a reason other than the one it names is worse than no
- * test. Isolating it properly needs the mask-truth walk's trick of solving
+ * adjustment neutral, failed too, so the walk was measuring something other
+ * than this and was deleted: a test that fails for a reason other than the one
+ * it names is worse than no test.
+ *
+ * WHAT IT WAS MEASURING IS NOT WHAT THIS COMMENT SAID IT WAS. It said the
+ * control failed because switching a look away and back does not return the
+ * same photograph — which was recorded as an open defect on that walk's two
+ * framebuffer hashes and is NOT TRUE. Re-measured through
+ * `tools/look-roundtrip-walk.mjs`: fourteen round trips over seven looks, with
+ * and without a Sky mask, byte for byte identical, and twenty away-and-back
+ * cycles with one distinct render. So the deleted walk's control failed for a
+ * reason still unknown, and nothing here should be read as having explained
+ * it. Isolating drift properly needs the mask-truth walk's trick of solving
  * coverage per pixel from two overlay reads, which is a real piece of work and
- * buys nothing a signature already guarantees.
+ * buys nothing the signature above already guarantees.
  */
 export function growSkyByColour(mask: BrushMask, guide: SkyGuide, reach = 1, feather = 0.5): BrushMask {
   const W = guide.w, H = guide.h, N = W * H;
@@ -422,15 +433,20 @@ export function growSkyByColour(mask: BrushMask, guide: SkyGuide, reach = 1, fea
   const madOf = (a: number[], m: number): number => 1.4826 * med(a.map((v) => Math.abs(v - m)));
   const spread = Math.min(SKY_GROW_SPREAD_MAX, Math.max(SKY_GROW_SPREAD_MIN, Math.hypot(madOf(sr, mr), madOf(sb, mb))));
   const edge = SKY_GROW_TOL * spread * Math.max(0.1, reach);
-  const plateau = edge * (1 - Math.min(1, Math.max(0, feather)));
-  /** This pixel's weight from its colour alone, 0 outside the tolerance. */
-  const weightAt = (p: number): number => {
-    const d = Math.hypot(guide.r[p] - mr, guide.b[p] - mb);
-    if (d >= edge) return 0;
-    if (d <= plateau) return 1;
-    const t = (d - plateau) / Math.max(1e-6, edge - plateau);
-    return 1 - t * t * (3 - 2 * t); // smoothstep, as smooth01 elsewhere
-  };
+  /** Whether this pixel's colour is the sky's. Takes a pixel index; gives back
+   *  a yes or a no. What it must satisfy: it is the ONLY thing the flood below
+   *  consults, so the selection's boundary is exactly this contour.
+   *
+   *  IT USED TO RETURN A WEIGHT, and the weight was dead. A plateau was
+   *  computed from Feather and the band between it and the tolerance was a
+   *  smoothstep — and the flood tested `weightAt(q) <= 0` and then wrote a flat
+   *  255, so nothing anywhere read the graded value. Two things were false
+   *  while it stood: the boundary looked soft in the source and is hard, and
+   *  Feather looked like it moved the selection when since membership became
+   *  binary it has only ever set the boundary blur's radius below. A half-used
+   *  function is how the next session concludes the first of those. */
+  const matchesSky = (p: number): boolean =>
+    Math.hypot(guide.r[p] - mr, guide.b[p] - mb) < edge;
   // The photograph's own edges, from the guide's luma — central differences,
   // the same measure buildSkyMask takes on its normalised luma one stage
   // earlier. A pixel ON an edge may be selected (the mask has to reach the
@@ -464,7 +480,7 @@ export function growSkyByColour(mask: BrushMask, guide: SkyGuide, reach = 1, fea
       if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
       const q = ny * W + nx;
       if (out[q] || seeded[q]) continue; // already settled
-      if (weightAt(q) <= 0) continue;    // outside the sky's colour: stop here
+      if (!matchesSky(q)) continue;      // outside the sky's colour: stop here
       // MEMBERSHIP IS BINARY; THE SOFTNESS GOES ON THE BOUNDARY BELOW.
       // Grading each pixel by its own colour confidence instead put SPECKLE
       // through the selection — a sky is a smooth gradient, so a wide band of

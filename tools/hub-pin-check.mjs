@@ -61,9 +61,37 @@
  * Wired as a `.branch-guard also=` entry, so it runs on every commit rather
  * than when somebody remembers — and for the same reason: a commit must not
  * depend on the hub being checked out beside this repository.
+ *
+ * ## Two files agreeing is not the same as the commit existing on a branch
+ *
+ * The check above compares two strings in this repository. Both can agree
+ * perfectly on a commit that is on NO BRANCH of the hub, and after a history
+ * rewrite that is exactly what every pin is.
+ *
+ * The hub's history was rewritten on 2026-09-18 to remove chat-session
+ * trailers, which gave every commit a new SHA. Measured on 2026-09-19 against
+ * the five hub commits the hub's own census records siblings pinning: four are
+ * unreachable from `main` — 3f2a373 (2026-09-02), a75d92d (2026-08-26),
+ * 61a3f9a (2026-08-22) and 042400b (2026-09-03), all dated before the rewrite.
+ * The fifth, 50207f0, was re-pinned after it and is on `main`.
+ *
+ * **And they still work**, which is why nothing noticed: GitHub keeps serving a
+ * commit that no ref reaches, so `actions/checkout` fetches it, the gates run,
+ * and CI is green — out of a tree frozen before the rewrite, which can never
+ * contain a gate added since and still carries the trailers the rewrite
+ * removed. A pin like that is not behind; it is off the line entirely, and
+ * `doctrine-sync --adopt` cannot move it because the marker agrees with it.
+ *
+ * So the ancestry check below is the second question — is this commit on the
+ * hub's `main` at all — and it needs the hub, which this file may not have. It
+ * SKIPS rather than fails when the hub is not beside this repository, and it
+ * PRINTS the skip: a declared check that quietly stops running is the fail-open
+ * this whole family of hooks exists because of, and `branch-guard --artefact`
+ * prints the checks it skips for the same reason.
  */
 
-import { readdirSync, readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -78,6 +106,37 @@ const read = (relative) => {
     return null;
   }
 };
+
+/** Whether a pinned hub commit is reachable from the hub's `main`. Takes the
+ *  40-character pin; gives back `{ ok, skipped, why }`. What it must satisfy:
+ *  it never fails on a question it could not ask — a hub that is not checked
+ *  out beside this repository, or a clone that has never seen the commit,
+ *  comes back `skipped` with the reason printed, because a pin the hub pushed
+ *  five minutes ago is legitimately absent from a stale clone and refusing the
+ *  commit for that would teach everyone to bypass this hook. */
+function onTheHubsBranch(pin) {
+  const hub = join(dirname(REPO), 'noahjefferson');
+  if (!existsSync(join(hub, '.git')))
+    return { skipped: true, why: `not checked: the hub is not beside this repository, so nothing here can say whether ${pin.slice(0, 7)} is on its main` };
+  const git = (...args) => execFileSync('git', ['-C', hub, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  try {
+    if (git('cat-file', '-t', pin) !== 'commit')
+      return { skipped: true, why: `not checked: the hub clone beside this repository does not have ${pin.slice(0, 7)}` };
+  } catch {
+    return { skipped: true, why: `not checked: the hub clone beside this repository does not have ${pin.slice(0, 7)}` };
+  }
+  for (const ref of ['origin/main', 'main']) {
+    try {
+      git('rev-parse', '--verify', `${ref}^{commit}`);
+      execFileSync('git', ['-C', hub, 'merge-base', '--is-ancestor', pin, ref], { stdio: 'ignore' });
+      return { ok: true, why: `${pin.slice(0, 7)} is on the hub's ${ref}, so the gates come from a commit the hub can still reach` };
+    } catch { /* not this ref, or not an ancestor of it */ }
+  }
+  return {
+    ok: false,
+    why: `${pin.slice(0, 7)} is on NO BRANCH of the hub — the gates would be fetched from a frozen tree that can never contain anything added since. A rewritten history does this to every pin, and the two files agreeing cannot see it. Re-pin to the hub's current main and adopt the marker with it.`,
+  };
+}
 
 console.log(`\n=== the hub pin · ${basename(REPO)} ===\n`);
 
@@ -139,8 +198,13 @@ if (failures.length === 0) {
     const where = calls.map((c) => c.file).join(', ');
     console.log(`  ok    ${MARKER} and ${WORKFLOWS}/${where} both read ${marker.slice(0, 7)}`);
     console.log('  ok    CI runs the hub gates from the commit this repository has reconciled with');
-    console.log('\nThe pin moves with the marker, because they are the same fact.\n');
-    process.exit(0);
+    const verdict = onTheHubsBranch(pin);
+    if (verdict.ok || verdict.skipped) {
+      console.log(`  ${verdict.ok ? 'ok   ' : 'skip '} ${verdict.why}`);
+      console.log('\nThe pin moves with the marker, because they are the same fact.\n');
+      process.exit(0);
+    }
+    failures.push(verdict.why);
   }
 }
 

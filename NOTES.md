@@ -1644,31 +1644,44 @@ balanced frame built once per photograph. Record 023 asked for this to be
 settled by measurement; removing the failure mode is a stronger answer than
 measuring it.
 
-## Switching a look away and back does not return the same photograph, 2026-09-19
+## Switching a look away and back DOES return the same photograph, 2026-09-19
 
-**Found as the CONTROL of a test that was measuring the wrong thing.** A walk
-was written to prove the Sky mask's selection does not drift with the grade: it
-built the selection under Aerochrome, rebuilt it under B&W IR, and compared the
-frame rendered back under Aerochrome. It failed on correct code. Its control —
-the identical comparison with the mask's adjustment NEUTRAL, so the selection
-contributes nothing — failed too.
+**This section reported the opposite for most of a day.** What was recorded:
+Aerochrome, then B&W IR, then Aerochrome again did not render what Aerochrome
+rendered the first time, measured on NIR_1644 as the framebuffer hashes
+`e56cb436` and `d91adb2e`. It was found sideways, as the CONTROL of a walk
+built to measure something else — that walk failed on correct code, its control
+failed too, and it was deleted rather than kept red.
 
-So Aerochrome, then B&W IR, then Aerochrome again does not render the same
-photograph as Aerochrome did the first time, with no mask involved. Measured
-on NIR_1644 as a framebuffer hash: `e56cb436` before the round trip and
-`d91adb2e` after.
+**Deleting it was right and left the claim standing on nothing.** The two
+hashes were the only evidence, and the thing that produced them was gone, so
+nothing in the tree could say whether the defect was still there or had ever
+been there.
 
-**Not diagnosed, and not chased here.** The likely suspect is a per-frame
-adaptation inside the look landing differently on a second application, which
-is the same family as the restore-depth lift. It is recorded rather than fixed
-because it was found sideways, while building something else, and the thing it
-broke was a test rather than a photograph anyone has reported.
+**It is not there.** Re-measured through `tools/look-roundtrip-walk.mjs`, which
+reads the whole framebuffer rather than a statistic of it: seven looks, each
+pressed, switched away to B&W IR and pressed again — fourteen round trips
+counting both configurations, with no mask and with a Sky mask on — every one
+byte for byte identical. Then twenty Aerochrome/B&W cycles on NIR_1644: one
+distinct render (`5a7d7ba1`) and one distinct set of white-balance slider
+positions (`503,594,661`) across all twenty. The recorded hashes match nothing
+any current reading produces.
 
-**The walk was deleted rather than kept red.** A test that fails for a reason
-other than the one it names is worse than no test — it trains everyone to read
-red as noise. What it was chasing is guaranteed by a signature instead, and
-`growSkyByColour`'s contract carries the reasoning so a second one is not
-written.
+**Why the arithmetic that looked dangerous is safe.** `applyLook` strips the
+previous look's bias by DIVISION — `params.wb[0] / lookBias[0]` — and
+re-multiplies the new one, and `(w * b) / b` is not `w` in floating point, so
+residue should accumulate over repeated switches. It does not: every value goes
+through `syncToUI`/`syncFromUI` on the way past, which puts it on a slider STEP,
+and a value already on a step is a fixed point of that. The twenty-cycle check
+exists to keep that true rather than to prove it once.
+
+**The instrument is kept, and it was proved by planting.** The first plant was
+worthless — moving `con` one step between the two applications, which the second
+application simply overwrote, so the walk passed with the plant in. The plant
+that works presses a DIFFERENT look as the second application, and every row
+goes red. Per look it also prints how many controls separate that look from B&W
+IR, which is the walk's own control: a walk that reads nothing would report
+every round trip clean.
 
 ## Masks combine, and the proof measured its own overlay first, 2026-09-19 (decision 026)
 
