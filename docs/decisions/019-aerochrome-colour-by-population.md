@@ -127,66 +127,50 @@ Fourth: its mechanism is on the branch; its amounts are finished inside the
 panel (022) after the correction has moved (021), from sheets rendered
 through the app's own controls, and chosen from pictures.
 
-## Outcome
+## Progress, 2026-09-19 — the foliage is settled, the sky is not
 
-Shipped 2026-09-19, option 1 as written. The mechanism landed with 2.51 —
-`LOOKS.eir` global `raw.sat` 1.0, the foliage's amount on the Colour tab's
-Foliage band with every band boost gated by `bandGain`'s `SAT_GUARD_LO..HI`,
-and the sky's amount as `skySat` through the selection built at open, gated
-by `SKY_SAT_GATE_LO..HI`. What stayed open until now was the two amounts,
-because the record said they are chosen from pictures after the correction
-had moved (021), and 021 shipped as 2.52. **Foliage 1.6, sky 1.8.**
+The mechanism landed with 2.51 and is unchanged: `LOOKS.eir` global `raw.sat`
+1.0, the foliage's amount on the Colour tab's Foliage band with every band
+boost gated by `bandGain`'s `SAT_GUARD_LO..HI`, and the sky's amount as
+`skySat` through the selection built at open, gated by `SKY_SAT_GATE_LO..HI`.
+What was open was the two amounts, which this record says are chosen from
+pictures once 021 had moved (it shipped as 2.52).
 
-The amounts were rendered as four arms through the app's own sliders on
-seven practice raws, composed into per-frame sheets, and chosen from the
-pictures. At foliage 1.6 the foliage population reads saturation 0.59 to
-0.82 against the film's 0.60 (IR-SCIENCE 4b-iii).
+**Foliage: 1.6, shipped.** Rendered as arms on seven practice raws through the
+app's own `folSat` slider, which is `params.foliage[1]`, which is what
+`raw.foliage` sets — the right control. At 1.6 the foliage population reads
+saturation 0.59 to 0.82 against the film's 0.60 (IR-SCIENCE 4b-iii). It comes
+DOWN from the 2.0 the branch was carrying.
 
-**What the sky's amount does and does not reach, measured across seven
-frames.** At `skySat` 1.0 the sky population reads 0.10 to 0.50; at 1.5,
-0.15 to 0.73; at 1.8, 0.18 to 0.79. Only two frames carry a sky deep enough
-to reach the film's 0.66 at any amount — NIR_1376 and NIR_1644, which land
-at 0.79 with 1.8, between the film's two filter references (0.66 with a
-yellow filter, 0.92 with a red). The other five are haze and overcast, and
-the saturation gate deliberately holds them near grey: NIR_0627 moves 0.10
-to 0.18 across the whole range. The amount therefore does not flatten the
-set to one number, and was never going to — what it does is narrow the
-spread, and 1.8 narrows it more than 1.5 because the weak-sky frames gain
-proportionally more (NIR_1651 +20%, NIR_3406 +10% from 1.5 to 1.8) while
-the two strong ones gain least (+8%, +13%), the guard's upper range having
-taken them.
+**Sky: still open, and the arms that were meant to settle it measured the
+wrong control.** The harness set the slider with id `skySat`. That is the
+Colour tab's sky hue BAND — `params.sky[1]` — and not `skySatSel`, which is
+`EditParams.skySat` and the thing this record chose. So three rendered arms,
+every per-frame saturation taken off them, the corner and blotch measurements
+taken off the same renders, and the value that was briefly committed to
+`LOOKS.eir` were all about a stage this record's **Rejected** section had
+already ruled out: *"a hue band is not a place. Teals and blues wherever they
+are reaches water, shade with a blue cast and a blue car."*
 
-**What turned out wrong: the first corner measurement was at the wrong
-spatial scale, and a splotch is not grain.** The sky was reported as
-splotchier in the corners at the higher amount, and the first instrument
-measured chroma residual against a 5x5 local mean — which cannot see a
-patch that has drifted off-colour over thirty pixels, because the local
-mean drifts with it. Re-measured by pooling the chroma into 24-pixel blocks
-and taking each block's distance from its 3x3 block neighbourhood, the
-answer inverts: the blotch roughly doubles to triples between 1.0 and 1.5
-(NIR_3406 0.0060/0.0093/0.0083 to 0.0105/0.0129/0.0131, left/centre/right;
-NIR_1644 0.0094/0.0076/0.0113 to 0.0204/0.0190/0.0183) and then adds
-nothing much between 1.5 and 1.8 (NIR_3406 +6 to +12%, NIR_1644 flat or
-slightly down). **The cost is paid at 1.5; 1.8 is close to free.**
+`skySat` reverted to its shipped 1.0. The sky's amount is chosen when arms
+driven through `skySatSel` exist.
 
-**And it is not a corner phenomenon.** Corner over centre at the blotch
-scale is 0.89 / 1.01 / 1.06 on NIR_3406 across the three amounts and 1.48 /
-1.07 / 1.29 on NIR_1644 — the corners and the centre track together. One
-frame does have a genuinely blotchy corner, NIR_1651's left at 0.0158
-against a centre of 0.0012, and it reads that way at the SHIPPING amount of
-1.0, before this change touches it. So the corner residual is in the data
-the look multiplies, not something the amount introduces there, and a
-corner-shaped remedy would be aimed at the wrong variable. The frame-wide
-chroma denoise that 013 is about is the remedy, and it is ranked.
+**What made it possible, and what it says about the instrument.** The two
+controls sit one line apart in `syncFromUI` and their ids differ by a
+three-letter suffix; both are ranges on 0..2; both are called "sky
+saturation" in conversation. Nothing in the harness read back which parameter
+it had moved, so every run was self-consistent and wrong together. The
+arms script now sets `skySatSel` for `--sky=` and records BOTH values in its
+per-frame output, so a future run states which stage it measured rather than
+leaving it to the argument name.
 
-Two things found on the way and not fixed here. NIR_1376's centre band
-spikes to 0.0238 at 1.8 — five times its 1.0 reading and 2.4 times its 1.5
-one — while its corners barely move, which is the shape of the selection
-admitting cloud structure at the higher amount rather than of noise; that
-is 018's and 023's territory and is recorded on 013. And NIR_0627 and
-NIR_2082 give no blotch reading at all: neither has a top band with enough
-sky blocks at 80% purity to pool, which is itself the finding that the gate
-is holding those frames grey as designed.
+**And the walk could not have caught it.** `tools/aerochrome-walk.mjs` asserts
+the look's declared amounts, so it followed `LOOKS.eir` to whatever was put
+there. Its check 10d reads the rendered sky's saturation against a floor, and
+on NIR_0063 that reading was 0.332 with the shipped look and 0.332 with the
+sky at 1.8 — because with Restore depth on, the lift tops the selection's
+amount up per frame and had already reached the slider's cap of 2 in both
+cases. A check whose reading does not move when the thing it names moves is
+not asserting it; that is recorded here for whoever sets the sky's amount
+next.
 
-NOTES.md "Aerochrome's two amounts, chosen from pictures" carries the
-per-frame numbers.

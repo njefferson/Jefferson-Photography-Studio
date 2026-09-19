@@ -925,33 +925,36 @@ O7Ggs3rTTS0 (the colour edit with masks, 2021-12-23), U7Km8kuzGi0 (the
 lh4XFGlagoU (several colours in one frame). Their transcripts, pulled on a
 machine that YouTube trusts, are the missing half of this paragraph.
 
-**THE TWO AMOUNTS, SETTLED 2026-09-19: foliage 1.6, sky 1.8.** Rendered as
-four arms on seven practice raws through the app's own sliders and chosen from
-the pictures. Foliage 1.6 puts that population at saturation 0.59 to 0.82
-against the film's 0.60. The sky's amount reaches the film only where the sky
-is deep: NIR_1376 and NIR_1644 read 0.46 and 0.50 at `skySat` 1.0, 0.70 and
-0.73 at 1.5, 0.79 and 0.79 at 1.8 — which sits between the film's two filter
-references, 0.66 with a yellow filter and 0.92 with a red. The other five
-frames are haze and overcast and the gate holds them near grey by design
-(NIR_0627 travels 0.10 to 0.18 across the whole range); the amount narrows the
-spread rather than levelling it, and 1.8 narrows it more than 1.5 because the
-weak-sky frames gain proportionally more once the two strong ones have reached
-the guard's upper range.
+**THE FOLIAGE AMOUNT IS SETTLED, 2026-09-19: 1.6.** Rendered as arms on seven
+practice raws through the app's own `folSat` slider and chosen from the
+pictures. At 1.6 the foliage population reads saturation 0.59 to 0.82 against
+the film's 0.60.
 
-**AND THE MEASUREMENT THAT CORRECTED ITSELF, because it is the kind that will
-be made again.** The question was whether a higher sky amount makes the sky
-splotchier, and the first instrument measured chroma residual against a 5x5
-local mean. That measures GRAIN. A splotch is a patch that has drifted
-off-colour over tens of pixels, and a 5x5 local mean drifts with it, so the
-instrument was blind to the thing it was pointed at — and it returned a
-confident answer, that the corners worsen with the amount. Pooling the chroma
-into 24-pixel blocks and taking each block's distance from its 3x3 block
-neighbourhood inverts the finding: the blotch doubles to triples between 1.0
-and 1.5 and adds almost nothing between 1.5 and 1.8, and corners and centre
-track together rather than diverging. **When measuring a spatial defect, the
-window has to be larger than the defect, and the honest check is to run two
-scales and see whether they agree.** The per-frame numbers are in NOTES.md
-"Aerochrome's two amounts, chosen from pictures".
+**THE SKY'S AMOUNT IS STILL OPEN**, and the arms meant to settle it drove the
+Colour tab's sky hue BAND (`skySat`, `params.sky[1]`) rather than the
+selection's amount (`skySatSel`, `EditParams.skySat`) that the look declares.
+Every per-frame sky saturation taken off those renders is a measurement of the
+band. `LOOKS.eir` carries its shipped `skySat` of 1.0 until arms driven through
+the right control exist. The film targets are unchanged: sky 0.66 with a yellow
+filter, 0.92 with a red.
+
+**AND THE MEASUREMENT LESSON, TWICE OVER, because both halves will be met
+again.**
+
+*A window must be larger than the defect it measures.* The first corner
+instrument took chroma residual against a 5x5 local mean, which measures GRAIN.
+A splotch is a patch that has drifted off-colour over tens of pixels, and a 5x5
+local mean drifts with it — so the instrument was blind to what it was pointed
+at and returned a confident answer anyway. Pooling the chroma into 24-pixel
+blocks and taking each block's distance from its 3x3 block neighbourhood
+inverted the finding. Run two scales and see whether they agree.
+
+*And an instrument must say what it touched.* Neither version of that corner
+measurement could have been right regardless, because both read renders made by
+moving the wrong slider. Nothing in the chain — the arms script's argument
+name, the composed sheets, the block-residual reader — recorded which parameter
+had been changed. **A harness that drives a control by id states, in its own
+output, which model field that id writes.** The arms script does now.
 
 ### 4b-vii. THE FILM REFERENCE — AEROCHROME DEVELOPED OUTSIDE THE APP, ON SEVEN FRAMES
 

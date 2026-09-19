@@ -328,28 +328,24 @@ and the misdiagnosis. Stage output and the 16-bit write now clamp; the
 chroma-distance gate stays. IR-SCIENCE §9l-ii.
 
 
-**What 019's amounts handed this record, 2026-09-19.** The look now ships
-`skySat` 1.8, and the sky's blotch was measured at two spatial scales across
-four frames to find out what that costs (NOTES.md "Aerochrome's two amounts,
-chosen from pictures"). Three things bear on this item.
+**What 019 handed this record, 2026-09-19 — and why the figures are withdrawn.**
+A two-scale sky-blotch measurement was made across four frames and written here
+as evidence for this item. It is withdrawn: the renders it read were made by
+moving the Colour tab's sky hue BAND (`skySat`) rather than the look's
+selection amount (`skySatSel`), so the figures describe a stage this record is
+not about. Two things from that work do survive, because they are about the
+instrument rather than the data.
 
-- **The blotch is a multiplication, and the multiplier is already near its
-  ceiling.** Pooled to 24-pixel blocks, the residual doubles to triples between
-  `skySat` 1.0 and 1.5 and then adds 6 to 12% between 1.5 and 1.8, or nothing
-  at all on NIR_1644. So the remaining splotch cannot be spent away by lowering
-  the amount without also giving back the colour; the amplification is already
-  as cheap per unit of saturation as it gets.
-- **It is not a corner defect.** Corner over centre is 0.89 / 1.01 / 1.06 on
-  NIR_3406 across the three amounts. One frame's corner is genuinely bad —
-  NIR_1651's left, 0.0158 against a centre of 0.0012 — and it reads that way at
-  the shipping amount of 1.0, before the look's amount touches it. So the
-  target for this record is frame-wide chroma denoise, not a corner-shaped
-  remedy, and that agrees with the scope gate's OWED whole-frame denoise and
-  chroma rows.
-- **One reading here is the selection's, not the noise's.** NIR_1376's CENTRE
-  band spikes to 0.0238 at `skySat` 1.8 — five times its 1.0 reading — while
-  its two corners barely move. A defect that appears in one band and scales
-  with the amount is the selection admitting cloud structure that the gate held
-  out at lower amounts, not grain being amplified. It belongs to 018 and 023
-  and is filed here so the first candidate rendered for THIS record does not
-  spend a round rediscovering it.
+- **Measure a splotch at the scale a splotch has.** Chroma residual against a
+  5x5 local mean measures grain; a patch that has drifted off-colour over tens
+  of pixels drags the local mean with it and reads as clean. Pool the chroma
+  into 24-pixel blocks and take each block's distance from its 3x3 block
+  neighbourhood. The two scales disagreed in direction, not just in magnitude,
+  which is the reason to run both.
+- **A harness states which model field it moved.** Nothing in that chain
+  recorded it, so a precise number was produced about the wrong stage and
+  nothing downstream could tell. The arms script records both sky values per
+  frame now.
+
+So the first candidate rendered for THIS record starts by measuring at both
+scales, through `skySatSel`, and printing which control it drove.

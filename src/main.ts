@@ -1573,7 +1573,7 @@ const LOOKS: Record<string, Look> = {
   // lands 1-4deg wide. That range is not in the data to recover -- it is the
   // same 1-3% residual section 4c-iv is about -- so this moves the population,
   // it does not enrich it.
-  eir: { swapRB: true, hue: 0, denoise: 0.45, texture: 0.25, skySmooth: 1, skyDepth: 0, skySat: 1.8, finish: EIR_FINISH,
+  eir: { swapRB: true, hue: 0, denoise: 0.45, texture: 0.25, skySmooth: 1, skyDepth: 0, skySat: 1.0, finish: EIR_FINISH,
          mix3: [0.99, -0.06, 0.07, -1.44, 1.37, 1.02, -0.47, 0.81, 0.65],
          // THE COLOUR GOES WHERE THE COLOUR IS, and to what is a PORTION of the
          // photograph. Global saturation 1: the 3.0 that used to be here coloured
