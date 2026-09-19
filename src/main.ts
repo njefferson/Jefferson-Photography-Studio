@@ -5707,7 +5707,8 @@ function currentMask(): MaskLayer | null {
   return selectedMask >= 0 && selectedMask < params.masks.length ? params.masks[selectedMask] : null;
 }
 
-/** Brush(2) and sky(4) masks share the 4-channel bitmap texture (see gl.ts) —
+/** Brush(2) and sky(4) masks share the bitmap atlas, four per RGBA layer of a
+ *  2D-array texture (see gl.ts) —
  *  count how many exist so the UI can cap them independently of the total. */
 function bitmapMaskCount(): number {
   return params.masks.reduce((n, m) => n + (m.type === 2 || m.type === 4 ? 1 : 0), 0);
@@ -5845,7 +5846,17 @@ function updateMaskUI() {
       pick.type = "button";
       pick.className = "mask-pick" + (i === selectedMask ? " active" : "");
       const label = m.type === 0 ? "Radial" : m.type === 1 ? "Gradient" : m.type === 2 ? "Brush" : m.type === 3 ? "Color" : "Sky";
-      pick.textContent = `${label} ${i + 1}`;
+      // A COMPONENT SAYS SO IN THE LIST (026). Without this, a mask joined to
+      // the one above by subtract or intersect reads as a separate mask that
+      // happens to sit below it — and deleting the mask above silently
+      // promotes it to a head, changing the picture for a reason nothing on
+      // screen gave. IN WORDS, not an icon or a colour: the accessibility
+      // mandate is that meaning never rides on colour alone, and a lone glyph
+      // beside a mask name is not self-explaining either. The first mask can
+      // never be a component — the shader forces the first uploaded mask to be
+      // a head — so its op is not consulted.
+      const joinWord = i > 0 && m.op === 1 ? "minus " : i > 0 && m.op === 2 ? "within " : "";
+      pick.textContent = `${joinWord}${label} ${i + 1}`;
       pick.addEventListener("click", () => selectMask(i));
       const del = document.createElement("button");
       del.type = "button";
@@ -5866,6 +5877,11 @@ function updateMaskUI() {
   addLinearBtn.disabled = full;
   addColorBtn.disabled = full;
   // Brush + Sky hit the bitmap cap first; a tooltip explains why when it does.
+  // WITH MAX_BITMAP_MASKS AT 8 THAT TOOLTIP CANNOT CURRENTLY SHOW — the two
+  // caps are equal, so `full` is always true whenever `bitmapFull` is. It is
+  // kept, rather than deleted as dead copy, because the two caps are
+  // independent by design and raising MAX_MASKS alone would make the bitmap
+  // ceiling silent again (026).
   addBrushBtn.disabled = full || bitmapFull;
   addSkyBtn.disabled = full || bitmapFull;
   const bitmapHint = bitmapFull && !full ? `Up to ${MAX_BITMAP_MASKS} brush or sky masks` : "";

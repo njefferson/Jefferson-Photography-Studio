@@ -524,10 +524,18 @@ export function sampleSkyMap(m: SkyMap, u: number, v: number): [number, number, 
 
 export const MAX_MASKS = 8;
 
-/** Painted (brush) and sky masks pack into ONE RGBA texture on the GPU, so at
- *  most this many of them can coexist — one per channel. Geometry/colour masks
- *  have no such limit; the overall cap is MAX_MASKS. The UI enforces both. */
-export const MAX_BITMAP_MASKS = 4;
+/** Painted (brush) and sky masks pack into a 2D-ARRAY texture on the GPU, four
+ *  per RGBA layer, so at most this many of them can coexist. Geometry/colour
+ *  masks have no such limit; the overall cap is MAX_MASKS. The UI enforces both.
+ *
+ *  RAISED FROM 4 TO 8 WITH GROUPS (026). Four was a cap on bitmap MASKS per
+ *  photograph; under groups it became a cap on bitmap COMPONENTS a single
+ *  adjustment can combine, and a sky with a brush subtracted from it is
+ *  already two — so two such groups reached the ceiling. It must stay a
+ *  multiple of 4 and no greater than MAX_MASKS, because the slot is split as
+ *  layer = slot >> 2 and channel = slot & 3 in the shader and in both packers
+ *  in gl.ts, and a slot past MAX_MASKS could never be uploaded. */
+export const MAX_BITMAP_MASKS = 8;
 
 /** A painted brush mask: a single-channel 0..255 weight bitmap at a small
  *  working resolution (bilinearly sampled). `rev` bumps on each stroke so undo
@@ -675,6 +683,34 @@ export function groupWeight(group: readonly MaskLayer[], weightOf: (m: MaskLayer
  *  Takes the group; returns whether it should be rendered at all. */
 export function maskGroupIsActive(group: readonly MaskLayer[]): boolean {
   return maskIsActive(group[0]);
+}
+
+/** The groups a render may actually use, whole, within the uniform-array cap.
+ *
+ *  Takes `masks`, the flat mask list; returns the active groups, in order,
+ *  keeping only WHOLE groups while their combined entry count fits MAX_MASKS.
+ *
+ *  What the result must satisfy, and it is the reason this exists: both render
+ *  paths must cap the SAME WAY. `compileEdit` used to cap the GROUP count and
+ *  the GL uploader the FLATTENED entry count, which are different numbers the
+ *  moment any group has a component — three groups of three are three by one
+ *  count and nine by the other. Today no reader can reach it, because addMask
+ *  refuses a ninth entry and nine entries cannot make nine groups; a later
+ *  change to either cap would activate it silently, and the two paths would
+ *  render different photographs with nothing to see it but the agreement walk
+ *  guessing the right mask count. Truncating mid-group is also refused here —
+ *  a head whose subtract was dropped is not a smaller edit, it is a different
+ *  one. (026) */
+export function maskGroupsForRender(masks: readonly MaskLayer[] | undefined): MaskLayer[][] {
+  const out: MaskLayer[][] = [];
+  let used = 0;
+  for (const g of maskGroups(masks ?? [])) {
+    if (!maskGroupIsActive(g)) continue;
+    if (used + g.length > MAX_MASKS) break;
+    out.push(g as MaskLayer[]);
+    used += g.length;
+  }
+  return out;
 }
 
 export function maskIsActive(m: MaskLayer): boolean {
@@ -1394,7 +1430,7 @@ export function compileEdit(
   // component whose own adjustment is neutral — which is EVERY component,
   // since the adjustment belongs to the group's head. So group first, keep the
   // groups whose head does something, and only then cap.
-  const maskGroupsActive = maskGroups(p.masks ?? []).filter(maskGroupIsActive).slice(0, MAX_MASKS);
+  const maskGroupsActive = maskGroupsForRender(p.masks);
   const masks = maskGroupsActive.map((g) => g[0]);
   const hasColorMask = masks.some((m) => m.type === 3);
   const lensOn = (p.hotspot ?? 0) !== 0 || (p.vignette ?? 0) !== 0 || (p.hotspotColor ?? 0) !== 0;

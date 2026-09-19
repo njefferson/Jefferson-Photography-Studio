@@ -90,11 +90,50 @@ What exists that this item uses, so a second one does not get written
   was written for 018 because of that. If this item needs to look at an edge,
   promote one into `tools/` first rather than writing a third.
 
-**The constraint, stated here because it is the thing that will bite.**
-`MAX_BITMAP_MASKS` in `src/pipeline.ts` is 4, one per atlas channel. Today that
-caps how many bitmap MASKS a photograph can carry; under a group model it caps
-how many bitmap COMPONENTS a single adjustment can combine, which is a much
-lower ceiling in practice. Raising it is part of this item, not a footnote.
+**The constraint, stated here because it is the thing that bit — and it is
+lifted now.** `MAX_BITMAP_MASKS` in `src/pipeline.ts` was 4, one per atlas
+channel: a cap on bitmap MASKS per photograph, which under a group model became
+a cap on bitmap COMPONENTS a single adjustment can combine. It is 8, and the
+atlas is a 2D ARRAY — four masks per RGBA layer, `slot >> 2` the layer and
+`slot & 3` the channel. An array rather than more 2D textures because the
+second-atlas route costs two texture units, units 0–13 are already bound and
+the WebGL2 fragment floor is 16. `tools/mask-slots-walk.mjs` is the instrument:
+four empty brush masks fill the low slots so a sky mask lands on layer 1, and
+it must render there exactly as it does from slot 0.
+
+## Looked at
+
+**NIR_1644** (the sky corpus; pines against open sky), rendered through the
+app's own pipeline in five states and every one of them opened. Aerochrome on,
+Sky mask brightness 0.35 so the operator's effect could not hide, coverage tint
+turned OFF first and asserted off — the first version of this proof measured
+its own overlay and reported the tint going on as the difference the operator
+made.
+
+- **No masks** — the reference. Even bright sky, pale haze above the treeline.
+- **Sky mask alone** — the whole sky darkens, the trees untouched, the boundary
+  following the crowns crisply (018's refined edge, seen rather than assumed).
+- **Sky MINUS a colour keyed on the sky's own colour** (Hue 163° · Sat 0.34) —
+  the darkening lifts across nearly the whole sky, leaving a dark rim at the
+  very top where the deepest, most saturated blue falls outside the key's
+  range. The picture moves back toward the unmasked frame, which is the
+  direction subtract has to move; a difference alone would not have shown that.
+- **Sky AND the same colour** — the exact complement: the band the key matched
+  darkens, the rim the key missed does not. Panel 2's dark strip is panel 3's
+  light one.
+- **That colour mask alone, no group at all** — rendered because both grouped
+  states showed blocky, stair-stepped contouring where the key rolls off across
+  a smooth sky gradient, and a record must not blame a new feature for
+  something that was already there. The contouring is identical with no group
+  present, so it belongs to the colour key's own falloff and predates this
+  item. It is visible here only because brightness 0.35 is a deliberately
+  extreme adjustment. Not fixed, and named so the next session does not
+  rediscover it: the colour mask's range falloff contours on smooth gradients.
+
+The numbers agreed with the pictures rather than standing in for them: the
+darkening subtract gave back and the darkening intersect kept sum to 20.67
+against sky-alone's 21.47, which is `w·(1−wc) + w·wc = w` surfacing in the
+render.
 
 ## Weighed against
 
@@ -125,6 +164,10 @@ lower ceiling in practice. Raising it is part of this item, not a footnote.
    for intersect, which is darktable's exclusive/inclusive algebra and matches
    Lightroom's behaviour on soft edges. Invert stays available at BOTH levels,
    per component and per group, because the convention has both.
+   **Built, and verified on NIR_1644**: a Sky component with a Colour
+   component keyed on the sky's own colour renders subtract and intersect as
+   exact complements of each other — which is what the algebra claims, and
+   what the pictures show rather than what a coverage number implies.
 2. **Operators between adjacent entries of the existing flat array** — each
    mask gains an operator saying how it joins the one above, no group object,
    adjustments stay per-entry.
