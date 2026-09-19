@@ -5,7 +5,7 @@
 
 // Single source of truth for edit parameters lives in pipeline.ts so the GPU
 // preview and CPU export can never drift apart.
-import { toneEvaluator, toneIsIdentity, maskIsActive, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, LENS_GAIN_LO, LENS_GAIN_HI, SAT_GUARD_LO, SAT_GUARD_HI, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, lensAreaMean, type EditParams, type LocalMap, type SkyMap, type BrushMask, type CropRect } from "./pipeline";
+import { toneEvaluator, toneIsIdentity, maskGroups, maskGroupIsActive, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, LENS_GAIN_LO, LENS_GAIN_HI, SAT_GUARD_LO, SAT_GUARD_HI, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, lensAreaMean, type EditParams, type LocalMap, type SkyMap, type BrushMask, type CropRect } from "./pipeline";
 import { toHalfBuffer } from "./half";
 export type { EditParams };
 
@@ -118,6 +118,11 @@ uniform int u_maskSlot[8];   // brush/sky: which packed channel (0..3); -1 other
 uniform sampler2D u_maskTex; // brush/sky masks packed 1-per-channel (rgba = 4 max)
 uniform sampler2D u_maskFineTex; // sky masks (type 4) refined to the picture's edges, same slots
 uniform bool u_maskFineOn;      // false when no sky mask has a refinement to read
+uniform int u_maskOp[8];     // 0 head (starts a group) · 1 subtract · 2 intersect (026)
+                             // LITERAL 8, like every array above it: MAX_MASKS is a
+                             // TypeScript constant and means nothing inside GLSL —
+                             // written as MAX_MASKS first, and the shader silently
+                             // failed to compile, so the app opened no files at all.
 uniform int u_readMode;      // 1 = output the mask-stage DISPLAY colour and stop
                              //     (lets the colour mask read its own key colour)
 uniform float u_hotspot;     // IR hot-spot correction (darken centre) 0..0.8
@@ -376,6 +381,26 @@ float colorMaskWeight(int i, vec3 c){
   float w = 1.0 - smoothstep(plateau, edge, nd);
   if (u_maskGeoB[i].y > 0.5) w = 1.0 - w;
   return w;
+}
+
+// ONE MASK'S OWN WEIGHT, so a group's head and its components read the same
+// function (026). Before this the head's weight was computed inline in the
+// mask loop and nothing else could ask for a mask's weight — which is fine
+// with one mask per adjustment and impossible once several combine.
+// Identical in intent to maskWeight/colorMaskWeight's callers in pipeline.ts;
+// the agreement walk holds the two implementations together.
+float maskWeightOf(int i, vec3 cKey){
+  if (u_maskType[i] == 2 || u_maskType[i] == 4) {
+    int s = u_maskSlot[i];
+    if (s < 0) return 0.0;              // beyond the 4-channel cap
+    float w = (u_maskType[i] == 4 && u_maskFineOn)
+      ? texture(u_maskFineTex, v_uv)[s]
+      : texture(u_maskTex, v_uv)[s];
+    if (u_maskGeoB[i].y > 0.5) w = 1.0 - w;  // invert
+    return w;
+  }
+  if (u_maskType[i] == 3) return colorMaskWeight(i, cKey);
+  return maskWeight(i, v_uv);
 }
 
 void main() {
@@ -664,6 +689,9 @@ void main() {
   // Local masks: each adjustment weighted by the mask, in linear space before
   // global contrast/gamma. Identical math to compileEdit in pipeline.ts.
   for (int i = 0; i < u_maskCount; i++) {
+    // A COMPONENT WAS ALREADY FOLDED INTO ITS HEAD (026) — skip it here, or its
+    // adjustment would be applied a second time on its own.
+    if (u_maskOp[i] != 0) continue;
     float w;
     if (u_maskType[i] == 2 || u_maskType[i] == 4) {
       // Brush (painted) and sky (heuristic-generated) both read their weight
@@ -683,6 +711,17 @@ void main() {
       w = colorMaskWeight(i, cKey); // chroma-key on the fixed mask-stage colour
     } else {
       w = maskWeight(i, v_uv);
+    }
+    // FOLD THIS GROUP'S COMPONENTS IN. Subtract is w * (1 - wc), intersect is
+    // w * wc — darktable's exclusive/inclusive algebra, which reduces to the
+    // boolean set operation on hard masks and stays continuous on soft edges.
+    // Identical to groupWeight() in pipeline.ts; the agreement walk is what
+    // holds the two to each other.
+    for (int j = i + 1; j < u_maskCount; j++) {
+      if (u_maskOp[j] == 0) break;          // next head: this group is done
+      if (w <= 0.0) break;
+      float wc = maskWeightOf(j, cKey);
+      w *= (u_maskOp[j] == 1) ? (1.0 - wc) : wc;
     }
     if (i == u_maskViz) vizW = w; // the true post-invert coverage of the shown mask
     if (w <= 0.0) continue;
@@ -1026,7 +1065,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskOp", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -1652,7 +1691,15 @@ export class Renderer {
     gl.activeTexture(gl.TEXTURE9);
     gl.bindTexture(gl.TEXTURE_2D, this.overlayScreenTex);
     // Local masks (up to MAX_MASKS, the shader array size).
-    const masks = (p.masks ?? []).filter(maskIsActive).slice(0, MAX_MASKS);
+    // GROUPS, NOT MASKS (026). maskIsActive asks whether a mask's own
+    // adjustment does anything — true of a head, false of EVERY component,
+    // since the adjustment belongs to the group. Filtering by it first would
+    // upload the heads and silently drop what they combine with. So: group,
+    // keep the groups whose head is active, then flatten back to the flat
+    // uniform arrays the shader indexes, components following their head.
+    const groups = maskGroups(p.masks ?? []).filter(maskGroupIsActive);
+    const masks: EditParams["masks"] = [];
+    for (const g of groups) { for (const m of g) { if (masks.length < MAX_MASKS) masks.push(m); } }
     // Slot map: brush(2)/sky(4) masks claim packed channels 0..3 in appearance
     // order, decoupled from their global index so a bitmap mask beyond index 3
     // still packs correctly; everything else (and any beyond 4 bitmap masks) is
@@ -1672,8 +1719,13 @@ export class Renderer {
       const adj = new Float32Array(MAX_MASKS * 4);
       const hue = new Float32Array(MAX_MASKS);
       const slot = new Int32Array(MAX_MASKS).fill(-1);
+      const op = new Int32Array(MAX_MASKS);   // 0 head · 1 subtract · 2 intersect (026)
       masks.forEach((m, i) => {
         types[i] = m.type;
+        // The FIRST mask uploaded always starts a group, whatever it carries:
+        // a component whose head was filtered out would otherwise be read as
+        // subtracting from the group above it, which is a different picture.
+        op[i] = i === 0 ? 0 : (m.op ?? 0);
         geoA.set(
           m.type === 0 ? [m.cx, m.cy, m.rx, m.ry]
           : m.type === 3 ? [m.hueTarget, m.satTarget, m.colorRange, 0]
@@ -1691,6 +1743,7 @@ export class Renderer {
       gl.uniform4fv(this.loc.u_maskAdj, adj);
       gl.uniform1fv(this.loc.u_maskHue, hue);
       gl.uniform1iv(this.loc.u_maskSlot, slot);
+      gl.uniform1iv(this.loc.u_maskOp, op);
     }
     gl.uniform1i(this.loc.u_glowTex, 1);
     gl.uniform1i(this.loc.u_toneTex, 2);

@@ -5648,6 +5648,10 @@ const mUI = {
   featherRow: $("mFeatherRow") as HTMLElement,
   outline: $("mOutline") as HTMLButtonElement,
   invert: $("mInvert") as HTMLButtonElement,
+  joinRow: $("mJoinRow") as HTMLFieldSetElement,
+  joinAdd: $("mJoinAdd") as HTMLInputElement,
+  joinSub: $("mJoinSub") as HTMLInputElement,
+  joinInt: $("mJoinInt") as HTMLInputElement,
   brushControls: $("brushControls") as HTMLElement,
   paint: $("mPaint") as HTMLButtonElement,
   erase: $("mErase") as HTMLButtonElement,
@@ -5894,6 +5898,17 @@ function updateMaskUI() {
       updateSkyStatus();
     }
     mUI.invert.setAttribute("aria-pressed", String(m.invert));
+    // HOW THIS MASK JOINS THE ONE ABOVE (026). Hidden on the FIRST mask, which
+    // has nothing above it to join — offering "subtract from it" there would be
+    // a control that cannot do anything, and the shader forces the first
+    // uploaded mask to be a head regardless.
+    const first = selectedMask === 0;
+    mUI.joinRow.hidden = first;
+    $("mJoinNote").hidden = first;
+    const op = m.op ?? 0;
+    mUI.joinAdd.checked = op === 0;
+    mUI.joinSub.checked = op === 1;
+    mUI.joinInt.checked = op === 2;
   }
   // If the armed pick's mask vanished under it (undo, delete, photo switch),
   // disarm so the banner never lies about what a tap will do.
@@ -5959,6 +5974,20 @@ mUI.invert.addEventListener("click", () => {
   draw();
   flushRecord();
 });
+// The join operator (026). Changing it re-groups the list, so the mask panel
+// redraws: a mask that becomes a component stops owning an adjustment, and the
+// one above it gains a shape.
+for (const [el, v] of [[mUI.joinAdd, 0], [mUI.joinSub, 1], [mUI.joinInt, 2]] as const) {
+  el.addEventListener("change", () => {
+    const m = currentMask();
+    if (!m || !el.checked) return;
+    m.op = v;
+    updateMaskUI();
+    renderMaskOverlay();
+    draw();
+    flushRecord();
+  });
+}
 $("mDelete").addEventListener("click", () => { if (selectedMask >= 0) deleteMask(selectedMask); });
 addRadialBtn.addEventListener("click", () => addMask(0));
 addLinearBtn.addEventListener("click", () => addMask(1));

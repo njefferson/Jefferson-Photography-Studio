@@ -562,6 +562,28 @@ export interface MaskLayer {
   lx: number; // linear: end x
   ly: number; // linear: end y
   invert: boolean;
+  /** HOW THIS MASK JOINS THE ONE ABOVE IT — the set operator (026).
+   *
+   *  0 or absent: this mask STARTS a group and owns its adjustment.
+   *  1: SUBTRACT it from the group above. 2: INTERSECT it with that group.
+   *
+   *  The convention is Lightroom's and darktable's alike: a mask is a GROUP of
+   *  components joined by add / subtract / intersect (union / difference /
+   *  intersection), and **the adjustment belongs to the GROUP, not to the
+   *  component**. Here the group's HEAD carries it; a component's own
+   *  brightness/contrast/saturation/hue/warmth are not read, because three
+   *  selections combining into one region have no sensible answer to "whose
+   *  adjustment applies" unless one of them owns it.
+   *
+   *  Soft edges compose multiplicatively rather than by hard set logic, which
+   *  is darktable's exclusive/inclusive algebra: subtract is `w * (1 - wc)`,
+   *  intersect is `w * wc`. Both reduce to the boolean operation when the
+   *  masks are 0/1 and stay continuous in between.
+   *
+   *  A file written before this field has it absent everywhere, which reads as
+   *  every mask starting its own group — exactly today's behaviour, so old
+   *  edits and undo snapshots migrate by doing nothing. */
+  op?: 0 | 1 | 2;
   brush?: BrushMask; // type 2 (painted) and type 4 (generated sky) both use this
   /** Sky mask (type 4) ONLY: `brush` refined to the picture's own edges by the
    *  guided filter (skyfine.ts), at SKY_FINE_EDGE rather than BRUSH_MAX_EDGE.
@@ -599,11 +621,60 @@ export interface MaskLayer {
 }
 
 export function neutralMask(type: 0 | 1 | 2 | 3 | 4): MaskLayer {
-  const base = { cx: 0.5, cy: 0.5, rx: 0.35, ry: 0.35, feather: 0.5, lx: 0.5, ly: 0.85, invert: false, hueTarget: 0, satTarget: -1, valTarget: 0.75, colorRange: 0.5, reach: 1, brightness: 1, contrast: 1, saturation: 1, hue: 0, warmth: 0 };
+  const base = { cx: 0.5, cy: 0.5, rx: 0.35, ry: 0.35, feather: 0.5, lx: 0.5, ly: 0.85, invert: false, op: 0 as const, hueTarget: 0, satTarget: -1, valTarget: 0.75, colorRange: 0.5, reach: 1, brightness: 1, contrast: 1, saturation: 1, hue: 0, warmth: 0 };
   if (type === 1) return { ...base, type, cx: 0.5, cy: 0.12, lx: 0.5, ly: 0.5 };
   if (type === 2) return { ...base, type, rev: 0 };
   if (type === 4) return { ...base, type, rev: 0 }; // sky: bitmap filled by the heuristic on add
   return { ...base, type };
+}
+
+/**
+ * Split a list of `masks` into GROUPS: each head (op 0 or absent) plus the
+ * components that follow it (op 1 subtract, op 2 intersect) until the next
+ * head. Takes the list; returns an array of arrays, head first in each.
+ *
+ * What the result must satisfy: it is a partition — every input mask appears
+ * exactly once, in order — and every group's first element is its head, whose
+ * adjustment is the group's. A leading component with no head above it starts
+ * its own group rather than being dropped, because silently discarding a mask
+ * the reader can see in the list is worse than rendering it as a union.
+ * `compileEdit`, `maskGroupIsActive` and the shader's uploader all read this,
+ * so the three cannot disagree about where a group begins.
+ */
+export function maskGroups(masks: readonly MaskLayer[]): MaskLayer[][] {
+  const out: MaskLayer[][] = [];
+  for (const m of masks) {
+    if (!m.op || out.length === 0) out.push([m]);
+    else out[out.length - 1].push(m);
+  }
+  return out;
+}
+
+/**
+ * Combine one group's components into a single weight at a pixel.
+ * Takes the group (head first) and `weightOf`, which gives a component's own
+ * 0..1 weight there; returns the group's weight, 0..1.
+ *
+ * What the result must satisfy: it equals the head's own weight when the group
+ * has one member, which is what makes every pre-026 edit render unchanged —
+ * the migration's proof. Soft edges compose multiplicatively (darktable's
+ * exclusive/inclusive algebra), so the result reduces to the boolean set
+ * operation when the inputs are 0 or 1 and stays continuous between.
+ */
+export function groupWeight(group: readonly MaskLayer[], weightOf: (m: MaskLayer) => number): number {
+  let w = weightOf(group[0]);
+  for (let i = 1; i < group.length && w > 0; i++) {
+    const c = weightOf(group[i]);
+    w *= group[i].op === 1 ? 1 - c : c;   // subtract : intersect
+  }
+  return w;
+}
+
+/** A GROUP does something iff its head's adjustment is non-neutral — the
+ *  adjustment belongs to the group, so a component's own values are not read.
+ *  Takes the group; returns whether it should be rendered at all. */
+export function maskGroupIsActive(group: readonly MaskLayer[]): boolean {
+  return maskIsActive(group[0]);
 }
 
 export function maskIsActive(m: MaskLayer): boolean {
@@ -1319,7 +1390,12 @@ export function compileEdit(
   const fol = p.foliage;
   const bandsActive =
     sky[0] !== 0 || sky[1] !== 1 || sky[2] !== 1 || fol[0] !== 0 || fol[1] !== 1 || fol[2] !== 1;
-  const masks = (p.masks ?? []).filter(maskIsActive).slice(0, MAX_MASKS);
+  // GROUPS, NOT MASKS (026). Filtering by maskIsActive first would drop a
+  // component whose own adjustment is neutral — which is EVERY component,
+  // since the adjustment belongs to the group's head. So group first, keep the
+  // groups whose head does something, and only then cap.
+  const maskGroupsActive = maskGroups(p.masks ?? []).filter(maskGroupIsActive).slice(0, MAX_MASKS);
+  const masks = maskGroupsActive.map((g) => g[0]);
   const hasColorMask = masks.some((m) => m.type === 3);
   const lensOn = (p.hotspot ?? 0) !== 0 || (p.vignette ?? 0) !== 0 || (p.hotspotColor ?? 0) !== 0;
   // The measured curve is its own stage: it must run whether or not any of the
@@ -1521,13 +1597,15 @@ export function compileEdit(
         kg = toGamma((ng - 0.5) * con + 0.5);
         kb = toGamma((nb - 0.5) * con + 0.5);
       }
-      for (const m of masks) {
-        let w: number;
-        if (m.type === 3) {
-          w = colorMaskWeight(m, kr, kg, kb);
-        } else {
-          w = maskWeight(m, u, v);
-        }
+      for (let gi = 0; gi < maskGroupsActive.length; gi++) {
+        const group = maskGroupsActive[gi];
+        const m = group[0];
+        // The group's weight: its head, then each component folded in by its
+        // operator. A one-component group is the head's own weight, so every
+        // edit made before 026 renders exactly as it did.
+        let w = group.length === 1
+          ? (m.type === 3 ? colorMaskWeight(m, kr, kg, kb) : maskWeight(m, u, v))
+          : groupWeight(group, (c) => (c.type === 3 ? colorMaskWeight(c, kr, kg, kb) : maskWeight(c, u, v)));
         if (w <= 0) continue;
         // warmth (linear temp shift)
         nr *= 1 + 0.5 * m.warmth * w;

@@ -2624,6 +2624,16 @@ label.open-btn, label.bar-btn {
 .mask-row .mask-del { width: auto; padding: 6px 10px; font-size: 0.8125rem; }
 #maskEditor { margin-top: 10px; }
 .mask-editor-actions { display: flex; gap: 6px; margin-top: 8px; }
+/* HOW A MASK JOINS THE ONE ABOVE (026). A real fieldset with a legend, because
+   the three choices are one question and a screen reader should hear it that
+   way. Targets stay >= 44px by padding the LABEL, so the whole row is tappable
+   rather than only the radio itself — the accessibility rule this repo holds
+   every new control to. */
+.mask-join { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 10px 0 0; padding: 8px 10px;
+  border: 1px solid var(--line-2); border-radius: 8px; }
+.mask-join legend { padding: 0 4px; font-size: 0.85em; color: var(--txt-3); }
+.mask-join label { display: flex; align-items: center; gap: 6px; min-height: 44px; cursor: pointer; }
+.mask-join input { min-width: 20px; min-height: 20px; }
 .mask-editor-actions button { width: auto; padding: 6px 12px; font-size: 0.8125rem; }
 
 /* The lost-graphics overlay shares the unsupported card's look, because it is
