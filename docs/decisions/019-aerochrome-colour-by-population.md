@@ -127,6 +127,50 @@ Fourth: its mechanism is on the branch; its amounts are finished inside the
 panel (022) after the correction has moved (021), from sheets rendered
 through the app's own controls, and chosen from pictures.
 
+## Looked at
+
+The seven arm sheets, opened as images on 2026-09-19 after four rounds of
+analysis had been written from their numbers alone. What each showed, and
+where it contradicts what the numbers had been taken to mean.
+
+- **NIR_2082** — a grey asphalt car park and a brick wall carrying dense red
+  speckle, thousands of scattered red pixels, in all four arms. Its numbers
+  read "foliage 0.69, colourless 51%" and it had been summarised as "overcast,
+  the gate holds it grey". This record's stated purpose is that nothing
+  colourless is touched; this frame is that claim failing in the shipped build,
+  and no statistic in the set said so.
+- **NIR_0627** — **no sky in it at all.** A macro of a flower spike against a
+  blurred background. Its sky reading of 0.10 had been reported for days as
+  "hazy sky staying grey"; those are grey flower stems. The sky conclusions
+  here rest on six frames, not seven. Its background red is also the worst
+  foliage rendering in the set: clipped to a flat posterized mass with hard
+  contours and pure black voids.
+- **NIR_0063** — identical across all four arms, as the numbers said. But at
+  foliage 1.6 it reads 0.82 and the central tree is a flat crimson mass with
+  its internal structure gone, the lower half crushed to black. The foliage
+  range was reported as "0.59 to 0.82 against the film's 0.60" as though
+  uniformly fine. It is not; the top of that range is overcooked.
+- **NIR_1651** — four panels indistinguishable by eye. This is the frame whose
+  corner residual was most dramatic (6.8x corner against centre, rising 15%
+  across the arms) and the frame the exchange-rate recommendation leaned on
+  hardest. Nothing visible changes. **A residual that moves is not a defect
+  that shows**, and that sentence cost a recommendation.
+- **NIR_3406** — identical across all four, confirming the lift pins it at the
+  slider's cap. Its sky is large, smooth and clean; the banding that dominates
+  the other two frames is not present here.
+- **NIR_1644** — the sky deepens visibly from 1.0 to 2.0, the most convincing
+  sky of the eight panels that change. The defect running through it is
+  **contour banding** in the cloud gradient — flat plateaus with hard stepped
+  edges — present at the shipped 1.0 and becoming more chromatically distinct
+  as the amount rises. Two rounds had described this as "corner blotch",
+  because local residual was the statistic available and the statistic chose
+  the vocabulary.
+- **NIR_1376** — the same banding, worst as a stepped arc around the tree
+  crown, plus **a grey halo hugging the crown itself** in every panel. That
+  halo is the sky selection's edge falloff, it is decision 023's subject, and
+  it had never been mentioned in any record. Its grass also carries scattered
+  red speckle from the foliage band, constant across the arms.
+
 ## Measured properly, 2026-09-19 — what the sky's amount can and cannot do
 
 Re-rendered as four separate BUILDS at declared `skySat` 1.0, 1.5, 1.8 and 2.0,
@@ -140,8 +184,14 @@ look declares, so the look's number cannot reach them: NIR_3406, NIR_0063 and
 NIR_2082 are identical on all four arms. Only NIR_1376 (0.461 → 0.605) and
 NIR_1644 (0.504 → 0.642) respond meaningfully against the film's 0.66.
 
-**So it widens the frame-to-frame spread rather than narrowing it** — 0.10 to
-0.50 at 1.0, 0.11 to 0.64 at 2.0 — because the lift has already spent the cap
+**And the corpus was wrong by one.** NIR_0627 was carried through every arm as
+a seventh sky frame, reading 0.101 / 0.103 / 0.104 / 0.105 and reported as haze
+the gate correctly holds grey. It is a macro of a flower spike with no sky in
+it; that reading is grey stems. Every sky conclusion here rests on six frames,
+and the bottom of the quoted range is not a sky at all.
+
+**So it widens the frame-to-frame spread rather than narrowing it** — 0.24 to
+0.50 at 1.0, 0.25 to 0.64 at 2.0 — because the lift has already spent the cap
 on the weak skies and only the deep ones have room to move. Whether that is
 right is the judgement: a hazy sky staying hazy is arguably correct, but it is
 the opposite of what the hue-band arms appeared to show.

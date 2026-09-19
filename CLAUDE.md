@@ -322,6 +322,41 @@ now, reading both lists out of the source.
   NEEDS THE OWNER'S HANDS on the real iPad (share sheet, pinch feel, install
   flows, Safari-only storage behavior — all measurements so far are Chromium).
 
+## THIS IS A VISUAL APP, NOT A MATH APP (owner, 2026-09-19)
+**OPEN WHAT YOU RENDERED. A number is a pointer to where to look; it is never a
+substitute for looking and never evidence about appearance.**
+
+**What it cost, the day the rule arrived.** Seven comparison sheets were
+rendered through the app's own pipeline, five were sent to the owner, and
+**none were opened.** Four rounds of analysis about how the photographs look —
+a named recommendation, an "exchange rate" of colour gained per unit of noise
+added, a paragraph on what each candidate costs — were written off saturation
+figures and a chroma residual. Opening all seven took one pass and found two
+defects that were shipping: a grey asphalt car park covered in red speckle in a
+frame summarised as "overcast, the gate holds it grey", and a foliage amount
+taken from a range ("0.59 to 0.82") read as uniform when its top end is a flat
+crimson mass. It also found a frame with **no sky in it** sitting in a
+seven-frame SKY corpus, its grey flower stems reported for days as hazy sky.
+
+**Three traps, each of which fired.** A residual that moves is not a defect that
+shows — the recommendation rested on a number that is invisible on the very
+frame where it was most dramatic. A statistic has a shape and the defect gets
+described in that shape — local residual was available, so the report was about
+"corners" while the visible artefact was frame-wide banding. And one line per
+frame is where a corpus rots.
+
+**THE RULE BELOW WAS OBEYED WHILE THIS HAPPENED INSIDE IT.** "A look choice is
+SHOWN, never described" says how to present a choice to the OWNER, and the
+candidates were rendered and the pictures were sent, exactly as written. It
+never said the session must open what it rendered before reasoning about it —
+so this is a gate, not a paragraph. `tools/decisions-check.mjs` requires a
+decision record naming frames to carry a `## Looked at` section, and **every
+frame named anywhere in the record must appear in it**, both ways, so the
+section cannot be padded. The pre-existing backlog is declared in
+`.looked-allow`, printed on every run, and can only shrink — a row there is an
+admission that a record concluded something about a photograph from a number
+with no render opened. (Hub LESSONS §328.)
+
 ## A LOOK CHOICE IS SHOWN, NEVER DESCRIBED (owner rule, 2026-09-16)
 When a decision is about how a photograph LOOKS — which rendering ships, how deep
 a red goes, what a look's numbers should be — **render the candidates and send
