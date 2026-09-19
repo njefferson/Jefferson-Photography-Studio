@@ -1515,6 +1515,11 @@ and opens again, which is how it was seen. Absence means 0 now.
 to within one 8-bit step on under 1% of pixels; a hash would call one flipped
 LSB in five million a defect, so the check is a bound, not a hash.
 
+**Walked before staging, all green on the 2.52 build:** lens-order (red on the
+build before on four checks), agreement (the four reconstructions still agree
+with the stage moved out of the grade for raws), tile-truth, sky-stage,
+conversion (the report's new lines beside the Conversion line) and aerochrome.
+
 ## The frame's aperture against the body's diffraction limit, 2026-09-18
 
 The diagnostic report carries an **Aperture** line beside the lens entry:
