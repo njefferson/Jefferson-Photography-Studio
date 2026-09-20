@@ -19,6 +19,10 @@
 // because CI has no browser — it is an artefact, like the branch guard's hook.
 
 import { chromium } from "/home/user/Jefferson-Photography-Studio/node_modules/playwright-core/index.mjs";
+import { requireFreshDist } from "./fresh-dist.mjs";
+// BEFORE THE BROWSER: this renders through the build in `dist`, and a stale one
+// renders the PREVIOUS build's pictures. See tools/fresh-dist.mjs.
+requireFreshDist();
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";

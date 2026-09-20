@@ -94,6 +94,30 @@ export interface ParallelJob {
   outPixels: number;
 }
 
+/** HOW MANY WORKERS THIS EXPORT MAY START — the one place that answers it.
+ *
+ *  It exists because the answer was computed twice and the two copies drifted
+ *  within a day. `bytesPerPixel` was threaded into the GATE (`canRunParallel`)
+ *  and not into the SPAWN (`exportBands`), which kept the 4-byte default — so
+ *  a TIFF was approved at six bytes a pixel and started at four. `workerCount`
+ *  is monotonically larger at four, so the pool could only ever come out
+ *  bigger than the budget had approved: on a tablet-class device (4 GB hint,
+ *  6 cores) at ~31 MP the gate said 3 and the spawn took 4, which is 629 MB
+ *  against the 600 MB ceiling that exists because such a device kills the tab
+ *  rather than swapping.
+ *
+ *  Takes `job` — the render this export will split, which carries the output's
+ *  size and therefore what one band weighs — and `opts`, the export options,
+ *  whose `format` decides the bytes per pixel. Returns the number of workers
+ *  this export is allowed to start, never fewer than one.
+ *
+ *  What the result has to satisfy: it is the ONLY caller of `workerCount` in
+ *  this file, and both the gate and the spawn read it. A second call site is
+ *  the defect returning, which is what `tools/one-pool-check.mjs` refuses. */
+export function approvedWorkers(job: ParallelJob, opts: ExportOptions): number {
+  return workerCount(job, bytesPerPixel(opts));
+}
+
 export function canRunParallel(params: EditParams, opts: ExportOptions, job: ParallelJob): boolean {
   if (typeof Worker === "undefined") return false;
   // TIFF RUNS HERE TOO SINCE 2026-09-20. It was refused on the grounds that it
@@ -109,7 +133,7 @@ export function canRunParallel(params: EditParams, opts: ExportOptions, job: Par
   if ((params.spots?.length ?? 0) > 0) return false;
   if ((params.stickers?.length ?? 0) > 0) return false;
   if (params.warp) return false;
-  return workerCount(job, bytesPerPixel(opts)) >= 2;
+  return approvedWorkers(job, opts) >= 2;
 }
 
 /** How many to start: one fewer than the machine claims, capped by how much
@@ -207,7 +231,16 @@ export async function exportBands(
   // two cannot disagree about what a band is.
   const axis: "rows" | "columns" = ((opts.rotate ?? 0) % 4 + 4) % 4 & 1 ? "columns" : "rows";
   const outerN = axis === "columns" ? outW : outH;
-  const n = Math.max(1, Math.min(workerCount(job), outerN));
+  // THE SAME BYTE MODEL THE GATE USED. `canRunParallel` asks
+  // `workerCount(job, bytesPerPixel(opts))`, and this — the call that actually
+  // STARTS the workers — took the 4-byte default, so a TIFF was gated at six
+  // bytes a pixel and spawned at four. Since `workerCount` is monotonically
+  // larger at four, the pool could only ever come out BIGGER than the budget
+  // approved: measured on a tablet-class device (4 GB hint, 6 cores) at ~31 MP,
+  // the gate returns 3 and this returned 4 — 629 MB against a 600 MB ceiling
+  // that exists because such a device kills the tab rather than swapping, and a
+  // killed tab loses the whole session.
+  const n = Math.max(1, Math.min(approvedWorkers(job, opts), outerN));
   const workers: Worker[] = [];
   const pending = new Map<number, Pending>();
   const shares = new Float64Array(n);

@@ -14,3 +14,10 @@ node tools/session-brief.mjs --repo . 2>/dev/null || true
 # And install the commit hook, because a fresh container has none and the guard
 # that refuses a commit on the wrong branch cannot fire if it was never written.
 node ../noahjefferson/branch-guard.mjs --repo . --install >/dev/null 2>&1 || true
+
+# And the patch-note refusal, for the same reason: the subject of a commit does
+# not exist when pre-commit runs, so the gate that reads it is a `commit-msg`
+# hook — and a fresh container has none.
+if [ -f .githooks/commit-msg ]; then
+  cp .githooks/commit-msg .git/hooks/commit-msg 2>/dev/null && chmod +x .git/hooks/commit-msg 2>/dev/null
+fi

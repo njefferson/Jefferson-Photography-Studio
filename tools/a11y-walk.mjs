@@ -40,6 +40,10 @@
 // that knows what the app is made of.
 
 import { chromium } from "/home/user/Jefferson-Photography-Studio/node_modules/playwright-core/index.mjs";
+import { requireFreshDist } from "./fresh-dist.mjs";
+// BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
+// directory to this tree. See tools/fresh-dist.mjs.
+requireFreshDist();
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { repo, surfaces, allowed, check as checkSurfaces } from "./surfaces.mjs";

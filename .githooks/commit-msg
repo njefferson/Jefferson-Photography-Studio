@@ -1,0 +1,6 @@
+#!/bin/sh
+# EVERY COMMIT THE READER SEES SAYS WHICH OF THE FOUR THINGS IT IS.
+# Generated source of truth is tools/patch-note-check.mjs; this is the door.
+# Installed by .claude/hooks/session-start.sh and checked by the pre-commit
+# chain, because .git/hooks is empty in a fresh container.
+exec node "$(git rev-parse --show-toplevel)/tools/patch-note-check.mjs" --msg="$1"

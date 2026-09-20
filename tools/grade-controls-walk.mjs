@@ -22,6 +22,10 @@
 //
 // --plant skips the double-tap and the centre drag. Three checks must go red.
 import { chromium } from "playwright-core";
+import { requireFreshDist } from "./fresh-dist.mjs";
+// BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
+// directory to this tree. See tools/fresh-dist.mjs.
+requireFreshDist();
 const PORT = (process.argv.find((a) => a.startsWith("--port=")) || "--port=8131").split("=")[1];
 const PLANT = process.argv.includes("--plant");
 let failed = 0;

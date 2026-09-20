@@ -19,6 +19,10 @@
 // It renders. It does not choose. What each candidate costs — what it does to
 // the sky while it fixes the foliage — belongs in the report beside the pictures.
 import { chromium } from "playwright-core";
+import { requireFreshDist } from "./fresh-dist.mjs";
+// BEFORE THE BROWSER: this renders through the build in `dist`, and a stale one
+// renders the PREVIOUS build's pictures. See tools/fresh-dist.mjs.
+requireFreshDist();
 import { mkdirSync, existsSync, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 const arg = (k, d) => (process.argv.find((a) => a.startsWith(`--${k}=`)) || `--${k}=${d}`).split("=").slice(1).join("=");

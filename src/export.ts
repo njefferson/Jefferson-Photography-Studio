@@ -72,6 +72,41 @@ export interface ExportOptions {
  *  a `width` x `height` rectangle of the finished picture, whose top-left
  *  corner in the whole is (0, band.from) for a row band and (band.from, 0) for
  *  a column one. */
+/** HOW MANY THREADS THE EXPORT RUNNING RIGHT NOW IS USING, or 0 while that is
+ *  not yet decided.
+ *
+ *  It exists because the export's progress strip PREDICTED this and was wrong
+ *  twice, in both directions. Its first version guessed the output size from
+ *  the half-size preview and printed "on one thread" over an export the app's
+ *  own report said had run on three; its second carried a copy of the rule that
+ *  refuses TIFF, which stopped being true on 2026-09-20 — so the strip said one
+ *  thread while the export ran on eight, and the owner reported it from the
+ *  device with the report beside it saying otherwise.
+ *
+ *  A predictor that has been wrong in both directions should not be repaired,
+ *  it should be replaced by the fact. Zero means "not known yet", so a caller
+ *  can say NOTHING rather than claim something; it is set the moment the pool
+ *  size is decided, which is before all but the first few progress callbacks.
+ *
+ *  What the result has to satisfy: it is the number `ExportProfile.threads`
+ *  will carry for this same export, so the strip and the §7f report can never
+ *  disagree about one run. */
+let liveThreads = 0;
+
+/** HOW MANY THREADS THE EXPORT RUNNING RIGHT NOW IS USING.
+ *
+ *  Takes nothing. Returns the pool size the current export settled on, or 0
+ *  when no export has got that far — including before the first one of the
+ *  session, and during the moments between the press and the pool being sized.
+ *
+ *  What the result has to satisfy: it is the same number `ExportProfile.threads`
+ *  records for this run, so the progress strip and the §7f report cannot
+ *  disagree. Its consumer is `threadNote` in main.ts, which says nothing at all
+ *  on a 0 rather than guessing. */
+export function exportThreadsNow(): number {
+  return liveThreads;
+}
+
 export interface BandResult {
   band: { from: number; to: number };
   /** Which way the band was cut — the axis the export's outer loop ran along. */
@@ -227,6 +262,8 @@ export async function exportImage(
   skyFine?: BrushMask | null,
 ): Promise<ExportResult | BandResult> {
   const __t: ExportProfile = { megapixels: 0, total: 0, source: 0, pixels: 0, watermark: 0, encode: 0, tag: 0, yields: 0, yieldMs: 0, threads: 1 };
+  // A BAND IS PART OF SOMEBODY ELSE'S EXPORT and must not touch the live count.
+  if (!opts.raw) liveThreads = 0;
   const __mark = (k: keyof ExportProfile, from: number) => { __t[k] += performance.now() - from; };
   const __start = performance.now();
   let __a = __start;
@@ -524,6 +561,9 @@ export async function exportImage(
         console.warn("parallel export failed, falling back to one thread:", err);
       }
     }
+    // DECIDED, either way — whether the pool ran or the export fell through to
+    // the loop below, the number is now known and the strip can stop guessing.
+    if (!opts.raw) liveThreads = __t.threads;
     for (let oIdx = ranParallel ? to : from; oIdx < to; oIdx++) {
       if (oIdx % 16 === 0) {
         onProgress?.((oIdx - from) / Math.max(1, to - from));
@@ -632,6 +672,7 @@ export async function exportImage(
         console.warn("parallel TIFF export failed, falling back to one thread:", err);
       }
     }
+    if (!opts.raw) liveThreads = __t.threads; // see the JPEG branch above
     for (let oIdx = ranParallelT ? to : from; oIdx < to; oIdx++) {
       if (oIdx % 16 === 0) {
         onProgress?.((oIdx - from) / Math.max(1, to - from));
