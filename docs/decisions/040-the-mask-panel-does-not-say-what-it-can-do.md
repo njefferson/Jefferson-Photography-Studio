@@ -108,6 +108,46 @@ numbers, plus 031's stroke list. On a Sky mask that means it is recomputed on
 the new photograph, which is what the field does and what makes it useful on a
 frame that is not the one it was built on.
 
+## Built already
+
+Four of this item's five parts already have code behind them, and the fifth has
+a shape to copy. The point of writing that here is 040's own headline: the
+capability was there and was not found. Building it again would be the same
+defect one level up.
+
+- **The set operators are shipped, whole** — `src/main.ts` renders the join row
+  (`mJoinAdd` / minus / within) and the mask list writes the operator into each
+  row's own name, so a component reads "minus Sky 2" rather than looking like a
+  separate mask. Record 026 is in the archive. The gap is that the join row is
+  hidden on the FIRST mask, which is correct — it has nothing above it to join —
+  and means a reader with one mask never sees the feature exists. **That is a
+  surfacing job, not a building one.**
+- **The brush's ring and its size control are shipped**, 2026-09-20, from this
+  record's own second point: hand size is a position mapped exponentially from
+  0.4% of the frame to 40%, and `#fixBrush` shows the footprint from the moment
+  a mode is armed and again while the slider moves. It copies `stkBrush`, the
+  sticker brush's ring, deliberately rather than being a second design — copy
+  that again for any further brush rather than drawing a third.
+- **Corrections are already kept as strokes rather than painted in**
+  (record 031: the `FixStroke` list rides the mask itself and is replayed in
+  `src/pipeline.ts`), which is
+  precisely what makes a saved mask a RECIPE rather than a bitmap. The saved
+  form this item needs is that list plus the selection's own numbers; nothing
+  new has to be invented to make a Sky mask travel to another photograph.
+- **The selection itself is already a named, exported thing** — `src/sky.ts`
+  exports `buildSkyMask`, and `src/skyhorizon.ts` and `src/skyfine.ts` are the
+  two halves behind it. A named list does not need a new model of what a mask
+  is.
+- **The walks to extend rather than replace**: `tools/mask-slots-walk.mjs` for
+  the list and the slots, `tools/mask-truth-walk.mjs` for what the overlay
+  actually shows, `tools/fullview-mask-walk.mjs` for the tab-in-front rule that
+  any new mask surface has to respect, and `tools/fix-brush-walk.mjs` for the
+  ring. A new surface joins `tools/surfaces.mjs` in the same commit that creates
+  it, or it ships unmeasured.
+
+What genuinely does not exist: renaming a mask, persisting one beyond the
+session, and any statement in the panel of what the panel can do.
+
 ## Rejected
 
 **Building add/subtract again.** It is shipped. The first point is a request

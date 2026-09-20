@@ -176,3 +176,32 @@ finished work on staging waiting on a person rather than work competing for
 session time — moving them down would not make them arrive sooner. It sits
 above 032 and everything under it because those are design work on the editor
 and this is a defect on the door every reader comes through first.
+
+## Outcome
+
+**BOTH WAITS FIXED 2026-09-20, and the plan's diagnosis was wrong about which
+half was slow.** It said the decode was the bottleneck. Measured before
+anything was changed, the first wait was 2.6s to a usable sheet, of which 1.7s
+was RENDERING and not decoding — so the fix is that the sheet is drawn before
+any file is read rather than that the reading is made faster.
+
+Every tile now exists from the moment the folder is picked: named, numbered, in
+order, pressable, each carrying the state it is in. **The first tile reaches
+the screen in 5ms against 331ms**, and the whole run came down from 2.6s to
+2.05s. The camera's own embedded preview fills a tile before this app's decode
+reaches it, so a tile shows a picture rather than a placeholder for most of its
+wait.
+
+**The first attempt made the first PICTURE worse — 331ms to 514ms — by opening
+every decode lane at once**, which put the first file behind the pool's own
+scheduling. The first file now runs alone and the lanes open behind it: 233ms,
+better than both.
+
+The second wait, after Keep, was measured and is unchanged within noise. It was
+not the same defect and it is not this record's; the counting half of 014 is
+where it goes.
+
+**Three walks broke when a heading was renamed**, because they polled
+user-facing prose to know when the sheet was busy. `qlGrid.dataset.busy` is the
+fact now, and a walk that reads words a person reads is brittle by
+construction.

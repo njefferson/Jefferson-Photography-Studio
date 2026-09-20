@@ -145,3 +145,34 @@ complaint: the controls on this tab do not behave like the others.
 defects rather than design, two are small, and none of them needs a
 measurement to know what correct looks like. It sits below 034 in the file only
 because 034 is what the reader is reaching for these controls to do.
+
+## Outcome
+
+**ALL THREE SHIPPED 2026-09-20, and the third took two attempts.**
+
+The colour wheels hold the hue over the innermost 15% of their travel, where the
+angle is noise, so pulling the puck in to take the effect off no longer
+overwrites the colour on the way and there is a direction to come back out
+along. The six sliders beside them have ids, which puts them in the double-tap
+capture and lookup with no other change.
+
+**THE SHADOW SLIDER WAS FIRST RENAMED RATHER THAN REVERSED, AND THAT WAS SENT
+BACK.** The report was that it runs backwards — right should increase, as it
+does on every other slider in the app. What was built instead relabelled the
+control "Amount" so that its NAME rose as the puck moved right while the colour
+in the photograph still fell. The left/right convention is about the
+photograph, not about the label, and a label cannot satisfy it.
+
+What shipped is the control reversed. Dragging right puts colour back into the
+shadows; the section above reads "Colour in the shadows" so the heading and the
+direction agree. The inversion lives in `syncFromUI` and `syncToUI` only, so the
+number stored in a look is untouched — every look already saved, shared as a
+link or baked into an exported JPEG renders exactly as it did, and only which
+end of the track it sits at has changed. A photograph opens with it all the way
+right, which is the end where it does nothing, because a control that can only
+take something away has to rest at the increasing end.
+
+**The walk had to be rewritten too.** Its first version read the control's
+LABEL, which is exactly what the sent-back fix changed — so it went green on the
+unfixed control. It reads the rendered frame now: the saturation of the dark
+pixels, 0.070 at the left against 0.220 at the right.

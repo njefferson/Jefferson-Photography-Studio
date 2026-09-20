@@ -86,3 +86,32 @@ the selected mask.
 carries the pattern, it is met by anyone who checks a mask at full size, and
 nothing above it depends on it — so it is ranked here for being cheap and
 finished rather than for being urgent.
+
+## Outcome
+
+**SHIPPED 2026-09-20, and the fix was in two places rather than one.**
+
+Full view stands the whole overlay down — tint, matte and outline together,
+through the one condition that already decides all three — and brings it back
+on leaving. The mask stays selected throughout. Measured on the conifer frame
+with a radial: 44.6% of the frame carries the overlay while editing, 11.6% in
+full view (which is the photograph's own teal sky, not the tint), and exactly
+44.6% again on return.
+
+**AND THE FIRST VERSION OF THIS FIX SHIPPED A WORSE DEFECT THAN THE ONE IT
+CURED.** `renderMaskOverlay` gained a full-view term; `skyFixOn`, which restates
+the same rule — is the Masks tab in front of the reader — did not. Full view
+hides the panel with CSS and never with the `hidden` attribute, so that second
+copy still returned true. Arm *Add by hand*, enter full view, tap the
+photograph to leave — one of the documented ways out — and the tap was taken as
+a brush stroke, stamped into the sky selection and replayed on every
+regeneration afterwards. With the overlay now standing down, nothing on screen
+said it had happened.
+
+Both now ask one predicate, `masksTabInFront()`. The walk arms the correction,
+enters full view, taps to leave and asserts the selection is unchanged: against
+the two-copies state it reported "1 correction by hand" and the selection moving
+54.0% to 55.2% from a single tap.
+
+**One rule, two copies, one updated** is the defect class this record ends on,
+and it is the same one 036 ends on.
