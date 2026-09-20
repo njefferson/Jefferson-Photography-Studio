@@ -3010,6 +3010,14 @@ function wireVersionMenu() {
       // between photos slow and nothing in the app could say which part of it
       // was slow — the parts are disjoint and add up to the whole.
       { k: "Last switch", v: switchSplit() },
+      // THE TWO WAITS ON THE PATH EVERY READER MEETS FIRST (decision 033).
+      // "A long delay before thumbnails begin showing" is a symptom with five
+      // stages behind it and "a long delay before the screen changes" has
+      // three, and nothing in the app could say which. These two lines carry
+      // the stages off the run that actually happened, with the reader's own
+      // files, which no synthetic measurement on practice photographs can.
+      { k: "Last quick look", v: quickLookSplit() },
+      { k: "Last keep", v: keepSplit() },
       { k: "Edits held in memory", v: editsHeldLine() },
       // WHICH COPY OF THE PHOTOGRAPH IS BEING EDITED, and what it cost to get
       // there. The editor shows the half-size copy first and replaces it with
@@ -10462,13 +10470,53 @@ async function resetSessionState(clearStorage: boolean) {
  *  new photo as soon as it's ready. Decoding is sequential with yields so the
  *  UI stays usable; only one decode is in RAM at a time. */
 async function addToSession(files: File[], append: boolean, ready?: Map<File, ReadyFile>) {
+  // READ AND CLEARED HERE, so a set opened by any other route is never reported
+  // as a keep and a second open cannot inherit the first one's clock.
+  const pressedAt = keepPressedAt;
+  keepPressedAt = 0;
+  const tReset = performance.now();
+  // A HEAD START ON THE ONE FILE THE READER IS WAITING FOR.
+  //
+  // The two lines below touch STORAGE and nothing else: ending the last
+  // session, then waiting for its chunk delete — a cost that scales with the
+  // set being REPLACED rather than the one being opened, so a reader keeping
+  // six photographs can be waiting on the forty they just finished with.
+  // Reading and decoding one file needs none of that, and until now it waited
+  // behind both for no reason at all.
+  //
+  // Started here and awaited in the loop, so it costs nothing when the delete
+  // is instant and saves the whole of it when it is not. Only on a FRESH
+  // session: an append does not clear anything, its file list is filtered
+  // below, and with a photo already on screen nothing is decoded up front.
+  // Its own errors are carried rather than thrown — an unawaited rejection
+  // here would be an unhandled one — and the loop below raises them at the
+  // point it would have raised its own.
+  let headStart: Promise<{ imported: ImportedFile; img: DecodedImage; read: number; decode: number } | { err: unknown }> | null = null;
+  if (!append && files.length) {
+    const f0 = files[0];
+    headStart = (async () => {
+      const a = performance.now();
+      try {
+        const imported = guardLocation(await importFile(f0));
+        const b = performance.now();
+        const img = await decodeWithLens(imported, { front: true, sky: true });
+        return { imported, img, read: b - a, decode: performance.now() - b };
+      } catch (err) {
+        return { err };
+      }
+    })();
+  }
   if (!append) await resetSessionState(true); // fresh session — clear leftovers
   // THE ONE PLACE THE DELETE IS STILL WORTH WAITING FOR. Ending a session and
   // immediately opening another is the only collision: the old bytes are still
   // on the device, so writing the new set on top of them is what would run the
   // device out of room. Waiting here puts that wait where a wait is already
   // expected and shown, rather than on a press that has nothing left to do.
+  const tSweep = performance.now();
   await Session.sweepSettled();
+  const msReset = tSweep - tReset;
+  const msSweep = performance.now() - tSweep;
+  let msRead = 0, msDecode = 0, msShow = 0;
   const skipped: string[] = [];
   let firstNewId: string | null = null;
   let quotaHit = false;
@@ -10586,8 +10634,14 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
       if (ownsBusy && busy.open) busyText.textContent = `Adding ${files.length} photos — reading ${i + 1} of ${files.length}: ${f.name}`;
       updateSessionStrip();
       let imported: ImportedFile;
+      const tRead = performance.now();
+      // The head start covers files[0] and only on a fresh session, which is
+      // exactly where it was set up; anything else reads here as before.
+      const head = i === 0 ? await headStart : null;
       try {
-        imported = guardLocation(await importFile(f));
+        if (head && "err" in head) throw head.err;
+        imported = head ? head.imported : guardLocation(await importFile(f));
+        if (!firstNewId) msRead += head ? head.read : performance.now() - tRead;
       } catch (err) {
         skipped.push(`${f.name} (${(err as Error).message})`);
         dropPlanned(slot.id);
@@ -10641,8 +10695,10 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
       // between one decode before you can work and forty.
       let firstImg: DecodedImage | null = null;
       if (!firstNewId && (!activePhotoId || activePhotoId === "lone")) {
+        const tDecode = performance.now();
         try {
-          firstImg = await decodeWithLens(imported, { front: true, sky: true });
+          firstImg = head ? head.img : await decodeWithLens(imported, { front: true, sky: true });
+          msDecode += head ? head.decode : performance.now() - tDecode;
         } catch (err) {
           skipped.push(`${f.name} (${(err as Error).message})`);
           dropPlanned(slot.id);
@@ -10668,9 +10724,22 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
       });
       if (!firstNewId) {
         firstNewId = slot.id;
+        const tShow = performance.now();
         if (firstImg) {
           showDecoded(firstImg, imported);
           activateCurrent(slot.id);
+        }
+        msShow = performance.now() - tShow;
+        // THE WAIT THE READER ACTUALLY HAD, closed here rather than at the
+        // bottom of the loop: this is the line where the editor appears and
+        // the spinner goes, and the loop runs on for the rest of the set.
+        if (pressedAt) {
+          lastKeepProfile = {
+            kept: files.length,
+            carried: ready ? [...ready.values()].filter((r) => r.thumb && r.thumb.byteLength).length : 0,
+            reset: msReset, sweep: msSweep, read: msRead, decode: msDecode, show: msShow,
+            total: performance.now() - pressedAt,
+          };
         }
         ownsBusy = false;
         hideBusy(); // there is a photo on screen — nothing left to wait for
@@ -11589,6 +11658,44 @@ function switchSplit(): string {
   );
 }
 
+/** WHERE THE LAST QUICK LOOK'S SECONDS WENT, in one line that can be pasted.
+ *
+ *  Time to the first tile leads, because that is the wait being reported: a
+ *  sheet with nothing on it. The stage sums follow in the order the loop does
+ *  them, so a reader of the report can see which one owns the run rather than
+ *  being told a total. Returns "none this session" where nothing has run — the
+ *  honest answer on a freshly opened page, and never a zero. */
+function quickLookSplit(): string {
+  const p = lastQuickProfile;
+  if (!p) return "none this session";
+  const t = (ms: number) => (ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)}s`);
+  const pic = p.firstPicture ? t(p.firstPicture) : "never — no file gave a picture";
+  return (
+    `${p.files} file${p.files === 1 ? "" : "s"} in ${t(p.total)} — first tile ${t(p.firstTile)}, first picture ${pic}` +
+    `; store lookup ${t(p.lookup)}, reading ${t(p.read)}, decode ${t(p.decode)}, rendering ${t(p.render)}, keeping ${t(p.store)}` +
+    `; ${p.reused} of ${p.files} came back already rendered` +
+    `, ${p.previewed} showed the camera's own picture first` +
+    `, ${p.lanes || "no"} decoder${p.lanes === 1 ? "" : "s"} running`
+  );
+}
+
+/** WHERE THE SECONDS AFTER **Keep** WENT — the press to the editor appearing.
+ *
+ *  The sweep is called out on its own because it is the one stage whose cost
+ *  belongs to the set being REPLACED rather than the one being opened, and a
+ *  reader looking at a slow keep of six photographs would otherwise have no
+ *  way to see that the forty they just ended are what they are waiting on. */
+function keepSplit(): string {
+  const p = lastKeepProfile;
+  if (!p) return "none this session";
+  const t = (ms: number) => (ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)}s`);
+  return (
+    `${p.kept} kept in ${t(p.total)} — ending the last session ${t(p.reset)}, waiting on its delete ${t(p.sweep)}` +
+    `, reading the first file ${t(p.read)}, decoding it ${t(p.decode)}, first paint ${t(p.show)}` +
+    `; ${p.carried} of ${p.kept} arrived with a picture already rendered`
+  );
+}
+
 /** How many photos are holding a full working state in memory, against how many
  *  are in the session. The number the session's own memory behaviour is judged
  *  by, and until now nothing could see it. */
@@ -11711,6 +11818,23 @@ void Session.sweepOrphans().catch(() => {});
 interface QuickItem {
   file: File;
   name: string;
+  /** WHOSE PICTURE IS IN THE TILE, AND WHETHER THERE IS ONE YET.
+   *
+   *  - `waiting` — the cell is drawn, named and numbered, and nothing has been
+   *    read. Every cell starts here, before a byte of any file is touched.
+   *  - `preview` — the CAMERA's own embedded JPEG. A picture, at once, with no
+   *    demosaic behind it; marked in text as the camera's, because on an
+   *    infrared conversion it is a different colour world from this app's
+   *    render (IR-SCIENCE.md section 3).
+   *  - `real` — this app's own rendering, through the same pipeline as opening
+   *    the photograph.
+   *  - `bad` — the file could not be opened at all.
+   *
+   *  `ok` is the keepable half and does NOT track this: a `preview` tile is a
+   *  real photograph and `willKeep` takes it, a `waiting` one is not yet known
+   *  to be anything. Changing this field means repainting through
+   *  `paintQuickTile`, which is what keeps the cell and its listeners intact. */
+  state: "waiting" | "preview" | "real" | "bad";
   thumbUrl: string; // object URL for the grid tile ("" if it couldn't decode)
   /** The SAME picture at strip size, rendered from the same decode. Quick look
    *  decodes every file to build the grid; keeping a set afterwards used to
@@ -11815,6 +11939,10 @@ function updateQuickHeader(progress?: string) {
  *  stays countable ("what number am I on?"). */
 /** Paint one cell to match its item — called on every mark, and the only place
  *  that knows what a mark looks like. */
+/** A cell's VERDICT and its provisional marking — everything about the tile
+ *  that can change without the picture changing. Kept apart from
+ *  `paintQuickTile` so a mark does not rebuild an image element and drop the
+ *  browser's decode of it. */
 function paintQuickCell(cell: HTMLElement, it: QuickItem): void {
   const tile = cell.querySelector(".ql-tile") as HTMLButtonElement | null;
   const badge = cell.querySelector(".ql-badge") as HTMLElement | null;
@@ -11831,6 +11959,52 @@ function paintQuickCell(cell: HTMLElement, it: QuickItem): void {
   if (x) x.setAttribute("aria-pressed", String(it.mark === "reject"));
 }
 
+/** THE PICTURE IN A CELL, AND WHOSE PICTURE IT IS. Called every time an item
+ *  moves between its four states, on a cell built once by `addQuickTile` — so
+ *  the tile's own controls and their listeners are never rebuilt and a cell
+ *  cannot end up with two of anything.
+ *
+ *  What it must hold: a cell in `preview` carries the word "Preview" in TEXT
+ *  and a title saying whose rendering it is. That is not decoration. The
+ *  camera's own JPEG on an infrared conversion is a different colour world
+ *  from this app's render (IR-SCIENCE.md section 3 — the camera cannot store
+ *  an infrared white point), and a reader judging colour from it without being
+ *  told would be judging the camera's guess. Lightroom bypasses the embedded
+ *  preview the moment its Develop module opens for the same reason; the
+ *  difference is that culling is composition, focus and the moment, which the
+ *  camera's picture carries perfectly well. */
+function paintQuickTile(cell: HTMLElement, it: QuickItem): void {
+  const tile = cell.querySelector(".ql-tile") as HTMLButtonElement | null;
+  const x = cell.querySelector(".ql-x") as HTMLButtonElement | null;
+  if (!tile) return;
+  cell.classList.toggle("provisional", it.state === "preview");
+  cell.classList.toggle("waiting", it.state === "waiting");
+  const prov = cell.querySelector(".ql-prov") as HTMLElement | null;
+  if (prov) prov.hidden = it.state !== "preview";
+  if (x) x.hidden = it.state === "bad";
+  tile.disabled = it.state === "bad";
+  tile.title = it.state === "preview"
+    ? `${it.name} — the camera's own picture, until this app has rendered its own`
+    : it.state === "waiting"
+      ? `${it.name} — not read yet`
+      : it.name;
+  tile.setAttribute("aria-label", it.state === "bad" ? `${it.name} — could not be opened` : `Pick ${it.name}`);
+  const img = tile.querySelector("img");
+  if (it.thumbUrl) {
+    if (img) { if (img.getAttribute("src") !== it.thumbUrl) img.src = it.thumbUrl; img.alt = it.name; return; }
+    tile.replaceChildren(Object.assign(document.createElement("img"), { src: it.thumbUrl, alt: it.name }));
+    return;
+  }
+  // No picture yet, or never. A waiting cell is deliberately NOT disabled: it
+  // is a real file with a real name and a reader who recognises the number can
+  // reject it before its bytes have been read.
+  tile.replaceChildren(Object.assign(document.createElement("span"), {
+    className: it.state === "bad" ? "ql-bad-mark" : "ql-wait-mark",
+    textContent: it.state === "bad" ? "\u26A0\uFE0E" : "\u2026",
+  }));
+  tile.classList.toggle("ql-bad", it.state === "bad");
+}
+
 function markQuick(it: QuickItem, mark: QuickItem["mark"]): void {
   it.mark = it.mark === mark ? null : mark; // pressing the same mark takes it off
   const i = quickItems.indexOf(it);
@@ -11839,6 +12013,15 @@ function markQuick(it: QuickItem, mark: QuickItem["mark"]): void {
   updateQuickHeader();
 }
 
+/** THE WHOLE SET, NAMED AND NUMBERED, BEFORE A BYTE IS READ.
+ *
+ *  This builds the cell and wires its two controls ONCE; every later change to
+ *  the item goes through `paintQuickTile`. It used to be called at the BOTTOM
+ *  of the decode loop's body, which is the whole of the first delay reported
+ *  on 2026-09-20: the sheet stayed empty until one file had been read,
+ *  demosaiced, denoised, lens-corrected and rendered twice, and then accreted
+ *  one tile at a time. The session strip was given this same change long ago
+ *  ("Every tile, up front" in `addToSession`) and the grid was not. */
 function addQuickTile(it: QuickItem, n: number) {
   // A CELL, because a tile now carries two controls and a button cannot hold a
   // button. The picture itself is the pick — the same tap that used to select —
@@ -11849,32 +12032,24 @@ function addQuickTile(it: QuickItem, n: number) {
   tile.type = "button";
   tile.className = "ql-tile";
   tile.tabIndex = -1; // one tab stop for the whole grid; arrows move within it
-  tile.title = it.name;
-  if (it.ok && it.thumbUrl) {
-    const im = document.createElement("img");
-    im.src = it.thumbUrl;
-    im.alt = it.name;
-    tile.append(im);
-    tile.setAttribute("aria-label", `Pick ${it.name}`);
-    tile.addEventListener("click", () => { quickCursor = quickItems.indexOf(it); markQuick(it, "pick"); focusQuickCursor(false); });
-    cell.append(tile);
-    const x = document.createElement("button");
-    x.type = "button";
-    x.className = "ql-x";
-    x.tabIndex = -1;
-    x.textContent = "✗";
-    x.setAttribute("aria-label", `Reject ${it.name}`);
-    x.addEventListener("click", (e) => { e.stopPropagation(); quickCursor = quickItems.indexOf(it); markQuick(it, "reject"); focusQuickCursor(false); });
-    cell.append(x);
-    cell.append(Object.assign(document.createElement("span"), { className: "ql-badge", hidden: true }));
-  } else {
-    tile.classList.add("ql-bad");
-    tile.disabled = true;
-    tile.append(Object.assign(document.createElement("span"), { className: "ql-bad-mark", textContent: "⚠︎" }));
-    cell.append(tile);
-  }
-  cell.append(Object.assign(document.createElement("span"), { className: "ql-name", textContent: `${n} · ${it.name}` }));
+  tile.addEventListener("click", () => { quickCursor = quickItems.indexOf(it); markQuick(it, "pick"); focusQuickCursor(false); });
+  cell.append(tile);
+  const x = document.createElement("button");
+  x.type = "button";
+  x.className = "ql-x";
+  x.tabIndex = -1;
+  x.textContent = "\u2717";
+  x.setAttribute("aria-label", `Reject ${it.name}`);
+  x.addEventListener("click", (e) => { e.stopPropagation(); quickCursor = quickItems.indexOf(it); markQuick(it, "reject"); focusQuickCursor(false); });
+  cell.append(x);
+  cell.append(Object.assign(document.createElement("span"), { className: "ql-badge", hidden: true }));
+  // SAID IN WORDS, beside the verdict badge and never instead of it: a reader
+  // who cannot separate the dimming from the full-strength tile still reads
+  // "Preview".
+  cell.append(Object.assign(document.createElement("span"), { className: "ql-prov", textContent: "Preview", hidden: true }));
+  cell.append(Object.assign(document.createElement("span"), { className: "ql-name", textContent: `${n} \u00B7 ${it.name}` }));
   qlGrid.append(cell);
+  paintQuickTile(cell, it);
   paintQuickCell(cell, it);
 }
 
@@ -11951,10 +12126,77 @@ qlGrid.addEventListener(
   { passive: true },
 );
 
+/** WHERE THE QUICK LOOK'S SECONDS WENT, measured on the run that actually
+ *  happened, with the reader's own files.
+ *
+ *  It exists because "a long delay before thumbnails begin showing" is a
+ *  symptom and not a stage, and this path has five of them. The two headline
+ *  numbers are deliberately separate: `firstTile` is how long the sheet stayed
+ *  EMPTY, and `firstPicture` is how long it stayed empty of a PICTURE. Those
+ *  are the same number today and are not meant to stay that way, so a single
+ *  "time to first tile" would hide exactly the change it is here to measure.
+ *
+ *  The per-stage figures are sums across the whole run, not per file, so they
+ *  can be read against `total` and against each other. `reused` is how many
+ *  tiles came back out of the preview store without a decode — a run that is
+ *  mostly reuse and still slow is a different defect from one that is not. */
+interface QuickProfile {
+  files: number;
+  reused: number;
+  /** HOW MANY TILES SHOWED THE CAMERA'S OWN PICTURE FIRST — reported because
+   *  it is the difference between a file that carries an embedded preview and
+   *  one that does not, and the app cannot know which the reader's camera
+   *  writes until it has read one. Current Nikon bodies embed a full-size
+   *  preview; several other makes embed a small one or none, and the 44
+   *  practice DNGs in this repository carry NONE at all, which is why no run
+   *  against them can measure this path. A zero here on the reader's own files
+   *  means the first picture waited for a full render and the stage list below
+   *  should be read with that in mind. */
+  previewed: number;
+  lanes: number;
+  firstTile: number;
+  firstPicture: number;
+  total: number;
+  lookup: number;
+  read: number;
+  decode: number;
+  render: number;
+  store: number;
+}
+let lastQuickProfile: QuickProfile | null = null;
+
+/** WHERE THE SECONDS AFTER **Keep** WENT, the other half of the same report.
+ *
+ *  `sweep` is the previous session's chunk delete, which `addToSession` waits
+ *  for before it reads a byte — a cost that scales with the set being REPLACED
+ *  rather than the one being opened, which is why it has its own field and is
+ *  not folded into "before the first file". `show` is the first paint: GL
+ *  upload, shader compile and the rest of `showDecoded`.
+ *
+ *  `carried` is how many of the kept photographs arrived with a picture from
+ *  the grid, against `kept`. Record 014 turns on that pair. */
+interface KeepProfile {
+  kept: number;
+  carried: number;
+  reset: number;
+  sweep: number;
+  read: number;
+  decode: number;
+  show: number;
+  total: number;
+}
+let lastKeepProfile: KeepProfile | null = null;
+/** Set the moment Keep is pressed, read inside `addToSession`, and cleared
+ *  there — so a set opened by any other route is not reported as a keep. */
+let keepPressedAt = 0;
+
 /** Open the grid and decode a preview of each picked file in turn. A transcoded
  *  JPEG still makes a fine preview, so — unlike a real open — we don't reject it
  *  here (that warning is for editing true RAW, which quick look isn't). */
 async function openQuickLook(files: File[]) {
+  const t0 = performance.now();
+  let firstTile = 0, firstPicture = 0;
+  let msLookup = 0, msRead = 0, msDecode = 0, msRender = 0, msStore = 0;
   files = inShutterOrder(files); // see inShutterOrder — the picker's order is arbitrary
   const gen = ++quickGen;
   for (const it of quickItems) if (it.thumbUrl) URL.revokeObjectURL(it.thumbUrl);
@@ -11966,11 +12208,30 @@ async function openQuickLook(files: File[]) {
   quickCursor = 0;
   qlGrid.replaceChildren();
   if (!quickLook.open) quickLook.showModal();
-  updateQuickHeader(`Decoding 0 / ${files.length}…`);
+
+  // --- EVERY TILE, UP FRONT -------------------------------------------------
+  // The picker has already told us each file's name, so the whole set is on
+  // screen — named, numbered, in order — before a byte is read. This is the
+  // first half of the delay reported 2026-09-20: the sheet used to stay
+  // completely empty until one file had been read, demosaiced, denoised,
+  // lens-corrected and rendered TWICE at 512 and 260 px through the CPU
+  // pipeline, and then grew one tile at a time. Measured before this change:
+  // 331 ms to the first tile of a 2.6 s run over eight practice raws in a
+  // container, of which 1.7 s was rendering on the main thread.
+  // A MACHINE-READABLE "STILL GOING", because three walks polled the header's
+  // PROSE for it and all three broke the day that sentence changed a word.
+  // Copy is the product's and must stay free to change; a harness needs state.
+  qlGrid.dataset.busy = "1";
+  quickItems = files.map((f) => ({ file: f, name: f.name, state: "waiting" as const, thumbUrl: "", stripThumb: null, ok: false, mark: null }));
+  quickItems.forEach((it, i) => addQuickTile(it, i + 1));
+  firstTile = performance.now() - t0;
+  focusQuickCursor(false); // the grid exists now, so the keys have somewhere to live
+  updateQuickHeader(`Reading 0 / ${files.length}…`);
 
   let done = 0;
   let reused = 0;
-  let landed = false; // whether the cursor has been put on a real tile yet
+  let previewed = 0;
+  let landed = false; // whether the cursor has been put on a tile with a picture
   // READ ONCE, AND CLEARED HERE. A run can end early — the grid closed, another
   // pick started over it — and a flag cleared only at the bottom would then
   // bypass the store on the NEXT run instead of this one.
@@ -11987,31 +12248,75 @@ async function openQuickLook(files: File[]) {
   // a picture of THAT state, not this one. It cannot change while this loop
   // runs: the grid is a modal dialog and every look button is behind it.
   const gradeStampAt = fnv1a(gradeStamp());
-  for (const f of files) {
-    if (gen !== quickGen) return; // closed or restarted under us
-    let thumbUrl = "";
-    let ok = false;
-    let stripThumb: ArrayBuffer | null = null;
-    // ALREADY RENDERED, ON THIS DEVICE, FROM THIS FILE, UNDER THIS GRADE. Keyed
-    // on the file's own name, length and modified time, on this build's
-    // pipeline, on the profiles above and on the grade — so the same folder
-    // comes back at once and a changed anything renders again. `rebuilding` is
-    // the reader's override.
+
+  /** Repaint one item's cell in place. The cell was built up front and owns its
+   *  listeners, so this only ever changes the picture and the wording. */
+  const repaint = (i: number) => {
+    const cell = qlGrid.children[i] as HTMLElement | undefined;
+    if (!cell) return;
+    paintQuickTile(cell, quickItems[i]);
+    paintQuickCell(cell, quickItems[i]);
+  };
+  /** Put a new picture in an item, releasing the one it had. The old URL must
+   *  go: a run of forty leaks forty object URLs otherwise, each holding a JPEG
+   *  alive for as long as the tab is. */
+  const setPicture = (it: QuickItem, bytes: ArrayBuffer | Uint8Array, state: QuickItem["state"]) => {
+    const old = it.thumbUrl;
+    it.thumbUrl = URL.createObjectURL(new Blob([bytes instanceof Uint8Array ? bytes.slice() : bytes], { type: "image/jpeg" }));
+    it.state = state;
+    it.ok = true;
+    if (old) URL.revokeObjectURL(old);
+  };
+
+  /** ONE FILE, ALL THE WAY THROUGH — and the order inside it is the point.
+   *
+   *  The camera's own preview goes in the tile the moment the bytes are in
+   *  hand, before anything is decoded, because that is what every culling tool
+   *  does and what makes one usable: Photo Mechanic's whole speed against
+   *  Lightroom is that it shows the embedded JPEG rather than rendering the
+   *  raw, and Lightroom answered with an Embedded & Sidecar import of its own.
+   *  This app's render replaces it a moment later, so the reader is never left
+   *  judging colour by the camera's guess — which on an infrared conversion is
+   *  a clamp artefact, not a white point. */
+  const one = async (i: number): Promise<void> => {
+    const f = files[i];
+    const it = quickItems[i];
+    const tLookup = performance.now();
     const cached = bypass ? null : await getPreview(f, QUICK_EDGE, gradeStampAt, lensStamp).catch(() => null);
+    msLookup += performance.now() - tLookup;
+    if (gen !== quickGen) return;
     if (cached && cached.grid.byteLength) {
-      thumbUrl = URL.createObjectURL(new Blob([cached.grid], { type: "image/jpeg" }));
-      ok = true;
-      stripThumb = cached.strip?.byteLength ? cached.strip : null;
+      setPicture(it, cached.grid, "real");
+      it.stripThumb = cached.strip?.byteLength ? cached.strip : null;
       reused++;
+      return;
     }
     try {
-      if (ok) throw null; // already have it — skip the decode without duplicating the tail
+      const tRead = performance.now();
       const imported = guardLocation(await importFile(f));
+      msRead += performance.now() - tRead;
+      if (gen !== quickGen) return;
+      // THE CAMERA'S OWN PICTURE, FREE, FROM BYTES ALREADY IN HAND. Nikon
+      // bodies embed a full-size preview, which `pickLargestPreview` takes;
+      // where a file has none this simply does nothing and the tile waits for
+      // the render below.
+      const prev = embeddedPreview(imported.bytes, imported.kind);
+      if (prev) {
+        previewed++;
+        setPicture(it, prev, "preview");
+        if (!firstPicture) firstPicture = performance.now() - t0;
+        repaint(i);
+        updateQuickHeader(`Reading ${done} / ${files.length}…`);
+      }
+      const tDecode = performance.now();
       const img = await decodeWithLens(imported);
+      const tRender = performance.now();
+      msDecode += tRender - tDecode;
+      if (gen !== quickGen) return;
       const thumb = await makeThumb(img, QUICK_EDGE, lensCurveFor(imported));
       if (thumb.byteLength) {
-        thumbUrl = URL.createObjectURL(new Blob([thumb], { type: "image/jpeg" }));
-        ok = true;
+        setPicture(it, thumb, "real");
+        if (!firstPicture) firstPicture = performance.now() - t0;
         // A second render at strip size, off the SAME decode. The render is a
         // fraction of the decode that produced it (a quarter of the pixels of
         // the grid tile), and it saves that decode happening again later. Made
@@ -12019,42 +12324,84 @@ async function openQuickLook(files: File[]) {
         // because the session stores a thumbnail INLINE in its meta row and
         // that row has to stay small — see session.ts on why large IDB values
         // are the one shape that is not crash-safe.
-        stripThumb = await makeThumb(img, 260, lensCurveFor(imported)).catch(() => null);
+        it.stripThumb = await makeThumb(img, 260, lensCurveFor(imported)).catch(() => null);
+        msRender += performance.now() - tRender;
         // Kept for next time. Not awaited: the reader is watching the grid
-        // fill, and a write to storage is not part of that.
-        if (stripThumb) void putPreview(f, QUICK_EDGE, { grid: thumb, strip: stripThumb }, gradeStampAt, lensStamp);
+        // fill, and a write to storage is not part of that. TIMED ANYWAY —
+        // not awaiting it does not make it free, it makes it land somewhere
+        // else in the same run.
+        const tStore = performance.now();
+        if (it.stripThumb) void putPreview(f, QUICK_EDGE, { grid: thumb, strip: it.stripThumb }, gradeStampAt, lensStamp);
+        msStore += performance.now() - tStore;
+      } else {
+        msRender += performance.now() - tRender;
       }
       // img + the imported bytes fall out of scope here; only the small JPEG
       // preview is retained, so RAM stays bounded to N thumbnails.
     } catch {
-      /* a cache hit throws null past the decode; anything else could not be
-         opened and is shown as a placeholder tile so nothing goes missing */
+      // The camera's preview may already be in the tile — a file that decodes
+      // badly can still have shown one — so only a tile with NO picture at all
+      // becomes the placeholder. Nothing goes missing either way.
+      if (!it.ok) it.state = "bad";
     }
-    if (gen !== quickGen) { if (thumbUrl) URL.revokeObjectURL(thumbUrl); return; }
-    const it: QuickItem = { file: f, name: f.name, thumbUrl, stripThumb, ok, mark: null };
-    quickItems.push(it);
-    addQuickTile(it, quickItems.length);
-    // THE KEYS LIVE ON THE GRID, so they do nothing until the focus is inside
-    // it. The dialog opens with the grid empty, so the browser puts the focus on
-    // the first thing it can find — the Close button, a SIBLING of the grid —
-    // and every tile is born tabIndex -1 (addQuickTile). P, X, U and C were
-    // therefore unreachable until the reader clicked a tile, and clicking a tile
-    // IS the pick: the keys could not be used to make the first decision, only
-    // to repeat one already made by hand.
-    //
-    // The first tile with a picture in it takes the cursor. Only the first —
-    // after that the reader owns where the focus is, and a set still filling in
-    // must never pull it back.
-    if (!landed && ok) {
-      landed = true;
-      quickCursor = quickItems.length - 1; // a placeholder tile is disabled and cannot hold focus
-      focusQuickCursor(false); // no scroll: the grid has not been scrolled yet
+  };
+
+  // --- AND THE LANES ARE KEPT FULL -----------------------------------------
+  // `decodeClient` runs three or four decoders and this loop used to await one
+  // file at a time, so all but one sat idle for the whole run. The count comes
+  // from `decodeLaneTarget`, never `decodeLanes`: the latter reports how many
+  // are ALIVE, which is zero before anything has decoded, and this pass runs
+  // when nothing has (decision 008's own Rejected section).
+  //
+  // EACH LANE TAKES THE NEXT UNCLAIMED INDEX, so no two ever take the same
+  // file. 008 records what the absence of that guard looks like: two lanes
+  // decode the same photograph, both write the same correct tile, and the grid
+  // looks perfect while the device decodes everything twice.
+  // THE FIRST FILE GOES ALONE, and that is not an optimisation — it is paying
+  // back a regression this change introduced and measured. Opening the lanes
+  // immediately puts three renders in a race for the one main thread, so on a
+  // file with no embedded preview the FIRST picture arrived at 514 ms where
+  // the old strictly-serial loop had it at 331. Time to the first tile is what
+  // the up-front cells fixed; time to the first picture is a separate promise
+  // and it must not be paid for with the other. One file first, then everything
+  // at once: the first picture lands as fast as it ever did, and the remaining
+  // seven still overlap.
+  let next = 0;
+  const lane = async (once = false): Promise<void> => {
+    for (;;) {
+      if (gen !== quickGen) return;
+      const i = next++;
+      if (i >= files.length) return;
+      await one(i);
+      if (gen !== quickGen) return;
+      repaint(i);
+      if (!landed && quickItems[i].ok) {
+        landed = true;
+        // THE KEYS LIVE ON THE GRID, so they do nothing until the focus is
+        // inside it. The first tile to hold a picture takes the cursor; only
+        // the first — after that the reader owns where the focus is, and a set
+        // still filling in must never pull it back.
+        quickCursor = i;
+        focusQuickCursor(false); // no scroll: the grid has not been scrolled yet
+      }
+      done++;
+      updateQuickHeader(done < files.length ? `Reading ${done} / ${files.length}…` : undefined);
+      await tick(); // yield so the grid paints and taps stay responsive
+      if (once) return;
     }
-    done++;
-    updateQuickHeader(done < files.length ? `Decoding ${done} / ${files.length}…` : undefined);
-    await tick(); // yield so the grid paints and taps stay responsive
-  }
+  };
+  await lane.call(null, true);   // the first file, on its own
+  if (gen !== quickGen) return;
+  await Promise.all(Array.from({ length: Math.max(1, decodeLaneTarget()) }, () => lane()));
+  if (gen !== quickGen) return;
+
+  delete qlGrid.dataset.busy;
   lastRun = { files, reused };
+  lastQuickProfile = {
+    files: files.length, reused, previewed, lanes: decodeLanes(),
+    firstTile, firstPicture, total: performance.now() - t0,
+    lookup: msLookup, read: msRead, decode: msDecode, render: msRender, store: msStore,
+  };
   updateQuickHeader();
   updateRebuildNote();
   void prunePreviews(); // one pass per run, never per file
@@ -12192,6 +12539,7 @@ let closingQuickLook = false;
 
 function closeQuickLook() {
   quickGen++;
+  delete qlGrid.dataset.busy; // a run abandoned mid-way is not still going
   closingQuickLook = true;
   // Its pictures are the grid's object URLs, revoked two lines below.
   if (cmpDlg?.open) cmpDlg.close();
@@ -12218,6 +12566,9 @@ async function keepQuickLook() {
   // built would otherwise arrive in the session unmarked.
   const ready = new Map<File, ReadyFile>();
   for (const it of keeping) ready.set(it.file, { thumb: it.stripThumb ?? undefined, mark: it.mark === "pick" ? "pick" : undefined });
+  // THE CLOCK STARTS AT THE PRESS, not where the work starts, because the wait
+  // being reported is the reader's and it begins when they press the button.
+  keepPressedAt = performance.now();
   closeQuickLook();
   try {
     await openPicked(files, ready);

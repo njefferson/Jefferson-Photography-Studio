@@ -1131,6 +1131,69 @@ user-scalable=no.
   byte-identical to today's, because a graphics chip computes in float where the
   processor uses doubles. It would match the PREVIEW instead.
 
+## The quick look's wait was the RENDER, not the decode, 2026-09-20 (decision 033)
+
+Two delays reported from the device: a long wait before any thumbnail appears
+on the pick/reject sheet, and a long wait after Keep before the editor arrives.
+Instrumented before anything was changed, because the first of those has five
+stages behind it and the second has four, and nothing in the app could say
+which owned the seconds.
+
+**The instrument is in the app and stays there.** `Last quick look` and
+`Last keep` in the §7f report carry the stage breakdown off the run that
+actually happened, with the reader's own files — which no synthetic measurement
+on practice photographs can, since those are a different camera's output and a
+different storage medium.
+
+**What the first run said, and it was not what the plan predicted.** Eight cold
+practice raws in a container: 2.6 s in total, first tile at 331 ms — and of
+that 2.6 s, **1.7 s was RENDERING and only 697 ms was decoding.** `makeThumb`
+runs the CPU pipeline per pixel on the MAIN THREAD, twice per file, at 512 and
+260 px: about 220,000 pipeline evaluations a file, synchronous, so nothing can
+paint while it runs. The plan had named the decode as the thing to parallelise.
+
+**Three fixes, each one a remedy this app had already written for the session
+strip and never given the grid.** Every cell on screen, named and numbered,
+before a byte is read; the camera's own embedded preview as the tile's first
+picture, marked `Preview` in text; and the decode lanes kept full instead of
+one file at a time.
+
+**And a regression the same measurement caught.** Opening the lanes immediately
+put three renders in a race for the one main thread, so on a file with NO
+embedded preview the first PICTURE went from 331 ms to 514 — the up-front tiles
+had been paid for with the thing they were meant to fix. The first file now
+runs alone and the rest overlap: first tile 5 ms, first picture 233 ms, whole
+grid 2.05 s, 2.3x overlap. Time to the first tile and time to the first picture
+are separate promises and the instrument reports them separately for exactly
+this reason.
+
+**NONE OF THE 44 PRACTICE DNGs CARRIES AN EMBEDDED PREVIEW** — measured, zero
+bytes in all eight of the first of them. They are converted files with their
+previews stripped, so no run against them can exercise the path that puts the
+camera's picture in a tile. The walk therefore builds a TIFF that does carry
+one, from the minimum `pickLargestPreview` accepts read out of its own source,
+and the app's own report now says how many tiles showed the camera's picture
+rather than leaving it to be inferred. Current Nikon bodies embed a full-size
+preview; several other makes embed a small one or none.
+
+**The keep is a different shape and the container cannot see it.** Before a
+byte of the new set is read, `addToSession` waits for the previous session's
+chunk delete — a cost that scales with the set being REPLACED, not the one
+being opened. In a fresh container there is nothing to delete, so it measures
+0 ms and the keep is 386 ms end to end, of which the first paint is 226. The
+first file's read and decode now start when Keep is pressed, beside that delete
+rather than behind it, so it costs nothing when the delete is instant and saves
+all of it when it is not. **Carrying the grid's decode across was rejected**:
+holding a full decoded frame for the length of a browsing session to save a
+stage measured at 127 ms is spending a memory ceiling on something that was
+never the wait.
+
+**And a walk that polls user-facing PROSE is brittle by construction.** Three
+walks waited on the header saying "Decoding", and all three broke the day that
+sentence changed one word to "Reading". The grid carries `data-busy` now and
+the walks poll that: copy is the product's and must stay free to change, a
+harness needs state.
+
 ## The oneband walk hangs, it is not from today, and nobody had written it down, 2026-09-17
 
 **RED ON WHAT STAGING ALREADY CARRIES, and it was reported in chat and recorded
