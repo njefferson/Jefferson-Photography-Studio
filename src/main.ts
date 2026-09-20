@@ -6228,7 +6228,20 @@ function renderMaskOverlay() {
   // hasn't hidden it. The COVERAGE tint (drawn in the shader) works for every
   // mask type; the handle OUTLINE only exists for radial (0) / linear (1) —
   // brush/colour/sky have no geometry to grab.
-  const overlayOn = !!current && !panel.hidden && welcome.hidden && activePanelTab === "masks" && showMaskOutline && !!m;
+  //
+  // AND NEVER IN FULL VIEW, which is the one thing that list did not say.
+  // Entering full view sets `app.dataset.full` and redraws, but nothing here
+  // read it, so both the tint and the dotted outline went with the photograph
+  // into the mode whose entire purpose is to show the photograph. Reported
+  // 2026-09-20 (decision 037). Put in the SAME condition as the rest rather
+  // than special-cased downstream, so the tint, the matte and the outline all
+  // stand down together and anything added to the overlay later inherits it.
+  //
+  // Derived, never stored: `showMaskOutline` is the reader's own toggle and is
+  // not touched, so somebody who had the overlay off before entering still has
+  // it off afterwards, and somebody who had it on gets it back.
+  const fullView = document.getElementById("app")?.dataset.full === "1";
+  const overlayOn = !!current && !panel.hidden && welcome.hidden && activePanelTab === "masks" && showMaskOutline && !!m && !fullView;
   // Coverage tint: re-render with the shader overlay when what's shown changes.
   // It also steps aside while a slider is being dragged (maskAdjusting) so the
   // adjustment shows on the real photo — the handle outline below is unaffected.
@@ -15221,6 +15234,12 @@ setupInstallFromApp("irInstallFromApp");
     setHint();
     // Refused (or unsupported) is fine — the in-page version is the real one.
     void document.documentElement.requestFullscreen?.().catch(() => {});
+    // THE OVERLAY IS DERIVED FROM THIS FLAG, so the flag has to be asked about
+    // after it moves. `draw()` alone repaints the canvas with whatever
+    // `renderer.maskViz` already held, and the dotted outline is DOM and is not
+    // in the canvas at all — so without this the mode changes and the overlay
+    // does not (decision 037).
+    renderMaskOverlay();
     draw();
   };
 
@@ -15231,6 +15250,7 @@ setupInstallFromApp("irInstallFromApp");
     btn.setAttribute("aria-pressed", "false");
     hint.hidden = true;
     if (document.fullscreenElement) void document.exitFullscreen?.().catch(() => {});
+    renderMaskOverlay(); // and back again — see enter()
     draw();
   };
 
