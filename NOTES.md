@@ -744,7 +744,21 @@ user-scalable=no.
   there. A saved mask is a RECIPE and not a bitmap, because a generated
   selection is recomputed on the new photograph and a painted one does not
   travel; this app already splits that way, since 031 keeps corrections as the
-  strokes they were. See
+  strokes they were.
+  **THE BRUSH HALF IS ON STAGING, 2026-09-20; the named list and saved masks
+  are not.** Hand size is a POSITION now rather than the radius, mapped
+  exponentially from 0.4% of the frame to 40% — a hundredfold range, where the
+  old control ran linearly from 3% and had nothing finer at all. And a ring
+  shows the footprint before anything is touched: up from the moment a mode is
+  armed, and again while the size slider moves, which is the half that matters
+  on a tablet where there is no hover to follow. Same shape as the sticker
+  brush's ring (`stkBrush`), deliberately not a second design.
+  Measured: the ring reads 7px across at the small end and 663px at the large
+  on a fitted frame, and the MASK agrees — one dab covers 0.006% of the frame
+  at the smallest and 35% at the largest. The default stroke is smaller than it
+  was (0.060 against 0.100), so the existing walk's take-out now moves 54.0% to
+  45.9% where it moved 54.0% to 39.6%, and the export walk's band figure moves
+  with it for the same reason. See
   `docs/decisions/040-the-mask-panel-does-not-say-what-it-can-do.md`.
 - [ ] **An edit you can put down and come back to** <!-- decision: 039 -->
   reported 2026-09-20: there is no way to save the photograph being worked on

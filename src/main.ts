@@ -6405,6 +6405,16 @@ function setSkyFixMode(mode: 0 | 1 | 2) {
     mUI.outline.setAttribute("aria-pressed", "true");
     renderMaskOverlay();
   }
+  // ARMED OR NOT IS WHAT THE RING MEANS. Turning the mode off takes it away at
+  // once; turning one on shows it immediately at the centre of the picture, so
+  // the size is known BEFORE the first mark rather than discovered by making
+  // one — which is the whole of the 2026-09-20 report.
+  if (skyFixMode === 0) hideFixBrush();
+  else {
+    showFixBrush();
+    clearTimeout(fixBrushHideTimer);
+    fixBrushHideTimer = window.setTimeout(() => { if (!fixing) hideFixBrush(); }, 1600);
+  }
 }
 
 function startFix(e: PointerEvent) {
@@ -6427,12 +6437,97 @@ function startFix(e: PointerEvent) {
   m.effFine = baseFine ? { w: baseFine.w, h: baseFine.h, data: new Uint8Array(baseFine.data) } : undefined;
   moveFix(e);
 }
+/** THE SMALLEST AND LARGEST HAND CORRECTION, as a fraction of the mask
+ *  bitmap's longer side. The old control ran LINEARLY from 0.03, which is the
+ *  whole of the 2026-09-20 report: 3% of a 1024 px mask is a 31 px dab, too
+ *  coarse for sky between branches, and it was also the far end of the track
+ *  so nothing finer existed at all. */
+const FIX_R_MIN = 0.004;
+const FIX_R_MAX = 0.4;
+
+/** The hand correction's radius, from the slider's POSITION.
+ *
+ *  Exponential, because the useful range spans a hundredfold and a linear
+ *  track spends nine tenths of itself on sizes nobody wants: from 0.004 to
+ *  0.04 — the whole of the fine end — is three steps out of forty on a linear
+ *  0.03-to-0.4 control, and none at all below 0.03.
+ *
+ *  What the result has to satisfy: it is the `r` handed to `stampFix` and
+ *  `stampSegment`, and the same number is STORED on each `FixStroke`, so a
+ *  correction made today is replayed at the radius it was made at whatever
+ *  this control says later. Changing the mapping therefore cannot disturb a
+ *  stroke already recorded. */
+function fixRadius(): number {
+  const t = Math.min(1, Math.max(0, Number(mUI.fixSize.value)));
+  return FIX_R_MIN * Math.pow(FIX_R_MAX / FIX_R_MIN, t);
+}
+
+// --- The hand correction's own brush ring. Same shape as the sticker brush's
+// (stkBrush, above) and deliberately not a second design: a ring over the
+// photograph, theme-invariant so it reads on any scene, following the pointer
+// while a correction is being made and FLASHING at the centre of the picture
+// while the size slider moves.
+//
+// That last part is the half that matters on the device this app is for. The
+// report was "I can't see until I touch the canvas", and on a tablet there is
+// no hover — so a ring that only follows a pointer would still show nothing
+// until the mark had been made. The slider preview is what answers it. ---
+const fixBrushCursor = $("fixBrush") as HTMLDivElement;
+Object.assign(fixBrushCursor.style, {
+  position: "absolute", borderRadius: "50%", boxSizing: "border-box",
+  border: "2px solid rgba(255,255,255,.92)",
+  boxShadow: "0 0 0 1.5px rgba(0,0,0,.6), inset 0 0 0 1.5px rgba(0,0,0,.4)",
+  pointerEvents: "none", transform: "translate(-50%, -50%)", zIndex: "6",
+});
+let fixBrushHideTimer = 0;
+
+/** The correction brush's radius in CLIENT pixels, or null when there is
+ *  nothing to measure against.
+ *
+ *  `stampFix` takes the radius as a fraction of the bitmap's LONGER side, so
+ *  as a fraction of the image's WIDTH it is that times max(1, h/w) — the same
+ *  conversion `stkBrushClientRadius` makes, and for the same reason. Measured
+ *  by mapping two image points to the screen rather than by scaling a number,
+ *  so zoom and fit are inherited from the renderer instead of re-derived. */
+function fixBrushClientRadius(): number | null {
+  const m = currentMask();
+  if (!m || !current) return null;
+  const bm = m.effFine ?? m.fine ?? m.eff ?? m.brush;
+  if (!bm) return null;
+  const rUv = fixRadius() * Math.max(1, bm.h / bm.w);
+  const [cx, cy] = renderer.imageUvToClient(0.5, 0.5);
+  const [ex, ey] = renderer.imageUvToClient(0.5 + rUv, 0.5);
+  return Math.max(3, Math.hypot(ex - cx, ey - cy));
+}
+
+/** Show the ring. Pass a client point to place it; omit to centre it on the
+ *  picture, which is the size-slider preview. */
+function showFixBrush(clientX?: number, clientY?: number): void {
+  const r = fixBrushClientRadius();
+  if (!r || skyFixMode === 0) { hideFixBrush(); return; }
+  let px = clientX, py = clientY;
+  if (px === undefined || py === undefined) [px, py] = renderer.imageUvToClient(0.5, 0.5);
+  const stage = fixBrushCursor.parentElement!.getBoundingClientRect();
+  fixBrushCursor.style.width = fixBrushCursor.style.height = `${2 * r}px`;
+  fixBrushCursor.style.left = `${px - stage.left}px`;
+  fixBrushCursor.style.top = `${py - stage.top}px`;
+  fixBrushCursor.hidden = false;
+}
+function hideFixBrush(): void { fixBrushCursor.hidden = true; }
+
+mUI.fixSize.addEventListener("input", () => {
+  showFixBrush();
+  clearTimeout(fixBrushHideTimer);
+  fixBrushHideTimer = window.setTimeout(() => { if (!fixing) hideFixBrush(); }, 1200);
+});
+
 function moveFix(e: PointerEvent) {
   const m = currentMask();
   if (!fixing || !m) return;
   const [uu, vv] = renderer.clientToImageUv(e.clientX, e.clientY);
   const u = clamp(uu, 0, 1), v = clamp(vv, 0, 1);
-  const r = Number(mUI.fixSize.value), add = skyFixMode === 1;
+  const r = fixRadius(), add = skyFixMode === 1;
+  showFixBrush(e.clientX, e.clientY);
   const n = fixPts.length;
   if (!n) {
     if (m.eff) stampFix(m.eff, u, v, r, add);
@@ -6449,10 +6544,14 @@ function moveFix(e: PointerEvent) {
 function endFix() {
   if (!fixing) return;
   fixing = false;
+  // The ring lingers rather than vanishing with the finger: the reader is
+  // about to make the next stroke and the size has not changed.
+  clearTimeout(fixBrushHideTimer);
+  fixBrushHideTimer = window.setTimeout(() => { if (!fixing) hideFixBrush(); }, 1200);
   const m = currentMask();
   if (m && fixPts.length >= 2) {
     // Replacing the array rather than pushing: every undo snapshot shares it.
-    m.fix = [...(m.fix ?? []), { pts: Float32Array.from(fixPts), r: Number(mUI.fixSize.value), add: skyFixMode === 1 }];
+    m.fix = [...(m.fix ?? []), { pts: Float32Array.from(fixPts), r: fixRadius(), add: skyFixMode === 1 }];
     applyMaskFix(m);
     m.rev = (m.rev ?? 0) + 1;
   }

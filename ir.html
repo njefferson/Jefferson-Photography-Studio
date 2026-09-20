@@ -145,6 +145,7 @@
         <svg id="stickerOverlay" hidden aria-hidden="true"></svg>
         <img id="stickerGhost" alt="" aria-hidden="true" hidden />
         <div id="stkBrush" aria-hidden="true" hidden></div>
+        <div id="fixBrush" aria-hidden="true" hidden></div>
         <div id="cropOverlay" hidden aria-hidden="true">
           <div id="cropBox">
             <div id="cropGuides" aria-hidden="true"></div>
@@ -792,7 +793,15 @@
                   <button id="mSkyFixCut" type="button" class="toggle" aria-pressed="false">Take out by hand</button>
                   <button id="mSkyFixClear" type="button">Clear by hand</button>
                 </div>
-                <label id="mSkyFixSizeRow">Hand size <input id="mSkyFixSize" type="range" min="0.03" max="0.4" step="0.01" value="0.1" /></label>
+                <!-- THE SLIDER IS A POSITION, NOT THE RADIUS. It maps
+                     exponentially in `fixRadius()`, from 0.4% of the frame to
+                     40% — a hundredfold range. Linear from 0.03 was the
+                     reported defect: the smallest brush would not go small
+                     enough for sky between branches, and on a linear track the
+                     useful small end was three steps out of forty anyway. The
+                     stored stroke still carries the RADIUS, so corrections
+                     saved before this keep their size. -->
+                <label id="mSkyFixSizeRow">Hand size <input id="mSkyFixSize" type="range" min="0" max="1" step="0.01" value="0.59" /></label>
                 <small id="mSkyFixNote" class="note">Turn one on and drag on the photo to add the sky it missed or take back what is not sky. Your corrections are kept separately, so Reach, Feather and the colour toggle keep working and your hand work stays where you put it. Turn both off to pan and zoom again.</small>
               </div>
               <label>Brightness <input id="mBrightness" type="range" min="0.3" max="2" step="0.01" value="1" /></label>
