@@ -567,11 +567,14 @@ user-scalable=no.
   brightness condition, so it admits the corner. A second instrument working
   from the selection's own colour test agrees, finding no unselected
   sky-coloured block on that frame above 692 px.
-  So this item is now blocked on the INSTRUMENT rather than on the app, and
-  that fix is not small — separating a defocused branch from sky needs a
-  property that separates them, and brightness does not: the block sits 1.8
-  MADs below typical sky, which is ordinary variation. The check stays red with
-  its cause written down rather than green by moving the truth.
+  So this item is now blocked on the INSTRUMENT rather than on the app, and the
+  obvious fix was measured and does not work. The field's answer to this exact
+  problem is colour plus TEXTURE, and texture fails on the only case that
+  matters: a blurred branch is smooth, reading fractionally SMOOTHER than the
+  sky at one pixel and indistinguishable from it at eight. What the test needs
+  is a truth that is not a per-frame colour key at all — sky painted once per
+  practice photograph and held fixed. The check stays red with its cause
+  written down rather than green by moving the truth.
   One caution for whoever takes this next: the spill figures — 8%, 23%, 55% —
   are not the mask swallowing canopy; opened, they are a bright cloud and the
   pale hazy sky above a treeline, which the walk's own key rejects and the mask
@@ -1715,6 +1718,47 @@ that works presses a DIFFERENT look as the second application, and every row
 goes red. Per look it also prints how many controls separate that look from B&W
 IR, which is the walk's own control: a walk that reads nothing would report
 every round trip clean.
+
+## Texture does not separate a blurred branch from sky, measured 2026-09-20 (decision 023)
+
+**The field's answer was tried before it was built.** Classic non-ML sky
+detection is colour PLUS texture — Kodak's patent US 6,504,951 calls the second
+half open space detection and states its purpose as separating sky from other
+blue-coloured things. `tools/mask-truth-walk.mjs` now reports, for each frame's
+largest missed block, a signed distance in MADs from the confident sky's median
+on four axes: luminance, saturation, and gradient activity at one pixel and at
+eight.
+
+- **NIR_0063**, 292 px: luminance −2.0, saturation −2.3, texture 1px +1.9,
+  texture 8px **+52.6**.
+- **NIR_1644**, 406 px: luminance +2.2, saturation −2.1, texture 1px +2.4,
+  texture 8px **+8.2**.
+- **NIR_1651**, 18,933 px, the defocused branch: luminance −1.6, saturation
+  +0.9, texture 1px **−0.6**, texture 8px **+0.1**.
+
+**Bokeh is smooth, so texture cannot see it.** At one pixel the branch is
+SMOOTHER than the sky; at eight it is the sky.
+
+**AND THE TWO APPARENT SUCCESSES ARE A SCALE CONFOUND — opening the maps is
+what showed it.** Those blocks are about seventeen and twenty pixels across, so
+an eight-pixel gradient step reaches outside them into the crown structure
+around them. Their big readings are a fact about their surroundings. The only
+block large enough for the window to stay inside it is the one reading +0.1.
+**A fixed-window texture measure on a region smaller than a few windows is
+measuring the region's surroundings**, and a discriminator validated on small
+blocks would have shipped on two frames' worth of that.
+
+**Proved by planting**: the gradient step set to zero flattens both texture
+columns to 0.0000 with no spread, so the columns read the step rather than
+nothing. The coverage figures were identical under the plant, confirming no
+behaviour moved.
+
+**What this rules out and what it leaves.** A colour-and-texture key cannot do
+this job. The remaining answer is a truth that is not a per-frame key: sky
+painted once per practice photograph, reviewed as an image, held fixed. Not
+filed as a roadmap record — the roadmap is what the ⓘ dialog shows readers, and
+an acceptance instrument's truth is not a reader-facing feature — so it sits in
+023's Outcome as that item's remaining work.
 
 ## The last red check was the instrument, and the first argument for it was wrong, 2026-09-20 (decision 023)
 

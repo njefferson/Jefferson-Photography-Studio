@@ -381,13 +381,44 @@ low — ordinary sky variation. Brightness never settled it; the magnified crop
 did. The walk now prints the distance in MADs and refuses to draw a conclusion
 inside 2.5 of them.
 
-**So what is still owed on this item is an instrument fix, not a mask fix**, and
-it is not a small one. Separating defocused dark foliage from sky needs a
-property that actually separates them, and the two obvious candidates do not:
-luminance is 1.8 MADs, and anything fitted to this frame is the same mistake in
-a new place. Until that exists this check stays red for a reason that is now
-written down, which is the least bad of the available states — a red whose
-cause is known beats a green bought by moving the truth.
+**SO WHAT IS OWED IS AN INSTRUMENT FIX, AND THE OBVIOUS ONE WAS MEASURED AND
+DOES NOT WORK.** Classic non-ML sky detection is colour PLUS texture — Kodak's
+sky-detection patent (US 6,504,951) calls the second half open space detection
+and states its purpose as separating sky from other blue-coloured things. That
+was measured here before being built, on all three frames' largest missed
+block, as a signed distance in MADs from the confident sky's median:
+
+- **NIR_0063** (292 px): luminance −2.0, saturation −2.3, texture 1px +1.9,
+  texture 8px **+52.6**.
+- **NIR_1644** (406 px): luminance +2.2, saturation −2.1, texture 1px +2.4,
+  texture 8px **+8.2**.
+- **NIR_1651** (18,933 px, the defocused branch): luminance −1.6, saturation
+  +0.9, texture 1px **−0.6**, texture 8px **+0.1**.
+
+**Texture fails completely on the only case that matters.** Bokeh is smooth: at
+one pixel the branch is SMOOTHER than the sky, and at eight it is
+indistinguishable from it.
+
+**And the two apparent successes are a confound, which opening the maps
+showed.** Those blocks are 292 and 406 px — about seventeen and twenty pixels
+across — so an eight-pixel gradient step reaches outside them into the
+surrounding crown structure. Their high texture readings are a fact about what
+is around them, not about them. The one block large enough for the window to
+stay inside it is the one that reads +0.1. A fixed-window texture measure on a
+region smaller than a few windows measures the region's surroundings.
+
+**A colour-and-texture key cannot do this job**, and that is now measured
+rather than suspected. What the instrument needs is a truth that does not
+derive from a per-frame key at all: sky painted once per practice frame,
+reviewed as an image, and held fixed. That is a real piece of work and it is
+what this item is now blocked on. It is NOT filed as its own roadmap record —
+the roadmap is what the ⓘ dialog shows readers, and an acceptance instrument's
+truth is not a reader-facing feature — so it lives here, as 023's remaining
+work.
+
+Until it exists this check stays red for a reason that is written down, which
+is the least bad state available: a red whose cause is known beats a green
+bought by moving the truth.
 
 **What is still owed:** the boundary. The grow fixes the interior and the gaps
 and leaves the rim misplaced by a pixel or two. Composing the guided filter
