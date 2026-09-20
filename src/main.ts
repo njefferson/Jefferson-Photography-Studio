@@ -45,7 +45,7 @@ import { buildSkyMap, SKY_DEPTH_CHROMA_LO, SKY_DEPTH_CHROMA_HI, SKY_DEPTH_GREY_L
 import { prepareSkySource, buildSkySelectionFrom, buildSkyGuide, refineSkyMask, growSkyByColour, type SkyGuide } from "./skyfine";
 import { makeRowDenoiser } from "./raw/denoise";
 import { makeRowDetail } from "./raw/detail";
-import { buildSkyMask, SKY_MIN_COVERAGE } from "./sky";
+import { buildSkyMask, skyPrepare, SKY_MIN_COVERAGE, type SkyPrep } from "./sky";
 import { buildDiagnostic } from "./diagnostic";
 import { Tiff } from "./raw/tiff";
 import { drawHistogram } from "./histogram";
@@ -5776,6 +5776,30 @@ function skyGuideFor(img: DecodedImage): SkyGuide | null {
   return g;
 }
 
+// THE PHOTOGRAPH-ONLY HALF OF THE SELECTION, HELD PER IMAGE. The small grid
+// and the horizon drawn on it read the photograph, the rotation and nothing
+// else — not Reach, not Feather — so dragging either slider used to pay for a
+// gradient sort and a 120-threshold border search it could not change. Held
+// here, a Reach drag costs what it did before the border existed. Keyed on the
+// rotation as well as the image, because the border is measured down from the
+// DISPLAY's top edge and a quarter turn moves which edge that is.
+const skyPrepOf = new WeakMap<DecodedImage, { rot: number; prep: SkyPrep }>();
+function skyPrepFor(img: DecodedImage, rot: number): SkyPrep {
+  const held = skyPrepOf.get(img);
+  if (held && held.rot === rot) return held.prep;
+  const prep = skyPrepare(
+    (x, y) => linearAt(img, x, y),
+    img.width,
+    img.height,
+    rot,
+    img.camMatrix ?? null,
+    grayWorldWB(img),
+    BRUSH_MAX_EDGE,
+  );
+  skyPrepOf.set(img, { rot, prep });
+  return prep;
+}
+
 function regenerateSkyMask(m: MaskLayer) {
   if (!current) return;
   const res = buildSkyMask(
@@ -5788,6 +5812,7 @@ function regenerateSkyMask(m: MaskLayer) {
     BRUSH_MAX_EDGE,
     m.reach ?? 1,
     m.feather,
+    skyPrepFor(current, renderer.rotation),
   );
   m.brush = res.mask; // fresh buffer from buildSkyMask — safe for copy-on-write
   // AND THE SAME SEED REFINED TO THE PICTURE'S EDGES (018). The reader's reach

@@ -557,56 +557,83 @@ user-scalable=no.
   The root is the FIRST PASS rather than the grow: it answers "where is the
   sky" on every photograph and has no way to answer "there isn't one". See
   `docs/decisions/029-the-sky-mask-claims-things-that-are-not-sky.md`.
+  **HALF OF IT IS ON STAGING, 2026-09-20.** The first pass now asks where the
+  sky ENDS before anything asks what colour it is — a horizon line the
+  photograph draws for itself, one border per column, by the published method
+  (`src/skyhorizon.ts`; Shen & Wang 2013; IR-SCIENCE.md section 9o). Measured
+  over all 44 practice frames with every overlay OPENED: the playhouse frame
+  goes 22.2% to 12.1% with the walls, the roof, the tyre swing and the lawn out
+  of the selection; a lake goes out of NIR_1830 (30.5% to 10.0%); a forest and
+  a far shore go out of NIR_1688 (13.9% to 4.1%) — and in the other direction
+  the same change gives NIR_1651 the whole left half of its sky (30.3% to
+  52.2%), NIR_1877 4.9% to 22.9% and canopy 5.5% to 19.2%. On the acceptance
+  instrument canopy's open sky reads 99.5% against 68.1% and its spill 3%
+  against 12%.
+  **STILL OPEN, and the flower macro is why.** NIR_0627 is unchanged at 75.9%.
+  Its defocused garden is smooth, fills the top half and has no edge in it, so
+  the border runs to the bottom honestly and both of the paper's no-sky tests
+  decline to fire. Under the ranking stated 2026-09-20 that is the lower half
+  of the requirement, but it is the picture this item is about.
+  **And one new artefact, seen rather than inferred:** a tree trunk is smooth
+  DOWN ITS LENGTH, so a column running through one carries the border deep with
+  no step to announce it, and a vertical band of selection stands down the
+  trunks on NIR_1638, NIR_1830 and NIR_1873 — the last of which used to report
+  no sky at all and now reads 7.4%, none of it sky.
 - [ ] **The Sky mask reads the sky's colour as well as its place** <!-- decision: 023 -->
   reported 2026-09-18 from the iPad with three screenshots of one frame: the
   Sky mask leaves a rim of unselected sky round every object and misses the
   sky between branches, because it knows WHERE the sky is and not which pixels
-  are it. **The first half shipped 2026-09-19** — the selection now grows out
-  of the heuristic's seed through every pixel that matches the sky's own colour
-  and is JOINED to it, on the 018 guide, with a "Follow the sky's colour"
-  toggle that is on by default. Measured before and after: NIR_1644's edge band
-  37% to 82% covered and its uncovered sky 5.5% to 1.0%, NIR_1651's uncovered
-  sky 21.3% to 7.5%, NIR_0063's edge band 45% to 52%.
-  **STILL OPEN, and it is down to one number on one frame.**
-  `tools/mask-truth-walk.mjs` wants the edge band covered at 0.85 and open sky
-  at 0.97. It failed three checks; it fails one. The three were partly an
-  arithmetic fault rather than a mask fault — the walk was averaging sky the
-  selection could have reached with sky it can never enter, since it only
-  spreads through pixels that are joined and no path leads behind a branch.
-  Sorting those apart first, over the sky the grow can actually get to,
-  NIR_0063's edge band reads 98% where it read 52% at every tolerance, and
-  NIR_1644's 87%. The sky the selection cannot enter is now its own item, 028.
-  **What survives is not a mask defect at all.** NIR_1651's open sky reads
-  93.4% because of one 18,933 px block in the extreme bottom-right corner, and
-  magnified three times that block is a heavily out-of-focus branch at the
-  frame edge — leaf silhouettes along its blurred boundary, deep dark teal
-  against the flat lighter teal of the sky. The mask is right to refuse it; the
-  walk's own idea of sky is a hue band above a saturation floor with no
-  brightness condition, so it admits the corner. A second instrument working
-  from the selection's own colour test agrees, finding no unselected
-  sky-coloured block on that frame above 692 px.
-  The obvious instrument fix was measured first and does not work: the field's
-  answer to this exact problem is colour plus TEXTURE, and texture fails on the
-  only case that matters, because a blurred branch is smooth — fractionally
-  SMOOTHER than the sky at one pixel and indistinguishable from it at eight.
-  A declared correction was then tried, took the walk green, and **has been
-  withdrawn**: the assertion it rested on — that the band in NIR_1651's corner
-  is a branch and not sky — did not survive checking, because the crop it was
-  judged from was aimed at x >= 0.80 when the band starts at x = 0.90, and
-  because the brightness comparison used the frame's global sky median when the
-  sky local to that corner is nearly twice as bright.
-  **The band is SKY — settled by four independent untinted renders opened at
-  6x — so the red is honest and the defect is the app's.** It is the clear sky
-  below the bright cloud deck that fills the top of that frame: same spectrum as
-  the sky above it, a quarter the light. The selection misses about 5% of the
-  frame's sky, and the suspected cause is that the colour target is refitted per
-  photograph from a seed the cloud dominates.
-  Also still open: the boundary residual this record names, and 028 for the sky
-  no path reaches.
-  One caution for whoever takes this next: the spill figures — 8%, 23%, 55% —
-  are not the mask swallowing canopy; opened, they are a bright cloud and the
-  pale hazy sky above a treeline, which the walk's own key rejects and the mask
-  correctly takes.
+  are it. **The first half shipped 2026-09-19** — the selection grows out of
+  the seed through every pixel that matches the sky's own colour and is JOINED
+  to it, on the 018 guide, behind a "Follow the sky's colour" toggle that is on
+  by default.
+  **The second half is on STAGING, 2026-09-20, and the last failing check is
+  green.** The corner band that record named is clear sky below the cloud deck
+  that fills the top of NIR_1651 — same spectrum, a quarter the light — and no
+  setting of the grow's constants reached it, because the target the grow fits
+  comes from a seed that is 100% cloud on that frame: of 211,602 seeded guide
+  pixels, zero sit below the cloud's lower edge. The remedy was not in the grow
+  at all. The SEED is now a horizon rather than a strip at the top of the frame
+  (`src/skyhorizon.ts`; IR-SCIENCE.md section 9o), and on the acceptance
+  instrument NIR_1651's reachable open sky reads 99.9% against 93.4%, its
+  uncovered sky 0.5% against 5.8%, and its largest uncovered block 430 px
+  against 18,933. NIR_1644's edge band 93% against 87%; NIR_0063 holds at 97%.
+  All four checks pass.
+  **Waiting on the on-device pass before it moves to the archive.** What stays
+  open after it belongs to 029, which owns the seed, and to 028 for the sky no
+  path reaches. One caution for whoever takes this next: the spill figures — 7%,
+  38%, 50% — are not the mask swallowing canopy; opened, they are the feather
+  sitting in the notches between crowns and the pale hazy sky above a treeline,
+  which the walk's own key rejects and the mask correctly takes.
+- [ ] **A generated selection can be corrected by hand** <!-- decision: 031 -->
+  the Sky mask is generated, and when it is wrong on a photograph the reader
+  has one lever: drag Reach and hope. Anything painted into it is destroyed by
+  the next Reach or Feather drag, because regenerating assigns the bitmap
+  wholesale; and the only way to see what is selected is a 32% cyan tint over
+  the graded photograph, which under the looks that swap the channels is the
+  same cyan the over-selected foliage renders as. Every editor that generates a
+  selection ships both halves — Lightroom adds to and subtracts from a Select
+  Sky mask with a brush, darktable combines drawn shapes with a parametric mask
+  per module and paints the result as a matte over a monochrome image. So: a
+  list of correction strokes the mask keeps, a composite every render path
+  reads in place of the automatic bitmap, and a second overlay mode that shows
+  the mask grey on black. The automatic selection stays live underneath, so
+  Reach still works and the hand work survives it. See
+  `docs/decisions/031-a-generated-selection-can-be-corrected-by-hand.md`.
+- [ ] **A mask keys the photograph, not the grade** <!-- decision: 032 -->
+  the Colour mask keys on the colour the pixel DISPLAYS — the decode through
+  contrast and gamma, and downstream of the channel swap — so a mask picked
+  with one grade selects a different population under another, and a mask
+  picked with the swap on keys something else with it off. Record 023 refused
+  to build the Sky mask on it for exactly this reason and never came back to
+  fix it. A mask has to be takeable at any point in the workflow: if all that
+  is in front of you is the current image, doing something to the image
+  underneath it is impossible. darktable offers a slider on the module's INPUT
+  and one on its output and hides the output one by default; this app already
+  has the input space built — `buildSkyGuide`'s red share, blue share and gamma
+  luma, under gray-world gains, which its own contract says does not move as
+  the photograph is graded. See
+  `docs/decisions/032-a-mask-keys-the-photograph-not-the-grade.md`.
 - [ ] **Every control can say what it does, and a finger can reach the saying** <!-- decision: 024 --> —
   asked 2026-09-19 from the PC, in the sitting that reported a slider named
   after the defect rather than the act: there should be something clickable

@@ -471,3 +471,24 @@ after the grow was measured both ways: it lifts NIR_1651's uncovered sky and pul
 NIR_1644's recovered rim back out, edge 73% to 62% with spill 14% to 26% —
 measured on the graded-weight build, before binary membership landed. The crowns are the reported defect, so the fine
 boundary wins and the composed arm is not what ships.
+
+**AND THE HALF THAT WAS LEFT WAS NOT THE GROW'S AT ALL — 2026-09-20.** The one
+failing acceptance check was NIR_1651's reachable open sky at 93.4% against a
+bound of 0.97, and 029 had already traced it to the SEED: of 211,602 seeded
+guide pixels on that frame, zero sit below the cloud deck's lower edge, so the
+target the grow fits is 100% cloud and the clear sky beneath it — same spectrum,
+a quarter of the light — falls outside the tolerance that fit produces. No
+setting of the grow's constants reaches it.
+
+Replacing the seed with a horizon (`src/skyhorizon.ts`, the published
+border-position method; IR-SCIENCE.md §9o) turns the check green on its own
+terms, with no declared correction to the walk's truth: **NIR_1651's reachable
+open sky 93.4% to 99.9%, its uncovered reachable sky 5.8% to 0.5%, and the
+largest uncovered block 18,933 px to 430 px.** That block is the corner band
+reported from the device on 2026-09-18, which is what this record is about.
+NIR_1644's edge band went 87% to 93% and NIR_0063's held at 97%. All four
+acceptance checks pass.
+
+**This record is closed and its remaining work belongs to 029**, which owns the
+seed and is not finished: a macro of a flower spike with no sky in it still
+selects three quarters of itself.
