@@ -2,7 +2,19 @@
 // THE OUTPUT GATE, AND THE ONE THAT MATTERS MOST. An export must produce the
 // same file whether or not the reader carries on working while it runs, and the
 // same file this app produced before the export stopped owning the screen. The
-// hash it prints is the claim: 602e2db1... Two plants once ran green here
+// hash it prints is a RECORD, not a claim, and saying so is why this sentence
+// changed. It read "the claim: 602e2db1..." and that number had gone stale —
+// the export is ce1c7ffc as of 2026-09-20 — so a session checking its own
+// export-path change against it would read a legitimate difference as a
+// regression, or a real regression as a number somebody forgot to update. The
+// hash moves whenever the pipeline legitimately moves, and
+// `preview-version-check` is the gate for that; what this walk ASSERTS is on
+// the `check` lines below.
+//
+// TO USE IT AS A REGRESSION CHECK, run it on both sides of a change and compare
+// the two hashes to EACH OTHER rather than to any number written here. That is
+// what settled the 2026-09-20 export change: identical before and after, so
+// moving the band rectangle above the format branch was inert on the JPEG path. Two plants once ran green here
 // because the export had quietly used three worker threads, which get a
 // structured COPY of the edit and cannot see a mid-run mutation (hub §290).
 //
@@ -39,6 +51,11 @@ const GLOW = process.argv.includes("--glow");
 // of the edit, so a mid-run mutation cannot reach it and a plant that relies on
 // one proves nothing there. Healing a spot is what makes the parallel path
 // refuse the job, and it is also a real thing a keeper has done to it.
+//
+// SO THIS RUN'S HASH IS NOT COMPARABLE WITH THE PLAIN RUN'S. The heal that
+// forces one thread also changes the pixels, so the two are different edits of
+// the same photograph and are MEANT to differ — read one against an earlier run
+// of the same flag, never against the other.
 const ONE = process.argv.includes("--onethread");
 let failed=0; const check=(n,g,w)=>{const ok=JSON.stringify(g)===JSON.stringify(w);if(!ok)failed++;console.log(`${ok?"ok  ":"FAIL"}  ${n}\n        got ${JSON.stringify(g)} want ${JSON.stringify(w)}`);};
 
