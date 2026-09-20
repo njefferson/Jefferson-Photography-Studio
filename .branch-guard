@@ -162,3 +162,15 @@ also=tools/one-pool-check.mjs
 # This is the half that can run here: the hook is there and matches the tracked
 # copy. It reads "user-facing" out of vite.config.ts rather than restating it.
 also=tools/patch-note-check.mjs
+
+# Run on every commit: the export pool is sized for what a band ACTUALLY weighs.
+# one-pool-check beside this refuses a SECOND caller of workerCount, which is
+# the shape the 2026-09-20 defect took. It says nothing about whether the one
+# remaining decider is told the truth: if bytesPerPixel ever returns 4 for a
+# format whose band is a Uint16Array, every call site agrees with every other
+# and all of them are wrong together, and the 600 MB tablet ceiling is breached
+# in silence again by one function instead of two. So this reads the real
+# weight out of the band's own allocation in src/export.ts and requires the
+# pool the app would start to equal the pool those bytes buy — two routes to
+# one number, neither of them a re-derivation of the memory model.
+also=tools/pool-budget-check.mjs

@@ -3319,6 +3319,29 @@ read as authoritative, and an invented one is worse than a missing one.
 
 ## Shipped (roadmap archive)
 
+- [x] **The panel's scroll cues are drawn over its controls** <!-- decision: 041 -->
+  reported 2026-09-20 as a weird scroll artefact on the Export panel while
+  setting up a TIFF. Two arrow pills floated over the scroller at `height: 0`,
+  and the up one sat four pixels under the pinned heading — which on that tab
+  is exactly where the Format menu begins, so twelve pixels of scroll drew a
+  44x27 pill across the top-right corner of the control the reader had opened
+  the tab to use. Its own comment claimed the right-hand corner is the one
+  place nothing is written: true of this panel's buttons, false of a `select`'s
+  chevron and of a slider's track. Swept across twelve tabs at two widths, both
+  pills were over menus and slider tracks on most of them, and the pill had
+  been moved twice before to corners that were clear for whichever controls
+  somebody looked at.
+  **REMOVED 2026-09-20.** What is above the fold is said by `^ Sections`, a
+  labelled 44px control that appeared under the identical condition; what is
+  below is said by the content being cut off, which is what a scroller looks
+  like. The first-visit card keeps its own cue, a different element that covers
+  nothing. `tools/scroll-cue-walk.mjs` measures geometry rather than semantics,
+  which is the only instrument that can see an element that is
+  `pointer-events: none` with no role and no name. One question left for the
+  owner and recorded in the record rather than lost: restoring them needs a
+  reserved lane down the right of every panel at about 30px of each control's
+  width.
+
 - [x] **The Sky mask claims things that are not sky** <!-- decision: 029 -->
   measured 2026-09-20 on practice photographs that were never in the acceptance
   corpus, and it is the defect a reader actually meets. **A macro of a flower
@@ -16296,6 +16319,12 @@ restored byte-identical.
 
 ## One defect no gate here can see, and one taste call that was not a defect, 2026-09-15
 
+> **THE PANEL'S TWO CUES WERE REMOVED ON 2026-09-20** — see "A decoration no
+> instrument samples" below. This entry is kept because its second paragraph is
+> what made that finding possible, but the pills it describes no longer exist
+> on the panel. The first-visit card keeps its own, which is a different
+> element (`.welcome-cue`) and covers nothing.
+
 **Both scroll cues had shipped as a flat 10 px pill with the arrow drawn outside
 it, underneath.** `.scroll-cue` is `display: flex` with `height: 0` — on purpose,
 so the cue floats without taking space in the flow — and a flex container's
@@ -17719,3 +17748,111 @@ how much of the frame carries no colour at all: **13.8% on the film against
 28–45% on these frames**. The film's reeds and lawn hold red where ours go to
 near-white. That is bright IR-reflective ground blowing out instead of holding
 its hue — highlight roll-off and exposure, not colour. Next piece of work.
+
+## A decoration no instrument samples, and a build no walk could name, 2026-09-20
+
+Four things from the day 2.54 shipped, each of which was green somewhere it
+should have been red.
+
+**A FAIL-FIRST RUN PASSED WITH THE DEFECT IN THE SOURCE.** The one-thread
+banner was fixed, the predictor was planted back to prove the walk could catch
+it, and the walk printed `all checks passed`. Five minutes went into reading
+the walk — wrong selector? sampler not firing? — before the actual answer: the
+walks serve a `dist` directory a python http.server is holding in another
+shell, and nothing connected that directory to the tree. `dist` was five
+minutes older than the plant. The walk was right and the plant was real and
+they had never met.
+
+What it costs beyond the hour is that every number taken off a walk that
+session was suddenly about an unknown build — not wrong, unknown, which is
+worse, because a wrong number can be found. And the discipline this repo runs
+on, that a check is made to fail once before it is trusted, had been satisfied
+by a build that did not contain the thing being tested.
+
+`tools/fresh-dist.mjs` refuses before the browser launches, in all 37 walks and
+in `walk-all`, exiting 2 — the code the walks already use for "this did not
+run" — so a sweep reports it as a refusal rather than a failed check. **Its
+limits, stated rather than papered over:** mtime cannot see a build made from
+different content at the same instant, and a checkout that rewrites mtimes
+reads as stale. Both fail toward "go and build", which costs three seconds.
+It went into every walk rather than into the sweep alone, because the failure
+happened running ONE walk directly, which is how a walk is run nine times out
+of ten.
+
+**AND THE ARROWS OVER THE PANEL WERE NOT A RENDERING ARTEFACT.** Reported from
+the device as a weird scroll artefact on the Export panel. `.scroll-cue` floats
+over the scroller at `height: 0`, and the up one sat four pixels under the
+pinned heading, which on that tab is exactly where the Format menu begins —
+twelve pixels of scroll drew a 44x27 pill across the top-right corner of the
+control the reader had opened the tab to use.
+
+Its own comment said the right-hand corner is "the one place nothing is
+written". True of this panel's buttons, which are full width with centred
+labels. False of a `select`, which draws its chevron there, and false of a
+slider, whose track runs the whole width. `tools/scroll-cue-walk.mjs` swept all
+twelve tabs at 1180px and 420px: 44x21 over the auto button on Basic, 44x27
+over the lift slider on IR, the Format menu on Export, and more. The pill had
+been moved twice before, each time to a corner where nothing was written for
+the controls somebody happened to look at.
+
+**The reason nothing caught it is the half that generalises.** The 2026-09-15
+entry above says the cue survived because every accessibility gate measures
+controls. That is too narrow: `pointer-events: none` with no role and no name
+puts an element in NO instrument's population — not the a11y walk, not the
+palette spec, not the surface sweep. Declaring something decorative is a
+declaration that nothing will ever check it, and the more carefully a codebase
+marks its decoration the larger that unmeasured surface gets. Geometry is the
+one instrument that can see it, because it has no opinion about what a box is
+for. Removed rather than moved a third time; restoring them needs a reserved
+lane down the right of `.panel-body` that no control may enter, at about 30px
+of every control's width. Decision 041.
+
+**THE TIFF REPORT BILLED THE WRONG STAGE AND STOPPED THE CLOCK EARLY.** The
+watermark loop was marked `encode` while `encode` measured nothing, so a report
+showing a TIFF spending time encoding was describing the watermark. And
+`writeTiff16` sat inside the `return`, which is evaluated after `__t.total` is
+taken — so the one stage that branch is named for was outside the total and
+reported 0.0s on a 31 MB file. Fixed by marking the watermark as the watermark
+and writing the file before the clock stops. **At this machine's 5.2 MP the
+difference is under the report's own 0.1s resolution, so no walk here can show
+it red**; it is fixed by construction rather than by measurement, and the
+device's 20.9 MP frame is where it would show.
+
+**AND FOUR WALKS WERE GREEN FOR REASONS THAT WERE NOT THE ONES THEY CLAIMED.**
+`quicklook-speed-walk`'s headline — a picture on screen in less than one decode
+— had never been measured in any run it ever made: it can only be measured on
+files carrying an embedded preview, the practice corpus carries none, and the
+pass that has such files printed a sentence saying the other pass would do it.
+It is measured now, 34 ms to a picture against 89 ms of decoding. Its "a failed
+decode does not take the camera's picture away" was green without a single
+decode having failed — the fixture builder's comment said its files cannot
+decode and they decode fine, because the app is content to use the embedded
+JPEG as the photograph; one fixture's decode is refused through the app's own
+error channel now. Its `--plant` claimed three reds and produced two; it
+produces four, and that number was got by running it. And `grade-controls-walk`
+read back its own last write: the drag before the resting check leaves the
+slider at 1, which IS the resting value, so a Reset that did nothing would have
+passed.
+
+**The one that failed the sweep was also the walk.** `oneband-walk` timed out
+for five minutes clicking a session thumbnail with `element.click()`. A
+capture-phase listener on `#sessionThumbs` never saw that click at all, so
+whether it lands depends on where the strip's re-render has got to. Measured
+before blaming the instrument: a real pointer click switches the photograph at
+rest, straight after a look is applied, and after a drag past the strip's own
+6px threshold, with no page errors in any of them — so the app answers every
+input a reader can produce and the walk was using one they cannot.
+
+**And the pool check that was substituted.** The plan for the day asked for a
+worker-count sweep over every size and device class; `tools/one-pool-check.mjs`
+was built instead — a source-shape gate refusing a second caller of
+`workerCount` — and reported as that item done. It is stronger against that
+defect returning and blind to a different one: it proves there is one decider
+and says nothing about whether the decider is told the truth. If
+`bytesPerPixel` ever returns 4 for a format whose band is a `Uint16Array`,
+every call site agrees with every other and all of them are wrong together.
+`tools/pool-budget-check.mjs` reads the real weight out of the band's own
+allocation in `src/export.ts` and requires the pool the app would start to
+equal the pool those bytes buy, over 56 combinations of device class,
+megapixels and format. Made to fail first: with `bytesPerPixel` reverted to the
+4-byte default, the 45 and 61 MP TIFF rows on both tablet classes go red.
