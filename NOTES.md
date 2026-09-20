@@ -539,214 +539,6 @@ user-scalable=no.
 > different approach and mindset"). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
-- [ ] **The Sky mask claims things that are not sky** <!-- decision: 029 -->
-  measured 2026-09-20 on practice photographs that were never in the acceptance
-  corpus, and it is the defect a reader actually meets. **A macro of a flower
-  spike, with no sky in it at all, has 76.4% of the frame selected as sky** —
-  the whole defocused garden behind the flower — and the coarse first pass
-  claims 58% of it before the colour grow even runs. A playhouse under trees is
-  47.4%: the selection covers the building's walls and roof, the tyre swing and
-  the grass. A road under a canopy is 19.5%. Any sky adjustment on such a
-  photograph lands on a building and a lawn.
-  **It was invisible because every frame the test used has a big obvious sky in
-  it**, so covering more always read as better. The same three frames steered
-  all of the previous item's tuning, including a colour-tolerance widening that
-  looks free on them and takes the flower macro to 87%. That lever is now
-  measured and spent: there is no setting of the current constants that fixes
-  one end without wrecking the other.
-  The root is the FIRST PASS rather than the grow: it answers "where is the
-  sky" on every photograph and has no way to answer "there isn't one". See
-  `docs/decisions/029-the-sky-mask-claims-things-that-are-not-sky.md`.
-  **HALF OF IT IS ON STAGING, 2026-09-20.** The first pass now asks where the
-  sky ENDS before anything asks what colour it is — a horizon line the
-  photograph draws for itself, one border per column, by the published method
-  (`src/skyhorizon.ts`; Shen & Wang 2013; IR-SCIENCE.md section 9o). Measured
-  over all 44 practice frames with every overlay OPENED: the playhouse frame
-  goes 22.2% to 12.1% with the walls, the roof, the tyre swing and the lawn out
-  of the selection; a lake goes out of NIR_1830 (30.5% to 10.0%); a forest and
-  a far shore go out of NIR_1688 (13.9% to 4.1%) — and in the other direction
-  the same change gives NIR_1651 the whole left half of its sky (30.3% to
-  52.2%), NIR_1877 4.9% to 22.9% and canopy 5.5% to 19.2%. On the acceptance
-  instrument canopy's open sky reads 99.5% against 68.1% and its spill 3%
-  against 12%.
-  **STILL OPEN, and the flower macro is why.** NIR_0627 is unchanged at 75.9%.
-  Its defocused garden is smooth, fills the top half and has no edge in it, so
-  the border runs to the bottom honestly and both of the paper's no-sky tests
-  decline to fire. Under the ranking stated 2026-09-20 that is the lower half
-  of the requirement, but it is the picture this item is about.
-  **And one new artefact, seen rather than inferred:** a tree trunk is smooth
-  DOWN ITS LENGTH, so a column running through one carries the border deep with
-  no step to announce it, and a vertical band of selection stands down the
-  trunks on NIR_1638, NIR_1830 and NIR_1873 — the last of which used to report
-  no sky at all and now reads 7.4%, none of it sky.
-  **AND A THIRD THING, reported 2026-09-20 and confirmed by looking.** On a
-  frame of a parked jet in front of a long building, the sky above the building
-  is selected and a band of sky BELOW the aircraft's wing — above the roofline,
-  behind the trees — is not. That is not a threshold to loosen: the horizon
-  method stores ONE border depth per column, which is what makes it cheap and
-  robust, so a column passing through the wing ends its sky there and
-  everything under it is ground by construction. It cannot represent sky that
-  reappears below an object. The colour grow is what would reach it, and
-  whether the grow may cross the border downward — without running into the
-  building — is the question this item now carries.
-- [ ] **The Sky mask reads the sky's colour as well as its place** <!-- decision: 023 -->
-  reported 2026-09-18 from the iPad with three screenshots of one frame: the
-  Sky mask leaves a rim of unselected sky round every object and misses the
-  sky between branches, because it knows WHERE the sky is and not which pixels
-  are it. **The first half shipped 2026-09-19** — the selection grows out of
-  the seed through every pixel that matches the sky's own colour and is JOINED
-  to it, on the 018 guide, behind a "Follow the sky's colour" toggle that is on
-  by default.
-  **The second half is on STAGING, 2026-09-20, and the last failing check is
-  green.** The corner band that record named is clear sky below the cloud deck
-  that fills the top of NIR_1651 — same spectrum, a quarter the light — and no
-  setting of the grow's constants reached it, because the target the grow fits
-  comes from a seed that is 100% cloud on that frame: of 211,602 seeded guide
-  pixels, zero sit below the cloud's lower edge. The remedy was not in the grow
-  at all. The SEED is now a horizon rather than a strip at the top of the frame
-  (`src/skyhorizon.ts`; IR-SCIENCE.md section 9o), and on the acceptance
-  instrument NIR_1651's reachable open sky reads 99.9% against 93.4%, its
-  uncovered sky 0.5% against 5.8%, and its largest uncovered block 430 px
-  against 18,933. NIR_1644's edge band 93% against 87%; NIR_0063 holds at 97%.
-  All four checks pass.
-  **Waiting on the on-device pass before it moves to the archive.** What stays
-  open after it belongs to 029, which owns the seed, and to 028 for the sky no
-  path reaches. One caution for whoever takes this next: the spill figures — 7%,
-  38%, 50% — are not the mask swallowing canopy; opened, they are the feather
-  sitting in the notches between crowns and the pale hazy sky above a treeline,
-  which the walk's own key rejects and the mask correctly takes.
-- [ ] **A generated selection can be corrected by hand** <!-- decision: 031 -->
-  the Sky mask is generated, and when it is wrong on a photograph the reader
-  has one lever: drag Reach and hope. Anything painted into it is destroyed by
-  the next Reach or Feather drag, because regenerating assigns the bitmap
-  wholesale; and the only way to see what is selected is a 32% cyan tint over
-  the graded photograph, which under the looks that swap the channels is the
-  same cyan the over-selected foliage renders as. Every editor that generates a
-  selection ships both halves — Lightroom adds to and subtracts from a Select
-  Sky mask with a brush, darktable combines drawn shapes with a parametric mask
-  per module and paints the result as a matte over a monochrome image. So: a
-  list of correction strokes the mask keeps, a composite every render path
-  reads in place of the automatic bitmap, and a second overlay mode that shows
-  the selection on its own. The automatic selection stays live underneath, so
-  Reach still works and the hand work survives it.
-  **BOTH HALVES ARE ON STAGING, 2026-09-20.** `Add by hand` and `Take out by
-  hand` arm the canvas; a drag records a stroke on the mask rather than paint
-  in its bitmap, so a Reach drag — which rebuilds the whole selection from the
-  photograph — replays it instead of destroying it. Measured on the conifer
-  frame: one take-out stroke moves coverage 54.0% to 39.6%, and after Reach 1
-  to 1.3 it reads 39.8% against 54.2% for the same Reach uncorrected. `Clear by
-  hand` returns exactly the uncorrected number.
-  And the SEEING half, which landed first: a `Matte` button beside `Show mask`
-  drops the photograph to dim grey and paints the selection in yellow, so what
-  is selected can be judged without the photograph's own colour arguing with
-  the overlay — which on the looks that swap red and blue is the same cyan the
-  overlay uses. Measured on the conifer frame under Aerochrome: with the old
-  tint none of the frame carries the overlay's own colour and 7.5% of it reads
-  grey; with the matte, 54% is the mask and 45% is grey, against 53% coverage
-  from the mask itself.
-  Corrections go into an export the same as the rest of the mask — measured on
-  a full-size export, 85% of a stroke's band changed and the rest of the frame
-  was identical to the byte. What is NOT verified is how a correction drags on
-  the tablet: every dab re-uploads both mask atlases, and the refined one is
-  2.8 MB. See
-  `docs/decisions/031-a-generated-selection-can-be-corrected-by-hand.md`.
-- [ ] **Quick look: the wait before the first picture, and the wait after Keep** <!-- decision: 033 -->
-  reported 2026-09-20 from the device, as two waits on the path every reader
-  meets first. After picking files, nothing appears on the pick/reject sheet
-  for a long time; after pressing Keep, the screen stays on the sheet for a
-  long time before the editor and its strip arrive.
-  **The first is not a slow decode, it is a grid that draws nothing until one
-  finishes.** `openQuickLook` appends a tile at the BOTTOM of its loop body, so
-  the sheet is empty until the first file has been read, demosaiced, denoised,
-  lens-corrected and rendered twice — and it works one file at a time while
-  three or four decode lanes sit idle. The session strip was given both fixes
-  already and the grid was given neither: every tile on screen before a byte is
-  read, and the camera's own embedded preview as a first picture. That second
-  one is what every culling tool does — it is the whole of Photo Mechanic's
-  speed against Lightroom — with the caveat this app has to handle rather than
-  inherit: on an infrared conversion the camera's JPEG is the wrong colour
-  world, so it is shown as provisional, in text, the way the strip already
-  shows it.
-  **The second has three candidates seconds apart and they are not guessed at.**
-  Before a byte of the new set is read, `addToSession` waits for the previous
-  session's chunk sweep — a cost that scales with the set being replaced, not
-  the one being opened — then reads the first file and decodes it AGAIN, though
-  the grid decoded it minutes earlier and kept only a 260 px JPEG. The
-  instrument goes in first: the test page measures both transitions on practice
-  files and the diagnostic carries the last run's stages, so the next report
-  names a stage instead of a symptom. Ruled out by reading rather than
-  measurement: the sky selection is not in the critical path, and the shared-look
-  sniff never reads a raw.
-  See `docs/decisions/033-the-wait-before-the-first-picture-and-the-wait-after-keep.md`.
-- [ ] **Full screen shows the mask** <!-- decision: 037 -->
-  reported 2026-09-20: opening full-screen view while the Masks tab is up
-  carries the mask into it — the coverage tint AND the dotted handle outline —
-  and full view exists to look at the photograph. One condition:
-  `renderMaskOverlay` decides whether the overlay is live from a list that does
-  not include full view, so entering it changes nothing about the overlay. The
-  same function already has the pattern — the tint steps aside while a slider
-  is being dragged, on exactly this reasoning.
-  **FIXED, ON STAGING 2026-09-20.** Full view now stands the whole overlay down
-  — tint, matte and outline together, through the one condition that already
-  decides all three — and brings it back on leaving. The mask stays selected
-  throughout, which the walk asserts on the far side: dropping the selection
-  would make the other checks pass while losing the reader's work. Measured on
-  the conifer frame with a radial: 44.6% of the frame carries the overlay while
-  editing, 11.6% in full view (which is the photograph's own teal sky, not the
-  tint), and exactly 44.6% again on return. The walk was run against the old
-  behaviour first and failed the two checks it exists for. See
-  `docs/decisions/037-full-screen-shows-the-mask.md`.
-- [ ] **The Grade tab's controls do not behave like the rest of the app** <!-- decision: 035 -->
-  three defects reported together 2026-09-20, two of which share a cause.
-  **The wheel destroys the hue you chose when you take the amount off**: its
-  drag handler writes both values from the pointer every move, so pulling the
-  puck to the middle overwrites the angle with whatever `atan2` returns there —
-  0 at the exact centre — and there is no axis left to come back out along. The
-  Amount slider does not do this, so the same band has two behaviours.
-  **Double-tap to put a slider back cannot reach any of the six grade
-  sliders**: they are built at runtime with no `id` at all, and both the
-  capture and the lookup are keyed by id, so the gesture has nothing to find.
-  **And Shadow colour runs the wrong way** — right reduces, where every other
-  slider in the app increases.
-  **THAT THIRD ONE WAS FIXED WRONG FIRST, SHIPPED, AND SENT BACK.** The first
-  answer renamed the control to "Amount" so its NAME rose as the slider moved
-  right, while the colour in the photograph still fell. The instruction had
-  been that moving right must not reduce, and the convention is about the
-  SCREEN, not the label: a name that rises while the picture falls is the same
-  defect with a better caption.
-  The error underneath is the one to keep: inverting the CONTROL and inverting
-  the STORED NUMBER were treated as one option. Flipping the stored
-  `shadowSat` really would break every saved look, every shared `.ipslook` and
-  every look baked into an exported JPEG — a real objection, to the wrong
-  thing, which was then allowed to veto the control's direction too. The
-  inversion belongs in `syncFromUI` and `syncToUI` and nowhere else.
-  The slider is now the colour the shadows KEEP: 0 left, 1 right, converted at
-  those two lines, with the stored field untouched. The heading moved from
-  "Colour out of the shadows" to "Colour IN the shadows" for the same reason —
-  a section cannot name one direction while its control runs the other. A
-  photograph opens with it at the RIGHT end, which is where a control that can
-  only take something away has to rest when right is the increasing direction.
-  And the walk was rewritten to read the PICTURE rather than the label: mean
-  saturation of the dark pixels, 0.070 at the left against 0.220 at the right.
-  The label-reading version of that check went green on the unfixed control.
-  **ALL THREE FIXED, ON STAGING 2026-09-20.** The wheel holds the hue over the
-  innermost 15% of its travel, where the angle is noise and at the exact centre
-  is zero — so pulling the puck in now does what the Amount slider beside it
-  already did, and the two controls agree. The six sliders have ids, which puts
-  them in the existing capture and lookup with no other change. And the shadow
-  slider reads "Amount" under the heading that names the effect, with an
-  accessible name that contains the visible word so SC 2.5.3 holds; the stored
-  number is untouched.
-  **The walk was run against all three old behaviours first and failed seven
-  checks**, then against the wheel's alone and failed that one (hue 200 becomes
-  180 on the way to the centre). Two instrument errors on the way, both caught:
-  the first version grabbed the wheel at 3 o'clock and reported the hue as lost,
-  when 3 o'clock IS hue 90 under this wheel's convention and the app was
-  behaving — the gesture has to start on the puck. And the first version died at
-  the first failing check, so a build with no ids reported one problem and
-  stopped; it refuses the dependent checks explicitly now and prints the whole
-  list.
-  See `docs/decisions/035-the-grade-tab-controls-do-not-behave-like-the-rest.md`.
 - [ ] **The mask panel does not say what it can do** <!-- decision: 040 -->
   four things reported 2026-09-20, and the first is the finding: the request
   was for masks to "include add, subtract, etc, like commercial offerings" —
@@ -794,50 +586,6 @@ user-scalable=no.
   a reload on iPad Safari. So keeping the edit is easy and keeping the
   photograph is the decision. See
   `docs/decisions/039-an-edit-you-can-put-down-and-come-back-to.md`.
-- [ ] **A TIFF export uses one core** <!-- decision: 036 -->
-  reported 2026-09-20 as a TIFF export that runs on one thread and takes
-  forever. It does, by an explicit condition: `canRunParallel` returns false on
-  any format that is not JPEG, so every TIFF falls to the single-threaded loop
-  on a machine that had eight workers and had just used them. The diagnostic
-  line beside the report read "17.6 MP in 27.5s — pixels 25.9s on 8 threads",
-  which looks like a contradiction and is not: that was a JPEG.
-  The condition is not an oversight — the band workers return eight bits a
-  channel and `writeTiff16` needs sixteen, so the parallel path has no 16-bit
-  return. Exporting at eight bits to make it fast is rejected: sixteen is the
-  reason to choose TIFF. The check afterwards is the one section 9l-ii
-  established — measure the exported FILE's bytes, not the screen.
-  **FIXED, 2026-09-20 — and both of this item's mechanisms were wrong before
-  they were right.** The bullet above said the band workers return eight bits
-  and the parallel path has no 16-bit return. It HAS one: `BandResult` declares
-  `rgb?: Uint16Array` with the comment "TIFF path: 16-bit RGB, same rectangle".
-  What is true is worse — that field was declared and produced by NOTHING. A
-  type with no code behind it reads exactly like a finished feature, which is
-  presumably how the exclusion survived being looked at. The diagnosis came
-  from a signature whose body had not been read.
-  **And the walk found a second defect the reading had missed: the report
-  cannot see a TIFF export at all.** `Last export` read "none this session"
-  straight after a completed 31 MB TIFF, because the three lines that record a
-  profile live only in the JPEG branch. That is the real reason a device report
-  and a complaint about a slow TIFF looked like they contradicted each other —
-  after a TIFF there is no line, so the newest one always belongs to an earlier
-  JPEG. It also left the first verification run unable to answer its own
-  question: the files came back byte-identical, which proves the band
-  arithmetic and says nothing about whether the pool engaged, because the
-  thread count read zero on both arms.
-  **Measured with the profile in place**: 5.2 MP in 8.0s across 3 threads
-  against 21.3s on one — 2.7x — and the two files are IDENTICAL, 0 bytes of
-  31,315,842. The single-threaded arm is forced by wrapping `Worker` so that
-  only the EXPORT worker's construction throws; making `Worker` undefined would
-  move the decode onto the main thread too, and a byte difference could then
-  have come from either end.
-  Two other things the change carries. `perWorkerMb` bills a band at four bytes
-  a pixel and a 16-bit RGB band is six, so the thread budget was understating a
-  TIFF band by half — on a tablet that budget is what stands between a big
-  export and a killed tab. And the worker transferred `res.data.buffer`, which
-  is `undefined` on a TIFF band, so thirty megabytes a band was being
-  structured-CLONED rather than moved: correct, and a doubled peak on the one
-  path whose ceiling matters most. See
-  `docs/decisions/036-a-tiff-export-uses-one-core.md`.
 - [ ] **Straighten to a line you draw** <!-- decision: 038 -->
   asked 2026-09-20: tap two points along an edge that should be level and let
   the photograph straighten to it. Today the control is an angle — a slider and
@@ -3571,7 +3319,265 @@ read as authoritative, and an invented one is worse than a missing one.
 
 ## Shipped (roadmap archive)
 
-- [ ] **Masks combine: a group of components joined by add, subtract and intersect** <!-- decision: 026 -->
+- [x] **The Sky mask claims things that are not sky** <!-- decision: 029 -->
+  measured 2026-09-20 on practice photographs that were never in the acceptance
+  corpus, and it is the defect a reader actually meets. **A macro of a flower
+  spike, with no sky in it at all, has 76.4% of the frame selected as sky** —
+  the whole defocused garden behind the flower — and the coarse first pass
+  claims 58% of it before the colour grow even runs. A playhouse under trees is
+  47.4%: the selection covers the building's walls and roof, the tyre swing and
+  the grass. A road under a canopy is 19.5%. Any sky adjustment on such a
+  photograph lands on a building and a lawn.
+  **It was invisible because every frame the test used has a big obvious sky in
+  it**, so covering more always read as better. The same three frames steered
+  all of the previous item's tuning, including a colour-tolerance widening that
+  looks free on them and takes the flower macro to 87%. That lever is now
+  measured and spent: there is no setting of the current constants that fixes
+  one end without wrecking the other.
+  The root is the FIRST PASS rather than the grow: it answers "where is the
+  sky" on every photograph and has no way to answer "there isn't one". See
+  `docs/decisions/029-the-sky-mask-claims-things-that-are-not-sky.md`.
+  **HALF OF IT IS ON STAGING, 2026-09-20.** The first pass now asks where the
+  sky ENDS before anything asks what colour it is — a horizon line the
+  photograph draws for itself, one border per column, by the published method
+  (`src/skyhorizon.ts`; Shen & Wang 2013; IR-SCIENCE.md section 9o). Measured
+  over all 44 practice frames with every overlay OPENED: the playhouse frame
+  goes 22.2% to 12.1% with the walls, the roof, the tyre swing and the lawn out
+  of the selection; a lake goes out of NIR_1830 (30.5% to 10.0%); a forest and
+  a far shore go out of NIR_1688 (13.9% to 4.1%) — and in the other direction
+  the same change gives NIR_1651 the whole left half of its sky (30.3% to
+  52.2%), NIR_1877 4.9% to 22.9% and canopy 5.5% to 19.2%. On the acceptance
+  instrument canopy's open sky reads 99.5% against 68.1% and its spill 3%
+  against 12%.
+  **STILL OPEN, and the flower macro is why.** NIR_0627 is unchanged at 75.9%.
+  Its defocused garden is smooth, fills the top half and has no edge in it, so
+  the border runs to the bottom honestly and both of the paper's no-sky tests
+  decline to fire. Under the ranking stated 2026-09-20 that is the lower half
+  of the requirement, but it is the picture this item is about.
+  **And one new artefact, seen rather than inferred:** a tree trunk is smooth
+  DOWN ITS LENGTH, so a column running through one carries the border deep with
+  no step to announce it, and a vertical band of selection stands down the
+  trunks on NIR_1638, NIR_1830 and NIR_1873 — the last of which used to report
+  no sky at all and now reads 7.4%, none of it sky.
+  **AND A THIRD THING, reported 2026-09-20 and confirmed by looking.** On a
+  frame of a parked jet in front of a long building, the sky above the building
+  is selected and a band of sky BELOW the aircraft's wing — above the roofline,
+  behind the trees — is not. That is not a threshold to loosen: the horizon
+  method stores ONE border depth per column, which is what makes it cheap and
+  robust, so a column passing through the wing ends its sky there and
+  everything under it is ground by construction. It cannot represent sky that
+  reappears below an object. The colour grow is what would reach it, and
+  whether the grow may cross the border downward — without running into the
+  building — is the question this item now carries.
+- [x] **The Sky mask reads the sky's colour as well as its place** <!-- decision: 023 -->
+  reported 2026-09-18 from the iPad with three screenshots of one frame: the
+  Sky mask leaves a rim of unselected sky round every object and misses the
+  sky between branches, because it knows WHERE the sky is and not which pixels
+  are it. **The first half shipped 2026-09-19** — the selection grows out of
+  the seed through every pixel that matches the sky's own colour and is JOINED
+  to it, on the 018 guide, behind a "Follow the sky's colour" toggle that is on
+  by default.
+  **The second half is on STAGING, 2026-09-20, and the last failing check is
+  green.** The corner band that record named is clear sky below the cloud deck
+  that fills the top of NIR_1651 — same spectrum, a quarter the light — and no
+  setting of the grow's constants reached it, because the target the grow fits
+  comes from a seed that is 100% cloud on that frame: of 211,602 seeded guide
+  pixels, zero sit below the cloud's lower edge. The remedy was not in the grow
+  at all. The SEED is now a horizon rather than a strip at the top of the frame
+  (`src/skyhorizon.ts`; IR-SCIENCE.md section 9o), and on the acceptance
+  instrument NIR_1651's reachable open sky reads 99.9% against 93.4%, its
+  uncovered sky 0.5% against 5.8%, and its largest uncovered block 430 px
+  against 18,933. NIR_1644's edge band 93% against 87%; NIR_0063 holds at 97%.
+  All four checks pass.
+  **Waiting on the on-device pass before it moves to the archive.** What stays
+  open after it belongs to 029, which owns the seed, and to 028 for the sky no
+  path reaches. One caution for whoever takes this next: the spill figures — 7%,
+  38%, 50% — are not the mask swallowing canopy; opened, they are the feather
+  sitting in the notches between crowns and the pale hazy sky above a treeline,
+  which the walk's own key rejects and the mask correctly takes.
+- [x] **A generated selection can be corrected by hand** <!-- decision: 031 -->
+  the Sky mask is generated, and when it is wrong on a photograph the reader
+  has one lever: drag Reach and hope. Anything painted into it is destroyed by
+  the next Reach or Feather drag, because regenerating assigns the bitmap
+  wholesale; and the only way to see what is selected is a 32% cyan tint over
+  the graded photograph, which under the looks that swap the channels is the
+  same cyan the over-selected foliage renders as. Every editor that generates a
+  selection ships both halves — Lightroom adds to and subtracts from a Select
+  Sky mask with a brush, darktable combines drawn shapes with a parametric mask
+  per module and paints the result as a matte over a monochrome image. So: a
+  list of correction strokes the mask keeps, a composite every render path
+  reads in place of the automatic bitmap, and a second overlay mode that shows
+  the selection on its own. The automatic selection stays live underneath, so
+  Reach still works and the hand work survives it.
+  **BOTH HALVES ARE ON STAGING, 2026-09-20.** `Add by hand` and `Take out by
+  hand` arm the canvas; a drag records a stroke on the mask rather than paint
+  in its bitmap, so a Reach drag — which rebuilds the whole selection from the
+  photograph — replays it instead of destroying it. Measured on the conifer
+  frame: one take-out stroke moves coverage 54.0% to 39.6%, and after Reach 1
+  to 1.3 it reads 39.8% against 54.2% for the same Reach uncorrected. `Clear by
+  hand` returns exactly the uncorrected number.
+  And the SEEING half, which landed first: a `Matte` button beside `Show mask`
+  drops the photograph to dim grey and paints the selection in yellow, so what
+  is selected can be judged without the photograph's own colour arguing with
+  the overlay — which on the looks that swap red and blue is the same cyan the
+  overlay uses. Measured on the conifer frame under Aerochrome: with the old
+  tint none of the frame carries the overlay's own colour and 7.5% of it reads
+  grey; with the matte, 54% is the mask and 45% is grey, against 53% coverage
+  from the mask itself.
+  Corrections go into an export the same as the rest of the mask — measured on
+  a full-size export, 85% of a stroke's band changed and the rest of the frame
+  was identical to the byte. What is NOT verified is how a correction drags on
+  the tablet: every dab re-uploads both mask atlases, and the refined one is
+  2.8 MB. See
+  `docs/decisions/031-a-generated-selection-can-be-corrected-by-hand.md`.
+- [x] **Quick look: the wait before the first picture, and the wait after Keep** <!-- decision: 033 -->
+  reported 2026-09-20 from the device, as two waits on the path every reader
+  meets first. After picking files, nothing appears on the pick/reject sheet
+  for a long time; after pressing Keep, the screen stays on the sheet for a
+  long time before the editor and its strip arrive.
+  **The first is not a slow decode, it is a grid that draws nothing until one
+  finishes.** `openQuickLook` appends a tile at the BOTTOM of its loop body, so
+  the sheet is empty until the first file has been read, demosaiced, denoised,
+  lens-corrected and rendered twice — and it works one file at a time while
+  three or four decode lanes sit idle. The session strip was given both fixes
+  already and the grid was given neither: every tile on screen before a byte is
+  read, and the camera's own embedded preview as a first picture. That second
+  one is what every culling tool does — it is the whole of Photo Mechanic's
+  speed against Lightroom — with the caveat this app has to handle rather than
+  inherit: on an infrared conversion the camera's JPEG is the wrong colour
+  world, so it is shown as provisional, in text, the way the strip already
+  shows it.
+  **The second has three candidates seconds apart and they are not guessed at.**
+  Before a byte of the new set is read, `addToSession` waits for the previous
+  session's chunk sweep — a cost that scales with the set being replaced, not
+  the one being opened — then reads the first file and decodes it AGAIN, though
+  the grid decoded it minutes earlier and kept only a 260 px JPEG. The
+  instrument goes in first: the test page measures both transitions on practice
+  files and the diagnostic carries the last run's stages, so the next report
+  names a stage instead of a symptom. Ruled out by reading rather than
+  measurement: the sky selection is not in the critical path, and the shared-look
+  sniff never reads a raw.
+  See `docs/decisions/033-the-wait-before-the-first-picture-and-the-wait-after-keep.md`.
+- [x] **Full screen shows the mask** <!-- decision: 037 -->
+  reported 2026-09-20: opening full-screen view while the Masks tab is up
+  carries the mask into it — the coverage tint AND the dotted handle outline —
+  and full view exists to look at the photograph. One condition:
+  `renderMaskOverlay` decides whether the overlay is live from a list that does
+  not include full view, so entering it changes nothing about the overlay. The
+  same function already has the pattern — the tint steps aside while a slider
+  is being dragged, on exactly this reasoning.
+  **FIXED, ON STAGING 2026-09-20.** Full view now stands the whole overlay down
+  — tint, matte and outline together, through the one condition that already
+  decides all three — and brings it back on leaving. The mask stays selected
+  throughout, which the walk asserts on the far side: dropping the selection
+  would make the other checks pass while losing the reader's work. Measured on
+  the conifer frame with a radial: 44.6% of the frame carries the overlay while
+  editing, 11.6% in full view (which is the photograph's own teal sky, not the
+  tint), and exactly 44.6% again on return. The walk was run against the old
+  behaviour first and failed the two checks it exists for. See
+  `docs/decisions/037-full-screen-shows-the-mask.md`.
+- [x] **The Grade tab's controls do not behave like the rest of the app** <!-- decision: 035 -->
+  three defects reported together 2026-09-20, two of which share a cause.
+  **The wheel destroys the hue you chose when you take the amount off**: its
+  drag handler writes both values from the pointer every move, so pulling the
+  puck to the middle overwrites the angle with whatever `atan2` returns there —
+  0 at the exact centre — and there is no axis left to come back out along. The
+  Amount slider does not do this, so the same band has two behaviours.
+  **Double-tap to put a slider back cannot reach any of the six grade
+  sliders**: they are built at runtime with no `id` at all, and both the
+  capture and the lookup are keyed by id, so the gesture has nothing to find.
+  **And Shadow colour runs the wrong way** — right reduces, where every other
+  slider in the app increases.
+  **THAT THIRD ONE WAS FIXED WRONG FIRST, SHIPPED, AND SENT BACK.** The first
+  answer renamed the control to "Amount" so its NAME rose as the slider moved
+  right, while the colour in the photograph still fell. The instruction had
+  been that moving right must not reduce, and the convention is about the
+  SCREEN, not the label: a name that rises while the picture falls is the same
+  defect with a better caption.
+  The error underneath is the one to keep: inverting the CONTROL and inverting
+  the STORED NUMBER were treated as one option. Flipping the stored
+  `shadowSat` really would break every saved look, every shared `.ipslook` and
+  every look baked into an exported JPEG — a real objection, to the wrong
+  thing, which was then allowed to veto the control's direction too. The
+  inversion belongs in `syncFromUI` and `syncToUI` and nowhere else.
+  The slider is now the colour the shadows KEEP: 0 left, 1 right, converted at
+  those two lines, with the stored field untouched. The heading moved from
+  "Colour out of the shadows" to "Colour IN the shadows" for the same reason —
+  a section cannot name one direction while its control runs the other. A
+  photograph opens with it at the RIGHT end, which is where a control that can
+  only take something away has to rest when right is the increasing direction.
+  And the walk was rewritten to read the PICTURE rather than the label: mean
+  saturation of the dark pixels, 0.070 at the left against 0.220 at the right.
+  The label-reading version of that check went green on the unfixed control.
+  **ALL THREE FIXED, ON STAGING 2026-09-20.** The wheel holds the hue over the
+  innermost 15% of its travel, where the angle is noise and at the exact centre
+  is zero — so pulling the puck in now does what the Amount slider beside it
+  already did, and the two controls agree. The six sliders have ids, which puts
+  them in the existing capture and lookup with no other change.
+  **THE THIRD ONE WAS PUT RIGHT TWICE, and this paragraph recorded the wrong
+  version of it for most of a day.** The first attempt RENAMED the control to
+  "Amount" so that its NAME rose as the slider moved right, while the colour in
+  the photograph still fell — a label change standing in for a direction change,
+  and it was sent back the same day. What shipped is the control reversed:
+  dragging right puts colour back into the shadows, the section reads "Colour in
+  the shadows", and the inversion lives in `syncFromUI` and `syncToUI` only, so
+  the number stored in a look is untouched and every saved look, shared link and
+  exported JPEG renders exactly as before. See record 035's Outcome.
+  **The walk was run against all three old behaviours first and failed seven
+  checks**, then against the wheel's alone and failed that one (hue 200 becomes
+  180 on the way to the centre). Two instrument errors on the way, both caught:
+  the first version grabbed the wheel at 3 o'clock and reported the hue as lost,
+  when 3 o'clock IS hue 90 under this wheel's convention and the app was
+  behaving — the gesture has to start on the puck. And the first version died at
+  the first failing check, so a build with no ids reported one problem and
+  stopped; it refuses the dependent checks explicitly now and prints the whole
+  list.
+  See `docs/decisions/035-the-grade-tab-controls-do-not-behave-like-the-rest.md`.
+- [x] **A TIFF export uses one core** <!-- decision: 036 -->
+  reported 2026-09-20 as a TIFF export that runs on one thread and takes
+  forever. It does, by an explicit condition: `canRunParallel` returns false on
+  any format that is not JPEG, so every TIFF falls to the single-threaded loop
+  on a machine that had eight workers and had just used them. The diagnostic
+  line beside the report read "17.6 MP in 27.5s — pixels 25.9s on 8 threads",
+  which looks like a contradiction and is not: that was a JPEG.
+  The condition is not an oversight — the band workers return eight bits a
+  channel and `writeTiff16` needs sixteen, so the parallel path has no 16-bit
+  return. Exporting at eight bits to make it fast is rejected: sixteen is the
+  reason to choose TIFF. The check afterwards is the one section 9l-ii
+  established — measure the exported FILE's bytes, not the screen.
+  **FIXED, 2026-09-20 — and both of this item's mechanisms were wrong before
+  they were right.** The bullet above said the band workers return eight bits
+  and the parallel path has no 16-bit return. It HAS one: `BandResult` declares
+  `rgb?: Uint16Array` with the comment "TIFF path: 16-bit RGB, same rectangle".
+  What is true is worse — that field was declared and produced by NOTHING. A
+  type with no code behind it reads exactly like a finished feature, which is
+  presumably how the exclusion survived being looked at. The diagnosis came
+  from a signature whose body had not been read.
+  **And the walk found a second defect the reading had missed: the report
+  cannot see a TIFF export at all.** `Last export` read "none this session"
+  straight after a completed 31 MB TIFF, because the three lines that record a
+  profile live only in the JPEG branch. That is the real reason a device report
+  and a complaint about a slow TIFF looked like they contradicted each other —
+  after a TIFF there is no line, so the newest one always belongs to an earlier
+  JPEG. It also left the first verification run unable to answer its own
+  question: the files came back byte-identical, which proves the band
+  arithmetic and says nothing about whether the pool engaged, because the
+  thread count read zero on both arms.
+  **Measured with the profile in place**: 5.2 MP in 8.0s across 3 threads
+  against 21.3s on one — 2.7x — and the two files are IDENTICAL, 0 bytes of
+  31,315,842. The single-threaded arm is forced by wrapping `Worker` so that
+  only the EXPORT worker's construction throws; making `Worker` undefined would
+  move the decode onto the main thread too, and a byte difference could then
+  have come from either end.
+  Two other things the change carries. `perWorkerMb` bills a band at four bytes
+  a pixel and a 16-bit RGB band is six, so the thread budget was understating a
+  TIFF band by half — on a tablet that budget is what stands between a big
+  export and a killed tab. And the worker transferred `res.data.buffer`, which
+  is `undefined` on a TIFF band, so thirty megabytes a band was being
+  structured-CLONED rather than moved: correct, and a doubled peak on the one
+  path whose ceiling matters most. See
+  `docs/decisions/036-a-tiff-export-uses-one-core.md`.
+- [x] **Masks combine: a group of components joined by add, subtract and intersect** <!-- decision: 026 -->
   asked 2026-09-19 in three parts: the masks need to combine, it should be
   possible to subtract other colours from the Sky mask, and a mask should be
   invertible. Invert already exists on every mask type. The other two are one

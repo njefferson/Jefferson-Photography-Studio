@@ -144,3 +144,44 @@ defect on a path the reader reaches at the END of an edit rather than the
 start, so it is met less often than the sheet or the controls; and it is
 bounded work with an in-house reference to copy, so it does not need to sit
 behind a measurement the way the pixel items do.
+
+## Outcome
+
+**SHIPPED 2026-09-20, and this record's mechanism was wrong twice before it was
+right.**
+
+A TIFF export splits across the pool exactly as a JPEG does. On the reporting
+device a 20.9 MP frame went from 27.5s to 13.7s on 8 threads. The file is
+identical to the one the single-threaded path produces — 0 of 31,315,842 bytes
+differ — which is the check that matters, because a seam between two workers is
+a plausible-looking photograph and section 9l-ii is about a stage that corrupted
+every TIFF while the preview looked correct.
+
+**FIRST WRONG MECHANISM:** that the band workers return eight bits a channel.
+They do not — `BandResult` declares `rgb?: Uint16Array` — but nothing anywhere
+produced one, which is a type with no code behind it and reads exactly like a
+finished feature.
+
+**SECOND WRONG MECHANISM:** that the report simply had no number for a TIFF. The
+walk found the TIFF path never recorded an export profile at all, so "Last
+export" said "none this session" straight after a TIFF however long it had
+taken — and a report sent in to ask about a slow TIFF was describing some
+earlier JPEG.
+
+**AND THE DEFECT CAME BACK IN THE FIX, TWICE, BOTH TIMES AS ONE RULE IN TWO
+PLACES.**
+
+- The progress strip kept its own copy of "which formats run in parallel", so it
+  said "on one thread" over an eight-thread export. It was reported from the
+  device with the app's own report beside it saying otherwise. The strip no
+  longer predicts: it reads the count the export settled on, and says nothing
+  while that is still 0. `tools/tiff-threads-walk.mjs` reads the banner and the
+  report together and was made to fail against the predictor.
+- `bytesPerPixel` reached the gate that APPROVES a parallel export and not the
+  code that STARTS the workers, which kept the 4-byte default. Since the count
+  is monotonically larger at four bytes, the spawn could only ever exceed what
+  had been approved: on a tablet-class device at ~31 MP the gate said 3 and the
+  spawn took 4, which is 629 MB against a 600 MB ceiling that exists because
+  such a device kills the tab rather than swapping. One function decides it now,
+  and `tools/one-pool-check.mjs` refuses the shape rather than re-deriving the
+  arithmetic — a test that recomputed it would have passed.
