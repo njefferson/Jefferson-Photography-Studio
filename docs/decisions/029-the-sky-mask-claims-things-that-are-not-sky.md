@@ -32,6 +32,25 @@ over-selection, and the whole of 023's tuning was steered by them — including 
 tolerance widening that looked free on all three (NIR_0063 +0.1 points,
 NIR_1644 +0.2) and takes NIR_0627 from 76% to 87%.
 
+**AND A LIMIT OF THE NEW SEED, REPORTED FROM THE DEVICE 2026-09-20 AND
+CONFIRMED BY LOOKING.** A frame of a parked jet in front of a long building:
+the sky above the building is selected, and a band of sky BELOW the aircraft's
+left wing — above the roofline, behind the trees — is not. It is not a
+threshold that can be loosened. The horizon method stores **one border depth
+per display column**, which is the whole of what makes it cheap and what makes
+it robust; a column that passes through the wing ends its sky at the wing, and
+everything under it in that column is ground by construction. The model cannot
+represent sky that reappears below an object, and no setting of its constants
+will make it.
+
+So the border is the right answer to "where does the sky stop coming down" and
+the wrong shape for "which pixels are sky" on a frame with something standing
+in front of the horizon. The colour grow (023) is what reaches under the wing
+if anything does, since that band is the same sky and the same spectrum; the
+question this record now carries is whether the grow is allowed to cross the
+border downward, and what stops it running into the building when it is.
+Failing that, it is what 031's hand correction is for, and the reader has it.
+
 ## Looked up
 
 The prior art is in `IR-SCIENCE.md` §9n, researched 2026-09-20 for the adjacent
