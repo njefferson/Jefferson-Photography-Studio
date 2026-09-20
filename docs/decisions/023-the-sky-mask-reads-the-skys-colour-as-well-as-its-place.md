@@ -408,31 +408,38 @@ stay inside it is the one that reads +0.1. A fixed-window texture measure on a
 region smaller than a few windows measures the region's surroundings.
 
 **A colour-and-texture key cannot do this job**, and that is now measured
-rather than suspected. So the correction is DECLARED instead of derived, in
-`.not-sky` at the repo root, and **the acceptance walk is green on all three
-frames for the first time**: NIR_1651's open sky 93.4% to **99.2%**, its edge
-band 94% to 95%, its uncovered reachable sky 5.8% to 1.1%. The other two frames
-are untouched to the digit, which is the first thing to check about a
-correction.
+rather than suspected.
 
-**A row names a CONNECTED COMPONENT, never a rectangle**, by a point inside it.
-A box drawn round that corner would also swallow the real sky above it, and
-removing real sky makes this test EASIER — the one direction a correction must
-never move. The map shows the corner gone and the sky above it still counted.
+**A DECLARED CORRECTION WAS TRIED AND HAS BEEN WITHDRAWN, 2026-09-20.** One row
+in `.not-sky` asserted that an 18,933 px band in NIR_1651's bottom-right corner
+is a defocused foreground branch rather than sky. It took the walk green on all
+three frames. **The assertion did not survive being checked, so the row and the
+green are both withdrawn.**
 
-**Four guards, because a file like this is otherwise a way to buy green**, and
-all four were watched firing before any of it was believed: every row prints on
-every run with the size it removed; a row matching no component fails as stale;
-a row with no reason fails; a row removing more than 10% of the frame's keyed
-sky fails whatever it says. The one row removes 4.7%.
+Two errors in reaching it, and neither was the app's:
 
-**What the green rests on, stated plainly so it can be re-examined:** one
-assertion that a particular 18,933 px component of NIR_1651 is a defocused
-foreground branch rather than sky. The evidence is a three-times magnified crop
-of that corner, and an independent second key — the grow's own, read through
-`tools/sky-probe.mjs --why` — which finds no unselected sky-coloured component
-on that frame above 692 px. Both are recorded above. If that assertion is
-wrong, the row is wrong and the green with it.
+- **The crop was aimed wrong.** The band runs x 0.90–1.00; the magnified crop
+  it was judged from was taken from x ≥ 0.80. What was described as a defocused
+  branch may be a different object sitting beside the band. That is the same
+  crop-aiming failure as the ragged-edge diagnosis, committed while writing the
+  lessons about it.
+- **The brightness anchor was the wrong statistic, again.** The band was called
+  dark against the frame's GLOBAL sky median of 0.312. Covered sky local to
+  that corner reads 0.501, and the frame gets brighter toward it — the left
+  edge is 0.394 — so there is no falloff to explain a dark band, and equally no
+  basis for the global median as the comparison.
+
+What is actually established about the band, measured from the maps: it is
+94 px wide by 335 tall, hard against the right edge, running to the bottom; its
+luminance is FLAT at 0.25–0.29 across the whole of it with no internal dark
+mass; its saturation is 0.357 against the sky's 0.230. Whether that is sky or
+an object is not settled, and is being settled by rendering the corner UNTINTED
+and magnified — the walk's overlay carries the coverage tint, which is what
+made the sky read as saturated cyan and the band as dark teal in the first
+place.
+
+**The walk is therefore back to one red check on NIR_1651**, pending the
+re-measurement that confirms it returns to 93.4%.
 
 **What is still owed:** the boundary. The grow fixes the interior and the gaps
 and leaves the rim misplaced by a pixel or two. Composing the guided filter
