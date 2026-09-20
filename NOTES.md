@@ -571,15 +571,15 @@ user-scalable=no.
   answer to this exact problem is colour plus TEXTURE, and texture fails on the
   only case that matters, because a blurred branch is smooth — fractionally
   SMOOTHER than the sky at one pixel and indistinguishable from it at eight.
-  **So the correction is declared rather than derived, and the acceptance walk
-  is now green on all three photographs for the first time** — NIR_1651's open
-  sky 93.4% to 99.2%, with the other two unchanged to the digit. What the green
-  rests on is one assertion, in `.not-sky`: that a particular block in that
-  frame's corner is a defocused branch and not sky, evidenced by a magnified
-  crop and by the selection's own colour test agreeing independently.
-  **Still open on the residual its record names**, the boundary — the grow
-  fixes the interior and the gaps and leaves the rim misplaced by a pixel or
-  two — and on 028 for the sky no path reaches.
+  A declared correction was then tried, took the walk green, and **has been
+  withdrawn**: the assertion it rested on — that the band in NIR_1651's corner
+  is a branch and not sky — did not survive checking, because the crop it was
+  judged from was aimed at x >= 0.80 when the band starts at x = 0.90, and
+  because the brightness comparison used the frame's global sky median when the
+  sky local to that corner is nearly twice as bright.
+  **So the check is red again and what that band IS remains the open question.**
+  Also still open: the boundary residual this record names, and 028 for the sky
+  no path reaches.
   One caution for whoever takes this next: the spill figures — 8%, 23%, 55% —
   are not the mask swallowing canopy; opened, they are a bright cloud and the
   pale hazy sky above a treeline, which the walk's own key rejects and the mask
@@ -1724,41 +1724,42 @@ goes red. Per look it also prints how many controls separate that look from B&W
 IR, which is the walk's own control: a walk that reads nothing would report
 every round trip clean.
 
-## The walk's sky truth takes declared corrections now, and it is green, 2026-09-20 (decision 023)
+## The walk's sky truth takes declared corrections, and the first one was withdrawn, 2026-09-20 (decision 023)
 
-**`.not-sky` at the repo root.** The acceptance walk derives its own sky truth
-per frame from colour, that truth is wrong in one measured way it cannot fix
-from the inside, so the correction is declared. Each row names ONE CONNECTED
-COMPONENT of keyed-but-uncovered pixels, by a point inside it, and asserts that
-component is not sky, with what is actually there.
+**`.not-sky` at the repo root** lets a row assert that a named connected
+component of keyed-but-uncovered pixels is not sky. A component and not a
+rectangle, because a box round a corner also swallows the real sky above it,
+and removing real sky makes the test EASIER — the one direction a correction
+must never move. Four guards, every one watched firing: every row prints with
+what it removed; a stale row fails; a reasonless row fails; a row removing more
+than 10% of the frame's keyed sky fails whatever it says.
 
-**A component and not a rectangle**, and that is the load-bearing choice. A box
-round NIR_1651's corner would also swallow the real sky above it, and removing
-real sky makes the test EASIER — the one direction a correction must never
-move. The corrected map shows the branch gone and the sky above it still
-counted.
+**The mechanism stands. The first row does not.** It asserted that an
+18,933 px band in NIR_1651's bottom-right corner is a defocused foreground
+branch, and it took the walk green on all three frames — NIR_1651's open sky
+93.4% to 99.2%. Checked afterwards, the assertion could not be defended, so the
+row and the green are both withdrawn.
 
-**Four guards, every one watched firing before any of this was believed:**
+**Two errors, and the same two shapes this repo keeps paying for.**
 
-- every row prints on every run with the pixel count it removed;
-- a row matching no component FAILS as stale, so it cannot rot quietly;
-- a row with no reason after the em dash FAILS;
-- a row removing more than 10% of that frame's keyed sky FAILS whatever it
-  says, because a correction that large is a broken key.
+- **The crop was aimed wrong.** The band runs x 0.90–1.00 and the magnified
+  crop was taken from x >= 0.80, so the dark mass described may be a different
+  object beside it. Hub LESSONS 338's own subject, committed while writing it.
+- **The brightness anchor was the wrong statistic.** The band was called dark
+  against the frame's GLOBAL sky median, 0.312. Sky local to that corner reads
+  0.501, and the frame brightens toward it — the left edge is 0.394. Hub
+  LESSONS 337's own subject, in a spatial disguise.
 
-The stale and ceiling guards were proved together by planting a bogus row and
-dropping the ceiling to 1%; the reason guard needed a second run, because the
-first test pointed at a component the real row had already consumed and so
-reported stale instead — a plant aimed at ground another row had taken.
+**What is actually established about the band**, recovered untinted from the
+maps: 94 px wide by 335 tall, hard against the right edge, running to the
+bottom; luminance FLAT at 0.25–0.29 across the whole of it, mean 0.264, with no
+internal dark mass; saturation 0.357 against the sky's 0.230.
 
-**The result.** All three frames green: NIR_0063 edge 98% / open 99.9%,
-NIR_1644 87% / 99.9%, NIR_1651 95% / 99.2%. The single row removes 18,933 px,
-4.7% of that frame's keyed sky.
-
-**Getting a row right needs a point INSIDE the block, and the centroid is not
-one** — these blocks are not convex, so a centroid can land in the sky beside
-the thing it describes. The walk prints a guaranteed-inside point for its
-largest missed block on every run, which is what a row is written from.
+**The lesson for the mechanism, not against it:** a correction file is only as
+good as the look that justifies a row, and a row justified by a mis-aimed crop
+passes all four guards while being wrong. The guards can check that a row is
+live, reasoned and bounded. They cannot check that somebody looked at the right
+place. That part is still a checklist, and it failed here.
 
 ## Texture does not separate a blurred branch from sky, measured 2026-09-20 (decision 023)
 

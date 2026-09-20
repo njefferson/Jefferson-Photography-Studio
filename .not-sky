@@ -30,15 +30,14 @@
 #
 #   <frame>  <x> <y>  — what is actually there, seen
 
-# NIR_1651's bottom-right corner. Magnified three times out of the walk's own
-# overlay it is a heavily defocused foliage mass at the frame edge — a
-# foreground branch, leaf silhouettes readable along its blurred boundary, a
-# deep dark teal beside the flat lighter teal of the sky. The key admits it
-# because its rendered chroma sits inside the sky's hue band above the
-# saturation floor, and the three things that might have separated them do not:
-# luminance 1.8 MADs (ordinary sky variation), texture at one pixel -0.6 MADs
-# (the bokeh is SMOOTHER than sky) and at eight pixels +0.1 MADs.
-# The selection's own colour test refuses it independently — the probe finds no
-# unselected sky-coloured component on this frame above 692 px against the
-# 18,933 here — so two different keys disagree with this one.
-NIR_1651  0.975 0.855  — a defocused foreground branch at the frame's edge, not sky
+# WITHDRAWN 2026-09-20, and the file is deliberately left empty rather than
+# deleted. One row was added here asserting that an 18,933 px band in
+# NIR_1651's bottom-right corner is a defocused foreground branch. It took the
+# acceptance walk green. The assertion could not be defended when it was
+# checked: the band is 94 px wide by 335 tall hard against the frame edge, its
+# luminance is flat across the whole of it, and the magnified crop it was
+# judged from was taken from x >= 0.80 when the band starts at x = 0.90 — so
+# what was described may have been something sitting beside it.
+#
+# The green went with it. See NOTES.md and decision 023 for what is being done
+# to settle what that band actually is.
