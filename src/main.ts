@@ -109,8 +109,6 @@ const canvas = $("view") as HTMLCanvasElement;
 const hint = $("hint") as HTMLParagraphElement;
 const panel = $("panel") as HTMLElement;
 const panelBody = $("panelBody") as HTMLElement;
-const cueUp = $("panelUp") as HTMLDivElement;
-const cueDown = $("panelDown") as HTMLDivElement;
 const sectionHead = document.querySelector(".section-head") as HTMLElement;
 const sectionBack = $("sectionBack") as HTMLButtonElement;
 
@@ -6870,21 +6868,42 @@ function updateLensCmp() {
   }
 }
 
-// Panel scroll cues: arrows appear when there is more panel above/below.
+// THERE ARE NO FLOATING ARROWS ON THE PANEL ANY MORE, and this is what is left
+// of them: the one control that said the same thing with a label on it.
+//
+// The pair of pills was reported from the device as "a weird scroll artifact on
+// the export window", and it was not an artefact. `.scroll-cue` floats over the
+// panel — `height: 0` on purpose, so it takes no space — and the up one was
+// placed four pixels under the pinned heading, which on the Export tab is
+// exactly where the Format menu begins. Twelve pixels of scroll drew a 44x27
+// pill across the top-right corner of the control you had opened the tab to
+// use.
+//
+// ITS OWN COMMENT SAID THE CORNER IS "THE ONE PLACE NOTHING IS WRITTEN", and
+// that was true of the controls it was checked against: this panel's buttons
+// are full-width with centred labels, so their right corner is blank. It is not
+// true of a `select`, which draws its chevron there, and it is not true of a
+// slider, whose track runs the whole width. `tools/scroll-cue-walk.mjs` swept
+// every tab at two widths and found both pills drawn over selects and slider
+// tracks on most of them — 44x21 over the auto button on Basic, 44x27 over the
+// lift slider on IR, and so on. Each earlier round had moved the pill to a
+// place nothing was written for the controls it was looked at against.
+//
+// Nothing anywhere could see it: the cue is `pointer-events: none` with no role
+// and no accessible name, so every instrument here — hit area, name, role,
+// contrast — samples a population it is not in. Marking something decorative
+// removes it from everything that measures.
+//
+// AND THE UP ONE WAS ALREADY SAID TWICE. The two lines below used to sit one
+// apart, driven by the identical condition, under a comment warning that two
+// conditions for one fact is how they come to disagree. What survived is the
+// one with a label and a 44px target. What is below the fold is said by the
+// content being cut off at the edge, which is what a scroller looks like.
 function updateScrollCues() {
-  if (panel.hidden) {
-    cueUp.hidden = true;
-    cueDown.hidden = true;
-    return;
-  }
-  const max = panelBody.scrollHeight - panelBody.clientHeight;
-  cueUp.hidden = panelBody.scrollTop < 12;
-  cueDown.hidden = max <= 0 || panelBody.scrollTop > max - 12;
-  // THE SAME FACT, SAID AS A CONTROL. The up arrow says there is more above;
-  // this is the thing to press about it, and what is above is the tab chooser.
-  // One driver for both, because two conditions for one fact is how they come
-  // to disagree — and setPanelTab already calls this after zeroing scrollTop,
-  // so switching tab re-hides it with nothing added there.
+  if (panel.hidden) return;
+  // THE CHOOSER IS ABOVE, AND THIS IS THE THING TO PRESS ABOUT IT.
+  // setPanelTab already calls this after zeroing scrollTop, so switching tab
+  // re-hides it with nothing added there.
   sectionBack.hidden = panelBody.scrollTop < 12;
   // ...and the heading's sub-line steps aside for it; see the stylesheet.
   sectionHead?.classList.toggle("chose", !sectionBack.hidden);
@@ -6896,22 +6915,12 @@ panelBody.addEventListener("scroll", updateScrollCues, { passive: true });
 sectionBack.addEventListener("click", () => {
   panelBody.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
 });
-// THE HEADING'S HEIGHT IS MEASURED, NOT TYPED. The up cue has to clear the
-// pinned heading, and that heading is a flex row that wraps at narrow widths,
-// so its height is not a constant anyone can write in the stylesheet. It was
-// written there twice, in two rules, which is how two numbers for one
-// measurement come to disagree.
-if (sectionHead && "ResizeObserver" in window) {
-  let headH = -1;
-  new ResizeObserver(() => {
-    const h = Math.round(sectionHead.getBoundingClientRect().height);
-    // Only on a CHANGE. Writing the same value every observation is how a
-    // ResizeObserver that writes a style ends up feeding itself.
-    if (h === headH) return;
-    headH = h;
-    panelBody.style.setProperty("--section-head-h", `${h}px`);
-  }).observe(sectionHead);
-}
+// THE HEADING'S HEIGHT WAS MEASURED INTO `--section-head-h` FOR THE UP CUE, and
+// the up cue is gone (see updateScrollCues above), so the measurement is gone
+// with it rather than left running. A ResizeObserver that writes a style
+// nothing reads is not free: it runs on every layout of the heading, and the
+// next session to find it has to work out who depends on it before touching
+// anything. Nothing does.
 window.addEventListener("resize", updateScrollCues);
 window.addEventListener("resize", positionMaskOverlay);
 window.addEventListener("resize", positionCropOverlay);
