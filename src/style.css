@@ -2450,11 +2450,6 @@ label.open-btn, label.bar-btn {
 }
 .section-back:active { background: var(--surface-3); }
 .panel-body {
-  /* SET FROM THE ELEMENT, not typed. The scroll cue has to clear the pinned
-     heading, and the heading's height now depends on whether its row wraps —
-     so main.ts measures .section-head and writes this. The value here is the
-     unwrapped height, used only for the frame before the observer first runs. */
-  --section-head-h: 60px;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -2916,58 +2911,26 @@ label.open-btn, label.bar-btn {
   white-space: nowrap;
 }
 
-/* THE CUE FLOATS OVER THE PANEL, so where it sits decides which control it
-   covers. Centred, it landed on the MIDDLE of a full-width button's label —
-   "R ⇄ B c▮▮▮▮l swap" on a phone, "HIE B&W" on a desktop — because every
-   control in this panel centres its text. `pointer-events: none` meant the tap
-   still worked and only the reading of it was lost, which is how it survived
-   long enough to be photographed and then blamed on iOS Reachability.
-   Against the right edge it has a clear margin at every width: the panel's
-   buttons are full-width with centred labels, so the corner is the one place
-   nothing is written. */
-.scroll-cue {
-  position: sticky;
-  display: flex;
-  justify-content: flex-end;
-  /* NOT `stretch`, which is the default. This is a flex container with
-     `height: 0` — deliberately, so the cue floats without taking space in the
-     flow — and a stretched flex item is sized to its CONTAINER. So the pill was
-     stretched to zero: 10px tall, all of it padding and border, with the arrow
-     drawn OUTSIDE it underneath. That is the flat pill with a triangle hanging
-     off it that shipped, on both cues, for as long as they have existed.
-     `flex-start` sizes the item from its own content instead. */
-  align-items: flex-start;
-  padding-right: 8px;
-  height: 0;
-  overflow: visible;
-  z-index: 6;
-  pointer-events: none;
-}
-.scroll-cue span {
-  display: inline-block;
-  background: var(--surface-3);
-  border: 1px solid var(--line-2);
-  border-radius: 999px;
-  padding: 4px 0;
-  width: 44px;
-  text-align: center;
-  font-size: 0.75rem;
-  /* NOT --accent: the selected chips are --accent, so the cue used to vanish
-     against them (owner, 2026-07-20). Neutral high-contrast text instead. */
-  color: var(--txt);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
-  white-space: nowrap;
-}
-/* BELOW THE PINNED HEADING, not on top of it. The up-cue sticks to the top of
-   the scroller and so does the section heading, so with the heading pinned the
-   two landed in the same place and the arrow sat on the word "Export". Its own
-   comment says it is placed where nothing is written — that was true while
-   nothing else was pinned there.
-   The offset is the heading's height, declared once beside it and used by both,
-   because two numbers for one measurement is how they come to disagree. */
-.scroll-cue.up { top: calc(var(--section-head-h) + 4px); z-index: 4; }
-.scroll-cue.down { bottom: 10px; }
-.scroll-cue.down span { transform: translateY(-100%); }
+/* THE PANEL'S TWO FLOATING ARROWS WERE REMOVED ON 2026-09-20, and this note is
+   what is left so the next session does not put them back. They were pills
+   floating over the scroller with `height: 0`, and the comment that stood here
+   said the right-hand corner is "the one place nothing is written". That is
+   true of this panel's buttons, which are full-width with centred labels. It is
+   false of a `select`, which draws its chevron in exactly that corner, and
+   false of a slider, whose track runs the whole width — so the up pill was
+   drawn across the top-right of the Export tab's Format menu, which is what was
+   reported from the device as a scroll artefact. tools/scroll-cue-walk.mjs
+   swept every tab at two widths and found both pills over selects and slider
+   tracks on most of them; each earlier round had simply moved the pill to a
+   place nothing was written for the controls it was checked against.
+   Nothing here could see it: the cue was `pointer-events: none` with no role
+   and no name, so every instrument in this repo sampled a population it was not
+   in. What is above the fold is now said by "^ Sections", a labelled 44px
+   control that appeared under the identical condition; what is below is said by
+   the content being cut off, which is what a scroller looks like.
+   RESTORING THEM NEEDS A LANE: a strip down the right of .panel-body that no
+   control may enter, which costs every control about 30px of width. It is not
+   a matter of moving the pill again. */
 
 .look-sub { display: flex; gap: 3px; align-items: center; }
 /* norm / R⇄B is the look-button's state-as-TEXT — NOTES' never-churn list blesses
