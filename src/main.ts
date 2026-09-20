@@ -30,7 +30,7 @@ import { writeZip, crc32 } from "./zip";
 import { putFrame, eachFrame, frameMetas, frameCount, clearFrames, frameStore } from "./batchstore";
 import * as Session from "./session";
 import { keepAwake } from "./wakelock";
-import { sampleBrush, skyBandCentre, lensGain, LENS_GAIN_HI, LENS_GAIN_LO, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, bandWeight, rgb2hsv, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, type MaskLayer, type CropRect, BRUSH_MAX_EDGE, type SkyMap } from "./pipeline";
+import { sampleBrush, rebuildFix, stampFix, stampSegment, skyBandCentre, lensGain, LENS_GAIN_HI, LENS_GAIN_LO, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, bandWeight, rgb2hsv, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, type MaskLayer, type CropRect, BRUSH_MAX_EDGE, type SkyMap } from "./pipeline";
 import { sensorPitchMicrons } from "./color";
 import { lensGains, applyLensFlat, lensPlanStamp, type LensPlan } from "./lensflat";
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, type HealSpot } from "./heal";
@@ -2130,7 +2130,12 @@ function cloneParams(p: EditParams): EditParams {
 // Float32Array lattice (its wrapper `id`/`strength` ARE compared, and the
 // lattice is immutable per id) so we never serialise hundreds of KB per frame.
 function snapSig(s: Snapshot): string {
-  return JSON.stringify(s, (k, v) => (k === "data" && (v instanceof Uint8Array || v instanceof Float32Array) ? undefined : v));
+  // `data` is a mask bitmap and `pts` a correction stroke's path — both are
+  // large, both are typed arrays, and neither needs serialising: `rev` bumps on
+  // every stroke and every regeneration, so two snapshots that differ by a
+  // stroke differ by a number. Before `pts` was listed here a single drag put
+  // a few hundred JSON entries into every undo comparison.
+  return JSON.stringify(s, (k, v) => ((k === "data" || k === "pts") && (v instanceof Uint8Array || v instanceof Float32Array) ? undefined : v));
 }
 
 function snapshot(): Snapshot {
@@ -5667,6 +5672,10 @@ const mUI = {
   skyReach: $("mSkyReach") as HTMLInputElement,
   skyByColour: $("mSkyByColour") as HTMLButtonElement,
   skyStatus: $("mSkyStatus") as HTMLElement,
+  fixAdd: $("mSkyFixAdd") as HTMLButtonElement,
+  fixCut: $("mSkyFixCut") as HTMLButtonElement,
+  fixClear: $("mSkyFixClear") as HTMLButtonElement,
+  fixSize: $("mSkyFixSize") as HTMLInputElement,
 };
 let selectedMask = -1;
 let overlayHandles: { el: SVGCircleElement; role: string }[] = [];
@@ -5871,7 +5880,29 @@ function regenerateSkyMask(m: MaskLayer) {
   m.fine = guide && res.mask
     ? ((m.skyByColour ?? true) ? growSkyByColour(res.mask, guide, m.reach ?? 1, m.feather) : refineSkyMask(res.mask, guide))
     : undefined;
+  // AND THE READER'S OWN CORRECTIONS GO BACK ON TOP (031). This is the whole
+  // reason they are a stroke list rather than paint: everything above just
+  // replaced both bitmaps wholesale, so anything painted into either of them
+  // would have gone with a Reach drag. Replayed here, the automatic selection
+  // stays live and the hand work survives it.
+  applyMaskFix(m);
   m.rev = (m.rev ?? 0) + 1;
+}
+
+/**
+ * Rebuild a mask's corrected composites from its stroke list.
+ * @param m  the mask, modified in place: `eff` and `effFine` are replaced.
+ * @returns nothing.
+ * What the result must satisfy: both composites are FRESHLY ALLOCATED and
+ * never touched again, because `cloneParams` shares them with every undo
+ * snapshot by reference; and they are cleared, not left stale, when the stroke
+ * list is empty — a composite outliving its strokes would be a correction
+ * nothing could undo.
+ */
+function applyMaskFix(m: MaskLayer) {
+  if (!m.fix || !m.fix.length) { m.eff = undefined; m.effFine = undefined; return; }
+  m.eff = m.brush ? rebuildFix(m.brush, m.fix) : undefined;
+  m.effFine = m.fine ? rebuildFix(m.fine, m.fix) : undefined;
 }
 
 /** Sky-mask status line, read straight from the generated bitmap so it is
@@ -5887,7 +5918,11 @@ function updateSkyStatus() {
   // the frame and what the mask selects is far more, so the line said 30%
   // whether the grow was on or off. A label that does not move when the
   // thing it describes doubles is not a label.
-  const d = (m.fine ?? m.brush).data;
+  // The SAME ordering maskWeight uses, so the number describes what is being
+  // rendered: the reader's corrections on top of the refinement on top of the
+  // seed. Reading the automatic bitmap here would report a percentage that
+  // does not move when a hand correction changes what is selected.
+  const d = (m.effFine ?? m.fine ?? m.eff ?? m.brush).data;
   let on = 0;
   for (let i = 0; i < d.length; i++) if (d[i] > 127) on++;
   const frac = d.length ? on / d.length : 0;
@@ -5898,10 +5933,12 @@ function updateSkyStatus() {
   // beside the selection (skyPrepFor), so this costs a lookup and no state.
   const hz = current ? skyPrepOf.get(current)?.prep.horizon : undefined;
   if (frac < SKY_MIN_COVERAGE) {
-    mUI.skyStatus.textContent = "No clear sky found — try a Brush or Color mask, or raise Reach."
+    mUI.skyStatus.textContent = "No clear sky found — try a Brush or Color mask, raise Reach, or add it by hand."
       + (hz?.noSky ? " Nothing in this photograph separates a sky from the ground." : "");
     return;
   }
+  const fixN = m.fix?.length ?? 0;
+  const byHand = fixN ? ` ${fixN} correction${fixN === 1 ? "" : "s"} by hand.` : "";
   const route = !hz
     ? ""
     : hz.boundary
@@ -5910,7 +5947,7 @@ function updateSkyStatus() {
         ? " Found at the horizon, with some columns taken back out as ground."
         : " Found at the horizon.";
   mUI.skyStatus.textContent =
-    `Sky detected — ${Math.round(frac * 100)}% of the frame.${route} Invert for everything but the sky.`;
+    `Sky detected — ${Math.round(frac * 100)}% of the frame.${route}${byHand} Invert for everything but the sky.`;
 }
 
 function deleteMask(i: number) {
@@ -5924,6 +5961,7 @@ function deleteMask(i: number) {
 
 function selectMask(i: number) {
   selectedMask = i;
+  setSkyFixMode(0); // arming is per-mask, like the colour pick
   maskAdjusting = false; // re-engaging with a mask brings the coverage tint back
   setColorPick(false); // arming is per-mask; disarm when the selection changes
   updateMaskUI();
@@ -6286,6 +6324,107 @@ function attachHandleDrag(el: SVGCircleElement, role: string) {
     el.addEventListener("pointerup", up);
   });
 }
+
+// --- CORRECTING A GENERATED SELECTION BY HAND (031). Add by hand / Take out
+// by hand arm the canvas the way Paint does, and a drag records a STROKE on
+// the mask rather than painting its bitmap. The bitmap is regenerated from the
+// photograph whenever Reach, Feather or the colour toggle moves, so paint in it
+// would not survive the next drag; the stroke list does, because
+// regenerateSkyMask replays it. ---
+/** 0 = off, 1 = add to the selection, 2 = take out of it. */
+let skyFixMode: 0 | 1 | 2 = 0;
+let fixing = false;
+let fixPts: number[] = [];
+
+function skyFixOn(): boolean {
+  const m = currentMask();
+  // The Masks tab has to be the one open: an armed correction owns the canvas
+  // ahead of pan and pinch, and a mode left armed behind a closed panel is a
+  // photograph that will not move under the finger for no visible reason.
+  return !!m && m.type === 4 && skyFixMode !== 0 && !panel.hidden && activePanelTab === "masks";
+}
+function setSkyFixMode(mode: 0 | 1 | 2) {
+  skyFixMode = mode;
+  mUI.fixAdd.setAttribute("aria-pressed", String(mode === 1));
+  mUI.fixCut.setAttribute("aria-pressed", String(mode === 2));
+  if (mode !== 0) {
+    // Arming this owns the canvas, the same way Paint does — and the reader is
+    // about to judge a selection, so bring the overlay back with it.
+    disarmPictureTools();
+    maskAdjusting = false;
+    showMaskOutline = true;
+    mUI.outline.setAttribute("aria-pressed", "true");
+    renderMaskOverlay();
+  }
+}
+
+function startFix(e: PointerEvent) {
+  const m = currentMask();
+  if (!m) return;
+  fixing = true;
+  tapSuppressed = true; // no tap-to-WB after the stroke
+  canvas.setPointerCapture(e.pointerId);
+  fixPts = [];
+  // FRESH BUFFERS TO DRAW INTO, and the stroke is stamped into them segment by
+  // segment as the finger moves. Rebuilding the whole composite on every
+  // pointermove instead — which is what a first version did — replays the
+  // stroke so far on each move, so the hundredth move of a drag replays a
+  // hundred segments over a 1024 px bitmap. The dabs are identical either way,
+  // because both go through pipeline.ts's `stampSegment`; only the cost
+  // differs, and `endFix` replays from the automatic bitmaps anyway.
+  const base = m.eff ?? m.brush;
+  const baseFine = m.effFine ?? m.fine;
+  m.eff = base ? { w: base.w, h: base.h, data: new Uint8Array(base.data) } : undefined;
+  m.effFine = baseFine ? { w: baseFine.w, h: baseFine.h, data: new Uint8Array(baseFine.data) } : undefined;
+  moveFix(e);
+}
+function moveFix(e: PointerEvent) {
+  const m = currentMask();
+  if (!fixing || !m) return;
+  const [uu, vv] = renderer.clientToImageUv(e.clientX, e.clientY);
+  const u = clamp(uu, 0, 1), v = clamp(vv, 0, 1);
+  const r = Number(mUI.fixSize.value), add = skyFixMode === 1;
+  const n = fixPts.length;
+  if (!n) {
+    if (m.eff) stampFix(m.eff, u, v, r, add);
+    if (m.effFine) stampFix(m.effFine, u, v, r, add);
+  } else {
+    const pu = fixPts[n - 2], pv = fixPts[n - 1];
+    if (m.eff) stampSegment(m.eff, pu, pv, u, v, r, add);
+    if (m.effFine) stampSegment(m.effFine, pu, pv, u, v, r, add);
+  }
+  fixPts.push(u, v);
+  m.rev = (m.rev ?? 0) + 1;
+  draw();
+}
+function endFix() {
+  if (!fixing) return;
+  fixing = false;
+  const m = currentMask();
+  if (m && fixPts.length >= 2) {
+    // Replacing the array rather than pushing: every undo snapshot shares it.
+    m.fix = [...(m.fix ?? []), { pts: Float32Array.from(fixPts), r: Number(mUI.fixSize.value), add: skyFixMode === 1 }];
+    applyMaskFix(m);
+    m.rev = (m.rev ?? 0) + 1;
+  }
+  fixPts = [];
+  updateSkyStatus();
+  draw();
+  flushRecord(); // one stroke = one undo step
+}
+
+mUI.fixAdd.addEventListener("click", () => setSkyFixMode(skyFixMode === 1 ? 0 : 1));
+mUI.fixCut.addEventListener("click", () => setSkyFixMode(skyFixMode === 2 ? 0 : 2));
+mUI.fixClear.addEventListener("click", () => {
+  const m = currentMask();
+  if (!m || !m.fix?.length) return;
+  m.fix = undefined;
+  applyMaskFix(m);
+  m.rev = (m.rev ?? 0) + 1;
+  updateSkyStatus();
+  draw();
+  flushRecord();
+});
 
 // --- Brush painting: with Paint on, drag on the photo to paint into the
 // selected brush mask (or Erase). Interpolates between moves for smooth
@@ -8561,6 +8700,7 @@ healAutoBtn.addEventListener("click", () => {
 canvas.addEventListener("pointerdown", (e) => {
   if (cropArmed) return; // Crop & straighten owns the canvas — no tap-WB / pan / pinch while armed
   if (brushPaintOn()) { e.preventDefault(); startPaint(e); return; }
+  if (skyFixOn()) { e.preventDefault(); startFix(e); return; }
   if (tatArmed) { if (!tatDrag) { e.preventDefault(); startTat(e); } return; }
   if (stickerArmed) {
     e.preventDefault();
@@ -8638,6 +8778,7 @@ canvas.addEventListener("pointermove", (e) => {
     paintStroke(u, v);
     return;
   }
+  if (fixing) { moveFix(e); return; }
   if (tatDrag) { moveTat(e); return; }
   if (stickerArmed) {
     const sp = stickerPointers.get(e.pointerId);
@@ -8706,6 +8847,7 @@ canvas.addEventListener("pointermove", (e) => {
 
 function endPointer(e: PointerEvent) {
   if (painting) { endPaint(); return; }
+  if (fixing) { endFix(); return; }
   if (tatDrag) { if (e.pointerId === tatDrag.id) endTat(); return; }
   if (stickerArmed && stickerPointers.has(e.pointerId)) {
     stickerPointers.delete(e.pointerId);

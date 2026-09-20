@@ -2621,7 +2621,14 @@ label.open-btn, label.bar-btn {
 .mask-row { display: flex; align-items: center; gap: 6px; }
 .mask-row .mask-pick { flex: 1; text-align: left; padding: 6px 10px; font-size: 0.8125rem; color: var(--txt); }
 .mask-row .mask-pick.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-.mask-row .mask-del { width: auto; padding: 6px 10px; font-size: 0.8125rem; }
+/* A 44px TARGET, not a 29px one. This is the "×" beside each mask in the list
+   and it is the only way to delete a mask from there; at 430px it measured
+   29x44 by finger, which is the width a single glyph plus 10px of padding
+   comes to. `min-width` rather than more padding, so the glyph stays centred
+   and the row's layout does not move. Found 2026-09-20, the first time the
+   accessibility sweep was ever taken into a mask editor — the panel is hidden
+   until a mask exists, so nothing had measured it. */
+.mask-row .mask-del { width: auto; min-width: 44px; padding: 6px 10px; font-size: 0.8125rem; }
 #maskEditor { margin-top: 10px; }
 .mask-editor-actions { display: flex; gap: 6px; margin-top: 8px; }
 /* HOW A MASK JOINS THE ONE ABOVE (026). A real fieldset with a legend, because

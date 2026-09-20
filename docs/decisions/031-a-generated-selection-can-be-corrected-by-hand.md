@@ -190,8 +190,7 @@ finally is, hand corrections included.
 
 ## Outcome
 
-**THE MATTE HALF SHIPPED 2026-09-20; the correction strokes have not.** The
-record stays open for them.
+**BOTH HALVES SHIPPED 2026-09-20.** The matte first, then the strokes.
 
 `Matte`, beside `Show mask` in the mask editor, drops the photograph to dim
 monochrome and paints the selection in the mask's own yellow — darktable's
@@ -216,3 +215,92 @@ running.**
   session, not a field on `EditParams` or `MaskLayer`: no undo entry, no
   snapshot, no export path, nothing to migrate. The correction strokes are
   where the model changes, and that is the part still to build.
+
+### The strokes
+
+`Add by hand` and `Take out by hand` arm the canvas the way `Paint` does, and a
+drag records a STROKE on the mask — image-uv points, a radius as a fraction of
+the bitmap's longer edge, and which way it goes — rather than painting a
+bitmap. `regenerateSkyMask` replays the list over whatever the generator
+produces next, so Reach, Feather and the colour toggle keep working and the
+hand work stays where it was put. `Clear by hand` drops the list.
+
+**Measured on NIR_1651, reading the real canvas through the matte.** One
+take-out stroke across the sky moved coverage 54.0% to 39.6%. Dragging Reach
+from 1 to 1.3 — which regenerates the seed, the refinement and the colour grow
+from the photograph — left it at 39.8%, against 54.2% for the same Reach with
+no correction: the stroke survived the regeneration that would have destroyed
+paint. Clearing it returned exactly the uncorrected 54.2%. The walk was made to
+fail first; with the arming press removed, the correction check goes red.
+
+**One rasteriser, and it is the reason the design works.** `stampSegment` in
+`pipeline.ts` decides a segment's dab spacing, and both the live preview under
+the finger and `rebuildFix`'s replay call it. A stroke therefore cannot change
+shape when it is finished, or when Reach is next dragged.
+
+**The live preview is incremental and the first version was not.** Rebuilding
+the whole composite on every pointermove replays the stroke so far on each
+move, so the hundredth move of a drag replays a hundred segments over a
+1024 px bitmap. The preview now stamps only the new segment into a buffer
+allocated at pointerdown; `endFix` replays from the automatic bitmaps anyway,
+and the dabs are identical because both go through `stampSegment`.
+
+**AND IT REACHES THE EXPORT, which is the one thing that had to be measured
+rather than reasoned about.** The preview is the GPU shader; the export is
+`compileEdit` on the CPU, rendered from `cloneParams(params)`. A composite
+stripped from the clone to save undo memory — which reads as prudent and was
+proposed — would have put the corrected mask on screen and the uncorrected one
+in the saved file, and the one arm nobody would think to drive is the only arm
+that shows it. Measured by exporting NIR_1651 twice, with and without a
+take-out stroke, and reading the app's own uncompressed 16-bit TIFF. At full
+size: in the stroke's band 85.3% of sampled pixels moved, by up to 31,951 of
+65,535; below it and above it, 0.00% moved and the largest difference was
+ZERO. `tools/mask-fix-export-walk.mjs` repeats it at quarter size, which is
+the same CPU path and sixteen times quicker, and reads 85.9% and 0.00%. The
+correction is in the file, and it is only where it was put.
+
+That walk PINS the export format and checks the bytes that arrive. The Format
+control is a remembered preference, so a walk that takes whatever is selected
+reads a JPEG on one run and a TIFF on the next — which it did, and died inside
+its own decoder with no clue which export was wrong.
+
+**Durability is the mask's, not better and not worse.** `editToJson` writes
+`masks: []` — no mask has ever survived a durable resume, and the corrections
+do not either. They survive a photograph switch within a session, because that
+path keeps the live objects.
+
+### What is NOT verified, and it needs a hand on the tablet
+
+**Stroke smoothness.** Every dab bumps the mask's `rev`, which is what both GPU
+atlases key their upload signature on, so a correction re-uploads the coarse
+atlas (about 390 KB) AND the refined one (about 2.8 MB) on every pointermove.
+Painting a brush mask has always re-uploaded the first of those and feels
+fine; the second is seven times larger and has never been in a drag before.
+Every measurement here is Chromium on a container with a software rasteriser,
+where this is not a fair test either way. If a correction drags heavily on the
+tablet, the remedy is known and is not a redesign: upload the dab's bounding
+box with `texSubImage3D` instead of the whole atlas.
+
+**And a ring under the finger.** The paint brush and the sticker brush both
+show one; a correction does not, so its size is only visible by trying it.
+Deliberately left out of this slice rather than forgotten.
+
+### And the a11y sweep had never seen a mask editor at all
+
+Found while checking that these controls would be measured: the accessibility
+walk visits every panel TAB, and the mask editors are `hidden` until a mask
+exists and one is selected. A hidden control has no bounding box, so the
+target-size sweep skipped it — which means Show mask, Invert, Delete mask,
+Reach, Feather, the join radios and the whole brush row had never been in a
+sweep either. The same shape as the defect that made the walk visit tabs in
+the first place, and as the one that made it enter crop mode: a sweep reports
+on what it managed to see, and nothing in its output tells that apart from
+coverage. `tools/a11y-walk.mjs` now adds a Sky mask and measures its editor as
+its own state, in both themes and at both widths.
+
+**And it found one on its first run, which is the whole point of a new check.**
+The "×" beside each mask in the list — the only way to delete a mask from
+there — measured 29x44 by finger at both widths, against the 44px bar. One
+glyph plus ten pixels of padding. It has been that size for as long as the
+mask list has existed, and nothing could see it. `min-width: 44px` rather than
+more padding, so the glyph stays centred and the row's layout does not move.

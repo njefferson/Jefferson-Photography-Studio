@@ -312,10 +312,12 @@ function mahal2(
  * @param margin  border texels to skip before looking for the first edge, so a
  *   dark demosaic rim cannot set the border at depth zero.
  * @returns the border and both post-processing verdicts (see `SkyHorizon`).
- * What the result must satisfy: `b[a] <= rows` for every column, and `share`
- * counts exactly the pixels `buildSkyMask` will seed from — the seed loop and
- * this number must not be able to disagree, because `share` is what the caller
- * tests against SKY_MIN_COVERAGE before deciding a photograph has a sky.
+ * What the result must satisfy: `b[a] <= rows` for every column, and `share` is
+ * the region above the border as a fraction of the frame — an UPPER BOUND on
+ * what `buildSkyMask` seeds from, which drops a `margin`-wide rim at the
+ * frame's edges as well. The caller counts its own seeds before deciding a
+ * photograph has a sky; this number is for the walks, the probe and the status
+ * line, and it must never be read as the seed count itself.
  */
 export function skyHorizon(
   c0: Float32Array,

@@ -551,6 +551,122 @@ export interface BrushMask {
   data: Uint8Array;
 }
 
+/** ONE CORRECTION STROKE on a GENERATED selection, pointerdown to pointerup.
+ *
+ *  WHY A STROKE AND NOT A BITMAP. A generated selection is rebuilt from the
+ *  photograph whenever Reach or Feather moves or the colour grow is switched —
+ *  `regenerateSkyMask` assigns the whole bitmap — so anything painted INTO that
+ *  bitmap is thrown away by the next drag. Recorded as strokes instead, the
+ *  correction is replayed onto whatever the generator produces next, and the
+ *  automatic selection stays live underneath it. That is Lightroom's
+ *  arrangement (a Select Sky is a component of a mask that a brush adds to and
+ *  subtracts from) and darktable's (drawn shapes combined with a parametric
+ *  mask, per module).
+ *
+ *  `r` is a fraction of the bitmap's LONGER EDGE, which is what the size
+ *  slider already means, so a stroke recorded against the 384 px seed replays
+ *  identically onto the 1024 px refinement and changing either working size
+ *  costs nothing. */
+export interface FixStroke {
+  /** Image-uv points, x and y interleaved: the path the finger took. */
+  pts: Float32Array;
+  /** Radius as a fraction of the target bitmap's longer edge. */
+  r: number;
+  /** true adds to the selection; false takes out of it. */
+  add: boolean;
+}
+
+/** Solid inner fraction of a dab before it falls off to its edge. Lifted from
+ *  `stampBrush` in main.ts so a correction dab feels exactly like a paint dab —
+ *  it is the same gesture on the same photograph and the two must not have
+ *  different edges. */
+export const FIX_HARD = 0.55;
+
+/**
+ * Stamp one dab of a correction stroke into a bitmap, in place.
+ * @param bm  the bitmap to modify — a FRESH copy, never one a snapshot shares.
+ * @param u,v  image-uv centre of the dab, 0..1.
+ * @param r  radius as a fraction of the bitmap's longer edge.
+ * @param add  true raises the weight toward 255, false lowers it toward 0.
+ * @returns nothing; `bm.data` is modified.
+ * What the result must satisfy: it is the ONLY place a correction dab is
+ * rasterised. The live preview and `rebuildFix`'s replay both come here, so a
+ * stroke can never look one way while it is being drawn and another way after
+ * a Reach drag has replayed it.
+ */
+export function stampFix(bm: BrushMask, u: number, v: number, r: number, add: boolean): void {
+  const rad = Math.max(1, r * Math.max(bm.w, bm.h));
+  const cx = Math.min(1, Math.max(0, u)) * (bm.w - 1);
+  const cy = Math.min(1, Math.max(0, v)) * (bm.h - 1);
+  const x0 = Math.max(0, Math.floor(cx - rad)), x1 = Math.min(bm.w - 1, Math.ceil(cx + rad));
+  const y0 = Math.max(0, Math.floor(cy - rad)), y1 = Math.min(bm.h - 1, Math.ceil(cy + rad));
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      const d = Math.hypot(x - cx, y - cy) / rad;
+      if (d > 1) continue;
+      let fall = 1;
+      if (d > FIX_HARD) { const t = (d - FIX_HARD) / (1 - FIX_HARD); fall = 1 - t * t * (3 - 2 * t); }
+      const i = y * bm.w + x;
+      const amt = fall * 255;
+      bm.data[i] = add ? Math.min(255, Math.max(bm.data[i], amt)) : Math.max(0, bm.data[i] - amt);
+    }
+  }
+}
+
+/**
+ * Stamp one segment of a correction stroke — the dabs between two points.
+ * @param bm  the bitmap to modify in place.
+ * @param u0,v0  the previous point, image-uv; pass the same point twice for
+ *   the first dab of a stroke.
+ * @param u1,v1  the new point.
+ * @param r  radius as a fraction of the bitmap's longer edge.
+ * @param add  true adds to the selection, false takes out of it.
+ * @returns nothing.
+ * What the result must satisfy: it is the ONLY place a segment's spacing is
+ * decided, and both callers go through it — the live preview under the finger
+ * and `rebuildFix`'s replay after the fact. If they differed, a stroke would
+ * change shape the moment it was finished, or the moment Reach was dragged.
+ * Dabs are spaced at a third of the radius, the same spacing the paint brush
+ * uses, so a fast drag does not come out as beads.
+ */
+export function stampSegment(
+  bm: BrushMask,
+  u0: number, v0: number,
+  u1: number, v1: number,
+  r: number, add: boolean,
+): void {
+  const stepPx = Math.max(1, r * Math.max(bm.w, bm.h) * 0.3);
+  const distPx = Math.hypot((u1 - u0) * (bm.w - 1), (v1 - v0) * (bm.h - 1));
+  const k = Math.max(1, Math.ceil(distPx / stepPx));
+  for (let j = 1; j <= k; j++) stampFix(bm, u0 + (u1 - u0) * (j / k), v0 + (v1 - v0) * (j / k), r, add);
+}
+
+/**
+ * Replay a stroke list over a generated bitmap.
+ * @param base  the automatic bitmap; NOT modified.
+ * @param fix  the strokes, in the order they were made.
+ * @returns a fresh bitmap of `base`'s size, or `base` itself when there is
+ *   nothing to replay.
+ * What the result must satisfy: it is what `maskWeight` and both GPU atlases
+ * read, so it is allocated fresh on every call and the caller must not mutate
+ * it afterwards — undo snapshots share it by reference. Dabs are interpolated
+ * along each stroke at a third of the radius, which is the spacing the paint
+ * brush uses, so a fast drag does not come out as beads.
+ */
+export function rebuildFix(base: BrushMask, fix: readonly FixStroke[] | undefined): BrushMask {
+  if (!fix || !fix.length) return base;
+  const out: BrushMask = { w: base.w, h: base.h, data: new Uint8Array(base.data) };
+  for (const st of fix) {
+    const n = st.pts.length >> 1;
+    if (!n) continue;
+    stampFix(out, st.pts[0], st.pts[1], st.r, st.add);
+    for (let i = 1; i < n; i++) {
+      stampSegment(out, st.pts[(i - 1) * 2], st.pts[(i - 1) * 2 + 1], st.pts[i * 2], st.pts[i * 2 + 1], st.r, st.add);
+    }
+  }
+  return out;
+}
+
 /** A local-adjustment mask. `type` 0 = radial, 1 = linear gradient, 2 = brush,
  *  3 = colour (chroma-key), 4 = sky (classical heuristic). Geometry is in
  *  image-uv [0..1] so it anchors to the photo through rotation/zoom; a colour
@@ -615,6 +731,26 @@ export interface MaskLayer {
    *  Optional and read as ON when absent, so saved edits and undo snapshots
    *  from before it migrate by doing nothing — the same shape `op` took. */
   skyByColour?: boolean;
+  /** CORRECTIONS TO A GENERATED SELECTION (031), in the order they were made.
+   *  Sky masks (type 4) only; absent on every other type and on every mask
+   *  nobody has corrected, so saved edits and undo snapshots from before this
+   *  migrate by doing nothing — the shape `op` and `skyByColour` took.
+   *
+   *  APPENDED BY REPLACING THE ARRAY, never by pushing to it: `cloneParams`
+   *  shares it with every undo snapshot, the same copy-on-write contract
+   *  `brush` carries. */
+  fix?: readonly FixStroke[];
+  /** `brush` with every stroke in `fix` replayed over it, and `fine` likewise.
+   *  Always FRESHLY ALLOCATED and never mutated after assignment, so snapshots
+   *  may share them by reference; absent when `fix` is empty.
+   *
+   *  Every render path reads these in place of the automatic bitmaps — the CPU
+   *  through `maskWeight`, the GPU through both atlases. They are not stripped
+   *  from `cloneParams`: `makeThumb` and the export path both render from a
+   *  clone, so a stripped composite would show the corrected mask on screen and
+   *  the uncorrected one in the saved file. */
+  eff?: BrushMask;
+  effFine?: BrushMask;
   /** Sky mask (type 4) "Reach": scales the heuristic's growth tolerances when
    *  regenerating the bitmap (1 = calibrated default, >1 grows more eagerly).
    *  Unused by other mask types. */
@@ -784,7 +920,13 @@ export function maskWeight(m: MaskLayer, u: number, v: number): number {
     // look's depth. `fine` is that refinement; the coarse `brush` remains the
     // fallback for a photograph whose guide could not be built, and it is what
     // the status line still counts.
-    const bm = m.type === 4 && m.fine ? m.fine : m.brush;
+    // A CORRECTED SELECTION READS ITS COMPOSITE (031). `eff`/`effFine` are the
+    // automatic bitmaps with the reader's own strokes replayed over them; they
+    // are absent until somebody corrects the mask, so the ordering below is
+    // "the most refined thing that exists".
+    const bm = m.type === 4
+      ? (m.effFine ?? m.fine ?? m.eff ?? m.brush)
+      : (m.eff ?? m.brush);
     w = bm ? sampleBrush(bm, u, v) : 0;
   }
   return m.invert ? 1 - w : w;

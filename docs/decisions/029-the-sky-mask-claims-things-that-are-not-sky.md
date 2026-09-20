@@ -247,6 +247,17 @@ Running the refinement on every photograph instead of on a stepped border was
 measured and is worse — it costs NIR_1651 half its sky, 52.2% to 34.6% — and it
 does not clear NIR_1638's trunks anyway, so the trigger is not the remedy.
 
+**A candidate for it, written down so the next round does not start from
+nothing.** The paper's trigger compares a column's border to its IMMEDIATE
+neighbour, and a trunk fifteen columns wide never steps by more than a third of
+the depth anywhere along it. Comparing each column's border to the MEDIAN of a
+neighbourhood wider than a trunk and narrower than a treeline would make a deep
+narrow RUN stand out where a single step does not. It is untested, it would need
+measuring across all 44 frames before it could be believed, and the frame it has
+to not break is NIR_1651 — where the naive version of this cost half the sky.
+Until then the remedy is two strokes: 031's hand corrections take a trunk band
+out in one drag and survive the next Reach.
+
 **THE ACCEPTANCE INSTRUMENT CANNOT MEASURE NIR_0172 AND THAT IS NOW KNOWN.**
 `tools/mask-truth-walk.mjs` learns the sky's colour from the pixels the mask
 covers. On a frame where the mask covers a playhouse it learns the playhouse:
