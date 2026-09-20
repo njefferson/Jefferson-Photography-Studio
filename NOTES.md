@@ -577,7 +577,12 @@ user-scalable=no.
   judged from was aimed at x >= 0.80 when the band starts at x = 0.90, and
   because the brightness comparison used the frame's global sky median when the
   sky local to that corner is nearly twice as bright.
-  **So the check is red again and what that band IS remains the open question.**
+  **The band is SKY — settled by four independent untinted renders opened at
+  6x — so the red is honest and the defect is the app's.** It is the clear sky
+  below the bright cloud deck that fills the top of that frame: same spectrum as
+  the sky above it, a quarter the light. The selection misses about 5% of the
+  frame's sky, and the suspected cause is that the colour target is refitted per
+  photograph from a seed the cloud dominates.
   Also still open: the boundary residual this record names, and 028 for the sky
   no path reaches.
   One caution for whoever takes this next: the spill figures — 8%, 23%, 55% —

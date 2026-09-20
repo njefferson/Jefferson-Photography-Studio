@@ -429,17 +429,36 @@ Two errors in reaching it, and neither was the app's:
   edge is 0.394 — so there is no falloff to explain a dark band, and equally no
   basis for the global median as the comparison.
 
-What is actually established about the band, measured from the maps: it is
-94 px wide by 335 tall, hard against the right edge, running to the bottom; its
-luminance is FLAT at 0.25–0.29 across the whole of it with no internal dark
-mass; its saturation is 0.357 against the sky's 0.230. Whether that is sky or
-an object is not settled, and is being settled by rendering the corner UNTINTED
-and magnified — the walk's overlay carries the coverage tint, which is what
-made the sky read as saturated cyan and the band as dark teal in the first
-place.
+**SETTLED 2026-09-20: THE BAND IS SKY, and the mask has a real defect.** Four
+independent renders of that corner, untinted and magnified to 6x, opened — a
+direct look, a comparison against the region beside it, an adversarial pass
+briefed to argue FOR sky, and a whole-frame context pass. All four return sky
+at high confidence.
 
-**The walk is therefore back to one red check on NIR_1651**, pending the
-re-measurement that confirms it returns to 93.4%.
+What it is: NIR_1651 is a frosted conifer under an overcast sky with a bright
+CLOUD DECK filling the top ~40%, its lower edge crossing the right margin at
+about y=0.43. The band is the CLEAR SKY BELOW that deck, running unbroken to the
+frame edge. Its linear channel ratios match the sky above it — R/G 1.978 against
+1.924, B/G 0.558 against 0.586. Same spectrum, a quarter the light. The higher
+saturation that was read as evidence of a different material is per-pixel chroma
+noise at that reduced signal. The 18,933 px bounding box corresponds to nothing
+in the photograph; it is a mask component boundary, not an object boundary.
+
+**A third wrong statistic, found by the same pass.** The claim that the frame
+gets brighter toward this corner, and so has no falloff to explain a dark band,
+compared HORIZONTALLY at cloud height — where the cloud sets brightness, not the
+lens. Measured vertically into the corner, luminance falls monotonically from
+0.1511 at y=1080 to 0.1367 at y=1320. There is falloff.
+
+**So the defect is the app's: the selection misses about 5% of this frame's
+sky.** The suspected mechanism is that `skyGrowKey` refits its colour target per
+photograph from whatever `buildSkyMask` seeded, and on this frame the seed is
+dominated by the bright cloud — so the tolerance centres on cloud-lit sky and
+the darker clear sky beneath falls outside it. Being measured rather than
+assumed.
+
+**The walk is back to one red check on NIR_1651**, and that red is now known to
+be honest.
 
 **What is still owed:** the boundary. The grow fixes the interior and the gaps
 and leaves the rim misplaced by a pixel or two. Composing the guided filter

@@ -3372,3 +3372,93 @@ not reported: on the 1400 px practice DNGs its teal population read 52 where
 the export-path instrument of 9l reads 4.4 on the same frame — a different
 population, not a scale. Residuals on the chosen candidate come from the
 export path (9l's method), with the lift state printed in the control block.
+
+### 9n. INVERTING THE SKY KEY — RESEARCHED, AND THE PHYSICS SAYS NO
+
+Proposed twice: stop keying the sky and key what is NOT sky, then take the
+complement. It is the right instinct about the symptom — a colour key on the
+sky has failed repeatedly — and the physics says the complement is the worse
+side to key. Researched 2026-09-20 before any code, per this file's own rule.
+
+**THE HALF EVERYONE KNOWS IS ABOUT LEAVES, NOT PLANTS.** Healthy foliage
+reflects roughly half the incident NIR across 700–1300 nm — about 60% of what
+reaches the spongy mesophyll comes back — against a few percent in the red,
+and the step between them at 680–750 nm is the red edge. That is the signal the
+inversion would key on.
+
+**BARK, TRUNKS AND BRANCHES ARE DARK IN NIR.** They are the standard
+counterexample to bright foliage, not an edge case: woody material is 5–35% of
+total plant area, and woody structures absorb 30–35% of in-canopy NIR where
+leaves absorb about 90% of the visible. So the brightness that makes vegetation
+keyable belongs to one part of a tree and not the part that most often
+silhouettes against sky.
+
+**AND SHADE REMOVES THE SIGNAL ENTIRELY.** An object shaded from the sun and
+lit only by open skylight loses nearly all its NIR illumination, because
+skylight is NIR-poor — clear sky collapses in the near infrared for the same
+Rayleigh reason it is blue, scatter going as λ⁻⁴, so 800 nm is scattered about
+a sixteenth as strongly as 400 nm and (850/550)⁴ makes it 5.7× weaker than
+green. A high-reflectance material under sky-only light reads dark.
+
+**So a defocused branch is the WORST CASE for a vegetation-brightness key:**
+woody, therefore not NIR-bright to begin with, and frequently shaded, therefore
+unlit in the band that would have keyed it. It can be simultaneously
+high-reflectance material and a dark pixel. There is no signature to key.
+
+**Does reflectance survive defocus at all?** In an object's INTERIOR, yes —
+defocus is convolution with a normalised point-spread function, a low-pass
+filter that destroys high spatial frequencies while preserving the local mean.
+That is why texture vanished (measured in-app: the band reads −0.6 MADs at one
+pixel and +0.1 at eight) while a mean would not. But it fails across a band one
+blur diameter wide at every edge, where the signal is a linear mixture of object
+and background weighted by fill fraction. The direct empirical analogue is
+upward hemispherical canopy photography — the same sky-versus-not-sky
+classification with near branches badly out of focus — and its error is
+concentrated precisely in those mixed pixels.
+
+**THIS APP'S OWN NUMBERS SPLIT THE IDEA IN HALF.** Section 4b-vi already
+measures foliage separating strongly by what it is (bare-mapping saturation
+0.386–0.647 across five frames). The colourless population — structures, bare
+ground — sits at 0.031–0.035, and an overcast sky sits at 0.038. **A separation
+of about 0.004, against foliage-to-colourless of about 0.35.** Half of "not
+sky" is indistinguishable from sky by the very property the inversion would
+use.
+
+**AND THE FIELD DOES NOT DO IT.** Inversion is universal as a UI step and
+essentially absent as a detection strategy. Adobe could define Sky as
+NOT-Landscape for nothing and instead ships eight positively-trained Landscape
+classes plus six independent automatic detectors, one of which is a positively
+trained Background; Invert is offered only afterwards, as a menu command. Every
+major classical sky detector keys a positive sky property (Luo & Etz report
+90.4% correct blue-sky detection at 13% misclassification; Shen & Wang >95% on a
+thousand images at ~150 ms). The one famous complement method in vision, the
+Dark Channel Prior, locates sky as the region where a not-sky property fails —
+and silently absorbs white walls, snow and bright hulls. The general form is
+named in the open-set segmentation literature: whichever class is defined as the
+complement becomes the catch-all that swallows every unmodelled class.
+
+**In infrared specifically**, a practitioner source states the failure directly:
+the established channel-luminosity key does not isolate sky — it lumps sky with
+water, ground and walls — and a foliage key's complement is *sky ∪ shadows*, not
+sky. The documented remedy there is manual painting.
+
+**WHAT THE RESEARCH DOES SUPPORT, and it is on the sky side.** Section 4c-v
+already measures that a population's chromaticity DIRECTION is a property of
+THIS CAMERA rather than of a photograph — spread 2.1–5.7% of the mean across six
+scenes, holding out of sample to 1.9°. A sky key could therefore be fitted ONCE
+for the camera instead of refitted per frame from whatever the coarse heuristic
+happened to seed. That per-frame refit is the live defect: on NIR_1651 the seed
+is dominated by a bright cloud deck, and the clear sky beneath it — same
+spectrum, a quarter the light — falls outside the tolerance that fit produces.
+
+**Sources.** Humboldt GSP reflectance notes (gsp.humboldt.edu/olm/Courses/
+GSP_216/lessons/reflectance.html); Wikipedia, Infrared photography; EPFL IVRL
+near-infrared imaging and NIR shadow detection (epfl.ch/labs/ivrl/research/
+near-infrared/); Adobe Lightroom Classic masking help (helpx.adobe.com/
+lightroom-classic/help/masking.html); Kolari Vision, advanced infrared
+processing with luminosity masks (kolarivision.com); Luo & Etz, IEEE
+(ieeexplore.ieee.org/document/988954/); Shen & Wang, SAGE
+(journals.sagepub.com/doi/full/10.5772/56884); Dark Channel Prior overview
+(sciencedirect.com/topics/computer-science/dark-channel-prior); PLOS ONE
+hemispherical photography classification (journals.plos.org/plosone/
+article?id=10.1371/journal.pone.0111924).
