@@ -349,6 +349,39 @@ try {
             }
           }
         }
+
+        // THE PICK/REJECT SHEET IS A STATE, AND SO IS ITS WAITING HALF.
+        // Every cell exists from the moment the sheet opens, named and
+        // numbered, before a byte is read (decision 033) — so there is a
+        // populated grid to measure that never existed before, and a reader
+        // can press a reject on a cell whose picture has not arrived. Both
+        // halves are swept: while the run is still going, when every cell is
+        // waiting, and again when it has finished and the tiles carry
+        // pictures. The grid's busy flag is what tells them apart; the
+        // header's wording is copy and must stay free to change, which is
+        // what three walks polling that sentence cost on 2026-09-20.
+        if (s.file === "ir.html") {
+          await page.setInputFiles("#quickFiles", [ONE, join(EX, "NIR_0102.dng")]);
+          const up = await page.waitForFunction(
+            () => (document.getElementById("qlGrid")?.children.length ?? 0) > 0, null, { timeout: 60000 },
+          ).then(() => true).catch(() => false);
+          if (!up) fail(`${s.file} ${vw}px quick look: the sheet would not open, so its tiles are unmeasured`);
+          else {
+            const waiting = await page.evaluate(HIT);
+            if (waiting.small.length) fail(`${s.file} ${vw}px quick look, still reading: ${waiting.small.join(" · ")}`);
+            else ok(`${s.file} ${vw}px quick look, still reading: all >= 44`);
+            await page.waitForFunction(
+              () => !document.getElementById("qlGrid")?.dataset.busy, null, { timeout: 300000 },
+            ).catch(() => {});
+            await page.waitForTimeout(400);
+            const filled = await page.evaluate(HIT);
+            if (filled.small.length) fail(`${s.file} ${vw}px quick look, tiles in: ${filled.small.join(" · ")}`);
+            else ok(`${s.file} ${vw}px quick look, tiles in: all >= 44`);
+            if (filled.exempt.length) note(`inline in a sentence, exempt (SC 2.5.8): ${filled.exempt.join(" · ")}`);
+            await page.evaluate(() => document.getElementById("qlClose")?.click());
+            await page.waitForTimeout(250);
+          }
+        }
       } finally { await page.close(); }
     }
   }

@@ -1992,6 +1992,47 @@ body.dropping::after {
    alone, and the picture stays legible enough to change your mind by. */
 .ql-cell.rejected img { opacity: 0.38; border-style: dashed; border-color: var(--line-2); }
 .ql-cell.rejected .ql-name { text-decoration: line-through; color: var(--txt-3); }
+/* A CELL WITH NOTHING IN IT YET. Named and numbered from the moment the sheet
+   opens, so the whole set can be seen and counted before a byte is read — and
+   deliberately still pressable, because a reader who recognises the number can
+   reject a frame before its picture arrives. The ellipsis is a glyph, not a
+   spinner: forty animating cells on a tablet is forty compositor layers. */
+.ql-cell.waiting .ql-tile { cursor: pointer; }
+.ql-wait-mark {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 1.25rem/1 var(--ui);
+  color: var(--txt-3);
+  background: var(--surface-2);
+  border: 2px dashed var(--line-2);
+  border-radius: 10px;
+}
+/* THE CAMERA'S PICTURE, SAID IN WORDS. It sits under the verdict badge rather
+   than replacing it: a tile can be a pick AND still be showing the camera's
+   rendering, and both facts are the reader's to see. Never colour alone — the
+   dimming below is the second carrier, not the first. */
+.ql-prov {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font: 600 0.6875rem/1 var(--ui);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--glass-txt);
+  background: var(--glass-bg);
+  border: 1px dashed var(--line-2);
+}
+/* Both showing at once would stack, so the verdict takes the corner and the
+   provisional mark steps below it. */
+.ql-cell.picked .ql-prov,
+.ql-cell.rejected .ql-prov { top: 40px; }
+.ql-cell.provisional img { opacity: 0.82; }
+
 .ql-help {
   margin: 0;
   padding: 0 16px calc(12px + env(safe-area-inset-bottom, 0px));

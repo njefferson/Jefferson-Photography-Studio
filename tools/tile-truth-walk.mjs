@@ -187,7 +187,7 @@ async function gridReady(page, n) {
   await page.waitForFunction(
     (n) => {
       const c = document.getElementById("qlCount");
-      if (!c || /Decoding/.test(c.textContent || "")) return false;
+      if (!c || document.getElementById("qlGrid")?.dataset.busy) return false;
       const imgs = [...document.querySelectorAll("#qlGrid .ql-tile img")];
       return imgs.length === n && imgs.every((i) => (i.getAttribute("src") || "").startsWith("blob:"));
     },

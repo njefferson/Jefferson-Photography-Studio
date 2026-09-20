@@ -147,7 +147,7 @@ try {
     q.on("pageerror", e => { console.log("FAIL  page error: " + e.message); failed++; });
     await q.goto("http://127.0.0.1:8131/ir.html");
     await q.setInputFiles("#quickFiles", FOUR);
-    await q.waitForFunction((n)=>{const c=document.getElementById("qlCount");return !!c&&!/Decoding/.test(c.textContent||"")&&document.querySelectorAll("#qlGrid .ql-cell").length===n;}, FOUR.length, {timeout:300000});
+    await q.waitForFunction((n)=>{const c=document.getElementById("qlCount");return !!c&&!document.getElementById("qlGrid")?.dataset.busy&&document.querySelectorAll("#qlGrid .ql-cell").length===n;}, FOUR.length, {timeout:300000});
     await q.keyboard.press("p");
     await q.keyboard.press("ArrowRight");
     await q.keyboard.press("p");

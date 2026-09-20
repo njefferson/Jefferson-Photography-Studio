@@ -63,7 +63,7 @@ async function openFolder(page, files) {
   await page.waitForFunction(
     (n) => {
       const c = document.getElementById("qlCount");
-      return !!c && !/Decoding/.test(c.textContent || "") && document.querySelectorAll("#qlGrid .ql-cell").length === n;
+      return !!c && !document.getElementById("qlGrid")?.dataset.busy && document.querySelectorAll("#qlGrid .ql-cell").length === n;
     },
     files.length,
     { timeout: 240000 },
