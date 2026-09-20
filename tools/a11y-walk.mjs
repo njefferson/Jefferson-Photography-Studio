@@ -315,6 +315,40 @@ try {
             await page.waitForTimeout(250);
           }
         }
+
+        // A MASK'S OWN EDITOR IS A STATE, and every control in it was
+        // unmeasured until 2026-09-20. The mask panels are `hidden` until a
+        // mask exists and one is selected, and a hidden control has no
+        // bounding box, so the tab sweep above walks the Masks tab seeing the
+        // Add row and nothing else. Show mask, Matte, Invert, Delete, Reach,
+        // Feather, the join radios and the hand-correction row had never been
+        // in a sweep — the same shape as the tabs themselves and as crop mode:
+        // a sweep reports on what it managed to see, and nothing in its output
+        // distinguishes that from coverage. A Sky mask opens the largest of
+        // those editors.
+        if (s.file === "ir.html") {
+          const opened = await page.evaluate(() => {
+            document.getElementById("ptab-masks")?.click();
+            const add = document.getElementById("addSky");
+            if (!add) return false;
+            add.click();
+            return true;
+          });
+          if (!opened) fail(`${s.file} ${vw}px sky mask: no Add control, so the mask editor is unmeasured`);
+          else {
+            const shown = await page.waitForFunction(
+              () => !document.getElementById("skyControls")?.hidden, null, { timeout: 60000 },
+            ).then(() => true).catch(() => false);
+            if (!shown) fail(`${s.file} ${vw}px sky mask: the editor would not open, so its controls are unmeasured`);
+            else {
+              await page.waitForTimeout(600);
+              const inside = await page.evaluate(HIT);
+              if (inside.small.length) fail(`${s.file} ${vw}px sky mask editor: ${inside.small.join(" · ")}`);
+              else ok(`${s.file} ${vw}px sky mask editor: all >= 44`);
+              if (inside.exempt.length) note(`inline in a sentence, exempt (SC 2.5.8): ${inside.exempt.join(" · ")}`);
+            }
+          }
+        }
       } finally { await page.close(); }
     }
   }

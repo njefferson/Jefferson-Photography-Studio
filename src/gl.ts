@@ -1031,6 +1031,14 @@ export class Renderer {
   /** The refined atlas's upload signature and whether it holds anything — the
    *  shader reads `u_maskFineOn` and falls back to the coarse atlas when off. */
   private brushFineSig = "";
+  // ONE FLAG FOR EVERY SLOT, which is a latent hazard worth naming rather than
+  // a defect anyone has met. The shader reads the refined atlas for ALL bitmap
+  // masks when this is on, and it goes on if ANY sky mask has a refinement —
+  // so two sky masks on one photograph, one of them on a frame whose guide
+  // could not be built, would have the guideless one read a slot nobody wrote.
+  // It needs two sky masks and a failed guide to show, which is why it has not;
+  // the fix is a per-slot mask rather than a flag, and it belongs to whoever
+  // next changes this atlas.
   private brushFineOn = false;
   private brushSig = ""; // re-upload the packed brush texture only when it changes
   private localTex: WebGLTexture;
@@ -1382,11 +1390,15 @@ export class Renderer {
 
   private updateBrushTexture(masks: EditParams["masks"], slotOf: number[]) {
     const gl = this.gl;
+    // A CORRECTED SELECTION UPLOADS ITS COMPOSITE (031). `eff` is the
+    // automatic bitmap with the reader's own strokes replayed over it, and it
+    // is what compileEdit's `maskWeight` reads on the CPU — the two sides must
+    // pick the same buffer by the same test or the agreement walk splits.
     const brushes = masks
-      .map((m, i) => ({ m, i, slot: slotOf[i] }))
-      .filter((x) => (x.m.type === 2 || x.m.type === 4) && x.m.brush && x.slot >= 0);
+      .map((m, i) => ({ m, i, slot: slotOf[i], bm: (m.eff ?? m.brush) }))
+      .filter((x) => (x.m.type === 2 || x.m.type === 4) && x.bm && x.slot >= 0);
     const layers = this.atlasLayers(slotOf);
-    const sig = `${layers}#` + brushes.map((x) => `${x.slot}:${x.m.brush!.w}x${x.m.brush!.h}:${x.m.rev ?? 0}`).join("|");
+    const sig = `${layers}#` + brushes.map((x) => `${x.slot}:${x.bm!.w}x${x.bm!.h}:${x.m.rev ?? 0}`).join("|");
     if (sig === this.brushSig) return;
     this.brushSig = sig;
     gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.brushTex);
@@ -1395,15 +1407,15 @@ export class Renderer {
       gl.texImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.RGBA, 1, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
       return;
     }
-    const bw = brushes[0].m.brush!.w, bh = brushes[0].m.brush!.h;
+    const bw = brushes[0].bm!.w, bh = brushes[0].bm!.h;
     // FOUR MASKS PER LAYER: slot >> 2 is the layer and slot & 3 the channel,
     // the same arithmetic the shader does. The count comes from atlasLayers so
     // this atlas and the refined one are always the same depth, and it is the
     // HIGHEST SLOT IN USE rather than MAX_BITMAP_MASKS / 4 — one mask must not
     // make the app upload an empty second layer of a full-size bitmap.
     const packed = new Uint8Array(bw * bh * 4 * layers);
-    for (const { m, slot } of brushes) {
-      const b = m.brush!;
+    for (const { bm, slot } of brushes) {
+      const b = bm!;
       if (b.w !== bw || b.h !== bh) continue; // all brush masks share one size
       const base = (slot >> 2) * bw * bh * 4 + (slot & 3);
       for (let p = 0; p < bw * bh; p++) packed[base + p * 4] = b.data[p];
@@ -1427,10 +1439,10 @@ export class Renderer {
   private updateBrushFineTexture(masks: EditParams["masks"], slotOf: number[]) {
     const gl = this.gl;
     const fines = masks
-      .map((m, i) => ({ m, i, slot: slotOf[i] }))
-      .filter((x) => x.m.type === 4 && x.m.fine && x.slot >= 0);
+      .map((m, i) => ({ m, i, slot: slotOf[i], bm: (m.effFine ?? m.fine) }))
+      .filter((x) => x.m.type === 4 && x.bm && x.slot >= 0);
     const layers = this.atlasLayers(slotOf);
-    const sig = `${layers}#` + fines.map((x) => `${x.slot}:${x.m.fine!.w}x${x.m.fine!.h}:${x.m.rev ?? 0}`).join("|");
+    const sig = `${layers}#` + fines.map((x) => `${x.slot}:${x.bm!.w}x${x.bm!.h}:${x.m.rev ?? 0}`).join("|");
     if (sig === this.brushFineSig) return;
     this.brushFineSig = sig;
     this.brushFineOn = fines.length > 0;
@@ -1440,14 +1452,14 @@ export class Renderer {
       gl.texImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.RGBA, 1, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
       return;
     }
-    const fw = fines[0].m.fine!.w, fh = fines[0].m.fine!.h;
+    const fw = fines[0].bm!.w, fh = fines[0].bm!.h;
     // THE SAME SLOT ARITHMETIC AND THE SAME DEPTH AS THE COARSE ATLAS, and it
     // has to be: the shader reads a slot's refinement from this atlas and its
     // coarse bitmap from that one by the identical layer/channel split, so a
     // slot landing elsewhere here would refine one mask with another's edge.
     const packed = new Uint8Array(fw * fh * 4 * layers);
-    for (const { m, slot } of fines) {
-      const f = m.fine!;
+    for (const { bm, slot } of fines) {
+      const f = bm!;
       if (f.w !== fw || f.h !== fh) continue; // one size per atlas, as above
       const base = (slot >> 2) * fw * fh * 4 + (slot & 3);
       for (let p = 0; p < fw * fh; p++) packed[base + p * 4] = f.data[p];

@@ -619,14 +619,26 @@ user-scalable=no.
   reads in place of the automatic bitmap, and a second overlay mode that shows
   the selection on its own. The automatic selection stays live underneath, so
   Reach still works and the hand work survives it.
-  **The SEEING half is on staging, 2026-09-20.** A `Matte` button beside `Show
-  mask` drops the photograph to dim grey and paints the selection in yellow, so
-  what is selected can be judged without the photograph's own colour arguing
-  with the overlay — which on the looks that swap red and blue is the same
-  cyan the overlay uses. Measured on the conifer frame under Aerochrome: with
-  the old tint none of the frame carries the overlay's own colour and 7.5% of
-  it reads grey; with the matte, 54% is the mask and 45% is grey, against 53%
-  coverage from the mask itself. The CORRECTING half is what is left. See
+  **BOTH HALVES ARE ON STAGING, 2026-09-20.** `Add by hand` and `Take out by
+  hand` arm the canvas; a drag records a stroke on the mask rather than paint
+  in its bitmap, so a Reach drag — which rebuilds the whole selection from the
+  photograph — replays it instead of destroying it. Measured on the conifer
+  frame: one take-out stroke moves coverage 54.0% to 39.6%, and after Reach 1
+  to 1.3 it reads 39.8% against 54.2% for the same Reach uncorrected. `Clear by
+  hand` returns exactly the uncorrected number.
+  And the SEEING half, which landed first: a `Matte` button beside `Show mask`
+  drops the photograph to dim grey and paints the selection in yellow, so what
+  is selected can be judged without the photograph's own colour arguing with
+  the overlay — which on the looks that swap red and blue is the same cyan the
+  overlay uses. Measured on the conifer frame under Aerochrome: with the old
+  tint none of the frame carries the overlay's own colour and 7.5% of it reads
+  grey; with the matte, 54% is the mask and 45% is grey, against 53% coverage
+  from the mask itself.
+  Corrections go into an export the same as the rest of the mask — measured on
+  a full-size export, 85% of a stroke's band changed and the rest of the frame
+  was identical to the byte. What is NOT verified is how a correction drags on
+  the tablet: every dab re-uploads both mask atlases, and the refined one is
+  2.8 MB. See
   `docs/decisions/031-a-generated-selection-can-be-corrected-by-hand.md`.
 - [ ] **A mask keys the photograph, not the grade** <!-- decision: 032 -->
   the Colour mask keys on the colour the pixel DISPLAYS — the decode through

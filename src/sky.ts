@@ -157,6 +157,17 @@ export interface SkyResult {
  *            bitmap packs with brush masks, which must all be one size).
  * @param reach  growth aggressiveness (1 = calibrated default).
  * @param feather  0..1 soft-edge width (blurs the final bitmap).
+ * @param prep  the photograph-only half from `skyPrepare`, when the caller is
+ *   holding one; omitted, it is built here.
+ * @returns the bitmap, whether a sky was found, its coverage, and the horizon
+ *   the selection was seeded from.
+ * What the result must satisfy — and it is a REAL hazard rather than a
+ * formality: a `prep` passed in must have been built with the SAME `rotate`,
+ * `cam`, `wb` and `maxEdge` as this call. The border it carries is measured
+ * down from the display's top edge, and `depthOf` below measures depth from
+ * that same edge using the `rotate` argument; hand it a prep from a quarter
+ * turn ago and the two disagree about which edge is up, silently, with a
+ * plausible-looking mask as the result.
  */
 /** The photograph as the sky stages read it: one small grid, three channels
  *  and their gradient, built once and shared by the border search and the

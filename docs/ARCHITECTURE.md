@@ -482,10 +482,13 @@ and NO Nikon body can channel-swap in camera. Field guide:
     Seeds below a threshold → `found=false`, an all-zero (inert) bitmap and an
     honest "No clear sky found" status pointing at Brush/Colour — never a fake
     selection. No geometry overlay (like brush/colour). LIMITS (stated, not hidden):
-    hard-edged clouds are a second cluster the fill may stop at (Reach/brush are
-    the fallback — UNVERIFIED against real clouds, none in the examples); sky not
-    touching the top won't seed (by design); 384px softens fine twigs (same as
-    brush). Verified in headless chromium: GPU==CPU ≤1 LSB on canopy/lodge/
+    a macro with no sky in it still selects most of a smooth defocused
+    background, because nothing in such a picture separates one from a sky; a
+    smooth tree TRUNK carries the border deep down its own length with no step
+    to announce it, so a narrow band of selection stands down it (NIR_1638,
+    NIR_1830, NIR_1873); Reach grows the selection OUT from the border and
+    cannot move the border, so a wrong horizon is corrected by hand rather than
+    by a slider; 384px softens fine twigs (same as brush). Verified in headless chromium: GPU==CPU ≤1 LSB on canopy/lodge/
     hillside across solo/inverted/(sky+radial)/(sky+colour+radial+brush)/strong-
     adjust; rendered before→after proof (foliage untouched, treeline hugged,
     holes filled); and a real add→grade→invert→undo UI flow (foliage Δ0, sky
@@ -615,7 +618,7 @@ cannot describe something the code does not say about itself.
 - **`src/export.worker.ts`** (64 lines) — ONE BAND OF AN EXPORT, ON ANOTHER CORE.
 - **`src/exportparallel.ts`** (244 lines) — AN EXPORT, SPLIT ACROSS CORES.
 - **`src/framecache.ts`** (139 lines) — What the lens rig has already measured, so an interrupted run is not thrown away.
-- **`src/gl.ts`** (2179 lines) — WebGL2 edit pipeline.
+- **`src/gl.ts`** (2191 lines) — WebGL2 edit pipeline.
 - **`src/glow.ts`** (110 lines) — HIE-style halation glow.
 - **`src/glprobe.worker.ts`** (39 lines) — CAN A WORKER DRAW? Asked from inside one, because that is the only place the answer is true or false rather than a specification.
 - **`src/gps.ts`** (245 lines) — Location-data guard: find and remove GPS location from a photo FILE's own bytes — the original the user loaded, not the app's exports (exports are re-encoded and carry no EXIF at all today).
@@ -642,9 +645,9 @@ cannot describe something the code does not say about itself.
 - **`src/macro/export.worker.ts`** (23 lines) — Full-resolution stacking runs here, OFF the main thread, so the long tiled render never janks the UI (the preview stack stays on the main thread — it's quick).
 - **`src/macro/main.ts`** (460 lines) — MACRO FOCUS-STACKING MODE: the second discipline, its own page and its own entry point.
 - **`src/macro/stack.ts`** (387 lines) — Macro focus-stacking engine (JPEG-first).
-- **`src/main.ts`** (14877 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
+- **`src/main.ts`** (15019 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
 - **`src/palette.ts`** (118 lines) — Palette family picker, shared across all three pages.
-- **`src/pipeline.ts`** (1847 lines) — CPU version of the GPU edit pipeline, kept numerically identical to the fragment shader in gl.ts so exports match the on-screen preview exactly.
+- **`src/pipeline.ts`** (1989 lines) — CPU version of the GPU edit pipeline, kept numerically identical to the fragment shader in gl.ts so exports match the on-screen preview exactly.
 - **`src/platform.ts`** (181 lines) — WHAT IS ACTUALLY IN FRONT OF THE PERSON — asked once, in one place.
 - **`src/previewcache.ts`** (220 lines) — THE SAME FOLDER, OPENED AGAIN, DECODED EVERY FILE AGAIN.
 - **`src/qr.ts`** (303 lines) — Minimal QR encoder — byte mode, error-correction level M, versions 1..26 — written from the public ISO/IEC 18004 spec, no third-party code (the app's no-third-party-IP stance).
@@ -658,11 +661,11 @@ cannot describe something the code does not say about itself.
 - **`src/savefile.ts`** (66 lines) — GETTING A FILE OUT OF THE APP, and the one decision that governs it.
 - **`src/session.ts`** (484 lines) — Crash-safe store for a photo SESSION — the set you opened and are moving between, each photo keeping its own edit.
 - **`src/share.ts`** (144 lines) — Share / copy-link for the INSTALLED (standalone) app.
-- **`src/sky.ts`** (623 lines) — Classical sky detection (mask type 4).
+- **`src/sky.ts`** (634 lines) — Classical sky detection (mask type 4).
 - **`src/sky.worker.ts`** (31 lines) — The sky selection, built off the main thread on a lane of its own.
 - **`src/skyClient.ts`** (62 lines) — The main thread's door to the sky worker (sky.worker.ts): hand it the 1024 px copy a decode came back with and get the selection as a promise.
 - **`src/skyfine.ts`** (606 lines) — The sky selection refined to the picture's own edges.
-- **`src/skyhorizon.ts`** (587 lines) — Where the sky ENDS, as a horizon line the photograph itself draws — one border depth per display column, found by the published method rather than invented here.
+- **`src/skyhorizon.ts`** (589 lines) — Where the sky ENDS, as a horizon line the photograph itself draws — one border depth per display column, found by the published method rather than invented here.
 - **`src/skymap.ts`** (257 lines) — The sky's colour, smoothed AFTER the look has amplified it — a small map rebuilt per edit, blended back in by the sky's own selection.
 - **`src/stamp.ts`** (27 lines) — ONE HASH, BECAUSE THE SECOND COPY IS WHERE THE TWO ANSWERS COME FROM.
 - **`src/sticker.ts`** (576 lines) — Sticker compositing — rhymes with heal.ts (src/heal.ts): stickers are baked INTO the linear source (pre-pipeline), so each one inherits the channel swap / WB / looks / grade / grain and lands in the I
