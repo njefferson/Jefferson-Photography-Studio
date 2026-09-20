@@ -94,7 +94,49 @@ const NOT_SKY = declaredNotSky();
 const PORT = arg("port", "8131"), REACH = Number(arg("reach", "1")), OUT = arg("out", join(tmpdir(), "mask-truth"));
 const PLANT_REACHABLE = process.argv.includes("--plant-reachable");
 const DIR = "/home/user/Jefferson-Photography-Studio/public/examples";
-const FRAMES = arg("frames", ["NIR_0063", "NIR_1644", "NIR_1651"].map((n) => `${DIR}/${n}.dng`).join(",")).split(",");
+// THE CORPUS, AND WHY IT GREW ON 2026-09-20. It was three frames, every one of
+// them a photograph with a large obvious sky in it, and that is the shape of
+// corpus that cannot see over-selection: on all three the mask covers roughly
+// the sky, so covering MORE sky always looked like an improvement. Measured on
+// the shipped build the day the corpus was questioned:
+//
+//   NIR_0627   76.4% of the frame selected as sky — a MACRO of a flower spike
+//              with NO SKY IN IT AT ALL. Its seed alone is 58%.
+//   NIR_0172   47.4% — a playhouse under trees; the selection covers the
+//              building's walls and roof, the tyre swing and the grass. Not in
+//              the default list — see the note below.
+//   canopy     19.5% — a road and canopy.
+//
+// None of that was visible from the three, and a tolerance widening that looked
+// free on them (0063 +0.1 points, 1644 +0.2) takes NIR_0627 to 87%.
+//
+// A corpus of one KIND of photograph measures one kind of failure. These are
+// the frames that carry the other kind.
+//
+// NIR_0172 IS DELIBERATELY NOT IN THE DEFAULT LIST, and the reason is a limit
+// of this instrument rather than of that photograph. This walk derives its sky
+// TRUTH from the pixels the mask covers at 0.9 or better. On a frame where the
+// mask is substantially wrong that truth is bootstrapped from wrong pixels: run
+// on NIR_0172 it reports the sky's colour as hue 0 degrees at saturation 0.597
+// and calls 552,767 px — 42% of the frame — reachable sky. It is keying the
+// WOODEN PLAYHOUSE, which renders warm in infrared, exactly as the mask does.
+// Both are colour keys seeded from the same coverage, so they agree with each
+// other and disagree with the photograph.
+//
+// Its coverage numbers therefore measure the mask against itself, and a red
+// that measures the wrong thing teaches everyone to read red as noise (hub
+// LESSONS 332). It comes back when the truth no longer derives from the mask.
+// Run it explicitly with --frames when working on that.
+const FRAMES = arg("frames", ["NIR_0063", "NIR_1644", "NIR_1651", "NIR_0627"].map((n) => `${DIR}/${n}.dng`).join(",")).split(",");
+// Frames with NO SKY IN THEM. For these the walk's own colour key is useless —
+// it would derive a "sky colour" from whatever the mask happens to cover, which
+// on a macro is defocused foliage — so the only honest question is how much of
+// the frame the mask claims at all. The answer should be almost none.
+const NO_SKY = { NIR_0627: "a macro of a flower spike; the background is defocused garden, not sky" };
+// What a no-sky frame may have selected before it counts as a defect. Not
+// fitted to the build: a photograph with no sky in it should select nothing,
+// and the allowance is for a stray pixel at an edge rather than for a region.
+const NO_SKY_MAX = 0.02;
 // 023's targets, and the readings this was written against (Aerochrome on,
 // Reach 1, Feather 0.5, the 2800 px working copy): the mask covers open sky
 // nearly whole and its edge band poorly — the rim the tablet showed.
@@ -336,6 +378,20 @@ try {
     await readInto(p, "A");
     const m = await solve(p, NOT_SKY.filter((e) => e.frame === name));
     if (!m.covered) { check(`${name}: the Sky mask found no sky`, true, "no coverage — nothing to measure"); results[name] = { covered: 0 }; await ctx.close(); continue; }
+    // A FRAME WITH NO SKY IS A DIFFERENT QUESTION AND GETS A DIFFERENT CHECK.
+    // Coverage of sky is meaningless where there is none; what matters is that
+    // the mask did not claim the photograph. Everything the key computes below
+    // is skipped, because on such a frame the key is keying foliage.
+    if (NO_SKY[name]) {
+      const share = m.covered / (m.W * m.H);
+      check(`${name}: a frame with no sky in it selects almost nothing (<= ${(100 * NO_SKY_MAX).toFixed(0)}%)`,
+        share <= NO_SKY_MAX,
+        `${(100 * share).toFixed(1)}% of the frame is selected — ${NO_SKY[name]}`);
+      results[name] = { noSky: true, covered: m.covered, share };
+      writeFileSync(join(OUT, `${name}-missed.png`), Buffer.from(m.png.split(",")[1], "base64"));
+      await p.locator("#view").screenshot({ path: join(OUT, `${name}-overlay.png`) });
+      await ctx.close(); continue;
+    }
     // The key discriminates only when the sky has colour to key on.
     check(`${name}: the sky's colour is keyable (sat > 0.08)`, m.target.sat > 0.08, `mean sat ${m.target.sat.toFixed(3)} at hue ${m.target.hue.toFixed(0)}°`);
     writeFileSync(join(OUT, `${name}-missed.png`), Buffer.from(m.png.split(",")[1], "base64"));
