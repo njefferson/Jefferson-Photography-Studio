@@ -728,6 +728,19 @@ export async function exportImage(
         }
       }
     }
+    // THE WATERMARK IS THE WATERMARK, and it was billed to `encode` here while
+    // `encode` itself measured nothing — the two stages were one mark apart and
+    // the wrong one was named. The JPEG branch a hundred lines above marks the
+    // same loop as `watermark`, which is how a report that showed a TIFF
+    // spending a second on "encode" was describing the watermark instead.
+    __mark("watermark", __a);
+    __a = performance.now();
+    // AND THE FILE IS WRITTEN BEFORE THE CLOCK STOPS. `writeTiff16` used to sit
+    // inside the `return`, which is evaluated AFTER `__t.total`, so the one
+    // stage this branch is named for was outside the total and reported 0.0s —
+    // on a 31 MB file. The stages are documented as adding up to the total, and
+    // they could not.
+    const tiff = writeTiff16(rgb, w, h, SRGB_ICC, readExifSubset(file.bytes) ?? undefined);
     __mark("encode", __a);
     // THE REPORT COULD NOT SEE A TIFF EXPORT AT ALL, and that is why a device
     // report showing "17.6 MP in 27.5s on 8 threads" sat next to a complaint
@@ -738,7 +751,7 @@ export async function exportImage(
     __t.megapixels = (w * h) / 1e6;
     __t.total = performance.now() - __start;
     lastProfile = __t;
-    return { blob: new Blob([writeTiff16(rgb, w, h, SRGB_ICC, readExifSubset(file.bytes) ?? undefined)], { type: "image/tiff" }), name: `${baseName}.tif` };
+    return { blob: new Blob([tiff], { type: "image/tiff" }), name: `${baseName}.tif` };
   }
 }
 

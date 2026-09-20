@@ -154,14 +154,31 @@ try {
   // AND IT RESTS WHERE IT DOES NOTHING. A control that only takes something
   // away has to open at the end that takes nothing, and with right increasing
   // that end is the right one.
+  //
+  // MOVED OFF THE RESTING VALUE FIRST, and it was not. The drag above leaves
+  // the slider at 1, which IS the resting value — so this check read back the
+  // walk's own last write and would have passed against a Reset button that did
+  // nothing whatever. It is set somewhere else now, and the check is that Reset
+  // brings it back rather than that it happens to be there.
+  await p.evaluate(() => {
+    const el = document.getElementById("shadowSat");
+    el.value = "0.25";
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await settle(p);
+  const moved = await p.evaluate(() => document.getElementById("shadowSat").value);
+  check("the slider can be moved off its resting value at all", moved !== "1",
+    `sits at ${moved} before Reset`);
   await p.click("#resetBtn").catch(() => {});
   await settle(p);
   const rest = await p.evaluate(() => {
     const el = document.getElementById("shadowSat");
     return { value: el.value, text: (el.closest("label")?.textContent ?? "").trim() };
   });
-  check("and a photograph opens with its shadow colour untouched", rest.value === "1",
-    `opens at ${rest.value}, label "${rest.text}"`);
+  check("and a photograph opens with its shadow colour untouched",
+    PLANT ? false : rest.value === "1",
+    `moved to ${moved}, Reset returns ${rest.value}, label "${rest.text}"`);
 
   await ctx.close();
 } finally { await b.close(); }
