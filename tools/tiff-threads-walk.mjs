@@ -74,12 +74,13 @@ async function run(b, name, noExportWorkers) {
       if (el) { el.value = v; el.dispatchEvent(new Event("change", { bubbles: true })); }
     }
   });
-  // THE BANNER, SAMPLED WHILE IT RUNS. This is the check that was missing when
-  // the owner reported "still on one thread" from the device: the walk read the
-  // app's own §7f line for its thread count — the same source the feature
-  // writes — so a SECOND copy of the rule, in the progress strip, could say the
-  // opposite forever without a single check going red. A test that reads only
-  // what the feature reports cannot catch the feature disagreeing with itself.
+  // THE BANNER, SAMPLED WHILE IT RUNS, and this is the check that was missing.
+  // The progress strip said "on one thread" over an export the app's own report
+  // put on eight, and nothing here could see it: this walk read that same §7f
+  // line for its thread count — the source the feature writes — so a SECOND
+  // copy of the rule, in the strip, could contradict it forever with every
+  // check green. A test that reads only what a feature reports about itself
+  // cannot catch the feature disagreeing with itself.
   const banner = [];
   const sampler = setInterval(async () => {
     try {
