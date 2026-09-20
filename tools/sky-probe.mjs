@@ -33,6 +33,7 @@ import { deflateSync } from "node:zlib";
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const arg = (k, d) => { const a = process.argv.find((x) => x.startsWith(`--${k}=`)); return a ? a.slice(k.length + 3) : d; };
 const FRAMES = arg("frames", "NIR_0063,NIR_1644,NIR_1651").split(",").filter(Boolean);
+const WHY = process.argv.includes("--why");
 const OUT = arg("out", join(tmpdir(), "sky-probe"));
 if (!existsSync(OUT)) mkdirSync(OUT, { recursive: true });
 
@@ -41,7 +42,7 @@ await build({
   stdin: { contents: `
     export { decode, grayWorldWB, linearAt } from "${repo}/src/decode";
     export { buildSkyMask } from "${repo}/src/sky";
-    export { buildSkyGuide, refineSkyMask, growSkyByColour, SKY_GROW_TOL } from "${repo}/src/skyfine";
+    export { buildSkyGuide, refineSkyMask, growSkyByColour, skyGrowKey, skyGrowGradient, SKY_GROW_TOL, GRAD_STOP } from "${repo}/src/skyfine";
     export { BRUSH_MAX_EDGE } from "${repo}/src/pipeline";`, resolveDir: repo, loader: "ts" },
   bundle: true, format: "esm", platform: "node", outfile: bundle, logLevel: "warning",
 });
@@ -88,7 +89,15 @@ async function selectionFor(name) {
   const seed = A.buildSkyMask(sample, img.width, img.height, img.rotate ?? 0, img.camMatrix ?? null, wb, A.BRUSH_MAX_EDGE, 1, 0.5);
   if (!seed.found) return null;
   const guide = A.buildSkyGuide(sample, img.width, img.height, wb);
-  return { guide, seed: seed.mask, grown: A.growSkyByColour(seed.mask, guide, 1, 0.5) };
+  return {
+    guide,
+    seed: seed.mask,
+    grown: A.growSkyByColour(seed.mask, guide, 1, 0.5),
+    // The grow's OWN decision, from the grow's own exported function rather
+    // than from a copy of it here — see skyGrowKey's contract.
+    key: A.skyGrowKey(seed.mask, guide, 1),
+    grad: A.skyGrowGradient(guide),
+  };
 }
 
 /** Per-pixel boundary roughness: of the selected pixels that sit ON the
@@ -118,6 +127,92 @@ function roughness(m) {
   return { share: n ? kinked / n : 0, n };
 }
 
+/** WHY THE GROW STOPPED: the sky-coloured ground it never took, and whether
+ *  anything the seed marked lies in the same piece of it.
+ *
+ *  Takes the guide, the grown selection, the grow's own key and its gradient
+ *  field; returns the components of "the grow's colour test admits this and
+ *  the selection does not have it", largest first, each saying whether its
+ *  colour-connected component contains a seed.
+ *
+ *  What the result must satisfy, and it is the whole point: the two answers
+ *  are exclusive and mean different things.
+ *
+ *    SEEDED — a path of pixels the grow's OWN colour test admits runs from the
+ *      seed to this ground, so colour did not refuse it and connectivity did
+ *      not sever it. The only thing left that can stop the flood is the brake:
+ *      a pixel may be SELECTED on an edge and is never propagated THROUGH.
+ *      That is a defect of this mechanism, with a named cause.
+ *    NOT SEEDED — no such path exists. The grow is behaving exactly as it is
+ *      specified to, and this ground is out of reach for anything that keeps
+ *      connectivity at all. That is decision 028's territory, not 023's.
+ *
+ *  It works on `matches` and `seeded` ALONE and never re-runs the flood.
+ *  Reconstructing the flood here to explain the flood is the second instrument
+ *  free to disagree with the first, which this file's header already refuses.
+ *
+ *  ONE CONCESSION TO THE FEATHER. `grown` has been box-blurred after the flood
+ *  (2 px at the default), so thresholding it at half puts a hairline of
+ *  disagreement round the whole boundary. The selection is dilated by 3 px
+ *  before the comparison, which can only UNDER-report unselected ground — a
+ *  conservative direction for a diagnostic whose subject is a block of some
+ *  thousands of pixels. */
+function whyStopped(guide, grown, key, grad, GRAD_STOP) {
+  const W = guide.w, H = guide.h, N = W * H;
+  // Selected, dilated by 3 to absorb the feather's hairline.
+  const sel = new Uint8Array(N);
+  for (let i = 0; i < N; i++) if (grown.data[i] >= 128) sel[i] = 1;
+  for (let pass = 0; pass < 3; pass++) {
+    const grow = new Uint8Array(sel);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = y * W + x;
+      if (sel[i]) continue;
+      if ((x > 0 && sel[i - 1]) || (x < W - 1 && sel[i + 1]) || (y > 0 && sel[i - W]) || (y < H - 1 && sel[i + W])) grow[i] = 1;
+    }
+    sel.set(grow);
+  }
+  // Components of everything the grow's colour test admits, and whether each
+  // holds a seed. One pass over the whole frame, explicit stack.
+  const comp = new Int32Array(N).fill(-1);
+  const hasSeed = [], size = [];
+  const stack = new Int32Array(N);
+  for (let s0 = 0; s0 < N; s0++) {
+    if (comp[s0] >= 0 || !key.matches(s0)) continue;
+    const id = size.length; size.push(0); hasSeed.push(false);
+    let sp = 0; stack[sp++] = s0; comp[s0] = id;
+    while (sp) {
+      const i = stack[--sp]; size[id]++;
+      if (key.seeded[i]) hasSeed[id] = true;
+      const x = i % W, y = (i / W) | 0;
+      const nb = [x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1, y > 0 ? i - W : -1, y < H - 1 ? i + W : -1];
+      for (const j of nb) if (j >= 0 && comp[j] < 0 && key.matches(j)) { comp[j] = id; stack[sp++] = j; }
+    }
+  }
+  // The unselected part of each colour component, as its own 4-connected
+  // pieces — a component can be half taken and half not.
+  const un = new Uint8Array(N);
+  for (let i = 0; i < N; i++) if (key.matches(i) && !sel[i]) un[i] = 1;
+  const seen = new Uint8Array(N), out = [];
+  for (let s0 = 0; s0 < N; s0++) {
+    if (!un[s0] || seen[s0]) continue;
+    let sp = 0, n = 0, sx = 0, sy = 0, gHi = 0, gSum = 0;
+    stack[sp++] = s0; seen[s0] = 1;
+    const cells = [];
+    while (sp) {
+      const i = stack[--sp]; n++; cells.push(i);
+      sx += i % W; sy += (i / W) | 0;
+      gSum += grad[i]; if (grad[i] >= GRAD_STOP) gHi++;
+      const x = i % W, y = (i / W) | 0;
+      const nb = [x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1, y > 0 ? i - W : -1, y < H - 1 ? i + W : -1];
+      for (const j of nb) if (j >= 0 && un[j] && !seen[j]) { seen[j] = 1; stack[sp++] = j; }
+    }
+    out.push({ n, cx: sx / n / W, cy: sy / n / H, seeded: hasSeed[comp[s0]], compSize: size[comp[s0]],
+               gradHi: gHi / n, gradMean: gSum / n, cells });
+  }
+  out.sort((a, b) => b.n - a.n);
+  return out;
+}
+
 console.log(`\n=== sky selection · tolerance ${A.SKY_GROW_TOL} · ${FRAMES.length} frame(s) ===\n`);
 for (const name of FRAMES) {
   const s = await selectionFor(name);
@@ -141,8 +236,36 @@ for (const name of FRAMES) {
     }
     rgba[p * 4] = c[0]; rgba[p * 4 + 1] = c[1]; rgba[p * 4 + 2] = c[2]; rgba[p * 4 + 3] = 255;
   }
+  if (WHY && s.key) {
+    const found = whyStopped(guide, grown, s.key, s.grad, A.GRAD_STOP);
+    const big = found.filter((c) => c.n >= 200).slice(0, 5);
+    const total = found.reduce((a, c) => a + c.n, 0);
+    console.log(`      the grow's own colour test admits ground the selection does not have:`
+      + ` ${(100 * total / (W * H)).toFixed(1)}% of the guide in ${found.length} pieces`);
+    if (!big.length) console.log(`      nothing above 200 px — no block to explain`);
+    for (const c of big) {
+      // THE DIAGNOSIS. A piece whose colour-connected component holds a seed
+      // was reachable by colour and was not taken, and the brake is the only
+      // thing left that can do that. A piece whose component holds none was
+      // severed by the colour test itself, and no tolerance short of dropping
+      // connectivity reaches it.
+      console.log(`      ${String(c.n).padStart(7)} px at (${c.cx.toFixed(2)}, ${c.cy.toFixed(2)}) of the frame`
+        + ` — its colour-connected component is ${c.compSize} px and ${c.seeded ? "HOLDS A SEED" : "holds NO seed"}`);
+      console.log(`              ${c.seeded
+        ? `colour did not refuse it and connectivity did not sever it: the BRAKE stopped the flood. ${(100 * c.gradHi).toFixed(0)}% of it sits at or above GRAD_STOP ${A.GRAD_STOP} (mean ${c.gradMean.toFixed(3)})`
+        : `no path of sky-coloured pixels joins it to the seed: the grow is doing what it says, and this is decision 028's ground rather than 023's`}`);
+      // Paint it, because a component the arithmetic calls large can be
+      // scattered speckle and only the picture says which.
+      for (const i of c.cells) {
+        rgba[i * 4] = c.seeded ? 255 : 190; rgba[i * 4 + 1] = c.seeded ? 140 : 50; rgba[i * 4 + 2] = c.seeded ? 20 : 215;
+      }
+    }
+  }
   png(join(OUT, `${name}-selection.png`), W, H, rgba);
 }
 console.log(`\n  pictures in ${OUT} — the border is drawn green. OPEN THEM; the`);
-console.log(`  roughness figure only says which frame to open first.\n`);
+console.log(`  roughness figure only says which frame to open first.`);
+if (WHY) console.log(`  With --why: ORANGE is sky-coloured ground the brake stopped the flood`
+  + `\n  reaching, MAGENTA is ground no sky-coloured path joins to the seed at all.`);
+console.log("");
 process.exit(0);

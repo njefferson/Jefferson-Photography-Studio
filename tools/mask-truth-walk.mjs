@@ -165,16 +165,52 @@ const solve = (p) => p.evaluate(([SAT_FLOOR, HUE_HALF, EDGE_FRAC, PLANT_REACHABL
   // spill: coverage of non-sky pixels within EDGE of a sky pixel (distance the other way, one cheap pass: any sky within EDGE in a cross)
   let sN = 0, sCov = 0; const R = EDGE;
   for (let y = 0; y < H; y += 2) for (let x = 0; x < W; x += 2) { const i = y * W + x; if (sky[i] || cov[i] < 0) continue; let near = false; for (let k = 1; k <= R && !near; k += 2) { if (x - k >= 0 && sky[i - k]) near = true; else if (x + k < W && sky[i + k]) near = true; else if (y - k >= 0 && sky[i - k * W]) near = true; else if (y + k < H && sky[i + k * W]) near = true; } if (near) { sN++; sCov += cov[i]; } }
-  // largest hard-missed component, 4-connected
+  // largest hard-missed component, 4-connected — and WHAT IT IS, which the
+  // size alone cannot say. A block this walk calls missed sky is either sky
+  // the mask failed to take or something the KEY mis-called sky, and the two
+  // want opposite responses. Dark out-of-focus foliage at a frame edge keys as
+  // sky readily: it sits in the hue band and clears the saturation floor while
+  // being nothing like the sky in brightness. So the component's own mean
+  // luminance and saturation are reported beside the sky target's, and it is
+  // painted its own colour on the map to be OPENED.
   const seen = new Uint8Array(N); let largest = 0; const stack = new Int32Array(N);
+  let bigCells = null;
   for (let s0 = 0; s0 < N; s0++) { if (!missed[s0] || seen[s0]) continue; let sp = 0, size = 0; stack[sp++] = s0; seen[s0] = 1;
-    while (sp) { const i = stack[--sp]; size++; const x = i % W, y = (i / W) | 0; const nb = [x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1, y > 0 ? i - W : -1, y < H - 1 ? i + W : -1]; for (const j of nb) if (j >= 0 && missed[j] && !seen[j]) { seen[j] = 1; stack[sp++] = j; } }
-    largest = Math.max(largest, size); }
+    const cells = [];
+    while (sp) { const i = stack[--sp]; size++; cells.push(i); const x = i % W, y = (i / W) | 0; const nb = [x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1, y > 0 ? i - W : -1, y < H - 1 ? i + W : -1]; for (const j of nb) if (j >= 0 && missed[j] && !seen[j]) { seen[j] = 1; stack[sp++] = j; } }
+    if (size > largest) { largest = size; bigCells = cells; } }
+  const bigStats = (() => {
+    if (!bigCells || !bigCells.length) return null;
+    let lum = 0, sat = 0, cx = 0, cy = 0;
+    for (const i of bigCells) { const o = i * 4;
+      lum += (B[o] * LW[0] + B[o + 1] * LW[1] + B[o + 2] * LW[2]) / 255;
+      const [x2, y2] = chroma(o); sat += Math.hypot(x2, y2);
+      cx += i % W; cy += (i / W) | 0; }
+    const n = bigCells.length;
+    // The sky the mask DID take, for comparison on the same two numbers — and
+    // its luminance SPREAD, because a mean says nothing about whether a block
+    // sitting below it is unusual. Median and MAD, the robust shape the grow
+    // already uses to set its own tolerance, so the answer is in units the
+    // rest of this family reasons in.
+    let skyLum = 0, skySat = 0, skyN = 0; const lums = [];
+    for (let i = 0; i < N; i++) if (cov[i] >= 0.9 && sky[i]) { const o = i * 4;
+      const L = (B[o] * LW[0] + B[o + 1] * LW[1] + B[o + 2] * LW[2]) / 255;
+      skyLum += L; lums.push(L);
+      const [x2, y2] = chroma(o); skySat += Math.hypot(x2, y2); skyN++; }
+    const med = (a) => { if (!a.length) return NaN; const t = Float64Array.from(a).sort(); return t[t.length >> 1]; };
+    const lMed = med(lums);
+    const lMad = 1.4826 * med(lums.map((v) => Math.abs(v - lMed)));
+    return { n, lum: lum / n, sat: sat / n, cx: cx / n / W, cy: 1 - (cy / n / H),
+             skyLum: skyN ? skyLum / skyN : NaN, skySat: skyN ? skySat / skyN : NaN,
+             lMed, lMad, mads: lMad > 1e-9 ? (lMed - lum / n) / lMad : NaN };
+  })();
+  const inBig = new Uint8Array(N); if (bigCells) for (const i of bigCells) inBig[i] = 1;
   // the map: sky = blue by coverage (dark = uncovered), uncovered sky = red, spill onto non-sky = yellow tint, else grey
   const oc = document.createElement("canvas"); oc.width = W; oc.height = H; const ctx = oc.getContext("2d"); const img = ctx.createImageData(W, H);
   for (let i = 0; i < N; i++) { const o = i * 4; const l = (0.2126 * B[o] + 0.7152 * B[o + 1] + 0.0722 * B[o + 2]) * 0.55; let r = l, gg = l, bb = l; const c = Math.max(0, cov[i]);
     if (sky[i]) {
       if (c >= 0.5) { r = l * 0.5; gg = l * 0.6 + 60 * c; bb = l * 0.6 + 120 * c; }
+      else if (inBig[i]) { r = 255; gg = 230; bb = 60; }      // THE largest missed block, whatever it is
       else if (reachable[i]) { r = 220; gg = 40; bb = 40; }   // the mask could have had it
       else { r = 190; gg = 50; bb = 215; }                     // nothing joins it to the selection
     }
@@ -183,7 +219,7 @@ const solve = (p) => p.evaluate(([SAT_FLOOR, HUE_HALF, EDGE_FRAC, PLANT_REACHABL
   const flipped = ctx.createImageData(W, H); for (let y = 0; y < H; y++) flipped.data.set(img.data.subarray(y * W * 4, (y + 1) * W * 4), (H - 1 - y) * W * 4); ctx.putImageData(flipped, 0, 0);
   delete window.__mt;
   let coveredPx = 0; for (let i = 0; i < N; i++) if (cov[i] >= 0.5) coveredPx++;
-  return { W, H, rows: [H - 1 - rHi, H - 1 - rLo], covered: coveredPx, skyPx, edgePx: EDGE, edgeN: eN, edgeCov: eN ? eCov / eN : NaN, openN: oN, openCov: oN ? oCov / oN : NaN, softMissed: skyPx ? soft / skyPx : NaN, hardMissed: skyPx ? hard / skyPx : NaN, reachN, reachMissed: reachN ? rHard / reachN : NaN, discN, discShare: skyPx ? discN / skyPx : NaN, discCov: discN ? discCov / discN : NaN, largest, spillN: sN, spill: sN ? sCov / sN : NaN, target: { hue: ((hue0 * 180) / Math.PI + 360) % 360, sat: tsat }, png: oc.toDataURL("image/png") };
+  return { bigStats, W, H, rows: [H - 1 - rHi, H - 1 - rLo], covered: coveredPx, skyPx, edgePx: EDGE, edgeN: eN, edgeCov: eN ? eCov / eN : NaN, openN: oN, openCov: oN ? oCov / oN : NaN, softMissed: skyPx ? soft / skyPx : NaN, hardMissed: skyPx ? hard / skyPx : NaN, reachN, reachMissed: reachN ? rHard / reachN : NaN, discN, discShare: skyPx ? discN / skyPx : NaN, discCov: discN ? discCov / discN : NaN, largest, spillN: sN, spill: sN ? sCov / sN : NaN, target: { hue: ((hue0 * 180) / Math.PI + 360) % 360, sat: tsat }, png: oc.toDataURL("image/png") };
 }, [SKY_SAT_FLOOR, HUE_HALF_RAD, EDGE_FRAC, PLANT_REACHABLE]);
 const b = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium", args: ["--use-gl=swiftshader", "--enable-unsafe-swiftshader"] });
 const results = {};
@@ -237,6 +273,28 @@ try {
     // line, and for the same reason: it is not this mechanism's to fix. A
     // connectivity-constrained selection cannot enter sky nothing joins to it,
     // so a bound here would be a gate that can never go green.
+    if (m.bigStats) {
+      const g = m.bigStats;
+      console.log(`      largest missed block: ${g.n} px at (${g.cx.toFixed(2)}, ${g.cy.toFixed(2)}) of the frame`
+        + ` — its mean luminance ${g.lum.toFixed(3)} and saturation ${g.sat.toFixed(3)},`
+        + ` against the covered sky's ${g.skyLum.toFixed(3)} and ${g.skySat.toFixed(3)}.`);
+      // THE VERDICT IS A COMPARISON, NOT A SENTENCE PRINTED EITHER WAY. The
+      // first version of this line asserted "far darker than the sky, so the
+      // key called it sky" unconditionally, which would have said the same
+      // thing about a block brighter than the sky.
+      console.log(`              the covered sky's luminance runs ${g.lMed.toFixed(3)} ± ${g.lMad.toFixed(3)} (median, MAD);`
+        + ` this block's mean sits ${Number.isFinite(g.mads) ? g.mads.toFixed(1) : "?"} MADs below that median`);
+      // THE VERDICT IS IN MADs OR IT IS NOT A VERDICT. The first version
+      // compared the block's mean against the covered sky's MEAN and called
+      // anything 25% below it "far darker". On NIR_1651 the covered sky holds
+      // a large bright cloud, so its mean (0.483) sits well above its median
+      // (0.312) and that test fired on a block only 1.8 MADs below typical
+      // sky — ordinary variation, dressed up as a finding. A skewed
+      // distribution's mean is not a place to measure a distance from.
+      console.log(`              ${!Number.isFinite(g.mads) ? "the sky's luminance has no spread to compare against"
+        : g.mads >= 2.5 ? `${g.mads.toFixed(1)} MADs below typical sky — far enough out to suspect the KEY admitted something that is not sky`
+        : `only ${g.mads.toFixed(1)} MADs below typical sky, which is ordinary variation: brightness does NOT settle what this block is`} — painted BRIGHT YELLOW on the missed map, and the map is the thing that settles it`);
+    }
     console.log(m.discN
       ? `      out of reach: ${(100 * m.discShare).toFixed(1)}% of ${m.skyPx} keyed sky px (${m.discN}) are joined to the selection by no sky-coloured path, mean coverage ${(100 * m.discCov).toFixed(1)}% — magenta on the missed map`
       : `      out of reach: none — every pixel the key calls sky is joined to the selection by a sky-coloured path`);
