@@ -685,7 +685,16 @@ user-scalable=no.
   `renderMaskOverlay` decides whether the overlay is live from a list that does
   not include full view, so entering it changes nothing about the overlay. The
   same function already has the pattern — the tint steps aside while a slider
-  is being dragged, on exactly this reasoning. See
+  is being dragged, on exactly this reasoning.
+  **FIXED, ON STAGING 2026-09-20.** Full view now stands the whole overlay down
+  — tint, matte and outline together, through the one condition that already
+  decides all three — and brings it back on leaving. The mask stays selected
+  throughout, which the walk asserts on the far side: dropping the selection
+  would make the other checks pass while losing the reader's work. Measured on
+  the conifer frame with a radial: 44.6% of the frame carries the overlay while
+  editing, 11.6% in full view (which is the photograph's own teal sky, not the
+  tint), and exactly 44.6% again on return. The walk was run against the old
+  behaviour first and failed the two checks it exists for. See
   `docs/decisions/037-full-screen-shows-the-mask.md`.
 - [ ] **The Grade tab's controls do not behave like the rest of the app** <!-- decision: 035 -->
   three defects reported together 2026-09-20, two of which share a cause.
