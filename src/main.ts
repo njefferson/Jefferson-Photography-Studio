@@ -5891,9 +5891,26 @@ function updateSkyStatus() {
   let on = 0;
   for (let i = 0; i < d.length; i++) if (d[i] > 127) on++;
   const frac = d.length ? on / d.length : 0;
-  mUI.skyStatus.textContent = frac < SKY_MIN_COVERAGE
-    ? "No clear sky found — try a Brush or Color mask, or raise Reach."
-    : `Sky detected — ${Math.round(frac * 100)}% of the frame. Invert for everything but the sky.`;
+  // AND HOW IT WAS FOUND, not only how much. A percentage is equally true of a
+  // sky and of a playhouse — decision 029's defect was found with a harness
+  // rather than by looking, because nothing in the app said anything a reader
+  // could disagree with. The horizon's own verdicts are held per photograph
+  // beside the selection (skyPrepFor), so this costs a lookup and no state.
+  const hz = current ? skyPrepOf.get(current)?.prep.horizon : undefined;
+  if (frac < SKY_MIN_COVERAGE) {
+    mUI.skyStatus.textContent = "No clear sky found — try a Brush or Color mask, or raise Reach."
+      + (hz?.noSky ? " Nothing in this photograph separates a sky from the ground." : "");
+    return;
+  }
+  const route = !hz
+    ? ""
+    : hz.boundary
+      ? " Found from the top edge: no horizon stood out in this photograph."
+      : hz.refined
+        ? " Found at the horizon, with some columns taken back out as ground."
+        : " Found at the horizon.";
+  mUI.skyStatus.textContent =
+    `Sky detected — ${Math.round(frac * 100)}% of the frame.${route} Invert for everything but the sky.`;
 }
 
 function deleteMask(i: number) {
