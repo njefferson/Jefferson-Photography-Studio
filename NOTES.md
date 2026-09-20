@@ -786,7 +786,38 @@ user-scalable=no.
   channel and `writeTiff16` needs sixteen, so the parallel path has no 16-bit
   return. Exporting at eight bits to make it fast is rejected: sixteen is the
   reason to choose TIFF. The check afterwards is the one section 9l-ii
-  established — measure the exported FILE's bytes, not the screen. See
+  established — measure the exported FILE's bytes, not the screen.
+  **FIXED, 2026-09-20 — and both of this item's mechanisms were wrong before
+  they were right.** The bullet above said the band workers return eight bits
+  and the parallel path has no 16-bit return. It HAS one: `BandResult` declares
+  `rgb?: Uint16Array` with the comment "TIFF path: 16-bit RGB, same rectangle".
+  What is true is worse — that field was declared and produced by NOTHING. A
+  type with no code behind it reads exactly like a finished feature, which is
+  presumably how the exclusion survived being looked at. The diagnosis came
+  from a signature whose body had not been read.
+  **And the walk found a second defect the reading had missed: the report
+  cannot see a TIFF export at all.** `Last export` read "none this session"
+  straight after a completed 31 MB TIFF, because the three lines that record a
+  profile live only in the JPEG branch. That is the real reason a device report
+  and a complaint about a slow TIFF looked like they contradicted each other —
+  after a TIFF there is no line, so the newest one always belongs to an earlier
+  JPEG. It also left the first verification run unable to answer its own
+  question: the files came back byte-identical, which proves the band
+  arithmetic and says nothing about whether the pool engaged, because the
+  thread count read zero on both arms.
+  **Measured with the profile in place**: 5.2 MP in 8.0s across 3 threads
+  against 21.3s on one — 2.7x — and the two files are IDENTICAL, 0 bytes of
+  31,315,842. The single-threaded arm is forced by wrapping `Worker` so that
+  only the EXPORT worker's construction throws; making `Worker` undefined would
+  move the decode onto the main thread too, and a byte difference could then
+  have come from either end.
+  Two other things the change carries. `perWorkerMb` bills a band at four bytes
+  a pixel and a 16-bit RGB band is six, so the thread budget was understating a
+  TIFF band by half — on a tablet that budget is what stands between a big
+  export and a killed tab. And the worker transferred `res.data.buffer`, which
+  is `undefined` on a TIFF band, so thirty megabytes a band was being
+  structured-CLONED rather than moved: correct, and a doubled peak on the one
+  path whose ceiling matters most. See
   `docs/decisions/036-a-tiff-export-uses-one-core.md`.
 - [ ] **Straighten to a line you draw** <!-- decision: 038 -->
   asked 2026-09-20: tap two points along an edge that should be level and let
