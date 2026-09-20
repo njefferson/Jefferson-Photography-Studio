@@ -557,15 +557,25 @@ user-scalable=no.
   spreads through pixels that are joined and no path leads behind a branch.
   Sorting those apart first, over the sky the grow can actually get to,
   NIR_0063's edge band reads 98% where it read 52% at every tolerance, and
-  NIR_1644's 87%. What survives is NIR_1651's open sky at 93.4%: a block of
-  about 18,933 px at the frame's lower-right margin, unselected, with a path
-  of sky-coloured pixels leading to it. The sky the selection cannot enter is
-  now its own item, 028.
-  Two cautions for whoever takes this next. The spill figures — 8%, 23%, 55% —
+  NIR_1644's 87%. The sky the selection cannot enter is now its own item, 028.
+  **What survives is not a mask defect at all.** NIR_1651's open sky reads
+  93.4% because of one 18,933 px block in the extreme bottom-right corner, and
+  magnified three times that block is a heavily out-of-focus branch at the
+  frame edge — leaf silhouettes along its blurred boundary, deep dark teal
+  against the flat lighter teal of the sky. The mask is right to refuse it; the
+  walk's own idea of sky is a hue band above a saturation floor with no
+  brightness condition, so it admits the corner. A second instrument working
+  from the selection's own colour test agrees, finding no unselected
+  sky-coloured block on that frame above 692 px.
+  So this item is now blocked on the INSTRUMENT rather than on the app, and
+  that fix is not small — separating a defocused branch from sky needs a
+  property that separates them, and brightness does not: the block sits 1.8
+  MADs below typical sky, which is ordinary variation. The check stays red with
+  its cause written down rather than green by moving the truth.
+  One caution for whoever takes this next: the spill figures — 8%, 23%, 55% —
   are not the mask swallowing canopy; opened, they are a bright cloud and the
   pale hazy sky above a treeline, which the walk's own key rejects and the mask
-  correctly takes. And reachable under the WALK's key is not reachable by the
-  grow: settling the 1651 block needs `tools/sky-probe.mjs`, not this walk.
+  correctly takes.
 - [ ] **Every control can say what it does, and a finger can reach the saying** <!-- decision: 024 --> —
   asked 2026-09-19 from the PC, in the sitting that reported a slider named
   after the defect rather than the act: there should be something clickable
@@ -1705,6 +1715,43 @@ that works presses a DIFFERENT look as the second application, and every row
 goes red. Per look it also prints how many controls separate that look from B&W
 IR, which is the walk's own control: a walk that reads nothing would report
 every round trip clean.
+
+## The last red check was the instrument, and the first argument for it was wrong, 2026-09-20 (decision 023)
+
+**NIR_1651's 18,933 px missed block is a defocused branch at the frame edge.**
+It sits at (0.96, 0.89) — the extreme bottom-right corner — and magnified three
+times out of the walk's own overlay it is unmistakable: a heavily out-of-focus
+foliage mass with leaf silhouettes along its blurred boundary, deep dark teal
+against the flat lighter teal of the sky. The mask is right to refuse it. The
+acceptance walk's truth key calls it sky because that key is a ±25° hue band
+above a 0.12 saturation floor and has **no luminance condition at all**.
+
+**Two keys, and they disagree about what the pixels ARE.**
+`tools/sky-probe.mjs --why` reads the grow's own decision — `skyGrowKey` and
+`skyGrowGradient` are exported from `src/skyfine.ts` for exactly this, so the
+probe asks the real function rather than a copy of it — and finds no unselected
+sky-coloured component on that frame larger than 692 px. The walk's key admits
+the corner; the grow's rejects it.
+
+**THE FIRST ARGUMENT WAS VOID AND THE CONCLUSION SURVIVED BY LUCK.** The block
+was called foliage because its mean luminance, 0.264, sits well below the
+covered sky's mean of 0.483. That frame's covered sky includes a large bright
+cloud, so the distribution is skewed: the median is 0.312 with a MAD of 0.028,
+and against the median the block sits 1.8 MADs low, which is ordinary sky
+variation. A mean is not a place to measure a distance from on a skewed
+distribution. The walk prints MADs now and refuses a verdict inside 2.5 of
+them; the crop is what settles it.
+
+**The method worth reusing is the crop.** Three times magnification of the
+corner, from the walk's own overlay, read beside the missed map at the same
+place. It is the second time on this item that magnifying beat measuring — the
+first was the ragged-edge diagnosis, which 4× magnification disproved.
+
+**What is owed is an instrument fix and it is not small.** Separating defocused
+foliage from sky needs a property that separates them, and neither luminance
+(1.8 MADs) nor anything fitted to this one frame is it. Until that exists the
+check stays red with its cause written down, which beats a green bought by
+moving the truth.
 
 ## The acceptance number was measuring two skies at once, 2026-09-19 (decision 023)
 

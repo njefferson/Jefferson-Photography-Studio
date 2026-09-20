@@ -318,7 +318,7 @@ const SEED_CUT = 128;
  *  Near buildSkyMask's own 0.045 seed-smoothness bound, which is the same idea
  *  on the same quantity one stage earlier; this one runs on the guide's gamma
  *  luma at 1024 rather than on normalised linear luma at 384. */
-const GRAD_STOP = 0.06;
+export const GRAD_STOP = 0.06;
 /** Widest soft edge Feather can ask for, in guide pixels at SKY_FINE_EDGE.
  *  Feather 0.5, the default, is half of this.
  *
@@ -336,6 +336,92 @@ const FEATHER_MAX_PX = 3;
  *  a bird against the sky is orders of magnitude bigger, and filling it would
  *  be selecting an object as sky. */
 const PINHOLE_MAX_PX = 24;
+
+/** What the grow decides with: which pixels seeded it, where the sky's colour
+ *  sits, how far from there still counts, and the test itself.
+ *
+ *  Takes the coarse bitmap, the guide for the SAME photograph, and the mask's
+ *  Reach; gives back the seeded map, the sky's median red and blue share, the
+ *  clamped spread, the resulting tolerance, and `matches` — or null when
+ *  nothing seeds, which is the caller's "no sky" case.
+ *
+ *  What the result must satisfy: `growSkyByColour` is its only production
+ *  caller and consults `matches` for every pixel it admits, so this IS the
+ *  selection's boundary rather than a model of it. It is exported for one
+ *  reason — `tools/sky-probe.mjs` has to ask WHY the grow stopped somewhere,
+ *  and answering that from a reimplementation would be a second instrument
+ *  free to disagree with the first. Keep it pure and keep it the only copy.
+ *
+ *  The seed is read at the guide's grid, sampled BILINEARLY and cut at half.
+ *  Nearest-neighbour was tried first and is visible in the photograph: the
+ *  seed is 384 px against the guide's 1024, so its own boundary arrives
+ *  magnified nearly three times, and wherever the grow stops at a colour edge
+ *  rather than running past it that staircase is what shows — stepped blocks
+ *  down the left of NIR_1651 and along its cloud. Bilinear was avoided at
+ *  first because a ramp would seed the grow with half-strength pixels along
+ *  the seed's feather; that reason went when membership became binary, and the
+ *  cut at SEED_CUT removes the ramp anyway.
+ *
+ *  THE TEST IS BINARY and the tolerance is its only parameter. It used to
+ *  return a weight and the weight was dead — a plateau computed from Feather,
+ *  a smoothstep above it, and a flood that consulted only the zero crossing
+ *  before writing a flat 255. Feather sets the boundary blur's radius and
+ *  nothing else. */
+export function skyGrowKey(
+  mask: BrushMask,
+  guide: SkyGuide,
+  reach = 1,
+): { seeded: Uint8Array; mr: number; mb: number; spread: number; edge: number; matches: (p: number) => boolean } | null {
+  const W = guide.w, H = guide.h, N = W * H;
+  const seeded = new Uint8Array(N);
+  const sr: number[] = [], sb: number[] = [];
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      if (sampleBrush(mask, (x + 0.5) / W, (y + 0.5) / H) * 255 >= SEED_CUT) {
+        const p = y * W + x;
+        seeded[p] = 1;
+        sr.push(guide.r[p]);
+        sb.push(guide.b[p]);
+      }
+    }
+  }
+  if (!sr.length) return null;
+  // The sky's own centre and spread, robustly — median and MAD, the same shape
+  // buildSkyMask uses to learn its model, so one outlier band of haze cannot
+  // drag the target off the sky.
+  const med = (a: number[]): number => { const t = Float64Array.from(a).sort(); return t[t.length >> 1]; };
+  const mr = med(sr), mb = med(sb);
+  const madOf = (a: number[], m: number): number => 1.4826 * med(a.map((v) => Math.abs(v - m)));
+  const spread = Math.min(SKY_GROW_SPREAD_MAX, Math.max(SKY_GROW_SPREAD_MIN, Math.hypot(madOf(sr, mr), madOf(sb, mb))));
+  const edge = SKY_GROW_TOL * spread * Math.max(0.1, reach);
+  const matches = (p: number): boolean => Math.hypot(guide.r[p] - mr, guide.b[p] - mb) < edge;
+  return { seeded, mr, mb, spread, edge, matches };
+}
+
+/** The photograph's own edges, from the guide's luma — central differences,
+ *  the same measure buildSkyMask takes on its normalised luma one stage
+ *  earlier.
+ *
+ *  Takes the guide; gives back one value per guide pixel.
+ *
+ *  What the result must satisfy: it is read against GRAD_STOP and nothing
+ *  else. A pixel ON an edge may be SELECTED — the mask has to reach the edge —
+ *  but is never propagated THROUGH, which is what stops the flood crossing a
+ *  crown into whatever shares the sky's colour behind it. Exported beside
+ *  `skyGrowKey` and for the same reason: the probe that asks why the grow
+ *  stopped has to read the real brake, not a copy of it. */
+export function skyGrowGradient(guide: SkyGuide): Float32Array {
+  const W = guide.w, H = guide.h;
+  const grad = new Float32Array(W * H);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const gx = guide.l[y * W + Math.min(W - 1, x + 1)] - guide.l[y * W + Math.max(0, x - 1)];
+      const gy = guide.l[Math.min(H - 1, y + 1) * W + x] - guide.l[Math.max(0, y - 1) * W + x];
+      grad[y * W + x] = Math.hypot(gx, gy);
+    }
+  }
+  return grad;
+}
 
 /**
  * Grow the sky selection outward from the coarse seed, through the guide, by
@@ -403,63 +489,10 @@ const PINHOLE_MAX_PX = 24;
 export function growSkyByColour(mask: BrushMask, guide: SkyGuide, reach = 1, feather = 0.5): BrushMask {
   const W = guide.w, H = guide.h, N = W * H;
   const out = new Uint8Array(N);
-  // The seed, at the guide's grid, sampled BILINEARLY and then cut at half.
-  // Nearest-neighbour was tried first and is visible in the photograph: the
-  // seed is 384 px against the guide's 1024, so its own boundary arrives
-  // magnified nearly three times, and wherever the grow stops at a colour
-  // edge rather than running past it that staircase is what shows — stepped
-  // blocks down the left of NIR_1651 and along its cloud. Bilinear was
-  // avoided at first because a ramp would seed the grow with half-strength
-  // pixels along the seed's feather; that reason went when membership became
-  // binary, and the cut at SEED_CUT removes the ramp anyway.
-  const seeded = new Uint8Array(N);
-  const sr: number[] = [], sb: number[] = [];
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      if (sampleBrush(mask, (x + 0.5) / W, (y + 0.5) / H) * 255 >= SEED_CUT) {
-        const p = y * W + x;
-        seeded[p] = 1;
-        sr.push(guide.r[p]);
-        sb.push(guide.b[p]);
-      }
-    }
-  }
-  if (!sr.length) return { w: W, h: H, data: out }; // no seed: no sky, as before
-  // The sky's own centre and spread, robustly — median and MAD, the same shape
-  // buildSkyMask uses to learn its model, so one outlier band of haze cannot
-  // drag the target off the sky.
-  const med = (a: number[]): number => { const t = Float64Array.from(a).sort(); return t[t.length >> 1]; };
-  const mr = med(sr), mb = med(sb);
-  const madOf = (a: number[], m: number): number => 1.4826 * med(a.map((v) => Math.abs(v - m)));
-  const spread = Math.min(SKY_GROW_SPREAD_MAX, Math.max(SKY_GROW_SPREAD_MIN, Math.hypot(madOf(sr, mr), madOf(sb, mb))));
-  const edge = SKY_GROW_TOL * spread * Math.max(0.1, reach);
-  /** Whether this pixel's colour is the sky's. Takes a pixel index; gives back
-   *  a yes or a no. What it must satisfy: it is the ONLY thing the flood below
-   *  consults, so the selection's boundary is exactly this contour.
-   *
-   *  IT USED TO RETURN A WEIGHT, and the weight was dead. A plateau was
-   *  computed from Feather and the band between it and the tolerance was a
-   *  smoothstep — and the flood tested `weightAt(q) <= 0` and then wrote a flat
-   *  255, so nothing anywhere read the graded value. Two things were false
-   *  while it stood: the boundary looked soft in the source and is hard, and
-   *  Feather looked like it moved the selection when since membership became
-   *  binary it has only ever set the boundary blur's radius below. A half-used
-   *  function is how the next session concludes the first of those. */
-  const matchesSky = (p: number): boolean =>
-    Math.hypot(guide.r[p] - mr, guide.b[p] - mb) < edge;
-  // The photograph's own edges, from the guide's luma — central differences,
-  // the same measure buildSkyMask takes on its normalised luma one stage
-  // earlier. A pixel ON an edge may be selected (the mask has to reach the
-  // edge) but is never propagated THROUGH, which is what stops the flood
-  // crossing a crown into whatever shares the sky's colour behind it.
-  const grad = new Float32Array(N);
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      const gx = guide.l[y * W + Math.min(W - 1, x + 1)] - guide.l[y * W + Math.max(0, x - 1)];
-      const gy = guide.l[Math.min(H - 1, y + 1) * W + x] - guide.l[Math.max(0, y - 1) * W + x];
-      grad[y * W + x] = Math.hypot(gx, gy);
-    }
-  }
+  const key = skyGrowKey(mask, guide, reach);
+  if (!key) return { w: W, h: H, data: out }; // no seed: no sky, as before
+  const { seeded, matches: matchesSky } = key;
+  const grad = skyGrowGradient(guide);
   // Flood from the seed through 4-neighbours. A pixel whose colour weight is
   // zero is not selected AND does not propagate, so the grow stops at the
   // photograph's own colour edges and the speckle beyond them is never

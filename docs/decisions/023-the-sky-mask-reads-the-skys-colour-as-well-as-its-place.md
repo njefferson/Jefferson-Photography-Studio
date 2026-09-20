@@ -357,14 +357,37 @@ floor. There is a real thin rim of coverage on the bright IR-white shrubs at
 NIR_0063's right edge, and it is thin. **The spill number must not be read as a
 mask defect without opening the map.**
 
-**What is still owed, and it is now one thing with a picture attached:** a
-block of sky at NIR_1651's lower-right margin, about 18,933 px in one
-component, unselected, with a path of keyed sky joining it to the selection.
-That is the single remaining red check. One caution on it: reachable under the
-WALK's key is not the same as reachable by the grow — the key is a hue band on
-rendered canvas chroma, the grow works on `guide.r`/`guide.b` at 1024 behind a
-luma-gradient brake — so whether the grow is wrong to stop there, or the key is
-wrong to claim a path, needs `tools/sky-probe.mjs` rather than this walk.
+**THE LAST RED CHECK IS THE INSTRUMENT, NOT THE MASK — measured 2026-09-20 and
+then LOOKED AT.** NIR_1651's remaining 18,933 px block sits at (0.96, 0.89),
+the extreme bottom-right corner. Magnified three times out of the walk's own
+overlay it is a heavily DEFOCUSED foliage mass at the frame edge — a foreground
+branch, with leaf silhouettes along its blurred boundary, a deep dark teal
+beside the flat lighter teal of the sky. It is not sky, the mask is right to
+refuse it, and the walk's truth key calls it sky because that key is a ±25° hue
+band above a 0.12 saturation floor with **no luminance condition at all**.
+
+Corroborated independently by `tools/sky-probe.mjs --why`, which works from the
+grow's OWN key — `skyGrowKey`, exported for this — rather than the walk's: the
+grow's colour test admits no unselected component anywhere near that size on
+this frame, its largest being 692 px. Two different keys, and the disagreement
+is about whether those pixels ARE sky rather than about reachability.
+
+**AND THE FIRST ARGUMENT FOR IT WAS WRONG, WHICH IS WORTH KEEPING.** The block
+was first called foliage because its mean luminance, 0.264, sits well below the
+covered sky's mean of 0.483. That comparison is void: this frame's covered sky
+includes a large bright cloud, so its luminance distribution is skewed and its
+median is 0.312 with a MAD of 0.028. Against the median the block sits 1.8 MADs
+low — ordinary sky variation. Brightness never settled it; the magnified crop
+did. The walk now prints the distance in MADs and refuses to draw a conclusion
+inside 2.5 of them.
+
+**So what is still owed on this item is an instrument fix, not a mask fix**, and
+it is not a small one. Separating defocused dark foliage from sky needs a
+property that actually separates them, and the two obvious candidates do not:
+luminance is 1.8 MADs, and anything fitted to this frame is the same mistake in
+a new place. Until that exists this check stays red for a reason that is now
+written down, which is the least bad of the available states — a red whose
+cause is known beats a green bought by moving the truth.
 
 **What is still owed:** the boundary. The grow fixes the interior and the gaps
 and leaves the rim misplaced by a pixel or two. Composing the guided filter
