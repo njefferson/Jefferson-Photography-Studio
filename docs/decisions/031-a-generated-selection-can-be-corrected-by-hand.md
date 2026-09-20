@@ -181,3 +181,38 @@ finally is, hand corrections included.
   exactly the shape a stroke fixes: a few small regions, not a re-tuning.
 - **NIR_1638** — a river between conifers, opened after 029's first half. A
   vertical band of selection stands down each foreground trunk. Two strokes.
+- **NIR_1651** — the conifer under the cloud deck, opened twice on the real
+  canvas under the eir look while building the matte. With the coverage tint
+  the picture is a blue sky and a red tree and there is NO WAY TO SEE where the
+  mask is: the tint is 32% cyan over a sky that is already cyan. With the matte
+  the sky is solid yellow, the conifer is dim monochrome, and the silhouette is
+  crisp to the needle. That pair is the whole argument for the control.
+
+## Outcome
+
+**THE MATTE HALF SHIPPED 2026-09-20; the correction strokes have not.** The
+record stays open for them.
+
+`Matte`, beside `Show mask` in the mask editor, drops the photograph to dim
+monochrome and paints the selection in the mask's own yellow — darktable's
+arrangement, and for its reason: judging a selection and judging a result are
+different jobs and the second one's view is no good for the first. Measured on
+NIR_1651 under the eir look, reading the real canvas: with the tint, 0.0% of
+the frame carries the matte's colour and 7.5% reads grey; with the matte, 54.0%
+is the mask's yellow and 45.0% is grey, against 53% coverage from the mask
+itself. Pressing it again returns the tint exactly. The walk was made to fail
+first — with the press removed, three of its five checks go red.
+
+**Two things were deliberately not done, both from reading rather than from
+running.**
+
+- **Overlay mode 0 is untouched, to the character.**
+  `tools/mask-truth-walk.mjs` hardcodes that blend's constants and inverts them
+  to recover coverage. Changing the existing mode would not fail anything: the
+  walk keeps solving, against the wrong constants, and reports plausible
+  coverage, edge-band and spill numbers on every frame. The instrument this
+  repo judges the sky mask with would start lying with nothing going red.
+- **Nothing was added to the data model.** The matte is a preference on the
+  session, not a field on `EditParams` or `MaskLayer`: no undo entry, no
+  snapshot, no export path, nothing to migrate. The correction strokes are
+  where the model changes, and that is the part still to build.

@@ -190,6 +190,7 @@ uniform vec2 u_texel;    // 1/textureSize
 uniform float u_split;   // compare divider: denoise applies where uv.x >= split
 uniform int u_spotVis;   // 1 = "Visualize spots": amplified high-pass luma view
 uniform int u_maskViz;   // >=0 = show that mask's coverage as a preview overlay
+uniform int u_maskMatte; // 1 = show it as a MATTE instead of a tint (preview only)
 uniform sampler2D u_warpTex; // RG displacement field (unit 7, LINEAR); 0.5 = no move
 uniform bool u_warpOn;       // any warp painted
 uniform sampler2D u_overlayTex; // on-top sticker overlay (unit 8): gamma sRGB + coverage alpha
@@ -924,9 +925,23 @@ void main() {
   // rule), and stays visible over any content, even same-hue. Never exported.
   if (u_maskViz >= 0) {
     float cov = clamp(vizW, 0.0, 1.0);
-    vec3 inside = mix(g, vec3(0.20, 0.85, 1.0), 0.32);
-    vec3 outside = mix(vec3(dot(g, LUMA_W)), g, 0.5) * 0.5;
-    g = mix(outside, inside, cov);
+    if (u_maskMatte == 1) {
+      // THE MATTE. The tint below keeps the photograph's own colour under a
+      // cool wash, which is the right thing when you are placing a radial and
+      // the wrong thing when you are judging a generated selection: the looks
+      // that swap red and blue render IR-bright foliage CYAN, so the tint and
+      // the population that over-selects are the same colour, and the defect
+      // 029 measured could not be seen on the device at all. Here the
+      // photograph drops to dim monochrome and the selection is the only
+      // colour on screen, so coverage reads by BRIGHTNESS as well as by hue
+      // and a half-covered pixel reads as half. Preview only — never exported.
+      vec3 mono = vec3(dot(g, LUMA_W)) * 0.45;
+      g = mix(mono, vec3(1.0, 0.92, 0.25), cov);
+    } else {
+      vec3 inside = mix(g, vec3(0.20, 0.85, 1.0), 0.32);
+      vec3 outside = mix(vec3(dot(g, LUMA_W)), g, 0.5) * 0.5;
+      g = mix(outside, inside, cov);
+    }
   }
   frag = vec4(g, 1.0);
 }`;
@@ -1081,7 +1096,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskOp", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskOp", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_maskMatte", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -1621,7 +1636,7 @@ export class Renderer {
    *  "read" pass (histogram, tap-pick, colour-key) — those work in TRUE
    *  image-uv (see readUvPixel's doc comment), which crop/straighten would
    *  otherwise remap out from under callers like clientToImageUv. */
-  private bindPipeline(p: EditParams, split: number, rot: number, readMode = 0, spotVis = 0, applyCrop = true, maskViz = -1) {
+  private bindPipeline(p: EditParams, split: number, rot: number, readMode = 0, spotVis = 0, applyCrop = true, maskViz = -1, maskMatte = false) {
     const gl = this.gl;
     gl.useProgram(this.prog);
     gl.uniform1i(this.loc.u_tex, 0);
@@ -1635,6 +1650,7 @@ export class Renderer {
     gl.uniform1i(this.loc.u_readMode, readMode);
     gl.uniform1i(this.loc.u_spotVis, spotVis);
     gl.uniform1i(this.loc.u_maskViz, maskViz);
+    gl.uniform1i(this.loc.u_maskMatte, maskMatte ? 1 : 0);
     gl.uniform1f(this.loc.u_denoise, p.denoise);
     gl.uniform1f(this.loc.u_chroma, p.chroma ?? 0);
     gl.uniform1f(this.loc.u_despeckle, p.despeckle ?? 0);
@@ -1893,6 +1909,10 @@ export class Renderer {
   /** Index of the mask whose coverage to overlay on the ON-SCREEN render, or -1
    *  for none (offscreen/export never see it — like spotVis). */
   maskViz = -1;
+  /** Draw the shown mask as a MATTE rather than as a tint over the photograph.
+   *  Preview only, like `maskViz` itself; nothing downstream of the canvas
+   *  reads it and no export path binds it. */
+  maskMatte = false;
 
   /** @param split 0..1 — denoise applies right of this fraction (0 = whole image). */
   render(p: EditParams, split = 0) {
@@ -1906,7 +1926,7 @@ export class Renderer {
     this.straighten = p.straighten ?? 0;
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-    this.bindPipeline(p, split, this.rotQ, 0, this.spotVis ? 1 : 0, true, this.maskViz);
+    this.bindPipeline(p, split, this.rotQ, 0, this.spotVis ? 1 : 0, true, this.maskViz, this.maskMatte);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 
