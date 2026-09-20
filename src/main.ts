@@ -5647,6 +5647,7 @@ const mUI = {
   feather: $("mFeather") as HTMLInputElement,
   featherRow: $("mFeatherRow") as HTMLElement,
   outline: $("mOutline") as HTMLButtonElement,
+  matte: $("mMatte") as HTMLButtonElement,
   invert: $("mInvert") as HTMLButtonElement,
   joinRow: $("mJoinRow") as HTMLFieldSetElement,
   joinAdd: $("mJoinAdd") as HTMLInputElement,
@@ -5674,6 +5675,14 @@ let overlayShape: SVGPolygonElement | SVGLineElement | null = null;
 // judge the masked result cleanly while the sliders are open; a fresh geometry
 // mask always turns it back on so its handles are there to place.
 let showMaskOutline = true;
+// SHOW THE MASK AS A MATTE, not as a tint over the photograph. A preference,
+// not a mode: nothing about the edit changes and no export sees it. It exists
+// because the tint keeps the photograph's colour and the looks that swap red
+// and blue render IR-bright foliage the same cyan the tint uses — so on the
+// frames where a generated selection is most wrong, the tint is the hardest
+// place to see it (decision 029 found that defect with a harness, on a
+// workstation, because there was nothing to look at on the device).
+let showMaskMatte = false;
 // Transient: while a mask slider is being dragged the heavy coverage TINT steps
 // aside so you can see your adjustment on the real photo. The thin handle
 // outline stays. This never touches showMaskOutline (the persistent preference)
@@ -5690,6 +5699,20 @@ function beginMaskAdjust() {
   maskAdjusting = true;
   renderMaskOverlay();
 }
+
+mUI.matte.addEventListener("click", () => {
+  showMaskMatte = !showMaskMatte;
+  mUI.matte.setAttribute("aria-pressed", String(showMaskMatte));
+  // Turning the matte on is a way of asking to SEE the mask, so it brings the
+  // overlay back the way Show mask does — otherwise pressing it while the tint
+  // is hidden does nothing visible and reads as a broken control.
+  if (showMaskMatte) {
+    maskAdjusting = false;
+    showMaskOutline = true;
+    mUI.outline.setAttribute("aria-pressed", "true");
+  }
+  renderMaskOverlay();
+});
 
 mUI.outline.addEventListener("click", () => {
   if (maskAdjusting) {
@@ -6148,8 +6171,10 @@ function renderMaskOverlay() {
   // adjustment shows on the real photo — the handle outline below is unaffected.
   const tintOn = overlayOn && !maskAdjusting;
   const vizIdx = tintOn ? selectedMask : -1;
-  if (renderer.maskViz !== vizIdx) {
+  const matteOn = tintOn && showMaskMatte;
+  if (renderer.maskViz !== vizIdx || renderer.maskMatte !== matteOn) {
     renderer.maskViz = vizIdx;
+    renderer.maskMatte = matteOn;
     draw();
   }
   const showable = overlayOn && !!m && (m.type === 0 || m.type === 1);

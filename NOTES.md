@@ -617,8 +617,16 @@ user-scalable=no.
   per module and paints the result as a matte over a monochrome image. So: a
   list of correction strokes the mask keeps, a composite every render path
   reads in place of the automatic bitmap, and a second overlay mode that shows
-  the mask grey on black. The automatic selection stays live underneath, so
-  Reach still works and the hand work survives it. See
+  the selection on its own. The automatic selection stays live underneath, so
+  Reach still works and the hand work survives it.
+  **The SEEING half is on staging, 2026-09-20.** A `Matte` button beside `Show
+  mask` drops the photograph to dim grey and paints the selection in yellow, so
+  what is selected can be judged without the photograph's own colour arguing
+  with the overlay — which on the looks that swap red and blue is the same
+  cyan the overlay uses. Measured on the conifer frame under Aerochrome: with
+  the old tint none of the frame carries the overlay's own colour and 7.5% of
+  it reads grey; with the matte, 54% is the mask and 45% is grey, against 53%
+  coverage from the mask itself. The CORRECTING half is what is left. See
   `docs/decisions/031-a-generated-selection-can-be-corrected-by-hand.md`.
 - [ ] **A mask keys the photograph, not the grade** <!-- decision: 032 -->
   the Colour mask keys on the colour the pixel DISPLAYS — the decode through
