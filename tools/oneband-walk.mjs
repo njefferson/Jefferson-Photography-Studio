@@ -59,14 +59,32 @@ try {
   // and the day a second look shipped under that name, the walk would have gone
   // on passing while measuring a different look entirely. A label is product
   // copy and changes; an id is the thing being tested.
+  // THE LOOK BUTTON STAYS SYNTHETIC, and the reason is not laziness: it sits on
+  // a panel tab this walk never opens, so a real click cannot reach it without
+  // the walk becoming a test of the panel instead. Its effect is ASSERTED
+  // rather than assumed — check 0 below reads #lookState and fails if the look
+  // did not land. The strip is the opposite case and is clicked for real.
   const press = async (id) => {
     await p.evaluate((t) => document.getElementById(t)?.click(), id);
     await p.waitForTimeout(1600);
   };
+  // A REAL POINTER CLICK, NOT `element.click()`, and this walk timed out for
+  // 300 seconds on the synthetic one. Measured 2026-09-20: a capture-phase
+  // listener on #sessionThumbs never saw the synthetic click at all — it
+  // depends on where the strip's own re-render has got to — while a real click
+  // switched the photo in every order tried, at rest, straight after a look is
+  // applied, and after a drag past the threshold. So the app answers every
+  // input a reader can produce and this walk was using one they cannot.
+  //
+  // The same argument quicklook-keys-walk.mjs makes in its header: driving a
+  // control by a route no finger and no mouse takes is testing a different
+  // thing. Playwright's click also waits for the element to be visible,
+  // enabled and STABLE, which is the part that matters on a strip that
+  // re-renders its tiles after a look.
   const stepTo = async (i) => {
-    await p.evaluate((n) => document.querySelectorAll("#sessionThumbs .session-thumb")[n].click(), i);
-    await p.waitForFunction((n) => document.querySelectorAll("#sessionThumbs .session-thumb")[n]?.classList.contains("active"), i, { timeout: 300000 });
-    await p.waitForFunction(() => !document.getElementById("busy")?.hasAttribute("open"), null, { timeout: 300000 });
+    await p.locator("#sessionThumbs .session-thumb").nth(i).click({ timeout: 120000 });
+    await p.waitForFunction((n) => document.querySelectorAll("#sessionThumbs .session-thumb")[n]?.classList.contains("active"), i, { timeout: 120000 });
+    await p.waitForFunction(() => !document.getElementById("busy")?.hasAttribute("open"), null, { timeout: 120000 });
     await p.waitForTimeout(1200);
   };
 
