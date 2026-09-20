@@ -1,0 +1,44 @@
+# PIXELS THE ACCEPTANCE WALK'S COLOUR KEY CALLS SKY AND THAT ARE NOT SKY.
+#
+# `tools/mask-truth-walk.mjs` derives its own sky TRUTH per frame — a hue band
+# either side of the covered sky's circular mean, above a saturation floor. It
+# has no other condition, and measurement says it cannot get one: a branch
+# thrown far out of focus reads SMOOTHER than the sky at one pixel and
+# identical to it at eight (NOTES, 2026-09-20), so the field's standard fix of
+# colour-plus-texture does not separate them. Brightness does not either — the
+# block that provoked this sits 1.8 MADs below typical sky.
+#
+# So the correction is declared rather than derived. Each row names ONE
+# CONNECTED COMPONENT of keyed-but-uncovered pixels, by a point inside it, and
+# asserts that component is not sky. A component rather than a rectangle on
+# purpose: a box drawn round a corner also swallows the real sky above it, and
+# excluding real sky makes the test EASIER, which is the one direction a
+# correction must never move.
+#
+# A ROW IS AN ASSERTION ABOUT A PHOTOGRAPH, NOT AN EXEMPTION. It says somebody
+# opened that frame, magnified that place, and saw what is there. The reason is
+# required and must say what was seen, not that the check was inconvenient.
+#
+# FOUR GUARDS, because a file like this is otherwise a way to buy green:
+#   - every row is PRINTED on every run, with the size it removed;
+#   - a row matching no component FAILS as stale — it cannot rot quietly;
+#   - a row with no reason after the em dash FAILS;
+#   - a row removing more than 10% of the frame's keyed sky FAILS, whatever its
+#     reason. A correction that large is a broken key, not a correction.
+#
+# Take a row off by fixing the key, never by widening the row.
+#
+#   <frame>  <x> <y>  — what is actually there, seen
+
+# NIR_1651's bottom-right corner. Magnified three times out of the walk's own
+# overlay it is a heavily defocused foliage mass at the frame edge — a
+# foreground branch, leaf silhouettes readable along its blurred boundary, a
+# deep dark teal beside the flat lighter teal of the sky. The key admits it
+# because its rendered chroma sits inside the sky's hue band above the
+# saturation floor, and the three things that might have separated them do not:
+# luminance 1.8 MADs (ordinary sky variation), texture at one pixel -0.6 MADs
+# (the bokeh is SMOOTHER than sky) and at eight pixels +0.1 MADs.
+# The selection's own colour test refuses it independently — the probe finds no
+# unselected sky-coloured component on this frame above 692 px against the
+# 18,933 here — so two different keys disagree with this one.
+NIR_1651  0.975 0.855  — a defocused foreground branch at the frame's edge, not sky

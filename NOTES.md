@@ -567,14 +567,19 @@ user-scalable=no.
   brightness condition, so it admits the corner. A second instrument working
   from the selection's own colour test agrees, finding no unselected
   sky-coloured block on that frame above 692 px.
-  So this item is now blocked on the INSTRUMENT rather than on the app, and the
-  obvious fix was measured and does not work. The field's answer to this exact
-  problem is colour plus TEXTURE, and texture fails on the only case that
-  matters: a blurred branch is smooth, reading fractionally SMOOTHER than the
-  sky at one pixel and indistinguishable from it at eight. What the test needs
-  is a truth that is not a per-frame colour key at all — sky painted once per
-  practice photograph and held fixed. The check stays red with its cause
-  written down rather than green by moving the truth.
+  The obvious instrument fix was measured first and does not work: the field's
+  answer to this exact problem is colour plus TEXTURE, and texture fails on the
+  only case that matters, because a blurred branch is smooth — fractionally
+  SMOOTHER than the sky at one pixel and indistinguishable from it at eight.
+  **So the correction is declared rather than derived, and the acceptance walk
+  is now green on all three photographs for the first time** — NIR_1651's open
+  sky 93.4% to 99.2%, with the other two unchanged to the digit. What the green
+  rests on is one assertion, in `.not-sky`: that a particular block in that
+  frame's corner is a defocused branch and not sky, evidenced by a magnified
+  crop and by the selection's own colour test agreeing independently.
+  **Still open on the residual its record names**, the boundary — the grow
+  fixes the interior and the gaps and leaves the rim misplaced by a pixel or
+  two — and on 028 for the sky no path reaches.
   One caution for whoever takes this next: the spill figures — 8%, 23%, 55% —
   are not the mask swallowing canopy; opened, they are a bright cloud and the
   pale hazy sky above a treeline, which the walk's own key rejects and the mask
@@ -1718,6 +1723,42 @@ that works presses a DIFFERENT look as the second application, and every row
 goes red. Per look it also prints how many controls separate that look from B&W
 IR, which is the walk's own control: a walk that reads nothing would report
 every round trip clean.
+
+## The walk's sky truth takes declared corrections now, and it is green, 2026-09-20 (decision 023)
+
+**`.not-sky` at the repo root.** The acceptance walk derives its own sky truth
+per frame from colour, that truth is wrong in one measured way it cannot fix
+from the inside, so the correction is declared. Each row names ONE CONNECTED
+COMPONENT of keyed-but-uncovered pixels, by a point inside it, and asserts that
+component is not sky, with what is actually there.
+
+**A component and not a rectangle**, and that is the load-bearing choice. A box
+round NIR_1651's corner would also swallow the real sky above it, and removing
+real sky makes the test EASIER — the one direction a correction must never
+move. The corrected map shows the branch gone and the sky above it still
+counted.
+
+**Four guards, every one watched firing before any of this was believed:**
+
+- every row prints on every run with the pixel count it removed;
+- a row matching no component FAILS as stale, so it cannot rot quietly;
+- a row with no reason after the em dash FAILS;
+- a row removing more than 10% of that frame's keyed sky FAILS whatever it
+  says, because a correction that large is a broken key.
+
+The stale and ceiling guards were proved together by planting a bogus row and
+dropping the ceiling to 1%; the reason guard needed a second run, because the
+first test pointed at a component the real row had already consumed and so
+reported stale instead — a plant aimed at ground another row had taken.
+
+**The result.** All three frames green: NIR_0063 edge 98% / open 99.9%,
+NIR_1644 87% / 99.9%, NIR_1651 95% / 99.2%. The single row removes 18,933 px,
+4.7% of that frame's keyed sky.
+
+**Getting a row right needs a point INSIDE the block, and the centroid is not
+one** — these blocks are not convex, so a centroid can land in the sky beside
+the thing it describes. The walk prints a guaranteed-inside point for its
+largest missed block on every run, which is what a row is written from.
 
 ## Texture does not separate a blurred branch from sky, measured 2026-09-20 (decision 023)
 

@@ -67,10 +67,30 @@
 // moves no number on any frame is reading nothing, and its green means
 // nothing.
 import { chromium } from "playwright-core";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 const arg = (k, d) => (process.argv.find((a) => a.startsWith(`--${k}=`)) || `--${k}=${d}`).split("=").slice(1).join("=");
+/** The declared corrections to this walk's own sky truth. Takes nothing;
+ *  returns one entry per row: frame, point, reason, and the row as written.
+ *  What it must satisfy: every row is printed on every run and a row that
+ *  matches no component fails the walk, so the list can only shrink. See
+ *  .not-sky for why it exists and what a row means. */
+function declaredNotSky() {
+  let text = "";
+  try { text = readFileSync(new URL("../.not-sky", import.meta.url), "utf8"); } catch { return []; }
+  const out = [];
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#")) continue;
+    const [lhs, ...rest] = line.split("—");
+    const why = rest.join("—").trim();
+    const bits = lhs.trim().split(/\s+/);
+    out.push({ frame: bits[0], x: Number(bits[1]), y: Number(bits[2]), why, line });
+  }
+  return out;
+}
+const NOT_SKY = declaredNotSky();
 const PORT = arg("port", "8131"), REACH = Number(arg("reach", "1")), OUT = arg("out", join(tmpdir(), "mask-truth"));
 const PLANT_REACHABLE = process.argv.includes("--plant-reachable");
 const DIR = "/home/user/Jefferson-Photography-Studio/public/examples";
@@ -96,7 +116,7 @@ const setSlider = async (p, id, v) => { await p.evaluate(([i, x]) => { const el 
 // The measurement, in the page: two reads, the coverage solved, the key applied.
 // One read of the canvas into the page's own memory, under the name given.
 const readInto = (p, key) => p.evaluate((k) => { const cv = document.querySelector("#view"); const g = cv.getContext("webgl2") || cv.getContext("webgl"); const b = new Uint8Array(cv.width * cv.height * 4); g.readPixels(0, 0, cv.width, cv.height, g.RGBA, g.UNSIGNED_BYTE, b); window.__mt = window.__mt || {}; window.__mt[k] = b; return [cv.width, cv.height]; }, key);
-const solve = (p) => p.evaluate(([SAT_FLOOR, HUE_HALF, EDGE_FRAC, PLANT_REACHABLE]) => {
+const solve = (p, notSky) => p.evaluate(([SAT_FLOOR, HUE_HALF, EDGE_FRAC, PLANT_REACHABLE, NOT_SKY]) => {
   const A = window.__mt.A, B = window.__mt.B; const cv = document.querySelector("#view"); const W = cv.width, H = cv.height, N = W * H;
   const CY = [0.20, 0.85, 1.0], LW = [0.2126, 0.7152, 0.0722];
   // 1. coverage, solved from the two reads
@@ -119,6 +139,36 @@ const solve = (p) => p.evaluate(([SAT_FLOOR, HUE_HALF, EDGE_FRAC, PLANT_REACHABL
   const rLo = Math.max(0, rowLo - EDGE), rHi = Math.min(H - 1, rowHi + EDGE); // WebGL rows run bottom-up; both bounds are widened
   const sky = new Uint8Array(N); let skyPx = 0;
   for (let y = rLo; y <= rHi; y++) for (let x = 0; x < W; x++) { const i = y * W + x; if (cov[i] < 0) continue; const [cx, cy] = chroma(i * 4); const s = Math.hypot(cx, cy); if (s < SAT_FLOOR) continue; let dh = Math.abs(Math.atan2(cy, cx) - hue0); if (dh > Math.PI) dh = 2 * Math.PI - dh; if (dh <= HUE_HALF) { sky[i] = 1; skyPx++; } }
+  // 3a. THE DECLARED CORRECTIONS, applied before anything downstream reads
+  // `sky`. Each row names ONE CONNECTED COMPONENT of keyed-but-uncovered
+  // pixels by a point inside it and asserts that component is not sky — see
+  // .not-sky for why the key cannot work this out for itself. A component
+  // rather than a box: a box round a corner also swallows the real sky above
+  // it, and removing real sky makes this test EASIER, which is the one
+  // direction a correction must never move.
+  const notSkyApplied = [];
+  {
+    const stack = new Int32Array(N);
+    for (const e of NOT_SKY) {
+      const px = Math.min(W - 1, Math.max(0, Math.round(e.x * W)));
+      // The rows here run bottom-up (the map is flipped on the way out), so a
+      // point written in DISPLAY coordinates is read from the other end.
+      const py = Math.min(H - 1, Math.max(0, Math.round((1 - e.y) * H)));
+      const s0 = py * W + px;
+      if (!sky[s0] || cov[s0] >= 0.5) { notSkyApplied.push({ line: e.line, why: e.why, n: 0 }); continue; }
+      let sp = 0, n = 0;
+      stack[sp++] = s0; sky[s0] = 0;
+      while (sp) {
+        const i = stack[--sp]; n++;
+        const x = i % W, y = (i / W) | 0;
+        const nb = [x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1, y > 0 ? i - W : -1, y < H - 1 ? i + W : -1];
+        for (const j of nb) if (j >= 0 && sky[j] && cov[j] < 0.5) { sky[j] = 0; stack[sp++] = j; }
+      }
+      notSkyApplied.push({ line: e.line, why: e.why, n });
+    }
+    skyPx = 0; for (let i = 0; i < N; i++) if (sky[i]) skyPx++;
+  }
+
   // 3b. REACHABLE vs DISCONNECTED. Flood from every sky pixel the mask already
   // covers, through 4-neighbours, restricted to keyed sky. What the flood
   // reaches is sky a connectivity-constrained selection could have grown into;
@@ -221,7 +271,13 @@ const solve = (p) => p.evaluate(([SAT_FLOOR, HUE_HALF, EDGE_FRAC, PLANT_REACHABL
     const joint = Math.hypot(...axes.map((a) => (Number.isFinite(a.mads) ? a.mads : 0)));
     let cx = 0, cy = 0; for (const i of bigCells) { cx += i % W; cy += (i / W) | 0; }
     const n = bigCells.length;
-    return { n, cx: cx / n / W, cy: 1 - (cy / n / H), axes, joint, skyN: skyIdx.length };
+    // A POINT GUARANTEED INSIDE IT, for writing a .not-sky row from. The
+    // CENTROID is not that point: these blocks are not convex, so a centroid
+    // can land in the sky beside the thing it describes. Any cell of the
+    // component is inside it by construction.
+    const seed = bigCells[bigCells.length >> 1];
+    return { n, cx: cx / n / W, cy: 1 - (cy / n / H), axes, joint, skyN: skyIdx.length,
+             seedX: (seed % W) / W, seedY: 1 - (((seed / W) | 0) / H) };
   })();
   const inBig = new Uint8Array(N); if (bigCells) for (const i of bigCells) inBig[i] = 1;
   // the map: sky = blue by coverage (dark = uncovered), uncovered sky = red, spill onto non-sky = yellow tint, else grey
@@ -238,8 +294,8 @@ const solve = (p) => p.evaluate(([SAT_FLOOR, HUE_HALF, EDGE_FRAC, PLANT_REACHABL
   const flipped = ctx.createImageData(W, H); for (let y = 0; y < H; y++) flipped.data.set(img.data.subarray(y * W * 4, (y + 1) * W * 4), (H - 1 - y) * W * 4); ctx.putImageData(flipped, 0, 0);
   delete window.__mt;
   let coveredPx = 0; for (let i = 0; i < N; i++) if (cov[i] >= 0.5) coveredPx++;
-  return { bigStats, W, H, rows: [H - 1 - rHi, H - 1 - rLo], covered: coveredPx, skyPx, edgePx: EDGE, edgeN: eN, edgeCov: eN ? eCov / eN : NaN, openN: oN, openCov: oN ? oCov / oN : NaN, softMissed: skyPx ? soft / skyPx : NaN, hardMissed: skyPx ? hard / skyPx : NaN, reachN, reachMissed: reachN ? rHard / reachN : NaN, discN, discShare: skyPx ? discN / skyPx : NaN, discCov: discN ? discCov / discN : NaN, largest, spillN: sN, spill: sN ? sCov / sN : NaN, target: { hue: ((hue0 * 180) / Math.PI + 360) % 360, sat: tsat }, png: oc.toDataURL("image/png") };
-}, [SKY_SAT_FLOOR, HUE_HALF_RAD, EDGE_FRAC, PLANT_REACHABLE]);
+  return { notSkyApplied, bigStats, W, H, rows: [H - 1 - rHi, H - 1 - rLo], covered: coveredPx, skyPx, edgePx: EDGE, edgeN: eN, edgeCov: eN ? eCov / eN : NaN, openN: oN, openCov: oN ? oCov / oN : NaN, softMissed: skyPx ? soft / skyPx : NaN, hardMissed: skyPx ? hard / skyPx : NaN, reachN, reachMissed: reachN ? rHard / reachN : NaN, discN, discShare: skyPx ? discN / skyPx : NaN, discCov: discN ? discCov / discN : NaN, largest, spillN: sN, spill: sN ? sCov / sN : NaN, target: { hue: ((hue0 * 180) / Math.PI + 360) % 360, sat: tsat }, png: oc.toDataURL("image/png") };
+}, [SKY_SAT_FLOOR, HUE_HALF_RAD, EDGE_FRAC, PLANT_REACHABLE, notSky]);
 const b = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium", args: ["--use-gl=swiftshader", "--enable-unsafe-swiftshader"] });
 const results = {};
 try {
@@ -278,7 +334,7 @@ try {
     await readInto(p, "B");
     await p.click("#mOutline"); await settle(p); // brings the tint back
     await readInto(p, "A");
-    const m = await solve(p);
+    const m = await solve(p, NOT_SKY.filter((e) => e.frame === name));
     if (!m.covered) { check(`${name}: the Sky mask found no sky`, true, "no coverage — nothing to measure"); results[name] = { covered: 0 }; await ctx.close(); continue; }
     // The key discriminates only when the sky has colour to key on.
     check(`${name}: the sky's colour is keyable (sat > 0.08)`, m.target.sat > 0.08, `mean sat ${m.target.sat.toFixed(3)} at hue ${m.target.hue.toFixed(0)}°`);
@@ -292,6 +348,18 @@ try {
     // line, and for the same reason: it is not this mechanism's to fix. A
     // connectivity-constrained selection cannot enter sky nothing joins to it,
     // so a bound here would be a gate that can never go green.
+    // EVERY DECLARED ROW, PRINTED, WITH WHAT IT REMOVED — and the guards that
+    // stop this file being a way to buy green.
+    for (const a of m.notSkyApplied ?? []) {
+      const share = m.skyPx + a.n > 0 ? a.n / (m.skyPx + a.n) : 0;
+      if (!a.n) check(`${name}: declared not-sky row matches a component`, false,
+        `"${a.line}" matched nothing — the key no longer calls that place sky, so the row is stale and must be removed`);
+      else if (!a.why) check(`${name}: declared not-sky row says what is there`, false,
+        `"${a.line}" carries no reason after the em dash`);
+      else if (share > 0.10) check(`${name}: declared not-sky row is a correction, not a rewrite`, false,
+        `"${a.line}" removes ${(100 * share).toFixed(1)}% of this frame's keyed sky, over the 10% ceiling — a correction that large is a broken key`);
+      else console.log(`      declared not sky: ${a.n} px (${(100 * share).toFixed(1)}% of keyed sky) — ${a.why}`);
+    }
     if (m.bigStats) {
       const g = m.bigStats;
       console.log(`      largest missed block: ${g.n} px at (${g.cx.toFixed(2)}, ${g.cy.toFixed(2)}) of the frame,`
@@ -307,6 +375,8 @@ try {
           + `   block ${a.blockMed.toFixed(4)}   ${Number.isFinite(a.mads) ? `${a.mads >= 0 ? "+" : ""}${a.mads.toFixed(1)} MADs` : "no spread"}`);
       }
       console.log(`              joint distance across the four axes: ${g.joint.toFixed(1)} MADs`);
+      console.log(`              a point INSIDE it, for a .not-sky row if this block turns out not to be sky:`
+        + `   ${name}  ${g.seedX.toFixed(3)} ${g.seedY.toFixed(3)}`);
     }
     console.log(m.discN
       ? `      out of reach: ${(100 * m.discShare).toFixed(1)}% of ${m.skyPx} keyed sky px (${m.discN}) are joined to the selection by no sky-coloured path, mean coverage ${(100 * m.discCov).toFixed(1)}% — magenta on the missed map`
