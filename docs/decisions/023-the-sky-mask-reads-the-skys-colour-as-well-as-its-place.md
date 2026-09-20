@@ -100,6 +100,11 @@ is the boundary.
   edges; this fixes the interior and the gaps it cannot reach. Same shader
   stage, same selection, and this follows it directly.
 - distinct-from 006 — mask by subject is a different seed, not this.
+- needs 029 — this item's remaining defect and 029 have ONE root. The band of
+  sky this misses on NIR_1651 is missed because skyGrowKey fits its target to a
+  seed that is 100% cloud deck on that frame — zero of 211,602 seeded pixels sit
+  below the cloud's edge. Fix the seed and this moves with it, so tuning here
+  first is tuning against ground about to shift.
 - touches 028 — 028 is the sky this mechanism cannot enter, and it is sized by
   what this one leaves behind: change the grow's tolerance or brake and the
   disconnected share moves with it.

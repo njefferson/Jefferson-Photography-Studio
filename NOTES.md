@@ -539,6 +539,24 @@ user-scalable=no.
 > different approach and mindset"). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
+- [ ] **The Sky mask claims things that are not sky** <!-- decision: 029 -->
+  measured 2026-09-20 on practice photographs that were never in the acceptance
+  corpus, and it is the defect a reader actually meets. **A macro of a flower
+  spike, with no sky in it at all, has 76.4% of the frame selected as sky** —
+  the whole defocused garden behind the flower — and the coarse first pass
+  claims 58% of it before the colour grow even runs. A playhouse under trees is
+  47.4%: the selection covers the building's walls and roof, the tyre swing and
+  the grass. A road under a canopy is 19.5%. Any sky adjustment on such a
+  photograph lands on a building and a lawn.
+  **It was invisible because every frame the test used has a big obvious sky in
+  it**, so covering more always read as better. The same three frames steered
+  all of the previous item's tuning, including a colour-tolerance widening that
+  looks free on them and takes the flower macro to 87%. That lever is now
+  measured and spent: there is no setting of the current constants that fixes
+  one end without wrecking the other.
+  The root is the FIRST PASS rather than the grow: it answers "where is the
+  sky" on every photograph and has no way to answer "there isn't one". See
+  `docs/decisions/029-the-sky-mask-claims-things-that-are-not-sky.md`.
 - [ ] **The Sky mask reads the sky's colour as well as its place** <!-- decision: 023 -->
   reported 2026-09-18 from the iPad with three screenshots of one frame: the
   Sky mask leaves a rim of unselected sky round every object and misses the
@@ -1765,6 +1783,48 @@ good as the look that justifies a row, and a row justified by a mis-aimed crop
 passes all four guards while being wrong. The guards can check that a row is
 live, reasoned and bounded. They cannot check that somebody looked at the right
 place. That part is still a checklist, and it failed here.
+
+## The corpus was three sky photographs, and it was hiding the real defect, 2026-09-20 (decision 029)
+
+**A macro of a flower spike, with no sky in it at all, has 76.4% of the frame
+selected as sky.** The coarse first pass claims 58% of it before the colour grow
+runs. A playhouse under trees is 47.4% — the selection covers the building's
+walls and roof, the tyre swing and the grass in front. A road under a canopy is
+19.5%. All three opened, not read off a figure.
+
+**None of it was visible from the acceptance corpus**, which was NIR_0063,
+NIR_1644 and NIR_1651 — every one a photograph with a large obvious sky, where
+covering more always reads as better. A corpus of one KIND of photograph
+measures one kind of failure.
+
+**And it refuted the fix that three independent diagnoses had just converged
+on.** Widening the colour tolerance 1.25x takes NIR_1651's missed corner band
+from 30% to 88% recovered for 1.8 points of whole-frame coverage, and moves the
+other two corpus frames by 0.1 and 0.2 points — which is why it looked free.
+The same change takes the flower macro from 76% to 87%. The tolerance lever is
+spent: there is no setting of the current constants that satisfies both ends.
+
+**What the walk gained:** NIR_0627 joins the corpus with a check of its own
+shape. Coverage of sky is meaningless where there is none, so the question is
+whether the mask claimed the photograph — at most 2%, which is an allowance for
+a stray pixel rather than for a region. It reads 76.4% and is honestly red.
+
+**AND THE WALK'S TRUTH IS CIRCULAR ON AN OVER-SELECTED FRAME, which is why
+NIR_0172 is not in the default list.** The walk derives its sky truth from the
+pixels the mask covers at 0.9 or better. Where the mask is substantially wrong
+that truth comes from wrong pixels: on NIR_0172 it reports the sky's colour as
+hue 0 degrees at saturation 0.597 and calls 42% of the frame reachable sky — it
+is keying the wooden playhouse, exactly as the mask does. Both are colour keys
+seeded from the same coverage, so they agree with each other and disagree with
+the photograph. Those numbers measure the mask against itself, and a red that
+measures the wrong thing teaches everyone to read red as noise. The frame comes
+back when the truth no longer derives from the mask.
+
+**Where this leaves the queue:** the root is the first pass rather than the
+grow, and it is decision 029 at rank 1, with 023 below it — 023's own remaining
+defect is a band of sky missed on NIR_1651 because `skyGrowKey` fits its target
+to a seed that is 100% cloud deck on that frame, zero of 211,602 seeded pixels
+sitting below the cloud's edge. One root, two symptoms.
 
 ## Texture does not separate a blurred branch from sky, measured 2026-09-20 (decision 023)
 
