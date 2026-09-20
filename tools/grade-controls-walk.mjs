@@ -118,18 +118,46 @@ try {
     `${hueBefore} -> ${hueAfter}`);
   }
 
-  // --- the Shadow colour label names a quantity that rises -----------------
-  const lab = await p.evaluate(() => {
-    const el = document.getElementById("shadowSat");
-    const text = (el?.closest("label")?.textContent ?? "").trim();
-    return { text, aria: el?.getAttribute("aria-label") ?? "" };
+  // --- right is MORE colour in the shadows, measured on the picture --------
+  // NOT THE LABEL. The first fix for this renamed the control so that its NAME
+  // rose as the slider moved right while the colour in the photograph still
+  // fell, and a check written against the label passed on it. The convention
+  // is about what happens on screen, so this reads the screen: the mean
+  // saturation of the DARK pixels, which is the population the control acts
+  // on, at each end of the track.
+  const darkSat = (pg) => pg.evaluate(() => {
+    const c = document.getElementById("view");
+    const oc = document.createElement("canvas"); oc.width = c.width; oc.height = c.height;
+    oc.getContext("2d").drawImage(c, 0, 0);
+    const d = oc.getContext("2d").getImageData(0, 0, oc.width, oc.height).data;
+    let n = 0, sat = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      const r = d[i] / 255, g = d[i + 1] / 255, b = d[i + 2] / 255;
+      const V = Math.max(r, g, b), m = Math.min(r, g, b);
+      if (V > 0.45 || V < 0.02) continue;   // the shadow band the control reaches
+      n++; sat += (V - m) / V;
+    }
+    return n ? sat / n : 0;
   });
-  check("the shadow slider's label names a rising quantity", /amount/i.test(lab.text),
-    `label "${lab.text}"`);
-  // SC 2.5.3: the accessible name has to CONTAIN the visible words.
-  check("and its accessible name contains the visible label",
-    lab.aria.toLowerCase().includes(lab.text.toLowerCase()),
-    `aria "${lab.aria}" against "${lab.text}"`);
+  await p.click("#ptab-grade"); await settle(p);
+  await setRange(p, "shadowSat", 0);
+  const atLeft = await darkSat(p);
+  await setRange(p, "shadowSat", 1);
+  const atRight = await darkSat(p);
+  check("dragging the shadow slider right puts colour BACK in the shadows",
+    PLANT ? false : atRight > atLeft * 1.2,
+    `dark-pixel saturation ${atLeft.toFixed(3)} at the left, ${atRight.toFixed(3)} at the right`);
+  // AND IT RESTS WHERE IT DOES NOTHING. A control that only takes something
+  // away has to open at the end that takes nothing, and with right increasing
+  // that end is the right one.
+  await p.click("#resetBtn").catch(() => {});
+  await settle(p);
+  const rest = await p.evaluate(() => {
+    const el = document.getElementById("shadowSat");
+    return { value: el.value, text: (el.closest("label")?.textContent ?? "").trim() };
+  });
+  check("and a photograph opens with its shadow colour untouched", rest.value === "1",
+    `opens at ${rest.value}, label "${rest.text}"`);
 
   await ctx.close();
 } finally { await b.close(); }

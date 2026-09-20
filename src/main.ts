@@ -1161,7 +1161,11 @@ function syncFromUI() {
   params.dehaze = Number(ui.dehaze.value);
   params.sharpen = Number(ui.sharpen.value);
   params.texture = Number(ui.texture.value);
-  params.shadowSat = Number(ui.shadowSat.value);
+  // THE CONTROL IS THE SHADOWS' COLOUR; THE FIELD IS HOW MUCH WAS TAKEN OUT.
+  // Right is more colour, which is the app's convention for every slider, and
+  // the stored number keeps the meaning every saved look already relies on —
+  // so the inversion lives here and in syncToUI, and nowhere else.
+  params.shadowSat = 1 - Number(ui.shadowSat.value);
   params.skySmooth = Number(ui.skySmooth.value);
   params.skyDepth = Number(ui.skyDepth.value);
   params.skySat = Number(ui.skySatSel.value);
@@ -1221,7 +1225,7 @@ function syncToUI() {
   ui.dehaze.value = String(params.dehaze);
   ui.sharpen.value = String(params.sharpen);
   ui.texture.value = String(params.texture);
-  ui.shadowSat.value = String(params.shadowSat ?? 0);
+  ui.shadowSat.value = String(1 - (params.shadowSat ?? 0)); // see syncFromUI: the control is colour KEPT
   ui.skySmooth.value = String(params.skySmooth ?? 0);
   ui.skyDepth.value = String(params.skyDepth ?? 0);
   ui.skySatSel.value = String(params.skySat ?? 0);

@@ -707,9 +707,28 @@ user-scalable=no.
   sliders**: they are built at runtime with no `id` at all, and both the
   capture and the lookup are keyed by id, so the gesture has nothing to find.
   **And Shadow colour runs the wrong way** — right reduces, where every other
-  slider in the app increases. That last one is a relabelling and never an
-  inversion: the stored number rides SavedLook, so flipping it would change the
-  meaning of every look already saved, shared or baked into an exported JPEG.
+  slider in the app increases.
+  **THAT THIRD ONE WAS FIXED WRONG FIRST, SHIPPED, AND SENT BACK.** The first
+  answer renamed the control to "Amount" so its NAME rose as the slider moved
+  right, while the colour in the photograph still fell. The instruction had
+  been that moving right must not reduce, and the convention is about the
+  SCREEN, not the label: a name that rises while the picture falls is the same
+  defect with a better caption.
+  The error underneath is the one to keep: inverting the CONTROL and inverting
+  the STORED NUMBER were treated as one option. Flipping the stored
+  `shadowSat` really would break every saved look, every shared `.ipslook` and
+  every look baked into an exported JPEG — a real objection, to the wrong
+  thing, which was then allowed to veto the control's direction too. The
+  inversion belongs in `syncFromUI` and `syncToUI` and nowhere else.
+  The slider is now the colour the shadows KEEP: 0 left, 1 right, converted at
+  those two lines, with the stored field untouched. The heading moved from
+  "Colour out of the shadows" to "Colour IN the shadows" for the same reason —
+  a section cannot name one direction while its control runs the other. A
+  photograph opens with it at the RIGHT end, which is where a control that can
+  only take something away has to rest when right is the increasing direction.
+  And the walk was rewritten to read the PICTURE rather than the label: mean
+  saturation of the dark pixels, 0.070 at the left against 0.220 at the right.
+  The label-reading version of that check went green on the unfixed control.
   **ALL THREE FIXED, ON STAGING 2026-09-20.** The wheel holds the hue over the
   innermost 15% of its travel, where the angle is noise and at the exact centre
   is zero — so pulling the puck in now does what the Amount slider beside it

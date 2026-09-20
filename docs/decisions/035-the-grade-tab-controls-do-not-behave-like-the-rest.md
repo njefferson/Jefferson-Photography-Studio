@@ -32,6 +32,23 @@ their own `toneDefaults` array; the grade sliders were never noticed.
 other slider in the app increases to the right, which is the whole of the
 report: a reader should not have to learn one control's direction separately.
 
+**AND THIS RECORD GOT THAT THIRD ONE WRONG, SHIPPED IT WRONG, AND WAS TOLD SO.**
+The first answer was to RENAME the control to "Amount" so that the name rose as
+the slider moved right — while the colour in the photograph still fell. The
+instruction had been that moving right must not reduce. A label is not the
+convention; the convention is about what happens on the screen, and a rename
+satisfies a sentence about names while leaving the reported defect exactly
+where it was.
+
+The mistake underneath it is worth more than the defect: **inverting the
+CONTROL and inverting the STORED NUMBER were treated as one option.** They are
+not. The stored `shadowSat` means "how much colour was removed" and rides
+SavedLook, so flipping THAT really would change the meaning of every look
+already saved, shared or baked into an exported JPEG — a real objection, to the
+wrong thing. It was allowed to veto the control's direction as well, and the
+rename was what was left. The inversion belongs in `syncFromUI` and `syncToUI`
+and nowhere else, where it costs nothing and breaks nothing.
+
 ## Looked up
 
 **Nothing external decides the first two** — they are this app's own
@@ -82,16 +99,34 @@ The grade sliders get ids, which puts them in `sliderDefaults` with no other
 change: the double-tap gesture then reaches them through the code that already
 exists. The ids also give them somewhere to hang a test.
 
-And the Shadow colour slider gets a label that matches its travel — the
-quantity rising to the right — rather than having its stored value flipped.
+And the Shadow colour slider is TURNED ROUND: the control is the colour the
+shadows KEEP, zero at the left and one at the right, converted to and from
+`params.shadowSat` in the two sync functions. The stored field keeps its
+meaning, so no saved look moves. The heading above it changes from "Colour out
+of the shadows" to "Colour IN the shadows" for the same reason the control
+turns — the whole section has to name the quantity that rises to the right, or
+the reader is asked to hold two directions in mind at once.
+
+A photograph therefore opens with this slider at its RIGHT end. That is not a
+wart: a control that can only take something away, on an app where right
+increases, has to rest at the end that takes nothing.
 
 ## Rejected
 
-**Inverting `shadowSat`'s stored value so right means more.** It would flip the
+**Inverting `shadowSat`'s STORED value so right means more.** It would flip the
 meaning of a number that rides `SavedLook`, so every look already saved, every
 `.ipslook` file already shared and every look inside an exported JPEG's APP11
 segment would come back meaning the opposite. A stored value is a contract with
-files that already exist.
+files that already exist. **Still rejected — and it is not the same thing as
+turning the control round**, which is what was actually asked for and is now
+what ships. Keeping these two apart is the whole lesson of this record.
+
+**Renaming the control instead of turning it.** Tried, shipped, and sent back.
+The convention is about the photograph, not the label: a name that rises while
+the picture falls is the defect with a better caption on it. Written down
+because it is a cheap-looking answer that passes a check written against a
+label — the walk for this originally read the word "Amount" and went green on
+the unfixed control.
 
 **Capturing the grade sliders' defaults by walking the DOM again after they are
 built.** It fixes today's symptom by adding a second moment that has to be
