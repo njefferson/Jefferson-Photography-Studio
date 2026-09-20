@@ -10,7 +10,12 @@ the acceptance corpus:
   the grow runs.
 - **NIR_0172 — 47.4%.** A wooden playhouse under trees. The selection covers the
   playhouse's walls, roof and railings, the tyre swing, and the grass in front
-  of it. The only real sky is a band at top right.
+  of it. **The line that used to stand here said "the only real sky is a band at
+  top right" and it is wrong** — opened, that band is dark branches and pale
+  leaves against a background blown to near-white. Sky-coloured pixels are 2.1%
+  of the frame and their largest connected run is 1,261 px in the BOTTOM-RIGHT
+  corner. This frame's sky is present and achromatic, so it is unkeyable by hue,
+  and it belongs nearer NIR_0627's no-sky class than to the corpus.
 - **canopy — 19.5%.** A road under a canopy.
 
 Against the three frames the acceptance walk has been using — NIR_0063 18.3%,
@@ -163,11 +168,92 @@ read off a coverage figure.
   anywhere in the photograph. This single picture is the item.
 - **NIR_0172** — the playhouse. The selection covers the wooden structure's
   walls, roof and railings, the tyre swing hanging from a branch, and the grass
-  in front. The band of real sky at top right is also taken, correctly, and is a
-  small part of what is selected.
+  in front. The band at top right that an earlier reading of this picture called
+  sky is branches and pale leaves; see the correction in Context.
 - **NIR_1651** — the frame 023 was tuned on. A conifer under a cloud deck; the
   selection is roughly right and misses a band of clear sky at one corner.
   Opened many times, untinted and magnified, to establish that the band is sky.
 - **NIR_0063** and **NIR_1644** — the other two corpus frames, whose missed-maps
   were opened when the acceptance split was built. Both sky-dominated, both
   roughly correct, and between them the reason none of this was visible.
+  NIR_1644's missed map was opened again after the horizon landed, before and
+  after side by side: the extra spill it reports is the feather sitting in the
+  notches between crowns the mask now reaches into, not a tree taken whole.
+
+Opened again on 2026-09-20, before and after the horizon, as overlays at the
+mask's own scale:
+
+- **NIR_1877** — sky on the right of a pale conifer stand. Before, thin slivers
+  of it; after, the whole of it with the treeline hugged.
+- **canopy** — the road under a canopy. Before, a strip down the left only;
+  after, the sky on both sides of the canopy.
+- **NIR_1830** — a tree trunk against a lake. Before, a wide selection that
+  included the LAKE; after, the lake is out and what remains is a band down the
+  trunk.
+- **NIR_1688** — a forest across a river. Before, a band across the top that took
+  the forest and the far shore; after, a thin strip of the pale gap at the top.
+- **NIR_1638** — a river between conifers. The sky is a strip at the top centre.
+  After, vertical cyan bands stand down the two foreground trunks: the artefact
+  named in the Outcome, seen rather than inferred.
+- **NIR_1873** — a lakeside forest with no sky in it. Before, nothing selected;
+  after, a band down the trunk at the left and a strip at the top right. Nothing
+  in what is selected is sky.
+
+## Outcome
+
+**Option 1 landed on 2026-09-20 and this record stays OPEN.** The seed now asks
+where the sky ENDS before anything asks what colour it is —
+`src/skyhorizon.ts`, the published border-position method (Shen & Wang 2013;
+IR-SCIENCE.md §9o carries the physics, the four adaptations and every number
+below). The region above that border seeds the existing colour fill; the paper's
+two post-processing tests give the refusal this record asked for.
+
+**What it fixed, coarse-mask coverage over all 44 practice frames, every
+overlay opened.**
+
+- **NIR_0172, the playhouse — 22.2% to 12.1%,** and the picture is the evidence
+  rather than the number: the walls, the roof, the tyre swing and the lawn are
+  out of the selection. That frame's real remainder is the sky above the canopy.
+- **NIR_1830 — 30.5% to 10.0%.** The lake is out.
+- **NIR_1688 — 13.9% to 4.1%.** The forest and the far shore are out.
+- And in the other direction, because the same change is what makes the border
+  reach: **NIR_1651 30.3% to 52.2%** (023's corner band and the whole left half
+  of that sky), **NIR_1877 4.9% to 22.9%**, **canopy 5.5% to 19.2%**, **NIR_1873
+  nothing at all to 7.4%**. Every frame still reports a sky; none is refused.
+- On the acceptance instrument, `canopy`'s reachable open sky went 68.1% to
+  99.5%, its uncovered reachable sky 30.8% to 7.1%, and its spill 12% to 3%.
+
+**What it did NOT fix, which is why this stays open.** NIR_0627, the macro of a
+flower spike, is unchanged: 76.4% to 75.9% of the frame on the acceptance
+instrument. Its defocused garden background is smooth, occupies the top half,
+and has no edge in it — so the border runs to the bottom of the frame honestly,
+the energy optimum is interior, and both of the paper's no-sky tests decline to
+fire. Under the ranking stated 2026-09-20 this is the lower half of the
+requirement — a photograph with no sky selecting one is not a failure, because
+the reader turns the mask off — but it is the picture this record was written
+about and the record does not close until it is answered.
+
+**And one new artefact, named rather than hidden.** A tree TRUNK is smooth down
+its length: the gradient across its edges is high and along its interior is not,
+so a column running down the middle of one carries the border deep with no step
+from its neighbours to announce it, and the paper's §2.3.2 column refinement
+never triggers. NIR_1638, NIR_1830 and NIR_1873 each keep a vertical band of
+selection down a trunk; NIR_1638 reads 11.1% of the frame against 7.8% before
+this work, and NIR_1873 — a lakeside forest with no sky in it, which used to
+report none — now reads 7.4%, ALL of it the band down one trunk and a strip at
+the top right. That one is a straight regression by the second half of the
+ranking and it is the trunk artefact rather than a separate defect.
+Running the refinement on every photograph instead of on a stepped border was
+measured and is worse — it costs NIR_1651 half its sky, 52.2% to 34.6% — and it
+does not clear NIR_1638's trunks anyway, so the trigger is not the remedy.
+
+**THE ACCEPTANCE INSTRUMENT CANNOT MEASURE NIR_0172 AND THAT IS NOW KNOWN.**
+`tools/mask-truth-walk.mjs` learns the sky's colour from the pixels the mask
+covers. On a frame where the mask covers a playhouse it learns the playhouse:
+the walk reports its target at hue 0° before this change and hue 359° after,
+both within a degree of the building's own warm red and 160-odd degrees from
+every verified sky in the set. It then calls the building sky and reports the
+mask for not covering enough of it — which is why that frame's numbers move the
+wrong way (open sky 79.6% to 57.1%) while the picture plainly improves. The
+frame is not an acceptance frame and must not become one without a truth the
+walk does not derive from the mask.

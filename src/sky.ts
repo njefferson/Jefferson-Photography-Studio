@@ -13,16 +13,38 @@
 //     brightest thing; lodge's sky is the DARKEST region in the frame. So the
 //     old "sky is bright" assumption is dropped entirely.
 //   - Smoothness IS the strong signal: sky gradient magnitude ~0.004–0.03 vs
-//     0.1–0.4 for foliage. Seeds are the smooth pixels along the display-top.
+//     0.1–0.4 for foliage.
 //   - Colour coherence: whatever the sky's colour, it is one tight cluster. The
-//     model is LEARNED from the seeds (robust median + MAD), never assumed, so
-//     it works whether the sky is bright-cyan, dark-olive or near-black.
+//     model is LEARNED, never assumed, so it works whether the sky is
+//     bright-cyan, dark-olive or near-black.
+//
+// TWO STAGES, and the order is the whole design (2026-09-20).
+//   1. WHERE THE SKY ENDS — `skyhorizon.ts`, the published border-position
+//      method (Shen and Wang 2013; IR-SCIENCE.md §9o). One border depth per
+//      display column, chosen by an energy function that rewards a homogeneous
+//      sky against a varied ground, plus that paper's two post-processing
+//      tests: this photograph has no sky at all, and these columns hold no sky.
+//      It never asks what colour a sky is, which is why it can answer both.
+//   2. WHICH PIXELS ARE IT — this file. The region above the border is the
+//      seed; the robust colour model is fitted to it and the edge-aware fill
+//      carries the selection down to the treeline and in through the branches,
+//      which a per-column border cannot do because it stops at the first twig.
+//
+// The stages were the other way round until 2026-09-20 and stage 1 did not
+// exist: a strip 6% deep at the top of the frame was the seed. Three measured
+// defects came out of that one choice, and each is a thing a colour model is
+// structurally unable to do rather than a constant tuned wrong — a macro of a
+// flower spike with no sky in it took 76.4% of the frame, a frame whose top
+// strip is cloud deck learned cloud and refused a band of clear sky lower in
+// the same picture, and a playhouse wall that matched the model was taken
+// because nothing in a colour test knows where the ground is.
 //
 // Everything works in the IMAGE-oriented grid (so the output bitmap samples
 // directly in image-uv like a brush mask); only the choice of which edge is
 // "up" depends on the display rotation.
 
 import { chromaVec, type BrushMask } from "./pipeline";
+import { skyAxes, skyHorizon, type SkyHorizon } from "./skyhorizon";
 
 const REC = [0.2126, 0.7152, 0.0722];
 
@@ -37,6 +59,79 @@ export const SKY_MIN_COVERAGE = 0.005;
  *  Calibrated over the 44 practice frames — see NOTES. */
 const SKY_LUMA_STRETCH = 6;
 
+/** Most pixels the robust model fit sorts. The seed set is now the whole region
+ *  above the horizon rather than a strip at the top of the frame, so it can be
+ *  a third of the picture; a median of a third of the picture, three channels,
+ *  twice over, is a sort nobody needs. A sky's median and MAD are stable long
+ *  before this many samples. */
+const SKY_FIT_SAMPLE = 20000;
+
+/** The fallback seed band, as a fraction of the frame's depth, and the
+ *  gradient a pixel in it must stay under to be a seed, and the share of the
+ *  band that must qualify before the frame is taken to have a sky at all.
+ *  These three were this file's ONLY seeding until 2026-09-20 and are now what
+ *  it falls back to when the energy function never turns over — unchanged, so
+ *  a frame that lands on this path gets exactly the selection it always got. */
+/** Border texels skipped before the first edge is looked for, so a dark
+ *  demosaic rim cannot put the horizon at depth zero. */
+const SKY_MARGIN = 3;
+const SKY_TOP_BAND = 0.06;
+const SKY_TOP_BAND_SMOOTH = 0.045;
+const SKY_TOP_BAND_SHARE = 0.12;
+
+
+/** The two stages of the selection that depend on the PHOTOGRAPH ALONE — the
+ *  small grid and the horizon drawn on it. Neither reads Reach or Feather, so a
+ *  caller holding one of these can redraw the mask at a new Reach without
+ *  paying for the border search again. */
+export interface SkyPrep {
+  fields: SkyFields;
+  horizon: SkyHorizon;
+}
+
+/**
+ * Do the photograph-only half of the selection once.
+ * @param sample  linear camera-native RGB at full-res image pixel (x, y).
+ * @param srcW,srcH  full image dimensions.
+ * @param rotate  display rotation in 90° CW steps — which edge the sky is at.
+ * @param cam  camera-native -> linear sRGB 3x3 row-major, or null.
+ * @param wb  gray-world gains — AUTO, never the live edit.
+ * @param maxEdge  working resolution cap on the longer edge.
+ * @returns the grid and the horizon, for `buildSkyMask`'s last argument.
+ * What the result must satisfy: it is a function of the photograph, the
+ * rotation and `maxEdge` and of NOTHING ELSE — a caller caching one against an
+ * image must invalidate it when the rotation changes, because the border is
+ * measured down from the display's top edge.
+ */
+export function skyPrepare(
+  sample: (x: number, y: number) => [number, number, number],
+  srcW: number,
+  srcH: number,
+  rotate: number,
+  cam: number[] | null,
+  wb: [number, number, number],
+  maxEdge: number,
+): SkyPrep {
+  const fields = skyFields(sample, srcW, srcH, cam, wb, maxEdge);
+  const N = fields.w * fields.h;
+  // The channels are scaled to 0..255 and the luminance is GAMMA-ENCODED AND
+  // CLAMPED first. Both halves are load-bearing. Jn mixes a covariance
+  // DETERMINANT (units of value³) with an EIGENVALUE (units of value¹), so it
+  // is not scale-free and its γ was chosen on 8-bit data; and the 8-bit data it
+  // was chosen on is BOUNDED, where `ln` is scene-linear normalised to the
+  // frame's own 95th percentile and runs freely past 1 on anything specular.
+  // Gamma is also what `buildSkyGuide` encodes its own luma with one module
+  // over, so the two instruments mean the same thing by the word.
+  const S0 = new Float32Array(N), S1 = new Float32Array(N), S2 = new Float32Array(N);
+  for (let p = 0; p < N; p++) {
+    S0[p] = Math.pow(Math.min(1, Math.max(0, fields.ln[p])), 1 / 2.2) * 255;
+    S1[p] = fields.cx[p] * 255;
+    S2[p] = fields.cy[p] * 255;
+  }
+  const horizon = skyHorizon(S0, S1, S2, fields.g, fields.w, fields.h, rotate, SKY_MARGIN);
+  return { fields, horizon };
+}
+
 export interface SkyResult {
   mask: BrushMask;
   /** false when too little smooth sky touches the top edge — the caller keeps
@@ -44,6 +139,9 @@ export interface SkyResult {
   found: boolean;
   /** fraction of the frame selected (0..1), for the status line. */
   coverage: number;
+  /** the border the selection was seeded from, for the walks and the probe —
+   *  null when the photograph was refused before one was measured. */
+  horizon: SkyHorizon | null;
 }
 
 /**
@@ -60,17 +158,43 @@ export interface SkyResult {
  * @param reach  growth aggressiveness (1 = calibrated default).
  * @param feather  0..1 soft-edge width (blurs the final bitmap).
  */
-export function buildSkyMask(
+/** The photograph as the sky stages read it: one small grid, three channels
+ *  and their gradient, built once and shared by the border search and the
+ *  colour fill so the two cannot disagree about what the picture is. */
+export interface SkyFields {
+  w: number;
+  h: number;
+  /** Luma normalised to the frame's own 95th percentile — unbounded above. */
+  ln: Float32Array;
+  /** Chroma, `chromaVec`: cx is red against the mean of green and blue. */
+  cx: Float32Array;
+  cy: Float32Array;
+  /** Gradient magnitude of `ln`, central differences. */
+  g: Float32Array;
+}
+
+/**
+ * Reduce a photograph to the small grid every sky stage works in.
+ * @param sample  linear camera-native RGB at full-res image pixel (x, y).
+ * @param srcW,srcH  full image dimensions.
+ * @param cam  camera-native -> linear sRGB 3x3 row-major, or null.
+ * @param wb  gray-world gains — AUTO, never the live edit.
+ * @param maxEdge  working resolution cap on the longer edge.
+ * @returns the grid and its four channels (see `SkyFields`).
+ * What the result must satisfy: it depends on the photograph and on nothing
+ * the reader has done to it. Every sky stage downstream inherits that, which
+ * is the property the whole selection rests on — a mask that moved as the
+ * photograph was graded would change what a look is looking at while the look
+ * ran.
+ */
+export function skyFields(
   sample: (x: number, y: number) => [number, number, number],
   srcW: number,
   srcH: number,
-  rotate: number,
   cam: number[] | null,
   wb: [number, number, number],
   maxEdge: number,
-  reach: number,
-  feather: number,
-): SkyResult {
+): SkyFields {
   const s = Math.min(1, maxEdge / Math.max(srcW, srcH));
   const W = Math.max(1, Math.round(srcW * s));
   const H = Math.max(1, Math.round(srcH * s));
@@ -126,6 +250,24 @@ export function buildSkyMask(
       G[p] = Math.hypot(gx, gy);
     }
   }
+  return { w: W, h: H, ln: Ln, cx: CX, cy: CY, g: G };
+}
+
+export function buildSkyMask(
+  sample: (x: number, y: number) => [number, number, number],
+  srcW: number,
+  srcH: number,
+  rotate: number,
+  cam: number[] | null,
+  wb: [number, number, number],
+  maxEdge: number,
+  reach: number,
+  feather: number,
+  prep?: SkyPrep,
+): SkyResult {
+  const { fields, horizon } = prep ?? skyPrepare(sample, srcW, srcH, rotate, cam, wb, maxEdge);
+  const { w: W, h: H, ln: Ln, cx: CX, cy: CY, g: G } = fields;
+  const N = W * H;
 
   // "depth" = distance in texels from the display-top edge (the sky edge). Only
   // this depends on rotation; adjacency and gradient are orientation-free.
@@ -137,38 +279,113 @@ export function buildSkyMask(
       default: return y;             // display-top ↔ image top
     }
   };
-  const perp = rotate % 2 === 0 ? H : W; // dimension along depth
-  const margin = 3;                       // skip the dark demosaic border
-  const seedDepth = Math.max(3, Math.round(perp * 0.06));
+  const margin = SKY_MARGIN;
+  const median = (a: number[]) => { const t = [...a].sort((x, y) => x - y); return t[Math.floor(t.length / 2)]; };
+  const empty = (hz: SkyHorizon | null = null): SkyResult =>
+    ({ mask: { w: W, h: H, data: new Uint8Array(N) }, found: false, coverage: 0, horizon: hz });
 
-  // --- seeds: smooth pixels in the top band ---
-  let seeds: number[] = [];
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      if (x < margin || x >= W - margin || y < margin || y >= H - margin) continue;
-      const d = depthOf(x, y);
-      if (d >= margin && d < seedDepth && G[y * W + x] < 0.045) seeds.push(y * W + x);
+  // --- where the sky ENDS: the published border-position method (skyhorizon.ts;
+  // Shen and Wang 2013; IR-SCIENCE.md §9o). It replaced the top-band seeding
+  // this file used to do, and it is the whole of the fix for three measured
+  // defects: a frame with no sky could not say so, a frame whose top band is
+  // cloud learned cloud and refused clear sky lower down, and a building that
+  // matched the learned colour was taken because a colour test cannot know
+  // where the ground is. Computed by `skyPrepare`, which the caller may cache
+  // per photograph — the border does not read Reach or Feather. ---
+  if (horizon.noSky) return empty(horizon);
+
+  // --- seeds: everything above the horizon. The model is therefore fitted to
+  // the WHOLE sky rather than to a strip 6% deep at the top of it, which is the
+  // other half of the cloud-deck failure: a seed drawn only from the top of
+  // NIR_1651 is 100% cloud, so the band of clear sky below the cloud edge in
+  // the same photograph never matched it.
+  //
+  // UNLESS THE ENERGY FUNCTION NEVER TURNED OVER, in which case the border is
+  // the sweep running out rather than a horizon (`horizon.boundary`) and the
+  // seed comes from the top band instead — which is what this file did before
+  // the horizon existed, and it is the RIGHT instrument on exactly this frame
+  // because it asks a different question: not "where does the picture stop
+  // being smooth" but "is the strip along the display's top edge smooth".
+  // hillside is the case, and it is one frame in the 44. It is a hillside of
+  // conifers with a sliver of sky along the top: 90% of the picture is one
+  // texture, so the separation the energy function is built to find is not
+  // there to find, its argmax sits at the last sample of the sweep, and
+  // "everything is sky" is what that argmax means. The top-band seed selects
+  // the sliver correctly and always did (10.0% of the frame, measured before
+  // and after).
+  // This is a FALLBACK and not a refusal on purpose. The ranking stated
+  // 2026-09-20 is that a photograph with sky in it must have all of it
+  // selected; refusing hillside for the honest reason that the published
+  // method does not apply to it would have cost a selection the app was
+  // already making correctly. ---
+  const seeds: number[] = [];
+  if (horizon.boundary) {
+    const perp = rotate % 2 === 0 ? H : W;
+    const seedDepth = Math.max(3, Math.round(perp * SKY_TOP_BAND));
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        if (x < margin || x >= W - margin || y < margin || y >= H - margin) continue;
+        const d = depthOf(x, y);
+        if (d >= margin && d < seedDepth && G[y * W + x] < SKY_TOP_BAND_SMOOTH) seeds.push(y * W + x);
+      }
+    }
+    const seedBandArea = seedDepth * (rotate % 2 === 0 ? W : H);
+    if (seeds.length < seedBandArea * SKY_TOP_BAND_SHARE) return empty(horizon);
+  } else {
+    const { cols, rows, at } = skyAxes(W, H, rotate);
+    for (let a = 0; a < cols; a++) {
+      const top = Math.min(rows, horizon.b[a]);
+      for (let d = margin; d < top; d++) {
+        const p = at(a, d);
+        const y = (p / W) | 0, x = p - y * W;
+        if (x < margin || x >= W - margin || y < margin || y >= H - margin) continue;
+        seeds.push(p);
+      }
     }
   }
-  const seedBandArea = seedDepth * (rotate % 2 === 0 ? W : H);
-  const median = (a: number[]) => { const t = [...a].sort((x, y) => x - y); return t[Math.floor(t.length / 2)]; };
-  const empty = (): SkyResult => ({ mask: { w: W, h: H, data: new Uint8Array(N) }, found: false, coverage: 0 });
-  if (seeds.length < seedBandArea * 0.12) return empty();
+  if (seeds.length < N * SKY_MIN_COVERAGE) return empty(horizon);
 
   // --- learn the sky model robustly: median + MAD, reject outliers, refit once
-  // (hillside's top edge mixes sky with dark twigs; the dominant cluster wins) ---
+  // (a treeline's own edge mixes sky with dark twigs; the dominant cluster
+  // wins). The rejection shapes the MODEL only — every pixel above the horizon
+  // is selected regardless, because the horizon is what decided it is sky and a
+  // colour fitted to it has no standing to overrule it. The model's job starts
+  // BELOW the horizon: it is what carries the selection down to the treeline
+  // and in through the branches. Fitted on a subsample, since the seed set is
+  // now a whole sky rather than a strip and each median sorts a copy. ---
+  //
+  // AND IT IS FITTED TO THE LARGEST CONNECTED PIECE of the seed, not to all of
+  // it. The region above the border is not always one thing: on a frame whose
+  // top corners are dark branches, each corner is its own island above its own
+  // shallow border, and a median-and-MAD taken over the union describes
+  // neither the sky nor the branches. Measured on NIR_1638, a river between
+  // pale conifers with a strip of sky at the top: the union's chroma MAD came
+  // out at 0.470, which pins the fill's tolerance at its own 0.15 ceiling —
+  // while the distance from that frame's sky to its ground is 0.106. A
+  // tolerance wider than the distance to the thing it is meant to exclude is
+  // not a tolerance, and the fill took the forest (7.8% of the frame selected
+  // before this work, 37.1% after the wider seed, 2026-09-20).
+  // Every seed pixel is still SELECTED. Only the model is fitted to one piece.
+  const fitSample = (a: number[]) =>
+    a.length > SKY_FIT_SAMPLE ? a.filter((_, i) => i % Math.ceil(a.length / SKY_FIT_SAMPLE) === 0) : a;
+  // ...and only on the horizon path. The fallback's seed is a strip along one
+  // edge, which this file has always fitted whole, and the promise made at the
+  // fallback is that a frame landing there gets exactly the selection it always
+  // got. Fitting hillside's strip to its largest piece alone took it from 10.0%
+  // of the frame to 6.3% (2026-09-20).
+  let fit = fitSample(horizon.boundary ? seeds : largestPiece(seeds, W, H));
   let mL = 0, mcx = 0, mcy = 0, sdL = 0, sdC = 0;
   for (let iter = 0; iter < 2; iter++) {
-    mL = median(seeds.map((p) => Ln[p]));
-    mcx = median(seeds.map((p) => CX[p]));
-    mcy = median(seeds.map((p) => CY[p]));
-    const dl = seeds.map((p) => Math.abs(Ln[p] - mL));
-    const dc = seeds.map((p) => Math.hypot(CX[p] - mcx, CY[p] - mcy));
+    mL = median(fit.map((p) => Ln[p]));
+    mcx = median(fit.map((p) => CX[p]));
+    mcy = median(fit.map((p) => CY[p]));
+    const dl = fit.map((p) => Math.abs(Ln[p] - mL));
+    const dc = fit.map((p) => Math.hypot(CX[p] - mcx, CY[p] - mcy));
     sdL = 1.4826 * median(dl);
     sdC = 1.4826 * median(dc);
-    const kept = seeds.filter((_, i) => dl[i] < Math.max(0.03, 3 * sdL) && dc[i] < Math.max(0.03, 3 * sdC));
-    if (kept.length < seeds.length * 0.4) break; // cluster too weak — keep all
-    seeds = kept;
+    const kept = fit.filter((_, i) => dl[i] < Math.max(0.03, 3 * sdL) && dc[i] < Math.max(0.03, 3 * sdC));
+    if (kept.length < fit.length * 0.4) break; // cluster too weak — keep all
+    fit = kept;
   }
 
   // tolerances: proportional to the seed spread, floored AND capped, then scaled
@@ -255,8 +472,40 @@ export function buildSkyMask(
     }
   }
 
-  // --- hole fill: enclosed pixels matching the model, no deeper than the sky
-  // already reaches (sky glimpsed through branches / around a horizon object) ---
+  // --- hole fill: ENCLOSED pixels matching the model — sky glimpsed through
+  // branches, sky around a horizon object.
+  //
+  // "Enclosed" is now tested rather than assumed, and that is the whole of the
+  // fix for the worst over-selection in the set. This stage used to apply its
+  // colour and luma test to EVERY unselected pixel above the deepest one the
+  // fill reached, with no connectivity of any kind — so one column of sky
+  // running a third of the way down the frame licensed every pixel in every
+  // other column above that depth whose colour was near enough. On IR-bright
+  // conifers, whose colour is near enough, that is the forest: NIR_1827 came
+  // out at 79.5% of the frame and NIR_1638's river valley at 51%, both with
+  // the trees and the banks in the selection (measured 2026-09-20).
+  // A hole is a component of the UNSELECTED region that does not touch the
+  // frame's edge. A cloud deck surrounded by sky is one, and it is the case
+  // this stage has to keep working for: a cloud's own boundary is a gradient,
+  // so the fill cannot cross into it, and the selection would otherwise stop
+  // at the cloud and leave a hole in the middle of the sky (NIR_1701,
+  // NIR_1703). A forest running to the bottom of the frame is not a hole and
+  // never was. ---
+  const outside = new Uint8Array(N);
+  {
+    const stack: number[] = [];
+    const push = (p: number) => { if (!mask[p] && !outside[p]) { outside[p] = 1; stack.push(p); } };
+    for (let x = 0; x < W; x++) { push(x); push((H - 1) * W + x); }
+    for (let y = 0; y < H; y++) { push(y * W); push(y * W + W - 1); }
+    while (stack.length) {
+      const p = stack.pop()!;
+      const y = (p / W) | 0, x = p - y * W;
+      if (x > 0) push(p - 1);
+      if (x < W - 1) push(p + 1);
+      if (y > 0) push(p - W);
+      if (y < H - 1) push(p + W);
+    }
+  }
   let maxDepth = 0;
   for (let p = 0; p < N; p++) {
     if (mask[p]) {
@@ -266,7 +515,7 @@ export function buildSkyMask(
     }
   }
   for (let p = 0; p < N; p++) {
-    if (mask[p]) continue;
+    if (mask[p] || outside[p]) continue;
     const y = (p / W) | 0, x = p - y * W;
     if (depthOf(x, y) > maxDepth) continue;
     const cd = Math.hypot(CX[p] - mcx, CY[p] - mcy);
@@ -295,7 +544,46 @@ export function buildSkyMask(
   // is why no reader was ever misled), but a documented flag that cannot say
   // "no" is a trap for whatever reads it next. Same threshold the status line
   // uses, so the two cannot disagree.
-  return { mask: { w: W, h: H, data }, found: coverage >= SKY_MIN_COVERAGE, coverage };
+  return { mask: { w: W, h: H, data }, found: coverage >= SKY_MIN_COVERAGE, coverage, horizon };
+}
+
+/**
+ * Keep only the largest 4-connected piece of a set of pixels.
+ * @param px  pixel indices into a W*H grid; not modified.
+ * @param W,H  grid dimensions.
+ * @returns the indices of the biggest connected component, or `px` unchanged
+ *   when it holds fewer than two pixels.
+ * What the result must satisfy: it is a SUBSET of the input and it is
+ * connected. `buildSkyMask` fits the sky's colour model to it, so a caller
+ * that passed a set with two equal halves would get one of them — which is the
+ * point: a median over two populations describes neither.
+ */
+function largestPiece(px: number[], W: number, H: number): number[] {
+  if (px.length < 2) return px;
+  const inSet = new Uint8Array(W * H);
+  for (const p of px) inSet[p] = 1;
+  const seen = new Uint8Array(W * H);
+  let best: number[] = [];
+  const stack: number[] = [];
+  for (const start of px) {
+    if (seen[start]) continue;
+    const piece: number[] = [];
+    seen[start] = 1;
+    stack.length = 0;
+    stack.push(start);
+    while (stack.length) {
+      const p = stack.pop()!;
+      piece.push(p);
+      const y = (p / W) | 0, x = p - y * W;
+      const step = (q: number) => { if (inSet[q] && !seen[q]) { seen[q] = 1; stack.push(q); } };
+      if (x > 0) step(p - 1);
+      if (x < W - 1) step(p + 1);
+      if (y > 0) step(p - W);
+      if (y < H - 1) step(p + W);
+    }
+    if (piece.length > best.length) best = piece;
+  }
+  return best;
 }
 
 /** In-place separable gaussian with edge clamping (same shape as glow/localmap). */

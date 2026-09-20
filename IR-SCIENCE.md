@@ -3462,3 +3462,176 @@ processing with luminosity masks (kolarivision.com); Luo & Etz, IEEE
 (sciencedirect.com/topics/computer-science/dark-channel-prior); PLOS ONE
 hemispherical photography classification (journals.plos.org/plosone/
 article?id=10.1371/journal.pone.0111924).
+
+### 9o. THE SKY IS A PLACE WITH A BORDER — THE PUBLISHED METHOD, AND WHAT IT COST TO FIT IT TO INFRARED
+
+**The question 9n left open.** That section ruled out inverting a foliage key
+and closed by naming the live defect: the sky model is refitted per frame from
+whatever the coarse heuristic seeded, and on a frame whose seed is a bright
+cloud deck the clear sky beneath it — same spectrum, a quarter the light —
+falls outside the tolerance that fit produces. The answer is not a better
+colour model. It is to stop asking a colour model where the sky is.
+
+**The method, and it is not one invented here.** Yehu Shen and Qicong Wang,
+"Sky Region Detection in a Single Image for Autonomous Ground Robot
+Navigation", International Journal of Advanced Robotic Systems 10(10), 2013
+(doi 10.5772/56884). Its parts, in its own terms:
+
+- A **sky border position function** `b(x)`, one border row per image column,
+  taken as the first row whose gradient magnitude exceeds a threshold `t`. Sky
+  is everything above it. The horizon is therefore free to follow any shape a
+  treeline takes; nothing is fitted to a line.
+- `t` is chosen by **optimising an energy function** over a one-dimensional
+  search, `Jn(t) = 1 / (γ|Σs| + |Σg| + γ|λ1ˢ| + |λ1ᵍ|)`, where Σ is the 3×3
+  covariance of the pixels in each region, λ1 its largest eigenvalue, and γ = 2
+  the emphasis on the sky's homogeneity. A border that leaves a uniform region
+  above it and a varied one below scores high. Its ancestor is Ettinger,
+  Nechyba, Ifju and Waszak's horizon energy for micro air vehicles (2002).
+- Two post-processing tests. **§2.3.1**, a photograph with no sky in it: the
+  border averages less than H/30, or less than H/4 with an average absolute
+  step over 5 px. **§2.3.2**, columns with no sky in them: where the border
+  steps by more than H/3 somewhere, split the region above it into two clusters
+  and clear the columns whose contents belong to the cluster nearer the ground.
+
+**Why it is the right instrument for infrared specifically.** Gradient is the
+one cue this repository has measured as reliable on these frames and it is the
+one the method runs on: `sky.ts` has recorded since 2026-07-06 that sky's luma
+gradient is 0.004–0.03 against 0.1–0.4 for foliage, and that brightness is NOT
+a usable prior here because sunlit foliage is the brightest thing in the frame
+and an overcast sky can be the darkest. The physics behind that gap is in §1
+and §4: Rayleigh scattering falls as λ⁻⁴, so a near-infrared sky carries almost
+no scattered light and almost no structure, while leaf mesophyll scatters NIR
+strongly and a canopy is all structure. The separation the method needs is
+wider in infrared than in the visible, not narrower.
+
+**FOUR THINGS HAD TO CHANGE, and each one is a measurement rather than a
+preference.**
+
+- **The thresholds are quantiles of the frame's own gradients, not numbers.**
+  The paper searches t over 5..600 in 120 steps, stating 1443 as the
+  theoretical maximum of an OpenCV Sobel on 8-bit greyscale. This app's
+  gradient is a central difference on luma normalised to the frame's own 95th
+  percentile. Transplanting a fixed range would mean something different on
+  every photograph; 120 quantiles from the 50th to the 99.9th percentile say
+  the same thing scale-free.
+- **The channels are scaled to 0..255 and the luminance is gamma-encoded
+  first.** `Jn` adds a covariance DETERMINANT, which has units of value³, to an
+  EIGENVALUE, which has units of value¹. It is therefore not scale-free, and
+  the γ that balances them was chosen on 8-bit data. Bounded 8-bit data: this
+  app's normalised luma runs freely past 1 on anything specular, and the gamma
+  encoding is what bounds it. (The gamma change alone did not fix the frame it
+  was found on — see hillside below — which is worth saying, because the
+  argument for it is sound and the fix it was reached for was elsewhere.)
+- **The no-sky test's SECOND clause is measured and never allowed to refuse.**
+  Equation 14's zigzag clause, wired as written, called NIR_0063 sky-less. That
+  frame has real sky; an oak fills its top-left, so the border sits high on the
+  left and low on the right and steps hard in between, which is what a canopy
+  IS. The paper's priority is a robot that must not drive into a wall. This
+  app's, stated 2026-09-20, is that a photograph WITH sky must have all of it
+  selected and no more, and a photograph with no sky selecting one is not a
+  failure because the reader turns the mask off.
+- **The sky-size bar is applied INSIDE the search, not after it.** This is the
+  one that matters most and it is not in the paper. At the bottom of the sweep
+  every column stops at its first faint edge, the region above the border is a
+  few rows of one colour, γ|Σs| vanishes and Jn settles at 1/(|Σ| + λ1) of the
+  WHOLE FRAME. That is a floor, not a hypothesis about where a sky ends, and a
+  photograph whose real sky is not uniform enough to beat it loses to it.
+  NIR_1667 — two conifers, a wide sky, one big white cloud in it — peaked
+  honestly at the 108th of 120 samples and was beaten by 22% by the floor at
+  the very first, and came back "no clear sky found" with 55% of the frame
+  sky. The paper's own thresh_min of 5 rather than 0 is the same guard, one
+  step weaker. Applying equation 15's bar to every candidate rather than only
+  to the winner removes the floor from the search, and `noSky` then means what
+  it ought to: no threshold anywhere put a sky-sized region above the border.
+
+**AND THE METHOD HAS A DOMAIN, WHICH IT ANNOUNCES.** The paper assumes the
+optimum is interior — its own words are that Jn(t) is nearly constant once t
+exceeds 600, so the sweep runs past the peak and comes back. A photograph with
+a sky gives exactly that: NIR_1651's Jn rises to 1.13e-8 at the 97th sample and
+falls away after it. A photograph that is 90% one texture gives a curve that
+rises monotonically to the last sample, because the best separation available
+is "call the whole frame sky": hillside, a hillside of conifers with a sliver of
+sky along the top, runs 5.05e-10 to 5.08e-9 without ever turning over. An
+argmax at the end of the search space is not an optimum, it is the search
+failing to find one — and it is a different claim from "there is no sky here",
+with a different remedy. The app falls back to its older top-band seed there,
+which asks a different question ("is the strip along the display's top edge
+smooth") and answers this frame correctly, as it always did.
+
+**THE BORDER SEEDS THE COLOUR FILL; IT DOES NOT REPLACE IT.** A per-column
+first-edge border stops at the first twig and cannot hug a treeline. The region
+above it becomes the seed, and the existing robust colour model and edge-aware
+fill carry the selection down to the silhouette and in through the branches.
+Two measured consequences of that composition:
+
+- **The model is fitted to the largest connected piece of the seed, not to all
+  of it.** The region above the border is not always one thing: on a frame
+  whose top corners are dark branches, each corner is its own island above its
+  own shallow border, and a median-and-MAD over the union describes neither
+  population. On NIR_1638 the union's chroma MAD came out at 0.470, which pins
+  the fill's tolerance at its own 0.15 ceiling, while the distance from that
+  frame's sky to its ground is 0.106. A tolerance wider than the distance to
+  the thing it is meant to exclude is not a tolerance, and the fill took the
+  forest: 37.1% of the frame against 7.8% before this work.
+- **The hole-fill's "enclosed" was never tested.** It applied a colour and luma
+  test to every unselected pixel above the deepest one the fill reached, with
+  no connectivity of any kind, so one column of sky running a third of the way
+  down licensed every pixel in every other column above that depth whose colour
+  was near enough. On IR-bright conifers that is the forest: NIR_1827 came out
+  at 79.5% of the frame. A hole is now a component of the unselected region
+  that does not touch the frame's edge — which keeps the case this stage exists
+  for, a cloud deck surrounded by sky whose own boundary is a gradient the fill
+  cannot cross (NIR_1701, NIR_1703).
+
+**WHAT IT MEASURED**, `tools/mask-truth-walk.mjs`, before and after, the app's
+own acceptance instrument reading coverage out of the reader's overlay:
+
+- NIR_1651 — reachable open sky 93.4% to 99.9%, its bound being 0.97; uncovered
+  reachable sky 5.8% to 0.5%; the largest uncovered block 18,933 px to 430 px.
+  That block is the corner band reported from the device on 2026-09-18, and it
+  is the check 023 could not pass.
+- NIR_1644 — edge-band coverage 87% to 93%; uncovered 0.6% to 0.3%. Spill onto
+  the key's non-sky rose from 23% to 38% of 11,712 edge-adjacent pixels: opened,
+  that is the feather sitting in the notches between crowns the mask now reaches
+  into, not a tree taken whole.
+- NIR_0063 — edge 98% to 97%, open sky unchanged at 99.9%, spill 8% to 7%.
+
+**And over all 44 practice frames**, coarse-mask coverage, with every frame's
+overlay opened: NIR_1651 30.3% to 52.2%, NIR_1877 4.9% to 22.9%, canopy 5.5% to
+19.2%, NIR_1873 nothing at all to 7.4%; against NIR_0172 22.2% to 12.1% (the
+playhouse's walls and roof, the tyre swing and the lawn are out), NIR_1830 30.5%
+to 10.0% (the lake is out), NIR_1688 13.9% to 4.1% (the forest is out). Every
+frame still reports a sky; none was refused.
+
+**WHAT IS STILL WRONG, NAMED.** A tree TRUNK is smooth down its length — the
+gradient across its edges is high and along its interior is not — so a column
+running down the middle of one carries the border deep with no step from its
+neighbours to announce it, and §2.3.2's column refinement does not fire. NIR_1638
+and NIR_1830 each keep a vertical band of selection down a trunk. Running the
+refinement on every photograph instead of on a stepped border was measured and
+is worse: it costs NIR_1651 half its sky, 52.2% of the frame to 34.6%, because a
+sky with a cloud deck in it splits in two under k-means whatever the gate says
+afterwards. And running it on NIR_1638 does not clear the trunks anyway, so no
+change to that trigger is the remedy.
+
+**AND THE CHANNEL SWAP IS NOT INVOLVED ANYWHERE, MEASURED RATHER THAN ASSUMED.**
+The selection is built on the gray-world-balanced camera-matrix LINEAR frame,
+before the grade, before the swap, before the look. Separately, on the rendered
+side: the R↔B swap is very nearly a hue reflection and preserves the angle
+between the two populations to within 1° — sky 55°→185° and foliage 238°→2° on
+NIR_0063, 68°→173° and 245°→355° on NIR_1651, 61°→179° and 245°→355° on
+NIR_1644, with the separation reading 183/183, 177/178 and 176/176 across the
+swap. Sky and foliage sit 164–183° apart in both spaces, so a ±25° band
+separates them either side of it.
+
+**Sources.** Shen & Wang, SAGE (journals.sagepub.com/doi/full/10.5772/56884);
+Ettinger, Nechyba, Ifju & Waszak, "Vision-Guided Flight Stability and Control
+for Micro Air Vehicles" (2002), cited there for the energy function; the
+reference Python implementation at github.com/cnelson/skydetector, read for the
+equations the paper states and NOT copied — two of its transcriptions are
+wrong, its threshold step drops a term of equation 11 and its energy function
+takes the determinant of the eigenVECTOR matrix, which is ±1 for any symmetric
+matrix, in place of λ1; darktable manual, parametric masks
+(docs.darktable.org/usermanual/development/en/darkroom/masking-and-blending/
+masks/parametric/), for the convention that a mask keys the module's INPUT and
+that both input and output sliders are offered.
