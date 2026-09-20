@@ -181,28 +181,47 @@ const solve = (p) => p.evaluate(([SAT_FLOOR, HUE_HALF, EDGE_FRAC, PLANT_REACHABL
     if (size > largest) { largest = size; bigCells = cells; } }
   const bigStats = (() => {
     if (!bigCells || !bigCells.length) return null;
-    let lum = 0, sat = 0, cx = 0, cy = 0;
-    for (const i of bigCells) { const o = i * 4;
-      lum += (B[o] * LW[0] + B[o + 1] * LW[1] + B[o + 2] * LW[2]) / 255;
-      const [x2, y2] = chroma(o); sat += Math.hypot(x2, y2);
-      cx += i % W; cy += (i / W) | 0; }
-    const n = bigCells.length;
-    // The sky the mask DID take, for comparison on the same two numbers — and
-    // its luminance SPREAD, because a mean says nothing about whether a block
-    // sitting below it is unusual. Median and MAD, the robust shape the grow
-    // already uses to set its own tolerance, so the answer is in units the
-    // rest of this family reasons in.
-    let skyLum = 0, skySat = 0, skyN = 0; const lums = [];
-    for (let i = 0; i < N; i++) if (cov[i] >= 0.9 && sky[i]) { const o = i * 4;
-      const L = (B[o] * LW[0] + B[o + 1] * LW[1] + B[o + 2] * LW[2]) / 255;
-      skyLum += L; lums.push(L);
-      const [x2, y2] = chroma(o); skySat += Math.hypot(x2, y2); skyN++; }
+    // WHAT SEPARATES A DEFOCUSED BRANCH FROM SKY — measured on four axes at
+    // once, and REPORTED rather than acted on. Brightness alone does not: the
+    // block that provoked this sits 1.8 MADs below typical sky, which is
+    // ordinary variation. The field's answer to the same problem is colour
+    // PLUS texture — Kodak's sky-detection patent calls it open space
+    // detection, for exactly this job of separating sky from other
+    // blue-coloured things — so gradient activity is measured here too.
+    //
+    // AT TWO SCALES, because the block is BLURRED. Bokeh is smooth at one
+    // pixel and may carry structure at eight; a single-scale texture test
+    // that only separates sky from IN-FOCUS foliage would pass this block
+    // straight through. If neither scale separates, that is the finding.
+    //
+    // Every axis is reported as a signed distance in MADs from the confident
+    // sky's MEDIAN. Never from its mean: on a frame whose sky holds a bright
+    // cloud the mean sits six MADs up in the tail and describes nothing.
+    const lumaAt = (i) => { const o = i * 4; return (B[o] * LW[0] + B[o + 1] * LW[1] + B[o + 2] * LW[2]) / 255; };
+    const satAt = (i) => { const [x2, y2] = chroma(i * 4); return Math.hypot(x2, y2); };
+    const gradAt = (step) => (i) => {
+      const x = i % W, y = (i / W) | 0;
+      const xl = Math.max(0, x - step), xr = Math.min(W - 1, x + step);
+      const yd = Math.max(0, y - step), yu = Math.min(H - 1, y + step);
+      return Math.hypot(lumaAt(y * W + xr) - lumaAt(y * W + xl), lumaAt(yu * W + x) - lumaAt(yd * W + x));
+    };
+    const AXES = [["luminance", lumaAt], ["saturation", satAt], ["texture 1px", gradAt(1)], ["texture 8px", gradAt(8)]];
     const med = (a) => { if (!a.length) return NaN; const t = Float64Array.from(a).sort(); return t[t.length >> 1]; };
-    const lMed = med(lums);
-    const lMad = 1.4826 * med(lums.map((v) => Math.abs(v - lMed)));
-    return { n, lum: lum / n, sat: sat / n, cx: cx / n / W, cy: 1 - (cy / n / H),
-             skyLum: skyN ? skyLum / skyN : NaN, skySat: skyN ? skySat / skyN : NaN,
-             lMed, lMad, mads: lMad > 1e-9 ? (lMed - lum / n) / lMad : NaN };
+    const spread = (a) => { const m = med(a); return { med: m, mad: 1.4826 * med(a.map((v) => Math.abs(v - m))) }; };
+    // The sky the mask is CONFIDENT about, which is what the key already
+    // learns its target from, so this adds no new dependency on the mask.
+    const skyIdx = []; for (let i = 0; i < N; i++) if (cov[i] >= 0.9 && sky[i]) skyIdx.push(i);
+    const axes = AXES.map(([name, f]) => {
+      const sk = spread(skyIdx.map(f)), bl = spread(bigCells.map(f));
+      return { name, skyMed: sk.med, skyMad: sk.mad, blockMed: bl.med,
+               mads: sk.mad > 1e-9 ? (bl.med - sk.med) / sk.mad : NaN };
+    });
+    // The JOINT distance, because the block may be unremarkable on every axis
+    // alone and far away in the space they span.
+    const joint = Math.hypot(...axes.map((a) => (Number.isFinite(a.mads) ? a.mads : 0)));
+    let cx = 0, cy = 0; for (const i of bigCells) { cx += i % W; cy += (i / W) | 0; }
+    const n = bigCells.length;
+    return { n, cx: cx / n / W, cy: 1 - (cy / n / H), axes, joint, skyN: skyIdx.length };
   })();
   const inBig = new Uint8Array(N); if (bigCells) for (const i of bigCells) inBig[i] = 1;
   // the map: sky = blue by coverage (dark = uncovered), uncovered sky = red, spill onto non-sky = yellow tint, else grey
@@ -275,25 +294,19 @@ try {
     // so a bound here would be a gate that can never go green.
     if (m.bigStats) {
       const g = m.bigStats;
-      console.log(`      largest missed block: ${g.n} px at (${g.cx.toFixed(2)}, ${g.cy.toFixed(2)}) of the frame`
-        + ` — its mean luminance ${g.lum.toFixed(3)} and saturation ${g.sat.toFixed(3)},`
-        + ` against the covered sky's ${g.skyLum.toFixed(3)} and ${g.skySat.toFixed(3)}.`);
-      // THE VERDICT IS A COMPARISON, NOT A SENTENCE PRINTED EITHER WAY. The
-      // first version of this line asserted "far darker than the sky, so the
-      // key called it sky" unconditionally, which would have said the same
-      // thing about a block brighter than the sky.
-      console.log(`              the covered sky's luminance runs ${g.lMed.toFixed(3)} ± ${g.lMad.toFixed(3)} (median, MAD);`
-        + ` this block's mean sits ${Number.isFinite(g.mads) ? g.mads.toFixed(1) : "?"} MADs below that median`);
-      // THE VERDICT IS IN MADs OR IT IS NOT A VERDICT. The first version
-      // compared the block's mean against the covered sky's MEAN and called
-      // anything 25% below it "far darker". On NIR_1651 the covered sky holds
-      // a large bright cloud, so its mean (0.483) sits well above its median
-      // (0.312) and that test fired on a block only 1.8 MADs below typical
-      // sky — ordinary variation, dressed up as a finding. A skewed
-      // distribution's mean is not a place to measure a distance from.
-      console.log(`              ${!Number.isFinite(g.mads) ? "the sky's luminance has no spread to compare against"
-        : g.mads >= 2.5 ? `${g.mads.toFixed(1)} MADs below typical sky — far enough out to suspect the KEY admitted something that is not sky`
-        : `only ${g.mads.toFixed(1)} MADs below typical sky, which is ordinary variation: brightness does NOT settle what this block is`} — painted BRIGHT YELLOW on the missed map, and the map is the thing that settles it`);
+      console.log(`      largest missed block: ${g.n} px at (${g.cx.toFixed(2)}, ${g.cy.toFixed(2)}) of the frame,`
+        + ` against ${g.skyN} px of sky the mask is confident about — painted BRIGHT YELLOW on the missed map`);
+      // REPORTED, NOT ACTED ON. No threshold here yet: the point of this run
+      // is to find out whether any of these axes separates a defocused branch
+      // from sky at all, on every frame rather than on the one that provoked
+      // the question. A gate and its justifying measurement written in the
+      // same commit is how the last version of this line shipped a rule that
+      // was void on arrival.
+      for (const a of g.axes) {
+        console.log(`              ${a.name.padEnd(12)} sky ${a.skyMed.toFixed(4)} ± ${a.skyMad.toFixed(4)}`
+          + `   block ${a.blockMed.toFixed(4)}   ${Number.isFinite(a.mads) ? `${a.mads >= 0 ? "+" : ""}${a.mads.toFixed(1)} MADs` : "no spread"}`);
+      }
+      console.log(`              joint distance across the four axes: ${g.joint.toFixed(1)} MADs`);
     }
     console.log(m.discN
       ? `      out of reach: ${(100 * m.discShare).toFixed(1)}% of ${m.skyPx} keyed sky px (${m.discN}) are joined to the selection by no sky-coloured path, mean coverage ${(100 * m.discCov).toFixed(1)}% — magenta on the missed map`
