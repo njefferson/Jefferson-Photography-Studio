@@ -462,6 +462,23 @@ export async function exportImage(
   const outerN = rot & 1 ? w : h;
   const innerN = rot & 1 ? h : w;
 
+  // THE BAND IS A RECTANGLE OF THE PICTURE, cut along whichever axis the loops
+  // below run: rows normally, columns under a quarter-turn. Without a band
+  // these are the whole frame and every index below is the plain one.
+  //
+  // HOISTED ABOVE THE FORMAT BRANCH 2026-09-20, because it belongs to both.
+  // It used to live inside the JPEG branch with a comment saying TIFF is "the
+  // print-master path, rarely used and enormous either way" — and that
+  // sentence was the whole reason a TIFF export ran on one core while eight
+  // workers sat idle. One rectangle, defined once, so the two formats cannot
+  // disagree about what a band is.
+  const from = opts.band ? opts.band.from : 0;
+  const to = opts.band ? Math.min(opts.band.to, outerN) : outerN;
+  const bandX0 = rot & 1 ? from : 0;
+  const bandY0 = rot & 1 ? 0 : from;
+  const bandW = rot & 1 ? to - from : w;
+  const bandH = rot & 1 ? h : to - from;
+
   if (opts.format === "jpeg") {
     // JPEG saves as DISPLAY P3: every final display colour is re-expressed in
     // P3 (srgbDisplayToP3Display) and the matching P3 profile is embedded
@@ -470,18 +487,8 @@ export async function exportImage(
     // container is what Apple devices shoot and share natively.
     // ONE BAND'S WORTH when a band was asked for — its own rows, in its own
     // coordinates, so a worker holds a slice of the picture rather than a whole
-    // copy of it. JPEG only: see ExportOptions.band on why a quarter-turned
-    // export stays single-threaded, and TIFF is the print-master path, rarely
-    // used and enormous either way.
-    // THE BAND IS A RECTANGLE OF THE PICTURE, cut along whichever axis the loop
-    // below runs: rows normally, columns under a quarter-turn. Without a band
-    // these are the whole frame and every index below is the plain one.
-    const from = opts.band ? opts.band.from : 0;
-    const to = opts.band ? Math.min(opts.band.to, outerN) : outerN;
-    const bandX0 = rot & 1 ? from : 0;
-    const bandY0 = rot & 1 ? 0 : from;
-    const bandW = rot & 1 ? to - from : w;
-    const bandH = rot & 1 ? h : to - from;
+    // copy of it. The rectangle is worked out above the branch; both formats
+    // use the same one.
     let data = new Uint8ClampedArray(bandW * bandH * 4);
     const p3 = new Float32Array(3);
     __a = performance.now();
@@ -505,6 +512,11 @@ export async function exportImage(
           // a lossy-linear DNG), which is the same test getSource makes.
           "cfa" in src ? { width: current.width, height: current.height, isRaw: current.isRaw } : current,
           params, opts, lens ?? null, sky ?? null, skyFine ?? null, w, h, job, onProgress);
+        // The JPEG path asked for 8-bit bands, so 8-bit bands are what came
+        // back; the check is here rather than assumed because `exportBands`
+        // now returns one of two shapes and a missing buffer must fall through
+        // to the single-threaded loop rather than export a black photograph.
+        if (!split.data) throw new Error("the workers returned no pixels");
         data = split.data;
         __t.threads = split.threads;
         ranParallel = true;
@@ -593,10 +605,36 @@ export async function exportImage(
     lastProfile = __t;
     return { blob: new Blob([tagged.buffer as ArrayBuffer], { type: "image/jpeg" }), name: `${baseName}.jpg` };
   } else {
-    const rgb = new Uint16Array(w * h * 3);
-    for (let oIdx = 0; oIdx < outerN; oIdx++) {
+    // ONE BAND'S WORTH, exactly as the JPEG path does it — three channels of
+    // sixteen bits rather than four of eight, which is the only difference
+    // between the two loops and is six bytes a pixel against four. That
+    // difference is billed in `perWorkerMb`, because the thread budget decides
+    // how many workers may start and a band it thinks weighs two thirds of its
+    // real size is a killed tab on a tablet.
+    const rgb = new Uint16Array(bandW * bandH * 3);
+    __a = performance.now();
+    // SEVERAL CORES, when this export can use them — the same call the JPEG
+    // path makes, with the same fall-through on any failure: the reader asked
+    // for a photograph, not for a particular number of threads.
+    const jobT = { fileBytes: file.bytes.length, srcPixels: srcW * srcH, outPixels: w * h };
+    let ranParallelT = false;
+    if (canRunParallel(params, opts, jobT)) {
+      try {
+        const split = await exportBands(
+          file,
+          "cfa" in src ? { width: current.width, height: current.height, isRaw: current.isRaw } : current,
+          params, opts, lens ?? null, sky ?? null, skyFine ?? null, w, h, jobT, onProgress);
+        if (!split.rgb) throw new Error("the workers returned no 16-bit pixels");
+        rgb.set(split.rgb);
+        __t.threads = split.threads;
+        ranParallelT = true;
+      } catch (err) {
+        console.warn("parallel TIFF export failed, falling back to one thread:", err);
+      }
+    }
+    for (let oIdx = ranParallelT ? to : from; oIdx < to; oIdx++) {
       if (oIdx % 16 === 0) {
-        onProgress?.(oIdx / outerN);
+        onProgress?.((oIdx - from) / Math.max(1, to - from));
         await tick();
       }
       for (let iIdx = 0; iIdx < innerN; iIdx++) {
@@ -608,7 +646,7 @@ export async function exportImage(
         edit(s[0], s[1], s[2], out, glowAt(sx, sy), (sx + 0.5) / srcW, (sy + 0.5) / srcH);
         applyOnTop(sx, sy); // on-top stickers over the finished look, before grain (matches the shader)
         finishPixel(x, y); // creative vignette + grain, same as the JPEG path
-        const o = (y * w + x) * 3;
+        const o = ((y - bandY0) * bandW + (x - bandX0)) * 3;
         // CLAMPED BEFORE THE 16-BIT WRITE. A Uint16Array wraps: 1.01 stores as
         // 0.01 and −0.02 as 0.98. The JPEG path never had this because
         // Uint8ClampedArray clamps for it, and the preview's framebuffer
@@ -625,6 +663,10 @@ export async function exportImage(
     onProgress?.(1);
     __mark("pixels", __a);
     __a = performance.now();
+    // A WORKER STOPS HERE, the same place the JPEG path stops: the watermark,
+    // the file header and the metadata all belong to the whole picture, and the
+    // whole picture is the main thread's to assemble.
+    if (opts.raw) return { band: { from, to }, axis: rot & 1 ? "columns" : "rows", rgb, width: bandW, height: bandH };
     if (opts.watermark) {
       // Same layer as the JPEG path, alpha-blended into the 16-bit buffer in
       // display space (the canvas layer and these pixels share the same gamma).
@@ -645,6 +687,16 @@ export async function exportImage(
         }
       }
     }
+    __mark("encode", __a);
+    // THE REPORT COULD NOT SEE A TIFF EXPORT AT ALL, and that is why a device
+    // report showing "17.6 MP in 27.5s on 8 threads" sat next to a complaint
+    // that TIFF runs on one thread and read as a contradiction: the line was a
+    // JPEG's, because the TIFF path had never once written a profile. Three
+    // lines the JPEG branch has had all along, missing here — so "Last export"
+    // said "none this session" after a TIFF however long it had taken.
+    __t.megapixels = (w * h) / 1e6;
+    __t.total = performance.now() - __start;
+    lastProfile = __t;
     return { blob: new Blob([writeTiff16(rgb, w, h, SRGB_ICC, readExifSubset(file.bytes) ?? undefined)], { type: "image/tiff" }), name: `${baseName}.tif` };
   }
 }

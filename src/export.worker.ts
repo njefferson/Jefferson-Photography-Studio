@@ -54,7 +54,13 @@ ctx.addEventListener("message", (e: MessageEvent) => {
         req.sky,
         req.skyFine,
       );
-      const buf = res.data?.buffer;
+      // EITHER SHAPE OF BAND, TRANSFERRED RATHER THAN COPIED. A TIFF band has
+      // no `data` — it carries `rgb`, sixteen bits a channel — so this read
+      // `undefined` for one and structured-cloned thirty megabytes per band
+      // instead of moving it. Correct either way, and a doubled peak on the
+      // one path whose memory ceiling is what decides how many workers may
+      // start at all.
+      const buf = res.data?.buffer ?? res.rgb?.buffer;
       ctx.postMessage({ id: req.id, done: res }, buf ? [buf as ArrayBuffer] : []);
     } catch (err) {
       ctx.postMessage({ id: req.id, error: String((err as Error)?.message ?? err) });
