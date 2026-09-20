@@ -35,8 +35,13 @@
 // always do. Neither needs a threshold in milliseconds.
 //
 // --plant makes the shape checks read the WRONG source — the tile count after
-// the run in place of the count at the first decode, and the whole-run total
-// in place of the time to the first picture. Three checks must go red.
+// the run in place of the count at the first decode, the whole-run total in
+// place of the time to the first picture (in BOTH passes), a tile read as
+// carrying no camera picture, and the refused decode read as not refused.
+// FOUR checks must go red, and that number was verified by running it rather
+// than by counting the `PLANT ?` expressions — the comment here said three and
+// the plant produced two, which is the same defect one level up: a claim about
+// an instrument that nobody ran the instrument to check.
 import { chromium } from "playwright-core";
 import { requireFreshDist } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
@@ -95,11 +100,23 @@ function previewTiff(jpeg) {
   return buf;
 }
 const jpegBytes = new Uint8Array(readFileSync("tools/fixtures/camera-ir-a.jpg"));
-const fixtures = ["a", "b"].map((k) => {
+const fixtures = ["a", "b", "fail"].map((k) => {
   const path = join(OUT, `preview-${k}.dng`);
   writeFileSync(path, previewTiff(jpegBytes));
   return path;
 });
+// THE THIRD ONE'S DECODE IS BROKEN ON PURPOSE, in the walk rather than in the
+// file, and this is the correction of an assumption that stood for as long as
+// this walk has existed. The builder's own comment said "nothing here is a raw
+// image, so the decode that follows fails" — it does not. Measured 2026-09-20:
+// both fixtures finish with a real picture, `provisional` false and no
+// placeholder, because the app is content to use the embedded JPEG as the
+// photograph. So the check that a failed decode keeps the camera's picture was
+// green in every run it has ever made WITHOUT A SINGLE DECODE HAVING FAILED.
+// The app's rule is that a tile becomes the broken-file placeholder only when
+// it has no picture at all; reaching that branch needs a decode that throws
+// while a preview is already in the tile, and no file content produces it.
+const FAIL_NAME = "preview-fail.dng";
 
 /** One line out of the §7f diagnostic, by its key. The report is the app's own
  *  instrument; reading it here rather than reaching into module state is what
@@ -128,9 +145,23 @@ try {
   const p = await ctx.newPage();
   p.on("dialog", (d) => d.accept());
   // COUNTED AT THE DOOR, before the app boots, so nothing it does can be missed.
-  await p.addInitScript(() => {
+  await p.addInitScript((failName) => {
     window.__decodes = [];
+    window.__failed = 0;
     const mp = Worker.prototype.postMessage;
+    // ONE FILE'S DECODE THROWS, through the app's own error channel. The job is
+    // never forwarded; the worker's own `onmessage` is called with the shape
+    // the decode client reports a failure in, so the app takes the path it
+    // takes for a corrupt file rather than one the walk invented.
+    Worker.prototype.postMessage = function (msg, ...rest) {
+      if (msg && msg.file && msg.file.name === failName && typeof msg.id !== "undefined") {
+        window.__failed++;
+        setTimeout(() => this.onmessage?.({ data: { id: msg.id, error: "planted decode failure" } }), 0);
+        return;
+      }
+      return mp.call(this, msg, ...rest);
+    };
+    const counted = Worker.prototype.postMessage;
     Worker.prototype.postMessage = function (msg, ...rest) {
       const n = msg && msg.file && msg.file.name;
       if (n) {
@@ -139,13 +170,13 @@ try {
         }
         window.__decodes.push(n);
       }
-      return mp.call(this, msg, ...rest);
+      return counted.call(this, msg, ...rest);
     };
     // HOW MUCH OF THE GRID WAS DRAWN WHEN THE FIRST DECODE STARTED. This is
     // the whole of "every tile up front", and it is a count rather than a
     // clock, so it means the same thing on a tablet and in a container.
     window.__cellsAtFirstDecode = -1;
-  });
+  }, FAIL_NAME);
   await p.goto(`http://127.0.0.1:${PORT}/ir.html`);
   await p.waitForSelector("#quickFiles", { state: "attached", timeout: 60000 });
 
@@ -178,11 +209,68 @@ try {
   // the strip's own badge exists.
   check("and the tile says in words whose picture it is", prov.badge.trim() === "Preview" && /camera/i.test(prov.title),
     `badge "${prov.badge.trim()}", title "${prov.title}"`);
-  // A file whose decode fails AFTER its preview landed keeps the preview.
-  check("a failed decode does not take the camera's picture away", !prov.bad,
-    prov.bad ? "the tile fell back to the broken-file placeholder" : "the picture stayed");
+
+  // AFTER THE RUN, NOT DURING IT. The snapshot above is taken the moment the
+  // tile turns provisional, which is BEFORE the decode it is waiting on has had
+  // a chance to fail — so reading `bad` from it asked whether a decode that had
+  // not finished had already gone wrong, and the answer was no every time, for
+  // any build. These fixtures are a preview wrapped in a stub: the decode is
+  // MEANT to fail, and the claim is that the camera's picture survives it.
   await p.waitForFunction(() => !document.getElementById("qlGrid")?.dataset.busy, null, { timeout: 120000 });
+  const after = await p.evaluate(() => {
+    const cells = [...document.querySelectorAll("#qlGrid .ql-cell")];
+    return cells.map((c) => ({
+      name: c.querySelector(".ql-tile")?.getAttribute("title")?.split(" — ")[0] ?? "",
+      hasImage: !!c.querySelector(".ql-tile img")?.getAttribute("src"),
+      bad: !!c.querySelector(".ql-bad-mark"),
+      provisional: c.classList.contains("provisional"),
+    }));
+  });
+  const refused = await p.evaluate(() => window.__failed ?? 0);
+  const failTile = after.find((c) => c.name === "preview-fail.dng");
+  check("one decode really was refused", PLANT ? false : refused > 0,
+    `${refused} decode job(s) answered with an error`);
+  // THE CLAIM, AND IT IS NOT THE ONE THIS CHECK USED TO MAKE. The app marks a
+  // tile as the broken-file placeholder only when it has NO picture at all, so
+  // a file whose preview landed before its decode failed must keep that picture
+  // and stay marked Preview — never fall back. Reading the `bad` mark was the
+  // wrong test twice over: it was read from a snapshot taken before the decode
+  // had had time to fail, and no decode was failing in the first place.
+  check("a failed decode does not take the camera's picture away",
+    !!failTile && failTile.hasImage && !failTile.bad && failTile.provisional,
+    failTile
+      ? `picture ${failTile.hasImage ? "kept" : "LOST"}, placeholder ${failTile.bad ? "SHOWN" : "not shown"}, still marked Preview ${failTile.provisional ? "yes" : "NO"}`
+      : "the planted file is not in the grid");
+  check("and the files that decoded fine finished",
+    after.filter((c) => c.name !== "preview-fail.dng").every((c) => c.hasImage && !c.bad && !c.provisional),
+    `${after.length - 1} of ${after.length} tile(s) reached a rendered picture`);
+
+  // THE HEADLINE CLAIM, MEASURED HERE AND NOWHERE ELSE. It is that a picture
+  // reaches the screen in less than one decode, and the main pass below CANNOT
+  // measure it: the practice corpus carries no embedded preview, so its first
+  // picture is a full render by definition. That pass used to print a sentence
+  // saying so and move on, which left the walk's own headline unmeasured in
+  // every run it has ever made. These fixtures DO carry one, so it is measured
+  // on the only files that can carry it.
+  // THE GRID HAS TO GO FIRST: the version tag that opens the report sits behind
+  // this modal dialog, and a click on it is swallowed. Nothing is lost here —
+  // the fixture pass makes no picks, which is exactly why the main pass below
+  // cannot do the same and reads its lines after its own keep.
   await p.evaluate(() => document.getElementById("qlClose")?.click());
+  await settle(p);
+  const fx = await diagLine(p, "Last quick look");
+  console.log(`\n  fixture pass     ${fx}\n`);
+  const fxPreviewed = Number((fx.match(/, (\d+) showed the camera's own picture/) ?? [])[1] ?? 0);
+  const fxFirstPic = PLANT ? t(fx, "in") : t(fx, "first picture");
+  const fxDecode = t(fx, "decode");
+  if (fxPreviewed === 0) {
+    check("a picture is on screen in less than one decode", false,
+      "the fixtures reported no camera picture — the one pass that can measure this did not");
+  } else {
+    check("a picture is on screen in less than one decode", fxFirstPic > 0 && fxFirstPic < fxDecode,
+      `first picture ${Math.round(fxFirstPic)} ms against ${Math.round(fxDecode)} ms of decoding` +
+      ` (${fxPreviewed} of ${fixtures.length} showed the camera's picture)`);
+  }
   await settle(p);
 
   // --- the grid -------------------------------------------------------------
