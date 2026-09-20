@@ -90,6 +90,10 @@ patching it again.
 - touches 008 — 008 is about decode queued behind one worker, this is about
   decoding what need not be decoded at all. Work avoided beats work
   parallelised, so if this is real it changes 008's numbers.
+- needs 033 — this record's chosen option is to COUNT the decodes on both
+  sides of the keep before changing anything, and 033 is where that count gets
+  built into the app. The half this record keeps afterwards is the stop and the
+  release, which 033 does not touch.
 
 ## Options
 

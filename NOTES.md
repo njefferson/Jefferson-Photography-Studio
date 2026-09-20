@@ -640,6 +640,34 @@ user-scalable=no.
   the tablet: every dab re-uploads both mask atlases, and the refined one is
   2.8 MB. See
   `docs/decisions/031-a-generated-selection-can-be-corrected-by-hand.md`.
+- [ ] **Quick look: the wait before the first picture, and the wait after Keep** <!-- decision: 033 -->
+  reported 2026-09-20 from the device, as two waits on the path every reader
+  meets first. After picking files, nothing appears on the pick/reject sheet
+  for a long time; after pressing Keep, the screen stays on the sheet for a
+  long time before the editor and its strip arrive.
+  **The first is not a slow decode, it is a grid that draws nothing until one
+  finishes.** `openQuickLook` appends a tile at the BOTTOM of its loop body, so
+  the sheet is empty until the first file has been read, demosaiced, denoised,
+  lens-corrected and rendered twice — and it works one file at a time while
+  three or four decode lanes sit idle. The session strip was given both fixes
+  already and the grid was given neither: every tile on screen before a byte is
+  read, and the camera's own embedded preview as a first picture. That second
+  one is what every culling tool does — it is the whole of Photo Mechanic's
+  speed against Lightroom — with the caveat this app has to handle rather than
+  inherit: on an infrared conversion the camera's JPEG is the wrong colour
+  world, so it is shown as provisional, in text, the way the strip already
+  shows it.
+  **The second has three candidates seconds apart and they are not guessed at.**
+  Before a byte of the new set is read, `addToSession` waits for the previous
+  session's chunk sweep — a cost that scales with the set being replaced, not
+  the one being opened — then reads the first file and decodes it AGAIN, though
+  the grid decoded it minutes earlier and kept only a 260 px JPEG. The
+  instrument goes in first: the test page measures both transitions on practice
+  files and the diagnostic carries the last run's stages, so the next report
+  names a stage instead of a symptom. Ruled out by reading rather than
+  measurement: the sky selection is not in the critical path, and the shared-look
+  sniff never reads a raw.
+  See `docs/decisions/033-the-wait-before-the-first-picture-and-the-wait-after-keep.md`.
 - [ ] **A mask keys the photograph, not the grade** <!-- decision: 032 -->
   the Colour mask keys on the colour the pixel DISPLAYS — the decode through
   contrast and gamma, and downstream of the channel swap — so a mask picked
