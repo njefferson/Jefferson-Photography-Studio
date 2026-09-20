@@ -710,6 +710,23 @@ user-scalable=no.
   slider in the app increases. That last one is a relabelling and never an
   inversion: the stored number rides SavedLook, so flipping it would change the
   meaning of every look already saved, shared or baked into an exported JPEG.
+  **ALL THREE FIXED, ON STAGING 2026-09-20.** The wheel holds the hue over the
+  innermost 15% of its travel, where the angle is noise and at the exact centre
+  is zero — so pulling the puck in now does what the Amount slider beside it
+  already did, and the two controls agree. The six sliders have ids, which puts
+  them in the existing capture and lookup with no other change. And the shadow
+  slider reads "Amount" under the heading that names the effect, with an
+  accessible name that contains the visible word so SC 2.5.3 holds; the stored
+  number is untouched.
+  **The walk was run against all three old behaviours first and failed seven
+  checks**, then against the wheel's alone and failed that one (hue 200 becomes
+  180 on the way to the centre). Two instrument errors on the way, both caught:
+  the first version grabbed the wheel at 3 o'clock and reported the hue as lost,
+  when 3 o'clock IS hue 90 under this wheel's convention and the app was
+  behaving — the gesture has to start on the puck. And the first version died at
+  the first failing check, so a build with no ids reported one problem and
+  stopped; it refuses the dependent checks explicitly now and prints the whole
+  list.
   See `docs/decisions/035-the-grade-tab-controls-do-not-behave-like-the-rest.md`.
 - [ ] **The mask panel does not say what it can do** <!-- decision: 040 -->
   four things reported 2026-09-20, and the first is the finding: the request
