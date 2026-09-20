@@ -37,6 +37,15 @@ import type { ExportOptions, BandResult } from "./export";
  *  is a second or two and the startup would show. */
 const MIN_PIXELS = 2e6;
 
+/** WHAT ONE OUTPUT PIXEL OF A BAND WEIGHS, by format — four bytes of RGBA for
+ *  a JPEG, six of 16-bit RGB for a TIFF. It exists because the memory budget
+ *  that decides how many workers may start is the one thing here that a tablet
+ *  cannot be wrong about: it kills the tab rather than swapping, and a killed
+ *  tab loses the whole session. */
+function bytesPerPixel(opts: ExportOptions): number {
+  return opts.format === "tiff" ? 6 : 4;
+}
+
 /** WHAT ONE MORE THREAD COSTS IN MEMORY, in megabytes, and it is not small: a
  *  worker holds its own copy of the file, its own decode of the sensor data,
  *  and its own band of the output.
@@ -48,8 +57,8 @@ const MIN_PIXELS = 2e6;
  *  part that travels: the same file at 45 megapixels would cost 220 MB a
  *  thread, and three of those is a killed tab on a tablet rather than a slow
  *  export. */
-function perWorkerMb(fileBytes: number, srcPixels: number, outPixels: number, n: number): number {
-  return (fileBytes + srcPixels * 2 + (outPixels * 4) / n) / 1e6 + 10;
+function perWorkerMb(fileBytes: number, srcPixels: number, outPixels: number, n: number, bytesPerPixel = 4): number {
+  return (fileBytes + srcPixels * 2 + (outPixels * bytesPerPixel) / n) / 1e6 + 10;
 }
 
 /** The memory an export may spend on threads that are not the main one, and how
@@ -87,25 +96,32 @@ export interface ParallelJob {
 
 export function canRunParallel(params: EditParams, opts: ExportOptions, job: ParallelJob): boolean {
   if (typeof Worker === "undefined") return false;
-  if (opts.format !== "jpeg") return false;
+  // TIFF RUNS HERE TOO SINCE 2026-09-20. It was refused on the grounds that it
+  // is "the print-master path and enormous either way" — and enormous is the
+  // argument FOR splitting it, not against: the 17.6 MP frame that took 25.9
+  // seconds of per-pixel work across eight threads as a JPEG was doing the
+  // same work undivided as a TIFF. What the refusal was really standing in for
+  // is that the 16-bit band was declared in `BandResult` and produced by
+  // nothing; it is produced now, and the memory model below is told that a
+  // band of it weighs six bytes a pixel rather than four.
   if (opts.band || opts.raw) return false; // already a band
   if (job.outPixels < MIN_PIXELS) return false;
   if ((params.spots?.length ?? 0) > 0) return false;
   if ((params.stickers?.length ?? 0) > 0) return false;
   if (params.warp) return false;
-  return workerCount(job) >= 2;
+  return workerCount(job, bytesPerPixel(opts)) >= 2;
 }
 
 /** How many to start: one fewer than the machine claims, capped by how much
  *  memory it admits to having — the main thread still has to stay answerable —
  *  then as many of those as the budget above will actually pay for. Returns 1
  *  when it will not pay for two, which is `canRunParallel` saying no. */
-export function workerCount(job: ParallelJob): number {
+export function workerCount(job: ParallelJob, bytesPerPixel = 4): number {
   const cores = typeof navigator !== "undefined" ? (navigator.hardwareConcurrency || 2) : 2;
   const byCores = Math.max(2, Math.min(threadCap(), cores - 1));
   const budget = budgetMb();
   for (let n = byCores; n >= 2; n--) {
-    if (n * perWorkerMb(job.fileBytes, job.srcPixels, job.outPixels, n) <= budget) return n;
+    if (n * perWorkerMb(job.fileBytes, job.srcPixels, job.outPixels, n, bytesPerPixel) <= budget) return n;
   }
   return 1;
 }
@@ -132,22 +148,34 @@ export function stitchBands(
   outW: number,
   outH: number,
   axis: "rows" | "columns",
-): Uint8ClampedArray<ArrayBuffer> {
-  const data = new Uint8ClampedArray(new ArrayBuffer(outW * outH * 4));
+  chan: 3 | 4 = 4,
+): Uint8ClampedArray<ArrayBuffer> | Uint16Array<ArrayBuffer> {
+  // ONE ASSEMBLER FOR BOTH FORMATS, differing only in how wide a pixel is:
+  // four channels of eight bits for a JPEG band, three of sixteen for a TIFF.
+  // Written as one function on purpose — a second copy for the 16-bit case is
+  // where the two would drift on the next change to the column arithmetic,
+  // which is the half of this that is easy to get wrong.
+  const n = outW * outH * chan;
+  const data = chan === 3
+    ? new Uint16Array(new ArrayBuffer(n * 2))
+    : new Uint8ClampedArray(new ArrayBuffer(n));
   let covered = 0;
   for (const r of results) {
-    if (!r.data) throw new Error("an export worker returned no pixels");
+    const px = chan === 3 ? r.rgb : r.data;
+    if (!px) throw new Error("an export worker returned no pixels");
     if (r.axis !== axis) throw new Error("an export worker cut its band the other way");
-    if (r.data.length !== r.width * r.height * 4) throw new Error("an export worker returned the wrong number of pixels");
+    if (px.length !== r.width * r.height * chan) throw new Error("an export worker returned the wrong number of pixels");
     if (axis === "rows") {
       if (r.width !== outW || r.height !== r.band.to - r.band.from) throw new Error("an export worker returned a band of the wrong shape");
-      data.set(r.data, r.band.from * outW * 4);
+      (data as { set(a: ArrayLike<number>, o: number): void }).set(px, r.band.from * outW * chan);
     } else {
       // A COLUMN BAND IS NOT ONE SLICE OF THE PICTURE — it is a narrow strip
       // down every row of it, so it goes back a row at a time.
       if (r.height !== outH || r.width !== r.band.to - r.band.from) throw new Error("an export worker returned a band of the wrong shape");
-      const bw4 = r.width * 4;
-      for (let y = 0; y < outH; y++) data.set(r.data.subarray(y * bw4, y * bw4 + bw4), (y * outW + r.band.from) * 4);
+      const bw = r.width * chan;
+      for (let y = 0; y < outH; y++) {
+        (data as { set(a: ArrayLike<number>, o: number): void }).set(px.subarray(y * bw, y * bw + bw), (y * outW + r.band.from) * chan);
+      }
     }
     covered += r.band.to - r.band.from;
   }
@@ -173,7 +201,7 @@ export async function exportBands(
   outH: number,
   job: ParallelJob,
   onProgress?: (fraction: number) => void,
-): Promise<{ data: Uint8ClampedArray<ArrayBuffer>; threads: number }> {
+): Promise<{ data?: Uint8ClampedArray<ArrayBuffer>; rgb?: Uint16Array<ArrayBuffer>; threads: number }> {
   // THE SAME AXIS THE EXPORT'S OWN LOOP RUNS ALONG — rows, or columns under a
   // quarter-turn. Derived from the same `rotate` the workers are handed, so the
   // two cannot disagree about what a band is.
@@ -236,7 +264,11 @@ export async function exportBands(
       }));
     }
     const results = await Promise.all(jobs);
-    return { data: stitchBands(results, outW, outH, axis), threads: jobs.length };
+    const chan = opts.format === "tiff" ? 3 : 4;
+    const stitched = stitchBands(results, outW, outH, axis, chan);
+    return chan === 3
+      ? { rgb: stitched as Uint16Array<ArrayBuffer>, threads: jobs.length }
+      : { data: stitched as Uint8ClampedArray<ArrayBuffer>, threads: jobs.length };
   } finally {
     for (const w of workers) w.terminate();
   }
