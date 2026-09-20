@@ -408,17 +408,31 @@ stay inside it is the one that reads +0.1. A fixed-window texture measure on a
 region smaller than a few windows measures the region's surroundings.
 
 **A colour-and-texture key cannot do this job**, and that is now measured
-rather than suspected. What the instrument needs is a truth that does not
-derive from a per-frame key at all: sky painted once per practice frame,
-reviewed as an image, and held fixed. That is a real piece of work and it is
-what this item is now blocked on. It is NOT filed as its own roadmap record —
-the roadmap is what the ⓘ dialog shows readers, and an acceptance instrument's
-truth is not a reader-facing feature — so it lives here, as 023's remaining
-work.
+rather than suspected. So the correction is DECLARED instead of derived, in
+`.not-sky` at the repo root, and **the acceptance walk is green on all three
+frames for the first time**: NIR_1651's open sky 93.4% to **99.2%**, its edge
+band 94% to 95%, its uncovered reachable sky 5.8% to 1.1%. The other two frames
+are untouched to the digit, which is the first thing to check about a
+correction.
 
-Until it exists this check stays red for a reason that is written down, which
-is the least bad state available: a red whose cause is known beats a green
-bought by moving the truth.
+**A row names a CONNECTED COMPONENT, never a rectangle**, by a point inside it.
+A box drawn round that corner would also swallow the real sky above it, and
+removing real sky makes this test EASIER — the one direction a correction must
+never move. The map shows the corner gone and the sky above it still counted.
+
+**Four guards, because a file like this is otherwise a way to buy green**, and
+all four were watched firing before any of it was believed: every row prints on
+every run with the size it removed; a row matching no component fails as stale;
+a row with no reason fails; a row removing more than 10% of the frame's keyed
+sky fails whatever it says. The one row removes 4.7%.
+
+**What the green rests on, stated plainly so it can be re-examined:** one
+assertion that a particular 18,933 px component of NIR_1651 is a defocused
+foreground branch rather than sky. The evidence is a three-times magnified crop
+of that corner, and an independent second key — the grow's own, read through
+`tools/sky-probe.mjs --why` — which finds no unselected sky-coloured component
+on that frame above 692 px. Both are recorded above. If that assertion is
+wrong, the row is wrong and the green with it.
 
 **What is still owed:** the boundary. The grow fixes the interior and the gaps
 and leaves the rim misplaced by a pixel or two. Composing the guided filter
