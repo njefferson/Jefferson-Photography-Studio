@@ -3830,6 +3830,15 @@ const gradeBalEl = $("gradeBal") as HTMLInputElement;
 const gradeBandUI: { hue: HTMLInputElement; amt: HTMLInputElement; puck: HTMLSpanElement; val: HTMLSpanElement; wheel: HTMLDivElement }[] = [];
 const WHEEL_R = 44; // px — half the .grade-wheel box; puck travel radius below
 const PUCK_MAX = 33; // keep the puck's centre inside the ring
+/** HOW CLOSE TO THE MIDDLE THE ANGLE STOPS MEANING ANYTHING.
+ *
+ *  Five pixels of a 33-pixel travel, so the hue is held over the innermost 15%
+ *  of the wheel — an amount of 0.15, which is below where the tint is visible
+ *  at all, so nothing a reader can see is being refused. Larger and choosing a
+ *  colour at a deliberately gentle amount would feel stuck; smaller and the
+ *  angle is still unstable enough that a pull toward the centre would swing
+ *  the hue on the way in, which is the defect. */
+const GRADE_HUE_MIN_R = 5;
 
 for (let band = 0; band < 3; band++) {
   const row = document.createElement("div");
@@ -3856,6 +3865,15 @@ for (let band = 0; band < 3; band++) {
     const l = document.createElement("label");
     l.append(label + " ");
     const inp = document.createElement("input");
+    // AN ID, BECAUSE WITHOUT ONE THE DOUBLE-TAP GESTURE CANNOT SEE THIS
+    // CONTROL AT ALL. `captureSliderDefaults` walks `#panel input[type=range]`
+    // and skips anything with no id; `back()` then looks the element up BY id.
+    // These six were built here with every attribute except that one, so the
+    // gesture that puts a slider back where the photograph opened had nothing
+    // to find on any of them — shipped and believed complete since 2026-09-09,
+    // reported 2026-09-20. The tone curve's five points had the same shape of
+    // problem and were given their own array; these were never noticed.
+    inp.id = `grade${label}${band}`;
     inp.type = "range";
     inp.min = String(min);
     inp.max = String(max);
@@ -3889,8 +3907,18 @@ for (let band = 0; band < 3; band++) {
       const dy = ev.clientY - (rect.top + rect.height / 2);
       // 0° at 12 o'clock, clockwise — the CSS conic ring's own convention.
       const deg = (Math.atan2(dx, -dy) * 180) / Math.PI;
-      params.grade![band * 2] = Math.round(((deg % 360) + 360) % 360);
-      params.grade![band * 2 + 1] = Math.min(1, Math.sqrt(dx * dx + dy * dy) / PUCK_MAX);
+      const r = Math.sqrt(dx * dx + dy * dy);
+      // THE HUE IS HELD NEAR THE CENTRE, and this is a defect fix rather than a
+      // refinement. This line used to write the angle on EVERY move, so pulling
+      // the puck in to take the effect off overwrote the hue with whatever
+      // `atan2` returned on the way — and at the exact centre that is
+      // `atan2(0, 0)`, which is 0. The reader's chosen colour was destroyed by
+      // the act of reducing its amount, leaving no axis to come back out along;
+      // reported 2026-09-20 in those words. Below this radius the angle is
+      // noise, so only the amount is written — which is exactly what the Amount
+      // slider beside the wheel already does, and the two controls now agree.
+      if (r >= GRADE_HUE_MIN_R) params.grade![band * 2] = Math.round(((deg % 360) + 360) % 360);
+      params.grade![band * 2 + 1] = Math.min(1, r / PUCK_MAX);
       updateGradeUI();
       draw();
     };
