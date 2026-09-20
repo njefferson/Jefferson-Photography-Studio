@@ -21,6 +21,7 @@ import { readdirSync } from "node:fs";
 import { join, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
+import { requireFreshDist } from "./fresh-dist.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const PORT = (process.argv.find((a) => a.startsWith("--port=")) || "--port=8131").split("=")[1];
@@ -38,6 +39,10 @@ if (!serving) {
   process.exit(2);
 }
 if (!walks.length) { console.error("no walks matched"); process.exit(2); }
+// AND THE BUILD IS THE ONE THIS TREE WOULD MAKE. Each walk refuses a stale dist
+// itself; this refuses once instead of thirty-six times, for the same reason
+// the serving check above it exists.
+requireFreshDist();
 
 const run = (file) =>
   new Promise((res) => {

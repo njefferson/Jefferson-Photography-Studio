@@ -24,6 +24,10 @@
 // to what it was: the ratio pass against the gains already in the buffer, no
 // second copy, no drift.
 import { chromium } from "playwright-core";
+import { requireFreshDist } from "./fresh-dist.mjs";
+// BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
+// directory to this tree. See tools/fresh-dist.mjs.
+requireFreshDist();
 import { readFileSync, existsSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";

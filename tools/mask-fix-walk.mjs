@@ -25,6 +25,10 @@
 //
 // --plant skips the arming press. Three of its checks must go red.
 import { chromium } from "playwright-core";
+import { requireFreshDist } from "./fresh-dist.mjs";
+// BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
+// directory to this tree. See tools/fresh-dist.mjs.
+requireFreshDist();
 import { writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 const PORT = (process.argv.find(a=>a.startsWith("--port="))||"--port=8131").split("=")[1];

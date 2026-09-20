@@ -22,7 +22,7 @@ import { type DecodedImage, pickLargestPreview, linearAt, grayWorldWB, lumNormal
 import { decodeOffThread, decodeLanes, decodeLaneTarget, type DecodeTiming } from "./decodeClient";
 import { sourceIsMosaiced, type ExportOptions } from "./export";
 import { Renderer, type EditParams } from "./gl";
-import { exportImage, saveBlob, lastExportProfile, getSource, proxyFactorFor, type ExportFormat } from "./export";
+import { exportImage, saveBlob, lastExportProfile, exportThreadsNow, getSource, proxyFactorFor, type ExportFormat } from "./export";
 import { buildLinearSourceInBands } from "./gpuexport";
 import { fromHalf } from "./half";
 import { findLocation, stripLocation } from "./gps";
@@ -6251,6 +6251,34 @@ function mkHandle(role: string): SVGCircleElement {
   return c;
 }
 
+/** IS THE MASKS TAB ACTUALLY IN FRONT OF THE READER — asked once, answered in
+ *  one place, because the two callers of this question drifted apart and it
+ *  cost the reader their own mask.
+ *
+ *  `renderMaskOverlay` was given a full-view term on 2026-09-20 so the tint and
+ *  the dotted outline stand down in the mode whose whole purpose is to show the
+ *  photograph. `skyFixOn` restated the same rule — `!panel.hidden &&
+ *  activePanelTab === "masks"` — and was not touched, so an armed hand
+ *  correction still owned the canvas in full view. Full view hides the panel
+ *  with CSS (`#app[data-full="1"] #panel { display: none }`) and NEVER with the
+ *  `hidden` attribute, so `panel.hidden` stays false and the second copy kept
+ *  saying yes.
+ *
+ *  What that cost: with a Sky mask selected and Add by hand armed, the tap that
+ *  LEAVES full view — one of the documented ways out — was taken by `startFix`,
+ *  which stamps a dab and records a stroke. And the overlay had just been made
+ *  to stand down, so nothing on screen said it had happened. The reader came
+ *  back carrying a correction to their selection that they never made, replayed
+ *  on every regeneration afterwards.
+ *
+ *  What the result has to satisfy: every consumer that means "the reader can
+ *  see and reach the mask controls" calls THIS, and none of them restates it. */
+function masksTabInFront(): boolean {
+  return !panel.hidden
+    && activePanelTab === "masks"
+    && document.getElementById("app")?.dataset.full !== "1";
+}
+
 // (Re)build the overlay element set for the selected mask. Cheap, but only call
 // when the SET of elements changes (select/add/delete/type) — NOT during a drag,
 // which would destroy the element holding the pointer capture.
@@ -6272,8 +6300,7 @@ function renderMaskOverlay() {
   // Derived, never stored: `showMaskOutline` is the reader's own toggle and is
   // not touched, so somebody who had the overlay off before entering still has
   // it off afterwards, and somebody who had it on gets it back.
-  const fullView = document.getElementById("app")?.dataset.full === "1";
-  const overlayOn = !!current && !panel.hidden && welcome.hidden && activePanelTab === "masks" && showMaskOutline && !!m && !fullView;
+  const overlayOn = !!current && welcome.hidden && showMaskOutline && !!m && masksTabInFront();
   // Coverage tint: re-render with the shader overlay when what's shown changes.
   // It also steps aside while a slider is being dragged (maskAdjusting) so the
   // adjustment shows on the real photo — the handle outline below is unaffected.
@@ -6394,7 +6421,7 @@ function skyFixOn(): boolean {
   // The Masks tab has to be the one open: an armed correction owns the canvas
   // ahead of pan and pinch, and a mode left armed behind a closed panel is a
   // photograph that will not move under the finger for no visible reason.
-  return !!m && m.type === 4 && skyFixMode !== 0 && !panel.hidden && activePanelTab === "masks";
+  return !!m && m.type === 4 && skyFixMode !== 0 && masksTabInFront();
 }
 function setSkyFixMode(mode: 0 | 1 | 2) {
   skyFixMode = mode;
@@ -9992,14 +10019,28 @@ function canLetGo(): { ok: boolean; why: string } {
  *  say so instead of leaving the reader to wonder. */
 let keptInMemory = "";
 
-/** Why an export will be slow, said only where it is knowable at the press: the
- *  parallel export refuses a photo carrying healed spots, stickers or a warp,
- *  and refuses TIFF. It also refuses an output too small to be worth splitting,
- *  and that size is the export's own arithmetic — an earlier version guessed it
- *  from the half-size preview and printed "on one thread" over an export the
- *  app's own report said had run on three. */
-function willRunOnOneThread(p: EditParams, format: string): boolean {
-  return (p.spots?.length ?? 0) > 0 || (p.stickers?.length ?? 0) > 0 || !!p.warp || format !== "jpeg";
+/** WHAT TO ADD TO THE EXPORT STRIP ABOUT THREADS — nothing, until the export
+ *  itself knows.
+ *
+ *  This replaced a PREDICTOR, `willRunOnOneThread`, which was wrong twice in
+ *  both directions. Its first version guessed the output size from the
+ *  half-size preview and printed "on one thread" over an export the app's own
+ *  report said had run on three. Its second carried a copy of the rule that
+ *  refuses TIFF, which stopped being true on 2026-09-20 when TIFF learned to
+ *  use the pool — so the strip said one thread while the export ran on eight,
+ *  and it was reported from the device with the report beside it saying so.
+ *
+ *  The size condition is why it could not simply ask `canRunParallel`: the
+ *  output size is the export's own arithmetic over crop, straighten, rotation
+ *  and scale, and no handler out here can work it out. So this stops guessing
+ *  and reads what the export has decided. `exportThreadsNow()` is 0 until the
+ *  pool size is settled, which is before all but the first progress callbacks,
+ *  and a 0 says NOTHING rather than claiming something.
+ *
+ *  What the result has to satisfy: it can never disagree with the "Last export"
+ *  line in the §7f report, because both come from the same number. */
+function threadNote(): string {
+  return exportThreadsNow() === 1 ? " — on one thread" : "";
 }
 
 /** Whether the last activateCurrent was a first visit (a fresh baseline and a
@@ -12005,8 +12046,29 @@ interface QuickItem {
  *  otherwise everything you did not reject. That way a folder gone through
  *  without marking anything behaves exactly as it did before there were marks,
  *  and one pick changes the answer to "only what I chose". */
+/** WILL THIS ONE BE KEPT — with picks in play, only the picks; without them,
+ *  everything not rejected.
+ *
+ *  THE TEST IS "DID IT FAIL", NOT "IS IT READY", and the difference is a
+ *  defect that shipped on 2026-09-20. It read `it.ok`, which was the same
+ *  question back when `quickItems` held only files the loop had already
+ *  processed — every entry was either a photograph or a failure. Putting every
+ *  cell on the sheet up front gave `ok` a third meaning it never had: NOT READ
+ *  YET. So a cell picked while its picture was still coming showed as picked,
+ *  was counted in the header, and was then silently dropped by Keep — the
+ *  reader culls forty frames and gets fewer than they chose, with nothing
+ *  saying which.
+ *
+ *  A waiting cell is a real file with a real name, and a reader who recognises
+ *  the number is entitled to pick it. If its bytes then turn out to be
+ *  unreadable, `addToSession` skips it and SAYS SO, which is the graceful path
+ *  that already exists. Only `bad` — this run tried and failed — is excluded.
+ *
+ *  What the result has to satisfy: the count `quickSelectedCount` puts on the
+ *  Keep button is the number of photographs `keepQuickLook` actually hands to
+ *  `openPicked`. Those two must not be able to disagree. */
 function willKeep(it: QuickItem, anyPicks: boolean): boolean {
-  return it.ok && (anyPicks ? it.mark === "pick" : it.mark !== "reject");
+  return it.state !== "bad" && (anyPicks ? it.mark === "pick" : it.mark !== "reject");
 }
 function quickPickCount(): number {
   return quickItems.reduce((n, it) => n + (it.mark === "pick" ? 1 : 0), 0);
@@ -12405,6 +12467,13 @@ async function openQuickLook(files: File[]) {
    *  go: a run of forty leaks forty object URLs otherwise, each holding a JPEG
    *  alive for as long as the tab is. */
   const setPicture = (it: QuickItem, bytes: ArrayBuffer | Uint8Array, state: QuickItem["state"]) => {
+    // ABANDONED RUNS CREATE NOTHING. The generation checks sit before each
+    // await, but `makeThumb` is awaited AFTER the last one — so a close landing
+    // during it used to reach here with `it` already detached from
+    // `quickItems`, mint an object URL on it, and leave it alive for the life
+    // of the tab. Nothing revokes an item the close no longer holds. Refusing
+    // here is cheaper than finding it again afterwards.
+    if (gen !== quickGen) return;
     const old = it.thumbUrl;
     it.thumbUrl = URL.createObjectURL(new Blob([bytes instanceof Uint8Array ? bytes.slice() : bytes], { type: "image/jpeg" }));
     it.state = state;
@@ -12432,6 +12501,11 @@ async function openQuickLook(files: File[]) {
     if (cached && cached.grid.byteLength) {
       setPicture(it, cached.grid, "real");
       it.stripThumb = cached.strip?.byteLength ? cached.strip : null;
+      // THE FAST CASE COUNTS TOO. This was the one path that put a picture on
+      // screen without recording when — so a second look at the same folder,
+      // which is the run most likely to feel instant and the one worth
+      // measuring, reported no first picture at all.
+      if (!firstPicture) firstPicture = performance.now() - t0;
       reused++;
       return;
     }
@@ -12471,9 +12545,14 @@ async function openQuickLook(files: File[]) {
         it.stripThumb = await makeThumb(img, 260, lensCurveFor(imported)).catch(() => null);
         msRender += performance.now() - tRender;
         // Kept for next time. Not awaited: the reader is watching the grid
-        // fill, and a write to storage is not part of that. TIMED ANYWAY —
-        // not awaiting it does not make it free, it makes it land somewhere
-        // else in the same run.
+        // fill, and a write to storage is not part of that.
+        // WHAT THE NUMBER BELOW IS, precisely, because the comment here used to
+        // claim more than it could deliver: it is the SYNCHRONOUS cost of
+        // handing the write off — serialising the call and returning — and not
+        // the write. An unawaited promise cannot be timed from its call site.
+        // It reads near zero and that is the honest answer; the write's real
+        // cost lands wherever the event loop gets to it, which is measurable
+        // only from inside `putPreview`.
         const tStore = performance.now();
         if (it.stripThumb) void putPreview(f, QUICK_EDGE, { grid: thumb, strip: it.stripThumb }, gradeStampAt, lensStamp);
         msStore += performance.now() - tStore;
@@ -13620,11 +13699,11 @@ async function exportPicked(): Promise<void> {
       if (activePhotoId !== view.id || !current || !currentFile) { skipped.push(`${view.name} (could not be opened)`); continue; }
       const job = openPhotoExportJob();
       if (!job) { skipped.push(`${view.name} (could not be opened)`); continue; }
-      const slow = willRunOnOneThread(job.params, job.opts.format) ? " — on one thread" : "";
+
       try {
         const result = await exportImage(
           job.file, job.frame, job.params, job.opts,
-          (f) => showExportStrip(`Exporting ${where} — ${view.name}… ${Math.round(f * 100)}%${slow}`, { actions: true, stop: true }),
+          (f) => showExportStrip(`Exporting ${where} — ${view.name}… ${Math.round(f * 100)}%${threadNote()}`, { actions: true, stop: true }),
           job.lens,
           job.sky,
           job.skyFine,
@@ -13787,11 +13866,10 @@ async function runExport(): Promise<void> {
   // to canRunParallel, and printed "on one thread" over an export the app's own
   // report then said had run on three. A label that is wrong about the thing it
   // exists to explain is worse than no label.
-  const oneThread = willRunOnOneThread(snapParams, opts.format);
 
   ui.exBtn.disabled = true; // ONE AT A TIME: at most one extra frame is ever held
   const releaseWake = keepAwake();
-  showExportStrip(`Exporting ${file.name}… 0%${oneThread ? " — on one thread" : ""}`);
+  showExportStrip(`Exporting ${file.name}… 0%${threadNote()}`);
   try {
     const result = await exportImage(
       file,
@@ -13799,7 +13877,7 @@ async function runExport(): Promise<void> {
       snapParams,
       opts,
       (f) => {
-        showExportStrip(`Exporting ${file.name}… ${Math.round(f * 100)}%${oneThread ? " — on one thread" : ""}`);
+        showExportStrip(`Exporting ${file.name}… ${Math.round(f * 100)}%${threadNote()}`);
       },
       // The raw export re-decodes from the file, so the measured correction has
       // to travel with it or the saved image would not match the screen.

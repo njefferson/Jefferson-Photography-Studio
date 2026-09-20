@@ -137,3 +137,28 @@ also=tools/scope-check.mjs
 # read out of the source; an exclusion must say why the field belongs to the
 # photograph rather than the grade.
 also=tools/stamp-check.mjs
+
+# Run on every commit: exactly one function decides how many export workers
+# start. It was worked out in two places — the gate that APPROVES a parallel
+# export and the code that STARTS the workers — and on 2026-09-20 one of them
+# learned that a 16-bit TIFF band weighs six bytes a pixel and the other kept
+# the 4-byte default. Both sides were individually correct; what was wrong was
+# that there were two sides, and since the count is monotonically larger at four
+# the spawn could only ever exceed what the gate had approved. Measured on a
+# tablet-class device at ~31 MP: gate 3, spawn 4, 629 MB against the 600 MB
+# ceiling that exists because such a device kills the tab rather than swapping,
+# and a killed tab loses the session. A test that re-derived the arithmetic
+# would have passed — this refuses the SHAPE instead, so the second call site
+# cannot come back.
+also=tools/one-pool-check.mjs
+
+# Run on every commit: the patch-note refusal is INSTALLED. Commit subjects are
+# the in-app patch notes, and five of them reached the ⓘ dialog saying nothing
+# about whether each was a defect put right or something new — one ended "and
+# says what it cost", which is about the diagnostic report and means nothing in
+# a list of changes. The refusal itself has to be a `commit-msg` hook, because
+# the subject does not exist yet when pre-commit runs; and .git/hooks is empty
+# in every fresh container, so the gate's absence looks exactly like it passing.
+# This is the half that can run here: the hook is there and matches the tracked
+# copy. It reads "user-facing" out of vite.config.ts rather than restating it.
+also=tools/patch-note-check.mjs

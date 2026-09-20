@@ -33,6 +33,10 @@
 // a reason after `—`, checked BOTH WAYS and printed on every run: a list that
 // hides what it excuses is a list nobody audits.
 import { chromium } from "playwright-core";
+import { requireFreshDist } from "./fresh-dist.mjs";
+// BEFORE THE BROWSER: this renders through the build in `dist`, and a stale one
+// renders the PREVIOUS build's pictures. See tools/fresh-dist.mjs.
+requireFreshDist();
 import { readFileSync, existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { PAGES, repo } from "./surfaces.mjs";

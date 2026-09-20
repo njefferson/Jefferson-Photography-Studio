@@ -18,6 +18,10 @@
 // sentence that is a constant is not a measurement, which is the shape of defect
 // this repository keeps paying for.
 import { chromium } from "playwright-core";
+import { requireFreshDist } from "./fresh-dist.mjs";
+// BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
+// directory to this tree. See tools/fresh-dist.mjs.
+requireFreshDist();
 import { existsSync } from "node:fs";
 
 const arg = (k, d) => (process.argv.find((a) => a.startsWith(`--${k}=`)) || `--${k}=${d}`).split("=").slice(1).join("=");

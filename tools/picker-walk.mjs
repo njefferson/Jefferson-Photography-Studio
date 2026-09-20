@@ -19,6 +19,10 @@
 // bug is WebKit's, in standalone mode. That is what the report's picker counter
 // is for.
 import { chromium } from "/home/user/Jefferson-Photography-Studio/node_modules/playwright-core/index.mjs";
+import { requireFreshDist } from "./fresh-dist.mjs";
+// BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
+// directory to this tree. See tools/fresh-dist.mjs.
+requireFreshDist();
 const PORT = (process.argv.find((a) => a.startsWith("--port=")) || "--port=8131").split("=")[1];
 const EX = new URL("./fixtures/", import.meta.url).pathname;
 let failed = 0;

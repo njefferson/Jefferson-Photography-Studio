@@ -24,6 +24,10 @@
 //   the DECODE, because correlation is scale-free and a pre-balance ratio is
 //   dominated by gain (section 4c-iv). Two different questions, two places.
 import { chromium } from "playwright-core";
+import { requireFreshDist } from "./fresh-dist.mjs";
+// BEFORE THE BROWSER: this renders through the build in `dist`, and a stale one
+// renders the PREVIOUS build's pictures. See tools/fresh-dist.mjs.
+requireFreshDist();
 import { readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 

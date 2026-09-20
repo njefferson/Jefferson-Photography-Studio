@@ -31,6 +31,10 @@
 // A raw has no such comparison — it opens gray-world balanced on purpose — so it
 // is checked only for the swap state it has always had.
 import { chromium } from "/home/user/Jefferson-Photography-Studio/node_modules/playwright-core/index.mjs";
+import { requireFreshDist } from "./fresh-dist.mjs";
+// BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
+// directory to this tree. See tools/fresh-dist.mjs.
+requireFreshDist();
 const PORT=(process.argv.find(a=>a.startsWith("--port="))||"--port=8131").split("=")[1];
 const BASE=`http://127.0.0.1:${PORT}`;
 const D="/tmp/claude-0/-home-user/2bd37282-d617-5a51-b357-6b20783a5840/scratchpad/real";

@@ -36,6 +36,10 @@
 //   node export-bytes.mjs --record      (quiet run; prints a hash)
 //   node export-bytes.mjs --interfere   (switch photos and edit while it runs)
 import { chromium } from "/home/user/Jefferson-Photography-Studio/node_modules/playwright-core/index.mjs";
+import { requireFreshDist } from "./fresh-dist.mjs";
+// BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
+// directory to this tree. See tools/fresh-dist.mjs.
+requireFreshDist();
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 const DIR = "/home/user/Jefferson-Photography-Studio/public/examples";

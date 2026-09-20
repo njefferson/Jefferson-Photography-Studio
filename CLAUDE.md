@@ -172,6 +172,35 @@ it: a gate that only counts says a filing cabinet is full.
 Commit subjects/bodies are the in-app patch notes, read by end users from the
 ⓘ dialog. Write them for the END USER — what changed for them, not how.
 
+**AND EVERY SUBJECT THE READER SEES OPENS WITH ONE OF FOUR WORDS (owner,
+2026-09-20): Fixed, New, Faster, Changed.** Reported from the device: five
+notes were in the ⓘ dialog and not one of them said whether it was a defect
+put right or something new, so a reader could not tell a thing they had been
+waiting for from a thing that had been broken. One ended "and says what it
+cost", which is about the app's own diagnostic report and means nothing in a
+list of changes. The verdict was that the notes were useless to the reader and
+to everyone else.
+
+Fixed is something that was wrong and now is not. New is something that was not
+there. Faster is the same thing taking less time. Changed is the same thing
+behaving differently on purpose. An internal commit needs no prefix — it is one
+touching only tools, docs and dotfiles, or whose subject starts `Notes:`,
+`Docs:`, `Roadmap:`, `Internal:` or `Chore:`.
+
+**Gated, because a convention in a file is the thing this repo has the most
+lessons about.** [`tools/patch-note-check.mjs`](tools/patch-note-check.mjs)
+refuses the commit. The refusal has to be a **`commit-msg`** hook — the subject
+does not exist yet when `pre-commit` runs — so `.githooks/commit-msg` is the
+door, `.claude/hooks/session-start.sh` installs it, and the pre-commit chain
+asserts it is installed and current, because `.git/hooks` is empty in every
+fresh container and an absent gate looks exactly like a gate that passed.
+**It does not carry its own copy of "user-facing"**: it reads `INTERNAL_PATH`
+and `INTERNAL_SUBJECT` out of `vite.config.ts`, the same two patterns the ⓘ
+dialog filters with, and stops with an error if either is renamed. One rule in
+two places, one of them updated, is the defect class that cost most of a day on
+the day this was written. `--above-main` prints every reader-facing subject on
+the branch; run it before a promotion.
+
 **NO TRAILER OF ANY KIND, AND NEVER A LINK TO A CHAT (owner, 2026-09-18).** No
 `Co-Authored-By` line, no `Claude-Session` line, no session URL, no model name,
 in a commit message, a PR title or body, a comment, or a file. The harness
