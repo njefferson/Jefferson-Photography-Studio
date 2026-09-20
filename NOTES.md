@@ -579,6 +579,16 @@ user-scalable=no.
   no step to announce it, and a vertical band of selection stands down the
   trunks on NIR_1638, NIR_1830 and NIR_1873 — the last of which used to report
   no sky at all and now reads 7.4%, none of it sky.
+  **AND A THIRD THING, reported 2026-09-20 and confirmed by looking.** On a
+  frame of a parked jet in front of a long building, the sky above the building
+  is selected and a band of sky BELOW the aircraft's wing — above the roofline,
+  behind the trees — is not. That is not a threshold to loosen: the horizon
+  method stores ONE border depth per column, which is what makes it cheap and
+  robust, so a column passing through the wing ends its sky there and
+  everything under it is ground by construction. It cannot represent sky that
+  reappears below an object. The colour grow is what would reach it, and
+  whether the grow may cross the border downward — without running into the
+  building — is the question this item now carries.
 - [ ] **The Sky mask reads the sky's colour as well as its place** <!-- decision: 023 -->
   reported 2026-09-18 from the iPad with three screenshots of one frame: the
   Sky mask leaves a rim of unselected sky round every object and misses the
@@ -668,6 +678,108 @@ user-scalable=no.
   measurement: the sky selection is not in the critical path, and the shared-look
   sniff never reads a raw.
   See `docs/decisions/033-the-wait-before-the-first-picture-and-the-wait-after-keep.md`.
+- [ ] **Full screen shows the mask** <!-- decision: 037 -->
+  reported 2026-09-20: opening full-screen view while the Masks tab is up
+  carries the mask into it — the coverage tint AND the dotted handle outline —
+  and full view exists to look at the photograph. One condition:
+  `renderMaskOverlay` decides whether the overlay is live from a list that does
+  not include full view, so entering it changes nothing about the overlay. The
+  same function already has the pattern — the tint steps aside while a slider
+  is being dragged, on exactly this reasoning. See
+  `docs/decisions/037-full-screen-shows-the-mask.md`.
+- [ ] **The Grade tab's controls do not behave like the rest of the app** <!-- decision: 035 -->
+  three defects reported together 2026-09-20, two of which share a cause.
+  **The wheel destroys the hue you chose when you take the amount off**: its
+  drag handler writes both values from the pointer every move, so pulling the
+  puck to the middle overwrites the angle with whatever `atan2` returns there —
+  0 at the exact centre — and there is no axis left to come back out along. The
+  Amount slider does not do this, so the same band has two behaviours.
+  **Double-tap to put a slider back cannot reach any of the six grade
+  sliders**: they are built at runtime with no `id` at all, and both the
+  capture and the lookup are keyed by id, so the gesture has nothing to find.
+  **And Shadow colour runs the wrong way** — right reduces, where every other
+  slider in the app increases. That last one is a relabelling and never an
+  inversion: the stored number rides SavedLook, so flipping it would change the
+  meaning of every look already saved, shared or baked into an exported JPEG.
+  See `docs/decisions/035-the-grade-tab-controls-do-not-behave-like-the-rest.md`.
+- [ ] **The mask panel does not say what it can do** <!-- decision: 040 -->
+  four things reported 2026-09-20, and the first is the finding: the request
+  was for masks to "include add, subtract, etc, like commercial offerings" —
+  **and those shipped in 2.53**. `MaskLayer.op`, groups folded by
+  `groupWeight`, darktable's exclusive/inclusive algebra, with a walk that
+  proves it. The capability is there and was not found, which is a worse defect
+  than a missing feature because nothing in the app reports it: every gate is
+  green and the reader concludes the app cannot do it.
+  The other three: the hand-correction brush is one size with no ring under the
+  pointer, so the size is discovered by making a mark; there is nowhere to keep
+  a mask that took work; and nothing says you are finished with one and may
+  move on. The field's answer to the first and last is the same thing — masks
+  are a NAMED LIST, and leaving one is deselecting in a list that is always
+  there. A saved mask is a RECIPE and not a bitmap, because a generated
+  selection is recomputed on the new photograph and a painted one does not
+  travel; this app already splits that way, since 031 keeps corrections as the
+  strokes they were. See
+  `docs/decisions/040-the-mask-panel-does-not-say-what-it-can-do.md`.
+- [ ] **An edit you can put down and come back to** <!-- decision: 039 -->
+  reported 2026-09-20: there is no way to save the photograph being worked on
+  and come back to it later. True, and by design in one half of the app — a set
+  of two or more opens as a persisted, resumable session, and a single
+  photograph opens ephemeral, with `openSingle`'s own comment saying there is
+  nothing to resume from a single edit. The session is not the answer either:
+  it is a working state with a Done that frees its storage, and the question is
+  "can I put this one down for a week", which wants a different answer.
+  The field keeps the edit as a few kilobytes of recipe beside the original and
+  never writes the file — which is already this app's shape, since a look is
+  0.5 KB of JSON. What the sources cannot settle is where the BYTES live: those
+  tools sit beside a filesystem, and this one cannot re-read a picked file after
+  a reload on iPad Safari. So keeping the edit is easy and keeping the
+  photograph is the decision. See
+  `docs/decisions/039-an-edit-you-can-put-down-and-come-back-to.md`.
+- [ ] **A TIFF export uses one core** <!-- decision: 036 -->
+  reported 2026-09-20 as a TIFF export that runs on one thread and takes
+  forever. It does, by an explicit condition: `canRunParallel` returns false on
+  any format that is not JPEG, so every TIFF falls to the single-threaded loop
+  on a machine that had eight workers and had just used them. The diagnostic
+  line beside the report read "17.6 MP in 27.5s — pixels 25.9s on 8 threads",
+  which looks like a contradiction and is not: that was a JPEG.
+  The condition is not an oversight — the band workers return eight bits a
+  channel and `writeTiff16` needs sixteen, so the parallel path has no 16-bit
+  return. Exporting at eight bits to make it fast is rejected: sixteen is the
+  reason to choose TIFF. The check afterwards is the one section 9l-ii
+  established — measure the exported FILE's bytes, not the screen. See
+  `docs/decisions/036-a-tiff-export-uses-one-core.md`.
+- [ ] **Straighten to a line you draw** <!-- decision: 038 -->
+  asked 2026-09-20: tap two points along an edge that should be level and let
+  the photograph straighten to it. Today the control is an angle — a slider and
+  a grid — so the reader sets a number and judges the result, when what they
+  know is not an angle but that THIS edge should be level and it is in front of
+  them. The field has this and it has a name: Lightroom's Angle tool in Crop &
+  Straighten, Photoshop's Ruler plus Straighten Layer, and in both it is a DRAG
+  along the edge. Two taps rather than a drag is an adaptation to a tablet held
+  in one hand, where a long precise drag competes with the pan gesture. The
+  angle goes into the same `straighten` value the slider already carries, so
+  undo, reset, the saved edit and the export inherit it with nothing new to
+  learn. See `docs/decisions/038-straighten-to-a-line-you-draw.md`.
+- [ ] **The red cast in the shadows comes off by hand, and should not have to** <!-- decision: 034 -->
+  reported 2026-09-20 with two renderings of one building frame and the Grade
+  panel that separates them — the Shadows wheel at 209 degrees, 47%. The shaded
+  wall and the area under the eaves open with a strong red cast; that tint takes
+  it out. The ask is that the app do it.
+  **The physics is two illuminants, and infrared pushes them further apart than
+  visible light does.** A visible-light shadow is lit by Rayleigh-scattered blue
+  skylight; in the near infrared that scattering collapses, which is the same
+  fact that makes an infrared sky dark, so the shadow gets almost no skylight
+  and is filled instead by bounce off the foliage — the brightest thing in the
+  frame. After the swap, that bounce is the red being taken out. One white
+  balance solves for one illuminant and there are two.
+  **And the automatic version was already tried and refused.** IR-SCIENCE
+  section 9j measured the additive complement: on the oak it works, eleven times
+  more effect on the bark than the leaves — and on a frame whose shadows are a
+  roof it took 858,273 grey pixels from saturation 0.005 to 0.989. So the
+  chosen route is per-photograph and multiplicative, measured from this frame's
+  own shadows the way the balance and the denoise floor already are, and bounded
+  so it cannot invent colour where there is none. See
+  `docs/decisions/034-the-red-cast-in-the-shadows-comes-off-by-hand.md`.
 - [ ] **A mask keys the photograph, not the grade** <!-- decision: 032 -->
   the Colour mask keys on the colour the pixel DISPLAYS — the decode through
   contrast and gamma, and downstream of the channel swap — so a mask picked
