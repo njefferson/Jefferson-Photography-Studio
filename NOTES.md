@@ -659,6 +659,26 @@ user-scalable=no.
   canvas's aspect, or the PAGE being zoomed rather than the canvas — cannot be
   told apart in a screenshot. Instrument first; make the escape unconditional
   either way. See `docs/decisions/012-full-view-must-fit-and-always-escape.md`.
+- [ ] **A mask can only act in one place, and there is only one version of an edit** <!-- decision: 030 -->
+  asked 2026-09-20 as a principle: a mask can be taken at any point in the
+  workflow, and without layers or named backups there is no way to work on the
+  raw underneath when all you have is the image in front of you.
+  **Half of it is already true and worth saying**: this app never overwrites
+  pixels. Every render starts from the linear decode, the sky selection is built
+  from that decode before any look and before the channel swap, and the raw is
+  always underneath. What is missing is that nothing INSIDE the pipeline can be
+  addressed — the order is fixed and invisible, a selection folds in at exactly
+  one stage, and there is one state with a linear undo.
+  **The measured cost is already written down**: the scope gate lists six
+  whole-frame knobs — denoise, chroma, texture, clarity, dehaze and the look's
+  own denoise — each carrying a reason that reduces to the same sentence, that
+  the sky and the canopy want opposite amounts and there is one control. Every
+  one is a mask with nowhere to be applied.
+  The field has both halves separately: RawTherapee ships named Snapshots beside
+  its history and is the cautionary case, giving no control over the order its
+  processes run; darktable's pixelpipe takes modules in any order with masks
+  combined per module. See
+  `docs/decisions/030-a-mask-can-only-act-in-one-place.md`.
 - [ ] **Aerochrome is the right colour and comes out splotchy** <!-- decision: 013 --> — reported
   from the iPad 2026-09-17 with two frames, on the look that shipped the same day:
   the colour is right, the foliage breaks into hard-edged patches and the gravel
@@ -1783,6 +1803,38 @@ good as the look that justifies a row, and a row justified by a mis-aimed crop
 passes all four guards while being wrong. The guards can check that a row is
 live, reasoned and bounded. They cannot check that somebody looked at the right
 place. That part is still a checklist, and it failed here.
+
+## What the Sky mask is FOR, ruled 2026-09-20, and a colour space nobody was tracking
+
+**THE RULING, and it re-weights the item above.** A photograph with no sky in it
+that happens to key as sky is NOT a failure — the reader simply does not reach
+for the Sky mask on it, or uses a different filter. What matters is that
+**photographs WITH sky get all of the sky selected and not more than sky.**
+
+So the flower macro's 76% is a thermometer rather than a gate, and the walk
+reports it without failing on it. The frames that carry the real requirement are
+the ones with sky in them, and the two halves of the requirement are
+completeness (NIR_1651's missed band) and precision (whatever is selected that
+is not sky). The walk currently BOUNDS the first and only REPORTS the second.
+
+**AND THE INSTRUMENT HAS BEEN MEASURING IN A SWAPPED SPACE ALL ALONG.** The look
+`eir` in `src/main.ts` is `{ swapRB: true, ... }`, and
+`tools/mask-truth-walk.mjs` presses `lookEir` before it adds the Sky mask and
+before it reads a single pixel. So every hue and saturation that walk has ever
+reported is measured on a render with red and blue exchanged — the look's own
+comment calls foliage "the infrared-bright red after the swap".
+
+Meanwhile the mask itself is built in the OTHER space: `prepareSkySource` reads
+`img.linear`, and `buildSkyGuide` and `skyGrowKey` work on gray-world-balanced
+linear data, before any look and before any swap. **The mask works on the raw
+underneath; the instrument grading it reads the manipulated display.** Every
+comparison made between the two today crossed that boundary.
+
+**The fact that made it visible**: run the same way under the same look, the
+walk reports the sky's hue as 200° on NIR_0063 and 0° on NIR_0172. Same camera,
+same look, same swap, 200° apart. At most one of those is the sky, and which one
+is being measured rather than reasoned about — reasoning has been wrong twice on
+this frame already.
 
 ## The corpus was three sky photographs, and it was hiding the real defect, 2026-09-20 (decision 029)
 

@@ -133,10 +133,8 @@ const FRAMES = arg("frames", ["NIR_0063", "NIR_1644", "NIR_1651", "NIR_0627"].ma
 // on a macro is defocused foliage — so the only honest question is how much of
 // the frame the mask claims at all. The answer should be almost none.
 const NO_SKY = { NIR_0627: "a macro of a flower spike; the background is defocused garden, not sky" };
-// What a no-sky frame may have selected before it counts as a defect. Not
-// fitted to the build: a photograph with no sky in it should select nothing,
-// and the allowance is for a stray pixel at an edge rather than for a region.
-const NO_SKY_MAX = 0.02;
+// NO BOUND. See the owner's ruling where this is used: a no-sky frame's number
+// is a thermometer, not a gate.
 // 023's targets, and the readings this was written against (Aerochrome on,
 // Reach 1, Feather 0.5, the 2800 px working copy): the mask covers open sky
 // nearly whole and its edge band poorly — the rim the tablet showed.
@@ -384,9 +382,15 @@ try {
     // is skipped, because on such a frame the key is keying foliage.
     if (NO_SKY[name]) {
       const share = m.covered / (m.W * m.H);
-      check(`${name}: a frame with no sky in it selects almost nothing (<= ${(100 * NO_SKY_MAX).toFixed(0)}%)`,
-        share <= NO_SKY_MAX,
-        `${(100 * share).toFixed(1)}% of the frame is selected — ${NO_SKY[name]}`);
+      // REPORTED, NOT BOUNDED — the owner's ruling, 2026-09-20. A photograph
+      // with no sky in it that happens to key as sky is not a failure: the
+      // reader simply does not reach for the Sky mask on it. What matters is
+      // frames that HAVE sky getting all of the sky and no more than the sky.
+      // This line stays because the number is a useful thermometer for the
+      // seed's appetite, and because a seed that claims three quarters of a
+      // macro is claiming it on other frames too — but it does not fail a run.
+      console.log(`      no sky in this frame: ${(100 * share).toFixed(1)}% selected`
+        + ` (${NO_SKY[name]}) — reported, not bounded`);
       results[name] = { noSky: true, covered: m.covered, share };
       writeFileSync(join(OUT, `${name}-missed.png`), Buffer.from(m.png.split(",")[1], "base64"));
       await p.locator("#view").screenshot({ path: join(OUT, `${name}-overlay.png`) });

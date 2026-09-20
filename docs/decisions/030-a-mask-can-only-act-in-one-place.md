@@ -1,0 +1,125 @@
+# 030 · A mask can only act in one place, and there is only one version of an edit
+
+## Context
+
+Asked 2026-09-20, and stated as a principle rather than a feature: a mask can be
+taken at any point in the workflow, and without layers or named backups there is
+no way to act on the raw underneath when all you have in front of you is the
+image and its pixels.
+
+**Half of that is already true here and should be said plainly, because it
+changes what is actually missing.** This app is non-destructive by construction:
+`EditParams` is a parameter set, every render starts from `img.linear`, and
+`prepareSkySource` builds the sky selection from that linear decode before any
+look and before any channel swap. The raw is always underneath and is never
+overwritten. There is no accumulating buffer of manipulated pixels.
+
+**What is missing is that nothing inside the pipeline is addressable.**
+
+- **The order is fixed and invisible.** A reader cannot see where a stage sits,
+  cannot move one, and cannot run one twice. Denoise happens where denoise
+  happens.
+- **A mask acts at exactly one stage.** `MaskLayer` weights fold in at the mask
+  stage in `compileEdit` and in the shader. There is no way to aim a selection
+  at an earlier stage — to denoise only the sky, say, which this repo's own scope
+  gate records as OWED against six separate knobs, every one of them marked
+  whole-frame because there is nowhere to aim it.
+- **There is one state.** Undo is a linear history. There is no way to keep two
+  versions of an edit side by side, name them, or return to one.
+
+**And it has already cost this investigation directly.** The acceptance
+instrument measures the sky mask on the RENDERED canvas after the E-IR look has
+been applied — a look which swaps red and blue. The mask is built from the raw;
+the instrument reads the manipulated display. That is the principle above,
+violated by the tooling rather than by the app, and it went unnoticed for the
+life of the walk.
+
+## Looked up
+
+The field has both halves, separately, and the split is instructive.
+
+**RawTherapee** keeps a History stack and, beside it, a **Snapshots** panel —
+named states you can return to within a session. Its editing is non-destructive
+in the same way this app's is: the raw is untouched and a sidecar records the
+changes. **But it is also the cautionary case**: it offers no visibility into or
+control over the order its processes are applied in, and it is not possible to
+apply any given process more than once. That is precisely the limitation
+described above, shipped by a mature editor.
+
+**darktable** takes the other road. Its pixelpipe is an explicit sequence of
+modules that can be added and removed in any order, with an unlimited number of
+masks that can be combined and blended per module. A selection there is not tied
+to one stage; it is an input any module can take.
+
+So "masks at any stage" is darktable's model and "named states" is
+RawTherapee's, and neither is exotic.
+
+Sources: RawPedia Getting Started (rawpedia.rawtherapee.com/Getting_Started);
+LWN, Raw photo editing with RawTherapee (lwn.net/Articles/883599/); darktable
+and RawTherapee comparisons (imagic.ink/blog/darktable-vs-rawtherapee-
+open-source-raw-shootout, shotkit.com/rawtherapee-vs-darktable/).
+
+## Weighed against
+
+**The scope gate is the measured argument that this is not cosmetic.**
+`tools/scope-check.mjs` lists forty-four whole-frame knobs, and six carry an
+OWED reason that reduces to the same sentence: the sky and the canopy want
+opposite amounts and there is one control. Denoise, chroma, texture, clarity,
+dehaze and the look's own denoise and texture. Every one of those is a mask
+waiting for somewhere to be applied.
+
+**026** shipped the algebra for combining masks — groups with add, subtract and
+intersect. That is the selection side of the problem solved. This is the other
+side: having somewhere to put the result.
+
+**029 and 023** are about whether the sky selection is CORRECT. This is about
+what the app can do with a correct one.
+
+## Depends
+
+- touches 026 — 026 built the combination model; this is where a combined mask
+  would be allowed to act.
+- distinct-from 029 — 029 is the selection being wrong about which pixels are
+  sky. This is the pipeline having one place to use a selection. A perfect
+  selection still cannot denoise only the sky today.
+- distinct-from 012 — a photograph filling the screen is a viewing question.
+
+## Options
+
+1. **Let a mask aim at named stages, smallest useful version first.** Keep the
+   pipeline order fixed, but allow a `MaskLayer` to declare which stages it
+   gates, starting with the ones the scope gate already records as OWED —
+   denoise and texture. One new field, a per-stage weight lookup, and the six
+   OWED reasons start coming off the list one at a time with a measurement each.
+2. Named snapshots of the whole `EditParams`, RawTherapee's model — cheap,
+   because the state is already a plain parameter object that is cloned for
+   undo. Solves comparison and return, solves nothing about aiming.
+3. A reorderable pixelpipe, darktable's model. The largest version, and it
+   changes every render path, the tile cache's stamp, the export and the shader.
+4. Both 1 and 2, in that order.
+
+## Rejected
+
+- **3 alone.** A reorderable pipeline is the general answer and it is a rewrite
+  of `compileEdit`, `src/gl.ts`, `stampOf` and the preview cache at once. This
+  repo's own record of what goes wrong when a stage moves — the TIFF export
+  corruption in IR-SCIENCE 9l-ii, diagnosed wrong the first time — is the
+  argument for not starting there.
+- **2 alone.** Named states would be genuinely useful and would not have
+  prevented any defect found this week. The aiming is what the measurements keep
+  pointing at.
+
+## Rank
+
+**Below the two sky-selection items and above the look tuning, provisionally.**
+
+The dependency test: 029 and 023 decide whether the selection is right, and this
+decides what can be done with it. Neither blocks the other, so this does not
+have to come first. But 013 and 016 are look-tuning items whose records both
+reach for per-population control that does not exist — the scope gate's OWED
+entries name denoise and texture specifically — so tuning them before this lands
+means tuning a whole-frame knob as a proxy for a selective one, and re-doing it
+after.
+
+Provisional because the rank rests on how much of 013 and 016 actually needs
+aiming, and that has not been measured. Whoever takes 013 first should say.
