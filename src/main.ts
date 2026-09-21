@@ -9599,12 +9599,45 @@ let learnMode = false;
 // right back. The start screen is also where the tutorials live, so Help's
 // "Tutorials" button routes here too (see the helpTutorials wiring).
 let lessonCardParked = false; // lesson card open when Home was pressed
+
+/** THE START SCREEN AND THE EDITOR DRAWER ARE NEVER BOTH ON SCREEN.
+ *
+ *  Takes `up` — true to raise the start screen, false to return to the
+ *  photograph — and returns nothing. It owns the only two elements that have to
+ *  agree about which of the two the reader is looking at.
+ *
+ *  What every caller relies on: after this, `panel.hidden` is TRUE whenever the
+ *  start card is up. Not `display: none` — the attribute. Three things read it
+ *  and would otherwise be wrong: `#app:has(#panel[hidden])` collapses the grid
+ *  so the stage takes the window, `masksTabInFront()` asks `!panel.hidden` and
+ *  its own contract records what it cost to hide the drawer the other way, and
+ *  `setGeoMode` uses the same attribute to tuck the drawer for a crop.
+ *
+ *  WHY IT IS A FUNCTION AND NOT TWO LINES AT EACH SITE. Seven places raise or
+ *  lower the start screen. Two of them set both elements and five set only
+ *  `welcome`, which is how pressing Home came to leave the whole drawer on
+ *  screen underneath the card — reported from an iPhone, 2026-09-21, where the
+ *  drawer had two thirds of the window and the card was squeezed into 305px of
+ *  the 699px a cold start gives it, clipped mid-sentence with its scroll cue
+ *  showing. One rule written in two places, one of them updated, is the defect
+ *  class this repository has the most lessons about.
+ *
+ *  AND THE ORDER MATTERS AT THE HOME SITE: `disarmPictureTools()` ends in
+ *  `setGeoMode(null)`, whose last act is `else if (current) panel.hidden =
+ *  false` — the line that un-tucks the drawer when a geometry tool exits. It
+ *  runs first and this runs after it, or leaving a photograph re-shows the
+ *  drawer every time, which is exactly what it did. */
+function setStartScreen(up: boolean): void {
+  welcome.hidden = !up;
+  panel.hidden = up || !current;
+}
+
 function goHome() {
   captureActiveEdit(); // park any in-flight edit before leaving the photo
   // Armed picture tools (and their banners) must not float over the start
   // screen or keep eating taps around the card (field gap, 2026-07-15).
   disarmPictureTools();
-  welcome.hidden = false;
+  setStartScreen(true); // AFTER the disarm above — see setStartScreen's last paragraph
   hint.hidden = !!current; // the tagline is for a cold start, not a return
   histWrap.hidden = true; // keep the histogram from floating over the card
   // The session strip sits above the welcome card (z-index) — hide it while the
@@ -9640,7 +9673,7 @@ function updateWelcomeReturn() {
 /** Leave the start screen and return to the live photo/session, restoring the
  *  session strip and stage sizing. */
 function returnToEditor() {
-  welcome.hidden = true;
+  setStartScreen(false);
   updateHistVisibility();
   updateSessionStrip(); // repaint + reshow the strip for a live session
   if (learnMode) {
@@ -9789,8 +9822,7 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
   }
   const __f = performance.now();
   // (recorded at the end of this function, so `rest` can carry the tail too)
-  panel.hidden = false;
-  welcome.hidden = true;
+  setStartScreen(false); // `current` was assigned above, so the drawer comes back with it
   lesson.hidden = true;
   lessonShow.hidden = true;
   // Any plain open/session-switch leaves learn mode; the gallery path turns it
@@ -10052,7 +10084,7 @@ async function openPickedFromFiles(files: File[]) {
   try {
     await openPicked(files);
   } catch (err) {
-    welcome.hidden = false;
+    setStartScreen(true);
     hint.hidden = false;
     hint.textContent = "Could not open this file: " + (err as Error).message;
     updateWelcomeReturn();
@@ -10113,7 +10145,7 @@ async function openFromOutside(files: File[]) {
   try {
     await openPicked(files);
   } catch (err) {
-    welcome.hidden = false;
+    setStartScreen(true);
     hint.hidden = false;
     hint.textContent = "Could not open this file: " + (err as Error).message;
     updateWelcomeReturn();
@@ -11491,7 +11523,7 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
   }
   if (notes.length) alert(notes.join("\n\n"));
   if (!sessionPhotos.length) {
-    welcome.hidden = false;
+    setStartScreen(true);
     hint.hidden = false;
     hint.textContent = "Nothing could be opened.";
     updateWelcomeReturn();
@@ -12343,8 +12375,7 @@ async function endSession() {
   renderer.clear();
   zoomCtl.hidden = true; // the zoom controls belong to a photograph, and there is none
   closeFinish(); // and the finishing panel belonged to a look on one
-  panel.hidden = true;
-  welcome.hidden = false;
+  setStartScreen(true);
   hint.hidden = false;
   hint.textContent = "Edit infrared photos — RAW (NEF / DNG) unlocks the full color magic.";
   histWrap.hidden = true;
@@ -13612,7 +13643,7 @@ async function keepQuickLook() {
   try {
     await openPicked(files, ready);
   } catch (err) {
-    welcome.hidden = false;
+    setStartScreen(true);
     hint.hidden = false;
     hint.textContent = "Could not open these files: " + (err as Error).message;
     updateWelcomeReturn();
