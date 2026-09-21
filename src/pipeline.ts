@@ -691,6 +691,23 @@ export const AIM_CLARITY = 2;
  *  so a deep infrared sky's dark end is desaturated to pay for a tree's bark.
  *  Aiming it is the second weight that record asked for. */
 export const AIM_SHADOW = 4;
+/** THE IR LENS HOT-SPOT FIX, both halves of it: the manual `hotspot` /
+ *  `hotspotColor` sliders and the measured `lensFix` / `hsFix` curves.
+ *
+ *  One bit rather than three, because to a reader they are ONE correction
+ *  reached two ways — the hot spot this converted sensor puts in the middle of
+ *  the frame — and three toggles for it would be three ways to ask the same
+ *  question. The scope gate's reason for all three is also the same sentence:
+ *  radial geometry is not a population, so the fix treats the sky and the
+ *  foliage at a given radius identically when the sky is the only place the
+ *  hot spot shows.
+ *
+ *  `vignette` is deliberately NOT aimed and shares `radialGain` with the hot
+ *  spot: it is declared whole-frame on purpose, a creative darkening of the
+ *  frame's edge, so the weight scales the hot-spot AMOUNT rather than the
+ *  combined gain. gHot is linear in that amount, so scaling it is exactly the
+ *  same thing as blending the hot-spot's own gain toward 1. */
+export const AIM_LENS = 8;
 
 export interface MaskLayer {
   type: 0 | 1 | 2 | 3 | 4;
@@ -1769,11 +1786,16 @@ export function compileEdit(
     // IR lens correction: radial luminance gain after WB (spatial -> skipped in
     // the LUT bake where u/v are absent), matching the shader.
     if (lensOn && u !== undefined && v !== undefined) {
-      const gain = radialGain(p.hotspot, p.hotspotSize, p.vignette, u, v, aspect);
+      // AIMED, IF ANY MASK ASKED (decision 030). The weight scales the
+      // hot-spot AMOUNT, never the combined gain — `vignette` rides the same
+      // function and is whole-frame on purpose. gHot is linear in the amount,
+      // so this is exactly the hot spot's own gain blended toward 1.
+      const lw = aimWeight(aimMasks, AIM_LENS, u, v);
+      const gain = radialGain(p.hotspot * lw, p.hotspotSize, p.vignette, u, v, aspect);
       r *= gain; g *= gain; b *= gain;
       // The COLOUR half, on the same circle. Before the swap and the matrix, so
       // it corrects the lens rather than the false-colour result.
-      const hc = p.hotspotColor ?? 0;
+      const hc = (p.hotspotColor ?? 0) * lw;
       if (hc !== 0) {
         const t = hotspotWeight(p.hotspotSize, u, v, aspect);
         r *= 1 + hc * t;
@@ -1787,9 +1809,16 @@ export function compileEdit(
     // guard the radial gain above carries, for the same reason.
     if (measuredOn && u !== undefined && v !== undefined) {
       const i = lensBin(u, v, aspect, lensN);
-      r *= lensGr![i];
-      b *= lensGb![i];
-      if (lensGg) g *= lensGg[i];
+      // AIMED with the same bit as the manual hot-spot above: one correction,
+      // two routes to it. The table is built once at full strength, so the aim
+      // BLENDS each gain toward 1 rather than re-deriving it per pixel at a
+      // scaled strength — `lensGain` is 1/(1+(k-1)s) and is not linear in s,
+      // so scaling the strength here and blending in the shader would be two
+      // different renderings of the same edit. The shader blends too.
+      const lw = aimWeight(aimMasks, AIM_LENS, u, v);
+      r *= 1 + (lensGr![i] - 1) * lw;
+      b *= 1 + (lensGb![i] - 1) * lw;
+      if (lensGg) g *= 1 + (lensGg[i] - 1) * lw;
     }
     // Camera-native -> linear sRGB (after WB, before swap), matching the shader.
     if (cam) {
