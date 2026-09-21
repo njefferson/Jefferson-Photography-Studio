@@ -704,6 +704,26 @@ user-scalable=no.
   processes run; darktable's pixelpipe takes modules in any order with masks
   combined per module. See
   `docs/decisions/030-a-mask-can-only-act-in-one-place.md`.
+- [ ] **A mask is a place, and most of the controls should work inside one** <!-- decision: 042 -->
+  asked 2026-09-21: masks should come out of the tab strip into a place of
+  their own, and inside a mask the reader should not be limited to the handful
+  of controls the mask menu offers.
+  **The menu is short because the pipeline is, not because the menu was written
+  short.** A mask carries five adjustments — brightness, contrast, saturation,
+  hue and warmth — folded in at one point in `compileEdit` and mirrored in the
+  shader, while `EditParams` carries about forty knobs that are all
+  whole-frame. So this is 030 arriving through the surface instead of through
+  the scope gate, and it is ranked directly below it.
+  **The editor this is modelled on is the one that limits the set**: Lightroom
+  hosts a fixed local list — tone, colour, effects and detail — and keeps
+  vibrance, the tone curve, the colour mixer, colour grading, lens corrections
+  and calibration global. darktable is the one that gives you everything, and
+  it does it by hanging a mask on every MODULE rather than on a panel. Which
+  means "every control inside a mask" is darktable's architecture, reachable
+  only by letting a selection gate a stage — 030's work, not a longer menu.
+  The mode and the first aimed controls therefore land together; a mode holding
+  today's five would promise more than it has. See
+  `docs/decisions/042-a-mask-is-a-place-and-most-controls-should-work-inside-one.md`.
 - [ ] **Aerochrome is the right colour and comes out splotchy** <!-- decision: 013 --> — reported
   from the iPad 2026-09-17 with two frames, on the look that shipped the same day:
   the colour is right, the foliage breaks into hard-edged patches and the gravel
