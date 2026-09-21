@@ -3182,6 +3182,54 @@ the above.
 
 ---
 
+## 4d. A NON-VEGETATION SUBJECT TAKES THE FOLIAGE COLOUR, AND THE FIELD'S ANSWER IS A MASK
+
+**Raised 2026-09-21 from two edits of the same frame** — an F-15 on a plinth in
+front of a building, one rendered pink-on-teal and one in an Aerochrome-like
+blue-and-red. In the second, red lands on the aircraft's nose, its vertical
+stabilisers and the intake lips, and the building takes the foliage colour
+whole. In the first the aircraft reads far cleaner against the pink. The
+question this section exists for: how do you keep that cleanliness while
+pushing the Aerochrome harder.
+
+**IT IS NOT A DEFECT IN THE MAPPING, AND "WHAT WOULD THE FILM DO" DOES NOT
+SETTLE IT.** Aerochrome has no concept of a subject. Every pixel is placed by
+its own reflectance across green, red and NIR — that is 4b's whole point — so a
+surface with high NIR reflectance goes red whether it is a leaf or a wing.
+White and light greys are frequently strongly NIR-reflective, which is exactly
+the case here: the red sits on the sunlit faces. **So the film would do
+something similar on this aircraft**, and appealing to the film cannot justify
+protecting it. What justifies protecting it is that it is a photograph and the
+subject is the aircraft.
+
+**THE FIELD'S ANSWER IS SELECTIVE, AND IT IS A MASK, NOT A BETTER GLOBAL
+MAPPING.** The Lightroom infrared workflows say it plainly — selectively
+desaturate the architecture and the stone wall to give it less colour; masking
+gives surgical control, so skies darken independently of foliage and colours
+adjust in specific areas. Nobody in the references tries to find a global
+transform that leaves man-made surfaces alone, because no such transform exists
+when the input is one number per channel and a painted wing and a leaf return
+the same one.
+
+**WHAT THAT MEANS FOR THIS APP, and it needs nothing new.** A Colour mask keyed
+on the subject alone is not enough on a frame like this: the aircraft's greys
+are the gravel's greys and the concrete pad's greys, so keying the colour takes
+all three. The isolation comes from INTERSECTING that colour selection with a
+place — a Radial over the aircraft — which is `op: 2`, shipped in 2.53 and
+surfaced in the panel in 2.55. Pull saturation down on the group's head and the
+foliage elsewhere is untouched.
+
+**AND IT IS THE ARGUMENT FOR 006 RATHER THAN AGAINST IT.** A subject selection
+would make this one gesture instead of two, which is worth having. It is not a
+prerequisite: the two-mask route works today and is what the references
+describe doing by hand.
+
+**A caution this repo has paid for once already (8's last standing error).**
+Whatever is done here is a look choice about how a photograph appears, so the
+candidates get rendered and opened, never described. The temptation on a frame
+with a bright subject is to reason from a saturation figure; a red cast on a
+sunlit wing is exactly the kind of thing a frame-wide statistic averages away.
+
 ## Sources
 
 The capture-side workflow, the hotspot procedure and the three routes are
@@ -3193,6 +3241,17 @@ what this app does to a file, this file wins and the measurement is named.
 Raw behaviour generally — levels, curves, matrices, highlight handling,
 metadata — follows dcraw/LibRaw and the DNG spec, and deviating from reference
 behaviour needs a written reason recorded in `NOTES.md`.
+
+**Section 4d** (a non-vegetation subject taking the foliage colour) reads:
+Life Pixel, "How to Emulate the look of Aerochrome Film"
+(lifepixel.com/photo-tutorials/emulate-look-aerochrome-film); Kolari Vision on
+emulating Aerochrome with the 550nm filter
+(kolarivision.com/post-infrared-photo-editing/processing-550nm-ir-filter/);
+Markus Hagner, "How to Process Infrared Photos in Lightroom", for the masking
+and selective-desaturation practice
+(markus-hagner-photography.com); and Lomography's Aerochrome summary for the
+film's own colour mapping
+(lomography.com/magazine/167094-kodak-aerochrome-the-colored-infrared-film).
 
 ### 9l-ii. THE STAGE CORRUPTED EVERY TIFF EXPORT, AND THE FIRST DIAGNOSIS WAS WRONG
 
