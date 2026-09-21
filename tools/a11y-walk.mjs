@@ -55,6 +55,25 @@ const axeSrc = readFileSync(join(repo, "node_modules/axe-core/axe.min.js"), "utf
 const EX = join(repo, "public/examples");
 const ONE = join(EX, "NIR_0063.dng");
 const THEMES = ["dark", "light"];
+/** THE TWO SHAPES THIS APP IS ACTUALLY HELD IN, declared once beside the themes
+ *  because they are the same kind of parameter and were not being treated as
+ *  one. The desktop entry is what every section here used to use; the phone
+ *  entry is the REPORTED geometry of the reader's own device — 402x812 at
+ *  device pixel ratio 2, with touch — taken from a §7f diagnostic rather than
+ *  guessed at.
+ *
+ *  WHY IT IS HERE AT ALL (hub LESSONS 347). A layout defect lived at phone
+ *  width for the whole life of the start card: pressing Home left the editor
+ *  drawer on screen under the start card, which on a phone is two thirds of the
+ *  window. Twelve walks in this directory are ones where the viewport is
+ *  load-bearing and exactly one of them ran at phone size, so the question "do
+ *  the walks test phone width?" answered YES — section 2 below has always run
+ *  at 430 — while nine walks that would have seen it were somewhere else. A
+ *  width visited by one instrument reads as covered. */
+const SIZES = [
+  { name: "desktop", opts: { viewport: { width: 1100, height: 850 } } },
+  { name: "phone", opts: { viewport: { width: 402, height: 812 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } },
+];
 const RULES = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
 let failed = 0;
@@ -218,10 +237,10 @@ try {
   else note("nothing excused — every declared dialog is opened below");
 
   // ── 1 ────────────────────────────────────────────────────────────────────
-  console.log("\n1 — axe over every deployed page, in both themes");
+  console.log("\n1 — axe over every deployed page, in both themes and both shapes");
   for (const s of surfaces()) {
-    for (const theme of THEMES) {
-      const page = await browser.newPage({ viewport: { width: 1100, height: 850 }, colorScheme: theme });
+    for (const theme of THEMES) for (const size of SIZES) {
+      const page = await browser.newPage({ ...size.opts, colorScheme: theme });
       page.on("dialog", (d) => d.accept());
       try {
         await page.goto(`${BASE}/${s.file}`);
@@ -240,12 +259,14 @@ try {
           // AND WITH A MASK MADE AND SAVED, so axe reads the mask editor and
           // the saved list rather than the Add row with everything behind it
           // still `hidden`.
-          await makeAndSaveMask(page, `${s.file} [${theme}] sky mask`);
+          await makeAndSaveMask(page, `${s.file} [${theme} ${size.name}] sky mask`);
         }
         await page.addScriptTag({ content: axeSrc });
         const r = await page.evaluate(async (rules) => await window.axe.run(document, { runOnly: rules }), RULES);
         const serious = r.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
-        const line = `${s.file} [${theme}]`;
+        // THE SHAPE IS IN THE LABEL, because this section now runs twice per theme
+        // and two identical lines would make a phone-only failure unattributable.
+        const line = `${s.file} [${theme} ${size.name}]`;
         if (serious.length) { fail(`${line}: ${serious.length} serious/critical`); for (const v of serious) for (const n of v.nodes) note(`[${v.impact}] ${v.id}: ${n.target.join(" ")}`); }
         else ok(`${line}: nothing serious or critical${r.violations.length ? ` (${r.violations.length} minor)` : ""}`);
         for (const v of r.violations.filter((v) => !serious.includes(v))) note(`  minor · ${v.id} x${v.nodes.length}`);
@@ -254,9 +275,13 @@ try {
   }
 
   // ── 2 ────────────────────────────────────────────────────────────────────
-  console.log("\n2 — hit areas at 430px and 900px, on every page and inside every dialog");
+  // 402 REPLACES THE 430 THIS SECTION USED TO RUN AT, and the replacement is
+  // the point rather than a tidy-up: 430 was a round number standing in for
+  // "a phone", and 402 is the width the reader's own diagnostic reports. It is
+  // also narrower, so nothing that passed at 430 is now unmeasured.
+  console.log("\n2 — hit areas at 402px and 900px, on every page and inside every dialog");
   for (const s of surfaces()) {
-    for (const vw of [430, 900]) {
+    for (const vw of [402, 900]) {
       const page = await browser.newPage({ viewport: { width: vw, height: 850 } });
       page.on("dialog", (d) => d.accept());
       try {

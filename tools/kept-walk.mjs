@@ -65,7 +65,13 @@ const b = await chromium.launch({
   args: ["--use-gl=swiftshader", "--enable-unsafe-swiftshader", "--no-sandbox"],
 });
 try {
-  const ctx = await b.newContext();
+  // AT THE READER'S OWN GEOMETRY, not the driver's default. This walk used to
+  // call newContext() with no options at all, which is Playwright's 1280x720 —
+  // a number nobody chose, on a walk that is entirely about whether a
+  // photograph can be put down and picked up again from a list on the start
+  // screen. That list is one of the surfaces the start card holds, and the
+  // start card is where a phone-width defect lived unseen (hub LESSONS 347).
+  const ctx = await b.newContext({ viewport: { width: 402, height: 812 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   const p = await ctx.newPage();
   p.on("dialog", (d) => d.accept());
   await p.goto(`http://127.0.0.1:${PORT}/ir.html`);

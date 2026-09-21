@@ -1146,6 +1146,40 @@ user-scalable=no.
   byte-identical to today's, because a graphics chip computes in float where the
   processor uses doubles. It would match the PREVIEW instead.
 
+## The phone-width pass found nothing, and that IS the finding, 2026-09-21
+
+After decision 044 — pressing Home leaving the editor drawer on screen under
+the start card, on a phone, for the whole life of that card — the blind spot
+was widened rather than only the defect fixed. `tools/a11y-walk.mjs` now runs
+its axe pass at BOTH shapes, `SIZES` declaring the desktop window it always
+used and the reader's own reported geometry (402x812, device pixel ratio 2,
+touch); its hit-area sweep moved from 430px to 402px, which is narrower, so
+nothing that passed before is now unmeasured; and `tools/kept-walk.mjs`, which
+called `newContext()` with no options at all and therefore ran at Playwright's
+1280x720, was given the same phone geometry.
+
+**It came back completely green. Nothing new was found, and that is worth
+writing down rather than filing as a clean run.** axe at phone width found
+nothing serious or critical on any of the seven deployed pages in either
+theme, and every control still clears 44px at 402. The defect that started
+this was invisible to both, because neither asks the question it fails:
+**are two surfaces that replace each other both drawn at once?** Coverage is
+counted by property, not by presence — hub LESSONS 347, which was itself
+corrected the same day after its first version claimed the narrowest viewport
+any walk used was 900px. It was not: `a11y-walk` had always run at 430 and
+`scroll-cue-walk` at 420, from loops a grep for a width literal could not see.
+
+So the honest state: the widening is right and cheap and it is not what would
+have caught 044. `tools/start-screen-walk.mjs` is the first instrument that
+asks the coexistence question, and it asks it about exactly one pair. A general
+version needs a declared list of surfaces that replace one another and a way to
+drive each into the state where the question applies; with one pair known, a
+generic mechanism would be the appearance of a gate rather than a gate. The
+next pair found is what earns it.
+
+Cost, for the record: the accessibility sweep goes from about four minutes to
+about eight.
+
 ## The quick look's wait was the RENDER, not the decode, 2026-09-20 (decision 033)
 
 Two delays reported from the device: a long wait before any thumbnail appears
