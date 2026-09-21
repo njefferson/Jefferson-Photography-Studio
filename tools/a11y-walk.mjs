@@ -654,6 +654,73 @@ try {
     }
     await page.close();
   }
+
+  // ── 6 ──────────────────────────────────────────────────
+  // DOCTRINE 7e, ASSERTED RATHER THAN BELIEVED. The baseline says every app
+  // carries an (i) control in its own chrome, accessibly named for what it
+  // OPENS; that a first-time reader is told what the app is, what it will not
+  // do and how to install it; and that the same words live permanently behind
+  // the (i) afterwards — MOVED, never copied.
+  //
+  // Nothing checked any of it. The editor's first-run half was missing for the
+  // whole life of the app and the audit that found it was a session reading
+  // the repository by hand, which is the thing a gate exists to replace.
+  //
+  // THE "MOVED, NEVER COPIED" HALF IS THE ONE WORTH MEASURING, and it is
+  // measurable: the start screen's route and the (i)'s route must land on the
+  // SAME element. Two buttons that open two copies of the same prose pass a
+  // human read and fail this.
+  console.log("\n6 — the (i) control, and orientation that is moved rather than copied");
+  {
+    const page = await browser.newPage(SIZES[1].opts); // at the reader's own shape
+    page.on("dialog", (d) => d.accept());
+    await page.goto(`${BASE}/ir.html`, { waitUntil: "load" });
+    await page.waitForTimeout(900);
+    const info = await page.evaluate(() => {
+      const b = document.getElementById("infoBtn");
+      if (!b) return null;
+      const r = b.getBoundingClientRect();
+      return { name: (b.getAttribute("aria-label") || b.textContent || "").trim(), w: Math.round(r.width), h: Math.round(r.height), inChrome: !b.closest("dialog") };
+    });
+    if (!info) fail("there is no (i) control on ir.html at all");
+    else if (!info.inChrome) fail("the (i) control is inside a dialog rather than in the app's own chrome");
+    else if (info.name.length < 12) fail(`the (i) control's accessible name does not say what it opens — "${info.name}"`);
+    else ok(`the (i) is in the chrome, ${info.w}x${info.h}, named "${info.name}"`);
+
+    // The two routes to orientation, and whether they are one place or two.
+    const routes = await page.evaluate(() => {
+      const out = {};
+      for (const id of ["welcomeWhat", "jumpWhat"]) out[id] = !!document.getElementById(id);
+      return out;
+    });
+    if (!routes.welcomeWhat) fail("the start screen has no route to what this app is and how to install it");
+    else if (!routes.jumpWhat) fail("the (i) panel has no route to what this app is and how to install it");
+    else {
+      const landed = [];
+      for (const [id, pre] of [["welcomeWhat", null], ["jumpWhat", "infoBtn"]]) {
+        await page.goto(`${BASE}/ir.html`, { waitUntil: "load" });
+        await page.waitForTimeout(700);
+        if (pre) { await page.click(`#${pre}`); await page.waitForTimeout(500); }
+        await page.click(`#${id}`);
+        await page.waitForTimeout(700);
+        landed.push(await page.evaluate(() => {
+          const d = document.getElementById("helpDlg");
+          const q = document.getElementById("helpQuickStart");
+          const i = document.getElementById("helpInstall");
+          return { open: !!d?.open, quick: !!(q && q.open), install: !!(i && i.open),
+            // the first words of the section, so two COPIES of the prose show up
+            // as two different landings rather than as one shared destination
+            text: (q?.textContent || "").replace(/\s+/g, " ").trim().slice(0, 90) };
+        }));
+      }
+      const [a, b2] = landed;
+      if (!a.open || !b2.open) fail(`a route did not open Help — start screen ${a.open}, (i) ${b2.open}`);
+      else if (!a.quick || !a.install || !b2.quick || !b2.install) fail("a route opened Help without expanding what this is and how to install it");
+      else if (a.text !== b2.text || !a.text) fail("the two routes land on DIFFERENT words — orientation has been copied, not moved");
+      else ok(`both routes open the same orientation, expanded: "${a.text.slice(0, 60)}…"`);
+    }
+    await page.close();
+  }
 } finally {
   await browser.close();
 }
