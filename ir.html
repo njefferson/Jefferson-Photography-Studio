@@ -285,6 +285,7 @@
           <button class="welcome-batch" id="welcomeLensBtn" type="button">Measure your lens&hellip;</button>
           <p class="welcome-batch-hint">Works out your lens&rsquo;s bright centre, from your own sky frames.</p>
           <button id="resumeSession" class="welcome-batch" type="button" hidden>Resume session</button>
+          <button id="keptOpen" class="welcome-batch" type="button" hidden>Photos you kept</button>
           <button id="recoverBatch" class="welcome-batch" type="button" hidden>Recover images from an interrupted batch</button>
           <hr class="welcome-div" />
           <div id="a2hs" class="a2hs" hidden>
@@ -874,6 +875,13 @@
               <p class="note" id="exportWaitingText" role="status" aria-live="polite"></p>
               <button id="exportWaitingSave" type="button">Save them all</button>
             </div>
+            <!-- KEEPING IS THE OTHER WAY OF BEING FINISHED (decision 039), so it
+                 sits in the panel you already open to finish. An export is a
+                 photograph; this is the EDIT, still open, waiting for you. -->
+            <div id="keepRow" class="keep-row">
+              <button id="keepPhoto" type="button">Keep this photo to edit later</button>
+              <p class="note" id="keepNote">Its edit and the original file stay on this <span data-device-noun>device</span> under a name you choose. Nothing is uploaded, and your original is never changed.</p>
+            </div>
             <label>Format
               <select id="exFormat">
                 <option value="jpeg">JPEG</option>
@@ -1157,6 +1165,18 @@
       </div>
       <textarea id="lookCodeOut" class="look-code" rows="4" readonly hidden aria-label="Look code — copy it by hand"></textarea>
       <button id="lookDlgClose" type="button">Close</button>
+    </dialog>
+
+    <!-- PHOTOGRAPHS PUT DOWN AND NOT YET PICKED UP (decision 039). A list
+         rather than a tab, because coming back to one is something you do from
+         the start screen, before there is an editor to put a tab in. -->
+    <dialog id="keptDlg" aria-labelledby="keptDlgTitle">
+      <h2 id="keptDlgTitle">Photos you kept</h2>
+      <p class="note">Each one is your edit and the original file, on this <span data-device-noun>device</span> and nowhere else. Open one to carry on; forget one to get the space back.</p>
+      <div id="keptList" class="kept-list"></div>
+      <p class="note" id="keptHeld" role="status" aria-live="polite"></p>
+      <p class="note" id="keptOwed">A painted mask, a warp and an imported LUT do not come back &mdash; everything else does, masks included.</p>
+      <button id="keptDlgClose" type="button">Close</button>
     </dialog>
 
     <!-- Look sharing: import a pasted link / code / raw look JSON. -->
