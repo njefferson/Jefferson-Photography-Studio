@@ -178,3 +178,45 @@ point in particular is a shipped capability the reader cannot reach, which
 makes it worth more than most new work; and the brush is the half of 031 that
 was named as unfinished on the day it shipped. It sits below the two located
 one-condition defects only because those are smaller.
+
+## Outcome
+
+**All four points shipped, across three commits and two releases.**
+
+- **"Fixed: the correction brush goes small, and shows you its size first"**
+  (2026-09-20) — the second point. Hand size is a POSITION mapped
+  exponentially from 0.4% of the frame to 40%, and `#fixBrush` shows the
+  footprint from the moment a mode is armed and again while the slider moves.
+  It copies `stkBrush`, the sticker brush's ring, rather than being a second
+  design.
+- **"New: name your masks, and the panel says that they combine"** — the first
+  and fourth points, released as 2.55. The sentence about combining sits above
+  the list, where it is read BEFORE a mask exists, which is the reader the
+  first point is about; naming replaces the derived string rather than sitting
+  beside it; and pressing the selected mask leaves it.
+- **"New: keep a mask and put it on another photograph"** — the third point,
+  released as 2.56. `src/maskstore.ts` stores a RECIPE: the mask's numbers with
+  every bitmap stripped, plus 031's stroke list. A saved Sky mask is
+  re-detected on the new photograph and the strokes replayed over what it
+  finds. A brush mask is refused in words.
+
+**What turned out wrong.**
+
+**The record's own research named the failure and the work repeated it one
+level up.** "A capability that cannot be found is worse than a missing one,
+because nothing about the app reports it" — and the saved-mask list is
+`hidden` until something has been saved, so the accessibility sweep walked
+straight past the new controls the same way it had walked past the mask editor
+for that editor's whole life. It was caught before shipping only because the
+plan said the walk had to REACH the new controls. `tools/a11y-walk.mjs` now
+makes and saves a mask before both its passes, in the commit that created the
+surface. A `hidden` container is the shape to look for, not a one-off.
+
+**And the check that matters could not be written as "did the mask come
+back".** A stored bitmap comes back too, and would lay the previous
+photograph's sky over this one. The assertion had to be that the SELECTION is
+regenerated: frame A's sky is 54% of itself, the saved mask on frame B selects
+18%, and a fresh detection on frame B also gives 18%. Made to fail first — with
+a bitmap smuggled through `shapeOf` and the regeneration skipped, frame B
+reported 54% and that one check went red while every other check in the walk
+stayed green.

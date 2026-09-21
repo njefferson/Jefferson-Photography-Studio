@@ -539,38 +539,6 @@ user-scalable=no.
 > different approach and mindset"). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
-- [ ] **The mask panel does not say what it can do** <!-- decision: 040 -->
-  four things reported 2026-09-20, and the first is the finding: the request
-  was for masks to "include add, subtract, etc, like commercial offerings" —
-  **and those shipped in 2.53**. `MaskLayer.op`, groups folded by
-  `groupWeight`, darktable's exclusive/inclusive algebra, with a walk that
-  proves it. The capability is there and was not found, which is a worse defect
-  than a missing feature because nothing in the app reports it: every gate is
-  green and the reader concludes the app cannot do it.
-  The other three: the hand-correction brush is one size with no ring under the
-  pointer, so the size is discovered by making a mark; there is nowhere to keep
-  a mask that took work; and nothing says you are finished with one and may
-  move on. The field's answer to the first and last is the same thing — masks
-  are a NAMED LIST, and leaving one is deselecting in a list that is always
-  there. A saved mask is a RECIPE and not a bitmap, because a generated
-  selection is recomputed on the new photograph and a painted one does not
-  travel; this app already splits that way, since 031 keeps corrections as the
-  strokes they were.
-  **THE BRUSH HALF IS ON STAGING, 2026-09-20; the named list and saved masks
-  are not.** Hand size is a POSITION now rather than the radius, mapped
-  exponentially from 0.4% of the frame to 40% — a hundredfold range, where the
-  old control ran linearly from 3% and had nothing finer at all. And a ring
-  shows the footprint before anything is touched: up from the moment a mode is
-  armed, and again while the size slider moves, which is the half that matters
-  on a tablet where there is no hover to follow. Same shape as the sticker
-  brush's ring (`stkBrush`), deliberately not a second design.
-  Measured: the ring reads 7px across at the small end and 663px at the large
-  on a fitted frame, and the MASK agrees — one dab covers 0.006% of the frame
-  at the smallest and 35% at the largest. The default stroke is smaller than it
-  was (0.060 against 0.100), so the existing walk's take-out now moves 54.0% to
-  45.9% where it moved 54.0% to 39.6%, and the export walk's band figure moves
-  with it for the same reason. See
-  `docs/decisions/040-the-mask-panel-does-not-say-what-it-can-do.md`.
 - [ ] **An edit you can put down and come back to** <!-- decision: 039 -->
   reported 2026-09-20: there is no way to save the photograph being worked on
   and come back to it later. True, and by design in one half of the app — a set
@@ -7351,6 +7319,50 @@ read as authoritative, and an invented one is worse than a missing one.
   on the rule's closing brace found the one INSIDE its own comment, because the
   comment quotes `select, button { width: 100% }`. Plant by a unique anchor, and
   print what was planted.
+- [x] **The mask panel does not say what it can do** <!-- decision: 040 -->
+  four things reported 2026-09-20, and the first is the finding: the request
+  was for masks to "include add, subtract, etc, like commercial offerings" —
+  **and those shipped in 2.53**. `MaskLayer.op`, groups folded by
+  `groupWeight`, darktable's exclusive/inclusive algebra, with a walk that
+  proves it. The capability is there and was not found, which is a worse defect
+  than a missing feature because nothing in the app reports it: every gate is
+  green and the reader concludes the app cannot do it.
+  The other three: the hand-correction brush is one size with no ring under the
+  pointer, so the size is discovered by making a mark; there is nowhere to keep
+  a mask that took work; and nothing says you are finished with one and may
+  move on. The field's answer to the first and last is the same thing — masks
+  are a NAMED LIST, and leaving one is deselecting in a list that is always
+  there. A saved mask is a RECIPE and not a bitmap, because a generated
+  selection is recomputed on the new photograph and a painted one does not
+  travel; this app already splits that way, since 031 keeps corrections as the
+  strokes they were.
+  **SHIPPED WHOLE.** The brush half landed 2026-09-20; the named list, leaving
+  a mask by pressing it and the sentence about combining went out as 2.55; and
+  keeping a mask beyond the session went out as 2.56, storing a RECIPE — the
+  mask's numbers with every bitmap stripped, plus 031's strokes — so a saved
+  Sky mask is re-detected on the next photograph rather than laid over it.
+  Proved by measurement rather than by the mask coming back: frame A's sky is
+  54% of itself, the saved mask on frame B selects 18%, and a fresh detection
+  on frame B gives 18% too.
+  **What it cost, and it is the record's own headline one level up:** the saved
+  list is `hidden` until something is saved, so the accessibility sweep walked
+  past every new control exactly as it had walked past the mask editor for that
+  editor's whole life. `tools/a11y-walk.mjs` makes and saves a mask before both
+  its passes now, in the commit that created the surface.
+  **On the brush half, as measured at the time.** Hand size is a POSITION now rather than the radius, mapped
+  exponentially from 0.4% of the frame to 40% — a hundredfold range, where the
+  old control ran linearly from 3% and had nothing finer at all. And a ring
+  shows the footprint before anything is touched: up from the moment a mode is
+  armed, and again while the size slider moves, which is the half that matters
+  on a tablet where there is no hover to follow. Same shape as the sticker
+  brush's ring (`stkBrush`), deliberately not a second design.
+  Measured: the ring reads 7px across at the small end and 663px at the large
+  on a fitted frame, and the MASK agrees — one dab covers 0.006% of the frame
+  at the smallest and 35% at the largest. The default stroke is smaller than it
+  was (0.060 against 0.100), so the existing walk's take-out now moves 54.0% to
+  45.9% where it moved 54.0% to 39.6%, and the export walk's band figure moves
+  with it for the same reason. See
+  `docs/decisions/040-the-mask-panel-does-not-say-what-it-can-do.md`.
 
 ## Desktop-mouse round + the flat-frame finding, 2026-09-08
 

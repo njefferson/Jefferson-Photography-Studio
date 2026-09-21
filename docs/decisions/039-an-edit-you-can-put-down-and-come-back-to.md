@@ -62,6 +62,11 @@ session store rather than inventing a second one.
 - touches 009 — 009 decides how large a copy of a photograph the editor holds,
   which is the same budget this proposes to keep bytes in. A change to either
   moves what the other may promise.
+- distinct-from 040 — 040 is the mask panel, and what it shipped that this
+  copies is a PATTERN rather than a dependency: `src/maskstore.ts` took the
+  named small-store shape from `src/luts.ts`, and this would take it from those
+  two. Neither changes what the other computes, and a change to 040 moves
+  nothing here.
 
 ## Options
 
@@ -78,6 +83,44 @@ not touch it.
 What that costs is honest and has to be said in the app: a saved photograph is
 the original's bytes on the device, and the reader can see how many there are
 and remove them. The §7f report already carries "App is holding".
+
+## Built already
+
+Every piece of this exists and none of it is in the right shape yet. Writing
+that here is 040's lesson applied one record on: the capability was there and
+was not found, and building a second copy would be the same defect.
+
+- **`src/session.ts` is the durability shape, whole.** Source bytes split into
+  chunks of 30 KB or less so they stay inline in the transaction log and are
+  genuinely on disk at commit — large IndexedDB values get externalised to a
+  lazily-flushed sidecar that `durability: "strict"` does not cover, which is
+  why the chunking exists and why it is not a detail to simplify away. A small
+  JPEG thumbnail and the edit JSON ride inline in the meta row. `addPhoto`,
+  `getBytes`, `setEdit`, `listPhotos` and `removePhoto` are the surface to
+  mirror.
+- **`src/batchstore.ts` is where that shape came from.** `src/session.ts`'s own
+  header says it inherited it wholesale. This would be the third inheritance,
+  not a new idea.
+- **`src/luts.ts` and `src/maskstore.ts` are the NAMED small-store shape** — a
+  record/meta split so a list is drawn without reading the payload, a declared
+  count cap, and put/get/list/delete. `src/maskstore.ts` copied `src/luts.ts` for
+  decision 040; a third copy follows the same two.
+- **The edit already serialises and restores.** `editToJson`, `applySnapshot`
+  and `restoreLiveEdit` in `src/main.ts` round-trip a photograph's whole edit on
+  every session photo switch, which is the same round trip this needs.
+- **`resumeSession` in `src/main.ts` is the reopen path, already written**:
+  stored bytes to `decodeWithLens` to `showDecoded` to `activateCurrent`, with
+  the stored edit layered on at activate.
+- **`src/diagnostic.ts` already reports what the app is holding** (Doctrine
+  §7f), so the storage cost this item creates has an honest place to appear
+  rather than needing a new one.
+- **`tools/surfaces.mjs`** is the enumeration a new dialog must join in the same
+  commit, and it is checked BOTH ways against the build, so it refuses rather
+  than reminds.
+
+What genuinely does not exist: a store that the Done button cannot reach, a
+name the reader chooses for one photograph's edit, and anywhere on the start
+screen to come back to it.
 
 ## Rejected
 
