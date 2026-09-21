@@ -629,6 +629,68 @@ user-scalable=no.
   anything whatever into the file the reader picked. See
   `docs/decisions/043-a-kept-photograph-should-be-a-file-you-own.md`.
 
+- [ ] **A mask can only act in one place, and there is only one version of an edit** <!-- decision: 030 -->
+  asked 2026-09-20 as a principle: a mask can be taken at any point in the
+  workflow, and without layers or named backups there is no way to work on the
+  raw underneath when all you have is the image in front of you.
+  **Half of it is already true and worth saying**: this app never overwrites
+  pixels. Every render starts from the linear decode, the sky selection is built
+  from that decode before any look and before the channel swap, and the raw is
+  always underneath. What is missing is that nothing INSIDE the pipeline can be
+  addressed — the order is fixed and invisible, a selection folds in at exactly
+  one stage, and there is one state with a linear undo.
+  **The measured cost is already written down**: the scope gate lists six
+  whole-frame knobs — denoise, chroma, texture, clarity, dehaze and the look's
+  own denoise — each carrying a reason that reduces to the same sentence, that
+  the sky and the canopy want opposite amounts and there is one control. Every
+  one is a mask with nowhere to be applied.
+  The field has both halves separately: RawTherapee ships named Snapshots beside
+  its history and is the cautionary case, giving no control over the order its
+  processes run; darktable's pixelpipe takes modules in any order with masks
+  combined per module. See
+  `docs/decisions/030-a-mask-can-only-act-in-one-place.md`.
+  **IN FLIGHT 2026-09-21 — the mechanism is built and three stages are aimed.**
+  `MaskLayer.aims` is a bitmask of the stages a mask gates; `aimWeight` in
+  `src/pipeline.ts` and `aimWeightOf` in `src/gl.ts` are the two halves, walking
+  the same flattened active groups in the same order. **Absent or zero means
+  whole-frame**, so every edit already finished renders identically. Dehaze,
+  Clarity and the shadow tint are aimed; each was one bitmask entry plus two
+  lines per path.
+  Two traps caught before they shipped, both of which would have made it
+  silently inert: `maskGroupsForRender` drops a group whose head's adjustment
+  does nothing — and a mask added PURELY to aim has exactly that — and the
+  shader uploads that same filtered list, so reading `p.masks` on the CPU alone
+  would have put the two paths on different sets. `maskIsActive` counts aiming
+  as doing something now, which fixes both at the one place that decides.
+  **Colour masks cannot aim**: their key is the pixel as it DISPLAYS at the mask
+  stage, which does not exist at dehaze. That boundary is 032's, and the control
+  stands down rather than offering nothing.
+  Still whole-frame: denoise, colour noise and texture are spatial pre-passes
+  rather than per-pixel gains, so aiming them means blending the filtered and
+  unfiltered results by the mask weight — more than a bitmask entry. The
+  hot-spot and lens corrections are radial and per-pixel, so they are the same
+  cheap shape as the three already done.
+
+- [ ] **A mask is a place, and most of the controls should work inside one** <!-- decision: 042 -->
+  asked 2026-09-21: masks should come out of the tab strip into a place of
+  their own, and inside a mask the reader should not be limited to the handful
+  of controls the mask menu offers.
+  **The menu is short because the pipeline is, not because the menu was written
+  short.** A mask carries five adjustments — brightness, contrast, saturation,
+  hue and warmth — folded in at one point in `compileEdit` and mirrored in the
+  shader, while `EditParams` carries about forty knobs that are all
+  whole-frame. So this is 030 arriving through the surface instead of through
+  the scope gate, and it is ranked directly below it.
+  **The editor this is modelled on is the one that limits the set**: Lightroom
+  hosts a fixed local list — tone, colour, effects and detail — and keeps
+  vibrance, the tone curve, the colour mixer, colour grading, lens corrections
+  and calibration global. darktable is the one that gives you everything, and
+  it does it by hanging a mask on every MODULE rather than on a panel. Which
+  means "every control inside a mask" is darktable's architecture, reachable
+  only by letting a selection gate a stage — 030's work, not a longer menu.
+  The mode and the first aimed controls therefore land together; a mode holding
+  today's five would promise more than it has. See
+  `docs/decisions/042-a-mask-is-a-place-and-most-controls-should-work-inside-one.md`.
 - [ ] **The red cast in the shadows comes off by hand, and should not have to** <!-- decision: 034 -->
   reported 2026-09-20 with two renderings of one building frame and the Grade
   panel that separates them — the Shadows wheel at 209 degrees, 47%. The shaded
@@ -729,46 +791,6 @@ user-scalable=no.
   canvas's aspect, or the PAGE being zoomed rather than the canvas — cannot be
   told apart in a screenshot. Instrument first; make the escape unconditional
   either way. See `docs/decisions/012-full-view-must-fit-and-always-escape.md`.
-- [ ] **A mask can only act in one place, and there is only one version of an edit** <!-- decision: 030 -->
-  asked 2026-09-20 as a principle: a mask can be taken at any point in the
-  workflow, and without layers or named backups there is no way to work on the
-  raw underneath when all you have is the image in front of you.
-  **Half of it is already true and worth saying**: this app never overwrites
-  pixels. Every render starts from the linear decode, the sky selection is built
-  from that decode before any look and before the channel swap, and the raw is
-  always underneath. What is missing is that nothing INSIDE the pipeline can be
-  addressed — the order is fixed and invisible, a selection folds in at exactly
-  one stage, and there is one state with a linear undo.
-  **The measured cost is already written down**: the scope gate lists six
-  whole-frame knobs — denoise, chroma, texture, clarity, dehaze and the look's
-  own denoise — each carrying a reason that reduces to the same sentence, that
-  the sky and the canopy want opposite amounts and there is one control. Every
-  one is a mask with nowhere to be applied.
-  The field has both halves separately: RawTherapee ships named Snapshots beside
-  its history and is the cautionary case, giving no control over the order its
-  processes run; darktable's pixelpipe takes modules in any order with masks
-  combined per module. See
-  `docs/decisions/030-a-mask-can-only-act-in-one-place.md`.
-- [ ] **A mask is a place, and most of the controls should work inside one** <!-- decision: 042 -->
-  asked 2026-09-21: masks should come out of the tab strip into a place of
-  their own, and inside a mask the reader should not be limited to the handful
-  of controls the mask menu offers.
-  **The menu is short because the pipeline is, not because the menu was written
-  short.** A mask carries five adjustments — brightness, contrast, saturation,
-  hue and warmth — folded in at one point in `compileEdit` and mirrored in the
-  shader, while `EditParams` carries about forty knobs that are all
-  whole-frame. So this is 030 arriving through the surface instead of through
-  the scope gate, and it is ranked directly below it.
-  **The editor this is modelled on is the one that limits the set**: Lightroom
-  hosts a fixed local list — tone, colour, effects and detail — and keeps
-  vibrance, the tone curve, the colour mixer, colour grading, lens corrections
-  and calibration global. darktable is the one that gives you everything, and
-  it does it by hanging a mask on every MODULE rather than on a panel. Which
-  means "every control inside a mask" is darktable's architecture, reachable
-  only by letting a selection gate a stage — 030's work, not a longer menu.
-  The mode and the first aimed controls therefore land together; a mode holding
-  today's five would promise more than it has. See
-  `docs/decisions/042-a-mask-is-a-place-and-most-controls-should-work-inside-one.md`.
 - [ ] **Aerochrome is the right colour and comes out splotchy** <!-- decision: 013 --> — reported
   from the iPad 2026-09-17 with two frames, on the look that shipped the same day:
   the colour is right, the foliage breaks into hard-edged patches and the gravel
