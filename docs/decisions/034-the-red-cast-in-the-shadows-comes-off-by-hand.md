@@ -88,6 +88,59 @@ channel to zero and leaves the others positive, which is saturation 1 by
 definition. `shadowSat` already demonstrates the asymmetry that makes grey
 shade safe by construction rather than by calibration.
 
+## Built already
+
+- **`src/shadowcast.ts` is the measurement half, built 2026-09-21**, with
+  `tools/shadow-cast-check.mjs` proving its arithmetic over synthetic
+  populations: chromaticity rather than colour, a gain of unit luma so it
+  cannot move brightness, the sky excluded, and exact unity on every frame it
+  cannot measure. The app reports it in the §7f diagnostic as "Shadow light"
+  and corrects nothing with it.
+- **AND IT DOES NOT YET DO WHAT THIS RECORD NEEDS.** IR-SCIENCE 9j-ii has the
+  run: NIR_3406, whose shadows are a roof, reads 17.6% where the design
+  requires it to read nothing, against NIR_1376's 9.3%; NIR_3394 and NIR_3429
+  sit at the held ceiling. Two
+  definitions of the shaded population were tried; a third would be tuning the
+  corpus. **Read 9j-ii before touching this again** — it names the two
+  candidates that are not more tuning.
+- **`grayWorldWB` in `src/decode.ts`** is the existing per-photograph
+  illuminant measurement and the precedent for the whole shape.
+- **The sky selection already exists for every photograph** — `skyMaskFor` in
+  `src/main.ts`, built from the same copy the decode worker uses and already on
+  the GPU — which is what lets the measurement exclude it, 9j's own named next
+  piece.
+- **`shadowSat` in `src/pipeline.ts` and its mirror in `src/gl.ts`** are the
+  multiplicative shape and the demonstration that scaling cannot create
+  saturation where there is none.
+- **`tools/agreement-walk.mjs`** holds the CPU pipeline and the shader
+  numerically identical, and is not optional for whatever correction lands.
+
+What genuinely does not exist: a measurement that separates a shadow a tree
+filled from one a roof made, and therefore any correction at all.
+
+## Looked at
+
+Rendered through the app at open and OPENED, 2026-09-21, which is how the first
+three were identified at all — 9j measured on an "oak frame" and a "carport
+frame" and wrote down neither identifier, so its refutation could not be
+repeated by anybody.
+
+- **NIR_1376.NEF** — one oak against a teal sky over a grass field, trunk and
+  limbs dark against bright foliage. 9j's oak.
+- **NIR_3406.NEF** — a long open-sided shelter with cars under it and deep
+  shade beneath the roof, trees along the apron in front. 9j's carport, and a
+  carport in the plain sense rather than a nickname. **The trees beside it are
+  why "this frame must read no cast" may itself be the wrong test**, which is
+  one of 9j-ii's two candidates and was visible only on the render.
+- **NIR_3394.JPG** and **NIR_3429.JPG** — an office block with a lit face and a
+  shaded one under its eaves, an F-15 on the pad in front. Camera JPEGs, so
+  they take the other side of every per-kind split at open and render red
+  overall where the two raws render teal.
+
+None of the 44 practice DNGs can stand in for any of them: IR-SCIENCE section 7
+says they are minimal hand-written files, useful for decode and geometry and
+useless for a colour question. The real corpus is not in this repository.
+
 ## Rejected
 
 **The additive complement, automatically.** It is what the reader did by hand

@@ -2981,6 +2981,100 @@ constant is a claim about every photograph, so it is measured on a frame that
 disagrees with the one that motivated it — not on a second frame of the same
 subject.
 
+**AND WHICH FRAMES THOSE ARE, WRITTEN DOWN 2026-09-21 — they were not.** This
+section's two measurements are the argument the next attempt has to clear, and
+neither frame carried an identifier, so the run that refuted the additive tint
+could not be repeated by anybody. Established by rendering the real corpus
+through the app and LOOKING at it:
+
+- **`NIR_1376.NEF` is the oak** — one big oak against a teal sky over a grass
+  field, its trunk and limbs dark against bright foliage. The frame the method
+  works on.
+- **`NIR_3406.NEF` is the carport** — a long open-sided shelter with cars
+  parked under it and deep shade beneath its roof, trees and a concrete apron
+  in front. The frame that killed the additive tint, and it is a CARPORT in the
+  plain sense rather than a nickname.
+- **`NIR_3394.JPG` and `NIR_3429.JPG`** are the building-and-aircraft frames —
+  an office block with a lit face and a shaded one under its eaves, an F-15 on
+  a pad in front. They are camera JPEGs, so they take the other side of every
+  per-kind split at open: measured denoise only, no gray-world balance, which is
+  why they render red overall where the two raws render teal.
+
+**And the two raws are what discriminate the effect, visibly.** Under the
+carport's roof the shade reads neutral dark grey; the oak's trunk and the shade
+beneath it read warm against the sky. That is the physics this file already
+states — an infrared shadow is filled by bounce off foliage because the sky
+gives it almost no infrared — appearing as the difference between a shadow a
+roof made and a shadow a tree made. A correction measured per photograph has
+to find a cast on the first and none on the second, and those two frames are
+the test.
+
+**None of the 44 practice DNGs can stand in for them.** Section 7: they are
+minimal hand-written files, useful for decode and geometry and useless for a
+colour question. The real corpus is not in the repository.
+
+---
+
+---
+
+### 9j-ii. MEASURING THE SHADOW ILLUMINANT PER PHOTOGRAPH — THE DISCRIMINATOR DOES NOT YET DISCRIMINATE
+
+Decision 034's chosen option is to stop applying a constant and **measure the
+cast from the photograph's own shadows**: find the shaded population and the
+sunlit one, see how far apart their colour sits, and correct by that. 9j is why
+— an additive constant works on the oak and destroys the carport — and the
+per-photograph half is supposed to be what makes the carport safe, because a
+frame whose shadows are a roof should measure no cast at all.
+
+**`src/shadowcast.ts` is that measurement and `tools/shadow-cast-check.mjs`
+proves its arithmetic.** It compares CHROMATICITY rather than colour, so a
+shade two hundred times darker than its sun still reads as no cast; the gain it
+returns carries unit Rec.709 luma, so a correction cannot smuggle in an
+exposure change; it excludes the sky, which is 9j's own named next piece; and
+it returns exact unity on every frame it cannot measure. Sixteen checks, and
+the gate caught two real defects in it before any pixel moved — a binning
+inconsistency that emptied the sunlit population entirely, and a per-channel
+clamp that broke the unit-luma invariant at 1.0198.
+
+**AND ON THE REAL CORPUS IT DOES NOT SEPARATE THE TWO CASES.** Measured through
+the app at open, sky excluded, on the frames named at the end of 9j:
+
+- **NIR_1376, the oak — 9.3%** off the sunlit face. A cast, as expected.
+- **NIR_3406, the carport — 17.6%.** It must read nothing. It reads nearly
+  twice the oak.
+- **NIR_3394 and NIR_3429, the camera JPEGs — 25.0% both**, which is the held
+  ceiling rather than a measurement.
+
+**Two definitions of the shaded population were tried and both fail the same
+way.** The first took everything below the 20th percentile and pinned three of
+four frames at the ceiling, the blue channel at its limit in each — which is an
+infrared trap rather than a coding slip: the blue channel carries almost
+nothing in an IR frame, so dividing a near-black pixel by its own luminance
+produces a huge meaningless blue ratio. Excluding a black floor and taking the
+shade as a BAND (12th to 32nd percentile) moved the oak to 9.3% and the carport
+to 17.6%: better, and still the wrong answer on the frame the whole design
+turns on.
+
+**SO NOTHING IS CORRECTED, AND THE MEASUREMENT IS REPORTED INSTEAD.** The app's
+§7f report carries a "Shadow light" row saying how far the shaded population's
+colour sits from the sunlit one, which is exactly what is measured and no more;
+it suggests no amount, because an amount would be offering a correction the
+measurement has not earned. `suggestedAmount` exists, is exercised by the gate,
+and nothing calls it.
+
+**WHAT THE NEXT ATTEMPT SHOULD NOT DO IS TUNE THE PERCENTILES AGAIN.** Two
+tries moved the numbers and neither changed the verdict, and a third would be
+converging on the corpus rather than asking whether the right question is being
+asked. Two candidates that are NOT more tuning: the carport's shade may carry a
+real cast — there are trees along the apron in that frame, and bounce is bounce
+whether or not a roof is overhead, in which case "the carport must read nothing"
+is the wrong test and 9j's refutation was about the additive operator rather
+than about that frame having no cast; or the populations are wrong, in that "the
+darkest band that is not sky" is not the same thing as "the shaded face of the
+subject", which a selection rather than a percentile would answer. The first can
+be settled by looking at the carport's shade against its sun; the second is a
+different piece of work.
+
 ---
 
 ---

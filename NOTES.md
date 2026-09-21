@@ -618,6 +618,20 @@ user-scalable=no.
   own shadows the way the balance and the denoise floor already are, and bounded
   so it cannot invent colour where there is none. See
   `docs/decisions/034-the-red-cast-in-the-shadows-comes-off-by-hand.md`.
+  **THE MEASUREMENT IS BUILT AND IT DOES NOT YET DISCRIMINATE, 2026-09-21.**
+  `src/shadowcast.ts` measures the cast from the photograph's own shadows —
+  chromaticity rather than colour, a gain of unit luma so it cannot move
+  brightness, the sky excluded, exact unity on any frame it cannot measure —
+  and `tools/shadow-cast-check.mjs` proves all of that over synthetic
+  populations. The gate caught two real defects in it before a pixel moved.
+  **On the real corpus it fails the test the whole design rests on**: the frame
+  whose shadows are a roof reads 17.6% where it must read nothing, and the two
+  camera JPEGs sit at the held ceiling. Two definitions of the shaded
+  population were tried and a third would be tuning the corpus, so nothing is
+  corrected: the app REPORTS the measurement in the ⓘ diagnostic as "Shadow
+  light" and suggests no amount. IR-SCIENCE 9j-ii has the run and names the two
+  candidates that are not more tuning — read it before touching this again.
+
 - [ ] **A mask keys the photograph, not the grade** <!-- decision: 032 -->
   the Colour mask keys on the colour the pixel DISPLAYS — the decode through
   contrast and gamma, and downstream of the channel swap — so a mask picked
