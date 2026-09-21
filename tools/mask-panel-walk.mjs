@@ -32,6 +32,15 @@
 // control is a button that opens the shared modal, and a walk that set
 // `mask.name` directly would pass against a rename button wired to nothing.
 //
+// AND A SAVED MASK IS A RECIPE, NOT A BITMAP (040's third point). This is the
+// check the whole feature turns on, and it cannot be made by asking whether the
+// mask came back: a stored bitmap would come back too, and would be the PREVIOUS
+// photograph's sky laid over this one. So it saves a Sky mask on one frame,
+// opens a DIFFERENT frame, applies it, and asserts the coverage matches the sky
+// this frame actually has rather than the one it was saved from. The two frames
+// are chosen to have visibly different amounts of sky, because a check between
+// two frames that happen to agree would pass on a bitmap.
+//
 // --plant makes the name check read the row it wrote rather than the row after
 // the undo, which is the shape of the defect this exists for. Two checks must
 // go red.
@@ -149,7 +158,95 @@ try {
   check("...and pressing it once more comes back to it",
     back[0]?.pressed === true && (await editorOpen(p)),
     `pressed ${back[0]?.pressed}`);
-  await ctx.close();
+
+  // 5 · A SAVED MASK IS A RECIPE. Save a Sky mask here, then put it on another
+  // photograph and read what it selects THERE.
+  await p.locator("#maskList .mask-row").nth(0).locator(".mask-keep").click();
+  await p.waitForSelector("#askInput", { state: "visible", timeout: 20000 });
+  await p.fill("#askInput", "Radial keeper");
+  await p.click("#askOk");
+  await settle(p);
+  const savedRows = await p.evaluate(() => ({
+    shown: !document.getElementById("savedMaskRow")?.hidden,
+    labels: [...document.querySelectorAll("#savedMaskList .mask-pick")].map((e) => e.textContent ?? ""),
+  }));
+  check("a saved mask appears in the saved list", savedRows.shown && savedRows.labels.some((l) => l.startsWith("Radial keeper")),
+    savedRows.labels.join(" | ") || "the list is empty");
+
+  // AND A BRUSH MASK REFUSES IN WORDS rather than by a missing control.
+  await p.click("#addBrush");
+  await settle(p);
+  await p.locator("#maskList .mask-row").nth(1).locator(".mask-keep").click();
+  await p.waitForSelector("#askDlg[open]", { timeout: 20000 });
+  const refusal = await p.evaluate(() => ({
+    title: document.getElementById("askTitle")?.textContent ?? "",
+    body: document.getElementById("askBody")?.textContent ?? "",
+    hasInput: !document.getElementById("askInputRow")?.hidden,
+  }));
+  check("a painted mask says why it cannot be saved",
+    /cannot be saved/i.test(refusal.title) && /brush|painted/i.test(refusal.body) && !refusal.hasInput,
+    `"${refusal.title}"`);
+  await p.click("#askOk");
+  await settle(p);
+
+  // 6 · A SAVED SKY MASK IS RE-DETECTED, NOT RESTORED.
+  // Save the Sky mask from THIS frame, then open a different one in the SAME
+  // browser context and apply it. IndexedDB is per-origin and shared across
+  // pages in a context but NOT across contexts — the first version of this
+  // section opened a fresh context under a comment saying a fresh context would
+  // lose the store, and then reported the empty list as the app failing.
+  await p.click("#addSky");
+  await p.waitForFunction(() => !document.getElementById("skyControls")?.hidden, null, { timeout: 120000 });
+  await settle(p);
+  const skyHere = await p.evaluate(() => document.getElementById("mSkyStatus")?.textContent ?? "");
+  const pctHere = Number((skyHere.match(/(\d+)% of the frame/) ?? [])[1] ?? -1);
+  const skyRow = await p.evaluate(() => document.querySelectorAll("#maskList .mask-row").length - 1);
+  await p.locator("#maskList .mask-row").nth(skyRow).locator(".mask-keep").click();
+  await p.waitForSelector("#askInput", { state: "visible", timeout: 20000 });
+  await p.fill("#askInput", "The sky");
+  await p.click("#askOk");
+  await settle(p);
+  check("the first frame's sky was measured, so there is something to compare",
+    pctHere >= 0, `${pctHere}% of the frame here`);
+
+  const p2 = await ctx.newPage();
+  p2.on("dialog", (d) => d.accept());
+  await p2.goto(`http://127.0.0.1:${PORT}/ir.html`);
+  await p2.setInputFiles("#file", ["public/examples/NIR_0063.dng"]);
+  await p2.waitForFunction(() => document.getElementById("welcome")?.hidden, null, { timeout: 300000 });
+  await p2.waitForFunction(() => !document.getElementById("busy")?.hasAttribute("open"), null, { timeout: 300000 });
+  await settle(p2);
+  await p2.click("#ptab-masks");
+  await settle(p2);
+  const carried = await p2.evaluate(() => ({
+    shown: !document.getElementById("savedMaskRow")?.hidden,
+    labels: [...document.querySelectorAll("#savedMaskList .mask-pick")].map((e) => e.textContent ?? ""),
+  }));
+  check("the saved list is drawn on a fresh load, not only after a save",
+    carried.shown && carried.labels.some((l) => l.startsWith("The sky")),
+    carried.labels.join(" | ") || "nothing carried over");
+
+  // THE CHECK THE FEATURE TURNS ON. Put the saved sky on this other frame and
+  // read what it selects HERE. A stored bitmap would carry the first frame's
+  // number across; a recipe re-detects and reports this frame's own.
+  const idx = carried.labels.findIndex((l) => l.startsWith("The sky"));
+  await p2.locator("#savedMaskList .mask-pick").nth(idx).click();
+  await p2.waitForFunction(() => !document.getElementById("skyControls")?.hidden, null, { timeout: 120000 });
+  await settle(p2);
+  const skyThere = await p2.evaluate(() => document.getElementById("mSkyStatus")?.textContent ?? "");
+  const pctThere = Number((skyThere.match(/(\d+)% of the frame/) ?? [])[1] ?? -1);
+  // Against a FRESH sky mask made on this frame, which is the ground truth for
+  // "what this photograph's sky actually is".
+  await p2.click("#addSky");
+  await p2.waitForFunction(() => !document.getElementById("skyControls")?.hidden, null, { timeout: 120000 });
+  await settle(p2);
+  const skyFresh = await p2.evaluate(() => document.getElementById("mSkyStatus")?.textContent ?? "");
+  const pctFresh = Number((skyFresh.match(/(\d+)% of the frame/) ?? [])[1] ?? -1);
+  console.log(`\n  frame A ${pctHere}%   saved-applied on frame B ${pctThere}%   fresh on frame B ${pctFresh}%\n`);
+  check("the saved sky was RE-DETECTED on the new frame, not restored from the old",
+    pctThere >= 0 && pctFresh >= 0 && Math.abs(pctThere - pctFresh) <= 2,
+    `applied ${pctThere}% against a fresh ${pctFresh}% on the same frame (frame A was ${pctHere}%)`);
+  await p2.close();
 } finally { await b.close(); }
 console.log(failed ? `\n${failed} failed` : "\nall checks passed");
 process.exit(failed ? 1 : 0);

@@ -105,6 +105,50 @@ const HIT = () => {
   return { small: out, exempt };
 };
 
+/** A SAVED MASK IS A SURFACE, AND IT IS HIDDEN UNTIL ONE IS SAVED (decision
+ *  040). `#savedMaskRow` starts `hidden`, so a sweep that only opens the Masks
+ *  tab walks past the whole feature seeing nothing — the same shape as the mask
+ *  editor itself, which was unmeasured for its whole life for exactly this
+ *  reason. This makes a Sky mask, names it through the real dialog and saves
+ *  it, so both passes below see the editor AND the saved list a reader sees.
+ *
+ *  Takes `page`. Returns true when the saved list is on screen, false with the
+ *  reason printed when any step would not happen — never a silent skip, because
+ *  a sweep that quietly measured nothing is indistinguishable from a clean one. */
+const makeAndSaveMask = async (page, where) => {
+  const added = await page.evaluate(() => {
+    document.getElementById("ptab-masks")?.click();
+    const add = document.getElementById("addSky");
+    if (!add) return false;
+    add.click();
+    return true;
+  });
+  if (!added) { fail(`${where}: no Add control, so the mask editor and the saved list are unmeasured`); return false; }
+  const shown = await page.waitForFunction(
+    () => !document.getElementById("skyControls")?.hidden, null, { timeout: 60000 },
+  ).then(() => true).catch(() => false);
+  if (!shown) { fail(`${where}: the mask editor would not open, so its controls are unmeasured`); return false; }
+  await page.waitForTimeout(600);
+  const kept = await page.evaluate(() => {
+    const rows = document.querySelectorAll("#maskList .mask-row");
+    const keep = rows[rows.length - 1]?.querySelector(".mask-keep");
+    if (!keep) return false;
+    keep.click();
+    return true;
+  });
+  if (!kept) { fail(`${where}: no Keep control on the mask row, so the saved list is unmeasured`); return false; }
+  const asked = await page.waitForSelector("#askInput", { state: "visible", timeout: 20000 }).then(() => true).catch(() => false);
+  if (!asked) { fail(`${where}: saving would not ask for a name, so the saved list is unmeasured`); return false; }
+  await page.fill("#askInput", "Sky to keep");
+  await page.click("#askOk");
+  const listed = await page.waitForFunction(
+    () => !document.getElementById("savedMaskRow")?.hidden, null, { timeout: 20000 },
+  ).then(() => true).catch(() => false);
+  if (!listed) { fail(`${where}: the mask saved but the saved list stayed hidden`); return false; }
+  await page.waitForTimeout(300);
+  return true;
+};
+
 /** The colour a reader actually sees: the first ancestor that paints, composited
  *  down. `getComputedStyle` hands back the rgba AS WRITTEN, so a 15% accent over
  *  a dark surface reads as the accent while it is on screen as near-black — a
@@ -158,6 +202,10 @@ try {
           await page.evaluate(() => document.getElementById("lookEir")?.click());
           await page.waitForTimeout(2000);
           await page.waitForTimeout(2500);
+          // AND WITH A MASK MADE AND SAVED, so axe reads the mask editor and
+          // the saved list rather than the Add row with everything behind it
+          // still `hidden`.
+          await makeAndSaveMask(page, `${s.file} [${theme}] sky mask`);
         }
         await page.addScriptTag({ content: axeSrc });
         const r = await page.evaluate(async (rules) => await window.axe.run(document, { runOnly: rules }), RULES);
@@ -329,29 +377,14 @@ try {
         // in a sweep — the same shape as the tabs themselves and as crop mode:
         // a sweep reports on what it managed to see, and nothing in its output
         // distinguishes that from coverage. A Sky mask opens the largest of
-        // those editors.
-        if (s.file === "ir.html") {
-          const opened = await page.evaluate(() => {
-            document.getElementById("ptab-masks")?.click();
-            const add = document.getElementById("addSky");
-            if (!add) return false;
-            add.click();
-            return true;
-          });
-          if (!opened) fail(`${s.file} ${vw}px sky mask: no Add control, so the mask editor is unmeasured`);
-          else {
-            const shown = await page.waitForFunction(
-              () => !document.getElementById("skyControls")?.hidden, null, { timeout: 60000 },
-            ).then(() => true).catch(() => false);
-            if (!shown) fail(`${s.file} ${vw}px sky mask: the editor would not open, so its controls are unmeasured`);
-            else {
-              await page.waitForTimeout(600);
-              const inside = await page.evaluate(HIT);
-              if (inside.small.length) fail(`${s.file} ${vw}px sky mask editor: ${inside.small.join(" · ")}`);
-              else ok(`${s.file} ${vw}px sky mask editor: all >= 44`);
-              if (inside.exempt.length) note(`inline in a sentence, exempt (SC 2.5.8): ${inside.exempt.join(" · ")}`);
-            }
-          }
+        // those editors. THE SAVED LIST IS THE SAME SHAPE ONE LEVEL ON: it is
+        // `hidden` until a mask has been saved, so the mask is saved here and
+        // both are swept together, in the commit that creates it.
+        if (s.file === "ir.html" && await makeAndSaveMask(page, `${s.file} ${vw}px sky mask`)) {
+          const inside = await page.evaluate(HIT);
+          if (inside.small.length) fail(`${s.file} ${vw}px sky mask editor and saved list: ${inside.small.join(" · ")}`);
+          else ok(`${s.file} ${vw}px sky mask editor and saved list: all >= 44`);
+          if (inside.exempt.length) note(`inline in a sentence, exempt (SC 2.5.8): ${inside.exempt.join(" · ")}`);
         }
 
         // THE PICK/REJECT SHEET IS A STATE, AND SO IS ITS WAITING HALF.
