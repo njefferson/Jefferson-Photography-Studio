@@ -585,6 +585,19 @@ user-scalable=no.
   angle goes into the same `straighten` value the slider already carries, so
   undo, reset, the saved edit and the export inherit it with nothing new to
   learn. See `docs/decisions/038-straighten-to-a-line-you-draw.md`.
+  **ON STAGING, 2026-09-21.** A "Level to a line you draw" button in the
+  straighten pill: tap the two ends of an edge that should be level and the
+  frame turns to it. The angle goes through `applyStraighten`, the same door
+  the slider uses, so it is one undo step and the slider afterwards shows the
+  number the line produced. One tap moves nothing — the gesture can be
+  abandoned — and a drag places nothing, so a stray movement while it is armed
+  cannot drop a point. A line past 45° is read as an UPRIGHT edge rather than
+  turning the photograph ninety degrees.
+  Measured: a line drawn 6.0° off level moves the frame 6.0°, the same line
+  drawn the other way up gives the opposite angle, and a line 84° off level
+  gives 6.0° read as an upright. The renders were opened, which is how the
+  direction was confirmed and how the layout defect below was found.
+
 - [ ] **The red cast in the shadows comes off by hand, and should not have to** <!-- decision: 034 -->
   reported 2026-09-20 with two renderings of one building frame and the Grade
   panel that separates them — the Shadows wheel at 209 degrees, 47%. The shaded
@@ -17799,6 +17812,31 @@ how much of the frame carries no colour at all: **13.8% on the film against
 28–45% on these frames**. The film's reeds and lawn hold red where ours go to
 near-white. That is bright IR-reflective ground blowing out instead of holding
 its hue — highlight roll-off and exposure, not colour. Next piece of work.
+
+## Two findings from the drawn straighten line, 2026-09-21
+
+**A CONTROL THAT MOVED BETWEEN ONE PRESS AND THE NEXT, and no number showed
+it.** The straighten pill is a flex column below 820px and a GRID WITH NAMED
+AREAS above it. The new button was given no area, so above 820px it was
+auto-placed into an implicit row at the END — it sat under Straighten while the
+status note was hidden and jumped below the ratio chips the moment the note
+appeared. Every check in the walk passed through both layouts without noticing,
+because a walk reads state and this is position. It was found by opening the
+screenshot the walk had just saved, which is the whole of the rule about
+opening what you rendered.
+**The general shape**: a surface with two layouts has two chances to be wrong,
+and a new child placed by DOM order in one of them is placed by the grid in the
+other. Anything added to `#cropTools` needs an area as well as a place.
+
+**AND THE FIRST RUN'S FAILURES WERE THE INSTRUMENT.** Three checks went red —
+a near-vertical line read as 0°, then two more that cascaded from it — and the
+cause was that the walk drew its line through the centre of the photograph with
+a fixed reach, so a steep line's lower end landed inside the straighten pill
+that floats over the bottom of the frame. The second tap pressed the tool's own
+button instead of the picture. The app was right every time. The walk now
+centres its line high and caps the length per slope, and says why in its own
+comment. "When a result looks absurd, suspect the instrument first" earned its
+place again.
 
 ## A container that is hidden until it is used, three times now, 2026-09-21
 

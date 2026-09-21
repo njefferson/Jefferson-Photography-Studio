@@ -1157,6 +1157,48 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
    and its readout belong to Straighten mode only. */
 #cropTools.tool-crop .crop-fine,
 #cropTools.tool-crop #straightenVal { display: none; }
+/* LEVEL TO A LINE YOU DRAW (decision 038) — straighten only, like the slider
+   row and the Level button above it. Full width because it is a sentence
+   rather than a word, and because a full-width control cannot be squeezed
+   under 44px by whatever sits beside it. */
+#cropTools.tool-crop .crop-line-row { display: none; }
+.crop-line-row { display: flex; width: 100%; }
+#cropTools .crop-line-row button {
+  flex: 1;
+  min-height: 44px;
+  padding: 6px 12px;
+  font-size: 0.75rem;
+}
+/* ARMED SAYS SO IN MORE THAN COLOUR: the pressed state takes the accent fill
+   AND the label changes to what the app is waiting for, so the state survives
+   grayscale and survives not being able to see the pill at all. */
+#cropTools .crop-line-row button[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+/* THE LINE ITSELF, over the photograph. Drawn as a dark casing under a light
+   core, which is how a rule reads on a bright sky and on a black conifer
+   alike — nothing here rides on hue, so it is legible in both themes and in
+   grayscale without a second thought. */
+#straightenLine {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  /* Above the crop box it shares the overlay with — it is the thing being
+     placed, and the box is the frame it is being placed on. */
+  z-index: 2;
+}
+/* `hidden` is an HTML content attribute; the UA stylesheet does not apply it
+   to SVG elements, so the hiding is written here rather than assumed. */
+#straightenLine[hidden] { display: none; }
+#straightenLine .sl-case { stroke: rgba(0, 0, 0, 0.72); stroke-width: 5; stroke-linecap: round; fill: none; }
+#straightenLine .sl-core { stroke: rgba(255, 255, 255, 0.96); stroke-width: 2; stroke-linecap: round; fill: none; }
+#straightenLine .sl-dot-case { fill: rgba(0, 0, 0, 0.72); }
+#straightenLine .sl-dot { fill: rgba(255, 255, 255, 0.96); }
+
 /* The slider with a tenth-of-a-degree button either side of it. */
 .crop-fine { display: flex; align-items: center; gap: 8px; width: 100%; }
 .crop-fine input[type="range"] { flex: 1; }
@@ -1228,12 +1270,21 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
     grid-template-areas:
       "head head"
       "note note"
+      "line line"
       "fine ratios";
     align-items: center;
     column-gap: 14px;
   }
   #cropTools .crop-row { grid-area: head; }
   #cropTools .crop-level-note { grid-area: note; }
+  /* THE LINE ROW NEEDS AN AREA OR IT MOVES. Above 820px this pill is a GRID,
+     and a child with no area is auto-placed into an implicit row at the END —
+     so the button sat under Straighten while the note was hidden and jumped
+     below the ratio chips the moment the note appeared. A control that moves
+     between one press and the next is the thing this app's taste rules are
+     about, and no number in any walk shows it: it was found by opening the
+     screenshot the walk had just saved. */
+  #cropTools .crop-line-row { grid-area: line; }
   #cropTools .crop-fine { grid-area: fine; }
   #cropTools #cropRatios { grid-area: ratios; margin-top: 0; justify-content: flex-end; }
   /* Crop mode hides the slider row, so the chips take the whole width there

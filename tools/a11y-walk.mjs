@@ -401,6 +401,28 @@ try {
             if (inside.small.length) fail(`${s.file} ${vw}px ${mode} mode: ${inside.small.join(" · ")}`);
             else ok(`${s.file} ${vw}px ${mode} mode: all >= 44`);
             if (inside.exempt.length) note(`inline in a sentence, exempt (SC 2.5.8): ${inside.exempt.join(" · ")}`);
+            // THE LINE TOOL'S ARMED STATE IS ITS OWN SURFACE (038): the label
+            // changes to what the app is waiting for and the fill goes to the
+            // accent, and a sweep that only ever saw the resting button would
+            // measure neither. Same shape as the mask editor and the kept list:
+            // a state nothing reaches is a state nothing measures.
+            if (mode === "straighten") {
+              const lineOn = await page.evaluate(() => {
+                const b2 = document.getElementById("cropLine");
+                if (!b2) return false;
+                b2.click();
+                return b2.getAttribute("aria-pressed") === "true";
+              });
+              if (!lineOn) fail(`${s.file} ${vw}px straighten: the line tool would not arm, so its armed state is unmeasured`);
+              else {
+                await page.waitForTimeout(250);
+                const armedHit = await page.evaluate(HIT);
+                if (armedHit.small.length) fail(`${s.file} ${vw}px line tool armed: ${armedHit.small.join(" · ")}`);
+                else ok(`${s.file} ${vw}px line tool armed: all >= 44`);
+                await page.evaluate(() => document.getElementById("cropLine")?.click());
+                await page.waitForTimeout(150);
+              }
+            }
             await page.evaluate((b) => document.getElementById(b)?.click(), id);
             await page.waitForTimeout(250);
           }

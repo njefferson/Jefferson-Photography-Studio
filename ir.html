@@ -154,6 +154,11 @@
             <div class="crop-handle" data-corner="bl"></div>
             <div class="crop-handle" data-corner="br"></div>
           </div>
+          <!-- THE LINE THE READER IS DRAWING (decision 038). Inside the overlay
+               because the overlay is what covers the photograph, and AFTER the
+               crop box so it is painted over it rather than under; pointer
+               events are off, so it never takes one of the taps that place it. -->
+          <svg id="straightenLine" hidden aria-hidden="true"></svg>
         </div>
         <div id="cropTools" hidden>
           <div class="crop-row">
@@ -180,6 +185,19 @@
                what the photo's reserve tracks, so remeasureCropTools() runs
                with it. -->
           <p id="cropLevelNote" class="crop-level-note" role="status" aria-live="polite" hidden></p>
+          <!-- LEVEL TO A LINE YOU DRAW (decision 038). Level, above, is the
+               automatic answer — it looks for the strongest line in the
+               photograph. This is the reader's own: tap the two ends of an edge
+               that should be level and the frame turns to it.
+               ITS OWN ROW rather than a sixth control beside Level, Reset and
+               Done: that pill is min(88%, 360px) wide, and a fifth button in it
+               takes the width out of the "Straighten" label first and then out
+               of the 44px every one of them owes a finger. A row costs height,
+               which the photograph's reserve already tracks through
+               remeasureCropTools(); a cramped target costs the rule. -->
+          <div class="crop-line-row">
+            <button id="cropLine" type="button" aria-pressed="false">Level to a line you draw</button>
+          </div>
           <!-- A tenth of a degree by finger. The slider covers ninety degrees
                across a few hundred pixels, so one pixel of drag is about a third
                of a degree — fine for finding the angle, no use for landing on

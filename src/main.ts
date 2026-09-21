@@ -8463,6 +8463,12 @@ function setGeoMode(mode: "crop" | "straighten" | null) {
   // on every arm and disarm rather than lingering into the next photo.
   const cln = document.getElementById("cropLevelNote");
   if (cln) { cln.textContent = ""; cln.hidden = true; }
+  // AND A HALF-DRAWN LINE GOES WITH IT (038). Every way out of the tool comes
+  // through here — pressing Straighten again, Done, another picture tool
+  // taking the stage — so this is the one place that has to clear it. It runs
+  // after the note is cleared because disarming writes an empty note of its
+  // own, and two answers to "what does the pill say now" is how they differ.
+  if (lineArmed || linePt) setLineArmed(false);
   if (cropArmed) { setHslPick(false); setColorPick(false); setTat(false); setHeal(false); setHealReview(false); mUI.paint.setAttribute("aria-pressed", "false"); resetZoom(); } // picture tools are exclusive; geometry wants the whole frame in view
   // Pull the photo in from the stage edges while a geometry tool is live so the
   // corner handles never sit flush in the physical screen corners (the OS eats
@@ -8686,19 +8692,38 @@ cropOverlay.addEventListener("pointerdown", (e) => {
   cropPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (cropPointers.size === 2) {
     // Second finger down — hand off from panning to pinch-zoom. Drop the pan
-    // silently (it never committed an undo step; the crop hasn't changed yet).
+    // silently (it never committed an undo step; the crop hasn't changed yet),
+    // and drop a half-made tap with it: a pinch is not the second end of a line.
     cropDrag = null;
+    linePending = null;
     viewFreezeCenter = null;
     const [a, b] = [...cropPointers.values()];
     cropPinch = { dist: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), zoom: viewZoom };
     try { cropOverlay.setPointerCapture(e.pointerId); } catch { /* synthetic pointers can throw */ }
   } else if (cropPointers.size === 1) {
-    startCropDrag("move", e, cropOverlay);
+    // A TAP PLACES A POINT ONLY WHILE THE LINE TOOL IS ARMED (038). Off, this
+    // is the pan it has always been; on, a pointer that travels cancels itself
+    // and does nothing at all, so a stray drag can never drop a point.
+    if (lineArmed) {
+      e.preventDefault();
+      linePending = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+      try { cropOverlay.setPointerCapture(e.pointerId); } catch { /* synthetic pointers can throw */ }
+    } else {
+      startCropDrag("move", e, cropOverlay);
+    }
   }
 });
 cropOverlay.addEventListener("pointermove", (e) => {
   const p = cropPointers.get(e.pointerId);
   if (p) { p.x = e.clientX; p.y = e.clientY; }
+  if (linePending && e.pointerId === linePending.id
+      && Math.hypot(e.clientX - linePending.x, e.clientY - linePending.y) > LINE_TAP_SLOP) {
+    linePending.moved = true;
+  }
+  // THE RUBBER BAND, from the end already placed to wherever the pointer is.
+  // On a tablet it only shows while a finger is down, which is the moment it
+  // is wanted; with a mouse it follows the cursor.
+  if (lineArmed && linePt && !cropPinch) drawStraightenLine(linePt, { x: e.clientX, y: e.clientY });
   if (cropPinch && cropPointers.size >= 2) {
     const [a, b] = [...cropPointers.values()];
     const dist = Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
@@ -8713,12 +8738,177 @@ cropOverlay.addEventListener("pointermove", (e) => {
   moveCropDrag(e);
 });
 function endCropPointer(e: PointerEvent) {
+  if (linePending && e.pointerId === linePending.id) {
+    const tap = linePending.moved ? null : { x: linePending.x, y: linePending.y };
+    linePending = null;
+    if (tap) placeLinePoint(tap);
+  }
   cropPointers.delete(e.pointerId);
   if (cropPointers.size < 2) cropPinch = null;
   if (cropPointers.size === 0) endCropDrag();
 }
 cropOverlay.addEventListener("pointerup", endCropPointer);
 cropOverlay.addEventListener("pointercancel", endCropPointer);
+
+// ── LEVEL TO A LINE YOU DRAW (decision 038) ────────────────────────────────
+//
+// The reader does not know an angle. They know that THIS edge should be level,
+// and the edge is in front of them — so they say which edge by tapping its two
+// ends, and the frame turns to it.
+//
+// TWO TAPS RATHER THAN A DRAG, which is the record's chosen option and the one
+// place this departs from the field. Lightroom's Angle tool and Photoshop's
+// Ruler are both a drag along the edge, and both were designed for a mouse; on
+// a tablet held in one hand a drag that must start and end precisely across a
+// large frame competes with the pan gesture. The drag can be added later as a
+// second way in without changing anything here.
+//
+// AND IT IS NOT A NEW PARAMETER. The angle goes through `applyStraighten`, the
+// same door the slider and the tenth-of-a-degree buttons use, so undo, Reset,
+// the saved edit, a kept photograph and the export all inherit it with nothing
+// new to teach them — and the slider afterwards shows the number the line
+// produced and can still be nudged.
+const LINE_TAP_SLOP = 8; // px of travel that turns a tap into "never mind"
+const cropLineBtn = document.getElementById("cropLine") as HTMLButtonElement | null;
+const straightenLineSvg = document.getElementById("straightenLine") as SVGSVGElement | null;
+let lineArmed = false;
+/** The first end, in CLIENT coordinates, or null when nothing is half-placed. */
+let linePt: { x: number; y: number } | null = null;
+/** A pointer that is down and might still become a tap. `moved` is set the
+ *  moment it travels past the slop, and a moved pointer places nothing. */
+let linePending: { id: number; x: number; y: number; moved: boolean } | null = null;
+
+/** DRAW THE LINE BEING PLACED, or take it off the photograph.
+ *
+ *  Takes `a`, the first end in client coordinates or null to clear, and `b`,
+ *  the other end or null when only one is placed. Returns nothing.
+ *
+ *  What the caller relies on: it reads the overlay's own rectangle every time
+ *  rather than caching it, because the overlay moves whenever the view is
+ *  re-fitted — which `applyStraighten` does on every angle change. */
+function drawStraightenLine(a: { x: number; y: number } | null, b: { x: number; y: number } | null): void {
+  if (!straightenLineSvg) return;
+  if (!a) { straightenLineSvg.replaceChildren(); straightenLineSvg.setAttribute("hidden", ""); return; }
+  const r = cropOverlay.getBoundingClientRect();
+  const ax = a.x - r.left, ay = a.y - r.top;
+  const bx = b ? b.x - r.left : ax, by = b ? b.y - r.top : ay;
+  const mk = (name: string, attrs: Record<string, string | number>) => {
+    const el = document.createElementNS("http://www.w3.org/2000/svg", name);
+    for (const k of Object.keys(attrs)) el.setAttribute(k, String(attrs[k]));
+    return el;
+  };
+  const kids: Element[] = [];
+  if (b) {
+    // A DARK CASING UNDER A LIGHT CORE, which is how a rule stays legible on a
+    // bright sky and on a black conifer alike. Nothing here rides on hue.
+    kids.push(mk("line", { class: "sl-case", x1: ax, y1: ay, x2: bx, y2: by }));
+    kids.push(mk("line", { class: "sl-core", x1: ax, y1: ay, x2: bx, y2: by }));
+  }
+  for (const [x, y] of b ? [[ax, ay], [bx, by]] : [[ax, ay]]) {
+    kids.push(mk("circle", { class: "sl-dot-case", cx: x, cy: y, r: 7 }));
+    kids.push(mk("circle", { class: "sl-dot", cx: x, cy: y, r: 4 }));
+  }
+  straightenLineSvg.replaceChildren(...kids);
+  // `hidden` is an HTML content attribute and the UA stylesheet does not apply
+  // it to SVG, so the rule that hides this element is written out in style.css.
+  straightenLineSvg.removeAttribute("hidden");
+}
+
+/** ARM OR DISARM THE LINE TOOL.
+ *
+ *  Takes `on`. Returns nothing. Disarming always clears a half-placed line, so
+ *  the gesture can be abandoned and nothing has happened — which is why the
+ *  frame does not move until the second end lands.
+ *
+ *  What the caller relies on: this is the ONLY place `lineArmed` moves, so
+ *  every way out of the tool — pressing it again, leaving straighten, Reset,
+ *  Done — clears the same state. A second place would be a second answer. */
+function setLineArmed(on: boolean): void {
+  lineArmed = on && geoMode === "straighten";
+  linePt = null;
+  linePending = null;
+  drawStraightenLine(null, null);
+  if (cropLineBtn) {
+    cropLineBtn.setAttribute("aria-pressed", String(lineArmed));
+    // THE LABEL SAYS WHAT THE APP IS WAITING FOR, not just that something is
+    // on. The pressed fill is the colour half and this is the half that
+    // survives grayscale, a narrow pill and not looking at the button at all.
+    cropLineBtn.textContent = lineArmed ? "Tap the two ends — or press to stop" : "Level to a line you draw";
+  }
+  sayLevel(lineArmed ? "Tap one end of an edge that should be level." : "");
+}
+
+/** PLACE ONE END OF THE LINE.
+ *
+ *  Takes `pt` in client coordinates. Returns nothing. The first end is drawn
+ *  and nothing else happens; the second end levels the frame and disarms.
+ *
+ *  What the caller relies on: it never leaves the tool armed with two ends
+ *  placed, so the next tap after a completed line starts a fresh one only if
+ *  the reader arms it again. */
+function placeLinePoint(pt: { x: number; y: number }): void {
+  if (!lineArmed || !current) return;
+  if (!linePt) {
+    linePt = pt;
+    drawStraightenLine(linePt, null);
+    sayLevel("Now tap the other end.");
+    return;
+  }
+  const a = linePt;
+  if (Math.hypot(pt.x - a.x, pt.y - a.y) < 24) {
+    // Two taps in the same place is not a line, and guessing an angle from a
+    // few pixels would turn the frame by a wild amount for a slip of the
+    // finger. Say so and keep the first end, which is the cheaper recovery.
+    sayLevel("Those two points are too close together to read an angle from — tap further along the edge.");
+    return;
+  }
+  // DISARMED FIRST, THEN LEVELLED, and the order is the whole of it: disarming
+  // clears the note, so doing it afterwards wiped the sentence saying what the
+  // gesture had just done. The tool says what it did and then erased it.
+  setLineArmed(false);
+  levelToLine(a, pt);
+}
+
+/** TURN THE FRAME UNTIL THE DRAWN LINE IS LEVEL.
+ *
+ *  Takes `a` and `b`, the line's two ends in CLIENT coordinates. Returns
+ *  nothing; it says what it did through `sayLevel`.
+ *
+ *  THE ANGLE IS MEASURED ON THE FRAME AS DISPLAYED, which already carries the
+ *  current straighten and the 90-degree display rotation — so the answer is
+ *  the current angle less the line's own slope, and nothing has to be
+ *  un-projected. Zoom and pan are a uniform scale and a translation; neither
+ *  changes an angle.
+ *
+ *  NEAR-VERTICAL IS READ AS A VERTICAL. Past 45 degrees the reader drew a
+ *  doorframe rather than a horizon, and the correction is taken against upright
+ *  instead of level — without it an honest reading of the slope turns the
+ *  photograph almost ninety degrees, which is the one case every implementation
+ *  of this handles.
+ *
+ *  What the caller relies on: it goes through `applyStraighten` and then
+ *  `flushRecord`, so one gesture is one undo step and the slider agrees with
+ *  the picture. WHICH DIRECTION IS NEGATIVE is a fact about this pipeline's
+ *  geometry and is asserted end to end by `tools/straighten-line-walk.mjs`
+ *  rather than reasoned about — the same discipline `levelHorizon` records. */
+function levelToLine(a: { x: number; y: number }, b: { x: number; y: number }): void {
+  let deg = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
+  // Fold to (-90, 90]: a line has no direction, so dragging it the other way
+  // round must give the same answer.
+  while (deg <= -90) deg += 180;
+  while (deg > 90) deg -= 180;
+  const upright = Math.abs(deg) > 45;
+  const correction = upright ? deg - Math.sign(deg) * 90 : deg;
+  const before = params.straighten;
+  applyStraighten(before - correction);
+  flushRecord(); // one gesture = one undo step
+  const moved = Math.abs(params.straighten - before);
+  sayLevel(moved < 0.05
+    ? "That edge is already level — nothing to put right."
+    : `Levelled to your line by ${moved.toFixed(1)}°${upright ? ", read as an upright edge" : ""} — on the Straighten slider, yours to nudge or undo.`);
+}
+
+cropLineBtn?.addEventListener("click", () => setLineArmed(!lineArmed));
 
 /** Put the photograph at an angle, from wherever the request came. Extracted so
  *  the slider and the tenth-of-a-degree buttons cannot drift apart: they are the
@@ -8904,6 +9094,10 @@ cropLevelBtn?.addEventListener("click", levelHorizon);
 
 cropResetBtn.addEventListener("click", () => {
   if (!cropArmed) return;
+  // A HALF-DRAWN LINE IS PART OF WHAT RESET UNDOES (038). Leaving it armed
+  // with one end down means the next tap levels the frame the reader has just
+  // asked to put back, which is the opposite of what the button says.
+  if (lineArmed || linePt) setLineArmed(false);
   if (geoMode === "crop") {
     // Reset the box to the largest valid frame at the current angle (identity
     // when not straightened) — leaves any straighten alone. The full frame is
