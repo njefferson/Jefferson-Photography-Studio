@@ -174,3 +174,17 @@ also=tools/patch-note-check.mjs
 # pool the app would start to equal the pool those bytes buy — two routes to
 # one number, neither of them a re-derivation of the memory model.
 also=tools/pool-budget-check.mjs
+
+# Run on every commit: the shadow measurement returns unity on a frame that has
+# nothing to correct. IR-SCIENCE 9j built the obvious fix for an infrared
+# shadow's red cast — find the hue, add 180 degrees, tint the shadows — watched
+# it work beautifully on one frame, and then measured 858,273 grey pixels driven
+# from saturation 0.005 to 0.989 on a frame whose shadows were a roof rather
+# than a tree. The per-photograph measurement that replaces it is only safe
+# because it cannot invent a cast, and that is an arithmetic property: the gain
+# compares chromaticity rather than colour, carries unit luma so it cannot move
+# brightness, and comes back at exact unity on every frame it cannot measure.
+# All three are cheap to assert and none of them is visible in a rendering, so
+# they are asserted here rather than looked for later. It caught two real
+# defects on its first run.
+also=tools/shadow-cast-check.mjs

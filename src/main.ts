@@ -48,6 +48,7 @@ import { prepareSkySource, buildSkySelectionFrom, buildSkyGuide, refineSkyMask, 
 import { makeRowDenoiser } from "./raw/denoise";
 import { makeRowDetail } from "./raw/detail";
 import { buildSkyMask, skyPrepare, SKY_MIN_COVERAGE, type SkyPrep } from "./sky";
+import { measureShadowCast, type ShadowCast } from "./shadowcast";
 import { buildDiagnostic } from "./diagnostic";
 import { Tiff } from "./raw/tiff";
 import { drawHistogram } from "./histogram";
@@ -1662,6 +1663,68 @@ function skyMaskFor(img: DecodedImage): BrushMask | null {
   skyMaskOf.set(img, m);
   return m;
 }
+/** WHAT THIS PHOTOGRAPH'S OWN SHADOWS ARE LIT BY (decision 034), measured once
+ *  and kept for the photograph's life.
+ *
+ *  Takes `img`, a decoded photograph. Returns its `ShadowCast` — unity when
+ *  there is no measurable cast, so a caller may use it unconditionally.
+ *
+ *  ON A COARSE GRID, not every pixel: the answer is two population means and a
+ *  24-megapixel walk would cost seconds to say the same number. 512 on the long
+ *  edge leaves a quarter of a million samples, which is fifty times the floor
+ *  the measurement refuses below.
+ *
+ *  AND THE SKY COMES OUT, which is the half `shadowSat` never had. That control
+ *  is keyed on luminance ALONE, so a deep sky's dark end pays for a tree's bark
+ *  — IR-SCIENCE 9j names the fix as a second weight on the sky band, and the
+ *  band is `skyMaskFor`, which this app already builds for every photograph.
+ *
+ *  What the caller relies on: it reads `img.linear` through `linearAt` and
+ *  never the displayed pixel, so the answer is a property of the light the
+ *  photograph was taken in and does not re-key under a look. */
+function shadowCastFor(img: DecodedImage): ShadowCast {
+  const hit = shadowCastOf.get(img);
+  if (hit) return hit;
+  const sky = skyMaskFor(img);
+  const N = 512;
+  const sx = Math.max(1, Math.floor(img.width / N));
+  const sy = Math.max(1, Math.floor(img.height / N));
+  const gw = Math.max(2, Math.floor(img.width / sx));
+  const gh = Math.max(2, Math.floor(img.height / sy));
+  const cast = measureShadowCast(
+    (x, y) => linearAt(img, Math.min(img.width - 1, x * sx), Math.min(img.height - 1, y * sy)),
+    gw,
+    gh,
+    (x, y) => !!sky && sampleBrush(sky, (x * sx + 0.5) / img.width, (y * sy + 0.5) / img.height) > 0.5,
+  );
+  shadowCastOf.set(img, cast);
+  return cast;
+}
+const shadowCastOf = new WeakMap<DecodedImage, ShadowCast>();
+
+/** ONE LINE FOR THE REPORT, saying what this frame's shadows are lit by.
+ *
+ *  Takes nothing; reads `current`. Returns the line, or a sentence saying why
+ *  there is nothing to measure.
+ *
+ *  IT IS REPORTED BEFORE IT MOVES ANY PIXEL, deliberately. IR-SCIENCE 9j's
+ *  lesson is that a shadow correction is judged on the frame that disagrees
+ *  with the one that motivated it, and a measurement nobody can read is a
+ *  measurement nobody can disagree with. Consumer: the report's "Shadow light"
+ *  row. */
+function shadowCastDiagnostic(): string {
+  if (!current) return "nothing open";
+  const c = shadowCastFor(current);
+  if (!c.measured) return `not measurable on this frame — ${c.shadePx} shaded and ${c.sunPx} sunlit samples, below the floor either way`;
+  const g = c.gain.map((v) => v.toFixed(3)).join(" · ");
+  // IT REPORTS THE MEASUREMENT AND SUGGESTS NOTHING. Measured on the real
+  // corpus 2026-09-21, this number does NOT yet separate a shadow a tree filled
+  // from one a roof made — the carport reads 17.6% where the design needs it to
+  // read nothing — so a line that offered an amount would be offering a
+  // correction the measurement has not earned. IR-SCIENCE 9j-ii has the run.
+  return `shade sits ${(c.spread * 100).toFixed(1)}% off the sunlit face in colour — ${g}, from ${c.shadePx} shaded and ${c.sunPx} sunlit samples with the sky excluded`;
+}
+
 /** The edit the current sky map was built for, so a draw that changes nothing
  *  the map depends on does not rebuild it. Cleared on open. */
 let skyMapKey = "";
@@ -2998,6 +3061,11 @@ function wireVersionMenu() {
       // selection read it. The walk reads these two lines back.
       { k: "Correction order", v: current?.linear ? `on the linear raw at decode, before the balance and the selection — ${current.lensApplied?.gains ? `strength ${current.lensApplied.strength} laid on the pixels` : "nothing laid on the pixels (no profile, or strength 0 at decode)"}` : current ? "inside the grade — an 8-bit source has no linear copy to correct first" : "nothing open" },
       { k: "Balance", v: current ? `white balance ${params.wb.map((x) => x.toFixed(4)).join(" · ")} — the at-open gray-world unless moved since` : "nothing open" },
+      // WHAT THE SHADOWS ARE LIT BY, which one white balance cannot answer: in
+      // the infrared a shadow gets almost nothing from the sky and is filled by
+      // bounce off foliage, so a lit face and a shaded face are two illuminants
+      // (decision 034). Reported before anything corrects it.
+      { k: "Shadow light", v: shadowCastDiagnostic() },
       // WHICH SIDE OF THE BODY'S DIFFRACTION LIMIT THE FRAME WAS SHOT ON — a soft
       // frame explains itself, from its own EXIF and the body's pitch (§9h).
       { k: "Aperture", v: apertureDiagnostic() },
