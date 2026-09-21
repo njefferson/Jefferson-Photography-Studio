@@ -46,7 +46,7 @@ export const PAGES = [
   { file: "ir.html", dialogs: [
       "verDlg", "busy", "library", "qlCompareDlg", "quickLook", "batchDlg",
       "ratioDlg", "lookDlg", "lookPasteDlg", "lookRecvDlg", "infoDlg",
-      "lensDlg", "askDlg", "locDlg", "helpDlg",
+      "lensDlg", "askDlg", "locDlg", "helpDlg", "keptDlg",
     ] },
   // verDlg is BUILT IN SCRIPT, not written in macro.html — src/verdlg.ts appends
   // it at boot. A surface the markup does not mention is exactly the kind that

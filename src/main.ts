@@ -31,6 +31,7 @@ import { putFrame, eachFrame, frameMetas, frameCount, clearFrames, frameStore } 
 import * as Session from "./session";
 import { keepAwake } from "./wakelock";
 import { canTravel, shapeOf, putMask, getMask, listMasks, deleteMask as forgetMask, MASK_COUNT_CAP } from "./maskstore";
+import { putKept, getKept, getKeptBytes, listKept, deleteKept, setKeptEdit, renameKept, keptBytesHeld, KEPT_COUNT_CAP, type KeptRecord } from "./keepstore";
 import { sampleBrush, rebuildFix, stampFix, stampSegment, skyBandCentre, lensGain, LENS_GAIN_HI, LENS_GAIN_LO, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, bandWeight, rgb2hsv, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, type MaskLayer, type CropRect, BRUSH_MAX_EDGE, type SkyMap } from "./pipeline";
 import { sensorPitchMicrons } from "./color";
 import { lensGains, applyLensFlat, lensPlanStamp, type LensPlan } from "./lensflat";
@@ -77,7 +78,7 @@ import { extractLookFromJpeg } from "./lookmark";
 import { encodeQr, drawQr } from "./qr";
 import { wireThemePicker } from "./theme";
 import { wirePalettePicker } from "./palette";
-import { isIOS as isIOSDevice, wireDeviceCopy } from "./platform";
+import { isIOS as isIOSDevice, wireDeviceCopy, deviceNoun } from "./platform";
 
 // Injected at build time from git history (see vite.config.ts).
 declare const __CHANGELOG__: { hash: string; date: string; subject: string; version: string }[];
@@ -139,6 +140,12 @@ renderer.onContextLost = () => {
 }
 let current: DecodedImage | null = null;
 let currentFile: ImportedFile | null = null;
+/** The kept row the photograph on screen came from, or null (039). Set only by
+ *  `openKeptPhoto`; cleared by `showDecoded`, which every open path runs. It
+ *  lives here beside `currentFile` rather than next to the rest of decision
+ *  039's code, because `showDecoded` would otherwise reach a `let` declared
+ *  three thousand lines below it. */
+let openKeptId: string | null = null;
 
 // --- Hot-spot profile correction: a SEPARATE stage from the manual
 // `hotspot`/`hotspotSize` slider above (params.hotspot). Auto-selected from
@@ -7161,6 +7168,26 @@ window.addEventListener("resize", updateScrollCues);
 window.addEventListener("resize", positionMaskOverlay);
 window.addEventListener("resize", positionCropOverlay);
 
+/** RE-DETECT EVERY SKY MASK ON THE PHOTOGRAPH AS IT IS NOW.
+ *
+ *  Takes nothing. Returns whether anything was rebuilt, so the caller knows
+ *  whether the status line has to be redrawn — two callers wrote that as
+ *  `let rebuilt = false` around the same loop, and a third was about to.
+ *
+ *  A sky mask keys off the DISPLAY-top edge and is a recipe rather than a
+ *  stored bitmap, so every change that moves which edge is the top — a
+ *  rotation, a vertical flip — has to ask the photograph again. So does a
+ *  restore that arrives with the numbers and no bitmaps, which is what a kept
+ *  photograph's masks are (039, the same shape a saved mask is under 040).
+ *
+ *  What the caller relies on: `regenerateSkyMask` replays each mask's own hand
+ *  corrections over what it finds, so nothing else has to put them back. */
+function rebuildSkyMasks(): boolean {
+  let rebuilt = false;
+  for (const m of params.masks) if (m.type === 4) { regenerateSkyMask(m); rebuilt = true; }
+  return rebuilt;
+}
+
 // Rotate 90° clockwise per tap. Applies to the preview and the export.
 $("rotateBtn").addEventListener("click", () => {
   if (!current) return;
@@ -7168,9 +7195,7 @@ $("rotateBtn").addEventListener("click", () => {
   resetZoom();
   // A sky mask keys off the display-top edge, so a rotation re-detects it to
   // stay glued to the sky in the new orientation.
-  let rebuilt = false;
-  for (const m of params.masks) if (m.type === 4) { regenerateSkyMask(m); rebuilt = true; }
-  if (rebuilt) updateSkyStatus();
+  if (rebuildSkyMasks()) updateSkyStatus();
   draw();
 });
 
@@ -7185,9 +7210,7 @@ function toggleFlip(displayVertical: boolean) {
   resetZoom();
   if (displayVertical) {
     // The sky moved to the other display edge — re-detect, like rotate does.
-    let rebuilt = false;
-    for (const m of params.masks) if (m.type === 4) { regenerateSkyMask(m); rebuilt = true; }
-    if (rebuilt) updateSkyStatus();
+    if (rebuildSkyMasks()) updateSkyStatus();
   }
   draw();
 }
@@ -9415,6 +9438,12 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
   const __z = performance.now();
   current = img;
   currentFile = imported;
+  // WHICH KEPT PHOTOGRAPH THIS IS, or none (039). Cleared on EVERY open path
+  // and set again by `openKeptPhoto` straight afterwards, so a second Keep can
+  // only ever update the row the photograph on screen actually came from. The
+  // alternative — setting it where a kept photo opens and clearing it in each
+  // of the other paths — is a list somebody has to keep complete.
+  openKeptId = null;
   // Location guard: paths that build ImportedFile by hand (session restore's
   // stored bytes) haven't been scanned yet — scan here so the 🛰 tip is honest
   // on every open path. (Stored bytes stripped on their first open scan clean.)
@@ -12163,8 +12192,22 @@ sessionDone.addEventListener("click", async () => {
 // Resume a session left in storage by a previous visit (close, crash, or the
 // OS discarding the tab). Offered on the start screen, next to Recover.
 const resumeBtn = $("resumeSession") as HTMLButtonElement;
+// The kept list's own controls live here beside `resumeBtn` rather than with
+// the rest of decision 039's code, because `updateSessionResume` below is
+// called during module init and asks the kept list to redraw itself — a const
+// declared after that call would be in its temporal dead zone.
+const keptBtn = $("keptOpen") as HTMLButtonElement;
+const keptDlg = $("keptDlg") as HTMLDialogElement;
+const keptListEl = $("keptList") as HTMLElement;
+const keptHeldEl = $("keptHeld") as HTMLElement;
 
 async function updateSessionResume() {
+  // THE KEPT LIST IS RE-OFFERED AT THE SAME MOMENT, because it is the same
+  // moment: the start screen is back, so what the reader can come back TO has
+  // to be worked out again. `keptOpen` hides itself while a photograph is open,
+  // so without this, ending a session returned to a start screen that had
+  // forgotten the photographs put down (039).
+  void refreshKept();
   try {
     const metas = await Session.listPhotos();
     if (metas.length >= 2 && !current) {
@@ -12223,6 +12266,272 @@ async function resumeSession() {
 
 resumeBtn.addEventListener("click", resumeSession);
 updateSessionResume();
+
+// ── A PHOTOGRAPH YOU PUT DOWN, AND PICK UP AGAIN (decision 039) ─────────────
+//
+// A SESSION answers "carry on where I was"; this answers "put this one down
+// and come back to it next week", and they are not the same question. A
+// session has a Done that frees its storage, so `src/keepstore.ts` is its own
+// database — the boundary is the storage rather than care.
+//
+// WHY THE BYTES GO IN TOO. iPad Safari cannot re-open a File the reader picked
+// once the page reloads, which is the fact the quick look is built around. So
+// keeping only the recipe, the way a desktop editor does, would mean "come
+// back later" was really "find it in Files again". The cost is real and the
+// app says it: the list shows how many and how much, and offers to forget one.
+/** Object URLs for the list's tiles, revoked before the list is redrawn — the
+ *  leak the session strip had until it started doing this. */
+let keptThumbUrls: string[] = [];
+
+/** THE WHOLE EDIT OF THE OPEN PHOTOGRAPH, as JSON, masks included.
+ *
+ *  Takes nothing. Returns the JSON a kept row stores and `openKeptPhoto`
+ *  restores through the same path a resumed session's stored edit takes.
+ *
+ *  IT IS NOT `editToJson`, and the difference is the masks. That one drops them
+ *  because a session restore has never carried them and Help says so. Here they
+ *  are the point: this app's edits are mask work, and coming back to find every
+ *  selection gone is not coming back to your edit. They travel as RECIPES —
+ *  `shapeOf` is the one place that knows which fields are bitmaps, and 040
+ *  already proved a Sky mask rebuilt from its numbers lands on the right sky.
+ *  On the SAME photograph it can only agree.
+ *
+ *  What the result has to satisfy: everything in it must survive
+ *  `JSON.stringify`, which is why the bitmaps go and why a painted mask
+ *  (`canTravel` false) is dropped rather than stored empty — an empty painted
+ *  mask would come back selecting nothing, which is worse than not coming back.
+ *  The reader is told that before they name it. */
+function keptEditToJson(): string {
+  const st = snapshot();
+  const masks = st.params.masks
+    .filter((m) => canTravel(m.type))
+    // `shapeOf` drops the name too, because a saved mask carries its name at the
+    // top level of its own row. Here the mask is inside a photograph's edit and
+    // has nowhere else to put it, so it goes back on.
+    .map((m) => (m.name ? { ...shapeOf(m), name: m.name } : shapeOf(m)));
+  return JSON.stringify({
+    params: { ...st.params, masks, lut: null, warp: null },
+    activeLook: st.activeLook, lookBias: st.lookBias, lookMark,
+    rot: renderer.rotation, flip: renderer.flip,
+  });
+}
+
+/** WHAT THIS PHOTOGRAPH WOULD LOSE by being kept, in the reader's words.
+ *
+ *  Takes nothing. Returns a sentence, or an empty string when nothing is lost.
+ *
+ *  Said BEFORE the name is asked for, because afterwards it is an apology. The
+ *  three are the three runtime things the stored form cannot hold: a painted
+ *  mask is nothing but its bitmap, a warp is a displacement field, and an
+ *  imported LUT is a lattice living in its own store. */
+function keptCaveat(): string {
+  const painted = params.masks.filter((m) => !canTravel(m.type)).length;
+  const bits: string[] = [];
+  if (painted) bits.push(`${painted} painted mask${painted === 1 ? "" : "es"}`);
+  if (params.warp) bits.push("the warp");
+  if (params.lut) bits.push("the imported LUT");
+  if (!bits.length) return "";
+  const list = bits.length === 1 ? bits[0] : `${bits.slice(0, -1).join(", ")} and ${bits[bits.length - 1]}`;
+  return `Everything comes back except ${list} — those are pixels rather than settings, so they are not part of what is kept.`;
+}
+
+/** KEEP THE OPEN PHOTOGRAPH, or update the row it came from.
+ *
+ *  Takes nothing. Returns nothing; every refusal is said to the reader rather
+ *  than logged, because a control that sometimes does nothing is the defect
+ *  this repo has the most lessons about.
+ *
+ *  What the caller relies on: after this resolves the list is redrawn, so the
+ *  start-screen button and the held total cannot disagree with the store. */
+async function keepCurrentPhoto(): Promise<void> {
+  if (!current || !currentFile) return;
+  flushRecord(); // a slider still mid-drag is part of the edit being kept
+  // ALREADY KEPT — the reader carried on editing and wants the newer state.
+  // Rewriting the file's bytes for a couple of kilobytes of change would cost a
+  // whole photograph's write, so only the edit moves.
+  if (openKeptId) {
+    try {
+      await setKeptEdit(openKeptId, keptEditToJson());
+      const lost = keptCaveat();
+      toast(lost ? `Kept — ${lost}` : "Kept", lost ? 4200 : 2000);
+      await refreshKept();
+      return;
+    } catch {
+      // The row is gone (forgotten on another tab): fall through and keep it
+      // again as a new one rather than telling the reader nothing happened.
+      openKeptId = null;
+    }
+  }
+  const held = await listKept().catch(() => []);
+  if (held.length >= KEPT_COUNT_CAP) {
+    await noticeDialog(
+      "No room for another kept photo",
+      `This ${deviceNoun()} is already holding ${KEPT_COUNT_CAP}, which is the limit. `
+      + "Open \u201cPhotos you kept\u201d from the start screen and forget one you have finished with.",
+    );
+    return;
+  }
+  const base = currentFile.name.replace(/\.[^.]+$/, "");
+  const caveat = keptCaveat();
+  const name = await askTextDialog(
+    "Keep this photo",
+    "Your edit and the original file stay on this " + deviceNoun() + " under this name. "
+    + "Nothing is uploaded and your original is never changed."
+    + (caveat ? " " + caveat : ""),
+    "Call it",
+    base,
+    "Keep",
+  );
+  if (name === null) return; // asked and then thought better of it
+  showBusy("Keeping\u2026");
+  try {
+    const rec: KeptRecord = {
+      id: `kept-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+      name: name || base,
+      srcName: currentFile.name,
+      kind: currentFile.kind,
+      size: currentFile.bytes.length,
+      thumb: await makeThumb(current, 260, lensCurveFor(currentFile), snapshot()),
+      edit: keptEditToJson(),
+      addedAt: Date.now(),
+    };
+    await putKept(rec, currentFile.bytes);
+    openKeptId = rec.id;
+    await refreshKept();
+    toast(`Kept as \u201c${rec.name}\u201d`, 2400);
+  } catch (err) {
+    recordFailure("keeping a photo", err);
+    await noticeDialog("That photo could not be kept", (err as Error).message);
+  } finally {
+    hideBusy();
+  }
+}
+
+/** OPEN A KEPT PHOTOGRAPH AND PUT ITS EDIT BACK ON.
+ *
+ *  Takes `id`, a kept row's id. Returns nothing.
+ *
+ *  It is the resumed-session path exactly — stored bytes, decode, show,
+ *  `activateCurrent` laying the stored edit over a fresh baseline — plus the
+ *  one thing a session restore never had to do: the masks arrive as numbers,
+ *  so every Sky mask is found again on this photograph before anything is
+ *  drawn.
+ *
+ *  What the caller relies on: the restore does NOT become an undo step. The
+ *  reader pressed a name in a list; one press of Undo waiting on arrival is the
+ *  restore showing through, which is the finding `activateCurrent`'s own
+ *  comment already records. */
+async function openKeptPhoto(id: string): Promise<void> {
+  keptDlg.close();
+  showBusy("Opening\u2026");
+  try {
+    const rec = await getKept(id);
+    if (!rec) { toast("That photo is no longer on this device", 2600); await refreshKept(); return; }
+    const bytes = await getKeptBytes(id);
+    if (!bytes.length) {
+      await noticeDialog("That photo could not be opened", "Its file is no longer on this device. Forgetting it will clear the row.");
+      return;
+    }
+    const imported: ImportedFile = { name: rec.srcName, kind: rec.kind, bytes, looksTranscoded: false };
+    const img = await decodeWithLens(imported, { front: true, sky: true });
+    showDecoded(img, imported);
+    // A kept photograph is one photograph, so it takes the lone-open shape —
+    // no strip, nothing to resume — with its stored edit riding in beside it
+    // for `activateCurrent` to lay on.
+    sessionPhotos = [{ id: "lone", name: rec.srcName, kind: rec.kind, size: rec.size, edit: rec.edit, thumbUrl: "", thumbState: "real" }];
+    nextOrder = 0;
+    liveEdits.clear();
+    activateCurrent("lone");
+    openKeptId = id;
+    if (rebuildSkyMasks()) updateSkyStatus();
+    // RE-SEEDED AFTER THE REBUILD, for `activateCurrent`'s own reason one step
+    // later: the masks it snapshotted had no bitmaps yet, so without this the
+    // state the reader can undo to is a photograph whose selections select
+    // nothing. `baseline` is deliberately not moved — Reset still returns to
+    // how the photograph opens.
+    settled = snapshot();
+    void captureActiveEdit();
+    updateMaskUI();
+    renderMaskOverlay();
+    updateSessionStrip();
+    draw();
+    toast(`Opened \u201c${rec.name}\u201d`, 2000);
+  } catch (err) {
+    recordFailure("opening a kept photo", err);
+    await noticeDialog("That photo could not be opened", (err as Error).message);
+  } finally {
+    hideBusy();
+  }
+}
+
+/** THE KEPT LIST, REDRAWN FROM THE STORE, and the button that reveals it.
+ *
+ *  Takes nothing. Returns nothing.
+ *
+ *  What the caller relies on: it is safe to call whenever the store may have
+ *  moved — after a keep, after a forget, and at startup — and it revokes the
+ *  previous pass's object URLs before making new ones, so opening the list
+ *  repeatedly does not leak a tile per visit. */
+async function refreshKept(): Promise<void> {
+  const list = await listKept().catch(() => []);
+  keptBtn.hidden = list.length === 0 || !!current;
+  keptBtn.textContent = list.length === 1 ? "Photos you kept \u2014 1" : `Photos you kept \u2014 ${list.length}`;
+  for (const u of keptThumbUrls) URL.revokeObjectURL(u);
+  keptThumbUrls = [];
+  keptListEl.replaceChildren(
+    ...list.map((meta) => {
+      const row = document.createElement("div");
+      row.className = "kept-row";
+      const img = document.createElement("img");
+      const url = URL.createObjectURL(new Blob([meta.thumb], { type: "image/jpeg" }));
+      keptThumbUrls.push(url);
+      img.src = url;
+      img.alt = ""; // the name beside it is the label; a second one is noise
+      const open = document.createElement("button");
+      open.type = "button";
+      open.className = "kept-open";
+      open.append(meta.name);
+      const sub = document.createElement("small");
+      sub.textContent = `${meta.srcName} \u00b7 ${fmtSize(meta.size)}`;
+      open.append(sub);
+      open.addEventListener("click", () => void openKeptPhoto(meta.id));
+      const ren = document.createElement("button");
+      ren.type = "button";
+      ren.className = "kept-ren";
+      ren.textContent = "\u270e";
+      ren.setAttribute("aria-label", `Rename ${meta.name}`);
+      ren.addEventListener("click", () => void (async () => {
+        const next = await askTextDialog("Rename this photo", "", "Call it", meta.name, "Rename");
+        if (next === null) return;
+        await renameKept(meta.id, next || meta.name).catch(() => {});
+        await refreshKept();
+      })());
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "kept-del";
+      del.textContent = "\u00d7";
+      del.setAttribute("aria-label", `Forget ${meta.name}`);
+      del.addEventListener("click", () => void (async () => {
+        await deleteKept(meta.id).catch(() => {});
+        if (openKeptId === meta.id) openKeptId = null;
+        await refreshKept();
+      })());
+      row.append(img, open, ren, del);
+      return row;
+    }),
+  );
+  // THE COST, IN WORDS, EVERY TIME THE LIST IS DRAWN. A store whose size the
+  // reader cannot see is the leak decision 039's own rejected option describes,
+  // and this is the difference between keeping something and losing track of it.
+  const bytes = await keptBytesHeld().catch(() => 0);
+  keptHeldEl.textContent = list.length
+    ? `${list.length} of ${KEPT_COUNT_CAP} kept \u00b7 ${fmtSize(bytes)} held on this ${deviceNoun()}.`
+    : "Nothing kept yet.";
+}
+
+$("keepPhoto").addEventListener("click", () => void keepCurrentPhoto());
+keptBtn.addEventListener("click", () => { void refreshKept(); keptDlg.showModal(); });
+$("keptDlgClose").addEventListener("click", () => keptDlg.close());
 
 // ANYTHING AN INTERRUPTED ENDING LEFT BEHIND, cleared at start rather than
 // kept forever. Ending a session forgets its index first and deletes the bytes

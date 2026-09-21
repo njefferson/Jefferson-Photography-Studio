@@ -554,6 +554,25 @@ user-scalable=no.
   a reload on iPad Safari. So keeping the edit is easy and keeping the
   photograph is the decision. See
   `docs/decisions/039-an-edit-you-can-put-down-and-come-back-to.md`.
+  **ON STAGING, 2026-09-21.** Every mask row's neighbour on the Export panel is
+  a Keep button; name it and the photograph joins a list on the start screen
+  that is still there after the app is closed. `src/keepstore.ts` is its own
+  database (`ips-kept`) rather than a store inside the session's, so the Done
+  button cannot reach it — 039's rejected "make it a session of one", made
+  structurally impossible rather than remembered. The durability shape is
+  `src/session.ts`'s and therefore `src/batchstore.ts`'s: bytes in chunks of
+  30 KB or less, one strict transaction per photograph.
+  **The masks come back, which a resumed session has never managed.** They are
+  stored as RECIPES with the bitmaps stripped — `shapeOf`, the one function that
+  knows which fields are pixels — and every Sky mask is found again on the
+  photograph before anything is drawn. Measured: a sky selecting 54% of the
+  frame when it was kept selects 54% when it is picked up. A painted mask, a
+  warp and an imported LUT are pixels rather than settings, so they do not come
+  back and the app says which of them this photograph would lose BEFORE asking
+  for a name.
+  Cap of ten, and the list prints how many and how many megabytes are held,
+  because a store whose size the reader cannot see is the leak the record's own
+  rejected option describes.
 - [ ] **Straighten to a line you draw** <!-- decision: 038 -->
   asked 2026-09-20: tap two points along an edge that should be level and let
   the photograph straighten to it. Today the control is an angle — a slider and
@@ -17780,6 +17799,45 @@ how much of the frame carries no colour at all: **13.8% on the film against
 28–45% on these frames**. The film's reeds and lawn hold red where ours go to
 near-white. That is bright IR-reflective ground blowing out instead of holding
 its hue — highlight roll-off and exposure, not colour. Next piece of work.
+
+## A container that is hidden until it is used, three times now, 2026-09-21
+
+**It is a CLASS and it should be looked for, not met again.** Three surfaces in
+this app have shipped invisible to the accessibility sweep for the same reason,
+and none of the three was a mistake in the sweep: it opens what is on screen,
+and each of these is `hidden` until the reader has done something.
+
+- **The mask editor** — hidden until a mask exists. Show mask, Matte, Invert,
+  Delete, Reach, Feather, the join radios and the hand-correction row had never
+  been in a sweep at all. Found 2026-09-20; `.mask-del` measured 29x44.
+- **The saved-mask list** — hidden until a mask has been saved. Found the next
+  day, in the commit that created it, only because the plan said the walk had to
+  REACH the new controls.
+- **The kept-photo dialog** — `#keptDlg` opens either way, so the dialog sweep
+  would have measured a heading and a Close button and reported the feature
+  clean. Its rows carry three controls.
+
+**The remedy is the same each time and it is cheap**: the walk performs the act
+that populates the container before it measures. `tools/a11y-walk.mjs` now makes
+and saves a mask, and keeps a photograph, before both its passes.
+**The test for the next one**: any container that starts `hidden` and is filled
+by an action is unmeasured until a walk performs that action. `tools/surfaces.mjs`
+catches a dialog that is never OPENED; nothing catches one that is opened empty.
+
+## A WALK THAT THROWS IS A WORSE INSTRUMENT THAN ONE THAT FAILS, 2026-09-21
+
+Measured on `tools/kept-walk.mjs`'s own fail-first run. The plant — a restore
+that stores the edit and never applies it — correctly turned two checks red and
+then left no mask for the next step to click, so Playwright threw and a stack
+trace took the place of the third finding AND of the two sections after it, the
+session boundary and forgetting. Under a real regression the operator would have
+seen a timeout rather than three findings and two passes.
+
+**So every step that depends on the thing under test is guarded**, and the
+failure says what was missing rather than what selector timed out: "no mask came
+back, so there was nothing to re-detect". The rule is not "add try/catch" — it is
+that a check whose precondition failed must REPORT that, because the point of a
+walk is the list it prints.
 
 ## A decoration no instrument samples, and a build no walk could name, 2026-09-20
 
