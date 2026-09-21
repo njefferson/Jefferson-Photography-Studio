@@ -25,13 +25,14 @@
 // there and reported the aim moving half the frame — which was 30% of extra
 // chroma over 54% of the picture and nothing whatever to do with the aim.
 //
-// A NOTE ON DRIVING THE CONTROLS, because it cost three rounds. Plain value
-// sliders take `setValue` from tools/walk-input.mjs — dispatched events, value
-// read back. A real pointer drag moves no range input in this container: six
-// sliders were driven three ways each and not one moved. Mask-panel controls
-// that carry a MODE are the exception (hub LESSONS §348); this walk turns the
-// coverage tint off explicitly and never reads it, and check 1 is what says so
-// if that reasoning is wrong.
+// A NOTE ON DRIVING THE CONTROLS. Plain value sliders take `setValue` from
+// tools/walk-input.mjs — dispatched events, value read back, which is exact and
+// fast. An earlier version of this comment said a real pointer drag moves no
+// range input in this container; that was measured to be false the same day and
+// the correction is in walk-input.mjs's header. Mask-panel controls that carry
+// a MODE take a real gesture (hub LESSONS §348); this walk turns the coverage
+// tint off explicitly and never reads it, and check 1 is what says so if that
+// reasoning is wrong.
 //
 //   python3 -m http.server 8131 --directory dist   (in another shell)
 //   node tools/aim-walk.mjs [--port=8131] [--shots=DIR]

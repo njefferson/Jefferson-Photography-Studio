@@ -10,16 +10,29 @@
 //
 // WHAT IT COST, 2026-09-21. Three rounds went into why Dehaze appeared to do
 // nothing, on a harness that drove it with a real pointer drag, a click on the
-// track and a focused ArrowRight. Six sliders — Saturation, Contrast, Hue,
-// Exposure, Clarity, Dehaze — were unmoved by all three, with focus landing on
-// each. Six for six is the INTERACTION, not six broken controls: the synthetic
-// pointer in this container does not move a range input. The route that does
-// work was already in the repository, in every walk here.
+// track and a focused ArrowRight. Six sliders were unmoved by all three, with
+// focus landing on each — and the conclusion drawn from that, written into this
+// header and into the hub's lessons, was that the synthetic pointer in this
+// container cannot move a range input.
 //
-// SO THERE ARE TWO ROUTES AND THE CHOICE IS NOT TASTE.
+// THAT WAS FALSE AND WAS NEVER CONTROLLED. A bare `<input type=range>` on a
+// blank page in this same browser goes 50 to 81 on a pointer drag; the app's
+// own Dehaze slider goes 0 to 0.64 on the same gesture, with elementFromPoint
+// at the drop coordinate returning the slider itself; and ArrowRight on it,
+// focused, moves it. Three routes out of three work. Six for six did not
+// reproduce, and what was wrong that first time is STILL NOT KNOWN.
+//
+// The diagnosis survived because the WORKAROUND WORKED — the dispatched route
+// fixed the harness, the arms rendered, the numbers were right, and a fix that
+// works reads as a cause confirmed. It is not one. (Hub LESSONS §348.)
+//
+// SO THE CHOICE BETWEEN THE TWO ROUTES IS NOT ABOUT THE CONTAINER. It is
+// about what the control DOES, and it is decided per control.
 //   setValue()  — plain VALUE controls: Exposure, Dehaze, Clarity, Contrast,
 //                 Saturation, and any other slider that only carries a number.
-//                 Dispatched events, value read back, throws if it did not land.
+//                 Dispatched events, value read back, throws if it did not
+//                 land. Preferred for these because it is exact and fast, not
+//                 because a drag would fail.
 //   dragSlider() — controls with a MODE behind them: a mask's own sliders put
 //                 the app into its adjusting state, where a dispatched event
 //                 leaves it half-entered and the coverage overlay never comes
@@ -29,7 +42,8 @@
 //                 a dispatched event had left it in.
 //
 // The reading-back is the whole point. A helper that only sets is the four
-// lines every walk already had.
+// lines every walk already had — and it is the part that would have made the
+// original six-for-six finding legible instead of leaving it to be guessed at.
 import { strict as assert } from "node:assert";
 
 /** SET A PLAIN VALUE CONTROL AND PROVE IT LANDED.
