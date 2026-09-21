@@ -665,11 +665,45 @@ user-scalable=no.
   **Colour masks cannot aim**: their key is the pixel as it DISPLAYS at the mask
   stage, which does not exist at dehaze. That boundary is 032's, and the control
   stands down rather than offering nothing.
-  Still whole-frame: denoise, colour noise and texture are spatial pre-passes
-  rather than per-pixel gains, so aiming them means blending the filtered and
-  unfiltered results by the mask weight — more than a bitmask entry. The
-  hot-spot and lens corrections are radial and per-pixel, so they are the same
-  cheap shape as the three already done.
+  **RENDERED AND OPENED 2026-09-21, which is the only verification that counts
+  for an appearance.** Three states of `NIR_1651` — a conifer against a teal
+  sky with a cloud bank across the top — with Dehaze held at 0.80 and the Sky
+  mask's own adjustment driven to neutral, so the mask is a PLACE and nothing
+  else. Whole-frame at 0.80 takes the sky down hard and the cloud gains real
+  structure, and it costs the conifer its luminosity: the foliage goes from
+  pale pink to a grey mauve and the shadows inside the crown crush toward
+  black. Aimed at the Sky mask it is that same sky with the tree exactly as it
+  opened. The aimed arm moved 55% of the frame against the mask's own claim of
+  54%, which is the shape the mechanism predicts.
+  **And what the render shows that no number did**: the selection's edge is
+  visible. A rim of un-darkened sky hugs the crown's silhouette, and the small
+  holes of sky between the needles keep their original teal while the open sky
+  around them goes dark. That is 029's ground — the selection being wrong about
+  which pixels are sky — and it is what now limits how far this can be pushed.
+  **The lens hot-spot fix is aimed too (2026-09-21), one more bitmask entry.**
+  `AIM_LENS` covers both routes to the same correction — the manual `hotspot`
+  and `hotspotColor` sliders and the measured `lensFix` / `hsFix` curves —
+  because to a reader they are one thing, the hot spot this converted sensor
+  puts in the middle of the frame. `vignette` rides the same circle and is
+  deliberately NOT aimed, so the weight scales the hot-spot AMOUNT rather than
+  the combined gain. The measured curve is blended toward 1 by the weight
+  rather than re-derived at a scaled strength, because `lensGain` is not linear
+  in strength and the CPU builds its table once — blending is the one thing
+  both paths can do identically.
+  **`tools/aim-walk.mjs` is the gate**, and it holds the mechanism to four
+  statements that are true of every aim or of none: aiming nothing changes
+  nothing (a neutral, non-aiming Sky mask renders byte-identical to no mask —
+  the check that protects every edit already saved), the stage does something
+  whole-frame, the aim holds something back, and the aim still does something.
+  Its own first run caught a confound that had already produced one wrong
+  report: a fresh Sky mask arrives with Saturation 1.3 on purpose, so an arm
+  that does not neutralise it is measuring 30% of extra chroma over half the
+  picture and calling it the aim.
+  Six of the scope gate's OWED entries came off the list with this: dehaze,
+  clarity, shadowSat, hotspot, lensFix and hsFix. Still whole-frame: denoise,
+  colour noise and texture are spatial pre-passes rather than per-pixel gains,
+  so aiming them means blending the filtered and unfiltered results by the mask
+  weight — more than a bitmask entry, and the next piece of 030.
 
 - [ ] **A mask is a place, and most of the controls should work inside one** <!-- decision: 042 -->
   asked 2026-09-21: masks should come out of the tab strip into a place of

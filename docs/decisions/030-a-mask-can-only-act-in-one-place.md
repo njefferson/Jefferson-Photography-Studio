@@ -91,6 +91,14 @@ what the app can do with a correct one.
    gates, starting with the ones the scope gate already records as OWED —
    denoise and texture. One new field, a per-stage weight lookup, and the six
    OWED reasons start coming off the list one at a time with a measurement each.
+   **CHOSEN, and built 2026-09-21 as `MaskLayer.aims`.** It started with the
+   per-pixel stages rather than denoise and texture, which this record named
+   first and which turn out to be the expensive ones: a spatial pre-pass has to
+   be run twice and blended by the weight, where a per-pixel gain only has to
+   be scaled. Dehaze, Clarity, the shadow tint and the IR lens hot-spot fix are
+   aimed, which took six OWED reasons off the scope gate's list. What made it
+   a decision rather than a claim is that Dehaze aimed at a Sky mask was
+   rendered on NIR_1651 and opened — see Looked at, and see the edge it found.
 2. Named snapshots of the whole `EditParams`, RawTherapee's model — cheap,
    because the state is already a plain parameter object that is cloned for
    undo. Solves comparison and return, solves nothing about aiming.
@@ -108,6 +116,24 @@ what the app can do with a correct one.
 - **2 alone.** Named states would be genuinely useful and would not have
   prevented any defect found this week. The aiming is what the measurements keep
   pointing at.
+
+## Looked at
+
+Three states of one frame, rendered through the real app by
+`tools/aim-walk.mjs --shots=` on 2026-09-21 and opened as photographs, with
+Dehaze held at 0.80 and the Sky mask's own adjustment driven to neutral so the
+mask is a PLACE and nothing else.
+
+- **NIR_1651** — a conifer against a deep teal sky with a cloud bank across the
+  top. Whole-frame Dehaze at 0.80 takes the sky down hard and gives the cloud
+  real structure, and it costs the conifer its luminosity: the foliage goes
+  from pale pink to a grey mauve and the shadows inside the crown crush toward
+  black. Aimed at the Sky mask it is that same sky with the tree exactly as it
+  opened. **The picture also shows what no figure did**: a rim of un-darkened
+  sky hugs the crown's silhouette, and the small holes of sky between the
+  needles keep their original teal while the open sky around them goes dark.
+  That edge is 029's ground, and it is now what limits how far this can be
+  pushed rather than the mechanism.
 
 ## Rank
 

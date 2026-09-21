@@ -32,7 +32,7 @@ import * as Session from "./session";
 import { keepAwake } from "./wakelock";
 import { canTravel, shapeOf, putMask, getMask, listMasks, deleteMask as forgetMask, MASK_COUNT_CAP } from "./maskstore";
 import { putKept, getKept, getKeptBytes, listKept, deleteKept, setKeptEdit, renameKept, keptBytesHeld, KEPT_COUNT_CAP, type KeptRecord } from "./keepstore";
-import { sampleBrush, rebuildFix, stampFix, stampSegment, skyBandCentre, lensGain, LENS_GAIN_HI, LENS_GAIN_LO, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, bandWeight, rgb2hsv, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, AIM_DEHAZE, AIM_CLARITY, AIM_SHADOW, type MaskLayer, type CropRect, BRUSH_MAX_EDGE, type SkyMap } from "./pipeline";
+import { sampleBrush, rebuildFix, stampFix, stampSegment, skyBandCentre, lensGain, LENS_GAIN_HI, LENS_GAIN_LO, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, bandWeight, rgb2hsv, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, AIM_DEHAZE, AIM_CLARITY, AIM_SHADOW, AIM_LENS, type MaskLayer, type CropRect, BRUSH_MAX_EDGE, type SkyMap } from "./pipeline";
 import { sensorPitchMicrons } from "./color";
 import { lensGains, applyLensFlat, lensPlanStamp, type LensPlan } from "./lensflat";
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, type HealSpot } from "./heal";
@@ -5846,6 +5846,7 @@ const mUI = {
   aimDehaze: $("mAimDehaze") as HTMLButtonElement,
   aimClarity: $("mAimClarity") as HTMLButtonElement,
   aimShadow: $("mAimShadow") as HTMLButtonElement,
+  aimLens: $("mAimLens") as HTMLButtonElement,
   joinRow: $("mJoinRow") as HTMLFieldSetElement,
   joinAdd: $("mJoinAdd") as HTMLInputElement,
   joinSub: $("mJoinSub") as HTMLInputElement,
@@ -6321,13 +6322,14 @@ function selectMask(i: number) {
   renderMaskOverlay();
 }
 
-/** THE TWO STAGES A MASK CAN AIM TODAY (decision 030), as [button, bit] pairs.
+/** THE STAGES A MASK CAN AIM TODAY (decision 030), as [button, bit] pairs.
  *  One list, read by the wiring below and by updateMaskUI, so a third stage is
  *  one line rather than three edits that can disagree. */
 const AIMS: ReadonlyArray<readonly [HTMLButtonElement, number]> = [
   [mUI.aimDehaze, AIM_DEHAZE],
   [mUI.aimClarity, AIM_CLARITY],
   [mUI.aimShadow, AIM_SHADOW],
+  [mUI.aimLens, AIM_LENS],
 ];
 for (const [btn, bit] of AIMS) {
   btn.addEventListener("click", () => {

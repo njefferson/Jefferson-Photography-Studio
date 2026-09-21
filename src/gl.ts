@@ -130,7 +130,7 @@ uniform sampler2DArray u_maskTex; // brush/sky masks, four per RGBA layer (MAX_B
 uniform sampler2DArray u_maskFineTex; // sky masks (type 4) refined to the picture's edges, same slots
 uniform bool u_maskFineOn;      // false when no sky mask has a refinement to read
 uniform int u_maskOp[8];     // 0 head (starts a group) · 1 subtract · 2 intersect (026)
-uniform int u_maskAims[8];   // bitmask of stages this mask gates: 1 dehaze, 2 clarity (030)
+uniform int u_maskAims[8];   // bitmask of stages this mask gates: 1 dehaze, 2 clarity, 4 shadow colour, 8 lens hot-spot fix (030)
                              // LITERAL 8, like every array above it: MAX_MASKS is a
                              // TypeScript constant and means nothing inside GLSL —
                              // written as MAX_MASKS first, and the shader silently
@@ -311,13 +311,17 @@ float grainNoise(vec2 p, float cell){
   float n01 = hash2d(x0, y0 + 1), n11 = hash2d(x0 + 1, y0 + 1);
   return mix(mix(n00, n10, s.x), mix(n01, n11, s.x), s.y) * 2.0 - 1.0;
 }
-float radialGain(vec2 uv){
+// THE HOT-SPOT AMOUNT IS A PARAMETER, the vignette is not, and that asymmetry
+// is decision 030: a mask can aim the hot-spot fix at one part of the frame,
+// while the vignette rides the same circle and is whole-frame on purpose.
+// Mirrors pipeline.ts radialGain, which takes the amount the same way.
+float radialGain(vec2 uv, float hot){
   // Circular in PIXELS (hot-spots are optically round): scale x by the image
   // aspect, normalise so r = 1 at the frame corner. Matches pipeline.ts.
   vec2 d = vec2((uv.x - 0.5) * u_aspect, uv.y - 0.5);
   float r = 2.0 * length(d) / sqrt(u_aspect * u_aspect + 1.0);
   float gVig = 1.0 + u_vignette * 0.85 * smoothstep(0.07, 1.0, r);
-  float gHot = 1.0 - u_hotspot * (1.0 - smoothstep(0.0, max(1e-3, u_hotspotSize), r));
+  float gHot = 1.0 - hot * (1.0 - smoothstep(0.0, max(1e-3, u_hotspotSize), r));
   return max(0.0, gVig * gHot);
 }
 /** The hot-spot's radial weight alone: 1 at the centre, 0 past u_hotspotSize.
@@ -639,13 +643,23 @@ void main() {
   }
 
   // IR lens correction: radial luminance gain (hot-spot / vignette) after WB.
-  if (u_hotspot != 0.0 || u_vignette != 0.0) c *= radialGain(v_uv);
+  // AIMED, IF ANY MASK ASKED (decision 030) — one weight for both halves and
+  // for the measured curve below, because they are one correction. Returns 1
+  // when nothing aims, so an unaimed frame is byte-identical to before.
+  // The ternary is load-bearing: aimWeightOf walks every mask, and this is the
+  // one aim computed outside the `if` that guards its stage, so without it
+  // every pixel of every frame would pay that loop to scale a correction that
+  // is switched off. `u_vignette` is deliberately absent from the condition —
+  // it is not aimed, and if it is the only thing on then u_hotspot is 0 and
+  // the weight cannot matter.
+  float lw = (u_hotspot != 0.0 || u_hotspotColor != 0.0 || (u_lensN > 0 && (u_lensFix != 0.0 || u_lensBump != 0.0))) ? aimWeightOf(8) : 1.0;
+  if (u_hotspot != 0.0 || u_vignette != 0.0) c *= radialGain(v_uv, u_hotspot * lw);
   // And the hot-spot's COLOUR, on the same circle — before the swap and the
   // matrix below, so it corrects the LENS rather than the false-colour result.
   if (u_hotspotColor != 0.0) {
     float t = hotspotWeight(v_uv);
-    c.r *= 1.0 + u_hotspotColor * t;
-    c.b *= 1.0 - u_hotspotColor * t;
+    c.r *= 1.0 + u_hotspotColor * lw * t;
+    c.b *= 1.0 - u_hotspotColor * lw * t;
   }
   // The MEASURED curve, on the same side of the matrix and the swap. Its own
   // branch: it does not depend on any manual slider being set.
@@ -656,10 +670,14 @@ void main() {
     vec3 k = texelFetch(u_lensTex, ivec2(i, 0), 0).rgb;
     // The brightness half rides all three channels; the colour half is a ratio
     // against green, so green takes the bump and nothing else.
+    // The aim BLENDS each gain toward 1 rather than scaling the strength:
+    // lensGain is 1/(1+(k-1)s) and is not linear in s, and pipeline.ts builds
+    // its table once at full strength. Blending is the one thing both paths
+    // can do identically.
     float ic = lensGain(1.0 + k.b, u_lensBump);
-    c.r *= lensGain(k.r, u_lensFix) * ic;
-    c.g *= ic;
-    c.b *= lensGain(k.g, u_lensFix) * ic;
+    c.r *= 1.0 + (lensGain(k.r, u_lensFix) * ic - 1.0) * lw;
+    c.g *= 1.0 + (ic - 1.0) * lw;
+    c.b *= 1.0 + (lensGain(k.g, u_lensFix) * ic - 1.0) * lw;
   }
 
   // Camera colour matrix: separates infrared chroma into distinct hues so the
