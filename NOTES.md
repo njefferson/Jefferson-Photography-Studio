@@ -3384,6 +3384,36 @@ read as authoritative, and an invented one is worse than a missing one.
 
 ## Shipped (roadmap archive)
 
+- [x] **Pressing Home leaves the editor drawer on screen** <!-- decision: 044 -->
+  reported from an iPhone 2026-09-21: pressing Home after editing does not
+  dismiss the menu, and the start screen arrives clipped. Both halves are one
+  cause, and the diagnostic in the report carries it — `window 402x812` and
+  "inside a stage of 402x272". `#welcome` is absolutely positioned inside the
+  stage at `max-height: 92%`, so the card can never be taller than the stage,
+  and the stage was a third of the window because the drawer still had the
+  rest. Measured before anything changed: the drawer keeps 365px at y=447, the
+  stage falls from the cold start's 699px to 334px, the card gets 305px instead
+  of 641px and clips mid-sentence with its scroll cue showing.
+  The mechanism is one line that is right where it lives: `goHome` calls
+  `disarmPictureTools()`, which ends in `setGeoMode(null)`, whose last act is
+  `else if (current) panel.hidden = false` — the line that un-tucks the drawer
+  when a geometry tool exits. Leaving a photograph ran it every time. And the
+  rule it broke was already written for the other half of the chrome:
+  `body:has(#welcome:not([hidden]))` has hidden the top bar's editing controls
+  behind the card for as long as the card has existed, and the drawer was never
+  added to it. **Eight places raise or lower the start screen; two set both
+  elements and six set only `welcome`.**
+  **FIXED 2026-09-21.** `setStartScreen(up)` owns both elements and is called at
+  all eight sites, so `welcome.hidden` is assigned in exactly one place in the
+  file. It hides the drawer with the `hidden` ATTRIBUTE rather than a stylesheet
+  rule, for two reasons: `#app:has(#panel[hidden])` is what collapses the grid
+  so the stage takes the window, and a surface behind an overlay has to leave
+  the tab order. Stage after Home is now 699 of 812, against 699 on a cold
+  start. `tools/start-screen-walk.mjs` measures it at 402x812 rather than the
+  1100px every other walk uses — on a wide window the drawer is a side column,
+  the stage keeps its height and this is invisible. See
+  `docs/decisions/044-pressing-home-leaves-the-editor-drawer-on-screen.md`.
+
 - [x] **The panel's scroll cues are drawn over its controls** <!-- decision: 041 -->
   reported 2026-09-20 as a weird scroll artefact on the Export panel while
   setting up a TIFF. Two arrow pills floated over the scroller at `height: 0`,
