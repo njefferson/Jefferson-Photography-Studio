@@ -13,6 +13,17 @@ work=claude/*
 promote=main
 escape=JPS_PROMOTE
 
+# Run on every commit, and FIRST, because everything after it is a text check:
+# does the app compile. Seventeen gates went green on a commit that did not
+# build and it was pushed — a comment added inside the WebGL shader in
+# src/gl.ts, which is a JavaScript template literal, quoted three identifiers
+# in backticks; the first one ENDED the literal and the rest of the shader was
+# parsed as TypeScript. That file's own header warns about it in capitals. It
+# was read and it happened anyway, which is this family's standing evidence
+# that an instruction in a file never once refused the commit it forbade. It is
+# `tsc --noEmit`, the first half of `npm run build`, about five seconds.
+also=tools/typecheck.mjs
+
 # Run on every commit: the quick look keeps rendered previews on the device and
 # hands them back instead of decoding again, so a change to the code a preview
 # is MADE of has to move the declared version or the app serves a picture this
