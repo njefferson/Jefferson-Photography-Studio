@@ -70,6 +70,34 @@ Near-vertical lines are read as verticals rather than being rotated ninety
 degrees, which is what every implementation of this does and is the one case
 where an honest reading of the slope gives an absurd answer.
 
+## Built already
+
+Nothing here needs a new model of what straightening is, and saying so is the
+point: the angle this produces is the one the slider already carries.
+
+- **`applyStraighten` in `src/main.ts` is the one door**, and it exists because
+  the slider and the tenth-of-a-degree buttons were already two ways to the
+  same operation. It clamps to ±45, rounds to a tenth, re-fits the crop and
+  re-fits the view. A drawn line is a third way in and teaches undo, Reset, the
+  saved edit, a kept photograph and the export nothing new.
+- **`levelHorizon` in `src/main.ts` is the nearest existing behaviour**, and its
+  own comment is the rule to follow rather than the code to copy: which
+  direction is negative is a fact about this pipeline's geometry and is
+  asserted end to end by levelling a frame and measuring what came out, never
+  reasoned about.
+- **The pointer plumbing is there.** `cropOverlay` already captures pointers
+  over the photograph, one finger pans and two pinch the view, and the drag
+  record keeps its own start point — so a tap is a release within a few pixels
+  of its press and needs no new machinery.
+- **`sayLevel` and the note it writes into** are already an `aria-live` region
+  in the straighten pill, and its height is already measured into the
+  photograph's reserve. The tool says what it wants and what it did through
+  the surface that exists.
+- **`tools/rotation-walk.mjs`** already drives straighten, the crop that comes
+  in behind it and Reset — the walk to re-run rather than replace.
+
+What genuinely does not exist: any way to say WHICH edge should be level.
+
 ## Rejected
 
 **A drag along the edge, as Lightroom and Photoshop do it.** It is the source
