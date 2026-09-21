@@ -647,11 +647,12 @@ void main() {
   // for the measured curve below, because they are one correction. Returns 1
   // when nothing aims, so an unaimed frame is byte-identical to before.
   // The ternary is load-bearing: aimWeightOf walks every mask, and this is the
-  // one aim computed outside the `if` that guards its stage, so without it
+  // one aim computed outside the branch that guards its stage, so without it
   // every pixel of every frame would pay that loop to scale a correction that
-  // is switched off. `u_vignette` is deliberately absent from the condition —
+  // is switched off. u_vignette is deliberately absent from the condition --
   // it is not aimed, and if it is the only thing on then u_hotspot is 0 and
-  // the weight cannot matter.
+  // the weight cannot matter. (No backticks in here: the shader is a template
+  // literal and one would end it, which is what this comment just did once.)
   float lw = (u_hotspot != 0.0 || u_hotspotColor != 0.0 || (u_lensN > 0 && (u_lensFix != 0.0 || u_lensBump != 0.0))) ? aimWeightOf(8) : 1.0;
   if (u_hotspot != 0.0 || u_vignette != 0.0) c *= radialGain(v_uv, u_hotspot * lw);
   // And the hot-spot's COLOUR, on the same circle — before the swap and the
