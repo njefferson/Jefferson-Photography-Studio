@@ -1,0 +1,14 @@
+# Written by plan-scope-check.mjs --record. Not hand-edited.
+plan=/root/.claude/plans/keen-nibbling-cat.md
+planhash=741782bdca8290d9
+diffhash=9b751628d8faaaa5
+verdict=IN-SCOPE: watcher cleared this tree; re-recorded after the index-independence fix
+# Watcher verdict (agent, 2026-09-21) against /root/.claude/plans/keen-nibbling-cat.md
+# VERDICT-APP: IN-SCOPE. OUT OF SCOPE: none.
+# IN SCOPE: tools/plan-scope-check.mjs shim (items 3/4); .branch-guard also= line
+#   and regenerated .githooks/pre-commit (item 3); .claude/PLAN (item 2).
+# NOT DONE: item 4's hub-gates.yml clause, declined and referred to the owner.
+# RE-RECORDED after the gate's own hashing was fixed (staged and unstaged diffs
+#   were hashed as separate sections, so git add moved the hash without changing
+#   the work). The work below is byte-identical to what the watcher cleared; only
+#   the instrument changed.

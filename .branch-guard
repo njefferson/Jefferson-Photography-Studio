@@ -13,6 +13,20 @@ work=claude/*
 promote=main
 escape=JPS_PROMOTE
 
+# Run on every commit: is this commit inside the plan that was approved? There
+# is no second process inside a session watching the first, and the plan file
+# leaves context the moment it stops being read — what is left is a paraphrase
+# that drifts, so deviation does not present as deviation, it presents as the
+# obvious next action. Measured 2026-09-21: an approved plan naming five items
+# and a Files list also shipped a 183-line committed walk the plan said should
+# stay in the scratchpad, a new gate in this very chain, seven rewritten scope
+# declarations and a decision-record edit. None approved, all pushed, and the
+# plan file was never re-opened once. A SUBAGENT judges it instead, reading the
+# plan by path rather than by summary, and a verdict that is not IN-SCOPE
+# cannot mint a passing record. Passes with a printed line when no plan is in
+# force: work outside plan mode is not what this gates.
+also=tools/plan-scope-check.mjs
+
 # Run on every commit, and FIRST, because everything after it is a text check:
 # does the app compile. Seventeen gates went green on a commit that did not
 # build and it was pushed — a comment added inside the WebGL shader in
