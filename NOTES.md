@@ -17846,6 +17846,15 @@ carries the regenerated `.githooks/pre-commit` with it. Every gate after step
 one is SKIPPED when that step fails, so one stale artefact takes the whole
 workflow down and none of the seventeen gates runs at all.
 
+**AND THE SECOND HALF, which the freshly installed hook then refused on: a
+declared check that is not EXECUTABLE is a failure, not a skip.** Three tools
+written in one session — `tools/shadow-cast-check.mjs`,
+`tools/straighten-line-walk.mjs`, `tools/kept-walk.mjs` — all landed at mode
+644, and the moment the first of them was declared in `.branch-guard` the guard
+refused the commit with "a declared check that silently stops running is worse
+than no check". It is right, and it is the same reason `.branch-guard` treats a
+missing one as a failure. `chmod +x` belongs with the `--install`.
+
 It is the same shape as the hub's own lesson about adding a hard gate to a
 pipeline: a session adding a gate has just added a new way for its own work to
 silently not arrive, and is least likely to look because it watched the gate
