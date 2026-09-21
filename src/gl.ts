@@ -832,9 +832,10 @@ void main() {
   // every amount — which the additive grade below cannot promise. Same
   // smoothstep reach as that grade's shadow band, at a fixed balance.
   // Matches compileEdit; EditParams.shadowSat says why it is here.
-  if (u_shadowSat > 0.0) {
+  float shA = u_shadowSat * aimWeightOf(4);
+  if (shA > 0.0) {
     float Ls = dot(g, LUMA_W);
-    float ks = 1.0 - u_shadowSat * (1.0 - smoothstep(0.05, 0.6, Ls));
+    float ks = 1.0 - shA * (1.0 - smoothstep(0.05, 0.6, Ls));
     g = vec3(Ls) + (g - vec3(Ls)) * ks;
   }
   // Color grade: split-tone wheels — one pure-chroma tint per tonal band,
