@@ -130,6 +130,7 @@ uniform sampler2DArray u_maskTex; // brush/sky masks, four per RGBA layer (MAX_B
 uniform sampler2DArray u_maskFineTex; // sky masks (type 4) refined to the picture's edges, same slots
 uniform bool u_maskFineOn;      // false when no sky mask has a refinement to read
 uniform int u_maskOp[8];     // 0 head (starts a group) · 1 subtract · 2 intersect (026)
+uniform int u_maskAims[8];   // bitmask of stages this mask gates: 1 dehaze, 2 clarity (030)
                              // LITERAL 8, like every array above it: MAX_MASKS is a
                              // TypeScript constant and means nothing inside GLSL —
                              // written as MAX_MASKS first, and the shader silently
@@ -419,6 +420,24 @@ float maskWeightOf(int i, vec3 cKey){
   return maskWeight(i, v_uv);
 }
 
+// HOW MUCH OF AN AIMED STAGE APPLIES HERE (decision 030). The mirror of
+// aimWeight() in pipeline.ts, walking the same flattened list in the same
+// order. 1.0 when nothing aims, so an unaimed frame renders exactly as it did
+// before this existed. Colour masks are skipped: their key is the pixel as it
+// DISPLAYS at the mask stage and does not exist this early.
+float aimWeightOf(int bit){
+  float w = 0.0;
+  bool any = false;
+  for (int i = 0; i < u_maskCount; i++) {
+    if ((u_maskAims[i] & bit) == 0) continue;
+    if (u_maskType[i] == 3) continue;
+    any = true;
+    w = max(w, maskWeightOf(i, vec3(0.0)));
+    if (w >= 1.0) break;
+  }
+  return any ? w : 1.0;
+}
+
 void main() {
   // Outside the source image, output transparent so the dark stage shows through
   // instead of the edge texel smearing (CLAMP_TO_EDGE). Only the crop/straighten
@@ -585,18 +604,22 @@ void main() {
     vec2 e = texture(u_localTex, v_uv).rg;
     float Lb = e.r * e.r * u_localScale;
     float Dv = e.g * e.g * u_localScale;
-    if (u_dehaze != 0.0) {
+    // Aimed, if any mask asked (030). Both are the slider unchanged when
+    // nothing aims at them.
+    float dzA = u_dehaze * aimWeightOf(1);
+    float clA = u_clarity * aimWeightOf(2);
+    if (dzA != 0.0) {
       // Hue-preserving: veil-subtract the luminance, scale all channels alike.
       float L0 = dot(c, LUMA_W);
       if (L0 > 1e-6) {
-        float L1 = max(0.0, L0 - u_dehaze * Dv) / max(0.1, 1.0 - u_dehaze * Dv);
+        float L1 = max(0.0, L0 - dzA * Dv) / max(0.1, 1.0 - dzA * Dv);
         c *= L1 / L0;
       }
     }
-    if (u_clarity != 0.0) {
+    if (clA != 0.0) {
       float L = dot(c, LUMA_W);
       float ratio = clamp(L / max(Lb, 1e-5), 0.25, 4.0);
-      c *= pow(ratio, u_clarity * 0.5);
+      c *= pow(ratio, clA * 0.5);
     }
   }
 
@@ -1104,7 +1127,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskOp", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_maskMatte", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskOp", "u_maskAims", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_maskMatte", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -1848,6 +1871,7 @@ export class Renderer {
       gl.uniform1fv(this.loc.u_maskHue, hue);
       gl.uniform1iv(this.loc.u_maskSlot, slot);
       gl.uniform1iv(this.loc.u_maskOp, op);
+      gl.uniform1iv(this.loc.u_maskAims, masks.map((m) => m.aims ?? 0));
     }
     gl.uniform1i(this.loc.u_glowTex, 1);
     gl.uniform1i(this.loc.u_toneTex, 2);

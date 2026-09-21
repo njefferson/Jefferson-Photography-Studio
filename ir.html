@@ -874,6 +874,18 @@
                 <label><input type="radio" name="mJoin" id="mJoinInt" value="2" /> Only where both</label>
               </fieldset>
               <p id="mJoinNote" class="note">On its own, this mask gets its own adjustment. Joined to the mask above, it shapes that one's area instead and the adjustment above is the one that applies &mdash; so you can take a colour back out of a sky, or keep only where two masks overlap.</p>
+              <!-- DECISION 030: a selection stops being usable at exactly one
+                   place. Dehaze and Clarity are the first two stages a mask can
+                   aim, because the scope gate already records both as OWED —
+                   one control for a sky and a canopy that want opposite
+                   amounts. Nothing here changes the pipeline's ORDER; it
+                   changes where a stage is allowed to act. -->
+              <div class="set-row mask-aim-row" id="mAimRow">
+                <div class="sub-title">Aim a whole-photo tool at this mask</div>
+                <button id="mAimDehaze" type="button" class="toggle" aria-pressed="false">Dehaze, here only</button>
+                <button id="mAimClarity" type="button" class="toggle" aria-pressed="false">Clarity, here only</button>
+                <p class="note">Dehaze and Clarity normally work on the whole photograph, which is why taking haze out of a sky also flattens whatever is standing in front of it. Turn one on here and it acts only where this mask reaches &mdash; the rest of the picture keeps what it had. Leave both off and the sliders behave exactly as before.</p>
+              </div>
               <div class="mask-editor-actions">
                 <button id="mOutline" type="button" class="toggle" aria-pressed="true" title="Show or hide the mask overlay on the photo">Show mask</button>
                 <button id="mMatte" type="button" class="toggle" aria-pressed="false" title="Show the selection on its own, as a matte: the photograph goes grey and what is selected lights up">Matte</button>

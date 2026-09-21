@@ -676,8 +676,26 @@ export function rebuildFix(base: BrushMask, fix: readonly FixStroke[] | undefine
  *  so it is sampled through the exact same path as a painted brush mask — the
  *  connectivity/flood-fill work that a per-pixel weight function cannot express
  *  happens in JS at generation time, not in the shader. */
+/** WHICH STAGES A MASK IS ALLOWED TO AIM AT (decision 030), as a bitmask.
+ *
+ *  The pipeline's order is fixed and stays fixed — this is option 1 of that
+ *  record, not darktable's reorderable pipe. What changes is that a selection
+ *  stops being usable at exactly one place.
+ *
+ *  ABSENT OR ZERO MEANS THE STAGE IS WHOLE-FRAME, exactly as it has always
+ *  been, so every edit ever saved renders identically. A stage only becomes
+ *  selective when a mask says so. */
+export const AIM_DEHAZE = 1;
+export const AIM_CLARITY = 2;
+
 export interface MaskLayer {
   type: 0 | 1 | 2 | 3 | 4;
+  /** Stages this mask gates in addition to its own adjustment — see AIM_*.
+   *  Colour masks (type 3) cannot appear here: their key is taken from the
+   *  pixel as it DISPLAYS at the mask stage, which does not exist yet at the
+   *  stages this aims at. That is decision 032's territory and the boundary is
+   *  deliberate rather than an oversight. */
+  aims?: number;
   cx: number; // radial: centre x; linear: start x
   cy: number; // radial: centre y; linear: start y
   rx: number; // radial: x radius (uv fraction)
@@ -875,6 +893,12 @@ export function maskGroupsForRender(masks: readonly MaskLayer[] | undefined): Ma
 }
 
 export function maskIsActive(m: MaskLayer): boolean {
+  // AIMING A STAGE IS DOING SOMETHING (decision 030). A mask added purely to
+  // point Dehaze or Clarity at one part of the photograph has no adjustment of
+  // its own, and without this line it would be dropped here — by the ONE
+  // function that decides what renders — so the CPU and the shader would both
+  // lose it, silently, in the most obvious way to use the feature.
+  if (m.aims) return true;
   return m.brightness !== 1 || m.contrast !== 1 || m.saturation !== 1 || m.hue !== 0 || m.warmth !== 0;
 }
 
@@ -913,6 +937,37 @@ export function sampleBrush(b: BrushMask, u: number, v: number): number {
 }
 
 /** Mask weight 0..1 at image-uv (u,v). Kept numerically identical to the shader. */
+/** HOW MUCH OF AN AIMED STAGE APPLIES AT THIS PIXEL (decision 030).
+ *
+ *  Takes the mask list, one AIM_* bit, and the pixel's `u`, `v`. Returns 1 when
+ *  no mask aims at that stage — which is the whole point: an unaimed stage is
+ *  whole-frame and renders exactly as it always has.
+ *
+ *  Otherwise it returns the UNION of the aiming masks' own weights, so two
+ *  masks aimed at one stage cover the union of their areas rather than
+ *  multiplying each other down to nothing.
+ *
+ *  Takes the FLATTENED active groups — heads and components, the same list and
+ *  order the shader indexes — so the two paths cannot walk different sets.
+ *
+ *  What the caller relies on: this is computable BEFORE the mask stage, because
+ *  it reads only geometry and bitmaps. Colour masks are skipped — their key
+ *  does not exist this early — so a reader who aims one gets no effect rather
+ *  than a wrong one, and the UI does not offer it. `src/gl.ts` carries the same
+ *  arithmetic and `tools/agreement-walk.mjs` is what holds the two together. */
+export function aimWeight(masks: readonly MaskLayer[], bit: number, u: number, v: number): number {
+  let w = 0, any = false;
+  for (const m of masks) {
+    if (!(m.aims && (m.aims & bit))) continue;
+    if (m.type === 3) continue; // no key this early — see MaskLayer.aims
+    any = true;
+    const mw = maskWeight(m, u, v);
+    if (mw > w) w = mw;
+    if (w >= 1) break;
+  }
+  return any ? w : 1;
+}
+
 export function maskWeight(m: MaskLayer, u: number, v: number): number {
   let w: number;
   if (m.type === 0) {
@@ -1599,6 +1654,12 @@ export function compileEdit(
   // groups whose head does something, and only then cap.
   const maskGroupsActive = maskGroupsForRender(p.masks);
   const masks = maskGroupsActive.map((g) => g[0]);
+  // THE FLATTENED LIST, HEADS AND COMPONENTS ALIKE, and it is what the shader
+  // indexes too (src/gl.ts flattens the same groups into its uniform arrays).
+  // Aiming reads this rather than `masks` above so the two paths walk exactly
+  // the same set in exactly the same order — the agreement walk is what would
+  // otherwise find them apart, after the fact.
+  const aimMasks = maskGroupsActive.flat();
   const hasColorMask = masks.some((m) => m.type === 3);
   const lensOn = (p.hotspot ?? 0) !== 0 || (p.vignette ?? 0) !== 0 || (p.hotspotColor ?? 0) !== 0;
   // The measured curve is its own stage: it must run whether or not any of the
@@ -1657,7 +1718,17 @@ export function compileEdit(
     // per-image maps — matching the shader (which runs them after denoise).
     if (localOn && u !== undefined && v !== undefined) {
       const [Lb, Dv] = sampleLocalMap(local, u, v);
-      if (dz !== 0) {
+      // AIMED, IF ANY MASK ASKED (decision 030). Both return 1 when nothing
+      // aims, so the unaimed frame is byte-identical to every render before
+      // this existed.
+      // p.masks, NOT the filtered `masks` above. maskGroupsForRender drops a
+      // group whose head's own adjustment is neutral — and a mask added PURELY
+      // to aim a stage has exactly that: nothing of its own to do. Reading the
+      // filtered list would have made the feature silently inert for the most
+      // obvious way to use it.
+      const dzA = dz * aimWeight(aimMasks, AIM_DEHAZE, u, v);
+      const clA = cl * aimWeight(aimMasks, AIM_CLARITY, u, v);
+      if (dzA !== 0) {
         // HUE-PRESERVING haze removal: veil-subtract the LUMINANCE only, then
         // scale all channels by the same factor. (Per-channel subtraction in
         // camera-native space shifted colours badly — the native channels are
@@ -1666,15 +1737,15 @@ export function compileEdit(
         // on the iPad, 2026-07-05.)
         const L0 = r * REC709[0] + g * REC709[1] + b * REC709[2];
         if (L0 > 1e-6) {
-          const L1 = Math.max(0, L0 - dz * Dv) / Math.max(0.1, 1 - dz * Dv);
+          const L1 = Math.max(0, L0 - dzA * Dv) / Math.max(0.1, 1 - dzA * Dv);
           const k = L1 / L0;
           r *= k; g *= k; b *= k;
         }
       }
-      if (cl !== 0) {
+      if (clA !== 0) {
         const L = r * REC709[0] + g * REC709[1] + b * REC709[2];
         const ratio = Math.min(4, Math.max(0.25, L / Math.max(Lb, 1e-5)));
-        const gain = Math.pow(ratio, cl * 0.5);
+        const gain = Math.pow(ratio, clA * 0.5);
         r *= gain; g *= gain; b *= gain;
       }
     }
