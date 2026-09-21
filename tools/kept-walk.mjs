@@ -32,7 +32,11 @@
 //      `keepstore.ts` is its own database for exactly this reason, and 039's
 //      rejected "make it a session of one" is asserted here rather than
 //      promised.
-//   6. Forgetting one empties the list and takes the offer away with it.
+//   6. The DIAGNOSTIC report says the device is holding one. That report
+//      enumerates a declared list of databases, so a new store is invisible
+//      in it until somebody names it — which is how a store nobody can see
+//      the size of gets shipped, one surface over from the list that does.
+//   7. Forgetting one empties the list and takes the offer away with it.
 import { chromium } from "playwright-core";
 import { requireFreshDist } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
@@ -157,7 +161,26 @@ try {
     after === 1 ? `${pctAfter}% against ${pctBefore}% when it was kept`
                 : `no mask came back, so there was nothing to re-detect`);
 
-  // 6 · ENDING A SESSION IS NOT FORGETTING A KEPT PHOTOGRAPH.
+  // 6 · AND THE APP SAYS IT IS HOLDING IT, where a reader looks when something
+  // is wrong. The list's own total is one place; the diagnostic report (§7f) is
+  // the one that gets copied and sent, and it enumerates a DECLARED list of
+  // databases — so a new store is invisible there until it is named. It was.
+  const report = await p2.evaluate(async () => {
+    document.getElementById("verTag")?.click();
+    for (let i = 0; i < 80; i++) {
+      const t = document.getElementById("verDlgText");
+      if (t && /App is holding/.test(t.value ?? "")) return t.value;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    return document.getElementById("verDlgText")?.value ?? "";
+  });
+  await p2.evaluate(() => document.getElementById("verClose")?.click());
+  await settle(p2);
+  check("the diagnostic report says the device is holding a kept photo",
+    /kept photo/.test(report),
+    (report.match(/App is holding.*/) ?? ["no holdings line in the report"])[0]);
+
+  // 7 · ENDING A SESSION IS NOT FORGETTING A KEPT PHOTOGRAPH.
   await p2.setInputFiles("#file", ["public/examples/NIR_0063.dng", "public/examples/NIR_0102.dng"]);
   await p2.waitForFunction(() => (document.querySelectorAll("#sessionThumbs .session-thumb").length >= 2), null, { timeout: 300000 });
   await p2.waitForFunction(() => !document.getElementById("busy")?.hasAttribute("open"), null, { timeout: 300000 });
@@ -173,7 +196,7 @@ try {
   check("ending a session does not forget a kept photograph",
     survived.shown && /1/.test(survived.label), survived.label || "the offer is gone");
 
-  // 7 · AND FORGETTING ONE TAKES THE OFFER WITH IT.
+  // 8 · AND FORGETTING ONE TAKES THE OFFER WITH IT.
   await p2.click("#keptOpen");
   await settle(p2);
   await p2.click("#keptList .kept-del");
