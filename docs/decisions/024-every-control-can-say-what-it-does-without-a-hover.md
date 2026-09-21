@@ -43,6 +43,48 @@ that would clutter the interface if always visible — which is the argument
 for a toggletip, and equally the argument for leaving a short note visible
 when it is short.
 
+## Built already
+
+Measured 2026-09-21, and the count matters: **almost all of this exists, and
+what is missing is a rule rather than a mechanism.**
+
+- **`tools/control-check.mjs` is the inventory and the gate**, and it already
+  carries the half of the rule that is decided: a `title` is a hover, there is
+  no hover on a tablet, so anything a title says that the visible label does
+  not is a sentence this reader will never see. It prints every control with
+  its label and the titles it found, and answers for **67 controls** today.
+  Whatever this item settles about WHERE an explanation lives, that gate is
+  where it is held — and its reverse direction (a control with nothing to say
+  for itself anywhere) is the piece it does not have.
+- **The permanent note beside a control is the app's existing answer**, and it
+  is the majority answer: **112 `class="note"` elements against 71 labelled
+  sliders** in `ir.html`. This item must not replace them. Progressive
+  disclosure is for what would clutter; a short sentence that fits is better
+  visible, and most of them are.
+- **The live region a toggletip needs already exists on every surface.**
+  `ir.html` declares at least a dozen — `#hint`, `#fileKind`, `#lookState`,
+  `#liftState`, `#sessionMeta`, `#cropLevelNote`, `#exportStripText` and
+  others — all `role="status" aria-live="polite"`. A toggletip reveals into a
+  live region so it is announced rather than merely drawn; the pattern is
+  already here and does not have to be invented.
+- **`.inline-btn` is the in-sentence button pattern**, used by the Help
+  install block and, since 2026-09-21, by the start screen's route to
+  orientation. A toggletip trigger is that shape.
+- **`#infoDlg` and `#helpDlg` are where the long form lives**, with
+  `#helpQuickStart` and `#helpInstall` now addressable and opened by one
+  function from two places. Anything too long for beside a control goes there
+  and is LINKED, not copied.
+- **`tools/a11y-walk.mjs` sweeps every control on every surface in both themes
+  and both shapes**, so a new trigger is measured for hit area, name and
+  contrast the moment it exists — and its section 6 already asserts the
+  "moved, never copied" rule for orientation, which is the same rule one
+  explanation surface below.
+
+What genuinely does not exist: a decision about WHICH controls owe a sentence,
+one trigger shape used everywhere rather than per-control judgement, and the
+gate's reverse direction — the list of controls that say nothing for themselves
+in any of the three places.
+
 ## Weighed against
 
 - **003, the photo fills the app and the menus float over it** — a panel that
