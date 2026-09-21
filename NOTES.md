@@ -17827,6 +17827,30 @@ how much of the frame carries no colour at all: **13.8% on the film against
 near-white. That is bright IR-reflective ground blowing out instead of holding
 its hue — highlight roll-off and exposure, not colour. Next piece of work.
 
+## ADDING A GATE TO `.branch-guard` GOES RED IN CI AND NOWHERE ELSE, 2026-09-21
+
+Adding `also=tools/shadow-cast-check.mjs` and committing passed every local
+check and failed the shared workflow's very first step.
+
+**The hook is a GENERATED FILE and the commit that changes its source does not
+regenerate it.** `.githooks/pre-commit` is written from `.branch-guard` by
+`branch-guard.mjs --install`. At commit time the installed hook is the one from
+BEFORE the edit: it checks the branch, runs the gates it was generated with,
+and has no idea its own source grew a line. CI runs `--artefact`, which
+compares the TRACKED hook against `.branch-guard` — and that is the only place
+the drift shows.
+
+**So the step after editing `.branch-guard` is always
+`node ../noahjefferson/branch-guard.mjs --repo . --install`**, and the commit
+carries the regenerated `.githooks/pre-commit` with it. Every gate after step
+one is SKIPPED when that step fails, so one stale artefact takes the whole
+workflow down and none of the seventeen gates runs at all.
+
+It is the same shape as the hub's own lesson about adding a hard gate to a
+pipeline: a session adding a gate has just added a new way for its own work to
+silently not arrive, and is least likely to look because it watched the gate
+pass locally.
+
 ## Two findings from the drawn straighten line, 2026-09-21
 
 **A CONTROL THAT MOVED BETWEEN ONE PRESS AND THE NEXT, and no number showed
