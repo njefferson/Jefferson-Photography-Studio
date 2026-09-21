@@ -687,6 +687,10 @@ export function rebuildFix(base: BrushMask, fix: readonly FixStroke[] | undefine
  *  selective when a mask says so. */
 export const AIM_DEHAZE = 1;
 export const AIM_CLARITY = 2;
+/** IR-SCIENCE 9j names this one: the shadow tint is keyed on LUMINANCE alone,
+ *  so a deep infrared sky's dark end is desaturated to pay for a tree's bark.
+ *  Aiming it is the second weight that record asked for. */
+export const AIM_SHADOW = 4;
 
 export interface MaskLayer {
   type: 0 | 1 | 2 | 3 | 4;
@@ -1953,9 +1957,10 @@ export function compileEdit(
     // EditParams.shadowSat for why the balance is not shared and what this is
     // for. Before the grade on purpose: any tint the reader adds then lands on
     // a neutral shadow. Same in the shader.
-    if (shSat > 0) {
+    const shA = u !== undefined && v !== undefined ? shSat * aimWeight(aimMasks, AIM_SHADOW, u, v) : shSat;
+    if (shA > 0) {
       const L = out[0] * 0.2126 + out[1] * 0.7152 + out[2] * 0.0722;
-      const k = 1 - shSat * (1 - smooth01(0.05, 0.6, L));
+      const k = 1 - shA * (1 - smooth01(0.05, 0.6, L));
       out[0] = L + (out[0] - L) * k;
       out[1] = L + (out[1] - L) * k;
       out[2] = L + (out[2] - L) * k;
