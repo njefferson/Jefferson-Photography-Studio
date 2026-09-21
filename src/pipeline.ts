@@ -708,6 +708,23 @@ export interface MaskLayer {
    *  every mask starting its own group — exactly today's behaviour, so old
    *  edits and undo snapshots migrate by doing nothing. */
   op?: 0 | 1 | 2;
+  /** WHAT THE READER CALLS THIS MASK (040), or absent for the derived name.
+   *
+   *  Absent means the list shows what it has always shown — the type and the
+   *  mask's position, "Sky 2", with the join word in front of a component so it
+   *  reads "minus Sky 2". A name only ever REPLACES that derived string; it
+   *  never adds a second label beside it, because two names for one row is how
+   *  a list stops being scannable.
+   *
+   *  Optional for the reason `op`, `skyByColour` and `fix` are optional: every
+   *  saved edit and every undo snapshot written before this field migrates by
+   *  doing nothing.
+   *
+   *  NOT IN `stampOf`, deliberately. That string is the tile-staleness test and
+   *  the preview cache key, so a field in it invalidates every rendered
+   *  thumbnail when it changes — and renaming a mask changes no pixel. The
+   *  exclusion is declared in the stamp gate with this reason. */
+  name?: string;
   brush?: BrushMask; // type 2 (painted) and type 4 (generated sky) both use this
   /** Sky mask (type 4) ONLY: `brush` refined to the picture's own edges by the
    *  guided filter (skyfine.ts), at SKY_FINE_EDGE rather than BRUSH_MAX_EDGE.

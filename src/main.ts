@@ -5607,6 +5607,9 @@ const askTitleEl = $("askTitle");
 const askBodyEl = $("askBody");
 const askOkBtn = $("askOk") as HTMLButtonElement;
 const askCancelBtn = $("askCancel") as HTMLButtonElement;
+const askInputRow = $("askInputRow") as HTMLLabelElement;
+const askInputLabelEl = $("askInputLabel");
+const askInputEl = $("askInput") as HTMLInputElement;
 
 /** Ask a two-way question. Resolves "ok" or "cancel" for the buttons, or
  *  "dismiss" when the dialog closes any other way (Escape) — callers treat
@@ -5631,6 +5634,36 @@ function askDialog(title: string, body: string, okLabel: string, cancelLabel: st
     askCancelBtn.addEventListener("click", onCancel);
     askDlg.addEventListener("close", onClose);
     askDlg.showModal();
+  });
+}
+
+/** ASK FOR A TYPED ANSWER, in the same modal as every other question.
+ *
+ *  Takes `title` and `body` for the dialog, `label` for the field, `value` to
+ *  start it at, and `okLabel` for the confirming button. Returns the trimmed
+ *  text, or null when the reader cancelled or dismissed — **null means change
+ *  nothing**, which is not the same as the empty string, and the empty string
+ *  is a real answer meaning "clear the name".
+ *
+ *  What the caller relies on: it never returns the untrimmed value, so a name
+ *  of only spaces reaches nobody, and a caller that treats null and "" the same
+ *  will clear a name on Escape.
+ *
+ *  The field is hidden again on the way out, so the next plain question does
+ *  not inherit it — `askDialog` does not know about it and must not have to. */
+function askTextDialog(title: string, body: string, label: string, value: string, okLabel: string): Promise<string | null> {
+  askInputLabelEl.textContent = label;
+  askInputEl.value = value;
+  askInputRow.hidden = false;
+  // FOCUS THE FIELD, not the confirming button. A dialog that asks for text and
+  // opens with the OK button focused costs a tab on a keyboard and a tap on a
+  // tablet, and on iPadOS it is the difference between the soft keyboard coming
+  // up and not.
+  queueMicrotask(() => { askInputEl.focus(); askInputEl.select(); });
+  return askDialog(title, body, okLabel, "Cancel").then((r) => {
+    const text = askInputEl.value.trim();
+    askInputRow.hidden = true;
+    return r === "ok" ? text : null;
   });
 }
 
@@ -5997,6 +6030,37 @@ function deleteMask(i: number) {
   flushRecord();
 }
 
+/** RENAME A MASK, or clear the name back to the derived one (040).
+ *
+ *  Takes `i`, the mask's index. Asks for the text in the shared dialog, writes
+ *  it to `MaskLayer.name`, redraws the list and records one undo step. Returns
+ *  nothing. A cancelled dialog changes nothing at all — not the name, not the
+ *  undo history — and an EMPTY answer clears the name, which is how the reader
+ *  gets the derived "Sky 2" back without a second control for it.
+ *
+ *  What the caller relies on: it never redraws the photograph. A name is not a
+ *  pixel and changing it must not cost a render or invalidate a cached tile,
+ *  which is also why `name` is excluded from `stampOf`. */
+async function renameMask(i: number): Promise<void> {
+  const m = params.masks[i];
+  if (!m) return;
+  const label = m.type === 0 ? "Radial" : m.type === 1 ? "Gradient" : m.type === 2 ? "Brush" : m.type === 3 ? "Color" : "Sky";
+  const derived = `${label} ${i + 1}`;
+  const text = await askTextDialog(
+    "Name this mask",
+    `Call it something you will recognise on this photograph. Leave it empty to go back to \u201c${derived}\u201d.`,
+    "Name",
+    m.name ?? "",
+    "Rename",
+  );
+  if (text === null) return; // cancelled or dismissed: change nothing
+  if ((m.name ?? "") === text) return; // same answer, so no undo step for it
+  if (text) m.name = text;
+  else delete m.name; // absent, not "" — the derived name is the absence
+  updateMaskUI();
+  flushRecord();
+}
+
 function selectMask(i: number) {
   selectedMask = i;
   setSkyFixMode(0); // arming is per-mask, like the colour pick
@@ -6025,15 +6089,38 @@ function updateMaskUI() {
       // never be a component — the shader forces the first uploaded mask to be
       // a head — so its op is not consulted.
       const joinWord = i > 0 && m.op === 1 ? "minus " : i > 0 && m.op === 2 ? "within " : "";
-      pick.textContent = `${joinWord}${label} ${i + 1}`;
-      pick.addEventListener("click", () => selectMask(i));
+      // THE NAME THE READER GAVE IT, or the derived one (040). A name REPLACES
+      // the type and number rather than sitting beside them — two labels on one
+      // row is how a list stops being scannable — but the join word stays in
+      // front of it either way, because how a mask joins the one above is not
+      // the reader's to rename and is the only thing on the row that changes
+      // what the picture does.
+      const shown = m.name?.trim() || `${label} ${i + 1}`;
+      pick.textContent = `${joinWord}${shown}`;
+      // PRESSING THE SELECTED ONE LEAVES IT (040, the fourth point reported).
+      // A mask used to stay selected with its editor open and no way to say you
+      // were finished, so moving on meant guessing that tapping elsewhere was
+      // allowed. The list is the answer the field's tools give: selecting is
+      // explicit and so is leaving, because the list is always there.
+      pick.setAttribute("aria-pressed", String(i === selectedMask));
+      pick.addEventListener("click", () => selectMask(i === selectedMask ? -1 : i));
+      // RENAME, as a real control rather than a double-click. This is a touch
+      // app first and a double-click is not a gesture a finger makes; the
+      // target is sized by .mask-ren in the stylesheet, not here.
+      const ren = document.createElement("button");
+      ren.type = "button";
+      ren.className = "mask-ren";
+      ren.textContent = "✎";
+      ren.setAttribute("aria-label", `Rename ${shown}`);
+      ren.title = "Rename this mask";
+      ren.addEventListener("click", () => renameMask(i));
       const del = document.createElement("button");
       del.type = "button";
       del.className = "mask-del";
       del.textContent = "×";
-      del.setAttribute("aria-label", "Delete mask");
+      del.setAttribute("aria-label", `Delete ${shown}`);
       del.addEventListener("click", () => deleteMask(i));
-      row.append(pick, del);
+      row.append(pick, ren, del);
       return row;
     }),
   );

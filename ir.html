@@ -761,7 +761,17 @@
 
           <!-- ===== MASKS ===== -->
           <section class="section" role="tabpanel" id="sec-masks" aria-labelledby="ptab-masks" data-tab="masks" hidden>
-            <p class="note">Add a radial, gradient, brush, color or sky mask, target it on the photo, then adjust only that area. Tap a mask to select it.</p>
+            <p class="note">Add a radial, gradient, brush, color or sky mask, target it on the photo, then adjust only that area. Tap a mask to select it, and tap it again when you are finished with it.</p>
+            <!-- WHAT THIS PANEL CAN DO, SAID ONCE (040). Add, subtract and
+                 intersect shipped in 2.53 and were asked for again from the
+                 device, because the control that offers them is on the SECOND
+                 mask and later — the first has nothing above it to join, so a
+                 reader who has made one mask never learns the capability is
+                 there. Nothing about the app reported it: every gate was green
+                 and the reader concluded it could not be done. This is the
+                 sentence that says otherwise, and it sits above the list rather
+                 than inside the editor so it is read before a mask is made. -->
+            <p id="maskCombineNote" class="note">Masks combine. Add a second one and it can subtract from the first, or keep only where the two overlap &mdash; so you can take a colour back out of a sky, or grade just the place where two selections meet.</p>
             <div class="mask-add">
               <button id="addRadial" type="button">+ Radial</button>
               <button id="addLinear" type="button">+ Gradient</button>
@@ -1321,6 +1331,16 @@
     <dialog id="askDlg" aria-labelledby="askTitle">
       <h2 id="askTitle"></h2>
       <p id="askBody" class="note ask-body"></p>
+      <!-- ONE ANSWER THAT IS TYPED RATHER THAN CHOSEN. Hidden for every
+           question that is a yes or a no, which is most of them; shown by
+           askTextDialog. It lives in the shared dialog rather than in a second
+           one because this is already the app's reusable modal, and a third
+           dialog for a third shape of question is how three of them come to
+           disagree about focus, Escape and announcement. -->
+      <label id="askInputRow" hidden>
+        <span id="askInputLabel"></span>
+        <input id="askInput" type="text" maxlength="60" autocomplete="off" />
+      </label>
       <button id="askOk" type="button" class="primary"></button>
       <button id="askCancel" type="button"></button>
     </dialog>
