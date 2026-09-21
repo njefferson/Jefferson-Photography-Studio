@@ -2671,6 +2671,11 @@ label.open-btn, label.bar-btn {
    from .mask-del above rather than measured again, because the two sit in the
    same row and a second answer to one question is how they come to differ. */
 .mask-row .mask-ren { width: auto; min-width: 44px; padding: 6px 10px; font-size: 0.8125rem; }
+/* SAVE FOR ANOTHER PHOTOGRAPH — the same 44px minimum as its two neighbours,
+   for the same reason: a single glyph in a button measures 29px otherwise. */
+.mask-row .mask-keep { width: auto; min-width: 44px; padding: 6px 10px; font-size: 0.8125rem; }
+#savedMaskRow { margin-top: 12px; border-top: 1px solid var(--line-2); padding-top: 10px; }
+.mask-saved-title { margin: 0 0 4px; font: 600 0.8125rem/1.2 var(--ui); color: var(--txt); }
 /* THE PANEL SAYS WHAT IT CAN DO before a mask exists to demonstrate it. Set
    apart from the instruction above it by weight rather than by colour, because
    meaning never rides on colour alone here. */

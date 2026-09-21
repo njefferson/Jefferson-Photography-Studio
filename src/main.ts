@@ -30,6 +30,7 @@ import { writeZip, crc32 } from "./zip";
 import { putFrame, eachFrame, frameMetas, frameCount, clearFrames, frameStore } from "./batchstore";
 import * as Session from "./session";
 import { keepAwake } from "./wakelock";
+import { canTravel, shapeOf, putMask, getMask, listMasks, deleteMask as forgetMask, MASK_COUNT_CAP } from "./maskstore";
 import { sampleBrush, rebuildFix, stampFix, stampSegment, skyBandCentre, lensGain, LENS_GAIN_HI, LENS_GAIN_LO, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, bandWeight, rgb2hsv, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, type MaskLayer, type CropRect, BRUSH_MAX_EDGE, type SkyMap } from "./pipeline";
 import { sensorPitchMicrons } from "./color";
 import { lensGains, applyLensFlat, lensPlanStamp, type LensPlan } from "./lensflat";
@@ -5707,6 +5708,8 @@ wireUpdateStrip();
 const SVGNS = "http://www.w3.org/2000/svg";
 const maskOverlay = $("maskOverlay") as unknown as SVGSVGElement;
 const maskList = $("maskList") as HTMLDivElement;
+const savedMaskRow = $("savedMaskRow") as HTMLDivElement;
+const savedMaskList = $("savedMaskList") as HTMLDivElement;
 const maskCount = $("maskCount") as HTMLParagraphElement;
 const maskEditor = $("maskEditor") as HTMLDivElement;
 const addRadialBtn = $("addRadial") as HTMLButtonElement;
@@ -6021,6 +6024,17 @@ function updateSkyStatus() {
     `Sky detected — ${Math.round(frac * 100)}% of the frame.${route}${byHand} Invert for everything but the sky.`;
 }
 
+/** WHAT A MASK OF THIS TYPE IS CALLED, in one place.
+ *
+ *  Takes `type`, a `MaskLayer.type`. Returns the word the reader sees.
+ *
+ *  What the caller relies on: the list row, the rename dialog, the save dialog
+ *  and the saved list all read it, so a mask cannot be a "Color" in one and a
+ *  "Colour" in another. It was written out three times before this. */
+function maskTypeLabel(type: MaskLayer["type"]): string {
+  return type === 0 ? "Radial" : type === 1 ? "Gradient" : type === 2 ? "Brush" : type === 3 ? "Color" : "Sky";
+}
+
 function deleteMask(i: number) {
   params.masks.splice(i, 1);
   if (selectedMask >= params.masks.length) selectedMask = params.masks.length - 1;
@@ -6044,7 +6058,7 @@ function deleteMask(i: number) {
 async function renameMask(i: number): Promise<void> {
   const m = params.masks[i];
   if (!m) return;
-  const label = m.type === 0 ? "Radial" : m.type === 1 ? "Gradient" : m.type === 2 ? "Brush" : m.type === 3 ? "Color" : "Sky";
+  const label = maskTypeLabel(m.type);
   const derived = `${label} ${i + 1}`;
   const text = await askTextDialog(
     "Name this mask",
@@ -6059,6 +6073,125 @@ async function renameMask(i: number): Promise<void> {
   else delete m.name; // absent, not "" — the derived name is the absence
   updateMaskUI();
   flushRecord();
+}
+
+/** SAVE A MASK SO IT CAN BE USED ON ANOTHER PHOTOGRAPH (040).
+ *
+ *  Takes `i`, the mask's index. Asks for a name, strips the mask to its
+ *  numbers and stores it. Returns nothing. A brush mask is refused IN WORDS
+ *  before the dialog opens — it is nothing but the bitmap somebody painted, so
+ *  there is no recipe to keep, and saving pixels would be right on this frame
+ *  and wrong on every other.
+ *
+ *  What the caller relies on: nothing about the open photograph changes. This
+ *  writes to a store and redraws no pixel. */
+async function saveMaskToStore(i: number): Promise<void> {
+  const m = params.masks[i];
+  if (!m) return;
+  if (!canTravel(m.type)) {
+    await noticeDialog(
+      "A painted mask cannot be saved",
+      "A brush mask is only the shape you painted on this photograph, so there is nothing to rebuild it from on another one. Radial, Gradient, Colour and Sky masks all save: each is a set of numbers, and a Sky mask finds the sky again on whatever photo you put it on.",
+    );
+    return;
+  }
+  const label = maskTypeLabel(m.type);
+  const text = await askTextDialog(
+    "Save this mask",
+    "It is saved as its settings rather than as a painted shape, so it rebuilds itself on whatever photograph you put it on.",
+    "Name",
+    m.name?.trim() || `${label} ${i + 1}`,
+    "Save",
+  );
+  if (text === null) return;
+  const saved = await listMasks().catch(() => []);
+  if (saved.length >= MASK_COUNT_CAP) {
+    await noticeDialog("No room for another saved mask", `This device is keeping ${MASK_COUNT_CAP} of them, which is the limit. Delete one from the saved list and try again.`);
+    return;
+  }
+  try {
+    await putMask({ id: `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`, name: text || `${label} ${i + 1}`, type: m.type, shape: shapeOf(m), addedAt: Date.now() });
+  } catch {
+    await noticeDialog("That mask was not saved", "This device refused to store it. Nothing about your photograph has changed.");
+    return;
+  }
+  await refreshSavedMasks();
+  toast(`Saved "${text || `${label} ${i + 1}`}"`, 2200);
+}
+
+/** PUT A SAVED MASK ONTO THE OPEN PHOTOGRAPH (040).
+ *
+ *  Takes `id`, a stored mask's id. Adds it to this photo's mask list as a new
+ *  mask and selects it. Returns nothing.
+ *
+ *  A SKY MASK IS RE-DETECTED HERE rather than restored, which is the whole
+ *  point of storing a recipe: `regenerateSkyMask` runs against the photograph
+ *  that is open now, and only then are the saved hand corrections replayed
+ *  over what it found. A stored bitmap would have put the previous frame's sky
+ *  on this one.
+ *
+ *  What the caller relies on: it respects both caps exactly as `addMask` does,
+ *  and says so rather than failing silently when there is no room. */
+async function applySavedMask(id: string): Promise<void> {
+  if (!current) return;
+  if (params.masks.length >= MAX_MASKS) { await noticeDialog("No room for another mask", `This photograph already has ${MAX_MASKS}, which is the limit.`); return; }
+  const rec = await getMask(id).catch(() => null);
+  if (!rec) { toast("That saved mask is no longer on this device", 2600); return; }
+  if ((rec.type === 2 || rec.type === 4) && bitmapMaskCount() >= MAX_BITMAP_MASKS) {
+    await noticeDialog("No room for another Sky or Brush mask", `This photograph already has ${MAX_BITMAP_MASKS} of them, which is the limit.`);
+    return;
+  }
+  maskAdjusting = false;
+  const m = { ...rec.shape, name: rec.name } as MaskLayer;
+  if (m.type === 4) {
+    regenerateSkyMask(m); // THIS photograph's sky, not the one it was saved from
+    applyMaskFix(m);      // then the saved corrections, replayed over what was found
+  }
+  params.masks.push(m);
+  selectedMask = params.masks.length - 1;
+  if (m.type === 0 || m.type === 1) showMaskOutline = true;
+  updateMaskUI();
+  renderMaskOverlay();
+  draw();
+  flushRecord();
+  toast(`Added "${rec.name}"`, 2000);
+}
+
+/** THE SAVED LIST, REDRAWN FROM THE STORE.
+ *
+ *  Takes nothing. Reads every saved mask and rebuilds the rows under the mask
+ *  panel, hiding the whole section when there are none. Returns nothing.
+ *
+ *  What the caller relies on: it is safe to call whenever the store may have
+ *  moved — after a save, after a delete, and when the panel is first built —
+ *  and it never touches the open photograph. */
+async function refreshSavedMasks(): Promise<void> {
+  const list = await listMasks().catch(() => []);
+  savedMaskRow.hidden = list.length === 0;
+  savedMaskList.replaceChildren(
+    ...list.map((meta) => {
+      const row = document.createElement("div");
+      row.className = "mask-row";
+      const use = document.createElement("button");
+      use.type = "button";
+      use.className = "mask-pick";
+      // THE COUNT OF CORRECTIONS IS IN WORDS, not a badge or a colour: a Sky
+      // mask carrying hand work is a different proposition from a bare one,
+      // and meaning here never rides on colour alone.
+      const fixes = meta.fixes ? ` · ${meta.fixes} by hand` : "";
+      use.textContent = `${meta.name} (${maskTypeLabel(meta.type)}${fixes})`;
+      use.title = "Put this mask on the open photograph";
+      use.addEventListener("click", () => void applySavedMask(meta.id));
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "mask-del";
+      del.textContent = "\u00d7";
+      del.setAttribute("aria-label", `Forget ${meta.name}`);
+      del.addEventListener("click", () => void forgetMask(meta.id).then(refreshSavedMasks));
+      row.append(use, del);
+      return row;
+    }),
+  );
 }
 
 function selectMask(i: number) {
@@ -6078,7 +6211,7 @@ function updateMaskUI() {
       const pick = document.createElement("button");
       pick.type = "button";
       pick.className = "mask-pick" + (i === selectedMask ? " active" : "");
-      const label = m.type === 0 ? "Radial" : m.type === 1 ? "Gradient" : m.type === 2 ? "Brush" : m.type === 3 ? "Color" : "Sky";
+      const label = maskTypeLabel(m.type);
       // A COMPONENT SAYS SO IN THE LIST (026). Without this, a mask joined to
       // the one above by subtract or intersect reads as a separate mask that
       // happens to sit below it — and deleting the mask above silently
@@ -6114,13 +6247,24 @@ function updateMaskUI() {
       ren.setAttribute("aria-label", `Rename ${shown}`);
       ren.title = "Rename this mask";
       ren.addEventListener("click", () => renameMask(i));
+      // KEEP IT FOR ANOTHER PHOTOGRAPH (040). Shown on every row including a
+      // brush mask's, which refuses IN WORDS when pressed rather than being
+      // absent — a control that is simply missing teaches nothing, and "why
+      // can I not save this one" is exactly the question 040 exists about.
+      const keep = document.createElement("button");
+      keep.type = "button";
+      keep.className = "mask-keep";
+      keep.textContent = "\u2b07";
+      keep.setAttribute("aria-label", `Save ${shown} for another photograph`);
+      keep.title = "Save this mask for another photograph";
+      keep.addEventListener("click", () => void saveMaskToStore(i));
       const del = document.createElement("button");
       del.type = "button";
       del.className = "mask-del";
       del.textContent = "×";
       del.setAttribute("aria-label", `Delete ${shown}`);
       del.addEventListener("click", () => deleteMask(i));
-      row.append(pick, ren, del);
+      row.append(pick, ren, keep, del);
       return row;
     }),
   );
@@ -6281,6 +6425,11 @@ addRadialBtn.addEventListener("click", () => addMask(0));
 addLinearBtn.addEventListener("click", () => addMask(1));
 addColorBtn.addEventListener("click", () => addMask(3));
 addSkyBtn.addEventListener("click", () => addMask(4));
+// DRAW THE SAVED LIST AT STARTUP, not only after a save. Without this a reader
+// who saved a mask yesterday opens the app today and sees nothing — the store
+// has their mask and the panel has never asked it. The read is one IndexedDB
+// getAll of meta rows and it is not awaited, so it costs the boot nothing.
+void refreshSavedMasks();
 
 // Colour-mask target pick: arm, then tap the photo and the mask keys on that
 // colour. SUSTAINED (the TAT lesson): while armed, EVERY tap re-picks and a

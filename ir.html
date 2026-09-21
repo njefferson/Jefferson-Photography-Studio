@@ -781,6 +781,18 @@
             </div>
             <p id="maskCount" class="note" aria-live="polite"></p>
             <div id="maskList" class="mask-list"></div>
+            <!-- MASKS KEPT FOR ANOTHER PHOTOGRAPH (040). Hidden until there is
+                 one, so the panel does not carry an empty heading for a feature
+                 nobody has used yet. What is stored is the mask's SETTINGS, not
+                 a painted shape: a Sky mask finds the sky again on whatever
+                 photograph it is put on, which is the whole reason this is
+                 worth having and is said in the line below rather than left to
+                 be discovered. -->
+            <div id="savedMaskRow" hidden>
+              <h3 class="mask-saved-title">Saved masks</h3>
+              <p class="note">Kept on this device as settings rather than as a painted shape, so each one rebuilds itself on the photo you put it on. Tap one to add it here.</p>
+              <div id="savedMaskList" class="mask-list"></div>
+            </div>
             <div id="maskEditor" hidden>
               <div id="colorControls" hidden>
                 <small class="note">With Pick on, tap the photo to choose the color to match &mdash; tap again to re-pick. Widen Range to include more shades; Feather softens the edge. Add another Color mask to grade a second color.</small>
