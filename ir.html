@@ -291,6 +291,14 @@
           <p id="hint" role="status" aria-live="polite">Edit infrared photos — RAW (NEF / DNG) unlocks the full color magic.</p>
           <label class="open-btn welcome-open"><input id="welcomeFile" class="file-input" type="file" accept=".dng,.nef,.zip,.ipslook,image/*" multiple />Open image(s)</label>
           <p class="welcome-open-hint">One photo, or a set to work through &mdash; each keeps its own edit.</p>
+          <!-- DOCTRINE 7e's first-run half, said on the first screen every reader
+               meets rather than in a dialog that interrupts them. What it IS,
+               what it will NOT do, and a route to the rest — which lives in Help
+               and is reached from the (i) panel by the same button, so the words
+               are MOVED rather than copied and there is one place to maintain
+               them. The install strip below (#a2hs) is the third part. -->
+          <p class="welcome-open-hint welcome-what"><strong>Built for infrared and full-spectrum photographs.</strong> It will not upload anything and it never changes your original file &mdash; everything happens on this <span data-device-noun>device</span>.
+          <button id="welcomeWhat" type="button" class="inline-btn">What this is, and how to install it</button></p>
           <!-- iCloud and the Files picker are an iOS story, and this paragraph
                was on the first screen every reader sees, on every machine. It
                ships hidden and is revealed on iOS only (src/platform.ts); the
@@ -1226,6 +1234,7 @@
       <div class="dlg-body" id="infoBody">
       <div class="dlg-cue up" id="infoCueUp" hidden aria-hidden="true">&#9650;</div>
       <p class="info-jump">
+        <button id="jumpWhat" type="button" class="info-jump-btn">What this is &amp; installing it</button>
         <button id="jumpRoadmap" type="button" class="info-jump-btn">Roadmap</button>
         <button id="jumpSettings" type="button" class="info-jump-btn">Settings &amp; reporting a problem</button>
       </p>
@@ -1426,7 +1435,7 @@
           <input id="helpFilter" type="search" placeholder="Search — e.g. picker, batch, install" autocomplete="off" />
           <p id="helpFilterCount" class="help-find-count" role="status"></p>
         </div>
-        <details class="help-sec" open>
+        <details class="help-sec" id="helpQuickStart" open>
           <summary>Quick start</summary>
 
         <ol>
@@ -1762,7 +1771,7 @@
         <strong>recover</strong> the finished images next time you open it. If the device runs out of storage
         mid-batch, it stops the same gentle way — save the <strong>.zip</strong> to free space, then Continue.</p>
         </details>
-        <details class="help-sec">
+        <details class="help-sec" id="helpInstall">
           <summary>Install as an app — one, two, or three</summary>
 
         <p>You get a full-screen icon that works offline. Open the page you want, then:</p>
