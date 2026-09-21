@@ -598,6 +598,37 @@ user-scalable=no.
   gives 6.0° read as an upright. The renders were opened, which is how the
   direction was confirmed and how the layout defect below was found.
 
+- [ ] **A kept photograph should be a file you own** <!-- decision: 043 -->
+  reported 2026-09-21, against the feature on staging: keeping a photograph
+  should not mean keeping it INSIDE the app — it should be saved and worked on
+  later — and whatever the app writes when it saves must never overwrite an
+  original.
+  The first half is a bound on what 039 shipped rather than a preference. A
+  kept photograph is rows in a database the app created: storage the reader
+  does not own, cannot move to another device, cannot back up, and which iOS
+  can reclaim without telling the app. "## The measurements lived in storage
+  the app does not own" is the same failure once already.
+  **Looked up.** Lightroom keeps the edit in a catalogue and optionally mirrors
+  it into an `.xmp` sidecar for NEF, ARW and CR3 — and for DNG, JPEG and HEIC it
+  writes the settings INTO the file instead, sidecars being unsupported for DNG
+  by design. The pixels are untouched and the file is rewritten, which is
+  exactly what the second half of the report forbids: "non-destructive" in the
+  field means *does not change the pixels*, not *does not write the file*. The
+  catalogue also holds a PATH and re-renders from it, and this app cannot
+  re-read a picked file after a reload. Capture One's EIP is the convention
+  that survives both: a standard zip carrying the original raw itself together
+  with its settings and profiles, self-contained, the original copied in rather
+  than referenced.
+  So: a keep file carrying the original's own bytes and the whole edit, saved
+  through the share sheet and opened again by picking it. A STORE-only zip, so
+  the original inside is byte-identical and any zip reader can take it back
+  out. Rejected: a sidecar (two files to pick and nothing keeping them
+  together), a DNG copy with the edit in its XMP (the looks, mask recipes,
+  lens profile and sky selections have no Camera Raw vocabulary, so the file
+  would announce a picture it is not carrying), the edit alone, and writing
+  anything whatever into the file the reader picked. See
+  `docs/decisions/043-a-kept-photograph-should-be-a-file-you-own.md`.
+
 - [ ] **The red cast in the shadows comes off by hand, and should not have to** <!-- decision: 034 -->
   reported 2026-09-20 with two renderings of one building frame and the Grade
   panel that separates them — the Shadows wheel at 209 degrees, 47%. The shaded
