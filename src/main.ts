@@ -5648,6 +5648,45 @@ for (const [btn, head] of [["jumpRoadmap", "rmHead"], ["jumpSettings", "settings
   if (el && target) el.addEventListener("click", () => target.scrollIntoView({ block: "start", behavior: "smooth" }));
 }
 
+// DOCTRINE 7e ASKS THE ⓘ FOR WHAT THE APP IS, WHAT IT IS NOT, AND HOW TO
+// INSTALL IT ON EVERY NAMED PLATFORM. All three are written, and they are
+// written in HELP — Quick start and "Install as an app", the latter naming
+// iPhone/iPad, Android, Chrome/Edge, Safari on a Mac and Firefox, plus how to
+// remove each again. The ⓘ had no route to them, so the panel that is meant
+// to answer "what is this" answered "what changed".
+//
+// A ROUTE AND NOT A COPY, which is 7e's own rule: the same prose has to be
+// maintained in one place, and Help is where a reader already looks for it.
+// So this closes the ⓘ, opens Help, expands the section and lands ON it —
+// scrolled AND focused, because scrolling alone moves the picture and leaves
+// the keyboard and the screen reader where they were (the same lesson the
+// Tutorials button below carries).
+// The two dialogs are looked up INSIDE the handler: this wiring sits beside the
+// other ⓘ jumps, which is where a reader of this file will look for it, and
+// `helpDlg` is declared some fifteen hundred lines further down. A module-scope
+// `const` read from above its declaration is a temporal-dead-zone throw, not a
+// lint complaint.
+function openWhatThisIs(): void {
+  (document.getElementById("infoDlg") as HTMLDialogElement | null)?.close();
+  (document.getElementById("helpDlg") as HTMLDialogElement | null)?.showModal();
+  requestAnimationFrame(() => {
+    for (const id of ["helpQuickStart", "helpInstall"]) {
+      const d = document.getElementById(id) as HTMLDetailsElement | null;
+      if (d) d.open = true;
+    }
+    const target = document.getElementById("helpQuickStart");
+    if (!target) return;
+    target.scrollIntoView({ block: "start" });
+    const sum = target.querySelector("summary") as HTMLElement | null;
+    sum?.focus();
+  });
+}
+$("jumpWhat").addEventListener("click", openWhatThisIs);
+// THE SAME DESTINATION FROM THE START SCREEN, which is the surface a first-time
+// reader actually meets. Two buttons, one function, one copy of the prose —
+// 7e's "moved, never copied" applies to the route as much as to the words.
+$("welcomeWhat").addEventListener("click", openWhatThisIs);
+
 $("locSettings").addEventListener("click", () => {
   locDlg.close();
   openInfoDialog();
