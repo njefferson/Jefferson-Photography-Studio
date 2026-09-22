@@ -753,6 +753,45 @@ user-scalable=no.
   canvas's aspect, or the PAGE being zoomed rather than the canvas — cannot be
   told apart in a screenshot. Instrument first; make the escape unconditional
   either way. See `docs/decisions/012-full-view-must-fit-and-always-escape.md`.
+- [ ] **The look's sky adjustments read a selection you cannot see** <!-- decision: 052 -->
+  reported 2026-09-22 from the device against Aerochrome: its sky adjustment
+  cannot be reproduced with a mask on sky the look does not reach, and the
+  shape suggested was that the look should open its own sky mask to start from,
+  which you then add to and subtract from, with Reach and Feather kept.
+  **Read off the source, and there are TWO sky selections on one photograph.**
+  The look's is `skyBitmap` and `skyFine` in `src/main.ts`, built at open and
+  assigned in six places, none of them reachable from any control — no Reach,
+  no Feather, no by-colour, no hand corrections — and it is what `skySmooth`,
+  `skyDepth` and `skySat` act through. The reader's is a type-4 Sky mask, which
+  has every one of those controls and drives nothing but the mask's own five
+  adjustments. `regenerateSkyMask` never touches the look's pair. So every
+  control over a sky selection is attached to the one the sky sliders ignore.
+  **It cannot be closed by finding a better slider value.** `skySat` multiplies
+  chroma about luma gated on each pixel's own saturation; `skyDepth` darkens
+  toward the film's value gated on the sky map's keying byte; a mask's
+  saturation folds in linear space at the mask stage before gamma, the tone
+  curves, the HSL mixer and the grade. Different operations, different
+  populations, different points in the pipeline.
+  **018's title is "One sky selection, built at open, for every sky-aware
+  tool", and this is the half that did not ship** — it unified the refinement
+  filter, not the selection, and its own Option 1 named per-population
+  strengths reading `skySel` as later items.
+  **Looked up.** Lightroom's Select Sky produces the mask the reader then
+  refines with Add and Subtract before using any slider on it: the automatic
+  detection IS the editable thing. darktable combines a parametric selection
+  with drawn shapes, with a polarity toggle so a component subtracts. Neither
+  exposes a detected selection that the module's own sliders read while the
+  reader edits a different one.
+  So: the detection that runs at open becomes a Sky mask the reader can see,
+  and the look's sky stages read it. Rejected: the sliders without the
+  detection (half of this, and 042 already owns that half); a second set of
+  Reach and Feather on the look's own selection (two skies in one app is what
+  018 exists to remove); and leaving it, which the source refutes rather than
+  taste. **Ranked above 013** because 013 tunes the Aerochrome sky against
+  whatever population the look's stages read, and this changes which population
+  that is — the same dependency test that put 023 at the top of the queue. See
+  `docs/decisions/052-the-looks-sky-adjustments-read-a-selection-the-reader-cannot-see.md`.
+
 - [ ] **Aerochrome is the right colour and comes out splotchy** <!-- decision: 013 --> — reported
   from the iPad 2026-09-17 with two frames, on the look that shipped the same day:
   the colour is right, the foliage breaks into hard-edged patches and the gravel
