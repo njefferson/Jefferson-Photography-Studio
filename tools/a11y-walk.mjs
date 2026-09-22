@@ -186,7 +186,17 @@ const keepAPhoto = async (page, where) => {
     keep.click();
     return true;
   });
-  if (!armed) { fail(`${where}: no Keep control, so the kept list is unmeasured`); return false; }
+  // DECISION 043 RETIRED `#keepPhoto` (2026-09-22): the in-app Keep is gone as a
+  // writer, so nothing in the app can create a kept row and this audit cannot
+  // arm itself. The message says which, because "no Keep control" now has two
+  // very different meanings — a regression, or a deliberate removal whose
+  // instrument was not rewritten with it. Both are failures; only one is a bug.
+  if (!armed) {
+    fail(`${where}: no #keepPhoto, so the kept list is UNMEASURED. Decision 043 removed it `
+       + `deliberately and this walk was not rewritten to seed the store another way — `
+       + `which is a gap in the instrument, not a clean result.`);
+    return false;
+  }
   const asked = await page.waitForSelector("#askInput", { state: "visible", timeout: 20000 }).then(() => true).catch(() => false);
   if (!asked) { fail(`${where}: keeping would not ask for a name, so the kept list is unmeasured`); return false; }
   await page.fill("#askInput", "A photo to come back to");

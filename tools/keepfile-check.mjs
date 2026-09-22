@@ -144,6 +144,34 @@ await missing(K.KEEP_PATHS.edit)();
 check("isKeepName accepts the extension, any case", K.isKeepName("a" + K.KEEP_EXT.toUpperCase()), true);
 check("...and rejects a photograph", K.isKeepName("NIR_1737.NEF"), false);
 
+// --- THE NAME MUST END IN A TYPE THE PLATFORM KNOWS. The first version used
+// `.ipskeep`, and an iPad's Files picker greyed the saved file out: 27.9 MB,
+// named correctly, unselectable, because iOS filters that picker by UTI and an
+// extension registered to nothing matches no allowed type. A keep file IS a
+// zip, so ending in `.zip` is honest as well as selectable.
+check("the extension ends in a type the platform registers", K.KEEP_EXT.endsWith(".zip"), true);
+
+// --- AND ROUTING ASKS THE BYTES, NOT THE NAME. Two reasons, both paid for: the
+// name had to change once already, and a reader may rename a file they own.
+const head = new Uint8Array(buf.slice(0, K.KEEP_SNIFF_BYTES));
+// Renaming cannot affect this and there is nothing to assert about it:
+// `sniffKeep` takes BYTES and never sees a name. A check comparing the same
+// call to itself would pass forever and say nothing, which is worse than no
+// check because it reads like coverage.
+check("a keep file is recognised from its first bytes alone", K.sniffKeep(head), true);
+
+// A PLAIN ZIP OF RAWS MUST NOT BE MISTAKEN FOR ONE. This is the check that
+// earns the sniff: a keep file is a valid zip, so the discriminator has to be
+// the first entry's NAME rather than the archive's signature.
+const decoy = Z.writeZip(
+  [{ name: "NIR_0001.NEF", size: original.length, crc: Z.crc32(original), data: original }],
+  WHEN,
+);
+const decoyHead = new Uint8Array((await decoy.arrayBuffer()).slice(0, K.KEEP_SNIFF_BYTES));
+check("an ordinary zip of raws is NOT a keep file", K.sniffKeep(decoyHead), false);
+check("...and neither is a raw itself", K.sniffKeep(original.slice(0, K.KEEP_SNIFF_BYTES)), false);
+check("...nor anything too short to be a zip", K.sniffKeep(new Uint8Array(8)), false);
+
 rmSync(dir, { recursive: true, force: true });
 console.log(failed ? `\n  ${failed} check(s) failed\n` : "\n  a keep file gives back exactly the photograph it was given\n");
 process.exit(failed ? 1 : 0);

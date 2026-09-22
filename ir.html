@@ -965,15 +965,14 @@
                  sits in the panel you already open to finish. An export is a
                  photograph; this is the EDIT, still open, waiting for you. -->
             <div id="keepRow" class="keep-row">
-              <button id="keepPhoto" type="button">Keep this photo to edit later</button>
-              <p class="note" id="keepNote">Its edit and the original file stay on this <span data-device-noun>device</span> under a name you choose. Nothing is uploaded, and your original is never changed.</p>
-              <!-- THE OTHER HALF OF KEEPING (decision 043), beside the first
-                   because they are two answers to one question and the reader
-                   should see both. The button above keeps the photograph in
-                   storage the app created; this one hands it back as a FILE.
-                   The in-app list stays and is not in question — what it cannot
-                   promise is next month, on the other device, because the
-                   browser may reclaim that storage without telling the app. -->
+              <!-- KEEPING IS SAVING A FILE, and there is one button for it.
+                   There were two — this and an in-app Keep that put the
+                   photograph in storage the app created. Reported from the
+                   device as duplicative, and the file is the one that matters:
+                   the other storage cannot move to another device, cannot be
+                   backed up, and the browser may reclaim it without telling the
+                   app. The in-app one is gone; the list of what was already
+                   kept stays, read-only, so nothing is stranded. -->
               <button id="keepFile" type="button">Save this photo as a file</button>
               <p class="note" id="keepFileNote">One file holding your original photograph exactly as it came, with this edit alongside it. Open it again here whenever you like &mdash; or unzip it anywhere and your photograph is inside, untouched. Your original is never written to.</p>
             </div>

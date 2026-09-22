@@ -24,9 +24,23 @@
 // approach. 043 refuses it in advance. Everything here produces NEW bytes.
 import { writeZip, readZip, crc32, type ZipWriteEntry } from "./zip";
 
-/** The extension a keep file carries, matching `.ipslook`'s precedent: the
- *  picker routes a non-image file to a handler rather than to the decoder. */
-export const KEEP_EXT = ".ipskeep";
+/** The extension a keep file carries.
+ *
+ *  IT ENDS IN `.zip` AND THAT IS NOT COSMETIC. The first version was
+ *  `.ipskeep`, and on an iPad the Files picker GREYED THE SAVED FILE OUT —
+ *  27.9 MB, named correctly, unselectable. iOS filters that picker by UTI, and
+ *  an extension registered to nothing matches no allowed type. Nothing in this
+ *  app ever ran: the failure was upstream of every line of routing.
+ *
+ *  A keep file IS a zip, so the trailing `.zip` is honest as well as
+ *  selectable — it maps to a real UTI, it is already in `OPENABLE_EXT` and in
+ *  every picker's accept list, and `src/zip.ts`'s own header records that
+ *  getting a file through iOS as a zip is the route this app already proved on
+ *  that device. `ipskeep` stays in the middle so a reader can still tell a kept
+ *  photograph from an archive of raws at a glance.
+ *
+ *  ROUTING DOES NOT DEPEND ON IT. See `sniffKeep`. */
+export const KEEP_EXT = ".ipskeep.zip";
 
 /** Layout version. Bumped only when an older reader would MISREAD a newer file;
  *  a reader refuses what it does not recognise rather than guessing. */
@@ -73,6 +87,42 @@ export interface KeepManifest {
 export function isKeepName(name: string): boolean {
   return name.toLowerCase().endsWith(KEEP_EXT);
 }
+
+/** Is this the head of a keep file? The question the ROUTING asks.
+ *
+ *  @param head  the first bytes of a picked file; 64 is always enough.
+ *  @returns whether the archive's FIRST entry is this format's manifest.
+ *
+ *  A NAME IS NOT EVIDENCE, and two separate things proved it. iOS would not let
+ *  a `.ipskeep` be picked at all, so the name had to change; and a reader may
+ *  rename a file they own, which is the whole point of them owning it. What
+ *  cannot be renamed is what the bytes say.
+ *
+ *  This is why `writeKeepFile` puts the manifest FIRST and says so: a zip's
+ *  first local header sits at offset 0, so the question is answered by a few
+ *  dozen bytes rather than by seeking to the central directory at the end of a
+ *  file that carries a whole photograph. `sniffLook` in src/look.ts is the same
+ *  shape for the same reason.
+ *
+ *  What it has to hold, and what `openPicked` depends on: it must say NO to an
+ *  ordinary zip of raws, which the import path handles and which would
+ *  otherwise be opened as a broken keep file. */
+export function sniffKeep(head: Uint8Array): boolean {
+  // Local file header: "PK\x03\x04", then the name length at 26 and the name
+  // itself at 30. Anything shorter than that is not a zip at all.
+  if (head.length < 30) return false;
+  if (head[0] !== 0x50 || head[1] !== 0x4b || head[2] !== 0x03 || head[3] !== 0x04) return false;
+  const nameLen = head[26] | (head[27] << 8);
+  if (nameLen !== KEEP_PATHS.manifest.length || head.length < 30 + nameLen) return false;
+  for (let i = 0; i < nameLen; i++) {
+    if (head[30 + i] !== KEEP_PATHS.manifest.charCodeAt(i)) return false;
+  }
+  return true;
+}
+
+/** How many bytes `sniffKeep` needs. Declared so a caller slicing a `File` does
+ *  not have to guess, and cannot guess short. */
+export const KEEP_SNIFF_BYTES = 64;
 
 /** Assemble a keep file: the original's own bytes beside the edit that was made
  *  of it.

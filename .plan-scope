@@ -1,40 +1,46 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=42c1a5dd2bc99191
-diffhash=b236b0e593a19c74
-verdict=IN-SCOPE: the plan's steps 1-4 exactly — the save control, the open path, the derived extension gate and the end-to-end walk, with the shared tail extracted rather than copied and keepfile.ts untouched
-# Every staged file maps to the plan's steps 1-4 and nothing else is touched.
+planhash=e24759cc02ab937d
+diffhash=f4723b6f056e900c
+verdict=IN-SCOPE: the plan's steps 1-5, with the out-of-scope caveat dialog backed out; unchanged from the judged diff but for one generated line count
+# Judged twice. The first pass returned OUT-OF-SCOPE on a caveat dialog added to
+# keepCurrentAsFile -- a new modal, new reader-facing copy and a new abort path on
+# the primary flow, with no accessibility pass, where the plan authorised only the
+# REMOVAL of the second Keep button. Backed out. keptCaveat now appears only in
+# comments and in 043's Outcome, with no dangling symbols.
 # 
-# EXTRACTED, NOT COPIED. showLoneWithEdit is defined once and called twice --
-# openKeepFile and openKeptPhoto -- and openKeptPhoto's own copy of the tail is
-# gone from the diff (17 lines removed). The load-bearing ordering survived:
-# `if (rebuildSkyMasks()) updateSkyStatus();` then `settled = snapshot();`.
+# It also found four defects, all now fixed: isLookFile's doc comment orphaned
+# above the newly inserted isKeepFile; the deleted keepCurrentPhoto's contract
+# block left stacked above keepCurrentAsFile; that function's own text still
+# citing a deleted function and a removed button; and a stale @param naming the
+# old extension.
 # 
-# THE GATE IS DERIVED. tools/openable-check.mjs parses OPENABLE_EXT out of
-# src/main.ts and exits 1 if that shape is gone. The watcher proved it fires both
-# directions on scratch copies: adding an extension to OPENABLE_EXT alone made
-# the gate demand it of every picker with no gate edit, and removing .ipskeep
-# from one picker failed that picker by name. It carries no governed list of its
-# own, so it cannot become the seventh place to update.
+# The second pass found the real blocker: the dead block's BODY had been deleted
+# and its opening `/**` line left behind, so keepCurrentAsFile's entire contract
+# was swallowed by a dead function's heading. contract-check passed throughout,
+# because a `/** */` block IS present -- the gate checks presence, not that the
+# comment is about the function beneath it. Fixed; the whole dead block is gone
+# and the surviving contract describes only its own function.
 # 
-# Both gates green. openable-check exit 0, five photograph pickers held to the
-# source at ir.html lines 127, 129, 130, 301 and 316; keepfile-check exit 0, 17
-# checks.
+# Plan steps 1-5 all hold. KEEP_EXT is ".ipskeep.zip"; sniffKeep routes on the
+# first entry's manifest name rather than the PK signature; the sniff runs in
+# openPicked after the looks and ahead of the zip import path, with the index
+# alignment against the reassigned files array checked; #keepPhoto, #keepNote and
+# the listener are gone while the store, #keptOpen, openKeptPhoto and refreshKept
+# remain; keep-walk asserts the name ends in a registered type and states that
+# selectability is a device question; 043 carries its Outcome.
 # 
-# NOTHING WRITES THE PICKED FILE, which is 043's standing requirement, checked in
-# the code rather than assumed: keepCurrentAsFile passes currentFile.bytes
-# straight into writeKeepFile, which hands it to writeZip as data and copies
-# nothing back; openKeepFile reads a fresh buffer. keepfile-check compares
-# against an independent snapshot taken before the call rather than against the
-# input array, so the instrument is sound.
+# Gates all exit 0: typecheck, contract-check (305/305), keepfile-check (22 ok
+# including the decoy that an ordinary zip of raws is not a keep file),
+# openable-check (5 pickers held to the source), decisions-check.
 # 
-# src/keepfile.ts and tools/keepfile-check.mjs are byte-identical to 3cc78ef --
-# untouched by this commit. No unstaged or untracked strays.
+# TWO FINDINGS CARRIED OUT, neither introduced here. The same swallowed-comment
+# defect exists in HEAD at src/main.ts 12541/12542 and 13799/13800, hiding the
+# contracts of switchSplit and closingQuickLook -- contract-check is blind to all
+# three, which is a gap in the gate rather than in this change. And
+# tools/a11y-walk.mjs is now permanently red: it reached the kept list through the
+# button this change removes, CLAUDE.md requires it before any UI release, and the
+# kept list is UNMEASURED until the walks are rewritten to seed the store or
+# retired with it.
 # 
-# Flagged, not blocking: the watcher cannot confirm from a diff that the walk was
-# made to fail. It was, against a compiling join defect that reset one edit field
-# -- the walk reported got "1" want "0.62" while every container check stayed
-# green, which is what shows it tests the join rather than repeating
-# keepfile-check. The walk's --file default is a session path, so it is
-# device-bound like the other sheets in this repo, and it is deliberately not in
-# the commit chain: it needs a built dist and a served port.
+# Delta since that judgement: one generated ARCHITECTURE.md module-map line count, rewritten by architecture-check --write. Generated, mechanical, no source or record file moved.
