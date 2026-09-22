@@ -3,7 +3,7 @@
 // a JPEG or 16-bit TIFF to the device.
 
 import { lensGains } from "./lensflat";
-import { compileEdit, toLinear8, cropToDisplayUvInto, CROP_DEFAULT, applyCreativeVignette, applyGrain, grainCellPx, type BrushMask, type EditParams, type LensCurve, lensBin } from "./pipeline";
+import { compileEdit, toLinear8, cropToDisplayUvInto, CROP_DEFAULT, applyCreativeVignette, applyGrain, grainCellPx, aimedSampler, maskGroupsForRender, AIM_NOISE, AIM_TEXTURE, type BrushMask, type EditParams, type LensCurve, lensBin } from "./pipeline";
 import { demosaicPixelLinearInto, type RawCfa } from "./raw/demosaic";
 import { readMosaicedCfa } from "./raw/dngRaw";
 import { readNefCfa } from "./raw/nef";
@@ -446,8 +446,20 @@ export async function exportImage(
   // Denoise first, then sharpen/texture — the same order the shader runs them
   // (raw neighbourhood -> denoised centre -> detail gain). Both are no-ops when
   // their slider is 0, so a plain edit keeps the 1x-decode fast path.
+  // AIMED, WHERE A MASK SAYS SO (decision 030). The flattened active groups are
+  // the same list and order the shader indexes, taken here rather than reaching
+  // into compileEdit's, because these pre-passes are composed before it runs.
+  const aimMasks = maskGroupsForRender(params.masks).flat();
   const denoised = makeRowDenoiser(warped, srcW, srcH, params.denoise, proxyFactor, params.chroma ?? 0, params.despeckle ?? 0);
-  const sampleLinear = makeRowDetail(warped, denoised, srcW, srcH, params.sharpen ?? 0, params.texture ?? 0, proxyFactor);
+  // Back toward `warped` — the pixel as it ARRIVED, before the despeckle median
+  // as well as the bilateral, because both are inside AIM_NOISE and the shader
+  // mixes toward the same pre-despeckle value. See AIM_NOISE.
+  const noiseAimed = aimedSampler(warped, denoised, aimMasks, AIM_NOISE, srcW, srcH);
+  const detailed = makeRowDetail(warped, noiseAimed, srcW, srcH, params.sharpen ?? 0, params.texture ?? 0, proxyFactor);
+  // Back toward the sampler detail was GIVEN, not toward `warped`: detail's
+  // base is the denoise result, so holding it back must restore that and not
+  // undo the denoise with it.
+  const sampleLinear = aimedSampler(noiseAimed, detailed, aimMasks, AIM_TEXTURE, srcW, srcH);
   // THE SKY MAP, from THE SAME PRE-PASSED SAMPLER the pixels come through — not
   // the raw source. Built from the raw source it targeted a sky 16% more
   // saturated than the rendered one (skymap.ts has the numbers), because the

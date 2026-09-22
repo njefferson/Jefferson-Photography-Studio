@@ -709,6 +709,39 @@ export const AIM_SHADOW = 4;
  *  same thing as blending the hot-spot's own gain toward 1. */
 export const AIM_LENS = 8;
 
+/** NOISE: the bilateral denoise, the colour-noise half and the despeckle
+ *  median, under ONE bit.
+ *
+ *  One rather than three for `AIM_LENS`'s reason — to a reader they are one
+ *  thing, the graininess of the picture, and three toggles for it would be
+ *  three ways to ask one question. The scope gate's reasons for all three
+ *  reduce to the same sentence: a sky and a canopy want opposite amounts and
+ *  there is one control.
+ *
+ *  AND ONE BIT IS WHAT MAKES THE TWO PATHS AGREE, which is the stronger
+ *  argument. The despeckle median runs BEFORE the bilateral in both paths, so
+ *  the value an aimed blend mixes toward has to be the pixel as it arrived —
+ *  before either. Under separate bits the CPU would blend toward the
+ *  pre-despeckle sample and the shader toward its post-despeckle `ctr`, and the
+ *  two would differ exactly where a speckle sat. `tools/agreement-walk.mjs`
+ *  would find that afterwards; the bit is what stops it being written.
+ *
+ *  SPATIAL, NOT PER-PIXEL, which is the difference from the four above. Those
+ *  scale a gain; this mixes a filtered result back toward the unfiltered one.
+ *  The taps are already paid for either way — the unfiltered value is the
+ *  centre sample the filter already took. */
+export const AIM_NOISE = 16;
+/** DETAIL: capture sharpening and the mid-frequency texture control, one bit
+ *  for the same reason — both are `raw/detail.ts`'s single unsharp `gain`,
+ *  reached by two sliders, and the reader sees one idea.
+ *
+ *  BLENDING THE RESULT AND BLENDING THE GAIN ARE THE SAME ARITHMETIC, and that
+ *  is why the CPU and the shader may do it differently and still agree:
+ *  mix(c, c*gain, w) == c * (1 + (gain - 1) * w) == c * mix(1, gain, w). The
+ *  shader scales the gain because it has it in a local; the CPU mixes the
+ *  sampler's output because the gain is inside a closure it does not own. */
+export const AIM_TEXTURE = 32;
+
 export interface MaskLayer {
   type: 0 | 1 | 2 | 3 | 4;
   /** Stages this mask gates in addition to its own adjustment — see AIM_*.
@@ -987,6 +1020,80 @@ export function aimWeight(masks: readonly MaskLayer[], bit: number, u: number, v
     if (w >= 1) break;
   }
   return any ? w : 1;
+}
+
+/** One pixel of linear source, by integer position — `raw/denoise.ts`'s
+ *  `LinearSampler` by structure rather than by import, so this file keeps its
+ *  one-way dependency on the decode layer. Named rather than written inline
+ *  because an inline `(x, y) => …` in a signature reads as this function's own
+ *  parameters to anything parsing the source, `tools/contract-check.mjs`
+ *  included. */
+type LinearTap = (x: number, y: number) => ArrayLike<number>;
+
+/** A SPATIAL PRE-PASS, HELD BACK WHERE NO MASK AIMS AT IT (decision 030).
+ *
+ *  @param off    the sampler as it was BEFORE this filter — what an aimed-away
+ *                pixel gets back.
+ *  @param on     the filtered sampler.
+ *  @param masks  the flattened active groups, as `aimWeight` takes them.
+ *  @param bit    one AIM_* bit.
+ *  @param w      the source's pixel width, for pixel-to-uv.
+ *  @param h      the source's pixel height, the same.
+ *  @returns a sampler, or `on` ITSELF when nothing aims at this stage.
+ *
+ *  RETURNING `on` UNCHANGED IS THE CONTRACT, not an optimisation. An unaimed
+ *  stage must render byte-identically to every build before aiming existed —
+ *  that is the first of the four statements `tools/aim-walk.mjs` holds this
+ *  mechanism to, and the one protecting every edit already saved. Going through
+ *  a blend at weight 1 would be arithmetic on the way to the same number, and
+ *  arithmetic on the way to the same number is how a number stops being the
+ *  same one.
+ *
+ *  EVERY VALUE IS COPIED OUT BEFORE THE NEXT CALL, and this is load-bearing:
+ *  both `makeRowDenoiser` and `makeRowDetail` return a REUSED scratch array, and
+ *  the filtered sampler calls the unfiltered one inside itself. Holding two
+ *  references across two calls reads one of them after it has been overwritten.
+ *
+ *  What the caller relies on: the uv here is the texel CENTRE, `(x + 0.5) / w`,
+ *  because that is what the shader's interpolated `v_uv` is at the same pixel
+ *  and `maskWeight` is the same function on both sides. */
+export function aimedSampler(
+  off: LinearTap,
+  on: LinearTap,
+  masks: readonly MaskLayer[],
+  bit: number,
+  w: number,
+  h: number,
+): LinearTap {
+  if (off === on) return on; // the filter was already a no-op at these settings
+  if (!masks.some((m) => m.aims && (m.aims & bit) && m.type !== 3)) return on;
+  const out = [0, 0, 0];
+  return (x, y) => {
+    const k = aimWeight(masks, bit, (x + 0.5) / w, (y + 0.5) / h);
+    if (k >= 1) return on(x, y);
+    // WEIGHT 0 MUST NOT RUN THE FILTER, and the first version of this did.
+    // `on` was called before the weight was branched on, so every pixel the
+    // mask excludes paid for a full 13x13 bilateral that was then thrown away —
+    // on a large export that is the greater part of the frame doing the most
+    // expensive thing in the pre-pass for nothing.
+    //
+    // IT IS NOT WHY THE FIRST RUN OF THE AIMED ARM TIMED OUT, and this sentence
+    // is here because the first version of this comment said it was. The export
+    // was finishing in under twenty seconds all along; the arm was waiting for a
+    // download that never comes, because a finished export COLLECTS and is
+    // handed over by a second press. The waste was real and worth removing on
+    // its own; it was not the failure in front of it, and attributing it was a
+    // guess with a fix attached.
+    if (k <= 0) return off(x, y);
+    const b = on(x, y);
+    const b0 = b[0], b1 = b[1], b2 = b[2]; // copied before `off` can clobber it
+    const a = off(x, y);
+    const a0 = a[0], a1 = a[1], a2 = a[2];
+    out[0] = a0 + (b0 - a0) * k;
+    out[1] = a1 + (b1 - a1) * k;
+    out[2] = a2 + (b2 - a2) * k;
+    return out;
+  };
 }
 
 export function maskWeight(m: MaskLayer, u: number, v: number): number {

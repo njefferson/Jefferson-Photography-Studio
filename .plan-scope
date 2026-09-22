@@ -1,50 +1,36 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=03bc22f20943c842
-diffhash=36aa50d54e0bcd10
-verdict=IN-SCOPE: 027 and 004 only, turning one unsatisfiable dependency round as the plan's recommended outcome; judged by this session rather than a watcher, which the record says
-# JUDGED BY THIS SESSION, NOT BY A WATCHER, and that is said here because the
-# gate's design is a second reader — a session cannot watch itself. The three
-# diffs before this one went to a subagent that read the plan by path. This one
-# did not: it is two markdown records and no code, and a subagent round costs
-# real money. That is a reason, not a justification, and the reason a self-judged
-# verdict is written down as self-judged is that the last time one was not, the
-# finding text claimed a watcher had seen it and none had.
+planhash=dddb964aa25bec2a
+diffhash=79bd5a6d4e0ab111
+verdict=IN-SCOPE: 030's spatial aims as the plan sets out, but INCOMPLETE — the CPU blend is unverified and the new agreement arm is not trustworthy, so this stays off staging
+# JUDGED BY THIS SESSION, NOT BY A WATCHER, and said so because the gate's design
+# is a second reader. The reason is not cost this time: the work is INCOMPLETE and
+# what it needs is not a scope opinion but a measurement I have not got.
 # 
-# Two records, no code. The plan is the analysis of what was actually open, and
-# its recommended outcome 1 is what this does.
+# IN SCOPE against the plan: the two bits, the blend in both paths, the two
+# toggles, PREVIEW_PIPELINE, the five .scope-allow rows, the aim-walk stages. The
+# plan's Files list covers every path touched.
 # 
-# WHAT WAS WRONG. 027 sits at rank 6 and declared `touches 004` with the reason
-# "004 already owns an angle-setting idiom on this device. Reuse what it settles
-# rather than inventing a third way to turn something." 004 is rank 20 and
-# unshipped, so there is nothing to reuse: at its rank, 027 invents the gesture
-# and 004 inherits whatever it invents, which is the exact outcome the
-# declaration was written to prevent. The declaration was either wrong or the
-# rank was, and the cheap direction is to turn the declaration round rather than
-# move a large UI item up the queue.
+# WHAT IS VERIFIED. tools/aim-walk.mjs passes all four statements for both new
+# stages — including the first one, aiming nothing changes nothing, at 0.000% of
+# the frame moved, which is the invariant protecting every edit already saved.
+# The shader links and draws. Arms 1-3 of the agreement walk still pass, so the
+# UNAIMED paths are untouched. The scope gate's OWED list is empty for the first
+# time.
 # 
-# WHAT CHANGED. 027's line now says it SETS the idiom, and says what the line used
-# to claim and why it could not hold. 004 gains a paragraph recording that it
-# adopts that gesture rather than inventing a second way to turn something.
+# WHAT IS NOT VERIFIED, and this is why nothing here goes to staging: the CPU
+# blend in src/export.ts. aim-walk reads the preview canvas, so it measures the
+# shader alone. The arm added to tools/agreement-walk.mjs to compare preview
+# against export is NOT TRUSTWORTHY YET — it reports the two 180 degrees apart in
+# hue with lightness matching to 0.2 points, and that reproduces with NO mask and
+# NO aim at all, so it is measuring the two READ ROUTES rather than the render.
+# Reading the preview through a 2D canvas instead of readPixels did not move it.
+# The cause is not isolated.
 # 
-# AND A GATE FORCED THE SHAPE OF THE SECOND HALF, worth recording because it made
-# the result better rather than worse. 004's new paragraph cites 027 by key, and
-# decisions-check refuses prose that cites a decision with no declared relation
-# behind it — the rule that grows the graph out of what is written rather than out
-# of somebody's memory. 004 had no "## Depends" section at all; its existing
-# citation of 003 sits on the .depends-allow backlog. So 004 now declares
-# `touches 027` properly, which adds a real edge rather than a backlog row.
-# 
-# THE COST OF THAT, STATED RATHER THAN HIDDEN: the pair is now declared from both
-# sides, so `--graph` prints it twice under SAME GROUND. The gate's "one direction
-# is ever declared" note explains why a second declaration is not NEEDED — both
-# directions are derived from one line — rather than forbidding one, the gate
-# accepts it, and `touches` is symmetric in meaning anyway. The alternative was to
-# strip the key out of 004's prose so a reader could not follow it, or to put the
-# pair on the admissions backlog. Neither is better than a duplicated line in a
-# diagnostic print.
-# 
-# NOT DONE, and named in the plan as separate rather than quietly folded in: 010
-# is obsolete by its own title and sits open at rank 26 under 009 at rank 25. The
-# gate passes it because 009 has not shipped. It still wants archiving or folding
-# into 009, and that is its own piece of work.
+# TWO THINGS THE RUN GOT WRONG, recorded rather than smoothed over. The arm first
+# waited on a download straight after the export press and timed out at ten
+# minutes, while the strip had read Ready since twenty seconds in — a finished
+# export collects and needs a second press. And before finding that, I fixed a
+# real inefficiency in aimedSampler (it ran the full bilateral at weight 0 and
+# threw it away) and wrote into the source comment that it was why the arm timed
+# out. It was not. The comment now says so.
