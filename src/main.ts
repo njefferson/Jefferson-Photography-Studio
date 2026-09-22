@@ -23,7 +23,7 @@ import { decodeOffThread, decodeLanes, decodeLaneTarget, type DecodeTiming } fro
 import { sourceIsMosaiced, type ExportOptions } from "./export";
 import { Renderer, type EditParams } from "./gl";
 import { exportImage, saveBlob, lastExportProfile, exportThreadsNow, getSource, proxyFactorFor, type ExportFormat } from "./export";
-import { writeKeepFile, readKeepFile, isKeepName, KEEP_EXT } from "./keepfile";
+import { writeKeepFile, readKeepFile, sniffKeep, KEEP_EXT, KEEP_SNIFF_BYTES } from "./keepfile";
 import { buildLinearSourceInBands } from "./gpuexport";
 import { fromHalf } from "./half";
 import { findLocation, stripLocation } from "./gps";
@@ -32,7 +32,7 @@ import { putFrame, eachFrame, frameMetas, frameCount, clearFrames, frameStore } 
 import * as Session from "./session";
 import { keepAwake } from "./wakelock";
 import { canTravel, shapeOf, putMask, getMask, listMasks, deleteMask as forgetMask, MASK_COUNT_CAP } from "./maskstore";
-import { putKept, getKept, getKeptBytes, listKept, deleteKept, setKeptEdit, renameKept, keptBytesHeld, KEPT_COUNT_CAP, type KeptRecord } from "./keepstore";
+import { getKept, getKeptBytes, listKept, deleteKept, renameKept, keptBytesHeld, KEPT_COUNT_CAP } from "./keepstore";
 import { sampleBrush, rebuildFix, stampFix, stampSegment, skyBandCentre, lensGain, LENS_GAIN_HI, LENS_GAIN_LO, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, bandWeight, rgb2hsv, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, AIM_DEHAZE, AIM_CLARITY, AIM_SHADOW, AIM_LENS, type MaskLayer, type CropRect, BRUSH_MAX_EDGE, type SkyMap } from "./pipeline";
 import { sensorPitchMicrons } from "./color";
 import { lensGains, applyLensFlat, lensPlanStamp, type LensPlan } from "./lensflat";
@@ -11175,6 +11175,24 @@ function embeddedPreview(bytes: Uint8Array, kind: ImageKind): Uint8Array | null 
   }
 }
 
+/** A cheap head-sniff: is this picked file a saved photograph (a keep file)?
+ *
+ *  @param f  the picked file.
+ *  @returns whether its first bytes say the archive's first entry is a keep
+ *  manifest. Reads 64 bytes, never the whole file — a keep file carries a whole
+ *  photograph and may be tens of megabytes.
+ *
+ *  BY CONTENT, NOT BY NAME, and the device is why: a `.ipskeep` could not be
+ *  selected in the iOS Files picker at all, so the name had to change, and a
+ *  name that had to change once is not something to route on. See `sniffKeep`.
+ *  Callers: `openPicked`, which must ask this BEFORE the zip import path, since
+ *  a keep file is a perfectly valid zip and would otherwise be opened as an
+ *  archive of raws and fail with the wrong message. */
+async function isKeepFile(f: File): Promise<boolean> {
+  if (f.size < 64) return false;
+  return sniffKeep(new Uint8Array(await f.slice(0, KEEP_SNIFF_BYTES).arrayBuffer()));
+}
+
 /** A cheap head-sniff: is this picked file a shared look (.ipslook JSON)?
  *  Reads only the first bytes; anything big is not a look. */
 async function isLookFile(f: File): Promise<boolean> {
@@ -11226,13 +11244,19 @@ async function openPicked(files: File[], ready?: Map<File, ReadyFile>) {
   }
   // KEEP FILES ARE PEELED OFF FOR THE SAME REASON LOOKS ARE (decision 043): a
   // keep file is not a photograph, it is a photograph AND the edit made of it,
-  // so it must never reach the decoder or be counted against a session. Routed
-  // by name rather than by a head-sniff because a keep file is a zip, and
-  // sniffing one would have to read far enough in to tell it from the zip of
-  // raws the importer already supports.
-  const keepFiles = files.filter((f) => isKeepName(f.name));
+  // so it must never reach the decoder or be counted against a session. It is
+  // also a valid zip, so this has to happen BEFORE the import path treats it as
+  // an archive of raws and fails with the wrong message.
+  //
+  // BY CONTENT. The comment here used to say "routed by name rather than by a
+  // head-sniff", and the device refuted it twice over: iOS would not let a
+  // `.ipskeep` be picked at all, so the name changed; and a reader may rename a
+  // file they own, which is the point of owning it. The manifest is the
+  // archive's first entry precisely so this costs 64 bytes.
+  const keepSniff = await Promise.all(files.map(async (f) => await isKeepFile(f).catch(() => false)));
+  const keepFiles = files.filter((_, i) => keepSniff[i]);
   if (keepFiles.length) {
-    files = files.filter((f) => !isKeepName(f.name));
+    files = files.filter((_, i) => !keepSniff[i]);
     await openKeepFile(keepFiles[0]);
     if (keepFiles.length > 1) toast(`Opened 1 of ${keepFiles.length} saved photos — open the others one at a time.`, 3200);
     if (!files.length) return;
@@ -12739,43 +12763,32 @@ function keptEditToJson(): string {
   });
 }
 
-/** WHAT THIS PHOTOGRAPH WOULD LOSE by being kept, in the reader's words.
- *
- *  Takes nothing. Returns a sentence, or an empty string when nothing is lost.
- *
- *  Said BEFORE the name is asked for, because afterwards it is an apology. The
- *  three are the three runtime things the stored form cannot hold: a painted
- *  mask is nothing but its bitmap, a warp is a displacement field, and an
- *  imported LUT is a lattice living in its own store. */
-function keptCaveat(): string {
-  const painted = params.masks.filter((m) => !canTravel(m.type)).length;
-  const bits: string[] = [];
-  if (painted) bits.push(`${painted} painted mask${painted === 1 ? "" : "es"}`);
-  if (params.warp) bits.push("the warp");
-  if (params.lut) bits.push("the imported LUT");
-  if (!bits.length) return "";
-  const list = bits.length === 1 ? bits[0] : `${bits.slice(0, -1).join(", ")} and ${bits[bits.length - 1]}`;
-  return `Everything comes back except ${list} — those are pixels rather than settings, so they are not part of what is kept.`;
-}
+// WHAT A KEPT PHOTOGRAPH CANNOT CARRY IS NO LONGER SAID ANYWHERE, and that
+// is a gap rather than a tidy-up. `keptCaveat` lived here and named the three
+// runtime things the stored form cannot hold — a painted mask is nothing but
+// its bitmap, a warp is a displacement field, an imported LUT is a lattice in
+// its own store. It was said before the name was asked for, because
+// afterwards it is an apology.
+//
+// The same three cannot travel in a keep FILE either, for the same reason:
+// the edit goes as recipes with the bitmaps stripped, which is what keeps it
+// portable. Saying so on the file save is a new control surface with new
+// reader-facing copy, so it is its own item with its own accessibility pass
+// rather than fallout from deleting a button. Recorded in decision 043's
+// Outcome so the next session meets it.
 
-/** KEEP THE OPEN PHOTOGRAPH, or update the row it came from.
- *
- *  Takes nothing. Returns nothing; every refusal is said to the reader rather
- *  than logged, because a control that sometimes does nothing is the defect
- *  this repo has the most lessons about.
- *
- *  What the caller relies on: after this resolves the list is redrawn, so the
- *  start-screen button and the held total cannot disagree with the store. */
+
 /** SAVE THIS PHOTOGRAPH AS A FILE THE READER OWNS — decision 043.
  *
  *  Takes nothing; acts on the open photograph. Writes a keep file — the picked
  *  file's own bytes carried beside this edit — and hands it to the share sheet.
  *  Returns nothing.
  *
- *  WHY IT IS NOT THE BUTTON ABOVE IT. `keepCurrentPhoto` puts the photograph in
- *  IndexedDB, which is storage the app created and the reader does not own: it
- *  cannot be moved to another device, cannot be backed up, and iOS may reclaim
- *  it without telling the app. Both are wanted and neither replaces the other.
+ *  IT IS THE ONLY KEEP. There was a second button that put the photograph into
+ *  IndexedDB, and it went 2026-09-22: that storage is not the reader's — it
+ *  cannot move to another device, cannot be backed up, and the browser may
+ *  reclaim it without telling the app. The list of what was already kept
+ *  remains, read-only, so nothing is stranded.
  *
  *  What it has to hold: `currentFile.bytes` is the reader's picked file, shared
  *  with the decode path, and is passed through UNWRITTEN — `keepfile.ts` does
@@ -12808,69 +12821,19 @@ async function keepCurrentAsFile(): Promise<void> {
   }
 }
 
-async function keepCurrentPhoto(): Promise<void> {
-  if (!current || !currentFile) return;
-  flushRecord(); // a slider still mid-drag is part of the edit being kept
-  // ALREADY KEPT — the reader carried on editing and wants the newer state.
-  // Rewriting the file's bytes for a couple of kilobytes of change would cost a
-  // whole photograph's write, so only the edit moves.
-  if (openKeptId) {
-    try {
-      await setKeptEdit(openKeptId, keptEditToJson());
-      const lost = keptCaveat();
-      toast(lost ? `Kept — ${lost}` : "Kept", lost ? 4200 : 2000);
-      await refreshKept();
-      return;
-    } catch {
-      // The row is gone (forgotten on another tab): fall through and keep it
-      // again as a new one rather than telling the reader nothing happened.
-      openKeptId = null;
-    }
-  }
-  const held = await listKept().catch(() => []);
-  if (held.length >= KEPT_COUNT_CAP) {
-    await noticeDialog(
-      "No room for another kept photo",
-      `This ${deviceNoun()} is already holding ${KEPT_COUNT_CAP}, which is the limit. `
-      + "Open \u201cPhotos you kept\u201d from the start screen and forget one you have finished with.",
-    );
-    return;
-  }
-  const base = currentFile.name.replace(/\.[^.]+$/, "");
-  const caveat = keptCaveat();
-  const name = await askTextDialog(
-    "Keep this photo",
-    "Your edit and the original file stay on this " + deviceNoun() + " under this name. "
-    + "Nothing is uploaded and your original is never changed."
-    + (caveat ? " " + caveat : ""),
-    "Call it",
-    base,
-    "Keep",
-  );
-  if (name === null) return; // asked and then thought better of it
-  showBusy("Keeping\u2026");
-  try {
-    const rec: KeptRecord = {
-      id: `kept-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
-      name: name || base,
-      srcName: currentFile.name,
-      kind: currentFile.kind,
-      size: currentFile.bytes.length,
-      thumb: await makeThumb(current, 260, lensCurveFor(currentFile), snapshot()),
-      edit: keptEditToJson(),
-      addedAt: Date.now(),
-    };
-    await putKept(rec, currentFile.bytes);
-    openKeptId = rec.id;
-    await refreshKept();
-    toast(`Kept as \u201c${rec.name}\u201d`, 2400);
-  } catch (err) {
-    recordFailure("keeping a photo", err);
-    await noticeDialog("That photo could not be kept", (err as Error).message);
-  } finally {
-    hideBusy();
-  }
-}
+// THE IN-APP KEEP IS RETIRED AS A WRITER (2026-09-22). `keepCurrentPhoto`
+// lived here and put a photograph into IndexedDB. Reported from the device:
+// it and "Save this photo as a file" were two buttons for one idea, and the
+// file is the one that matters, because the store is not the reader's to keep
+// — it cannot move to another device, cannot be backed up, and the browser
+// may reclaim it. The button and this function are gone.
+//
+// THE STORE AND ITS LIST STAY, deliberately and for now: photographs already
+// kept must not be stranded by the change. The list is read-and-open-only —
+// nothing can add to it. Retiring it is its own item and needs a way to write
+// an already-kept photograph out as a file first, which `showLoneWithEdit` and
+// `writeKeepFile` between them make small.
+
 
 /** OPEN A KEPT PHOTOGRAPH AND PUT ITS EDIT BACK ON.
  *
@@ -12926,7 +12889,7 @@ function showLoneWithEdit(srcName: string, kind: ImageKind, size: number, edit: 
 
 /** OPEN A KEEP FILE THE READER PICKED — decision 043's other door.
  *
- *  @param f  the picked `.ipskeep` file.
+ *  @param f  the picked keep file, whatever it has been named.
  *  @returns nothing. Reports through the usual dialog when the package cannot
  *  be opened; `readKeepFile` refuses a damaged or future-format one with a
  *  message worth showing, so nothing here has to guess.
@@ -13054,7 +13017,6 @@ async function refreshKept(): Promise<void> {
     : "Nothing kept yet.";
 }
 
-$("keepPhoto").addEventListener("click", () => void keepCurrentPhoto());
 $("keepFile").addEventListener("click", () => void keepCurrentAsFile());
 keptBtn.addEventListener("click", () => { void refreshKept(); keptDlg.showModal(); });
 $("keptDlgClose").addEventListener("click", () => keptDlg.close());

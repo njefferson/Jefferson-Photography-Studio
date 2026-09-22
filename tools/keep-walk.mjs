@@ -76,7 +76,21 @@ try {
   const [download] = await Promise.all([p.waitForEvent("download", { timeout: 120000 }), btn.click({ timeout: 60000 })]);
   const saved = join(dir, download.suggestedFilename());
   await download.saveAs(saved);
-  check("the saved file is named .ipskeep", /\.ipskeep$/i.test(download.suggestedFilename()), true);
+  // THE NAME MUST END IN A TYPE THE PLATFORM REGISTERS, and this walk cannot
+  // test the thing that actually matters about it. The first version saved a
+  // `.ipskeep`, every check here passed, and on an iPad the Files picker greyed
+  // the file out — 27.9 MB, named correctly, unselectable, because iOS filters
+  // that picker by UTI and an unregistered extension matches no allowed type.
+  // Chromium's file input does NO such filtering: `setInputFiles` hands the
+  // page any file whatever `accept` says, which is exactly why the pick-it-back
+  // step below went green against a file no reader could have chosen.
+  //
+  // So this asserts the one property that IS checkable here — the name ends in
+  // `.zip`, a real registered type and the thing the container actually is —
+  // and states plainly that selectability is a DEVICE question. Do not read
+  // this walk's green as covering it.
+  check("the saved file ends in a type the platform registers", /\.zip$/i.test(download.suggestedFilename()), true);
+  check("...and still says what it is", /\.ipskeep\.zip$/i.test(download.suggestedFilename()), true);
 
   // The original inside, against the original on disk — the whole promise.
   const src = readFileSync(FILE);

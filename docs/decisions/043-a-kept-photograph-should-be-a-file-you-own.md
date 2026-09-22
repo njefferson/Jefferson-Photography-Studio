@@ -207,3 +207,72 @@ bound rather than a convenience.
 
 It sits below 039 by dependency as well as by argument — the shape it writes
 out is 039's, and settling that on the device comes first.
+
+## Outcome
+
+Shipped in three commits: the container (`src/keepfile.ts` with
+`tools/keepfile-check.mjs`), the write and open paths with the extension gate
+and the end-to-end walk, and this correction.
+
+**THE FIRST VERSION CHOSE AN EXTENSION THE PLATFORM WILL NOT LET A READER
+SELECT.** A keep file was `.ipskeep`, following `.ipslook`'s precedent. Saving
+worked on the device; reopening was impossible. The Files picker greyed the
+saved file out — 27.9 MB, named correctly, unselectable — because iOS filters
+that picker by UTI and an extension registered to nothing matches no allowed
+type. Nothing in the app ever ran: the failure was upstream of every line of
+routing, and no amount of correct routing could have reached it.
+
+**Fixed by ending the name in `.zip`, which is what the container already is.**
+`.ipskeep.zip` maps to a real UTI, is already in `OPENABLE_EXT` and in every
+picker's accept list, and keeps the intent visible in the filename. This is the
+route the repository had already proved on that device: `src/zip.ts`'s own
+header records that getting a file through iOS as a zip is why ZIP import
+exists.
+
+**And routing stopped depending on the name.** `sniffKeep` reads the archive's
+first local header and asks whether the first entry is this format's manifest —
+which is why `writeKeepFile` writes the manifest first. Two things paid for
+that: the name had to change once already, and a reader may rename a file they
+own, which is the point of owning it. The check that earns it is the decoy — an
+ordinary zip of raws must NOT be taken for a keep file, since a keep file is a
+perfectly valid zip.
+
+**No container test could have caught the original defect, and the walk now
+says so in its own header.** Chromium's file input does no UTI filtering at all:
+`setInputFiles` hands the page any file whatever `accept` says, so the
+pick-it-back step went green against a file no reader could have chosen. The
+walk asserts what it can — the name ends in a registered type — and states that
+selectability is a device question.
+
+**The in-app Keep was retired as a writer in the same change.** Reported from
+the device: it and "Save this photo as a file" were two buttons for one idea,
+and the file is the one that matters, because the store is not the reader's to
+keep. The list of what was already kept stays, read-and-open-only, so nothing is
+stranded; retiring the store is its own item and needs a way to write an
+already-kept photograph out as a file first.
+
+**TWO GAPS THE REMOVAL OPENED, recorded rather than quietly carried.**
+
+**What a kept photograph cannot carry is now said nowhere.** `keptCaveat` named
+the three runtime things the stored form cannot hold — a painted mask is
+nothing but its bitmap, a warp is a displacement field, an imported LUT is a
+lattice in its own store — and it was said before the name was asked for,
+because afterwards it is an apology. The same three cannot travel in a keep
+FILE either, for the same reason: the edit goes as recipes with the bitmaps
+stripped, which is what keeps it portable. It went with the button.
+
+Saying it on the file save was written and then BACKED OUT of this change. It
+is a new modal with new reader-facing copy and a new abort path on the primary
+Keep flow, which CLAUDE.md requires an accessibility pass for; doing it here
+would have been a fresh product decision wearing the costume of fallout from a
+deletion. It is its own item.
+
+**And two walks now drive markup that is gone.** `tools/kept-walk.mjs` pressed
+`#keepPhoto` to create a row, and `tools/a11y-walk.mjs` used the same button to
+reach the kept list for its audit. Nothing in the app can create a kept row any
+more, so neither can arm itself. Both now FAIL loudly naming decision 043 as the
+cause rather than timing out on a missing selector — a walk that quietly
+measures nothing is indistinguishable from a clean one, which is `a11y-walk`'s
+own recorded rule. **The kept list is UNMEASURED until they are rewritten to
+seed the store directly, or retired with it**, and that belongs with the item
+that retires the store.

@@ -98,8 +98,27 @@ try {
     satBefore === "2.4" && pctBefore > 0, `saturation ${satBefore}, sky ${pctBefore}%`);
 
   // 3 · KEEP IT, from the panel a reader already opens to finish.
+  //
+  // THIS PATH NO LONGER EXISTS AND THIS WALK IS HONEST ABOUT IT (decision 043,
+  // 2026-09-22). `#keepPhoto` put a photograph into IndexedDB and was retired:
+  // it and "Save this photo as a file" were two buttons for one idea, and that
+  // storage is not the reader's to keep. The STORE and its list remain,
+  // read-and-open-only, so what is still worth testing is that an
+  // already-kept photograph opens — which needs a row seeded some other way,
+  // because nothing in the app can create one now.
+  //
+  // Failing loudly beats timing out on a selector that is gone, and beats
+  // quietly measuring nothing. Rewriting this walk to seed the store directly
+  // is its own item; until then the round trip below is UNMEASURED.
   await p.click("#ptab-export");
   await settle(p);
+  if (!(await p.$("#keepPhoto"))) {
+    console.log("\n  FAIL  #keepPhoto is gone (decision 043 retired the in-app Keep as a writer).");
+    console.log("        Nothing in the app can create a kept row, so this round trip cannot be");
+    console.log("        driven through the UI. Seed the store directly, or retire this walk with");
+    console.log("        the store. It is NOT passing and must not be read as passing.\n");
+    process.exit(1);
+  }
   await p.click("#keepPhoto");
   await p.waitForSelector("#askInput", { state: "visible", timeout: 20000 });
   await p.fill("#askInput", "Barn at dusk");
