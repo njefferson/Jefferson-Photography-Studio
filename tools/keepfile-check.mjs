@@ -50,6 +50,22 @@ const NAME = "NIR_1737.NEF";
 const EDIT = JSON.stringify({ exposure: 0.42, masks: [{ type: 4, op: 2 }] });
 const WHEN = new Date("2026-09-22T12:00:00Z");
 
+// THE PARTS: everything in an edit that is bytes rather than numbers — a
+// painted mask's bitmap, the warp's two displacement fields, a LUT lattice.
+// Filled with a pattern rather than zeroes, because a writer that lost a part
+// and a reader that zero-filled one would both pass against zeroes.
+const part = (n, seed) => {
+  const u = new Uint8Array(n);
+  for (let i = 0; i < n; i++) u[i] = (i * 2246822519 + seed * 374761393) >>> 24;
+  return u;
+};
+const PARTS = new Map([
+  ["mask-0.bin", part(384 * 256, 1)],
+  ["warp-du.bin", part(33 * 33 * 4, 2)],
+  ["lut.bin", part(17 * 17 * 17 * 3 * 4, 3)],
+]);
+const NO_PARTS = new Map();
+
 // A SNAPSHOT TAKEN BEFORE THE WRITE, and it is load-bearing. Comparing against
 // `original` itself lets a writer that corrupts its input IN PLACE pass: both
 // sides of the comparison change together. A planted one-byte flip proved
@@ -57,7 +73,7 @@ const WHEN = new Date("2026-09-22T12:00:00Z");
 // the property the app needs anyway — the bytes handed in are the reader's
 // picked file, shared with the decode path, and this module must not touch them.
 const pristine = Uint8Array.from(original);
-const blob = K.writeKeepFile(original, NAME, EDIT, "Lakeshore", "2.58.1", WHEN);
+const blob = K.writeKeepFile(original, NAME, EDIT, PARTS, "Lakeshore", "2.58.1", WHEN);
 const buf = await blob.arrayBuffer();
 const got = await K.readKeepFile(buf);
 
@@ -82,7 +98,7 @@ check("...and the photograph is one contiguous run of its own length",
   idx.find((e) => e.name.endsWith(NAME))?.compSize, original.length);
 
 // Deterministic: this module never reads the clock.
-const again = await K.writeKeepFile(original, NAME, EDIT, "Lakeshore", "2.58.1", WHEN).arrayBuffer();
+const again = await K.writeKeepFile(original, NAME, EDIT, PARTS, "Lakeshore", "2.58.1", WHEN).arrayBuffer();
 const a = new Uint8Array(buf), b = new Uint8Array(again);
 let identical = a.length === b.length;
 for (let i = 0; identical && i < a.length; i++) if (a[i] !== b[i]) identical = false;
@@ -106,7 +122,7 @@ await refuses("a photograph whose bytes were altered", (bytes) => {
 });
 
 const missing = (path) => async () => {
-  const b2 = K.writeKeepFile(original, NAME, EDIT, "x", "2.58.1", WHEN);
+  const b2 = K.writeKeepFile(original, NAME, EDIT, NO_PARTS, "x", "2.58.1", WHEN);
   const buf2 = await b2.arrayBuffer();
   const u = new Uint8Array(buf2);
   // Corrupt the entry NAME in both headers so the reader cannot find that part.
@@ -126,7 +142,7 @@ await missing(K.KEEP_PATHS.edit)();
 
 // A format from the future is refused rather than guessed at.
 {
-  const future = K.writeKeepFile(original, NAME, EDIT, "x", "2.58.1", WHEN);
+  const future = K.writeKeepFile(original, NAME, EDIT, NO_PARTS, "x", "2.58.1", WHEN);
   const u = new Uint8Array(await future.arrayBuffer());
   const enc = new TextEncoder().encode(`"format": ${K.KEEP_FORMAT}`);
   const rep = new TextEncoder().encode(`"format": ${K.KEEP_FORMAT + 8}`);
@@ -171,6 +187,31 @@ const decoyHead = new Uint8Array((await decoy.arrayBuffer()).slice(0, K.KEEP_SNI
 check("an ordinary zip of raws is NOT a keep file", K.sniffKeep(decoyHead), false);
 check("...and neither is a raw itself", K.sniffKeep(original.slice(0, K.KEEP_SNIFF_BYTES)), false);
 check("...nor anything too short to be a zip", K.sniffKeep(new Uint8Array(8)), false);
+
+// --- THE EDIT'S BYTES COME BACK TOO. This is what makes a kept photograph one
+// you can actually resume: a painted selection is nothing but its bitmap, a
+// warp is nothing but its displacement field, and an edit that arrives without
+// them is not the edit that was saved. They were left out of the first version
+// of this format by inheriting the mask LIBRARY's rule — which is about
+// applying a mask to OTHER photographs, a question a keep file never asks.
+check("every part written comes back", got.parts.size, PARTS.size);
+for (const [key, want] of PARTS) {
+  const have = got.parts.get(key);
+  let ok = !!have && have.length === want.length;
+  for (let i = 0; ok && i < want.length; i++) if (have[i] !== want[i]) ok = false;
+  check(`...${key} byte for byte`, ok, true);
+}
+check("the parts are STORED as well (method 0)",
+  idx.filter((e) => e.name.startsWith(K.KEEP_PATHS.partDir)).every((e) => e.method === 0), true);
+check("...and there are as many part entries as parts",
+  idx.filter((e) => e.name.startsWith(K.KEEP_PATHS.partDir)).length, PARTS.size);
+
+// An edit with no bytes in it yields no parts — not an absent map the caller
+// has to test for.
+{
+  const bare = await K.readKeepFile(await K.writeKeepFile(original, NAME, EDIT, NO_PARTS, "x", "2.58.1", WHEN).arrayBuffer());
+  check("an edit with no bytes yields an empty map, never undefined", bare.parts.size, 0);
+}
 
 rmSync(dir, { recursive: true, force: true });
 console.log(failed ? `\n  ${failed} check(s) failed\n` : "\n  a keep file gives back exactly the photograph it was given\n");

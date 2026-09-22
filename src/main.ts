@@ -7369,8 +7369,30 @@ window.addEventListener("resize", positionCropOverlay);
  *  corrections over what it finds, so nothing else has to put them back. */
 function rebuildSkyMasks(): boolean {
   let rebuilt = false;
-  for (const m of params.masks) if (m.type === 4) { regenerateSkyMask(m); rebuilt = true; }
+  for (const m of params.masks) if (regeneratedAtOpen(m)) { regenerateSkyMask(m); rebuilt = true; }
   return rebuilt;
+}
+
+/** DOES THIS MASK GET ITS BITMAP BACK FROM THE PHOTOGRAPH, or is the bitmap the
+ *  only copy there is?
+ *
+ *  @param m  a mask off the open photograph.
+ *  @returns true when `rebuildSkyMasks` above will re-detect it, so its pixels
+ *  are derived and need not be stored anywhere.
+ *
+ *  It exists because TWO features have to agree about it and they had no shared
+ *  answer. `rebuildSkyMasks` re-detects; `keepEdit` decides which bitmaps a keep
+ *  file must carry, and the right answer there is exactly "the ones this returns
+ *  false for". Written as two separate `type === 4` tests, the day a second mask
+ *  type became generated would silently start saving a redundant megabyte — or,
+ *  worse the other way, stop saving the only copy of something painted.
+ *
+ *  NOT `canTravel` (maskstore.ts), which answers a DIFFERENT question and was
+ *  wrongly used for this one: that asks whether a mask can be applied to OTHER
+ *  photographs, where a painted bitmap is meaningless. A keep file has no other
+ *  photograph. */
+function regeneratedAtOpen(m: MaskLayer): boolean {
+  return m.type === 4;
 }
 
 // Rotate 90° clockwise per tap. Applies to the preview and the export.
@@ -12730,52 +12752,268 @@ updateSessionResume();
  *  leak the session strip had until it started doing this. */
 let keptThumbUrls: string[] = [];
 
-/** THE WHOLE EDIT OF THE OPEN PHOTOGRAPH, as JSON, masks included.
+/** WHAT A KEEP FILE CARRIES THAT JSON CANNOT — revived as the typed arrays the
+ *  renderer reads, ready to be laid onto the open photograph.
  *
- *  Takes nothing. Returns the JSON a kept row stores and `openKeptPhoto`
- *  restores through the same path a resumed session's stored edit takes.
- *
- *  IT IS NOT `editToJson`, and the difference is the masks. That one drops them
- *  because a session restore has never carried them and Help says so. Here they
- *  are the point: this app's edits are mask work, and coming back to find every
- *  selection gone is not coming back to your edit. They travel as RECIPES —
- *  `shapeOf` is the one place that knows which fields are bitmaps, and 040
- *  already proved a Sky mask rebuilt from its numbers lands on the right sky.
- *  On the SAME photograph it can only agree.
- *
- *  What the result has to satisfy: everything in it must survive
- *  `JSON.stringify`, which is why the bitmaps go and why a painted mask
- *  (`canTravel` false) is dropped rather than stored empty — an empty painted
- *  mask would come back selecting nothing, which is worse than not coming back.
- *  The reader is told that before they name it. */
-function keptEditToJson(): string {
-  const st = snapshot();
-  const masks = st.params.masks
-    .filter((m) => canTravel(m.type))
-    // `shapeOf` drops the name too, because a saved mask carries its name at the
-    // top level of its own row. Here the mask is inside a photograph's edit and
-    // has nowhere else to put it, so it goes back on.
-    .map((m) => (m.name ? { ...shapeOf(m), name: m.name } : shapeOf(m)));
-  return JSON.stringify({
-    params: { ...st.params, masks, lut: null, warp: null },
-    activeLook: st.activeLook, lookBias: st.lookBias, lookMark,
-    rot: renderer.rotation, flip: renderer.flip,
-  });
+ *  `masks` is sparse and indexed into the edit's own `masks` array, because a
+ *  generated selection is re-detected rather than stored and therefore has no
+ *  row here. A field absent means the archive did not carry it, or carried it
+ *  damaged; it is never a zeroed stand-in, because a painted mask restored
+ *  empty selects nothing, which looks like the edit surviving and is not. */
+interface KeepBytes {
+  masks: { i: number; brush?: BrushMask; fine?: BrushMask }[];
+  warp: WarpField | null;
+  lut: EditParams["lut"];
 }
 
-// WHAT A KEPT PHOTOGRAPH CANNOT CARRY IS NO LONGER SAID ANYWHERE, and that
-// is a gap rather than a tidy-up. `keptCaveat` lived here and named the three
-// runtime things the stored form cannot hold — a painted mask is nothing but
-// its bitmap, a warp is a displacement field, an imported LUT is a lattice in
-// its own store. It was said before the name was asked for, because
-// afterwards it is an apology.
+/** THE WHOLE EDIT, with the parts that are bytes handed out beside it.
+ *
+ *  Takes nothing; reads the open photograph's state. Returns the edit as JSON
+ *  and a map of every piece of it that is BYTES rather than numbers, keyed by
+ *  the name the JSON's own `bytes` appendix refers to it by.
+ *
+ *  IT CARRIES EVERYTHING, and the version before it did not. Masks were filtered
+ *  through `canTravel`, which belongs to the mask LIBRARY: that feature saves a
+ *  mask to use on OTHER photographs, where a painted bitmap is meaningless
+ *  because pixels painted on one photograph are wrong on the next. A kept
+ *  photograph has no next photograph. It is this one, byte for byte, so those
+ *  pixels are exactly right for it — and dropping them meant coming back to an
+ *  edit with its painted selections, its warp and its LUT gone, which is not
+ *  coming back to your edit at all.
+ *
+ *  `params.warp` and `params.lut` are NULL in the JSON on purpose, and the
+ *  bitmaps are out of `masks` on purpose: what goes in the JSON is exactly the
+ *  shape `applySnapshot` already accepts, which refuses a revived warp or LUT
+ *  by design — a JSON array is not a Float32Array and half-activating one is
+ *  worse than not having it. The bytes ride in the `bytes` appendix instead and
+ *  are laid on as a SECOND pass, by `attachKeepBytes`.
+ *
+ *  A GENERATED SELECTION'S PIXELS ARE NOT STORED. `regeneratedAtOpen` says which
+ *  those are; the photograph itself puts them back on open, with the reader's
+ *  own corrections replayed over whatever it finds. Storing them as well would
+ *  be a redundant megabyte AND a stale one — the stored copy would be laid over
+ *  the freshly detected one.
+ *
+ *  What the result has to satisfy, and what `readKeepBytes` below depends on:
+ *  every key named in `bytes` is a key of the returned map, and nothing in the
+ *  JSON is a typed array — it must survive `JSON.stringify` unchanged. */
+function keepEdit(): { json: string; parts: Map<string, Uint8Array> } {
+  const st = snapshot();
+  const parts = new Map<string, Uint8Array>();
+  const put = (key: string, bytes: Uint8Array): string => { parts.set(key, bytes); return key; };
+
+  // `shapeOf` drops the bitmaps and the name. The name goes back on because a
+  // mask inside a photograph's edit has nowhere else to put it.
+  //
+  // `fix` IS REWRITTEN AS PLAIN ARRAYS, and that is a fix rather than a tidy-up.
+  // A correction stroke's points are a Float32Array, which `JSON.stringify`
+  // turns into {"0":…,"1":…} — an object with no `length`, so `rebuildFix` reads
+  // a stroke of zero dabs and skips it. Every hand correction on a kept sky
+  // selection was dropped that way, silently, on every reopen.
+  const masks = st.params.masks.map((m) => {
+    const sh = shapeOf(m);
+    return {
+      ...(m.name ? { ...sh, name: m.name } : sh),
+      fix: m.fix ? m.fix.map((f) => ({ pts: Array.from(f.pts), r: f.r, add: f.add })) : undefined,
+    };
+  });
+
+  const bitmaps: { i: number; w?: number; h?: number; key?: string; fineW?: number; fineH?: number; fineKey?: string }[] = [];
+  st.params.masks.forEach((m, i) => {
+    if (regeneratedAtOpen(m)) return;
+    const row: (typeof bitmaps)[number] = { i };
+    if (m.brush?.data.length) { row.w = m.brush.w; row.h = m.brush.h; row.key = put(`mask-${i}.bin`, m.brush.data); }
+    if (m.fine?.data.length) { row.fineW = m.fine.w; row.fineH = m.fine.h; row.fineKey = put(`mask-${i}-fine.bin`, m.fine.data); }
+    if (row.key || row.fineKey) bitmaps.push(row);
+  });
+
+  // The warp's `rgba` is DERIVED from du/dv by `encodeWarp`, so only the two
+  // displacement fields are stored and the sampled form is rebuilt on read —
+  // half the bytes, and one encoding rule in one place rather than a stored
+  // copy that a change to the encoding would silently invalidate.
+  const w = st.params.warp;
+  const lut = st.params.lut;
+  return {
+    json: JSON.stringify({
+      params: { ...st.params, masks, warp: null, lut: null },
+      bytes: {
+        masks: bitmaps,
+        warp: w && !warpFieldEmpty(w)
+          ? { res: w.res, rev: w.rev, du: put("warp-du.bin", bytesOf(w.du)), dv: put("warp-dv.bin", bytesOf(w.dv)) }
+          : null,
+        lut: lut
+          ? { id: lut.id, name: lut.name, size: lut.size, strength: lut.strength, data: put("lut.bin", bytesOf(lut.data)) }
+          : null,
+      },
+      activeLook: st.activeLook, lookBias: st.lookBias, lookMark,
+      rot: renderer.rotation, flip: renderer.flip,
+    }),
+    parts,
+  };
+}
+
+/** A typed array's own bytes, without copying its contents.
+ *
+ *  @param a  any Float32Array whose bytes are wanted.
+ *  @returns a Uint8Array over the SAME buffer — a view, not a copy, so a large
+ *  displacement field is not duplicated on its way into the archive.
+ *  Callers: `keepEdit` above. What it has to hold: the view covers exactly the
+ *  array's own region, since a Float32Array may be a window onto a larger
+ *  buffer and writing the whole buffer would carry a neighbour's data. */
+function bytesOf(a: Float32Array): Uint8Array {
+  return new Uint8Array(a.buffer, a.byteOffset, a.byteLength);
+}
+
+/** READ THE EDIT'S BYTES BACK OUT of a keep file's archive entries.
+ *
+ *  @param editJson  the edit as it came out of the keep file.
+ *  @param parts     the archive's binary entries, keyed as `keepEdit` wrote them.
+ *  @returns the pieces that are bytes, as real typed arrays, or null when the
+ *  file carries none. A piece whose entry is MISSING OR THE WRONG LENGTH is
+ *  left out rather than zero-filled: a painted mask restored empty selects
+ *  nothing, and a displacement field of the wrong size would move the
+ *  photograph somewhere nobody asked for.
+ *
+ *  EVERY ARRAY IS COPIED OUT OF THE ARCHIVE'S BYTES, deliberately. A zip entry
+ *  begins wherever the file put it, and a Float32Array view demands a
+ *  four-byte-aligned offset — so a view would throw on most files and be a
+ *  hidden dependency on luck on the rest. The copy also detaches the edit from
+ *  the archive buffer, which is a whole photograph.
+ *
+ *  What the caller relies on: this returns only what it verified, so
+ *  `attachKeepBytes` never has to check anything again. */
+function readKeepBytes(editJson: string, parts: Map<string, Uint8Array>): KeepBytes | null {
+  type Rows = {
+    masks?: { i?: number; w?: number; h?: number; key?: string; fineW?: number; fineH?: number; fineKey?: string }[];
+    warp?: { res?: number; rev?: number; du?: string; dv?: string } | null;
+    lut?: { id?: string; name?: string; size?: number; strength?: number; data?: string } | null;
+  };
+  let b: Rows | undefined;
+  try { b = (JSON.parse(editJson) as { bytes?: Rows }).bytes; } catch { return null; }
+  if (!b) return null;
+
+  const raw = (key: unknown, bytes: number): Uint8Array | null => {
+    const p = typeof key === "string" ? parts.get(key) : undefined;
+    return p && p.length === bytes ? new Uint8Array(p) : null; // copy: see the header
+  };
+  const floats = (key: unknown, n: number): Float32Array | null => {
+    const p = raw(key, n * 4);
+    return p ? new Float32Array(p.buffer, p.byteOffset, n) : null;
+  };
+  const bitmap = (key: unknown, w: unknown, h: unknown): BrushMask | undefined => {
+    if (typeof w !== "number" || typeof h !== "number" || w <= 0 || h <= 0) return undefined;
+    const data = raw(key, w * h);
+    return data ? { w, h, data } : undefined;
+  };
+
+  const masks: KeepBytes["masks"] = [];
+  for (const r of b.masks ?? []) {
+    if (typeof r?.i !== "number") continue;
+    const brush = bitmap(r.key, r.w, r.h);
+    const fine = bitmap(r.fineKey, r.fineW, r.fineH);
+    if (brush || fine) masks.push({ i: r.i, brush, fine });
+  }
+
+  let warp: WarpField | null = null;
+  const wr = b.warp;
+  if (wr && typeof wr.res === "number" && wr.res > 0) {
+    const n = wr.res * wr.res;
+    const du = floats(wr.du, n);
+    const dv = floats(wr.dv, n);
+    // `rgba` is rebuilt from du/dv by the one encoder both the shader and the
+    // export sampler are written against — never stored, never guessed.
+    if (du && dv) {
+      warp = { res: wr.res, du, dv, rgba: new Uint8Array(n * 4), rev: typeof wr.rev === "number" ? wr.rev : 1 };
+      encodeWarp(warp);
+    }
+  }
+
+  let lut: EditParams["lut"] = null;
+  const lr = b.lut;
+  if (lr && typeof lr.size === "number" && lr.size > 1 && typeof lr.name === "string") {
+    const data = floats(lr.data, lr.size * lr.size * lr.size * 3);
+    if (data) {
+      lut = {
+        id: typeof lr.id === "string" ? lr.id : "",
+        name: lr.name,
+        size: lr.size,
+        data,
+        strength: typeof lr.strength === "number" ? Math.min(1, Math.max(0, lr.strength)) : 1,
+      };
+    }
+  }
+
+  return masks.length || warp || lut ? { masks, warp, lut } : null;
+}
+
+/** LAY A KEEP FILE'S BYTES ONTO THE PHOTOGRAPH THAT IS ALREADY OPEN.
+ *
+ *  @param bytes  what `readKeepBytes` verified.
+ *  @returns nothing; mutates the live `params`.
+ *
+ *  WHEN IT MUST RUN, and this is the load-bearing part: AFTER the edit's JSON
+ *  has been laid on and AFTER `rebuildSkyMasks`. The JSON pass sets the warp and
+ *  the LUT to null by design, so this cannot be folded into it; and a generated
+ *  selection is re-detected on open, so anything written over `params.masks`
+ *  before that would be thrown away by the detection that follows.
+ *
+ *  `bakedWarpRev` is reset rather than trusted. It is the GPU's note of which
+ *  revision is uploaded, and a restored field arrives carrying the revision it
+ *  had when it was saved — which can equal a number already on the card from
+ *  the photograph before this one, in which case the upload is skipped and the
+ *  reader sees the wrong warp with no way to tell. */
+function attachKeepBytes(bytes: KeepBytes): void {
+  for (const r of bytes.masks) {
+    const m = params.masks[r.i];
+    if (!m) continue;
+    if (r.brush) { m.brush = r.brush; m.rev = (m.rev ?? 0) + 1; }
+    if (r.fine) m.fine = r.fine;
+  }
+  if (bytes.warp) {
+    params.warp = bytes.warp;
+    bakedWarpRev = -1;
+  }
+  if (bytes.lut) {
+    params.lut = bytes.lut;
+    syncLutUI();
+  }
+}
+
+/** PUT THE CORRECTION STROKES BACK IN THEIR DECLARED TYPE.
+ *
+ *  Takes nothing; acts on the open photograph's masks. Returns nothing.
+ *
+ *  A stroke's `pts` is declared a Float32Array and arrives from a stored edit as
+ *  a plain array, because JSON has no typed arrays. Everything that reads it —
+ *  `rebuildFix`, the overlay, `shapeOf` — happens to work on either, so this is
+ *  not a repair; it is refusing to leave the live state disagreeing with the
+ *  type that describes it, which is how the next reader of that type is misled.
+ *
+ *  What it has to hold: a stroke whose points did NOT arrive as an array is left
+ *  alone rather than guessed at. That is the pre-2026-09-22 written form, where
+ *  `JSON.stringify` had already turned the points into a keyed object with no
+ *  length — unrecoverable, and `rebuildFix` skips it exactly as it did before. */
+function reviveFixStrokes(): void {
+  for (const m of params.masks) {
+    if (!m.fix?.length) continue;
+    m.fix = m.fix.map((f) => (Array.isArray(f.pts) ? { pts: Float32Array.from(f.pts as ArrayLike<number>), r: f.r, add: f.add } : f));
+  }
+}
+
+// WHAT A KEEP FILE CANNOT CARRY IS NOW A SHORT LIST, and it is worth writing
+// down because it used to be a long one. `keptCaveat` lived here and named the
+// three runtime things the stored form could not hold — a painted mask, a warp,
+// an imported LUT — and every one of them travels now, in the archive beside
+// the edit rather than inside its JSON.
 //
-// The same three cannot travel in a keep FILE either, for the same reason:
-// the edit goes as recipes with the bitmaps stripped, which is what keeps it
-// portable. Saying so on the file save is a new control surface with new
-// reader-facing copy, so it is its own item with its own accessibility pass
-// rather than fallout from deleting a button. Recorded in decision 043's
-// Outcome so the next session meets it.
+// What genuinely does not travel: a LUT's `.cube` source text, which stays in
+// the device's own LUT store, so opening a keep file on another device applies
+// the lattice without adding the LUT to that device's library; and the undo
+// history, which is a session's, not a photograph's.
+//
+// A GENERATED SELECTION'S PIXELS ARE NOT CARRIED EITHER, and that is not a
+// limit — `regeneratedAtOpen` says why: the photograph puts them back, with the
+// reader's own corrections replayed over what it finds.
 
 
 /** SAVE THIS PHOTOGRAPH AS A FILE THE READER OWNS — decision 043.
@@ -12801,10 +13039,12 @@ async function keepCurrentAsFile(): Promise<void> {
   const base = currentFile.name.replace(/\.[^.]+$/, "");
   showBusy("Packing\u2026");
   try {
+    const edit = keepEdit();
     const blob = writeKeepFile(
       currentFile.bytes,
       currentFile.name,
-      keptEditToJson(),
+      edit.json,
+      edit.parts,
       base,
       __APP_VERSION__,
       new Date(),
@@ -12862,15 +13102,24 @@ async function keepCurrentAsFile(): Promise<void> {
  *                  whichever kept photograph happened to be open before.
  *  @returns nothing.
  *
- *  WHAT IT HAS TO HOLD, and the whole reason it is one function: `settled` is
- *  re-seeded AFTER `rebuildSkyMasks`, because the masks `activateCurrent`
- *  snapshotted had no bitmaps yet — without it, the state the reader can undo
- *  to is a photograph whose selections select nothing. `baseline` is
- *  deliberately NOT moved, so Reset still returns to how the photograph opens.
- *  That ordering is subtle, it is load-bearing, and two copies of it is the
- *  defect class this repository has the most lessons about.
+ *  @param bytes    what the archive carried that JSON cannot hold — painted
+ *                  bitmaps, the warp field, an imported LUT — or null for the
+ *                  in-app store, whose rows have never carried any.
+ *  @returns nothing.
+ *
+ *  WHAT IT HAS TO HOLD, and the whole reason it is one function: FIVE steps in
+ *  one order. The edit's JSON goes on (`activateCurrent`); the correction
+ *  strokes get their declared type back; every generated selection is
+ *  re-detected on this photograph, with those strokes replayed; only then are
+ *  the carried bytes laid on, because a detection that ran afterwards would
+ *  throw them away; and `settled` is re-seeded LAST, because the masks
+ *  `activateCurrent` snapshotted had no bitmaps yet — without it, the state the
+ *  reader can undo to is a photograph whose selections select nothing.
+ *  `baseline` is deliberately NOT moved, so Reset still returns to how the
+ *  photograph opens. That ordering is subtle, it is load-bearing, and two
+ *  copies of it is the defect class this repository has the most lessons about.
  */
-function showLoneWithEdit(srcName: string, kind: ImageKind, size: number, edit: string, keptId: string | null): void {
+function showLoneWithEdit(srcName: string, kind: ImageKind, size: number, edit: string, keptId: string | null, bytes: KeepBytes | null = null): void {
   // A photograph opened this way is ONE photograph: the lone-open shape, no
   // strip to resume, with its stored edit riding in beside it.
   sessionPhotos = [{ id: "lone", name: srcName, kind, size, edit, thumbUrl: "", thumbState: "real" }];
@@ -12878,7 +13127,9 @@ function showLoneWithEdit(srcName: string, kind: ImageKind, size: number, edit: 
   liveEdits.clear();
   activateCurrent("lone");
   openKeptId = keptId;
+  reviveFixStrokes();
   if (rebuildSkyMasks()) updateSkyStatus();
+  if (bytes) attachKeepBytes(bytes);
   settled = snapshot();
   void captureActiveEdit();
   updateMaskUI();
@@ -12906,7 +13157,7 @@ function showLoneWithEdit(srcName: string, kind: ImageKind, size: number, edit: 
 async function openKeepFile(f: File): Promise<void> {
   showBusy("Opening\u2026");
   try {
-    const { manifest, original, editJson } = await readKeepFile(await f.arrayBuffer());
+    const { manifest, original, editJson, parts } = await readKeepFile(await f.arrayBuffer());
     const imported: ImportedFile = {
       name: manifest.original,
       kind: refineKind(sniff(original), manifest.original),
@@ -12915,7 +13166,7 @@ async function openKeepFile(f: File): Promise<void> {
     };
     const img = await decodeWithLens(imported, { front: true, sky: true });
     showDecoded(img, imported);
-    showLoneWithEdit(manifest.original, imported.kind, original.length, editJson, null);
+    showLoneWithEdit(manifest.original, imported.kind, original.length, editJson, null, readKeepBytes(editJson, parts));
     toast(`Opened \u201c${manifest.name}\u201d`, 2000);
   } catch (err) {
     recordFailure("opening a keep file", err);
