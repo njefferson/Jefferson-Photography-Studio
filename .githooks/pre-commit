@@ -176,6 +176,24 @@ if [ ! -x "./tools/shadow-cast-check.mjs" ]; then
 fi
 "./tools/shadow-cast-check.mjs" || exit 1
 
+if [ ! -x "./tools/keepfile-check.mjs" ]; then
+  echo "" >&2
+  echo "  REFUSED — .branch-guard declares also=tools/keepfile-check.mjs and it is missing or not executable." >&2
+  echo "  A declared check that silently stops running is worse than no check." >&2
+  echo "" >&2
+  exit 1
+fi
+"./tools/keepfile-check.mjs" || exit 1
+
+if [ ! -x "./tools/openable-check.mjs" ]; then
+  echo "" >&2
+  echo "  REFUSED — .branch-guard declares also=tools/openable-check.mjs and it is missing or not executable." >&2
+  echo "  A declared check that silently stops running is worse than no check." >&2
+  echo "" >&2
+  exit 1
+fi
+"./tools/openable-check.mjs" || exit 1
+
 branch=$(git symbolic-ref --short HEAD 2>/dev/null || echo '')
 
 case "$branch" in claude/*) exit 0 ;; esac
