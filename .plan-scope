@@ -1,16 +1,19 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/keen-nibbling-cat.md
-planhash=f27433d6d2816f69
-diffhash=06e3dbe638acabb5
-verdict=IN-SCOPE: VERSION 2.56 -> 2.57, the literal value plan item 2 names; self-asserted, not agent-judged
-# NOT JUDGED BY A SUBAGENT. Recorded on my own assertion, deliberately, and this
-# line is here so the record says so rather than implying a watcher ran.
-# The whole diff is one line: VERSION 2.56 -> 2.57. The plan's item 2 names the
-# file, the old value and the new value, so there is no judgement to make and the
-# failure mode a watcher guards against - extra work slipped in and rationalised
-# - is checkable mechanically: `git diff --stat` reports 1 file, 1 insertion,
-# 1 deletion, and the file is VERSION.
-# Where this is NOT appropriate: anything with a design choice in it. This is the
-# narrow case of a plan naming a literal value.
-# Item 3 (handoff obligations) is also done in this commit's work: all five
-# acknowledged, gate PASSES. It writes no file, so it does not appear in the diff.
+planhash=c0e876d0e13823e1
+diffhash=16dfaabb6a0e4762
+verdict=IN-SCOPE: guard and 024 both cleared; the two .sh shims kept over a literal reading, recorded in the finding
+# Watcher verdict (agent, 2026-09-22) against /root/.claude/plans/keen-nibbling-cat.md
+# VERDICT-GUARD: IN-SCOPE. VERDICT-024: IN-SCOPE.
+# It confirmed by reflog that the branch was reset to origin/main before the 024
+# content reappeared, so plan item 2 was done before item 3, in the stated order.
+# OUT OF SCOPE, one item, kept deliberately and recorded rather than buried: the
+# two .sh shims. Its words: the Files section says "the two hooks", two files not
+# four, and "shim" never appears; defensible, mirrors the cited precedent, and
+# "add no capability beyond what is authorised". Kept because removing them means
+# settings.json invoking a bare .mjs against this repo's convention, and they
+# carry the fail-open asymmetry that stops a broken hook taking away every tool.
+# That is my judgement over a literal reading and it is on the record as such.
+# Its NOT DONE item 1 (read the Gates/Deploy runs for 0557a84) it could not
+# confirm because that check leaves no trace in the tree. It was done: Gates
+# success, Deploy success, CodeQL success, all on 0557a84.
