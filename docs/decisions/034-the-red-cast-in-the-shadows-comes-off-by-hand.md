@@ -63,12 +63,36 @@ against `EditParams.shadowSat`.
 Previous work by `NOTES.md` heading: "## Both amounts shipped: foliage 1.6, sky
 1.8" and the Grade tab's own history.
 
+**AND THE QUESTION CAME BACK ON 2026-09-22 AS "WHAT AMOUNT", which is this
+record's rejected option wearing a number.** It came back because the first
+three frames it was asked on agreed with each other. NIR_2927 and NIR_2922 —
+a hard sun/shade boundary and a canopy-shade frame — are both clean wins: the
+red leaves the shadow, the sunlit areas hold, and on that evidence alone an
+amount looks like a free improvement. NIR_3430 was the first frame to disagree,
+and it disagreed weakly enough to be read as an edge case: it is shadow-poor,
+so the control desaturates a sunlit building and its foliage, which reads as
+"the cost falls on flat frames" rather than as a defect in the key.
+
+**Six more frames were rendered to price that cost, and they moved the
+diagnosis instead.** The two intermediate cases are the ones that show why.
+NIR_1679 has the artefact AND the subject in the same tonal band — the crimson
+wash on the shaded ground goes by 0.50 with the sunlit trunk intact, and by
+0.25 the trunk has dulled too. NIR_1835 is the case no measurement reaches:
+its lake is a sheet of bright red, the reflection of the IR-bright forest, and
+whether that is the photograph or a cast on water is a taste call that the
+renders can present and cannot answer.
+
 ## Depends
 
 - touches 032 — a correction keyed on the pixel as DISPLAYED has the defect 032
   names: it re-keys under every look. A shadow cast is a property of the light
   the photograph was taken in, so it is measurable on the linear frame, which
   is the input space 032 is about.
+- touches 019 — 019 settled that a hue band is not a place. The 2026-09-22
+  renders make that this record's problem too: excluding shaded foliage from
+  the shadow population needs a selection, and `u_fol` is a band. A selection
+  built for one would serve the other, and a band adopted here would repeat
+  019's rejected route.
 
 ## Options
 
@@ -141,6 +165,64 @@ None of the 44 practice DNGs can stand in for any of them: IR-SCIENCE section 7
 says they are minimal hand-written files, useful for decode and geometry and
 useless for a colour question. The real corpus is not in this repository.
 
+**NINE MORE, 2026-09-22**, each rendered through the app at four Shadow colour
+amounts — 1.00, which is the look as it ships, then 0.75, 0.50 and 0.25 — and
+each of the thirty-six opened. The question put to them was whether an amount
+could be baked into Aerochrome.
+
+They were chosen as shadow-rich against flat, on the expectation that the cost
+would fall on the flat frames. **That expectation was wrong, and the renders
+say so: the split is not shade against flat, it is what the dark pixels are
+made of.**
+
+- **NIR_1748.NEF** — a granite shore with paddleboarders and a shaded band
+  across the top. The clean case. At 1.00 the grey granite carries red speckle
+  and the shaded band a red wash; by 0.50 the rock reads grey; at 0.25 both are
+  gone and nothing in the subject moved — the sunlit trunk, the boards and the
+  foreground bush are unchanged at every amount.
+- **NIR_2927.NEF** and **NIR_2922.NEF** — a hard sun/shade boundary and a
+  canopy-shade frame. The same shape as 1748: the red leaves the shadow while
+  the sunlit areas stay. 0.75 is near-indistinguishable from 1.00, and what is
+  useful sits between 0.50 and 0.25.
+- **NIR_1679.NEF** — a campsite under a fir, with a boulder and deep dappled
+  shade. Helps, and then takes the subject. The murky crimson on the shaded
+  ground and on the boulder's shaded face is gone by 0.50 with the sunlit trunk
+  still a strong red column; at 0.25 the trunk itself dulls to a dark brown.
+- **NIR_1642.NEF** — a dense conifer stand in even light. At 1.00 the shaded
+  inner canopy is a deep crimson, and that crimson is the depth of the
+  photograph. At 0.50 it is a dull grey-brown; at 0.25 the frame is grey with
+  pink on the sunlit tips only. The look is gone.
+- **NIR_1851.NEF** — standing under a tree looking out at sunlit forest. The
+  overhanging near foliage is a brilliant saturated red at 1.00 and near
+  black-brown at 0.25. It is in shade, so it is dark, so the control takes it.
+- **NIR_1737.NEF** — a lakeshore treeline above a bright beach. The treeline's
+  shaded interior loses its red the same way; the small bright markers on the
+  beach keep theirs. The sky's dark end lightens as the amount rises, which is
+  the luminance-only limitation showing on the population it is already
+  recorded against.
+- **NIR_1835.NEF** — a paddleboarder on a lake under a dark sky. The lake is a
+  sheet of bright red at 1.00, the reflection of the IR-bright forest, and dark
+  grey by 0.25. Whether that red is the photograph or a cast on water is the
+  one thing in the set a measurement cannot settle.
+- **NIR_3430.NEF** — shadow-poor: a sunlit building and foliage. The control
+  desaturates both, which is what a frame with little shade has instead of
+  shade.
+
+**The dividing line, stated from the renders rather than from the numbers.**
+Where the dark pixels are ground, rock, water or a deep interior, the control
+removes an artefact and costs nothing. Where the dark pixels are FOLIAGE — a
+shaded canopy, an overhanging near branch, the inside of a treeline — it
+removes the look's whole subject, because on this corpus the shaded side of
+vegetation is where Aerochrome's red lives. Four of the nine are that second
+case, and three of those four had been picked as the flat ones.
+
+**The numbers beside those renders would have given the opposite answer.** The
+foliage-population saturation falls smoothly on all nine, 0.64 to 0.75 at 1.00
+and 0.40 to 0.54 at 0.25, with no break anywhere between the frames it helps
+and the frames it destroys — because a pixel that desaturates leaves the
+population being averaged. The split is visible in one pass and invisible in
+the statistic.
+
 ## Rejected
 
 **The additive complement, automatically.** It is what the reader did by hand
@@ -153,6 +235,14 @@ looking at that frame while they do.
 every photograph, so it is measured on a frame that disagrees with the one that
 motivated it. The building frame is the oak's argument again.
 
+**AND IT HAS ITS FRAMES NOW, which it did not.** That rejection rested on 9j's
+carport, whose identifier was never written down, so no later session could
+re-open it and the rejection had to be taken on trust. NIR_1642, NIR_1737 and
+NIR_1851 are the frames that disagree; they are named in "## Looked at" with
+what each one showed at each amount. What they disagree about is not the
+amount, and there is no amount that survives all nine — 0.25 is free on
+NIR_1748 and has destroyed the look on NIR_1642 before it reaches 0.50.
+
 **Widening `shadowSat` and calling it the fix.** It REMOVES colour; it does not
 correct a cast. A red shadow becomes a grey shadow rather than a neutral one,
 and the shadows go flat — against the standing taste of shadows alive.
@@ -161,6 +251,16 @@ and the shadows go flat — against the standing taste of shadows alive.
 would be inherited whole: on a frame with a deep sky the sky's dark end is
 inside the band and pays. Whatever selects the shadow population has to know
 more than how dark a pixel is.
+
+**AND THE SKY IS THE SMALLER HALF OF THAT.** The limitation is written down
+against the sky in `src/shadowcast.ts` because the sky is the population the
+app can already exclude. The 2026-09-22 renders show the same key failing on a
+population it cannot: shaded FOLIAGE. NIR_1851's darkest non-sky region is an
+overhanging branch, NIR_1642's and NIR_1737's is the inside of a treeline, and
+`k = 1 - amount * (1 - smoothstep(0.05, 0.6, L))` in `src/gl.ts` and its mirror
+in `src/pipeline.ts` cannot tell any of them from a shaded rock. There is no
+foliage selection to exclude them with either — `u_fol` is a hue BAND, and
+record 019's rejection that a hue band is not a place applies here unchanged.
 
 **Taking the reader's 209° at 47% as the answer.** It is one frame's cast
 measured by eye, and it is evidence that a correction is wanted, not a constant.
