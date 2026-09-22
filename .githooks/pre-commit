@@ -158,6 +158,15 @@ if [ ! -x "./tools/patch-note-check.mjs" ]; then
 fi
 "./tools/patch-note-check.mjs" || exit 1
 
+if [ ! -x "./tools/roadmap-copy-check.mjs" ]; then
+  echo "" >&2
+  echo "  REFUSED — .branch-guard declares also=tools/roadmap-copy-check.mjs and it is missing or not executable." >&2
+  echo "  A declared check that silently stops running is worse than no check." >&2
+  echo "" >&2
+  exit 1
+fi
+"./tools/roadmap-copy-check.mjs" || exit 1
+
 if [ ! -x "./tools/pool-budget-check.mjs" ]; then
   echo "" >&2
   echo "  REFUSED — .branch-guard declares also=tools/pool-budget-check.mjs and it is missing or not executable." >&2

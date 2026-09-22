@@ -92,8 +92,17 @@ const INTERNAL_SUBJECT = /^(Roadmap|Notes|Docs|Internal|Chore):/i;
  *  "What's new". A DENY-list on purpose: a root this repo grows later
  *  is treated as shipped and shows in the dialog, where a wrong line is seen;
  *  an allow-list would drop its commits in silence (the hub's binary-files
- *  lesson, §243, is the same choice for the same reason). */
-const INTERNAL_PATH = /^(tools|docs|palettes|presets|asset-factory|\.github|\.claude|\.githooks)\/|^\.[^/]+$|\.md$/;
+ *  lesson, §243, is the same choice for the same reason).
+ *
+ *  `VERSION` JOINED THIS LIST 2026-09-22, and it is the single biggest thing
+ *  that was wrong with the ⓘ dialog. The versioning rule says the VERSION edit
+ *  rides its release's own final commit; when it rides alone instead, the
+ *  commit changes nothing a reader can see and still prints as a patch note.
+ *  Six of the 38 reader-facing subjects in this repository's whole history are
+ *  "Changed: this release is 2.54" through "2.59" — one in six of everything
+ *  the dialog has ever shown, telling the reader a number they are already
+ *  looking at. A VERSION-only commit is a housekeeping commit. */
+const INTERNAL_PATH = /^(tools|docs|palettes|presets|asset-factory|\.github|\.claude|\.githooks)\/|^\.[^/]+$|\.md$|^VERSION$/;
 
 /** True when nothing the commit touched reaches the reader. An empty list (an
  *  empty commit, or a merge shown without its diff) has nothing shipped in it
@@ -135,10 +144,30 @@ function changelog() {
   return filteredLog(5);
 }
 
+/** THE LINE THE READER IS SHOWN, declared per bullet as `Shown as:`.
+ *
+ *  A roadmap bullet's bold title is a DECISION TITLE — it is written to be
+ *  argued with, ranked and cited by key, and it is the right text for that job.
+ *  It is the wrong text for somebody holding the app. Reported from the device
+ *  2026-09-22, against a screen that was showing "A mask keys the photograph,
+ *  not the grade", "Colour cannot finish a selection an occluder has split" and
+ *  "(superseded detail) The live view at full resolution" to a reader who has
+ *  no idea what any of that means. Twenty-six lines, and not one of them was
+ *  written for them.
+ *
+ *  So the reader's sentence is written as the reader's sentence, on its own
+ *  line under the bullet, and this is what the ⓘ renders. `internal` means the
+ *  item is real work that is not a change anyone can see — a walk's coverage,
+ *  a record kept open on purpose — and it is left out of the reader's list
+ *  rather than dressed up for it. `tools/roadmap-copy-check.mjs` refuses a
+ *  commit when an open bullet has no such line, so the internal title cannot
+ *  fall through to the screen again. */
+const SHOWN_AS = /^\s+\*\*Shown as:\*\*\s+(.+)$/;
+
 /** Checkbox bullets under a `## ` heading of NOTES.md. Each `- [ ]`/`- [x]`
- *  bullet becomes one item; the shown title is the full **bold span** when the
- *  item leads with one (so an inner em-dash survives), else text before " — ",
- *  stripped of markdown emphasis. */
+ *  bullet becomes one item, carrying the `Shown as:` line beneath it. Items
+ *  marked `internal`, and items with no such line at all, are left out — a
+ *  bullet that has not said how to say itself is never guessed at. */
 function checklist(headingRe: RegExp) {
   try {
     const notes = readFileSync(new URL("./NOTES.md", import.meta.url), "utf8");
@@ -150,10 +179,16 @@ function checklist(headingRe: RegExp) {
       if (/^##\s/.test(lines[i])) break; // stop at the next section heading
       const m = lines[i].match(/^-\s+\[([ xX])\]\s+(.+)$/);
       if (!m) continue;
-      const bold = m[2].match(/^\*\*(.+?)\*\*/);
-      const title = (bold ? bold[1] : m[2].split(" — ")[0])
-        .replace(/\*\*|`|_/g, "") // drop markdown emphasis
-        .trim();
+      // Look ahead for this bullet's own `Shown as:` line, stopping at the next
+      // bullet so a missing one can never borrow the line below it.
+      let shown = "";
+      for (let j = i + 1; j < lines.length; j++) {
+        if (/^-\s+\[[ xX]\]\s/.test(lines[j]) || /^##\s/.test(lines[j])) break;
+        const sa = lines[j].match(SHOWN_AS);
+        if (sa) { shown = sa[1].trim(); break; }
+      }
+      if (!shown || /^internal$/i.test(shown)) continue;
+      const title = shown.replace(/\*\*|`|_/g, "").trim();
       if (title) items.push({ done: m[1].toLowerCase() === "x", title });
     }
     return items;

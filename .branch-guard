@@ -188,6 +188,20 @@ also=tools/one-pool-check.mjs
 # copy. It reads "user-facing" out of vite.config.ts rather than restating it.
 also=tools/patch-note-check.mjs
 
+# Run on every commit: the ⓘ dialog's Roadmap is READER COPY, and for its whole
+# life it was the decision titles. Reported from the device 2026-09-22 against a
+# screen showing "A mask keys the photograph, not the grade", "Colour cannot
+# finish a selection an occluder has split" and "(superseded detail) The live
+# view at full resolution" — twenty-six lines, none of them written for anybody
+# holding the app. Each open bullet now declares its own `Shown as:` line and
+# that is what ships. The build DROPS a bullet with no such line rather than
+# guessing, which is safe but silent, so this is the half that says so out loud:
+# a roadmap quietly losing items is its own defect. It reads the pattern out of
+# vite.config.ts and the word list out of tools/reader-words.mjs, which
+# patch-note-check shares — two lists for one idea is a gate lying about its
+# coverage.
+also=tools/roadmap-copy-check.mjs
+
 # Run on every commit: the export pool is sized for what a band ACTUALLY weighs.
 # one-pool-check beside this refuses a SECOND caller of workerCount, which is
 # the shape the 2026-09-20 defect took. It says nothing about whether the one
