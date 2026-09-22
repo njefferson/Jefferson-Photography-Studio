@@ -391,7 +391,21 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   color: var(--txt);
   font: 500 1rem/1 var(--ui);
 }
-.dlg-body { flex: 1 1 auto; overflow-y: auto; padding: 14px 20px 18px; min-height: 0; }
+/* THE SCROLL CUE HANGS OVER THIS BOX'S TOP EDGE, so anything scrolled to
+   `block: "start"` lands under it — `#jumpRoadmap` and `#jumpSettings` both put
+   their heading at the very top, where `.dlg-cue.up` fades it out.
+   THE OVERHANG VARIES AND THE FIRST VALUE HERE WAS DERIVED AND WRONG. Pinned,
+   the cue sits at `top: -18px` over a 30px box and hangs over by 12px; at
+   scrollTop 0 it is still in flow, where `margin-top: -18px` against this box's
+   own 14px padding puts its bottom 26px below the scrollport edge. 12px was
+   typed from the first case, measured at 14px short, and corrected. 30px is the
+   cue's own `height` two rules below — ONE number from ONE rule, comfortably
+   above the 26px worst case, so this inset cannot drift out of step with the
+   cue through arithmetic across three declarations.
+   `.help-body` has the same defect from a taller, content-sized header, and is
+   measured at runtime instead — see `clearStickyHeader` in src/main.ts, and
+   record 047 for why the two sites take different mechanisms. */
+.dlg-body { flex: 1 1 auto; overflow-y: auto; padding: 14px 20px 18px; min-height: 0; scroll-padding-top: 30px; }
 #helpDlg .help-body { flex: 1 1 auto; overflow-y: auto; padding: 14px 20px 4px; min-height: 0; }
 #helpDlg > #helpClose,
 #batchDlg > #batchCancel,

@@ -5667,9 +5667,52 @@ for (const [btn, head] of [["jumpRoadmap", "rmHead"], ["jumpSettings", "settings
 // `helpDlg` is declared some fifteen hundred lines further down. A module-scope
 // `const` read from above its declaration is a temporal-dead-zone throw, not a
 // lint complaint.
+/** Stop a sticky header from covering whatever a scroll lands on.
+ *
+ *  Takes `scroller`, the element that actually scrolls, and `sticky`, the
+ *  element pinned across its top edge. Measures how far that element hangs
+ *  over the scroller's top and writes it to the scroller's
+ *  `scroll-padding-top`, which is the property CSS Scroll Snap defines for
+ *  exactly this — an inset on the scrollport's optimal viewing region,
+ *  honoured by `scrollIntoView` and not only by snapping. Returns nothing.
+ *
+ *  MEASURED RATHER THAN TYPED, because `.help-find` grows a line whenever
+ *  `#helpFilterCount` wraps, and a constant that goes stale brings this defect
+ *  back with nothing going red. Call it while the dialog is OPEN: a closed
+ *  `<dialog>` has no layout and every rect reads zero, which would silently
+ *  write no inset at all.
+ *
+ *  WHAT IT HAS TO HOLD, and what `openWhatThisIs` below depends on: after this
+ *  runs, an element scrolled to `block: "start"` inside `scroller` has its top
+ *  edge at or below `sticky`'s bottom edge. Record 047 carries the measurement
+ *  that says what happens when it does not — the `<summary>` a reader was sent
+ *  to sat at y=146-190 behind a search box at y=159-247, focused, announced,
+ *  and invisible.
+ */
+function clearStickyHeader(scroller: HTMLElement | null, sticky: HTMLElement | null): void {
+  if (!scroller || !sticky) return;
+  const over = sticky.getBoundingClientRect().bottom - scroller.getBoundingClientRect().top;
+  if (over > 0) scroller.style.scrollPaddingTop = `${Math.ceil(over)}px`;
+}
+
+/** Open Help with its sticky search box accounted for.
+ *
+ *  Takes nothing. Shows `#helpDlg` and sets the inset described above, so every
+ *  scroll inside it — this route, and the filter's own jumps — stops short of
+ *  the search box rather than under it. Returns nothing. Every opener of that
+ *  dialog goes through here; calling `showModal()` on it directly reintroduces
+ *  record 047.
+ */
+function openHelpDialog(): void {
+  const dlg = document.getElementById("helpDlg") as HTMLDialogElement | null;
+  if (!dlg) return;
+  dlg.showModal();
+  clearStickyHeader(dlg.querySelector(".help-body"), dlg.querySelector(".help-find"));
+}
+
 function openWhatThisIs(): void {
   (document.getElementById("infoDlg") as HTMLDialogElement | null)?.close();
-  (document.getElementById("helpDlg") as HTMLDialogElement | null)?.showModal();
+  openHelpDialog();
   requestAnimationFrame(() => {
     for (const id of ["helpQuickStart", "helpInstall"]) {
       const d = document.getElementById(id) as HTMLDetailsElement | null;
@@ -7118,7 +7161,7 @@ if (new URLSearchParams(location.search).has("lens")) {
 }
 
 const helpDlg = $("helpDlg") as HTMLDialogElement;
-$("helpBtn").addEventListener("click", () => helpDlg.showModal());
+$("helpBtn").addEventListener("click", openHelpDialog);
 for (const id of ["helpClose", "helpCloseTop"]) $(id).addEventListener("click", () => helpDlg.close());
 helpDlg.addEventListener("click", (e) => {
   if (e.target === helpDlg) helpDlg.close();
