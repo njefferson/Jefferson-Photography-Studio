@@ -1262,6 +1262,92 @@ user-scalable=no.
   byte-identical to today's, because a graphics chip computes in float where the
   processor uses doubles. It would match the PREVIEW instead.
 
+## The black screen on a phone was the update strip, not the photograph, 2026-09-22
+
+Reported from an iPhone with a diagnostic report attached: a landscape
+photograph on a phone held in portrait gives a black screen that **cannot be
+tapped out of**. The only way back is to turn rotation lock off and rotate to
+landscape, at which point the file is visible again.
+
+**It is the §7h update strip, and it has nothing to do with the photograph.**
+
+`.sw-strip` is placed with `grid-area: swstrip`. The desktop template declares
+that area; the phone template at `max-width: 760px` did not — it read
+`"bar" "stage" "panel"`. A grid item whose named area does not exist in the
+template in force **does not fall back to the normal flow**. It auto-places into
+the IMPLICIT grid, and the implicit tracks it creates take the explicit layout
+apart.
+
+Measured at 302x656 with the strip shown, before the fix:
+
+- `grid-template-columns` went from `302px` to **`16px 0px 286px`**
+- `grid-template-rows` went from three tracks to **five**
+- the stage collapsed from 302x198 to **16x62**
+- the top bar from 302 wide to **16 wide**
+
+Opened and looked at rather than inferred: the whole app is crushed into a
+sliver down the left edge — fragments of buttons, a slice of the session strip —
+with the entire rest of the screen empty and the update strip the only working
+control on it. In the dark theme that is a black screen. **Nothing on it is big
+enough to press**, which is the "cannot be tapped out of" exactly.
+
+Rotating past 760px leaves the media query, so the template that DOES declare
+the area takes over and everything returns. That is the whole reason the
+rotation-lock workaround works, and it is why the report reads as an orientation
+defect when orientation is only how the reader escaped it.
+
+**Two rare states at once is why it survived.** The strip landed 2026-09-10 and
+only appears when a worker is WAITING. It took until somebody was holding a
+phone at the moment an update was ready. No screenshot sweep would find it.
+
+**The page zoom was a red herring and the walk disproves it.** The report showed
+`Page zoom 1.33x`, which made the layout viewport 302 on a 402 screen, and the
+first hypothesis here was that something sized the shell from the device rather
+than the viewport. Nothing in `src/` reads `screen.*` or `devicePixelRatio` at
+all. The walk fails identically at 402x874 with no page zoom, so any iPhone in
+portrait meets this; the zoom changed nothing but the numbers in the report.
+
+**Fixed** by declaring the row: the phone template is
+`"bar" "swstrip" "stage" "panel"` over `auto auto 1fr auto`.
+
+### The gate asserts the invariant that broke, not the fix
+
+`tools/shell-grid-walk.mjs` — and it deliberately does NOT check that the phone
+template contains the word `swstrip`, which would only ever catch this one
+defect. **Showing the strip must not change the COLUMN COUNT, and must add at
+most one row.** That needs no knowledge of the template and catches the whole
+class: any future `grid-area` pointing at an area some breakpoint forgot to
+declare fails here, whatever it is called. It runs at three widths, and
+`walk-all` picks it up off disk with no list to edit.
+
+Made to fail before being trusted: with the old template planted back it refuses
+both phone widths and passes at 900px, which is the defect's own shape.
+
+### What this is NOT, and the record says so
+
+**It is not decision 012.** That record is about a photograph that fills the
+screen with no way back out, reported from the iPad, where the evidence is a
+picture occupying a shallow band with its top and bottom CUT OFF and the zoom
+reading 100%. 012 predicted the diagnostic would say the canvas was DRAWN LARGER
+THAN THE STAGE. This report says the opposite — 2800x1864 drawn at 153x102
+inside a stage of 402x272, far SMALLER than its box. Different defect, and 012
+stays open.
+
+### Still open, from the same report, and not chased here
+
+**The photograph gets no height on a narrow phone.** At 302x656 the stage is 198
+tall and `--session-h` reserves 138 of it, leaving the picture about 28px even
+with the update strip hidden and the shell perfectly healthy. The reader's own
+report shows the milder version of this: `Strip reserves 138px` of a 272 stage,
+photograph drawn 102 tall. Not diagnosed and deliberately not fixed here — 012's
+Rejected section names "adjust the CSS until it looks right" as the route to
+avoid, and this wants the same instrument treatment 012 asks for.
+
+**And the worker serving that page was v2.56 while the app reported v2.59.1**,
+with caches `ips-2.46.39`, `ips-2.56` and `ips-2.59.1` all present. That is the
+mixed-build shape §7h exists to prevent and it is not explained. Recorded, not
+chased.
+
 ## The ⓘ dialog was written for us, and shipped that way for its whole life, 2026-09-22
 
 Reported from the device with a photograph of the screen. What was on it:

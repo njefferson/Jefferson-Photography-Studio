@@ -63,6 +63,36 @@ record exists to resist: a screen photograph cannot distinguish a stale
 `--session-h`, a strip whose height is read before it has laid out, and a stage
 whose own box is wrong. The report can.
 
+## Not this, measured 2026-09-22
+
+**A DIFFERENT black-screen defect was reported from an iPhone and fixed, and it
+is not this record.** A landscape photograph on a phone in portrait gave a black
+screen that could not be tapped out of, escapable only by rotating. The cause
+was `.sw-strip`'s `grid-area: swstrip` naming an area the `max-width: 760px`
+template did not declare, so the update strip auto-placed into the implicit grid
+and collapsed the shell — one column became `16px 0px 286px`, the stage 16x62.
+Rotating past 760px left the media query, which is why rotation "fixed" it.
+`tools/shell-grid-walk.mjs` holds it.
+
+**This record stays open, and the reason is the number it predicted.** Above,
+this record says the diagnostic would show the canvas DRAWN LARGER THAN THE
+STAGE. That report said the opposite: 2800x1864 drawn at 153x102 inside a stage
+of 402x272 — far smaller than its box, with the zoom at 100% and at fit. So the
+instrument has now run and it did NOT name this record's state; nothing here is
+discharged.
+
+It is written down because the next session to meet a black screen on a phone
+will find that fix and be tempted to close this. The two share a symptom and
+share nothing else.
+
+**What the same report DID add here.** At 302x656 the stage is 198 tall and
+`--session-h` reserves 138 of it, leaving the photograph about 28px with a
+perfectly healthy shell — and the reader's own numbers are the milder version,
+138 reserved from a 272 stage for a picture 102 tall. That is a live candidate
+for this record's "sized against the wrong box" branch, on a phone rather than
+an iPad, and it is untouched: the Rejected section's "adjust the CSS until it
+looks right" is exactly what fixing it from here would be.
+
 ## Weighed against
 
 Overlaps **003, "Big image: the photo fills the app, menus float over it"**, and
