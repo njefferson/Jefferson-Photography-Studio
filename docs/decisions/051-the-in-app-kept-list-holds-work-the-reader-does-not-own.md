@@ -62,6 +62,38 @@ every failure explains itself and offers a way forward.
 Sources: MDN `IndexedDB_API/Using_IndexedDB`; W3C Indexed Database API 3.0;
 Dexie.js "Migrating existing DB to Dexie".
 
+## Built already
+
+- **`src/keepstore.ts` is the whole store, and every door this needs is already
+  exported.** `listKept` gives the list a row's meta, `getKept` its record with
+  the edit, `getKeptBytes` the original's own bytes, `deleteKept` the forget.
+  Writing a kept row out as a file needs no new read path: it is those three
+  joined to a writer that already exists.
+- **`keepEdit`, `writeKeepFile` and `keepCurrentAsFile` are that writer**
+  (`src/main.ts`, `src/keepfile.ts`). They take an original's bytes, an edit and
+  a name and hand back a Blob for the share sheet. A kept ROW carries exactly
+  those three things, so the migration is one function calling another rather
+  than a second implementation of the format — which is the trap this section
+  exists to name, since a second writer would drift from the first.
+- **`showLoneWithEdit` in `src/main.ts` is the one route back into a photograph
+  from a stored edit**, already serving both the kept store and a picked keep
+  file. Nothing about opening a kept row changes while the list still exists.
+- **The list's surface is built and named**: `#keptOpen` in the app's chrome,
+  `#keptDlg` with `#keptList`, `#keptHeld` and `#keptOwed` inside it, and
+  `.kept-row` per row with its own Open, rename and forget controls. This adds a
+  "Save as a file" control to a row that already has three; it does not build a
+  screen.
+- **`tools/keep-walk.mjs` already proves the destination end to end** — a real
+  press, a real download, the photograph found inside byte for byte, and the
+  file picked back with its painted mask selecting the same pixels. What a
+  migration owes on top of that is only that a row's bytes and edit reach it.
+- **`keepAPhoto` in `tools/a11y-walk.mjs` (line 181) is the exact function to
+  rewrite**, and `tools/kept-walk.mjs` reaches the list through `#keptOpen` at
+  two places. Both need a row to exist; neither needs the removed button. The
+  store's own `putKept(rec, bytes)` is what a walk should call through
+  `page.evaluate`, so the seed goes in by the app's own door rather than by a
+  hand-written IndexedDB transaction that could drift from the schema.
+
 ## Weighed against
 
 **043**, which this completes. Its Outcome names retiring the store as its own
@@ -135,12 +167,13 @@ prior occurrence and the reason this is a bound rather than a preference.
 
 ## Rank
 
-**Directly below 043 and above 030.**
+**First, above 030.**
 
-It cannot go above 043: the file it writes rows out as is 043's, and 043 has not
-been through a device pass since the carriage landed. Migrating a reader's only
-copy into a container that has not been confirmed on the device is the one
-ordering that could lose work.
+It was ranked directly below 043, because the file it writes rows out AS is
+043's and migrating a reader's only copy into an unconfirmed container is the
+one ordering that could lose work. 043 shipped in 2.59 on 2026-09-22, confirmed
+on the device — a photograph saved with painted masks comes back with them — so
+that condition is discharged and this leads the queue.
 
 It goes above everything else open for one reason that is not about its own
 importance: **the accessibility walk is red until it is settled**, and that walk
