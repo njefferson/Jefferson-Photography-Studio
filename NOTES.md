@@ -775,6 +775,33 @@ user-scalable=no.
   measures the exported file whole (§9l-ii). The gravel half stays open. The
   sources go into `IR-SCIENCE.md` (9l for what shipped). See
   `docs/decisions/013-aerochrome-splotchy-chroma.md`.
+- [ ] **The mask system is short of standard convention** <!-- decision: 050 -->
+  asked for 2026-09-22: a drawn box or circle that ISOLATES part of the
+  photograph, which a subsequent mask is then constrained by — and with it the
+  observation that a good deal of standard mask convention may be missing. So
+  this is a SURVEY, and each row is its own piece of work ranked on its own.
+  Naming one gap at a time is how a system ends up with six of them.
+  **Reachable today and therefore not a gap:** constraining a colour selection
+  to part of the frame is a Radial with a Colour mask joined **Only where
+  both**, and it works.
+  **Genuinely absent:** a **rectangle** — the only drawn shapes are an ellipse
+  and a linear gradient, and neither approximates a box; a **luminance-range
+  selection**, absent entirely, where Lightroom carries Luminance Range beside
+  Color Range and darktable's parametric masks work on lightness, chroma and
+  hue channels, while this app has one hue/sat/value target and a single range;
+  a **proximity limit on the colour mask**, which matches across the whole frame
+  with no spatial locality at all (Photoshop added Localized Color Clusters in
+  CS4 for exactly the frame where one colour appears twice); the **union join**
+  (048); **several shapes inside one mask**, which is the convention and may or
+  may not be a gap here — it needs measuring against a real edit; and
+  **duplicating or naming a mask**, neither of which exists.
+  **The discoverability defect sits under all of it** (040): the join control
+  that makes the reachable thing reachable appears only on the SECOND mask, and
+  the panel's sentence did not fix that.
+  **The first two to build** are the rectangle and the colour-proximity limit —
+  a named need each, the smallest surface each. Nothing here becomes one
+  "advanced mask" control that does several of them. See
+  `docs/decisions/050-the-mask-system-is-short-of-standard-convention.md`.
 - [ ] **Show the border and let it be moved** <!-- decision: 049 -->
   proposed from the device 2026-09-22, and it reframes 048 below it: the
   detection is good, what is missing is an OVERRIDE. Somebody looking at the
