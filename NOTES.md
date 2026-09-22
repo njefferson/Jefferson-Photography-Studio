@@ -539,50 +539,6 @@ user-scalable=no.
 > different approach and mindset"). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
-- [ ] **A kept photograph should be a file you own** <!-- decision: 043 -->
-  reported 2026-09-21, against the feature on staging: keeping a photograph
-  should not mean keeping it INSIDE the app — it should be saved and worked on
-  later — and whatever the app writes when it saves must never overwrite an
-  original.
-  The first half is a bound on what 039 shipped rather than a preference. A
-  kept photograph is rows in a database the app created: storage the reader
-  does not own, cannot move to another device, cannot back up, and which iOS
-  can reclaim without telling the app. "## The measurements lived in storage
-  the app does not own" is the same failure once already.
-  **Looked up.** Lightroom keeps the edit in a catalogue and optionally mirrors
-  it into an `.xmp` sidecar for NEF, ARW and CR3 — and for DNG, JPEG and HEIC it
-  writes the settings INTO the file instead, sidecars being unsupported for DNG
-  by design. The pixels are untouched and the file is rewritten, which is
-  exactly what the second half of the report forbids: "non-destructive" in the
-  field means *does not change the pixels*, not *does not write the file*. The
-  catalogue also holds a PATH and re-renders from it, and this app cannot
-  re-read a picked file after a reload. Capture One's EIP is the convention
-  that survives both: a standard zip carrying the original raw itself together
-  with its settings and profiles, self-contained, the original copied in rather
-  than referenced.
-  So: a keep file carrying the original's own bytes and the whole edit, saved
-  through the share sheet and opened again by picking it. A STORE-only zip, so
-  the original inside is byte-identical and any zip reader can take it back
-  out. Rejected: a sidecar (two files to pick and nothing keeping them
-  together), a DNG copy with the edit in its XMP (the looks, mask recipes,
-  lens profile and sky selections have no Camera Raw vocabulary, so the file
-  would announce a picture it is not carrying), the edit alone, and writing
-  anything whatever into the file the reader picked. See
-  `docs/decisions/043-a-kept-photograph-should-be-a-file-you-own.md`.
-  **Two more device reports against it, both answered — read the record's
-  Outcome before touching this.** The first version named the file `.ipskeep`
-  and an iPad's Files picker greyed it out, 27.9 MB and unselectable, because
-  iOS filters that picker by UTI; it ends in `.ipskeep.zip` now and routing asks
-  the bytes rather than the name. The second: a saved photograph came back
-  without its masks. The format had filtered them through `canTravel`, which is
-  the mask LIBRARY's rule about applying a mask to OTHER photographs and is a
-  question a keep file never asks — it carries this one, byte for byte, so a
-  painted bitmap is exactly right for it. Painted masks, the warp and the LUT
-  ride in `edit/` inside the archive now, and hand corrections on a sky
-  selection had been silently lost on every reopen because a `Float32Array`
-  does not survive `JSON.stringify`. `tools/keep-walk.mjs` paints a stroke,
-  saves, reopens and reads the coverage back off the app's own matte.
-
 - [ ] **The in-app kept list holds work the reader does not own** <!-- decision: 051 -->
   039 kept photographs inside the app, in a database the reader does not own,
   cannot move to another device, cannot back up and which iOS may reclaim
@@ -3523,6 +3479,46 @@ read as authoritative, and an invented one is worse than a missing one.
 
 ## Shipped (roadmap archive)
 
+- [x] **A kept photograph should be a file you own** <!-- decision: 043 -->
+  **SHIPPED IN 2.59, 2026-09-22.** Keeping a photograph used to mean keeping it
+  inside the app, in storage the reader does not own: it cannot move to another
+  device, cannot be backed up, and the browser may reclaim it without saying so.
+  It is a FILE now. One press writes your original photograph — its own bytes,
+  exactly as they came — with this edit alongside it, and hands it to the share
+  sheet. Pick that file again and the photograph opens with the edit still on
+  it; unzip it anywhere and your photograph is inside, stored plainly rather
+  than squeezed, so it is not a format you need this app to escape from. The
+  file you picked is never written to.
+  It is recognised by what it IS rather than by what it is called: the app
+  reads the first few dozen bytes and asks whether the archive begins with a
+  keep file's own manifest, so a reader may rename a file they own and it still
+  opens, while an ordinary zip of raws is never mistaken for one.
+  **Two defects were reported from the device and fixed on the way, both of
+  them the same shape — a rule inherited from somewhere it did not apply.** The
+  first version was named `.ipskeep`, and an iPad's Files picker greyed the
+  saved file out: 27.9 MB, named correctly, unselectable, because iOS filters
+  that picker by UTI and an extension registered to nothing matches no allowed
+  type. Nothing in the app ever ran. It ends in `.ipskeep.zip` now, which is
+  what the container already was. The second: a saved photograph came back
+  without its masks. The format had filtered them through `canTravel`, the mask
+  LIBRARY's rule about reusing a mask on OTHER photographs — a question a keep
+  file never asks, because it carries this one byte for byte, so a painted
+  bitmap is exactly right for it forever. Painted masks, the warp and any
+  imported LUT ride in `edit/` inside the archive now. Writing that down found
+  a third: hand corrections on a sky selection had been lost on every reopen
+  since the format existed, because a `Float32Array` does not survive
+  `JSON.stringify`.
+  **What is still not right.** The in-app kept list can no longer be added to,
+  so it holds whatever was kept before this release and nothing since — 051
+  retires it, and offers each row as a file first. A LUT's `.cube` source text
+  stays in the device's own LUT store, so a keep file opened on another device
+  applies the lattice without adding the LUT to that device's library. Undo
+  history does not travel; it belongs to a session rather than to a photograph.
+  And selectability in the Files picker is confirmed on iPadOS only.
+  `tools/keep-walk.mjs` paints a real stroke, saves, picks the file back and
+  reads the selection's coverage off the app's own matte — 22.09% before,
+  22.09% after. See
+  `docs/decisions/043-a-kept-photograph-should-be-a-file-you-own.md`.
 - [x] **The heading you were sent to is the one thing the jump hides** <!-- decision: 047 -->
   **SHIPPED IN 2.58, 2026-09-22.** Reported from the device with a screenshot:
   **What this is, and how to install it** opened Help part-way down a numbered

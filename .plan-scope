@@ -1,46 +1,49 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=e24759cc02ab937d
-diffhash=f4723b6f056e900c
-verdict=IN-SCOPE: the plan's steps 1-5, with the out-of-scope caveat dialog backed out; unchanged from the judged diff but for one generated line count
-# Judged twice. The first pass returned OUT-OF-SCOPE on a caveat dialog added to
-# keepCurrentAsFile -- a new modal, new reader-facing copy and a new abort path on
-# the primary flow, with no accessibility pass, where the plan authorised only the
-# REMOVAL of the second Keep button. Backed out. keptCaveat now appears only in
-# comments and in 043's Outcome, with no dangling symbols.
+planhash=6cd3cea0d2daea20
+diffhash=88cdcaad73556372
+verdict=IN-SCOPE: NOTES.md archives 043, 051's Rank is corrected, and its Built already section is the gate's own precondition for the ranking the plan directs; no source files touched
+# Judged by a subagent that read the plan BY PATH and the staged diff, three
+# times across the changes below.
 # 
-# It also found four defects, all now fixed: isLookFile's doc comment orphaned
-# above the newly inserted isKeepFile; the deleted keepCurrentPhoto's contract
-# block left stacked above keepCurrentAsFile; that function's own text still
-# citing a deleted function and a removed button; and a stale @param naming the
-# old extension.
+# NOTES.md moves roadmap item 043 out of the open list to the top of the Shipped
+# archive and touches nothing else; 051's record changes inside "## Rank" and
+# gains "## Built already". No file under src/ is touched, which is what the plan
+# says.
 # 
-# The second pass found the real blocker: the dead block's BODY had been deleted
-# and its opening `/**` line left behind, so keepCurrentAsFile's entire contract
-# was swallowed by a dead function's heading. contract-check passed throughout,
-# because a `/** */` block IS present -- the gate checks presence, not that the
-# comment is about the function beneath it. Fixed; the whole dead block is gone
-# and the surviving contract describes only its own function.
+# ONE FINDING WAS ACTED ON. The first pass flagged a clause in the new archive
+# entry claiming the walk had been planted with an all-zero bitmap of the right
+# length and read zero coverage. That plant WAS run in this session and did read
+# 0.00%, but nothing in the repository records it, so a reader of the shipped
+# patch note could not find the evidence behind it. The clause was removed rather
+# than defended. Recording the plant in tools/keep-walk.mjs's own header is worth
+# doing and is a separate change this plan does not authorise.
 # 
-# Plan steps 1-5 all hold. KEEP_EXT is ".ipskeep.zip"; sniffKeep routes on the
-# first entry's manifest name rather than the PK signature; the sniff runs in
-# openPicked after the looks and ahead of the zip import path, with the index
-# alignment against the reassigned files array checked; #keepPhoto, #keepNote and
-# the listener are gone while the store, #keptOpen, openKeptPhoto and refreshKept
-# remain; keep-walk asserts the name ends in a registered type and states that
-# selectability is a device question; 043 carries its Outcome.
+# THE "## Built already" SECTION IS THE CLOSE CALL, and the watcher said so
+# rather than waving it through. The plan's Files list scopes 051's edit to Rank
+# only, so on the letter of the plan a stricter reading could refuse it. It was
+# judged in scope because the plan's own step 3 directs that 051 leads the queue,
+# which makes it the top-ranked item, and decisions-check.mjs refuses any commit
+# where the top-ranked record lacks that section (LESSONS 330) and names the
+# remedy in its refusal. There was no discretion: the section is a precondition
+# of the plan's own directed outcome landing at all, it carries no product
+# decision, and it is placed where 043's own record puts the same section.
 # 
-# Gates all exit 0: typecheck, contract-check (305/305), keepfile-check (22 ok
-# including the decoy that an ordinary zip of raws is not a keep file),
-# openable-check (5 pickers held to the source), decisions-check.
+# ALL SIX CLASSES OF CLAIM IN THAT SECTION WERE CHECKED AGAINST THE FILES and
+# every one held: keepstore.ts's five exports at their lines; keepEdit and
+# keepCurrentAsFile in main.ts with writeKeepFile in keepfile.ts, and
+# keepCurrentAsFile's body read to confirm it joins them into a Blob for the share
+# sheet; showLoneWithEdit called from exactly two places, the keep-file path and
+# the kept-store path; ir.html's five kept ids and the kept-row class; keepAPhoto
+# at a11y-walk.mjs line 181; and kept-walk.mjs reaching the list through #keptOpen
+# at exactly two lines.
 # 
-# TWO FINDINGS CARRIED OUT, neither introduced here. The same swallowed-comment
-# defect exists in HEAD at src/main.ts 12541/12542 and 13799/13800, hiding the
-# contracts of switchSplit and closingQuickLook -- contract-check is blind to all
-# three, which is a gap in the gate rather than in this change. And
-# tools/a11y-walk.mjs is now permanently red: it reached the kept list through the
-# button this change removes, CLAUDE.md requires it before any UI release, and the
-# kept list is UNMEASURED until the walks are rewritten to seed the store or
-# retired with it.
+# ONE FINDING CARRIED, not a scope violation. The archive entry names a THIRD
+# defect -- correction strokes lost to JSON.stringify -- where the plan's step 2
+# enumerated two. It is accurate and already in 043's Outcome in substance.
 # 
-# Delta since that judgement: one generated ARCHITECTURE.md module-map line count, rewritten by architecture-check --write. Generated, mechanical, no source or record file moved.
+# The walks the plan requires ran before this commit, against a served build:
+# release-walk all checks passed; keep-walk green with 22.09% painted and 22.09%
+# restored; a11y-walk ran to completion over seven pages at two widths in both
+# themes, 131 checks ok and exactly two failures, both the recorded instrument gap
+# where keepAPhoto cannot arm itself. Nothing else is red.
