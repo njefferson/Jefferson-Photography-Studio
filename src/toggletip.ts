@@ -1,7 +1,7 @@
 // A CONTROL'S OWN SENTENCE, REACHED BY A FINGER — the toggletip of decision 024.
 //
 // A `title` is a HOVER and there is no hover on a tablet, which is the rule
-// `tools/control-check.mjs` already refuses against: anything a title says that
+// `tools/control-walk.mjs` already refuses against: anything a title says that
 // the visible label does not is a sentence this app's reader will never see.
 // The field separates two answers and only one of them is reachable here. A
 // TOOLTIP is hover-or-focus and describes its trigger; a TOGGLETIP is a real
@@ -65,7 +65,7 @@ function labelFor(id: string): string {
  *
  *  What the result must satisfy: it equals the number of `button[data-tip]`
  *  elements under `root`. A shortfall means a trigger names a body that is not
- *  in the page — the defect `tools/control-check.mjs` refuses in both
+ *  in the page — the defect `tools/control-walk.mjs` refuses in both
  *  directions, so it cannot ship; the count is how a caller sees it anyway.
  *  Consumers: `src/main.ts`, once, after the panel exists. */
 export function wireToggletips(root: ParentNode = document, liveId = "tipLive"): number {

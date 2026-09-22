@@ -824,6 +824,28 @@ user-scalable=no.
   silently correcting it: the centre-against-edge white balance test, roughly
   1000K apart on a visible one.
   See `docs/decisions/015-lens-correction-against-the-reference.md`.
+- [ ] **The control sweep reaches two thirds of the controls** <!-- decision: 046 -->
+  found 2026-09-22, in the minute after `tools/control-check.mjs` was renamed
+  `tools/control-walk.mjs` so the sweep would pick it up. The rename was called
+  the whole fix before anybody ran the file; running it is what showed the walk
+  exits 1. Measured on the built tree at 2.58: `ir.html` reaches 139 of 219
+  declared controls with 18 declared unreachable, leaving 62 unexcused;
+  `macro.html` 7 of 13, six unexcused; `debug.html` 3 of 6, three unexcused;
+  `index.html` clean. **71 controls the markup declares are never reached and
+  are not excused.**
+  The walk's own header says why that is a failure rather than a note: a sweep
+  can only refuse what it reached, and its first version reported green over a
+  top bar laid out at 0x0 and a panel that was `hidden`, having never opened a
+  photograph. **The rot shows in which ids are missing** — `#keptOpen` and
+  `#cropLine` are the controls that shipped this morning, so every feature that
+  adds a control widens the gap and nothing was running to say so.
+  The work is a judgement per control: either it is genuinely unreachable
+  headlessly and earns a line in `.control-allow` naming the state that would
+  reveal it, or it is reachable and the sweep is extended to press it. Declaring
+  all 71 to get green is the rejected option and the one that looks like
+  tidying. **The sweep is red until this is done, on purpose** — it was red
+  before today and the only change is that it is now visible. See
+  `docs/decisions/046-the-control-sweep-reaches-two-thirds-of-the-controls.md`.
 - [ ] **Creative — a third app for regular photos** — owner direction 2026-07-19 <!-- decision: 002 -->
   ("a separate page next to infrared and macro, called creative, for regular
   photos, installable separately… same things we're building here… I suppose I
@@ -2257,7 +2279,7 @@ card's own note and the two passages in Help that name them were rewritten in
 the same commit, or the app would point at labels that no longer exist. Ids,
 ranges and params are untouched, so nothing stored, walked or saved moves.
 
-**`tools/control-check.mjs` passed all three.** Its mechanical half is the
+**`tools/control-walk.mjs` passed all three.** Its mechanical half is the
 tooltip rule — a `title` that carries what the label lacks — and these carry
 no title; the other half, whether the visible label says what the control
 does, is taste and cannot be parsed, which is why the gate's own header says
@@ -7578,11 +7600,16 @@ read as authoritative, and an invented one is worse than a missing one.
   trigger's accessible name from the control's own label so nothing is written
   twice, and announces through one `#tipLive` region. The 112 permanent notes
   beside other controls did not move — they are the app's majority answer.
-  **What is still owed is a gate that runs.** `tools/control-check.mjs` was
+  **What is still owed is a gate that runs.** `tools/control-walk.mjs` was
   extended by 189 lines here, including the count of controls that say nothing
-  for themselves anywhere, and nothing invokes it: no workflow, no
-  `.branch-guard` line, and `walk-all.mjs` globs `*-walk.mjs`, which its name
-  does not match. Four source comments call it a gate that refuses things.
+  for themselves anywhere, and nothing invoked it: no workflow, no
+  `.branch-guard` line, and `walk-all.mjs` globs `*-walk.mjs`, which
+  `control-check.mjs` did not match — while four source comments called it a
+  gate that refuses things. **Renamed `tools/control-walk.mjs` the same day**, so
+  the sweep globs it and it now runs with the other forty-three walks — and
+  running it showed the rename is NOT the whole fix: the walk exits 1 on 71
+  controls the markup declares and the sweep never reaches. That triage is its
+  own item and the sweep stays red until it is done.
 
 ## Desktop-mouse round + the flat-frame finding, 2026-09-08
 
@@ -17785,7 +17812,7 @@ is a hover, and there is no hover on a tablet.
   and the version dialog. Its dead id left `main.ts`'s wiring list in the same
   commit.
 
-### The gate: `tools/control-check.mjs`
+### The gate: `tools/control-walk.mjs`
 
 Opens every page and every dialog from `tools/surfaces.mjs`, presses every panel
 tab, and inventories **every control in the app** — 416 of them across 7 pages —
