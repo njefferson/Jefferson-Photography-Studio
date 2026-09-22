@@ -30,6 +30,7 @@
 // `commit-msg` hook and `.git/hooks` is empty in a fresh container and after
 // every clone. A gate that is absent looks exactly like a gate that passed.
 import { readFileSync, existsSync } from "node:fs";
+import { internalWords } from "./reader-words.mjs";
 import { execSync } from "node:child_process";
 import { join } from "node:path";
 
@@ -95,6 +96,25 @@ if (msgArg) {
     console.error("    Changed:  the same thing, behaving differently on purpose\n");
     console.error("  An internal commit needs no prefix — it is one that touches only");
     console.error("  tools, docs and dotfiles, or whose subject starts Roadmap:/Notes:/Docs:.\n");
+    process.exit(1);
+  }
+  // AND IT HAS TO BE IN WORDS THE READER USES. The four-word opener says what
+  // KIND of change this is; it says nothing about whether the sentence after it
+  // means anything to somebody holding the app. Eleven of the 38 reader-facing
+  // subjects in this repository's history fail this, including "a keep file
+  // carries your photograph, not a reference to it" and "a saved photo comes
+  // back with its masks, warp and colour LUT" — both of which cleared the
+  // opener check and both of which reached a real screen. The list is measured
+  // rather than chosen; `tools/reader-words.mjs` says what against.
+  const words = internalWords(subject);
+  if (words.length) {
+    console.error("\n  THIS COMMIT REACHES THE READER, AND ITS SUBJECT IS WRITTEN FOR YOU RATHER THAN THEM.\n");
+    console.error(`    ${subject}\n`);
+    console.error(`  Our word, not theirs: ${words.map((w) => `"${w}"`).join(", ")}\n`);
+    console.error("  Commit subjects ARE the in-app patch notes. Say what somebody holding");
+    console.error("  the app can now do, or what stopped going wrong for them — not what");
+    console.error("  moved in the source. If the change genuinely reaches no reader, give it");
+    console.error("  an Internal:/Notes:/Docs:/Roadmap:/Chore: prefix and it is not a note.\n");
     process.exit(1);
   }
   process.exit(0);

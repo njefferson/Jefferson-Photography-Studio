@@ -540,6 +540,7 @@ user-scalable=no.
 > continues as the parallel design track below.
 
 - [ ] **A mask can only act in one place, and there is only one version of an edit** <!-- decision: 030 -->
+  **Shown as:** Use more of the app's tools inside a mask, so the sky and the trees can take different amounts.
   asked 2026-09-20 as a principle: a mask can be taken at any point in the
   workflow, and without layers or named backups there is no way to work on the
   raw underneath when all you have is the image in front of you.
@@ -635,6 +636,7 @@ user-scalable=no.
   paper.
 
 - [ ] **A mask is a place, and most of the controls should work inside one** <!-- decision: 042 -->
+  **Shown as:** Masks get a place of their own, with far more of the controls working inside one.
   asked 2026-09-21: masks should come out of the tab strip into a place of
   their own, and inside a mask the reader should not be limited to the handful
   of controls the mask menu offers.
@@ -655,6 +657,7 @@ user-scalable=no.
   today's five would promise more than it has. See
   `docs/decisions/042-a-mask-is-a-place-and-most-controls-should-work-inside-one.md`.
 - [ ] **The red cast in the shadows comes off by hand, and should not have to** <!-- decision: 034 -->
+  **Shown as:** The red cast in shadows comes off on its own, without reaching for the colour wheels.
   reported 2026-09-20 with two renderings of one building frame and the Grade
   panel that separates them — the Shadows wheel at 209 degrees, 47%. The shaded
   wall and the area under the eaves open with a strong red cast; that tint takes
@@ -689,6 +692,7 @@ user-scalable=no.
   candidates that are not more tuning — read it before touching this again.
 
 - [ ] **A mask keys the photograph, not the grade** <!-- decision: 032 -->
+  **Shown as:** A colour selection stays on the same pixels when you change the look.
   the Colour mask keys on the colour the pixel DISPLAYS — the decode through
   contrast and gamma, and downstream of the channel swap — so a mask picked
   with one grade selects a different population under another, and a mask
@@ -703,6 +707,7 @@ user-scalable=no.
   the photograph is graded. See
   `docs/decisions/032-a-mask-keys-the-photograph-not-the-grade.md`.
 - [ ] **The radial mask turns** <!-- decision: 027 -->
+  **Shown as:** Turn an oval mask to any angle.
   asked 2026-09-19 beside the mask-combining request: the circle mask needs to
   be rotated. It is the only selection in the app whose orientation cannot be
   set — a radial mask is an axis-aligned ellipse, `cx`/`cy`/`rx`/`ry` with no
@@ -718,6 +723,7 @@ user-scalable=no.
   and a panel route beside it. Ranked below 024, because a rotation grip that
   nothing names is the failure 024 exists to fix.
 - [ ] **While you straighten: finer guides you can turn off, and a picture you can zoom and pan** <!-- decision: 025 --> —
+  **Shown as:** Zoom and move the photograph while you straighten it, with finer guides you can turn off.
   asked 2026-09-19 from the PC. The overlay draws twelfths; the ask is
   sub-lines below that with a toggle on the straighten card, because twice
   the lines is twice the ink over the photograph. And while the tool is
@@ -730,6 +736,7 @@ user-scalable=no.
   See
   `docs/decisions/025-the-straightening-view-finer-guides-you-can-turn-off-and-a-picture-you-can-zoom.md`.
 - [ ] **A photograph that fills the screen with no way back out** <!-- decision: 012 --> — reported
+  **Shown as:** Always get back to the whole photograph from the full view.
   from the iPad 2026-09-17: a photograph in the full view appeared zoomed in, and
   neither zooming out nor scrolling brought the rest of it back. Two failures, and
   the second is the serious one — a reader who cannot get back to the whole
@@ -744,6 +751,7 @@ user-scalable=no.
   told apart in a screenshot. Instrument first; make the escape unconditional
   either way. See `docs/decisions/012-full-view-must-fit-and-always-escape.md`.
 - [ ] **The look's sky adjustments read a selection you cannot see** <!-- decision: 052 -->
+  **Shown as:** Aerochrome's sky sliders work on the sky you selected, not one you cannot see.
   reported 2026-09-22 from the device against Aerochrome: its sky adjustment
   cannot be reproduced with a mask on sky the look does not reach, and the
   shape suggested was that the look should open its own sky mask to start from,
@@ -783,6 +791,7 @@ user-scalable=no.
   `docs/decisions/052-the-looks-sky-adjustments-read-a-selection-the-reader-cannot-see.md`.
 
 - [ ] **Aerochrome is the right colour and comes out splotchy** <!-- decision: 013 --> — reported
+  **Shown as:** Aerochrome comes out smooth instead of breaking into hard-edged patches.
   from the iPad 2026-09-17 with two frames, on the look that shipped the same day:
   the colour is right, the foliage breaks into hard-edged patches and the gravel
   carries a coarse mottle. Searched before touching anything, and it named the
@@ -803,6 +812,7 @@ user-scalable=no.
   sources go into `IR-SCIENCE.md` (9l for what shipped). See
   `docs/decisions/013-aerochrome-splotchy-chroma.md`.
 - [ ] **The mask system is short of standard convention** <!-- decision: 050 -->
+  **Shown as:** Draw a box or circle to work inside, and add, subtract and combine masks.
   asked for 2026-09-22: a drawn box or circle that ISOLATES part of the
   photograph, which a subsequent mask is then constrained by — and with it the
   observation that a good deal of standard mask convention may be missing. So
@@ -830,6 +840,7 @@ user-scalable=no.
   "advanced mask" control that does several of them. See
   `docs/decisions/050-the-mask-system-is-short-of-standard-convention.md`.
 - [ ] **Show the border and let it be moved** <!-- decision: 049 -->
+  **Shown as:** See where the horizon was found, and move it yourself when you know better.
   proposed from the device 2026-09-22, and it reframes 048 below it: the
   detection is good, what is missing is an OVERRIDE. Somebody looking at the
   photograph knows where the horizon is and the detector only infers it, and
@@ -860,6 +871,7 @@ user-scalable=no.
   approximately instead of one thing exactly. See
   `docs/decisions/049-show-the-border-and-let-it-be-moved.md`.
 - [ ] **Colour cannot finish a selection an occluder has split** <!-- decision: 048 -->
+  **Shown as:** Bring in sky that a wing or a branch has cut off from the rest.
   reported from the device 2026-09-22: the sky selection stops at a jet's wing
   and the sky visible under the wing cannot be brought in. Two things were asked
   for and neither exists. **A mask cannot add to the mask above it** — driven in
@@ -889,6 +901,7 @@ user-scalable=no.
   `w + c - w*c`, beside the existing multiply and never in place of it. See
   `docs/decisions/048-colour-cannot-finish-a-selection-an-occluder-has-split.md`.
 - [ ] **Sky seen through a canopy takes no sky adjustment** <!-- decision: 028 -->
+  **Shown as:** Sky showing between leaves takes the sky adjustments too.
   — the Sky mask spreads only through pixels that are JOINED to the sky, which
   is the whole reason it does not readmit every cold-looking object in the
   frame. The same property forbids sky between leaves: the path to it runs
@@ -903,6 +916,7 @@ user-scalable=no.
   declines these only because they are larger than its cap. See
   `docs/decisions/028-sky-seen-through-a-canopy-takes-no-sky-adjustment.md`.
 - [ ] **A quick look you cannot stop, and a session that renders it all again** <!-- decision: 014 --> — reported Reported a second time 2026-09-18 from a PC on staging 2.51.2; the record carries a candidate mechanism to count against.
+  **Shown as:** Stop a quick look part-way through, and get the memory back.
   from the iPad 2026-09-17. There is no way to stop a quick look building its
   grid, so no way to say done and get the memory back; and after Keep in a
   session it looked as though every photograph was rendered a second time. The
@@ -913,6 +927,7 @@ user-scalable=no.
   changing anything rather than rewriting the handoff a second time. See
   `docs/decisions/014-quick-look-stop-and-release.md`.
 - [ ] **The centre of the picture washes out — the lens correction, against the reference** <!-- decision: 015 --> — reported
+  **Shown as:** Stop the middle of the frame losing its colour.
   from the iPad 2026-09-17 on the lone oak under Aerochrome, and the report named
   the cause correctly. Rendered on and off from the app itself, the measured lens
   correction removes 37% of the foliage's red-against-blue in the middle of the
@@ -938,6 +953,7 @@ user-scalable=no.
   1000K apart on a visible one.
   See `docs/decisions/015-lens-correction-against-the-reference.md`.
 - [ ] **The control sweep reaches two thirds of the controls** <!-- decision: 046 -->
+  **Shown as:** internal
   found 2026-09-22, in the minute after `tools/control-check.mjs` was renamed
   `tools/control-walk.mjs` so the sweep would pick it up. The rename was called
   the whole fix before anybody ran the file; running it is what showed the walk
@@ -960,6 +976,7 @@ user-scalable=no.
   before today and the only change is that it is now visible. See
   `docs/decisions/046-the-control-sweep-reaches-two-thirds-of-the-controls.md`.
 - [ ] **Creative — a third app for regular photos** — owner direction 2026-07-19 <!-- decision: 002 -->
+  **Shown as:** A third app for ordinary colour photographs, beside infrared and macro.
   ("a separate page next to infrared and macro, called creative, for regular
   photos, installable separately… same things we're building here… I suppose I
   will want a whole image editor there eventually"). A NEW entry point beside the
@@ -975,6 +992,7 @@ user-scalable=no.
   or the full editor; (3) name/route/icon and whether it installs from the same
   chooser. Ships on its own once scoped — unrelated to the sticker betas.
 - [ ] **Big image: the photo fills the app, menus float over it** — owner <!-- decision: 003 -->
+  **Shown as:** The photograph becomes the background of the whole app, with the controls over it.
   direction 2026-07-16, given as the owner ended the session and moved to a new one.
   STILL AN IDEA — the owner says so plainly, expect design questions. The vision: the
   open photo is the BACKGROUND everywhere in the app, not boxed inside a stage.
@@ -995,6 +1013,7 @@ user-scalable=no.
   or export — it's a presentation/layout direction. Scope as its own design pass
   (likely several); the crop overflow-view ships first and proves the model.
 - [ ] **Full-bleed crop — the photo flows behind the crop tools** — owner design <!-- decision: 004 -->
+  **Shown as:** See the whole photograph while you crop, not only the part you are keeping.
   **PILOT SHIPPED 2026-09-10, and this stays open because the design questions
   are not answered.** What landed: with a geometry tool armed the canvas reaches
   the top and both side edges (safe-area only), the 8px border-radius is gone,
@@ -1023,6 +1042,7 @@ user-scalable=no.
   anchoring, and the OS-edge insets (`.cropping`) all assume the contained
   `#view`. Scope as its own UI release; decide it alongside the clamp fix.
 - [ ] **More composition overlays** <!-- decision: 005 --> — owner ask 2026-07-16, optional, for anyone
+  **Shown as:** More composition guides while cropping — golden ratio, the spiral, diagonals.
   who wants them: beyond the rule-of-thirds grid, offer selectable composition
   guides while cropping — golden-ratio (phi) grid, golden spiral, the diagonal
   method, a finer grid, and a centre cross. Thirds stays the default. Build
@@ -1037,6 +1057,7 @@ user-scalable=no.
   localStorage like the panel tab. Non-goal: nothing touches the pipeline or
   export — overlay-only, exactly like the thirds grid.
 - [ ] **Mask by subject / background** — auto-select the subject or the <!-- decision: 006 -->
+  **Shown as:** Select the subject, or the background, in one press.
   background (owner request 2026-07-05).
   **Part of the machinery exists now (2026-09-18):** `src/skyfine.ts` refines
   the sky bitmap to the picture's edges with a guided filter, once per
@@ -1046,6 +1067,7 @@ user-scalable=no.
   item); there is no classical stand-in the way sky had one. Architect as a mask
   type so it slots into the same engine when ready.
 - [ ] **Tiles for a photo you have not opened yet** — measured 2026-09-12 and <!-- decision: 007 -->
+  **Shown as:** Every photo in the strip looks like itself before you open it.
   written up under "the strip's tiles". A tile for a photo you HAVE opened
   matches the photograph to 0.004 on a centre-against-edge measure; one you have
   not is 0.052 off, on a flat with a 43% hot spot. The lens correction is not
@@ -1145,6 +1167,7 @@ user-scalable=no.
    changed nothing. That is a different measurement on a different fixture and
    the colour fix says nothing about it.
 - [ ] **Opening a set on several cores** — measured 2026-09-13, and the first <!-- decision: 008 -->
+  **Shown as:** Open a folder of photographs faster.
   version of this item blamed the wrong thing (see "the tile audit was wrong").
   What is true: every photograph is decoded by ONE worker, one after another,
   and the lens rig sends ninety flats through the same door. What is NOT the
@@ -1186,6 +1209,7 @@ user-scalable=no.
   session asks with a native `confirm()`, which Playwright DISMISSES by default
   — so the teardown branch never ran while reporting a failure about the app.
 - [ ] **The editor's WORKING COPY at native resolution** — never call this "full <!-- decision: 009 -->
+  **Shown as:** The editor works on the photograph itself rather than a smaller copy.
   size" to the owner: the export panel already owns that phrase, its scale
   control reads "Full (native)" and a Quality slider sits at 92 beside it, and a
   crop already changes the output's dimensions. NOTHING in that panel changes.
@@ -1208,6 +1232,7 @@ user-scalable=no.
   work at native scale is a SEPARATE product question with a slider-meaning
   change attached. Original note follows.
 - [ ] **(superseded detail) The live view at full resolution** — <!-- decision: 010 -->
+  **Shown as:** internal
   measured 2026-09-13 and the premise for the proxy may have expired. The editor
   works on a downscaled copy because a full-resolution render was too costly when
   that was decided; drawing a screen-sized frame from a full-resolution texture
@@ -1222,6 +1247,7 @@ user-scalable=no.
   reports the memory per device, so the decision has numbers. Do this BEFORE the
   drawn export below — it subsumes most of it.
 - [ ] **The export drawn rather than computed** — **ships in 3.0 with the item <!-- decision: 011 -->
+  **Shown as:** Exports finish faster, and match what you were shown on screen.
   above, the two together (owner declaration, 2026-09-13)** — scoped 2026-09-13,
   waiting on numbers from the device. The live view already runs the entire edit as shaders
   in `gl.ts`; `export.ts` implements every one of them again in TypeScript, and
@@ -1235,6 +1261,80 @@ user-scalable=no.
   The decision that comes with it is the owner's: a drawn export cannot be
   byte-identical to today's, because a graphics chip computes in float where the
   processor uses doubles. It would match the PREVIEW instead.
+
+## The ⓘ dialog was written for us, and shipped that way for its whole life, 2026-09-22
+
+Reported from the device with a photograph of the screen. What was on it:
+
+- **"Changed: this release is 2.59"** as the newest thing that happened.
+- **"Fixed: a saved photo comes back with its masks, warp and colour LUT"** —
+  two words nobody outside this repository has any reason to know.
+- **"New: a keep file carries your photograph, not a reference to it"** — about
+  an internal object, phrased as a distinction only an implementer would draw.
+- **A Roadmap of twenty-six lines**, every one of them a DECISION TITLE: "A mask
+  keys the photograph, not the grade", "Colour cannot finish a selection an
+  occluder has split", "(superseded detail) The live view at full resolution".
+
+The verdict was that it is in the way of somebody who has no idea what it is
+saying, which is the whole population it is shown to.
+
+### Three defects, and only one of them was the wording
+
+**ONE. A VERSION-only commit was a patch note.** `INTERNAL_PATH` in
+`vite.config.ts` never covered `VERSION`, so a commit that bumps it and nothing
+else printed as a change. The versioning rule says that edit rides its release's
+own final commit; when it rode alone instead, the reader got a line telling them
+a number already printed two lines above it. **Six of the 38 reader-facing
+subjects in this repository's entire history are that line** — 2.54 through
+2.59, one in six of everything the dialog has ever shown. `VERSION` is on the
+list now and all six are gone.
+
+**TWO. The Roadmap rendered the bullet's bold title**, and a bold title is a
+decision title: written to be argued with, ranked and cited by key. It is the
+right text for that and the wrong text for a screen. Each open bullet now
+declares its own `**Shown as:**` line and THAT is what ships. `internal` is a
+real answer — the control sweep's coverage and one record kept open on purpose
+are work with nothing visible in them, and they are left out rather than dressed
+up. Twenty-six titles became twenty-four sentences and two honest omissions.
+
+**THREE. Nothing ever checked the words.** `tools/patch-note-check.mjs` held a
+subject to opening with Fixed/New/Faster/Changed, which says what KIND of change
+it is and nothing about whether the rest of the sentence means anything.
+"a keep file carries your photograph, not a reference to it" passed it.
+
+### The word list is measured, and that is the only thing that makes it usable
+
+`tools/reader-words.mjs` is one list, imported by both gates, because two lists
+for one idea is a gate lying about its coverage. Every entry was checked against
+all 38 reader-facing subjects in history: **11 flagged, all 11 genuinely wrong,
+27 honest subjects clean.**
+
+What is deliberately absent is the part that took measuring. `texture`, `mask`,
+`grade`, `look`, `export` and `crop` all read as jargon and are all CONTROL
+NAMES this app puts on screen — a list assembled by taste would have banned
+every one. `hub` is out too; it is a place a reader can visit.
+
+Both gates were made to fail before being trusted: a bullet with its line
+removed and a bullet with `worker` and `buffer` in it took
+`tools/roadmap-copy-check.mjs` to exit 1, and it returns 0 on the real tree.
+
+### What it looks like now, and what is still wrong
+
+The dialog was OPENED at the reported width rather than the parser being trusted
+to describe it. "this release is 2.59" is gone. The Roadmap reads as twenty-four
+things a person will be able to do.
+
+**Two lines are still not right and they are on production.** "a saved photo
+comes back with its masks, warp and colour LUT" is the bad one; "the saved file
+could not be picked back on an iPad" and "save a photo as a file, and open it
+again by picking it" are awkward rather than opaque. Fixing them means rewriting
+published history, which is not a session's call, and they roll off as the next
+reader-facing releases land. The gate stops any more arriving.
+
+**And one was ours and was fixed here.** "New: aim noise reduction and texture
+at a mask" was still on the work branch, so its subject was rewritten to say what
+the reader gets: noise reduction and sharpening can work inside a mask. `aim` is
+our verb for it and appears nowhere a reader would meet it.
 
 ## The 180 degrees was the statistic, and the export was right all along, 2026-09-22
 
