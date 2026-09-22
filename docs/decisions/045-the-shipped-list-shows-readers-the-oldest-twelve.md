@@ -134,3 +134,34 @@ What argues for it over the remaining additions is that it is cheap, it is
 already measured, and the surface it corrupts is the one a reader consults to
 find out whether a thing they were waiting for has arrived — which is the same
 question the archived 039 and 038 were being answered wrongly on for a day.
+
+## Outcome
+
+Shipped in 2.58 on 2026-09-22, commit subject *Fixed: What's new listed the
+oldest twelve changes, not the newest*. `notesPage()` takes the first twelve
+with no `reverse()`, the archive is uniformly newest-first, and
+`tools/notes-check.mjs` carries the 14-day freshness check on every commit.
+
+**What turned out wrong is the shape of the commit, not the fix.** The same
+commit that removed the defect also added this item to the open roadmap, so
+what went to staging told every reader of the ⓘ Roadmap and of `/notes` that a
+list showing the oldest twelve was still coming — while the build beside it no
+longer did. It sat there through the on-device pass and was archived only at
+the promotion.
+
+**And the gate this record added cannot see that.** `notes-check.mjs` refuses a
+TICKED box left in the roadmap, which is the shape of an item somebody
+remembered to tick and forgot to move. It says nothing about an UNTICKED box
+whose work has landed, which is the shape of an item written and fixed in one
+sitting — the more likely order when a defect is small enough to fix the day it
+is found. The half that can refuse does not reach the half that happened here.
+
+**The promotion was not a clean replay.** Main had moved underneath staging by
+one commit, which renamed `tools/control-check.mjs` and rewrote a paragraph
+INSIDE the 024 archive entry that this fix MOVES — so the naive resolution
+reinstates a stale tool name at the top of the public archive. Resolved by
+taking staging's file and porting main's four edits onto it, with the
+acceptance check being that `control-check.mjs` survives only as history.
+The archive's head came out `045, 039, 038, 024, 040, 016`, which carries the
+kind of inversion the freshness gate was deliberately built to tolerate rather
+than refuse.
