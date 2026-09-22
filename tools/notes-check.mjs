@@ -67,6 +67,56 @@ function boxes(re) {
   return out;
 }
 
+/** Every checkbox bullet under the heading `re`, WITH THE BODY THAT FOLLOWS IT.
+ *
+ *  Takes the same heading pattern the two parsers above take.
+ *  Returns `[{ done, text, body }]` in file order, where `body` is the raw lines
+ *  between this bullet and the next one (or the next `## `), or `[]` when the
+ *  heading is missing. The freshness check below is its only caller and it needs
+ *  the body, because an entry's date is almost never on the bullet's own line —
+ *  it sits in a "SHIPPED"/"FIXED" paragraph a dozen lines down. */
+function entries(re) {
+  const start = lines.findIndex((l) => re.test(l));
+  if (start < 0) return [];
+  const out = [];
+  for (let i = start + 1; i < lines.length; i++) {
+    if (/^##\s/.test(lines[i])) break;
+    const m = lines[i].match(/^-\s+\[([ xX])\]\s+(.+)$/);
+    if (m) out.push({ done: m[1] !== " ", text: m[2], body: [] });
+    else if (out.length) out[out.length - 1].body.push(lines[i]);
+  }
+  return out;
+}
+
+/** The window `notesPage()` in vite.config.ts will actually render, READ OUT OF
+ *  THAT FILE rather than restated here.
+ *
+ *  Takes nothing; reads `vite.config.ts` beside this tool.
+ *  Returns `{ size, reversed }` — the `.slice` bound, and whether the chain
+ *  reverses the archive before slicing.
+ *  THROWS rather than defaulting if the shape is gone. A default would leave
+ *  this gate confidently checking a number the app no longer uses, which is the
+ *  defect class this repo pays for most often — `tools/patch-note-check.mjs`
+ *  reads its two patterns out of the same file for the same reason. */
+function renderWindow() {
+  const vite = readFileSync(join(repo, "vite.config.ts"), "utf8");
+  const at = vite.indexOf("const shipped = checklist(");
+  if (at < 0) {
+    throw new Error(
+      "cannot find `const shipped = checklist(` in vite.config.ts — notesPage() was\n" +
+        "      renamed or restructured, so this gate is measuring nothing. Fix the gate.",
+    );
+  }
+  // COMMENTS ARE STRIPPED BEFORE LOOKING FOR THE CALL, and that is load-bearing:
+  // the chain's own comment explains the `.reverse()` that was REMOVED, so a
+  // plain search for the word finds it in the prose and reports the opposite of
+  // the truth. Three gates in this family have read a comment as code.
+  const chain = vite.slice(at, vite.indexOf(";", at)).replace(/\/\/[^\n]*/g, "");
+  const m = chain.match(/\.slice\(\s*0\s*,\s*(\d+)\s*\)/);
+  if (!m) throw new Error("found the shipped chain in vite.config.ts but no `.slice(0, N)` in it. Fix the gate.");
+  return { size: Number(m[1]), reversed: /\.reverse\(\s*\)/.test(chain) };
+}
+
 let failed = 0;
 const check = (name, got, want) => {
   const ok = got === want;
@@ -123,6 +173,73 @@ const blank = (road || []).filter((t) => {
   return !((bold ? bold[1] : t.split(" — ")[0]).replace(/\*\*|`|_/g, "").trim());
 });
 check("every roadmap item has a title to render", blank.length, 0);
+
+// WHAT READERS SEE UNDER "RECENTLY SHIPPED" HAS TO BE RECENT (decision 045).
+//
+// `notesPage()` renders a WINDOW of the archive, and which entries land in it
+// depends on the archive's own order — one fact split across two files. It
+// drifted: the chain reversed the section under a comment saying "NOTES keeps
+// newest last" while the file ran newest-FIRST, so the window reached back to
+// July 2026 and about eighteen of the most recently shipped entries sat outside
+// it and never rendered at all. Every check above was green on that, because
+// they all ask whether the section PARSES, never whether what it parses to is
+// what a reader should be shown.
+//
+// IT IS NOT A SORTED-ORDER CHECK, and that is from measurement rather than
+// taste. On the day this was written the archive had 13 inversions across its 81
+// dated pairs and they SURVIVE the fix, so a monotonicity assertion would refuse
+// correct work on its first run — and a gate that refuses correct work is one
+// somebody switches off. This asserts the property the reader actually cares
+// about: nothing in the rendered window is much older than the newest thing in
+// the archive. About 80 days before the fix; about 4 after.
+// AND IT MEASURES THE DATE AN ENTRY CARRIES, WHICH IS NOT ALWAYS ITS SHIP DATE.
+// Only 8 of 114 entries carried an explicit SHIPPED/FIXED date when this was
+// written; the rest open with the date the thing was reported or asked for. So
+// a ship marker is preferred where there is one and the first date is the
+// fallback, and every message below says "dated" rather than "shipped". The
+// proxy is safe in this direction — a report never postdates its own fix, so an
+// entry cannot look fresher than it is — but a check whose sentence claims more
+// than its predicate tests is the defect this file already has a lesson about.
+const FRESH_DAYS = 14;
+const DATE = /\b(20\d\d-\d\d-\d\d)\b/;
+const SHIPPED = /\*\*(?:SHIPPED|FIXED|DONE|LANDED)\b[^*]*?(20\d\d-\d\d-\d\d)/i;
+const dateOf = (e) => {
+  const all = `${e.text}\n${e.body.join("\n")}`;
+  return (all.match(SHIPPED) || all.match(DATE) || [])[1] ?? null;
+};
+const daysBetween = (a, b) => Math.round((new Date(b) - new Date(a)) / 86_400_000);
+
+const arch = entries(/^##\s+Shipped \(roadmap archive\)/i).filter((e) => e.done);
+const win = renderWindow();
+const shown = (win.reversed ? [...arch].reverse() : arch).slice(0, win.size);
+const allDates = arch.map(dateOf).filter(Boolean).sort();
+const newest = allDates[allDates.length - 1];
+const shownDated = shown.map((e) => ({ e, d: dateOf(e) })).filter((x) => x.d);
+const undated = shown.length - shownDated.length;
+
+// PRINTED ON EVERY RUN, pass or fail — the two-exposure design the decision
+// records and plan-scope-check already use. A number nobody reads is not a check.
+console.log(
+  `          notes.html shows ${win.reversed ? "the LAST" : "the FIRST"} ${win.size} of ` +
+    `${arch.length} archived item(s), read from vite.config.ts`,
+);
+
+if (!newest || !shownDated.length) {
+  console.log(`  ok    no dated archive entry to measure freshness against (${undated} undated in the window)`);
+} else {
+  const stale = shownDated.filter((x) => daysBetween(x.d, newest) > FRESH_DAYS);
+  const oldestShown = shownDated.map((x) => x.d).sort()[0];
+  console.log(
+    `          newest date in the archive: ${newest}; oldest in the window: ${oldestShown} ` +
+      `(span ${daysBetween(oldestShown, newest)}d, limit ${FRESH_DAYS}d; ${undated} undated, not judged)`,
+  );
+  if (stale.length) {
+    console.log("          these are in the window and are not recent — the archive's order and notesPage() disagree:");
+    for (const x of stale.slice(0, 6)) console.log(`            - ${x.d}  ${x.e.text.replace(/\*\*/g, "").slice(0, 60)}`);
+    if (stale.length > 6) console.log(`            … and ${stale.length - 6} more`);
+  }
+  check(`everything in the rendered window is dated within ${FRESH_DAYS} days of the newest`, stale.length, 0);
+}
 
 console.log(failed ? `\n  ${failed} check(s) failed\n` : "\n  the ⓘ roadmap and the archive both have content\n");
 process.exit(failed ? 1 : 0);
