@@ -1,16 +1,59 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
-plan=/root/.claude/plans/keen-nibbling-cat.md
-planhash=f27433d6d2816f69
-diffhash=06e3dbe638acabb5
-verdict=IN-SCOPE: VERSION 2.56 -> 2.57, the literal value plan item 2 names; self-asserted, not agent-judged
-# NOT JUDGED BY A SUBAGENT. Recorded on my own assertion, deliberately, and this
-# line is here so the record says so rather than implying a watcher ran.
-# The whole diff is one line: VERSION 2.56 -> 2.57. The plan's item 2 names the
-# file, the old value and the new value, so there is no judgement to make and the
-# failure mode a watcher guards against - extra work slipped in and rationalised
-# - is checkable mechanically: `git diff --stat` reports 1 file, 1 insertion,
-# 1 deletion, and the file is VERSION.
-# Where this is NOT appropriate: anything with a design choice in it. This is the
-# narrow case of a plan naming a literal value.
-# Item 3 (handoff obligations) is also done in this commit's work: all five
-# acknowledged, gate PASSES. It writes no file, so it does not appear in the diff.
+plan=/root/.claude/plans/linear-baking-island.md
+planhash=ef69beb062994fa7
+diffhash=735fdd72524eb2c8
+verdict=IN-SCOPE: every touched file is in the plan's Files list, no source/tool/walk was touched, nothing pushed; all three deviations verified correct by a subagent reading the plan by path
+# WATCHER: a subagent, given the plan BY PATH and the staged diff by path, told to
+# be adversarial and to answer OUT-OF-SCOPE without softening.
+# 
+# FILES — exact match with the plan's Files section, both directions. .doctrine-sync,
+# .github/workflows/gates.yml, NOTES.md, and the two decision records. No extra file
+# in the diff; nothing named in Files missing from it.
+# 
+# NOT IN SCOPE — clean. No src/, tools/ or walk file anywhere in the diff. The
+# watcher independently checked origin/staging, origin/main and the remote session
+# branch and confirmed nothing has been pushed.
+# 
+# NOTES.md IS A PURE RELOCATION. The watcher reconstructed the removed and added
+# blocks from the diff and ran diff on them: the only changes are `- [ ]` -> `- [x]`
+# and the "ON STAGING, 2026-09-21" marker replaced by a "SHIPPED IN 2.57" marker,
+# reflowed to the file's ~80 columns. Every other word is byte-identical. The
+# insertion point is the literal end of the archive section, before the next
+# heading.
+# 
+# DEVIATION (a), plan item 3 not done: judged correct. The 030 bullet already
+# records the lens hot-spot fix, and scope-check confirms dehaze, clarity, hotspot,
+# lensFix, hsFix and shadowSat are all off the whole-frame list. Nothing stale was
+# left in the tracked file.
+# 
+# DEVIATION (b), placement at the END of the archive rather than the top: judged
+# correct and necessary. notesPage() in vite.config.ts does
+# filter(done).reverse().slice(0,12) under the comment that NOTES keeps newest
+# last. The section holds 114 items, so an entry near the top lands past the slice
+# window and is never shown on /notes at all. End placement is the only one that
+# does not silently defeat the plan's own purpose.
+# 
+# A THIRD DEVIATION THE WATCHER FOUND UNPROMPTED, and it is right to name it: the
+# plan's item 4 names 65bf038 as the adopt target and the diff pins 52546b9. The
+# hub moved one commit between the plan being written and the step running, and
+# --adopt followed the live tip rather than the now-stale literal in the plan. That
+# commit adds one row to the hub's docs/usage-trend.csv and carries nothing this
+# repo owes; it was read before the marker was moved. hub-pin-check passes and
+# confirms the pin is reachable on the hub's origin/main.
+# 
+# AND IT CAUGHT AN ARITHMETIC ERROR IN THE PLAN AND IN MY OWN REPORT. Both said
+# scope-check leaves three OWED entries. It leaves FIVE: EditParams.denoise,
+# EditParams.chroma, EditParams.texture, Look.denoise and Look.texture. The wrong
+# count came from reading only the tail of that tool's output. It reached no
+# tracked file, because item 3 was dropped and the 030 bullet was never edited —
+# and that bullet's own closing line names three CONCEPTS (denoise, colour noise,
+# texture) which do cover all five declarations. The plan text is left as written
+# rather than corrected, because editing it now would invalidate the hash this
+# verdict is recorded against.
+# 
+# OUTCOME SECTIONS — nothing overstated. Both disclaim re-running the walks in so
+# many words. The watcher checked all six cited SHAs with git show --stat and
+# confirmed 0557a84 is the tip of origin/main, so "shipped in 2.57, deployed" is
+# not an invented claim.
+# 
+# notes-check and decisions-check both exit 0 against the staged tree.

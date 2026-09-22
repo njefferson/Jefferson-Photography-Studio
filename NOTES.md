@@ -539,65 +539,6 @@ user-scalable=no.
 > different approach and mindset"). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
-- [ ] **An edit you can put down and come back to** <!-- decision: 039 -->
-  reported 2026-09-20: there is no way to save the photograph being worked on
-  and come back to it later. True, and by design in one half of the app — a set
-  of two or more opens as a persisted, resumable session, and a single
-  photograph opens ephemeral, with `openSingle`'s own comment saying there is
-  nothing to resume from a single edit. The session is not the answer either:
-  it is a working state with a Done that frees its storage, and the question is
-  "can I put this one down for a week", which wants a different answer.
-  The field keeps the edit as a few kilobytes of recipe beside the original and
-  never writes the file — which is already this app's shape, since a look is
-  0.5 KB of JSON. What the sources cannot settle is where the BYTES live: those
-  tools sit beside a filesystem, and this one cannot re-read a picked file after
-  a reload on iPad Safari. So keeping the edit is easy and keeping the
-  photograph is the decision. See
-  `docs/decisions/039-an-edit-you-can-put-down-and-come-back-to.md`.
-  **ON STAGING, 2026-09-21.** Every mask row's neighbour on the Export panel is
-  a Keep button; name it and the photograph joins a list on the start screen
-  that is still there after the app is closed. `src/keepstore.ts` is its own
-  database (`ips-kept`) rather than a store inside the session's, so the Done
-  button cannot reach it — 039's rejected "make it a session of one", made
-  structurally impossible rather than remembered. The durability shape is
-  `src/session.ts`'s and therefore `src/batchstore.ts`'s: bytes in chunks of
-  30 KB or less, one strict transaction per photograph.
-  **The masks come back, which a resumed session has never managed.** They are
-  stored as RECIPES with the bitmaps stripped — `shapeOf`, the one function that
-  knows which fields are pixels — and every Sky mask is found again on the
-  photograph before anything is drawn. Measured: a sky selecting 54% of the
-  frame when it was kept selects 54% when it is picked up. A painted mask, a
-  warp and an imported LUT are pixels rather than settings, so they do not come
-  back and the app says which of them this photograph would lose BEFORE asking
-  for a name.
-  Cap of ten, and the list prints how many and how many megabytes are held,
-  because a store whose size the reader cannot see is the leak the record's own
-  rejected option describes.
-- [ ] **Straighten to a line you draw** <!-- decision: 038 -->
-  asked 2026-09-20: tap two points along an edge that should be level and let
-  the photograph straighten to it. Today the control is an angle — a slider and
-  a grid — so the reader sets a number and judges the result, when what they
-  know is not an angle but that THIS edge should be level and it is in front of
-  them. The field has this and it has a name: Lightroom's Angle tool in Crop &
-  Straighten, Photoshop's Ruler plus Straighten Layer, and in both it is a DRAG
-  along the edge. Two taps rather than a drag is an adaptation to a tablet held
-  in one hand, where a long precise drag competes with the pan gesture. The
-  angle goes into the same `straighten` value the slider already carries, so
-  undo, reset, the saved edit and the export inherit it with nothing new to
-  learn. See `docs/decisions/038-straighten-to-a-line-you-draw.md`.
-  **ON STAGING, 2026-09-21.** A "Level to a line you draw" button in the
-  straighten pill: tap the two ends of an edge that should be level and the
-  frame turns to it. The angle goes through `applyStraighten`, the same door
-  the slider uses, so it is one undo step and the slider afterwards shows the
-  number the line produced. One tap moves nothing — the gesture can be
-  abandoned — and a drag places nothing, so a stray movement while it is armed
-  cannot drop a point. A line past 45° is read as an UPRIGHT edge rather than
-  turning the photograph ninety degrees.
-  Measured: a line drawn 6.0° off level moves the frame 6.0°, the same line
-  drawn the other way up gives the opposite angle, and a line 84° off level
-  gives 6.0° read as an upright. The renders were opened, which is how the
-  direction was confirmed and how the layout defect below was found.
-
 - [ ] **A kept photograph should be a file you own** <!-- decision: 043 -->
   reported 2026-09-21, against the feature on staging: keeping a photograph
   should not mean keeping it INSIDE the app — it should be saved and worked on
@@ -7560,6 +7501,65 @@ read as authoritative, and an invented one is worse than a missing one.
   45.9% where it moved 54.0% to 39.6%, and the export walk's band figure moves
   with it for the same reason. See
   `docs/decisions/040-the-mask-panel-does-not-say-what-it-can-do.md`.
+- [x] **An edit you can put down and come back to** <!-- decision: 039 -->
+  reported 2026-09-20: there is no way to save the photograph being worked on
+  and come back to it later. True, and by design in one half of the app — a set
+  of two or more opens as a persisted, resumable session, and a single
+  photograph opens ephemeral, with `openSingle`'s own comment saying there is
+  nothing to resume from a single edit. The session is not the answer either:
+  it is a working state with a Done that frees its storage, and the question is
+  "can I put this one down for a week", which wants a different answer.
+  The field keeps the edit as a few kilobytes of recipe beside the original and
+  never writes the file — which is already this app's shape, since a look is
+  0.5 KB of JSON. What the sources cannot settle is where the BYTES live: those
+  tools sit beside a filesystem, and this one cannot re-read a picked file after
+  a reload on iPad Safari. So keeping the edit is easy and keeping the
+  photograph is the decision. See
+  `docs/decisions/039-an-edit-you-can-put-down-and-come-back-to.md`.
+  **SHIPPED IN 2.57, 2026-09-22 — commit `9319fdc`, deployed.** Every mask
+  row's neighbour on the Export panel is a Keep button; name it and the
+  photograph joins a list on the start screen that is still there after the
+  app is closed. `src/keepstore.ts` is its own database (`ips-kept`) rather
+  than a store inside the session's, so the Done button cannot reach it —
+  039's rejected "make it a session of one", made structurally impossible
+  rather than remembered. The durability shape is `src/session.ts`'s and
+  therefore `src/batchstore.ts`'s: bytes in chunks of 30 KB or less, one
+  strict transaction per photograph.
+  **The masks come back, which a resumed session has never managed.** They are
+  stored as RECIPES with the bitmaps stripped — `shapeOf`, the one function that
+  knows which fields are pixels — and every Sky mask is found again on the
+  photograph before anything is drawn. Measured: a sky selecting 54% of the
+  frame when it was kept selects 54% when it is picked up. A painted mask, a
+  warp and an imported LUT are pixels rather than settings, so they do not come
+  back and the app says which of them this photograph would lose BEFORE asking
+  for a name.
+  Cap of ten, and the list prints how many and how many megabytes are held,
+  because a store whose size the reader cannot see is the leak the record's own
+  rejected option describes.
+- [x] **Straighten to a line you draw** <!-- decision: 038 -->
+  asked 2026-09-20: tap two points along an edge that should be level and let
+  the photograph straighten to it. Today the control is an angle — a slider and
+  a grid — so the reader sets a number and judges the result, when what they
+  know is not an angle but that THIS edge should be level and it is in front of
+  them. The field has this and it has a name: Lightroom's Angle tool in Crop &
+  Straighten, Photoshop's Ruler plus Straighten Layer, and in both it is a DRAG
+  along the edge. Two taps rather than a drag is an adaptation to a tablet held
+  in one hand, where a long precise drag competes with the pan gesture. The
+  angle goes into the same `straighten` value the slider already carries, so
+  undo, reset, the saved edit and the export inherit it with nothing new to
+  learn. See `docs/decisions/038-straighten-to-a-line-you-draw.md`.
+  **SHIPPED IN 2.57, 2026-09-22 — commit `76ef0ad`, deployed.** A "Level to a
+  line you draw" button in the straighten pill: tap the two ends of an edge
+  that should be level and the frame turns to it. The angle goes through
+  `applyStraighten`, the same door the slider uses, so it is one undo step and
+  the slider afterwards shows the number the line produced. One tap moves
+  nothing — the gesture can be abandoned — and a drag places nothing, so a
+  stray movement while it is armed cannot drop a point. A line past 45° is
+  read as an UPRIGHT edge rather than turning the photograph ninety degrees.
+  Measured: a line drawn 6.0° off level moves the frame 6.0°, the same line
+  drawn the other way up gives the opposite angle, and a line 84° off level
+  gives 6.0° read as an upright. The renders were opened, which is how the
+  direction was confirmed and how the layout defect below was found.
 
 ## Desktop-mouse round + the flat-frame finding, 2026-09-08
 

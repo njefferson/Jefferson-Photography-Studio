@@ -122,3 +122,46 @@ A second angle would be two answers to one question.
 
 **With the other control work and below the defects.** It is an addition rather
 than a repair, it is bounded, and nothing else on the schedule waits on it.
+
+## Outcome
+
+**Shipped in 2.57 and deployed.** `76ef0ad` is the whole of it — the "Level to a
+line you draw" button in the straighten pill, `tools/straighten-line-walk.mjs`,
+and this record; `c64325b` made the walk executable. The Cloudflare deploy for
+the release commit `0557a84` concluded success.
+
+The chosen option survived unchanged, including the part that made it worth
+choosing: the angle goes through `applyStraighten`, the same door the slider
+uses, so it is one undo step and the slider afterwards shows the number the line
+produced. Undo, Reset, the saved edit and the export inherited it with nothing
+new to learn. Two taps rather than a drag held up as the tablet adaptation it
+was argued as — one tap moves nothing, so the gesture can be abandoned, and a
+drag places nothing, so a stray movement while the tool is armed cannot drop a
+point.
+
+**Measured:** a line drawn 6.0° off level moves the frame 6.0°; the same line
+drawn the other way up gives the opposite angle; and a line 84° off level gives
+6.0° read as an UPRIGHT edge rather than turning the photograph ninety degrees.
+Those figures are the walk's, recorded when it was written — this session
+verified the code, the commit and the deploy, and did not re-run it.
+
+**The renders were opened, and that is where the value was.** This repo's rule
+is that a number is a pointer to where to look and never evidence about an
+appearance, and obeying it here did two things a passing walk would not have:
+it confirmed the direction of the turn, and it found a separate layout defect
+that had nothing to do with straightening — the start screen, at phone width,
+arriving clipped with the editor drawer still stacked underneath it. That one
+had been true for the whole life of the start card, and the walks had never
+seen it because they all stood at desktop width. It was reported, recorded and
+fixed on its own, and it is the reason the accessibility walk now runs a phone
+arm at the reader's own 402x812 alongside its desktop one.
+
+### What turned out wrong
+
+**Not the code. The record.** This stayed `- [ ]` at rank 2 through the release
+that shipped it. Two deployed surfaces read that list — `vite.config.ts` builds
+`__ROADMAP__` from it and `notes.html` renders the undone items — so the ⓘ
+dialog and the public notes page offered this feature as still to come to
+readers who already had it, and `tools/session-brief.mjs` ranked it second in
+the queue for every new session. Nineteen commit gates were green throughout,
+because none of them compares this list against what is on `main`.

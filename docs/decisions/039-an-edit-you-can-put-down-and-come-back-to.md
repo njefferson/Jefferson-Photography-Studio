@@ -148,3 +148,50 @@ repair, and it is the one on this list that changes what the app IS for a
 reader with one picture — but it is bounded by whatever 014 and 009 settle
 about how much the app may hold, so it sits below the things that are simply
 wrong today.
+
+## Outcome
+
+**Shipped in 2.57 and deployed.** `9319fdc` is the feature — `src/keepstore.ts`,
+its own `ips-kept` database, the Keep button beside every mask row on the Export
+panel, the `keptDlg` list on the start screen, and `tools/kept-walk.mjs`.
+`af622b0` added the count to the §7f report, `6ae8280` moved the walk to the
+reader's own width, and `c64325b` made it executable. The Cloudflare deploy for
+the release commit `0557a84` concluded success, so this is a release rather than
+a push mistaken for one.
+
+The chosen option survived unchanged: the edit is what the app already stored
+per photo, the bytes went in beside it, and the store is a separate database so
+that Done cannot reach it — the rejected "make it a session of one" made
+structurally impossible rather than remembered.
+
+**The check the feature turns on is that the EDIT comes back, not the
+photograph.** "Did the photo reopen" would have passed with every slider at its
+default, which is precisely the failure, so the walk puts an unmistakable
+saturation and a Sky mask on before keeping and reads both back. The masks come
+back REGENERATED from recipes rather than bitmaps, and the sky's own percentage
+is what tells those apart: 54% when it was kept, 54% when it was picked up.
+That figure is the one recorded when the walk was written — this session
+verified the code, the commits and the deploy, and did not re-run the walk,
+which needs a browser against a served `dist`.
+
+
+### What turned out wrong
+
+**Not the code. The record.** This item stayed `- [ ]` at rank 1 through the
+release that shipped it, and that is not bookkeeping, because two deployed
+surfaces read this list. `vite.config.ts` builds `__ROADMAP__` from it and
+`notes.html` renders `.filter((i) => !i.done)`, so the ⓘ dialog and the public
+notes page advertised this feature as still to come **to readers running the
+build that contained it**. `tools/session-brief.mjs` printed "NEXT UP IS 039" to
+every new session at the same time.
+
+**It worked.** The session that archived this arrived, read the brief, and was
+three reads from planning `src/keepstore.ts` a second time; what stopped it was
+noticing `keptDlg` already in `tools/surfaces.mjs`.
+
+**No gate could see it, and all nineteen were green.**
+`tools/decisions-check.mjs` asks whether every open item HAS a record, whether
+the record is about the item that claims it, and whether its sections have
+bodies. Nothing anywhere asks whether an open item's work has LANDED — which is
+a comparison between this list and `main`, and is the one question that would
+have caught it.
