@@ -4136,7 +4136,7 @@ const MIX3_PRESETS: { label: string; m: number[] }[] = [
   // tools/look-sheet.mjs presses them by index.
   //
   // AND THE SENTENCE IS IN THE CARD'S NOTE, NOT IN A TOOLTIP. It went in as a
-  // `title` first and tools/control-check.mjs refused it the same day, rightly:
+  // `title` first and tools/control-walk.mjs refused it the same day, rightly:
   // a title is a hover, there is no hover on a tablet, and a chip whose whole
   // explanation lives in one is a chip that explains itself to nobody here.
   { label: "Film rotation", m: [0, 0, 1, 1, 0, 0, 0, 1, 0] },
@@ -7236,7 +7236,7 @@ function lensFixLive(): { colour: boolean; bump: boolean } | null {
  *  IN A NOTE, NOT A `title`. It was a tooltip, which is a hover, and there is
  *  no hover on the tablet this app is built for — so the one sentence saying a
  *  correction had been applied was invisible on the device that needed it.
- *  tools/control-check.mjs refuses that shape now. */
+ *  tools/control-walk.mjs refuses that shape now. */
 function updateLensCmp() {
   const live = lensFixLive();
   const note = document.getElementById("lensCmpNote");

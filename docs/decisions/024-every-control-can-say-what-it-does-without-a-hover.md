@@ -32,7 +32,7 @@ practice; Elastic's EUI tooltip documentation). Native `title` tooltips are
 unstyled, unreachable on touch, and inconsistent across screen readers.
 
 **This repository already measured that half on its own device.**
-`tools/control-check.mjs` carries the TOOLTIP RULE: a `title` is a hover,
+`tools/control-walk.mjs` carries the TOOLTIP RULE: a `title` is a hover,
 there is no hover on a tablet, so anything a title says and the visible label
 does not is a sentence this app's reader will never see. It was written after
 a "Share" button whose title explained what its one wrong word did not, and
@@ -48,7 +48,7 @@ when it is short.
 Measured 2026-09-21, and the count matters: **almost all of this exists, and
 what is missing is a rule rather than a mechanism.**
 
-- **`tools/control-check.mjs` is the inventory and the gate**, and it already
+- **`tools/control-walk.mjs` is the inventory and the gate**, and it already
   carries the half of the rule that is decided: a `title` is a hover, there is
   no hover on a tablet, so anything a title says that the visible label does
   not is a sentence this reader will never see. It prints every control with
@@ -95,7 +95,7 @@ in any of the three places.
 - **The ⓘ panel and Help** — they already hold the long explanations, and the
   hot-spot passage in Help is an example. This item is about the sentence
   that belongs BESIDE a control, not the essay about the feature.
-- **`tools/control-check.mjs`** — it prints every control and its label and
+- **`tools/control-walk.mjs`** — it prints every control and its label and
   refuses a `title` that carries what the label lacks. It is the gate this
   item extends: a rule about where explanations live is a rule that gate can
   hold, both ways.
@@ -119,7 +119,7 @@ in any of the three places.
    `role="status"` region announces it, the way the level note and the file
    kind already do. A control whose note is short enough to live on screen
    keeps it visible — the toggletip is for the ones where the sentence would
-   push the panel apart. `control-check` gains the other direction: a control
+   push the panel apart. `control-walk` gains the other direction: a control
    with neither a note nor a toggletip is named in the inventory.
 2. A `title` on every control. Rejected below.
 3. Move every note into Help. Rejected below.
@@ -167,13 +167,26 @@ It touches no pixels — no pipeline, no shader, no decode.
 
 ### What turned out wrong
 
-**The gate this work extends runs nowhere.** `tools/control-check.mjs` gained
+**The gate this work extends runs nowhere.** `tools/control-walk.mjs` gained
 189 lines here, including the count reporting the other direction — how many
 labelled controls still say nothing for themselves in any of the three places.
-Nothing invokes it: it is in no workflow, it is not in `.branch-guard`'s `also=`
-list, and `walk-all.mjs` globs `*-walk.mjs`, which its name does not match. It
-needs a browser, so it cannot join the commit chain; the remedy is a rename so
-the sweep picks it up.
+Nothing invoked it: it was in no workflow, it was not in `.branch-guard`'s
+`also=` list, and `walk-all.mjs` globs `*-walk.mjs` — which `control-check.mjs`
+did not match. It drives a browser, so it cannot join the commit chain either.
+
+**Renamed `tools/control-walk.mjs` the same day**, so the sweep globs it off
+disk and it now runs with the other forty-three walks. A gate whose name
+excludes it from the one command that runs every gate is a naming bug with the
+consequences of a missing gate.
+
+**And the rename was called the whole remedy before anybody ran the file.** It
+is not. Running it is what showed the walk exits 1: 71 controls the built markup
+declares are never reached by the sweep and are not excused in `.control-allow`
+— 62 on `ir.html`, 6 on `macro.html`, 3 on `debug.html`. Two of them,
+`#keptOpen` and `#cropLine`, are controls that shipped this morning, so the
+coverage had been rotting with every release while nothing ran to say so. The
+triage is its own item, and the sweep stays red until it is done rather than
+being quieted.
 
 Meanwhile four source comments and this record describe it as a gate that
 refuses things. A gate asserted in comments and invoked by nothing is the shape
