@@ -631,7 +631,7 @@ cannot describe something the code does not say about itself.
 - **`src/icc.ts`** (241 lines) — Embed a colour profile in every export so files are never emitted untagged (untagged JPEG/TIFF is a real-world failure: viewers guess the colour space).
 - **`src/iconpicker.ts`** (202 lines) — Home-Screen icon picker for the installed Studio launcher.
 - **`src/import.ts`** (114 lines) — Hardened image import.
-- **`src/keepfile.ts`** (230 lines) — THE KEEP FILE: a photograph the reader owns, as one file they hold.
+- **`src/keepfile.ts`** (258 lines) — THE KEEP FILE: a photograph the reader owns, as one file they hold.
 - **`src/keepstore.ts`** (328 lines) — KEEPING ONE PHOTOGRAPH, ON PURPOSE, UNDER A NAME (decision 039).
 - **`src/lensbackup.ts`** (84 lines) — HAS ANY OF THIS EVER LEFT THE DEVICE — its own file, deliberately.
 - **`src/lensflat.ts`** (121 lines) — The measured lens correction as a flat-field pass on the LINEAR working copy, applied at decode before anything is measured or graded (decision 021; IR-SCIENCE.md §9c — RawPedia, the DNG GainMap, Ligh
@@ -647,7 +647,7 @@ cannot describe something the code does not say about itself.
 - **`src/macro/export.worker.ts`** (23 lines) — Full-resolution stacking runs here, OFF the main thread, so the long tiled render never janks the UI (the preview stack stays on the main thread — it's quick).
 - **`src/macro/main.ts`** (460 lines) — MACRO FOCUS-STACKING MODE: the second discipline, its own page and its own entry point.
 - **`src/macro/stack.ts`** (387 lines) — Macro focus-stacking engine (JPEG-first).
-- **`src/main.ts`** (16655 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
+- **`src/main.ts`** (16906 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
 - **`src/maskstore.ts`** (186 lines) — On-device store for SAVED MASKS (IndexedDB "ips-masks").
 - **`src/palette.ts`** (118 lines) — Palette family picker, shared across all three pages.
 - **`src/pipeline.ts`** (2111 lines) — CPU version of the GPU edit pipeline, kept numerically identical to the fragment shader in gl.ts so exports match the on-screen preview exactly.
