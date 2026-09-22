@@ -3395,6 +3395,30 @@ read as authoritative, and an invented one is worse than a missing one.
 
 ## Shipped (roadmap archive)
 
+- [x] **The heading you were sent to is the one thing the jump hides** <!-- decision: 047 -->
+  **SHIPPED IN 2.58, 2026-09-22.** Reported from the device with a screenshot:
+  **What this is, and how to install it** opened Help part-way down a numbered
+  list, first line cut off, with no heading anywhere on screen to say where the
+  reader had landed. Measured at 2.58.1 on both routes to that destination, the
+  start screen's button and the ⓘ's, which are one function: the scroll was
+  right and landed the `<summary>Quick start</summary>` at y=146 to 190, under
+  a `position: sticky` search box occupying y=159 to 247 with an opaque
+  background. The heading a reader was sent to was the one thing they could not
+  see, along with the first 57px beneath it.
+  **Every instrument except the eye said it worked.** The handler focuses the
+  summary as well as scrolling to it, so the keyboard and the screen reader
+  arrived correctly and the focus ring was even drawn — poking out from behind
+  the search box in the reported screenshot, with no heading under it.
+  **It was a class, not a button**: nothing in either dialog declared
+  `scroll-padding-top`, so the ⓘ's own Roadmap and Settings jumps landed their
+  headings under the scroll cue too, greyed rather than hidden. Both fixed —
+  Help measures its search box when it opens, the ⓘ panel declares the cue's
+  own height. The ⓘ jumps now land at y=175 against a cue ending at y=171, and
+  Help's first visible line reads "Quick start".
+  **What is still not right:** the button names two destinations and delivers
+  one. `#helpInstall` is expanded but sits 874px past the bottom of the panel,
+  1.58 screens down, and the word "install" is nowhere on the landing screen.
+  See `docs/decisions/047-the-button-lands-under-the-sticky-header-it-scrolled-past.md`.
 - [x] **The shipped list shows readers the oldest twelve** <!-- decision: 045 -->
   **SHIPPED IN 2.58, 2026-09-22** — the commit subject is "Fixed: What's
   new listed the oldest twelve changes, not the newest"; the SHA is minted by
