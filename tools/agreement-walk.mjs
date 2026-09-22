@@ -47,7 +47,11 @@ const PORT = (process.argv.find((a) => a.startsWith("--port=")) || "--port=8131"
 const BASE = `http://127.0.0.1:${PORT}`;
 const D = "/tmp/claude-0/-home-user/2bd37282-d617-5a51-b357-6b20783a5840/scratchpad/real";
 const EX = "/home/user/Jefferson-Photography-Studio/public/examples";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+// The frame arm 4 aims a mask on: a conifer against a deep teal sky, which is
+// the one decision 030's own render was opened on, so a reader comparing the
+// two is looking at the same picture.
+const AIM_FILE = `${EX}/NIR_1651.dng`;
 
 const SETS = [
   [[`${D}/NIR_2821.JPG`, `${D}/NIR_2813.JPG`], "camera JPEG"],
@@ -323,6 +327,125 @@ try {
       // twice the lightness slack.
       if (dh > 30 || dl > 16) fail(`${label}: a tile under a look disagrees with opening the same file — ${dh}deg and ${dl.toFixed(1)} points`);
       else ok(`${label}: tile and open agree under a look`);
+    } finally { await page.close(); }
+  }
+
+  // 4. AN AIMED MASK, PREVIEW AGAINST EXPORT — the two paths that write the
+  //    same blend in two languages.
+  //
+  //    Decision 030's spatial half is the first thing here that is implemented
+  //    TWICE and differently on purpose: the shader scales its own local gain,
+  //    `src/export.ts` mixes a sampler's output, and they are equal only because
+  //    mix(c, c*g, w) == c * mix(1, g, w). Nothing else in this repo asserted
+  //    that. `aim-walk` reads the preview canvas, so it measures the shader
+  //    alone; `export-bytes-walk` asserts the export is DETERMINISTIC, not that
+  //    it agrees with what the reader was shown. Arms 1-3 above use no mask at
+  //    all, so they prove the unaimed path is untouched and nothing more.
+  //
+  //    So this is the arm that would find the halves apart, and it is written
+  //    because the change it covers was made without it existing.
+  {
+    const label = "aimed";
+    const page = await br.newPage({ viewport: { width: 1000, height: 820 }, acceptDownloads: true });
+    try {
+      await page.goto(`${BASE}/ir.html`, { waitUntil: "load" });
+      await page.setInputFiles("#file", [AIM_FILE]);
+      await page.waitForFunction(() => document.getElementById("welcome")?.hidden, null, { timeout: 300000 });
+      await page.waitForFunction(() => !document.getElementById("busy")?.hasAttribute("open"), null, { timeout: 300000 });
+      await page.waitForTimeout(2500);
+
+      // Denoise hard, then a Sky mask that aims it and does nothing else. The
+      // mask's own adjustment is neutralised for aim-walk's reason: a fresh Sky
+      // mask arrives at Saturation 1.3, and an arm that leaves it there is
+      // measuring chroma over half the picture and calling it the aim.
+      await page.click("#ptab-basic");
+      await page.evaluate(() => {
+        const d = document.getElementById("dn");
+        d.value = "0.9";
+        d.dispatchEvent(new Event("input", { bubbles: true }));
+        d.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+      await page.waitForTimeout(1200);
+      await page.click("#ptab-masks");
+      await page.click("#addSky");
+      await page.waitForFunction(() => !document.getElementById("skyControls")?.hidden, null, { timeout: 120000 });
+      await page.waitForTimeout(1500);
+      await page.click("#mOutline"); // the coverage tint is drawn ON the canvas
+      await page.evaluate(() => {
+        const sv = document.getElementById("mSat");
+        sv.value = "1";
+        sv.dispatchEvent(new Event("input", { bubbles: true }));
+        sv.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+      await page.waitForTimeout(800);
+      await page.click("#mAimNoise");
+      await page.waitForTimeout(1500);
+      const armed = await page.getAttribute("#mAimNoise", "aria-pressed");
+      if (armed !== "true") { fail(`${label}: the aim did not arm, so nothing below measures it`); throw new Error("not armed"); }
+
+      // READ THE PREVIEW THROUGH A 2D CANVAS, not readPixels, because the other
+      // side of THIS comparison is a decoded JPEG read that way — and the two
+      // routes do not agree about channel order. Measured: with no mask and no
+      // aim at all, readPixels against a JPEG decode reads 180 degrees apart in
+      // hue with lightness matching to 0.2 points, which is red and blue
+      // swapped and nothing to do with any edit. Arms 1-3 compare readPixels
+      // with readPixels, so it cancels there and never showed. It does not
+      // cancel here, and taken at face value it accused this walk's own subject
+      // of a defect it does not have.
+      const shown = await page.evaluate(`(() => {
+        const read = ${READ};
+        const c = document.querySelector("#view");
+        const o = document.createElement("canvas");
+        o.width = c.width; o.height = c.height;
+        o.getContext("2d").drawImage(c, 0, 0);
+        return read(o.getContext("2d").getImageData(0, 0, o.width, o.height).data);
+      })()`);
+      if (!shown) { fail(`${label}: the preview has no colour to read`); throw new Error("no preview"); }
+
+      // A FINISHED EXPORT COLLECTS; IT DOES NOT FALL OUT OF THE PRESS. The first
+      // version of this arm waited on a download straight after #exBtn and timed
+      // out at ten minutes while the strip had read "Ready" since twenty
+      // seconds in. Wait for Ready, then hand it over — the shape
+      // tools/collect-walk.mjs already uses, which is where this was read from
+      // rather than guessed at.
+      await page.click("#ptab-export");
+      await page.click("#exBtn");
+      await page.waitForFunction(
+        () => /^Ready \u2014/.test(document.getElementById("exportStripText")?.textContent || ""),
+        null, { timeout: 600000 },
+      );
+      // ONE export hands over as the image itself through #exportSave;
+      // #exportSaveAll is for two or more and stays hidden here, which is why
+      // clicking it waited on an element that was never going to appear.
+      await page.waitForFunction(
+        () => { const a = document.getElementById("exportStripActions"); return a && !a.hidden; },
+        null, { timeout: 120000 },
+      );
+      const dl = page.waitForEvent("download", { timeout: 120000 });
+      dl.catch(() => {});
+      await page.click("#exportSave");
+      const file = await (await dl).path();
+      const b64 = readFileSync(file).toString("base64");
+      const saved = await page.evaluate(`(async () => {
+        const read = ${READ};
+        const img = new Image();
+        await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = "data:image/jpeg;base64," + ${JSON.stringify(b64)}; });
+        const c = document.createElement("canvas");
+        c.width = img.naturalWidth; c.height = img.naturalHeight;
+        c.getContext("2d").drawImage(img, 0, 0);
+        return read(c.getContext("2d").getImageData(0, 0, c.width, c.height).data);
+      })()`);
+      if (!saved) { fail(`${label}: the exported file has no colour to read`); throw new Error("no export"); }
+
+      const dh = dHue(shown.hue, saved.hue), dl2 = Math.abs(shown.light - saved.light);
+      console.log(`  ${label.padEnd(12)} shown hue ${String(shown.hue).padStart(3)} (${(shown.share*100).toFixed(0)}%) light ${shown.light.toFixed(1)}%   [denoise 0.9 aimed at a Sky mask]`);
+      console.log(`  ${"".padEnd(12)} saved hue ${String(saved.hue).padStart(3)} (${(saved.share*100).toFixed(0)}%) light ${saved.light.toFixed(1)}%  \u00b7  ${dh}deg, ${dl2.toFixed(1)} points apart`);
+      // The export is full resolution against a screen-sized preview and is
+      // JPEG-compressed, so the bars match arm 2's rather than being tighter.
+      if (dh > 30 || dl2 > 8) fail(`${label}: the preview and the export disagree with a mask aiming a spatial stage — ${dh}deg and ${dl2.toFixed(1)} points. The shader scales its gain and export.ts mixes a sampler; those two have drifted.`);
+      else ok(`${label}: preview and export agree with a spatial stage aimed`);
+    } catch (e) {
+      if (!/not armed|no preview|no export/.test(String(e && e.message))) fail(`${label}: the arm could not run — ${e}`);
     } finally { await page.close(); }
   }
 } finally { await br.close(); }

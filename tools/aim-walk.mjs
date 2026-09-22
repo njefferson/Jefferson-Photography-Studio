@@ -174,6 +174,19 @@ try {
 
   await stage("dehaze", "ptab-color", "dehaze", "0.8", "mAimDehaze");
   await stage("hotspot", "ptab-corrections", "hotspot", "0.8", "mAimLens");
+  // THE TWO SPATIAL STAGES. Everything above scales a per-pixel gain; these mix
+  // a filtered result back toward the unfiltered one, in two languages — the
+  // shader blends its own local, the CPU blends a sampler's output — so they
+  // are the pair most able to drift apart. The four statements are the same.
+  //
+  // DENOISE DOES NOT OPEN AT ZERO on a raw: it is set from the frame's measured
+  // noise, which is a confound of the same family as the fresh Sky mask's
+  // Saturation 1.3 this walk's header records. It does not break the four
+  // statements — the baseline arm carries the measured value in every arm
+  // equally, and what is asserted is the DIFFERENCE each arm makes — but a
+  // reader comparing absolute numbers between stages should know.
+  await stage("denoise", "ptab-basic", "dn", "0.9", "mAimNoise");
+  await stage("texture", "ptab-basic", "texture", "0.9", "mAimTexture");
 
   if (SHOTS) console.log(`\n  shots in ${SHOTS} — the verification of an appearance is the photographs, not these numbers.`);
 } finally {

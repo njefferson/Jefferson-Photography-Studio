@@ -130,7 +130,7 @@ uniform sampler2DArray u_maskTex; // brush/sky masks, four per RGBA layer (MAX_B
 uniform sampler2DArray u_maskFineTex; // sky masks (type 4) refined to the picture's edges, same slots
 uniform bool u_maskFineOn;      // false when no sky mask has a refinement to read
 uniform int u_maskOp[8];     // 0 head (starts a group) · 1 subtract · 2 intersect (026)
-uniform int u_maskAims[8];   // bitmask of stages this mask gates: 1 dehaze, 2 clarity, 4 shadow colour, 8 lens hot-spot fix (030)
+uniform int u_maskAims[8];   // bitmask of stages this mask gates: 1 dehaze, 2 clarity, 4 shadow colour, 8 lens hot-spot fix, 16 noise, 32 detail (030)
                              // LITERAL 8, like every array above it: MAX_MASKS is a
                              // TypeScript constant and means nothing inside GLSL —
                              // written as MAX_MASKS first, and the shader silently
@@ -494,6 +494,13 @@ void main() {
   // raw/denoise.ts: the centre must be the extreme of its own 3x3 AND sit
   // further from that window's median than k times the window's spread.
   vec3 ctr = c;
+  // THE PIXEL AS IT ARRIVED, kept for AIM_NOISE. Captured HERE, before the
+  // despeckle median as well as the bilateral, because both sit inside that one
+  // bit and export.ts mixes back toward its own pre-despeckle warped sampler.
+  // Taken
+  // after despeckle instead, the two paths would differ exactly where a speckle
+  // sat — see AIM_NOISE in pipeline.ts.
+  vec3 preNoise = c;
   if (u_despeckle > 0.0 && v_uv.x >= u_split) {
     float k = 0.45 * (1.0 - u_despeckle) + 0.02; // keep in sync with raw/denoise.ts
     vec3 n[9];
@@ -575,6 +582,14 @@ void main() {
 
   // Detail: sharpen (high-freq) + texture (mid-freq) on LINEAR data, after
   // denoise and before WB — a hue-preserving luminance gain from two Gaussian
+  // HELD BACK WHERE NO MASK AIMS AT NOISE (decision 030). The ternary is
+  // load-bearing for the same reason it is on the lens weight below:
+  // aimWeightOf walks every mask, and a frame with neither slider on must not
+  // pay for it. At weight 1 this is mix(x, y, 1.0) == y exactly.
+  if (u_despeckle > 0.0 || u_denoise > 0.0 || u_chroma > 0.0) {
+    c = mix(preNoise, c, aimWeightOf(16));
+  }
+
   // blurs of the neighbourhood luma. Same math + constants as raw/detail.ts
   // (R=3, sigma 1.0/2.0 -> 2*sigma^2 = 2.0/8.0; KS=2.2, KT=2.4, EPS=0.05).
   if (u_sharpen > 0.0 || u_texture != 0.0) {
@@ -599,7 +614,14 @@ void main() {
     float blurT = sumT / wsumT;
     float hp = 2.2 * u_sharpen * (Lc - blurS) + 2.4 * u_texture * (blurS - blurT);
     float gain = clamp(1.0 + hp / (Lc + 0.05), 0.25, 3.0);
-    c *= gain;
+    // TOWARD 1, NOT TOWARD THE UNFILTERED COLOUR, and the two are the same
+    // number: mix(c, c*gain, w) == c * mix(1.0, gain, w). The CPU mixes the
+    // sampler's output because the gain lives inside a closure it does not own;
+    // this scales the gain because it is right here. See AIM_TEXTURE.
+    //
+    // The CLAMP stays where it is, outside the blend: it bounds what the filter
+    // may do, and a weight is not a licence to exceed it.
+    c *= mix(1.0, gain, aimWeightOf(32));
   }
 
   // Clarity / Dehaze on LINEAR source data (after denoise, before exposure/WB),
