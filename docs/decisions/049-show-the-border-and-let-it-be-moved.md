@@ -28,16 +28,28 @@ honoured, and the colour stage then does the pixel work underneath it. That is
 the right division of labour: the semantic fact from the person who can see the
 scene, the pixel-accurate boundary from the machine.
 
-**AND THE ONE THING IT DOES NOT SOLVE UNCHANGED, which is the reported frame.**
-A per-column border expresses exactly ONE transition — sky above, not-sky below.
-A wing is sky, then wing, then sky: two transitions in the same column. Dragging
-the border down past the wing to the true horizon would select the wing itself,
-because everything above the border is selected regardless. So the override
-needs one added rule to cover the case that prompted it, and it is a narrow one:
-**inside a span the reader has moved, the colour model may veto.** The reader's
-claim is that the sky reaches this far, not that every pixel above it is sky.
-Where the reader has not intervened, nothing changes and the border keeps the
-absolute authority it has today.
+**AND IT IS NOT JUDGED BY WHETHER IT SOLVES THE REPORTED FRAME ALONE.** A
+per-column border expresses one transition — sky above, not-sky below — and a
+wing is sky, then wing, then sky. Moved down to the true horizon it therefore
+takes the wing in along with the sky it was moved for.
+
+That is not a defect in this control and not a reason to give it a special
+case. **The wing comes off with a Colour mask joined as Subtract from it, which
+ships today.** Move the border to where the horizon actually is; subtract the
+wing by its colour; the sky above and below it is selected and the wing is not.
+Two controls, each doing one thing it can be held to.
+
+**So the reported frame is answered by this plus what already exists, and does
+not need 048.** That does not retire 048 — a union still serves every case a
+subtract cannot, and both stay wanted for the reason already written down about
+the intersection.
+
+**The principle, because it decided this record's shape:** a capability is
+judged on whether it does what it says and does it correctly, not on whether it
+delivers a desired outcome by itself. Outcomes come from stacks. A control that
+grows a special case for each outcome somebody wants ends up doing several
+things approximately instead of one thing exactly, and every special case is a
+behaviour a reader has to learn and a gate has to assert.
 
 ## Looked up
 
@@ -135,9 +147,11 @@ dragged.
 resampled across the columns it covers. It is a curve, not a region: the effort
 is proportional to how wrong the detector was, not to the area of the selection.
 
-**Honour it.** A moved span is authoritative in the direction the reader moved
-it, and the colour model may veto WITHIN that span so an occluder in the middle
-of a column is not swallowed. Unmoved columns keep today's behaviour exactly.
+**Honour it.** A moved column is authoritative exactly as a detected one is
+today — "selected regardless" is the rule, and the reader inherits it whole
+rather than a weaker version of it. No conditional behaviour, no span that
+behaves differently from the columns beside it, nothing for a reader to learn
+about when their correction counts.
 
 The override is stored as the reader's edit, not baked into the bitmap, so
 Reach, Feather and the colour toggle keep working on top of it — the same
@@ -151,11 +165,20 @@ including all the ones that are already right. What makes the chosen option
 different is that it is not one number — it is the existing array, shown and
 edited where it is wrong.
 
+**A colour veto inside spans the reader moved. THIS RECORD'S OWN FIRST DRAFT,
+corrected within the hour.** It existed so that dragging the border past a wing
+would not swallow the wing — that is, so this one control would solve the
+reported frame by itself. It is wrong twice: it duplicates a capability that
+already ships (subtract a Colour mask), and it makes the control's behaviour
+conditional, so a moved column would obey a different rule from the detected
+column beside it and a reader would have to know which. It is written down
+because it is the route a session reinvents: a special case always looks like
+thoroughness at the moment it is added.
+
 **Making the border a hint the colour model can overrule everywhere.** It would
 make an override unnecessary by making the border advisory, and it undoes the
 2026-09-20 work deliberately: stage one exists precisely because a colour model
-with no spatial authority took 76.4% of a macro with no sky in it. The veto in
-the chosen option is scoped to spans the reader moved for exactly this reason.
+with no spatial authority took 76.4% of a macro with no sky in it.
 
 **Asking for the boundary to be traced.** The 2-D version of this, and the thing
 the field's own literature is written to avoid. A reader supplies the constraint;
