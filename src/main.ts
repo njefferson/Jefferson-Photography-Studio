@@ -78,6 +78,7 @@ import { putLut, getLut, listLuts, deleteLut, LUT_COUNT_CAP } from "./luts";
 import { extractLookFromJpeg } from "./lookmark";
 import { encodeQr, drawQr } from "./qr";
 import { wireThemePicker } from "./theme";
+import { wireToggletips } from "./toggletip";
 import { wirePalettePicker } from "./palette";
 import { isIOS as isIOSDevice, wireDeviceCopy, deviceNoun } from "./platform";
 
@@ -16505,6 +16506,20 @@ setupInstallFromApp("irInstallFromApp");
     });
   }
 }
+
+/* ---- The explanations that are NOT beside the control (decision 024) -------
+ *
+ *  Straight after the toggle above, because the two are one idea seen from
+ *  opposite ends: that one takes the permanent notes away when a reader has
+ *  learned them, this one is for the controls where a permanent note was never
+ *  affordable in the first place. A toggletip's body is deliberately NOT a
+ *  `.note`, so turning the explanations off leaves this route working — which
+ *  is exactly the state a reader who turned them off is in.
+ *
+ *  Wired once over the whole document: every trigger is in the markup, and
+ *  `#panel` being `hidden` until a photograph opens does not stop a listener
+ *  being attached to something inside it. */
+wireToggletips();
 
 // Offline support.
 if ("serviceWorker" in navigator) {

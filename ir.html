@@ -137,6 +137,15 @@
         <button id="swStripLater" type="button" class="sw-strip-later">Not now</button>
       </div>
 
+      <!-- ONE LIVE REGION FOR EVERY TOGGLETIP IN THE APP (decision 024), and it
+           is here rather than in the panel because #panel is `hidden` until a
+           photograph opens and a region inside a hidden ancestor is not in the
+           accessibility tree at all. Present from parse, empty at rest: a
+           region created at press time is not reliably announced, which is the
+           whole reason the pattern needs one standing. src/toggletip.ts writes
+           the revealed sentence into it and clears it again on dismiss. -->
+      <p id="tipLive" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
+
       <main id="stage">
         <h1 class="sr-only">Infrared photo editor</h1>
         <canvas id="view" role="img" aria-label="Photo canvas — no photo open"></canvas>
@@ -702,7 +711,17 @@
               <div class="sub-title">Matched lens profile <span>automatic, per-lens</span></div>
               <p class="note">Two lenses come measured with the app. When a photograph was taken with one of them the correction is chosen from the file&rsquo;s own EXIF &mdash; matched to the frame&rsquo;s <em>own</em> focal length and aperture, between the nearest measurements rather than snapped to one of them. It needs nothing set by hand and works on RAW as well as camera JPEGs. The line above says which lens it matched, how far it had to reach, and what that profile knows: the hot-spot moves a long way with aperture, so a profile measured without one recorded says so. Measure your own lens below and yours takes over for the colour.</p>
               <small class="note" id="hsStatus">No photo loaded.</small>
-              <label>Strength <input id="hsStrength" type="range" min="0" max="1.5" step="0.01" value="1" /></label>
+              <label>Strength <input id="hsStrength" type="range" min="0" max="1.5" step="0.01" value="1" aria-describedby="tipHsStrength" /></label>
+              <!-- THE LABEL NAMES A QUANTITY AND NOT THE ACT (decision 024).
+                   "Strength" is one word in a card that already carries a long
+                   note about the matched profile, and adding a second paragraph
+                   under the slider is what this item exists to avoid — the card
+                   is four controls deep inside a tab. So the sentence is here,
+                   one press away, and what it says is the part no label can:
+                   the slider opens at 0 rather than at full, and where it is
+                   left is remembered per lens. -->
+              <button type="button" class="inline-btn toggletip" data-tip="tipHsStrength" data-tip-for="hsStrength" aria-controls="tipHsStrength" aria-expanded="false"><span class="toggletip-mark" aria-hidden="true">&#9656;</span><span class="toggletip-txt">What this does</span></button>
+              <p class="tip-body" id="tipHsStrength" hidden>How much of the matched profile's correction this photograph gets. It opens at <strong>0</strong> &mdash; the correction waits to be asked for &mdash; <strong>1</strong> is the profile exactly as it was measured, and past 1 pushes further than the measurement, which a look that magnifies the hot-spot can want. What it can move depends on what the profile knows: the line above says <em>brightness only</em> or <em>brightness and colour</em>, and it also prints what the correction is doing to the middle of this frame right now. Where you leave it is remembered for that lens at that aperture and comes back on the next photograph taken with it.</p>
               <button id="hsBypassBtn" type="button" class="toggle" aria-pressed="false">Bypass</button>
               <div id="hsPrompt" hidden>
                 <small class="note">Couldn't identify the lens from EXIF &mdash; pick it so the correction isn't skipped:</small>
@@ -719,7 +738,12 @@
               <div class="sub-title">Your measured lens <span>from your own sky frames</span></div>
               <p class="note">This is used instead of the profile that came with the app, matched to this frame&rsquo;s focal length and aperture. It was measured on your lens and your camera. Whether it supplies the colour as well as the brightness depends on how it was measured &mdash; the line below says which, and why.</p>
               <small class="note" id="myLensStatus"></small>
-              <label>Strength <input id="myLensStrength" type="range" min="0" max="1.5" step="0.01" value="1" /></label>
+              <label>Strength <input id="myLensStrength" type="range" min="0" max="1.5" step="0.01" value="1" aria-describedby="tipMyLensStrength" /></label>
+              <!-- The same one-word label, on the card that supersedes the one
+                   above it, so it gets the same answer rather than a different
+                   one (decision 024). -->
+              <button type="button" class="inline-btn toggletip" data-tip="tipMyLensStrength" data-tip-for="myLensStrength" aria-controls="tipMyLensStrength" aria-expanded="false"><span class="toggletip-mark" aria-hidden="true">&#9656;</span><span class="toggletip-txt">What this does</span></button>
+              <p class="tip-body" id="tipMyLensStrength" hidden>How much of <em>your own</em> measurement this photograph gets. It opens at <strong>0</strong>, <strong>1</strong> is the profile exactly as you measured it, and past 1 pushes further than the measurement. Whether it moves the colour as well as the brightness depends on how the measurement was made &mdash; the line above says which, and why. Where you leave it is remembered against your profile and comes back on the next photograph taken with that lens. While this card is here it owns the correction outright: the shipped profile's card is put away rather than left with a second slider that moves nothing.</p>
               <button id="myLensBypass" type="button" class="toggle" aria-pressed="false">Bypass</button>
               <button id="myLensForget" type="button">Forget this profile</button>
             </div>
@@ -775,13 +799,35 @@
             <svg id="toneSvg" viewBox="-8 -8 116 116" preserveAspectRatio="none" aria-label="Tone curve"></svg>
             <!-- Global luminance rides on top of the five-point curve: a log-scale
                  track (0.5–2x) storing a 0..1000 position, neutral 1.0 at 500. -->
-            <label>Luminance <small>(overall)</small> <input id="lum" type="range" min="0" max="1000" step="1" value="500" /></label>
+            <label>Luminance <small>(overall)</small> <input id="lum" type="range" min="0" max="1000" step="1" value="500" aria-describedby="tipLum" /></label>
+            <!-- SIX SLIDERS, SIX SENTENCES, AND NONE OF THEM ON SCREEN UNLESS
+                 THEY ARE ASKED FOR (decision 024). A permanent note under each
+                 of these would put six paragraphs between the curve widget and
+                 the points it draws, which is the case the toggletip exists
+                 for — the panel's other 112 notes stay exactly where they are.
+                 Each one says the thing the label cannot: WHERE on the curve
+                 the point sits, and (for the two ends) that it only moves one
+                 way, because main.ts's clampToneOrder holds Blacks in 0..0.25
+                 and Highlights in 0.75..1. A slider that will not go one
+                 direction reads as broken until something says otherwise. -->
+            <button type="button" class="inline-btn toggletip" data-tip="tipLum" data-tip-for="lum" aria-controls="tipLum" aria-expanded="false"><span class="toggletip-mark" aria-hidden="true">&#9656;</span><span class="toggletip-txt">What this does</span></button>
+            <p class="tip-body" id="tipLum" hidden>Rides on top of the curve below and bends everything between its ends: black stays black, white stays white, and the middle lifts or falls around them. That is what makes it different from <strong>Exposure</strong> on the Basic tab, which moves the whole frame, ends included. Half to double, resting in the middle.</p>
             <hr class="divider" />
-            <label>Blacks <input id="tone0" type="range" min="-25" max="25" step="0.5" value="0" /></label>
-            <label>Shadows <input id="tone1" type="range" min="-25" max="25" step="0.5" value="0" /></label>
-            <label>Midtones <input id="tone2" type="range" min="-25" max="25" step="0.5" value="0" /></label>
-            <label>Whites <input id="tone3" type="range" min="-25" max="25" step="0.5" value="0" /></label>
-            <label>Highlights <input id="tone4" type="range" min="-25" max="25" step="0.5" value="0" /></label>
+            <label>Blacks <input id="tone0" type="range" min="-25" max="25" step="0.5" value="0" aria-describedby="tipTone0" /></label>
+            <button type="button" class="inline-btn toggletip" data-tip="tipTone0" data-tip-for="tone0" aria-controls="tipTone0" aria-expanded="false"><span class="toggletip-mark" aria-hidden="true">&#9656;</span><span class="toggletip-txt">What this does</span></button>
+            <p class="tip-body" id="tipTone0" hidden>The curve's bottom point, at the very darkest end. It is already at the floor, so it only <strong>lifts</strong> &mdash; dragging left does nothing. Lifting it puts a grey floor under the deepest shadows, which is what takes the dug-out look off an infrared frame where the foliage is bright and the trunks have nothing in them at all.</p>
+            <label>Shadows <input id="tone1" type="range" min="-25" max="25" step="0.5" value="0" aria-describedby="tipTone1" /></label>
+            <button type="button" class="inline-btn toggletip" data-tip="tipTone1" data-tip-for="tone1" aria-controls="tipTone1" aria-expanded="false"><span class="toggletip-mark" aria-hidden="true">&#9656;</span><span class="toggletip-txt">What this does</span></button>
+            <p class="tip-body" id="tipTone1" hidden>The curve's point a quarter of the way up, so it moves the dark half without touching black itself. This is the one to reach for when shade has gone muddy: lift it and detail comes back out of the dark without flattening the whole frame the way Exposure would.</p>
+            <label>Midtones <input id="tone2" type="range" min="-25" max="25" step="0.5" value="0" aria-describedby="tipTone2" /></label>
+            <button type="button" class="inline-btn toggletip" data-tip="tipTone2" data-tip-for="tone2" aria-controls="tipTone2" aria-expanded="false"><span class="toggletip-mark" aria-hidden="true">&#9656;</span><span class="toggletip-txt">What this does</span></button>
+            <p class="tip-body" id="tipTone2" hidden>The curve's middle point, halfway up the brightness range. Moving it swings everything in between while the two ends stay put, so it is the closest thing on this tab to a brightness control that cannot blow a highlight or crush a black.</p>
+            <label>Whites <input id="tone3" type="range" min="-25" max="25" step="0.5" value="0" aria-describedby="tipTone3" /></label>
+            <button type="button" class="inline-btn toggletip" data-tip="tipTone3" data-tip-for="tone3" aria-controls="tipTone3" aria-expanded="false"><span class="toggletip-mark" aria-hidden="true">&#9656;</span><span class="toggletip-txt">What this does</span></button>
+            <p class="tip-body" id="tipTone3" hidden>The curve's point three quarters of the way up &mdash; the bright half, just below the brightest point. Pull it down to hold back foliage that is running away to white, which in infrared is where most of the brightness sits; push it up to open that foliage out.</p>
+            <label>Highlights <input id="tone4" type="range" min="-25" max="25" step="0.5" value="0" aria-describedby="tipTone4" /></label>
+            <button type="button" class="inline-btn toggletip" data-tip="tipTone4" data-tip-for="tone4" aria-controls="tipTone4" aria-expanded="false"><span class="toggletip-mark" aria-hidden="true">&#9656;</span><span class="toggletip-txt">What this does</span></button>
+            <p class="tip-body" id="tipTone4" hidden>The curve's top point, at the very brightest end. It is already at the ceiling, so it only comes <strong>down</strong> &mdash; dragging right does nothing. Bringing it down rolls off a white that has gone featureless. It is not the same tool as <strong>Recover highlights</strong> on the Basic tab: that one works on what the sensor actually clipped, this one shapes the bright end whether it clipped or not.</p>
             <p class="note">The channel chips steer just one color's curve &mdash; lift Red's shadows to warm them, drop Blue's highlights to un-cool a sky. All rides every saved look and bakes into .cube exports.</p>
             <button id="toneReset" type="button">Reset tone</button>
           </section>
