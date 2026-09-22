@@ -1,59 +1,19 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
-plan=/root/.claude/plans/linear-baking-island.md
-planhash=ef69beb062994fa7
-diffhash=735fdd72524eb2c8
-verdict=IN-SCOPE: every touched file is in the plan's Files list, no source/tool/walk was touched, nothing pushed; all three deviations verified correct by a subagent reading the plan by path
-# WATCHER: a subagent, given the plan BY PATH and the staged diff by path, told to
-# be adversarial and to answer OUT-OF-SCOPE without softening.
-# 
-# FILES — exact match with the plan's Files section, both directions. .doctrine-sync,
-# .github/workflows/gates.yml, NOTES.md, and the two decision records. No extra file
-# in the diff; nothing named in Files missing from it.
-# 
-# NOT IN SCOPE — clean. No src/, tools/ or walk file anywhere in the diff. The
-# watcher independently checked origin/staging, origin/main and the remote session
-# branch and confirmed nothing has been pushed.
-# 
-# NOTES.md IS A PURE RELOCATION. The watcher reconstructed the removed and added
-# blocks from the diff and ran diff on them: the only changes are `- [ ]` -> `- [x]`
-# and the "ON STAGING, 2026-09-21" marker replaced by a "SHIPPED IN 2.57" marker,
-# reflowed to the file's ~80 columns. Every other word is byte-identical. The
-# insertion point is the literal end of the archive section, before the next
-# heading.
-# 
-# DEVIATION (a), plan item 3 not done: judged correct. The 030 bullet already
-# records the lens hot-spot fix, and scope-check confirms dehaze, clarity, hotspot,
-# lensFix, hsFix and shadowSat are all off the whole-frame list. Nothing stale was
-# left in the tracked file.
-# 
-# DEVIATION (b), placement at the END of the archive rather than the top: judged
-# correct and necessary. notesPage() in vite.config.ts does
-# filter(done).reverse().slice(0,12) under the comment that NOTES keeps newest
-# last. The section holds 114 items, so an entry near the top lands past the slice
-# window and is never shown on /notes at all. End placement is the only one that
-# does not silently defeat the plan's own purpose.
-# 
-# A THIRD DEVIATION THE WATCHER FOUND UNPROMPTED, and it is right to name it: the
-# plan's item 4 names 65bf038 as the adopt target and the diff pins 52546b9. The
-# hub moved one commit between the plan being written and the step running, and
-# --adopt followed the live tip rather than the now-stale literal in the plan. That
-# commit adds one row to the hub's docs/usage-trend.csv and carries nothing this
-# repo owes; it was read before the marker was moved. hub-pin-check passes and
-# confirms the pin is reachable on the hub's origin/main.
-# 
-# AND IT CAUGHT AN ARITHMETIC ERROR IN THE PLAN AND IN MY OWN REPORT. Both said
-# scope-check leaves three OWED entries. It leaves FIVE: EditParams.denoise,
-# EditParams.chroma, EditParams.texture, Look.denoise and Look.texture. The wrong
-# count came from reading only the tail of that tool's output. It reached no
-# tracked file, because item 3 was dropped and the 030 bullet was never edited —
-# and that bullet's own closing line names three CONCEPTS (denoise, colour noise,
-# texture) which do cover all five declarations. The plan text is left as written
-# rather than corrected, because editing it now would invalidate the hash this
-# verdict is recorded against.
-# 
-# OUTCOME SECTIONS — nothing overstated. Both disclaim re-running the walks in so
-# many words. The watcher checked all six cited SHAs with git show --stat and
-# confirmed 0557a84 is the tip of origin/main, so "shipped in 2.57, deployed" is
-# not an invented claim.
-# 
-# notes-check and decisions-check both exit 0 against the staged tree.
+plan=/root/.claude/plans/keen-nibbling-cat.md
+planhash=c0e876d0e13823e1
+diffhash=16dfaabb6a0e4762
+verdict=IN-SCOPE: guard and 024 both cleared; the two .sh shims kept over a literal reading, recorded in the finding
+# Watcher verdict (agent, 2026-09-22) against /root/.claude/plans/keen-nibbling-cat.md
+# VERDICT-GUARD: IN-SCOPE. VERDICT-024: IN-SCOPE.
+# It confirmed by reflog that the branch was reset to origin/main before the 024
+# content reappeared, so plan item 2 was done before item 3, in the stated order.
+# OUT OF SCOPE, one item, kept deliberately and recorded rather than buried: the
+# two .sh shims. Its words: the Files section says "the two hooks", two files not
+# four, and "shim" never appears; defensible, mirrors the cited precedent, and
+# "add no capability beyond what is authorised". Kept because removing them means
+# settings.json invoking a bare .mjs against this repo's convention, and they
+# carry the fail-open asymmetry that stops a broken hook taking away every tool.
+# That is my judgement over a literal reading and it is on the record as such.
+# Its NOT DONE item 1 (read the Gates/Deploy runs for 0557a84) it could not
+# confirm because that check leaves no trace in the tree. It was done: Gates
+# success, Deploy success, CodeQL success, all on 0557a84.
