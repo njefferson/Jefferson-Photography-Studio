@@ -775,6 +775,31 @@ user-scalable=no.
   measures the exported file whole (§9l-ii). The gravel half stays open. The
   sources go into `IR-SCIENCE.md` (9l for what shipped). See
   `docs/decisions/013-aerochrome-splotchy-chroma.md`.
+- [ ] **Show the border and let it be moved** <!-- decision: 049 -->
+  proposed from the device 2026-09-22, and it reframes 048 below it: the
+  detection is good, what is missing is an OVERRIDE. Somebody looking at the
+  photograph knows where the horizon is and the detector only infers it, and
+  there is no way for the first fact to reach the second.
+  **The border already exists as data and already leaves the module** —
+  `SkyHorizon.b` is an `Int32Array` of one depth per display column, returned
+  from `buildSkyMask` beside the bitmap for the walks and the probe. Nothing
+  needs computing; showing it is drawing an array that is already there, and
+  adjusting it is editing one integer per column.
+  **And the border is already ABSOLUTE**, which is what makes an override worth
+  having: every pixel above it is selected regardless, because the border is
+  what decided it is sky and a colour fitted to it has no standing to overrule
+  it. So a corrected border is honoured rather than argued with, and the colour
+  stage does the pixel work underneath — the reader supplies the fact only they
+  can see, the machine supplies the boundary. That is the shape interactive
+  segmentation has used since Lazy Snapping: sparse constraints from a person,
+  pixel-accurate edges from the solver, with the contour SHOWN while it is
+  corrected.
+  **One added rule covers the frame that prompted it.** A per-column border
+  expresses one transition, and a wing is sky-wing-sky. So inside a span the
+  reader has moved, the colour model may veto; where nobody has intervened,
+  nothing changes. **This does not replace 048 and 048 does not replace it** —
+  same rule as keeping the intersection when the union lands. See
+  `docs/decisions/049-show-the-border-and-let-it-be-moved.md`.
 - [ ] **Colour cannot finish a selection an occluder has split** <!-- decision: 048 -->
   reported from the device 2026-09-22: the sky selection stops at a jet's wing
   and the sky visible under the wing cannot be brought in. Two things were asked
