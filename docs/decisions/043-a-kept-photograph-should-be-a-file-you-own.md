@@ -86,10 +86,13 @@ pretending the new file is the old one.
   UTF-8 named — which is exactly the container this item's chosen option
   specifies, down to the reason. The closing line of this section said a zip
   writer did not exist; it did, and had for some time.
-- **`src/keepstore.ts` and `keptEditToJson` in `src/main.ts`** are 039's store
-  and its edit round-trip, including the part that matters most here: masks
-  travel as RECIPES with the bitmaps stripped by `shapeOf`, so the edit JSON is
-  already small and already portable.
+- **`src/keepstore.ts` and the edit round-trip in `src/main.ts`** are 039's
+  store and the shape this reuses. **Read the Outcome before taking the next
+  sentence as written**: this said masks travel as RECIPES with the bitmaps
+  stripped by `shapeOf`, so the edit JSON is already small and portable — true
+  of the LIBRARY, and the reason the keep file inherited a rule it should not
+  have. A painted mask has no recipe, and a keep file carries its bitmap. The
+  writer is `keepEdit`, which also hands out the bytes.
 - **`src/gps.ts` already parses an original's own bytes and produces new bytes
   from them** without touching the file it was given — the existing proof that
   deriving a file is a thing this app does and does not confuse with editing one.
@@ -251,23 +254,67 @@ keep. The list of what was already kept stays, read-and-open-only, so nothing is
 stranded; retiring the store is its own item and needs a way to write an
 already-kept photograph out as a file first.
 
-**TWO GAPS THE REMOVAL OPENED, recorded rather than quietly carried.**
+**THE SECOND DEFECT WAS IN THE FORMAT ITSELF, AND THIS RECORD FIRST WROTE IT
+DOWN AS A LIMIT TO BE ANNOUNCED.** The paragraph that stood here said three
+things "cannot travel in a keep FILE either" — a painted mask, a warp, an
+imported LUT — and proposed a caveat dialog so the reader would be told. That
+was wrong in the only way that matters: it accepted the loss and then argued
+about how to phrase it. Reported from the device, and correctly: an edit that
+comes back without its masks is not one you can go on editing, so the app has
+saved a file that cannot do the thing it exists for.
 
-**What a kept photograph cannot carry is now said nowhere.** `keptCaveat` named
-the three runtime things the stored form cannot hold — a painted mask is
-nothing but its bitmap, a warp is a displacement field, an imported LUT is a
-lattice in its own store — and it was said before the name was asked for,
-because afterwards it is an apology. The same three cannot travel in a keep
-FILE either, for the same reason: the edit goes as recipes with the bitmaps
-stripped, which is what keeps it portable. It went with the button.
+**Where the mistake came from is worth more than the fix.** The keep file
+filtered its masks through `canTravel` in `src/maskstore.ts`, which is the mask
+LIBRARY's rule and is right for the library: that feature saves a mask to use on
+OTHER photographs, and pixels painted on one photograph are meaningless on the
+next. A keep file has no next photograph. It carries this one, byte for byte, so
+those pixels are exactly right for it forever. The same reasoning had been
+applied to the warp and the LUT, and the same answer holds. **A new format
+inherited a rule from the one place in the app whose whole subject is a case it
+does not have** — and it inherited the rule's prose with it, which is how the
+limit came to be written down twice as though it had been decided.
 
-Saying it on the file save was written and then BACKED OUT of this change. It
-is a new modal with new reader-facing copy and a new abort path on the primary
-Keep flow, which CLAUDE.md requires an accessibility pass for; doing it here
-would have been a fresh product decision wearing the costume of fallout from a
-deletion. It is its own item.
+Nor was there a size argument. A painted bitmap is capped at
+`BRUSH_MAX_EDGE` = 384 on its longer edge, so about 147 KB beside a 28 MB raw,
+and unlike the raw it compresses.
 
-**And two walks now drive markup that is gone.** `tools/kept-walk.mjs` pressed
+**Fixed by giving the container a place for bytes.** `KEEP_PATHS.partDir` —
+`edit/` inside the archive — holds every piece of an edit that is bytes rather
+than numbers, and the edit JSON's own `bytes` appendix names the entry it wants.
+`src/keepfile.ts` never looks inside one: it owns the container and knows
+nothing about what an edit means.
+
+**The JSON stays exactly the shape the applier already accepts**, with `warp`
+and `lut` null and the bitmaps out of `masks`, and the bytes are laid on as a
+SECOND pass by `attachKeepBytes`. That is not tidiness. `applySnapshot` refuses a
+warp or a LUT whose arrays are not real typed arrays, deliberately, because a
+resumed session's JSON strips them and a half-activated one is worse than none —
+so routing a revived lattice through that channel would have been silently
+dropped, in a way that reads as the restore working.
+
+**A generated selection's pixels are still not stored, and that is not the same
+kind of omission.** `regeneratedAtOpen` is the one predicate both
+`rebuildSkyMasks` and the writer ask, so the two cannot come to disagree: the
+photograph itself puts a sky selection back on open, with the reader's own
+corrections replayed over what it finds. Storing it as well would be a redundant
+megabyte AND a stale one, laid over the freshly detected copy.
+
+**AND A THIRD DEFECT FELL OUT OF WRITING THE FIRST ONE DOWN.** A correction
+stroke's points are a `Float32Array`, which `JSON.stringify` turns into
+`{"0":…,"1":…}` — an object with no `length`. `rebuildFix` reads that as a
+stroke of zero dabs and skips it. **Every hand correction on a kept sky
+selection had been lost on every reopen, silently, since the format existed**,
+while the mask itself came back and the selection looked merely wrong rather
+than incomplete. The strokes are written as plain arrays now and given their
+declared type back on the way in.
+
+**What genuinely does not travel** is a LUT's `.cube` source text, which stays
+in the device's own LUT store — so opening a keep file elsewhere applies the
+lattice without adding the LUT to that device's library — and the undo history,
+which belongs to a session rather than to a photograph.
+
+**AND THE ONE GAP THE REMOVAL ACTUALLY LEFT: two walks now drive markup
+that is gone.** `tools/kept-walk.mjs` pressed
 `#keepPhoto` to create a row, and `tools/a11y-walk.mjs` used the same button to
 reach the kept list for its audit. Nothing in the app can create a kept row any
 more, so neither can arm itself. Both now FAIL loudly naming decision 043 as the
