@@ -2901,7 +2901,20 @@ button.toggletip {
 .look-sub { font: 400 0.6875rem/1.2 var(--mono); color: var(--txt-3); min-height: 13px; }
 
 @media (max-width: 760px) {
-  #app { grid-template-columns: 1fr; grid-template-areas: "bar" "stage" "panel"; grid-template-rows: auto 1fr auto; }
+  /* THE `swstrip` ROW IS IN THIS TEMPLATE TOO, and leaving it out took the
+     whole app apart. `.sw-strip` is placed with `grid-area: swstrip`; a named
+     area that does not exist in the template in force does not fall back to
+     the normal flow, it auto-places into the IMPLICIT grid. Measured at
+     302x656 with the strip shown: one column became `16px 0px 286px`, three
+     rows became five, the stage collapsed to 16x62 and the top bar to 16px
+     wide — the whole app crushed into a sliver down one edge with nothing on
+     it big enough to press, and the update strip the only working control on
+     screen. Opened and looked at, not inferred from the numbers.
+     Reported from an iPhone 2026-09-22, where the only way out was to
+     turn off rotation lock and rotate: past 760px this query stops applying
+     and the template that DOES declare the area takes over. It needed a
+     waiting worker to show at all, which is why it took until now to meet. */
+  #app { grid-template-columns: 1fr; grid-template-areas: "bar" "swstrip" "stage" "panel"; grid-template-rows: auto auto 1fr auto; }
   #app:has(#panel[hidden]) { grid-template-columns: 1fr; }
   #panel { border-left: none; border-top: 1px solid var(--line); max-height: 45dvh; }
   /* min-width:0 on BOTH levels: the nowrap action row's min-content would
