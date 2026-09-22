@@ -1,4 +1,4 @@
-# 026 · Masks combine: a group of components joined by add, subtract and intersect
+# 026 · Masks combine: a group of components joined by subtract and intersect
 
 ## Context
 
@@ -7,6 +7,17 @@ combine; it should be possible to **subtract other colours from the Sky mask**;
 and a mask should be invertible. Lightroom is the familiar reference and the
 request was explicitly for the **standard convention**, not for something
 invented here.
+
+**TITLE CORRECTED 2026-09-22, and the correction is the point rather than a
+tidy-up.** It read "joined by add, subtract and intersect". No union was ever
+built: `groupWeight` folds op 1 as subtract and ops 0 and 2 through the same
+multiply, so what this record shipped is subtract and intersect. The word
+"add" came from the request, where it meant adding a MASK, and it was carried
+into the title as though it named an operator. It then travelled into record
+040, into `NOTES.md` twice and into a source comment in `ir.html`, and was
+read back as evidence that a union existed — which is how a reader came to
+ask for one and be told it was already there. Record 048 carries the missing
+half.
 
 One of the three already exists. `MaskLayer.invert` is on every mask type and
 has been since the masks shipped — the Masks tab exposes it, and the sky

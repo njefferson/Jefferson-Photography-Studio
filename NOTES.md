@@ -775,6 +775,35 @@ user-scalable=no.
   measures the exported file whole (§9l-ii). The gravel half stays open. The
   sources go into `IR-SCIENCE.md` (9l for what shipped). See
   `docs/decisions/013-aerochrome-splotchy-chroma.md`.
+- [ ] **Colour cannot finish a selection an occluder has split** <!-- decision: 048 -->
+  reported from the device 2026-09-22: the sky selection stops at a jet's wing
+  and the sky visible under the wing cannot be brought in. Two things were asked
+  for and neither exists. **A mask cannot add to the mask above it** — driven in
+  the app with real presses, the join control offers only **On its own**,
+  **Subtract from it** and **Only where both**, so a second mask can shrink or
+  intersect the one above it and nothing grows it. And **nothing moves the sky's
+  border**: `skyhorizon.ts` computes one border depth per display column, so in
+  every column the wing crosses the border lands at the wing's top edge, which
+  is also why one slider could never fix it.
+  **Colour cannot reach it either.** Follow the sky's colour grows out of what
+  was found into pixels that match **and join** it — a 4-connected fill that
+  refuses to cross a hard edge — and the hole-fill only re-adds enclosed pixels
+  no deeper than the sky already reaches. Sky below a wing is both detached and
+  deeper, so it is excluded twice by rules that are each correct on their own.
+  **The remedy is the half of the algebra this repo already claims to ship.**
+  Record 040 names darktable's exclusive/inclusive algebra; what shipped is
+  subtract and exclusive. Inclusive — the union — is missing, and it is what
+  lets a Colour mask complete the Sky mask, which is the field's answer in
+  Lightroom (Select Sky, then Add → Color Range, which is deliberately not
+  contiguous) and in darktable alike. **Hand-brushing the region in is not the
+  route** and is rejected on the report.
+  **THE UNION IS ADDITIVE AND MUST NOT COST THE INTERSECTION** — both are
+  wanted and both ship. `groupWeight` folds with `w *= op === 1 ? 1 - c : c`, so
+  intersect is the DEFAULT branch and a session adding union there is one edit
+  from making union the default and losing **Only where both** with nothing
+  going red. Union lands as a third fold case, darktable's inclusive operator
+  `w + c - w*c`, beside the existing multiply and never in place of it. See
+  `docs/decisions/048-colour-cannot-finish-a-selection-an-occluder-has-split.md`.
 - [ ] **Sky seen through a canopy takes no sky adjustment** <!-- decision: 028 -->
   — the Sky mask spreads only through pixels that are JOINED to the sky, which
   is the whole reason it does not readmit every cold-looking object in the
@@ -3538,7 +3567,10 @@ read as authoritative, and an invented one is worse than a missing one.
   was for masks to "include add, subtract, etc, like commercial offerings" —
   **and those shipped in 2.53**. `MaskLayer.op`, groups folded by
   `groupWeight`, darktable's exclusive/inclusive algebra, with a walk that
-  proves it. The capability is there and was not found, which is a worse defect
+  proves it. **CORRECTED 2026-09-22: "add" there means adding a MASK, not a
+  union with the mask above, which does not exist** — `groupWeight` folds op 1
+  as subtract and ops 0 and 2 through one multiply, so what shipped is subtract
+  and intersect. Record 048 carries the missing half. The capability is there and was not found, which is a worse defect
   than a missing feature because nothing in the app reports it: every gate is
   green and the reader concludes the app cannot do it.
   The other three: the hand-correction brush is one size with no ring under the
@@ -3931,7 +3963,7 @@ read as authoritative, and an invented one is worse than a missing one.
   structured-CLONED rather than moved: correct, and a doubled peak on the one
   path whose ceiling matters most. See
   `docs/decisions/036-a-tiff-export-uses-one-core.md`.
-- [x] **Masks combine: a group of components joined by add, subtract and intersect** <!-- decision: 026 -->
+- [x] **Masks combine: a group of components joined by subtract and intersect** <!-- decision: 026 -->
   asked 2026-09-19 in three parts: the masks need to combine, it should be
   possible to subtract other colours from the Sky mask, and a mask should be
   invertible. Invert already exists on every mask type. The other two are one
