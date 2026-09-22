@@ -794,11 +794,16 @@ user-scalable=no.
   segmentation has used since Lazy Snapping: sparse constraints from a person,
   pixel-accurate edges from the solver, with the contour SHOWN while it is
   corrected.
-  **One added rule covers the frame that prompted it.** A per-column border
-  expresses one transition, and a wing is sky-wing-sky. So inside a span the
-  reader has moved, the colour model may veto; where nobody has intervened,
-  nothing changes. **This does not replace 048 and 048 does not replace it** —
-  same rule as keeping the intersection when the union lands. See
+  **AND IT IS NOT JUDGED ON SOLVING THE REPORTED FRAME ALONE.** A per-column
+  border expresses one transition and a wing is sky-wing-sky, so moving the
+  border to the true horizon takes the wing in with the sky. That is not a
+  defect in this control: the wing comes off with a Colour mask joined as
+  **Subtract from it**, which ships today. **So the reported frame is answered
+  by this plus what already exists, and does not need 048** — which stays
+  wanted anyway, for every case a subtract cannot serve. A capability is judged
+  on doing what it says and doing it correctly; outcomes come from STACKS, and
+  a control that grows a special case per outcome ends up doing several things
+  approximately instead of one thing exactly. See
   `docs/decisions/049-show-the-border-and-let-it-be-moved.md`.
 - [ ] **Colour cannot finish a selection an occluder has split** <!-- decision: 048 -->
   reported from the device 2026-09-22: the sky selection stops at a jet's wing
