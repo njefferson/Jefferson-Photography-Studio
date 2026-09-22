@@ -16,13 +16,14 @@ import "./style.css";
 // The shared chrome stylesheet. The editor does not use verdlg.ts yet — see the
 // note there — but it uses .more-row, which now lives beside it.
 import "./verdlg.css";
-import { importFile, type ImportedFile, type ImageKind } from "./import";
+import { importFile, sniff, refineKind, type ImportedFile, type ImageKind } from "./import";
 import { wireForceUpdate, wireUpdateStrip, setUpdateCost } from "./swupdate";
 import { type DecodedImage, pickLargestPreview, linearAt, grayWorldWB, lumNormalize } from "./decode";
 import { decodeOffThread, decodeLanes, decodeLaneTarget, type DecodeTiming } from "./decodeClient";
 import { sourceIsMosaiced, type ExportOptions } from "./export";
 import { Renderer, type EditParams } from "./gl";
 import { exportImage, saveBlob, lastExportProfile, exportThreadsNow, getSource, proxyFactorFor, type ExportFormat } from "./export";
+import { writeKeepFile, readKeepFile, isKeepName, KEEP_EXT } from "./keepfile";
 import { buildLinearSourceInBands } from "./gpuexport";
 import { fromHalf } from "./half";
 import { findLocation, stripLocation } from "./gps";
@@ -10251,7 +10252,7 @@ document.addEventListener("keydown", (e) => {
 /** The picker's own accept list, applied to files that arrive by other routes.
  *  A drop and a paste have to be as fussy as the picker or they hand the decoder
  *  something it will fail on later, further from the thing the reader did. */
-const OPENABLE_EXT = /\.(dng|nef|zip|ipslook)$/i;
+const OPENABLE_EXT = /\.(dng|nef|zip|ipslook|ipskeep)$/i;
 function openableFiles(list: FileList | null | undefined): File[] {
   return Array.from(list ?? []).filter((f) => f.type.startsWith("image/") || OPENABLE_EXT.test(f.name));
 }
@@ -11221,6 +11222,19 @@ async function openPicked(files: File[], ready?: Map<File, ReadyFile>) {
     // One receive dialog at a time; extra look files are announced honestly.
     receiveLookText(await lookFiles[0].text(), "look file");
     if (lookFiles.length > 1) toast(`Opened 1 of ${lookFiles.length} look files — import the others one at a time.`, 3200);
+    if (!files.length) return;
+  }
+  // KEEP FILES ARE PEELED OFF FOR THE SAME REASON LOOKS ARE (decision 043): a
+  // keep file is not a photograph, it is a photograph AND the edit made of it,
+  // so it must never reach the decoder or be counted against a session. Routed
+  // by name rather than by a head-sniff because a keep file is a zip, and
+  // sniffing one would have to read far enough in to tell it from the zip of
+  // raws the importer already supports.
+  const keepFiles = files.filter((f) => isKeepName(f.name));
+  if (keepFiles.length) {
+    files = files.filter((f) => !isKeepName(f.name));
+    await openKeepFile(keepFiles[0]);
+    if (keepFiles.length > 1) toast(`Opened 1 of ${keepFiles.length} saved photos — open the others one at a time.`, 3200);
     if (!files.length) return;
   }
   let append = false;
@@ -12752,6 +12766,48 @@ function keptCaveat(): string {
  *
  *  What the caller relies on: after this resolves the list is redrawn, so the
  *  start-screen button and the held total cannot disagree with the store. */
+/** SAVE THIS PHOTOGRAPH AS A FILE THE READER OWNS — decision 043.
+ *
+ *  Takes nothing; acts on the open photograph. Writes a keep file — the picked
+ *  file's own bytes carried beside this edit — and hands it to the share sheet.
+ *  Returns nothing.
+ *
+ *  WHY IT IS NOT THE BUTTON ABOVE IT. `keepCurrentPhoto` puts the photograph in
+ *  IndexedDB, which is storage the app created and the reader does not own: it
+ *  cannot be moved to another device, cannot be backed up, and iOS may reclaim
+ *  it without telling the app. Both are wanted and neither replaces the other.
+ *
+ *  What it has to hold: `currentFile.bytes` is the reader's picked file, shared
+ *  with the decode path, and is passed through UNWRITTEN — `keepfile.ts` does
+ *  not touch it and `tools/keepfile-check.mjs` asserts that separately. A
+ *  cancelled share sheet is an ordinary outcome, not a failure.
+ */
+async function keepCurrentAsFile(): Promise<void> {
+  if (!current || !currentFile) return;
+  flushRecord(); // a slider still mid-drag is part of the edit being written
+  const base = currentFile.name.replace(/\.[^.]+$/, "");
+  showBusy("Packing\u2026");
+  try {
+    const blob = writeKeepFile(
+      currentFile.bytes,
+      currentFile.name,
+      keptEditToJson(),
+      base,
+      __APP_VERSION__,
+      new Date(),
+    );
+    hideBusy(); // the sheet is the reader's turn, not the app's
+    const how = await saveBlob(blob, base + KEEP_EXT);
+    if (how === "cancelled") return; // asked and then thought better of it
+    toast("Saved \u2014 open it here again any time", 2600);
+  } catch (err) {
+    recordFailure("saving a photo as a file", err);
+    await noticeDialog("That photo could not be saved", (err as Error).message);
+  } finally {
+    hideBusy();
+  }
+}
+
 async function keepCurrentPhoto(): Promise<void> {
   if (!current || !currentFile) return;
   flushRecord(); // a slider still mid-drag is part of the edit being kept
@@ -12830,6 +12886,82 @@ async function keepCurrentPhoto(): Promise<void> {
  *  reader pressed a name in a list; one press of Undo waiting on arrival is the
  *  restore showing through, which is the finding `activateCurrent`'s own
  *  comment already records. */
+/** SHOW ONE PHOTOGRAPH WITH AN EDIT ALREADY ON IT — the shape both routes back
+ *  into a photograph share, so neither can drift from the other.
+ *
+ *  @param srcName  the original's filename; the strip and the exports use it.
+ *  @param kind     the decoded kind, as the import decided it.
+ *  @param size     the original's length in bytes.
+ *  @param edit     039's edit JSON, which `activateCurrent` lays on.
+ *  @param keptId   the store row this came from, or null when it came from a
+ *                  FILE the reader holds. A keep file has no row, and saying so
+ *                  is what stops a later Keep silently rewriting the edit of
+ *                  whichever kept photograph happened to be open before.
+ *  @returns nothing.
+ *
+ *  WHAT IT HAS TO HOLD, and the whole reason it is one function: `settled` is
+ *  re-seeded AFTER `rebuildSkyMasks`, because the masks `activateCurrent`
+ *  snapshotted had no bitmaps yet — without it, the state the reader can undo
+ *  to is a photograph whose selections select nothing. `baseline` is
+ *  deliberately NOT moved, so Reset still returns to how the photograph opens.
+ *  That ordering is subtle, it is load-bearing, and two copies of it is the
+ *  defect class this repository has the most lessons about.
+ */
+function showLoneWithEdit(srcName: string, kind: ImageKind, size: number, edit: string, keptId: string | null): void {
+  // A photograph opened this way is ONE photograph: the lone-open shape, no
+  // strip to resume, with its stored edit riding in beside it.
+  sessionPhotos = [{ id: "lone", name: srcName, kind, size, edit, thumbUrl: "", thumbState: "real" }];
+  nextOrder = 0;
+  liveEdits.clear();
+  activateCurrent("lone");
+  openKeptId = keptId;
+  if (rebuildSkyMasks()) updateSkyStatus();
+  settled = snapshot();
+  void captureActiveEdit();
+  updateMaskUI();
+  renderMaskOverlay();
+  updateSessionStrip();
+  draw();
+}
+
+/** OPEN A KEEP FILE THE READER PICKED — decision 043's other door.
+ *
+ *  @param f  the picked `.ipskeep` file.
+ *  @returns nothing. Reports through the usual dialog when the package cannot
+ *  be opened; `readKeepFile` refuses a damaged or future-format one with a
+ *  message worth showing, so nothing here has to guess.
+ *
+ *  THE KIND IS DERIVED, NOT STORED. `refineKind(sniff(bytes), name)` is exactly
+ *  what a normal import does, so a photograph opened out of a keep file is
+ *  classified identically to the same file picked directly — one rule in one
+ *  place, which a `kind` field in the manifest could only ever disagree with.
+ *  It is also why `keepfile.ts` carries no app types: it owns the container.
+ *
+ *  What it has to hold: this ends in `showLoneWithEdit` with a null store id,
+ *  because a keep file has no row — see that function for what the null means.
+ */
+async function openKeepFile(f: File): Promise<void> {
+  showBusy("Opening\u2026");
+  try {
+    const { manifest, original, editJson } = await readKeepFile(await f.arrayBuffer());
+    const imported: ImportedFile = {
+      name: manifest.original,
+      kind: refineKind(sniff(original), manifest.original),
+      bytes: original,
+      looksTranscoded: false,
+    };
+    const img = await decodeWithLens(imported, { front: true, sky: true });
+    showDecoded(img, imported);
+    showLoneWithEdit(manifest.original, imported.kind, original.length, editJson, null);
+    toast(`Opened \u201c${manifest.name}\u201d`, 2000);
+  } catch (err) {
+    recordFailure("opening a keep file", err);
+    await noticeDialog("That file could not be opened", (err as Error).message);
+  } finally {
+    hideBusy();
+  }
+}
+
 async function openKeptPhoto(id: string): Promise<void> {
   keptDlg.close();
   showBusy("Opening\u2026");
@@ -12847,23 +12979,7 @@ async function openKeptPhoto(id: string): Promise<void> {
     // A kept photograph is one photograph, so it takes the lone-open shape —
     // no strip, nothing to resume — with its stored edit riding in beside it
     // for `activateCurrent` to lay on.
-    sessionPhotos = [{ id: "lone", name: rec.srcName, kind: rec.kind, size: rec.size, edit: rec.edit, thumbUrl: "", thumbState: "real" }];
-    nextOrder = 0;
-    liveEdits.clear();
-    activateCurrent("lone");
-    openKeptId = id;
-    if (rebuildSkyMasks()) updateSkyStatus();
-    // RE-SEEDED AFTER THE REBUILD, for `activateCurrent`'s own reason one step
-    // later: the masks it snapshotted had no bitmaps yet, so without this the
-    // state the reader can undo to is a photograph whose selections select
-    // nothing. `baseline` is deliberately not moved — Reset still returns to
-    // how the photograph opens.
-    settled = snapshot();
-    void captureActiveEdit();
-    updateMaskUI();
-    renderMaskOverlay();
-    updateSessionStrip();
-    draw();
+    showLoneWithEdit(rec.srcName, rec.kind, rec.size, rec.edit, id);
     toast(`Opened \u201c${rec.name}\u201d`, 2000);
   } catch (err) {
     recordFailure("opening a kept photo", err);
@@ -12939,6 +13055,7 @@ async function refreshKept(): Promise<void> {
 }
 
 $("keepPhoto").addEventListener("click", () => void keepCurrentPhoto());
+$("keepFile").addEventListener("click", () => void keepCurrentAsFile());
 keptBtn.addEventListener("click", () => { void refreshKept(); keptDlg.showModal(); });
 $("keptDlgClose").addEventListener("click", () => keptDlg.close());
 

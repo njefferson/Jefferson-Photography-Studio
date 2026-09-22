@@ -226,3 +226,15 @@ also=tools/shadow-cast-check.mjs
 # INSTRUMENT: comparing against the input array let a writer that corrupts its
 # input in place pass, because both sides of the comparison changed together.
 also=tools/keepfile-check.mjs
+
+# Run on every commit: what the app will open is written in SIX places and they
+# have to agree. `OPENABLE_EXT` in src/main.ts decides what a picked file may
+# be; five `accept` attributes in ir.html tell the PICKER the same thing by
+# hand. On iOS an extension missing from `accept` is a file the reader cannot
+# select at all — so the two disagreeing does not degrade, it hides the feature
+# while every gate stays green. Adding decision 043's `.ipskeep` meant touching
+# six places, and this repo already has an EditParams rule about five. Derived
+# from the regex in the source rather than typed, so this gate cannot become
+# the seventh place to update; the lens rig's own picker is declared as an
+# exception with its reason and printed on every run.
+also=tools/openable-check.mjs
