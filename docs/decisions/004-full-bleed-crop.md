@@ -37,6 +37,23 @@ Non-trivial against the existing code: canvas sizing, the box-to-photo mapping
 through `viewImageRect` and `positionCropOverlay`, pinch anchoring, and the
 OS-edge insets under `.cropping` all assume the contained `#view`.
 
+**THE ROTATION GESTURE IS NOT THIS ITEM'S TO INVENT ANY MORE.** `027` declares
+that it SETS the idiom for turning something on this device, and it is ranked
+far above this, so by the time this is built the gesture will exist and this
+adopts it. The declaration used to run the other way — `027` was to reuse what
+this settles — which was unsatisfiable at its rank and was corrected on
+2026-09-22 rather than left to be discovered by whichever was built first
+inventing a second way to turn something.
+
+## Depends
+
+- touches 027 — 027 sets the idiom for turning something on this device and is
+  ranked far above this, so this ADOPTS that gesture rather than inventing a
+  second way to turn something. Declared here as well as there because this
+  record names 027 in its own prose, and a citation with no relation behind it
+  is how the graph comes to be grown out of somebody's memory instead of out of
+  what is written.
+
 ## Options
 
 **Float the crop pill over the photo and let taps pass through where it is

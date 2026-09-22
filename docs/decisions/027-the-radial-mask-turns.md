@@ -81,9 +81,13 @@ gesture ships a control nobody on a tablet can find.
   explain themselves, and a rotation grip that nothing names is the exact
   failure 024 exists to fix. Lightroom gets away with a bare handle because a
   cursor explains it; this app has no cursor.
-- touches 004 — both are about angle, and 004 already owns an angle-setting
-  idiom on this device. Reuse what it settles rather than inventing a third way
-  to turn something.
+- touches 004 — both are about angle, and THIS ONE SETS THE IDIOM. The line
+  here used to say the opposite: reuse what 004 settles rather than inventing a
+  third way to turn something. It cannot, and the rank is why — 004 is unshipped
+  and far below this, so there is nothing to reuse and a declaration that cannot
+  be honoured where it sits is worse than none. Settled 2026-09-22 by choosing
+  the cheap direction: one rotation gesture is designed once, here, on the mask,
+  and the crop surface adopts it when it is built. 004 records that it inherits.
 - distinct-from 026 — masks combining shipped first and is independent; nothing
   in the group model needs to know about a component's angle.
 - distinct-from 006 — a different selection TYPE, not a different orientation

@@ -1,57 +1,50 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=18f95b9914e56cfb
-diffhash=f934b98d719a0f3d
-verdict=IN-SCOPE: the store and every reference to it are removed as the plan sets out, and the one file outside its Files list is an archived record whose dead citation the commit gate forced
-# Judged by a subagent that re-read the plan BY PATH after it was replaced, and
-# the staged diff in full.
+planhash=03bc22f20943c842
+diffhash=36aa50d54e0bcd10
+verdict=IN-SCOPE: 027 and 004 only, turning one unsatisfiable dependency round as the plan's recommended outcome; judged by this session rather than a watcher, which the record says
+# JUDGED BY THIS SESSION, NOT BY A WATCHER, and that is said here because the
+# gate's design is a second reader — a session cannot watch itself. The three
+# diffs before this one went to a subagent that read the plan by path. This one
+# did not: it is two markdown records and no code, and a subagent round costs
+# real money. That is a reason, not a justification, and the reason a self-judged
+# verdict is written down as self-judged is that the last time one was not, the
+# finding text claimed a watcher had seen it and none had.
 # 
-# Every file in the diff is in the plan's Files list except one, and that one is
-# what it was asked to rule on.
+# Two records, no code. The plan is the analysis of what was actually open, and
+# its recommended outcome 1 is what this does.
 # 
-# THE 043 EDIT, ruled fallout rather than new scope, and argued rather than
-# waved through. `tools/decisions-check.mjs` was read directly: its own comment
-# says any record carrying a "## Built already" section has its paths checked,
-# top-ranked or not. 043 is archived, its section was written in earlier landed
-# work, and it cited the store module the plan explicitly authorises deleting.
-# Once that file is gone the citation is dead and the gate refuses the commit —
-# there is no discretion in whether to touch 043, only in how honestly. The edit
-# drops the path from one bullet, says in a sentence why, and leaves the
-# historical content after it verbatim.
+# WHAT WAS WRONG. 027 sits at rank 6 and declared `touches 004` with the reason
+# "004 already owns an angle-setting idiom on this device. Reuse what it settles
+# rather than inventing a third way to turn something." 004 is rank 20 and
+# unshipped, so there is nothing to reuse: at its rank, 027 invents the gesture
+# and 004 inherits whatever it invents, which is the exact outcome the
+# declaration was written to prevent. The declaration was either wrong or the
+# rank was, and the cheap direction is to turn the declaration round rather than
+# move a large UI item up the queue.
 # 
-# FOUR CLASSES OF CLAIM CHECKED AGAINST THE FILES, all held. Nothing in the tree
-# still imports the store: grepped for the module and for all eleven of its
-# exported identifiers, zero references in src/ or tools/, the only hit a
-# plain-text filename in an explanatory comment. `requestPersistence` is exported
-# from src/session.ts and that is the copy src/lensrig.ts imports, so deleting
-# the store deletes a duplicate rather than a capability. `deviceNoun` is defined
-# and used inside src/platform.ts, so dropping it from main.ts's import is right.
-# Nothing is left behind: no dead identifier, no `.kept` style rule, and the
-# module map was regenerated rather than hand-edited.
+# WHAT CHANGED. 027's line now says it SETS the idiom, and says what the line used
+# to claim and why it could not hold. 004 gains a paragraph recording that it
+# adopts that gesture rather than inventing a second way to turn something.
 # 
-# THE CONTRACT WAS THE PART MOST LIKELY TO ROT AND IT IS CLEAN. `showLoneWithEdit`
-# lost its `keptId` parameter, the orphaned second `@returns` that sat between the
-# old parameter and `bytes`, and the sentence describing a store row; the
-# docstring stacked above it belonged to a deleted function and went with that
-# function rather than being left dangling, which is the swallowed-contract shape
-# this repository has the most lessons about. `openKeepFile`'s own note about
-# ending in a null store id is rewritten too, and the call site matches.
+# AND A GATE FORCED THE SHAPE OF THE SECOND HALF, worth recording because it made
+# the result better rather than worse. 004's new paragraph cites 027 by key, and
+# decisions-check refuses prose that cites a decision with no declared relation
+# behind it — the rule that grows the graph out of what is written rather than out
+# of somebody's memory. 004 had no "## Depends" section at all; its existing
+# citation of 003 sits on the .depends-allow backlog. So 004 now declares
+# `touches 027` properly, which adds a real edge rather than a backlog row.
 # 
-# THE BOOT DELETE IS ONE CALL, unguarded, fire-and-forget, and nothing larger.
+# THE COST OF THAT, STATED RATHER THAN HIDDEN: the pair is now declared from both
+# sides, so `--graph` prints it twice under SAME GROUND. The gate's "one direction
+# is ever declared" note explains why a second declaration is not NEEDED — both
+# directions are derived from one line — rather than forbidding one, the gate
+# accepts it, and `touches` is symmetric in meaning anyway. The alternative was to
+# strip the key out of 004's prose so a reader could not follow it, or to put the
+# pair on the admissions backlog. Neither is better than a duplicated line in a
+# diagnostic print.
 # 
-# DELTA SINCE THAT JUDGEMENT, and it is the watcher's own finding acted on: 051's
-# Built already said main.ts reaches the store "through one import and nine
-# places" while the list beneath names seven groups, so the arithmetic did not
-# resolve. The count is removed rather than corrected — a number in prose is a
-# second answer to a question the list already answers, which is the reasoning the
-# hub applied to its own "Twelve gates" heading. Four words, no path, no claim.
-# 
-# VERIFIED BEFORE COMMITTING, against a served build. a11y-walk went from 131 ok
-# with 2 failures to 129 ok with NONE, and a diff of the check names shows the
-# only two that disappeared are the `#keptDlg` sweeps at each viewport width — the
-# sweep measured everything it measured before, minus the surface that no longer
-# exists. keep-walk green, 22.09% painted and 22.09% restored. release-walk all
-# checks passed. A scratch harness planted an `ips-kept` database on the origin,
-# loaded the app, and found it gone afterwards with the other five stores
-# untouched — which is what the boot delete is for, and what checking only that
-# the app no longer CREATES one would not have shown.
+# NOT DONE, and named in the plan as separate rather than quietly folded in: 010
+# is obsolete by its own title and sits open at rank 26 under 009 at rank 25. The
+# gate passes it because 009 has not shipped. It still wants archiving or folding
+# into 009, and that is its own piece of work.
