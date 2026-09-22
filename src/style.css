@@ -2518,9 +2518,52 @@ label.open-btn, label.bar-btn {
   gap: 8px;
 }
 .sub-title span { font: 400 0.6875rem/1.3 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--txt-3); }
-.note { display: block; margin: 6px 0; font-size: 0.75rem; line-height: 1.45; color: var(--txt-3); text-align: left; }
+/* `.tip-body` rides this rule rather than carrying `.note`, and the difference
+   is deliberate: `#panel.notes-off .note` hides the permanent explanations when
+   the reader turns them off, and a toggletip that opened onto nothing would be
+   a control that does nothing. Turning the notes off is exactly the state where
+   the on-demand route has to keep working. Same words, same tokens, one rule. */
+.note, .tip-body { display: block; margin: 6px 0; font-size: 0.75rem; line-height: 1.45; color: var(--txt-3); text-align: left; }
 .note.footnote { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
 .note-inline { font-size: 0.6875rem; color: var(--txt-3); }
+
+/* DECISION 024 · THE TOGGLETIP — a control's sentence, reached by a finger.
+   A `title` is a hover and there is no hover on a tablet, so the route to an
+   explanation is a real button: 44px from the base button rule, accent text on
+   the panel's own ground (the pairing `.note-more > summary` already ships and
+   the a11y walk already measures), and a --line-2 edge, which is the calibrated
+   3:1 token. The marker turns with the state AND the label changes word — the
+   rotation is a second cue, never the only one. */
+/* `button.toggletip` AND NOT `.toggletip`: `.inline-btn` is declared later in
+   this file and sets `display: inline-block`, which at equal specificity wins
+   and silently drops the flex `gap` — the marker rendered flush against the
+   word ("▸What this does"). An element+class selector beats it, and the pill
+   shape and width:auto still come from `.inline-btn`, which is the point of
+   reusing that pattern. */
+button.toggletip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid var(--line-2);
+  color: var(--accent);
+  font-weight: 500;
+  margin: 2px 0 4px;
+}
+/* NO LOCAL prefers-reduced-motion RULE HERE ON PURPOSE. The global one at the
+   bottom of this stylesheet already kills every transition with !important, so
+   a second rule saying the same thing would be a second answer to a settled
+   question — measured 0.01ms under `reduce`, which is that rule and not this
+   one. `.note-more` has a local copy from before the global rule existed. */
+.toggletip-mark { display: inline-block; font-size: 0.9em; transition: transform 0.15s ease; }
+.toggletip[aria-expanded="true"] .toggletip-mark { transform: rotate(90deg); }
+/* Attached to the trigger above it by a rule rather than by proximity alone,
+   so it reads as that control's sentence and not as the next control's note. */
+.tip-body {
+  margin: 0 0 12px;
+  padding-left: 10px;
+  border-left: 2px solid var(--line-2);
+}
 /* THE LABEL IS --txt, NOT --accent. An accent-tinted fill with accent-coloured
    text on it works against itself: the wash pulls the ground toward the very
    colour the text is, so the more visible the tint, the worse the contrast.
