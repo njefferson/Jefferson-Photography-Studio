@@ -714,17 +714,6 @@ user-scalable=no.
   luma, under gray-world gains, which its own contract says does not move as
   the photograph is graded. See
   `docs/decisions/032-a-mask-keys-the-photograph-not-the-grade.md`.
-- [ ] **Every control can say what it does, and a finger can reach the saying** <!-- decision: 024 --> —
-  asked 2026-09-19 from the PC, in the sitting that reported a slider named
-  after the defect rather than the act: there should be something clickable
-  or hoverable, where it makes sense, that says what each tool does. Measured
-  the same day: 103 visible notes against 76 labelled sliders, so most
-  controls already explain themselves permanently and what is missing is the
-  rule — which get a sentence, where it goes, and how a reader asks for one.
-  The field's tap-reachable form is a toggletip, not a tooltip, and this
-  repository's own gate already refuses a `title` for this use, because there
-  is no hover on a tablet. See
-  `docs/decisions/024-every-control-can-say-what-it-does-without-a-hover.md`.
 - [ ] **The radial mask turns** <!-- decision: 027 -->
   asked 2026-09-19 beside the mask-combining request: the circle mask needs to
   be rotated. It is the only selection in the app whose orientation cannot be
@@ -786,37 +775,6 @@ user-scalable=no.
   measures the exported file whole (§9l-ii). The gravel half stays open. The
   sources go into `IR-SCIENCE.md` (9l for what shipped). See
   `docs/decisions/013-aerochrome-splotchy-chroma.md`.
-- [ ] **The foliage is the right colour and reads as a blob** <!-- decision: 016 --> — reported
-  from the iPad 2026-09-17 on the Aerochrome look, asking how to get the detail
-  back the way the film looks or the way people who edit these files normally do
-  it. Measured on the lone oak's canopy — 1.57 million pixels, 30% of the frame:
-  fine texture reads 40.15 with the denoiser off, 34.11 under the 5x5 filter this
-  app shipped until the day before, and 30.76 under the 13x13 that replaced it.
-  The denoiser costs the canopy 23% of its modelling and the widening is a third
-  of that, on a commit that said detail was not the price. Two halves shipped as
-  one: the look's floor drops to 0.45 (+11.6% texture per unit brightness, the
-  canopy's own brightness unmoved) and the look carries 0.25 of mid-frequency
-  local contrast to give back what the floor still costs (+16.0% in total). The
-  sky pays 6.2% of a speckle residual the widening had already cut 76%. The
-  reference video's own foliage lever — the hue band's luminance — was measured
-  and REJECTED: texture per unit luma is flat at 0.254 across a six-step ladder,
-  so every point it appears to add is brightness. Still not fixed and visible in
-  every crop: the trunk renders the same crimson as the leaves. The published
-  subtractive-colour fix was measured and REJECTED at every amount, and the
-  second measurement is why — on the oak it takes the bark's saturation down 20%
-  for 2% of the leaves and looks finished, and on the next frame tried it drives
-  858,273 pixels of ordinary grey roof shade to saturated teal, because the tint
-  is weighted by brightness alone and added rather than multiplied. What the bark
-  needs is a luminance-weighted saturation REDUCTION, and that control now
-  exists: **Shadow colour**, a slider on the Grade tab, off by default. It scales
-  colour down in the dark end instead of adding a complement in, so a pixel with
-  no colour cannot gain one — the same 858,273 pixels of roof shade come out
-  CLEANER at every amount, where the published fix took them to saturated teal.
-  On the oak at 0.45 it takes the bark down 20.6% for 4.7% of the leaves. Whether
-  Aerochrome should carry an amount of its own is an appearance choice with
-  candidates rendered rather than described. Sources and every number in
-  `IR-SCIENCE.md` sections 9i and 9j. See
-  `docs/decisions/016-foliage-tonality.md`.
 - [ ] **Sky seen through a canopy takes no sky adjustment** <!-- decision: 028 -->
   — the Sky mask spreads only through pixels that are JOINED to the sky, which
   is the whole reason it does not readmit every cold-looking object in the
@@ -7560,6 +7518,71 @@ read as authoritative, and an invented one is worse than a missing one.
   drawn the other way up gives the opposite angle, and a line 84° off level
   gives 6.0° read as an upright. The renders were opened, which is how the
   direction was confirmed and how the layout defect below was found.
+- [x] **The foliage is the right colour and reads as a blob** <!-- decision: 016 --> — reported
+  from the iPad 2026-09-17 on the Aerochrome look, asking how to get the detail
+  back the way the film looks or the way people who edit these files normally do
+  it. Measured on the lone oak's canopy — 1.57 million pixels, 30% of the frame:
+  fine texture reads 40.15 with the denoiser off, 34.11 under the 5x5 filter this
+  app shipped until the day before, and 30.76 under the 13x13 that replaced it.
+  The denoiser costs the canopy 23% of its modelling and the widening is a third
+  of that, on a commit that said detail was not the price. Two halves shipped as
+  one: the look's floor drops to 0.45 (+11.6% texture per unit brightness, the
+  canopy's own brightness unmoved) and the look carries 0.25 of mid-frequency
+  local contrast to give back what the floor still costs (+16.0% in total). The
+  sky pays 6.2% of a speckle residual the widening had already cut 76%. The
+  reference video's own foliage lever — the hue band's luminance — was measured
+  and REJECTED: texture per unit luma is flat at 0.254 across a six-step ladder,
+  so every point it appears to add is brightness. Still not fixed and visible in
+  every crop: the trunk renders the same crimson as the leaves. The published
+  subtractive-colour fix was measured and REJECTED at every amount, and the
+  second measurement is why — on the oak it takes the bark's saturation down 20%
+  for 2% of the leaves and looks finished, and on the next frame tried it drives
+  858,273 pixels of ordinary grey roof shade to saturated teal, because the tint
+  is weighted by brightness alone and added rather than multiplied. What the bark
+  needs is a luminance-weighted saturation REDUCTION, and that control now
+  exists: **Shadow colour**, a slider on the Grade tab, off by default. It scales
+  colour down in the dark end instead of adding a complement in, so a pixel with
+  no colour cannot gain one — the same 858,273 pixels of roof shade come out
+  CLEANER at every amount, where the published fix took them to saturated teal.
+  On the oak at 0.45 it takes the bark down 20.6% for 4.7% of the leaves. Whether
+  Aerochrome should carry an amount of its own is an appearance choice with
+  candidates rendered rather than described. Sources and every number in
+  `IR-SCIENCE.md` sections 9i and 9j. See
+  `docs/decisions/016-foliage-tonality.md`.
+  **SHIPPED — the chosen work is on main.** The `eir` look carries
+  `denoise: 0.45` and `texture: 0.25` in `src/main.ts`; `applyLook` applies the
+  first as a floor and the second without overwriting a hand-dragged value; the
+  mid-frequency band-pass is real in both render paths; both land on reader
+  sliders; and `tools/aerochrome-walk.mjs` pins the pair as `FLOOR` and
+  `TEXTURE`. The introducing commit is below this checkout's graft, so it is not
+  named here rather than guessed at.
+  **What survived is the appearance choice the record already named:** whether
+  Aerochrome should carry a Shadow colour amount of its own. `shadowSat` is
+  absent from the `eir` entry, and that is a choice to be SHOWN with candidates
+  rendered rather than argued. The crimson trunk went where the record routed
+  it, to the separate Shadow colour control, which has since shipped.
+- [x] **Every control can say what it does, and a finger can reach the saying** <!-- decision: 024 --> —
+  asked 2026-09-19 from the PC, in the sitting that reported a slider named
+  after the defect rather than the act: there should be something clickable
+  or hoverable, where it makes sense, that says what each tool does. Measured
+  the same day: 103 visible notes against 76 labelled sliders, so most
+  controls already explain themselves permanently and what is missing is the
+  rule — which get a sentence, where it goes, and how a reader asks for one.
+  The field's tap-reachable form is a toggletip, not a tooltip, and this
+  repository's own gate already refuses a `title` for this use, because there
+  is no hover on a tablet. See
+  `docs/decisions/024-every-control-can-say-what-it-does-without-a-hover.md`.
+  **SHIPPED IN 2.58, 2026-09-22 — commit `4ffb0e1`, deployed.** Eight controls
+  carry a "What this does" button: the Tone tab's six points and the two lens
+  Strength sliders. `src/toggletip.ts` wires every `button[data-tip]`, builds the
+  trigger's accessible name from the control's own label so nothing is written
+  twice, and announces through one `#tipLive` region. The 112 permanent notes
+  beside other controls did not move — they are the app's majority answer.
+  **What is still owed is a gate that runs.** `tools/control-check.mjs` was
+  extended by 189 lines here, including the count of controls that say nothing
+  for themselves anywhere, and nothing invokes it: no workflow, no
+  `.branch-guard` line, and `walk-all.mjs` globs `*-walk.mjs`, which its name
+  does not match. Four source comments call it a gate that refuses things.
 
 ## Desktop-mouse round + the flat-frame finding, 2026-09-08
 

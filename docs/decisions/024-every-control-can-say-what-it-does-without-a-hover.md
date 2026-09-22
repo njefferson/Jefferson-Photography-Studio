@@ -141,3 +141,47 @@ in any of the three places.
 Below 019, 018 and 023, which are measured defects with numbers attached, and
 below 003, which decides how much room a panel has for permanent text and so
 changes this item's shape. Above the unscoped design items.
+
+## Outcome
+
+**Shipped in 2.58 and deployed**, commit `4ffb0e1`. The chosen option survived
+whole: a toggletip rather than a tooltip, because there is no hover on a tablet
+and a `title` is a sentence this app's reader would never see. Eight controls
+carry it — the Tone tab's six points and the two lens Strength sliders — chosen
+because they are the ones that say nothing for themselves anywhere else.
+
+`src/toggletip.ts` wires every `button[data-tip]`, sets `aria-controls` and
+`aria-expanded`, and announces through one `#tipLive` region. Two details worth
+keeping: the trigger's accessible name is built from the control's own label, so
+renaming a slider renames every mention of it and nothing is written twice; and
+the state is carried in the WORDS — "What this does" becomes "Hide this" — so it
+never depends on noticing a marker's rotation.
+
+**The load-bearing half is why most controls did NOT get one.** The 112
+permanent notes beside other controls are the app's majority answer and they did
+not move. A short sentence that fits on screen is better visible than hidden
+behind a press; this is only for the controls where the sentence would push the
+panel apart.
+
+It touches no pixels — no pipeline, no shader, no decode.
+
+### What turned out wrong
+
+**The gate this work extends runs nowhere.** `tools/control-check.mjs` gained
+189 lines here, including the count reporting the other direction — how many
+labelled controls still say nothing for themselves in any of the three places.
+Nothing invokes it: it is in no workflow, it is not in `.branch-guard`'s `also=`
+list, and `walk-all.mjs` globs `*-walk.mjs`, which its name does not match. It
+needs a browser, so it cannot join the commit chain; the remedy is a rename so
+the sweep picks it up.
+
+Meanwhile four source comments and this record describe it as a gate that
+refuses things. A gate asserted in comments and invoked by nothing is the shape
+this family has the most lessons about, and it was introduced by the commit that
+extended it.
+
+**And the bookkeeping did not land with the code.** This item stayed `- [ ]` at
+rank 6 through its own release, so the ⓘ dialog and the public notes page
+offered it to readers as still to come while they were running it. It was found
+by an audit that compared every open roadmap item against `main`, not by any
+gate — nothing in the chain asks whether an open item's work has landed.

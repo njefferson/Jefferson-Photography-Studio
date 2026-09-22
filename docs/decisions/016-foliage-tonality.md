@@ -179,3 +179,39 @@ proposed. It sits below 013 because 013's chroma stage is the larger piece of
 work on the same look and because the splotch is visible on more frames than the
 blob is — a canopy that reads flat is a frame that looks dull, and a mottled
 gravel bed is a frame that looks broken.
+
+## Outcome
+
+**The chosen work is on `main`.** The `eir` look carries `denoise: 0.45` and
+`texture: 0.25` in `src/main.ts`, with the comment block above the entry holding
+the measurements the choice was made on. `applyLook` applies the denoise as a
+FLOOR and the texture as a look-owned value that never overwrites a hand-dragged
+one, so a reader who has already moved either keeps what they set. The
+mid-frequency band-pass is real in both render paths rather than approximated in
+one, both values land on reader sliders, and `tools/aerochrome-walk.mjs` pins
+the pair as `FLOOR` and `TEXTURE` so neither can drift silently.
+
+**The introducing commit is not named here.** This checkout is shallow and the
+commit sits below its graft, so the SHA could not be read. Naming one would be a
+value produced to look like a value that was read.
+
+### What survived
+
+**Whether Aerochrome should carry a Shadow colour amount of its own.**
+`shadowSat` is absent from the `eir` entry. That is an appearance choice, and
+this repo's rule is that such a choice is SHOWN with candidates rendered through
+the real pipeline, never argued in prose — so it is not settled by this record
+and should not be settled by reading it.
+
+The crimson trunk went where this record routed it: to a luminance-weighted
+saturation reduction, which shipped as the separate Shadow colour control rather
+than as part of the foliage work. That was the rejected option here and the
+rejection held.
+
+### What turned out wrong
+
+Nothing in the code. This item sat open at rank 11 with its chosen work already
+shipped, and no gate could see it — the decision gate asks whether an open item
+HAS a record, never whether that item's work has LANDED. It was found by an
+audit that compared all 24 open items against `main`, one agent per item, each
+verdict then adversarially re-checked in the opposite direction.
