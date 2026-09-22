@@ -32,7 +32,6 @@ import { putFrame, eachFrame, frameMetas, frameCount, clearFrames, frameStore } 
 import * as Session from "./session";
 import { keepAwake } from "./wakelock";
 import { canTravel, shapeOf, putMask, getMask, listMasks, deleteMask as forgetMask, MASK_COUNT_CAP } from "./maskstore";
-import { getKept, getKeptBytes, listKept, deleteKept, renameKept, keptBytesHeld, KEPT_COUNT_CAP } from "./keepstore";
 import { sampleBrush, rebuildFix, stampFix, stampSegment, skyBandCentre, lensGain, LENS_GAIN_HI, LENS_GAIN_LO, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, bandWeight, rgb2hsv, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, AIM_DEHAZE, AIM_CLARITY, AIM_SHADOW, AIM_LENS, type MaskLayer, type CropRect, BRUSH_MAX_EDGE, type SkyMap } from "./pipeline";
 import { sensorPitchMicrons } from "./color";
 import { lensGains, applyLensFlat, lensPlanStamp, type LensPlan } from "./lensflat";
@@ -81,7 +80,7 @@ import { encodeQr, drawQr } from "./qr";
 import { wireThemePicker } from "./theme";
 import { wireToggletips } from "./toggletip";
 import { wirePalettePicker } from "./palette";
-import { isIOS as isIOSDevice, wireDeviceCopy, deviceNoun } from "./platform";
+import { isIOS as isIOSDevice, wireDeviceCopy } from "./platform";
 
 // Injected at build time from git history (see vite.config.ts).
 declare const __CHANGELOG__: { hash: string; date: string; subject: string; version: string }[];
@@ -143,13 +142,6 @@ renderer.onContextLost = () => {
 }
 let current: DecodedImage | null = null;
 let currentFile: ImportedFile | null = null;
-/** The kept row the photograph on screen came from, or null (039). Set only by
- *  `openKeptPhoto`; cleared by `showDecoded`, which every open path runs. It
- *  lives here beside `currentFile` rather than next to the rest of decision
- *  039's code, because `showDecoded` would otherwise reach a `let` declared
- *  three thousand lines below it. */
-let openKeptId: string | null = null;
-
 // --- Hot-spot profile correction: a SEPARATE stage from the manual
 // `hotspot`/`hotspotSize` slider above (params.hotspot). Auto-selected from
 // EXIF, or from a manual lens and focal-length pick, and applied as a PIPELINE
@@ -9872,12 +9864,6 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
   const __z = performance.now();
   current = img;
   currentFile = imported;
-  // WHICH KEPT PHOTOGRAPH THIS IS, or none (039). Cleared on EVERY open path
-  // and set again by `openKeptPhoto` straight afterwards, so a second Keep can
-  // only ever update the row the photograph on screen actually came from. The
-  // alternative — setting it where a kept photo opens and clearing it in each
-  // of the other paths — is a list somebody has to keep complete.
-  openKeptId = null;
   // Location guard: paths that build ImportedFile by hand (session restore's
   // stored bytes) haven't been scanned yet — scan here so the 🛰 tip is honest
   // on every open path. (Stored bytes stripped on their first open scan clean.)
@@ -12661,22 +12647,7 @@ sessionDone.addEventListener("click", async () => {
 // Resume a session left in storage by a previous visit (close, crash, or the
 // OS discarding the tab). Offered on the start screen, next to Recover.
 const resumeBtn = $("resumeSession") as HTMLButtonElement;
-// The kept list's own controls live here beside `resumeBtn` rather than with
-// the rest of decision 039's code, because `updateSessionResume` below is
-// called during module init and asks the kept list to redraw itself — a const
-// declared after that call would be in its temporal dead zone.
-const keptBtn = $("keptOpen") as HTMLButtonElement;
-const keptDlg = $("keptDlg") as HTMLDialogElement;
-const keptListEl = $("keptList") as HTMLElement;
-const keptHeldEl = $("keptHeld") as HTMLElement;
-
 async function updateSessionResume() {
-  // THE KEPT LIST IS RE-OFFERED AT THE SAME MOMENT, because it is the same
-  // moment: the start screen is back, so what the reader can come back TO has
-  // to be worked out again. `keptOpen` hides itself while a photograph is open,
-  // so without this, ending a session returned to a start screen that had
-  // forgotten the photographs put down (039).
-  void refreshKept();
   try {
     const metas = await Session.listPhotos();
     if (metas.length >= 2 && !current) {
@@ -12736,22 +12707,22 @@ async function resumeSession() {
 resumeBtn.addEventListener("click", resumeSession);
 updateSessionResume();
 
-// ── A PHOTOGRAPH YOU PUT DOWN, AND PICK UP AGAIN (decision 039) ─────────────
+// ── A PHOTOGRAPH YOU PUT DOWN, AND PICK UP AGAIN (decisions 039 and 043) ────
 //
 // A SESSION answers "carry on where I was"; this answers "put this one down
-// and come back to it next week", and they are not the same question. A
-// session has a Done that frees its storage, so `src/keepstore.ts` is its own
-// database — the boundary is the storage rather than care.
+// and come back to it next week", and they are not the same question.
 //
-// WHY THE BYTES GO IN TOO. iPad Safari cannot re-open a File the reader picked
-// once the page reloads, which is the fact the quick look is built around. So
-// keeping only the recipe, the way a desktop editor does, would mean "come
-// back later" was really "find it in Files again". The cost is real and the
-// app says it: the list shows how many and how much, and offers to forget one.
-/** Object URLs for the list's tiles, revoked before the list is redrawn — the
- *  leak the session strip had until it started doing this. */
-let keptThumbUrls: string[] = [];
-
+// 039 ANSWERED IT WITH A DATABASE AND 043 REPLACED THAT WITH A FILE. The store
+// is gone entirely as of 051: it was storage the reader did not own — no way
+// to another device, no backup, and a browser free to reclaim it — and once
+// nothing could write to it, a list that could only shrink was a promise
+// nothing could honour. What is left is `keepCurrentAsFile` below.
+//
+// WHY THE ORIGINAL'S BYTES GO INTO THAT FILE, which is 039's finding and still
+// holds: iPad Safari cannot re-open a File the reader picked once the page
+// reloads, the fact the quick look is built around. Keeping only the recipe,
+// the way a desktop editor does, would make "come back later" mean "find it in
+// Files again".
 /** WHAT A KEEP FILE CARRIES THAT JSON CANNOT — revived as the typed arrays the
  *  renderer reads, ready to be laid onto the open photograph.
  *
@@ -13068,44 +13039,30 @@ async function keepCurrentAsFile(): Promise<void> {
 // — it cannot move to another device, cannot be backed up, and the browser
 // may reclaim it. The button and this function are gone.
 //
-// THE STORE AND ITS LIST STAY, deliberately and for now: photographs already
-// kept must not be stranded by the change. The list is read-and-open-only —
-// nothing can add to it. Retiring it is its own item and needs a way to write
-// an already-kept photograph out as a file first, which `showLoneWithEdit` and
-// `writeKeepFile` between them make small.
+// AND THE STORE WENT WITH IT (051). It was kept for one release, read-only, so
+// that anything already in it would not be stranded — and it held nothing. A
+// list that can only shrink, on storage the reader does not own, is a promise
+// nothing can honour, so `src/keepstore.ts`, the start-screen button and the
+// dialog are all gone and the file is the only way back into a photograph.
 
 
-/** OPEN A KEPT PHOTOGRAPH AND PUT ITS EDIT BACK ON.
- *
- *  Takes `id`, a kept row's id. Returns nothing.
- *
- *  It is the resumed-session path exactly — stored bytes, decode, show,
- *  `activateCurrent` laying the stored edit over a fresh baseline — plus the
- *  one thing a session restore never had to do: the masks arrive as numbers,
- *  so every Sky mask is found again on this photograph before anything is
- *  drawn.
- *
- *  What the caller relies on: the restore does NOT become an undo step. The
- *  reader pressed a name in a list; one press of Undo waiting on arrival is the
- *  restore showing through, which is the finding `activateCurrent`'s own
- *  comment already records. */
 /** SHOW ONE PHOTOGRAPH WITH AN EDIT ALREADY ON IT — the shape both routes back
  *  into a photograph share, so neither can drift from the other.
  *
  *  @param srcName  the original's filename; the strip and the exports use it.
  *  @param kind     the decoded kind, as the import decided it.
  *  @param size     the original's length in bytes.
- *  @param edit     039's edit JSON, which `activateCurrent` lays on.
- *  @param keptId   the store row this came from, or null when it came from a
- *                  FILE the reader holds. A keep file has no row, and saying so
- *                  is what stops a later Keep silently rewriting the edit of
- *                  whichever kept photograph happened to be open before.
+ *  @param edit     the edit JSON, which `activateCurrent` lays on.
+ *  @param bytes    what the archive carried that JSON cannot hold — painted
+ *                  bitmaps, the warp field, an imported LUT — or null when
+ *                  there were none.
  *  @returns nothing.
  *
- *  @param bytes    what the archive carried that JSON cannot hold — painted
- *                  bitmaps, the warp field, an imported LUT — or null for the
- *                  in-app store, whose rows have never carried any.
- *  @returns nothing.
+ *  IT HAS ONE CALLER NOW and is still one function rather than inlined. It
+ *  served two routes back into a photograph — a keep file and a row in the
+ *  in-app store — and 051 removed the store. The ordering below is what the
+ *  second route would have had to match, and it is easier to get wrong than to
+ *  read, so it stays named and stays here.
  *
  *  WHAT IT HAS TO HOLD, and the whole reason it is one function: FIVE steps in
  *  one order. The edit's JSON goes on (`activateCurrent`); the correction
@@ -13119,14 +13076,13 @@ async function keepCurrentAsFile(): Promise<void> {
  *  photograph opens. That ordering is subtle, it is load-bearing, and two
  *  copies of it is the defect class this repository has the most lessons about.
  */
-function showLoneWithEdit(srcName: string, kind: ImageKind, size: number, edit: string, keptId: string | null, bytes: KeepBytes | null = null): void {
+function showLoneWithEdit(srcName: string, kind: ImageKind, size: number, edit: string, bytes: KeepBytes | null = null): void {
   // A photograph opened this way is ONE photograph: the lone-open shape, no
   // strip to resume, with its stored edit riding in beside it.
   sessionPhotos = [{ id: "lone", name: srcName, kind, size, edit, thumbUrl: "", thumbState: "real" }];
   nextOrder = 0;
   liveEdits.clear();
   activateCurrent("lone");
-  openKeptId = keptId;
   reviveFixStrokes();
   if (rebuildSkyMasks()) updateSkyStatus();
   if (bytes) attachKeepBytes(bytes);
@@ -13151,8 +13107,9 @@ function showLoneWithEdit(srcName: string, kind: ImageKind, size: number, edit: 
  *  place, which a `kind` field in the manifest could only ever disagree with.
  *  It is also why `keepfile.ts` carries no app types: it owns the container.
  *
- *  What it has to hold: this ends in `showLoneWithEdit` with a null store id,
- *  because a keep file has no row — see that function for what the null means.
+ *  What it has to hold: this ends in `showLoneWithEdit`, which is the one place
+ *  a stored edit is laid onto a freshly decoded photograph — see that function
+ *  for the five steps and why their order is load-bearing.
  */
 async function openKeepFile(f: File): Promise<void> {
   showBusy("Opening\u2026");
@@ -13166,7 +13123,7 @@ async function openKeepFile(f: File): Promise<void> {
     };
     const img = await decodeWithLens(imported, { front: true, sky: true });
     showDecoded(img, imported);
-    showLoneWithEdit(manifest.original, imported.kind, original.length, editJson, null, readKeepBytes(editJson, parts));
+    showLoneWithEdit(manifest.original, imported.kind, original.length, editJson, readKeepBytes(editJson, parts));
     toast(`Opened \u201c${manifest.name}\u201d`, 2000);
   } catch (err) {
     recordFailure("opening a keep file", err);
@@ -13176,101 +13133,7 @@ async function openKeepFile(f: File): Promise<void> {
   }
 }
 
-async function openKeptPhoto(id: string): Promise<void> {
-  keptDlg.close();
-  showBusy("Opening\u2026");
-  try {
-    const rec = await getKept(id);
-    if (!rec) { toast("That photo is no longer on this device", 2600); await refreshKept(); return; }
-    const bytes = await getKeptBytes(id);
-    if (!bytes.length) {
-      await noticeDialog("That photo could not be opened", "Its file is no longer on this device. Forgetting it will clear the row.");
-      return;
-    }
-    const imported: ImportedFile = { name: rec.srcName, kind: rec.kind, bytes, looksTranscoded: false };
-    const img = await decodeWithLens(imported, { front: true, sky: true });
-    showDecoded(img, imported);
-    // A kept photograph is one photograph, so it takes the lone-open shape —
-    // no strip, nothing to resume — with its stored edit riding in beside it
-    // for `activateCurrent` to lay on.
-    showLoneWithEdit(rec.srcName, rec.kind, rec.size, rec.edit, id);
-    toast(`Opened \u201c${rec.name}\u201d`, 2000);
-  } catch (err) {
-    recordFailure("opening a kept photo", err);
-    await noticeDialog("That photo could not be opened", (err as Error).message);
-  } finally {
-    hideBusy();
-  }
-}
-
-/** THE KEPT LIST, REDRAWN FROM THE STORE, and the button that reveals it.
- *
- *  Takes nothing. Returns nothing.
- *
- *  What the caller relies on: it is safe to call whenever the store may have
- *  moved — after a keep, after a forget, and at startup — and it revokes the
- *  previous pass's object URLs before making new ones, so opening the list
- *  repeatedly does not leak a tile per visit. */
-async function refreshKept(): Promise<void> {
-  const list = await listKept().catch(() => []);
-  keptBtn.hidden = list.length === 0 || !!current;
-  keptBtn.textContent = list.length === 1 ? "Photos you kept \u2014 1" : `Photos you kept \u2014 ${list.length}`;
-  for (const u of keptThumbUrls) URL.revokeObjectURL(u);
-  keptThumbUrls = [];
-  keptListEl.replaceChildren(
-    ...list.map((meta) => {
-      const row = document.createElement("div");
-      row.className = "kept-row";
-      const img = document.createElement("img");
-      const url = URL.createObjectURL(new Blob([meta.thumb], { type: "image/jpeg" }));
-      keptThumbUrls.push(url);
-      img.src = url;
-      img.alt = ""; // the name beside it is the label; a second one is noise
-      const open = document.createElement("button");
-      open.type = "button";
-      open.className = "kept-open";
-      open.append(meta.name);
-      const sub = document.createElement("small");
-      sub.textContent = `${meta.srcName} \u00b7 ${fmtSize(meta.size)}`;
-      open.append(sub);
-      open.addEventListener("click", () => void openKeptPhoto(meta.id));
-      const ren = document.createElement("button");
-      ren.type = "button";
-      ren.className = "kept-ren";
-      ren.textContent = "\u270e";
-      ren.setAttribute("aria-label", `Rename ${meta.name}`);
-      ren.addEventListener("click", () => void (async () => {
-        const next = await askTextDialog("Rename this photo", "", "Call it", meta.name, "Rename");
-        if (next === null) return;
-        await renameKept(meta.id, next || meta.name).catch(() => {});
-        await refreshKept();
-      })());
-      const del = document.createElement("button");
-      del.type = "button";
-      del.className = "kept-del";
-      del.textContent = "\u00d7";
-      del.setAttribute("aria-label", `Forget ${meta.name}`);
-      del.addEventListener("click", () => void (async () => {
-        await deleteKept(meta.id).catch(() => {});
-        if (openKeptId === meta.id) openKeptId = null;
-        await refreshKept();
-      })());
-      row.append(img, open, ren, del);
-      return row;
-    }),
-  );
-  // THE COST, IN WORDS, EVERY TIME THE LIST IS DRAWN. A store whose size the
-  // reader cannot see is the leak decision 039's own rejected option describes,
-  // and this is the difference between keeping something and losing track of it.
-  const bytes = await keptBytesHeld().catch(() => 0);
-  keptHeldEl.textContent = list.length
-    ? `${list.length} of ${KEPT_COUNT_CAP} kept \u00b7 ${fmtSize(bytes)} held on this ${deviceNoun()}.`
-    : "Nothing kept yet.";
-}
-
 $("keepFile").addEventListener("click", () => void keepCurrentAsFile());
-keptBtn.addEventListener("click", () => { void refreshKept(); keptDlg.showModal(); });
-$("keptDlgClose").addEventListener("click", () => keptDlg.close());
 
 // ANYTHING AN INTERRUPTED ENDING LEFT BEHIND, cleared at start rather than
 // kept forever. Ending a session forgets its index first and deletes the bytes
@@ -13279,6 +13142,23 @@ $("keptDlgClose").addEventListener("click", () => keptDlg.close());
 // key-cursor step per photo when there is nothing to find, which is the usual
 // case, and never awaited by anything the reader is waiting on.
 void Session.sweepOrphans().catch(() => {});
+
+// AND THE STORE 051 REMOVED, TAKEN OFF THE DEVICE RATHER THAN ORPHANED. Every
+// device that has opened this app since 039 carries an empty `ips-kept`
+// database, because the start screen listed it on every visit and listing it
+// created it. Deleting the code alone would leave that database there forever
+// with nothing in the app that knows its name — and the diagnostic no longer
+// reports it either, so nothing would ever mention it again.
+//
+// UNGUARDED ON PURPOSE. A flag saying "already done" is a second thing to
+// remember and to get wrong; this is a no-op on every run after the first, it
+// is never awaited, and a browser that refuses is a browser that had nothing
+// to delete. The name is a literal because the module that defined it is gone,
+// which is the one honest way left to write it.
+void new Promise<void>((res) => {
+  const rq = indexedDB.deleteDatabase("ips-kept");
+  rq.onsuccess = rq.onerror = rq.onblocked = () => res();
+}).catch(() => {});
 
 // --- Quick look: preview a whole folder instantly, keep the ones you want ----
 // The pure form of the owner's origin story — "white balance a whole folder

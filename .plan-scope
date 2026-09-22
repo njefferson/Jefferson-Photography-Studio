@@ -1,49 +1,57 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=6cd3cea0d2daea20
-diffhash=88cdcaad73556372
-verdict=IN-SCOPE: NOTES.md archives 043, 051's Rank is corrected, and its Built already section is the gate's own precondition for the ranking the plan directs; no source files touched
-# Judged by a subagent that read the plan BY PATH and the staged diff, three
-# times across the changes below.
+planhash=18f95b9914e56cfb
+diffhash=f934b98d719a0f3d
+verdict=IN-SCOPE: the store and every reference to it are removed as the plan sets out, and the one file outside its Files list is an archived record whose dead citation the commit gate forced
+# Judged by a subagent that re-read the plan BY PATH after it was replaced, and
+# the staged diff in full.
 # 
-# NOTES.md moves roadmap item 043 out of the open list to the top of the Shipped
-# archive and touches nothing else; 051's record changes inside "## Rank" and
-# gains "## Built already". No file under src/ is touched, which is what the plan
-# says.
+# Every file in the diff is in the plan's Files list except one, and that one is
+# what it was asked to rule on.
 # 
-# ONE FINDING WAS ACTED ON. The first pass flagged a clause in the new archive
-# entry claiming the walk had been planted with an all-zero bitmap of the right
-# length and read zero coverage. That plant WAS run in this session and did read
-# 0.00%, but nothing in the repository records it, so a reader of the shipped
-# patch note could not find the evidence behind it. The clause was removed rather
-# than defended. Recording the plant in tools/keep-walk.mjs's own header is worth
-# doing and is a separate change this plan does not authorise.
+# THE 043 EDIT, ruled fallout rather than new scope, and argued rather than
+# waved through. `tools/decisions-check.mjs` was read directly: its own comment
+# says any record carrying a "## Built already" section has its paths checked,
+# top-ranked or not. 043 is archived, its section was written in earlier landed
+# work, and it cited the store module the plan explicitly authorises deleting.
+# Once that file is gone the citation is dead and the gate refuses the commit —
+# there is no discretion in whether to touch 043, only in how honestly. The edit
+# drops the path from one bullet, says in a sentence why, and leaves the
+# historical content after it verbatim.
 # 
-# THE "## Built already" SECTION IS THE CLOSE CALL, and the watcher said so
-# rather than waving it through. The plan's Files list scopes 051's edit to Rank
-# only, so on the letter of the plan a stricter reading could refuse it. It was
-# judged in scope because the plan's own step 3 directs that 051 leads the queue,
-# which makes it the top-ranked item, and decisions-check.mjs refuses any commit
-# where the top-ranked record lacks that section (LESSONS 330) and names the
-# remedy in its refusal. There was no discretion: the section is a precondition
-# of the plan's own directed outcome landing at all, it carries no product
-# decision, and it is placed where 043's own record puts the same section.
+# FOUR CLASSES OF CLAIM CHECKED AGAINST THE FILES, all held. Nothing in the tree
+# still imports the store: grepped for the module and for all eleven of its
+# exported identifiers, zero references in src/ or tools/, the only hit a
+# plain-text filename in an explanatory comment. `requestPersistence` is exported
+# from src/session.ts and that is the copy src/lensrig.ts imports, so deleting
+# the store deletes a duplicate rather than a capability. `deviceNoun` is defined
+# and used inside src/platform.ts, so dropping it from main.ts's import is right.
+# Nothing is left behind: no dead identifier, no `.kept` style rule, and the
+# module map was regenerated rather than hand-edited.
 # 
-# ALL SIX CLASSES OF CLAIM IN THAT SECTION WERE CHECKED AGAINST THE FILES and
-# every one held: keepstore.ts's five exports at their lines; keepEdit and
-# keepCurrentAsFile in main.ts with writeKeepFile in keepfile.ts, and
-# keepCurrentAsFile's body read to confirm it joins them into a Blob for the share
-# sheet; showLoneWithEdit called from exactly two places, the keep-file path and
-# the kept-store path; ir.html's five kept ids and the kept-row class; keepAPhoto
-# at a11y-walk.mjs line 181; and kept-walk.mjs reaching the list through #keptOpen
-# at exactly two lines.
+# THE CONTRACT WAS THE PART MOST LIKELY TO ROT AND IT IS CLEAN. `showLoneWithEdit`
+# lost its `keptId` parameter, the orphaned second `@returns` that sat between the
+# old parameter and `bytes`, and the sentence describing a store row; the
+# docstring stacked above it belonged to a deleted function and went with that
+# function rather than being left dangling, which is the swallowed-contract shape
+# this repository has the most lessons about. `openKeepFile`'s own note about
+# ending in a null store id is rewritten too, and the call site matches.
 # 
-# ONE FINDING CARRIED, not a scope violation. The archive entry names a THIRD
-# defect -- correction strokes lost to JSON.stringify -- where the plan's step 2
-# enumerated two. It is accurate and already in 043's Outcome in substance.
+# THE BOOT DELETE IS ONE CALL, unguarded, fire-and-forget, and nothing larger.
 # 
-# The walks the plan requires ran before this commit, against a served build:
-# release-walk all checks passed; keep-walk green with 22.09% painted and 22.09%
-# restored; a11y-walk ran to completion over seven pages at two widths in both
-# themes, 131 checks ok and exactly two failures, both the recorded instrument gap
-# where keepAPhoto cannot arm itself. Nothing else is red.
+# DELTA SINCE THAT JUDGEMENT, and it is the watcher's own finding acted on: 051's
+# Built already said main.ts reaches the store "through one import and nine
+# places" while the list beneath names seven groups, so the arithmetic did not
+# resolve. The count is removed rather than corrected — a number in prose is a
+# second answer to a question the list already answers, which is the reasoning the
+# hub applied to its own "Twelve gates" heading. Four words, no path, no claim.
+# 
+# VERIFIED BEFORE COMMITTING, against a served build. a11y-walk went from 131 ok
+# with 2 failures to 129 ok with NONE, and a diff of the check names shows the
+# only two that disappeared are the `#keptDlg` sweeps at each viewport width — the
+# sweep measured everything it measured before, minus the surface that no longer
+# exists. keep-walk green, 22.09% painted and 22.09% restored. release-walk all
+# checks passed. A scratch harness planted an `ips-kept` database on the origin,
+# loaded the app, and found it gone afterwards with the other five stores
+# untouched — which is what the boot delete is for, and what checking only that
+# the app no longer CREATES one would not have shown.

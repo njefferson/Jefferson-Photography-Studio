@@ -86,8 +86,11 @@ pretending the new file is the old one.
   UTF-8 named — which is exactly the container this item's chosen option
   specifies, down to the reason. The closing line of this section said a zip
   writer did not exist; it did, and had for some time.
-- **`src/keepstore.ts` and the edit round-trip in `src/main.ts`** are 039's
-  store and the shape this reuses. **Read the Outcome before taking the next
+- **039's kept store and the edit round-trip in `src/main.ts`** are the shape
+  this reuses. The store module itself is gone as of 051, and its path is out of
+  this line rather than the line being deleted: what this item was built ON is
+  part of the record, but a citation the gate can follow must point at something
+  that exists, or the next reader is sent to a file that is not there. **Read the Outcome before taking the next
   sentence as written**: this said masks travel as RECIPES with the bitmaps
   stripped by `shapeOf`, so the edit JSON is already small and portable — true
   of the LIBRARY, and the reason the keep file inherited a rule it should not
