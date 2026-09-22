@@ -846,31 +846,6 @@ user-scalable=no.
   tidying. **The sweep is red until this is done, on purpose** — it was red
   before today and the only change is that it is now visible. See
   `docs/decisions/046-the-control-sweep-reaches-two-thirds-of-the-controls.md`.
-- [ ] **The shipped list shows readers the oldest twelve** <!-- decision: 045 -->
-  found 2026-09-22 while archiving the items that shipped in 2.57: the public
-  `/notes` page's "Recently shipped" list is built as
-  `filter(done).reverse().slice(0, 12)` in `notesPage()`, under a comment saying
-  NOTES keeps newest last. It does not. Measured over the archive's entries, 82
-  of 114 carried a date and only 13 of the 81 dated pairs were inversions, so the
-  file runs newest-FIRST, from 2026-09-21 down to 2026-07-04. The reverse
-  therefore hands the reader a window reaching back to July 2026 while about
-  eighteen of the most recently shipped items sit outside it and never render at
-  all — what shipped recently reads as the oldest twelve things in the archive.
-  **The renderer is the half that is wrong.** The field puts the ordering in the
-  data and the newest first — Keep a Changelog 1.0.0, and Common Changelog its
-  stricter subset — which is what this archive already does, so re-sorting the
-  file would move away from the documented convention to accommodate one
-  `reverse()`. Drop it, take the first twelve, move the tail entries to the top,
-  and correct the comment rather than obeying it.
-  **The gate lands in the same commit**, in `tools/notes-check.mjs`, which already
-  parses this section and already exists because a misplaced `## ` once emptied
-  the in-app Roadmap in silence. It is designed from the measurement rather than
-  from taste: strict sorted order is not available, because 13 inversions survive
-  the fix and a gate that refuses correct work on its first run is one somebody
-  switches off. It asserts what the reader cares about instead — every entry in
-  the rendered window is within 14 days of the newest dated entry in the archive,
-  which spanned about eighty days before the fix and four afterwards. See
-  `docs/decisions/045-the-shipped-list-shows-readers-the-oldest-twelve.md`.
 - [ ] **Creative — a third app for regular photos** — owner direction 2026-07-19 <!-- decision: 002 -->
   ("a separate page next to infrared and macro, called creative, for regular
   photos, installable separately… same things we're building here… I suppose I
@@ -3420,6 +3395,34 @@ read as authoritative, and an invented one is worse than a missing one.
 
 ## Shipped (roadmap archive)
 
+- [x] **The shipped list shows readers the oldest twelve** <!-- decision: 045 -->
+  **SHIPPED IN 2.58, 2026-09-22** — the commit subject is "Fixed: What's
+  new listed the oldest twelve changes, not the newest"; the SHA is minted by
+  the rebase merge, so it is named here by the subject rather than guessed.
+  found 2026-09-22 while archiving the items that shipped in 2.57: the public
+  `/notes` page's "Recently shipped" list is built as
+  `filter(done).reverse().slice(0, 12)` in `notesPage()`, under a comment saying
+  NOTES keeps newest last. It does not. Measured over the archive's entries, 82
+  of 114 carried a date and only 13 of the 81 dated pairs were inversions, so the
+  file runs newest-FIRST, from 2026-09-21 down to 2026-07-04. The reverse
+  therefore hands the reader a window reaching back to July 2026 while about
+  eighteen of the most recently shipped items sit outside it and never render at
+  all — what shipped recently reads as the oldest twelve things in the archive.
+  **The renderer is the half that is wrong.** The field puts the ordering in the
+  data and the newest first — Keep a Changelog 1.0.0, and Common Changelog its
+  stricter subset — which is what this archive already does, so re-sorting the
+  file would move away from the documented convention to accommodate one
+  `reverse()`. Drop it, take the first twelve, move the tail entries to the top,
+  and correct the comment rather than obeying it.
+  **The gate lands in the same commit**, in `tools/notes-check.mjs`, which already
+  parses this section and already exists because a misplaced `## ` once emptied
+  the in-app Roadmap in silence. It is designed from the measurement rather than
+  from taste: strict sorted order is not available, because 13 inversions survive
+  the fix and a gate that refuses correct work on its first run is one somebody
+  switches off. It asserts what the reader cares about instead — every entry in
+  the rendered window is within 14 days of the newest dated entry in the archive,
+  which spanned about eighty days before the fix and four afterwards. See
+  `docs/decisions/045-the-shipped-list-shows-readers-the-oldest-twelve.md`.
 - [x] **An edit you can put down and come back to** <!-- decision: 039 -->
   reported 2026-09-20: there is no way to save the photograph being worked on
   and come back to it later. True, and by design in one half of the app — a set
