@@ -1,12 +1,31 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
-plan=/root/.claude/plans/keen-nibbling-cat.md
-planhash=c0e876d0e13823e1
-diffhash=402ccb42b63e37ec
-verdict=IN-SCOPE: the 024 subset the watcher cleared; the guard half is already committed
-# Watcher verdict (agent, 2026-09-22) against /root/.claude/plans/keen-nibbling-cat.md
-# VERDICT-024: IN-SCOPE. Its words: plan item 3 "names this exact stash, and git
-# reflog confirms this branch was reset to origin/main (item 2) before this
-# content reappeared, so this is 'the fresh branch' item 3 means." It also
-# confirmed the working-tree content of these files is identical to stash@{0}.
-# The guard half of that same verdict is now committed as its own change; what
-# remains is the 024 subset the watcher cleared, unchanged.
+plan=/root/.claude/plans/linear-baking-island.md
+planhash=3bccd3e5ce5e4dc3
+diffhash=b24625dee316ab90
+verdict=IN-SCOPE: the plan's steps 1-2 exactly — 26d36b4 replayed byte-identically outside NOTES.md, and NOTES.md is staging's file with main's four edits ported and nothing else
+# Staged diff is exactly the plan's steps 1-2. Files: NOTES.md, the new
+# docs/decisions/045 record, tools/notes-check.mjs, vite.config.ts. Nothing else.
+# 
+# `git diff 26d36b4 --cached --` over the three non-NOTES files is EMPTY: the
+# tested artefact is byte-identical, so the reverse() removal and the +117
+# freshness gate are the ones that passed on the device, not a re-typed variant.
+# 
+# NOTES.md resolved as staging's file with main's four edits ported:
+#   control-check.mjs appears exactly twice, both as history -- 828 (inside the
+#   046 bullet, describing the rename) and 3503 (main's own past-tense clause
+#   inside the rewritten 024 paragraph). Neither names it as a live file.
+#   control-walk.mjs at 829, 2307, 3499, 3504, 17840 -- all live references.
+#   Resolved lines 3499-3508 diffed against origin/main:NOTES.md 7603-7612:
+#   identical. Main's ten-line version; staging's five-line version is gone.
+#   046 bullet present, 045 bullet still present (24 open) -- correct before the
+#   next commit archives 045. Archive 116 entries, head 039 038 024 040 016 044.
+# 
+# Both directions checked. Against origin/staging:NOTES.md the resolved file
+# differs by exactly 4 hunks (@@824, @@2282, @@3474, @@17810, +33/-6) -- the 046
+# bullet, the two renames, the paragraph swap, nothing else. Against the
+# merge-base, main contributed exactly those 4 hunks, so nothing main wrote was
+# dropped, and staging's 174-line archive move survives by construction.
+# 
+# Out of scope and not introduced here: .control-allow:4, ir.html:66 and
+# docs/decisions/024-...md:174 still name control-check.mjs in HEAD. Pre-existing
+# on main, untouched, and the plan does not authorise touching them.

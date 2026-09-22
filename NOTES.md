@@ -846,6 +846,31 @@ user-scalable=no.
   tidying. **The sweep is red until this is done, on purpose** — it was red
   before today and the only change is that it is now visible. See
   `docs/decisions/046-the-control-sweep-reaches-two-thirds-of-the-controls.md`.
+- [ ] **The shipped list shows readers the oldest twelve** <!-- decision: 045 -->
+  found 2026-09-22 while archiving the items that shipped in 2.57: the public
+  `/notes` page's "Recently shipped" list is built as
+  `filter(done).reverse().slice(0, 12)` in `notesPage()`, under a comment saying
+  NOTES keeps newest last. It does not. Measured over the archive's entries, 82
+  of 114 carried a date and only 13 of the 81 dated pairs were inversions, so the
+  file runs newest-FIRST, from 2026-09-21 down to 2026-07-04. The reverse
+  therefore hands the reader a window reaching back to July 2026 while about
+  eighteen of the most recently shipped items sit outside it and never render at
+  all — what shipped recently reads as the oldest twelve things in the archive.
+  **The renderer is the half that is wrong.** The field puts the ordering in the
+  data and the newest first — Keep a Changelog 1.0.0, and Common Changelog its
+  stricter subset — which is what this archive already does, so re-sorting the
+  file would move away from the documented convention to accommodate one
+  `reverse()`. Drop it, take the first twelve, move the tail entries to the top,
+  and correct the comment rather than obeying it.
+  **The gate lands in the same commit**, in `tools/notes-check.mjs`, which already
+  parses this section and already exists because a misplaced `## ` once emptied
+  the in-app Roadmap in silence. It is designed from the measurement rather than
+  from taste: strict sorted order is not available, because 13 inversions survive
+  the fix and a gate that refuses correct work on its first run is one somebody
+  switches off. It asserts what the reader cares about instead — every entry in
+  the rendered window is within 14 days of the newest dated entry in the archive,
+  which spanned about eighty days before the fix and four afterwards. See
+  `docs/decisions/045-the-shipped-list-shows-readers-the-oldest-twelve.md`.
 - [ ] **Creative — a third app for regular photos** — owner direction 2026-07-19 <!-- decision: 002 -->
   ("a separate page next to infrared and macro, called creative, for regular
   photos, installable separately… same things we're building here… I suppose I
@@ -3395,6 +3420,179 @@ read as authoritative, and an invented one is worse than a missing one.
 
 ## Shipped (roadmap archive)
 
+- [x] **An edit you can put down and come back to** <!-- decision: 039 -->
+  reported 2026-09-20: there is no way to save the photograph being worked on
+  and come back to it later. True, and by design in one half of the app — a set
+  of two or more opens as a persisted, resumable session, and a single
+  photograph opens ephemeral, with `openSingle`'s own comment saying there is
+  nothing to resume from a single edit. The session is not the answer either:
+  it is a working state with a Done that frees its storage, and the question is
+  "can I put this one down for a week", which wants a different answer.
+  The field keeps the edit as a few kilobytes of recipe beside the original and
+  never writes the file — which is already this app's shape, since a look is
+  0.5 KB of JSON. What the sources cannot settle is where the BYTES live: those
+  tools sit beside a filesystem, and this one cannot re-read a picked file after
+  a reload on iPad Safari. So keeping the edit is easy and keeping the
+  photograph is the decision. See
+  `docs/decisions/039-an-edit-you-can-put-down-and-come-back-to.md`.
+  **SHIPPED IN 2.57, 2026-09-22 — commit `9319fdc`, deployed.** Every mask
+  row's neighbour on the Export panel is a Keep button; name it and the
+  photograph joins a list on the start screen that is still there after the
+  app is closed. `src/keepstore.ts` is its own database (`ips-kept`) rather
+  than a store inside the session's, so the Done button cannot reach it —
+  039's rejected "make it a session of one", made structurally impossible
+  rather than remembered. The durability shape is `src/session.ts`'s and
+  therefore `src/batchstore.ts`'s: bytes in chunks of 30 KB or less, one
+  strict transaction per photograph.
+  **The masks come back, which a resumed session has never managed.** They are
+  stored as RECIPES with the bitmaps stripped — `shapeOf`, the one function that
+  knows which fields are pixels — and every Sky mask is found again on the
+  photograph before anything is drawn. Measured: a sky selecting 54% of the
+  frame when it was kept selects 54% when it is picked up. A painted mask, a
+  warp and an imported LUT are pixels rather than settings, so they do not come
+  back and the app says which of them this photograph would lose BEFORE asking
+  for a name.
+  Cap of ten, and the list prints how many and how many megabytes are held,
+  because a store whose size the reader cannot see is the leak the record's own
+  rejected option describes.
+- [x] **Straighten to a line you draw** <!-- decision: 038 -->
+  asked 2026-09-20: tap two points along an edge that should be level and let
+  the photograph straighten to it. Today the control is an angle — a slider and
+  a grid — so the reader sets a number and judges the result, when what they
+  know is not an angle but that THIS edge should be level and it is in front of
+  them. The field has this and it has a name: Lightroom's Angle tool in Crop &
+  Straighten, Photoshop's Ruler plus Straighten Layer, and in both it is a DRAG
+  along the edge. Two taps rather than a drag is an adaptation to a tablet held
+  in one hand, where a long precise drag competes with the pan gesture. The
+  angle goes into the same `straighten` value the slider already carries, so
+  undo, reset, the saved edit and the export inherit it with nothing new to
+  learn. See `docs/decisions/038-straighten-to-a-line-you-draw.md`.
+  **SHIPPED IN 2.57, 2026-09-22 — commit `76ef0ad`, deployed.** A "Level to a
+  line you draw" button in the straighten pill: tap the two ends of an edge
+  that should be level and the frame turns to it. The angle goes through
+  `applyStraighten`, the same door the slider uses, so it is one undo step and
+  the slider afterwards shows the number the line produced. One tap moves
+  nothing — the gesture can be abandoned — and a drag places nothing, so a
+  stray movement while it is armed cannot drop a point. A line past 45° is
+  read as an UPRIGHT edge rather than turning the photograph ninety degrees.
+  Measured: a line drawn 6.0° off level moves the frame 6.0°, the same line
+  drawn the other way up gives the opposite angle, and a line 84° off level
+  gives 6.0° read as an upright. The renders were opened, which is how the
+  direction was confirmed and how the layout defect below was found.
+- [x] **Every control can say what it does, and a finger can reach the saying** <!-- decision: 024 --> —
+  asked 2026-09-19 from the PC, in the sitting that reported a slider named
+  after the defect rather than the act: there should be something clickable
+  or hoverable, where it makes sense, that says what each tool does. Measured
+  the same day: 103 visible notes against 76 labelled sliders, so most
+  controls already explain themselves permanently and what is missing is the
+  rule — which get a sentence, where it goes, and how a reader asks for one.
+  The field's tap-reachable form is a toggletip, not a tooltip, and this
+  repository's own gate already refuses a `title` for this use, because there
+  is no hover on a tablet. See
+  `docs/decisions/024-every-control-can-say-what-it-does-without-a-hover.md`.
+  **SHIPPED IN 2.58, 2026-09-22 — commit `4ffb0e1`, deployed.** Eight controls
+  carry a "What this does" button: the Tone tab's six points and the two lens
+  Strength sliders. `src/toggletip.ts` wires every `button[data-tip]`, builds the
+  trigger's accessible name from the control's own label so nothing is written
+  twice, and announces through one `#tipLive` region. The 112 permanent notes
+  beside other controls did not move — they are the app's majority answer.
+  **What is still owed is a gate that runs.** `tools/control-walk.mjs` was
+  extended by 189 lines here, including the count of controls that say nothing
+  for themselves anywhere, and nothing invoked it: no workflow, no
+  `.branch-guard` line, and `walk-all.mjs` globs `*-walk.mjs`, which
+  `control-check.mjs` did not match — while four source comments called it a
+  gate that refuses things. **Renamed `tools/control-walk.mjs` the same day**, so
+  the sweep globs it and it now runs with the other forty-three walks — and
+  running it showed the rename is NOT the whole fix: the walk exits 1 on 71
+  controls the markup declares and the sweep never reaches. That triage is its
+  own item and the sweep stays red until it is done.
+- [x] **The mask panel does not say what it can do** <!-- decision: 040 -->
+  four things reported 2026-09-20, and the first is the finding: the request
+  was for masks to "include add, subtract, etc, like commercial offerings" —
+  **and those shipped in 2.53**. `MaskLayer.op`, groups folded by
+  `groupWeight`, darktable's exclusive/inclusive algebra, with a walk that
+  proves it. The capability is there and was not found, which is a worse defect
+  than a missing feature because nothing in the app reports it: every gate is
+  green and the reader concludes the app cannot do it.
+  The other three: the hand-correction brush is one size with no ring under the
+  pointer, so the size is discovered by making a mark; there is nowhere to keep
+  a mask that took work; and nothing says you are finished with one and may
+  move on. The field's answer to the first and last is the same thing — masks
+  are a NAMED LIST, and leaving one is deselecting in a list that is always
+  there. A saved mask is a RECIPE and not a bitmap, because a generated
+  selection is recomputed on the new photograph and a painted one does not
+  travel; this app already splits that way, since 031 keeps corrections as the
+  strokes they were.
+  **SHIPPED WHOLE.** The brush half landed 2026-09-20; the named list, leaving
+  a mask by pressing it and the sentence about combining went out as 2.55; and
+  keeping a mask beyond the session went out as 2.56, storing a RECIPE — the
+  mask's numbers with every bitmap stripped, plus 031's strokes — so a saved
+  Sky mask is re-detected on the next photograph rather than laid over it.
+  Proved by measurement rather than by the mask coming back: frame A's sky is
+  54% of itself, the saved mask on frame B selects 18%, and a fresh detection
+  on frame B gives 18% too.
+  **What it cost, and it is the record's own headline one level up:** the saved
+  list is `hidden` until something is saved, so the accessibility sweep walked
+  past every new control exactly as it had walked past the mask editor for that
+  editor's whole life. `tools/a11y-walk.mjs` makes and saves a mask before both
+  its passes now, in the commit that created the surface.
+  **On the brush half, as measured at the time.** Hand size is a POSITION now rather than the radius, mapped
+  exponentially from 0.4% of the frame to 40% — a hundredfold range, where the
+  old control ran linearly from 3% and had nothing finer at all. And a ring
+  shows the footprint before anything is touched: up from the moment a mode is
+  armed, and again while the size slider moves, which is the half that matters
+  on a tablet where there is no hover to follow. Same shape as the sticker
+  brush's ring (`stkBrush`), deliberately not a second design.
+  Measured: the ring reads 7px across at the small end and 663px at the large
+  on a fitted frame, and the MASK agrees — one dab covers 0.006% of the frame
+  at the smallest and 35% at the largest. The default stroke is smaller than it
+  was (0.060 against 0.100), so the existing walk's take-out now moves 54.0% to
+  45.9% where it moved 54.0% to 39.6%, and the export walk's band figure moves
+  with it for the same reason. See
+  `docs/decisions/040-the-mask-panel-does-not-say-what-it-can-do.md`.
+- [x] **The foliage is the right colour and reads as a blob** <!-- decision: 016 --> — reported
+  from the iPad 2026-09-17 on the Aerochrome look, asking how to get the detail
+  back the way the film looks or the way people who edit these files normally do
+  it. Measured on the lone oak's canopy — 1.57 million pixels, 30% of the frame:
+  fine texture reads 40.15 with the denoiser off, 34.11 under the 5x5 filter this
+  app shipped until the day before, and 30.76 under the 13x13 that replaced it.
+  The denoiser costs the canopy 23% of its modelling and the widening is a third
+  of that, on a commit that said detail was not the price. Two halves shipped as
+  one: the look's floor drops to 0.45 (+11.6% texture per unit brightness, the
+  canopy's own brightness unmoved) and the look carries 0.25 of mid-frequency
+  local contrast to give back what the floor still costs (+16.0% in total). The
+  sky pays 6.2% of a speckle residual the widening had already cut 76%. The
+  reference video's own foliage lever — the hue band's luminance — was measured
+  and REJECTED: texture per unit luma is flat at 0.254 across a six-step ladder,
+  so every point it appears to add is brightness. Still not fixed and visible in
+  every crop: the trunk renders the same crimson as the leaves. The published
+  subtractive-colour fix was measured and REJECTED at every amount, and the
+  second measurement is why — on the oak it takes the bark's saturation down 20%
+  for 2% of the leaves and looks finished, and on the next frame tried it drives
+  858,273 pixels of ordinary grey roof shade to saturated teal, because the tint
+  is weighted by brightness alone and added rather than multiplied. What the bark
+  needs is a luminance-weighted saturation REDUCTION, and that control now
+  exists: **Shadow colour**, a slider on the Grade tab, off by default. It scales
+  colour down in the dark end instead of adding a complement in, so a pixel with
+  no colour cannot gain one — the same 858,273 pixels of roof shade come out
+  CLEANER at every amount, where the published fix took them to saturated teal.
+  On the oak at 0.45 it takes the bark down 20.6% for 4.7% of the leaves. Whether
+  Aerochrome should carry an amount of its own is an appearance choice with
+  candidates rendered rather than described. Sources and every number in
+  `IR-SCIENCE.md` sections 9i and 9j. See
+  `docs/decisions/016-foliage-tonality.md`.
+  **SHIPPED — the chosen work is on main.** The `eir` look carries
+  `denoise: 0.45` and `texture: 0.25` in `src/main.ts`; `applyLook` applies the
+  first as a floor and the second without overwriting a hand-dragged value; the
+  mid-frequency band-pass is real in both render paths; both land on reader
+  sliders; and `tools/aerochrome-walk.mjs` pins the pair as `FLOOR` and
+  `TEXTURE`. The introducing commit is below this checkout's graft, so it is not
+  named here rather than guessed at.
+  **What survived is the appearance choice the record already named:** whether
+  Aerochrome should carry a Shadow colour amount of its own. `shadowSat` is
+  absent from the `eir` entry, and that is a choice to be SHOWN with candidates
+  rendered rather than argued. The crimson trunk went where the record routed
+  it, to the separate Shadow colour control, which has since shipped.
 - [x] **Pressing Home leaves the editor drawer on screen** <!-- decision: 044 -->
   reported from an iPhone 2026-09-21: pressing Home after editing does not
   dismiss the menu, and the start screen arrives clipped. Both halves are one
@@ -7437,179 +7635,6 @@ read as authoritative, and an invented one is worse than a missing one.
   on the rule's closing brace found the one INSIDE its own comment, because the
   comment quotes `select, button { width: 100% }`. Plant by a unique anchor, and
   print what was planted.
-- [x] **The mask panel does not say what it can do** <!-- decision: 040 -->
-  four things reported 2026-09-20, and the first is the finding: the request
-  was for masks to "include add, subtract, etc, like commercial offerings" —
-  **and those shipped in 2.53**. `MaskLayer.op`, groups folded by
-  `groupWeight`, darktable's exclusive/inclusive algebra, with a walk that
-  proves it. The capability is there and was not found, which is a worse defect
-  than a missing feature because nothing in the app reports it: every gate is
-  green and the reader concludes the app cannot do it.
-  The other three: the hand-correction brush is one size with no ring under the
-  pointer, so the size is discovered by making a mark; there is nowhere to keep
-  a mask that took work; and nothing says you are finished with one and may
-  move on. The field's answer to the first and last is the same thing — masks
-  are a NAMED LIST, and leaving one is deselecting in a list that is always
-  there. A saved mask is a RECIPE and not a bitmap, because a generated
-  selection is recomputed on the new photograph and a painted one does not
-  travel; this app already splits that way, since 031 keeps corrections as the
-  strokes they were.
-  **SHIPPED WHOLE.** The brush half landed 2026-09-20; the named list, leaving
-  a mask by pressing it and the sentence about combining went out as 2.55; and
-  keeping a mask beyond the session went out as 2.56, storing a RECIPE — the
-  mask's numbers with every bitmap stripped, plus 031's strokes — so a saved
-  Sky mask is re-detected on the next photograph rather than laid over it.
-  Proved by measurement rather than by the mask coming back: frame A's sky is
-  54% of itself, the saved mask on frame B selects 18%, and a fresh detection
-  on frame B gives 18% too.
-  **What it cost, and it is the record's own headline one level up:** the saved
-  list is `hidden` until something is saved, so the accessibility sweep walked
-  past every new control exactly as it had walked past the mask editor for that
-  editor's whole life. `tools/a11y-walk.mjs` makes and saves a mask before both
-  its passes now, in the commit that created the surface.
-  **On the brush half, as measured at the time.** Hand size is a POSITION now rather than the radius, mapped
-  exponentially from 0.4% of the frame to 40% — a hundredfold range, where the
-  old control ran linearly from 3% and had nothing finer at all. And a ring
-  shows the footprint before anything is touched: up from the moment a mode is
-  armed, and again while the size slider moves, which is the half that matters
-  on a tablet where there is no hover to follow. Same shape as the sticker
-  brush's ring (`stkBrush`), deliberately not a second design.
-  Measured: the ring reads 7px across at the small end and 663px at the large
-  on a fitted frame, and the MASK agrees — one dab covers 0.006% of the frame
-  at the smallest and 35% at the largest. The default stroke is smaller than it
-  was (0.060 against 0.100), so the existing walk's take-out now moves 54.0% to
-  45.9% where it moved 54.0% to 39.6%, and the export walk's band figure moves
-  with it for the same reason. See
-  `docs/decisions/040-the-mask-panel-does-not-say-what-it-can-do.md`.
-- [x] **An edit you can put down and come back to** <!-- decision: 039 -->
-  reported 2026-09-20: there is no way to save the photograph being worked on
-  and come back to it later. True, and by design in one half of the app — a set
-  of two or more opens as a persisted, resumable session, and a single
-  photograph opens ephemeral, with `openSingle`'s own comment saying there is
-  nothing to resume from a single edit. The session is not the answer either:
-  it is a working state with a Done that frees its storage, and the question is
-  "can I put this one down for a week", which wants a different answer.
-  The field keeps the edit as a few kilobytes of recipe beside the original and
-  never writes the file — which is already this app's shape, since a look is
-  0.5 KB of JSON. What the sources cannot settle is where the BYTES live: those
-  tools sit beside a filesystem, and this one cannot re-read a picked file after
-  a reload on iPad Safari. So keeping the edit is easy and keeping the
-  photograph is the decision. See
-  `docs/decisions/039-an-edit-you-can-put-down-and-come-back-to.md`.
-  **SHIPPED IN 2.57, 2026-09-22 — commit `9319fdc`, deployed.** Every mask
-  row's neighbour on the Export panel is a Keep button; name it and the
-  photograph joins a list on the start screen that is still there after the
-  app is closed. `src/keepstore.ts` is its own database (`ips-kept`) rather
-  than a store inside the session's, so the Done button cannot reach it —
-  039's rejected "make it a session of one", made structurally impossible
-  rather than remembered. The durability shape is `src/session.ts`'s and
-  therefore `src/batchstore.ts`'s: bytes in chunks of 30 KB or less, one
-  strict transaction per photograph.
-  **The masks come back, which a resumed session has never managed.** They are
-  stored as RECIPES with the bitmaps stripped — `shapeOf`, the one function that
-  knows which fields are pixels — and every Sky mask is found again on the
-  photograph before anything is drawn. Measured: a sky selecting 54% of the
-  frame when it was kept selects 54% when it is picked up. A painted mask, a
-  warp and an imported LUT are pixels rather than settings, so they do not come
-  back and the app says which of them this photograph would lose BEFORE asking
-  for a name.
-  Cap of ten, and the list prints how many and how many megabytes are held,
-  because a store whose size the reader cannot see is the leak the record's own
-  rejected option describes.
-- [x] **Straighten to a line you draw** <!-- decision: 038 -->
-  asked 2026-09-20: tap two points along an edge that should be level and let
-  the photograph straighten to it. Today the control is an angle — a slider and
-  a grid — so the reader sets a number and judges the result, when what they
-  know is not an angle but that THIS edge should be level and it is in front of
-  them. The field has this and it has a name: Lightroom's Angle tool in Crop &
-  Straighten, Photoshop's Ruler plus Straighten Layer, and in both it is a DRAG
-  along the edge. Two taps rather than a drag is an adaptation to a tablet held
-  in one hand, where a long precise drag competes with the pan gesture. The
-  angle goes into the same `straighten` value the slider already carries, so
-  undo, reset, the saved edit and the export inherit it with nothing new to
-  learn. See `docs/decisions/038-straighten-to-a-line-you-draw.md`.
-  **SHIPPED IN 2.57, 2026-09-22 — commit `76ef0ad`, deployed.** A "Level to a
-  line you draw" button in the straighten pill: tap the two ends of an edge
-  that should be level and the frame turns to it. The angle goes through
-  `applyStraighten`, the same door the slider uses, so it is one undo step and
-  the slider afterwards shows the number the line produced. One tap moves
-  nothing — the gesture can be abandoned — and a drag places nothing, so a
-  stray movement while it is armed cannot drop a point. A line past 45° is
-  read as an UPRIGHT edge rather than turning the photograph ninety degrees.
-  Measured: a line drawn 6.0° off level moves the frame 6.0°, the same line
-  drawn the other way up gives the opposite angle, and a line 84° off level
-  gives 6.0° read as an upright. The renders were opened, which is how the
-  direction was confirmed and how the layout defect below was found.
-- [x] **The foliage is the right colour and reads as a blob** <!-- decision: 016 --> — reported
-  from the iPad 2026-09-17 on the Aerochrome look, asking how to get the detail
-  back the way the film looks or the way people who edit these files normally do
-  it. Measured on the lone oak's canopy — 1.57 million pixels, 30% of the frame:
-  fine texture reads 40.15 with the denoiser off, 34.11 under the 5x5 filter this
-  app shipped until the day before, and 30.76 under the 13x13 that replaced it.
-  The denoiser costs the canopy 23% of its modelling and the widening is a third
-  of that, on a commit that said detail was not the price. Two halves shipped as
-  one: the look's floor drops to 0.45 (+11.6% texture per unit brightness, the
-  canopy's own brightness unmoved) and the look carries 0.25 of mid-frequency
-  local contrast to give back what the floor still costs (+16.0% in total). The
-  sky pays 6.2% of a speckle residual the widening had already cut 76%. The
-  reference video's own foliage lever — the hue band's luminance — was measured
-  and REJECTED: texture per unit luma is flat at 0.254 across a six-step ladder,
-  so every point it appears to add is brightness. Still not fixed and visible in
-  every crop: the trunk renders the same crimson as the leaves. The published
-  subtractive-colour fix was measured and REJECTED at every amount, and the
-  second measurement is why — on the oak it takes the bark's saturation down 20%
-  for 2% of the leaves and looks finished, and on the next frame tried it drives
-  858,273 pixels of ordinary grey roof shade to saturated teal, because the tint
-  is weighted by brightness alone and added rather than multiplied. What the bark
-  needs is a luminance-weighted saturation REDUCTION, and that control now
-  exists: **Shadow colour**, a slider on the Grade tab, off by default. It scales
-  colour down in the dark end instead of adding a complement in, so a pixel with
-  no colour cannot gain one — the same 858,273 pixels of roof shade come out
-  CLEANER at every amount, where the published fix took them to saturated teal.
-  On the oak at 0.45 it takes the bark down 20.6% for 4.7% of the leaves. Whether
-  Aerochrome should carry an amount of its own is an appearance choice with
-  candidates rendered rather than described. Sources and every number in
-  `IR-SCIENCE.md` sections 9i and 9j. See
-  `docs/decisions/016-foliage-tonality.md`.
-  **SHIPPED — the chosen work is on main.** The `eir` look carries
-  `denoise: 0.45` and `texture: 0.25` in `src/main.ts`; `applyLook` applies the
-  first as a floor and the second without overwriting a hand-dragged value; the
-  mid-frequency band-pass is real in both render paths; both land on reader
-  sliders; and `tools/aerochrome-walk.mjs` pins the pair as `FLOOR` and
-  `TEXTURE`. The introducing commit is below this checkout's graft, so it is not
-  named here rather than guessed at.
-  **What survived is the appearance choice the record already named:** whether
-  Aerochrome should carry a Shadow colour amount of its own. `shadowSat` is
-  absent from the `eir` entry, and that is a choice to be SHOWN with candidates
-  rendered rather than argued. The crimson trunk went where the record routed
-  it, to the separate Shadow colour control, which has since shipped.
-- [x] **Every control can say what it does, and a finger can reach the saying** <!-- decision: 024 --> —
-  asked 2026-09-19 from the PC, in the sitting that reported a slider named
-  after the defect rather than the act: there should be something clickable
-  or hoverable, where it makes sense, that says what each tool does. Measured
-  the same day: 103 visible notes against 76 labelled sliders, so most
-  controls already explain themselves permanently and what is missing is the
-  rule — which get a sentence, where it goes, and how a reader asks for one.
-  The field's tap-reachable form is a toggletip, not a tooltip, and this
-  repository's own gate already refuses a `title` for this use, because there
-  is no hover on a tablet. See
-  `docs/decisions/024-every-control-can-say-what-it-does-without-a-hover.md`.
-  **SHIPPED IN 2.58, 2026-09-22 — commit `4ffb0e1`, deployed.** Eight controls
-  carry a "What this does" button: the Tone tab's six points and the two lens
-  Strength sliders. `src/toggletip.ts` wires every `button[data-tip]`, builds the
-  trigger's accessible name from the control's own label so nothing is written
-  twice, and announces through one `#tipLive` region. The 112 permanent notes
-  beside other controls did not move — they are the app's majority answer.
-  **What is still owed is a gate that runs.** `tools/control-walk.mjs` was
-  extended by 189 lines here, including the count of controls that say nothing
-  for themselves anywhere, and nothing invoked it: no workflow, no
-  `.branch-guard` line, and `walk-all.mjs` globs `*-walk.mjs`, which
-  `control-check.mjs` did not match — while four source comments called it a
-  gate that refuses things. **Renamed `tools/control-walk.mjs` the same day**, so
-  the sweep globs it and it now runs with the other forty-three walks — and
-  running it showed the rename is NOT the whole fix: the walk exits 1 on 71
-  controls the markup declares and the sweep never reaches. That triage is its
-  own item and the sweep stays red until it is done.
 
 ## Desktop-mouse round + the flat-frame finding, 2026-09-08
 

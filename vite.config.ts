@@ -196,7 +196,15 @@ function notesPage(): Plugin {
       const coming = checklist(/^##\s+Next capability release/i).filter((i) => !i.done);
       const shipped = checklist(/^##\s+Shipped \(roadmap archive\)/i)
         .filter((i) => i.done)
-        .reverse() // NOTES keeps newest last; readers want newest first
+        // NOTES keeps the archive newest-FIRST. That is the field's convention
+        // (Keep a Changelog 1.0.0, and Common Changelog as its stricter subset)
+        // and it is what this file has always mostly done — measured 2026-09-22
+        // at 13 inversions across its 81 dated pairs. This used to `.reverse()`
+        // here under a comment claiming the opposite, which handed the reader
+        // the OLDEST twelve: a window reaching back to July 2026 while about
+        // eighteen of the most recently shipped entries sat outside it and never
+        // rendered. Nineteen commit gates were green on that. Decision 045, and
+        // `tools/notes-check.mjs` now refuses a drift back.
         .slice(0, 12);
       const li = (s: string) => `      <li>${s}</li>`;
       const html = `<!doctype html>
