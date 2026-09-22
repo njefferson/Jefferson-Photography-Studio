@@ -78,9 +78,14 @@ pretending the new file is the old one.
   door.** A look already travels as a tiny file the reader saves and picks
   again, so the picker already routes a non-image file to a handler rather than
   to the decoder.
-- **`src/zip.ts` is a minimal ZIP reader with no dependencies** (297 lines),
-  written for ZIP import. EIP's container is a zip, and the READING half of it
-  is already in the app and already tested against real archives.
+- **`src/zip.ts` reads AND WRITES, and this entry said otherwise.** Corrected
+  2026-09-22 on the run that started the work, which is the only reason a second
+  writer was not built beside the first (hub LESSONS 330). `writeZip` and
+  `crc32` ship and are used by the batch export at `main.ts:14601`. It is
+  STORE-only, Blob-backed so a large original never materialises in RAM, and
+  UTF-8 named — which is exactly the container this item's chosen option
+  specifies, down to the reason. The closing line of this section said a zip
+  writer did not exist; it did, and had for some time.
 - **`src/keepstore.ts` and `keptEditToJson` in `src/main.ts`** are 039's store
   and its edit round-trip, including the part that matters most here: masks
   travel as RECIPES with the bitmaps stripped by `shapeOf`, so the edit JSON is
@@ -94,8 +99,28 @@ pretending the new file is the old one.
 - **`src/export.ts` and the share path** are how any file this produces reaches
   the reader, and the export panel is where the Keep button already lives.
 
-What genuinely does not exist: a zip WRITER, a declared package layout, and a
-path by which picking one back opens the photograph with its edit on it.
+What genuinely does not exist, corrected 2026-09-22 now that the writer has
+been found: **a declared package layout, and a path by which picking one back
+opens the photograph with its edit on it.**
+
+**The layout landed first, as `src/keepfile.ts`**, with `tools/keepfile-check.mjs`
+in the commit chain. Three entries, whose names are declared once in that
+module's `KEEP_PATHS` so the writer and the reader cannot drift: a manifest
+carrying the format, the app version, the original's name, size and CRC and the
+reader's name; an edit entry carrying 039's round-trip verbatim; and the picked
+file's own bytes under a directory of their own, STORED and byte-identical, so
+a reader unzipping by hand sees at once which file is their photograph. The reader refuses rather than half-opens — a missing
+part, a format from the future, a length that disagrees with the manifest, or a
+checksum that does not match — because a photograph decoded from slightly wrong
+bytes is still a picture, and that is the failure nothing would show.
+
+**The check was made to fail before it was trusted, and the plant found a defect
+in the INSTRUMENT rather than in the module.** A one-byte flip taken before the
+checksums went green, because the comparison was against the input array and a
+writer that corrupts its input IN PLACE changes both sides of it at once. It
+compares against a snapshot taken before the write now, and asserts separately
+that the bytes handed in are never written to — which is this item's own
+requirement, one level down from the file the reader picked.
 
 ## Weighed against
 

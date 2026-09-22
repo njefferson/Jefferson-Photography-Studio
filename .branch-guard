@@ -213,3 +213,16 @@ also=tools/pool-budget-check.mjs
 # they are asserted here rather than looked for later. It caught two real
 # defects on its first run.
 also=tools/shadow-cast-check.mjs
+
+# Run on every commit: a keep file gives back exactly the photograph it was
+# given. The whole promise of decision 043 is that the original is CARRIED
+# rather than referenced, byte for byte, so the reader owns their photograph
+# instead of renting it from a database the browser may reclaim — and that
+# promise is one CRC away from being false in a way nothing would show, because
+# a picture that decodes from slightly wrong bytes is still a picture. It reads
+# the archive back through src/zip.ts, the same reader the app opens a picked
+# zip with, so it is a round trip rather than a writer agreeing with itself. It
+# was made to fail before it was trusted, and the plant found a defect in the
+# INSTRUMENT: comparing against the input array let a writer that corrupts its
+# input in place pass, because both sides of the comparison changed together.
+also=tools/keepfile-check.mjs
