@@ -26,6 +26,33 @@
 //   desktop nicety and harmless) but "no title that carries what the label
 //   lacks".
 //
+// AND THE OTHER DIRECTION, WHICH IS DECISION 024. The tooltip rule above can
+// only refuse a sentence that is in the WRONG PLACE. It has nothing to say
+// about a control with no sentence anywhere — which is the half the record
+// asked for: "a list of which controls still have nothing to say for
+// themselves". Three places count, and they are the three the app actually
+// uses: a permanent `.note` under the control, an `aria-describedby` pointing
+// at one, or a toggletip the reader can press (src/toggletip.ts).
+//
+//   WHAT THAT LIST CANNOT SEE, said out loud rather than discovered later. It
+//   reads POSITION, not aboutness. A note sitting after a run of four sliders
+//   is credited to the LAST of them, because that is the only one it is
+//   adjacent to — and a note that happens to sit there while being about
+//   something else is credited just the same. No parser tells a sentence about
+//   this control from a sentence about the next one. So this is a LIST and not
+//   a refusal: it names what to go and look at, and the looking is a person's.
+//
+//   SCOPED TO LABELLED INPUT CONTROLS — sliders, selects, checkboxes. A
+//   button's label is a verb phrase and is usually the whole sentence ("Reset
+//   black & white"); a slider's is a noun that names a quantity and often is
+//   not ("Strength", "Hot-spot size"). Widening this to every button would
+//   bury the finding in four hundred rows of controls that are fine, and the
+//   record's own measurement counts labelled sliders.
+//
+// The toggletip WIRING is a refusal, both ways, because it is mechanical: a
+// trigger whose body is not in the page opens onto nothing, and a body no
+// trigger names is a sentence with no route to it.
+//
 // It also PRINTS THE INVENTORY, grouped by surface, so reviewing every control
 // in the app is one read of one page rather than a person tapping through it.
 //
@@ -105,6 +132,88 @@ async function controlsOn(page, where) {
   }, where);
 }
 
+/** Every LABELLED INPUT CONTROL on whatever is currently on screen, with where
+ *  its explanation lives — the decision-024 direction.
+ *
+ *  Takes `page`, a Playwright page, and `where`, the surface label to stamp on
+ *  each row.
+ *  Returns one row per visible control: its id, its label text, and `says` —
+ *  the routes to an explanation that actually resolve, out of `describedby`,
+ *  `toggletip` and `note`. An empty `says` is a control with nothing to say for
+ *  itself anywhere, which is what the inventory below names. Read from the live
+ *  DOM, so a `hidden` tab's controls are correctly absent rather than counted
+ *  as fine. */
+async function explainedOn(page, where) {
+  return page.evaluate((w) => {
+    const root = document.querySelector("dialog[open]") || document;
+    const out = [];
+    for (const el of root.querySelectorAll("input[type=range], input[type=checkbox], input[type=number], select")) {
+      const r = el.getBoundingClientRect();
+      if (!r.width || !r.height) continue;
+      if (el.closest("[hidden]") || el.hidden) continue;
+      const lab = el.closest("label");
+      let name = "";
+      if (lab) {
+        for (const n of lab.childNodes) {
+          if (n.nodeType === Node.TEXT_NODE) name += n.textContent || "";
+          else if (n.nodeType === Node.ELEMENT_NODE && n.tagName === "SMALL") name += " " + (n.textContent || "");
+        }
+      }
+      name = (name || el.getAttribute("aria-label") || "").replace(/\s+/g, " ").trim();
+
+      const says = [];
+      const desc = (el.getAttribute("aria-describedby") || "").split(/\s+/).filter(Boolean);
+      if (desc.some((id) => (document.getElementById(id)?.textContent || "").trim())) says.push("describedby");
+      if (el.id && document.querySelector(`button[data-tip-for="${CSS.escape(el.id)}"]`)) says.push("toggletip");
+      // THE ELEMENT IMMEDIATELY AFTER THE LABEL, and nothing further. Reaching
+      // past one sibling is how a note four controls away gets credited to a
+      // control it says nothing about, which would make this list agree with
+      // the app about nothing at all.
+      const after = (lab || el).nextElementSibling;
+      if (after && (after.classList.contains("note") || after.classList.contains("tip-body") || after.classList.contains("note-more"))) {
+        if ((after.textContent || "").trim()) says.push("note");
+      }
+      out.push({ where: w, id: el.id || "", tag: el.tagName.toLowerCase(), name, says });
+    }
+    return out;
+  }, where);
+}
+
+/** The toggletip wiring on this page, read from the markup rather than from a
+ *  press.
+ *
+ *  Takes `page`, a Playwright page.
+ *  Returns `{ triggers, bodies }`: one row per `button[data-tip]` with the ids
+ *  it names and whether each resolves, and the id of every `.tip-body` in the
+ *  document with the count of triggers naming it. The caller refuses a trigger
+ *  that opens onto nothing and a body no trigger can reach; both directions,
+ *  because a sentence with no route to it is the same defect facing the other
+ *  way. Reads the whole document, not the visible part: the panel is `hidden`
+ *  until a photograph opens and the wiring is a fact about the markup. */
+async function toggletipsOn(page) {
+  return page.evaluate(() => {
+    const triggers = [...document.querySelectorAll("button[data-tip]")].map((b) => {
+      const bodyId = b.dataset.tip || "";
+      const body = bodyId ? document.getElementById(bodyId) : null;
+      const forId = b.dataset.tipFor || "";
+      const ctl = forId ? document.getElementById(forId) : null;
+      return {
+        bodyId,
+        forId,
+        hasBody: !!body,
+        bodyText: (body?.textContent || "").trim().length,
+        hasControl: !!ctl,
+        described: (ctl?.getAttribute("aria-describedby") || "").split(/\s+/).includes(bodyId),
+      };
+    });
+    const bodies = [...document.querySelectorAll(".tip-body")].map((el) => ({
+      id: el.id,
+      named: document.querySelectorAll(`button[data-tip="${CSS.escape(el.id)}"]`).length,
+    }));
+    return { triggers, bodies };
+  });
+}
+
 // Words the label is not required to repeat: they carry no meaning on their own.
 const STOP = new Set(["the","a","an","and","or","to","of","it","its","this","that","is","for","with","on","in","from","your","you","as","at","by","one","all","no","not","be","into","when","what","which","so","if","up","out","then","there","here","also","just","every","each","any","use","used","like","than","only","still","them","they"]);
 const words = (s) => s.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").split(/\s+/).filter((w) => w && !STOP.has(w));
@@ -131,6 +240,11 @@ if (!served) {
 
 const allow = allowList();
 const rows = [];
+// The decision-024 direction, collected at exactly the same moments as `rows`:
+// a labelled control is only visible on the tab it lives on, so a sweep that
+// looks once looks at one tab in twelve.
+const ctlRows = [];
+const tipWiring = new Map();
 const br = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium", args: ["--use-gl=swiftshader", "--enable-unsafe-swiftshader"] });
 try {
   for (const s of PAGES) {
@@ -143,7 +257,10 @@ try {
     // traded one blind spot for another and lost the welcome card's five
     // controls while gaining the panel's. A page can have more than one resting
     // state, and sweeping one of them is not sweeping the page.
-    if (s.file === "ir.html") rows.push(...(await controlsOn(page, `${s.file} · start screen`)));
+    if (s.file === "ir.html") {
+      rows.push(...(await controlsOn(page, `${s.file} · start screen`)));
+      ctlRows.push(...(await explainedOn(page, `${s.file} · start screen`)));
+    }
     // A PHOTOGRAPH FIRST, OR THE EDITOR IS NOT THERE. Measured the day this was
     // written: with nothing open, #panel is `hidden` and the bar's edit actions
     // lay out at 0x0 — so a cold sweep of ir.html misses every panel control and
@@ -170,7 +287,15 @@ try {
       if (!up) console.log(`  (${s.file}: the practice frame never opened — the editor's controls are not in this run)`);
       await page.waitForTimeout(1500);
     }
-    rows.push(...(await controlsOn(page, s.file === "ir.html" ? `${s.file} · with a photo open` : s.file)));
+    {
+      const w = s.file === "ir.html" ? `${s.file} · with a photo open` : s.file;
+      rows.push(...(await controlsOn(page, w)));
+      ctlRows.push(...(await explainedOn(page, w)));
+      // ONCE PER PAGE, AFTER THE APP HAS BOOTED. src/toggletip.ts appends each
+      // trigger's accessible name at wire time, so reading before boot reads a
+      // page the reader never sees.
+      tipWiring.set(s.file, await toggletipsOn(page));
+    }
     // Every panel tab on ir.html is its own set of controls and only one is on
     // screen at a time — a sweep of the page at rest sees one of eleven.
     const tabs = await page.evaluate(() =>
@@ -179,6 +304,7 @@ try {
       await page.evaluate((i) => document.getElementById(i)?.click(), t);
       await page.waitForTimeout(120);
       rows.push(...(await controlsOn(page, `${s.file} · ${t}`)));
+      ctlRows.push(...(await explainedOn(page, `${s.file} · ${t}`)));
       // AND THE TOOLS THAT ARM, which are not a tab and are not on screen at
       // rest. The crop bar floats over the photograph and only exists while the
       // tool is armed — five controls the coverage check below found missing,
@@ -190,6 +316,7 @@ try {
         await page.evaluate(() => document.getElementById("cropBtn")?.click());
         await page.waitForTimeout(250);
         rows.push(...(await controlsOn(page, `${s.file} · crop armed`)));
+        ctlRows.push(...(await explainedOn(page, `${s.file} · crop armed`)));
         await page.evaluate(() => document.getElementById("cropBtn")?.click());
         await page.waitForTimeout(150);
       }
@@ -204,6 +331,7 @@ try {
       if (!opened) continue;
       await page.waitForTimeout(150);
       rows.push(...(await controlsOn(page, `${s.file} · ${id}`)));
+      ctlRows.push(...(await explainedOn(page, `${s.file} · ${id}`)));
       await page.evaluate(() => document.querySelector("dialog[open]")?.close());
     }
     await page.close();
@@ -268,6 +396,63 @@ console.log(`\n=== every control with no name at all ===\n`);
 const nameless = all.filter((r) => !r.text && !r.aria && !(allow.has(key(r)) && used.add(key(r))));
 for (const r of nameless) fail(`${key(r)}: a ${r.tag} with no visible text and no aria-label`);
 if (!nameless.length) console.log("  ok    every control has a name");
+
+// ===== DECISION 024, BOTH HALVES =====================================
+//
+// The wiring half REFUSES, because it is mechanical and cannot be a matter of
+// opinion. The inventory half PRINTS, because deciding whether a control needs
+// a sentence is the judgement the record left to a person — and a gate that
+// failed on all of them would be a red light nobody could turn off honestly.
+console.log(`\n=== the toggletip wiring: a press opens something, and every sentence has a press ===\n`);
+let tipCount = 0;
+for (const [file, w] of tipWiring) {
+  for (const t of w.triggers) {
+    tipCount++;
+    if (!t.hasBody) fail(`${file}: a toggletip names data-tip="${t.bodyId}" and nothing in the page has that id — the press opens onto nothing`);
+    else if (!t.bodyText) fail(`${file}: the toggletip body #${t.bodyId} is empty — the press opens onto nothing`);
+    if (!t.forId) fail(`${file}: the toggletip for #${t.bodyId} names no control (data-tip-for) — its accessible name cannot carry which control it is about`);
+    else if (!t.hasControl) fail(`${file}: a toggletip claims data-tip-for="${t.forId}" and no such control exists`);
+    else if (!t.described) fail(`${file}: #${t.forId} does not point at #${t.bodyId} with aria-describedby — a screen reader is told only if it finds the button`);
+  }
+  for (const b of w.bodies) {
+    if (b.named === 0) fail(`${file}: #${b.id} is a toggletip body no trigger names — a sentence with no route to it`);
+    if (b.named > 1) fail(`${file}: ${b.named} triggers name #${b.id} — one sentence, one press`);
+  }
+}
+console.log(`  ${tipCount} toggletip${tipCount === 1 ? "" : "s"} across ${tipWiring.size} page(s)`);
+
+console.log(`\n=== decision 024: labelled controls with nothing to say for themselves ===\n`);
+// One row per CONTROL, like the inventory above: a slider lives on one tab but
+// is read again on every dialog sweep of the same page.
+const ctlSeen = new Map();
+for (const r of ctlRows) {
+  const page = r.where.split(" · ")[0];
+  const k = r.id ? `${page}|${r.id}` : `${r.where}|${r.name}`;
+  if (!ctlSeen.has(k) || (ctlSeen.get(k).says.length === 0 && r.says.length)) ctlSeen.set(k, r);
+}
+const labelled = [...ctlSeen.values()];
+// Its own key: `key` above reads `r.text`, which is the BUTTON inventory's
+// field. Sharing it read undefined and threw — two row shapes, one accessor.
+const ctlKey = (r) => `${r.where.split(" · ")[0]}#${r.id || r.name.slice(0, 24)}`;
+// A declaration in `.control-allow` excuses a control here too, and is MARKED
+// USED — the file is checked both ways, so an excuse that stops being consulted
+// has to stop being an excuse.
+const silent = labelled.filter((r) => {
+  if (r.says.length) return false;
+  const k = ctlKey(r);
+  if (allow.has(k)) { used.add(k); return false; }
+  return true;
+});
+let lastWhere = "";
+for (const r of silent) {
+  if (r.where !== lastWhere) { console.log(`\n  ${r.where}`); lastWhere = r.where; }
+  console.log(`    ${(r.id || "-").padEnd(20)} ${r.name.slice(0, 54)}`);
+}
+console.log(
+  `\n  ${silent.length} of ${labelled.length} labelled controls say nothing for themselves in any of the three places.` +
+  `\n  ${labelled.length - silent.length} do: a note beside them, an aria-describedby, or a toggletip.` +
+  `\n  This is a LIST, not a refusal — see the header for what it cannot see.\n`,
+);
 
 console.log(`\n=== coverage: every control the markup declares was reached ===\n`);
 const reached = new Set(all.map((r) => r.id).filter(Boolean));
