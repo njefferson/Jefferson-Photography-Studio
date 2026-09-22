@@ -3075,6 +3075,35 @@ subject", which a selection rather than a percentile would answer. The first can
 be settled by looking at the carport's shade against its sun; the second is a
 different piece of work.
 
+**AND THE SECOND CANDIDATE HAS EVIDENCE NOW, from pictures rather than from
+percentiles.** Nine frames were rendered at four `shadowSat` amounts on
+2026-09-22 and all thirty-six were opened; decision 034's "## Looked at"
+carries what each one showed. Three of them answer this paragraph directly.
+NIR_1851's darkest region that is not sky is an overhanging near BRANCH;
+NIR_1642's and NIR_1737's is the inside of a treeline. A percentile band over
+"everything that is not sky" takes all three and calls them shade — so on a
+forest corpus the darkest non-sky band is routinely vegetation, which is the
+one material the look exists to turn red.
+
+That is the second candidate restated as a measurement rather than a suspicion:
+the populations are wrong, and wrong in a direction excluding the sky cannot
+fix. **There is no foliage selection to exclude them with either** — `u_fol` is
+a hue BAND, per-pixel over hue, and decision 019 already rejected a band as a
+stand-in for a place. What `skyMaskFor` is for the sky does not exist for
+vegetation, and building it is what 9j-ii's second candidate actually names.
+
+**The luminance key fails at the other end too, which is worth recording here
+because `shadowSat` SHIPS and this is its own limitation rather than the
+correction's.** On NIR_1748 — granite, water, one shaded band — taking three
+quarters of the shadows' colour out costs nothing a reader would see. On
+NIR_1642, taking half is already enough to leave the frame grey. One key, two
+frames, opposite verdicts. And the foliage-population saturation falls smoothly
+across all nine, 0.64–0.75 at amount 1.00 down to 0.40–0.54 at 0.25, with no
+break anywhere to mark which frames were helped and which were destroyed —
+because a pixel that desaturates leaves the population being averaged. The
+split is obvious in one pass of the renders and absent from the statistic,
+which is section 6's warning arriving on a new population.
+
 ---
 
 ---
