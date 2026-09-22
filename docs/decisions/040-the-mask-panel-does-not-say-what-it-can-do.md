@@ -7,7 +7,12 @@ panel as a surface rather than about what a mask computes.
 
 **The first is not a missing feature and that is the finding.** The report asks
 for masks to "include add, subtract, etc, like commercial offerings". Add,
-subtract and intersect SHIPPED in 2.53 (decision 026, `936e9bd`):
+subtract and intersect SHIPPED in 2.53 (decision 026, `936e9bd`) — with one
+correction made 2026-09-22 and recorded rather than quietly edited: **"add"
+there means adding a mask, not a UNION with the mask above, which does not
+exist.** `groupWeight` folds op 1 as subtract and ops 0 and 2 through the same
+multiply, so what shipped is subtract and intersect. Record 048 carries the
+missing half and the report that found it. The rest of this paragraph stands:
 `MaskLayer.op` says how a mask joins the one above it, `maskGroups` reads the
 flat list into groups and `groupWeight` folds them with darktable's
 exclusive/inclusive algebra. The capability is there and was not found. That is
