@@ -156,10 +156,23 @@ exists to stop that. Dropping the connectivity requirement inside stage two
 re-opens it, and the frame that proves the damage is not the frame that
 motivated the change.
 
-**A horizon slider.** Asked for directly, and it cannot work: the border is one
-depth per display column, so a single control would move every column including
-all the ones that are already right. A per-column editor is a drawing tool by
-another name, which is the thing being refused.
+**A horizon slider.** Asked for directly, and a SLIDER still cannot work: the
+border is one depth per display column, so a single control moves every column
+including all the ones that are already right.
+
+**CORRECTED 2026-09-22, same day, and the correction is recorded rather than
+edited away.** This rejection continued "a per-column editor is a drawing tool
+by another name, which is the thing being refused", and that sentence was
+wrong. It generalised from the right conclusion about a slider to a claim about
+every possible control, and in doing so it refused the good idea along with the
+bad one. Showing the border and letting it be dragged is not drawing: the
+reader supplies a constraint along a line that is already computed and already
+returned, and the colour stage still resolves every pixel below it — which is
+what the interactive-segmentation literature has done since Lazy Snapping. It
+is record 049, ranked immediately above this one, and it is the more
+fundamental of the two because it corrects the border rather than patching the
+result. A rejected option is a live boundary; one written too wide fences off
+work that should have happened.
 
 **Widening `Reach`.** It scales the grow tolerances outward from the border and
 cannot move the border. On this frame it would loosen the colour test
