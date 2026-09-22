@@ -55,6 +55,21 @@ export const KEEP_PATHS = {
   /** The original's own bytes, under its own name, in a directory of its own so
    *  a reader unzipping by hand sees immediately which file is their photograph. */
   originalDir: "original/",
+  /** Everything in the edit that is BYTES rather than numbers: a painted mask's
+   *  bitmap, a warp's displacement field, an imported LUT's lattice. The edit
+   *  JSON names the entry it wants; this module never looks inside one.
+   *
+   *  THEY BELONG HERE BECAUSE THIS IS A CONTAINER. The app's mask LIBRARY
+   *  refuses to store a painted bitmap, and it is right to: a library saves a
+   *  mask to use on OTHER photographs, and pixels painted on one are wrong on
+   *  the next. A keep file has no next photograph — it carries this one, byte
+   *  for byte, so those pixels are exactly right for it forever. Inheriting the
+   *  library's rule here dropped every painted mask, the warp and the LUT out
+   *  of a saved edit for a reason that does not apply, which made a kept
+   *  photograph one you could not actually resume. A 384-square bitmap against
+   *  a 28 MB raw is not a size argument either, and these compress where the
+   *  raw does not. */
+  partDir: "edit/",
 } as const;
 
 /** What `keep.json` carries: enough to open the package, and enough to refuse it
@@ -129,7 +144,11 @@ export const KEEP_SNIFF_BYTES = 64;
  *
  *  @param original   the picked file's bytes, written through UNCHANGED.
  *  @param originalName  its filename as picked, used inside the archive.
- *  @param editJson   039's edit round-trip, already a string.
+ *  @param editJson   the edit round-trip, already a string.
+ *  @param parts      every piece of the edit that is BYTES rather than numbers,
+ *                    keyed by the name the edit JSON refers to it by. Written
+ *                    under `KEEP_PATHS.partDir`. This module never reads one:
+ *                    it owns the container and knows nothing about an edit.
  *  @param name       the reader's name for the photograph.
  *  @param appVersion the running app version, recorded for diagnosis.
  *  @param when       the timestamp to stamp, passed in so a caller can be
@@ -144,6 +163,7 @@ export function writeKeepFile(
   original: Uint8Array,
   originalName: string,
   editJson: string,
+  parts: ReadonlyMap<string, Uint8Array>,
   name: string,
   appVersion: string,
   when: Date,
@@ -169,6 +189,7 @@ export function writeKeepFile(
     [
       entry(KEEP_PATHS.manifest, text(JSON.stringify(manifest, null, 2))),
       entry(KEEP_PATHS.edit, text(editJson)),
+      ...[...parts].map(([k, bytes]) => entry(KEEP_PATHS.partDir + k, bytes)),
       { name: KEEP_PATHS.originalDir + originalName, size: original.length, crc: manifest.crc, data: original },
     ],
     when,
@@ -180,9 +201,12 @@ export interface KeepContents {
   manifest: KeepManifest;
   /** The original's bytes, verified against the manifest's size and CRC. */
   original: Uint8Array;
-  /** 039's edit JSON, for the caller to apply. Not parsed here: this module
-   *  owns the CONTAINER and knows nothing about what an edit means. */
+  /** The edit JSON, for the caller to apply. Not parsed here: this module owns
+   *  the CONTAINER and knows nothing about what an edit means. */
   editJson: string;
+  /** Every binary piece of the edit, keyed exactly as it was written — the
+   *  names the edit JSON refers to. Empty when the edit had none. */
+  parts: Map<string, Uint8Array>;
 }
 
 /** Open a keep file picked by the reader.
@@ -225,5 +249,9 @@ export async function readKeepFile(buf: ArrayBuffer): Promise<KeepContents> {
     throw new Error("keep file damaged: the photograph inside does not match its checksum");
   }
 
-  return { manifest, original: originalEntry.bytes, editJson: new TextDecoder().decode(editEntry.bytes) };
+  const parts = new Map<string, Uint8Array>();
+  for (const e of entries) {
+    if (e.name.startsWith(KEEP_PATHS.partDir)) parts.set(e.name.slice(KEEP_PATHS.partDir.length), e.bytes);
+  }
+  return { manifest, original: originalEntry.bytes, editJson: new TextDecoder().decode(editEntry.bytes), parts };
 }

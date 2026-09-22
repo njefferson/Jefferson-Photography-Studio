@@ -8,7 +8,21 @@
 // WHAT THIS PROVES THAT keepfile-check DOES NOT (decision 043). That one holds
 // the CONTAINER to its promise in isolation: write bytes, read them back,
 // byte-identical, damage refused. This holds the JOIN — that the app writes
-// what it thinks it writes and opens what it wrote. Every interaction below is
+// what it thinks it writes and opens what it wrote.
+//
+// AND THE EDIT IT CHECKS IS A PAINTED MASK, not a slider. A slider is a number
+// and every channel here carries numbers; a painted selection is nothing but
+// the bitmap somebody painted, so it is the piece with no recipe behind it and
+// the only one whose loss cannot be recovered from anywhere else. The first
+// version of this format dropped it — along with the warp and the LUT — by
+// inheriting the mask LIBRARY's rule, which is about applying a mask to OTHER
+// photographs and is a question a keep file never asks. A saved photograph that
+// comes back without its selections is not one you can go on editing.
+//
+// IT IS MEASURED AS COVERAGE ON SCREEN, through the app's own matte view, and
+// not by reading a bitmap out of the page. What the reader gets back is a
+// picture; a byte array that matches while nothing reaches the renderer is the
+// shape of pass this repository has the most lessons about. Every interaction below is
 // a REAL press through the browser's input pipeline and a REAL download
 // captured off the page, never `element.click()` in an evaluate: a dispatched
 // event is not a gesture, and a harness that presses by id cannot tell you
@@ -39,6 +53,55 @@ const check = (name, got, want) => {
   console.log(`  ${ok ? "ok  " : "FAIL"}  ${name}${ok ? "" : `\n          got ${JSON.stringify(got)}  want ${JSON.stringify(want)}`}`);
 };
 
+/** Fraction of the canvas the matte view is showing as selected.
+ *
+ *  The matte drops the photograph to dim monochrome and paints the selection in
+ *  one colour (gl.ts: `vec3(1.0, 0.92, 0.25)`), which is why coverage can be
+ *  read off the rendered frame at all — and why it is read by BOTH hue and
+ *  brightness, so a half-covered pixel reads as half. The same measure
+ *  `tools/fix-brush-walk.mjs` uses, deliberately: two instruments for one
+ *  quantity is how they come to disagree. */
+const matteCoverage = (page) => page.evaluate(() => {
+  const c = document.getElementById("view");
+  const oc = document.createElement("canvas");
+  oc.width = c.width; oc.height = c.height;
+  oc.getContext("2d").drawImage(c, 0, 0);
+  const d = oc.getContext("2d").getImageData(0, 0, oc.width, oc.height).data;
+  let n = 0, hit = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i] / 255, g = d[i + 1] / 255, b = d[i + 2] / 255;
+    const V = Math.max(r, g, b); n++;
+    if (g > 0.75 * r && b < 0.6 * g && V > 0.45) hit++;
+  }
+  return hit / n;
+});
+
+/** Paint a stroke across the photograph, as a finger would. */
+const paintStroke = async (page) => {
+  const box = await page.locator("#view").boundingBox();
+  const y = box.y + box.height * 0.42;
+  await page.mouse.move(box.x + box.width * 0.22, y);
+  await page.mouse.down();
+  for (let i = 1; i <= 8; i++) await page.mouse.move(box.x + box.width * (0.22 + 0.056 * i), y + Math.sin(i) * 8);
+  await page.mouse.up();
+  await page.waitForTimeout(900);
+};
+
+/** Arm the matte, read the coverage, put it away. Reading it means LOOKING at
+ *  the rendered frame, so the view has to be the one the reader judges with. */
+const coverageOf = async (page, row) => {
+  await page.locator("#ptab-masks").click();
+  await page.waitForTimeout(500);
+  const pick = page.locator("#maskList .mask-row").nth(row).locator(".mask-pick");
+  if ((await pick.getAttribute("aria-pressed")) !== "true") { await pick.click(); await page.waitForTimeout(500); }
+  await page.locator("#mMatte").click();
+  await page.waitForTimeout(900);
+  const cov = await matteCoverage(page);
+  await page.locator("#mMatte").click();
+  await page.waitForTimeout(500);
+  return cov;
+};
+
 const dir = mkdtempSync(join(tmpdir(), "keep-walk-"));
 const br = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });
 try {
@@ -66,6 +129,17 @@ try {
   await p.waitForTimeout(1200);
   const before = await p.evaluate(() => document.getElementById("sat").value);
   check("the edit was made and the control reads it back", before, MARK);
+
+  // AND A PAINTED MASK, which is the part with no recipe behind it.
+  await p.locator("#ptab-masks").click();
+  await p.waitForTimeout(500);
+  await p.locator("#addBrush").click();
+  await p.waitForTimeout(700);
+  await paintStroke(p);
+  const painted = await coverageOf(p, 0);
+  check("a stroke was painted and the app shows it as coverage", painted > 0.005, true);
+  console.log(`          painted coverage: ${(painted * 100).toFixed(2)}% of the frame`);
+  const maskLabel = await p.locator("#maskList .mask-row").nth(0).locator(".mask-pick").textContent();
 
   // THE REAL PRESS, and the real save.
   await p.locator("#ptab-export").click();
@@ -115,6 +189,24 @@ try {
   await p2.waitForTimeout(600);
   const after = await p2.evaluate(() => document.getElementById("sat").value);
   check("picking it back opens the photograph with the SAME edit on it", after, MARK);
+
+  // THE MASK. Same row, same name, and — the part that actually matters — the
+  // same pixels selected, read off the app's own matte rather than out of a
+  // field. A tolerance rather than equality because the frame is re-decoded and
+  // re-rendered from scratch; a mask that was DROPPED reads zero, which is not
+  // a near miss, and a mask restored empty reads zero too.
+  const rows2 = await p2.locator("#maskList .mask-row").count().catch(() => 0);
+  await p2.locator("#ptab-masks").click();
+  await p2.waitForTimeout(600);
+  const rowCount = await p2.locator("#maskList .mask-row").count();
+  check("the painted mask is in the list after reopening", rowCount >= 1, true);
+  const label2 = rowCount ? await p2.locator("#maskList .mask-row").nth(0).locator(".mask-pick").textContent() : "(none)";
+  check("...under the name it had", label2, maskLabel);
+  const back = rowCount ? await coverageOf(p2, 0) : 0;
+  console.log(`          restored coverage: ${(back * 100).toFixed(2)}% of the frame`);
+  check("...selecting the same pixels it was painted over",
+    back > 0 && Math.abs(back - painted) <= Math.max(0.004, painted * 0.15), true);
+  void rows2;
   const name = await p2.evaluate(() => document.title + "|" + (document.getElementById("hint")?.textContent ?? ""));
   console.log(`          opened as: ${name.slice(0, 70)}`);
 } finally {
