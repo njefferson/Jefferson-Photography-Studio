@@ -211,3 +211,33 @@ stands before any UI release. 030, 042, 034 and the mask work below them are all
 UI. Leaving this where its subject would rank means either shipping them
 unmeasured or routing around the gate, and both are failures this repository has
 a lesson for.
+
+## Outcome
+
+**SHIPPED 2026-09-22**, as the chosen option rather than the drafted one: the
+store removed outright, with no migration control and nothing for the reader to
+do. What made that legitimate is written in Context — the premise the migration
+draft rested on was that a reader might hold photographs existing nowhere else,
+and that premise turned out to be false.
+
+Removed with it: the store module, the start-screen button, the dialog and its
+styles, the diagnostic's row for the database, and the walk that only ever
+walked that dialog. `showLoneWithEdit` lost the parameter naming a store row,
+along with the module variable behind it and the sentence in its contract
+explaining what that null meant. The empty database is deleted on the next boot
+after the update, and the other five stores were confirmed untouched by planting
+an `ips-kept` database on the origin and watching only that one go.
+
+**The ranking reason discharged as stated.** The accessibility walk went from
+131 checks with two failures to 129 with none, and by the surface ceasing to
+exist rather than by being seeded — a name diff showed the only two sweeps that
+disappeared were the removed dialog's own, at each width. Every UI item below
+this is unblocked.
+
+**What turned out wrong, and it was found by the keep file rather than by this
+work.** `fix.pts` is a `Float32Array`, and `JSON.stringify` writes one as
+`{"0":…,"1":…}` with no `.length`, so the revive skipped every stroke: hand
+corrections to a kept sky selection had been silently lost on every reopen. It
+is fixed — plain arrays out, `reviveFixStrokes` in — but nothing in this
+record's analysis would ever have reached it, because this record is about the
+store and that defect is in the file that replaced it.

@@ -27,13 +27,29 @@
 // and nowhere else. A rule-checking gate cannot see any of it. Rendering the
 // same file two ways and comparing can.
 //
-// WHAT IT MEASURES. The biggest 30-degree hue bin and its share, plus the median
-// lightness of the coloured pixels — IR-SCIENCE.md section 6's metric, which
-// works whether the frame is one population (a camera JPEG, near enough all its
-// colour in one bin) or two (a swapped raw, foliage against sky). NOT a
-// whole-frame mean: on a bimodal frame that lands on grey and its hue is decided
-// by whichever population is a few pixels larger, which read 127 degrees apart on
-// two renderings that agreed to 1.5.
+// WHAT IT MEASURES, AND THIS PARAGRAPH USED TO BE WRONG IN THE SAME WAY IT WARNS
+// ABOUT. It said the walk asserts on the biggest 30-degree hue bin and its
+// share, and argued that works "whether the frame is one population or two".
+// It does not work when the frame is two. On a bimodal frame the two modes are
+// near enough equal and the winner is a coin toss between them, so the reading
+// swings by the full distance between the modes off a change that is invisible.
+// It cost decision 030's spatial half a release: preview and export of NIR_1651
+// read 180 degrees apart on that statistic, which is red and blue traded, on a
+// photograph where the channel means agree to 0.2 of 255 and the two pictures
+// side by side are the same picture.
+//
+// The old paragraph rejected a whole-frame MEAN for that exact reason — "its hue
+// is decided by whichever population is a few pixels larger" — and then
+// prescribed a bin winner, which is decided by whichever population is a few
+// pixels larger. Same defect, one line apart, for as long as the file existed.
+//
+// So: the whole twelve-bin hue histogram, compared by the circular earth mover's
+// distance in `dHist` below, plus the median lightness of the coloured pixels
+// and the three channel means. The winner is still computed and PRINTED, because
+// it is the quickest thing to read when a run goes red — it is never asserted on.
+// IR-SCIENCE.md section 6's metric is about whether ONE rendering spreads its
+// hues; borrowing it to compare TWO renderings is the misuse, and section 6 now
+// says so.
 //
 // THE RAW ARM IS THE CONTROL. The assemblers differ on FILE KIND, so a walk with
 // only one kind cannot see the disagreement; and an arm that passes in both
@@ -62,12 +78,35 @@ let bad = 0;
 const fail = (s) => { bad++; console.log(`FAIL  ${s}`); };
 const ok = (s) => console.log(`ok    ${s}`);
 
-// The reading, computed the same way wherever the pixels came from.
+// THE READING, computed the same way wherever the pixels came from — and it
+// returns the WHOLE hue histogram, not a winner.
+//
+// WHAT THE WINNER COST, measured 2026-09-22 and this is why the shape changed.
+// This function used to hand back the biggest of twelve hue bins, and the walk
+// asserted on the distance between two winners. Every photograph this app
+// exists for is BIMODAL: false-colour infrared puts foliage and sky at opposite
+// ends of the wheel, so the two modes are near enough equal and the winner is a
+// coin toss between them. NIR_1651 measured 41.6% teal against 29.9% pink in
+// the preview and 31.9% against 38.3% in the export — the same picture, twice,
+// at two resolutions — and the winner flipped from 165 to 345. That is 180
+// degrees, the largest number the statistic can produce, off a change that is
+// invisible: the channel means agree to 0.2 of 255 and the two pictures opened
+// side by side are the same photograph.
+//
+// IT IS WORSE THAN NOISY, IT IS BACKWARDS. The same export with RED AND BLUE
+// TRADED reads 90 degrees from the preview on that statistic — HALF what the
+// honest pair reads. A walk asserting on the winner would have passed the swap
+// and failed the truth.
+//
+// So the comparison is the CIRCULAR EARTH MOVER below, over the whole
+// histogram, and the winner is printed as information and never asserted on.
 const READ = `(px) => {
   const bins = new Array(12).fill(0); let n = 0; const ls = [];
+  let sr = 0, sg = 0, sb = 0, np = 0;
   for (let i = 0; i < px.length; i += 4) {
     const r = px[i], g = px[i+1], b = px[i+2];
     if (px[i+3] === 0) continue;
+    sr += r; sg += g; sb += b; np++;
     const mx = Math.max(r,g,b), mn = Math.min(r,g,b);
     ls.push((mx + mn) / 2 / 255);
     if (mx - mn < 12) continue;                       // grey carries no hue
@@ -78,10 +117,72 @@ const READ = `(px) => {
   if (!n) return null;
   let k = 0; for (let i = 1; i < 12; i++) if (bins[i] > bins[k]) k = i;
   ls.sort((a,z) => a - z);
-  return { hue: k*30 + 15, share: bins[k]/n, light: ls[Math.floor(ls.length/2)] * 100 };
+  return { hue: k*30 + 15, share: bins[k]/n, light: ls[Math.floor(ls.length/2)] * 100,
+    p: bins.map((b) => b / n), mean: [sr/np, sg/np, sb/np].map((x) => +x.toFixed(1)) };
 }`;
 
-const dHue = (a, b) => { const d = Math.abs(a - b) % 360; return d > 180 ? 360 - d : d; };
+/** HOW FAR APART TWO HUE HISTOGRAMS ARE, IN DEGREES.
+ *
+ *  Takes `p` and `q`, each twelve bin shares summing to one as `READ` returns
+ *  them. Returns the circular earth mover's distance: the least total
+ *  mass-times-distance that turns one into the other, minimised over where the
+ *  ring is cut, scaled by the 30 degrees a bin spans — so the answer is in the
+ *  units the bar is stated in.
+ *
+ *  WHAT IT HAS TO SATISFY, and every number here was measured on NIR_1651
+ *  rather than chosen. The same picture at two resolutions reads 7.7. The same
+ *  export with two channels traded reads 75.9 for red against blue, 41.5 for
+ *  red against green and 19.4 for green against blue — that last one is the
+ *  narrowest real swap and it is the one the bar has to clear. A bar of 15
+ *  degrees sits between 7.7 and 19.4 with room on both sides. Callers assert on
+ *  this and never on `hue`. */
+const dHist = (p, q) => {
+  let best = Infinity;
+  for (let k = 0; k < 12; k++) {
+    let c = 0, t = 0;
+    for (let i = 0; i < 12; i++) { const j = (k + i) % 12; c += p[j] - q[j]; t += Math.abs(c); }
+    if (t < best) best = t;
+  }
+  return +(best * 30).toFixed(1);
+};
+
+// The bar, in the same degrees. See dHist's contract for what it was measured
+// against and why it is not a round number chosen by taste. Arms 2 and 4 both
+// measure 9.2 honest against a narrowest-swap floor of 19.4, so 15 has room on
+// both sides.
+const HUE_BAR = 15;
+
+// THE TILE ARM NEEDS ITS OWN BAR, AND IT IS NOT A CLEAN ONE — this is the
+// honest version rather than one number stretched to cover everything.
+//
+// A tile under a look measures 14.3 from opening the same file, where the batch
+// export and the single export both measure 9.2. That is NOT the 260px resample:
+// a 260px nearest-sampled copy of the export, compared against the preview
+// through this same code, reads 7.8, and normalising both sides to one width
+// takes it to 5.8. So roughly five of those degrees belong to the TILE PATH
+// itself, and why is not established.
+//
+// WHAT 20 COSTS, and the honest answer is LESS than this comment first claimed.
+// It was written predicting that 20 could not catch the narrowest swap, green
+// against blue, because that swap measures 19.4 when applied synthetically to
+// the export. Then the swap was planted for real — g.rbg at the end of the
+// fragment shader — and driven through this arm's own path, where it reads
+// 22.2. The arm refused it. A prediction dressed as a measurement is the thing
+// this file's other comments are a record of, so the prediction is struck and
+// the run stands: arms 2 and 4 read 18.7 against their bar of 15, this arm
+// 22.2 against 20, all four red.
+//
+// The margin is still THIN and that is the real cost: 14.3 honest, 22.2 on the
+// narrowest swap, bar at 20 — 5.7 of room below and 2.2 above. Red against blue
+// (75.9) and red against green (41.5) are never close. If this arm starts
+// flaking, the five degrees of tile-path residual are where to look, not this
+// number.
+const TILE_BAR = 20;
+
+// Lightness is (max+min)/2, which does not change when channels are TRADED —
+// all three planted swaps above read 54.9%, exactly what the honest pair reads.
+// So it catches an exposure difference and says nothing whatever about colour.
+// It is asserted beside dHist, never instead of it.
 
 const br = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });
 try {
@@ -199,11 +300,11 @@ try {
         fail(`${label} / ${gradeLabel}: no batch frame for ${openName} — the store holds ${JSON.stringify(batch?.missing ?? [])}`);
         continue;
       }
-      const dh = dHue(open.hue, batch.hue), dl = Math.abs(open.light - batch.light);
-      console.log(`  ${label.padEnd(12)} open  ${openName} hue ${String(open.hue).padStart(3)} (${(open.share*100).toFixed(0)}%) light ${open.light.toFixed(1)}%`);
-      console.log(`  ${"".padEnd(12)} batch ${batch.name} hue ${String(batch.hue).padStart(3)} (${(batch.share*100).toFixed(0)}%) light ${batch.light.toFixed(1)}%  ·  ${gradeLabel} · ${dh}deg, ${dl.toFixed(1)} points apart`);
-      // 30deg is one bin: inside it the two agree on which bin is biggest.
-      if (dh > 30 || dl > 8) fail(`${label} / ${gradeLabel}: a batch render disagrees with opening the same file — ${dh}deg and ${dl.toFixed(1)} points`);
+      const dh = dHist(open.p, batch.p), dl = Math.abs(open.light - batch.light);
+      console.log(`  ${label.padEnd(12)} open  ${openName} biggest bin ${String(open.hue).padStart(3)} (${(open.share*100).toFixed(0)}%) light ${open.light.toFixed(1)}% mean ${JSON.stringify(open.mean)}`);
+      console.log(`  ${"".padEnd(12)} batch ${batch.name} biggest bin ${String(batch.hue).padStart(3)} (${(batch.share*100).toFixed(0)}%) light ${batch.light.toFixed(1)}% mean ${JSON.stringify(batch.mean)}`);
+      console.log(`  ${"".padEnd(12)} ${gradeLabel} · ${dh}deg of hue apart (bar ${HUE_BAR}), ${dl.toFixed(1)} points of lightness (bar 8)`);
+      if (dh > HUE_BAR || dl > 8) fail(`${label} / ${gradeLabel}: a batch render disagrees with opening the same file — ${dh}deg and ${dl.toFixed(1)} points`);
       else ok(`${label} / ${gradeLabel}: batch and open agree`);
     }
   }
@@ -319,13 +420,14 @@ try {
       })()`);
       if (!opened) { fail(`${label}: opening the second photograph gave no colour to read`); continue; }
 
-      const dh = dHue(tile.hue, opened.hue), dl = Math.abs(tile.light - opened.light);
-      console.log(`  ${label.padEnd(12)} tile  hue ${String(tile.hue).padStart(3)} (${(tile.share*100).toFixed(0)}%) light ${tile.light.toFixed(1)}%   [Aerochrome, never opened]`);
-      console.log(`  ${"".padEnd(12)} open  hue ${String(opened.hue).padStart(3)} (${(opened.share*100).toFixed(0)}%) light ${opened.light.toFixed(1)}%  \u00b7  ${dh}deg, ${dl.toFixed(1)} points apart`);
-      // A tile is 260px, nearest-sampled and JPEG-compressed against a full
-      // render, so the bars are looser than arm 2's: one bin of hue still, and
-      // twice the lightness slack.
-      if (dh > 30 || dl > 16) fail(`${label}: a tile under a look disagrees with opening the same file — ${dh}deg and ${dl.toFixed(1)} points`);
+      const dh = dHist(tile.p, opened.p), dl = Math.abs(tile.light - opened.light);
+      console.log(`  ${label.padEnd(12)} tile  biggest bin ${String(tile.hue).padStart(3)} (${(tile.share*100).toFixed(0)}%) light ${tile.light.toFixed(1)}% mean ${JSON.stringify(tile.mean)}   [Aerochrome, never opened]`);
+      console.log(`  ${"".padEnd(12)} open  biggest bin ${String(opened.hue).padStart(3)} (${(opened.share*100).toFixed(0)}%) light ${opened.light.toFixed(1)}% mean ${JSON.stringify(opened.mean)}`);
+      console.log(`  ${"".padEnd(12)} ${dh}deg of hue apart (bar ${TILE_BAR}), ${dl.toFixed(1)} points of lightness (bar 16)`);
+      // TILE_BAR, not HUE_BAR, and its comment says what that costs. A tile is
+      // 260px, nearest-sampled and JPEG-compressed against a full render, so it
+      // also gets twice arm 2's lightness slack.
+      if (dh > TILE_BAR || dl > 16) fail(`${label}: a tile under a look disagrees with opening the same file — ${dh}deg and ${dl.toFixed(1)} points`);
       else ok(`${label}: tile and open agree under a look`);
     } finally { await page.close(); }
   }
@@ -383,15 +485,20 @@ try {
       const armed = await page.getAttribute("#mAimNoise", "aria-pressed");
       if (armed !== "true") { fail(`${label}: the aim did not arm, so nothing below measures it`); throw new Error("not armed"); }
 
-      // READ THE PREVIEW THROUGH A 2D CANVAS, not readPixels, because the other
-      // side of THIS comparison is a decoded JPEG read that way — and the two
-      // routes do not agree about channel order. Measured: with no mask and no
-      // aim at all, readPixels against a JPEG decode reads 180 degrees apart in
-      // hue with lightness matching to 0.2 points, which is red and blue
-      // swapped and nothing to do with any edit. Arms 1-3 compare readPixels
-      // with readPixels, so it cancels there and never showed. It does not
-      // cancel here, and taken at face value it accused this walk's own subject
-      // of a defect it does not have.
+      // THE 180 DEGREES THIS ARM ONCE REPORTED WAS THE STATISTIC, NOT THE READ,
+      // AND THE COMMENT THAT USED TO SIT HERE SAID OTHERWISE. It blamed the two
+      // read routes for disagreeing about channel order. They do not: #view
+      // read by gl.readPixels and the same canvas read through a 2D context at
+      // the same instant came back BYTE-IDENTICAL — same channel means to the
+      // decimal, same twelve bins to the pixel. The real cause is written over
+      // READ above: the biggest of twelve hue bins is a coin toss on a bimodal
+      // frame, and this app's frames are all bimodal. The single-photo export
+      // agrees with the preview; the two pictures were opened side by side to
+      // check, which is what settled it rather than any further number.
+      //
+      // Either read works. This one stays because the other side of this
+      // comparison is a decoded JPEG read through a 2D context, so both sides
+      // now travel the same route and one fewer thing differs between them.
       const shown = await page.evaluate(`(() => {
         const read = ${READ};
         const c = document.querySelector("#view");
@@ -437,12 +544,14 @@ try {
       })()`);
       if (!saved) { fail(`${label}: the exported file has no colour to read`); throw new Error("no export"); }
 
-      const dh = dHue(shown.hue, saved.hue), dl2 = Math.abs(shown.light - saved.light);
-      console.log(`  ${label.padEnd(12)} shown hue ${String(shown.hue).padStart(3)} (${(shown.share*100).toFixed(0)}%) light ${shown.light.toFixed(1)}%   [denoise 0.9 aimed at a Sky mask]`);
-      console.log(`  ${"".padEnd(12)} saved hue ${String(saved.hue).padStart(3)} (${(saved.share*100).toFixed(0)}%) light ${saved.light.toFixed(1)}%  \u00b7  ${dh}deg, ${dl2.toFixed(1)} points apart`);
+      const dh = dHist(shown.p, saved.p), dl2 = Math.abs(shown.light - saved.light);
+      console.log(`  ${label.padEnd(12)} shown biggest bin ${String(shown.hue).padStart(3)} (${(shown.share*100).toFixed(0)}%) light ${shown.light.toFixed(1)}% mean ${JSON.stringify(shown.mean)}   [denoise 0.9 aimed at a Sky mask]`);
+      console.log(`  ${"".padEnd(12)} saved biggest bin ${String(saved.hue).padStart(3)} (${(saved.share*100).toFixed(0)}%) light ${saved.light.toFixed(1)}% mean ${JSON.stringify(saved.mean)}`);
+      console.log(`  ${"".padEnd(12)} ${dh}deg of hue apart (bar ${HUE_BAR}), ${dl2.toFixed(1)} points of lightness (bar 8)`);
       // The export is full resolution against a screen-sized preview and is
-      // JPEG-compressed, so the bars match arm 2's rather than being tighter.
-      if (dh > 30 || dl2 > 8) fail(`${label}: the preview and the export disagree with a mask aiming a spatial stage — ${dh}deg and ${dl2.toFixed(1)} points. The shader scales its gain and export.ts mixes a sampler; those two have drifted.`);
+      // JPEG-compressed. That exact pair is what the 7.7 in dHist's contract
+      // was measured on, so this arm is the one the bar was fitted to.
+      if (dh > HUE_BAR || dl2 > 8) fail(`${label}: the preview and the export disagree with a mask aiming a spatial stage — ${dh}deg and ${dl2.toFixed(1)} points. The shader scales its gain and export.ts mixes a sampler; those two have drifted.`);
       else ok(`${label}: preview and export agree with a spatial stage aimed`);
     } catch (e) {
       if (!/not armed|no preview|no export/.test(String(e && e.message))) fail(`${label}: the arm could not run — ${e}`);
