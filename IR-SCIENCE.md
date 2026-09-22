@@ -2376,6 +2376,29 @@ largest 30° hue bin, and how many bins hold at least 5%. A false-colour look
 exists to put foliage and sky in *different* hues, so hue count is what tells you
 whether it worked.
 
+**AND IT IS A METRIC ABOUT ONE RENDERING, NOT A WAY TO COMPARE TWO — standing
+error, measured 2026-09-22.** The bin count above answers "did this look put
+foliage and sky in different hues", which is a property of a single frame. It
+does NOT answer "are these two renderings of one photograph the same", and
+borrowing it for that fails in the worst possible direction, because the
+answer is a WINNER and a bimodal frame's winner is a coin toss between two
+modes that this metric exists to put far apart.
+
+`tools/agreement-walk.mjs` borrowed it and reported the preview and the export
+of NIR_1651 **180 degrees apart in hue**, which is red and blue traded, on a
+pair whose channel means agree to 0.2 of 255 and which are the same picture
+when opened side by side. The teal mode held 41.6% of the preview against the
+pink mode's 29.9%, and 31.9% against 38.3% in the export — the same photograph
+at two resolutions — so the winner crossed and the reading jumped the full
+diameter. Worse, the same export with red and blue ACTUALLY traded read 90
+degrees, half what the honest pair read: the statistic ranked a real swap as
+less different than no difference at all.
+
+To compare two renderings, compare the whole histogram. The walk now uses a
+circular earth mover's distance in degrees; on that pair it reads 7.7 for the
+honest comparison and 75.9, 41.5 and 19.4 for red/blue, red/green and
+green/blue traded.
+
 **Brightness and per-pixel saturation mislead, and did, repeatedly.** Three
 rounds of this thread measured median, mean and saturation, and each drew the
 wrong conclusion, because "flat purple" is not a brightness fact. A single hue at

@@ -539,42 +539,6 @@ user-scalable=no.
 > different approach and mindset"). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
-- [ ] **The in-app kept list holds work the reader does not own** <!-- decision: 051 -->
-  039 kept photographs inside the app, in a database the reader does not own,
-  cannot move to another device, cannot back up and which iOS may reclaim
-  without warning. 043 shipped the other half — the same photograph as a FILE
-  they hold — and removed the in-app Keep button, so the list still opens and
-  restores but nothing can add to it. A store with no way in is a promise that
-  depends on which release the reader was using.
-  **Looked up.** Everything the field writes about replacing IndexedDB storage
-  is schema migration — `onupgradeneeded`, read which version they came from,
-  transform what is there — and its one product rule carries: existing data
-  survives the upgrade automatically, without the reader being asked. Nothing
-  addresses DELETING a store of irreplaceable work, because a migration never
-  does. Where the data should go here has no external answer, because the
-  destination is a file in a share sheet and a share sheet needs a press.
-  **THE CHOSEN OPTION CHANGED, and the record says so rather than doing it
-  quietly.** This was drafted as a migration — "Save as a file" on every row, a
-  line saying the list is going, nothing deleted by the app — and all of it
-  rested on one premise: the store is on production, so a reader might hold
-  photographs that exist nowhere else. Settled 2026-09-22: nobody has kept
-  photographs in the app. So the store is removed outright, which this record
-  had rejected on the grounds that a patch note is read after the work is
-  already gone — and there is no work to be gone. The migration is rejected now
-  for the opposite reason: a control, new copy and the accessibility pass that
-  copy owes, to migrate nothing. Still rejected for their own reasons: writing
-  them all out at start-up (a file only exists once it has been through the
-  share sheet, so that is either a modal storm or a write into the storage this
-  is escaping) and leaving it read-and-open-only.
-  **It ranks here because the accessibility walk is red until it is settled.**
-  `tools/kept-walk.mjs` and `tools/a11y-walk.mjs` both reached the list through
-  the button 043 removed, and CLAUDE.md requires that walk before any UI
-  release — so every UI item below this is blocked or the gate gets routed
-  around. The walk goes green by the surface ceasing to exist rather than by
-  being seeded, and `tools/surfaces.mjs` — which holds its dialog list to the
-  BUILD in both directions — is what makes that honest rather than quiet. See
-  `docs/decisions/051-the-in-app-kept-list-holds-work-the-reader-does-not-own.md`.
-
 - [ ] **A mask can only act in one place, and there is only one version of an edit** <!-- decision: 030 -->
   asked 2026-09-20 as a principle: a mask can be taken at any point in the
   workflow, and without layers or named backups there is no way to work on the
@@ -650,6 +614,25 @@ user-scalable=no.
   colour noise and texture are spatial pre-passes rather than per-pixel gains,
   so aiming them means blending the filtered and unfiltered results by the mask
   weight — more than a bitmask entry, and the next piece of 030.
+  **THAT PIECE IS BUILT AND NOW VERIFIED ON EXPORT (2026-09-22).** `AIM_NOISE`
+  and `AIM_TEXTURE` join the four above, as TWO toggles rather than five —
+  noise covers denoise, colour noise and despeckle, texture covers sharpen —
+  because to a reader each is one idea. `aimedSampler` in `src/pipeline.ts`
+  blends the unfiltered and filtered row samplers by the mask weight; the
+  shader scales its gain instead, which is the same arithmetic because
+  `mix(c, c*g, w) == c * mix(1, g, w)`. The scope gate's OWED list is EMPTY for
+  the first time.
+  **It shipped to the work branch unverified, and the reason it stayed there
+  was an instrument.** The arm written to hold the two paths together reported
+  the preview and the export 180 degrees apart on a frame with no mask and no
+  aim, which is a defect the app does not have: the walk was asserting on the
+  biggest of twelve hue bins, and every photograph here is bimodal, so that
+  winner is a coin toss between two modes 180 degrees apart. The walk now
+  measures a circular earth mover's distance over the whole histogram; that arm
+  passes at 9.2 degrees against a bar of 15, and a green/blue swap planted in
+  the shader takes it to 18.7 and red. See "The 180 degrees was the statistic"
+  above. Blending a sampler and scaling a gain agree in practice, not only on
+  paper.
 
 - [ ] **A mask is a place, and most of the controls should work inside one** <!-- decision: 042 -->
   asked 2026-09-21: masks should come out of the tab strip into a place of
@@ -1252,6 +1235,106 @@ user-scalable=no.
   The decision that comes with it is the owner's: a drawn export cannot be
   byte-identical to today's, because a graphics chip computes in float where the
   processor uses doubles. It would match the PREVIEW instead.
+
+## The 180 degrees was the statistic, and the export was right all along, 2026-09-22
+
+Decision 030's spatial half was committed unverified because the arm written to
+check it reported the preview and the single-photo export **180 degrees apart in
+hue** on NIR_1651, with lightness matching to 0.2 points — the signature of red
+and blue traded. It reproduced with no mask and no aim at all. The commit said
+so, and said the cause was not isolated.
+
+**It is isolated. Nothing was wrong with the app.**
+
+**The read route was accused first and it is innocent.** `#view` read with
+`gl.readPixels` and the same canvas read by drawing it into a 2D context, at the
+same instant, come back BYTE-IDENTICAL: the same channel means to the decimal,
+the same twelve hue bins to the pixel. The comment that blamed those two routes
+has been struck out of `tools/agreement-walk.mjs`.
+
+**The cause is the statistic the walk asserted on.** `READ` reduced a photograph
+to the biggest of twelve 30-degree hue bins, and the walk compared two winners.
+Every photograph this app exists for is BIMODAL — false-colour infrared puts
+foliage and sky at opposite ends of the wheel — so the two modes are near enough
+equal and the winner is a coin toss between them. NIR_1651 reads 41.6% teal
+against 29.9% pink in the preview and 31.9% against 38.3% in the full-resolution
+export. Same photograph, twice. The winner moved from bin 5 to bin 11, and those
+two bins are exactly 180 degrees apart, which is the largest number the
+statistic can produce.
+
+**And it was worse than noisy, it was backwards.** The same export with red and
+blue actually traded reads **90 degrees** from the preview on that statistic —
+HALF what the honest pair reads. A walk asserting on the winner would have
+passed the swap and failed the truth.
+
+**What settled it was opening the two pictures.** Channel means agreeing to 0.2
+of 255 was a number, and this repository has a rule about concluding from those.
+The preview and the export were put side by side and looked at: teal sky, pale
+pink conifer, the same photograph. `debug.html` was not needed; the pair is in
+the session scratchpad.
+
+**Lightness was never evidence.** It is `(max+min)/2`, which does not change
+when channels are TRADED. All three planted swaps read 54.9%, exactly what the
+honest pair reads. "Lightness matching to 0.2 points" had been carried in the
+commit message as if it corroborated the hue reading; it corroborated nothing.
+
+### What the walk asserts on now
+
+A **circular earth mover's distance** over the whole twelve-bin histogram, in
+degrees: the least total mass-times-distance that turns one histogram into the
+other, minimised over where the ring is cut. It is stable under a resolution
+change, because a resample moves a little mass between neighbouring bins, and
+enormous under a channel swap, because a swap moves most of the mass a third of
+the way round.
+
+Every bar was measured rather than chosen. On NIR_1651, preview against export:
+
+- the same picture at two resolutions — **7.7**
+- red and blue traded — **75.9**
+- red and green traded — **41.5**
+- green and blue traded — **19.4**, the narrowest real swap
+
+Arms 2 and 4 read **9.2** honest and their bar is **15**. The tile arm reads
+**14.3** and has its own bar of **20**, because roughly five of its degrees
+belong to the TILE PATH rather than to the 260px resample: a 260px
+nearest-sampled copy of the export, read through the same code, is only 7.8 from
+the preview, and normalising both sides to one width takes that to 5.8. Why the
+tile path sits five degrees out is NOT established and is worth its own look.
+
+**AND THE TILE WAS OPENED, because a residual that moves is not a defect that
+shows.** `NIR_0102` under the `eir` look, its strip tile beside the same
+photograph opened, at the same size. The difference IS visible and it is
+tonal rather than a cast: the tile reads flatter and pinker — the canopy a more
+uniform mid-red, the grass pink-grey — where the opened render has deeper
+shadows between the leaves and whiter grass. Some of that flatness is a 260px
+tile scaled up to be looked at, and the two also appear to frame very slightly
+differently, which is its own question and not this one. Not diagnosed, not
+ranked, and it wants its own record rather than a paragraph here: what it
+means is that the strip is telling the reader something a little different
+from the photograph, and nothing had ever compared the two by looking.
+
+### The bar was made to fail, and the comment on it was wrong first
+
+`g.rbg` at the end of the fragment shader — green and blue traded in the preview
+only — built and run through the whole walk. All four arms went red: arms 2 and
+4 at 18.7 against 15, the tile arm at 22.2 against 20.
+
+**The tile arm's comment had predicted it would MISS that swap**, reasoning from
+the synthetic 19.4 above sitting under a bar of 20. Driven through the arm's own
+path the same swap reads 22.2 and the arm refused it. The prediction was written
+into the source as though it were a finding, which is the exact mistake this
+file already records against the timeout that was blamed on an inefficiency. It
+has been struck and replaced with the run.
+
+The margin is thin and that is the real cost of the tile arm: 14.3 honest, 22.2
+on the narrowest swap, bar at 20 — 5.7 below and 2.2 above.
+
+### What this releases
+
+Arm 4 passes at **9.2 degrees**, which is the thing decision 030 was waiting on:
+the CPU blend in `src/export.ts` and the shader's scaled gain render the same
+photograph. `mix(c, c*g, w) == c * mix(1, g, w)` holds in practice and not only
+on paper. The aims are verified on export.
 
 ## The phone-width pass found nothing, and that IS the finding, 2026-09-21
 
@@ -3524,6 +3607,42 @@ reason it is a footnote rather than a finding — a list of known limitations is
 read as authoritative, and an invented one is worse than a missing one.
 
 ## Shipped (roadmap archive)
+
+- [x] **The in-app kept list holds work the reader does not own** <!-- decision: 051 -->
+  039 kept photographs inside the app, in a database the reader does not own,
+  cannot move to another device, cannot back up and which iOS may reclaim
+  without warning. 043 shipped the other half — the same photograph as a FILE
+  they hold — and removed the in-app Keep button, so the list still opens and
+  restores but nothing can add to it. A store with no way in is a promise that
+  depends on which release the reader was using.
+  **Looked up.** Everything the field writes about replacing IndexedDB storage
+  is schema migration — `onupgradeneeded`, read which version they came from,
+  transform what is there — and its one product rule carries: existing data
+  survives the upgrade automatically, without the reader being asked. Nothing
+  addresses DELETING a store of irreplaceable work, because a migration never
+  does. Where the data should go here has no external answer, because the
+  destination is a file in a share sheet and a share sheet needs a press.
+  **THE CHOSEN OPTION CHANGED, and the record says so rather than doing it
+  quietly.** This was drafted as a migration — "Save as a file" on every row, a
+  line saying the list is going, nothing deleted by the app — and all of it
+  rested on one premise: the store is on production, so a reader might hold
+  photographs that exist nowhere else. Settled 2026-09-22: nobody has kept
+  photographs in the app. So the store is removed outright, which this record
+  had rejected on the grounds that a patch note is read after the work is
+  already gone — and there is no work to be gone. The migration is rejected now
+  for the opposite reason: a control, new copy and the accessibility pass that
+  copy owes, to migrate nothing. Still rejected for their own reasons: writing
+  them all out at start-up (a file only exists once it has been through the
+  share sheet, so that is either a modal storm or a write into the storage this
+  is escaping) and leaving it read-and-open-only.
+  **It ranks here because the accessibility walk is red until it is settled.**
+  `tools/kept-walk.mjs` and `tools/a11y-walk.mjs` both reached the list through
+  the button 043 removed, and CLAUDE.md requires that walk before any UI
+  release — so every UI item below this is blocked or the gate gets routed
+  around. The walk goes green by the surface ceasing to exist rather than by
+  being seeded, and `tools/surfaces.mjs` — which holds its dialog list to the
+  BUILD in both directions — is what makes that honest rather than quiet. See
+  `docs/decisions/051-the-in-app-kept-list-holds-work-the-reader-does-not-own.md`.
 
 - [x] **A kept photograph should be a file you own** <!-- decision: 043 -->
   **SHIPPED IN 2.59, 2026-09-22.** Keeping a photograph used to mean keeping it

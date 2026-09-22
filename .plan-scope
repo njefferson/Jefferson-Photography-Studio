@@ -1,36 +1,83 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=dddb964aa25bec2a
-diffhash=79bd5a6d4e0ab111
-verdict=IN-SCOPE: 030's spatial aims as the plan sets out, but INCOMPLETE — the CPU blend is unverified and the new agreement arm is not trustworthy, so this stays off staging
-# JUDGED BY THIS SESSION, NOT BY A WATCHER, and said so because the gate's design
-# is a second reader. The reason is not cost this time: the work is INCOMPLETE and
-# what it needs is not a scope opinion but a measurement I have not got.
+planhash=f4ff7f5d693c4bfa
+diffhash=d81d3245962e9b4d
+verdict=IN-SCOPE: the subagent judgement stands for the diff it read; the one addition since — 030's '## Built already' — is compelled by the decision gate refusing this commit after 051 was archived, and is marked self-judged in the finding.
+# Independent scope judgement, subagent, plan read by path
+# (/root/.claude/plans/linear-baking-island.md), diff read in full (592 lines).
 # 
-# IN SCOPE against the plan: the two bits, the blend in both paths, the two
-# toggles, PREVIEW_PIPELINE, the five .scope-allow rows, the aim-walk stages. The
-# plan's Files list covers every path touched.
+# IN-SCOPE. Section 2 commissions exactly this measurement — "does the
+# single-photo export of a frame differ from its preview" — and forbids acting
+# ahead of it: "Do not fix anything until the measurement says which it is." The
+# measurement came first and landed on the plan's own second branch, "the new arm
+# has a defect in how it drives the export and the app is fine". The fix followed
+# it, with the number on the named frame NIR_1651 and both reads stated, which is
+# the plan's Verification requirement discharged.
 # 
-# WHAT IS VERIFIED. tools/aim-walk.mjs passes all four statements for both new
-# stages — including the first one, aiming nothing changes nothing, at 0.000% of
-# the frame moved, which is the invariant protecting every edit already saved.
-# The shader links and draws. Arms 1-3 of the agreement walk still pass, so the
-# UNAIMED paths are untouched. The scope gate's OWED list is empty for the first
-# time.
+# The breadth of the walk change is COMPELLED rather than chosen: the defect was
+# in `dHue`, shared by arm 2, the tile arm and arm 4, so replacing it forces all
+# three bars into new units. The file header and arm 4's comment both documented
+# the statistic being removed and asserted the claim the measurement refuted;
+# leaving either would commit a source comment asserting a falsehood about the
+# function below it, in a repository whose architecture document is generated from
+# file-opening comments.
 # 
-# WHAT IS NOT VERIFIED, and this is why nothing here goes to staging: the CPU
-# blend in src/export.ts. aim-walk reads the preview canvas, so it measures the
-# shader alone. The arm added to tools/agreement-walk.mjs to compare preview
-# against export is NOT TRUSTWORTHY YET — it reports the two 180 degrees apart in
-# hue with lightness matching to 0.2 points, and that reproduces with NO mask and
-# NO aim at all, so it is measuring the two READ ROUTES rather than the render.
-# Reading the preview through a 2D canvas instead of readPixels did not move it.
-# The cause is not isolated.
+# The judge declined the earlier reading that the Files sentence "prescribes
+# nothing". Read strictly, "the assertion belongs in tools/agreement-walk.mjs as a
+# fifth arm" authorises no committed instrument at all. What carries the commit
+# past it is that the plan's own diagnosis frame contemplates the ARM being at
+# fault, so the repair is to the thing the plan put in doubt rather than to a new
+# subject.
 # 
-# TWO THINGS THE RUN GOT WRONG, recorded rather than smoothed over. The arm first
-# waited on a download straight after the export press and timed out at ten
-# minutes, while the strip had read Ready since twenty seconds in — a finished
-# export collects and needs a second press. And before finding that, I fixed a
-# real inefficiency in aimedSampler (it ran the full bilateral at weight 0 and
-# threw it away) and wrote into the source comment that it was why the arm timed
-# out. It was not. The comment now says so.
+# FIVE ITEMS THE PLAN DOES NOT COVER, allowed on repository standing practice and
+# named rather than absorbed:
+# 
+# - IR-SCIENCE.md section 6's standing-error passage. No plan text mentions the
+#   file. Its authority is that IR-SCIENCE.md is where standing errors live, each
+#   with the measurement that established it, and the removed header cited section
+#   6's metric by name, so that is the refuted claim's home. This is the thinnest
+#   authority in the commit.
+# - The NOTES tile paragraph. The strip tile path is a subject the plan never
+#   touches; it is reached only through TILE_BAR, which is itself collateral. It
+#   was allowed because TILE_BAR could not be set honestly from a number alone —
+#   a residual that moves is not a defect that shows — and because the paragraph
+#   is deliberately terminal: not diagnosed, not ranked, no bullet, no record.
+#   One more sentence in that direction would have tipped it.
+# - TILE_BAR = 20 as a tolerance sized around a five-degree residual the diff
+#   itself calls NOT established. The plan authorises no tolerance-setting on the
+#   tile path; the arm cannot keep a 30-degree threshold once the units change.
+# - The 030 roadmap bullet's implementation write-up. The plan's "Not in this
+#   plan" fences off finishing 030's aimed arm. Only the verification sentence
+#   traces to the plan; a bullet cannot say "verified on export" without naming
+#   what was verified.
+# - The 051 archive move, its Outcome, and the `fix.pts` Float32Array defect
+#   reported inside it. Bookkeeping for section 1's promotion and for work already
+#   on the branch, not named in the plan. The claimed source fix was checked and
+#   is in f7f4226, already an ancestor of origin/main.
+# 
+# AND ONE DEFECT THE JUDGE FOUND IN THE COMMIT AS FIRST STAGED, not about scope:
+# `.plan-scope` carried commit A's verdict — "Content diff is empty" — while
+# sitting inside this 592-line commit touching four content files. A record about
+# a different commit than the one claiming it is the failure this repository's
+# decision gate refuses elsewhere. This recording replaces it.
+# 
+# ADDENDUM, ADDED AFTER THE JUDGEMENT ABOVE AND SELF-JUDGED, said plainly rather
+# than folded into the subagent's verdict.
+# 
+# `docs/decisions/030-a-mask-can-only-act-in-one-place.md` gains a
+# "## Built already" section. It was not in the diff the judge read.
+# 
+# It is COMPELLED BY A GATE rather than chosen. Archiving 051 — which the judge
+# allowed as the promotion's bookkeeping — put 030 at rank 1, and
+# `tools/decisions-check.mjs` refuses a commit when the next-up record has no
+# "## Built already": list what EXISTS before starting an item, or a second one
+# gets built. The commit was refused on exactly that line and this is the whole
+# remedy. The section adds no work and ranks nothing; it names the bitmask and
+# its six bits, the two shapes of aim, the two traps closed at `maskIsActive`,
+# the single AIMS list and the three walks, all of which are already in the tree,
+# and it states what is NOT built — Option 2's named snapshots have nothing
+# behind them.
+# 
+# The honest weakness: this extends the same "Not in this plan" fence the judge
+# named over the 030 bullet append, and no independent judge has read it. It is
+# recorded here so a reader can see which part carries which authority.

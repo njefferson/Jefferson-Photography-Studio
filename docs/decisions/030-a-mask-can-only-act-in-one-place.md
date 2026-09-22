@@ -59,6 +59,50 @@ LWN, Raw photo editing with RawTherapee (lwn.net/Articles/883599/); darktable
 and RawTherapee comparisons (imagic.ink/blog/darktable-vs-rawtherapee-
 open-source-raw-shootout, shotkit.com/rawtherapee-vs-darktable/).
 
+## Built already
+
+Everything below EXISTS and is on production or on the work branch. Whatever
+this record's remaining work turns out to be, it extends this rather than
+starting again.
+
+- **The mechanism itself: `MaskLayer.aims`, a bitmask.** `src/pipeline.ts`
+  exports the bits — `AIM_DEHAZE` 1, `AIM_CLARITY` 2, `AIM_SHADOW` 4,
+  `AIM_LENS` 8, `AIM_NOISE` 16, `AIM_TEXTURE` 32 — and `aimWeight` resolves one
+  at a point. `src/gl.ts` has the matching `aimWeightOf`. The two walk the same
+  flattened active groups in the same order, and that sameness is the whole
+  contract between them. **Absent or zero means whole-frame**, so every edit
+  already saved renders identically; a new bit does not change that.
+- **Two shapes of aim, and the expensive one is done.** A per-pixel gain is
+  aimed by SCALING it, which is one line per path. A spatial pre-pass has to be
+  run twice and blended, which is `aimedSampler` in `src/pipeline.ts` on the
+  processor against `mix(preNoise, c, aimWeightOf(16))` and
+  `c *= mix(1.0, gain, aimWeightOf(32))` in the shader — equal because
+  `mix(c, c*g, w) == c * mix(1, g, w)`. A third spatial stage is one call, not
+  a new design.
+- **The two traps are closed at the one place that decides.**
+  `maskGroupsForRender` drops a group whose head adjusts nothing, and a mask
+  added PURELY to aim is exactly that; the shader uploads the same filtered
+  list, so reading `p.masks` on the processor alone would put the two paths on
+  different sets. `maskIsActive` counts aiming as doing something. Both paths
+  read one answer.
+- **The toggles are ONE list.** `AIMS` in `src/main.ts` pairs each button with
+  its bit, so a new stage is a line there plus a button in `ir.html` rather than
+  three edits that can disagree.
+- **Three gates already hold it, and none of them needs writing again.**
+  `tools/aim-walk.mjs` holds every aim to four statements — chief among them
+  that aiming nothing changes nothing, measured at 0.000% of the frame moved,
+  which is what protects every saved edit. `tools/agreement-walk.mjs` holds the
+  processor and the shader to the same photograph; as of 2026-09-22 it compares
+  whole hue histograms rather than a bin winner, and its aimed arm passes at 9.2
+  degrees against a bar of 15. `tools/scope-check.mjs` is the ledger of which
+  knobs should be aimable, and its OWED list is EMPTY.
+- **What is NOT built, and is deliberately not.** Colour masks cannot aim: their
+  key is the pixel as it DISPLAYS at the mask stage, which does not exist at
+  dehaze. That boundary belongs to 032 and the control stands down rather than
+  offering nothing. And the chosen option here is Option 1 only — Option 2's
+  named snapshots, the second half of this record's own title, has nothing built
+  for it at all.
+
 ## Weighed against
 
 **The scope gate is the measured argument that this is not cosmetic.**
