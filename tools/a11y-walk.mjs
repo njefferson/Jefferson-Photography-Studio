@@ -168,51 +168,6 @@ const makeAndSaveMask = async (page, where) => {
   return true;
 };
 
-/** A KEPT PHOTOGRAPH IS A SURFACE, AND ITS LIST IS EMPTY UNTIL THERE IS ONE
- *  (decision 039). `#keptDlg` opens either way, so the dialog sweep below would
- *  measure a heading and a Close button and report the whole feature clean —
- *  which is the blind spot that left the mask editor, and then the saved-mask
- *  list, unmeasured. This keeps one photograph first, so the row's Open, rename
- *  and forget controls are on screen when the sweep reaches them.
- *
- *  Takes `page` and `where`, a label for any failure. Returns true when a row
- *  exists, false with the reason printed — never a silent skip, because a sweep
- *  that quietly measured nothing is indistinguishable from a clean one. */
-const keepAPhoto = async (page, where) => {
-  const armed = await page.evaluate(() => {
-    document.getElementById("ptab-export")?.click();
-    const keep = document.getElementById("keepPhoto");
-    if (!keep) return false;
-    keep.click();
-    return true;
-  });
-  // DECISION 043 RETIRED `#keepPhoto` (2026-09-22): the in-app Keep is gone as a
-  // writer, so nothing in the app can create a kept row and this audit cannot
-  // arm itself. The message says which, because "no Keep control" now has two
-  // very different meanings — a regression, or a deliberate removal whose
-  // instrument was not rewritten with it. Both are failures; only one is a bug.
-  if (!armed) {
-    fail(`${where}: no #keepPhoto, so the kept list is UNMEASURED. Decision 043 removed it `
-       + `deliberately and this walk was not rewritten to seed the store another way — `
-       + `which is a gap in the instrument, not a clean result.`);
-    return false;
-  }
-  const asked = await page.waitForSelector("#askInput", { state: "visible", timeout: 20000 }).then(() => true).catch(() => false);
-  if (!asked) { fail(`${where}: keeping would not ask for a name, so the kept list is unmeasured`); return false; }
-  await page.fill("#askInput", "A photo to come back to");
-  await page.click("#askOk");
-  const done = await page.waitForFunction(
-    () => !document.getElementById("busy")?.hasAttribute("open"), null, { timeout: 120000 },
-  ).then(() => true).catch(() => false);
-  if (!done) { fail(`${where}: keeping never finished, so the kept list is unmeasured`); return false; }
-  const listed = await page.waitForFunction(
-    () => document.querySelectorAll("#keptList .kept-row").length > 0, null, { timeout: 20000 },
-  ).then(() => true).catch(() => false);
-  if (!listed) { fail(`${where}: the photograph was kept and the list stayed empty`); return false; }
-  await page.waitForTimeout(300);
-  return true;
-};
-
 /** The colour a reader actually sees: the first ancestor that paints, composited
  *  down. `getComputedStyle` hands back the rgba AS WRITTEN, so a 15% accent over
  *  a dark surface reads as the accent while it is on screen as near-black — a
@@ -310,9 +265,6 @@ try {
         if (small.length) fail(`${s.file} ${vw}px: ${small.join(" · ")}`);
         else ok(`${s.file} ${vw}px: all >= 44`);
         if (exempt.length) note(`inline in a sentence, exempt (SC 2.5.8): ${exempt.join(" · ")}`);
-        // BEFORE THE DIALOG SWEEP, because one of the dialogs is a LIST and an
-        // empty list measures its heading. See keepAPhoto above.
-        if (s.file === "ir.html") await keepAPhoto(page, `${s.file} ${vw}px kept photo`);
         for (const id of s.dialogs) {
           const opened = await page.evaluate((i) => { const d = document.getElementById(i); if (!d) return false; try { if (!d.open) d.showModal(); } catch { return false; } return true; }, id);
           if (!opened) { fail(`${s.file} ${vw}px #${id}: would not open — declare it in .a11y-allow with a reason, or fix it`); continue; }

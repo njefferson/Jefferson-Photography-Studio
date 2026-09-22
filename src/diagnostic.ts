@@ -180,11 +180,6 @@ async function holdingsLine(): Promise<string> {
     // "meta" in both — batchstore's v1 "frames" store was deleted at its own
     // v2 upgrade, so naming it here would count a store that cannot exist.
     ["ips-batch", "meta", "saved frame"],
-    // A KEPT PHOTOGRAPH IS THE LONGEST-LIVED THING THE APP HOLDS (039). A
-    // session ends and a batch is recovered; these stay until the reader
-    // forgets them, which makes them the ones most worth reporting. The store
-    // is named "kept" rather than "meta" — see src/keepstore.ts.
-    ["ips-kept", "kept", "kept photo"],
   ];
   try {
     const listed = await (indexedDB as { databases?(): Promise<{ name?: string }[]> }).databases?.();

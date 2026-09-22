@@ -2802,22 +2802,6 @@ button.toggletip {
 .mask-join input { min-width: 20px; min-height: 20px; }
 .mask-editor-actions button { width: auto; padding: 6px 12px; font-size: 0.8125rem; }
 
-/* PHOTOGRAPHS PUT DOWN AND NOT YET PICKED UP (decision 039).
-   The row is a TILE, a name and two controls, and the two controls take the
-   same 44px minimum as .mask-del and .mask-ren above rather than being measured
-   again — a single glyph in a button is 29px wide at every width this app runs
-   at, and a second answer to one question is how two rows come to differ. */
-.kept-list { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
-.kept-row { display: flex; align-items: center; gap: 8px; }
-.kept-row img { width: 56px; height: 56px; object-fit: cover; border-radius: 6px;
-  border: 1px solid var(--line-2); background: var(--surface-2); flex: none; }
-.kept-row .kept-open { flex: 1; text-align: left; padding: 8px 10px; font-size: 0.8125rem; color: var(--txt); }
-/* The file's own name and the size sit under the reader's name, dimmer but
-   still over the 4.5:1 floor (--txt-3 is calibrated for it), because they are
-   context rather than the label. */
-.kept-row .kept-open small { display: block; margin-top: 2px; color: var(--txt-3); font-size: 0.75rem; }
-.kept-row .kept-ren { width: auto; min-width: 44px; padding: 8px 10px; font-size: 0.8125rem; }
-.kept-row .kept-del { width: auto; min-width: 44px; padding: 8px 10px; font-size: 0.8125rem; }
 /* Keeping sits above Format in the Export panel, separated by a rule so it
    reads as the other way of finishing rather than as an export setting. */
 .keep-row { margin: 0 0 12px; padding-bottom: 12px; border-bottom: 1px solid var(--line-2); }

@@ -553,19 +553,26 @@ user-scalable=no.
   addresses DELETING a store of irreplaceable work, because a migration never
   does. Where the data should go here has no external answer, because the
   destination is a file in a share sheet and a share sheet needs a press.
-  So: every kept row gains "Save as a file", the list says plainly that it is
-  going and why, and nothing is deleted by the app. Rejected: writing them all
-  out automatically at start-up (a file only exists once it has been through
-  the sheet, so that is either a modal storm or a write into the storage this
-  is escaping), deleting the store with a patch note (it is on production; the
-  note is read after the work is gone), and leaving it read-and-open-only (it
-  keeps a promise nothing can honour, and keeps the a11y walk red).
+  **THE CHOSEN OPTION CHANGED, and the record says so rather than doing it
+  quietly.** This was drafted as a migration — "Save as a file" on every row, a
+  line saying the list is going, nothing deleted by the app — and all of it
+  rested on one premise: the store is on production, so a reader might hold
+  photographs that exist nowhere else. Settled 2026-09-22: nobody has kept
+  photographs in the app. So the store is removed outright, which this record
+  had rejected on the grounds that a patch note is read after the work is
+  already gone — and there is no work to be gone. The migration is rejected now
+  for the opposite reason: a control, new copy and the accessibility pass that
+  copy owes, to migrate nothing. Still rejected for their own reasons: writing
+  them all out at start-up (a file only exists once it has been through the
+  share sheet, so that is either a modal storm or a write into the storage this
+  is escaping) and leaving it read-and-open-only.
   **It ranks here because the accessibility walk is red until it is settled.**
   `tools/kept-walk.mjs` and `tools/a11y-walk.mjs` both reached the list through
   the button 043 removed, and CLAUDE.md requires that walk before any UI
   release — so every UI item below this is blocked or the gate gets routed
-  around. The walks are rewritten to seed the store directly, which is also the
-  only honest way to reach a surface no button opens. See
+  around. The walk goes green by the surface ceasing to exist rather than by
+  being seeded, and `tools/surfaces.mjs` — which holds its dialog list to the
+  BUILD in both directions — is what makes that honest rather than quiet. See
   `docs/decisions/051-the-in-app-kept-list-holds-work-the-reader-does-not-own.md`.
 
 - [ ] **A mask can only act in one place, and there is only one version of an edit** <!-- decision: 030 -->

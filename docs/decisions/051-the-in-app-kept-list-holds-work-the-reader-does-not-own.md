@@ -32,9 +32,25 @@ kept row any more, so neither can arm itself; both now fail loudly naming 043.
 `CLAUDE.md` requires the accessibility walk before any UI release, so **the kept
 list is unmeasured and the walk cannot pass until this is settled.**
 
-**The store shipped to production**, not just staging: `src/keepstore.ts` is on
-`main`. So this cannot be decided from one device's contents. A reader may hold
-kept photographs that exist nowhere else.
+**THIS RECORD CHANGED ITS CHOSEN OPTION, and that is written down rather than
+done quietly.** It was drafted around a migration — a "Save as a file" control
+on every row, a line saying the list was going, nothing deleted by the app —
+and every part of that rested on one premise: the store shipped to production,
+`src/keepstore.ts` is on `main`, so a reader might hold kept photographs that
+exist nowhere else and the contents of one device could not settle it.
+
+Settled 2026-09-22: **nobody has kept photographs in the app.** There is no work
+to migrate. The migration therefore protects nothing while costing a new
+control, new reader-facing copy and the accessibility pass that copy owes — and
+option 3 below, outright removal, which this record had rejected, becomes the
+chosen one. Its rejection reason was that a patch note is read after the work is
+already gone. There is no work to be gone.
+
+**It also changes what clears the walk**, which had been the argument for doing
+the instrument half first. There is nothing to seed and no surface to measure:
+the audit goes green because the surface ceases to exist, and
+`tools/surfaces.mjs` — which holds its dialog list to the BUILD in both
+directions — is what makes that removal honest rather than merely quiet.
 
 ## Looked up
 
@@ -62,37 +78,48 @@ every failure explains itself and offers a way forward.
 Sources: MDN `IndexedDB_API/Using_IndexedDB`; W3C Indexed Database API 3.0;
 Dexie.js "Migrating existing DB to Dexie".
 
+**AND IT NO LONGER DECIDES ANYTHING HERE, which is why it stays rather than
+being cut.** The rule above is satisfied vacuously once the store is known to
+be empty: no reader's state is lost across the change, because there is none.
+The research is kept because it was load-bearing right up until the premise
+moved, and a line of reasoning that is deleted the moment it stops applying is
+one the next session re-derives from scratch. What it still settles is the
+shape of any FUTURE removal in this app where data does exist.
+
 ## Built already
 
-- **`src/keepstore.ts` is the whole store, and every door this needs is already
-  exported.** `listKept` gives the list a row's meta, `getKept` its record with
-  the edit, `getKeptBytes` the original's own bytes, `deleteKept` the forget.
-  Writing a kept row out as a file needs no new read path: it is those three
-  joined to a writer that already exists.
-- **`keepEdit`, `writeKeepFile` and `keepCurrentAsFile` are that writer**
-  (`src/main.ts`, `src/keepfile.ts`). They take an original's bytes, an edit and
-  a name and hand back a Blob for the share sheet. A kept ROW carries exactly
-  those three things, so the migration is one function calling another rather
-  than a second implementation of the format — which is the trap this section
-  exists to name, since a second writer would drift from the first.
-- **`showLoneWithEdit` in `src/main.ts` is the one route back into a photograph
-  from a stored edit**, already serving both the kept store and a picked keep
-  file. Nothing about opening a kept row changes while the list still exists.
-- **The list's surface is built and named**: `#keptOpen` in the app's chrome,
-  `#keptDlg` with `#keptList`, `#keptHeld` and `#keptOwed` inside it, and
-  `.kept-row` per row with its own Open, rename and forget controls. This adds a
-  "Save as a file" control to a row that already has three; it does not build a
-  screen.
-- **`tools/keep-walk.mjs` already proves the destination end to end** — a real
+- **The complete call-site list, read off the source rather than remembered.**
+  `src/main.ts` reaches the store through one import and these:
+  `openKeptId`, the four element handles, `keptThumbUrls`, `openKeptPhoto`,
+  `refreshKept`, the two listeners, and the `void refreshKept()` inside
+  `updateSessionResume`. `ir.html` carries `#keptOpen` and the `#keptDlg`
+  block. `src/style.css` carries the `.kept-row` rules. `src/diagnostic.ts`
+  names the database in one row of its store table. Nothing else in the tree
+  imported the store module.
+- **`showLoneWithEdit`'s `keptId` parameter falls out with it.** The keep-file
+  route is its only remaining caller and already passes null, and `openKeptId`
+  is write-only once nothing reads a kept row — so the parameter, the module
+  variable and the contract sentence explaining what the null MEANS all go
+  together rather than leaving a stale explanation behind.
+- **`requestPersistence` is exported from `src/session.ts` as well**, which is
+  the copy `src/lensrig.ts` imports. Deleting the store deletes a duplicate of
+  one idea rather than a capability.
+- **Four gates already refuse a missed reference**, so this does not need a new
+  one. `typecheck` catches an import of a file that is gone;
+  `tools/surfaces.mjs` holds the dialog list to the BUILD in both directions, so
+  markup removed without its declaration — or the reverse — fails;
+  `architecture-check` regenerates the module map from each file's own opening
+  comment, so a deleted module cannot linger in it; `contract-check` reads the
+  declared backlog both ways, and `.contract-allow` carried no entries for the
+  store to unwind.
+- **`tools/keep-walk.mjs` already proves the route that replaces it** — a real
   press, a real download, the photograph found inside byte for byte, and the
-  file picked back with its painted mask selecting the same pixels. What a
-  migration owes on top of that is only that a row's bytes and edit reach it.
-- **`keepAPhoto` in `tools/a11y-walk.mjs` (line 181) is the exact function to
-  rewrite**, and `tools/kept-walk.mjs` reaches the list through `#keptOpen` at
-  two places. Both need a row to exist; neither needs the removed button. The
-  store's own `putKept(rec, bytes)` is what a walk should call through
-  `page.evaluate`, so the seed goes in by the app's own door rather than by a
-  hand-written IndexedDB transaction that could drift from the schema.
+  file picked back with its painted mask selecting the same pixels. The store is
+  not being removed and left with nothing in its place.
+- **The kept list's own walk had eleven checks and all of them were about the
+  list**, so it is deleted rather than rewritten, and `tools/walk-all.mjs`
+  enumerates the directory so it drops out on its own. `keepAPhoto` in `tools/a11y-walk.mjs`
+  (line 181) and its one call site go the same way.
 
 ## Weighed against
 
@@ -127,53 +154,56 @@ prior occurrence and the reason this is a bound rather than a preference.
 
 ## Options
 
-1. **Offer each kept photograph as a file, one press per photograph, and remove
-   the store only once the list is empty — with the removal of the code itself
-   deferred to a later release.** Chosen. The list gains "Save as a file" on
-   every row and a line saying plainly that the list is going and why. Nothing
-   is deleted by the app; a row disappears when the reader has saved it and
-   pressed Forget, which the list already offers. The walks are rewritten to
-   seed the store directly through `keepstore.ts` rather than through a button
-   that no longer exists, which restores the accessibility audit immediately and
-   independently of any reader's progress.
-2. Migrate automatically: write every kept row out to a file at start-up.
-3. Delete the store outright in this release and say so in the patch note.
+1. **Remove the store outright in this release, and say so in the patch note.**
+   Chosen, once the store was known to be empty. The store module and every
+   reference to it go: the start-screen button, the dialog, the row markup and
+   styles, the diagnostic's row for the database, the walk that only ever walked
+   it. One unguarded `indexedDB.deleteDatabase("ips-kept")` at boot takes the
+   empty database off every device that has one, because after this nothing in
+   the tree knows the name and the diagnostic will stop reporting it — cheap
+   now, impossible later.
+2. Offer each kept photograph as a file, one press per row, and remove the
+   store only once every list is empty.
+3. Migrate automatically: write every kept row out to a file at start-up.
 4. Leave the list exactly as it is, read-and-open-only, indefinitely.
 
 ## Rejected
 
-- **2 — migrate automatically at start-up.** A file only exists once it has been
-  through the share sheet, and a share sheet needs a press: there is no way to
-  put a file somewhere the reader will find it without them choosing where. An
-  automatic pass would either open a sheet per photograph unbidden — which is
-  exactly the modal storm Doctrine §14's "modes announce themselves and offer an
-  obvious exit" rules out — or write into storage the reader does not own, which
-  is the problem this is fixing.
-- **3 — delete outright with a patch note.** The store is on production. A patch
-  note is read after the release, by whoever opens the ⓘ, and the work is gone
-  by then. This repository's standing rule is that the reader's original is
-  never touched; their saved edit is the same class of thing.
+- **2 — a "Save as a file" control on every row.** THIS WAS THIS RECORD'S
+  CHOSEN OPTION and it is rejected now on one fact: there is nothing in the
+  store to save. It would add a control, a line of reader-facing copy saying
+  the list is going, and the accessibility pass that copy owes, to migrate
+  nothing. Its reasoning was right while the premise held, and the premise is
+  what moved — not the argument.
+- **3 — migrate automatically at start-up.** Rejected before and still, for a
+  reason the empty store does not touch: a file only exists once it has been
+  through the share sheet, and a share sheet needs a press. An automatic pass
+  would either open a sheet per photograph unbidden, which is the modal storm
+  Doctrine §14 rules out, or write into the storage this is escaping.
 - **4 — leave it read-and-open-only.** It reads like caution and is not. The
-  list keeps the promise "your work is here" while nothing can add to it and the
-  browser may take it at any time, and it keeps the accessibility walk red, so
-  every UI release after this is blocked or the gate gets routed around. A
-  feature nobody can reach is worse than a missing one; a feature only some
-  readers can reach, on a store that may vanish, is the same shape.
-- **AND, ON THE INSTRUMENTS: rewriting the walks to press the file-save button
-  instead.** `keep-walk.mjs` already covers that path end to end. What
-  `a11y-walk.mjs` needs is the kept LIST as a surface, and the honest way to get
-  a row is to put one in the store directly — a walk that reaches a surface by a
-  route no reader takes is measuring its own arrangement.
+  list keeps the promise "your work is here" while nothing can add to it and
+  nothing is in it, and it keeps the accessibility walk red, so every UI release
+  after this is blocked or the gate gets routed around. A feature nobody can
+  reach is worse than a missing one.
+- **AND, ON THE INSTRUMENTS: rewriting the walks to seed the store directly.**
+  That was the plan while a surface was going to survive. With the store gone
+  there is nothing to seed and no surface to measure, so the kept list's walk
+  is deleted rather than rewritten and `keepAPhoto` goes out of
+  `tools/a11y-walk.mjs`. What keeps that honest rather than quiet is
+  `tools/surfaces.mjs`, which holds the dialog list to the BUILD in both
+  directions: a surface cannot be dropped from the sweep without also being
+  dropped from the app.
 
 ## Rank
 
 **First, above 030.**
 
-It was ranked directly below 043, because the file it writes rows out AS is
-043's and migrating a reader's only copy into an unconfirmed container is the
-one ordering that could lose work. 043 shipped in 2.59 on 2026-09-22, confirmed
-on the device — a photograph saved with painted masks comes back with them — so
-that condition is discharged and this leads the queue.
+It was ranked directly below 043, because the file it would have written rows
+out AS is 043's and migrating a reader's only copy into an unconfirmed container
+is the one ordering that could lose work. 043 shipped in 2.59 on 2026-09-22,
+confirmed on the device — a photograph saved with painted masks comes back with
+them. That condition is discharged twice over now: there is also nothing to
+migrate.
 
 It goes above everything else open for one reason that is not about its own
 importance: **the accessibility walk is red until it is settled**, and that walk

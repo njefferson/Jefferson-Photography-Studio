@@ -320,7 +320,6 @@
           <button class="welcome-batch" id="welcomeLensBtn" type="button">Measure your lens&hellip;</button>
           <p class="welcome-batch-hint">Works out your lens&rsquo;s bright centre, from your own sky frames.</p>
           <button id="resumeSession" class="welcome-batch" type="button" hidden>Resume session</button>
-          <button id="keptOpen" class="welcome-batch" type="button" hidden>Photos you kept</button>
           <button id="recoverBatch" class="welcome-batch" type="button" hidden>Recover images from an interrupted batch</button>
           <hr class="welcome-div" />
           <div id="a2hs" class="a2hs" hidden>
@@ -971,8 +970,9 @@
                    device as duplicative, and the file is the one that matters:
                    the other storage cannot move to another device, cannot be
                    backed up, and the browser may reclaim it without telling the
-                   app. The in-app one is gone; the list of what was already
-                   kept stays, read-only, so nothing is stranded. -->
+                   app. The in-app one went first, then the store itself (051),
+                   which held nothing: a list that can only shrink, on storage
+                   the reader does not own, is a promise nothing can honour. -->
               <button id="keepFile" type="button">Save this photo as a file</button>
               <p class="note" id="keepFileNote">One file holding your original photograph exactly as it came, with this edit alongside it. Open it again here whenever you like &mdash; or unzip it anywhere and your photograph is inside, untouched. Your original is never written to.</p>
             </div>
@@ -1259,18 +1259,6 @@
       </div>
       <textarea id="lookCodeOut" class="look-code" rows="4" readonly hidden aria-label="Look code — copy it by hand"></textarea>
       <button id="lookDlgClose" type="button">Close</button>
-    </dialog>
-
-    <!-- PHOTOGRAPHS PUT DOWN AND NOT YET PICKED UP (decision 039). A list
-         rather than a tab, because coming back to one is something you do from
-         the start screen, before there is an editor to put a tab in. -->
-    <dialog id="keptDlg" aria-labelledby="keptDlgTitle">
-      <h2 id="keptDlgTitle">Photos you kept</h2>
-      <p class="note">Each one is your edit and the original file, on this <span data-device-noun>device</span> and nowhere else. Open one to carry on; forget one to get the space back.</p>
-      <div id="keptList" class="kept-list"></div>
-      <p class="note" id="keptHeld" role="status" aria-live="polite"></p>
-      <p class="note" id="keptOwed">A painted mask, a warp and an imported LUT do not come back &mdash; everything else does, masks included.</p>
-      <button id="keptDlgClose" type="button">Close</button>
     </dialog>
 
     <!-- Look sharing: import a pasted link / code / raw look JSON. -->
