@@ -1,31 +1,40 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=3bccd3e5ce5e4dc3
-diffhash=a3415ad6fb495371
-verdict=IN-SCOPE: the plan's step 6 exactly — a byte-identical replay of edf92c2, the two docs files only, verified to reach neither the build nor the deployed site
-# Byte-identical replay of edf92c2. `git diff edf92c2 --cached --` over the two
-# files is 0 bytes, exit 0; blob hashes match on both (IR-SCIENCE.md c7926a9,
-# 034 d793c04).
+planhash=42c1a5dd2bc99191
+diffhash=b236b0e593a19c74
+verdict=IN-SCOPE: the plan's steps 1-4 exactly — the save control, the open path, the derived extension gate and the end-to-end walk, with the shared tail extracted rather than copied and keepfile.ts untouched
+# Every staged file maps to the plan's steps 1-4 and nothing else is touched.
 # 
-# Disjoint from the first two commits of this branch. b9e87f6 touches
-# .plan-scope, NOTES.md, the 045 record, tools/notes-check.mjs and vite.config.ts;
-# 1cf26e0 touches .plan-scope, NOTES.md and the 045 record. Neither names
-# IR-SCIENCE.md or the 034 record.
+# EXTRACTED, NOT COPIED. showLoneWithEdit is defined once and called twice --
+# openKeepFile and openKeptPhoto -- and openKeptPhoto's own copy of the tail is
+# gone from the diff (17 lines removed). The load-bearing ordering survived:
+# `if (rebuildSkyMasks()) updateSkyStatus();` then `settled = snapshot();`.
 # 
-# decisions-check exits 0. 034 is not in .looked-allow (the backlog is 001, 017,
-# 021), so it was checked in full: 13 NIR_ frames named anywhere in the record,
-# the same 13 inside "## Looked at", set difference empty in both directions. The
-# `touches 019` line covers the new prose citing 019, so the undeclared-pairs
-# count stays at its allowed 32.
+# THE GATE IS DERIVED. tools/openable-check.mjs parses OPENABLE_EXT out of
+# src/main.ts and exits 1 if that shape is gone. The watcher proved it fires both
+# directions on scratch copies: adding an extension to OPENABLE_EXT alone made
+# the gate demand it of every picker with no gate edit, and removing .ipskeep
+# from one picker failed that picker by name. It carries no governed list of its
+# own, so it cannot become the seventh place to update.
 # 
-# DOCS-ONLY VERIFIED rather than assumed, so no device pass is owed.
-# vite.config.ts reads exactly two files at build time, ./VERSION and ./NOTES.md;
-# it never reads IR-SCIENCE.md or anything under docs/decisions. Its own
-# INTERNAL_PATH deny-list matches both staged paths twice over (the docs/ root
-# and the .md extension), so neither can reach the ⓘ patch notes. Every hit for
-# IR-SCIENCE under src/ is a prose citation inside a comment -- no import, no
-# fetch, no ?raw, no import.meta.glob -- and there are zero references to
-# docs/decisions in src/ or public/. No .md file exists under public/ and none
-# appears in dist, so nothing here is precached or served.
+# Both gates green. openable-check exit 0, five photograph pickers held to the
+# source at ir.html lines 127, 129, 130, 301 and 316; keepfile-check exit 0, 17
+# checks.
 # 
-# Nothing else staged, nothing unstaged, no untracked files.
+# NOTHING WRITES THE PICKED FILE, which is 043's standing requirement, checked in
+# the code rather than assumed: keepCurrentAsFile passes currentFile.bytes
+# straight into writeKeepFile, which hands it to writeZip as data and copies
+# nothing back; openKeepFile reads a fresh buffer. keepfile-check compares
+# against an independent snapshot taken before the call rather than against the
+# input array, so the instrument is sound.
+# 
+# src/keepfile.ts and tools/keepfile-check.mjs are byte-identical to 3cc78ef --
+# untouched by this commit. No unstaged or untracked strays.
+# 
+# Flagged, not blocking: the watcher cannot confirm from a diff that the walk was
+# made to fail. It was, against a compiling join defect that reset one edit field
+# -- the walk reported got "1" want "0.62" while every container check stayed
+# green, which is what shows it tests the join rather than repeating
+# keepfile-check. The walk's --file default is a session path, so it is
+# device-bound like the other sheets in this repo, and it is deliberately not in
+# the commit chain: it needs a built dist and a served port.

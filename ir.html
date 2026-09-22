@@ -124,10 +124,10 @@
                (Owner report, 2026-09-16.) -->
           <label class="open-btn bar-primary" title="Edit one photo — or several as a session">
             Open image(s)
-            <input id="file" class="file-input" type="file" accept=".dng,.nef,.zip,.ipslook,image/*" multiple />
+            <input id="file" class="file-input" type="file" accept=".dng,.nef,.zip,.ipslook,.ipskeep,image/*" multiple />
           </label>
-          <input id="batchFiles" type="file" accept=".dng,.nef,.zip,.ipslook,image/*" multiple hidden />
-          <input id="quickFiles" type="file" accept=".dng,.nef,.zip,.ipslook,image/*" multiple hidden />
+          <input id="batchFiles" type="file" accept=".dng,.nef,.zip,.ipslook,.ipskeep,image/*" multiple hidden />
+          <input id="quickFiles" type="file" accept=".dng,.nef,.zip,.ipslook,.ipskeep,image/*" multiple hidden />
         </span></span>
       </header>
 
@@ -298,7 +298,7 @@
           <button id="welcomeClose" class="welcome-close" type="button" hidden aria-label="Close the welcome panel">&#10005;</button>
           <button id="welcomeBack" class="welcome-back" type="button" hidden>&#8249; Back to your photo</button>
           <p id="hint" role="status" aria-live="polite">Edit infrared photos — RAW (NEF / DNG) unlocks the full color magic.</p>
-          <label class="open-btn welcome-open"><input id="welcomeFile" class="file-input" type="file" accept=".dng,.nef,.zip,.ipslook,image/*" multiple />Open image(s)</label>
+          <label class="open-btn welcome-open"><input id="welcomeFile" class="file-input" type="file" accept=".dng,.nef,.zip,.ipslook,.ipskeep,image/*" multiple />Open image(s)</label>
           <p class="welcome-open-hint">One photo, or a set to work through &mdash; each keeps its own edit.</p>
           <!-- DOCTRINE 7e's first-run half, said on the first screen every reader
                meets rather than in a dialog that interrupts them. What it IS,
@@ -313,7 +313,7 @@
                ships hidden and is revealed on iOS only (src/platform.ts); the
                full version, for every platform, is in Help either way. -->
           <p class="welcome-open-hint" data-only-plat="ios" hidden><strong>If the Files picker sits there after you tap Open:</strong> that wait is iOS fetching your photos out of iCloud, before this app is handed anything. A file with a cloud badge, or one that says &ldquo;Waiting&hellip;&rdquo;, is not on this <span data-device-noun>device</span> yet. Download the folder in Files first and it opens straight away — see <strong>Help &rarr; Why the Files picker hangs</strong>.</p>
-          <label class="welcome-batch" id="welcomeQuickBtn"><input id="welcomeQuickFiles" class="file-input" type="file" accept=".dng,.nef,.zip,.ipslook,image/*" multiple />Quick look a folder…</label>
+          <label class="welcome-batch" id="welcomeQuickBtn"><input id="welcomeQuickFiles" class="file-input" type="file" accept=".dng,.nef,.zip,.ipslook,.ipskeep,image/*" multiple />Quick look a folder…</label>
           <p class="welcome-batch-hint">An instant grid of a whole folder. Nothing is saved.</p>
           <button class="welcome-batch" id="welcomeBatchBtn" type="button">Develop a whole set unattended — one .zip…</button>
           <p class="welcome-batch-hint">Develops a whole set into one .zip, unattended.</p>
@@ -967,6 +967,15 @@
             <div id="keepRow" class="keep-row">
               <button id="keepPhoto" type="button">Keep this photo to edit later</button>
               <p class="note" id="keepNote">Its edit and the original file stay on this <span data-device-noun>device</span> under a name you choose. Nothing is uploaded, and your original is never changed.</p>
+              <!-- THE OTHER HALF OF KEEPING (decision 043), beside the first
+                   because they are two answers to one question and the reader
+                   should see both. The button above keeps the photograph in
+                   storage the app created; this one hands it back as a FILE.
+                   The in-app list stays and is not in question — what it cannot
+                   promise is next month, on the other device, because the
+                   browser may reclaim that storage without telling the app. -->
+              <button id="keepFile" type="button">Save this photo as a file</button>
+              <p class="note" id="keepFileNote">One file holding your original photograph exactly as it came, with this edit alongside it. Open it again here whenever you like &mdash; or unzip it anywhere and your photograph is inside, untouched. Your original is never written to.</p>
             </div>
             <label>Format
               <select id="exFormat">
