@@ -18,6 +18,7 @@
 // files. Run it before a release, or through tools/walk-all.mjs.
 // A VERDICT LETS THE APP PUT THE PHOTO DOWN — and says so.
 // Needs dist/ served on :8131.
+import { openMasks } from "./walk-input.mjs";
 import { chromium } from "/home/user/Jefferson-Photography-Studio/node_modules/playwright-core/index.mjs";
 import { requireFreshDist } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
@@ -188,12 +189,15 @@ try {
 
   // A photo the saved copy CANNOT describe is kept, and the strip says why.
   await stepTo(p, 3);
-  await p.click("#ptab-masks");
-  await p.evaluate(() => {
-    const b = [...document.querySelectorAll("#sec-masks button")].find(x => /brush/i.test(x.textContent || ""));
-    b?.click();
-  });
-  await p.waitForTimeout(500);
+  await openMasks(p);
+  // #sec-masks WAS DELETED IN 2.60 (decision 042) — masks are a place now, and
+  // the add buttons live in #maskPlace. The old selector matched nothing and
+  // `b?.click()` swallowed it, so this walk would have gone on to assert that a
+  // photo with brush masks is kept, on a photo that had none. A walk that
+  // measures nothing and says ok is the failure this directory is about, so the
+  // press is asserted rather than optional.
+  await p.click("#addBrush");
+  await p.waitForFunction(() => !document.getElementById("brushControls")?.hidden, null, { timeout: 30000 });
   // ENSURE the verdict rather than toggling it: P on a photo that is already
   // picked takes the pick OFF, and this photo was picked by the walk above — so
   // pressing it here left the photo undecided and the check was measuring

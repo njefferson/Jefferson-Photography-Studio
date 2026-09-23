@@ -44,6 +44,7 @@
 // --plant makes the name check read the row it wrote rather than the row after
 // the undo, which is the shape of the defect this exists for. Two checks must
 // go red.
+import { openMasks } from "./walk-input.mjs";
 import { chromium } from "playwright-core";
 import { requireFreshDist } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
@@ -81,7 +82,7 @@ try {
   await p.waitForFunction(() => document.getElementById("welcome")?.hidden, null, { timeout: 300000 });
   await p.waitForFunction(() => !document.getElementById("busy")?.hasAttribute("open"), null, { timeout: 300000 });
   await settle(p);
-  await p.click("#ptab-masks");
+  await openMasks(p);
   await settle(p);
 
   // 1 · THE SENTENCE IS THERE BEFORE ANY MASK IS, which is the reader it is for.
@@ -216,7 +217,7 @@ try {
   await p2.waitForFunction(() => document.getElementById("welcome")?.hidden, null, { timeout: 300000 });
   await p2.waitForFunction(() => !document.getElementById("busy")?.hasAttribute("open"), null, { timeout: 300000 });
   await settle(p2);
-  await p2.click("#ptab-masks");
+  await openMasks(p2);
   await settle(p2);
   const carried = await p2.evaluate(() => ({
     shown: !document.getElementById("savedMaskRow")?.hidden,

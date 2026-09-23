@@ -107,3 +107,39 @@ export async function dragSlider(page, id, frac) {
   await page.mouse.up();
   return getValue(page, id);
 }
+
+/** OPEN THE MASK PLACE, WHEREVER THE WALK IS STARTING FROM.
+ *
+ *  Takes `page`, a Playwright page with a photograph open. Ensures the mask
+ *  place (decision 042) is on screen and returns nothing.
+ *
+ *  WHY IT EXISTS. Masks were one of twelve tabs until 2.60 and nineteen call
+ *  sites across fifteen walks reached them with `click("#ptab-masks")`. That
+ *  button no longer exists — masks are a place, entered from `#maskPlaceOpen`
+ *  above the tab strip — so every one of those walks would have failed, and
+ *  a walk that cannot reach its subject is the failure this directory has the
+ *  most lessons about.
+ *
+ *  IT IS IDEMPOTENT, WHICH THE RAW CLICK IS NOT. The opener HIDES itself once
+ *  the place is up, so a Playwright click on it a second time waits forever on
+ *  an invisible element — and several walks enter the masks twice. It asks
+ *  whether the place is already open first and returns, so the press below is
+ *  always a REAL one on a visible control.
+ *
+ *  What the caller relies on: after this resolves, `#maskPlace` is not hidden
+ *  and `#addSky` and friends are reachable. Callers that then assert on tab
+ *  state must ask `#maskPlace`, not `aria-selected` — there is no tab. */
+export async function openMasks(page) {
+  const already = await page.evaluate(() => !document.getElementById("maskPlace")?.hidden);
+  if (already) return;
+  // A REAL PRESS, NOT A DISPATCHED CLICK. keep-walk's own header states the
+  // rule this nearly broke: "a dispatched event is not a gesture, and a harness
+  // that presses by id cannot tell you whether a finger could have got there"
+  // (hub LESSONS §348). #maskPlaceOpen is now the ONLY way a reader reaches
+  // masking at all, so if every walk reached it through `element.click()` in an
+  // evaluate, nothing in this repository would ever have pressed it. The early
+  // return above is what buys the idempotence instead — the opener hides itself
+  // once the place is up, and several walks enter the masks twice.
+  await page.locator("#maskPlaceOpen").click();
+  await page.waitForFunction(() => !document.getElementById("maskPlace")?.hidden, null, { timeout: 30000 });
+}

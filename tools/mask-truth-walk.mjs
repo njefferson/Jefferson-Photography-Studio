@@ -66,6 +66,7 @@
 // readings — 52% on NIR_0063 — and the unplanted run must not. A split that
 // moves no number on any frame is reading nothing, and its green means
 // nothing.
+import { openMasks } from "./walk-input.mjs";
 import { chromium } from "playwright-core";
 import { requireFreshDist } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
@@ -358,7 +359,7 @@ try {
     // "sky" and reported nothing missed. The report that prompted this
     // instrument was made with Aerochrome on.
     await p.evaluate(() => document.getElementById("lookEir")?.click()); await settle(p);
-    await p.click("#ptab-masks"); await p.click("#addSky"); await settle(p);
+    await openMasks(p); await p.click("#addSky"); await settle(p);
     if (REACH !== 1) await setSlider(p, "mSkyReach", REACH);
     // THE OVERLAY'S STATE IS NOT THE BUTTON'S. Dragging a mask slider steps
     // the coverage tint aside (maskAdjusting) while the Show mask button keeps

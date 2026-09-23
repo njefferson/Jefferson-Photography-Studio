@@ -27,6 +27,7 @@
 // captured off the page, never `element.click()` in an evaluate: a dispatched
 // event is not a gesture, and a harness that presses by id cannot tell you
 // whether a finger could have got there (hub LESSONS 348).
+import { openMasks } from "./walk-input.mjs";
 import { chromium } from "playwright-core";
 import { requireFreshDist } from "./fresh-dist.mjs";
 import { readFileSync, existsSync, mkdtempSync, rmSync } from "node:fs";
@@ -90,7 +91,7 @@ const paintStroke = async (page) => {
 /** Arm the matte, read the coverage, put it away. Reading it means LOOKING at
  *  the rendered frame, so the view has to be the one the reader judges with. */
 const coverageOf = async (page, row) => {
-  await page.locator("#ptab-masks").click();
+  await openMasks(page);
   await page.waitForTimeout(500);
   const pick = page.locator("#maskList .mask-row").nth(row).locator(".mask-pick");
   if ((await pick.getAttribute("aria-pressed")) !== "true") { await pick.click(); await page.waitForTimeout(500); }
@@ -131,7 +132,7 @@ try {
   check("the edit was made and the control reads it back", before, MARK);
 
   // AND A PAINTED MASK, which is the part with no recipe behind it.
-  await p.locator("#ptab-masks").click();
+  await openMasks(p);
   await p.waitForTimeout(500);
   await p.locator("#addBrush").click();
   await p.waitForTimeout(700);
@@ -196,7 +197,7 @@ try {
   // re-rendered from scratch; a mask that was DROPPED reads zero, which is not
   // a near miss, and a mask restored empty reads zero too.
   const rows2 = await p2.locator("#maskList .mask-row").count().catch(() => 0);
-  await p2.locator("#ptab-masks").click();
+  await openMasks(p2);
   await p2.waitForTimeout(600);
   const rowCount = await p2.locator("#maskList .mask-row").count();
   check("the painted mask is in the list after reopening", rowCount >= 1, true);

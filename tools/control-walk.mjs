@@ -298,11 +298,31 @@ try {
     }
     // Every panel tab on ir.html is its own set of controls and only one is on
     // screen at a time — a sweep of the page at rest sees one of eleven.
+    //
+    // AND THE MASK PLACE, which is not a tab (decision 042). Masks left the
+    // strip in 2.60, so this enumeration stopped reaching the five mask
+    // adjustments, the six aim toggles, the selection controls, the join radios
+    // and the add buttons — every one of them would have become an unreached,
+    // undeclared control while this walk went on printing the same coverage
+    // number. The record warned about exactly this by name: "a new panel is NOT
+    // automatically swept."
     const tabs = await page.evaluate(() =>
       [...document.querySelectorAll("#panelTabs .ptab")].map((t) => t.id).filter(Boolean));
+    tabs.push("maskPlaceOpen");
     for (const t of tabs) {
       await page.evaluate((i) => document.getElementById(i)?.click(), t);
       await page.waitForTimeout(120);
+      // The mask editor only exists once there IS a mask, and its groups are
+      // <details> — a collapsed one hides its controls from this sweep exactly
+      // as a closed tab does. Make one and open them all.
+      if (t === "maskPlaceOpen") {
+        await page.evaluate(() => {
+          if (!document.querySelector("#maskList .mask-row")) document.getElementById("addRadial")?.click();
+        });
+        await page.waitForTimeout(400);
+        await page.evaluate(() => document.querySelectorAll(".mask-group").forEach((d) => { d.open = true; }));
+        await page.waitForTimeout(200);
+      }
       rows.push(...(await controlsOn(page, `${s.file} · ${t}`)));
       ctlRows.push(...(await explainedOn(page, `${s.file} · ${t}`)));
       // AND THE TOOLS THAT ARM, which are not a tab and are not on screen at

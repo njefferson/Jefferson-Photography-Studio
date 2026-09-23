@@ -21,6 +21,7 @@
 // the selection is asserted on the far side.
 //
 // --plant skips the full-view press. Two checks must go red.
+import { openMasks } from "./walk-input.mjs";
 import { chromium } from "playwright-core";
 import { requireFreshDist } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
@@ -78,7 +79,7 @@ try {
   await settle(p);
   // A RADIAL, not the sky — it is the only kind with a dotted handle outline,
   // so it is the one frame where both halves can be read at once.
-  await p.click("#ptab-masks"); await p.click("#addRadial"); await settle(p);
+  await openMasks(p); await p.click("#addRadial"); await settle(p);
 
   const before = await overlay(p);
   writeFileSync(join(OUT, "1-editing.png"), Buffer.from(before.png.split(",")[1], "base64"));

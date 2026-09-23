@@ -22,6 +22,7 @@
 // not have.
 //
 // --plant skips arming the mode. Three checks must go red.
+import { openMasks } from "./walk-input.mjs";
 import { chromium } from "playwright-core";
 import { requireFreshDist } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
@@ -74,7 +75,7 @@ try {
   await p.waitForFunction(() => document.getElementById("welcome")?.hidden, null, { timeout: 300000 });
   await p.waitForFunction(() => !document.getElementById("busy")?.hasAttribute("open"), null, { timeout: 300000 });
   await settle(p);
-  await p.click("#ptab-masks"); await p.click("#addSky"); await settle(p);
+  await openMasks(p); await p.click("#addSky"); await settle(p);
   await p.click("#mMatte"); await settle(p);
 
   check("nothing is showing before a mode is armed", !(await ring(p)).shown);

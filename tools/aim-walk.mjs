@@ -39,7 +39,7 @@
 import { chromium } from "/home/user/Jefferson-Photography-Studio/node_modules/playwright-core/index.mjs";
 import { requireFreshDist } from "./fresh-dist.mjs";
 requireFreshDist();
-import { setValue, getValue } from "./walk-input.mjs";
+import { setValue, getValue, openMasks } from "./walk-input.mjs";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { deflateSync } from "node:zlib";
 import { join } from "node:path";
@@ -127,7 +127,7 @@ try {
    *  Takes the page and the aim button's id (or null). Returns what the panel
    *  reads back, which the caller asserts before trusting any pixel. */
   async function neutralSky(p, aimId) {
-    await p.click("#ptab-masks");
+    await openMasks(p);
     await p.click("#addSky");
     await settle(p);
     // The coverage tint is drawn ON THE CANVAS: leaving it on would compare a

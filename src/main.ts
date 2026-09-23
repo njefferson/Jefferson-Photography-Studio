@@ -2783,7 +2783,11 @@ $("toneReset").addEventListener("click", () => {
 
 // --- Sectioned tab panel: segmented tabs, one section of controls each.
 // The active tab is remembered per session so reopening lands where you left.
-const PANEL_TABS = ["basic", "ir", "bw", "color", "tone", "masks", "corrections", "export", "crop", "grade", "stickers", "warp"] as const;
+// "masks" left this list in 2.60 (decision 042): masks are a PLACE now, not
+// one of twelve sections. `maskPlaceOpen` below is the state that replaced
+// `activePanelTab === "masks"`, and `masksTabInFront()` is the one place
+// that answers it for every consumer.
+const PANEL_TABS = ["basic", "ir", "bw", "color", "tone", "corrections", "export", "crop", "grade", "stickers", "warp"] as const;
 type PanelTab = (typeof PANEL_TABS)[number];
 const TAB_META: Record<PanelTab, { name: string; sub: string }> = {
   basic: { name: "Basic", sub: "White balance, exposure & detail" },
@@ -2791,7 +2795,6 @@ const TAB_META: Record<PanelTab, { name: string; sub: string }> = {
   bw: { name: "Black & white", sub: "Channel-mix mono, made for 720nm" },
   color: { name: "Color", sub: "Hue, per-color & the mixer" },
   tone: { name: "Tone", sub: "Curve, luminance & bands" },
-  masks: { name: "Masks", sub: "Local, area-only adjustments" },
   corrections: { name: "Corrections", sub: "Dust, spots & IR lens fixes" },
   export: { name: "Export", sub: "Save, my looks & profiles" },
   grade: { name: "Grade", sub: "Color wheels, toned mono, grain & vignette" },
@@ -2957,6 +2960,64 @@ function setPanelTab(tab: PanelTab) {
   if (warpReady) setWarpMode(activePanelTab === "warp");
 }
 panelTabBtns.forEach((b) => b.addEventListener("click", () => setPanelTab(b.dataset.tab as PanelTab)));
+// ===== MASKS ARE A PLACE, NOT A TAB (decision 042) =====
+// Asked from the device 2026-09-21. A tab says "one of twelve sections"; the
+// ask was that masking get its own place the way a commercial editor gives it
+// the whole column. So the tab strip and every section stand down while this is
+// up, and the panel column is the mask's.
+//
+// IT COULD NOT SHIP BEFORE 2.60, and that is the record's own rejected option
+// 2: a place holding only the five adjustments a MaskLayer carried would have
+// been a claim about capacity the app could not meet. 030 taught the pipeline
+// to aim six whole-photo stages at a selection, so there is something for the
+// place to hold.
+//
+// THE STATE LIVES HERE AND IS READ IN ONE PLACE. `masksTabInFront()` used to
+// ask `activePanelTab === "masks"`; it asks this flag now, and its contract
+// already says every consumer calls it and none restates it — which is why
+// moving masks out of the tab strip is this one line rather than a sweep of
+// call sites.
+const maskPlaceEl = $("maskPlace") as HTMLElement;
+const maskPlaceOpenBtn = $("maskPlaceOpen") as HTMLButtonElement;
+const maskPlaceCloseBtn = $("maskPlaceClose") as HTMLButtonElement;
+const maskPlaceCountEl = $("maskPlaceCount") as HTMLSpanElement;
+let maskPlaceIsOpen = false;
+
+/** OPEN OR CLOSE THE MASK PLACE, and stand the rest of the panel down with it.
+ *
+ *  Takes `on` — true to show the place, false to return to the tab that was
+ *  last in front. Hides or shows `#panelTabs` and every `section.section`
+ *  together, moves focus to the place's heading on open and back to the opener
+ *  on close, and keeps `aria-expanded` on the opener honest. Returns nothing.
+ *
+ *  What the result has to satisfy: `maskPlaceIsOpen` is the ONLY state that
+ *  says the reader can see and reach the mask controls, and `masksTabInFront()`
+ *  is the only thing that reads it. A second copy of that question is the
+ *  defect that cost a reader a hand correction they never made (see that
+ *  function's own contract), so do not restate it here or anywhere else. */
+function setMaskPlace(on: boolean): void {
+  maskPlaceIsOpen = on;
+  maskPlaceEl.hidden = !on;
+  panelTabsEl.hidden = on;
+  panelSections.forEach((sec) => { if (on) sec.hidden = true; else sec.hidden = sec.dataset.tab !== activePanelTab; });
+  maskPlaceOpenBtn.setAttribute("aria-expanded", String(on));
+  maskPlaceOpenBtn.hidden = on;
+  sectionTitleEl.textContent = on ? "Masks" : TAB_META[activePanelTab].name;
+  sectionSubEl.textContent = on ? "Local, area-only adjustments" : TAB_META[activePanelTab].sub;
+  panelBody.scrollTop = 0;
+  updateScrollCues();
+  // Same guard setPanelTab uses: the overlay system does not exist yet at the
+  // init-time call, and a tint rendered before it does would throw.
+  if (overlayReady) { maskAdjusting = false; renderMaskOverlay(); }
+}
+
+/** Show the mask place. Takes nothing, returns nothing; used by the opener and
+ *  by `addMask`, which reveals a just-created mask's editor. */
+function openMaskPlace(): void { setMaskPlace(true); }
+
+maskPlaceOpenBtn.addEventListener("click", () => { setMaskPlace(true); maskPlaceCloseBtn.focus(); });
+maskPlaceCloseBtn.addEventListener("click", () => { setMaskPlace(false); maskPlaceOpenBtn.focus(); });
+
 // Keyboard tab traversal: Left/Right (wrapping) and Home/End move focus AND
 // select — the tab grid wraps visually, so a 1-D order is what fingers expect.
 panelTabsEl.addEventListener("keydown", (e) => {
@@ -6002,7 +6063,7 @@ function addMask(type: 0 | 1 | 2 | 3 | 4) {
   params.masks.push(m);
   selectedMask = params.masks.length - 1;
   if (type === 0 || type === 1) showMaskOutline = true; // a new geometry mask shows its handles
-  setPanelTab("masks"); // reveal the just-created mask's editor in its own tab
+  openMaskPlace(); // reveal the just-created mask's editor in the place it lives
   updateMaskUI();
   renderMaskOverlay();
   if (type === 3) setColorPick(true); // arm the tap-to-pick target immediately
@@ -6462,6 +6523,12 @@ function updateMaskUI() {
   const m = currentMask();
   maskEditor.hidden = !m;
   const total = params.masks.length;
+  // The opener carries the count, so the reader can see there ARE masks without
+  // going in. 040's headline defect was the app being able to do something and
+  // not saying so; a place you cannot see into from outside is the same shape.
+  maskPlaceCountEl.textContent = total ? ` ${total}` : "";
+  maskPlaceOpenBtn.setAttribute(
+    "aria-label", total ? `Masks, ${total} on this photograph` : "Masks");
   const full = !current || total >= MAX_MASKS;
   const bitmapFull = bitmapMaskCount() >= MAX_BITMAP_MASKS;
   addRadialBtn.disabled = full;
@@ -6700,7 +6767,7 @@ function mkHandle(role: string): SVGCircleElement {
  *  see and reach the mask controls" calls THIS, and none of them restates it. */
 function masksTabInFront(): boolean {
   return !panel.hidden
-    && activePanelTab === "masks"
+    && maskPlaceIsOpen
     && document.getElementById("app")?.dataset.full !== "1";
 }
 
@@ -14150,7 +14217,10 @@ const GALLERY: GalleryTile[] = [
   galJpeg("magenta-dusk-trees", "Dusk conifers (D5300)"),
 ];
 
-const LESSONS: { title: string; tab: PanelTab; steps: string[] }[] = [
+// A lesson names where its controls live. "masks" is not a PanelTab any more
+// (decision 042) — it is the place — so the type carries both and `openLesson`
+// branches once rather than every lesson knowing which kind it is.
+const LESSONS: { title: string; tab: PanelTab | "masks"; steps: string[] }[] = [
   {
     title: "Lesson 1 · White balance — the IR crux",
     tab: "basic",
@@ -14324,7 +14394,7 @@ function showLesson(i: number) {
   );
   // Open the panel tab this lesson works in (the steps name where the rest
   // lives when a lesson spans more than one section).
-  setPanelTab(L.tab);
+  if (L.tab === "masks") setMaskPlace(true); else { setMaskPlace(false); setPanelTab(L.tab); }
   updateScrollCues();
   lesson.hidden = false;
   lessonShow.hidden = true;
