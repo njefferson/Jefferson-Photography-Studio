@@ -1,25 +1,36 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
 planhash=d7ad09163632fc44
-diffhash=5bff3ccc5306d860
-verdict=IN-SCOPE: the approved plan's section 1 names this as step one — VERSION 2.59 to 2.60 in the release's own final commit, because the aims make this a capability release. One line, self-judged.
-# Self-judged, and said so rather than implied. The diff is one line.
+diffhash=e5388e56c803cce6
+verdict=IN-SCOPE: the approved plan's section 2 names this step in detail — archive 030 with an Outcome, give 042 its Built already. Docs and NOTES only, no source. Self-judged.
+# Self-judged, and said so rather than implied.
 # 
-# `VERSION` 2.59 -> 2.60, amended into `d4ab294`, this release's own final commit.
+# The approved plan's section 2 names this step in detail: "030's bullet moves to
+# the shipped archive with an `## Outcome`: Option 1 delivered, all six stages
+# aimable, OWED empty; Option 2's named snapshots were rejected as an alternative
+# and remain unbuilt, so say that rather than letting the title's second half read
+# as unfinished work" and "042 becomes rank 1 and gains its `## Built already`
+# before the first edit — the gate requires it of the next-up record".
 # 
-# The approved plan's section 1 names exactly this as its first step, with the
-# reason: the aims add a tool, so this is a capability release, every capability
-# release that ships to main bumps the middle number, and the VERSION edit rides
-# that release's own final commit so the commit reads as the new base in the
-# changelog. Shipped history is never renumbered, so it is now or it is wrong
-# permanently.
+# That is the whole diff. NOTES.md moves 030's bullet to the shipped archive and
+# ticks it; 030 gains its Outcome; 042 gains Built already.
 # 
-# It rides the final commit rather than standing alone deliberately. A VERSION-only
-# commit is filtered out of the ⓘ dialog since d33ab04 — which is correct, because
-# "this release is 2.59" told the reader a number printed above it — but the
-# versioning rule wants the release commit to READ as the new base in the
-# changelog, and only a commit that reaches the reader can do that. Amending it
-# into the black-screen fix satisfies both: that note now reads v2.60, and no
-# empty line is added.
+# It rides this release rather than a later one because 030's Outcome says the
+# work shipped in 2.60, and that sentence is only true once main carries it. The
+# archive and the release land in the same promotion or the record claims
+# something main does not yet have.
 # 
-# Nothing else is in this diff.
+# Two things went further than a minimal archive would, both named rather than
+# absorbed:
+# 
+# - 030's Outcome states what is NOT built — Option 2's named snapshots — and why
+#   that does not leave the record open. The record's own title carries a second
+#   half that Option 2 covers and Option 1 does not, so an Outcome silent on it
+#   would read as unfinished work in flight.
+# - 042's Built already records that an aim is a WEIGHT and not a value
+#   (`dz * aimWeight(...)`, where `dz` is the whole-frame slider), read off
+#   src/pipeline.ts rather than assumed. That is the gap between what shipped and
+#   what 042 asks for, and a record that did not say it is a record that invites
+#   its own implementer to read six shipped toggles as the job already done.
+# 
+# No source file is touched.

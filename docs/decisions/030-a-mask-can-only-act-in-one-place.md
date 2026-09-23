@@ -193,3 +193,56 @@ after.
 
 Provisional because the rank rests on how much of 013 and 016 actually needs
 aiming, and that has not been measured. Whoever takes 013 first should say.
+
+## Outcome
+
+**OPTION 1 SHIPPED IN 2.60, and it is complete on its own terms.** Six stages
+can be aimed at a mask: Dehaze, Clarity, the shadow tint and the IR lens
+hot-spot fix (2026-09-21, per-pixel gains), then noise reduction and Sharpen &
+texture (2026-09-22, the spatial pre-passes). `tools/scope-check.mjs`'s OWED
+list — its record of knobs measured as wanting two answers in one frame and
+having one control — is EMPTY for the first time.
+
+**The expensive half was the second one, exactly as Options predicted.** A
+per-pixel gain is aimed by scaling it, one line per path. A spatial pre-pass has
+to be run twice and blended, which is `aimedSampler` in `src/pipeline.ts` on the
+processor against `mix(preNoise, c, aimWeightOf(16))` and
+`c *= mix(1.0, gain, aimWeightOf(32))` in the shader — equal only because
+`mix(c, c*g, w) == c * mix(1, g, w)`.
+
+**It shipped to the work branch unverified and sat there, and the reason was an
+instrument rather than the code.** The arm written to hold the two languages
+together reported preview and export 180 degrees apart in hue on a frame with no
+mask and no aim at all. `tools/agreement-walk.mjs` was asserting on the biggest
+of twelve hue bins, and every photograph this app exists for is bimodal, so that
+winner is a coin toss between two modes 180 degrees apart — it ranked a REAL
+red/blue swap at 90 degrees, less than the honest pair. The walk now measures a
+circular earth mover's distance over the whole histogram; the aimed arm passes at
+9.2 degrees against a bar of 15, and a green/blue swap planted in the shader
+takes it to 18.7 and red.
+
+**Two traps were caught before they shipped**, both of which would have made the
+mechanism silently inert: `maskGroupsForRender` drops a group whose head adjusts
+nothing — and a mask added PURELY to aim is exactly that — and the shader uploads
+that same filtered list, so reading `p.masks` on the processor alone would have
+put the two paths on different sets. `maskIsActive` counts aiming as doing
+something, at the one place that decides.
+
+**WHAT IS NOT BUILT, AND WAS NEVER GOING TO BE BY THIS RECORD.** The title's
+second half — "there is only one version of an edit" — is Option 2's named
+snapshots, and Option 2 was rejected. It was rejected *as an alternative to
+Option 1* ("2 alone"), not as a follow-on, and Option 4 ("both, in that order")
+was listed and never chosen. So this record is closed on what it chose, and
+named states remain genuinely useful and genuinely unbuilt. If they are wanted
+they need a record of their own rather than this one being left open to imply
+work in flight.
+
+**And colour masks still cannot aim, by design.** Their key is the pixel as it
+DISPLAYS at the mask stage, which does not exist at dehaze. That boundary
+belongs to 032; the control stands down rather than offering nothing.
+
+**What it unblocks: 042.** That record's chosen option is "the mask becomes a
+place, and what it hosts is whatever 030 has taught the pipeline to aim… the
+inventory is the scope gate's six OWED knobs first". Those six now exist, which
+is the precondition its rejected option 2 — shipping the mode with only today's
+five adjustments — was written to avoid.

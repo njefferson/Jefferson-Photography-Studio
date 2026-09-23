@@ -539,102 +539,6 @@ user-scalable=no.
 > different approach and mindset"). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
-- [ ] **A mask can only act in one place, and there is only one version of an edit** <!-- decision: 030 -->
-  **Shown as:** Use more of the app's tools inside a mask, so the sky and the trees can take different amounts.
-  asked 2026-09-20 as a principle: a mask can be taken at any point in the
-  workflow, and without layers or named backups there is no way to work on the
-  raw underneath when all you have is the image in front of you.
-  **Half of it is already true and worth saying**: this app never overwrites
-  pixels. Every render starts from the linear decode, the sky selection is built
-  from that decode before any look and before the channel swap, and the raw is
-  always underneath. What is missing is that nothing INSIDE the pipeline can be
-  addressed — the order is fixed and invisible, a selection folds in at exactly
-  one stage, and there is one state with a linear undo.
-  **The measured cost is already written down**: the scope gate lists six
-  whole-frame knobs — denoise, chroma, texture, clarity, dehaze and the look's
-  own denoise — each carrying a reason that reduces to the same sentence, that
-  the sky and the canopy want opposite amounts and there is one control. Every
-  one is a mask with nowhere to be applied.
-  The field has both halves separately: RawTherapee ships named Snapshots beside
-  its history and is the cautionary case, giving no control over the order its
-  processes run; darktable's pixelpipe takes modules in any order with masks
-  combined per module. See
-  `docs/decisions/030-a-mask-can-only-act-in-one-place.md`.
-  **IN FLIGHT 2026-09-21 — the mechanism is built and three stages are aimed.**
-  `MaskLayer.aims` is a bitmask of the stages a mask gates; `aimWeight` in
-  `src/pipeline.ts` and `aimWeightOf` in `src/gl.ts` are the two halves, walking
-  the same flattened active groups in the same order. **Absent or zero means
-  whole-frame**, so every edit already finished renders identically. Dehaze,
-  Clarity and the shadow tint are aimed; each was one bitmask entry plus two
-  lines per path.
-  Two traps caught before they shipped, both of which would have made it
-  silently inert: `maskGroupsForRender` drops a group whose head's adjustment
-  does nothing — and a mask added PURELY to aim has exactly that — and the
-  shader uploads that same filtered list, so reading `p.masks` on the CPU alone
-  would have put the two paths on different sets. `maskIsActive` counts aiming
-  as doing something now, which fixes both at the one place that decides.
-  **Colour masks cannot aim**: their key is the pixel as it DISPLAYS at the mask
-  stage, which does not exist at dehaze. That boundary is 032's, and the control
-  stands down rather than offering nothing.
-  **RENDERED AND OPENED 2026-09-21, which is the only verification that counts
-  for an appearance.** Three states of `NIR_1651` — a conifer against a teal
-  sky with a cloud bank across the top — with Dehaze held at 0.80 and the Sky
-  mask's own adjustment driven to neutral, so the mask is a PLACE and nothing
-  else. Whole-frame at 0.80 takes the sky down hard and the cloud gains real
-  structure, and it costs the conifer its luminosity: the foliage goes from
-  pale pink to a grey mauve and the shadows inside the crown crush toward
-  black. Aimed at the Sky mask it is that same sky with the tree exactly as it
-  opened. The aimed arm moved 55% of the frame against the mask's own claim of
-  54%, which is the shape the mechanism predicts.
-  **And what the render shows that no number did**: the selection's edge is
-  visible. A rim of un-darkened sky hugs the crown's silhouette, and the small
-  holes of sky between the needles keep their original teal while the open sky
-  around them goes dark. That is 029's ground — the selection being wrong about
-  which pixels are sky — and it is what now limits how far this can be pushed.
-  **The lens hot-spot fix is aimed too (2026-09-21), one more bitmask entry.**
-  `AIM_LENS` covers both routes to the same correction — the manual `hotspot`
-  and `hotspotColor` sliders and the measured `lensFix` / `hsFix` curves —
-  because to a reader they are one thing, the hot spot this converted sensor
-  puts in the middle of the frame. `vignette` rides the same circle and is
-  deliberately NOT aimed, so the weight scales the hot-spot AMOUNT rather than
-  the combined gain. The measured curve is blended toward 1 by the weight
-  rather than re-derived at a scaled strength, because `lensGain` is not linear
-  in strength and the CPU builds its table once — blending is the one thing
-  both paths can do identically.
-  **`tools/aim-walk.mjs` is the gate**, and it holds the mechanism to four
-  statements that are true of every aim or of none: aiming nothing changes
-  nothing (a neutral, non-aiming Sky mask renders byte-identical to no mask —
-  the check that protects every edit already saved), the stage does something
-  whole-frame, the aim holds something back, and the aim still does something.
-  Its own first run caught a confound that had already produced one wrong
-  report: a fresh Sky mask arrives with Saturation 1.3 on purpose, so an arm
-  that does not neutralise it is measuring 30% of extra chroma over half the
-  picture and calling it the aim.
-  Six of the scope gate's OWED entries came off the list with this: dehaze,
-  clarity, shadowSat, hotspot, lensFix and hsFix. Still whole-frame: denoise,
-  colour noise and texture are spatial pre-passes rather than per-pixel gains,
-  so aiming them means blending the filtered and unfiltered results by the mask
-  weight — more than a bitmask entry, and the next piece of 030.
-  **THAT PIECE IS BUILT AND NOW VERIFIED ON EXPORT (2026-09-22).** `AIM_NOISE`
-  and `AIM_TEXTURE` join the four above, as TWO toggles rather than five —
-  noise covers denoise, colour noise and despeckle, texture covers sharpen —
-  because to a reader each is one idea. `aimedSampler` in `src/pipeline.ts`
-  blends the unfiltered and filtered row samplers by the mask weight; the
-  shader scales its gain instead, which is the same arithmetic because
-  `mix(c, c*g, w) == c * mix(1, g, w)`. The scope gate's OWED list is EMPTY for
-  the first time.
-  **It shipped to the work branch unverified, and the reason it stayed there
-  was an instrument.** The arm written to hold the two paths together reported
-  the preview and the export 180 degrees apart on a frame with no mask and no
-  aim, which is a defect the app does not have: the walk was asserting on the
-  biggest of twelve hue bins, and every photograph here is bimodal, so that
-  winner is a coin toss between two modes 180 degrees apart. The walk now
-  measures a circular earth mover's distance over the whole histogram; that arm
-  passes at 9.2 degrees against a bar of 15, and a green/blue swap planted in
-  the shader takes it to 18.7 and red. See "The 180 degrees was the statistic"
-  above. Blending a sampler and scaling a gain agree in practice, not only on
-  paper.
-
 - [ ] **A mask is a place, and most of the controls should work inside one** <!-- decision: 042 -->
   **Shown as:** Masks get a place of their own, with far more of the controls working inside one.
   asked 2026-09-21: masks should come out of the tab strip into a place of
@@ -3793,6 +3697,102 @@ reason it is a footnote rather than a finding — a list of known limitations is
 read as authoritative, and an invented one is worse than a missing one.
 
 ## Shipped (roadmap archive)
+
+- [x] **A mask can only act in one place, and there is only one version of an edit** <!-- decision: 030 -->
+  **Shown as:** Use more of the app's tools inside a mask, so the sky and the trees can take different amounts.
+  asked 2026-09-20 as a principle: a mask can be taken at any point in the
+  workflow, and without layers or named backups there is no way to work on the
+  raw underneath when all you have is the image in front of you.
+  **Half of it is already true and worth saying**: this app never overwrites
+  pixels. Every render starts from the linear decode, the sky selection is built
+  from that decode before any look and before the channel swap, and the raw is
+  always underneath. What is missing is that nothing INSIDE the pipeline can be
+  addressed — the order is fixed and invisible, a selection folds in at exactly
+  one stage, and there is one state with a linear undo.
+  **The measured cost is already written down**: the scope gate lists six
+  whole-frame knobs — denoise, chroma, texture, clarity, dehaze and the look's
+  own denoise — each carrying a reason that reduces to the same sentence, that
+  the sky and the canopy want opposite amounts and there is one control. Every
+  one is a mask with nowhere to be applied.
+  The field has both halves separately: RawTherapee ships named Snapshots beside
+  its history and is the cautionary case, giving no control over the order its
+  processes run; darktable's pixelpipe takes modules in any order with masks
+  combined per module. See
+  `docs/decisions/030-a-mask-can-only-act-in-one-place.md`.
+  **IN FLIGHT 2026-09-21 — the mechanism is built and three stages are aimed.**
+  `MaskLayer.aims` is a bitmask of the stages a mask gates; `aimWeight` in
+  `src/pipeline.ts` and `aimWeightOf` in `src/gl.ts` are the two halves, walking
+  the same flattened active groups in the same order. **Absent or zero means
+  whole-frame**, so every edit already finished renders identically. Dehaze,
+  Clarity and the shadow tint are aimed; each was one bitmask entry plus two
+  lines per path.
+  Two traps caught before they shipped, both of which would have made it
+  silently inert: `maskGroupsForRender` drops a group whose head's adjustment
+  does nothing — and a mask added PURELY to aim has exactly that — and the
+  shader uploads that same filtered list, so reading `p.masks` on the CPU alone
+  would have put the two paths on different sets. `maskIsActive` counts aiming
+  as doing something now, which fixes both at the one place that decides.
+  **Colour masks cannot aim**: their key is the pixel as it DISPLAYS at the mask
+  stage, which does not exist at dehaze. That boundary is 032's, and the control
+  stands down rather than offering nothing.
+  **RENDERED AND OPENED 2026-09-21, which is the only verification that counts
+  for an appearance.** Three states of `NIR_1651` — a conifer against a teal
+  sky with a cloud bank across the top — with Dehaze held at 0.80 and the Sky
+  mask's own adjustment driven to neutral, so the mask is a PLACE and nothing
+  else. Whole-frame at 0.80 takes the sky down hard and the cloud gains real
+  structure, and it costs the conifer its luminosity: the foliage goes from
+  pale pink to a grey mauve and the shadows inside the crown crush toward
+  black. Aimed at the Sky mask it is that same sky with the tree exactly as it
+  opened. The aimed arm moved 55% of the frame against the mask's own claim of
+  54%, which is the shape the mechanism predicts.
+  **And what the render shows that no number did**: the selection's edge is
+  visible. A rim of un-darkened sky hugs the crown's silhouette, and the small
+  holes of sky between the needles keep their original teal while the open sky
+  around them goes dark. That is 029's ground — the selection being wrong about
+  which pixels are sky — and it is what now limits how far this can be pushed.
+  **The lens hot-spot fix is aimed too (2026-09-21), one more bitmask entry.**
+  `AIM_LENS` covers both routes to the same correction — the manual `hotspot`
+  and `hotspotColor` sliders and the measured `lensFix` / `hsFix` curves —
+  because to a reader they are one thing, the hot spot this converted sensor
+  puts in the middle of the frame. `vignette` rides the same circle and is
+  deliberately NOT aimed, so the weight scales the hot-spot AMOUNT rather than
+  the combined gain. The measured curve is blended toward 1 by the weight
+  rather than re-derived at a scaled strength, because `lensGain` is not linear
+  in strength and the CPU builds its table once — blending is the one thing
+  both paths can do identically.
+  **`tools/aim-walk.mjs` is the gate**, and it holds the mechanism to four
+  statements that are true of every aim or of none: aiming nothing changes
+  nothing (a neutral, non-aiming Sky mask renders byte-identical to no mask —
+  the check that protects every edit already saved), the stage does something
+  whole-frame, the aim holds something back, and the aim still does something.
+  Its own first run caught a confound that had already produced one wrong
+  report: a fresh Sky mask arrives with Saturation 1.3 on purpose, so an arm
+  that does not neutralise it is measuring 30% of extra chroma over half the
+  picture and calling it the aim.
+  Six of the scope gate's OWED entries came off the list with this: dehaze,
+  clarity, shadowSat, hotspot, lensFix and hsFix. Still whole-frame: denoise,
+  colour noise and texture are spatial pre-passes rather than per-pixel gains,
+  so aiming them means blending the filtered and unfiltered results by the mask
+  weight — more than a bitmask entry, and the next piece of 030.
+  **THAT PIECE IS BUILT AND NOW VERIFIED ON EXPORT (2026-09-22).** `AIM_NOISE`
+  and `AIM_TEXTURE` join the four above, as TWO toggles rather than five —
+  noise covers denoise, colour noise and despeckle, texture covers sharpen —
+  because to a reader each is one idea. `aimedSampler` in `src/pipeline.ts`
+  blends the unfiltered and filtered row samplers by the mask weight; the
+  shader scales its gain instead, which is the same arithmetic because
+  `mix(c, c*g, w) == c * mix(1, g, w)`. The scope gate's OWED list is EMPTY for
+  the first time.
+  **It shipped to the work branch unverified, and the reason it stayed there
+  was an instrument.** The arm written to hold the two paths together reported
+  the preview and the export 180 degrees apart on a frame with no mask and no
+  aim, which is a defect the app does not have: the walk was asserting on the
+  biggest of twelve hue bins, and every photograph here is bimodal, so that
+  winner is a coin toss between two modes 180 degrees apart. The walk now
+  measures a circular earth mover's distance over the whole histogram; that arm
+  passes at 9.2 degrees against a bar of 15, and a green/blue swap planted in
+  the shader takes it to 18.7 and red. See "The 180 degrees was the statistic"
+  above. Blending a sampler and scaling a gain agree in practice, not only on
+  paper.
 
 - [x] **The in-app kept list holds work the reader does not own** <!-- decision: 051 -->
   039 kept photographs inside the app, in a database the reader does not own,

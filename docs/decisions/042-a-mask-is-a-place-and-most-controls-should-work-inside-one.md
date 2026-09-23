@@ -64,6 +64,56 @@ adjustments for local adjustment tools; darktable user manual, masking and
 blending — overview, parametric masks, and combining drawn and parametric masks
 (docs.darktable.org/usermanual/development/en/darkroom/masking-and-blending/).
 
+## Built already
+
+Everything here EXISTS and shipped in 2.60 or before. This record is the surface
+over it, not a second version of it.
+
+- **The aim mechanism, all six bits.** `MaskLayer.aims` is a bitmask;
+  `src/pipeline.ts` exports `AIM_DEHAZE` 1, `AIM_CLARITY` 2, `AIM_SHADOW` 4,
+  `AIM_LENS` 8, `AIM_NOISE` 16, `AIM_TEXTURE` 32, with `aimWeight` resolving one
+  at a point and `aimWeightOf` in `src/gl.ts` doing the same on the other side.
+  `aimedSampler` handles the spatial stages, which have to be run twice and
+  blended rather than scaled. Absent or zero means whole-frame, so every edit
+  already saved renders identically.
+- **The interim surface this replaces, and it is the honest starting point.**
+  `#mAimRow` in `ir.html` holds six toggles reading "Dehaze, here only" through
+  "Sharpen & texture, here only". They are proof the pipeline can aim and they
+  are what a reader has today.
+- **AND WHAT THEY CANNOT DO IS THIS RECORD'S WHOLE JOB.** An aim is a WEIGHT,
+  not a value: `const dzA = dz * aimWeight(aimMasks, AIM_DEHAZE, u, v)` — `dz`
+  is the whole-frame Dehaze slider. So a mask can say "apply the global amount
+  here and nowhere else"; it cannot say "0.8 here while the rest of the frame
+  keeps 0.2". Every one of the six is that shape. "Most of the controls should
+  work INSIDE one" means per-mask VALUES, which is strictly more than aiming,
+  and reading the toggles as already-done is the way to build nothing.
+- **The mask's own five adjustments and where they fold in.** `brightness`,
+  `contrast`, `saturation`, `hue`, `warmth`, applied at one point in
+  `compileEdit` in linear space — before the global gamma and contrast, before
+  the tone curves, the 8-channel mixer and the grade — and mirrored numerically
+  in `src/gl.ts`. Any per-mask value this record adds has to pick its point in
+  that order deliberately; it does not automatically belong where these five are.
+- **The mask list, types and selection UI**: `#maskList`, `#addSky`,
+  `#mOutline`, and the Sky mask's own reach/feather/by-colour/hand corrections.
+- **Four gates already cover the mechanism**, so none of them needs writing
+  again. `tools/aim-walk.mjs` holds every aim to four statements, chief among
+  them that aiming nothing changes nothing at 0.000% of the frame moved.
+  `tools/agreement-walk.mjs` holds the processor and the shader to the same
+  photograph and passes its aimed arm at 9.2 degrees against a bar of 15.
+  `tools/scope-check.mjs` is the ledger of which knobs should be aimable and its
+  OWED list is empty. `tools/control-walk.mjs` is the control sweep — and 046
+  records that it reaches two thirds of the controls, so a new panel is NOT
+  automatically swept.
+- **What a new surface owes, mechanically**: its entry in `tools/surfaces.mjs`,
+  which holds the a11y walk's screen list to the BUILD in both directions, in
+  the same commit that creates it — a surface arriving with nothing having to
+  acknowledge it is how one shipped unmeasured before. Plus `docs/ARCHITECTURE.md`
+  for any new module, generated from its opening comment.
+- **And the six places an `EditParams` field needs**, if per-mask values land as
+  fields rather than inside `MaskLayer`: `cloneParams`, `applySnapshot`,
+  `syncFromUI`, `syncToUI`, the input-listener array in `src/main.ts`, and `stampOf`
+  if a look writes it.
+
 ## Weighed against
 
 **030, "A mask can only act in one place"**, is this record's other half and it
