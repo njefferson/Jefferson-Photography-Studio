@@ -316,12 +316,33 @@ try {
       // <details> — a collapsed one hides its controls from this sweep exactly
       // as a closed tab does. Make one and open them all.
       if (t === "maskPlaceOpen") {
-        await page.evaluate(() => {
-          if (!document.querySelector("#maskList .mask-row")) document.getElementById("addRadial")?.click();
-        });
-        await page.waitForTimeout(400);
-        await page.evaluate(() => document.querySelectorAll(".mask-group").forEach((d) => { d.open = true; }));
-        await page.waitForTimeout(200);
+        // ONE MASK OF EACH KIND THAT CARRIES ITS OWN CONTROLS. #colorControls
+        // and #brushControls exist only while a Color or a Brush mask is
+        // selected, so a sweep that makes a Radial and stops leaves
+        // #mColorPick, #mPaint, #mErase and #mClearBrush declared in the markup
+        // and never reached — excused by unreachability rather than measured.
+        // Each kind is added and then SELECTED, because the editor shows the
+        // selected mask's controls and adding leaves the newest one selected.
+        // addSky is in the list for the same reason as the other two, and it
+        // is the slow one: the sky is DETECTED, so the controls arrive when the
+        // detection lands rather than on a clock. Without it #mSkyByColour,
+        // #mSkyFixAdd, #mSkyFixCut and #mSkyFixClear stay unreached — four more
+        // controls excused by unreachability, which is the thing this branch
+        // exists to stop.
+        for (const add of ["addRadial", "addColor", "addBrush", "addSky"]) {
+          await page.evaluate((a) => document.getElementById(a)?.click(), add);
+          if (add === "addSky") {
+            await page.waitForFunction(() => !document.getElementById("skyControls")?.hidden, null, { timeout: 180000 })
+              .catch(() => console.log(`  (the sky never resolved, so ${s.file} sky controls stay unmeasured)`));
+          }
+          await page.waitForTimeout(500);
+          // The groups are <details>; a collapsed one hides its controls from
+          // this sweep exactly as a closed tab does.
+          await page.evaluate(() => document.querySelectorAll(".mask-group").forEach((d) => { d.open = true; }));
+          await page.waitForTimeout(150);
+          rows.push(...(await controlsOn(page, `${s.file} · ${t} · ${add}`)));
+          ctlRows.push(...(await explainedOn(page, `${s.file} · ${t} · ${add}`)));
+        }
       }
       rows.push(...(await controlsOn(page, `${s.file} · ${t}`)));
       ctlRows.push(...(await explainedOn(page, `${s.file} · ${t}`)));

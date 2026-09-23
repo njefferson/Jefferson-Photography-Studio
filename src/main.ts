@@ -6496,8 +6496,8 @@ function updateMaskUI() {
       ren.type = "button";
       ren.className = "mask-ren";
       ren.textContent = "✎";
-      ren.setAttribute("aria-label", `Rename ${shown}`);
-      ren.title = "Rename this mask";
+      ren.setAttribute("aria-label", `Rename the mask ${shown}`);
+      ren.title = `Rename the mask ${shown}`;
       ren.addEventListener("click", () => renameMask(i));
       // KEEP IT FOR ANOTHER PHOTOGRAPH (040). Shown on every row including a
       // brush mask's, which refuses IN WORDS when pressed rather than being
@@ -6507,8 +6507,8 @@ function updateMaskUI() {
       keep.type = "button";
       keep.className = "mask-keep";
       keep.textContent = "\u2b07";
-      keep.setAttribute("aria-label", `Save ${shown} for another photograph`);
-      keep.title = "Save this mask for another photograph";
+      keep.setAttribute("aria-label", `Save the mask ${shown} for another photograph`);
+      keep.title = `Save the mask ${shown} for another photograph`;
       keep.addEventListener("click", () => void saveMaskToStore(i));
       const del = document.createElement("button");
       del.type = "button";

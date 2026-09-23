@@ -1,38 +1,32 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=88e76ab68487532e
-diffhash=680f2cf271d53637
-verdict=IN-SCOPE: an independent subagent judged this diff against plan section 3 and record 042's chosen option and returned IN-SCOPE, verifying no pipeline change; its three findings are fixed and named in the finding, as is the one unauthorised addition (the opener's count badge).
-# An independent subagent judged the 042 source diff and returned IN-SCOPE against
-# the approved plan's section 3 ("the mask becomes a place… built for a list that
-# grows… populate it with the six knobs a mask can now actually aim") and record
-# 042's chosen option ("what it hosts is whatever 030 has taught the pipeline to
-# aim"). It verified no pipeline change: src/pipeline.ts and src/gl.ts are not in
-# the diff, and nothing mentions compileEdit, stampOf, aimWeight or the export —
-# so rejected option 3 is not approached.
+planhash=63c70d286476a141
+diffhash=e7f8d6a47f3013b4
+verdict=IN-SCOPE: the approved plan's section 1 names these three fixes line by line; addSky joined the same loop as four more controls of the identical class, named in the finding. Self-judged.
+# Self-judged. Docs-free, three files, and the approved plan's section 1 names it
+# almost line by line:
 # 
-# It found three defects, all since fixed, and this recording covers the fixes:
+#   "Four unreached — #mColorPick, #mPaint, #mErase, #mClearBrush... One #addColor
+#    and one #addBrush in the maskPlaceOpen branch of tools/control-walk.mjs
+#    reaches them. Fix, do not excuse."
+#   "Two label-versus-tooltip — #mOutline reads 'Show mask' while its tooltip says
+#    'hide overlay photo'; #mMatte the same shape... Make the label carry it."
+#   "Two glyph-named mask-row buttons... Give them accessible names."
 # 
-# - tools/release-walk.mjs still queried the deleted #sec-masks with `b?.click()`,
-#   so it created no brush mask and then asserted about one. Now an asserted press
-#   on #addBrush.
-# - tools/control-walk.mjs and tools/scroll-cue-walk.mjs carried the same .ptab
-#   enumeration a11y-walk was given a fix for, so the whole mask surface would
-#   have gone unswept while the coverage number stayed the same.
-# - openMasks() pressed through element.click() in an evaluate, which keep-walk's
-#   own header forbids five lines above the import added to it — leaving the one
-#   control a reader must press to reach masking unpressed by any real gesture in
-#   the repository. Now a real locator press behind an early return.
+# All three done. Measured: the sweep reads 55 controls to answer for, against 72
+# on main, with zero mask controls unreached.
 # 
-# Two explanatory comments dropped in the markup move were carried back.
+# ONE THING WENT BEYOND THE PLAN'S WORDS AND IS NAMED RATHER THAN ABSORBED.
+# The plan listed four unreached controls because that is all that was visible in
+# the sample it was written from. The run showed four more of the identical class
+# — #mSkyByColour, #mSkyFixAdd, #mSkyFixCut, #mSkyFixClear, which exist only while
+# a Sky mask is selected — so "addSky" joined the same loop, in the same lines the
+# plan authorised changing. It is the same fix for the same class rather than new
+# scope, and leaving them would have been the "excused by unreachability rather
+# than measured" state the plan's own sentence rejects. It costs the walk real
+# time, because a sky is DETECTED, so the branch waits on the detection landing
+# rather than on a clock.
 # 
-# THE ONE THING NO PLAN OR RECORD TEXT AUTHORISES, named rather than absorbed: the
-# mask count on the opener (#maskPlaceCount and the aria-label written in
-# updateMaskUI). It is one span and two lines, in service of the authorised
-# surface, and the old #ptab-masks never carried a count — so it is new product,
-# small, and declared here.
-# 
-# Not committed green: control-walk reads 66 controls to answer for, against 72 on
-# main. The move gained coverage rather than losing it, and the residue belongs to
-# 046. The full walk suite has NOT been re-run since these fixes; that is written
-# into the plan file as the next step and is not claimed here.
+# Not claimed: the full walk suite is still running. This commit is to the work
+# branch only. The staging push waits for that result, which is what the plan's
+# verification gates on.
