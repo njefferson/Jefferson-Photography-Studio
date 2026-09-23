@@ -64,6 +64,30 @@ export function spotRect(s: HealSpot, W: number, H: number): Rect {
   return { x0, y0, w: Math.max(0, x1 - x0 + 1), h: Math.max(0, y1 - y0 + 1) };
 }
 
+/** WHAT THE HEALED PATCHES WEIGH, in bytes, at a given resolution.
+ *
+ *  Takes `spots`, the edit's heal list, and `W`/`H`, the SOURCE dimensions the
+ *  patches are baked at. Returns the total bytes those patches occupy —
+ *  `spotRect`'s area for each, at the 12 bytes a pixel `HealPatch.data` costs
+ *  as three floats of linear RGB.
+ *
+ *  What the caller relies on, and the whole reason it exists: the export's
+ *  memory model bills this PER WORKER, because every worker bakes every patch
+ *  independently from its own copy of the source. Three default spots on a
+ *  5600-wide frame is about 0.3 MB and invisible; forty at the largest radius
+ *  the app allows is about 75 MB each, which is 300 MB across four workers and
+ *  over the whole budget on its own. It lives here rather than in the export so
+ *  that it reads `spotRect` — the same geometry the bake uses — instead of a
+ *  second copy of that arithmetic that could drift from it. */
+export function healPatchBytes(spots: readonly HealSpot[] | undefined, W: number, H: number): number {
+  let bytes = 0;
+  for (const s of spots ?? []) {
+    const r = spotRect(s, W, H);
+    bytes += r.w * r.h * 12;
+  }
+  return bytes;
+}
+
 /** Per-spot constants at a resolution, precomputed once per bake/scan. */
 interface SpotPx {
   cx: number;

@@ -1,28 +1,25 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=0ca28ae701655148
-diffhash=a071bbaa258fe1ae
-verdict=IN-SCOPE: record 055 and its roadmap bullet only, with no threading implementation, every citation declared, and the rank argued by dependency.
-# Independent scope judge, reading the plan by path and the staged diff.
+planhash=4cdc28ce96717e38
+diffhash=b64a5600d10a3abb
+verdict=IN-SCOPE: the same approved item D work, with an explanatory comment moved out of the window a gate reads, the gate itself untouched.
+# Independent scope judge, re-reading the plan and the staged diff after one
+# change to an already-approved diff.
 # 
-# Two paths only: NOTES.md and the new record. No parallel-export module, no
-# budget change, no walk, no ratchet. The increment release's items are not here.
-# Record only, which is what the plan's next step is.
+# The change is comment-only inside canRunParallel. Reading the function body top
+# to bottom, every guard is present, in the same order, ending in the same return
+# of approvedWorkers. An inline explanation became a one-line pointer and the same
+# two paragraphs moved above the signature verbatim, plus one new paragraph saying
+# why they sit there.
 # 
-# Every decision number the record cites is declared: 036, 008 and 011 appear in
-# Weighed against and again in the options prose, 054 appears in Rank, and Depends
-# carries touches 036, touches 008, touches 011 and distinct-from 054.
+# tools/one-pool-check.mjs is named only as prose in that explanation and appears
+# in no diff entry. The gate was not widened to accommodate the comment; the
+# comment was moved to accommodate the gate, which is the right direction.
 # 
-# The Rank section now argues the dependency test — nothing above needs it first,
-# nothing above would be redone — and names and rejects its own first draft's
-# severity framing. No wording-against-speed comparison survives.
+# The ninth file is the generated module map, carrying four regenerated line
+# counts and no prose, for four files the plan already puts in scope. The
+# exportparallel count moves as the direct mechanical consequence of the comment
+# move being judged.
 # 
-# The chosen and rejected options trace to the plan rather than to anything
-# invented here: remove the exclusion, bill heal into the per-helper budget, add
-# the byte-identical arm, replace the vacuous plant, then bill the whole page,
-# degrade on what is catchable and ratchet on what is not; with slicing the
-# source, the scratch disk and raising the thread cap rejected.
-# 
-# The previous judge's prediction that the decisions gate would refuse this was
-# tested by running it and did not hold: exit 0, and the undeclared-pairs backlog
-# unchanged at 32.
+# Nothing else differs from the five steps, and there is no VERSION bump, no
+# notes or record edit, and no unrelated file.

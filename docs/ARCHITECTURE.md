@@ -608,15 +608,15 @@ cannot describe something the code does not say about itself.
 - **`src/color.ts`** (88 lines) — Camera color science.
 - **`src/cubeimport.ts`** (136 lines) — .cube (Adobe/Resolve 3D LUT) IMPORT parser.
 - **`src/dcp.ts`** (247 lines) — DNG Camera Profile (.dcp) export for Lightroom / Camera Raw.
-- **`src/debug.ts`** (1441 lines) — The test page behind the version number.
+- **`src/debug.ts`** (1445 lines) — The test page behind the version number.
 - **`src/decode.ts`** (394 lines) — Image decoding. Three real paths, no big WASM dependency: - JPEG/PNG: native bitmap decode.
 - **`src/decode.worker.ts`** (57 lines) — Decoding, off the main thread.
 - **`src/decodeClient.ts`** (260 lines) — Main-thread side of the decode workers.
 - **`src/diagnostic.ts`** (262 lines) — The text report (Doctrine §7f).
 - **`src/exif.ts`** (258 lines) — Keep the honest EXIF subset in exports: capture date/time, camera and lens, and the exposure triangle — read from the ORIGINAL file and written into exported JPEG/TIFF as a freshly BUILT block.
-- **`src/export.ts`** (1124 lines) — Full-resolution export.
+- **`src/export.ts`** (1127 lines) — Full-resolution export.
 - **`src/export.worker.ts`** (70 lines) — ONE BAND OF AN EXPORT, ON ANOTHER CORE.
-- **`src/exportparallel.ts`** (309 lines) — AN EXPORT, SPLIT ACROSS CORES.
+- **`src/exportparallel.ts`** (343 lines) — AN EXPORT, SPLIT ACROSS CORES.
 - **`src/framecache.ts`** (139 lines) — What the lens rig has already measured, so an interrupted run is not thrown away.
 - **`src/gl.ts`** (2257 lines) — WebGL2 edit pipeline.
 - **`src/glow.ts`** (110 lines) — HIE-style halation glow.
@@ -624,7 +624,7 @@ cannot describe something the code does not say about itself.
 - **`src/gps.ts`** (245 lines) — Location-data guard: find and remove GPS location from a photo FILE's own bytes — the original the user loaded, not the app's exports (exports are re-encoded and carry no EXIF at all today).
 - **`src/gpuexport.ts`** (272 lines) — AN EXPORT DRAWN RATHER THAN COMPUTED — the measurement, not yet the product.
 - **`src/half.ts`** (69 lines) — IEEE half-precision, both directions, in one place.
-- **`src/heal.ts`** (787 lines) — Dust & spot healing: a per-photo list of feathered clone spots that REWRITES
+- **`src/heal.ts`** (811 lines) — Dust & spot healing: a per-photo list of feathered clone spots that REWRITES
 - **`src/histogram.ts`** (114 lines) — Lightroom-style floating histogram.
 - **`src/hotspot.ts`** (197 lines) — The per-lens IR hot-spot correction that comes WITH the app, as opposed to one the reader measured for themselves (lensstore.ts).
 - **`src/hotspotProfiles.ts`** (32 lines) — GENERATED — do not hand-edit.
