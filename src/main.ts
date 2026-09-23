@@ -16,7 +16,7 @@ import "./style.css";
 // The shared chrome stylesheet. The editor does not use verdlg.ts yet — see the
 // note there — but it uses .more-row, which now lives beside it.
 import "./verdlg.css";
-import { importFile, sniff, refineKind, type ImportedFile, type ImageKind } from "./import";
+import { importFile, sniff, refineKind, isZip, type ImportedFile, type ImageKind } from "./import";
 import { wireForceUpdate, wireUpdateStrip, setUpdateCost } from "./swupdate";
 import { type DecodedImage, pickLargestPreview, linearAt, grayWorldWB, lumNormalize } from "./decode";
 import { decodeOffThread, decodeLanes, decodeLaneTarget, type DecodeTiming } from "./decodeClient";
@@ -74,6 +74,7 @@ import {
   lookFileName,
 } from "./look";
 import { parseCube, CUBE_FILE_MAX } from "./cubeimport";
+import { listPackedCubes, readPackedCube, PackedCubeTooLarge } from "./lutpack";
 import { putLut, getLut, listLuts, deleteLut, LUT_COUNT_CAP } from "./luts";
 import { extractLookFromJpeg } from "./lookmark";
 import { encodeQr, drawQr } from "./qr";
@@ -16126,12 +16127,125 @@ function applyLutToEdit(lut: NonNullable<EditParams["lut"]>) {
   flushRecord();
 }
 
+/** IMPORT EVERY .cube OUT OF A ZIP, AS FAR AS THERE IS ROOM FOR THEM.
+ *
+ *  Takes `f`, an archive the reader picked. Stores each LUT it finds, in the
+ *  order the pack lists them, and tells the reader what happened in one
+ *  sentence. Returns nothing; it owns its own reporting because a pack of
+ *  eighteen cannot speak eighteen times.
+ *
+ *  What the caller relies on: it NEVER applies a LUT to the open photograph.
+ *  The single-file path does, because there is one and the reader just chose
+ *  it; choosing one of eighteen on their behalf would be inventing an answer.
+ *  It also always says what it did NOT do — the count cap is real and a pack
+ *  can exceed it, and a silent truncation would leave the reader believing they
+ *  have LUTs they do not have. */
+async function importLutPack(f: File): Promise<void> {
+  let packed;
+  try {
+    packed = await listPackedCubes(f);
+  } catch {
+    alert("That .zip could not be read — it may be damaged, or not a zip at all.");
+    return;
+  }
+  if (!packed.length) {
+    alert("That .zip has no .cube files in it. A LUT pack holds files ending in .cube, in folders or loose.");
+    return;
+  }
+  const existing = await listLuts().catch(() => []);
+  const room = LUT_COUNT_CAP - existing.length;
+  if (room <= 0) {
+    const mb = (existing.reduce((s, m) => s + m.bytes, 0) / (1024 * 1024)).toFixed(1);
+    alert(`${LUT_COUNT_CAP} LUTs are already stored on this device (${mb} MB) — delete some in Profiles & LUTs, then import this pack.`);
+    return;
+  }
+  // THE CEILING IS CHECKED BEFORE ANYTHING IS INFLATED. `size` is the central
+  // directory's claim, so an entry that says it is enormous costs nothing to
+  // refuse; one that LIES is bounded by readPackedCube, which is handed the same
+  // ceiling and inflates no further than it, so a small declared size cannot buy
+  // an unbounded inflate.
+  const tooBigClaimed = packed.filter((p) => p.entry.size > CUBE_FILE_MAX).length;
+  const usable = packed.filter((p) => p.entry.size <= CUBE_FILE_MAX);
+  // A FAILURE MUST NOT EAT A SLOT. The loop stops when the shelf is FULL, not
+  // when it has made `room` attempts — otherwise two LUTs that fail to parse
+  // consume two places that are still empty, and the reader is told the rest
+  // "did not fit" while the shelf has room for them. Counting attempts instead
+  // of arrivals is the shape that gives honest totals and dishonest advice.
+  let stored = 0, tooBigLied = 0, unreadable = 0, unstorable = 0, i = 0;
+  for (; i < usable.length && stored < room; i++) {
+    const p = usable[i];
+    let parsed, bytes;
+    try {
+      // THE BYTES ARE WHAT GETS STORED, and the text is a copy made to parse.
+      // `LutRecord.cube` promises the ORIGINAL file, so re-encoding the decoded
+      // string would quietly break sharing: a byte-order mark would vanish and
+      // any invalid byte would come back as U+FFFD.
+      bytes = await readPackedCube(f, p.entry, CUBE_FILE_MAX);
+      parsed = parseCube(new TextDecoder().decode(bytes));
+    } catch (err) {
+      // A LIAR IS "TOO LARGE", NOT "COULD NOT BE READ". Its declared size
+      // passed the check above; only the real bytes gave it away. Reporting it
+      // with the honestly oversized entries rather than folding it into
+      // "could not be read" tells the reader the true reason rather than a
+      // generic one — the file itself is fine, it just did not fit the limit.
+      if (err instanceof PackedCubeTooLarge) tooBigLied++;
+      else unreadable++; // one bad LUT does not stop the pack
+      continue;
+    }
+    const name = cleanName(parsed.name) ?? p.name;
+    const id = typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `lut-${Date.now()}-${stored}-${Math.floor(Math.random() * 1e6)}`;
+    try {
+      await putLut({ id, name, size: parsed.size, data: parsed.data, cube: bytes, addedAt: Date.now() });
+      stored++;
+    } catch {
+      // NOT THE SAME THING AS UNREADABLE, and the single-file path beside this
+      // has always said so. A device that refuses the write is a storage
+      // problem; telling the reader their files could not be read sends them to
+      // check the wrong thing.
+      unstorable++;
+    }
+  }
+  const left = usable.length - i;
+  const tooBig = tooBigClaimed + tooBigLied;
+  const parts = [`${stored} LUT${stored === 1 ? "" : "s"} imported from that pack`];
+  if (left) parts.push(`${left} did not fit — ${LUT_COUNT_CAP} is the limit, delete some in Profiles & LUTs`);
+  if (tooBig) parts.push(`${tooBig} ${tooBig === 1 ? "was" : "were"} too large for a 3D LUT`);
+  if (unreadable) parts.push(`${unreadable} could not be read`);
+  if (unstorable) parts.push(`${unstorable} couldn't be stored on this device`);
+  const summary = parts.join(". ") + ".";
+  // LONGER WHEN THERE IS MORE TO READ. This is the app's only account of what
+  // happened to a pack and it is transient. `toast`'s own default is 2200 ms
+  // (src/share.ts:25); the longest duration used ANYWHERE in the app — not
+  // just this file — is 6000, for a link a reader may need to read and type
+  // (src/share.ts:92, :139). Neither is long enough here: this summary can run
+  // to five clauses, and five clauses is over 200 characters. This is the
+  // third wording of this comment; the first two named a duration this file
+  // did not actually contain.
+  const dwell = 3600 + parts.length * 2600;
+  if (stored) toast(current ? `${summary} Pick one below to apply it.` : `${summary} Open a photo, then pick one below.`, dwell);
+  else alert(summary);
+  void renderLutList();
+}
+
 $("lutImportBtn").addEventListener("click", () => openPicker("lutFile"));
 registerPicker("lutFile", (files) => { void (async () => {
   const f = files[0];
   if (!f) return;
+  // A ZIP IS A PACK, AND IT IS DECIDED BY THE FIRST BYTES rather than the name,
+  // which is the rule this app already follows for looks and keep files. A
+  // reader told to zip their LUTs may hand over anything the system called it.
+  if (isZip(await f.slice(0, 4).arrayBuffer())) { await importLutPack(f); return; }
+  // IT CANNOT CALL THE FILE A .cube ANY MORE. This fires on the SIZE, before a
+  // byte is read, so it never knew what it had — it only sounded right while
+  // the picker's accept list kept everything else out. That list is gone (see
+  // the input in ir.html: on an iPad it greyed out every file it claimed to
+  // want), so this is now the first thing a reader meets after picking a
+  // photograph by mistake, and telling somebody their 12 MB JPEG is an
+  // oversized .cube is a worse answer than the one below it. The sentence in
+  // cubeimport.ts that says the same thing keeps its wording: that one runs
+  // after the text has been read and is genuinely about a .cube.
   if (f.size > CUBE_FILE_MAX) {
-    alert("That .cube file is too large — files up to 8 MB (grid size 65) are supported.");
+    alert("That file is too large to be a 3D LUT — files up to 8 MB (grid size 65) are supported.");
     return;
   }
   let parsed;
