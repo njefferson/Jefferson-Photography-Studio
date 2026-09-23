@@ -901,6 +901,35 @@ user-scalable=no.
   tidying. **The sweep is red until this is done, on purpose** — it was red
   before today and the only change is that it is now visible. See
   `docs/decisions/046-the-control-sweep-reaches-two-thirds-of-the-controls.md`.
+- [ ] **Healed spots force an export onto one core** <!-- decision: 055 -->
+  **Shown as:** Photographs with dust spots healed export on every core, like everything else.
+  Reported from the device 2026-09-23. `canRunParallel` refuses any export whose
+  spot list is non-empty (`src/exportparallel.ts:133`), so three healed dust
+  spots take a 21-megapixel export from four threads to one. The frame was shot
+  at f/9, past this body's infrared diffraction limit — and stopping down is
+  what makes sensor dust visible, so the exclusion targets exactly the
+  photographs most likely to need it.
+  The stated reason does not survive reading: the header excludes stickers, heal
+  spots and warp together as "bitmaps the worker cannot be handed cheaply",
+  which is true of the other two and false of a spot — five numbers that already
+  travel inside the edit.
+  **The route that looks obvious is a trap and the record says so.** Heal is a
+  CLONE: every spot reads a second rectangle elsewhere in the frame, up to 4.6
+  radii away or wherever it was dragged. Bands work only because each helper
+  decodes the whole source, so slicing the source per helper — the obvious way
+  to cut the memory that gates the pool — bakes the slice edge into the spot.
+  Three things land in the same commit as the removal: heal billed into
+  `perWorkerMb` (forty spots is ~75 MB a helper, 300 MB across four, over the
+  600 MB ceiling on its own), a healed-spot arm on `tools/tiff-threads-walk.mjs`
+  held to 036's byte-identical standard, and a new way for
+  `tools/export-bytes-walk.mjs` to force one thread — it currently uses heal to
+  do it, so removing the gate would leave that plant passing while testing
+  nothing.
+  Then the budget, which cannot be measured: Safari exposes no memory reading of
+  any kind and gives a page no exception when it is killed, so the only honest
+  shapes left are billing the whole page, halving the pool on a catchable
+  failure, and a one-way marker that learns a tab died. See
+  `docs/decisions/055-healed-spots-force-an-export-onto-one-core.md`.
 - [ ] **The export panel says "save" twice and means two different things** <!-- decision: 054 -->
   **Shown as:** The export panel says plainly which button makes a picture to send and which one saves work you can come back to.
   Reported from the device 2026-09-23. Four controls sit on that panel and the

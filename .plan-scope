@@ -1,36 +1,28 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
 planhash=0ca28ae701655148
-diffhash=3adb6f6217c032d9
-verdict=IN-SCOPE: items C and D of the approved increment release, with the parallel module, the spots exclusion and the ratchet all absent, and both buffer-adoption correctness risks checked.
+diffhash=a071bbaa258fe1ae
+verdict=IN-SCOPE: record 055 and its roadmap bullet only, with no threading implementation, every citation declared, and the rank argued by dependency.
 # Independent scope judge, reading the plan by path and the staged diff.
 # 
-# Two files only: src/export.ts and the module map's regenerated line count.
+# Two paths only: NOTES.md and the new record. No parallel-export module, no
+# budget change, no walk, no ratchet. The increment release's items are not here.
+# Record only, which is what the plan's next step is.
 # 
-# C is implemented on both sides. The 16-bit path adopts the stitched result
-# instead of setting it into a buffer made in advance, and both paths now allocate
-# only on the fallback, which is the hoist the plan names.
+# Every decision number the record cites is declared: 036, 008 and 011 appear in
+# Weighed against and again in the options prose, 054 appears in Rank, and Depends
+# carries touches 036, touches 008, touches 011 and distinct-from 054.
 # 
-# D is implemented as the plan states it: the drawing context is no longer
-# asserted non-null, a refusal throws a named error carrying the size, and the
-# surface is released on every exit path including a failed encode. The
-# area clamp against a probe-measured ceiling is correctly deferred, because that
-# number does not exist until the probe has run on a device.
+# The Rank section now argues the dependency test — nothing above needs it first,
+# nothing above would be redone — and names and rejects its own first draft's
+# severity framing. No wording-against-speed comparison survives.
 # 
-# The watermark layer's surface is released at both sites. Judged in scope: same
-# defect class, same helper, same path, no new capability.
+# The chosen and rejected options trace to the plan rather than to anything
+# invented here: remove the exclusion, bill heal into the per-helper budget, add
+# the byte-identical arm, replace the vacuous plant, then bill the whole page,
+# degrade on what is catchable and ratchet on what is not; with slicing the
+# source, the scratch disk and raising the thread cap rejected.
 # 
-# The band result types are tightened to real buffers. Judged a consequence of C
-# rather than unrelated: the parallel module already declared that return type and
-# already carried a cast to reach it, and the direct assignment now type-checks as
-# what the wire actually guarantees.
-# 
-# Absent: the parallel module, the spots exclusion, any ratchet, main.ts and every
-# walk.
-# 
-# Correctness, checked by reading the whole surrounding branch rather than the
-# diff alone. No path reaches a use of either buffer while it is null: every read
-# sits after the line that allocates on fallback, with no branch or early return
-# between. No wrong-length adoption: this is the top-level call, so the band is
-# the whole frame and the stitched result is sized identically to what the eager
-# allocation would have produced.
+# The previous judge's prediction that the decisions gate would refuse this was
+# tested by running it and did not hold: exit 0, and the undeclared-pairs backlog
+# unchanged at 32.
