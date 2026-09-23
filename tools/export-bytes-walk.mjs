@@ -35,7 +35,6 @@
 // before the export stopped owning the screen.
 //   node export-bytes.mjs --record      (quiet run; prints a hash)
 //   node export-bytes.mjs --interfere   (switch photos and edit while it runs)
-import { openMasks } from "./walk-input.mjs";
 import { chromium } from "/home/user/Jefferson-Photography-Studio/node_modules/playwright-core/index.mjs";
 import { requireFreshDist } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
@@ -54,13 +53,25 @@ const INTERFERE = process.argv.includes("--interfere");
 const GLOW = process.argv.includes("--glow");
 // ONE THREAD ON PURPOSE. A parallel export hands each worker a structured COPY
 // of the edit, so a mid-run mutation cannot reach it and a plant that relies on
-// one proves nothing there. Healing a spot is what makes the parallel path
-// refuse the job, and it is also a real thing a keeper has done to it.
+// one proves nothing there.
 //
-// SO THIS RUN'S HASH IS NOT COMPARABLE WITH THE PLAIN RUN'S. The heal that
-// forces one thread also changes the pixels, so the two are different edits of
-// the same photograph and are MEANT to differ — read one against an earlier run
-// of the same flag, never against the other.
+// IT USED TO FORCE THAT BY HEALING A SPOT, because a healed frame was refused
+// by the parallel path outright. 055 removed that refusal — healed frames run
+// across cores now and are priced instead — so the old mechanism would have
+// gone VACUOUSLY GREEN: still passing, no longer producing a single-threaded
+// export, and therefore no longer testing the thing this flag exists for. That
+// is the worst shape a test can take, and it would have been invisible.
+//
+// So it refuses the export Worker instead, which is what
+// tools/tiff-threads-walk.mjs already does and is the only mechanism that
+// cannot be undone by a change to what the pool accepts.
+//
+// AND THE HASH IS COMPARABLE NOW, which it was not before: the old mechanism
+// changed the PIXELS as a side effect of forcing one thread, so a run under
+// this flag could only be read against an earlier run of the same flag. The
+// edit is identical either way now, so a single-threaded export must produce
+// the SAME bytes as a parallel one — which is a stronger check than the one
+// this replaces.
 const ONE = process.argv.includes("--onethread");
 let failed=0; const check=(n,g,w)=>{const ok=JSON.stringify(g)===JSON.stringify(w);if(!ok)failed++;console.log(`${ok?"ok  ":"FAIL"}  ${n}\n        got ${JSON.stringify(g)} want ${JSON.stringify(w)}`);};
 
@@ -70,6 +81,20 @@ try {
   const p = await ctx.newPage();
   p.on("pageerror", e => { console.log("FAIL  page error: " + e.message); failed++; });
   p.on("dialog", d => d.accept());
+  if (ONE) {
+    // REFUSED BEFORE ANY OF THE APP'S SCRIPT RUNS, and ONLY the export worker —
+    // the decode pool keeps going, so the run differs from a plain one in
+    // exactly one thing. Same trick as tools/tiff-threads-walk.mjs.
+    await p.addInitScript(() => {
+      const Real = window.Worker;
+      window.Worker = class extends Real {
+        constructor(url, opts) {
+          if (String(url).includes("export")) throw new Error("export workers disabled by the walk");
+          super(url, opts);
+        }
+      };
+    });
+  }
   await p.goto("http://127.0.0.1:8131/ir.html");
   await p.setInputFiles("#file", TWO);
   await p.waitForFunction((n)=>document.querySelectorAll("#sessionThumbs .session-thumb").length===n, TWO.length, {timeout:300000});
@@ -79,15 +104,6 @@ try {
   const modal = await p.evaluate(() => !document.getElementById("exportStrip"));
   console.log(`        flow: ${modal ? "the old modal dialog" : "the strip beside the button"}`);
 
-  if (ONE) {
-    await p.click("#ptab-corrections").catch(async()=>{ await openMasks(p); });
-    await p.click("#healBtn");
-    const box = await p.evaluate(() => { const c = document.querySelector("#stage canvas"); const r = c.getBoundingClientRect(); return { x: r.x + r.width/2, y: r.y + r.height/2 }; });
-    await p.mouse.click(box.x, box.y);
-    await p.waitForTimeout(600);
-    await p.click("#healBtn"); // out of heal mode
-    await p.waitForTimeout(300);
-  }
   if (GLOW) {
     await p.click("#ptab-bw").catch(async () => { await p.click("#ptab-ir"); });
     const set = await p.evaluate(() => {

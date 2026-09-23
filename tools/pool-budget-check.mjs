@@ -62,12 +62,19 @@ export function measuredBytesPerPixel(root = ".") {
 // dependencies and can be called directly.
 const dir = mkdtempSync(join(tmpdir(), "poolbudget-"));
 const out = join(dir, "ep.mjs");
+// AND heal.ts, because the heal term is part of the budget now. It is bundled
+// rather than re-derived here for the same reason the byte weight is read out
+// of the allocation: a check that recomputed `spotRect`'s area would agree with
+// a defect in `spotRect` on the day it shipped.
+const healOut = join(dir, "heal.mjs");
+const bundle = (src, dest) => execFileSync(join(repo, "node_modules", ".bin", "esbuild"),
+  [join(repo, "src", src), "--bundle", "--format=esm", "--platform=neutral", `--outfile=${dest}`],
+  { stdio: ["ignore", "ignore", "pipe"] });
 try {
-  execFileSync(join(repo, "node_modules", ".bin", "esbuild"),
-    [join(repo, "src", "exportparallel.ts"), "--bundle", "--format=esm", "--platform=neutral", `--outfile=${out}`],
-    { stdio: ["ignore", "ignore", "pipe"] });
+  bundle("exportparallel.ts", out);
+  bundle("heal.ts", healOut);
 } catch (e) {
-  console.error(`  could not bundle src/exportparallel.ts: ${String(e.stderr ?? e).slice(0, 400)}`);
+  console.error(`  could not bundle the export modules: ${String(e.stderr ?? e).slice(0, 400)}`);
   rmSync(dir, { recursive: true, force: true });
   process.exit(2);
 }
@@ -86,6 +93,7 @@ if (typeof globalThis.Worker === "undefined") {
 
 const mod = await import(`file://${out}`);
 const { approvedWorkers, workerCount, canRunParallel } = mod;
+const { healPatchBytes } = await import(`file://${healOut}`);
 
 // The three device classes the budget itself distinguishes, plus the case that
 // matters most: no `deviceMemory` at all, which is every Safari and therefore
@@ -98,7 +106,25 @@ const DEVICES = [
 ];
 const MP = [2, 5.2, 12, 20.9, 31, 45, 61];
 const FORMATS = ["jpeg", "tiff"];
-const params = { spots: [], stickers: [] };
+// HEALED SPOTS ARE A MEMORY TERM NOW, NOT A BLANKET REFUSAL (055). Until that
+// change `canRunParallel` refused any frame with a spot on it, so this file
+// tested with an empty list and said in a comment that heal's refusal "is not
+// about memory". It is entirely about memory now, and a frame with forty large
+// spots must come back with a SMALLER pool rather than none at all.
+//
+// The two populated cases are the ends of the real range: a few dust marks off
+// a stopped-down infrared frame, which is what the report that started this was
+// about, and the most the app will let a reader place at the largest radius it
+// allows. One is a rounding error and the other is 75 MB a worker.
+const SPOTS = [
+  { name: "none", spots: [] },
+  { name: "three dust marks", spots: Array(3).fill({ x: 0.5, y: 0.5, r: 0.01, dx: 0.05, dy: 0.05 }) },
+  { name: "forty, largest radius", spots: Array(40).fill({ x: 0.5, y: 0.5, r: 0.035, dx: 0.1, dy: 0.1 }) },
+];
+// Did billing heal ever actually change an answer? If not, the term is inert
+// and this whole check would pass with `healBytes` ignored.
+let healBit = null;
+const baseline = new Map();
 
 for (const d of DEVICES) {
   // `globalThis.navigator` is a getter-only property on Node 22, so it is
@@ -110,30 +136,60 @@ for (const d of DEVICES) {
   });
   for (const mp of MP) {
     const px = Math.round(mp * 1e6);
-    const job = { fileBytes: 26e6, srcPixels: px, outPixels: px };
-    for (const format of FORMATS) {
-      const opts = { format };
-      const approved = approvedWorkers(job, opts);
-      // THE WHOLE CHECK: the pool the app starts must be the pool the band's
-      // real weight buys. These are two different routes to one number.
-      const byMeasured = workerCount(job, real[format]);
-      if (approved !== byMeasured) {
-        fail(`${d.name}, ${mp} MP ${format}: the app would start ${approved} worker(s), but ${real[format]} bytes a pixel only pays for ${byMeasured}`);
+    // A 3:2 FRAME, because `spotRect` works in pixels and a spot's radius is a
+    // fraction of the WIDTH — so the heal term needs dimensions, not an area.
+    const srcW = Math.round(Math.sqrt(px * 1.5));
+    const srcH = Math.round(px / srcW);
+    for (const sc of SPOTS) {
+      const healBytes = healPatchBytes(sc.spots, srcW, srcH);
+      const job = { fileBytes: 26e6, srcPixels: px, outPixels: px, healBytes };
+      const params = { spots: sc.spots, stickers: [] };
+      for (const format of FORMATS) {
+        const opts = { format };
+        const approved = approvedWorkers(job, opts);
+        // THE WHOLE CHECK: the pool the app starts must be the pool the band's
+        // real weight buys. These are two different routes to one number.
+        const byMeasured = workerCount(job, real[format]);
+        if (approved !== byMeasured) {
+          fail(`${d.name}, ${mp} MP ${format}, ${sc.name}: the app would start ${approved} worker(s), but ${real[format]} bytes a pixel only pays for ${byMeasured}`);
+        }
+        // ...and the gate must not disagree with the spawn about whether to run
+        // at all. What it still refuses outright — stickers, a warp, a band, an
+        // output under MIN_PIXELS — is not about memory. Healed spots WERE on
+        // that list until 055 and are not any more: they are priced instead.
+        const gate = canRunParallel(params, opts, job);
+        const wantGate = approved >= 2 && px >= 2e6;
+        if (gate !== wantGate) {
+          fail(`${d.name}, ${mp} MP ${format}, ${sc.name}: canRunParallel says ${gate} while the pool is ${approved}`);
+        }
+        const key = `${d.name}|${mp}|${format}`;
+        if (sc.spots.length === 0) baseline.set(key, approved);
+        else {
+          const none = baseline.get(key);
+          if (none !== undefined && approved < none && !healBit) {
+            healBit = `${d.name}, ${mp} MP ${format}: ${none} worker(s) clean, ${approved} with ${sc.name} (${(healBytes / 1e6).toFixed(1)} MB a worker)`;
+          }
+          if (none !== undefined && approved > none) {
+            fail(`${d.name}, ${mp} MP ${format}, ${sc.name}: healing made the pool BIGGER (${none} to ${approved}) — the heal term is signed wrong`);
+          }
+        }
+        if (VERBOSE) console.log(`  ${d.name.padEnd(24)} ${String(mp).padStart(5)} MP ${format.padEnd(5)} ${sc.name.padEnd(22)} -> ${approved} worker(s), gate ${gate ? "yes" : "no "}`);
       }
-      // ...and the gate must not disagree with the spawn about whether to run
-      // at all. Everything else it refuses (healed spots, stickers, a warp, a
-      // band, an output under MIN_PIXELS) is not about memory.
-      const gate = canRunParallel(params, opts, job);
-      const wantGate = approved >= 2 && px >= 2e6;
-      if (gate !== wantGate) {
-        fail(`${d.name}, ${mp} MP ${format}: canRunParallel says ${gate} while the pool is ${approved}`);
-      }
-      if (VERBOSE) console.log(`  ${d.name.padEnd(24)} ${String(mp).padStart(5)} MP ${format.padEnd(5)} → ${approved} worker(s), gate ${gate ? "yes" : "no "}`);
     }
   }
 }
+// THE TERM MUST BE ABLE TO BITE. Everything above would pass unchanged if
+// `healBytes` were dropped on the floor — every spot case would simply agree
+// with the clean one. This is the line that says the billing is load-bearing,
+// and the line that fails if a later change stops threading it through.
+if (!healBit) {
+  fail("billing healed patches never changed the pool anywhere in this matrix — the heal term is inert, so nothing above is testing it");
+} else {
+  console.log(`  ok    healed patches are priced, and the price bites\n        ${healBit}`);
+}
+
 rmSync(dir, { recursive: true, force: true });
 
-if (!failed) console.log(`  ok    ${DEVICES.length * MP.length * FORMATS.length} combinations: the pool never outruns what a band actually weighs\n`);
+if (!failed) console.log(`  ok    ${DEVICES.length * MP.length * FORMATS.length * SPOTS.length} combinations: the pool never outruns what a band actually weighs\n`);
 else console.error(`\n${failed} combination(s) size the pool for a band weight that is not the band's.\n`);
 process.exit(failed ? 1 : 0);

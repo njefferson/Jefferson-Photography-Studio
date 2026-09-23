@@ -23,8 +23,8 @@
 //
 // WHAT FALLS BACK, and why each one:
 //   - TIFF, which is the print-master path and enormous either way;
-//   - stickers, heal spots and warp, whose assets are bitmaps the worker cannot
-//     be handed cheaply;
+//   - stickers and warp, whose assets are bitmaps the worker cannot be handed
+//     cheaply (healed spots came off this list with 055 — see canRunParallel);
 //   - a small export, where starting four workers costs more than it saves;
 //   - and any browser without module workers.
 // In every one of those the caller runs the export exactly as it always did.
@@ -57,8 +57,14 @@ function bytesPerPixel(opts: ExportOptions): number {
  *  part that travels: the same file at 45 megapixels would cost 220 MB a
  *  thread, and three of those is a killed tab on a tablet rather than a slow
  *  export. */
-function perWorkerMb(fileBytes: number, srcPixels: number, outPixels: number, n: number, bytesPerPixel = 4): number {
-  return (fileBytes + srcPixels * 2 + (outPixels * bytesPerPixel) / n) / 1e6 + 10;
+function perWorkerMb(fileBytes: number, srcPixels: number, outPixels: number, n: number, bytesPerPixel = 4, healBytes = 0): number {
+  // HEAL IS PER WORKER AND DOES NOT DIVIDE. Every other term here either
+  // belongs to the worker alone (its copy of the file, its decode) or is the
+  // output split `n` ways — but each worker bakes EVERY patch, from its own
+  // source, whichever band it was given. So this is added whole to each one,
+  // not divided. Three dust spots is a rounding error; forty at the largest
+  // radius the app allows is about 75 MB each.
+  return (fileBytes + srcPixels * 2 + (outPixels * bytesPerPixel) / n + healBytes) / 1e6 + 10;
 }
 
 /** The memory an export may spend on threads that are not the main one, and how
@@ -92,6 +98,11 @@ export interface ParallelJob {
   fileBytes: number;
   srcPixels: number;
   outPixels: number;
+  /** What this edit's healed patches weigh, in bytes, from `healPatchBytes`.
+   *  REQUIRED rather than optional with a zero default: a caller that forgets
+   *  it would under-bill the budget silently, which is the shape of defect the
+   *  budget exists to prevent. Zero when nothing is healed. */
+  healBytes: number;
 }
 
 /** HOW MANY WORKERS THIS EXPORT MAY START — the one place that answers it.
@@ -118,6 +129,29 @@ export function approvedWorkers(job: ParallelJob, opts: ExportOptions): number {
   return workerCount(job, bytesPerPixel(opts));
 }
 
+// HEALED SPOTS RUN ACROSS CORES SINCE 055. They were excluded alongside
+// stickers and warp as "bitmaps the worker cannot be handed cheaply", which is
+// true of the other two and was never true of a spot: a HealSpot is five
+// numbers and already travels inside `params`. What was really missing was the
+// MEMORY, since every worker bakes every patch — and that is billed now,
+// through `job.healBytes`, so a frame with forty large spots is refused by the
+// budget rather than by a blanket rule that also refused three dust marks. The
+// output is held byte-identical either way by tools/tiff-threads-walk.mjs's
+// healed arm, both formats, all four rotations.
+//
+// AND THE REASON A BAND CAN REPRODUCE A HEAL IS NOT THAT HEAL IS LOCAL.
+// Heal is a CLONE: it reads a second rectangle elsewhere in the frame, up to
+// 4.6 radii away or wherever the reader dragged it. This works only because
+// export.worker.ts hands each worker the WHOLE file and it decodes the whole
+// source. Anyone slicing the source per worker to save memory must read that
+// decision first, or the clamp will bake the slice's edge into every spot.
+//
+// IT LIVES OUT HERE RATHER THAN BESIDE THE CHECK because
+// tools/one-pool-check.mjs reads the first 2000 characters of this function's
+// body looking for the `approvedWorkers` call, and sixteen lines of prose
+// inside it pushed that call out of the window. The gate was right to refuse:
+// what it asserts — that one function decides the pool size — is worth more
+// than where this paragraph sits.
 export function canRunParallel(params: EditParams, opts: ExportOptions, job: ParallelJob): boolean {
   if (typeof Worker === "undefined") return false;
   // TIFF RUNS HERE TOO SINCE 2026-09-20. It was refused on the grounds that it
@@ -130,7 +164,7 @@ export function canRunParallel(params: EditParams, opts: ExportOptions, job: Par
   // band of it weighs six bytes a pixel rather than four.
   if (opts.band || opts.raw) return false; // already a band
   if (job.outPixels < MIN_PIXELS) return false;
-  if ((params.spots?.length ?? 0) > 0) return false;
+  // Healed spots are priced, not refused — see the note above this function.
   if ((params.stickers?.length ?? 0) > 0) return false;
   if (params.warp) return false;
   return approvedWorkers(job, opts) >= 2;
@@ -145,7 +179,7 @@ export function workerCount(job: ParallelJob, bytesPerPixel = 4): number {
   const byCores = Math.max(2, Math.min(threadCap(), cores - 1));
   const budget = budgetMb();
   for (let n = byCores; n >= 2; n--) {
-    if (n * perWorkerMb(job.fileBytes, job.srcPixels, job.outPixels, n, bytesPerPixel) <= budget) return n;
+    if (n * perWorkerMb(job.fileBytes, job.srcPixels, job.outPixels, n, bytesPerPixel, job.healBytes) <= budget) return n;
   }
   return 1;
 }

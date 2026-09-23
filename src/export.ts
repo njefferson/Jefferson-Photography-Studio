@@ -13,7 +13,7 @@ import { cameraModel, readCameraMatrix } from "./decode";
 import { makeRowDenoiser, type LinearSampler } from "./raw/denoise";
 import { canRunParallel, exportBands } from "./exportparallel";
 import { makeRowDetail } from "./raw/detail";
-import { healPatches8, healPatchesFromSampler, wrapWithPatches } from "./heal";
+import { healPatches8, healPatchesFromSampler, wrapWithPatches, healPatchBytes } from "./heal";
 import { stickerPatches, makeStickerOverlaySampler, type StickerAsset } from "./sticker";
 import { warpSampler, warpIsEmpty } from "./warp";
 import { buildGlowMap, sampleGlow, GLOW_GAIN } from "./glow";
@@ -686,7 +686,10 @@ export async function exportImage(
     // reader asked for a photograph, not for a particular number of threads.
     // WHAT A THREAD WOULD COST, handed to the decision: the file is copied per
     // worker, the sensor data is decoded per worker, and each holds its band.
-    const job = { fileBytes: file.bytes.length, srcPixels: srcW * srcH, outPixels: w * h };
+    // WHAT THE PATCHES WEIGH, per worker — every worker bakes every one of them
+    // from its own copy of the source, so this is what the budget has to know
+    // now that a healed frame is allowed through the pool at all.
+    const job = { fileBytes: file.bytes.length, srcPixels: srcW * srcH, outPixels: w * h, healBytes: healPatchBytes(params.spots, srcW, srcH) };
     let ranParallel = false;
     if (canRunParallel(params, opts, job)) {
       try {
@@ -854,7 +857,7 @@ export async function exportImage(
     // SEVERAL CORES, when this export can use them — the same call the JPEG
     // path makes, with the same fall-through on any failure: the reader asked
     // for a photograph, not for a particular number of threads.
-    const jobT = { fileBytes: file.bytes.length, srcPixels: srcW * srcH, outPixels: w * h };
+    const jobT = { fileBytes: file.bytes.length, srcPixels: srcW * srcH, outPixels: w * h, healBytes: healPatchBytes(params.spots, srcW, srcH) };   // see the JPEG branch
     let ranParallelT = false;
     if (canRunParallel(params, opts, jobT)) {
       try {

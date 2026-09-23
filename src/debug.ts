@@ -560,9 +560,13 @@ async function exportOnTheGpu(): Promise<void> {
 function threads(): void {
   const cores = navigator.hardwareConcurrency || 0;
   // The file the numbers in the release notes were measured on.
-  const job = { fileBytes: 26.1e6, srcPixels: 5600 * 3728, outPixels: 5600 * 3728 };
+  // `healBytes: 0` is a property of the FILE being modelled, not a default: both
+  // of these stand for a photograph with nothing healed on it, which is what the
+  // numbers in the release notes were measured on. A frame with spots costs its
+  // patches on top, per thread, and would come out with fewer.
+  const job = { fileBytes: 26.1e6, srcPixels: 5600 * 3728, outPixels: 5600 * 3728, healBytes: 0 };
   const n = workerCount(job);
-  const big = workerCount({ fileBytes: 55e6, srcPixels: 8256 * 5504, outPixels: 8256 * 5504 });
+  const big = workerCount({ fileBytes: 55e6, srcPixels: 8256 * 5504, outPixels: 8256 * 5504, healBytes: 0 });
   row("Cores this browser admits to", cores ? String(cores) : "not reported",
     cores ? "The export keeps one for the interface and splits the rest of the work." : "Without a number the export assumes two.");
   row("Threads a 21-megapixel export would use", n === 1 ? "one — it would not split" : String(n),
