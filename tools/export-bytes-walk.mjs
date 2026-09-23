@@ -35,6 +35,7 @@
 // before the export stopped owning the screen.
 //   node export-bytes.mjs --record      (quiet run; prints a hash)
 //   node export-bytes.mjs --interfere   (switch photos and edit while it runs)
+import { openMasks } from "./walk-input.mjs";
 import { chromium } from "/home/user/Jefferson-Photography-Studio/node_modules/playwright-core/index.mjs";
 import { requireFreshDist } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
@@ -79,7 +80,7 @@ try {
   console.log(`        flow: ${modal ? "the old modal dialog" : "the strip beside the button"}`);
 
   if (ONE) {
-    await p.click("#ptab-corrections").catch(async()=>{ await p.click("#ptab-masks"); });
+    await p.click("#ptab-corrections").catch(async()=>{ await openMasks(p); });
     await p.click("#healBtn");
     const box = await p.evaluate(() => { const c = document.querySelector("#stage canvas"); const r = c.getBoundingClientRect(); return { x: r.x + r.width/2, y: r.y + r.height/2 }; });
     await p.mouse.click(box.x, box.y);

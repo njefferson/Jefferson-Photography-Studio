@@ -54,6 +54,7 @@
 // THE RAW ARM IS THE CONTROL. The assemblers differ on FILE KIND, so a walk with
 // only one kind cannot see the disagreement; and an arm that passes in both
 // states is what says the walk is not vacuous.
+import { openMasks } from "./walk-input.mjs";
 import { chromium } from "playwright-core";
 import { requireFreshDist } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
@@ -468,7 +469,7 @@ try {
         d.dispatchEvent(new Event("change", { bubbles: true }));
       });
       await page.waitForTimeout(1200);
-      await page.click("#ptab-masks");
+      await openMasks(page);
       await page.click("#addSky");
       await page.waitForFunction(() => !document.getElementById("skyControls")?.hidden, null, { timeout: 120000 });
       await page.waitForTimeout(1500);

@@ -19,6 +19,7 @@
 // re-render: the stroke's band must move, and everything else must not.
 //
 // --plant skips the arming press; the first assertion must then go red.
+import { openMasks } from "./walk-input.mjs";
 import { chromium } from "playwright-core";
 import { requireFreshDist } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
@@ -96,14 +97,14 @@ try {
   await p.waitForFunction(()=>document.getElementById("welcome")?.hidden, null, {timeout:300000});
   await p.waitForFunction(()=>!document.getElementById("busy")?.hasAttribute("open"), null, {timeout:300000});
   await settle(p);
-  await p.click("#ptab-masks"); await p.click("#addSky"); await settle(p);
+  await openMasks(p); await p.click("#addSky"); await settle(p);
   // A mask that does something visible: take the sky's brightness right down.
   await p.evaluate(() => { const el = document.getElementById("mBrightness");
     el.value = "0.35"; el.dispatchEvent(new Event("input",{bubbles:true})); el.dispatchEvent(new Event("change",{bubbles:true})); });
   await settle(p);
   const a = await doExport(p, "before");
 
-  await p.click("#ptab-masks"); await settle(p);
+  await openMasks(p); await settle(p);
   if (!PLANT) { await p.click("#mSkyFixCut"); await settle(p); }
   const box = await p.locator("#view").boundingBox();
   const X = f => box.x + box.width*f, Y = f => box.y + box.height*f;

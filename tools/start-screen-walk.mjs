@@ -26,6 +26,7 @@
 // a side column and the stage keeps its height, so the card never clips and
 // the defect is invisible — every walk in this directory before this one ran
 // at 1100px or wider.
+import { openMasks } from "./walk-input.mjs";
 import { chromium } from "playwright-core";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
@@ -140,14 +141,19 @@ try {
 
   // 5 · AND THE TAB THE READER WAS ON SURVIVES THE ROUND TRIP, since the drawer
   // is being hidden and shown rather than rebuilt.
-  await p.click("#ptab-masks");
+  await openMasks(p);
   await settle(p);
   await p.click("#homeBtn");
   await settle(p);
   await p.click("#welcomeBack");
   await settle(p);
-  const tab = await p.getAttribute("#ptab-masks", "aria-selected");
-  check("the tab you were on is still the tab you come back to", tab === "true", `masks aria-selected=${tab}`);
+  // WHERE YOU WERE IS THE MASK PLACE NOW, NOT A TAB (decision 042). The same
+  // assertion, asked of the thing that exists: masks left the tab strip in
+  // 2.60, so `aria-selected` on a button that is gone would have read null and
+  // this check would have failed for a reason that has nothing to do with what
+  // it is about.
+  const backInMasks = await p.evaluate(() => !document.getElementById("maskPlace")?.hidden);
+  check("where you were is where you come back to", backInMasks, `mask place open=${backInMasks}`);
 
   if (SHOTS) console.log(`\n  shots in ${SHOTS} — OPEN THEM. The numbers say the drawer is away; only the picture says the card looks right.\n`);
 } finally { await b.close(); }

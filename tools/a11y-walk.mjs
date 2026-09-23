@@ -136,7 +136,10 @@ const HIT = () => {
  *  a sweep that quietly measured nothing is indistinguishable from a clean one. */
 const makeAndSaveMask = async (page, where) => {
   const added = await page.evaluate(() => {
-    document.getElementById("ptab-masks")?.click();
+    // Masks are a PLACE now, not a tab (decision 042) — the opener sits above
+    // the tab strip. Clicking the old #ptab-masks here would find nothing and
+    // the sweep would report a clean run over a surface it never reached.
+    document.getElementById("maskPlaceOpen")?.click();
     const add = document.getElementById("addSky");
     if (!add) return false;
     add.click();
@@ -313,14 +316,25 @@ try {
         // A page, a dialog, a mode and a TAB are four different things, and only
         // the first two were ever in the list.
         if (s.file === "ir.html") {
+          // THE MASK PLACE IS SWEPT BESIDE THE TABS (decision 042). It left the
+          // tab strip in 2.60, and this enumeration is what used to reach its
+          // controls — so without the extra entry below, moving masks out of
+          // the strip would have silently removed a whole surface from the
+          // sweep while every check stayed green. That is the exact failure
+          // tools/surfaces.mjs exists to refuse, one level down.
           const tabs = await page.evaluate(() =>
             [...document.querySelectorAll("#panelTabs .ptab")].map((t) => t.id).filter(Boolean));
+          tabs.push("maskPlaceOpen");
           for (const id of tabs) {
             const on = await page.evaluate((t) => {
               const b2 = document.getElementById(t);
               if (!b2) return false;
               b2.click();
-              return b2.getAttribute("aria-selected") === "true";
+              // A tab says aria-selected; the mask place's opener says
+              // aria-expanded, and it hides itself once the place is up.
+              return t === "maskPlaceOpen"
+                ? !document.getElementById("maskPlace")?.hidden
+                : b2.getAttribute("aria-selected") === "true";
             }, id);
             if (!on) { fail(`${s.file} ${vw}px tab #${id}: would not select, so its controls are unmeasured`); continue; }
             // SETTLE ON A COUNT, NOT ON A CLOCK. A flat 260ms wait passed this

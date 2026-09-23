@@ -30,6 +30,7 @@
 // (`float(s >> 2)` -> `0.0`): "a sky mask in slot 4 renders as it does in slot
 // 0" failed with the frame undarkened, which is the aliasing this exists to
 // catch.
+import { openMasks } from "./walk-input.mjs";
 import { chromium } from "playwright-core";
 import { requireFreshDist } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
@@ -74,7 +75,7 @@ async function openFrame(b, port) {
   await p.waitForFunction(() => !document.getElementById("busy")?.hasAttribute("open"), null, { timeout: 300000 });
   await settle(p);
   await p.evaluate(() => document.getElementById("lookEir")?.click()); await settle(p);
-  await p.click("#ptab-masks");
+  await openMasks(p);
   return p;
 }
 

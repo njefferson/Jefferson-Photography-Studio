@@ -3693,3 +3693,62 @@ li.plat-you { font-weight: 600; }
 .finish-step { margin: 2px 0 6px; }
 .finish-step .note { margin-top: 0; }
 #finishOpen { margin-top: 6px; }
+
+/* ===== MASKS ARE A PLACE, NOT A TAB (decision 042) =====
+   The way in sits ABOVE the tab strip rather than inside it, because a tab says
+   "one of twelve sections" and this is a place. 44px minimum like every other
+   target, and it carries the count so the reader can see there are masks
+   without opening it. */
+.mask-place-open {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; /* deliberate here — the way IN is a full-width row above the strip */ min-height: 44px; margin: 0 0 8px; padding: 8px 14px;
+  border: 1px solid var(--line-2); border-radius: 10px;
+  background: transparent; color: var(--txt);
+  font: 600 0.875rem/1.2 var(--ui); touch-action: manipulation;
+}
+.mask-place-open:active { background: var(--surface-3); }
+/* The count is a SECOND carrier beside the word, never the only one — it reads
+   "Masks 3", so the number is not doing the work alone. */
+.mask-place-count { font: 400 0.8125rem/1.2 var(--mono); color: var(--txt-2); }
+
+/* The place itself. A region, not a dialog — the same shape .finish uses, and
+   for the same reason: the photograph stays in view. */
+.mask-place { margin: 0 0 12px; }
+.mask-place-head {
+  display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+  position: sticky; top: 0; z-index: 2;
+  padding: 6px 0 8px; background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.mask-place-head .sub-title { margin: 0; flex: 1 1 auto; }
+/* The way out is a WORD, not a glyph. A mode announces itself and offers an
+   obvious exit; an x in a corner is the shape that gets hunted for. */
+.mask-place-close {
+  width: auto; flex: 0 0 auto; min-height: 44px; min-width: 64px; padding: 6px 16px;
+  border: 1px solid var(--line-2); border-radius: 999px;
+  background: transparent; color: var(--txt); font: 600 0.8125rem/1.2 var(--ui);
+  touch-action: manipulation;
+}
+.mask-place-close:active { background: var(--surface-3); }
+
+/* Collapsible groups, so each later local control is an entry rather than a
+   redesign. <details>/<summary> because it is the native disclosure: keyboard
+   reachable, announced, and it needs no script to be correct. */
+.mask-group { border: 1px solid var(--line); border-radius: 10px; margin: 8px 0; padding: 0 10px; }
+.mask-group > summary {
+  min-height: 44px; display: flex; align-items: center;
+  font: 600 0.8125rem/1.2 var(--ui); color: var(--txt);
+  cursor: pointer; list-style: none; padding: 4px 0;
+}
+.mask-group > summary::-webkit-details-marker { display: none; }
+/* The triangle is drawn rather than inherited so its direction is a shape and
+   not a font glyph that may not arrive. */
+.mask-group > summary::before {
+  content: ""; flex: 0 0 auto; width: 0; height: 0; margin-right: 8px;
+  border-left: 6px solid currentColor; border-top: 4px solid transparent; border-bottom: 4px solid transparent;
+  transition: transform 0.12s ease;
+}
+.mask-group[open] > summary::before { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { .mask-group > summary::before { transition: none; } }
+.mask-group > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mask-group > *:last-child { margin-bottom: 10px; }

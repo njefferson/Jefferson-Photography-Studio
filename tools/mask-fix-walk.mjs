@@ -24,6 +24,7 @@
 // regeneration happened to land near the old number".
 //
 // --plant skips the arming press. Three of its checks must go red.
+import { openMasks } from "./walk-input.mjs";
 import { chromium } from "playwright-core";
 import { requireFreshDist } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
@@ -71,7 +72,7 @@ try {
   await p.waitForFunction(()=>document.getElementById("welcome")?.hidden, null, {timeout:300000});
   await p.waitForFunction(()=>!document.getElementById("busy")?.hasAttribute("open"), null, {timeout:300000});
   await settle(p);
-  await p.click("#ptab-masks"); await p.click("#addSky"); await settle(p);
+  await openMasks(p); await p.click("#addSky"); await settle(p);
   await p.click("#mMatte"); await settle(p);
   const before = await coverage(p);
   writeFileSync(join(OUT, "1-before.png"), Buffer.from(before.png.split(",")[1], "base64"));

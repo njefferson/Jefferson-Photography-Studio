@@ -45,6 +45,7 @@
 //
 // NOT in .branch-guard's `also=`: it drives a real browser and decodes a RAW.
 // Run it before a release, or through tools/walk-all.mjs.
+import { openMasks } from "./walk-input.mjs";
 import { chromium } from "/home/user/Jefferson-Photography-Studio/node_modules/playwright-core/index.mjs";
 import { requireFreshDist } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
@@ -154,7 +155,7 @@ try {
     await settle(p);
     if (withMask) {
       await press(p, "lookEir");
-      await p.click("#ptab-masks");
+      await openMasks(p);
       await p.click("#addSky");
       await settle(p);
     }

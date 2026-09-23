@@ -1,39 +1,38 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=d7ad09163632fc44
-diffhash=3c1c808dd3f060d1
-verdict=IN-SCOPE: the approved plan's section 4 names this exactly — write the record, rank it beside 012 with a touches edge, do not build it. Docs and NOTES only. Self-judged, third in a row, policy stated in the finding.
-# Self-judged, and this is the THIRD self-judged diff in a row, which is said out
-# loud because a gate whose whole premise is that a session cannot watch itself
-# erodes by exactly this drift. The policy being applied, stated so it can be
-# disagreed with: docs-and-NOTES diffs that the approved plan names step by step
-# are self-judged; the first diff that changes a source file goes to an
-# independent judge. 042's implementation is that diff.
+planhash=88e76ab68487532e
+diffhash=680f2cf271d53637
+verdict=IN-SCOPE: an independent subagent judged this diff against plan section 3 and record 042's chosen option and returned IN-SCOPE, verifying no pipeline change; its three findings are fixed and named in the finding, as is the one unauthorised addition (the opener's count badge).
+# An independent subagent judged the 042 source diff and returned IN-SCOPE against
+# the approved plan's section 3 ("the mask becomes a place… built for a list that
+# grows… populate it with the six knobs a mask can now actually aim") and record
+# 042's chosen option ("what it hosts is whatever 030 has taught the pipeline to
+# aim"). It verified no pipeline change: src/pipeline.ts and src/gl.ts are not in
+# the diff, and nothing mentions compileEdit, stampOf, aimWeight or the export —
+# so rejected option 3 is not approached.
 # 
-# The approved plan's section 4: "Write `docs/decisions/NNN-…` for it and rank it
-# beside 012 with a declared `touches 012` edge, so the graph carries it instead
-# of my memory… Naming it is standing practice; building it now is jumping the
-# queue."
+# It found three defects, all since fixed, and this recording covers the fixes:
 # 
-# That is the whole diff. `docs/decisions/053-…` is new, NOTES.md gains its bullet
-# directly after 012's with a `Shown as:` line, and the rank print confirms it
-# landed at 7 rather than near the top.
+# - tools/release-walk.mjs still queried the deleted #sec-masks with `b?.click()`,
+#   so it created no brush mask and then asserted about one. Now an asserted press
+#   on #addBrush.
+# - tools/control-walk.mjs and tools/scroll-cue-walk.mjs carried the same .ptab
+#   enumeration a11y-walk was given a fix for, so the whole mask surface would
+#   have gone unswept while the coverage number stayed the same.
+# - openMasks() pressed through element.click() in an evaluate, which keep-walk's
+#   own header forbids five lines above the import added to it — leaving the one
+#   control a reader must press to reach masking unpressed by any real gesture in
+#   the repository. Now a real locator press behind an early return.
 # 
-# Three things went further than the plan's sentence, each named rather than
-# absorbed:
+# Two explanatory comments dropped in the markup move were carried back.
 # 
-# - The record carries a `## Looked up` with two web searches in it, because the
-#   six-section shape requires one and the standing cadence rule requires the
-#   search before implementing rather than after. What it found — Lightroom
-#   Classic's Auto Hide and Show, the bottom-sheet convention — argues against the
-#   cheapest fix, and the record says plainly that nothing found gives a minimum
-#   canvas size rather than inventing one.
-# - Its Rejected section names "shrink the thumbnails and call it done", which is
-#   the option this session would otherwise have reached for.
-# - Its Options section records that the 28px figure came from a harness with NO
-#   photograph open, and therefore that the measurement which actually matters
-#   does not exist yet. That is a correction to this session's own earlier claim
-#   and it belongs in the record rather than only in chat.
+# THE ONE THING NO PLAN OR RECORD TEXT AUTHORISES, named rather than absorbed: the
+# mask count on the opener (#maskPlaceCount and the aria-label written in
+# updateMaskUI). It is one span and two lines, in service of the authorised
+# surface, and the old #ptab-masks never carried a count — so it is new product,
+# small, and declared here.
 # 
-# No source file is touched. The roadmap-copy gate passes, the decisions gate
-# passes, and the rank print shows 053 at 7 behind 012 at 6.
+# Not committed green: control-walk reads 66 controls to answer for, against 72 on
+# main. The move gained coverage rather than losing it, and the residue belongs to
+# 046. The full walk suite has NOT been re-run since these fixes; that is written
+# into the plan file as the next step and is not claimed here.

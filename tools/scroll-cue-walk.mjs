@@ -71,7 +71,11 @@ try {
         body.append(mk("down", "\u25BC"));
       });
     }
+    // The mask place joins the tabs here (decision 042). It is not a .ptab, and
+    // with its groups open it is the longest panel content in the app — which
+    // is precisely the case a scroll-cue walk exists to measure.
     const tabs = await p.$$eval(".ptab", (els) => els.map((e) => e.id));
+    tabs.push("maskPlaceOpen");
     const hits = [];
     for (const id of tabs) {
       await p.click(`#${id}`);
