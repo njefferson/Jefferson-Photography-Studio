@@ -1241,6 +1241,72 @@ user-scalable=no.
   byte-identical to today's, because a graphics chip computes in float where the
   processor uses doubles. It would match the PREVIEW instead.
 
+## The app would not open offline, and the harness could not have seen it, 2026-09-23
+
+Reported from the device on 2.61: an iPad with no network, showing "Safari
+can't open the page. The error was: Response served by service worker has
+redirections" and a black screen. Offline-first is a product value here, so
+this is the most expensive shape a defect can take — invisible to anyone with
+a network, including every walk in this repository.
+
+**THE DEPLOY DOES NOT SERVE WHAT THE HARNESS SERVES.** Cloudflare Pages
+308-redirects every `.html` url to its extensionless form — `/ir.html` to
+`/ir`, `/index.html` to `/` — measured against production the same day.
+`python3 -m http.server`, which every other walk is served by, returns
+`/ir.html` verbatim. The whole defect lives in that gap.
+
+**Two halves, and fixing the first leaves the second.**
+
+The precache list is generated from `dist` filenames, so it is entirely
+`.html`. Fetching one FOLLOWS the 308, and the response that comes back carries
+`redirected: true`. A service worker may not answer a NAVIGATION with such a
+response — the browser refuses it outright, which is the message the device
+showed. `servableCopy` rebuilds the response from its own body, which is the
+only way to clear the flag: `redirected` is read-only and `clone()` preserves
+it.
+
+And then the cache holds only `.html` keys, which are urls **no reader is ever
+on**. The IR manifest's `start_url` is `./ir.html` and every door in the
+launcher points at a `.html` file, so the deploy redirects all of them; what a
+reader bookmarks, installs to a home screen and reloads is `/ir`. Offline that
+was a miss, the fallback handed back the root shell, and a reader asking for
+the editor got the launcher — whose Infrared door did it again. Each page is
+now stored under BOTH keys. Precaching the extensionless form INSTEAD is not
+open to us: it 404s on every plain file server, and a 404 aborts the install.
+
+**Confirmed from the device, same day.** A diagnostic report from the installed
+app gives its address as `https://jefferson-photo-studio.pages.dev/ir` — the
+extensionless url, from a home-screen launch whose `start_url` is `./ir.html` —
+and its caches as `ips-examples-v1, ips-2.61`. That is the whole failure in two
+lines: the reader is on a url the release's own shell has no key for, and the
+2.61 cache is the only shell cache there is, because activate deleted 2.60 and
+with it the `/ir` entry an earlier online visit had left in it.
+
+**A cached 308 is replayed before the worker is consulted.** Measured with the
+alias half planted: a navigation to `/ir.html` arrives at the worker as `/ir`,
+and `/ir.html` is never asked for. So the two urls are not two cases from the
+browser's side once it has seen the redirect once — which is why the url set is
+asserted against the CACHE, before going offline, rather than by navigating to
+each one.
+
+**`tools/offline-shell-walk.mjs` brings its own server**, redirecting the way
+Pages does — which no other walk here does, and is the point. Twelve of them
+also ignore `--port` and hardcode :8131, so that is not what distinguishes it;
+what does is that the behaviour under test belongs to the SERVER, so it cannot
+measure whatever is already serving `dist`. Three checks:
+nothing in any cache is a redirected response; every page is cached under the
+url the deploy serves it at, read before the first offline navigation so it
+answers for what INSTALL wrote rather than what browsing left behind; and the
+app opens with no network at the manifest's own `start_url`. Two plants,
+`--plant=redirect` and `--plant=alias`, put back one half each — every check
+has been seen to fail, each for its own reason, and the substitution is
+asserted to have landed before anything is measured.
+
+**What this says about the sweep.** Forty-six walks, all green, against a build
+served differently from the one readers get. Anything that depends on the
+url a file is served AT is outside their reach by construction, and this is the
+first walk in the repository that closes any of that gap.
+
 ## The black screen on a phone was the update strip, not the photograph, 2026-09-22
 
 Reported from an iPhone with a diagnostic report attached: a landscape
