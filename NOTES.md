@@ -654,6 +654,28 @@ user-scalable=no.
   canvas's aspect, or the PAGE being zoomed rather than the canvas — cannot be
   told apart in a screenshot. Instrument first; make the escape unconditional
   either way. See `docs/decisions/012-full-view-must-fit-and-always-escape.md`.
+- [ ] **The session strip takes the stage on a phone** <!-- decision: 053 -->
+  **Shown as:** On a phone the photograph gets room instead of the strip of thumbnails taking most of it.
+  reported from an iPhone 2026-09-22 in the same sentence as the black screen,
+  and fixing that did not make the photograph usable. Measured at 302x656 with
+  a healthy shell: the bar takes 163, the panel 295 (45dvh), the stage gets 198,
+  and `--session-h` is 138 of that — so `#view`'s max-height resolves to 28px. A
+  landscape photograph is height-limited, so it gets 4% of the screen. The
+  reader's own report is the milder version: 138 reserved from a 272 stage, the
+  picture drawn 102 tall.
+  **The strip does not scale.** `.session-thumb` is a fixed 92x66 plus the
+  strip's header and padding, so it costs ~138px whether the stage has 700 to
+  give or 198 — the narrower the screen, the larger its share.
+  **Looked up:** Lightroom Classic's answer to a filmstrip eating canvas is that
+  it YIELDS — hidden outright, or Auto Hide and Show, collapsing to nothing and
+  returning on demand — and on phones the named convention is a bottom sheet,
+  easily accessed and easily dismissed. Nothing found gives a minimum canvas
+  size for an editor, and this record says so rather than inventing one.
+  **Ranked here rather than at the top on purpose**: a reported defect goes
+  where it naturally goes and only dependency privileges it. Nothing above needs
+  this first, and the graph puts this ground at 012's rank. See
+  `docs/decisions/053-the-session-strip-takes-the-stage-on-a-phone.md`.
+
 - [ ] **The look's sky adjustments read a selection you cannot see** <!-- decision: 052 -->
   **Shown as:** Aerochrome's sky sliders work on the sky you selected, not one you cannot see.
   reported 2026-09-22 from the device against Aerochrome: its sky adjustment
