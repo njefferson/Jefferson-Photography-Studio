@@ -16,9 +16,9 @@ understand.
 - `#exportWaitingSave` — "Save them all".
 
 Three of the four carry "Save" and two carry "Export", and both words are used
-for both jobs. `#keepFile`'s explanatory note runs forty words before the
-difference becomes clear, which is forty words after the reader has had to
-choose.
+for both jobs. `#keepFile`'s explanatory note runs thirty-eight words before
+the difference becomes clear, which is thirty-eight words after the reader has
+had to choose.
 
 **The distinction the labels are failing to carry is a working file versus a
 finished picture.** The keep file is work you come back to: it holds the
@@ -90,7 +90,7 @@ claiming the words read better.
 
 ## Rejected
 
-**2, explain harder.** The note under `#keepFile` is already forty words and the
+**2, explain harder.** The note under `#keepFile` is already thirty-eight words and the
 report came from somebody who had it in front of them. A label that needs a
 paragraph is the defect; more paragraph is not the fix.
 
