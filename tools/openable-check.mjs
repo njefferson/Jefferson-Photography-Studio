@@ -48,17 +48,25 @@ const want = m[1].split("|").sort();
 console.log(`          OPENABLE_EXT says: ${want.join(", ")}\n`);
 
 // WHICH ACCEPT LISTS THIS GOVERNS, and the narrowing is a measurement rather
-// than a taste. ir.html carries nine accept attributes; only five are pickers
-// that route into `openPicked`. The other four are different doors — a look
-// importer (.ipslook,.json), a LUT importer (.cube), a JSON/txt importer, and
-// the lens rig's own picker, which takes calibration frames and deliberately
-// does NOT take a look. A gate that held all nine to one list would be wrong
-// four times on its first run, and a gate that is wrong is a gate somebody
-// switches off.
+// than a taste. A list claiming `.dng` is claiming to open photographs and must
+// carry the whole set; the rest are different doors — a look importer, a sticker
+// importer, a JSON/txt importer for lens profiles, and the lens rig's own
+// picker, which takes calibration frames and deliberately does NOT take a look.
+// A gate that held every list to one set would be wrong on its first run, and a
+// gate that is wrong is a gate somebody switches off.
 //
-// So: a list claiming `.dng` is claiming to open photographs, and must carry
-// the whole set. The exceptions are DECLARED, with their reason, and printed
-// every run so the list can only shrink.
+// THE COUNTS USED TO BE WRITTEN HERE AND WERE WRONG — nine attributes when
+// there were ten, and a LUT importer accepting `.cube` that no longer has an
+// accept at all, because on an iPad that list greyed out every file it claimed
+// to want (ir.html, and src/keepfile.ts:27 for the same finding measured on
+// .ipskeep). So this paragraph does not carry counts any more: the run itself
+// prints how many lists it governed and how many it left alone, which is the
+// only answer that cannot go stale. The header above still writes two — six
+// places, five accept attributes — and both are true today; they are named here
+// rather than fixed because the plan covering this commit parked them.
+//
+// The exceptions are DECLARED, with their reason, and printed every run so the
+// list can only shrink.
 const EXCEPT = [
   {
     accept: "image/*,.dng,.nef,.DNG,.NEF,.zip,.ZIP,application/zip",

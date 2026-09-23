@@ -107,7 +107,15 @@ export function refineKind(kind: ImageKind, name: string): ImageKind {
   return kind;
 }
 
-function isZip(buf: ArrayBuffer): boolean {
+/** IS THIS A ZIP, BY ITS FIRST BYTES?
+ *
+ *  Takes `buf`, at least the head of a file. Returns true for the local-file
+ *  and empty-archive signatures. What the caller relies on: the NAME is never
+ *  consulted — a reader's archive may be called anything, and routing by
+ *  content is the rule this app already follows for looks and keep files.
+ *  Exported so the LUT importer asks the same question in the same way; two
+ *  copies of one test is a check that can disagree with itself. */
+export function isZip(buf: ArrayBuffer): boolean {
   const b = new Uint8Array(buf, 0, Math.min(4, buf.byteLength));
   return b[0] === 0x50 && b[1] === 0x4b && (b[2] === 0x03 || b[2] === 0x05);
 }

@@ -3839,6 +3839,45 @@ read as authoritative, and an invented one is worse than a missing one.
 
 ## Shipped (roadmap archive)
 
+- [x] **A .cube file cannot be picked on an iPad** <!-- decision: 056 -->
+  **Shown as:** .cube colour files can be picked from Files on an iPad again — they were greyed out and unselectable.
+  reported 2026-09-23 with a screenshot of the Files panel: six .cube files in
+  an iCloud folder, every one greyed out, none selectable. Importing a colour
+  file had never worked on the target device, and it is the only route that
+  feature has.
+  **The cause was already measured here and did not need rediscovering.**
+  `src/keepfile.ts:27` carries the identical finding for a keep file named
+  `.ipskeep` — 27.9 MB, named correctly, unselectable — because iOS filters the
+  picker by type identifier and an extension registered to nothing matches no
+  allowed type. An earlier draft of this work was going to build a probe on the
+  test page to establish what the codebase had already written down.
+  **There is no narrow fix for a web app.** A type identifier is declared by an
+  installed application's bundle; this app has none, by product value. So
+  anything that makes a .cube selectable makes everything selectable, and the
+  honest markup is no filter rather than one that pretends — with the reason
+  carried beside it so the attribute cannot return as a tidy-up. The parser
+  already refuses non-LUT text with a sentence written for a reader, and the
+  size cap runs first, so nothing was lost.
+  **And a pack arrives as one file.** Asked for once the first half was built,
+  and it is the same finding the other way round: a .zip IS a type the platform
+  registers, which is why a keep file ends in one. The importer takes every
+  .cube out of an archive — nested folders and all — ignores the licence,
+  the readme and the resource-fork debris a Mac adds, imports as many as the
+  25-LUT shelf has room for and says what it could not take. It never picks one
+  of eighteen to apply on the reader's behalf, and what it stores is the file the
+  archive held byte for byte — the promise that sharing a LUT re-sends the exact
+  file, which an earlier draft broke by storing a re-encoding of the decoded
+  text. Measured by
+  `tools/lutpack-walk.mjs` against an archive it builds itself. It was also run
+  once against a real eighteen-LUT pack, which imported whole — eighteen of
+  eighteen, counted out of the archive by something that is not this app — but
+  that arm only runs when a pack is handed to it with `--pack=`, and the pack is
+  somebody else's work and is deliberately not in the tree, so no later run
+  reproduces it.
+  **Not covered, and recorded rather than silently left:** the same defect is
+  latent on `.ipslook`, whose remedy is not free, and nothing in the commit
+  chain refuses the class. See
+  `docs/decisions/056-a-cube-file-cannot-be-picked-on-an-ipad.md`.
 - [x] **A mask can only act in one place, and there is only one version of an edit** <!-- decision: 030 -->
   **Shown as:** Use more of the app's tools inside a mask, so the sky and the trees can take different amounts.
   asked 2026-09-20 as a principle: a mask can be taken at any point in the

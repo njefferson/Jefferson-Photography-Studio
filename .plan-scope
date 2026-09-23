@@ -1,57 +1,41 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
-plan=/root/.claude/plans/offline-shell-fix.md
-planhash=a0534f7b38bcb14d
-diffhash=8a9b2056fd981a17
-verdict=IN-SCOPE: the three staged paths are exactly Steps 1 to 3 of the offline-shell plan, on the branch Step 4 names, with no VERSION, manifest, roadmap, decision-record or gate-wiring change riding along.
-# Independent scope judge, third pass, reading the plan by path and the staged diff.
+plan=/root/.claude/plans/linear-baking-island.md
+planhash=f252b91b46b71258
+diffhash=05a25ed17614c6ca
+verdict=IN-SCOPE: all eight fifth-pass findings verified fixed by direct inspection and hand-derived arithmetic, one framing correction in the round's own instructions that never reached the diff, no remaining thread after six passes.
+# Independent scope judge, sixth pass, reading the plan by path and the staged diff.
 # 
-# Scope. The staged set is exactly three paths: NOTES.md, public/sw.js and the new
-# tools/offline-shell-walk.mjs — Steps 3, 1 and 2. HEAD is claude/promote-024 per
-# Step 4, and VERSION is absent from the diff as Step 4 requires. Nothing from
-# "Not in this plan" appears: no update-strip code, no export-pool code, no roadmap
-# bullet, no decision record, no manifest edit, and .branch-guard is untouched. That
-# last is stated positively because it is the shape a walk usually arrives in: this
-# one drives a browser, its header says so, and it is correctly not in also=. Its
-# claim that walk-all "finds it on disk" is true with no edit, because walk-all globs
-# *-walk.mjs rather than carrying a list.
+# All eight findings from the fifth pass verified fixed by direct inspection:
+# the dwell comment cites 6000ms and both share.ts:92/139 sites and calls itself
+# the third wording; both stale "Four" comments in the walk read "Five" with
+# correct downstream arithmetic (5+20=25 cap, 30-20=10 did not fit); checks 1
+# and 6 append the app's actual answer to their failure detail; the fixed
+# waitForTimeout(400) is replaced by a three-consecutive-reads row-count
+# stability poll; indexedDB.deleteDatabase in check 6 is wrapped in a Promise
+# and awaited before reload; ir.html's comment distinguishes the single-file
+# size-cap path from the zip's per-entry ceiling; the record's Outcome reads
+# "six checks green... without arguments" with the seventh's --pack= condition
+# stated separately; and PackedCubeTooLarge correctly routes a lying archive
+# entry to the tooBig count rather than unreadable, verified by hand-deriving
+# the arithmetic identity packed.length = stored + unreadable + unstorable +
+# left + tooBig across every loop exit path, and by reading src/lutpack.ts's
+# comment region for the seam a prior mid-edit corruption left, which is gone.
 # 
-# The cache-first servableCopy is inside Step 1. Step 1's sentence names two call
-# sites and this is a third, but Step 2 declares check 1 as "nothing in any cache is
-# redirected" — a property quantified over every cache and therefore over every path
-# that writes into one, of which sw.js has exactly three. Leaving one uncleaned would
-# make the plan's own check pass by coincidence rather than by construction. The
-# change adds no behaviour on this deploy and its comment says so rather than claiming
-# a fix. Step 1's sentence is under-specified; the diff does not over-reach.
+# One correction, not a defect: contract-check's 303/304 to 304/304 move was
+# attributed to PackedCubeTooLarge in the round's own task framing. That is
+# wrong — contract-check matches only `export function`, never a class, so a
+# class can never move that count. The actual mover is isZip in src/import.ts
+# being exported with a contract, which is part of Step 5 and already in the
+# diff. This false attribution appears nowhere in the shipped diff — not
+# NOTES.md, not the decision record, not any code comment — so there is
+# nothing to fix; it was a mistaken instruction to this round's judge, not a
+# mistaken commit.
 # 
-# The five follow-ups from the previous pass are real and complete. The walk count is
-# right: 47 files match walk-all's glob with this applied, 46 before. Exactly 12 walks
-# contain 8131 and no --port handling. alsoAt is now character-for-character the same
-# rule as deployServesAt in the walk, so the walk asserts the worker against the deploy
-# rather than against a second copy of the worker's own logic. Every fetch( in src/
-# targets examples/*.dng, stickers/manifest.json, an icon PNG or tile.file — none is
-# "./" or an index page — so the navigation-branch comment is accurate. macro.html does
-# carry id="stage" and the three titles are distinct, so check 3's IR assertion is
-# load-bearing.
+# Also verified: tsc clean; decisions-check, openable-check, architecture-check
+# green; openable-check's rewritten paragraph is a necessary consequence of
+# Step 1 (it named a LUT importer accept that Step 1 removes), not scope creep
+# into the plan's parked cleanup item.
 # 
-# Run three times rather than read. Clean: all three green. --plant=redirect: checks 1
-# and 3 fail, 14 redirected entries (7 pages under both keys), check 3 as net::ERR_FAILED
-# — the browser refusing the redirected response, which is the device's defect.
-# --plant=alias: checks 2 and 3 fail, 6 missing, check 3 served /ir titled "Photography
-# Studio" — the launcher in place of the editor at the extensionless url, which confirms
-# the 308-replay claim and proves the title clause. --plant=nonsense exits 2. Afterwards
-# the tree is still the three staged paths, port 8137 does not answer and no browser
-# remains. That discharges the plan's verification line.
+# No attribution trailer, chat-session link or model name; no tables or grids.
 # 
-# Six non-blocking observations recorded for follow-up, none a scope problem: the walk's
-# openOffline contract block sits above the IR_TITLE constant rather than the function;
-# the new file is mode 100644 where the other walks are 100755; a leftover double blank
-# line above ctx.close(); check 2's "exactly the set install put there" is slightly
-# stronger than the code supports, since the runtime put paths also write into CACHE
-# during online browsing; servableCopy rebuilding with a null-body status would throw on
-# an unreachable 204/205/304; and install now writes the "/" key twice concurrently,
-# benign but unmentioned. Also noted and deliberately left alone: isNavigation still uses
-# the unanchored endsWith("index.html"), the same shape corrected in alsoAt — untouched
-# by this diff, not named by the plan, and changing it here would be the scope extension.
-# 
-# Prohibitions clean: no grids, no set-apart quotations, no third-person pronouns, and no
-# attribution trailer, chat-session link or model name in any of the three files.
+# Six passes deep with no remaining thread to pull. Recommend committing now.

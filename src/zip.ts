@@ -29,6 +29,16 @@ export interface ZipIndexEntry {
   method: number;
   /** Compressed size in bytes — what has to be read to get this entry out. */
   compSize: number;
+  /** Uncompressed size in bytes, as the central directory declares it.
+   *
+   *  IT IS A CLAIM, NOT A MEASUREMENT, and that is exactly what makes it
+   *  useful: it is readable without inflating anything, so a caller with a
+   *  ceiling can refuse an entry BEFORE spending the memory to find out. A
+   *  deflate stream can expand by roughly a thousand to one, so a caller that
+   *  inflates first and checks afterwards has already paid whatever the archive
+   *  asked for. A liar's entry inflates to something other than this, so a
+   *  caller that must be certain still checks the length it got. */
+  size: number;
   localHeaderOffset: number;
 }
 
@@ -60,12 +70,13 @@ function parseCentral(view: DataView, bytes: Uint8Array, p: number, count: numbe
     if (p + 46 > view.byteLength || view.getUint32(p, true) !== SIG_CEN) break;
     const method = view.getUint16(p + 10, true);
     const compSize = view.getUint32(p + 20, true);
+    const size = view.getUint32(p + 24, true);
     const nameLen = view.getUint16(p + 28, true);
     const extraLen = view.getUint16(p + 30, true);
     const commentLen = view.getUint16(p + 32, true);
     const localHeaderOffset = view.getUint32(p + 42, true);
     const name = new TextDecoder().decode(bytes.subarray(p + 46, p + 46 + nameLen));
-    if (!name.endsWith("/")) entries.push({ name, method, compSize, localHeaderOffset });
+    if (!name.endsWith("/")) entries.push({ name, method, compSize, size, localHeaderOffset });
     p += 46 + nameLen + extraLen + commentLen;
   }
   return entries;
