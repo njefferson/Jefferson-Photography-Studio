@@ -579,7 +579,7 @@
             <label>Hue <input id="mHue" type="range" min="-60" max="60" step="1" value="0" /></label>
             <label>Warmth <input id="mWarmth" type="range" min="-1" max="1" step="0.01" value="0" /></label>
           </details>
-          <details class="mask-group" id="mgAims">
+          <details class="mask-group" id="mgAims" open>
             <summary>Whole-photo tools, here only</summary>
             <!-- DECISION 030: a selection stops being usable at exactly one
                  place. Dehaze and Clarity are the first two stages a mask can
@@ -587,6 +587,13 @@
                  one control for a sky and a canopy that want opposite
                  amounts. Nothing here changes the pipeline's ORDER; it
                  changes where a stage is allowed to act. -->
+            <!-- THIS GROUP SHIPS OPEN, and it was collapsed for about an hour.
+                 Aiming a whole-photo tool at a mask is the capability 2.60 adds;
+                 putting it behind a closed disclosure on the release that introduces
+                 it is 040’s defect exactly — the app able to do something and not
+                 saying so. Three walks caught it before a reader could: a closed
+                 <details> hides its contents, so aim-walk could not press
+                 #mAimDehaze at all. -->
             <div class="set-row mask-aim-row" id="mAimRow">
               <div class="sub-title">Aim a whole-photo tool at this mask</div>
               <button id="mAimDehaze" type="button" class="toggle" aria-pressed="false">Dehaze, here only</button>

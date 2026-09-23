@@ -19,7 +19,7 @@
 // re-render: the stroke's band must move, and everything else must not.
 //
 // --plant skips the arming press; the first assertion must then go red.
-import { openMasks } from "./walk-input.mjs";
+import { openMasks, closeMasks } from "./walk-input.mjs";
 import { chromium } from "playwright-core";
 import { requireFreshDist } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
@@ -59,7 +59,7 @@ const at = (t, x, y, s) => t.buf.readUInt16LE(t.off + ((y * t.W + x) * t.samples
 // quantisation would move bytes everywhere and drown the thing being measured.
 // Quarter size because the CPU path is the same path at any scale.
 const doExport = async (p, name) => {
-  await p.click("#ptab-export");
+  await closeMasks(p); await p.click("#ptab-export");
   await p.evaluate(() => {
     for (const [id, v] of [["exFormat", "tiff"], ["exScale", "0.25"]]) {
       const el = document.getElementById(id);

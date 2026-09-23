@@ -31,7 +31,6 @@ ir.html#exportSaveAll — The other half of the export strip above.
 ir.html#exportRetry — In the export strip, and only after an export has FAILED. Reachable by planting a failure, which is its own piece of work.
 ir.html#exportStop — In the export strip while an export is running.
 ir.html#exportDismiss — In the export strip once there is something to dismiss.
-ir.html#colorBanner — An armed-tool banner over the photograph, shown while the colour picker is armed on the canvas.
 ir.html#welcomeBack — On the start screen, and only when there is a photograph open BEHIND it to go back to. A cold start has nothing to return to, so the control correctly does not exist.
 ir.html#resumeSession — On the start screen, and only when a previous session is in storage. Reachable by opening a set, reloading, and sweeping the second load.
 ir.html#recoverBatch — On the start screen, and only when an interrupted batch left finished frames behind. It needs a batch killed mid-run to exist at all.
