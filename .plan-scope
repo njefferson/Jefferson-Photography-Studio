@@ -1,19 +1,30 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=11db529d9f0a80c5
-diffhash=9d5bbe67643a4539
-verdict=IN-SCOPE: the diff corrects only the two prose defects the verification found in the 054 recording, and touches no product code, option, rejection or rank.
+planhash=0ca28ae701655148
+diffhash=66caa798ebac0a40
+verdict=IN-SCOPE: the ceiling probe plus a regenerated module-map line count and the gate's own ledger, with none of the plan's later export-path work present.
 # Independent scope judge, reading the plan by path and the staged diff.
 # 
-# Two files, both prose. NOTES.md: the 054 bullet's reader-facing Shown as line
-# drops the completed-tense "now" for an item the same bullet marks HELD two
-# lines below, and the hand-counted note length goes to thirty-eight. The 054
-# record: the same count corrected in Context and in rejected option 2.
+# Three files: src/debug.ts, docs/ARCHITECTURE.md and .plan-scope. No product
+# code beyond the probe. No src/export.ts, no src/exportparallel.ts, no
+# src/main.ts, no decision record.
 # 
-# The Options and Rank sections were read in full, not only in the diff, and are
-# byte-identical: the chosen direction, the four options, the four rejected
-# paragraphs and the held rank are all unchanged. Only the numeral inside
-# rejected option 2's justification moved.
+# The module map's change is one line — src/debug.ts's generated line count moving
+# 1288 to 1441 — and the arithmetic was checked rather than taken on trust: the
+# two hunks add 152 and 1 lines, and 1288 plus 153 is 1441. The description text
+# is unchanged. .plan-scope is the gate's own ledger, rewritten wholesale on every
+# recorded verdict, as its header declares.
 # 
-# Nothing touches ir.html or src/. No control is renamed, which the plan holds
-# for a later session. Nothing references the export threading work.
+# src/debug.ts has two hunks: the new probe function, placed between its two
+# siblings, and one call in the existing run sequence beside them. No other
+# function, control or call site is touched.
+# 
+# None of the plan's later items are present — the Promise fix, the loud fallback,
+# the TIFF copy, the export path's own drawing-surface defects, the spots
+# exclusion and the ratchet are all absent. The probe measures the two caps the
+# plan says those lines violate and modifies none of them.
+# 
+# Read-only, self-cleaning and bounded, checked in the new code rather than
+# assumed: no storage or app-state write anywhere, a release after every draw in
+# part one, a finally covering the early break in part two, six fixed sizes and a
+# hard stop at seven frame-sized surfaces.

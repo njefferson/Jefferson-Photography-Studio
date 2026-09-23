@@ -1115,6 +1115,158 @@ async function aCanvasTheSizeOfTheFrame(): Promise<void> {
   }
 }
 
+/** THE DRAWING SURFACE THE EXPORT ITSELF USES — A DIFFERENT LIMIT AGAIN.
+ *
+ *  The probe above asks about a WebGL2 drawing buffer, and its own header makes
+ *  the point that a framebuffer being accepted says nothing about a canvas being
+ *  accepted. The same split runs one level further down: a 2D context is not a
+ *  WebGL2 one either, and the export uses the 2D one. `exportImage` builds a
+ *  canvas at the full frame size, takes `getContext("2d")`, puts the finished
+ *  pixels into it and calls `toBlob`. So the limit that decides whether an
+ *  export comes out is this one, and nothing has ever measured it.
+ *
+ *  TWO SEPARATE CAPS, both documented with reproductions, neither respected by
+ *  the export path today.
+ *
+ *  The first is AREA. Safari refuses a canvas above a fixed number of pixels
+ *  regardless of how much memory is free — 16,777,216 on the version this was
+ *  written against, which is 4096x4096, and the refusal does not depend on the
+ *  shape: 4097x4096 is over it and 5120x3072 is under. A frame out of the camera
+ *  this app is built around is 5568x3712, which is 20,668,416 pixels, ABOVE that
+ *  number. Exports do come out on the reporter's iPad, so the cap is evidently
+ *  not biting there — but that is one device, the published figure is several
+ *  years old, and the app has never asked.
+ *
+ *  The second is TOTAL canvas memory across every canvas the page is holding,
+ *  and it is worse, because Safari keeps canvases alive after the last reference
+ *  to them is gone. Past the total, `getContext("2d")` starts returning null and
+ *  canvases draw transparent. The documented remedy is to resize to 1x1 and
+ *  clear before dropping one, which is what the export path does not do.
+ *
+ *  AND THE FAILURE MODE IS THE REASON THIS IS WORTH A PROBE RATHER THAN A NOTE:
+ *  it is not a crash. It is a photograph that comes out blank, from an export
+ *  that reported success. So the test is never "did the context exist" but DRAW
+ *  A KNOWN COLOUR AND READ IT BACK — the same standard the probe above settled
+ *  on, for the same reason.
+ *
+ *  Bounded on purpose. The hoarding ladder stops at roughly the export's own
+ *  600 MB budget rather than climbing until something dies, because this runs on
+ *  the reader's device and a diagnostic that kills the tab has answered nothing.
+ *  The area answer is recorded before the hoarding ladder starts, so the cheap
+ *  half survives if the expensive half goes badly. */
+async function theCanvasTheExportUses(): Promise<void> {
+  // A canvas of a given size, filled with a known colour and read back at the
+  // FAR corner — the near one can read correctly on a surface that was clamped,
+  // because the clamp keeps the origin. Returns null when the context was
+  // refused outright, false when it drew the wrong thing, true when it is real.
+  const drawsAt = (w: number, h: number): { ok: boolean; ctx: boolean; cv: HTMLCanvasElement } => {
+    const cv = document.createElement("canvas");
+    cv.width = w;
+    cv.height = h;
+    const c = cv.getContext("2d");
+    if (!c) return { ok: false, ctx: false, cv };
+    try {
+      c.fillStyle = "rgb(64, 128, 191)";
+      c.fillRect(0, 0, w, h);
+      const px = c.getImageData(w - 1, h - 1, 1, 1).data;
+      return { ok: Math.abs(px[0] - 64) <= 2 && Math.abs(px[1] - 128) <= 2 && Math.abs(px[2] - 191) <= 2, ctx: true, cv };
+    } catch {
+      // getImageData throws rather than returning wrong pixels in some builds;
+      // either way the surface is not usable for an export.
+      return { ok: false, ctx: true, cv };
+    }
+  };
+  const release = (cv: HTMLCanvasElement) => {
+    // THE DOCUMENTED RELEASE, not merely dropping the reference: Safari holds a
+    // canvas after nothing points at it, and a 1x1 clear is what makes it give
+    // the memory back. This probe would otherwise poison its own later rungs.
+    try { cv.width = 1; cv.height = 1; cv.getContext("2d")?.clearRect(0, 0, 1, 1); } catch { /* already gone */ }
+  };
+
+  // --- part one: how big a single 2D surface can be -------------------------
+  // Ordered by area, and chosen so the two sides of the published cap are both
+  // tested rather than inferred: 4096x4096 is exactly it, 4097x4096 is one row
+  // of pixels over, and the two frame sizes are what this app actually asks for.
+  const SIZES: Array<[number, number, string]> = [
+    [4096, 4096, "the published cap exactly"],
+    [4097, 4096, "one pixel row over it"],
+    [5120, 3072, "under the cap, but wider than 4096"],
+    [5568, 3712, "a frame from the camera this app is built around"],
+    [5600, 3728, "the frame size the rest of this page uses"],
+    [8192, 4096, "twice the published cap"],
+  ];
+  let biggest = 0, biggestLabel = "", firstRefusal = "", frameOk: boolean | null = null;
+  for (const [w, h, what] of SIZES) {
+    const r = drawsAt(w, h);
+    release(r.cv);
+    if (w === 5568 && h === 3712) frameOk = r.ok;
+    if (r.ok) {
+      if (w * h > biggest) { biggest = w * h; biggestLabel = `${w}x${h}`; }
+    } else if (!firstRefusal) {
+      firstRefusal = `${w}x${h} (${what})${r.ctx ? " drew nothing" : " was refused a drawing context"}`;
+    }
+    await tick();
+  }
+  row("The biggest surface the export can draw on",
+    biggest ? `${biggestLabel} — ${(biggest / 1e6).toFixed(1)} megapixels` : "none of the sizes tried",
+    (biggest
+      ? `The largest of the sizes tried that actually held a colour when it was read back. `
+      : `None of the sizes tried came back with the colour that was drawn into them, which would mean exports cannot work on this device at all by this route. `) +
+    (frameOk === true
+      ? `A whole frame from your camera — 5568x3712 — works, so a full-size export is not hitting this limit here.`
+      : frameOk === false
+        ? `A whole frame from your camera — 5568x3712 — did NOT work. That is the size the app exports at, so a full-size export on this device is producing a blank picture rather than failing loudly. This is the number that matters.`
+        : `The frame size was not reached.`) +
+    (firstRefusal ? ` First refusal: ${firstRefusal}.` : ` Nothing tried was refused.`));
+
+  // --- part two: how many at once, and whether releasing them helps ---------
+  // 5568x3712 at four bytes a pixel is about 83 MB a surface, so seven of them
+  // is roughly the 600 MB the export already budgets for itself. Stopping there
+  // is deliberate: past it this stops being a measurement and starts being an
+  // attempt to kill the reader's tab.
+  const FW = 5568, FH = 3712;
+  const eachMb = Math.round((FW * FH * 4) / 1e6);
+  const MOST = 7;
+  const held: HTMLCanvasElement[] = [];
+  let heldOk = 0;
+  try {
+    for (let i = 0; i < MOST; i++) {
+      const r = drawsAt(FW, FH);
+      held.push(r.cv);
+      if (!r.ok) break;
+      heldOk++;
+      await tick();
+    }
+    const hitIt = heldOk < MOST;
+    // AND THE HALF THAT MAKES IT ACTIONABLE: if holding them broke it, does the
+    // documented release actually give it back? A yes here says the export's
+    // missing cleanup is a real defect with a real remedy rather than a theory.
+    let recovered: boolean | null = null;
+    if (hitIt) {
+      for (const cv of held) release(cv);
+      held.length = 0;
+      await tick();
+      const again = drawsAt(FW, FH);
+      recovered = again.ok;
+      release(again.cv);
+    }
+    row("Surfaces this size it will hold at once",
+      hitIt ? `${heldOk} — about ${heldOk * eachMb} MB` : `at least ${heldOk} — about ${heldOk * eachMb} MB`,
+      `Each one is a whole frame at four bytes a pixel, roughly ${eachMb} MB, and they were kept rather than released — which is what the app does today, because it never releases the surface an export draws on. ` +
+      (hitIt
+        ? `The next one came back empty. ` +
+          (recovered === true
+            ? `Releasing the earlier ones gave it straight back, so exporting several photographs in one sitting can quietly start producing blank pictures on this device, and the fix is for the app to let each surface go when it is done with it.`
+            : recovered === false
+              ? `Releasing the earlier ones did NOT give it back, which is worse: once this device is in that state, only reloading the page appears to clear it.`
+              : `Whether releasing them gives it back was not established.`)
+        : `It never refused within the ${Math.round(MOST * eachMb / 100) * 100} MB this test is willing to ask for, which is about what the export budgets for itself. That is the reassuring answer — it does not prove there is no ceiling, only that this device's is further out than the app's own spending.`));
+  } finally {
+    for (const cv of held) release(cv);
+    held.length = 0;
+  }
+}
+
 /** COULD THE LIVE VIEW RUN AT FULL RESOLUTION ON THIS DEVICE?
  *
  *  The editor works on a downscaled copy of the photograph for one reason: a
@@ -1277,6 +1429,7 @@ async function fullResolutionPreview(): Promise<void> {
   await sameEverywhere();
   await drawnVersusComputed();
   await aCanvasTheSizeOfTheFrame();
+  await theCanvasTheExportUses();
   await fullResolutionPreview();
   await storage();
   btn.textContent = "Run again";
