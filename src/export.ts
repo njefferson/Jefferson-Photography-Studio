@@ -139,10 +139,16 @@ export interface BandResult {
   band: { from: number; to: number };
   /** Which way the band was cut — the axis the export's outer loop ran along. */
   axis: "rows" | "columns";
+  // BACKED BY A REAL ArrayBuffer, said explicitly. A worker TRANSFERS these
+  // rather than copying them, and a transferred buffer is always an ArrayBuffer
+  // — never the shared kind, which cannot be transferred at all. Left
+  // unparameterised, they widen to ArrayBufferLike and the main thread cannot
+  // hand the result to `ImageData` without a cast, which is a cast standing in
+  // for a fact the wire already guarantees.
   /** JPEG path: RGBA bytes, Display P3, `height` rows of `width`. */
-  data?: Uint8ClampedArray;
+  data?: Uint8ClampedArray<ArrayBuffer>;
   /** TIFF path: 16-bit RGB, same rectangle. */
-  rgb?: Uint16Array;
+  rgb?: Uint16Array<ArrayBuffer>;
   width: number;
   height: number;
 }
@@ -269,6 +275,27 @@ type ProfileMs = { [K in keyof ExportProfile]-?: ExportProfile[K] extends number
 let lastProfile: ExportProfile | null = null;
 export function lastExportProfile(): ExportProfile | null {
   return lastProfile;
+}
+
+/** LET A DRAWING SURFACE GO, the way the browser actually needs it let go.
+ *
+ *  Takes `canvas`, a surface nothing will draw on again. Returns nothing.
+ *
+ *  Dropping the last reference is NOT enough: Safari keeps a canvas alive after
+ *  that, and counts it against a total across the page, past which
+ *  `getContext("2d")` returns null and new surfaces draw transparent. Resizing
+ *  to 1x1 and clearing is what makes it give the memory back.
+ *
+ *  What the caller relies on: after this, the surface costs about nothing, so a
+ *  session that exports photograph after photograph does not walk into that
+ *  total. It is safe on a surface that was already refused a context — the one
+ *  path that most needs to release and has the least to release. */
+function releaseCanvas(canvas: HTMLCanvasElement): void {
+  try {
+    canvas.width = 1;
+    canvas.height = 1;
+    canvas.getContext("2d")?.clearRect(0, 0, 1, 1);
+  } catch { /* a surface already gone is a surface already released */ }
 }
 
 /** THE PHOTOGRAPH, FLATTENED FOR THE WIRE — never the live editor object.
@@ -642,7 +669,14 @@ export async function exportImage(
     // coordinates, so a worker holds a slice of the picture rather than a whole
     // copy of it. The rectangle is worked out above the branch; both formats
     // use the same one.
-    let data = new Uint8ClampedArray(bandW * bandH * 4);
+    // NOT ALLOCATED UNTIL IT IS KNOWN WHO FILLS IT. The pool returns the
+    // finished picture as its own buffer, so allocating one here first meant
+    // holding two full-size copies for the length of the stitch and throwing
+    // the untouched one away — about 126 MB of it on a 21-megapixel frame,
+    // spent at the exact moment the export is nearest whatever ceiling this
+    // device has. The single-threaded loop still needs one, so it is made
+    // below, once the pool has had its chance.
+    let data: Uint8ClampedArray<ArrayBuffer> | null = null;
     const p3 = new Float32Array(3);
     __a = performance.now();
     // SEVERAL CORES, WHEN THIS EXPORT CAN USE THEM. The bands run the same code
@@ -681,6 +715,8 @@ export async function exportImage(
     // DECIDED, either way — whether the pool ran or the export fell through to
     // the loop below, the number is now known and the strip can stop guessing.
     if (!opts.raw) { liveThreads = __t.threads; liveFallback = __t.fallback ?? null; }
+    // ADOPTED ABOVE, OR MADE HERE — never both.
+    data ??= new Uint8ClampedArray(bandW * bandH * 4);
     for (let oIdx = ranParallel ? to : from; oIdx < to; oIdx++) {
       if (oIdx % 16 === 0) {
         onProgress?.((oIdx - from) / Math.max(1, to - from));
@@ -734,16 +770,54 @@ export async function exportImage(
             data[o + 2] = data[o + 2] * (1 - a) + wp[2] * 255 * a;
           }
         }
+        // The mark's own surface counts against the same page-wide total the
+        // export's does, and it is finished with the moment its pixels are read.
+        releaseCanvas(wm.canvas);
       }
     }
     __mark("watermark", __a);
     __a = performance.now();
+    // THE DRAWING SURFACE, AND THE TWO WAYS A BROWSER REFUSES ONE WITHOUT
+    // SAYING SO.
+    //
+    // Safari caps a surface by AREA — 16,777,216 pixels on the version this was
+    // written against, which a 5568x3712 frame is already over — and caps the
+    // TOTAL across every surface the page is holding, past which
+    // `getContext("2d")` starts returning null and surfaces draw transparent.
+    // It also keeps a surface alive after the last reference to it is gone, so
+    // exporting several photographs in one sitting walks towards that total;
+    // the documented remedy is to resize to 1x1 and clear before letting go,
+    // which this never did.
+    //
+    // BOTH FAILURES LOOK LIKE SUCCESS. The old code asserted the context
+    // non-null with a `!`, so a refusal became a TypeError with no bearing on
+    // what went wrong, and a transparent draw became a blank photograph
+    // reported as a finished export. What the reader gets now is a sentence
+    // naming the limit and the size that hit it.
+    //
+    // The ceilings themselves are measured on the device rather than assumed —
+    // `theCanvasTheExportUses` on the test page asks both questions and prints
+    // what this device actually gives.
     const canvas = document.createElement("canvas");
     canvas.width = w;
     canvas.height = h;
-    const cctx = canvas.getContext("2d")!;
-    cctx.putImageData(new ImageData(data, w, h), 0, 0);
-    const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", opts.quality));
+    const cctx = canvas.getContext("2d");
+    if (!cctx) {
+      releaseCanvas(canvas);
+      throw new Error(
+        `This browser would not give the export a drawing surface ${w} by ${h} (${((w * h) / 1e6).toFixed(1)} megapixels). ` +
+        `Export at a smaller size, or close other photographs first.`);
+    }
+    let blob: Blob | null;
+    try {
+      cctx.putImageData(new ImageData(data, w, h), 0, 0);
+      blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", opts.quality));
+    } finally {
+      // RELEASED WHETHER OR NOT THE ENCODE WORKED. A failed export that leaves
+      // its surface behind makes the next one likelier to fail as well, which
+      // is how one refusal becomes a session of them.
+      releaseCanvas(canvas);
+    }
     if (!blob) throw new Error("JPEG encoding failed.");
     __mark("encode", __a);
     __a = performance.now();
@@ -768,7 +842,14 @@ export async function exportImage(
     // difference is billed in `perWorkerMb`, because the thread budget decides
     // how many workers may start and a band it thinks weighs two thirds of its
     // real size is a killed tab on a tablet.
-    const rgb = new Uint16Array(bandW * bandH * 3);
+    // NOT ALLOCATED UNTIL IT IS KNOWN WHO FILLS IT. The pool returns the
+    // finished picture as its own buffer, so allocating one here first meant
+    // holding two full-size copies for the length of the stitch and throwing
+    // the untouched one away — about 126 MB of it on a 21-megapixel frame,
+    // spent at the exact moment the export is nearest whatever ceiling this
+    // device has. The single-threaded loop still needs one, so it is made
+    // below, once the pool has had its chance.
+    let rgb: Uint16Array<ArrayBuffer> | null = null;
     __a = performance.now();
     // SEVERAL CORES, when this export can use them — the same call the JPEG
     // path makes, with the same fall-through on any failure: the reader asked
@@ -782,7 +863,7 @@ export async function exportImage(
           "cfa" in src ? { width: current.width, height: current.height, isRaw: current.isRaw } : forTheWire(current),
           params, opts, lens ?? null, sky ?? null, skyFine ?? null, w, h, jobT, onProgress);
         if (!split.rgb) throw new Error("the workers returned no 16-bit pixels");
-        rgb.set(split.rgb);
+        rgb = split.rgb;   // ADOPTED, not copied into a buffer made in advance
         __t.threads = split.threads;
         ranParallelT = true;
       } catch (err) {
@@ -791,6 +872,7 @@ export async function exportImage(
       }
     }
     if (!opts.raw) { liveThreads = __t.threads; liveFallback = __t.fallback ?? null; } // see the JPEG branch above
+    rgb ??= new Uint16Array(bandW * bandH * 3);   // adopted above, or made here
     for (let oIdx = ranParallelT ? to : from; oIdx < to; oIdx++) {
       if (oIdx % 16 === 0) {
         onProgress?.((oIdx - from) / Math.max(1, to - from));
@@ -844,6 +926,7 @@ export async function exportImage(
             rgb[o + 2] = rgb[o + 2] * (1 - a) + ld[li + 2] * 257 * a + 0.5;
           }
         }
+        releaseCanvas(wm.canvas);   // see the JPEG path above
       }
     }
     // THE WATERMARK IS THE WATERMARK, and it was billed to `encode` here while
