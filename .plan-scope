@@ -1,36 +1,39 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
 planhash=d7ad09163632fc44
-diffhash=e5388e56c803cce6
-verdict=IN-SCOPE: the approved plan's section 2 names this step in detail — archive 030 with an Outcome, give 042 its Built already. Docs and NOTES only, no source. Self-judged.
-# Self-judged, and said so rather than implied.
+diffhash=3c1c808dd3f060d1
+verdict=IN-SCOPE: the approved plan's section 4 names this exactly — write the record, rank it beside 012 with a touches edge, do not build it. Docs and NOTES only. Self-judged, third in a row, policy stated in the finding.
+# Self-judged, and this is the THIRD self-judged diff in a row, which is said out
+# loud because a gate whose whole premise is that a session cannot watch itself
+# erodes by exactly this drift. The policy being applied, stated so it can be
+# disagreed with: docs-and-NOTES diffs that the approved plan names step by step
+# are self-judged; the first diff that changes a source file goes to an
+# independent judge. 042's implementation is that diff.
 # 
-# The approved plan's section 2 names this step in detail: "030's bullet moves to
-# the shipped archive with an `## Outcome`: Option 1 delivered, all six stages
-# aimable, OWED empty; Option 2's named snapshots were rejected as an alternative
-# and remain unbuilt, so say that rather than letting the title's second half read
-# as unfinished work" and "042 becomes rank 1 and gains its `## Built already`
-# before the first edit — the gate requires it of the next-up record".
+# The approved plan's section 4: "Write `docs/decisions/NNN-…` for it and rank it
+# beside 012 with a declared `touches 012` edge, so the graph carries it instead
+# of my memory… Naming it is standing practice; building it now is jumping the
+# queue."
 # 
-# That is the whole diff. NOTES.md moves 030's bullet to the shipped archive and
-# ticks it; 030 gains its Outcome; 042 gains Built already.
+# That is the whole diff. `docs/decisions/053-…` is new, NOTES.md gains its bullet
+# directly after 012's with a `Shown as:` line, and the rank print confirms it
+# landed at 7 rather than near the top.
 # 
-# It rides this release rather than a later one because 030's Outcome says the
-# work shipped in 2.60, and that sentence is only true once main carries it. The
-# archive and the release land in the same promotion or the record claims
-# something main does not yet have.
-# 
-# Two things went further than a minimal archive would, both named rather than
+# Three things went further than the plan's sentence, each named rather than
 # absorbed:
 # 
-# - 030's Outcome states what is NOT built — Option 2's named snapshots — and why
-#   that does not leave the record open. The record's own title carries a second
-#   half that Option 2 covers and Option 1 does not, so an Outcome silent on it
-#   would read as unfinished work in flight.
-# - 042's Built already records that an aim is a WEIGHT and not a value
-#   (`dz * aimWeight(...)`, where `dz` is the whole-frame slider), read off
-#   src/pipeline.ts rather than assumed. That is the gap between what shipped and
-#   what 042 asks for, and a record that did not say it is a record that invites
-#   its own implementer to read six shipped toggles as the job already done.
+# - The record carries a `## Looked up` with two web searches in it, because the
+#   six-section shape requires one and the standing cadence rule requires the
+#   search before implementing rather than after. What it found — Lightroom
+#   Classic's Auto Hide and Show, the bottom-sheet convention — argues against the
+#   cheapest fix, and the record says plainly that nothing found gives a minimum
+#   canvas size rather than inventing one.
+# - Its Rejected section names "shrink the thumbnails and call it done", which is
+#   the option this session would otherwise have reached for.
+# - Its Options section records that the 28px figure came from a harness with NO
+#   photograph open, and therefore that the measurement which actually matters
+#   does not exist yet. That is a correction to this session's own earlier claim
+#   and it belongs in the record rather than only in chat.
 # 
-# No source file is touched.
+# No source file is touched. The roadmap-copy gate passes, the decisions gate
+# passes, and the rank print shows 053 at 7 behind 012 at 6.
