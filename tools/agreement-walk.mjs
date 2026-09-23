@@ -54,7 +54,7 @@
 // THE RAW ARM IS THE CONTROL. The assemblers differ on FILE KIND, so a walk with
 // only one kind cannot see the disagreement; and an arm that passes in both
 // states is what says the walk is not vacuous.
-import { openMasks } from "./walk-input.mjs";
+import { openMasks, closeMasks } from "./walk-input.mjs";
 import { chromium } from "playwright-core";
 import { requireFreshDist } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
@@ -516,6 +516,9 @@ try {
       // seconds in. Wait for Ready, then hand it over — the shape
       // tools/collect-walk.mjs already uses, which is where this was read from
       // rather than guessed at.
+      // Leave the mask place first: it takes the whole panel column, so the
+      // tab strip is not on screen while it is up (decision 042).
+      await closeMasks(page);
       await page.click("#ptab-export");
       await page.click("#exBtn");
       await page.waitForFunction(

@@ -27,7 +27,7 @@
 // captured off the page, never `element.click()` in an evaluate: a dispatched
 // event is not a gesture, and a harness that presses by id cannot tell you
 // whether a finger could have got there (hub LESSONS 348).
-import { openMasks } from "./walk-input.mjs";
+import { openMasks, closeMasks } from "./walk-input.mjs";
 import { chromium } from "playwright-core";
 import { requireFreshDist } from "./fresh-dist.mjs";
 import { readFileSync, existsSync, mkdtempSync, rmSync } from "node:fs";
@@ -118,7 +118,7 @@ try {
 
   // AN EDIT WORTH RECOGNISING. A default edit would let a keep file that
   // carried NO edit pass this walk, which is the failure it exists to catch.
-  await p.locator("#ptab-basic").click();
+  await closeMasks(p); await p.locator("#ptab-basic").click();
   await p.waitForTimeout(400);
   const MARK = "0.62";
   await p.evaluate((v) => {
@@ -143,7 +143,7 @@ try {
   const maskLabel = await p.locator("#maskList .mask-row").nth(0).locator(".mask-pick").textContent();
 
   // THE REAL PRESS, and the real save.
-  await p.locator("#ptab-export").click();
+  await closeMasks(p); await p.locator("#ptab-export").click();
   await p.waitForTimeout(500);
   const btn = p.locator("#keepFile");
   const box = await btn.boundingBox();
@@ -186,7 +186,7 @@ try {
   await p2.setInputFiles("#file", [saved]);
   await p2.waitForFunction(() => document.getElementById("welcome")?.hidden, null, { timeout: 300000 });
   await p2.waitForTimeout(3000);
-  await p2.locator("#ptab-basic").click();
+  await closeMasks(p2); await p2.locator("#ptab-basic").click();
   await p2.waitForTimeout(600);
   const after = await p2.evaluate(() => document.getElementById("sat").value);
   check("picking it back opens the photograph with the SAME edit on it", after, MARK);

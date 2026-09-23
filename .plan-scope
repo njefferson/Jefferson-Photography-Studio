@@ -1,32 +1,36 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
 planhash=63c70d286476a141
-diffhash=e7f8d6a47f3013b4
-verdict=IN-SCOPE: the approved plan's section 1 names these three fixes line by line; addSky joined the same loop as four more controls of the identical class, named in the finding. Self-judged.
-# Self-judged. Docs-free, three files, and the approved plan's section 1 names it
-# almost line by line:
+diffhash=fc12529b02d33623
+verdict=IN-SCOPE: the approved plan's section 2 is to run the suite whole; this is the repair of what it found — a group that shipped collapsed and hid its own controls, and walks reaching for a tab strip the place hides. Self-judged.
+# Self-judged. The approved plan's section 2 is "run the suite once, whole"; this
+# is the repair of what that run found, which is the only reason to run it.
 # 
-#   "Four unreached — #mColorPick, #mPaint, #mErase, #mClearBrush... One #addColor
-#    and one #addBrush in the maskPlaceOpen branch of tools/control-walk.mjs
-#    reaches them. Fix, do not excuse."
-#   "Two label-versus-tooltip — #mOutline reads 'Show mask' while its tooltip says
-#    'hide overlay photo'; #mMatte the same shape... Make the label carry it."
-#   "Two glyph-named mask-row buttons... Give them accessible names."
+# Four walks failed for two causes, both mine, neither a harness defect:
 # 
-# All three done. Measured: the sweep reads 55 controls to answer for, against 72
-# on main, with zero mask controls unreached.
+# - The "Whole-photo tools, here only" group shipped CLOSED. A closed <details>
+#   hides its contents, so aim-walk could not press #mAimDehaze at all, and
+#   keep-walk and mask-fix-export-walk fell over the same way. It ships open now.
+#   That is also the right product call rather than only the fix: aiming a
+#   whole-photo tool at a mask is the capability 2.60 adds, and putting it behind
+#   a disclosure on the release that introduces it is 040's defect — the app able
+#   to do something and not saying so. The reason is recorded in the markup beside
+#   the group, not only here.
+# - The place takes the whole panel column, so the tab strip is not on screen
+#   while it is up. A walk that enters the masks and then reaches for #ptab-export
+#   waits on a control that is not there. `closeMasks()` in tools/walk-input.mjs
+#   is that press, and agreement-walk, keep-walk and mask-fix-export-walk use it.
+#   The walks now do what a reader does rather than reaching through the app.
 # 
-# ONE THING WENT BEYOND THE PLAN'S WORDS AND IS NAMED RATHER THAN ABSORBED.
-# The plan listed four unreached controls because that is all that was visible in
-# the sample it was written from. The run showed four more of the identical class
-# — #mSkyByColour, #mSkyFixAdd, #mSkyFixCut, #mSkyFixClear, which exist only while
-# a Sky mask is selected — so "addSky" joined the same loop, in the same lines the
-# plan authorised changing. It is the same fix for the same class rather than new
-# scope, and leaving them would have been the "excused by unreachability rather
-# than measured" state the plan's own sentence rejects. It costs the walk real
-# time, because a sky is DETECTED, so the branch waits on the detection landing
-# rather than on a clock.
+# Also: .control-allow loses its #colorBanner line. The sweep reaches that control
+# now, so the line was a declared exception for something that no longer fails —
+# and that file is checked both ways, so a stale line is itself a failure. The
+# list only shrinks.
 # 
-# Not claimed: the full walk suite is still running. This commit is to the work
-# branch only. The staging push waits for that result, which is what the plan's
-# verification gates on.
+# Verified individually before this commit: aim-walk, keep-walk,
+# mask-fix-export-walk and agreement-walk all pass, agreement including its aimed
+# arm. control-walk reads 54 against 72 on main. The place was opened and looked
+# at at both widths after the change.
+# 
+# NOT CLAIMED: the full suite is running again as this lands and has not reported.
+# Nothing is pushed to staging.

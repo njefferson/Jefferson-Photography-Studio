@@ -143,3 +143,24 @@ export async function openMasks(page) {
   await page.locator("#maskPlaceOpen").click();
   await page.waitForFunction(() => !document.getElementById("maskPlace")?.hidden, null, { timeout: 30000 });
 }
+
+/** LEAVE THE MASK PLACE, BACK TO THE TAB YOU WERE ON.
+ *
+ *  Takes `page`. Presses "Done with masks" if the place is open and returns
+ *  nothing; a no-op when it is already closed.
+ *
+ *  WHY A WALK NEEDS THIS. The place takes the whole panel column — the tab
+ *  strip is hidden while it is up, which is what "its own place" means
+ *  (decision 042). So a walk that enters the masks and then reaches for
+ *  `#ptab-export` is asking for a control that is not on screen, and Playwright
+ *  waits on it until it times out. That is not a harness defect: it is the walk
+ *  skipping the press a reader has to make. This is that press.
+ *
+ *  What the caller relies on: after this resolves the tab strip is back and any
+ *  `#ptab-*` is clickable again. */
+export async function closeMasks(page) {
+  const open = await page.evaluate(() => !document.getElementById("maskPlace")?.hidden);
+  if (!open) return;
+  await page.locator("#maskPlaceClose").click();
+  await page.waitForFunction(() => !!document.getElementById("maskPlace")?.hidden, null, { timeout: 30000 });
+}
