@@ -1,29 +1,36 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
 planhash=0ca28ae701655148
-diffhash=a9fd1c25c763b146
-verdict=IN-SCOPE: items A and B of the approved increment release, with C, D, the spots exclusion and the ratchet all confirmed absent, plus a regression walk for the defect being fixed.
+diffhash=3adb6f6217c032d9
+verdict=IN-SCOPE: items C and D of the approved increment release, with the parallel module, the spots exclusion and the ratchet all absent, and both buffer-adoption correctness risks checked.
 # Independent scope judge, reading the plan by path and the staged diff.
 # 
-# Implements A and B and nothing beyond them. A is forTheWire, a named-field
-# plain object replacing the live decoded image at both post sites, with the sky
-# selection and its promise correctly left out. B is the recorded reason beside
-# the live thread count, its accessor, its field on the profile, and the two
-# reader-facing lines that carry it.
+# Two files only: src/export.ts and the module map's regenerated line count.
 # 
-# The derived ProfileMs type is part of B rather than drift: adding a string field
-# to the profile stopped the timing marks compiling, and deriving the markable
-# keys from the interface is the narrow fix.
+# C is implemented on both sides. The 16-bit path adopts the stitched result
+# instead of setting it into a buffer made in advance, and both paths now allocate
+# only on the fallback, which is the hoist the plan names.
 # 
-# C is confirmed absent: the TIFF branch still sets into a pre-allocated buffer.
-# D is confirmed absent: nothing near the drawing-surface block is touched. No
-# change to the parallel-export module, the spots exclusion or any ratchet, by
-# grep over the diff.
+# D is implemented as the plan states it: the drawing context is no longer
+# asserted non-null, a refusal throws a named error carrying the size, and the
+# surface is released on every exit path including a failed encode. The
+# area clamp against a probe-measured ceiling is correctly deferred, because that
+# number does not exist until the probe has run on a device.
 # 
-# The module map carries only two regenerated line counts, no prose and no new
-# entries.
+# The watermark layer's surface is released at both sites. Judged in scope: same
+# defect class, same helper, same path, no new capability.
 # 
-# The new walk is judged in scope rather than creep: it asserts the exact property
-# A establishes, on the batch path the research showed was the broken one, in the
-# repo's own walk shape, and this repo requires a new test to fail once before it
-# is trusted — which it did, three times over, against the planted defect.
+# The band result types are tightened to real buffers. Judged a consequence of C
+# rather than unrelated: the parallel module already declared that return type and
+# already carried a cast to reach it, and the direct assignment now type-checks as
+# what the wire actually guarantees.
+# 
+# Absent: the parallel module, the spots exclusion, any ratchet, main.ts and every
+# walk.
+# 
+# Correctness, checked by reading the whole surrounding branch rather than the
+# diff alone. No path reaches a use of either buffer while it is null: every read
+# sits after the line that allocates on fallback, with no branch or early return
+# between. No wrong-length adoption: this is the top-level call, so the band is
+# the whole frame and the stitched result is sized identically to what the eager
+# allocation would have produced.
