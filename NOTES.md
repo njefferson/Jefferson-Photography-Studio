@@ -902,15 +902,16 @@ user-scalable=no.
   before today and the only change is that it is now visible. See
   `docs/decisions/046-the-control-sweep-reaches-two-thirds-of-the-controls.md`.
 - [ ] **The export panel says "save" twice and means two different things** <!-- decision: 054 -->
-  **Shown as:** The export panel now says plainly which button makes a picture to send and which one saves your work to come back to.
+  **Shown as:** The export panel says plainly which button makes a picture to send and which one saves work you can come back to.
   Reported from the device 2026-09-23. Four controls sit on that panel and the
   words do not separate them: "Save this photo as a file" writes the `.ipskeep`
   that holds the original photograph and reopens here, "Export & Save" writes a
   finished JPEG or TIFF, and the two batch controls are "Export all" and "Save
   them all". Three of the four carry "Save", two carry "Export", and both words
   are used for both jobs — so they read as two routes to the same place. The
-  explanatory note under the first one runs forty words before the difference
-  becomes clear, which is forty words after the reader has had to choose.
+  explanatory note under the first one runs thirty-eight words before the
+  difference becomes clear, which is thirty-eight words after the reader has had
+  to choose.
   The distinction the labels are failing to carry is **a working file versus a
   finished picture**. The record's research found that this is not a defect of
   having two controls: Affinity Photo, Photoshop, Capture One and Lightroom all

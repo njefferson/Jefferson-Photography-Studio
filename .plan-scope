@@ -1,24 +1,19 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
 planhash=11db529d9f0a80c5
-diffhash=893bff9fbf732e51
-verdict=IN-SCOPE: the diff adds only the 054 decision record and its roadmap bullet, which is plan Section 1's first executable step, and builds none of the label change it holds for later.
-# Independent scope judge, reading /root/.claude/plans/linear-baking-island.md by
-# path and the staged diff.
+diffhash=9d5bbe67643a4539
+verdict=IN-SCOPE: the diff corrects only the two prose defects the verification found in the 054 recording, and touches no product code, option, rejection or rank.
+# Independent scope judge, reading the plan by path and the staged diff.
 # 
-# Two files changed: NOTES.md (one inserted roadmap bullet, pure insertion) and
-# the new docs/decisions/054-the-export-panel-says-save-twice.md. No hunk touches
-# ir.html, src/, tools/, .github/, or any gate configuration. No button is
-# renamed anywhere — the four controls are described in prose only, which is what
-# plan Section 1 holds for a later session.
+# Two files, both prose. NOTES.md: the 054 bullet's reader-facing Shown as line
+# drops the completed-tense "now" for an item the same bullet marks HELD two
+# lines below, and the hand-counted note length goes to thirty-eight. The 054
+# record: the same count corrected in Context and in rejected option 2.
 # 
-# The record carries Context, Looked up with named sources, Weighed against (043,
-# 051), Depends (touches 043, touches 051), Options with the chosen direction
-# first, Rejected with four alternatives, and Rank. The roadmap bullet carries the
-# decision key on its first line and a Shown as line.
+# The Options and Rank sections were read in full, not only in the diff, and are
+# byte-identical: the chosen direction, the four options, the four rejected
+# paragraphs and the held rank are all unchanged. Only the numeral inside
+# rejected option 2's justification moved.
 # 
-# Rank matches the plan: below the near-term queue, nothing above depends on it,
-# and being reported is not what privileges it.
-# 
-# Nothing in the diff references exportparallel.ts, canRunParallel, heal.ts,
-# thread pools or OPFS — plan Section 2's research is untouched.
+# Nothing touches ir.html or src/. No control is renamed, which the plan holds
+# for a later session. Nothing references the export threading work.
