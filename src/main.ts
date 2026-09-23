@@ -22,7 +22,7 @@ import { type DecodedImage, pickLargestPreview, linearAt, grayWorldWB, lumNormal
 import { decodeOffThread, decodeLanes, decodeLaneTarget, type DecodeTiming } from "./decodeClient";
 import { sourceIsMosaiced, type ExportOptions } from "./export";
 import { Renderer, type EditParams } from "./gl";
-import { exportImage, saveBlob, lastExportProfile, exportThreadsNow, getSource, proxyFactorFor, type ExportFormat } from "./export";
+import { exportImage, saveBlob, lastExportProfile, exportThreadsNow, exportFallbackReason, getSource, proxyFactorFor, type ExportFormat } from "./export";
 import { writeKeepFile, readKeepFile, sniffKeep, KEEP_EXT, KEEP_SNIFF_BYTES } from "./keepfile";
 import { buildLinearSourceInBands } from "./gpuexport";
 import { fromHalf } from "./half";
@@ -10807,7 +10807,14 @@ let keptInMemory = "";
  *  What the result has to satisfy: it can never disagree with the "Last export"
  *  line in the §7f report, because both come from the same number. */
 function threadNote(): string {
-  return exportThreadsNow() === 1 ? " — on one thread" : "";
+  if (exportThreadsNow() !== 1) return "";
+  // AND WHY, WHEN THERE IS A WHY. One thread because the photograph is small,
+  // or because several cores were asked for and none started, are the same
+  // sentence to a reader and were the same sentence here for the whole life of
+  // the feature — which is how an export that could never start a worker went
+  // unnoticed. The strip stays short: the reason itself belongs in the report,
+  // where it can be read and copied rather than watched going past.
+  return exportFallbackReason() ? " — on one thread, the others would not start" : " — on one thread";
 }
 
 /** Whether the last activateCurrent was a first visit (a fresh baseline and a
@@ -12699,6 +12706,11 @@ function exportSplit(): string {
   const s = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
   return `${p.megapixels.toFixed(1)} MP in ${s(p.total)} — reading ${s(p.source)}, pixels ${s(p.pixels)}` +
     ` on ${p.threads === 1 ? "one thread" : `${p.threads} threads`}` +
+    // THE WHOLE POINT OF THE LINE, when it is there: the export asked for
+    // several threads and got none, and this says what stopped them in the
+    // failure's own words. A report that said "one thread" and nothing else is
+    // what let a broken pool look like a small photograph.
+    (p.fallback ? ` (the pool would not start: ${p.fallback})` : "") +
     `, encode ${s(p.encode)}, metadata ${s(p.tag + p.watermark)}, paused ${s(p.yieldMs)} over ${p.yields} yields`;
 }
 

@@ -93,6 +93,20 @@ export interface ExportOptions {
  *  disagree about one run. */
 let liveThreads = 0;
 
+/** WHY THE POOL DID NOT RUN, for the export happening right now.
+ *
+ *  Null when it ran, when it was never eligible, or before an export has got
+ *  that far. A string only when the pool was asked for and failed, and the
+ *  string is the failure's own message rather than a category, because the one
+ *  that mattered was a `DataCloneError` naming the thing that could not be
+ *  copied, and a tidier word for it would have thrown that away.
+ *
+ *  It exists because the fallback was a `console.warn`. A tablet has no
+ *  console, so an export that asked for eight threads, failed to start any, and
+ *  ran on one looked exactly like an export that was never going to be split —
+ *  and it did that for every JPEG the app has ever written. */
+let liveFallback: string | null = null;
+
 /** HOW MANY THREADS THE EXPORT RUNNING RIGHT NOW IS USING.
  *
  *  Takes nothing. Returns the pool size the current export settled on, or 0
@@ -105,6 +119,20 @@ let liveThreads = 0;
  *  on a 0 rather than guessing. */
 export function exportThreadsNow(): number {
   return liveThreads;
+}
+
+/** WHY THE EXPORT RUNNING RIGHT NOW IS ON ONE THREAD, when it tried not to be.
+ *
+ *  Takes nothing. Returns the failure's message, or null when the pool ran,
+ *  when it was never eligible, or when no export has reached that point.
+ *
+ *  What the result has to satisfy: it is the same string `ExportProfile.fallback`
+ *  records for this run, so the progress strip and the §7f report cannot
+ *  disagree about one export — the defect that made `liveThreads` a fact rather
+ *  than a prediction in the first place. Its consumers are `threadNote` in
+ *  main.ts and the diagnostic's last-export line. */
+export function exportFallbackReason(): string | null {
+  return liveFallback;
 }
 
 export interface BandResult {
@@ -220,10 +248,83 @@ export interface ExportProfile {
    *  saying "this is slow on mine" is otherwise indistinguishable from a device
    *  that quietly fell back to one thread. */
   threads: number;
+  /** WHY it is 1, when the pool was eligible and did not run. Absent when the
+   *  pool ran, and absent when it was never eligible — a photograph small
+   *  enough not to be worth splitting is not a failure and must not read like
+   *  one. Present only when the export ASKED for several threads and got none,
+   *  which is the case that was invisible for the whole life of the feature. */
+  fallback?: string;
 }
+/** The fields `__mark` may add a duration to — every NUMERIC member of
+ *  `ExportProfile`, derived from the interface rather than listed beside it.
+ *
+ *  It is derived because the alternative is a second list: `fallback` was added
+ *  to the profile as a string and `__t[k] += ...` immediately stopped compiling,
+ *  which is the type system catching the exact class of defect this repository
+ *  keeps paying for — one rule written down twice, one copy updated. A new
+ *  timing field joins this automatically; a new non-timing one cannot be marked
+ *  by accident. */
+type ProfileMs = { [K in keyof ExportProfile]-?: ExportProfile[K] extends number ? K : never }[keyof ExportProfile];
+
 let lastProfile: ExportProfile | null = null;
 export function lastExportProfile(): ExportProfile | null {
   return lastProfile;
+}
+
+/** THE PHOTOGRAPH, FLATTENED FOR THE WIRE — never the live editor object.
+ *
+ *  Takes `current`, the `DecodedImage` the editor is holding. Returns a plain
+ *  object carrying only its data fields, which `postMessage` can structured-
+ *  clone. The invariant the callers depend on: everything `getSource` reads for
+ *  a non-mosaiced source — `pixels`, `width`, `height` — survives, and nothing
+ *  that cannot be cloned does.
+ *
+ *  WHY THIS EXISTS, AND WHY IT NAMES ITS FIELDS ONE BY ONE. The two posts below
+ *  used to hand the live `DecodedImage` straight to `postMessage`. That object
+ *  can carry `skySelReady` — a PROMISE, set by a decode asked for a sky
+ *  selection and deleted nowhere — and a Promise cannot be structured-cloned:
+ *  the post throws `DataCloneError`, `Promise.all` rejects, and the `catch`
+ *  around the pool logs a line to a console nobody on a tablet can see and
+ *  quietly exports on one thread.
+ *
+ *  MEASURED, rather than reasoned about, because the first account of this was
+ *  wrong in a way that would have gone into a release note. Driving the app in
+ *  a browser and reading what actually reaches `postMessage`:
+ *
+ *    - DEVELOPING A SET fires it. `runBatch` hands `exportImage` the decoded
+ *      image itself, and the payload arrives as `width, height, pixels, isRaw,
+ *      skySelReady` with `structuredClone` throwing `DataCloneError` on it.
+ *      Every photograph in every set went to one thread.
+ *    - EXPORTING THE OPEN PHOTOGRAPH did NOT. The same test on a 7.7-megapixel
+ *      JPEG posted `width, height, pixels, isRaw` and cloned cleanly, so the
+ *      single-photograph path was never affected and must not be described as
+ *      though it was.
+ *
+ *  The first draft of this comment said every JPEG export had been
+ *  single-threaded for the life of the field. The plant that was supposed to
+ *  demonstrate it exported on three threads instead, which is what sent
+ *  somebody to look at the wire rather than at the source.
+ *
+ *  Structured clone is a WHOLE-OBJECT operation, so a deny-list of "the fields
+ *  we know are troublesome" is a gate that fails the day somebody adds the next
+ *  one. Naming what travels is the only shape that cannot rot: a new field on
+ *  `DecodedImage` does not reach the wire until somebody writes it here.
+ *
+ *  `skySel` is left behind deliberately rather than merely as a Promise's
+ *  neighbour — the selection already travels as `sky` and `skyFine`, so copying
+ *  it again would cost every worker a second copy of the same mask. */
+function forTheWire(current: DecodedImage): DecodedImage {
+  return {
+    width: current.width,
+    height: current.height,
+    isRaw: current.isRaw,
+    pixels: current.pixels,
+    linear: current.linear,
+    camMatrix: current.camMatrix,
+    rotate: current.rotate,
+    lensApplied: current.lensApplied,
+    previewNotice: current.previewNotice,
+  };
 }
 
 // TWO SHAPES, ONE IMPLEMENTATION. A worker asks for `raw: true` and gets its
@@ -262,9 +363,12 @@ export async function exportImage(
   skyFine?: BrushMask | null,
 ): Promise<ExportResult | BandResult> {
   const __t: ExportProfile = { megapixels: 0, total: 0, source: 0, pixels: 0, watermark: 0, encode: 0, tag: 0, yields: 0, yieldMs: 0, threads: 1 };
+  // A NEW EXPORT OWNS ITS OWN ANSWER. Left over from the previous one, a
+  // reason would attach itself to a run that succeeded.
+  if (!opts.raw) liveFallback = null;
   // A BAND IS PART OF SOMEBODY ELSE'S EXPORT and must not touch the live count.
   if (!opts.raw) liveThreads = 0;
-  const __mark = (k: keyof ExportProfile, from: number) => { __t[k] += performance.now() - from; };
+  const __mark = (k: ProfileMs, from: number) => { __t[k] += performance.now() - from; };
   const __start = performance.now();
   let __a = __start;
   const src = getSource(file, current);
@@ -559,7 +663,7 @@ export async function exportImage(
           // copied per worker for pixels `getSource` will not look at. Sent
           // whole only when the decode IS the source (JPEG, HEIC, a preview,
           // a lossy-linear DNG), which is the same test getSource makes.
-          "cfa" in src ? { width: current.width, height: current.height, isRaw: current.isRaw } : current,
+          "cfa" in src ? { width: current.width, height: current.height, isRaw: current.isRaw } : forTheWire(current),
           params, opts, lens ?? null, sky ?? null, skyFine ?? null, w, h, job, onProgress);
         // The JPEG path asked for 8-bit bands, so 8-bit bands are what came
         // back; the check is here rather than assumed because `exportBands`
@@ -570,12 +674,13 @@ export async function exportImage(
         __t.threads = split.threads;
         ranParallel = true;
       } catch (err) {
+        __t.fallback = String((err as Error)?.message ?? err);
         console.warn("parallel export failed, falling back to one thread:", err);
       }
     }
     // DECIDED, either way — whether the pool ran or the export fell through to
     // the loop below, the number is now known and the strip can stop guessing.
-    if (!opts.raw) liveThreads = __t.threads;
+    if (!opts.raw) { liveThreads = __t.threads; liveFallback = __t.fallback ?? null; }
     for (let oIdx = ranParallel ? to : from; oIdx < to; oIdx++) {
       if (oIdx % 16 === 0) {
         onProgress?.((oIdx - from) / Math.max(1, to - from));
@@ -674,17 +779,18 @@ export async function exportImage(
       try {
         const split = await exportBands(
           file,
-          "cfa" in src ? { width: current.width, height: current.height, isRaw: current.isRaw } : current,
+          "cfa" in src ? { width: current.width, height: current.height, isRaw: current.isRaw } : forTheWire(current),
           params, opts, lens ?? null, sky ?? null, skyFine ?? null, w, h, jobT, onProgress);
         if (!split.rgb) throw new Error("the workers returned no 16-bit pixels");
         rgb.set(split.rgb);
         __t.threads = split.threads;
         ranParallelT = true;
       } catch (err) {
+        __t.fallback = String((err as Error)?.message ?? err);
         console.warn("parallel TIFF export failed, falling back to one thread:", err);
       }
     }
-    if (!opts.raw) liveThreads = __t.threads; // see the JPEG branch above
+    if (!opts.raw) { liveThreads = __t.threads; liveFallback = __t.fallback ?? null; } // see the JPEG branch above
     for (let oIdx = ranParallelT ? to : from; oIdx < to; oIdx++) {
       if (oIdx % 16 === 0) {
         onProgress?.((oIdx - from) / Math.max(1, to - from));

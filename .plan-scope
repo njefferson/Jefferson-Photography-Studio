@@ -1,30 +1,29 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
 planhash=0ca28ae701655148
-diffhash=66caa798ebac0a40
-verdict=IN-SCOPE: the ceiling probe plus a regenerated module-map line count and the gate's own ledger, with none of the plan's later export-path work present.
+diffhash=a9fd1c25c763b146
+verdict=IN-SCOPE: items A and B of the approved increment release, with C, D, the spots exclusion and the ratchet all confirmed absent, plus a regression walk for the defect being fixed.
 # Independent scope judge, reading the plan by path and the staged diff.
 # 
-# Three files: src/debug.ts, docs/ARCHITECTURE.md and .plan-scope. No product
-# code beyond the probe. No src/export.ts, no src/exportparallel.ts, no
-# src/main.ts, no decision record.
+# Implements A and B and nothing beyond them. A is forTheWire, a named-field
+# plain object replacing the live decoded image at both post sites, with the sky
+# selection and its promise correctly left out. B is the recorded reason beside
+# the live thread count, its accessor, its field on the profile, and the two
+# reader-facing lines that carry it.
 # 
-# The module map's change is one line — src/debug.ts's generated line count moving
-# 1288 to 1441 — and the arithmetic was checked rather than taken on trust: the
-# two hunks add 152 and 1 lines, and 1288 plus 153 is 1441. The description text
-# is unchanged. .plan-scope is the gate's own ledger, rewritten wholesale on every
-# recorded verdict, as its header declares.
+# The derived ProfileMs type is part of B rather than drift: adding a string field
+# to the profile stopped the timing marks compiling, and deriving the markable
+# keys from the interface is the narrow fix.
 # 
-# src/debug.ts has two hunks: the new probe function, placed between its two
-# siblings, and one call in the existing run sequence beside them. No other
-# function, control or call site is touched.
+# C is confirmed absent: the TIFF branch still sets into a pre-allocated buffer.
+# D is confirmed absent: nothing near the drawing-surface block is touched. No
+# change to the parallel-export module, the spots exclusion or any ratchet, by
+# grep over the diff.
 # 
-# None of the plan's later items are present — the Promise fix, the loud fallback,
-# the TIFF copy, the export path's own drawing-surface defects, the spots
-# exclusion and the ratchet are all absent. The probe measures the two caps the
-# plan says those lines violate and modifies none of them.
+# The module map carries only two regenerated line counts, no prose and no new
+# entries.
 # 
-# Read-only, self-cleaning and bounded, checked in the new code rather than
-# assumed: no storage or app-state write anywhere, a release after every draw in
-# part one, a finally covering the early break in part two, six fixed sizes and a
-# hard stop at seven frame-sized surfaces.
+# The new walk is judged in scope rather than creep: it asserts the exact property
+# A establishes, on the batch path the research showed was the broken one, in the
+# repo's own walk shape, and this repo requires a new test to fail once before it
+# is trusted — which it did, three times over, against the planted defect.
