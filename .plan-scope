@@ -1,36 +1,24 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=63c70d286476a141
-diffhash=fc12529b02d33623
-verdict=IN-SCOPE: the approved plan's section 2 is to run the suite whole; this is the repair of what it found — a group that shipped collapsed and hid its own controls, and walks reaching for a tab strip the place hides. Self-judged.
-# Self-judged. The approved plan's section 2 is "run the suite once, whole"; this
-# is the repair of what that run found, which is the only reason to run it.
+planhash=11db529d9f0a80c5
+diffhash=893bff9fbf732e51
+verdict=IN-SCOPE: the diff adds only the 054 decision record and its roadmap bullet, which is plan Section 1's first executable step, and builds none of the label change it holds for later.
+# Independent scope judge, reading /root/.claude/plans/linear-baking-island.md by
+# path and the staged diff.
 # 
-# Four walks failed for two causes, both mine, neither a harness defect:
+# Two files changed: NOTES.md (one inserted roadmap bullet, pure insertion) and
+# the new docs/decisions/054-the-export-panel-says-save-twice.md. No hunk touches
+# ir.html, src/, tools/, .github/, or any gate configuration. No button is
+# renamed anywhere — the four controls are described in prose only, which is what
+# plan Section 1 holds for a later session.
 # 
-# - The "Whole-photo tools, here only" group shipped CLOSED. A closed <details>
-#   hides its contents, so aim-walk could not press #mAimDehaze at all, and
-#   keep-walk and mask-fix-export-walk fell over the same way. It ships open now.
-#   That is also the right product call rather than only the fix: aiming a
-#   whole-photo tool at a mask is the capability 2.60 adds, and putting it behind
-#   a disclosure on the release that introduces it is 040's defect — the app able
-#   to do something and not saying so. The reason is recorded in the markup beside
-#   the group, not only here.
-# - The place takes the whole panel column, so the tab strip is not on screen
-#   while it is up. A walk that enters the masks and then reaches for #ptab-export
-#   waits on a control that is not there. `closeMasks()` in tools/walk-input.mjs
-#   is that press, and agreement-walk, keep-walk and mask-fix-export-walk use it.
-#   The walks now do what a reader does rather than reaching through the app.
+# The record carries Context, Looked up with named sources, Weighed against (043,
+# 051), Depends (touches 043, touches 051), Options with the chosen direction
+# first, Rejected with four alternatives, and Rank. The roadmap bullet carries the
+# decision key on its first line and a Shown as line.
 # 
-# Also: .control-allow loses its #colorBanner line. The sweep reaches that control
-# now, so the line was a declared exception for something that no longer fails —
-# and that file is checked both ways, so a stale line is itself a failure. The
-# list only shrinks.
+# Rank matches the plan: below the near-term queue, nothing above depends on it,
+# and being reported is not what privileges it.
 # 
-# Verified individually before this commit: aim-walk, keep-walk,
-# mask-fix-export-walk and agreement-walk all pass, agreement including its aimed
-# arm. control-walk reads 54 against 72 on main. The place was opened and looked
-# at at both widths after the change.
-# 
-# NOT CLAIMED: the full suite is running again as this lands and has not reported.
-# Nothing is pushed to staging.
+# Nothing in the diff references exportparallel.ts, canRunParallel, heal.ts,
+# thread pools or OPFS — plan Section 2's research is untouched.
