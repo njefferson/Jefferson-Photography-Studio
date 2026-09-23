@@ -42,12 +42,12 @@ and not in Safari.
 
 **And a page gets no exception when it dies.** Jeff Johnson's measurement
 (lapcatsoftware.com, January 2026, iOS 26.2) states it directly: `try`/`catch`
-does not help, there is no JavaScript exception to catch. A couple of his runs
-froze the iPad hard enough that it appeared to reboot. This is the fact that
+does not help, there is no JavaScript exception to catch. Two runs in that
+measurement froze the iPad hard enough that it appeared to reboot. This is the fact that
 decides the shape of everything below — a catchable allocation failure and a
 process kill are different events, and only one of them can be handled.
 
-**His headline figures are nominal, not bytes, and must not be budgeted
+**Those headline figures are nominal, not bytes, and must not be budgeted
 against.** The test pushes `size * 1024 * 1024` one-character strings into an
 array, so "crashes at around 200 MB" on an 8th-generation iPad is about 210
 million array slots. At the eight bytes a 64-bit slot costs at minimum that is
