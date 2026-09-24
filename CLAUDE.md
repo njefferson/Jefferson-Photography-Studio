@@ -144,7 +144,9 @@ it: a gate that only counts says a filing cabinet is full.
   to test AND no other branch is already waiting for a go to `main` — being
   asked for it is the signal this rule was broken (owner rule, 2026-07-13). Staging
   may be force-pushed: its history is disposable, but check first that every
-  staging-only commit is already contained in `main` (`git cherry`).
+  staging-only commit is already contained in `main` — BY CONTENT (a diff of the
+  shipped paths between the two), never by `git cherry`, which answers by patch
+  identity and so reads every rebase-merged commit as missing (hub LESSONS §352).
 - Parallel sessions happen. Before pushing anywhere, fetch and check what
   `main` and `staging` actually contain — a roadmap item may have shipped
   from another session mid-work (it happened 2026-07-13: two sessions built

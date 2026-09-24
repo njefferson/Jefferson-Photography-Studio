@@ -28,6 +28,11 @@ import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
+// WHAT THIS CANNOT SEE, said here so its green is not read as more (hub
+// LESSONS §352). It refuses a TICKED item left in the open roadmap: the tidy
+// mistake. It cannot see the hurried one, an UNTICKED item whose work has
+// already shipped, because nothing in NOTES.md says so. A commit that both fixes
+// something and files its bullet has to archive the bullet in the same commit.
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
 const notes = readFileSync(join(repo, "NOTES.md"), "utf8");
 const lines = notes.split("\n");
@@ -209,9 +214,29 @@ const dateOf = (e) => {
 };
 const daysBetween = (a, b) => Math.round((new Date(b) - new Date(a)) / 86_400_000);
 
+/** THE `Shown as:` PATTERN, READ OUT OF vite.config.ts, as roadmap-copy-check
+ *  reads it. Takes nothing. Returns the RegExp the build parses NOTES.md with,
+ *  so this gate and notesPage() agree on which entries render. Throws when it is
+ *  no longer a one-line literal, so a rename cannot make the two disagree quietly. */
+function shownAsPattern() {
+  const src = readFileSync(join(repo, "vite.config.ts"), "utf8");
+  const m = src.match(/^const SHOWN_AS = (\/.*\/[a-z]*);$/m);
+  if (!m) throw new Error("vite.config.ts no longer declares SHOWN_AS as a one-line regex literal. Fix the reader rather than copying the pattern here.");
+  return new RegExp(m[1].replace(/^\//, "").replace(/\/[a-z]*$/, ""), m[1].match(/\/([a-z]*)$/)[1]);
+}
+
+// THE WINDOW IS WHAT RENDERS, NOT WHAT THE SLICE BOUND SAYS. notesPage() drops
+// an entry with no `Shown as:` line, or one declared `internal`, BEFORE it
+// slices. This used to slice the unfiltered archive and print "shows the FIRST
+// 12" while the page carried 5, because entries archived before 2026-09-22
+// predate the line. So the filter is the build's own, and the count printed is
+// the count rendered.
+const SHOWN_AS = shownAsPattern();
+const shownLineOf = (e) => { for (const l of e.body) { const m = l.match(SHOWN_AS); if (m) return m[1].trim(); } return ""; };
 const arch = entries(/^##\s+Shipped \(roadmap archive\)/i).filter((e) => e.done);
+const renders = arch.filter((e) => { const t = shownLineOf(e); return t && !/^internal$/i.test(t); });
 const win = renderWindow();
-const shown = (win.reversed ? [...arch].reverse() : arch).slice(0, win.size);
+const shown = (win.reversed ? [...renders].reverse() : renders).slice(0, win.size);
 const allDates = arch.map(dateOf).filter(Boolean).sort();
 const newest = allDates[allDates.length - 1];
 const shownDated = shown.map((e) => ({ e, d: dateOf(e) })).filter((x) => x.d);
@@ -220,9 +245,11 @@ const undated = shown.length - shownDated.length;
 // PRINTED ON EVERY RUN, pass or fail — the two-exposure design the decision
 // records and plan-scope-check already use. A number nobody reads is not a check.
 console.log(
-  `          notes.html shows ${win.reversed ? "the LAST" : "the FIRST"} ${win.size} of ` +
-    `${arch.length} archived item(s), read from vite.config.ts`,
+  `          notes.html renders ${shown.length} entr${shown.length === 1 ? "y" : "ies"}: ` +
+    `${win.reversed ? "the LAST" : "the FIRST"} ${win.size} of the ${renders.length} archived item(s) that carry a ` +
+    `Shown as: line (${arch.length - renders.length} of ${arch.length} do not), read from vite.config.ts`,
 );
+check("notes.html renders at least one shipped entry", shown.length > 0, true);
 
 if (!newest || !shownDated.length) {
   console.log(`  ok    no dated archive entry to measure freshness against (${undated} undated in the window)`);
