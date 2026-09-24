@@ -3839,6 +3839,24 @@ read as authoritative, and an invented one is worse than a missing one.
 
 ## Shipped (roadmap archive)
 
+- [x] **Imported LUTs were on the wrong tab** <!-- decision: 057 -->
+  **Shown as:** Imported LUTs moved to the Grade tab, next to the R⇄B swap you can use with them.
+  reported in chat 2026-09-24: LUTs living on the Export tab didn't belong
+  there, and using a red/blue channel swap together with an imported LUT
+  needed a control nearby.
+  **A working swap already existed, twice, and neither copy was near it.**
+  The IR tab's one-tap swap button and the Grade tab's channel-mixer preset
+  chip both already compose correctly with any applied LUT — verified against
+  both render paths, the LUT is unconditionally the last colour stage in
+  each. So the fix is a relocation: the whole Imported LUTs block moved from
+  Export to Grade, directly under the mixer's own R⇄B swap. Nothing in the
+  pipeline changed.
+  **A per-LUT invert button was considered and rejected.** "Invert" has no
+  fixed meaning for an arbitrary imported LUT — the one cheap candidate
+  (swap R/B into the sampler) is a coincidental homonym for invert, not an
+  actual reversal, and the pack's own "IR Invert.cube" doesn't behave like a
+  literal one either. See
+  `docs/decisions/057-imported-luts-were-on-the-wrong-tab.md`.
 - [x] **A .cube file cannot be picked on an iPad** <!-- decision: 056 -->
   **Shown as:** .cube colour files can be picked from Files on an iPad again — they were greyed out and unselectable.
   reported 2026-09-23 with a screenshot of the Files panel: six .cube files in
