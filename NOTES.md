@@ -108,6 +108,27 @@ Dehaze aimed through a subtraction changes the same pixels in both, 96.6%
 one way and 98.2% the other, and a union changes the same pixels in both,
 99% of them shared.
 
+**Two more on the held candidate, the same night: decisions 062 and 064.**
+
+- The Grade tab's LUTs are a grid: None, one tile per stored file drawn from
+  the open photograph, then Manage…, the 059 dialog. A tap applies at full
+  strength and a second tap on the chosen tile goes to its strength. A run of
+  taps is one undo step. `draw()` asks `recordSoon` on every frame, so each
+  tap was its own step until `recordSoon` stood down while a run is open; the
+  check that one Undo takes back a run failed with that guard removed. The
+  grid reads the stored list `renderLutList` already holds, because
+  `listLuts` reads every lattice. `editToJson` now keeps `{lutId, strength}`,
+  and after a reload and Resume the LUT is back with nothing to undo.
+- None is the first of the looks. It takes the look off with `applyLook`'s own
+  hand-back rules and sets the session look to none; a LUT stays. On a raw and
+  on a camera JPEG the frame returns byte-identical to the one the photograph
+  opened with. That failed until None made the same syncToUI and syncFromUI
+  round trip the open makes: Restore depth's tone points differed in the third
+  decimal, found by comparing the editor's whole snapshot.
+- Walks on this build: the control walk reports the same 55 findings as
+  before it (532 controls, up from 530 by the two None buttons); the pack,
+  look round-trip, one-band, tile-truth and accessibility walks pass.
+
 ## Confirmed
 
 - Camera: **Nikon Z50, IR-converted**. Filters tested: **red, 530nm, 720nm,
