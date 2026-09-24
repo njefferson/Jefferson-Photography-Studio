@@ -16121,7 +16121,7 @@ lookRecvDlg.addEventListener("click", (e) => {
   if (e.target === lookRecvDlg) lookRecvDlg.close();
 });
 
-// --- Imported .cube LUTs: import (Profiles & LUTs panel), an active-LUT row
+// --- Imported .cube LUTs: import (the Manage your LUTs dialog), an active-LUT row
 // with a strength slider, and an on-device list with share/delete (storage
 // honesty). The LUT applies as the LAST colour stage (gl.ts / pipeline.ts);
 // import, apply and remove are each ONE atomic undo step. ---
@@ -16183,7 +16183,7 @@ async function importLutPack(f: File): Promise<void> {
   const room = LUT_COUNT_CAP - existing.length;
   if (room <= 0) {
     const mb = (existing.reduce((s, m) => s + m.bytes, 0) / (1024 * 1024)).toFixed(1);
-    alert(`${LUT_COUNT_CAP} LUTs are already stored on this device (${mb} MB) — delete some in Profiles & LUTs, then import this pack.`);
+    alert(`${LUT_COUNT_CAP} LUTs are already stored on this device (${mb} MB) — delete some in Manage your LUTs, then import this pack.`);
     return;
   }
   // THE CEILING IS CHECKED BEFORE ANYTHING IS INFLATED. `size` is the central
@@ -16235,7 +16235,7 @@ async function importLutPack(f: File): Promise<void> {
   const left = usable.length - i;
   const tooBig = tooBigClaimed + tooBigLied;
   const parts = [`${stored} LUT${stored === 1 ? "" : "s"} imported from that pack`];
-  if (left) parts.push(`${left} did not fit — ${LUT_COUNT_CAP} is the limit, delete some in Profiles & LUTs`);
+  if (left) parts.push(`${left} did not fit — ${LUT_COUNT_CAP} is the limit, delete some in Manage your LUTs`);
   if (tooBig) parts.push(`${tooBig} ${tooBig === 1 ? "was" : "were"} too large for a 3D LUT`);
   if (unreadable) parts.push(`${unreadable} could not be read`);
   if (unstorable) parts.push(`${unstorable} couldn't be stored on this device`);
@@ -16285,7 +16285,7 @@ registerPicker("lutFile", (files) => { void (async () => {
   const existing = await listLuts().catch(() => []);
   if (existing.length >= LUT_COUNT_CAP) {
     const mb = (existing.reduce((s, m) => s + m.bytes, 0) / (1024 * 1024)).toFixed(1);
-    alert(`${LUT_COUNT_CAP} LUTs are stored on this device (${mb} MB) — delete one in Profiles & LUTs to add more.`);
+    alert(`${LUT_COUNT_CAP} LUTs are stored on this device (${mb} MB) — delete one in Manage your LUTs to add more.`);
     return;
   }
   const name = cleanName(parsed.name) ?? (f.name.replace(/\.cube$/i, "").slice(0, 60) || "Imported LUT");

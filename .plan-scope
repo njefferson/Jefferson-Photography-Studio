@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=72f3ceda30434889
-diffhash=8a3802de40141b6d
-verdict=IN-SCOPE: matches Remaining 2's record of the go exactly: 52 attribution rewordings in comments across 11 shipped files, build output byte-identical, the preview record a proven entry.
-# Promotion of v2.62.10 on the go (plan Remaining 2), commit 2 of 4, replayed unchanged from staging ce47ae8: Unit 3a, comments in shipped pages reworded as what was wrong and what it measured, with the preview hash recorded on build-diff evidence. Judged by an independent subagent that read the plan by path and the commit's diff.
+planhash=2c1902d1e385acf6
+diffhash=4b81662a89aac6b6
+verdict=IN-SCOPE: Unit 3b exactly (Profiles & LUTs renamed to Manage your LUTs in the three alerts, the Help text and the stale comment) plus the Grade note wording that Remaining 2's record of the go names.
+# Promotion of v2.62.10 on the go (plan Remaining 2), commit 3 of 4, replayed unchanged from staging 903f19a: Unit 3b, the LUT storage messages and Help name "Manage your LUTs" instead of the retired "Profiles & LUTs". Judged by an independent subagent that read the plan by path and the commit's diff.
