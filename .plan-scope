@@ -1,10 +1,11 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
 planhash=e643191cd7b74f81
-diffhash=ba63b5cf6f5d166b
-verdict=IN-SCOPE: the three-file docs candidate records the staging push and the re-measured 059 count, changes no product code, and its numbers match the control-walk log
-# Docs: NOTES records the staging candidate (URL and v2.62.10) with its device-pass checklist; 059's
-# Outcome states the re-measured control-walk count (54, the LUT manager's three controls reached); the
-# status page follows the run. No product code. Judged by an independent subagent that read the plan by
-# path; after the verdict, the NOTES heading was reworded from a possessive to "waiting on a device
-# pass" because the third-person gate refused the possessive.
+diffhash=b2a14ef73b64c25f
+verdict=IN-SCOPE: docs-only rewrite of 042, new records 061 and 062, three matching roadmap bullets and the status page, implementing Units 5, 3.4 and 3.5 with no product code and no attribution
+# Docs: record 042 rewritten around the 2026-09-24 ruling (stated as three requirements, not quoted), with
+# the 2.61 commits in Built already, parseable Rejected bullets, the narrowed Rejected 3, Capture One as
+# the model, stages 0-5 and M1-M3 open; record 061 carries 3.4's outcome and ownership split; record 062
+# carries 3.5's convention and problems with the layout left to pictures; three roadmap bullets; the
+# status page. No product code. Judged by an independent subagent that read the plan by path, after a
+# first review caught a quoted phrase of the ruling, which was reworded.
