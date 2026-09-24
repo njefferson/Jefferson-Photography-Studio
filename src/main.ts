@@ -32,7 +32,7 @@ import { putFrame, eachFrame, frameMetas, frameCount, clearFrames, frameStore } 
 import * as Session from "./session";
 import { keepAwake } from "./wakelock";
 import { canTravel, shapeOf, putMask, getMask, listMasks, deleteMask as forgetMask, MASK_COUNT_CAP } from "./maskstore";
-import { sampleBrush, rebuildFix, stampFix, stampSegment, skyBandCentre, lensGain, LENS_GAIN_HI, LENS_GAIN_LO, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, bandWeight, rgb2hsv, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, AIM_DEHAZE, AIM_CLARITY, AIM_SHADOW, AIM_LENS, AIM_NOISE, AIM_TEXTURE, type MaskLayer, type CropRect, BRUSH_MAX_EDGE, type SkyMap } from "./pipeline";
+import { sampleBrush, rebuildFix, stampFix, stampSegment, skyBandCentre, lensGain, LENS_GAIN_HI, LENS_GAIN_LO, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, bandWeight, rgb2hsv, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, AIM_DEHAZE, AIM_CLARITY, AIM_SHADOW, AIM_LENS, AIM_NOISE, AIM_TEXTURE, maskGroups, groupCanAim, type MaskLayer, type CropRect, BRUSH_MAX_EDGE, type SkyMap } from "./pipeline";
 import { sensorPitchMicrons } from "./color";
 import { lensGains, applyLensFlat, lensPlanStamp, type LensPlan } from "./lensflat";
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, type HealSpot } from "./heal";
@@ -5953,6 +5953,7 @@ const mUI = {
   aimLens: $("mAimLens") as HTMLButtonElement,
   aimNoise: $("mAimNoise") as HTMLButtonElement,
   aimTexture: $("mAimTexture") as HTMLButtonElement,
+  aimColourNote: $("mAimColourNote") as HTMLElement,
   joinRow: $("mJoinRow") as HTMLFieldSetElement,
   joinAdd: $("mJoinAdd") as HTMLInputElement,
   joinSub: $("mJoinSub") as HTMLInputElement,
@@ -6460,7 +6461,16 @@ function updateMaskUI() {
   {
     const am = currentMask();
     mUI.aimRow.hidden = !am || am.type === 3;
-    for (const [btn, bit] of AIMS) btn.setAttribute("aria-pressed", String(!!(am?.aims && (am.aims & bit))));
+    // A HEAD'S AIM IS ITS GROUP'S AREA (042, stage 1), and a group a colour mask
+    // shapes has no area this early (groupCanAim). The toggles stay visible so a
+    // saved aim is not hidden, but they cannot be pressed, and the note says why.
+    const group = am ? maskGroups(params.masks).find((g) => g.includes(am)) : undefined;
+    const blocked = !!group && group[0] === am && !groupCanAim(group);
+    mUI.aimColourNote.hidden = !blocked;
+    for (const [btn, bit] of AIMS) {
+      btn.setAttribute("aria-pressed", String(!!(am?.aims && (am.aims & bit))));
+      btn.disabled = blocked;
+    }
   }
   maskList.replaceChildren(
     ...params.masks.map((m, i) => {

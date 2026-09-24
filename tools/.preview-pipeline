@@ -1,5 +1,3 @@
 # Written by tools/preview-version-check.mjs --record. Not hand-edited.
-version=56
-hash=b2f543148ddcdbc4
-# Recorded WITHOUT a version bump. The evidence the pictures did not change:
-proven=demosaicPixelLinearInto is the only function changed in src/raw; its callers are src/export.ts and src/gpuexport.ts (grep over src), neither reached from makeThumb or decode; a quick-look preview is made from demosaicBinned. Full-res JPEG exports of NIR_0063 before and after: 0 pixels differ more than 16 px from any edge
+version=57
+hash=707a70016c7f682b
