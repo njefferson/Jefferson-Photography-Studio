@@ -1,51 +1,11 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=a808e7de1361cd99
-diffhash=150a47a62fd458c3
-verdict=IN-SCOPE: all five changed files map to the approved plan's four steps or are mechanical consequences of existing repo gates (decisions-check.mjs's roadmap-claim requirement, architecture-check.mjs's line-count sync); no scope creep found
-# Plan's own stated scope (/root/.claude/plans/linear-baking-island.md): answer
-# three chat questions with research only (Aerochrome+LUT composition,
-# Looks/LUT grouping, recipe-vs-LUT vocabulary — no code from these), then ship
-# the one real decision the owner's follow-up authorized: (1) fix a two-fact
-# stale text passage in ir.html's Help dialog, (2) add a credit link to Rob
-# Shea's free infrared LUT pack in the (i) dialog, (3) badge a stacked LUT on
-# the built-in Looks row via updateLookUI()/applyLutToEdit()/lutRemoveBtn, and
-# (4) write decision record 058 covering both (2) and (3), touching 056 and
-# 057.
-# 
-# Mapping, file by file:
-# - ir.html — two hunks, both plan-specified. The Aerochrome/Pink-IR paragraph
-#   edit matches Step 1 exactly ("Colour tab"/"mixer preset called Aerochrome"
-#   -> "Grade tab"/"Film rotation mixer preset"). The inserted note/more-row
-#   pair sits exactly where Step 2 specified (between the Licence link and the
-#   coffee/tip row), with copy and the https://590.red/lut2 URL matching the
-#   plan's given HTML verbatim.
-# - src/main.ts — one diff region, all three plan-specified edits and nothing
-#   else: updateLookUI() computes and appends a .lut-badge tag; applyLutToEdit()
-#   gains one updateLookUI() call; the lutRemoveBtn handler gains the matching
-#   call. No unrelated edits elsewhere in the file.
-# - docs/decisions/058-a-lut-said-nothing-about-itself.md — new file, Step 4.
-#   Carries Context, Looked up, Weighed against, Depends (touches 056, touches
-#   057), Options, Looked at (required by this repo's own decisions-check gate
-#   for any record naming frames — NIR_0063.dng render described and opened),
-#   Rejected, Rank, Outcome. Direct writeup of what Steps 2-3 did.
-# - NOTES.md — one new roadmap bullet under "## Shipped (roadmap archive)"
-#   carrying <!-- decision: 058 --> and a Shown as: line. Not named in the
-#   plan's Steps list, but mechanically required: tools/decisions-check.mjs
-#   (wired via .branch-guard's also= chain) fails the commit with "claimed by
-#   no roadmap item" for any decision record with no matching bullet. This was
-#   foreseeable from the plan's own invocation of this repo's decision-record
-#   process, not an independent addition.
-# - docs/ARCHITECTURE.md — one line, src/main.ts's stated line count updated to
-#   match the file's actual new length. Mechanical: tools/architecture-check.mjs
-#   is in the same also= chain and refuses a stale count.
-# 
-# Nothing beyond the plan found: no unrelated refactors, no extra features, no
-# files touched outside these five, no scope creep (e.g. no grouping of Looks
-# and LUTs was implemented, correctly honoring the plan's "No" answer to Q2).
-# Both generated/mechanical files change by exactly the minimum the
-# corresponding gate requires, with no unrelated drift.
-# 
-# Rendered by an independent subagent (Agent tool) that read the plan file by
-# path and the full git diff before this commit was made; verdict recorded
-# here after confirming the working tree is unchanged since that review.
+planhash=ffe51e0e6eba5202
+diffhash=5225ebb9b62c3d2f
+verdict=IN-SCOPE: the only change is NOTES.md:3880 his->that, exactly as Unit 1 prescribes
+# Unit 1 ("Main goes green (docs)") prescribes a single wording change at
+# NOTES.md:3880 so the hub third-person gate stops failing on a pronoun for a
+# third party, and forbids widening .third-person-allow. The diff is exactly
+# one hunk in NOTES.md replacing "his" with "that"; no other tracked file is
+# changed and .third-person-allow is untouched. Judged by an independent
+# subagent that read the plan by path and the full git diff.
