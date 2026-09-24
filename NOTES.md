@@ -1,6 +1,6 @@
 # Infrared Photography Studio (IPS) — Project Notes
 
-> Captured from Noah's description and refined as the project progressed.
+> Captured from the original project description and refined as the project progressed.
 > Date captured: 2026-06-17
 
 ## What this is
@@ -35,11 +35,11 @@ because they floor temperature at ~2000K.
 4. **Save the edited image back to the device**, at **native resolution or
    lower by user's choice**.
 
-## Open requests from Noah
+## Open requests
 
-- **Help avoid common pitfalls.**
-- Do **not** want pseudo code or drafts — wants it run through **review passes
-  until it is as good as it can be**.
+- **Identify and avoid the common pitfalls.**
+- No pseudo code or drafts: finished work only, after **repeated review
+  passes**.
 
 ## Confirmed
 
@@ -83,10 +83,10 @@ See **`PLAN.md`** for the full build plan.
       pushes serving only a 301 -> the new home (see `redirect/`: a Cloudflare
       `_redirects` splat plus an HTML fallback that unregisters the old service
       worker + clears caches, then forwards, preserving the path). Old
-      Home-Screen installs / bookmarks break and must be re-added — accepted by
-      Noah. DEPLOYED 2026-07-13 (production flipped with the Studio-icon
+      Home-Screen installs / bookmarks break and must be re-added — accepted.
+      DEPLOYED 2026-07-13 (production flipped with the Studio-icon
       release; redirect published on the main push) and the old-URL redirect
-      CONFIRMED WORKING by Noah on device the same day.
+      CONFIRMED WORKING on device the same day.
 - [x] Camera color matrix (fixes flat IR color); exposure + Auto; punchy preset
 - [x] Review pass: preview proxy for >2800px 8-bit sources (iOS WebGL buffer
       limit), single EditParams definition, NEF white level 15520, exposure
@@ -101,8 +101,8 @@ See **`PLAN.md`** for the full build plan.
 ## Versioning (agreed 2026-07-04, promoted to 1.0 same day; taxonomy agreed 2026-07-18)
 
 - THE TAXONOMY (owner rule, 2026-07-18): **identity → capability → increment**.
-  - **Identity (major, X.0)** — the product changes as a thing: a different
-    approach and mindset, a new edition. The owner declares these, and has
+  - **Identity (major, X.0)** — the product changes as a thing: it works
+    from a different premise, a new edition. The owner declares these, and has
     declared the CREATIVE RELEASE the first one → it ships as **2.0**.
     - **3.0 IS DECLARED AND CLAIMED (owner, 2026-09-13): the OPTIMIZED
       RELEASE.** It ships when the export is fixed and the full-resolution
@@ -119,7 +119,7 @@ See **`PLAN.md`** for the full build plan.
       with both sides quantified.
       **AND THE HALVES HAVE TO BE NAMED CAREFULLY**: calling the first one "full
       size" in a report collided head-on with the export panel's own "Full
-      (native)" scale and its Quality slider, and the owner rightly asked which
+      (native)" scale and its Quality slider, which left it unclear which
       of the two was being decided. It is neither — it is the editor's internal
       working copy — and the only thing actually being decided is the drawn
       export. That is an
@@ -134,9 +134,12 @@ See **`PLAN.md`** for the full build plan.
   - **Capability (middle number)** — a release that ADDS something: a new
     tool, format, mode. EVERY capability release that ships to main bumps it
     (owner decision, 2026-07-18): the core sweep goes 1.2, 1.3, … Bump the
-    VERSION file IN the release's own final commit — the commit that changes
-    VERSION displays as exactly the new base (versionFor, vite.config.ts),
-    so the release commit reads "1.2" in the changelog.
+    VERSION file in the release's last READER-FACING commit — the commit that
+    changes VERSION displays as exactly the new base (versionFor,
+    vite.config.ts). A commit that changes ONLY `VERSION` is housekeeping and
+    is filtered out of the changelog (`INTERNAL_PATH`, since 2026-09-22), so a
+    bump made on its own shows the release under no number of its own: 2.62's
+    two reader-facing commits read as 2.61 increments for exactly this reason.
   - **Increment (third digit, automatic)** — bug fixes and quality-of-life
     ticks between capability releases, from the commit counter. Features are
     NOT increments; if a shipment adds capability, bump VERSION with it.
@@ -151,7 +154,7 @@ See **`PLAN.md`** for the full build plan.
 - CI must check out full history (`fetch-depth: 0` in deploy.yml) or the
   commit counts — and therefore the version numbers — come out wrong.
 - The service-worker CACHE name is NOT a version and is never hand-edited
-  (owner rule, 2026-07-18 — "tired of calling everything a version"): the
+  (owner rule, 2026-07-18): the
   build stamps it as `ips-<app version>` (vite.config.ts precache plugin
   replaces the placeholder in public/sw.js). Every deploy is a commit, so
   the version — and with it the cache — refreshes automatically; the old
@@ -164,8 +167,8 @@ missing rung: ir.html/macro.html each carried "‹ Studio" in the bar, and then
 index.html carried NOTHING to the hub. The only hub link in the whole app was
 the FOURTH of five identical grey text links inside the IR ⓘ dialog, worded
 "More free tools by Noah Jefferson" — which doesn't read as "the way back", and
-which the owner could not find on device ("nearly buried — barely an actual
-usable thing for a user"). Macro had no hub link at all.
+which could not be found on device, buried among identical links in a dialog.
+Macro had no hub link at all.
 
 The chain is now one visible control per level, no dialogs on the path:
 tool "‹ Studio" (bar) → index "‹ Noah Jefferson" (bar) → hub. The launcher's ⓘ
@@ -242,7 +245,7 @@ actually measured to put it there.
 RANGE SLIDERS carry `touch-action: none` + a 22px thumb (style.css ~217) —
 they OWN the finger gesture like every other drag control. Do NOT set
 `pan-y` (it handed the drag to the panel scroller; a finger on the thumb
-scrolled instead of moving it — owner-caught on the iPad 2026-07-19). The
+scrolled instead of moving it — caught on the iPad 2026-07-19). The
 panel still scrolls from label text + the gaps between rows.
 A ROVING TABINDEX NEEDS AN INITIALISER, and it is not decoration: the pattern
 is one tab stop for a whole grid with arrows moving within it, so every cell is
@@ -324,8 +327,8 @@ bundle). VERIFIED picker-walk.mjs 36/36 across all three pages: applies,
 persists, survives reload, moves aria-checked, restamps theme-color, and
 clears both attribute and key when Instrument is reselected.
 
-EACH OPTION SHOWS A NIGHT|DAY MINIATURE (owner, 2026-07-30: a text-only list
-"doesn't show shit" — correct, you cannot choose a look you cannot see). The
+EACH OPTION SHOWS A NIGHT|DAY MINIATURE (2026-07-30: a text-only list shows
+nothing of how a palette looks, and you cannot choose a look you cannot see). The
 swatch is a small mock of the real UI: page colour as the field, a card on it
 with its rail, a text bar and the accent dot. It shows the thing that actually
 separates these palettes — how far a card stands off the page, and how warm or
@@ -341,8 +344,8 @@ The swatch is aria-hidden with the family NAME as the label. The doctrine rule
 is "colour is never the SOLE carrier", which was misread here as "do not show
 the colour at all" — the correct reading is name AND swatch.
 
-FULL A11Y AUDIT 2026-07-30 (owner: "it's all placeholder while I get
-accessibility right — everything is subject to audit"). axe-core 4.12 (wcag2a/
+FULL A11Y AUDIT 2026-07-30 (every surface in scope; nothing treated as
+settled). axe-core 4.12 (wcag2a/
 aa, wcag21, wcag22aa, best-practice) plus the checks axe cannot make, over
 EVERY page in BOTH repos, both themes, resting AND with each dialog open —
 because most of this app's controls only exist inside a dialog, and a
@@ -382,7 +385,7 @@ elementFromPoint at the four corners of a 44px box around each control's
 centre, because a legitimate hit-expanding overlay would otherwise be reported
 as a failure. That check is also what proved the overlay above did NOT work.
 
-SURFACE SEPARATION 2026-07-30 (owner: "address the surface fills"). Fills now
+SURFACE SEPARATION 2026-07-30 (the surface fills barely separated from the page). Fills now
 carry elevation, not just the rail: dusk page→card 1.09 → 1.30:1, dawn 1.17 →
 1.27:1, and the dusk ladder is a real ladder at 1.30/1.43/1.65.
 
@@ -535,13 +538,12 @@ user-scalable=no.
 > CORE-COMPLETENESS SWEEP ships first — each capability release bumps
 > VERSION (1.2, 1.3, … per the taxonomy in "## Versioning") — then the
 > CREATIVE RELEASE, which the owner has declared an IDENTITY change: it
-> ships as **2.0**, not 1.2 (owner call, 2026-07-18 — "an entirely
-> different approach and mindset"). The big-image / full-bleed direction
+> ships as **2.0**, not 1.2 (owner call, 2026-07-18). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
 - [ ] **A mask is a place, and most of the controls should work inside one** <!-- decision: 042 -->
   **Shown as:** Masks get a place of their own, with far more of the controls working inside one.
-  asked 2026-09-21: masks should come out of the tab strip into a place of
+  filed 2026-09-21: masks should come out of the tab strip into a place of
   their own, and inside a mask the reader should not be limited to the handful
   of controls the mask menu offers.
   **The menu is short because the pipeline is, not because the menu was written
@@ -565,7 +567,7 @@ user-scalable=no.
   reported 2026-09-20 with two renderings of one building frame and the Grade
   panel that separates them — the Shadows wheel at 209 degrees, 47%. The shaded
   wall and the area under the eaves open with a strong red cast; that tint takes
-  it out. The ask is that the app do it.
+  it out. The app should do it.
   **The physics is two illuminants, and infrared pushes them further apart than
   visible light does.** A visible-light shadow is lit by Rayleigh-scattered blue
   skylight; in the near infrared that scattering collapses, which is the same
@@ -602,9 +604,9 @@ user-scalable=no.
   with one grade selects a different population under another, and a mask
   picked with the swap on keys something else with it off. Record 023 refused
   to build the Sky mask on it for exactly this reason and never came back to
-  fix it. A mask has to be takeable at any point in the workflow: if all that
-  is in front of you is the current image, doing something to the image
-  underneath it is impossible. darktable offers a slider on the module's INPUT
+  fix it. A mask has to be usable at any stage of the edit: a selection keyed
+  on the rendered image cannot act on the image underneath it. darktable offers
+  a slider on the module's INPUT
   and one on its output and hides the output one by default; this app already
   has the input space built — `buildSkyGuide`'s red share, blue share and gamma
   luma, under gray-world gains, which its own contract says does not move as
@@ -612,7 +614,7 @@ user-scalable=no.
   `docs/decisions/032-a-mask-keys-the-photograph-not-the-grade.md`.
 - [ ] **The radial mask turns** <!-- decision: 027 -->
   **Shown as:** Turn an oval mask to any angle.
-  asked 2026-09-19 beside the mask-combining request: the circle mask needs to
+  filed 2026-09-19 beside the mask-combining item: the circle mask needs to
   be rotated. It is the only selection in the app whose orientation cannot be
   set — a radial mask is an axis-aligned ellipse, `cx`/`cy`/`rx`/`ry` with no
   angle in either weight function, so it can be made wide or tall and never
@@ -628,7 +630,7 @@ user-scalable=no.
   nothing names is the failure 024 exists to fix.
 - [ ] **While you straighten: finer guides you can turn off, and a picture you can zoom and pan** <!-- decision: 025 --> —
   **Shown as:** Zoom and move the photograph while you straighten it, with finer guides you can turn off.
-  asked 2026-09-19 from the PC. The overlay draws twelfths; the ask is
+  filed 2026-09-19 from the PC. The overlay draws twelfths; the need is
   sub-lines below that with a toggle on the straighten card, because twice
   the lines is twice the ink over the photograph. And while the tool is
   armed one pointer moves the crop box and two pinch-zoom, with no wheel
@@ -661,7 +663,7 @@ user-scalable=no.
   a healthy shell: the bar takes 163, the panel 295 (45dvh), the stage gets 198,
   and `--session-h` is 138 of that — so `#view`'s max-height resolves to 28px. A
   landscape photograph is height-limited, so it gets 4% of the screen. The
-  reader's own report is the milder version: 138 reserved from a 272 stage, the
+  device's own report is the milder version: 138 reserved from a 272 stage, the
   picture drawn 102 tall.
   **The strip does not scale.** `.session-thumb` is a fixed 92x66 plus the
   strip's header and padding, so it costs ~138px whether the stage has 700 to
@@ -739,7 +741,7 @@ user-scalable=no.
   `docs/decisions/013-aerochrome-splotchy-chroma.md`.
 - [ ] **The mask system is short of standard convention** <!-- decision: 050 -->
   **Shown as:** Draw a box or circle to work inside, and add, subtract and combine masks.
-  asked for 2026-09-22: a drawn box or circle that ISOLATES part of the
+  filed 2026-09-22: a drawn box or circle that ISOLATES part of the
   photograph, which a subsequent mask is then constrained by — and with it the
   observation that a good deal of standard mask convention may be missing. So
   this is a SURVEY, and each row is its own piece of work ranked on its own.
@@ -799,8 +801,8 @@ user-scalable=no.
 - [ ] **Colour cannot finish a selection an occluder has split** <!-- decision: 048 -->
   **Shown as:** Bring in sky that a wing or a branch has cut off from the rest.
   reported from the device 2026-09-22: the sky selection stops at a jet's wing
-  and the sky visible under the wing cannot be brought in. Two things were asked
-  for and neither exists. **A mask cannot add to the mask above it** — driven in
+  and the sky visible under the wing cannot be brought in. Two things are
+  needed and neither exists. **A mask cannot add to the mask above it** — driven in
   the app with real presses, the join control offers only **On its own**,
   **Subtract from it** and **Only where both**, so a second mask can shrink or
   intersect the one above it and nothing grows it. And **nothing moves the sky's
@@ -956,14 +958,12 @@ user-scalable=no.
   `docs/decisions/054-the-export-panel-says-save-twice.md`.
 - [ ] **Creative — a third app for regular photos** — owner direction 2026-07-19 <!-- decision: 002 -->
   **Shown as:** A third app for ordinary colour photographs, beside infrared and macro.
-  ("a separate page next to infrared and macro, called creative, for regular
-  photos, installable separately… same things we're building here… I suppose I
-  will want a whole image editor there eventually"). A NEW entry point beside the
+  A NEW entry point beside the
   IR studio and the macro tool: its own route + installable PWA (own
   manifest.webmanifest / start_url / icons / SW cache, added to the `/` chooser),
   aimed at ordinary visible-light photos rather than IR RAW. It REUSES the
   creative stack built up here — stickers (the two-kind library, adjust, blend,
-  perspective), grade, channel mixer, warp — and grows "down from creative" into
+  perspective), grade, channel mixer, warp — and grows outward from those tools into
   a full image editor over time. Big build; NOT yet scoped. OPEN QUESTIONS FOR
   THE OWNER before starting (all asked in chat, no pop-ups): (1) does it share
   the IR pipeline/renderer or start from a trimmed visible-light pipeline (no
@@ -972,8 +972,8 @@ user-scalable=no.
   chooser. Ships on its own once scoped — unrelated to the sticker betas.
 - [ ] **Big image: the photo fills the app, menus float over it** — owner <!-- decision: 003 -->
   **Shown as:** The photograph becomes the background of the whole app, with the controls over it.
-  direction 2026-07-16, given as the owner ended the session and moved to a new one.
-  STILL AN IDEA — the owner says so plainly, expect design questions. The vision: the
+  direction 2026-07-16.
+  STILL AN IDEA — expect design questions. The vision: the
   open photo is the BACKGROUND everywhere in the app, not boxed inside a stage.
   The picture fills the screen (overflowing behind as needed) and EVERY control
   — the top bar, the editor drawer/tabs, histogram, lesson chips, crop aids,
@@ -1006,12 +1006,12 @@ user-scalable=no.
   the pill should instead float OVER the photo and pass taps through where it is
   empty is one of the owner's open questions, not a guess for a session to make.
   The remaining text below is the original entry.
-  question 2026-07-16 (the FIRST instance of the "big image" direction above):
-  why must the photo be bound inside a "view box" (the
-  letterboxed `#view` rect) at all while cropping? Could it simply OVERFLOW — the
+  raised 2026-07-16 (the FIRST instance of the "big image" direction above):
+  the photo need not be bound inside the
+  letterboxed `#view` rect while cropping. It could OVERFLOW — the
   photo fills/extends behind everything, with the crop box, grid, Straighten pill
   and Done just floating over it (no black frame around the picture while you
-  align)? Worth a future UI pass. Today the armed preview renders into the
+  align). Worth a future UI pass. Today the armed preview renders into the
   contained `#view` canvas (object-fit:contain, so a tilted/zoomed photo is
   letterboxed and `positionCropOverlay` maps the box onto that drawn rect via
   `viewImageRect`). An overflow model lets the GL canvas bleed to the screen
@@ -1020,7 +1020,7 @@ user-scalable=no.
   clamps to the photo). Non-trivial: canvas sizing, the box↔photo mapping, pinch
   anchoring, and the OS-edge insets (`.cropping`) all assume the contained
   `#view`. Scope as its own UI release; decide it alongside the clamp fix.
-- [ ] **More composition overlays** <!-- decision: 005 --> — owner ask 2026-07-16, optional, for anyone
+- [ ] **More composition overlays** <!-- decision: 005 --> — filed 2026-07-16, optional, for anyone
   **Shown as:** More composition guides while cropping — golden ratio, the spiral, diagonals.
   who wants them: beyond the rule-of-thirds grid, offer selectable composition
   guides while cropping — golden-ratio (phi) grid, golden spiral, the diagonal
@@ -1037,7 +1037,7 @@ user-scalable=no.
   export — overlay-only, exactly like the thirds grid.
 - [ ] **Mask by subject / background** — auto-select the subject or the <!-- decision: 006 -->
   **Shown as:** Select the subject, or the background, in one press.
-  background (owner request 2026-07-05).
+  background (filed 2026-07-05).
   **Part of the machinery exists now (2026-09-18):** `src/skyfine.ts` refines
   the sky bitmap to the picture's edges with a guided filter, once per
   photograph, and the Sky depth stage rides it. A subject mask would take the
@@ -1310,8 +1310,8 @@ first walk in the repository that closes any of that gap.
 ## The black screen on a phone was the update strip, not the photograph, 2026-09-22
 
 Reported from an iPhone with a diagnostic report attached: a landscape
-photograph on a phone held in portrait gives a black screen that **cannot be
-tapped out of**. The only way back is to turn rotation lock off and rotate to
+photograph on a phone held in portrait gives a black screen with **nothing on
+it that answers a tap**. The only way back is to turn rotation lock off and rotate to
 landscape, at which point the file is visible again.
 
 **It is the §7h update strip, and it has nothing to do with the photograph.**
@@ -1334,12 +1334,12 @@ Opened and looked at rather than inferred: the whole app is crushed into a
 sliver down the left edge — fragments of buttons, a slice of the session strip —
 with the entire rest of the screen empty and the update strip the only working
 control on it. In the dark theme that is a black screen. **Nothing on it is big
-enough to press**, which is the "cannot be tapped out of" exactly.
+enough to press**, which is exactly why nothing on it answers a tap.
 
 Rotating past 760px leaves the media query, so the template that DOES declare
 the area takes over and everything returns. That is the whole reason the
 rotation-lock workaround works, and it is why the report reads as an orientation
-defect when orientation is only how the reader escaped it.
+defect when orientation is only the way out of it.
 
 **Two rare states at once is why it survived.** The strip landed 2026-09-10 and
 only appears when a worker is WAITING. It took until somebody was holding a
@@ -1382,7 +1382,7 @@ stays open.
 
 **The photograph gets no height on a narrow phone.** At 302x656 the stage is 198
 tall and `--session-h` reserves 138 of it, leaving the picture about 28px even
-with the update strip hidden and the shell perfectly healthy. The reader's own
+with the update strip hidden and the shell perfectly healthy. The device's own
 report shows the milder version of this: `Strip reserves 138px` of a 272 stage,
 photograph drawn 102 tall. Not diagnosed and deliberately not fixed here — 012's
 Rejected section names "adjust the CSS until it looks right" as the route to
@@ -1406,8 +1406,8 @@ Reported from the device with a photograph of the screen. What was on it:
   keys the photograph, not the grade", "Colour cannot finish a selection an
   occluder has split", "(superseded detail) The live view at full resolution".
 
-The verdict was that it is in the way of somebody who has no idea what it is
-saying, which is the whole population it is shown to.
+It was unreadable to anyone who does not work on this repository, which is the
+whole population it is shown to.
 
 ### Three defects, and only one of them was the wording
 
@@ -1573,7 +1573,7 @@ After decision 044 — pressing Home leaving the editor drawer on screen under
 the start card, on a phone, for the whole life of that card — the blind spot
 was widened rather than only the defect fixed. `tools/a11y-walk.mjs` now runs
 its axe pass at BOTH shapes, `SIZES` declaring the desktop window it always
-used and the reader's own reported geometry (402x812, device pixel ratio 2,
+used and the reporting device's geometry (402x812, device pixel ratio 2,
 touch); its hit-area sweep moved from 430px to 402px, which is narrower, so
 nothing that passed before is now unmeasured; and `tools/kept-walk.mjs`, which
 called `newContext()` with no options at all and therefore ran at Playwright's
@@ -1666,10 +1666,10 @@ harness needs state.
 
 ## The oneband walk hangs, it is not from today, and nobody had written it down, 2026-09-17
 
-**RED ON WHAT STAGING ALREADY CARRIES, and it was reported in chat and recorded
-nowhere.** That second half is the reason this section exists at all: a walk
-found failing, established as somebody else's, and then left in a message
-nobody will scroll back to is a finding that has to be paid for again.
+**RED ON WHAT STAGING ALREADY CARRIES, and it was recorded nowhere.** That
+second half is the reason this section exists at all: a walk found failing,
+established as somebody else's, and then left unrecorded is a finding that has
+to be paid for again.
 
 **The symptom.** `tools/oneband-walk.mjs` hangs in `stepTo`, at the
 `waitForFunction` on line 64 that waits for `#busy` to close after clicking the
@@ -1819,14 +1819,15 @@ The three slow ones are a11y (69s, seven pages in both themes), export-report
 
 ## The correction strength would not stay where it was put, 2026-09-14
 
-**THE REPORT WAS RIGHT IN ITS FIRST SENTENCE AND THREE TURNS WENT ELSEWHERE.**
-"Blue circles instead of fixed hotspots" named the hot-spot correction; it was
-read as healed dust spots after a screenshot showed the Corrections panel open
-on Dust & spots, and two failed fixes went into the heal path before the reader
-said plainly that turning the hot-spot strength down fixes it. The lesson is not
-subtle: the reporter had already named both the cause and the remedy.
+**THE REPORT WAS RIGHT IN ITS FIRST SENTENCE AND THREE ATTEMPTS WENT ELSEWHERE.**
+It described blue circles where a hot-spot had been corrected, which named the
+hot-spot correction; it was read as healed dust spots after a screenshot showed
+the Corrections panel open on Dust & spots, and two failed fixes went into the
+heal path before it was established that turning the hot-spot strength down
+fixes it. The lesson is not subtle: the report had already named both the cause
+and the remedy.
 
-**MEASURED ON THE READER'S OWN FRAME** (NIR_1376.NEF, Z 50, NIKKOR Z DX 50-250mm
+**MEASURED ON THE REPORTED FRAME** (NIR_1376.NEF, Z 50, NIKKOR Z DX 50-250mm
 at 57mm f/8 — the first real file with EXIF this work has had, since all 44
 practice DNGs carry none). The correction at strength 1 changes the centre by
 **-6 red, +5 green, +3 blue**, falling to nothing by two-thirds of the way out.
@@ -1844,15 +1845,15 @@ Which of the two matters is a judgement about the reader's own photographs.
 
 **SO THE FIX IS TO REMEMBER THEIR ANSWER, NOT TO GUESS A BETTER NUMBER.** Both
 cards hard-coded full strength on every open — `params.lensFix = myLens ? 1 : 0`
-and `params.hsFix = 1` — so the remedy the reader had already found was a slider
-they had to move again on every photograph. Reported from a session of
+and `params.hsFix = 1` — so the remedy already found was a slider that had
+to be moved again on every photograph. Reported from a session of
 **sixty-two**. The strength is now remembered per profile, keyed per lens AND
 aperture (`shipped:50-250@8.0`), because a strength that suits one is not a claim
 about another. Written on `change` and never on `input`, or a drag stores every
 value it passed through. Full strength is stored as ABSENCE, so putting it back
 leaves nothing behind and the map cannot only grow.
 
-**Also confirmed dead, on the reader's file:** the lens correction's centre gains
+**Also confirmed dead, on the reported file:** the lens correction's centre gains
 came back red 1.022x, blue 0.943x, **blue over red 0.92x — close to neutral**, so
 the arithmetic-from-the-honest-range theory that opened this investigation was
 wrong. Nothing in the lens or hot-spot path changed in the 52-commit promote
@@ -1870,11 +1871,11 @@ the first id matching /stren/i. Every one of them produced a confident number.
 ## Healed spots cloning the wrong colour — RETRACTED, it was the measurement, 2026-09-14
 
 **THE REPORT WAS ABOUT HEALED DUST SPOTS, and the first two hours went to the
-wrong defect.** "Hot-spots" was read as the IR LENS hot-spot and a whole lens
+wrong defect.** The term hot-spot was read as the IR LENS hot-spot and a whole lens
 section was built for the §7f report before a screenshot showed the Corrections
 panel open on Dust & spots and a soft cyan disc sitting in bright infrared
 grass. The lens work is kept because a lens question will come and the report
-could not answer one either — but it was not the question asked, and the term
+could not answer one either — but it was not the question the report raised, and the term
 means both things in this app.
 
 **THE STRUCTURAL CAUSE IS REAL AND WAS FOUND BY READING.** `findHealSource`
@@ -1897,7 +1898,7 @@ match, and calling the difference a defect.
 **THE REAL MEASUREMENT SAYS THE SEARCH IS ALREADY OPTIMAL.** Asking the right
 question — how does the patch the app picks compare with the best colour match
 available in its own 48 offsets, and with the best in a set twelve times larger
-— on the reader's own NIR_1376 and on two practice frames, at twelve taps:
+— on the reported NIR_1376 and on two practice frames, at twelve taps:
 
 - what the app picks: **0.000 to 0.007**
 - the best available in the same 48 offsets: **0.000 to 0.001**
@@ -2018,8 +2019,8 @@ keypress. The mark lost was always the LAST one pressed; the ones before it had
 time to land.
 
 **Not a contrived race on the device this is built for.** iPadOS discards
-background tabs and reloads them by itself, so "the page came back a moment after
-I pressed X" is what a long culling session looks like. The whole point of a
+background tabs and reloads them by itself, so a page that reloads a moment
+after a keypress is what a long culling session looks like. The whole point of a
 verdict is that it is a decision rather than a highlight.
 
 The intent is now recorded SYNCHRONOUSLY, in `localStorage`, before the durable
@@ -2142,8 +2143,8 @@ mark lost is always the one set immediately before the reload (`-,-,Pick,-`
 against `-,Reject,Pick,-` — the Pick, set earlier, survives). `Session.setMark`
 is a durable write and the reload can beat it. It reproduces on the pre-change
 build, so it is not from this work. **The reason to look at it: iPadOS discards
-background tabs and reloads them**, so "pressed X and the page reloaded in the
-same instant" is not a contrived sequence on the target device — it is what a
+background tabs and reloads them**, so a keypress and a reload in the same
+instant is not a contrived sequence on the target device — it is what a
 long culling session looks like. Fixing it is a design decision (block, or
 write on `pagehide`), not a tail-end patch.
 
@@ -2771,8 +2772,8 @@ there.
 layer order bare — red←blue, green←red, blue←green — and bare it renders teal
 and pale; the Aerochrome look is that rotation's other half, the swap plus a
 mixer solved on six frames (IR-SCIENCE 4b-ii), and it lives on the Looks tab.
-Under the film's name the chip read as the look and was reported as "the
-colours are not swapped". It is **Film rotation** now, with a title naming
+Under the film's name the chip read as the look, and its bare rotation was
+taken for a look whose swap had failed. It is **Film rotation** now, with a title naming
 the mapping and pointing at the Looks tab. Matrix and position untouched:
 the chips carry no ids and `tools/look-sheet.mjs` presses them by index.
 
@@ -2994,7 +2995,7 @@ were about the selection.** Everything previously recorded here as "sky 1.0 /
 **Why nothing caught it.**
 
 - The two ids differ by a three-letter suffix, sit one line apart, are both
-  ranges on 0..2, and are both called "sky saturation" in conversation.
+  ranges on 0..2, and both answer to the name sky saturation.
 - The harness never read back WHICH parameter it had moved, so every run was
   self-consistent and wrong together, across three arms and seven frames.
 - The instrument that derived the corner and blotch figures read the rendered
@@ -3055,8 +3056,7 @@ any amount that matters: the colour curves are AREA-NORMALISED at application
 uncorrected decode and 0.5617 · 1.0588 · 1.7083 on the corrected one — 0.19%.
 The balance check in the walk is therefore a consistency check (the app's
 number is its own gray-world of the corrected copy), not the discriminator.
-What the order changes is what the owner's framing said and the record did
-not measure: the noise. Laid on after the denoise, the flat's gain at a corner
+What the order changes is what the record did not measure: the noise. Laid on after the denoise, the flat's gain at a corner
 multiplies the residual the denoise left; laid on before it, the denoise
 measures and removes it. On NIR_1376 at strength 1, corner over centre
 residual, red/blue: **1.033 / 1.051 before, 1.009 / 0.965 after.** The lens is
@@ -3595,8 +3595,7 @@ re-specified; `6px 12px` is what the button has always been.
 ## Six infrared JPEGs, a look, and no explanation, 2026-09-14
 
 **Reported as:** a six-photo set on staging, the NEF rendering correctly and
-every JPEG flat purple with Aerochrome lit — *the problem is fixed with that
-image now, but nothing else works.*
+every JPEG flat purple with Aerochrome lit.
 
 **It is not a rendering defect and it is not a regression.** A camera-rendered
 infrared JPEG can arrive with all its colour in ONE band, and `applyLook`
@@ -3647,7 +3646,7 @@ picture. A third option exists and is not built: offer the balance as a press
 
 ## The one-band decision goes back to the reader, 2026-09-14
 
-**Asked: didn't they used to work?** They did something different, and the
+**Whether these files used to work:** they did something different, and the
 answer is in the history rather than in anybody's memory. Before 2026-09-11
 every camera-rendered file was gray-world balanced under a colour look, with no
 exception. `1f29118` added one: a file whose cool band measures under
@@ -3841,7 +3840,7 @@ read as authoritative, and an invented one is worse than a missing one.
 
 - [x] **A colour file is not a photograph either** <!-- decision: 059 -->
   **Shown as:** Manage your LUTs no longer needs a photo open — it's on the start screen and in the (i) dialog too.
-  Reported in chat 2026-09-24: having to open a photo just to reach LUT
+  Found 2026-09-24: having to open a photo just to reach LUT
   import and the stored list was the wrong convention, since none of that
   reads or writes anything about a specific photograph — only applying one
   does.
@@ -3860,7 +3859,7 @@ read as authoritative, and an invented one is worse than a missing one.
   `docs/decisions/059-a-colour-file-is-not-a-photograph-either.md`.
 - [x] **A LUT said nothing about itself** <!-- decision: 058 -->
   **Shown as:** A stacked LUT now shows on the Looks row, and the (i) dialog links to a free infrared LUT pack.
-  Asked in chat 2026-09-24, alongside whether Aerochrome and a LUT compose
+  Looked into 2026-09-24, alongside whether Aerochrome and a LUT compose
   (they do — the LUT is unconditionally the last colour stage) and whether
   Looks and LUTs should group (no — different kinds of thing, per 057):
   tracing the answer found a built-in Look never reads or writes
@@ -3883,8 +3882,8 @@ read as authoritative, and an invented one is worse than a missing one.
   `docs/decisions/058-a-lut-said-nothing-about-itself.md`.
 - [x] **Imported LUTs were on the wrong tab** <!-- decision: 057 -->
   **Shown as:** Imported LUTs moved to the Grade tab, next to the R⇄B swap you can use with them.
-  reported in chat 2026-09-24: LUTs living on the Export tab didn't belong
-  there, and using a red/blue channel swap together with an imported LUT
+  found 2026-09-24: LUTs living on the Export tab were in the wrong place,
+  and using a red/blue channel swap together with an imported LUT
   needed a control nearby.
   **A working swap already existed, twice, and neither copy was near it.**
   The IR tab's one-tap swap button and the Grade tab's channel-mixer preset
@@ -3900,8 +3899,8 @@ read as authoritative, and an invented one is worse than a missing one.
   literal one either. See
   `docs/decisions/057-imported-luts-were-on-the-wrong-tab.md`.
 - [x] **A .cube file cannot be picked on an iPad** <!-- decision: 056 -->
-  **Shown as:** .cube colour files can be picked from Files on an iPad again — they were greyed out and unselectable.
-  reported 2026-09-23 with a screenshot of the Files panel: six .cube files in
+  **Shown as:** .cube colour files can be picked from Files on an iPad — they were greyed out and unselectable.
+  Seen 2026-09-23 in the Files panel on the target device: six .cube files in
   an iCloud folder, every one greyed out, none selectable. Importing a colour
   file had never worked on the target device, and it is the only route that
   feature has.
@@ -3918,7 +3917,7 @@ read as authoritative, and an invented one is worse than a missing one.
   carried beside it so the attribute cannot return as a tidy-up. The parser
   already refuses non-LUT text with a sentence written for a reader, and the
   size cap runs first, so nothing was lost.
-  **And a pack arrives as one file.** Asked for once the first half was built,
+  **And a pack arrives as one file.** Added once the first half was built,
   and it is the same finding the other way round: a .zip IS a type the platform
   registers, which is why a keep file ends in one. The importer takes every
   .cube out of an archive — nested folders and all — ignores the licence,
@@ -3940,9 +3939,9 @@ read as authoritative, and an invented one is worse than a missing one.
   `docs/decisions/056-a-cube-file-cannot-be-picked-on-an-ipad.md`.
 - [x] **A mask can only act in one place, and there is only one version of an edit** <!-- decision: 030 -->
   **Shown as:** Use more of the app's tools inside a mask, so the sky and the trees can take different amounts.
-  asked 2026-09-20 as a principle: a mask can be taken at any point in the
-  workflow, and without layers or named backups there is no way to work on the
-  raw underneath when all you have is the image in front of you.
+  filed 2026-09-20 as a principle: a mask should be usable at any stage of the
+  edit, and without layers or named backups nothing can reach the raw
+  underneath once only the rendered image is in view.
   **Half of it is already true and worth saying**: this app never overwrites
   pixels. Every render starts from the linear decode, the sky selection is built
   from that decode before any look and before the channel swap, and the raw is
@@ -4169,7 +4168,7 @@ read as authoritative, and an invented one is worse than a missing one.
   photograph opens ephemeral, with `openSingle`'s own comment saying there is
   nothing to resume from a single edit. The session is not the answer either:
   it is a working state with a Done that frees its storage, and the question is
-  "can I put this one down for a week", which wants a different answer.
+  whether one photograph can be put down for a week, which wants a different answer.
   The field keeps the edit as a few kilobytes of recipe beside the original and
   never writes the file — which is already this app's shape, since a look is
   0.5 KB of JSON. What the sources cannot settle is where the BYTES live: those
@@ -4198,8 +4197,8 @@ read as authoritative, and an invented one is worse than a missing one.
   because a store whose size the reader cannot see is the leak the record's own
   rejected option describes.
 - [x] **Straighten to a line you draw** <!-- decision: 038 -->
-  asked 2026-09-20: tap two points along an edge that should be level and let
-  the photograph straighten to it. Today the control is an angle — a slider and
+  filed 2026-09-20: tapping two points along an edge that should be level
+  straightens the photograph to it. Today the control is an angle — a slider and
   a grid — so the reader sets a number and judges the result, when what they
   know is not an angle but that THIS edge should be level and it is in front of
   them. The field has this and it has a name: Lightroom's Angle tool in Crop &
@@ -4222,9 +4221,9 @@ read as authoritative, and an invented one is worse than a missing one.
   gives 6.0° read as an upright. The renders were opened, which is how the
   direction was confirmed and how the layout defect below was found.
 - [x] **Every control can say what it does, and a finger can reach the saying** <!-- decision: 024 --> —
-  asked 2026-09-19 from the PC, in the sitting that reported a slider named
-  after the defect rather than the act: there should be something clickable
-  or hoverable, where it makes sense, that says what each tool does. Measured
+  filed 2026-09-19 from the PC, beside the slider named after the defect
+  rather than the act: each tool needs a reachable explanation of what it
+  does. Measured
   the same day: 103 visible notes against 76 labelled sliders, so most
   controls already explain themselves permanently and what is missing is the
   rule — which get a sentence, where it goes, and how a reader asks for one.
@@ -4250,10 +4249,10 @@ read as authoritative, and an invented one is worse than a missing one.
   own item and the sweep stays red until it is done.
 - [x] **The mask panel does not say what it can do** <!-- decision: 040 -->
   four things reported 2026-09-20, and the first is the finding: the request
-  was for masks to "include add, subtract, etc, like commercial offerings" —
+  was for masks that combine by adding and subtracting, as commercial editors do —
   **and those shipped in 2.53**. `MaskLayer.op`, groups folded by
   `groupWeight`, darktable's exclusive/inclusive algebra, with a walk that
-  proves it. **CORRECTED 2026-09-22: "add" there means adding a MASK, not a
+  proves it. **CORRECTED 2026-09-22: adding there means adding a MASK, not a
   union with the mask above, which does not exist** — `groupWeight` folds op 1
   as subtract and ops 0 and 2 through one multiply, so what shipped is subtract
   and intersect. Record 048 carries the missing half. The capability is there and was not found, which is a worse defect
@@ -4296,9 +4295,9 @@ read as authoritative, and an invented one is worse than a missing one.
   with it for the same reason. See
   `docs/decisions/040-the-mask-panel-does-not-say-what-it-can-do.md`.
 - [x] **The foliage is the right colour and reads as a blob** <!-- decision: 016 --> — reported
-  from the iPad 2026-09-17 on the Aerochrome look, asking how to get the detail
-  back the way the film looks or the way people who edit these files normally do
-  it. Measured on the lone oak's canopy — 1.57 million pixels, 30% of the frame:
+  from the iPad 2026-09-17 on the Aerochrome look: the foliage's detail is
+  lost, against both the film and the way these files are normally edited.
+  Measured on the lone oak's canopy — 1.57 million pixels, 30% of the frame:
   fine texture reads 40.15 with the denoiser off, 34.11 under the 5x5 filter this
   app shipped until the day before, and 30.76 under the 13x13 that replaced it.
   The denoiser costs the canopy 23% of its modelling and the widening is a third
@@ -4369,7 +4368,7 @@ read as authoritative, and an invented one is worse than a missing one.
   `docs/decisions/044-pressing-home-leaves-the-editor-drawer-on-screen.md`.
 
 - [x] **The panel's scroll cues are drawn over its controls** <!-- decision: 041 -->
-  reported 2026-09-20 as a weird scroll artefact on the Export panel while
+  reported 2026-09-20 as a scroll artefact on the Export panel while
   setting up a TIFF. Two arrow pills floated over the scroller at `height: 0`,
   and the up one sat four pixels under the pinned heading — which on that tab
   is exactly where the Format menu begins, so twelve pixels of scroll drew a
@@ -4607,7 +4606,7 @@ read as authoritative, and an invented one is worse than a missing one.
   See `docs/decisions/035-the-grade-tab-controls-do-not-behave-like-the-rest.md`.
 - [x] **A TIFF export uses one core** <!-- decision: 036 -->
   reported 2026-09-20 as a TIFF export that runs on one thread and takes
-  forever. It does, by an explicit condition: `canRunParallel` returns false on
+  far longer than a JPEG. It does, by an explicit condition: `canRunParallel` returns false on
   any format that is not JPEG, so every TIFF falls to the single-threaded loop
   on a machine that had eight workers and had just used them. The diagnostic
   line beside the report read "17.6 MP in 27.5s — pixels 25.9s on 8 threads",
@@ -4629,7 +4628,7 @@ read as authoritative, and an invented one is worse than a missing one.
   cannot see a TIFF export at all.** `Last export` read "none this session"
   straight after a completed 31 MB TIFF, because the three lines that record a
   profile live only in the JPEG branch. That is the real reason a device report
-  and a complaint about a slow TIFF looked like they contradicted each other —
+  and the slow-TIFF report looked like they contradicted each other —
   after a TIFF there is no line, so the newest one always belongs to an earlier
   JPEG. It also left the first verification run unable to answer its own
   question: the files came back byte-identical, which proves the band
@@ -4650,7 +4649,7 @@ read as authoritative, and an invented one is worse than a missing one.
   path whose ceiling matters most. See
   `docs/decisions/036-a-tiff-export-uses-one-core.md`.
 - [x] **Masks combine: a group of components joined by subtract and intersect** <!-- decision: 026 -->
-  asked 2026-09-19 in three parts: the masks need to combine, it should be
+  filed 2026-09-19 in three parts: the masks need to combine, it should be
   possible to subtract other colours from the Sky mask, and a mask should be
   invertible. Invert already exists on every mask type. The other two are one
   thing, and both Lightroom and darktable describe the same model: a mask is a
@@ -4683,8 +4682,8 @@ read as authoritative, and an invented one is worse than a missing one.
 
 
 - [x] **One sky selection, built at open, for every sky-aware tool** <!-- decision: 018 --> —
-  asked 2026-09-18: should the sky selection be set before any corrections
-  and be available to later operations. It is, for the look's stages, the
+  filed 2026-09-18: whether the sky selection is set before any corrections
+  and available to later operations. It is, for the look's stages, the
   tile and the batch: the decode worker builds the bitmap and its refinement
   to the picture's edges from the undegraded decode a moment after the
   picture itself. Two consumers still do not read it — the reader's own Sky
@@ -4925,7 +4924,7 @@ read as authoritative, and an invented one is worse than a missing one.
 > (vite.config.ts, stops at the next `## `) no longer renders all of dev
 > history to end users (share-readiness audit, 2026-07-17).
 
-- [x] **Guide lines in Straighten & Crop** — owner ask 2026-07-15 (the owner's third
+- [x] **Guide lines in Straighten & Crop** — filed 2026-07-15 (the third on-device
   crop pass): thin-line overlays to align against, one per geometry tool.
   (1) STRAIGHTEN — reference lines to align a horizon or vertical bars against
   while leveling: a set of screen-true horizontal + vertical lines that stay
@@ -4940,7 +4939,7 @@ read as authoritative, and an invented one is worse than a missing one.
   stage-aligned grid over `#cropOverlay`/the stage while straighten mode is live.
   Keep them hairline weight + low opacity (match the app's `--line`), maybe
   fading in only while a drag is active so they don't clutter the still preview.
-- [x] **Tap the histogram to hide it** — owner ask 2026-07-15 (given with the
+- [x] **Tap the histogram to hide it** — filed 2026-07-15 (with the
   crop go-to-main): tapping the histogram HUD directly should collapse/hide it
   (it floats over the top-right of the photo); the Histogram button in the top
   bar still brings it back as normal. Direct manipulation — touch the thing to
@@ -4950,17 +4949,17 @@ read as authoritative, and an invented one is worse than a missing one.
   affordance on it; keep the Histogram button as the single source of truth for
   the shown/hidden state so the two never disagree.
   SHIPPED (editing-polish release, cache ips-v55 → ips-v56): only the histogram
-  CANVAS takes the tap (owner refinement "tap histogram, not whole hud") — the
+  CANVAS takes the tap (refined: the histogram itself, not the whole HUD) — the
   `#histWrap` wrapper stays pointer-events:none so its padding never eats photo
   taps; `#histogram` alone gets pointer-events:auto + cursor + a title hint. Its
   click routes through the SAME `histEnabled`/`ips-hist`/`updateHistVisibility()`
   path the Histogram button uses (button stays the one control that re-shows it),
   and only ever hides. VERIFIED headless (Chromium): tap hides + persists
   ips-hist="0" + aria-pressed flips, button brings it back.
-- [x] **Crop controls should stand out + a rotate cue** — owner ask 2026-07-15
+- [x] **Crop controls should stand out + a rotate cue** — filed 2026-07-15
   (on-device, with the crop go): the Straighten slider and Reset crop button
-  are easy to miss. The owner wants them to carry the "active" blue background like
-  the "tap here" pill does (open to a better suggestion). AND a circle-arrow
+  are easy to miss. They should carry the "active" blue background like
+  the "tap here" pill does, unless something better fits. AND a circle-arrow
   (↻) paired with the crop icon — both on the top-bar Crop button and at the
   bottom near Straighten — so it visually reads that rotation/leveling is
   possible. Build notes: the crop toolbar (#cropTools) is currently a neutral
@@ -4968,8 +4967,8 @@ read as authoritative, and an invented one is worse than a missing one.
   change; the ↻ glyph can ride in the Crop button label and as a slider-end
   affordance. Keep Reset crop's disabled state honest (it greys when the crop
   is already identity).
-  SHIPPED (same release): SOFTER accent first (owner refinement "try the softer
-  accent for the bottom pill, first") — `#cropTools` now wears a blue-tinted
+  SHIPPED (same release): SOFTER accent first (the softer accent tried on the
+  bottom pill before a solid one) — `#cropTools` now wears a blue-tinted
   glass (`var(--accent-soft)`) + a solid `var(--accent)` border with light text,
   reading as active but secondary to the solid-accent exit banner stacked above
   it (solid fill is the fallback if it's too subtle on device). Reset crop keeps
@@ -4981,8 +4980,8 @@ read as authoritative, and an invented one is worse than a missing one.
   all shipped same round, cache ips-v56 → ips-v57):
   (1) ICON CONFUSING. Root cause: the Crop button's ↻ collided with the Rotate
   90° button RIGHT NEXT TO IT (which already leads with ↻), and ↻▣ read as two
-  mashed glyphs. Owner's call — "put crop, straighten, and rotate in one of the
-  sub menus, or a new one, instead of the main menu." DONE: a new **"Crop" panel
+  mashed glyphs. Owner's call: crop, straighten and rotate move out of the main
+  menu into a sub-menu, existing or new. DONE: a new **"Crop" panel
   tab** (7th, full-width below the six adjustment tabs via
   `.ptab[data-tab="crop"]{grid-column:1/-1}`); "crop" added to PANEL_TABS +
   TAB_META (setPanelTab is generic, sections/tabs are DOM-queried, so it wires
@@ -4990,14 +4989,14 @@ read as authoritative, and an invented one is worse than a missing one.
   so their handlers are unchanged; only the DOM home moved. In-tab there's no
   adjacent ↻, so Rotate keeps a clear "↻ Rotate 90°" and Crop is now plain words
   ("Crop & straighten"). Top bar is decluttered (both buttons gone from it).
-  (2) LOCKED OUT — "the bottom opens and covers so much." In portrait the editor
+  (2) LOCKED OUT — the open drawer left the photo too little room. In portrait the editor
   drawer (#panel, 45dvh) stayed open under the crop toolbar, squeezing the photo.
   FIX: `setCropMode` now sets `panel.hidden = true` while armed (restored on
   exit only when a photo is open, so the start-screen setCropMode(false) calls
   never bare an empty drawer). Reuses the EXISTING `#app:has(#panel[hidden])`
   collapse — zero new layout CSS; the stage goes full-height in both layouts.
   Exits (the "Tap here when done" banner + the Crop tab button) are unchanged.
-  (3) BOTTOM PILL. Owner: "accent is good but the bottom pill needs work." With
+  (3) BOTTOM PILL. The accent held; the pill's layout did not. With
   the drawer gone there's room, so #cropTools became a COLUMN: a header row
   (Straighten label · degree readout · Reset crop) over a full-width slider —
   no more thumb/readout overlap. Soft-accent tint kept; ↻ dropped from the pill
@@ -5016,7 +5015,7 @@ read as authoritative, and an invented one is worse than a missing one.
   the real iPhone, and the redesigned pill's look/room.
   SECOND ON-DEVICE PASS (2026-07-15, staging, iPhone — three fixes, cache
   ips-v57 → ips-v58):
-  (1) STRAIGHTEN SMEARED. "Straighten doesn't work — it smears." At larger
+  (1) STRAIGHTEN SMEARED. At larger
   angles the full-frame straighten PREVIEW didn't fill the viewport and the
   empty corners smeared the edge texel (the source texture is CLAMP_TO_EDGE).
   FIX: one guard at the top of the gl.ts fragment main() — if the resolved
@@ -5033,8 +5032,8 @@ read as authoritative, and an invented one is worse than a missing one.
   against the dialog's own scrollport — no position:relative, which would break
   modal centering; #infoDlg gained max-height:82vh + overflow-y:auto to match
   #helpDlg).
-  (3) CROP TAB NAME. Owner: "'Crop' doesn't indicate what's in it; separate
-  rotate and crop." Tab renamed **"Crop & rotate"** (TAB_META.crop.name + the
+  (3) CROP TAB NAME. "Crop" did not say what the tab holds, and rotate and
+  crop needed to be separate. Tab renamed **"Crop & rotate"** (TAB_META.crop.name + the
   full-width tab label; the "crop" key + saved-tab localStorage unchanged);
   Rotate 90° and Crop & straighten stay two separate, direct controls.
   VERIFIED headless 15/15 (Chromium, short portrait 390×720; fail-first proven —
@@ -5048,10 +5047,10 @@ read as authoritative, and an invented one is worse than a missing one.
   preview LOOKS clean on the real iPhone (Chromium corner-alpha is the proxy),
   the up-arrows read right, and the "Crop & rotate" name.
   THIRD ON-DEVICE PASS (2026-07-15, staging, iPhone — THE persistent misread,
-  cache ips-v58 → ips-v59): the owner never wanted a COMBINED crop+straighten
-  mode — the owner wanted THREE separate tools, each activated on its own. The old
+  cache ips-v58 → ips-v59): the design was never a COMBINED crop+straighten
+  mode — it was THREE separate tools, each activated on its own. The old
   single "Crop & straighten" button armed one mode showing the box AND the
-  slider at once ("fighting two controls"). FIX: split into two independent
+  slider at once, two controls competing for one gesture. FIX: split into two independent
   modes via a new `geoMode: "crop" | "straighten" | null` (main.ts). `cropArmed`
   stays a DERIVED `geoMode !== null` so the whole-frame render, canvas lock,
   `.cropping` inset and drawer-hide are untouched; only the box (Crop only) and
@@ -5081,7 +5080,7 @@ read as authoritative, and an invented one is worse than a missing one.
   done" on the separate `#cropBanner` overlapped the taller Straighten pill. FIX:
   removed the banner; the pill now carries a prominent accent-filled **Done**
   button (single bottom element, no overlap, obvious exit). (4) CORNER-ROTATE.
-  Owner: "make each corner a place to rotate from" — chose IN STRAIGHTEN. So
+  Every corner becomes a rotation grip, chosen for Straighten. So
   Straighten now shows the box too, and dragging any corner ROTATES (angle about
   the photo centre → params.straighten; slider stays as fine control); Crop's
   corners still resize. `setPointerCapture` wrapped in try/catch (can throw on
@@ -5094,12 +5093,12 @@ read as authoritative, and an invented one is worse than a missing one.
   OWNER'S HANDS: the box now hugs the photo on the real iPhone, Done is findable,
   and corner-rotation levels in the intuitive DIRECTION (sign easy to flip).
   FIFTH ON-DEVICE PASS (2026-07-15, staging, iPhone — cache ips-v60 → ips-v61):
-  (1) "Make Done brighter" — `#cropDone` now font-weight 700 + an accent glow
+  (1) DONE BRIGHTER — `#cropDone` now font-weight 700 + an accent glow
   (`box-shadow: 0 2px 14px -2px var(--accent)`) so it pops off the accent-soft
-  pill. (2) "Remove the circles on the Straighten corners, put arrows that move
-  with the photo" — Straighten's corner grips are now thin white CURVED rotation
-  double-arrows (circular two-way arrows — owner follow-ups: "thinner, arrow head
-  both ways" then "indicate ROTATION not stretching", so a straight ↔ was wrong;
+  pill. (2) ARROWS IN PLACE OF THE CIRCLES on the Straighten corners, moving
+  with the photo — Straighten's corner grips are now thin white CURVED rotation
+  double-arrows (circular two-way arrows — thin, headed both ways, and reading
+  as ROTATION rather than stretching, so a straight ↔ was wrong;
   Crop keeps the resize dots): `setGeoMode` toggles `#cropOverlay.straightening`,
   `positionCropOverlay` sets `--tilt = params.straighten` deg, and
   `#cropOverlay.straightening .crop-handle::before` swaps the dot for the arrow
@@ -5147,7 +5146,7 @@ read as authoritative, and an invented one is worse than a missing one.
   • REPOSITION — drag anywhere on the photo pans the crop (`#cropOverlay` captures
     it; `clampCropOnPhoto` clamps the position in SOURCE space so it stays on the
     photo — there's slack along a rotated photo's non-binding axis, which is the
-    "slide along the length" the owner wanted).
+    lengthwise slide the design called for).
   • AIDS PER FOCUS (the Guide-lines roadmap item, shipped) — Straighten shows a
     finer ALIGNMENT grid + the slider (no handles, no arrows); Crop shows the
     RULE-OF-THIRDS grid + round resize handles. Toggled by `.focus-straighten`/
@@ -5163,9 +5162,9 @@ read as authoritative, and an invented one is worse than a missing one.
   of both focuses captured. NEEDS THE OWNER'S HANDS: it now behaves like a normal
   editor crop/straighten on the real iPhone — level against the alignment lines,
   slide to reposition, switch to Crop for the thirds grid.
-- [x] **Pinch-zoom the crop while aligning** — owner ask 2026-07-16 (with the
+- [x] **Pinch-zoom the crop while aligning** — filed 2026-07-16 (with the
   crop go-to-main): during crop/straighten, two-finger pinch to zoom the view
-  in/out so the box (the "square") is easier to see and align against. Build
+  in/out so the box is easier to see and align against. Build
   notes: the fit-view is a single chokepoint — `fitViewCrop()` (main.ts) is the
   only reader of the preview window, and all three consumers (the armed render in
   `draw()`, the box placement in `positionCropOverlay`, and the pan-delta scaling
@@ -5178,9 +5177,9 @@ read as authoritative, and an invented one is worse than a missing one.
   path's CSS transform (the crop view re-renders the GL scene, it doesn't magnify
   a letterboxed canvas). Preview-only: export reads `params.crop` and is provably
   untouched; reset `viewZoom` on arm/disarm.
-- [x] **Box-fill default crop view** — owner ask 2026-07-16: instead of opening
+- [x] **Box-fill default crop view** — filed 2026-07-16: instead of opening
   zoomed-out to the whole tilted photo, default the armed view so the crop box
-  (the square) FILLS the frame with the photo visible but dimmed AROUND it (to
+  FILLS the frame with the photo visible but dimmed AROUND it (to
   show it continues), and pinch-out from there to see the whole tilt. Same
   mechanism as the pinch item: `fitViewCrop()` returns a smaller window AND
   recenters on the crop-box centre (not the hard 0.5) — the renderer accepts a
@@ -5203,7 +5202,7 @@ read as authoritative, and an invented one is worse than a missing one.
     on-screen), a little past it in Straighten (no handles to lose — precise
     leveling). One finger still pans; the 2nd finger hands off pan → pinch and
     drops the pan with no undo step.
-  • MODEL SHIFT (owner: eyes on this) — box-fill leaves no room for a movable
+  • MODEL SHIFT (flagged for the owner's review) — box-fill leaves no room for a movable
     box, so the tool became the standard "centred box, photo pans under it":
     a one-finger drag now moves the PHOTO (it follows your finger; the crop
     slides the opposite way in source space), where before the box moved inside
@@ -5225,19 +5224,19 @@ read as authoritative, and an invented one is worse than a missing one.
   the photo-follows-finger pan under a now-centred box, and the resize feel. If
   the pan direction or the centred box reads wrong on device, both are a one-line
   flip / a small change here.
-- [x] **Keep the crop box inside the photo** — owner-caught on device 2026-07-16
+- [x] **Keep the crop box inside the photo** — caught on device 2026-07-16
   (with the crop go-to-main), a REGRESSION from the box-first/pinch release: once
   the photo has been STRAIGHTENED or CROPPED, a resize handle (and maybe a pan)
   can drag the crop box PAST the image edge into the black void — the box is
-  allowed larger than / outside the photo (the owner's IMG_1007: the box's top + right run
+  allowed larger than / outside the photo (IMG_1007: the box's top + right run
   off the rounded photo edge into black; also visible after a straighten). Export
   reads `params.crop`, so a box dragged out there bakes black/transparent wedges
   into the saved image — fix before it bites.
   SHIPPED (cache ips-v67 → ips-v68). ROOT CAUSE confirmed: the RESIZE path
   clamped each moved corner to `cropSafeBound()` — a CENTRED, axis-aligned
   inscribed rect — and never re-checked the two shared-coordinate corners. Once
-  the box is panned off-centre on a tilted photo (valid — the slide the owner
-  wanted), a centred axis-aligned bound is the wrong constraint and a corner
+  the box is panned off-centre on a tilted photo (valid — the lengthwise slide
+  the design calls for), a centred axis-aligned bound is the wrong constraint and a corner
   lands off-photo (and at straighten 0 that bound is identity [0,1]). PAN
   (`clampCropOnPhoto`) was already correct. FIX: a new `clampResizeOnPhoto`
   (main.ts) — because `outToSrc` is LINEAR, an output rect images to a
@@ -5250,7 +5249,7 @@ read as authoritative, and an invented one is worse than a missing one.
   resize branch rewritten to use it; `cropSafeBound` stays for the straighten
   slider re-fit + Reset (deliberate centred inscribe); pan/fitViewCrop/export
   untouched (export reads `params.crop`, correct-by-construction once it's always
-  on-photo). The "rounded photo edge" the owner saw is a CSS border-radius on
+  on-photo). The rounded photo edge seen on device is a CSS border-radius on
   `#view` — preview-only, not in the buffer/export.
   VERIFIED headless 64/64 (Chromium, scratchpad harness driving the REAL app —
   synthetic pointer drags on the actual handles/overlay, sampling the WebGL
@@ -5265,7 +5264,7 @@ read as authoritative, and an invented one is worse than a missing one.
   iPhone/iPad that the box now stops at the photo edge on a resize/pan after a
   straighten or crop, and that the corner "slides back to fit" feel is natural.
   Still pairs with the overflow-view idea below (reframes "outside the image").
-- [x] **Redo** — owner ask 2026-07-15: add a Redo button + function next to
+- [x] **Redo** — filed 2026-07-15: add a Redo button + function next to
   "Go back", and RENAME "Go back" to "Undo" (unless a reason surfaces not to).
   Build notes: the undo stack already exists (undoStack + settled/flushRecord);
   Redo needs a parallel redo stack that undo() pushes onto and any NEW edit
@@ -5281,7 +5280,7 @@ read as authoritative, and an invented one is worse than a missing one.
   A→B, undo→undo→redo→redo walks exactly, a new edit after an undo clears the
   redo future, buttons enable/disable correctly. (In-session-switch persistence
   mirrors the already-proven undo path by construction; not separately driven.)
-- [x] **Drop "· RAW" from tile labels** — owner note 2026-07-15: every practice
+- [x] **Drop "· RAW" from tile labels** — filed 2026-07-15: every practice
   photo in the tutorial set is RAW now, so the "· RAW" suffix on the tile
   labels is redundant noise. Remove it from the gallery tile titles (main.ts
   GALLERY entries / galNef/galRaw label helpers). The RAW-vs-JPEG distinction
@@ -5292,8 +5291,8 @@ read as authoritative, and an invented one is worse than a missing one.
   ("53 photos · 44 RAW") is KEPT — it's an aggregate over a mixed set (44 DNG + 9
   JPEG), a different context, and stays honest. VERIFIED headless: no tile label
   contains "RAW"; the libCount readout still does.
-- [x] **Crop & straighten** — owner GO 2026-07-15 ("quick addition", one
-  release not a saga). The last table-stakes editing tool before the App
+- [x] **Crop & straighten** — owner GO 2026-07-15 (scoped as a single
+  release). The last table-stakes editing tool before the App
   Store path. SHIPPED to `claude/crop-straighten-jx2a0t`, not yet pushed to
   staging (cache ips-v53 → ips-v54).
   GEOMETRY: `EditParams` gained `crop {x,y,w,h}` (fraction of the STRAIGHTENED
@@ -5330,8 +5329,8 @@ read as authoritative, and an invented one is worse than a missing one.
   the-box-to-move) marks the PENDING crop — deliberately simpler than a
   Lightroom-style rotating viewfinder: since the photo itself already renders
   straightened while editing, the box never needs its own CSS rotation, which
-  sidesteps a whole class of touch-drag-under-rotation math for a "quick
-  addition". Exiting the mode (tap the banner) is what actually commits the
+  sidesteps a whole class of touch-drag-under-rotation math for a
+  single-release addition. Exiting the mode (tap the banner) is what actually commits the
   crop into the live canvas size. One drag = one undo step (`flushRecord` on
   pointerup, matching TAT/heal); Reset returns to the full, unstraightened
   frame; a fresh photo open clears crop/straighten like masks/spots; crop
@@ -5366,7 +5365,7 @@ read as authoritative, and an invented one is worse than a missing one.
   correctly by construction, per the inverse-mapping argument above, but a
   real mask-under-crop headless check is still owed before calling this
   fully proven).
-  OWNER'S FIRST ON-DEVICE PASS (2026-07-15, staging — "Crop works well" +
+  OWNER'S FIRST ON-DEVICE PASS (2026-07-15, staging — crop working, with
   two bugs, both fixed same day, cache ips-v54 → ips-v55):
   (1) A translucent BLUE BAND (iPad Safari's text-selection highlight)
   painted over the photo while dragging the box/handles — the crop overlay
@@ -5375,7 +5374,7 @@ read as authoritative, and an invented one is worse than a missing one.
   -webkit-tap-highlight-color:transparent + -webkit-touch-callout:none (the
   same guard #view already had; the overlay's div children had been missed).
   (2) The BOTTOM-LEFT corner handle couldn't be grabbed when the box sat in
-  the frame's bottom-left-most corner — until the owner SHRANK the Safari window.
+  the frame's bottom-left-most corner — until the Safari window was SHRUNK.
   Root cause: a full-frame crop put the handle flush in the physical screen's
   bottom-left corner, exactly where iOS reserves the first touch for the
   home-indicator swipe (bottom edge) and back-swipe (left edge); resizing the
@@ -5470,21 +5469,21 @@ read as authoritative, and an invented one is worse than a missing one.
   (all measurements so far are Chromium + a simulated update, not iOS Safari's
   own SW/storage behaviour).
 
-- [x] **RAW practice photos for every lesson** — owner ask 2026-07-14, given
-  with the dust-release GO: the next release brings the RAW (binned-DNG)
+- [x] **RAW practice photos for every lesson** — filed 2026-07-14, with
+  the dust-release GO: the next release brings the RAW (binned-DNG)
   versions of the library frames, and each practice photo opens on ITS OWN
   lesson. The plumbing already exists from the dust release: the scratchpad
   `bin-dng.ts` pipeline (NEF → 2×2 same-colour-binned half-res uncompressed
   DNG, ~10 MB, under the 25 MB Pages limit), `GalleryTile.lesson` (home
   lesson per tile), and the ONE-TILE-PER-SCENE rule (binned DNG REPLACES the
-  scene's JPEG tile — never side by side; owner called out the duplicate).
+  scene's JPEG tile — never side by side; a duplicate had already been flagged).
   WAITING ON: the owner uploading the NEFs (session repo access can't add
   files; the owner uploads to the chat, one or a zip at a time — full-res originals
   never enter the repo, only the binned DNGs do).
   DESIGN DECIDED (owner pick, 2026-07-14): TAG TILES FREELY — each tile
   names the lesson it opens on (`GalleryTile.lesson`), several photos may
   share a lesson, everything untagged defaults to Lesson 1. No "sets"
-  machinery (the owner's own "gets complicated" caution), no one-frame-per-
+  machinery (rejected as needless complexity), no one-frame-per-
   lesson constraint. Lessons stay SKILLS that work on any frame — the
   mapping only decides where a tap lands you. Sessions propose a sensible
   mapping for the owner's approval as frames arrive.
@@ -5580,16 +5579,15 @@ read as authoritative, and an invented one is worse than a missing one.
   library group opens/renders (incl. Golden canopy proving galRaw's 3rd
   arg is rotate, not lesson), no page errors.
   [SUPERSEDED 2026-07-15: the library came BACK as its own full-screen
-  overlay — owner pick "needs its own location"; see the landing/library
+  overlay — owner pick: a location of its own; see the landing/library
   entry below. The paragraph that follows records the 2026-07-14 state.]
-  LIBRARY UI REMOVED same day (owner on-device verdict, escalating from
-  "they don't have to collapse" to "It doesn't HAVE to BE THERE" — read
-  the second message before acting on the first; cache ips-v45 → ips-v46):
+  LIBRARY UI REMOVED same day (owner on-device verdict: the library need not
+  be on the start screen at all, not merely collapsed; cache ips-v45 → ips-v46):
   the start screen is now ONLY the 13-tile tutorial set. The expander,
   #library, LIBRARY_GROUPS and the group-header CSS were deleted. The 40
   non-core GALLERY entries REMAIN in data and their DNGs REMAIN deployed
-  (~420 MB of currently-unreachable files) — "set aside as an example
-  library" pending a home the owner actually wants (options: a page of
+  (~420 MB of currently-unreachable files) — held in reserve as an example
+  library pending a home the owner actually wants (options: a page of
   its own, inside Help, or trimming the files from deploy entirely — THE OWNER'S
   call, don't rebuild unprompted). Verified 31/31 headless: 13 tiles, no
   library element anywhere, all 13 open on their lesson chips and render,
@@ -5606,8 +5604,8 @@ read as authoritative, and an invented one is worse than a missing one.
   chat zip uploads remain the delivery path. The Drive "Hotspot test shots"
   folder (NIR_1597–1619 + Archive.zip) is a DIFFERENT project, not the
   gallery RAWs.
-- [x] **Studio icon in the top bar + the wrapped corner** — owner ask
-  2026-07-14, given WITH the main-release GO. Measured at iPad width
+- [x] **Studio icon in the top bar + the wrapped corner** — filed
+  2026-07-14, WITH the main-release GO. Measured at iPad width
   the top-left "‹ Studio" link wraps onto two lines, and the brand area
   should carry the Studio/NJ mark). SHIPPED to staging 2026-07-15 (cache
   ips-v50 → ips-v51): the NJ mark (icons/icon-192.png at 22px, rounded,
@@ -5660,9 +5658,9 @@ read as authoritative, and an invented one is worse than a missing one.
   sweep-entry.ts esbuild bundle + run-tests.mjs). NEEDS THE OWNER'S
   HANDS: the corner mark's look at the owner's sizes/themes, and that the wrap
   measured at that width is gone on the real iPad.
-- [x] **Install the sub-apps from inside the installed Studio** — owner ask
-  2026-07-15 ("There is no way to save to Home Screen from within the studio
-  as a web app, for the two sub-apps"): the installed launcher is standalone —
+- [x] **Install the sub-apps from inside the installed Studio** — filed
+  2026-07-15 (neither sub-app could be added to the Home Screen from inside the
+  installed Studio): the installed launcher is standalone —
   no Safari chrome, no Share — and Add to Home Screen lives ONLY in real
   Safari's share sheet, so Infrared/Macro opened from inside the installed
   Studio could never be installed on their own. SHIPPED to staging 2026-07-15
@@ -5679,7 +5677,7 @@ read as authoritative, and an invented one is worse than a missing one.
   the block says "tap its Safari (compass) button to hop over" and offers
   the copy-link path that always works. Hidden in the plain browser (Safari
   has Share there; the [hidden] guard lesson applies — all three pages'
-  stylesheets already carry it). ON-DEVICE RESULT (owner 2026-07-15, same
+  stylesheets already carry it). ON-DEVICE RESULT (2026-07-15, same
   day): the "Open in Safari" links DO NOT LEAVE the installed app on iPad
   — target=_blank navigates within the web app; no Safari, no in-app-
   browser escape hatch appeared. MEASURED iOS FACT for the file: a
@@ -5691,11 +5689,10 @@ read as authoritative, and an invented one is worse than a missing one.
   copy dropped. VERIFIED headless (in the 66/66 suite): blocks hidden in
   the browser, revealed under navigator.standalone, contain NO anchors
   (copy buttons only), and the clipboard carries the absolute sub-app URL.
-- [x] **Landing scroll cue + a home for the example library** — owner ask
+- [x] **Landing scroll cue + a home for the example library** — filed
   2026-07-15. Measured at iPad landscape: the welcome card ended AT
-  the fold — "can sometimes look like there is nothing to scroll down
-  to"). OWNER PICKS same day: landing "a, b, and c seem all good" (all
-  three fold fixes); library "needs its own location to go into".
+  the fold, so it could read as having nothing below. OWNER PICKS same day:
+  landing — all three fold fixes (a, b and c); library — a location of its own.
   SHIPPED to staging 2026-07-15 (cache ips-v51 → ips-v52):
   LIBRARY: a full-screen overlay of its own (#library in ir.html, the
   quickLook shell reused; role=dialog), opened from a dashed-pill
@@ -5717,8 +5714,8 @@ read as authoritative, and an invented one is worse than a missing one.
   display:none!important guard would kill; ResizeObserver on the card AND
   the grid since content growth doesn't resize a capped card); (c) the
   three welcome hints tightened without dropping a claim.
-  WATERMARK (owner: "Bake watermarks in at export for my own images
-  provided with the app"): exports of the app's own practice photos now
+  WATERMARK (baked in at export, for the practice photographs the app ships):
+  exports of the app's own practice photos now
   carry the corner mark — export.ts makeWatermarkLayer (scrim + domain +
   NJ ring from icons/nj-watermark-line-512.png, sized to the image,
   ring:text ratio 2.4 matching the baked teaching JPEGs), drawn on the
@@ -5747,7 +5744,7 @@ read as authoritative, and an invented one is worse than a missing one.
   REAL iPad (Safari chrome heights differ from headless), and the mark's
   size/placement taste on a real export.
 - [x] **Dust & spot removal** — heal sensor dust and hot pixels, the classic IR
-  pain (dust shows worst in smooth skies). Owner ask 2026-07-14; graduates the
+  pain (dust shows worst in smooth skies). Filed 2026-07-14; graduates the
   "Heal / clone" backlog item into the queue. Classical — no ML, no server.
   SHIPPED to staging 2026-07-14 (cache ips-v34 → ips-v35).
   WHAT SHIPPED: a "Dust & spots" cluster in the Basic tab. Arm **Heal spots —
@@ -5827,7 +5824,7 @@ read as authoritative, and an invented one is worse than a missing one.
   2800px preview (~70 MB transient), and tap-accuracy of small spots on
   finger vs pointer. LATER (unchanged): content-aware gradient-domain blend
   for spots straddling an edge; manual clone-stamp (pick your own source).
-  OWNER'S FIRST ON-DEVICE PASS (2026-07-14, staging — "works quite clever" +
+  OWNER'S FIRST ON-DEVICE PASS (2026-07-14, staging — working, with
   four tweaks, all shipped same day, cache ips-v35 → ips-v36):
   (1) NO SIZE FEEDBACK — you couldn't see the size before tapping, or adjust a
   fix after. Now the NEWEST heal stays ACTIVE (accent ring) and the Spot size
@@ -5843,7 +5840,7 @@ read as authoritative, and an invented one is worse than a missing one.
   overlay only. LESSON, now a comment in applyZoom: pinch/pan is a pure CSS
   transform with NO repaint — EVERY on-photo overlay must be retraced there,
   not just in draw(). positionHealOverlay() added beside positionMaskOverlay().
-  (3) AUTO-DETECT picked wrong things and IGNORED THE OWNER'S OBVIOUS SPOT. The
+  (3) AUTO-DETECT picked the wrong things and MISSED THE OBVIOUS SPOT. The
   obvious spot was a LARGE FAINT smudge — real dust at small apertures —
   invisible to the single-scale pass. detectSpots is now THREE-SCALE
   (fine / mid / coarse; mid+coarse dark-only), with three measured lessons:
@@ -5867,8 +5864,8 @@ read as authoritative, and an invented one is worse than a missing one.
   Harness gotcha for the file: synthetic PointerEvents have no active pointer,
   so setPointerCapture throws NotFoundError — stub capture in the test page
   before dispatching a simulated pinch.
-  DETECTOR REBUILT ON THE OWNER'S REAL NEF (2026-07-14, same day — the owner uploaded
-  NIR_1675.NEF, the frame the reports were about; cache ips-v36 → ips-v37). Its
+  DETECTOR REBUILT ON THE REAL NEF (2026-07-14, same day — NIR_1675.NEF arrived,
+  the frame the reports were about; cache ips-v36 → ips-v37). Its
   smudge measured rBlob 50-80 preview px at ~5% depth in open sky — and the
   session's synthetic tuning had been wrong on every axis. detectSpots is now:
   a 3-level PYRAMID (full/2×/4× planes; a huge faint smudge becomes a small
@@ -5885,8 +5882,8 @@ read as authoritative, and an invented one is worse than a missing one.
   Closing erases any dark blob smaller than its window yet follows brightness
   boundaries. The fine pass keeps the mean blur (its σ threshold is
   calibrated to it).
-  (2) The OWNER'S UNIFORM-AREA RULE ("look for areas of uniform color before
-  beginning smudge detection") is load-bearing twice: a BUSY MAP (gradient-
+  (2) The OWNER'S UNIFORM-AREA RULE (find the areas of uniform colour first,
+  and only then detect smudges) is load-bearing twice: a BUSY MAP (gradient-
   magnitude outliers over the frame's calm-quartile grain, ABSOLUTE bar — the
   sqrt-encoded luma is variance-stabilized, and a relative bar made dark sky
   read 10× busier than bright ice) is downsampled per level into busy DENSITY,
@@ -5924,7 +5921,7 @@ read as authoritative, and an invented one is worse than a missing one.
   NEEDS THE OWNER'S HANDS: re-run Find spots on NIR_1675 on the iPad (expect
   the big smudge ringed first + a couple of faint companions), and the owner's verdict
   on aggressiveness across a real library.
-  INTO THE LEARNING LIBRARY (owner ask 2026-07-14, same day; cache ips-v37 →
+  INTO THE LEARNING LIBRARY (filed 2026-07-14, same day; cache ips-v37 →
   ips-v38): NIR_1675 is now teaching frame #15 — tile "Lakeside & sensor
   dust" (after Lake & contrails; GALLERY is 18 tiles = 3 RAW + 15 JPEG) — and
   **Lesson 6 · Dust & spots** was added (tab "basic": Visualize → Find spots →
@@ -5947,7 +5944,7 @@ read as authoritative, and an invented one is worse than a missing one.
   OWNER'S UPCOMING PLAN (2026-07-14): the owner will add RAW VERSIONS of all library
   frames. HARD CONSTRAINT to plan around: **Cloudflare Pages refuses files
   over 25 MB** — NIR_1675.NEF is 28.8 MB, so raw NEFs cannot deploy as-is.
-  OWNER CHOSE BINNING ("You bin it", 2026-07-14) — PIPELINE BUILT AND FIRST
+  OWNER CHOSE BINNING (2026-07-14) — PIPELINE BUILT AND FIRST
   FILE SHIPPED (cache ips-v38 → ips-v39): scratchpad `bin-dng.ts` reads the
   NEF with the app's own decoder (readNefCfa), bins the Bayer mosaic 2×2
   SAME-COLOUR (output phase (x&1,y&1) averages the four same-phase pixels of
@@ -5958,11 +5955,11 @@ read as authoritative, and an invented one is worse than a missing one.
   33422(pattern)/50706/50714(black 1008)/50717(white 15520)/50721(Z50 colour
   matrix as SRATIONAL×10000)). NIR_1675.dng: 2800×1864, 10.4 MB. It's now the
   4th RAW tile "Lakeside & sensor dust · RAW" (rotation rides in the DNG's own
-  tag 274 so the tile needs no rotate field). DE-DUPED same day (owner: "You
-  duplicated it") — the JPEG twin tile was REMOVED, so the dust frame is ONE
+  tag 274 so the tile needs no rotate field). DE-DUPED same day (the frame had
+  been added twice) — the JPEG twin tile was REMOVED, so the dust frame is ONE
   tile, the RAW (GALLERY = 18 tiles = 4 RAW + 14 JPEG; the 1600px teaching
   JPEG was deleted, its thumbs/NIR_1675.jpg stays as the RAW tile's thumb).
-  Lesson-wise the owner also found it opening Lesson 1 — GalleryTile grew an
+  Lesson-wise it also opened on Lesson 1 — GalleryTile grew an
   optional `lesson` field and openGalleryPhoto opens the tile's HOME lesson
   (default 0); the dust tile carries lesson: 5, so tapping it lands straight
   on Dust & spots with chip ⑥ active. WHEN THE REST OF THE OWNER'S RAW VERSIONS
@@ -5974,10 +5971,9 @@ read as authoritative, and an invented one is worse than a missing one.
   + review) passes headless. Use the same script for the rest of the owner's RAW
   uploads. Also remember: Z50 II High-Efficiency NEFs don't decode at all —
   the owner's Z50 classics are fine.
-  AUTO-SWEEP REVIEW MODE (owner feedback 2026-07-14: the rings read as
-  "places someone still has to touch", and "the tap-to-heal menu shouldn't
-  open unless someone is doing a manual tap to heal"; cache bump shared with
-  the binning ship): "Find spots automatically" no longer arms heal mode.
+  AUTO-SWEEP REVIEW MODE (2026-07-14: the rings read as work still to do,
+  and the tap-to-heal menu opened when nobody was healing by hand; cache bump
+  shared with the binning ship): "Find spots automatically" no longer arms heal mode.
   The fixes are already applied when the sweep ends, and the UI now SAYS so:
   SOLID accent rings (class heal-done — receipts, not the dashed to-do style)
   plus a "✓ N spots healed" banner — tap a ring to put that one fix back
@@ -5985,18 +5981,18 @@ read as authoritative, and an invented one is worse than a missing one.
   all (rings retire; heals stay). Review is a state (healReview +
   setHealReview), mutually exclusive with the picture tools, cleared by fresh
   opens/Clear-all/arming heal manually, and dismisses itself when the last
-  ring is put back. The heal-mode banner now appears ONLY when the owner arms
-  Heal spots without help. Lesson 6 step 2 and the Help line reworded to match.
+  ring is put back. The heal-mode banner now appears ONLY when Heal spots is
+  armed by hand. Lesson 6 step 2 and the Help line reworded to match.
   VERIFIED headless: lesson suite grown to 21/21 (sweep → solid rings +
   review banner, heal button stays un-pressed and its banner closed, ring-tap
   drops exactly one fix, banner-tap retires rings but keeps the heals, the
   known smudge still ringed, RAW-tile round trip) + main UI suite still green
   (its sweep found 10 faint spots on a practice frame and the review path
   handled them).
-- [x] **Learn on real photos — lessons ride on the picture** — owner ask
-  2026-07-14 (the owner's framing: instead of dedicated tutorial photos, "lessons that
-  can be collapsed to 1, 2, 3 on top of the photo and when you touch them shows
-  lessons 1, 2, 3"). SHIPPED to staging 2026-07-14.
+- [x] **Learn on real photos — lessons ride on the picture** — filed
+  2026-07-14 (instead of dedicated tutorial photos, numbered lesson chips that sit
+  collapsed on top of the photo and open their lesson when touched). SHIPPED to
+  staging 2026-07-14.
   BACKSTORY: the owner had uploaded example IR frames that got stranded — 5 were
   committed to branch `example-ir-photos` (PR #10), 15 more were only PR-body
   attachments this session's egress policy (github.com/user-attachments → 403)
@@ -6030,14 +6026,14 @@ read as authoritative, and an invented one is worse than a missing one.
   "✕ Exit lessons" drops the rail to edit freely; Home hides the rail but keeps
   learnMode so Back restores it. Gotcha fixed: the global `button { width: 100% }`
   made the chips stack full-width — `.chip` needs `width:auto; flex:0 0 auto`.
-  WATERMARK (owner ask 2026-07-14): each low-res JPEG carries a small bottom-right
+  WATERMARK (filed 2026-07-14): each low-res JPEG carries a small bottom-right
   NJ mark + jefferson-photo-studio.pages.dev over a scrim, BAKED INTO the pixels
   (so it survives into an exported/shared photo — an overlay wouldn't, and export-
   stamping would be real work). It recolors with edits; owner OK'd that as the
   cheap, correct trade (white text stays legible through swap/sat/hue). RAW tiles
   are unwatermarked (can't bake into raw). Magenta-woodland was shot a quarter
-  turn off — corrected upright in the file (owner said teaching Rotate on a broken
-  frame was obtuse). Cache bumped ips-v26 → ips-v30 (frames added, then water tower cut).
+  turn off — corrected upright in the file (a broken frame is a poor way to
+  teach Rotate). Cache bumped ips-v26 → ips-v30 (frames added, then water tower cut).
   VERIFIED headless (Chromium, negative-control proven — chips hidden on the
   start screen, shown only after opening a practice photo; a wrong chip-count
   expectation made the suite FAIL first): 13 gallery tiles; opening one raises
@@ -6058,7 +6054,7 @@ read as authoritative, and an invented one is worse than a missing one.
   (and manifest icons) before Add to Home Screen — iOS reads the link at add
   time. PROVE the swap trick on a real iPad EARLY (a probe page with two
   choices) before building the full picker; if iOS caches the first icon, the
-  fallback is per-style install pages. Owner ask, 2026-07-13.
+  fallback is per-style install pages. Filed 2026-07-13.
   PROBE SHIPPED 2026-07-13 (stays unchecked — the full picker isn't built yet;
   this is the "prove it first" step): a temporary `icon-probe.html` route (linked
   discreetly from the launcher footer) with two deliberately opposite test icons
@@ -6082,8 +6078,8 @@ read as authoritative, and an invented one is worse than a missing one.
   and compare. Report which of the two outcomes happened; then we build the real
   picker and DELETE these four probe files (icon-probe/icon-a/icon-b .html + the
   probe PNGs/SVGs, their three vite inputs, and the footer link).
-  ON-DEVICE RESULT 2026-07-13 — owner tested on the real iPad: "All worked
-  perfectly." So the LIVE SWAP mechanism is CONFIRMED on iOS: rewriting
+  ON-DEVICE RESULT 2026-07-13 — owner tested on the real iPad: every case
+  worked. So the LIVE SWAP mechanism is CONFIRMED on iOS: rewriting
   `apple-touch-icon` (whole-node replace) before Add-to-Home-Screen DOES change
   the installed icon — no per-style-page fallback needed. NEXT: build the real
   picker (offer a small set of styles on the launcher/install flow; on pick,
@@ -6114,8 +6110,8 @@ read as authoritative, and an invented one is worse than a missing one.
   rendering screenshotted. NEEDS THE OWNER'S HANDS: the real iOS Add-to-Home-
   Screen with each style on the iPad (the live-swap was already confirmed by the
   probe — this just confirms the three finished icons look right installed).
-  CHANGE-IT-LATER PASS 2026-07-13 (owner clarification: the picker read as
-  install-time only; the owner wants to switch icons AFTER installing): on the web an
+  CHANGE-IT-LATER PASS 2026-07-13 (the picker read as install-time only, and
+  the need is to switch icons AFTER installing): on the web an
   installed tile's icon is BAKED at Add-to-Home-Screen — iOS never re-reads it,
   no JS/manifest change can repaint it, so "change it later" honestly means
   remove-the-tile-and-re-add. The picker now says exactly that, per surface
@@ -6137,9 +6133,9 @@ read as authoritative, and an invented one is worse than a missing one.
   studio-icon{,-graphite,-noir} files stay on disk but are no longer referenced.
   manifests use plain purpose "any" (the mark fills ~80% and its ring rides near
   the edge, so no maskable crop). SCOPE: LAUNCHER ONLY — Infrared (icon.svg/
-  ir-icon-*) and Macro (macro-icon*) are deliberately UNCHANGED (owner corrected
-  an over-broad first pass). No sw.js cache bump this release (owner asked for the
-  smallest diff; new icons are at fresh paths so nothing stale is served on iOS
+  ir-icon-*) and Macro (macro-icon*) are deliberately UNCHANGED (an over-broad
+  first pass was corrected). No sw.js cache bump this release (the smallest
+  diff, by design; new icons are at fresh paths so nothing stale is served on iOS
   AHS — the manifest is only cache-first for already-visited Android). Verified
   headless 31/31 (Light default, order Light→Dark, Dark→blob-manifest swap,
   switch-back restores the static manifest, IR/Macro assert NOT-NJ). Merged to
@@ -6147,7 +6143,7 @@ read as authoritative, and an invented one is worse than a missing one.
 - [x] **Share the app from inside the installed app** — an installed
   (standalone) PWA has
   NO Safari chrome — no address bar, no Share, no Back — so there was no way to
-  send someone the link or even see it (owner ask, 2026-07-13). SHIPPED same day:
+  send someone the link or even see it (filed 2026-07-13). SHIPPED same day:
   a Share control that appears ONLY when running standalone (in the browser
   Safari already offers this, so we stay out of the way there) on all three
   installable surfaces — the IR top bar (next to Tutorials), the Macro top bar
@@ -6169,13 +6165,13 @@ read as authoritative, and an invented one is worse than a missing one.
   label you'd actually keep — Studio (index.html), Infrared (ir.html), Macro
   (macro.html) — so the Add-to-Home-Screen sheet pre-fills the short name
   instead of the long `<title>`. Android side aligned to match: the IR
-  manifest `short_name` was "IR" (not the owner's stated "Infrared"), now
+  manifest `short_name` was "IR" (not the intended "Infrared"), now
   "Infrared"; Studio/Macro already correct. Cache bumped ips-v14 → ips-v15 so
   installed apps pick up the new manifest (fetched cache-first). VERIFIED in
   the built `dist/` (all three meta titles + all three short_names + the cache
   bump). NEEDS OWNER'S HANDS: the real pre-fill only shows in the iPad Safari
   Add-to-Home-Screen sheet — confirm each page offers Studio / Infrared /
-  Macro on device. Owner ask, 2026-07-13.
+  Macro on device. Filed 2026-07-13.
 - [x] **See what you're opening** — photo SESSIONS (owner design, 2026-07-13):
   "Open image" takes one or several; the picked set becomes the current
   session — big tappable previews in-app, choose and switch from there, each
@@ -6254,14 +6250,14 @@ read as authoritative, and an invented one is worse than a missing one.
   (the colour-pick banner lifts above it too). The strip never covers the
   picture; pinch behaviour left as-is (min = fit).
   (3) NAMING: "Open image" now takes several, which collided head-on with
-  "Process many" (batch). Renames (owner suggested the first): top bar
+  "Process many" (batch). Renames: top bar
   "Open image(s)" (edit — one photo or a session) and "Batch export" (output —
   develop a set unattended → one .zip); welcome buttons + hints and the Help
   reworded to draw exactly that editing-vs-output line ("Batch export — develop
   a whole set at once" now opens by contrasting the two; the sessions themselves
   are documented under "The basics" step 1). The .zip filename stays
   IR-batch-N.zip.
-  OWNER'S SECOND ON-DEVICE FINDING (2026-07-13 — navigation): after Resume (and,
+  SECOND ON-DEVICE FINDING (2026-07-13 — navigation): after Resume (and,
   really, any open) there was NO non-destructive way back to the start screen.
   The editor's own start screen (#welcome, where Open/Resume/Quick look/Tutorials
   live) was only reachable via the "Tutorials" button — unguessable — and the
@@ -6286,7 +6282,7 @@ read as authoritative, and an invented one is worse than a missing one.
   Back appear only when there's something live to return to; no page errors.
   NEEDS THE OWNER'S HANDS on the iPad: that Home reads as "start screen" (vs the
   ‹ Studio umbrella link) and the Back pill is obvious enough.
-  FOLLOW-UP (2026-07-13, owner ask, cache ips-v24 → ips-v25): with Home now
+  FOLLOW-UP (2026-07-13, cache ips-v24 → ips-v25): with Home now
   opening the start screen, the top-bar "Tutorials" button was redundant, so it
   was REMOVED from the IR top bar and moved INTO Help — a prominent "▶ Tutorials
   — learn by doing…" button at the top of the Help dialog that closes Help and
@@ -6320,7 +6316,7 @@ read as authoritative, and an invented one is worse than a missing one.
   512 maskable) and index.html (apple-touch-icon + svg icon — the launcher had
   NO icon links before, so iOS installs were falling back to the IR art).
   Owner-previewed before staging. SHIPPED 2026-07-13. REWORKED same day after
-  owner review ("is that really how the leaves work?" — no, it wasn't): real
+  owner review (the blades did not behave like a real iris's): real
   iris blades OVERLAP, so every visible seam is the straight-line CONTINUATION
   of one edge of the opening (the blade edge sweeps in from the barrel and
   becomes a hexagon side); v1's radial corner-to-rim seams read as a colour
@@ -6351,7 +6347,7 @@ read as authoritative, and an invented one is worse than a missing one.
   (The old-URL redirect from an installed old-domain PWA PASSED — owner
   confirmed on device, 2026-07-13.)
 - [x] **Quick look** — see what's in a folder without loading a session or
-  round-tripping a .zip (owner ask 2026-07-13, GO given same day; this is the
+  round-tripping a .zip (filed 2026-07-13, GO given same day; this is the
   pure form of the need the app was built for: white-balance a whole folder
   just to see what the files in it actually are). Design agreed: pick files →
   decode a small AUTO-BALANCED preview of each straight from the picked Files
@@ -6402,19 +6398,19 @@ read as authoritative, and an invented one is worse than a missing one.
   hitches on large RAW — the Web-Worker thumbnailer stays the obvious follow-up),
   and that "Keep in a session" flows straight into editing. Cache bumped
   ips-v22 → ips-v23.
-  ORDER FIX 2026-07-25 (owner: "they load on that tray out of order?"): the
+  ORDER FIX 2026-07-25 (tray tiles loaded out of shutter order): the
   grid decoded in FileList order — the picker's tap order, which reads as
   random. openQuickLook now sorts by filename first (localeCompare
   numeric-aware), so tiles read in shutter order and same-shot NEF/DNG
   twins sit adjacent. VERIFIED headless (real #quickFiles input, scrambled
   3-DNG pick comes out sorted; fail-first: the unsorted build fails the
   same walk; no page errors).
-- [x] **Batch process asks what goes on every photo** — owner feedback
-  2026-07-13 (the need the app was built for: white-balance an entire folder
-  just to SEE what files the owner was dealing with): batch used to silently take the
+- [x] **Batch process asks what goes on every photo** — 2026-07-13 (the
+  need the app was built for: white-balance an entire folder just to SEE
+  what files are in it): batch used to silently take the
   on-screen edit — meaningless when nothing is open — and the "Batch export"
   name still read like a sibling of "Open image(s)". Now named **Batch
-  process** (owner's word), and tapping it opens a CHOOSER dialog before the
+  process**, and tapping it opens a CHOOSER dialog before the
   file picker: **Your current edit** (offered only when a photo is open;
   otherwise an honest "no photo is open" note), **A saved look** (the filled
   My-looks slots; none → a tip teaching open-a-photo → dial-it-in → save in My
@@ -6434,7 +6430,7 @@ read as authoritative, and an invented one is worse than a missing one.
   edit" and the saved slot appear. Dialog screenshotted in both states.
   QUICK-LOOK note for later: an in-app no-copy preview grid (decode small
   previews straight from the picked Files, no session storage cost) would
-  serve "see what's in a folder" without the .zip round-trip — sessions
+  serve a look at what is in a folder without the .zip round-trip — sessions
   already show auto-balanced thumbs but copy bytes to storage first; batch
   Auto-balance-only + a smaller Export resolution is the zip-based answer
   today. Owner to say if the grid is wanted.
@@ -6450,8 +6446,8 @@ read as authoritative, and an invented one is worse than a missing one.
   Entry points: a "Process many photos…" action on the welcome screen and a
   "Process many" button in the top bar next to Open image (both are labels for
   the same hidden multi-file input) — deliberately NOT buried in Export, which
-  is the last accordion (owner feedback 2026-07-12). Graceful exit + resume
-  (owner asks, same day): every finished frame is persisted to IndexedDB the
+  is the last accordion (2026-07-12). Graceful exit + resume
+  (same day): every finished frame is persisted to IndexedDB the
   moment it completes (src/batchstore.ts; iOS Safari cannot silently write real
   files, so IDB is the only honest "save as you go"). MEASURED (2026-07-12,
   on-disk Chromium profile): IDB values ≳64 KB (100 KB tested) — Blob and
@@ -6494,18 +6490,18 @@ read as authoritative, and an invented one is worse than a missing one.
 - [x] **Gentler denoise + usable slider** — the slider was far too aggressive
   (top sigma 0.63, near a box blur, 0.2 auto floor). Now QUADRATIC AND
   FLOORLESS: sigma = 0.10·strength², in BOTH the shader and the CPU path
-  (raw/denoise.ts — kept bit-identical for GPU==CPU parity). Two owner
-  feedback rounds (2026-07-12) shaped this; both failure modes matter:
+  (raw/denoise.ts — kept bit-identical for GPU==CPU parity). Two on-device
+  tuning rounds (2026-07-12) shaped this; both failure modes matter:
   (1) a LINEAR slider crams the bilateral's narrow grain→smear sigma band
   into the first pixel of travel — the square spreads it; (2) an ADDITIVE
   FLOOR (first try was 0.03 + 0.12·s²) makes 0→first-step a hard jump to
-  sigma 0.03, which on a flat IR sky is already heavy — "0 is none and the
-  first step is more than enough". Never re-add a floor; the curve must pass
+  sigma 0.03, which on a flat IR sky is already heavy — slider 0 must mean no
+  denoise, and the first step must stay light. Never re-add a floor; the curve must pass
   through zero. Auto inverts the curve from measured noise; owner-tuned
-  2026-07-12 ("default should barely just get rid of the banding only"):
+  2026-07-12 (the default clears the banding and nothing more):
   s = clamp(sqrt(0.75·med / 0.10), 0, 0.6) — targets the noise amplitude
-  itself, all headroom above is left for taste. Owner confirmed the slider
-  feel ("denoise works well now"); don't reshape without fresh feedback.
+  itself, all headroom above is left for taste. The slider feel was
+  confirmed on device; don't reshape without fresh feedback.
 - [x] **Drag on photo to adjust** — Lightroom-style targeted adjustment (shipped
   2026-07-05): arm the tool, then drag on the photo — UP/DOWN scales that
   colour's luminance, LEFT/RIGHT shifts its hue. The colour under your finger
@@ -6593,8 +6589,8 @@ read as authoritative, and an invented one is worse than a missing one.
   and notes on GitHub.
 
 - [x] **Share-ready: honest copy, public notes page, share cards, privacy** —
-  the pre-promotion due-diligence pass (owner ask 2026-07-17, "Fable is on"
-  session; three-agent audit + this fix release, cache ips-v69 → ips-v70).
+  the pre-promotion due-diligence pass (2026-07-17; three-agent audit + this
+  fix release, cache ips-v69 → ips-v70).
   SHIPPED, seven commits:
   (1) deploy.yml concurrency group (per-ref, newest wins; Pages deploys are
   atomic so cancel-in-progress is safe). (2) .cube/.dcp exports ride the share
@@ -6644,8 +6640,8 @@ read as authoritative, and an invented one is worse than a missing one.
   absolute to the prod origin); the notes + privacy pages' look on device;
   and an explicit OK that privacy.html publishes noah.jefferson@gmail.com as
   the contact (easily swapped/removed if not).
-- [x] **Share your look — links, files and codes** — owner GO 2026-07-18 ("do
-  look sharing", with the full channel scope: core + .cube import + JPEG
+- [x] **Share your look — links, files and codes** — owner GO 2026-07-18 (look
+  sharing, with the full channel scope: core + .cube import + JPEG
   recipes + QR — releases 2-3 are queued above). SHIPPED same day (cache
   ips-v74 → ips-v75), release 1 of three.
   FORMAT (new `src/look.ts`, pure/DOM-free): payload
@@ -6709,7 +6705,7 @@ read as authoritative, and an invented one is worse than a missing one.
   which needs a photo open — with NO photo open, a look still arrives via
   link or via Open image(s) picking the .ipslook.
 - [x] **Import .cube LUTs as looks** — look-sharing release 2 (owner go
-  2026-07-18 with the full channel scope; "Continue with the next release"
+  2026-07-18 with the full channel scope; a go for this release the
   same day). SHIPPED same day (cache ips-v75 → ips-v76): import any .cube 3D
   LUT — the free film/cinema LUT universe — and it applies as the LAST colour
   stage on the final display colour, stacking on top of the whole IR grade,
@@ -6784,7 +6780,7 @@ read as authoritative, and an invented one is worse than a missing one.
   across real launches, and Batch-with-LUT output on a real set (the
   resolution path is headless-proven; a full batch zip diff was not run).
 - [x] **Looks that travel inside the JPEG + QR share** — look-sharing release
-  3 of 3 (owner go 2026-07-18: "Promote to Main and continue"). SHIPPED same
+  3 of 3 (owner go 2026-07-18). SHIPPED same
   day (cache ips-v76 → ips-v77). Every exported JPEG can now carry the look
   that made it, and any look can be shared as a QR code.
   TRAVELING RECIPE (`src/lookmark.ts`): the R1 wire-format payload rides as
@@ -6828,7 +6824,7 @@ read as authoritative, and an invented one is worse than a missing one.
   of a recipe-carrying JPEG, the recipe offer feel when opening shared
   photos, and the Export checkbox's discoverability.
 - [x] **Aspect-ratio crop presets + Flip the photo** — the core sweep's first
-  release (owner go 2026-07-18, "Promote to Main and continue"). SHIPPED same
+  release (owner go 2026-07-18). SHIPPED same
   day (cache ips-v77 → ips-v78), two queue items in one release — both live
   in the Crop & rotate area.
   PRESETS: a chip row on the crop pill — Free (default, old behaviour),
@@ -6876,9 +6872,9 @@ read as authoritative, and an invented one is worse than a missing one.
   check (0.15% exact). NEEDS THE OWNER'S HANDS: the chip row's feel on the
   real pill, whether locked-corner drags feel natural on touch, the flips'
   direction reading right, and the hidden lesson rail returning as expected.
-  OWNER'S ON-DEVICE PASS (2026-07-18, staging iPad, screenshot IMG_1050):
-  "loads into a fail state where it can't work" on a PORTRAIT photo —
-  everything else "works great" — plus two asks: each ratio's INVERSE and a
+  ON-DEVICE PASS (2026-07-18, staging iPad, screenshot IMG_1050): on a
+  PORTRAIT photo the crop tool opened in an unusable state — everything else
+  worked — plus two additions: each ratio's INVERSE and a
   CUSTOM ratio. ROOT CAUSE: `#stage.cropping #view` reserved a FIXED 96px for
   the pill, sized for the pre-chips one-row pill; the chip row (wrapping to
   two lines on the iPad) grew the pill to ~140px, which floated OVER the
@@ -6909,9 +6905,9 @@ read as authoritative, and an invented one is worse than a missing one.
   themes. NEEDS THE OWNER'S HANDS: the portrait arm now framing the whole
   box above the pill on the real iPad, the repeat-tap inverse discoverability,
   and the custom dialog's feel.
-- [x] **Crop ratio chips — obvious tap affordance, no side-scroll** — owner
-  feedback 2026-07-18, given WITH the promote of the aspect/flip + fix
-  releases. Two asks. (1) A chip that has been used must still look tappable —
+- [x] **Crop ratio chips — obvious tap affordance, no side-scroll** — found
+  2026-07-18, at the promote of the aspect/flip + fix
+  releases. Two defects. (1) A chip that has been used must still look tappable —
   the ACTIVE chip has to read as a live control rather than a spent one, since
   it flips to its inverse on a second tap, and it was becoming camouflaged the
   moment it was applied. (2) Every aspect ratio has to be visible at once, with no
@@ -6959,8 +6955,8 @@ read as authoritative, and an invented one is worse than a missing one.
   right orientation; aria-pressed exclusive; hint present/absent per chip;
   contrast computed ≥4.5:1 both themes; axe-core clean on the armed UI both
   themes; no page errors. NEEDS THE OWNER'S HANDS: the two wrapped rows
-  read neat on the real iPhone/iPad; the glow + ⇅/✎ badge reads as "still
-  tappable"; the glyphs render as text (not emoji) on iOS; mis-tap feel
+  read neat on the real iPhone/iPad; the glow + ⇅/✎ badge reads as still
+  tappable; the glyphs render as text (not emoji) on iOS; mis-tap feel
   between the two chip rows.
 
 - [x] **Black & white for 720nm** — THE FIRST CAPABILITY RELEASE under the
@@ -7042,7 +7038,7 @@ read as authoritative, and an invented one is worse than a missing one.
   rail's Exit chip now rides OVER the histogram HUD (chips are z-above it
   and stay tappable/legible on the dark glass; histogram hides on tap as
   ever) — fine headless, the owner's call on the real screen.
-  OWNER FEEDBACK, staging round 3 (2026-07-18): the function itself was
+  STAGING ROUND 3 (2026-07-18): the function itself was
   approved, and B&W gets ITS OWN PANEL TAB next to IR instead of living under
   the IR section. A ninth tab also completes the grid, which was wanted for its
   own sake: the .panel-tabs 3-column grid now fills exactly 3×3, with no orphan
@@ -7066,10 +7062,10 @@ read as authoritative, and an invented one is worse than a missing one.
   MERGED TO MAIN 2026-07-18 (owner go; PR #28, rebase) — production
   deploys as 1.2.
 
-- [x] **Learning library tile in the grid** — owner verdict 2026-07-15 (given
+- [x] **Learning library tile in the grid** — 2026-07-15 (decided
   WITH the crop go to main): the dashed "Browse the full example library"
-  pill was "completely missable, and most people would never know it was
-  there — it's at the bottom and does not stand out." The owner's design: a TILE
+  pill sat below the grid with no visual weight, so the library behind it went
+  largely undiscovered. The owner's design: a TILE
   inside the tutorial grid that looks like SEVERAL PHOTOS STACKED behind one
   another, labeled "Learning library", opening the same full-screen library
   overlay; keep the photo count; remove the pill (one way in, not two).
@@ -7097,17 +7093,17 @@ read as authoritative, and an invented one is worse than a missing one.
   transforms; tap opens the same overlay, six groups, no "More", Close
   closes; axe clean on the grid + tile both themes; no page errors;
   lesson-walk re-run green (its tile count now excludes .gal-library).
-  NEEDS THE OWNER'S HANDS: whether the stacked-prints look reads as "a
-  library lives here" at iPhone tile size, the three frames fronting it,
+  NEEDS THE OWNER'S HANDS: whether the stacked-prints look reads as a
+  library at iPhone tile size, the three frames fronting it,
   and the count text size.
-  MERGED TO MAIN 2026-07-18 (owner "Promote to main"; PR #29, rebase) —
+  MERGED TO MAIN 2026-07-18 (owner go; PR #29, rebase) —
   ships as a 1.2.x increment.
 
-- [x] **Location-data guard — the 🛰 tip** — owner ask 2026-07-18. The ask had
-  been made earlier and never written down anywhere; captured and
+- [x] **Location-data guard — the 🛰 tip** — 2026-07-18. The requirement had
+  been raised earlier and never written down anywhere; captured and
   built the same day as THE SECOND CAPABILITY RELEASE, ships as **1.3**
-  (VERSION in the release's final commit). The ask, in full: an icon (a
-  satellite or some other tip) shows when location data is saved with the
+  (VERSION in the release's final commit). The requirement, in full: an icon (a
+  satellite glyph or similar tip) shows when location data is saved with the
   loaded file; tapping it offers removing it and re-saving the file, or
   saving as a copy, the user choosing where; the tip can be turned off in
   settings AND that must be clear to the user; settings also offer
@@ -7173,11 +7169,11 @@ read as authoritative, and an invented one is worse than a missing one.
   resumed after a reload re-scans its STORED bytes, so a pre-setting
   stored copy still reports honestly, but the "cleaned on open" nuance
   doesn't survive a reload (the tip then reads as normal found-location).
-  MERGED TO MAIN 2026-07-18 (owner "Promote"; PR #31, rebase) —
+  MERGED TO MAIN 2026-07-18 (owner go; PR #31, rebase) —
   production deploys as 1.3.
 
-- [x] **Landing-page welcome — the first-visit card + the ⓘ button** — owner
-  ask 2026-07-18: the Studio landing page should pop up for NEW users
+- [x] **Landing-page welcome — the first-visit card + the ⓘ button** —
+  2026-07-18: the Studio landing page should pop up for NEW users
   explaining the purpose of the app and the tool family, how to install,
   the benefits, and that installing is OPTIONAL — and the same information
   must stay reachable behind an information icon after dismissal.
@@ -7206,9 +7202,9 @@ read as authoritative, and an invented one is worse than a missing one.
   NEEDS THE OWNER'S HANDS (iPad): the card's tone/wording, the ⓘ button's
   corner spot vs the notch/safe-area on the real devices, and whether the
   auto-open feels welcoming rather than in-the-way on a first real visit.
-  OWNER REWORK WITH THE PROMOTE (2026-07-18): "you're asking a user to
-  read two paragraphs before figuring out how to install — they'll never
-  make it." REBUILT INSTALL-FIRST: one lead line, then a boxed accent
+  REWORK WITH THE PROMOTE (2026-07-18): the card put two paragraphs ahead
+  of how to install, and a new visitor would not read that far.
+  REBUILT INSTALL-FIRST: one lead line, then a boxed accent
   install card ("Put it on your Home Screen" + an OPTIONAL badge, two
   numbered steps: Share → Add to Home Screen, with the Android line and
   the it's-optional sentence as fine print inside the box), THEN the
@@ -7218,8 +7214,8 @@ read as authoritative, and an invented one is worse than a missing one.
   incl. a new DOM-order check (install steps BEFORE the tool list) and a
   close-event race fix in the harness (the dialog "close" event that
   records seen fires a task after close()).
-  MERGED TO MAIN 2026-07-18 (owner "Promote to main" with the rework
-  note; ships as a 1.3.x increment).
+  MERGED TO MAIN 2026-07-18 (owner go, with the rework; ships as a
+  1.3.x increment).
 
 - [x] **Display-P3 JPEG export** — THE THIRD CAPABILITY RELEASE, ships as
   **1.4** (VERSION in this release's final commit). The recorded trap —
@@ -7277,11 +7273,11 @@ read as authoritative, and an invented one is worse than a missing one.
   next to the app preview in Apple Photos (they should be
   indistinguishable), and one social-upload round trip (recompressors
   convert tagged P3 correctly, but the owner's pipeline is the real test).
-  MERGED TO MAIN 2026-07-18 (owner "Promote"; PR #34, rebase) —
+  MERGED TO MAIN 2026-07-18 (owner go; PR #34, rebase) —
   production deploys as 1.4.
 
 - [x] **Keep EXIF in exports** — THE FOURTH CAPABILITY RELEASE, ships as
-  **1.5** (owner directive "get through these to creative"). Exported JPEG
+  **1.5** (owner directive: clear these before the creative release). Exported JPEG
   and 16-bit TIFF now carry the HONEST SUBSET of the original's EXIF:
   capture date/time (DateTimeOriginal, 0x0132 fallback), Make/Model, lens
   (LensModel), and the exposure triangle (ExposureTime/FNumber as RAW
@@ -7531,8 +7527,8 @@ read as authoritative, and an invented one is worse than a missing one.
   whether the mixer belongs in the Grade tab or wants its own home on
   the real iPad.
 - [x] **Stickers — UFOs in the trees** — CREATIVE, shipped as a BETA
-  straight to main (owner's 2026-07-19 gate exception; the owner is most excited
-  about this one). VERSION unchanged (still 2.1 — this is an increment on
+  straight to main (owner's 2026-07-19 gate exception). VERSION unchanged
+  (still 2.1 — this is an increment on
   the Creative line, not a new capability number; bump the middle when the
   owner blesses stickers out of beta or the next capability lands).
   A new **Stickers** tab (11th; row 4 = Grade + Stickers, Warp completes
@@ -7544,8 +7540,8 @@ read as authoritative, and an invented one is worse than a missing one.
   geometry in image-uv (id, asset, x, y, scale=frac of width, rot,
   occlude, occludeLuma, occludeBright) on `params.stickers`. It composites
   INTO the source before the pipeline — so it inherits the channel swap /
-  sub-2000K WB / grade and lands in the IR palette (the owner's "fitting
-  for the weird colors": the grey saucer's dome/eyes come out recolored),
+  sub-2000K WB / grade and lands in the IR palette (so it fits the false
+  colours: the grey saucer's dome/eyes come out recolored),
   and grain settles over it for free (grain is post-pipeline). Preview:
   syncSpotsToTexture (renamed in spirit) bakes the union of heal+sticker
   dirty rects from the PRISTINE previewSrc — heal first, stickers on top —
@@ -7636,7 +7632,7 @@ read as authoritative, and an invented one is worse than a missing one.
   DEFERRED: a live brush-ring cursor; higher-res or float field; per-photo
   session persistence of the field (currently resets on reload like masks).
 - [x] **Sticker drag lag — ghost during the gesture, bake on release** —
-  owner-caught on device 2026-07-19 ("stickers add a ton of lag once added").
+  caught on device 2026-07-19 (every placed sticker made dragging lag).
   Cause: `syncSpotsToTexture` re-baked the CPU composite EVERY drag frame, and
   baked BOTH the old and new rects — ~4.7M px × (heal bake + composite) ≈
   200–300M ops/frame for one scale-0.55 sticker. Fix: a `liveSticker` index is
@@ -7655,9 +7651,9 @@ read as authoritative, and an invented one is worse than a missing one.
   the drag/resize feel on the iPad, and that the grey ghost→recolored snap on
   release reads fine (a recolored ghost is a later option).
 - [x] **Stickers v2 — blend in, don't decorate (art + auto-match + adjust +
-  import)** — owner-caught on device 2026-07-19: "those aren't stickers, they're
-  bright white shapes… blend funny things into the picture that look like part
-  of it." Four moves, all BETA straight to main (Creative exception):
+  import)** — caught on device 2026-07-19: the stickers rendered as flat,
+  over-bright cut-outs pasted on the photo rather than subjects blended into
+  the scene. Four moves, all BETA straight to main (Creative exception):
   (1) ART — the in-house set redrawn with rich SVG shading (radial form
   gradients, feTurbulence surface/fur, feDisplacementMap furry outlines, soft
   edges) and the catalog grown 4→8: saucer, alien, Saturn, beam PLUS four
@@ -7708,9 +7704,9 @@ read as authoritative, and an invented one is worse than a missing one.
   regressions green. NEEDS THE OWNER'S HANDS: the brush feel + size range on the
   iPad, whether rub-away/bring-back read clearly, and the pinch/spin feel
   (sensitivity, whether one-finger-drag vs two-finger never fight).
-- [x] **Sticker library v3 — categorized + dynamic (Increment A)** — the owner
-  is generating a large themed set with another AI ("of all drop in soon") and
-  wants a MANAGED library, not one flat unmanaged row. Direction baked in
+- [x] **Sticker library v3 — categorized + dynamic (Increment A)** — a large
+  themed set is being generated with another AI and will all land soon, so it
+  needs a MANAGED library, not one flat unmanaged row. Direction baked in
   (2026-07-19), BETA straight to main. STRUCTURE: assets live at
   `public/stickers/<category>/<name>.png` (cryptids/ ufo/ aliens/ paranormal/
   lostworld/ oddities/); the recursive dist-walk precache already covers nested
@@ -7740,8 +7736,8 @@ read as authoritative, and an invented one is worse than a missing one.
   DELIVERY ASSUMPTION: committed PNGs in category folders (permanent, precached,
   offline), with runtime "Import a picture" kept for one-offs.
 - [x] **Sticker perspective — drag the corners to set the plane (Increment B)** —
-  owner direction 2026-07-19: "some of these need to skew by moving a corner… set
-  the perspective for the image they're putting it into" (esp. evidence — a
+  owner direction 2026-07-19: per-corner skew, so a sticker can be laid onto the
+  plane of the surface it sits on in the photo (esp. evidence — a
   footprint laid flat on the ground, a lantern tucked behind a log reads far more
   believable than a decal). BETA straight to main. MODEL: `Sticker.corners` = 4
   offsets (TL,TR,BR,BL) in local half-extent units, absent = the plain scale+rot
@@ -7768,10 +7764,10 @@ read as authoritative, and an invented one is worse than a missing one.
   is smooth enough or wants a matrix3d ghost), and whether one-finger corner-drag
   vs body-drag ever fight (corner handles stop-propagation, so they shouldn't).
 - [x] **Sticker library — two kinds: Creatures & craft / Evidence (Increment C)**
-  — owner reframe 2026-07-19: "split the app into two kinds of overlays —
-  Creatures & craft, and Evidence… the evidence overlays are more believable
-  because you can tuck them into a corner or partly hide them behind real
-  objects." So the picker gained a TOP tier: `STICKER_GROUPS` (👣 Creatures &
+  — owner reframe 2026-07-19: overlays split into two kinds, Creatures & craft
+  and Evidence, because evidence reads as real when it sits small in a corner or
+  half-hidden by real
+  objects. So the picker gained a TOP tier: `STICKER_GROUPS` (👣 Creatures &
   craft, 🔍 Evidence) → category chips (now carrying a `group`) → the sticker
   grid. Categories re-sliced: Creatures = Cryptids, UFOs & craft, Aliens, Spirits
   (paranormal figures), Beasts (lost-world); Evidence = Tracks & marks
@@ -7793,8 +7789,8 @@ read as authoritative, and an invented one is worse than a missing one.
   paranormal figures belong), and whether a 3-row picker (kind → category →
   stickers) is right on the iPad or wants a lighter shape once the set is full.
 - [x] **Blend to match — a strength dial on the auto-harmonise (Increment D)** —
-  owner ask 2026-07-19 ("a blend capability to make the sticker match the image
-  as best it can"). A "Blend to match the photo" button + a **Match strength**
+  2026-07-19: a sticker should be pulled toward the photo it sits in, as far
+  as the pipeline allows. A "Blend to match the photo" button + a **Match strength**
   slider under "Match to the photo": the sticker takes on the local scene's
   brightness, warmth and a softened contrast, and the strength dials 0 (raw
   asset) → 1 (full match). MODEL: `matchTarget` = the full-strength
@@ -7810,7 +7806,7 @@ read as authoritative, and an invented one is worse than a missing one.
   display didn't help (RAW source is camera-native, a third space). The ONLY
   thing that harmonises predictably through this pipeline is the gentle, monotonic
   brightness/warmth/contrast scalars sampled from the DISPLAYED scene (the
-  original auto-match the owner already liked) — so the affine was reverted and
+  original auto-match, which already worked on device) — so the affine was reverted and
   the deliverable is the STRENGTH CONTROL over that. On a bright IR-saturated
   asset the red channel clips at 255 and can't be pulled down; the match still
   improves green/blue (walk measures total channel distance, not max, for this
@@ -7822,7 +7818,7 @@ read as authoritative, and an invented one is worse than a missing one.
   feels right, and whether the owner wants saturation folded into the auto-match too
   (left manual for now — auto-sat was too unpredictable to trust).
 - [x] **Blend to match REWORKED — actually works now, and on iOS (2026-07-20)** —
-  owner on device: "the blend is not working in any sort of way" (a blown-white
+  on device the blend had no visible effect at all (a blown-white
   UFO craft, identical at Match strength 0 and max). TWO bugs: (1) auto-match
   sampled the scene by reading the WebGL canvas back through a 2D canvas — works
   in Chromium, SILENTLY FAILS on iOS Safari, so no match ever computed and the
@@ -7859,7 +7855,7 @@ read as authoritative, and an invented one is worse than a missing one.
   selected chips and vanished). Both verified (force-update-walk stubs the SW +
   catches the reload; sticker-category-walk + a screenshot for the tiers).
 - [x] **Sticker rotation on iOS — decode via <img>, not createImageBitmap
-  (2026-07-20)** — sticker-factory chat diagnosed: placed stickers rendered 90°
+  (2026-07-20)** — diagnosed by the sticker-factory work: placed stickers rendered 90°
   CCW on iOS Safari (correct in Chromium + the raw PNGs). Ruled out files (no
   EXIF, pixel-upright), the CPU composite math, and makeStickerAsset (row-major)
   — it's the DECODE. `ensureStickerAsset` + the "import your own" path rasterized
@@ -7891,9 +7887,9 @@ read as authoritative, and an invented one is worse than a missing one.
   appear with Wildlife → "Owl"; three kinds now render and filter; PLANT=nofilter
   fails; all sticker regressions + build green. The factory promotes reviewed
   PNGs into public/stickers/<category>/ as its own deliberate step.
-- [x] **Sticker brush QoL: start off-edge + a brush-size ring (2026-07-21, owner:
-  "brushing only works if you start within the transparent background… near the
-  edge is hard" + "brush size slider has nothing to show that effect")** — two
+- [x] **Sticker brush QoL: start off-edge + a brush-size ring (2026-07-21: a
+  stroke had to begin on the sticker, which made edge trimming fiddly, and the
+  brush-size slider gave no visual feedback)** — two
   fixes, increments. (a) EDGE BRUSHING: `startStickerPaint` used to bail (return
   false → fall through to drag) unless the press landed inside the sticker's local
   [0,1] rect, so a stroke had to BEGIN on the sticker and trimming the very edge
@@ -7914,7 +7910,7 @@ read as authoritative, and an invented one is worse than a missing one.
   7/7, sticker-fixes 39/39, parity 0 LSB. `__stickers()` snapshot gained maskRev/
   hasMask for the walk.
 - [x] **Sticker placement QoL: smaller min, pan while armed, reachable delete +
-  Delete key (2026-07-21, owner batch)** — four usability fixes, all increments
+  Delete key (2026-07-21)** — four usability fixes, all increments
   (no VERSION bump). (a) MIN SIZE: Size floor dropped 0.05 → 0.015 (slider min +
   the resize-handle and two-finger-pinch clamps) so a distant/tiny creature is
   possible. (b) PAN WHILE ARMED: the Stickers tab used to dead-own the canvas
@@ -7937,9 +7933,9 @@ read as authoritative, and an invented one is worse than a missing one.
   0 LSB. NEEDS THE OWNER'S HANDS: grabbing a very small sticker by body is a small
   target — the Size slider + handles still work, but a tap-to-select-nearest could
   be a follow-up if it feels fiddly.
-- [x] **Cast shadows auto-follow their creature (2026-07-21, owner "a toggle
-  that makes the sticker auto-update when dropped in a new location" applied to
-  the shadow's placement pain)** — a cast shadow is now GLUED to the creature it
+- [x] **Cast shadows auto-follow their creature (2026-07-21: a cast shadow had
+  to be re-placed by hand every time its creature moved)** — a cast shadow is
+  now GLUED to the creature it
   came from and tracks its position / scale / spin on every settle, so you place
   the creature once and the contact puddle rides along — no more casting a shadow
   and then hand-lining-it-up, which made placement effectively impossible.
@@ -7964,8 +7960,8 @@ read as authoritative, and an invented one is worse than a missing one.
   shadow strip below the creature is an easy enough tap-target to grab for a manual
   offset (auto-follow means most placements never need it; if the owner wants a dedicated
   nudge/direction control that's a clean follow-up).
-  - FOLLOW-UP FIX (2026-07-21, owner: "rotating the shadow makes the whole image
-    show again, not the rotating shadow"): the live ghost is a plain rotated
+  - FOLLOW-UP FIX (2026-07-21: rotating a shadow showed the whole creature image
+    instead of the rotating shadow): the live ghost is a plain rotated
     `<img>` of the asset — it CANNOT reproduce a shadow's flatten (a corner
     homography), so ghosting a shadow during a transform showed the un-flattened
     full creature. GOTCHA to keep: shadows must never be ghosted. Fix: shadows are
@@ -7978,7 +7974,7 @@ read as authoritative, and an invented one is worse than a missing one.
     re-bakes; creature rotation still ghosts; follow 14/14, sticker-fixes 39/39,
     parity 0 LSB, no console errors.
 - [x] **Scene toolkit: auto-shadow + Screen-for-lights (2026-07-21, asset-factory
-  handoff + owner "auto-shadow, then screen-for-lights")** — polish on the new
+  handoff; auto-shadow first, then screen-for-lights)** — polish on the new
   toolkit assets. (a) REGISTERED the factory's new folders: `illustrated/` (10
   hand-drawn cryptids) under Creatures → Illustrated cryptids, and `shadows/`
   (grounding + dapple) under a new `toolkit` group (🎬 Scene toolkit) → Shadows.
@@ -8004,11 +8000,11 @@ read as authoritative, and an invented one is worse than a missing one.
   (currently a fixed light dir; a light-direction knob + the silhouette blur are
   the next polish), and which assets should count as "glows" for Screen.
 - [x] **Sticker "match the photo" done RIGHT — its own adjustment, not the
-  pipeline (2026-07-21, owner: "it has to have ITS OWN adjustments that mimic the
-  photo underneath… it will NEVER work by treating it the same as the photo")** —
+  pipeline (2026-07-21: a sticker is matched by a separate adjustment in its own
+  layer, never by running it through the photo's pipeline)** —
   the "push it through the infrared look" (in-look) path is fundamentally broken:
   the IR pipeline is calibrated for RAW SENSOR data, so an sRGB sticker forced
-  through it blows to neon (owner's screenshot: a figure gone yellow/red/green).
+  through it blows to neon (device screenshot: a figure gone yellow/red/green).
   REMOVED the in-look toggle entirely. REPLACED with a DISPLAY-space palette match:
   `computeSceneMatch` reads the DISPLAYED scene colour under the sticker via
   `renderer.readUvPixel` (offscreen GL read, iOS-safe — the tap-WB path, NOT a
@@ -8025,13 +8021,13 @@ read as authoritative, and an invented one is worse than a missing one.
   neon; strength 0 restores the raw colour; the in-look toggle is gone, the match
   button+slider present; overlay preview-vs-export parity still 0 LSB WITH the
   match applied; axe clean both themes; build clean. This is the real answer to
-  the owner's ask from the very start — a sticker mimics the photo instead of
+  the requirement from the very start — a sticker mimics the photo instead of
   being run through the same filters.
-- [x] **Killed the confusing "blend/match" pile (2026-07-21, owner: "it's not
-  blending, it's just wrong")** — after on-top shipped, the owner turned on the
-  "Blend into the infrared look" toggle (sounds like nice blending) and got a
-  cooked sticker, then fought the "Match to the photo → Blending into the photo →
-  Match strength" controls that darken a sticker into the scene under it. Root
+- [x] **Killed the confusing "blend/match" pile (2026-07-21: the blend controls
+  produced wrong colours rather than a blend)** — after on-top shipped, turning on the
+  "Blend into the infrared look" toggle (sounds like nice blending) gave a
+  cooked sticker, and the "Match to the photo → Blending into the photo →
+  Match strength" controls darkened a sticker into the scene under it. Root
   cause was NAMING + a leftover feature: on-top already keeps the sticker's own
   colours, so the whole source-space match machinery was obsolete AND misleadingly
   labelled. REMOVED entirely: `stkBlendToggle` ("Blend into the photo"),
@@ -8086,17 +8082,17 @@ read as authoritative, and an invented one is worse than a missing one.
   themes. Help + Lesson 9 rewritten. NEEDS THE OWNER'S HANDS: confirm on the iPad
   that on-top stickers now read as their own picture (and export the same), and the
   in-look opt-in still gives the cryptid-in-infrared effect when the owner wants it.
-- [x] **Sticker usability sweep + zoom-with-no-wheel (2026-07-21 device asks)** —
-  owner on device, five things at once (branch
+- [x] **Sticker usability sweep + zoom-with-no-wheel (2026-07-21 device fixes)** —
+  found on device, five things at once (branch
   `claude/sticker-blending-resize-rotate-tr3hrl`, BETA straight to main via
   staging). (1) **Blend on/off** — a `#stkBlendToggle` at the top of "Match to
   the photo": ON restores the full-strength match (computes matchGain via
   autoMatchSticker if the sticker never had one) → matchAmt = MATCH_AMT_DEFAULT;
-  OFF sets matchAmt 0 so the raw asset colours show ("some work better without
-  it"). updateStickerUI mirrors it as ✓-text + aria-pressed and disables the
+  OFF sets matchAmt 0 so the raw asset colours show (some stickers look better
+  unmatched). updateStickerUI mirrors it as ✓-text + aria-pressed and disables the
   strength slider + "Blend to match" button when off. (2) **Resize/rotate right on
-  the photo** — the owner "didn't see how" (only sliders/pinch + the persp corner
-  handles, which skew, confused the owner). positionStickerOverlay now has three modes
+  the photo** — there was no visible way to do it (only sliders/pinch + the persp corner
+  handles, which skew rather than resize). positionStickerOverlay now has three modes
   by data-mode: `persp` (4 skew handles, unchanged), `xform` (4 `.sticker-size`
   resize corners + a `.sticker-rotate` knob on a `.sticker-stem`, shown when a
   sticker is selected and neither perspective nor blend-paint is armed), and `box`
@@ -8136,17 +8132,17 @@ read as authoritative, and an invented one is worse than a missing one.
   Lesson 9 + the Gestures list updated. VERSION unchanged (Creative beta
   increment). NEEDS THE OWNER'S HANDS: the resize/rotate handle feel + size on the
   iPad, the zoom button placement, and whether Fit should also frame a crop.
-  DEFERRED — **the "double blend" the owner flagged next**: stickers composite
+  DEFERRED — **the double blend found next**: stickers composite
   INTO the source (pre-pipeline), so the IR look (WB, camera matrix, R↔B swap,
   saturation, grade) re-cooks even a matched sticker — a colourful alien blows to
   neon, measured on the device. Blend-off helps but the look still processes it. The real
   cure is a per-sticker "lay it on top / keep its own look" mode that composites
   AFTER the pipeline (a new display-space stage in BOTH preview + export, with
   occlusion/mask/perspective in display space) — a real architectural fork; parked
-  for owner direction before building (asked in chat, per the no-picker rule).
-- [x] **New Infrared app icon + social tile (Bigfoot IR forest)** — owner ask
-  2026-07-20, from a ChatGPT-made color-IR forest the owner liked (a Bigfoot subtly
-  placed in the trees; source in session uploads). Three deliverables, all cut
+  for owner direction before building.
+- [x] **New Infrared app icon + social tile (Bigfoot IR forest)** — 2026-07-20,
+  from a chosen ChatGPT-made color-IR forest (a Bigfoot subtly
+  placed in the trees; source image not in the repo). Three deliverables, all cut
   from that one square image via the headless-Chromium canvas pipeline
   (`gen-brand.mjs`, scratchpad): (1) **IR icon** — `public/icon.svg` now embeds
   a 384px JPEG of the photo, center-square, clipped to the same rx=96 squircle
@@ -8159,7 +8155,7 @@ read as authoritative, and an invented one is worse than a missing one.
   glyph mark; wired as `og:image`/`twitter:image` in ir.html (was a bare sample
   photo). EXCLUDED from precache (vite.config.ts) — scrapers fetch it, the app
   never does. (3) Instagram announcement copy for the sticker/creature release —
-  delivered in chat (not committed). VERIFIED headless: icon.svg decodes as an
+  delivered outside the repo (not committed). VERIFIED headless: icon.svg decodes as an
   `<img>` and renders the squircle photo; build clean; dist serves all four
   assets; ir-social.jpg absent from sw.js precache, icons + icon.svg present;
   og:image points at the tile. NEEDS OWNER'S HANDS (iPad): how the icon looks
@@ -8168,16 +8164,16 @@ read as authoritative, and an invented one is worse than a missing one.
   picks the og:image up automatically). Not a capability — ships as an increment
   (no VERSION bump).
 
-- [x] **Full-bleed alignment view — CLOSED, not shipped: subsumed by the full-bleed track** — owner-caught on device
+- [x] **Full-bleed alignment view — CLOSED, not shipped: subsumed by the full-bleed track** — caught on device
   2026-07-16 (with the crop go-to-main; screenshot IMG_6201, Straighten @ 23.6°).
   While a geometry tool is armed, rotating and pinch-zooming CLIPS the photo
   inside the `#view` box: the tilted/zoomed photo is letterboxed and cut by
   `#view`'s rounded-rect edges, so black wedges show at the rotated corners and
-  the alignment grid floats over the black margins — the picture is "boxed"
+  the alignment grid floats over the black margins — the picture is boxed in
   instead of filling the screen. Mechanism: the armed preview renders into the
   contained `#view` canvas (`object-fit:contain`), so a tilted + `viewZoom`
-  photo doesn't fill the axis-aligned `#view`. Owner's call: this gets fixed when
-  the image is simply made completely visible below everything — i.e. it's
+  photo doesn't fill the axis-aligned `#view`. Owner's call: this gets fixed by
+  making the whole image visible beneath all the controls — i.e. it's
   SUBSUMED by the "Crop view: let the photo overflow instead of boxing it" and
   "Big image: the photo fills the app" items below (the photo becomes the
   full-bleed background and the tilt/zoom view stops clipping). No fix in
@@ -8501,8 +8497,8 @@ appearance may be the accepted one.
 **ANSWERED, NOT A DEFECT:** whether "Quick look a folder" differs from picking
 several photos through "Open image(s)". It does, and the difference is storage.
 Quick look decodes each picked file to a preview held in RAM only, writes nothing
-to the device, and is gone when the tab closes — it exists to answer "what have I
-got?"; the keepers you tap go into a real session through the normal open path.
+to the device, and is gone when the tab closes — it exists to show what a folder
+holds; the keepers you tap go into a real session through the normal open path.
 Opening several photos COPIES each one's source bytes into on-device storage so
 the set survives a reload, a crash or the OS discarding the tab, and each photo
 keeps its own edit. That copy is the 72% above. Batch process is the third thing
@@ -8558,10 +8554,10 @@ sliders behave differently.
 
 ## Every photo in a kept set was decoded twice, 2026-09-09
 
-Reported as a question: why does the strip render every thumbnail again, after
-the Quick look grid was just watched rendering them?
+The strip rendered every thumbnail a second time, right after the Quick look
+grid had rendered them.
 
-Because it did. `openQuickLook` decodes every picked file to build the grid.
+`openQuickLook` decodes every picked file to build the grid.
 `keepQuickLook` then took `quickItems.map(it => it.file)` — **the bare Files,
 throwing every rendered picture away** — and handed them to `addToSession`,
 whose background pass decoded all of them a second time to build the strip.
@@ -8623,7 +8619,7 @@ off, and the strength survives a reload.
 **AND IT SHIPPED, BRIEFLY, DEFAULTING TO ZERO.** The stored value was read as
 `Number(localStorage.getItem(...))`, and `Number(null)` is **0** — which passes
 every range check a sane person writes. So a fresh install would have had the
-automatic switched on, showing on, and doing nothing: **the exact complaint this
+automatic switched on, showing on, and doing nothing: **the exact defect this
 control was added to answer, reintroduced by the control itself.** Caught by the
 first run of its own test, whose "100%" baseline read `amt: "0"`. Ask whether
 there IS a stored value before asking what it is.
@@ -8651,8 +8647,8 @@ Asserted across a 44-file open: 42 distinct lines, every one carrying
 
 Spotted in a screenshot: the photo on screen strongly cyan, every thumbnail in
 the strip beneath it grey-pink. The repo's own rule is that a tile matches what
-tapping it opens into, and `makeThumb` carries a comment citing an
-owner-caught case of exactly this.
+tapping it opens into, and `makeThumb` carries a comment citing a
+device-caught case of exactly this.
 
 **MEASURED, because a screenshot is not a measurement.** Four photos, Aerochrome
 applied, each tile's mean colour compared against the photo it opens into — as a
@@ -8836,8 +8832,8 @@ tile was landscape in either the provisional or the settled state.
 
 ## What batch was actually doing, 2026-09-09
 
-Asked what batch processing does now, and the answer read off `batchParamsFor`
-was that it does **less than every other path in the app**. Per frame it sets a
+Read off `batchParamsFor`, batch processing does **less than every other
+path in the app**. Per frame it sets a
 gray-world balance (times the chosen built-in look's WB bias), auto exposure,
 measured denoise, the grade's creative values and the resolved LUT, and nothing
 composition-specific — no masks, heals, stickers, crop or straighten, all
@@ -8894,7 +8890,7 @@ app. There are four paths that develop a frame here — the open, the strip
 thumbnail, the export and the batch — and a change to one is a divergence in the
 other three until somebody checks. The thumbnails already cost a release for
 exactly this (they wore another photo's correction); this is the same lesson in
-the fourth path, found only because it was asked about.
+the fourth path, found only when batch was read against the other three.
 
 ## A look carries whole, or it does not carry, 2026-09-09
 
@@ -9035,7 +9031,7 @@ test, a `durability` attribute — ask it, and stop timing.**
 
 ## Restore depth: two states that disagreed, and three causes, 2026-09-09
 
-Reported from the device as "default-on but has no effect until off/on again".
+Reported from the device: on by default, but with no effect until switched off and on again.
 Reproduced, and it was three separate faults stacked on one control. The walk
 did not catch any of them because its assertion presses Aerochrome FIRST and
 then reads the sliders — so it was satisfied by the LOOK path while the at-open
@@ -9213,8 +9209,8 @@ nothing in `src/` had ever called `navigator.storage.persist()`. It had:
 search that missed it looked for `storage.persist`, with a literal dot; the code
 reads `storage?.persist?.()`. **A pattern that assumes the punctuation reports
 the code absent from a tree it is in** — the same shape as the hub's §250, where
-a search that never ran reported nothing found, and it landed in the owner's
-report as a fact. The finding underneath survived: the BATCH path asked and the
+a search that never ran reported nothing found, and that was passed on
+as a fact. The finding underneath survived: the BATCH path asked and the
 SESSION path did not, for as long as sessions have existed, and the session path
 is the one that copies every original to storage.
 
@@ -9466,7 +9462,7 @@ a diagnostic would answer this and several other questions that currently end in
 
 ## Saturation clipping: measured, mis-sized, and NOT fixed, 2026-09-09
 
-Owner asked for the clipping flagged earlier to be fixed. **It was measured
+The clipping flagged earlier was taken up for a fix. **It was measured
 instead, and the finding is that the alarm was wrong by an order of magnitude
 and the change built for it does not earn its place. Nothing shipped.** Recorded
 so nobody re-opens it from the same bad signal.
@@ -9708,9 +9704,9 @@ from false colour; hue spread can.
 
 ## A look on a camera-rendered file had no white balance to work on, 2026-09-10
 
-**Reported first as "the thumbnail fix only affects jpg, not nef", then — with a
-screenshot — as "the jpg thumbnail looks good but the image itself didn't
-match". The second reading is the right one, and it inverts the first.**
+**Reported first as a thumbnail fix that reached JPEG but not NEF, then — with a
+screenshot — as a JPEG whose thumbnail looked right while the opened image did
+not match it. The second reading is the right one, and it inverts the first.**
 
 `establishFreshEdit` sets white balance BY FILE KIND: a raw gets
 `grayWorldWB(src)`, a camera-rendered file gets `params.wb = [1, 1, 1]`. That
@@ -9766,7 +9762,7 @@ IDENTICAL `swapRB` and `hue`; they differ almost entirely by `wbBias` — goldie
 `[0.78, 1.22, 1.4]`, red `[0.78, 1.02, 1.35]`, aero none at all. Strip the bias
 and all three collapse into Aerochrome. `natural`, `mono`, `sepia` and `hie`
 differ by swap, sat or tint, which survived, so those tiles did change and the
-defect read as "goldie doesn't work" rather than "the WB bias is dropped".
+defect read as one look failing rather than as the WB bias being dropped.
 
 **Fix:** multiply `lookBias` onto the thumbnail's gray-world WB, the same
 multiply `batchParamsFor` already does for a built-in look.
@@ -9825,8 +9821,8 @@ side edges (safe-area insets only), `border-radius: 0`, and `#stage` drops its
 - fills 100% of the width, against 93% and 90% before
 - side gaps 0, against 30px and 22px
 - border-radius 0px, against 8px — that rounded rect is what cut the black
-  wedges off a tilted photo's corners, which was the alignment item's whole
-  complaint
+  wedges off a tilted photo's corners, which was the whole defect the
+  alignment item recorded
 - all four crop handles still grabbable, at both sizes, in both builds
 
 **One assertion of mine was wrong and the measurement caught it.** The first
@@ -9888,9 +9884,9 @@ off the displayed frame:
 - highlights 0.0
 
 Six times stronger in the shadows than the mids and nothing at all in the
-highlights. What the reader met was 92% of a correctly-confined shadows tint on
-a false-colour frame that is mostly in the lower range — which reads as "the
-whole image" and is not the same thing.
+highlights. What the drag produced was 92% of a correctly-confined shadows tint on
+a false-colour frame that is mostly in the lower range — which looks like the
+whole image and is not the same thing.
 
 **Left alone, deliberately, and this is a taste call rather than a defect.** The
 puck is drawn at `amt * PUCK_MAX`, so it sits UNDER THE FINGER. A curved
@@ -10198,7 +10194,7 @@ saying so. Asserted at both ends, and the note still says which end it used and
 how far away the frame is.
 
 **APERTURE PICKS THE SET; FOCAL LENGTH INTERPOLATES INSIDE IT.** This is the
-part the owner's own data settled. A hot-spot changes more with aperture than
+part the measured data settled. A hot-spot changes more with aperture than
 with anything else — measured on a real lens, **0.19 at f/29 and 0.00 at
 f/5.3**, nearly the same focal length — so blending across apertures averages
 two different behaviours into one meaningless curve. Planted exactly that: with
@@ -10218,8 +10214,8 @@ extrapolation past the ends, and blending across apertures.
 
 ## The preview would have carried a correction the file did not, 2026-09-10
 
-Caught by reading `export.ts` before answering a question about automatic lens
-correction, not by any walk — and the walks are the point of the finding.
+Caught by reading `export.ts` while checking automatic lens correction, not by
+any walk — and the walks are the point of the finding.
 
 **A raw export does not use the decoded frame.** `getSource` re-reads the CFA
 from the file at native resolution, deliberately, so a saved image is not
@@ -10253,8 +10249,8 @@ fourth time in this session.
 
 ## The rig measured a lens and nothing read it back, 2026-09-10
 
-**Asked plainly: did the app ingest my numbers, or do you have to do something
-with them — is that why they are on a debug screen?** Both halves were right.
+**Nothing in the app ingested the rig's numbers: a developer had to do something
+with them, which is why they sat on a debug screen.**
 The rig measured a lens, printed 2.6 KB of JSON, and NOTHING in the app read it.
 The output was data for a developer to paste into `hotspotProfiles.ts`. That is
 not a feature, it is a collection form — and it is why the thing still read as a
@@ -10319,11 +10315,11 @@ clean in both themes, with the new card's controls matching the card beside it
 rather than inventing a size.
 
 **A PASTE-IN BOX WAS BUILT AND THEN REMOVED, and the removal is the lesson.**
-The first measurements exist only as text in a message, from before anything
+The first measurements exist only as text outside the app, from before anything
 could keep them, so a "numbers you measured before" control went into the lens
 panel to bring them in without re-shooting. It worked, and it was wrong: the
-owner still has the photographs, so re-measuring costs one press — and the
-control served exactly one situation, this conversation's, while sitting
+source photographs still exist, so re-measuring costs one press — and the
+control served exactly one situation, a one-off import, while sitting
 permanently in a reader-facing panel. **Solving MY problem in THEIR UI.** Cut
 the same session it was written.
 
@@ -10378,12 +10374,12 @@ it never does. Bound it, and print what it was still waiting for when it stops.
 
 This also sits under the standing rule that a session cannot see the balance and
 should spend deliberately. A loop left running unattended is spending with
-nobody watching, and the only reason it stopped is that somebody opened a panel
-and asked what it was.
+nobody watching, and the only reason it stopped is that the background-tasks
+panel happened to be opened.
 
 ## The measurement cost more than the decode, 2026-09-10
 
-Told the owner the remaining cost was the raw decode. It was not, and the
+The remaining cost had been put down to the raw decode. It was not, and the
 numbers were there to be taken:
 
 - **decoding a 10 MB raw: 95 ms** (70 ms in the worker) — the app's own speed
@@ -10418,7 +10414,7 @@ the app's other whole-set actions and it belongs with them.
 
 ## It decoded everything to find out it wanted none of it, 2026-09-10
 
-**Reported from a phone: a 1.69 GB zip, no sign of progress, taking forever.**
+**Reported from a phone: a 1.69 GB zip showed no sign of progress and ran for a very long time.**
 Both halves were real and the second was the cause of the first.
 
 **MEASURED BASELINE: a zip of twelve 10 MB raws ran for over FIFTEEN MINUTES
@@ -10456,9 +10452,9 @@ and the hot-spot is entirely an aperture effect between them. Groups key on
 lens, focal length AND aperture now.
 
 **And the Copy button was at the top while the numbers were at the bottom**,
-under a long list of per-frame findings — so on a phone the reader scrolled
-past everything, found a text box, and tried to select 2 KB of JSON by hand
-(reported, and fair). Copy and Save sit with the text they act on now.
+under a long list of per-frame findings — so on a phone the numbers sat past
+everything in a text box, and the one way to take them was selecting 2 KB of
+JSON by hand. Copy and Save sit with the text they act on now.
 
 ## A lens is not a photograph, 2026-09-10
 
@@ -10505,8 +10501,8 @@ is in this repo's own standing rules, and it keeps being the answer.
 
 ## Close was inside the thing that scrolls, 2026-09-10
 
-**Reported from a phone:** Close on the ⓘ is all the way at the bottom, and it
-does not close by tapping out — is the ⓘ too long?
+**Reported from a phone:** Close on the ⓘ sat at the very bottom, tapping
+outside did not close it, and the ⓘ looked too long.
 
 **The length is not the defect.** Measured at 393x852: the ⓘ held 2333px of
 content in a 699px box — **1636px of scrolling, 1.9 screens, before Close came
@@ -10541,8 +10537,8 @@ with bare `vh` while the rest of the app uses `dvh` — `#infoDlg` and `#helpDlg
 at 82vh, `#batchDlg` at 86vh. On a phone browser `vh` is the viewport with the
 URL bar HIDDEN, which is taller than what is on screen, so 82vh came to roughly
 95% of the visible height: the dialog ran under the browser's own chrome and the
-band of backdrop you tap to dismiss all but vanished. That is why it "doesn't
-close by tapping out" — the handler was there and correct
+band of backdrop you tap to dismiss all but vanished. That is why tapping
+outside did not close it — the handler was there and correct
 (`e.target === dlg`) the whole time, with nowhere left to tap. All three are
 `min(82vh, calc(100dvh - 2rem))` now. Quietkeep's app.css states the same rule
 in the same words; this repo already used `dvh` for the editor panel and simply
@@ -10565,8 +10561,8 @@ close) and letting the bar scroll again (three dialogs lose their way out).
 Measured after: ⓘ 1670px of scrolling, Help 9482px, Batch 141px — and all three
 keep a way out at top, middle and end, in both themes, 44x44, axe clean.
 
-**And the lens rig had one route in, behind a version number.** "Where do I find
-the place to upload lens test shots?" — nowhere, which is the point: the frames
+**And the lens rig had one route in, behind a version number.** There is no
+place to upload lens test shots, which is the point: the frames
 stay on the iPad. But the only way to Measure a lens was ⓘ → the version tag →
 the test page, which is not a route anybody finds looking for their lens. The IR
 lens fixes card on the Corrections tab now links straight to it, next to the
@@ -10574,7 +10570,7 @@ sliders it is the answer to.
 
 ## The phone spent a whole band on one button, 2026-09-10
 
-**Reported as "the phone user experience is not good", with a screenshot.**
+**Reported as a poor experience on a phone, with a screenshot.**
 Measured on an iPhone 15 Pro viewport (393x852) with a portrait photo open,
 which is the case in the screenshot and the worst one — a tall photo in a short
 wide stage:
@@ -10827,8 +10823,8 @@ costs an hour of looking in the wrong place.
 
 ## The iPad slept and the work was thrown away, 2026-09-10
 
-**Reported from the device: on long loads the iPad goes to sleep, stops all the
-work, and discards everything done to that point.** Two failures, and fixing one
+**Reported from the device: during a long load the iPad slept, the work
+stopped, and everything done up to then was lost.** Two failures, and fixing one
 without the other would have left the reader still losing a run.
 
 **THERE WAS A WAKE LOCK AND IT COVERED ONE JOB.** `acquireWakeLock` in main.ts
@@ -10881,9 +10877,9 @@ the next run, which is when it can be acted on.
 
 ## The measurements lived in storage the app does not own, 2026-09-10
 
-**Named from the device: a lens correction needs a warning that it is only kept
-in the browser's agreed-upon memory.** It is `localStorage`, and the framing was
-exactly right — it is not storage this app owns. iOS Safari drops site data
+**Found from the device: a lens correction carried no warning that it is kept
+only in storage the browser controls.** It is `localStorage`, and that is the
+right framing — it is not storage this app owns. iOS Safari drops site data
 after a stretch of not visiting, "Clear website data" takes it, a device short
 of room evicts, and `navigator.storage.persist()` asks the browser to keep it
 and may be refused silently.
@@ -10956,8 +10952,8 @@ correction fell back to the shipped profile correctly and nothing on screen said
 so, until the photograph was opened again. `syncMyLens` tells the shipped card
 when it stops being superseded.
 
-**RE-MEASURING REPLACES, and now it says so.** Asked what happens when a flat
-frame already accounted for is ingested again. Within one run, frames in the
+**RE-MEASURING REPLACES, and now it says so.** The case: a flat frame already
+accounted for is ingested again. Within one run, frames in the
 same lens/focal-length/aperture group are averaged — up to six, spread across
 the set — so nothing is double-counted. Across runs, a profile with the same key
 is replaced outright, which is what a reader re-shooting a lens wants. The hole
@@ -10977,7 +10973,7 @@ feature set; one phrased as a comparison is a claim about the thing itself.
 
 ## Seven questions from the device, and what each one measured, 2026-09-10
 
-**Is the location strip taking the lens with it?** No, and it is asserted now
+**Does removing location data also remove the lens data?** No, and it is asserted now
 rather than reasoned about. `stripLocation` zeroes the GPS entries in place and
 returns a file of the SAME LENGTH; lens, focal length, aperture, camera and
 capture time all survive, and the photograph matches the same profile before and
@@ -10992,7 +10988,7 @@ negative control that cannot fail, for the third time on this work. The fixture
 is a hand-written TIFF with a real GPS IFD beside a real Exif IFD, and
 `findLocation` is asserted to see it BEFORE the strip runs.
 
-**Does interpolation fail badly across a hole?** Measured by leave-one-out on
+**How far off is interpolation across a gap in the measurements?** Measured by leave-one-out on
 real anchors: hide the measured 36mm profile, blend 19mm and 50mm across the gap
 it leaves, and compare against the measurement that was hidden. Worst bin off by
 **1.48 points of gain — 3.8 of 255 on a mid-grey**. Using the nearest end alone
@@ -11001,9 +10997,9 @@ last measurement it clamps rather than running the trend on. That number is why
 the "gap too wide to blend across" bar in `coverage()` sits at a 2.2 ratio and
 not tighter.
 
-**Does the manual Hot-spot slider still do anything, now that the automatic one
+**Does the manual Hot-spot slider still act, now that the automatic one
 shares its stage?** Yes: 113.4 to 41.5 at the centre. Size changes the circle,
-zero returns exactly. Asked, so measured.
+zero returns exactly. Measured rather than assumed.
 
 **THE RIGHT-EDGE SWIPE WAS OUR OWN HISTORY.** Every dialog open pushed an entry
 and every close consumed it with `history.back()` — which leaves a FORWARD entry
@@ -11050,8 +11046,8 @@ for that button.
 
 ## The rig reported what came out and nothing about what went in, 2026-09-10
 
-**Asked plainly: there is no way to see which focal length and aperture gaps are
-still open.** There was not. The rig printed the profiles it produced, a
+**Nothing showed which focal length and aperture gaps were still
+open.** The rig printed the profiles it produced, a
 per-frame list of refusals scrolled off the top, and one line reading "averaged
 from 21 frames out of the 94 you picked" — a number with no account attached.
 Seventy-three frames went somewhere and nothing said where, which lens they
@@ -11427,9 +11423,9 @@ section below.
 
 ## A fast second tap on a control zoomed the whole app, 2026-09-09
 
-**Reported as** the screen zooming when trying to zoom in quickly — and first
-read here as a PINCH problem, which it was not. The clarification was that it
-happens when tapping the zoom "+" quickly. Two taps in quick succession on a
+**Reported as** the whole screen zooming during a quick zoom-in — and first
+read here as a PINCH problem, which it was not. The trigger was quick taps on
+the zoom "+" control. Two taps in quick succession on a
 button is iOS Safari's double-tap-to-zoom, and it scaled the entire app: the
 exact opposite of what the control the finger was on does.
 
@@ -11457,8 +11453,8 @@ all 28 visible buttons manipulation with none left on `auto`.
 problem and would have led to gesture-event interception on the canvas — real
 work, in the wrong place, fixing nothing. One sentence naming the control
 turned it into a one-rule change. A symptom described by its EFFECT — the whole
-screen zooms — and the same symptom described by its TRIGGER — it happens when
-the plus control is tapped in quick succession — are different amounts of
+screen zooms — and the same symptom described by its TRIGGER — quick taps on
+the zoom + control — are different amounts of
 information, and only the second one located it.
 
 ## The conventions a reader brings with them, 2026-09-09
@@ -11474,7 +11470,7 @@ keep and easy to forget precisely because the increment digit moves ON ITS OWN
 from the commit count, so the version always looks like it changed.
 
 
-**The observation that prompted this** was that universal conventions felt
+**What prompted this:** universal conventions looked
 missing or half-implemented. Audited statically, that was right, and the split
 is sharp: **everything the platform gives for free was already correct, and
 almost nothing that needed hand-wiring had been wired.**
@@ -11752,7 +11748,7 @@ ways, so this commit adds none of them.
 
 ## Audit: what else was treated as an aside, 2026-09-09
 
-Asked directly, after the theme default turned out to have been visible in this
+Prompted by the theme default having been visible in this
 session's own output and walked past. Going back over every measurement taken
 here, three things had been noticed and not pursued. Two were real.
 
@@ -11794,8 +11790,8 @@ GL program stall at the first photo of a page. None has been investigated.
 
 ## The theme control had no system option — and never had, 2026-09-09
 
-Reported from the device: the switch shows one name, and there is no "follow the
-OS". Both true, and the second was the larger of the two.
+Reported from the device: the switch showed one name, and there was no option to
+follow the OS setting. Both true, and the second was the larger of the two.
 
 **THE DEFAULT WAS DARK, UNCONDITIONALLY.** `currentTheme()` returned "dawn" only
 when localStorage said so and "dark" otherwise, so a reader who had never touched
@@ -11852,7 +11848,7 @@ hosts and reading the served markup and bundle rather than assuming — producti
 served `class="accent-outline"` with the old label and no `ips-autolift` key,
 staging served the toggle with `aria-pressed="true"`. **Worth remembering: when
 on-device feedback describes behaviour that was already fixed, check WHICH BUILD
-is in front of the reader before touching anything.** Three of five reports
+is on the device before touching anything.** Three of five reports
 needed no code at all.
 
 What was genuinely still open, and is now fixed:
@@ -11892,8 +11888,8 @@ own controls.
 
 ## Adapt flat frames became automatic, 2026-09-08
 
-Owner direction, same day: photos should open the best they can, without a
-control anyone has to remember. So the measured lift that shipped as a button
+Owner direction, same day: a photo opens already adapted, with no control to
+remember to press. So the measured lift that shipped as a button
 became an at-open automatic with a toggle beside it — default on, pressed means
 this frame is adapted, shaped after the R/B swap.
 
@@ -12092,8 +12088,8 @@ Help section is present and rendered, axe is clean, and the note reuses
 > suite where a headless check exists. DEFERRED items are real but need their
 > own release (or an owner decision) — do not re-discover them.
 
-FIXED 2026-07-25, later session ("the pairs are not matching still" — the
-owner's NEF + Lightroom-DNG twins of the same shot: the DSC_4940 pair + the
+FIXED 2026-07-25, later session (NEF + Lightroom-DNG twins of the same shot
+still rendered differently: the DSC_4940 pair + the
 DSC_4776 NEF, all D5300 full-spectrum). THREE decode bugs made a NEF and its
 DNG twin render as different photos:
 (1) The DNG path IGNORED LinearizationTable (tag 50712). Lightroom's DNG of
@@ -12116,7 +12112,7 @@ practice DNGs carry only 50721 — their pick is unchanged.
 (3) The NEF path hardcoded the Z 50 matrix for EVERY body (the deferred
 "per-model table" item). color.ts nikonColorMatrix(model) now keys off the
 file's own Model tag (272, via the new Ifd.str()): D5300 → Adobe's D5300
-ColorMatrix2, taken VERBATIM from the owner's own DNG twin of DSC_4940;
+ColorMatrix2, taken VERBATIM from the Lightroom DNG twin of DSC_4940;
 anything else → Z 50 exactly as before. export.ts getSource() shares the
 same helpers, so preview and native export agree by construction.
 VERIFIED (scratchpad harnesses; every check fail-first proven):
@@ -12136,14 +12132,14 @@ NEEDS THE OWNER'S HANDS / STILL OPEN: (a) on-device pass — D5300 NEFs now
 render through Adobe's real D5300 matrix, so their open look CHANGES from
 the old Z 50-matrix look (the LR-familiar rendering, more color
 separation); (b) the DSC_4776 DNG twin never arrived (its zip was too big
-for the chat upload; Drive delivery to a session is hard-capped at
+to upload; Drive delivery to a session is hard-capped at
 10 MB/file) — its NEF decodes clean on the same path, but that pair itself
-is unverified until the owner re-sends a smaller zip; (c) the ~3% white-level
+is unverified until a smaller zip arrives; (c) the ~3% white-level
 residual (curve top vs Adobe's true saturation point) stays a candidate for
 a per-model saturation table, absorbed by auto exposure today.
-RESOLVED same night — the "1709 still mismatched / channels swapped" report
-(owner's Quick-look screenshot on the fixed build; DSC_1709 pair re-sent):
-NOT a decode bug. The owner's Lightroom-iOS DNGs embed a Rob Shea IR camera
+RESOLVED same night — DSC_1709 still mismatched, with channels apparently swapped
+(Quick-look screenshot on the fixed build; DSC_1709 pair re-sent):
+NOT a decode bug. The Lightroom-iOS DNGs embed a Rob Shea IR camera
 profile, and it differs per photo: DSC_4940 (and, per the matching
 screenshot tiles, 4776) carry ProfileName (50936) "Infrared Temp -100",
 DSC_1709 carries "Infrared Temp -50" (both ProfileCopyright "Rob Shea").
@@ -12153,7 +12149,7 @@ legitimately renders per its own profile and the app is RIGHT to honor it.
 The NEF-side hardcode (read from 4940's DNG) is therefore the "-100"
 PROFILE matrix, not Adobe stock — color.ts now says so (deliberate
 deviation from dcraw's stock D5300 matrix: stock matches NONE of the
-owner's real files; -100 is the owner's standard). PROOF the profile is the whole
+real test files; -100 is the standard profile in use). PROOF the profile is the whole
 story: rendering the 1709 NEF through the -50 matrix from its own DNG twin
 matches that DNG at mean 0.61/255 (max 4); through the default -100 matrix
 the diff is 13.5/255 — exactly the reported difference. The linearization
@@ -12163,8 +12159,8 @@ DNG with the -100 profile, or the owner names a different NEF default
 (one-line change). Profile-aware NEF defaults beyond one per model are
 impossible — the NEF simply doesn't say which profile the user assigned.
 
-FIXED 2026-07-25 (the "dark daytime frame" — DSC_1709 NEF vs its DNG twin,
-owner-supplied ground truth): the NEF path's black pedestal was the Z-series
+FIXED 2026-07-25 (a daytime frame rendered dark — DSC_1709 NEF vs its DNG twin
+as ground truth): the NEF path's black pedestal was the Z-series
 1008 for every body, but the D5300's true pedestal is 600 — the NEF file SAYS
 SO in MakerNote tag 0x003D (four u16, one per CFA site), and the Adobe DNG
 twin carries BlackLevel 600. On normal exposures the 400-count error is a
@@ -12186,7 +12182,7 @@ one Nikon body's levels for another — the NEF carries black (0x003D) and
 white (curve top); read the file.
 
 FIXED same day (quick-look/session thumbnails didn't match what opening
-shows, owner IMG_1255/1256): makeThumb rendered bare WB+matrix, but OPENING
+shows, screenshots IMG_1255/1256): makeThumb rendered bare WB+matrix, but OPENING
 also applies the persisted creative grade (swap/sat/tint carry across opens
 by design) — with a look active, thumbs were a different color world (yellow/
 blue vs teal/orange). makeThumb now renders through the REAL compileEdit with
@@ -12199,7 +12195,7 @@ NEEDS OWNER'S EYES: thumbnail appearance on device (harness covers code path
 OWNER RULING 2026-07-25 REV. 2 — AUTO BASELINE AT OPEN, PER FILE TYPE.
 The blanket "nothing at open" below was a STABILIZATION MEASURE, adopted
 because the build was not staying reliable enough to test at all, and never the
-product. The product was settled by four answers in chat: the denoise is a
+product. The product was settled by four answers: the denoise is a
 lighter touch than it was; there is no dark-scene special case, because no
 infrared photograph is shot in the dark; the baseline should be what apps of
 this class normally do; and it is automatic, with the untouched decode still
@@ -12211,12 +12207,12 @@ reachable behind a Hold control:
   sources only — recovery renders only there). 0.7 calibrated: lowest
   fully-clean value on DSC_4940 is 0.6, plus margin; industry-normal —
   LR/ACR/C1 apply (stronger) reconstruction unconditionally in default raw
-  rendering (the answer to the owner's Q3).
+  rendering (answer 3).
 - CAMERA-RENDERED (JPEG/HEIC/PNG/third-party previews): as the camera made
   them + measured denoise ONLY (lighter touch, answer 1).
 - Reset returns to this baseline (answer 4). NEW "Hold: Untouched" button
   beside Hold: Original renders the bare decode (all params neutral) while
-  held — the "original option" of answer 4. Hold: Original = the opened
+  held — the untouched option of answer 4. Hold: Original = the opened
   baseline, as before.
 - Baseline values are VISIBLE on sliders, undoable, and never mutate pixels
   — the three tests any future at-open automatic must pass (CLAUDE.md).
@@ -12236,13 +12232,13 @@ pointers have no id; capture is best-effort).
 
 (SUPERSEDED by rev. 2 above — kept for the ledger:)
 OWNER RULING 2026-07-25 — NOTHING HAPPENS TO A PHOTO AT OPEN. FINAL.
-The ask was that nothing whatever happens to a photograph at open. A photo opens
+The ruling: nothing happens to a photograph at open. A photo opens
 exactly as decoded: WB [1,1,1], exposure 1, denoise 0, and NO automatic
 highlight repair. Every automatic adjustment is now an EXPLICIT press: Auto
 (Basic: WB + exposure + denoise), Auto WB (top of IR tab: WB only), tap-WB.
 The entire highlight-recovery subsystem (src/raw/highlights.ts and its two
 decode-stage call sites) was REMOVED under this ruling — after three
-owner-caught artifact regressions (desat flattening, lawn squares, leaf
+device-caught artifact regressions (desat flattening, lawn squares, leaf
 square) the automatic-repair approach is dead. The final audited version of
 the code survives at commit bf5fe0a if repair ever returns AS AN EXPLICIT
 USER CONTROL — never automatic, and read the audit ledger below first. The
@@ -12255,8 +12251,8 @@ The entries below this line record the removed subsystem's history and its
 audit — kept as the gotcha ledger, NOT as live documentation.
 
 SHIPPED 2026-07-25, same session — "Recover highlights" slider (Basic tab,
-id `recover`, EditParams.recover, DEFAULT 0): the RIGHT construction, after
-the owner demanded it be figured out properly. Why every decode-stage repair
+id `recover`, EditParams.recover, DEFAULT 0): the RIGHT construction, worked
+out properly this time. Why every decode-stage repair
 failed: before white balance, "what colour should a blown pixel be" has no
 answer — every version had to GUESS hues (neighbour, global prior, fixed
 ratio) and every guess painted artifacts. The answer exists only AFTER WB:
@@ -12285,13 +12281,13 @@ silently drop it: cloneParams, applySnapshot, syncFromUI, syncToUI, and the
 input-listener array. `recover` initially missed applySnapshot and
 Undo/Reset ignored the slider.
 
-FIXED 2026-07-24 (native NEF highlights on non-Z50 bodies — the "other
-users can't use it" report; owner's D5300 full-spectrum frame DSC_4940):
+FIXED 2026-07-24 (native NEF highlights on non-Z50 bodies — unusable on any
+body but the Z 50; D5300 full-spectrum frame DSC_4940):
 - The native-NEF white level was HARDCODED to 15520, which is the Nikon Z 50's
   saturation point. NEFs carry no DNG level tags, so every OTHER camera got the
   Z 50's ceiling too. A D5300 saturates at 16383 — feeding it 15520 pushed the
   whole frame ~6% over and pinned ~14% of it (all the sky + IR-lit foliage) past
-  white with NO headroom to recover. Noah never saw it because the owner feeds the app
+  white with NO headroom to recover. It went unseen because the test files had been
   DNGs (Adobe DNG Converter writes real per-file black/white/ColorMatrix, and the
   DNG path already reads them); the hardcode only bites on native NEF opens.
 - FIX: white is now read from the FILE'S OWN linearization curve
@@ -12322,8 +12318,8 @@ users can't use it" report; owner's D5300 full-spectrum frame DSC_4940):
   higher risk than value. Black 1008 errs high (crushes a little shadow) which is
   safer than a milky lift; both are candidates for a real per-model table later.
 
-FIXED 2026-07-24 (IR highlight fringe + blown-sky flattening — the "D5300
-cleanliness report against the Z 50, DSC_4940 + the five
+FIXED 2026-07-24 (IR highlight fringe + blown-sky flattening — D5300 frames
+rendering less clean than the Z 50's, DSC_4940 + the five
 staging screenshots; TWO attempts, the first REJECTED — read both):
 - SYMPTOM: lurid lime-green (and magenta) fringes on every high-contrast edge
   (bare branches against bright sky), plus a wide green band around thick
@@ -12342,7 +12338,7 @@ staging screenshots; TWO attempts, the first REJECTED — read both):
   fringe but OVERWROTE THE UNCLIPPED CHANNELS — the blue channel carrying the
   sky's real cloud gradient got averaged up into the clipped garbage, and every
   near-clip region (0.9–1.0 = genuine bright detail, not clip) collapsed to one
-  flat tone. Owner's screenshots: whole skies as flat salmon/magenta slabs.
+  flat tone. Device screenshots: whole skies as flat salmon/magenta slabs.
   What was wrong, in one line: every channel was being reduced to the least
   common denominator of the three. OWNER
   RULE (standing, non-negotiable): NEVER discard captured channel data to hide
@@ -12374,7 +12370,7 @@ staging screenshots; TWO attempts, the first REJECTED — read both):
   overlapping writes compose as max, so order can't matter);
   (2) R-only clipped near clean data: rebuild along the nearest DENSE clean
   ring's hue (>= ~1/8 ring occupancy — a lone clean quad is usually a stray
-  object of another material and must not steer; owner-caught halo), fading
+  object of another material and must not steer; device-caught halo), fading
   smoothly to zero over RSOLID=10 → RMAX=20 quads;
   (3) R-only clipped anywhere: warm fallback R = 1.5 x the pixel's OWN green
   (WARM_RG), gated by low-blue severity smooth01(0.1,0.3,1-B) — with B near
@@ -12403,7 +12399,7 @@ staging screenshots; TWO attempts, the first REJECTED — read both):
   iPad from staging (all measurements are node/CPU-pipeline; the GPU path
   consumes the same repaired data so it should match, but that's inference,
   not measurement).
-- AUDIT 2026-07-25 (owner demanded "find ALL of it"; 55-agent adversarial
+- AUDIT 2026-07-25 (a sweep for every remaining defect; 55-agent adversarial
   audit: 44-DNG sweep, synthetic property tests, correctness/integration/perf
   reviews, headless app walk, copy sweep; every finding independently
   refuted-or-confirmed). CONFIRMED + FIXED same day:
@@ -12429,7 +12425,7 @@ staging screenshots; TWO attempts, the first REJECTED — read both):
   per the taxonomy). Commit messages rewritten to drop false absolutes
   ("any Nikon", "down to the last bit", "photo's own evidence" for the
   constant-ratio path).
-  CONFIRMED, NOT CHANGED (owner calls, flagged in chat): batch still
+  CONFIRMED, NOT CHANGED (owner calls): batch still
   auto-balances each frame (its dialog says so — but "Your current edit"
   output now diverges from an as-shot screen by default); strip/quick-look
   thumbnails stay gray-world balanced while opening shows as-shot red;
@@ -12471,7 +12467,7 @@ FIXED in the 2026-07-15 review release (cache ips-v52 → ips-v53):
   "Lightroom colour test" never had a chance; re-ask the owner to test.
 - NEF lossy-branch (0x44/0x20) linearization-curve interpolation read past
   the curve array (undefined→NaN→0): highlights decoded BLACK on
-  lossy-compressed NEFs. Upper grid index now clamped. (The owner's classic
+  lossy-compressed NEFs. Upper grid index now clamped. (Classic
   Z50 files take the other branch — bit-exactness unaffected.)
 - LJ92: restart markers (DRI) never reset prediction — any DRI DNG decoded
   to garbage. Now resets per T.81 (default at interval start, Ra across the
@@ -12594,8 +12590,8 @@ batch-from-session and the Web-Worker thumbnailer remain open here.)
 
 > Not parsed into the in-app roadmap (only "Next capability release" is) — this
 > is the fuller backlog reachable via the ⓘ dialog's "More → full notes" link.
-> Positioning (recalibrated 2026-07-05, per Noah): the pitch is NOT purely
-> "beat the subscription" — Affinity Photo 2 went free (Canva, late 2025). The
+> Positioning (recalibrated 2026-07-05, owner decision): the pitch is NOT purely
+> beating the subscription — Affinity Photo 2 went free (Canva, late 2025). The
 > real moat is: **free, on-device, no account, no install (runs in the iPad
 > browser), and IR-native** — the channel-swap / sub-2000K WB / hot-spot work
 > that no general editor does at all (free or paid), plus things the IR/stacking
@@ -12663,21 +12659,21 @@ Classical, subscription-grade tools (fit the current architecture directly):
   the structure the owner wants. Cache bumped ips-v33 → ips-v34.
 - **Heal / clone** for sensor dust & hot pixels — clone-stamp first,
   content-aware later. PROMOTED 2026-07-14 to the "Next capability release"
-  queue as **Dust & spot removal** (owner ask) — see that entry for the plan.
+  queue as **Dust & spot removal** — see that entry for the plan.
 - **Copy settings + batch apply/export** across a folder — builds on the
   snapshot system shipped 2026-07-04; no ML.
 - **Channel mixer (full 3×3)** — custom false colour beyond the R↔B swap;
   IR-native, per-pixel. PROMOTED 2026-07-18 to the "Next capability release"
   queue (Creative release, v2.0) — see that entry.
-- **UFOs in the trees — playful sticker compositing** (owner ask 2026-07-14,
-  given right after the dust-release promotion; the owner will open a NEW CHAT for it —
+- **UFOs in the trees — playful sticker compositing** (2026-07-14, raised
+  right after the dust-release promotion; to be built in its own session —
   next session, read this entry first). PROMOTED 2026-07-18 to the "Next
   capability release" queue (Creative release, v2.0); this entry keeps the
   architecture sketch. The idea: paste fun cutouts (UFOs,
-  aliens, "other such fun things fitting for the weird colors") into a photo,
+  aliens and similar playful subjects that suit the false colours) into a photo,
   including PEEKING FROM BEHIND things — which is the real requirement: an
   occlusion mask per sticker so scene elements (trees, branches) render in
-  front of it, "behind or interacting with something".
+  front of it, so a sticker can be partly hidden by the scene.
   ARCHITECTURE SKETCH (deliberately rhyming with heal): a per-photo list of
   sticker placements (asset id + centre/scale/rotation in image-uv + an
   optional occlusion mask). Composite in LINEAR SOURCE SPACE before the
@@ -12685,7 +12681,7 @@ Classical, subscription-grade tools (fit the current architecture directly):
   (patchImage rects from the pristine decode; syncSpotsToTexture pattern) with
   the identical math mirrored in the CPU export — so the sticker inherits the
   channel swap / sub-2000K WB / looks and lands IN the IR palette naturally
-  (that's the owner's "fitting for the weird colors"; a display-space literal-
+  (which is what makes it fit the false colours; a display-space literal-
   colour mode could be a later toggle). Spatial + composition-specific: stays
   with the photo, never in saved looks / batch / .cube/.dcp — the whole
   spatial-op rulebook applies as-is. OCCLUSION: sticker alpha × (1 − mask
@@ -12699,8 +12695,8 @@ Classical, subscription-grade tools (fit the current architecture directly):
   with the .dcp stance) + allow importing any PNG-with-alpha as a sticker.
   SCOPE CAUTION: this is "layers lite" — keep it stickers (no general layer
   stack), or it eats the app.
-- **Playful warp tools — Swirl / Liquefy / Pinch** (owner ask 2026-07-14:
-  "crazy tools like swirl or liquefy"). PROMOTED 2026-07-18 to the "Next
+- **Playful warp tools — Swirl / Liquefy / Pinch** (2026-07-14: playful
+  distortion tools such as swirl and liquefy). PROMOTED 2026-07-18 to the "Next
   capability release" queue (Creative release, v2.0); this entry keeps the
   architecture sketch. Finger-driven local GEOMETRY warps —
   a real departure from the colour pipeline, but classical and on-device:
@@ -12749,8 +12745,8 @@ Frontier (needs WebGPU + an ML model — a real departure from pure-JS/no-WASM):
 Native App Store build (the eventual target; carries over when it happens):
 - **True in-place icon switching** — the web picker can only re-bake a tile at
   Add-to-Home-Screen; a native app switches its installed icon live via iOS
-  alternate app icons (`setAlternateIconName`). Owner ask 2026-07-13 ("select
-  an icon later"). NOTE for the owner's API/secrets worry (raised same day):
+  alternate app icons (`setAlternateIconName`). Queued 2026-07-13: choosing an
+  icon after install. NOTE on API keys and secrets (raised same day):
   this app needs NO API keys, servers, or data secrets even as a native build —
   everything stays on-device; the only credential involved is the Apple
   developer signing certificate to build and submit.
@@ -12776,12 +12772,12 @@ Second discipline:
   memory-bounded streaming passes, NO tiling (so no seams), in a Web Worker
   (`export.worker.ts`, UI stays responsive), two-phase Save for the iOS fresh-tap
   share rule, ~30 s/stack in headless software decode (faster on device).
-  Verified on Noah's real 11-frame Z50 II set: no halos (high-mag petal-edge
+  Verified on a real 11-frame Z50 II set: no halos (high-mag petal-edge
   crop), smooth bokeh, sharper than any single frame. Next refinements: breathing
   scale/rotation align (this set was tripod-steady, drift ≈0), and an optional
   confidence floor to push subject crispness further.
   DEFERRED — **RAW (NEF) input**: the Z50 II shoots **High-Efficiency NEF**
-  (confirmed by Noah; ~14.5 MB / 20 MP), a TicoRAW-class codec `nef.ts` cannot
+  (confirmed; ~14.5 MB / 20 MP), a TicoRAW-class codec `nef.ts` cannot
   decode; a HE-NEF decoder is a separate large effort. Macro mode is named
   **"Macro Studio"** (flower icon, `public/macro-icon.svg` + 180/512 PNGs for
   iOS home-screen). The IR-mode iOS PNG icon is DONE (2026-07-13:
@@ -12918,7 +12914,7 @@ returning the button was correct and was not enough: a sticky overlay with
 `pointer-events: none` is not at the point it covers. "Nothing in the app paints
 there" was a conclusion drawn from an instrument that cannot see that kind of
 element, and it went into the record as fact. What made it a question rather
-than a fix was luck — the cause was named by someone else, and it was wrong too.
+than a fix was luck — a second candidate cause came up, and it was wrong too.
 
 **Moved to the right edge, on the owner's call.** Its APPEARANCE was already an
 owner ruling (2026-07-20, neutral rather than --accent so it does not vanish
@@ -13255,7 +13251,7 @@ comments now: a scan that cannot tell prose from code will keep finding prose.
 
 ## The session-stepping drift that is not there, 2026-09-11
 
-Reported: exposure may not be reset or auto-applied the way white balance is,
+Suspected: exposure may not be reset or auto-applied the way white balance is,
 and Restore depth may be stacking as more photos are viewed. Tested by visiting
 photo 1, walking the whole strip, and coming back — twice, so a drift needing
 two laps is not missed, reading the SLIDERS and the rendered pixels rather than
@@ -13264,8 +13260,8 @@ any internal state.
 **No drift.** Exposure, Restore depth, its strength, denoise and highlight
 recovery are identical after two laps, and the picture moves 0.00 of 255.
 
-That is a real answer but not a complete one: six practice DNGs are not
-fifty-seven of the owner's NEFs, and the frames in the report are a high-contrast
+That is a real answer but not a complete one: six practice DNGs are not the
+fifty-seven NEFs the symptom was seen on, and those frames are a high-contrast
 scene whose shadows crush. What the test rules out is the mechanism — stepping
 does not accumulate. Where to look next is in `main.ts` around line 766:
 `balancing` is `untouched && !current.isRaw`, and `untouched` is false for any
@@ -13383,7 +13379,7 @@ enough on conclusions drawn from what an element looks like it should do.
 
 ## Restore depth: dead on a raw, and it is what yellows a JPEG, 2026-09-11
 
-Asked directly whether Restore depth misbehaves on JPEGs. Measured on one
+Whether Restore depth misbehaves on JPEGs, measured directly on one
 photograph supplied both ways, with Aerochrome on, toggling the control:
 
 - **On the raw it does NOTHING.** The button flips `aria-pressed`, the strength
@@ -13418,13 +13414,13 @@ into a swap in the record.
 
 ## Restore depth, looked at properly, 2026-09-11
 
-Asked to fix it. Part of it is fixed and part of it was not what it looked like,
+Part of it is fixed and part of it was not what it looked like,
 including in my own report an hour earlier.
 
 **What the control actually writes**, read off the sliders it says it uses
 rather than inferred from the picture:
 
-- the owner's NEF: tone 0/0/0/0, skySat 1, folSat 1 — nothing, in every state.
+- the NEF: tone 0/0/0/0, skySat 1, folSat 1 — nothing, in every state.
 - the same frame as a JPEG: skySat **2**, which is the slider's CEILING, with
   tone and foliage untouched.
 - twelve practice raws: skySat 1.09 to 2.00, folSat 1.00 to 2.00.
@@ -13436,7 +13432,7 @@ shape as the green floor earlier today. Swept over fourteen frames, TWO PRACTICE
 RAWS ALSO RAIL at 2.00. The rule would have broken good frames. It was measured
 because the green floor was measured; the habit is the only reason it was caught.
 
-**AND I TOLD THE OWNER RESTORE DEPTH MAKES THE SKY YELLOW. IT DOES NOT.** That
+**AND THE ENTRY ABOVE SAYS RESTORE DEPTH MAKES THE SKY YELLOW. IT DOES NOT.** That
 came from one measurement — blue falling 111 to 81.5 when the toggle goes on —
 without looking at the toggle-OFF picture. With Restore depth off the JPEG is
 still yellow-skied and purple, just less saturated. The control amplifies the
@@ -13471,7 +13467,7 @@ inferred from its output, which had produced three wrong answers in a row.
 **`coolSat` at open, measured through the app's own `measureFrame`:**
 
 - fifteen frames that carry Aerochrome perfectly well: **0.0606 to 0.1729**
-- the owner's camera JPEG of the same scene as one of them: **exactly 0.0000**
+- the camera JPEG of the same scene as one of them: **exactly 0.0000**
 
 and its warm band reads **0.7587** against a maximum of 0.1461 across the other
 fifteen. The whole picture is in one band. A false-colour look works by moving
@@ -13803,7 +13799,7 @@ question is never "did anything fail", it is "did every claim actually run".
 ## Three floors and a cache: why every profile read "rendered", 2026-09-12
 
 Four fixes that are really one story, and it ends with a measured magnitude for
-"the correction is too strong".
+how much too strong the correction was.
 
 **THE RIG ALREADY PREFERRED RAW FRAMES AND HAD NEVER ONCE BEEN GIVEN ONE.** It
 sets rendered frames aside when raw ones are present, with a written reason. The
@@ -13831,7 +13827,7 @@ while admitting ones three times worse. Not one raw flat reaches 0.09; the
 highest is 0.0753. `GREEN_FLOOR_RAW = 0.002` is where one 14-bit step is 1.7% of
 the value — the same bargain, struck on the right scale.
 
-**AND THE MAGNITUDE, WHICH IS THE ANSWER TO A QUESTION ASKED FROM A TABLET.**
+**AND THE MAGNITUDE: HOW MUCH TOO STRONG THE CORRECTION WAS.**
 Same sixteen frames, raw against rendered, as a departure from 1: colour reads
 3.53x in red and 2.30x in blue, and the brightness curve 1.24x at the centre.
 The camera matrix's green row is (-0.537, 2.703, -1.166), so a camera-space
@@ -14070,8 +14066,8 @@ the other 8 are keys no batch re-shot, which is coverage, not a fault.
 
 **THE TWO SAVES HAD THE SAME SHAPE AND DIFFERENT SCOPES, and the narrow one was
 the one in reach.** "Save as a file" writes the run just finished; the backup of
-everything on the device sat below the entire results list and was reported as
-not findable after an import. Four batches therefore produced four single-run
+everything on the device sat below the entire results list, out of sight after
+an import. Four batches therefore produced four single-run
 files and no backup. Both are in the run's own action row now and each says which
 it is.
 
@@ -14435,7 +14431,7 @@ expected and shown.
 **BOTH HALVES WERE HALF TRUE, AND WHICH ONE YOU GOT DEPENDED ON HISTORY NOBODY
 CAN SEE.** Choosing a look carried to a photo that had never been opened —
 `establishFreshEdit` re-applies it — and never to one already visited, whose own
-snapshot was restored instead. Reported as a look not carrying to the next
+snapshot was restored instead. Seen as a look not carrying to the next
 photo.
 
 **Measured on the build before the change, over four photos:** a photo already
@@ -14481,8 +14477,8 @@ claims; four of them fail on the build before the change.
 
 **A QUICK LOOK RENDERS EVERY PICKED FILE THROUGH THE REAL PIPELINE**, which is
 the whole point of it and also why opening a folder already looked at cost
-exactly what the first look cost. Reported from a real session: the same folder,
-repeatedly, watched loading.
+exactly what the first look cost. Seen in a real session: the same folder,
+opened repeatedly, loading in full each time.
 
 Rendered previews are kept now (`src/previewcache.ts`), keyed on the FILE — name,
 byte length and modified time — because that is what identifies a picked file
@@ -14603,7 +14599,7 @@ folder you are going through.
 Three states now: **pick**, **reject**, or nothing yet, which is what every
 culling tool has had since slide sorters. Lightroom's flags and Photo Mechanic's
 whole reason to exist are the precedent, and the two that earn their place here
-are the ones that were asked for: a pick, and a reject that dims the tile and is
+are a pick, and a reject that dims the tile and is
 skipped by the arrow keys.
 
 **What Keep takes is stated once, in `willKeep`, because it is SAID in three
@@ -14719,8 +14715,8 @@ shared, and a fallback to today's path for stickers, warp, heal patches and
 masks. The bit-identical proof is the same hash comparison used above.
 
 **AND THE PROBE BECAME AN INSTRUMENT.** The stage timings are not a test hook:
-`lastExportProfile()` feeds a line in the §7f diagnostic, so a reader saying
-"this takes forever" sends a report with the split in it rather than a stopwatch
+`lastExportProfile()` feeds a line in the §7f diagnostic, so a reader who finds
+an export slow sends a report with the split in it rather than a stopwatch
 and a guess. Counts and seconds only — it names no file.
 
 **The preview-pipeline gate fired on all of this, and it was right to.** It
@@ -14912,8 +14908,8 @@ speed question and not a correctness one.
 
 ## 2026-09-13 — where the work still happens on one thread, and what the graphics chip could take
 
-Written after the export learned to use several cores, because the question that
-followed was the right one: is anything else in this app doing by hand what the
+Written after the export learned to use several cores, to answer the question
+that follows from it: is anything else in this app doing by hand what the
 machine already has hardware for? Four places, measured.
 
 **THE STRIP AND THE QUICK LOOK GRID RENDER ON THE MAIN THREAD, PIXEL BY PIXEL.**
@@ -15632,8 +15628,8 @@ The closing question put to the owner read "full size only, or both". **Both
 words were wrong.** The export panel's scale control already reads **"Full
 (native)"**, with a **Quality** slider at 92 beside it, and a crop already changes
 the output's dimensions — so "full size" pointed at two existing controls and an
-obvious third question, none of which were the subject. The owner asked, exactly
-as they should have, which of the two they were deciding.
+obvious third question, none of which were the subject, and nothing in it said
+which of the two was being decided.
 
 **What the phrase was standing in for**: the editor's INTERNAL WORKING COPY. A
 raw is decoded at half resolution for the live view today, and the export
@@ -15682,7 +15678,7 @@ Two megapixels, the practice raw, the same edit:
   where they differ 29.9 against 11.4 over the frame, so all of it on edges;
 - with both of those off — 450 over 8 (0.023%) and 134 over 24 (0.0067%).
 
-That is a fourth renderer, not one of the owner's, and its own fingerprint
+That is a fourth renderer, not one of the three devices, and its own fingerprint
 (`62b68d97`) is nothing like the three real ones. It is offered as the shape of
 the answer, not the answer: the devices print their own numbers on the next run.
 
@@ -15935,9 +15931,9 @@ disagrees means the two frames differ in a handful of pixels at most.
 **So "three graphics chips, three different photographs" was true and
 misleading, and it was my sentence.** A fingerprint is a BINARY: it answers
 identical-or-not and says nothing about how far. Having built the magnitude
-instrument specifically because an average and a worst pixel could not answer
-"would I notice", I then let a hash answer exactly that question two paragraphs
-later. The honest statement is that the drawn frames differ between graphics
+instrument specifically because an average and a worst pixel could not say
+whether a difference would be noticed, I then let a hash answer exactly that
+question two paragraphs later. The honest statement is that the drawn frames differ between graphics
 chips of the same family by an amount too small to move any of five statistics.
 
 **AND THE SYSTEMATIC PART TRACKS THE BROWSER, NOT THE CHIP.** With the two
@@ -16265,9 +16261,9 @@ SO WAS ALREADY IN THIS FILE.** The before-and-after comparison read **0.748 of
 holds", which is true and is not the point. The half-size copy is 2,800 pixels
 wide against a display using about 1,200: it already had 2.3 times more pixels
 than the screen could use, so doubling that to 4.7 cannot show anybody anything.
-The measurement was a verdict and it was read as reassurance. It took the owner
-saying they could not tell two images apart for the file's own number to be
-read correctly.
+The measurement was a verdict and it was read as reassurance: at display size
+the two images cannot be told apart, and the file's own number had said so all
+along.
 
 **ZOOMED TO 1:1 IT DOES SHOW, AND ONLY WHERE THERE IS DETAIL TO SHOW.** Twelve
 regions of a real 20.9-megapixel frame (`NIR_2082.NEF`), each blown up to the
@@ -16565,7 +16561,7 @@ WAITING worker's — filled at install, before activation, deliberately, so that
 taking the update works offline the moment it is taken. Written down because a
 future session will see two version-stamped caches and try to fix it.
 
-**AND THE SAME LINE IS THE REPORTED BUG, CAUGHT IN THE WILD.** The page says it
+**AND THE SAME LINE IS THE UPDATE BUG, CAUGHT IN THE WILD.** The page says it
 is **v2.43.36**. The worker actually controlling it is **2.43.27**. The update
 waiting is **2.43.36** — the version already on screen. That is exactly the
 sequence described: navigations are network-first, so a reload delivers the new
@@ -16583,8 +16579,7 @@ report.
 
 **The pattern worth keeping:** a state that is TRUE and a state that MATTERS are
 different, and a diagnostic that reports the first as though it were the second
-sends its reader after the wrong thing. It cost a round of questions here, from
-the one person the report exists for.
+sends its reader after the wrong thing, and here it did.
 
 ## 2026-09-13 — the wordiness, measured before being cut
 
@@ -16623,7 +16618,7 @@ welcome — not more trimming of the panel.
 
 ## 2026-09-13 — the "waiting worker with no cache" was the report's own race
 
-**THE CONTRADICTION, AND IT WAS FLAGGED AS POSSIBLY SERIOUS.** A desktop report
+**THE CONTRADICTION, AND IT LOOKED POSSIBLY SERIOUS.** A desktop report
 named a waiting **v2.43.39** beside caches holding only **v2.43.38**. If a worker
 could reach "waiting" without its cache, taking that update would leave a broken
 offline copy — a real defect, and worth chasing rather than shrugging at.
@@ -16682,7 +16677,7 @@ would have left the next session with a false model of the stylesheet.
 
 ## The macro stacker, measured on a real burst for the first time, 2026-09-13
 
-The owner supplied a focus-shift set — a shared folder of NEF+JPG pairs,
+A focus-shift set came in — a shared folder of NEF+JPG pairs,
 NOA_3538…3584, Nikon Z50_2. Thirteen consecutive JPEGs at **5568×3712** were run
 through Macro Studio end to end, which had never been done with real frames:
 every earlier check used synthetic or single images, and the manifest screenshot
@@ -16984,7 +16979,7 @@ already existed, and axe clean over the strip.
 
 ## A decision the app can act on, 2026-09-14
 
-"Finished with this one" is a fact the app can use: the working state of a photo
+A verdict on a photo is a fact the app can use: the working state of a photo
 the reader will not edit again is memory held for nobody. Every photo visited in
 a session kept its full live edit — snapshot, baseline, settled state, both undo
 stacks — for the life of the session, and nothing ever evicted one.
@@ -17288,7 +17283,7 @@ own variable, across a switch away and back, a Reset, and a reload.
 
 ## Straightening: what was actually coarse, 2026-09-14
 
-The report was that it would not go finer than about a third of a degree. The
+The symptom: it would not go finer than about a third of a degree. The
 finder is not the reason: `findTilt` already fits a parabola to the Hough peak and
 takes its vertex, and its own comment records 0.54° from the cell centre against
 0.66° interpolated on a horizon drawn at 0.7°.
@@ -17460,8 +17455,8 @@ at **both** widths — where the flat wait had caught it at one, once.
 
 ## The automatic one was the hardest to reach, 2026-09-15
 
-Reported as a question — where is auto rotate — and it is a fair one. Measured
-at iPad landscape:
+The automatic angle-finder was hard to reach, and the geometry says why.
+Measured at iPad landscape:
 
 **"Level the horizon" sat at y 770 in a panel scroller that ends at 768.** It is
 the sixth control in the Crop & straighten tab, behind five 44px buttons, so it
@@ -17503,7 +17498,7 @@ Full view works from inside the tool and is the present answer — 365x243 to
 817x544, measured — but it is a second press for something the mode should
 probably just do.
 
-**The stylesheet already records this as the owner's question, in those words:**
+**The stylesheet already records this, in its own words, as an open question for the owner:**
 whether a floating pill should sit OVER the photo and pass taps through. Three
 ways out, and none of them is a session's to pick:
 
@@ -17517,7 +17512,7 @@ ways out, and none of them is a session's to pick:
 
 ## The one-band thread, measured on all five frames at last, 2026-09-15
 
-**Asked: what was decided, and when did it change.** From the history, not from
+**The question: what was decided, and when did it change.** From the history, not from
 memory.
 
 **Nothing about looks was ever decided by the owner.** Three owner rulings touch
@@ -17600,7 +17595,7 @@ Putting it back gives four to five hues and 11-15% crushed shadows: a cast
 correction improvised out of a white balance, applied to 8-bit data.
 
 **The camera recorded step 1 and both file types carry it.** Read out of the
-owner's own files: `NIR_1376.NEF` is WhiteBalance `PRESET4`, 0x000C
+files themselves: `NIR_1376.NEF` is WhiteBalance `PRESET4`, 0x000C
 `[1.8574, 1.4668, 1, 1]`; all five reported JPEGs are Z 50, `PRESET6`, and the
 **identical four numbers**. One preset, measured once on foliage, constant
 across a shoot — while gray-world re-derives a different answer per frame from
@@ -17658,7 +17653,7 @@ thing this build does not do.
 
 ## The camera's white balance is a clamp, not a measurement — reverted, 2026-09-15
 
-**Shipped wrong and caught the same day, on the owner's read.** The previous
+**Shipped wrong and caught the same day.** The previous
 entry recorded reading NEF MakerNote 0x000C and opening raws on it. That is
 correct for a visible-light body and wrong here, and the reason is the one thing
 this whole thread kept missing: **an infrared white point is outside the range a
@@ -17699,7 +17694,7 @@ is the paragraph that was not enough on its own.
 
 ## Aerochrome is a SEPARATION, not a cast — fixed, 2026-09-15
 
-**The defect behind every colour complaint in this thread.** Route 1 is: usable
+**The defect behind every colour fault in this thread.** Route 1 is: usable
 white balance, swap R/B, **correct the resulting cast**, contrast last. `aero`
 had no step 3 — `red` carries `wbBias [0.78, 1.02, 1.35]`, `goldie`
 `[0.78, 1.22, 1.4]`, and `aero` carried nothing. The comment beside it already
@@ -17761,7 +17756,7 @@ the instrument is the thing to fix first.
 
 ## A measured lens that saved fine and then never loaded, 2026-09-15
 
-**Reported as hot-spot removal that had worked like magic and then stopped.**
+**The symptom: a measured hot-spot correction that had worked and then stopped.**
 The lens code had not changed in days — `5b5cfa7` (2026-09-12) is the last commit
 that touched it, and it is the one that did this.
 
@@ -17891,7 +17886,7 @@ plant took.
 
 ## Camera JPEGs opened with a channel swap nobody asked for, 2026-09-15
 
-**Reported with two screenshots: the strip of thumbnails looked like infrared
+**Seen on the device in two screenshots: the strip of thumbnails looked like infrared
 photographs and the picture above them was a flat purple wash.**
 
 **Not a regression from the colour work.** Measured against a build of `6acd35c`,
@@ -17979,8 +17974,8 @@ does one without the other is the commit to refuse.
 
 ## The hot-spot correction the thumbnails kept and the photograph lost, 2026-09-15
 
-**Reported with a screenshot and the diagnostic: the correction is still good on
-the thumbnail and not on the image.** It is the same shape as the camera-JPEG
+**Seen in a screenshot and the diagnostic report: the correction was present on
+the thumbnail and missing from the photograph.** It is the same shape as the camera-JPEG
 fault earlier the same day and it is a different cause — the strip and the open
 photograph are two render paths, and two paths is two chances to disagree.
 
@@ -18043,7 +18038,7 @@ do not, which would have been the same absence reached a second way.
 
 ## A hot-spot measured at one focal length and none at the next, 2026-09-15
 
-**Found by the instrument shipped an hour earlier, on the reader's own report.**
+**Found by the instrument shipped an hour earlier, in a diagnostic report from the device.**
 The new lens line read *NO BRIGHTNESS CURVE — nothing is correcting the
 hot-spot*, with no *set aside on read* clause beside it, on a frame at 57mm f/8
 that the report said was matched to a real profile. Nothing had been dropped, so
@@ -18092,7 +18087,7 @@ loosening.
 
 ## The tile kept its own copy of the open-time ruling, 2026-09-15
 
-**Reported with a screenshot: the JPG thumbnail and the image no longer match.**
+**Seen in a screenshot: a JPG's thumbnail and its photograph no longer matched.**
 Caused by the fix three commits earlier, and by the half of it that was not
 made.
 
@@ -18137,8 +18132,8 @@ two renders of one frame by one pipeline, so they agree or something diverged �
 
 ## Why a measured lens disagreed with the table that ships, 2026-09-15
 
-**Asked from the device, with the whole profile store attached: one camera, so
-why do the two differ so much?** They are not two calibrations of one lens. One
+**With the whole profile store exported from the device: one camera, yet its
+stored profiles and the shipped table differ widely.** They are not two calibrations of one lens. One
 of them was measured through a decode fault.
 
 **The provenance, read off the export and the table.** Twenty-two stored
@@ -18272,11 +18267,11 @@ match read as the reader's when it was the table's. Identity, not name.
 
 ## The thumbnail that looked a darker red — NOT a defect, 2026-09-16
 
-**Reported as a question rather than a fault, and it was the right question:**
-four reports today of a tile disagreeing with the photograph were real defects,
-so the instinct had earned its keep. This one is perception.
+**Checked as a question rather than a fault, and worth checking:** four earlier
+cases today of a tile disagreeing with the photograph were real defects. This
+one is perception.
 
-**Measured off the reported screenshot, splitting the two populations rather than
+**Measured off the screenshot, splitting the two populations rather than
 averaging the frame:**
 
 - red foliage — photograph `rgb(173,104,106)` hue 358.5, lightness 52.7%,
@@ -18364,7 +18359,7 @@ needs the share in it before it is.
 
 ## Double-tap reaches the tone curve's points, 2026-09-16
 
-**Asked for: the same double-tap-to-return the sliders have.** Wired into
+**The change: the same double-tap-to-return the sliders have.** Wired into
 `wireSliderReset` rather than beside the curve, because "double-tap puts this
 back where the photo opened" is a RULE, and this session was spent on what
 happens when one rule is written in two places. The points share the delegation,
@@ -18404,7 +18399,7 @@ redirect to a file and read `$?` instead.
 
 ## The per-colour boxes are named for subjects and keyed on hue, 2026-09-16
 
-**Found while answering how to deepen the foliage, and NOT acted on — what a
+**Found while working out how to deepen the foliage, and NOT acted on — what a
 control is called is product copy.**
 
 There are two bands and they partition the wheel (`pipeline.ts`):
@@ -18548,7 +18543,7 @@ goes from roughly 40/220/0 to a neutral 105/110/100 and the hues spread. What is
 still missing is the JPEG-side cast correction, and solving it needs a **two-band
 camera JPEG**, which this repository does not have.
 
-## Four controls the owner had to find by hand, 2026-09-16
+## Four controls found only by hand on the device, 2026-09-16
 
 Reported from the device, one after another, in a single sitting: a **Share**
 button in the top bar beside the photograph being edited, which shared the
@@ -18603,16 +18598,16 @@ instrument is wrong before the finding is. It also reported a nameless
 `<summary>` that was its own fault — `innerText` is the RENDERED text and a
 summary inside a collapsed `<details>` renders as nothing.
 
-**It is committed RED, on two findings**, both inside a design question the owner
-opened the same afternoon: `Hold: Untouched` and `Full view` each leave real
+**It is committed RED, on two findings**, both inside a design question opened
+for the owner the same afternoon: `Hold: Untouched` and `Full view` each leave real
 meaning in a tooltip, and the bar's hold-to-compare buttons are being reconsidered
 as one control. Recording them rather than declaring them away.
 
 ## Aerochrome is the matrix now, and a look may raise denoise, 2026-09-16
 
 **Three decisions came back off rendered sheets, and this is what they changed.**
-Raise denoise to about 0.8; the matrix arm is Aerochrome; keep the teal sky and go
-from there. Nothing here was argued into place — four arms were rendered on two
+Denoise rises to about 0.8; the matrix arm becomes Aerochrome; the teal sky stays
+as the starting point. Nothing here was argued into place — four arms were rendered on two
 frames, full-frame and at 1:1, and picked by looking.
 
 **WHAT `LOOKS.eir` NOW CARRIES.**
@@ -18703,8 +18698,8 @@ balance. Said out loud in the walk's header rather than asserted weakly.
 ## The camera-JPEG tile disagrees under the new Aerochrome — OPEN, 2026-09-16
 
 **Found by `tools/agreement-walk.mjs` on the build that ships the matrix, and
-deliberately not fixed in that release** (owner call: get the NEF path working
-first). Recorded here so it is a known open defect rather than a surprise.
+deliberately not fixed in that release** (owner call: the NEF path first).
+Recorded here so it is a known open defect rather than a surprise.
 
 **What it says.** Under Aerochrome, a tile for a camera-rendered JPEG nobody has
 opened reads hue 165 (97% in one bin) while opening the same file reads hue 315
@@ -18747,8 +18742,8 @@ IR-SCIENCE.md §6):
 
 **What 2.47 rendered:** foliage **325°**, sky **167°**. About 40° out in BOTH
 populations and on the MAGENTA side of red where the film is scarlet. Pink IR, at
-353° and 180°, was closer to the film than the look named after it — which had
-been reported off a photograph long before anything measured it, and was right.
+353° and 180°, was closer to the film than the look named after it — a difference
+visible in a photograph long before anything measured it.
 
 **THE LESSON IS THE ONE THE STANDING RULE NAMES.** Every previous round compared
 the app against the app: hue and saturation on rendered frames, band sweeps, a
@@ -18925,8 +18920,8 @@ It went into every walk rather than into the sweep alone, because the failure
 happened running ONE walk directly, which is how a walk is run nine times out
 of ten.
 
-**AND THE ARROWS OVER THE PANEL WERE NOT A RENDERING ARTEFACT.** Reported from
-the device as a weird scroll artefact on the Export panel. `.scroll-cue` floats
+**AND THE ARROWS OVER THE PANEL WERE NOT A RENDERING ARTEFACT.** Seen on
+the device as a stray mark across the top of the Export panel. `.scroll-cue` floats
 over the scroller at `height: 0`, and the up one sat four pixels under the
 pinned heading, which on that tab is exactly where the Format menu begins —
 twelve pixels of scroll drew a 44x27 pill across the top-right corner of the

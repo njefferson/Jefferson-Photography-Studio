@@ -272,8 +272,8 @@ than doubles the sky's saturation against every other candidate. The rotation
 applied ON TOP of a swap is two mappings composed, which is not what either
 recipe describes.
 
-**WHAT IS NAMED IN THE FIELD, AND WHAT THIS APP HAS.** The owner asked directly,
-and the audit is worth keeping:
+**WHAT IS NAMED IN THE FIELD, AND WHAT THIS APP HAS.** Which of the named
+recipes the app actually implements, audited:
 
 - **Aerochrome / EIR** — the film and its mapping. The app has a button by that
   name that performs a two-channel swap, which is NOT that mapping.

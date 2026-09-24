@@ -2,11 +2,11 @@
 
 ## Context
 
-Reported in chat 2026-09-24, the same session as 058: "I don't like having to
-load an image to see the menu for things that don't require one. Change to a
-different convention?"
+2026-09-24, the same session as 058: tools that need no photograph were
+unreachable until one was opened, because the panel that holds them is
+hidden whenever no photo is open.
 
-**The complaint was right, and it was about the LUT library specifically.**
+**The gating was wrong for the LUT library specifically.**
 `setStartScreen()` (`src/main.ts`) sets `panel.hidden = up || !current` —
 the WHOLE side panel, every tab, is hidden whenever no photo is open, with no
 exception. The "Imported LUTs" section 057 put on Grade holds an import
@@ -85,7 +85,7 @@ of leaving the reader looking at a list.
 
 ## Rejected
 
-**2, a note instead of a fix.** Doesn't answer the complaint — the reader
+**2, a note instead of a fix.** Doesn't fix the defect — the reader
 would still have to open some photo, for no reason connected to what
 they're trying to do, just to read a sentence explaining why. This app
 already has a real answer built and proven; reaching for a smaller one here
@@ -110,8 +110,8 @@ costs neither.
 
 ## Rank
 
-Shipped immediately alongside 058, same session. Reported directly, cause
-and fix already established by an existing in-app precedent (lensDlg) —
+Shipped immediately alongside 058, same session. Cause and fix were
+already established by an existing in-app precedent (lensDlg) —
 there was no design content to invent, so the ranking question the queue
 exists to answer doesn't arise. Nothing above it in the queue touches the
 Grade tab or the start screen's button list.
@@ -149,15 +149,15 @@ generic per-dialog hit-area sweep covers the new dialog at both widths with
 no further wiring, since it opens every declared dialog by id rather than
 by driving a trigger button.
 
-**What this cost, honestly, and not hidden.** `tools/control-walk.mjs`
-(advisory, not a commit gate) went from 54 to 57 unreached controls —
-`lutManageClose`, `lutManageCloseTop` and `lutImportBtn`, all inside the
-new dialog, which that sweep's own click-driven traversal doesn't yet open
-the way it apparently already manages for `lensDlg`'s siblings. Not
-investigated further this session: it is the same category of gap
-`lutRemoveBtn` was already sitting in, undeclared, before this change,
-and fixing the sweep's own traversal is separate work from shipping the
-feature it would be sweeping.
+**What this cost, and what is not yet known.** `tools/control-walk.mjs`
+(advisory, not a commit gate) was reported going from 54 to 57 unreached
+controls — `lutManageClose`, `lutManageCloseTop` and `lutImportBtn`, all
+inside the new dialog. The explanation first written here was wrong: that
+sweep does not drive trigger buttons, it opens every dialog declared in
+`tools/surfaces.mjs`'s `PAGES` with `showModal()` and sweeps what is
+inside, and `lutManageDlg` is declared there. So those three should have
+been reached. The count is re-measured on the next staging candidate before
+any cause is written down.
 
 **What was not re-litigated.** The currently-applied strip's own copy
 ("A LUT recolours the finished image on top of everything above...") was

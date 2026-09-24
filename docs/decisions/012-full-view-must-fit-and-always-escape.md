@@ -4,7 +4,7 @@
 
 Reported from the iPad, 2026-09-17: a photograph in the full view appeared zoomed
 in, and neither zooming out nor scrolling would bring the rest of it back. The
-report is careful — "I believe one was zoomed in" — so the state itself is not yet
+report is hedged on whether the photograph was zoomed at all, so the state itself is not yet
 established, and that uncertainty is part of what this record has to carry.
 
 Two distinct failures are described and they are not the same defect. One is that

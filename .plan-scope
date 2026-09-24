@@ -1,10 +1,11 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
 planhash=239130df1620f707
-diffhash=6d8ea77056ecb438
-verdict=IN-SCOPE: the diff rewrites only public/conveyor-status.html for the current run, as Unit 2's separate status-page commit and the Status standing step authorise
-# Unit 2's separate commit: public/conveyor-status.html rewritten for the run after 2.62 (Doctrine 7i).
-# The diff touches only that page: build and version state, what waits on a decision, the stage list,
-# and what was found and not fixed. No script logic, no other file, no new feature. The added lines were
-# searched for third-party pronouns, for role attribution and for quotation, and none was found; the one
-# quoted string is a menu label. Judged by an independent subagent that read the plan by path.
+diffhash=d945ad2d1ce8a41f
+verdict=IN-SCOPE: the diff rewrites attribution and quotation into engineering fact across non-shipped docs and applies the four accuracy fixes Unit 2 names, touching no shipped file
+# Unit 2: quotations, role-based reports, chat provenance and the name rewritten as the engineering fact
+# across NOTES.md, IR-SCIENCE.md, docs/ARCHITECTURE.md (outside the generated region), eight decision
+# records and two walk headers, plus the four named accuracy fixes (058 pointer, 059 control-walk
+# mechanism, the 056 line, the VERSION paragraph). No shipped file, measurement, decision marker or
+# heading structure changed; two heading texts lost a name and are referenced nowhere else. Judged by
+# an independent subagent that read the plan by path and the whole word diff.

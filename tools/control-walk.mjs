@@ -4,7 +4,7 @@
 //   python3 -m http.server 8131 --directory dist   (in another shell)
 //   node tools/control-walk.mjs [--port=8131] [--list]
 //
-// WHY IT EXISTS. On 2026-09-16 the owner reported four controls in one sitting,
+// WHY IT EXISTS. On 2026-09-16 four controls were reported in one sitting,
 // by hand, from the device: a "Share" button in the bar beside the photograph
 // that shared the APP; a "Tutorials" button that left you on the landing screen;
 // "Batch process", whose two words describe what Quick look does; and "Measure

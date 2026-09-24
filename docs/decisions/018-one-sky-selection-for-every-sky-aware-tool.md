@@ -2,8 +2,8 @@
 
 ## Context
 
-The owner asked on 2026-09-18 whether the sky selection should be set before
-any corrections and then be available to later operations. It is now, in
+Raised on 2026-09-18: should the sky selection be set before any
+corrections and then be available to later operations? It is now, in
 part: the decode worker builds the photograph's sky bitmap and its refinement
 to the picture's edges (`src/skyfine.ts`) from the undegraded decode — gray-
 world balance only, no exposure, correction or look — a moment after the

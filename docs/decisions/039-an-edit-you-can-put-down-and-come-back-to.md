@@ -15,8 +15,8 @@ reader is working on one picture, which is the case a reader is in most often.
 
 **And the session half is not the answer either.** A session is a set the
 reader opened, with a Done that ends it and frees its storage; it is a working
-state rather than a place to keep things. The reader's question is not "can I
-resume where I was" but "can I put this one down and pick it up next week",
+state rather than a place to keep things. The need is not to resume where
+the session was left but to put one photograph down and pick it up next week,
 and those want different answers.
 
 ## Looked up

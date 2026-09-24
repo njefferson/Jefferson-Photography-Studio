@@ -4,7 +4,7 @@
 
 Beyond the rule-of-thirds grid, offer selectable composition guides while
 cropping: golden-ratio grid, golden spiral, the diagonal method, a finer grid, a
-centre cross. Thirds stays the default. Owner ask 2026-07-16, marked optional.
+centre cross. Thirds stays the default. Filed 2026-07-16, marked optional.
 
 The build notes are already written into the bullet and are unusually complete:
 the guides are one element `#cropGuides` inside `#cropBox`, drawn as hairline CSS
@@ -39,7 +39,7 @@ overlay work twice.
 ## Rejected
 
 **Making a new default.** Thirds stays the default; this is additive and optional,
-and the owner said so. A guide that changes what every existing user sees while
+as filed. A guide that changes what every existing user sees while
 cropping is a different and unrequested change.
 
 ## Rank
