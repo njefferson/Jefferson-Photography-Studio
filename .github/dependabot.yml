@@ -1,0 +1,24 @@
+# Keeps the commit pins on the workflows' actions current.
+#
+# Pinning an action by commit makes it safe and frozen: without this file the
+# pins stop receiving fixes the day they are written. Dependabot moves the
+# commit and the trailing version comment together. Same shape as the hub's
+# .github/dependabot.yml.
+#
+# Actions only. npm is left out on purpose: the dependencies here are build
+# tools, the one outstanding advisory set is dev-only, and a monthly stream of
+# major-version bumps to the bundler is not a security fix.
+#
+# The prefix makes every bump an internal commit, so none of them reaches the
+# in-app patch notes (INTERNAL_SUBJECT in vite.config.ts).
+
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "Chore"
+    labels:
+      - dependencies

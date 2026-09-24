@@ -53,14 +53,31 @@ permissions:
 jobs:
   generate:
     runs-on: ubuntu-latest
+    # EVERY INPUT REACHES A SHELL THROUGH `env:`, never by `${{ }}` inside a
+    # `run:`. An expression is pasted into the script before the shell parses
+    # it, so a category typed as `x"; curl …` would have run as code with this
+    # job's write token. Through the environment it is only ever a string.
+    env:
+      PROVIDER: ${{ inputs.provider }}
+      CATEGORY: ${{ inputs.category }}
+      PER_CATEGORY: ${{ inputs.per_category }}
+      IDS: ${{ inputs.ids }}
+      LIMIT: ${{ inputs.limit }}
+      CONFIRM: ${{ inputs.confirm }}
     steps:
-      - uses: actions/checkout@v4
+      # Pinned by commit, as the hub's workflows are; .github/dependabot.yml
+      # keeps the pins current. The credentials stay in .git/config on purpose:
+      # the last step pushes the review batch. The artifact upload below names
+      # asset-factory/ paths only, so .git never goes into an artifact.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ref }}
+          persist-credentials: true # zizmor: ignore[artipacked]
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
+          package-manager-cache: false
 
       # `npm ci`, NOT `npm install`: install resolves whatever the registry
       # serves at that moment, so a run is not reproducible and a compromised
@@ -72,7 +89,10 @@ jobs:
 
       - name: Plan (counts + cost estimate)
         working-directory: asset-factory
-        run: node cli.mjs plan --provider "${{ inputs.provider }}" ${{ inputs.category && format('--category {0}', inputs.category) || '' }}
+        run: |
+          args=(--provider "$PROVIDER")
+          if [ -n "$CATEGORY" ]; then args+=(--category "$CATEGORY"); fi
+          node cli.mjs plan "${args[@]}"
 
       - name: Generate
         working-directory: asset-factory
@@ -80,18 +100,21 @@ jobs:
           IDEOGRAM_API_KEY: ${{ secrets.IDEOGRAM_API_KEY }}
           FAL_KEY: ${{ secrets.FAL_KEY }}
         run: |
-          node cli.mjs generate \
-            --provider "${{ inputs.provider }}" \
-            ${{ inputs.category && format('--category {0}', inputs.category) || '' }} \
-            ${{ inputs.per_category && format('--per-category {0}', inputs.per_category) || '' }} \
-            ${{ inputs.ids && format('--ids {0}', inputs.ids) || '' }} \
-            --limit "${{ inputs.limit }}" \
-            ${{ inputs.confirm && '--yes' || '--dry-run' }}
+          args=(--provider "$PROVIDER")
+          if [ -n "$CATEGORY" ]; then args+=(--category "$CATEGORY"); fi
+          if [ -n "$PER_CATEGORY" ]; then args+=(--per-category "$PER_CATEGORY"); fi
+          if [ -n "$IDS" ]; then args+=(--ids "$IDS"); fi
+          args+=(--limit "$LIMIT")
+          if [ "$CONFIRM" = "true" ]; then args+=(--yes); else args+=(--dry-run); fi
+          node cli.mjs generate "${args[@]}"
 
       - name: Stats
         if: ${{ inputs.confirm }}
         working-directory: asset-factory
-        run: node cli.mjs stats ${{ inputs.category && format('--category {0}', inputs.category) || '' }}
+        run: |
+          args=()
+          if [ -n "$CATEGORY" ]; then args+=(--category "$CATEGORY"); fi
+          node cli.mjs stats "${args[@]}"
 
       # Publish the approved batch as viewable PNGs + a contact sheet, then push
       # them to a throwaway branch. A session reads them back over the GitHub API
@@ -99,7 +122,10 @@ jobs:
       - name: Publish review batch
         if: ${{ inputs.confirm }}
         working-directory: asset-factory
-        run: node cli.mjs publish-review ${{ inputs.category && format('--category {0}', inputs.category) || '' }}
+        run: |
+          args=()
+          if [ -n "$CATEGORY" ]; then args+=(--category "$CATEGORY"); fi
+          node cli.mjs publish-review "${args[@]}"
 
       - name: Push review batch to the review branch
         if: ${{ inputs.confirm }}
@@ -109,9 +135,12 @@ jobs:
           git checkout --orphan review-tmp
           git reset
           git add -f asset-factory/review asset-factory/database/catalog
-          git commit -m "Review batch: ${{ inputs.category }} (run ${{ github.run_id }})"
+          git commit -m "Review batch: ${CATEGORY} (run ${GITHUB_RUN_ID})"
           git push -f origin review-tmp:claude/asset-factory-review
 
+      # STILL ON A TAG. No pin for this action has been vetted anywhere in this
+      # repo or the hub, and a pin copied from a search result is a pin nobody
+      # checked. Owed, and the one finding zizmor still reports here.
       - name: Upload results (images + catalog)
         if: ${{ inputs.confirm }}
         uses: actions/upload-artifact@v4
