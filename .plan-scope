@@ -1,12 +1,10 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=ffe51e0e6eba5202
-diffhash=355844b5f0ea147b
-verdict=IN-SCOPE: Unit 1's one-word pronoun fix at NOTES.md:3880, with the scope record re-worded so the gate does not flag the record itself
-# Unit 1 ("Main goes green (docs)") prescribes a single wording change at
-# NOTES.md:3880: a possessive pronoun for a third party becomes "that", so
-# the hub third-person gate stops failing, and .third-person-allow is not
-# widened. The previous scope record repeated the removed word and the gate
-# flagged the record itself. This commit re-records the same verdict in
-# neutral wording and changes no other file. Judged by an independent
-# subagent that read the plan by path and confirmed the tree matched HEAD.
+planhash=239130df1620f707
+diffhash=6d8ea77056ecb438
+verdict=IN-SCOPE: the diff rewrites only public/conveyor-status.html for the current run, as Unit 2's separate status-page commit and the Status standing step authorise
+# Unit 2's separate commit: public/conveyor-status.html rewritten for the run after 2.62 (Doctrine 7i).
+# The diff touches only that page: build and version state, what waits on a decision, the stage list,
+# and what was found and not fixed. No script logic, no other file, no new feature. The added lines were
+# searched for third-party pronouns, for role attribution and for quotation, and none was found; the one
+# quoted string is a menu label. Judged by an independent subagent that read the plan by path.
