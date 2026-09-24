@@ -80,7 +80,7 @@
                always done; the button is the signpost for a gesture nothing
                else advertises. The other two were not before/after at all and
                have moved beside what they explain — see the Basic and
-               Corrections tabs. (Owner direction, 2026-09-16.) -->
+               Corrections tabs. (Directed, 2026-09-16.) -->
           <button id="origBtn" class="bar-btn" type="button">Hold: Before</button>
           <button id="histBtn" class="bar-btn" type="button" aria-pressed="true">Histogram</button>
           <!-- No `title`: the mode prints "Tap anywhere or press Escape to go
@@ -95,14 +95,14 @@
                and does not exist on a touch screen. So on the device it was
                built for, the label was one word and the word was wrong. It
                lives in the ⓘ dialog now, under Settings, saying what it
-               shares. (Owner report, 2026-09-16.) -->
+               shares. (Reported from the device, 2026-09-16.) -->
           <span class="bar-sep" aria-hidden="true"></span>
           <!-- NOT "BATCH PROCESS". Those two words describe what Quick look
                does -- take a batch of photographs and process them -- and they
                were spent on the rare one, whose actual job is to run a whole set
                through unattended and hand back a .zip. The label says the job
                now; the tooltip that used to say it is a hover, and a hover does
-               not exist on a touch screen. (Owner report, 2026-09-16.) -->
+               not exist on a touch screen. (Reported from the device, 2026-09-16.) -->
           <button class="bar-btn" id="batchBtn" type="button">
             Develop unattended
           </button>
@@ -121,7 +121,7 @@
                on the start screen, the Measure button on the My-lens card in
                the IR tab (beside the sliders it affects), and the version
                dialog. Nothing was lost by taking the fourth out of the bar.
-               (Owner report, 2026-09-16.) -->
+               (Reported from the device, 2026-09-16.) -->
           <label class="open-btn bar-primary" title="Edit one photo — or several as a session">
             Open image(s)
             <input id="file" class="file-input" type="file" accept=".dng,.nef,.zip,.ipslook,.ipskeep,image/*" multiple />
@@ -234,7 +234,7 @@
              than only being visible; it is not a control and takes no taps. -->
         <div id="fileKind" role="status" aria-live="polite" hidden></div>
         <!-- Zoom controls: work with no mouse wheel and no pinch (a desktop/laptop
-             without either had NO way to zoom in to brush up close — owner,
+             without either had NO way to zoom in to brush up close —
              2026-07-21). They also work while a brush tool is armed, when the
              canvas gestures are busy painting. Cursor-anchored wheel zoom is wired
              on the canvas too. -->
@@ -332,7 +332,7 @@
           <p class="ex-title">&hellip;or learn by doing &mdash; tap a practice photo, and the lessons ride along on it.</p>
           <!-- The way into the full library is the grid's LAST tile (the
                stacked-photos "Learning library" tile, built in main.ts) —
-               the old dashed pill here was "completely missable" (owner). -->
+               the old dashed pill here was too easy to miss. -->
           <div id="galleryList" class="gallery-list" aria-label="Practice photos"></div>
           <div class="welcome-cue" id="welcomeCue" hidden aria-hidden="true">&#9660;</div>
         </div>
@@ -436,7 +436,7 @@
                the controls get learned; on the fiftieth they are in the way. So
                they are a toggle, on to begin with, remembered once turned off.
                THE TWO LABELS ARE "Explanations" AND "Explanations off", and
-               they are the owner's call, not a session's — a session briefly
+               they are deliberate, not a session's to change — a session briefly
                made them "Explanations on" / "Explanations off" on the argument
                that a bare noun reads as a label, which is a judgement about
                reader-facing copy and therefore not its judgement to make.
@@ -627,7 +627,7 @@
             <p class="note">Tip: tap foliage in the image to set white balance.</p>
             <label>Recover highlights <input id="recover" type="range" min="0" max="1" step="0.01" value="0" /></label>
             <p class="note">Pulls genuinely blown (sensor-clipped) areas toward clean neutral for your current white balance &mdash; it re-aims live as you rebalance. Set automatically at open when the frame has clipping; 0 = untouched.</p>
-            <!-- A DIAGNOSTIC, NOT A PROMISE, and it took the owner to say so.
+            <!-- A DIAGNOSTIC, NOT A PROMISE — misdescribed until that was pointed out.
                  This was carried for a long time as the standing PROOF that
                  opening a photograph did not touch pixels — which it never was:
                  it renders the same decode either way with four sliders zeroed,
@@ -641,7 +641,7 @@
                  belongs beside the controls it diagnoses rather than in the top
                  bar next to the before/after. No commercial editor offers a bare
                  decode as a compare state at all; theirs already include the
-                 default rendering. (Owner, 2026-09-16.) -->
+                 default rendering. (2026-09-16.) -->
             <p class="note"><strong>Your original file is never changed.</strong> Everything on this photograph is a setting you can move, and Reset puts them all back.</p>
             <button id="untouchedBtn" type="button">Hold: the bare decode</button>
             <p class="note">Press and hold to see this photograph as the file decoded, with the four automatics above taken off &mdash; white balance, exposure, denoise and highlight recovery. It is for working out whether a frame that opens looking wrong is the file or one of those four.</p>

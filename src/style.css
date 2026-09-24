@@ -334,7 +334,7 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 }
 #infoDlg::backdrop, #helpDlg::backdrop, #batchDlg::backdrop, #lensDlg::backdrop, #lookDlg::backdrop, #lookPasteDlg::backdrop, #lookRecvDlg::backdrop, #ratioDlg::backdrop, #locDlg::backdrop { background: rgba(0, 0, 0, 0.55); }
 /* The "What's new" dialog scrolls; sticky chevron cues at its top/bottom edges
-   say "there's more this way" (owner ask 2026-07-15). Sticky resolves against
+   say "there's more this way" (asked for 2026-07-15). Sticky resolves against
    the dialog's own scrollport, so no position:relative (that breaks modal
    centering). */
 /* THE WAY OUT MUST NOT LIVE INSIDE THE THING THAT SCROLLS.
@@ -511,7 +511,7 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
    set in updateRatioUI, never colour alone. */
 #cropRatios {
   display: flex;
-  flex-wrap: wrap; /* every ratio visible at once, no side-scroll (owner ask
+  flex-wrap: wrap; /* every ratio visible at once, no side-scroll (asked for
                       2026-07-18). Extra rows are SAFE: the view steps back by
                       the pill's MEASURED height (--croptools-h) in BOTH width
                       bands, so a taller pill can't bury the bottom handles
@@ -590,8 +590,8 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 }
 .mix-chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
 
-/* Sticker picker hierarchy — the three tiers must read as distinct levels (owner,
-   2026-07-20: "menu and submenus are indistinguishable"). KIND = biggest, solid
+/* Sticker picker hierarchy — the three tiers must read as distinct levels
+   (2026-07-20: menu and submenus read as indistinguishable). KIND = biggest, solid
    selected fill + a divider under it; CATEGORY = medium, soft/outlined selected;
    STICKER = plain (add-only, never a persistent selected state). The ✓ text
    prefix carries selection independent of colour (grayscale-safe). */
@@ -608,7 +608,7 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 #stickerCats .mix-chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--txt); }
 
 /* The add-a-sticker grid: a thumbnail of each piece with its label beneath, so
-   you can tell a Bigfoot from a Mothman before you drop it (owner, 2026-07-21).
+   you can tell a Bigfoot from a Mothman before you drop it (2026-07-21).
    A soft checker sits behind each thumb so both dark and pale art stay visible
    in either theme (theme-invariant, so it survives grayscale). */
 #stickerAdd { align-items: flex-start; }
@@ -1061,7 +1061,7 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
    classic one-element "darken everything outside this rect" trick.
    user-select/tap-highlight/touch-callout are ALL killed here: without them,
    dragging the box or a handle on iPad Safari paints a translucent blue
-   text-selection band over the photo (owner-caught on device, 2026-07-15). */
+   text-selection band over the photo (caught on the device, 2026-07-15). */
 #cropOverlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 6; }
 #cropOverlay:not([hidden]) { pointer-events: auto; cursor: grab; touch-action: none; } /* drag the photo to reposition the crop */
 #cropOverlay,
@@ -1365,7 +1365,7 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 }
 .welcome-cue.on { opacity: 1; }
 /* Matching UP cue: hugs the card's TOP edge, shows once you've scrolled down so
-   it's clear there's more above (owner ask 2026-07-15). */
+   it's clear there's more above (asked for 2026-07-15). */
 .welcome-cue.up {
   top: -22px;
   bottom: auto;
@@ -2249,7 +2249,7 @@ body.dropping::after {
 .bar-actions { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 /* The top bar reflects the MODE. While the start screen is up, the photo
    controls park themselves — they act on a photo that isn't on screen, so
-   they read as a broken menu (owner report 2026-07-14, narrow viewport).
+   they read as a broken menu (reported from the device, 2026-07-14, narrow viewport).
    Home lives up by ‹ Studio and also parks: on the start screen you're home. */
 body:has(#welcome:not([hidden])) :is(#homeBtn, #undoBtn, #redoBtn, #resetBtn, #origBtn, #histBtn, .bar-sep) { display: none; }
 .bar-actions .bar-sep { width: 1px; height: 22px; background: var(--line); flex: none; }
@@ -2921,8 +2921,8 @@ button.toggletip {
      otherwise propagate through .bar (a grid item, min-width:auto) and push
      the whole bar past the viewport instead of scrolling inside it. */
   .bar { flex-wrap: wrap; padding-bottom: 6px; min-width: 0; }
-  /* On narrow screens the photo needs the room (owner report 2026-07-14:
-     "Not enough room to do anything"): the edit actions become ONE sideways-
+  /* On narrow screens the photo needs the room (reported from the device,
+     2026-07-14: not enough room to do anything): the edit actions become ONE sideways-
      scrolling row instead of stacking two or three rows tall. Labels stay
      full; the cut-off last button is the scroll affordance. */
   .bar-actions-wrap { position: relative; width: 100%; min-width: 0; }

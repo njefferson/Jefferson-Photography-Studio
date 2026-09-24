@@ -59,7 +59,7 @@ export function wireLensRig(root: ParentNode): void {
   // at the top, while the text it copies appeared at the bottom under a long
   // list of per-frame findings — so on a phone the reader scrolled past
   // everything, found a text box, and tried to select 2 KB of JSON by hand
-  // (owner report, 2026-09-10). The pair travels together now.
+  // (reported from the device, 2026-09-10). The pair travels together now.
   const profOut = $("lensOut");
   const profCopy = $<HTMLButtonElement>("lensCopy2");
   const profSave = $<HTMLButtonElement>("lensSave2");

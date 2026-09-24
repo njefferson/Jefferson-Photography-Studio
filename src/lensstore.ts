@@ -4,7 +4,7 @@
 // the app read them: the output was data to hand to a developer to paste into
 // `hotspotProfiles.ts`. That is not a feature, it is a collection form — and it
 // is why the whole thing still read as a debug screen no matter where the
-// button was put (owner, 2026-09-10, and the question was the right one).
+// button was put (2026-09-10, and the question was worth asking).
 //
 // WHAT GETS APPLIED, and what deliberately does not. A measurement gives three
 // things and they are not equally trustworthy:

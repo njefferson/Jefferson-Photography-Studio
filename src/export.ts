@@ -80,7 +80,7 @@ export interface ExportOptions {
  *  the half-size preview and printed "on one thread" over an export the app's
  *  own report said had run on three; its second carried a copy of the rule that
  *  refuses TIFF, which stopped being true on 2026-09-20 — so the strip said one
- *  thread while the export ran on eight, and the owner reported it from the
+ *  thread while the export ran on eight, and it was reported from the
  *  device with the report beside it saying otherwise.
  *
  *  A predictor that has been wrong in both directions should not be repaired,
@@ -154,7 +154,7 @@ export interface BandResult {
 }
 
 // --- Corner watermark for the bundled practice photos ------------------------
-// (owner ask 2026-07-15). The teaching JPEGs carry a baked bottom-right mark;
+// (asked for 2026-07-15). The teaching JPEGs carry a baked bottom-right mark;
 // the RAW practice files can't (a mark inside raw sensor data would falsify
 // it), so their EXPORTS carry it instead: scrim + domain + NJ line mark, the
 // same family style, drawn after the pipeline and before encoding.
@@ -520,8 +520,8 @@ export async function exportImage(
   // Stickers split into two kinds. IN-LOOK stickers wrap OUTSIDE heal — they
   // composite over the healed source and then run THROUGH the pipeline (they take
   // on the IR palette). ON-TOP stickers (the default) are composited AFTER the
-  // whole pipeline via an overlay sampler, so they keep their own colours (owner,
-  // 2026-07-21). Both samplers are LINEAR; never touched when no stickers exist.
+  // whole pipeline via an overlay sampler, so they keep their own colours
+  // (2026-07-21). Both samplers are LINEAR; never touched when no stickers exist.
   const allStickers = (params.stickers ?? []).filter((s) => opts.stickerAssets?.[s.asset]);
   const inLookStickers = allStickers.filter((s) => s.onTop === false);
   const onTopStickers = allStickers.filter((s) => s.onTop !== false);

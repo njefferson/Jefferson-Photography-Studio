@@ -1,3 +1,5 @@
 # Written by tools/preview-version-check.mjs --record. Not hand-edited.
 version=56
-hash=9bbb9fd848b96696
+hash=0bb98aaef656c925
+# Recorded WITHOUT a version bump. The evidence the pictures did not change:
+proven=comment-only change: vite build of this tree against its parent gives byte-identical JS and CSS for every asset (diff -rq over dist: only .map files and HTML comments in ir.html differ), so no preview can render differently
