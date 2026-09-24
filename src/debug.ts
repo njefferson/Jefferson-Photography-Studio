@@ -20,7 +20,7 @@ import { sniff } from "./import";
 import { workerCount } from "./exportparallel";
 import { linearAt } from "./decode";
 import { makeRowDenoiser } from "./raw/denoise";
-import { compileEdit, TONE_DEFAULT, GRADE_DEFAULT, MIX3_DEFAULT, hslDefault, CROP_DEFAULT, type EditParams } from "./pipeline";
+import { compileEdit, TONE_DEFAULT, GRADE_DEFAULT, MIX3_DEFAULT, hslDefault, CROP_DEFAULT, neutralMask, type EditParams, type MaskLayer } from "./pipeline";
 import { exportImage } from "./export";
 import { drawFrame, canDrawFrame, buildLinearSource } from "./gpuexport";
 import { Renderer } from "./gl";
@@ -130,6 +130,29 @@ function shaderRoom(): void {
     // The CONTEXT, not just the canvas — see Renderer.dispose.
     r?.dispose();
   }
+}
+
+/** EIGHT MASKS FOR THE FRAME-TIME ROW (decision 042, stage 0). Takes nothing;
+ *  returns eight active masks — three radial, two gradient, three colour — with
+ *  one radial subtracted from the first and one colour mask added to another, so
+ *  the shader's group fold runs. What the row relies on: every mask is ACTIVE
+ *  (a non-neutral adjustment), because `maskGroupsForRender` drops a neutral
+ *  one and an inactive mask costs the frame nothing; and there are exactly
+ *  eight entries, the cap `maskGroupsForRender` keeps whole. */
+function eightMasks(): MaskLayer[] {
+  const radial = (over: Partial<MaskLayer>): MaskLayer => ({ ...neutralMask(0), ...over });
+  const gradient = (over: Partial<MaskLayer>): MaskLayer => ({ ...neutralMask(1), ...over });
+  const colour = (over: Partial<MaskLayer>): MaskLayer => ({ ...neutralMask(3), hueTarget: 210, satTarget: 0.35, valTarget: 0.6, ...over });
+  return [
+    radial({ brightness: 1.1 }),
+    radial({ op: 1, cx: 0.6, cy: 0.4, rx: 0.15, ry: 0.15 }),
+    gradient({ contrast: 1.1 }),
+    colour({ saturation: 1.2 }),
+    colour({ op: 3, hueTarget: 30 }),
+    radial({ warmth: 0.2, cx: 0.3, cy: 0.7 }),
+    gradient({ hue: 10, ly: 0.9, cy: 0.6 }),
+    colour({ brightness: 0.95, hueTarget: 100 }),
+  ];
 }
 
 async function graphics(): Promise<void> {
@@ -1395,6 +1418,25 @@ async function fullResolutionPreview(): Promise<void> {
         row(`Drawing from ${label}`, `upload ${ms(upload)} · ${ms(per)} a frame`,
           `A ${canvas.width}x${canvas.height} draw — about what a screen asks for — sampled from a ${(image.width * image.height / 1e6).toFixed(1)}-megapixel texture. Under 16 ms a frame is smooth at sixty; under 33 is smooth at thirty. The upload happens once when a photograph opens. Compare the spread against the gap between these rows before concluding one source is faster than another.`,
           passes.map((x) => Math.round(x) + " ms").join(", "));
+        // EIGHT MASKS ON THE SAME FRAME (decision 042, stage 0). The shader-room
+        // rows say how much per-mask state fits; this says what the masks
+        // already cost a frame on THIS device, timed exactly as the row above so
+        // the difference between the two is the masks and nothing else.
+        if (label === "full resolution") {
+          const eight = { ...pr, masks: eightMasks() };
+          r.render(eight); r.readFrame(); await tick(); // warm-up, not timed
+          const withMasks: number[] = [];
+          for (let pass = 0; pass < PASSES; pass++) {
+            const t1 = performance.now();
+            for (let i = 0; i < N; i++) { r.render(eight); r.readFrame(); }
+            withMasks.push((performance.now() - t1) / N);
+            await tick();
+          }
+          const perMasks = mid(withMasks);
+          row("…the same draw with eight masks", `${ms(perMasks)} a frame · ${perMasks >= per ? "+" : "−"}${ms(Math.abs(perMasks - per))}`,
+            `Eight masks of the kinds this page can make without a photograph's own selection: radial, gradient and colour, two of them joined to another. Brush and sky masks are left out because they need a painted or detected selection. Masks are planned to carry their own settings for the ordinary controls, and this is what a frame costs before they do. Under 33 ms a frame is still smooth at thirty; compare the gap with the spread before reading anything into it.`,
+            withMasks.map((x) => Math.round(x) + " ms").join(", "));
+        }
       } catch (err) {
         row(`Drawing from ${label}`, "refused", `This device would not do it: ${String((err as Error)?.message ?? err)}.`);
       } finally {

@@ -1,6 +1,10 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
 planhash=57a4a72df437f124
-diffhash=0e183b0edf0faf9d
-verdict=IN-SCOPE: HEAD's tree matches the judged union change file for file; the amend changes only the commit message, dropping an unverified example.
-# Message-only amend of d74309a (the union commit): drops the unverified example 'or behind a branch'. Tree unchanged from the judged union change.
+diffhash=19550c3780fe6a7f
+verdict=IN-SCOPE: both hunks (the eightMasks helper and the timed row in fullResolutionPreview, reusing the same passes, median and spread, plus the generated line count) match the plan bullet; no per-mask store or UI change; the row's copy makes no delivery promise; no owner quotation.
+# Commit: plan item 3, 042 stage 1, third commit: "The test page's frame time with eight masks, the rest of stage 0's instrument."
+# - src/debug.ts: inside the existing full-resolution draw timing (fullResolutionPreview), for the "full resolution" source only, the same draw is timed again with eight masks — same N, same three passes, median, spread printed, and the gap against no masks. eightMasks() builds eight active masks (radial, gradient, colour; one subtracted, one added) with a stated contract; imports neutralMask and the MaskLayer type.
+# - docs/ARCHITECTURE.md: generated line count.
+# Evidence: the test page was run headless on the candidate build; the row printed with three runs and no page errors (container numbers, not device numbers).
+# Not in this commit: nothing else.
