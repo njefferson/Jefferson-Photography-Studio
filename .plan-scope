@@ -1,11 +1,12 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
 planhash=ffe51e0e6eba5202
-diffhash=5225ebb9b62c3d2f
-verdict=IN-SCOPE: the only change is NOTES.md:3880 his->that, exactly as Unit 1 prescribes
+diffhash=355844b5f0ea147b
+verdict=IN-SCOPE: Unit 1's one-word pronoun fix at NOTES.md:3880, with the scope record re-worded so the gate does not flag the record itself
 # Unit 1 ("Main goes green (docs)") prescribes a single wording change at
-# NOTES.md:3880 so the hub third-person gate stops failing on a pronoun for a
-# third party, and forbids widening .third-person-allow. The diff is exactly
-# one hunk in NOTES.md replacing "his" with "that"; no other tracked file is
-# changed and .third-person-allow is untouched. Judged by an independent
-# subagent that read the plan by path and the full git diff.
+# NOTES.md:3880: a possessive pronoun for a third party becomes "that", so
+# the hub third-person gate stops failing, and .third-person-allow is not
+# widened. The previous scope record repeated the removed word and the gate
+# flagged the record itself. This commit re-records the same verdict in
+# neutral wording and changes no other file. Judged by an independent
+# subagent that read the plan by path and confirmed the tree matched HEAD.
