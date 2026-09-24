@@ -1844,7 +1844,11 @@ export function compileEdit(
   // them as GROUPS so a head's aim covers its group's area (042, stage 1) — the
   // agreement walk is what would otherwise find the two apart, after the fact.
   const aimGroups = maskGroupsActive;
-  const hasColorMask = masks.some((m) => m.type === 3);
+  // EVERY MASK IN EVERY GROUP, not the heads in `masks`: a colour mask joined
+  // to another one is a component, and reading heads only left its key black
+  // in every export while the shader keyed it, so the saved photo ignored the
+  // join. tools/join-fold-check.mjs holds the joined case.
+  const hasColorMask = maskGroupsActive.some((g) => g.some((m) => m.type === 3));
   const lensOn = (p.hotspot ?? 0) !== 0 || (p.vignette ?? 0) !== 0 || (p.hotspotColor ?? 0) !== 0;
   // The measured curve is its own stage: it must run whether or not any of the
   // manual lens sliders are off zero.
