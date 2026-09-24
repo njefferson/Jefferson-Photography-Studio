@@ -98,8 +98,9 @@ holds v2.62.16 until the go, and it goes there once v2.62.16 is on production.
 - The device test page times a frame with eight masks beside the same draw
   with none.
 
-The per-mask store is not in it. What a stored value means is M1's question,
-and decision 042 rejects answering it in code before it is put.
+The per-mask store is not in it. M1 is answered now (an offset on the
+whole-photo value), and the store lands with stage 2's switch, which carries
+Foliage first (decision 042, re-sliced 2026-09-24).
 
 Walks run against the whole candidate: aim-walk, whose grouped arm failed on
 the build before the fix; the agreement walk; the export check; and the
@@ -128,6 +129,19 @@ one way and 98.2% the other, and a union changes the same pixels in both,
 - Walks on this build: the control walk reports the same 55 findings as
   before it (532 controls, up from 530 by the two None buttons); the pack,
   look round-trip, one-band, tile-truth and accessibility walks pass.
+
+**A sixth on the held candidate, the same night: a fix found while rendering a
+workaround for the red wires.** A colour mask joined to another mask (Only
+where both, Take away or Add to it) showed on screen and did nothing to the
+saved photo. The export's pipeline computed the colour key only when a group's
+first mask was a colour mask, so a joined one keyed on black in every export,
+quick-look preview and strip tile. Measured on NIR_3461 in production's build:
+the workaround's export was byte-identical to the shipped one while the screen
+showed the change. After the fix (8b6f758), strongly red pixels above the
+horizon in the full export go from 233,425 to 43,733 with the workaround on.
+`tools/join-fold-check.mjs` holds the joined case and failed on the old line
+first; the quick-look preview version moved to 59, because those previews come
+from the same pipeline.
 
 ## Confirmed
 

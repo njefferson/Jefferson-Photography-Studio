@@ -55,12 +55,36 @@ on a building turns red with the grass. The band selects a colour, not a place:
   grass needs the band and the building does not, which is the whole case for
   limiting it to a place.
 
-It stays in stage 3, with no reorder. The band runs before the mask stage
-(`src/gl.ts`, the band ahead of the mask loop), so it needs a place mask's
-weight evaluated early, and a selected mask can only offer it once stage 2's
-switch exists. Its scope is place masks: gradient, radial, brush and the sky
-bitmap. A colour mask keys on the colour after the band, so limiting the band
-by one would be circular.
+**It moved up on 2026-09-24, late, into stage 2 (see Rank).** The band runs
+before the mask stage (`src/gl.ts`, the band ahead of the mask loop), so it
+needs a place mask's weight evaluated early. That weight is already computed
+there: `aimWeightOf` folds a place mask's group before the band, which stage 1
+built. What it genuinely needs beyond that is stage 2's switch, because a mask's
+own Foliage value has to be set somewhere. Its scope is place masks: gradient,
+radial, brush and the sky bitmap. A colour mask keys on the colour after the
+band, so limiting the band by one would be circular.
+
+**What can be done before the switch ships, measured the same night on
+NIR_3461.** A gradient covering everything above the grass, with a colour mask
+picked on a saturated red joined to it by Only where both, and the group's
+saturation at 0, works at the mask stage, which runs after the band. In the
+full export, strongly red pixels above the horizon went from 233,425 to 43,733
+and the grass was untouched (1,975,208 to 1,965,729). The wires go dark, the far
+pylon loses its red, and the red trees on the horizon go dark with them, which
+is that route's cost. Two things were found on the way:
+
+- **It did not work in the export at first, and that was a defect.** The
+  export's pipeline computed the colour key only when a group's first mask was
+  a colour mask, so a colour mask joined to any other mask keyed on black in
+  every export, quick-look preview and strip tile while the screen keyed it
+  correctly. Fixed in the held candidate (8b6f758), with
+  `tools/join-fold-check.mjs` holding the joined case; it was seen failing on
+  the old line first.
+- **Found, not fixed: the round discs differ between the screen and the
+  export.** With the workaround on, the Sky colour smoothing discs stay pink on
+  screen and are faint in the export. As shipped, the two agree on the whole
+  (1.088% and 1.075% of the area above the horizon strongly red), so the
+  difference sits in how the sky map sees the masks. The discs are 013's.
 
 ## Looked up
 
@@ -190,16 +214,24 @@ These EXIST, and this record is the next layer over them, not a second version.
 - **048 and 050** wait on the same wiring: a union join, and box and lasso
   shapes.
 - **060, the top bar.** The "editing this mask" indicator goes in the drawer's
-  heading, never in the bar, which has no room. The drawer's portrait behaviour
-  is 003's, and it must be decided before stage 2 builds into the drawer.
-- **The Aerochrome red-edge research, still running.** It must be settled
-  before anyone claims per-mask Foliage fixes red wires. A 1024-texel
-  selection cannot follow a 1-3px wire.
+  heading, never in the bar, which has no room.
+- **003, the drawer.** This record used to say the drawer's portrait behaviour
+  had to be decided before stage 2 builds into the drawer. The premise was
+  per-mask sliders growing inside the mask place. The ruling (the ordinary tabs
+  follow the mask) and M3 (a chip row on the tab strip) removed it: the chips
+  travel with the tabs wherever the drawer goes. What remains is a cost, one
+  more row in portrait until 060's bar lands.
+- **The Aerochrome red-edge research, settled (061).** On the reported frame
+  the red on the wire is the Foliage band painting the wire's own slight colour,
+  not the channels misaligned. A place limit does not have to follow a 1-3px
+  wire: the wire sits inside a coarse place above the horizon, which the
+  workaround above shows.
 
 ## Looked at
 
 - The reported frame NIR_3461: the editing view in Aerochrome as shipped and with Foliage saturation at 0, the wires, the far pylon and the near pylon.
 - The frame NIR_3467: the editing view in Aerochrome as shipped and with Foliage saturation at 0, the building and the ground.
+- NIR_3461 again, 2026-09-24, night: the full export in Aerochrome as shipped against the same with the workaround masks, full frame and at full size on the wires against cloud, the far pylon, and the horizon trees and grass; and the editing view against the export on the far pylon, where the discs differ.
 
 ## Depends
 
@@ -209,7 +241,7 @@ These EXIST, and this record is the next layer over them, not a second version.
 - touches 048 — the union join lands in stage 1.
 - touches 050 — box and lasso shapes are the hard edges a gradient cannot draw.
 - touches 060 — the editing indicator stays out of the top bar; candidate B adds controls over the photograph where mask handles are drawn.
-- touches 003 — the drawer's behaviour must be decided before stage 2 builds into it.
+- touches 003 — the chips ride the tab strip, so the drawer's portrait behaviour no longer gates stage 2; it costs one more row in portrait until 060's bar lands.
 - touches 040 — the mask panel's list and naming survive; its five sliders and six aim toggles move out.
 - touches 024 — every control that cannot act on a mask says why, in words.
 - touches 028 — sky seen through a lattice or a canopy is a selection that has to be completed.
@@ -231,20 +263,52 @@ selection; built in stages, each shippable and checkable on its own.** Chosen.
     `aimWeight`, `gl.ts` `aimWeightOf`). The fix is rendered before it is
     built.
   - It also adds a per-mask parameter store and 048's union.
-- **Stage 2: the switch.**
-  - Tabs follow the targeted mask.
-  - "Editing: Sky 1 · Back to whole photo" sits in the drawer's sticky
-    heading, is announced, and has a way back at least 44px tall.
-  - Every stage after the mask stage goes per mask: contrast, the curves,
-    HSL, B&W, shadow colour, grade, luminance and LUT strength.
-  - The five mask sliders and six aim toggles go in the same release.
-  - Old saved values keep rendering, and a visible Convert, which can be
-    undone, is offered.
-  - A control that is not per mask yet shows disabled, with its reason.
-- **Stage 3: the stages before the mask stage, and the foliage band.** These
-  are exposure, white balance as relative gains, saturation, hue, tint and
-  glow, for masks that are not colour masks. This is the conventional fix for
-  the cladding: a colour band limited to a place.
+- **Stage 2: the switch, with Foliage as its first new per-mask value.**
+  - **The chips (M3).** A row above the tab strip: Whole photo first, then one
+    chip per group head, named as in the mask list. One tap targets; the
+    targeted chip is pressed (`aria-pressed`); every chip is at least 44px. The
+    row shows only while the photograph has a mask.
+  - **The heading.** "Editing: Sky 1 · Back to whole photo" sits in the
+    drawer's sticky heading, is announced in a live region when the target
+    changes, and its way back is a button at least 44px tall.
+  - **What follows a targeted mask in this release**, each starting at no
+    change (M1):
+    - the mask's five existing values, moved out of the mask place into the
+      tab controls with the same meaning: Exposure on Basic (the mask's
+      brightness, shown in stops), and Hue shift, Saturation and Contrast on
+      Colour; Warmth takes the place of the three gains on Basic, because a
+      mask gets a relative warm or cool, never an absolute white point;
+    - **the Foliage band on Colour (Hue, Saturation, Luminance)**, new: the
+      mask's own offsets, stored as an optional `MaskLayer` field, absent
+      meaning no change. The Aerochrome Finish panel's Foliage row follows on
+      its own, because it mirrors the Colour tab's slider by id.
+  - **How a Foliage offset combines.** At a pixel the band's value is the
+    whole-photo value plus each group's offset times that group's joined place
+    weight, summed where masks overlap (the Lightroom convention), then held
+    to the slider's own range. The weight is the same fold `aimWeightOf`
+    computes before the band. A group that is or holds a colour mask adds
+    nothing to the band, and its Foliage row shows disabled with the reason in
+    words (`groupCanAim`).
+  - **Every other control** shows disabled with its reason while a mask is
+    targeted, naming the stage that brings it.
+  - **The mask place** keeps what shapes the selection. Its five sliders
+    leave in this release, because their controls now live in the tabs. The
+    six aim toggles stay until each tool they point becomes per mask, so
+    nothing a reader can do today stops working between releases.
+  - **Saved edits.** The five values keep their fields and their math, and a
+    Foliage offset is absent in every existing edit, so nothing converts and
+    everything renders as before. The Convert is owed only when an aim gives
+    way to a per-mask value.
+  - **Where it is held true.** The shader and `compileEdit` both, and every
+    export and preview path through `compileEdit`; per-mask Foliage costs 8
+    uniform rows of the 876 free.
+- **Stage 2b: the other stages after the mask stage, per mask:** contrast
+  beyond the mask's own, the curves, HSL, B&W, shadow colour, grade, luminance
+  and LUT strength. The curves need texture units, and 2 of 16 are free on the
+  iPad, so they are measured first.
+- **Stage 3: the rest of the stages before the mask stage:** exposure beyond
+  the mask's own brightness, white balance as relative gains, saturation, hue,
+  tint and glow, for masks that are not colour masks.
 - **Stage 4: the spatial stages on the CPU, one commit each:** clarity and
   dehaze, then sharpen and texture, then noise.
 - **Stage 5: the sky stages as a sky mask's values, with 052.**
@@ -310,3 +374,14 @@ onto real capacity. Stage 3 comes before stage 4 because the two share the
 early weights, and stage 3 carries no pre-pass risk. Stage 5 waits for 052.
 013 and 016 stay below both lanes, because both lanes change what they would be
 tuned against.
+
+**Re-sliced 2026-09-24, late: Foliage moved from stage 3 into stage 2.** The red
+wires, pylons and cladding under Aerochrome were to be expedited if nothing they
+need is ahead of them. What they need is stage 1's joined weights (built, held)
+and the switch (the interface; both routes around it are rejected below). What
+was ahead of them and not needed is stage 2's eight other stages and the rest of
+stage 3: the record put the eight first because they need neither 032 nor the
+CPU pre-pass, and the Foliage band on a place mask meets that same test, since
+its early weights already exist. It sat in stage 3 only because of where the
+band runs. So the switch ships with Foliage first, and the eight follow as stage
+2b. Nothing else in the queue was ahead of it.

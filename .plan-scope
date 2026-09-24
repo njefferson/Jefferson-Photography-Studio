@@ -1,6 +1,10 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=045c454b661423b3
-diffhash=8f1a3d8dd3f51277
-verdict=IN-SCOPE: 060 records the chosen bar and 042 records M1, M2 and M3 as answered by convention, each supported by the record's own Looked up; the status page's one open decision is the v2.62.16 go; nothing claims the bar is built; no product code; no owner quotation.
-# Docs commit per the plan's 'Ruled 2026-09-24, late' paragraph, first bullet: record 060 records the chosen bar (A's bar, the histogram collapsing to its own icon in place, Help as a ? button; the start card later) as settled by convention, citing its own Looked up research; record 042 records M1 offset, M2 whole-photo, M3 chips above the tabs, answered by convention; the status page's one open decision is the v2.62.16 go, the top bar entry reads Next and decided, and mask stage two says the three are settled.
+planhash=20d6d976ab7d46bf
+diffhash=0a3a41c03829190a
+verdict=IN-SCOPE: plan item 3's record 042 re-slice with the NOTES and status-page updates the standing steps require
+# IN-SCOPE: every change in the diff lands in a file and section the plan names for this docs commit, and no sentence quotes or attributes anything to the owner by name or links to a chat.
+# - docs/decisions/042-...md: plan item 3 (record 042 re-sliced, the switch written as a buildable design), with item 2's Outcome and item 2b recorded in Context; Weighed against, Depends, Looked at, Options and Rank as item 3 lists.
+# - NOTES.md: the standing step that records each held or staged candidate; adds the sixth held commit (8b6f758) and the M1 answer.
+# - public/conveyor-status.html: the standing step that updates the status page at every stage; held count, last verified green SHA 283748f, the Now item, a found-not-fixed line, and item 5's wrangler wording.
+# No unauthorised files.
