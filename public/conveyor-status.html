@@ -84,7 +84,7 @@
       <ul class="facts">
         <li><b>Production</b> <span>v2.62, carrying documentation commits since, which change nothing you see.</span></li>
         <li><b>On staging</b> <span>v2.62.10: the small fixes below, waiting for a pass on the iPad.</span></li>
-        <li><b>Last verified green</b> <span><code>3fd239f</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
+        <li><b>Last verified green</b> <span><code>90fa699</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
         <li><b>Next version</b> <span>2.63, when masks gain their own amounts. The fixes before that take the increment digit and no version bump.</span></li>
       </ul>
 
@@ -95,13 +95,15 @@
             <strong>Decisions</strong>, each answerable in a word or a letter.
             They are repeated in the chat that points here.
             <ol>
-              <li>May the change that only rewords comments in the shipped page go
-                to production without a device pass, once the built app is proven
-                identical apart from those comments? Recommended: yes.</li>
               <li>Should the two privacy checks run on every commit that touches
                 prose, at about thirty seconds each? Recommended: yes.</li>
               <li>Which top bar: A, B or C? Six comparison pictures were sent in
-                the chat.</li>
+                the chat. Recommended: A.</li>
+              <li>Which LUT browser layout: 1, 2, 3 or 4? Pictures in both
+                orientations and both themes were sent in the chat. Recommended: 2,
+                a place of its own beside the photograph.</li>
+              <li>Do the colour swap and the channel mixer stay whole-photo when
+                masks gain their own settings? Recommended: yes.</li>
             </ol>
           </li>
           <li>
@@ -169,15 +171,16 @@
           bar to one row is in the repository and fails today, as it should. The
           side panel that folds away stays a separate question.
         </li>
-        <li class="later"><span class="state">Next</span>
+        <li class="waiting"><span class="state">Waiting on you</span>
           <strong>LUTs you tap through on your own photo.</strong>
           Comparing eighteen LUTs today means eighteen round trips through a
           full-screen list. The usual shape is a browser beside the photo, each tile
           drawn from your picture, None first, tapping the chosen one again for its
           strength, and import, share and delete kept apart. Browsing must not fill
           the undo history, and a LUT must survive the iPad closing the tab. The
-          record is written; four layouts are being drawn with tiles made from a
-          real photograph.
+          record is written, and four layouts were drawn in the real app with tiles
+          made from a real photograph and sent as pictures. It is built once you
+          pick one.
         </li>
         <li class="waiting"><span class="state">On staging</span>
           <strong>One staging build of small fixes.</strong>
@@ -188,13 +191,27 @@
           comments in the shipped pages no longer credit anyone, proven to change
           nothing else in the build.
         </li>
-        <li class="now"><span class="state">In progress</span>
+        <li class="done"><span class="state">Done</span>
           <strong>The checks that should have caught the red.</strong>
-          Done on the hub: seven lessons carry the day's evidence, the lessons
-          check reads every enforcement line (it was missing 23), and the doctrine
-          sync names each lesson that changed. Still to come: the privacy checks
-          before a commit, which waits on your answer, and the records refusing
-          wording that says who asked.
+          On the hub: seven lessons carry the day's evidence, the lessons check
+          reads every enforcement line (it was missing 23), and the doctrine sync
+          names each lesson that changed. Here: a decision record that says who
+          asked, or that it was asked in a conversation, is refused; the release
+          notes check counts what the page actually shows (5, where it had been
+          reporting 12); and the shared checks run from the newest hub. Only the
+          privacy checks before a commit are left, and that waits on your answer.
+        </li>
+        <li class="now"><span class="state">Built, held</span>
+          <strong>The next staging build.</strong>
+          Every full-size export had a line of the wrong colour along all four
+          edges, one pixel wide, not just the top and left: the export read a
+          neighbouring pixel of the wrong colour at the border. Fixed and measured
+          on a practice photograph: every edge now matches the pixels beside it,
+          and nothing further in changes. The device test page also gains a row
+          saying how much room the editor's graphics have for masks with their own
+          settings, which decides how the mask work is built on your iPad. It waits
+          for your pass on v2.62.10, because only one build goes to staging at a
+          time.
         </li>
         <li class="later"><span class="state">Queued</span>
           <strong>Masks, in code.</strong>

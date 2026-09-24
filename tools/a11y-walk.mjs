@@ -29,11 +29,16 @@
 // (tools/surfaces.mjs), checked both ways against the BUILD, so a surface that
 // arrives unmeasured fails rather than being noticed later by somebody.
 //
-// FOUR SECTIONS, each a standing claim rather than a one-release probe:
+// THE SECTIONS, each a standing claim rather than a one-release probe. The
+// headings each prints are the source; this is a copy of them, and it said
+// "four" at 430px while seven ran at 402px.
 //   0  every deployed page and dialog is declared, and every declaration exists
-//   1  axe over every page, in both themes
-//   2  hit areas at 430px and 900px, on every page and inside every dialog
+//   1  axe over every page, in both themes and both shapes
+//   2  hit areas at 402px and 900px, on every page and inside every dialog
 //   3  the colours that carry meaning, read COMPOSITED (hub LESSONS §293)
+//   4  the palette spec still describes what the app paints
+//   5  decoration that paints has a box to paint in
+//   6  the (i) control, and orientation that is moved rather than copied
 //
 // Feature-specific a11y probes stay in the scratchpad, per release. What makes
 // this one repo-worthy is the coverage assertion: it is the only thing here

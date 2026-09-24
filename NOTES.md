@@ -694,6 +694,16 @@ user-scalable=no.
   swap-type file undoes the app's own swap. Browsing must be one undo step, and
   a file must survive the tab closing. Four layouts are rendered for choosing.
   See `docs/decisions/062-choosing-a-colour-file-means-leaving-the-photograph.md`.
+- [ ] **A look cannot be taken off** <!-- decision: 064 -->
+  **Shown as:** Take a look off your photograph with a None button, and open the next photos without it.
+  Found by reading, 2026-09-24. No look button takes a look off: a second press
+  flips the swap on four looks and applies the same look again on the other
+  four. Reset returns to the photograph as it opened, which includes the
+  session look, and every photograph opened afterwards wears it; the one way
+  out is Settings, Default look, None, which is described as a preference for
+  new sets and leaves the photograph on screen alone. The convention is None
+  first among the looks, as 062 puts it first among colour files. See
+  `docs/decisions/064-a-look-cannot-be-taken-off.md`.
 - [ ] **A photograph that fills the screen with no way back out** <!-- decision: 012 --> — reported
   **Shown as:** Always get back to the whole photograph from the full view.
   from the iPad 2026-09-17: a photograph in the full view appeared zoomed in, and
@@ -730,6 +740,16 @@ user-scalable=no.
   where it naturally goes and only dependency privileges it. Nothing above needs
   this first, and the graph puts this ground at 012's rank. See
   `docs/decisions/053-the-session-strip-takes-the-stage-on-a-phone.md`.
+
+- [ ] **A shared look file cannot be picked on an iPad** <!-- decision: 063 -->
+  **Shown as:** Open a look someone sent you as a file, from Files on an iPad.
+  Found by reading, 2026-09-24, and not yet seen on the device. A shared look is
+  saved as `.ipslook`, an extension nothing on iOS declares, which is the exact
+  shape 056 measured for `.cube`: the file sits greyed out in every picker that
+  should take it. The remedy is 043's: write it as `.ipslook.json`, which the
+  platform does type, add `json` to what Open accepts, and let the content
+  sniff keep deciding. See
+  `docs/decisions/063-a-shared-look-file-cannot-be-picked-on-an-ipad.md`.
 
 - [ ] **The look's sky adjustments read a selection you cannot see** <!-- decision: 052 -->
   **Shown as:** Aerochrome's sky sliders work on the sky you selected, not one you cannot see.

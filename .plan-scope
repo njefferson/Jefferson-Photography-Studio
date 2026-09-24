@@ -1,11 +1,14 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=e643191cd7b74f81
-diffhash=11e4be98bc8c621d
-verdict=IN-SCOPE: the five-file diff implements exactly the four listed JPS items from Close the gates, with no drift and no pronoun or attribution violations
-# Unit 4, the JPS items: decisions-check refuses chat provenance and credit to a reader or a role in
-# every record (each pattern planted and refused; "the reader wants" left legal for readers in general);
-# notes-check counts what notes.html renders through the build's own Shown-as filter and refuses zero
-# (planted and refused; 5 rendered, matching the built page); the hub pin and .doctrine-sync moved
-# together to 5c57d1f; CLAUDE.md's staging check is by content; notes-check's header names the shape it
-# cannot see. Judged by an independent subagent that read the plan by path.
+planhash=8d04fd9fd78137bb
+diffhash=cc1dce29b652aad7
+verdict=IN-SCOPE: every changed file maps to a plan-named docs-lane item (the two .control-allow claims, the a11y-walk header, 046's list, 061's border finding from 3.4, records 063 and 064 with their two inserted bullets) or the standing status-page rule; no source, gate or ranking change beyond the two new bullets.
+# Docs lane, small fixes and records: .control-allow's header names control-walk.mjs (renamed per 046) and
+# its update-strip line no longer claims a tools/ walk that drives a second worker (sw-walk was never
+# committed); a11y-walk's header lists the seven sections it runs at 402px; 046 carries the 2026-09-24
+# re-measurement (54 unexcused) and its groups; 061 records the export border defect on all four edges,
+# measured on NIR_0063 exports before and after the held fix, and names that frame in Looked at; records
+# 063 (a shared .ipslook file cannot be picked on an iPad) and 064 (a look cannot be taken off) with
+# bullets ranked by dependency; the status page follows the run (90fa699 green, decisions list, LUT stage
+# waiting, checks stage done, the held candidate). Judged by an independent subagent that read the plan
+# by path.
