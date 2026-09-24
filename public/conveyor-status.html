@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#1a1a1a" />
     <meta name="robots" content="noindex" />
-    <meta name="description" content="Where the session-as-a-conveyor work has got to: what has shipped, what is on staging, what is waiting for a device pass, and what was found and not fixed." />
+    <meta name="description" content="Where the current run of work has got to: what has shipped, what is on staging, what is waiting on you, and what was found and not fixed." />
     <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192-light.png" />
-    <title>Session work — where it has got to</title>
+    <title>Work in progress — where it has got to</title>
     <style>
       * { box-sizing: border-box; }
       body {
@@ -68,191 +68,157 @@
   <body>
     <main>
       <a class="backlink" href="./index.html">&#8249; Studio</a>
-      <h1>Session work — where it has got to</h1>
+      <h1>Work in progress — where it has got to</h1>
       <p class="lede">
-        Moving between photos in a long session takes seconds, and exporting a keeper
-        takes over the screen while it runs. The work below treats those as one thing:
-        the session is built to hold <em>one</em> photo set up for editing, and it is
-        used to pass a few hundred through. Everything the passing-through needs already
-        exists in the app, in the tools that keep nothing — the deciding keys are in
-        Quick look, unattended work is in Batch, and a non-blocking export is in Macro
-        Studio. Most of what follows moves those in, rather than inventing anything.
+        The run of work after 2.62. It starts by putting right what 2.62 left
+        behind: a red check on production, wording in the records that should not be
+        there, stale directions to a menu that moved, and a Share icon that draws as
+        an empty box on the iPad. Then it answers what came back from the device
+        the same day: red edges on metal under Aerochrome, a LUT list you have to
+        leave to see anything, a top bar that wraps, and masks that cannot carry
+        the controls you want inside them.
       </p>
       <p class="lede">This page is updated in place. The link does not change.</p>
 
       <h2>Where the builds are</h2>
       <ul class="facts">
-        <li><b>Production</b> <span>v2.46.4, at <code>ec2cf80</code> &mdash; 52 commits promoted 2026-09-14 by rebase, so the history stayed linear and the patch notes read as releases. Verified by fetching the deployed bundle and diffing it against a local build of that commit: byte for byte, content hash included.</span></li>
-        <li><b>On staging</b> <span>The head of the working branch, level with production at the moment of the promote and moving ahead of it again as work lands.</span></li>
-        <li><b>Last verified green</b> <span><code>99e8a0f</code>: build clean, and every walk green — the new tile-truth walk (eight of its checks red against the build before it, all green after), the Quick look keys, the switch instrument against a planted delay, the default look, the class-width walk, the whole journey from the start screen to a saved export, the export gate byte for byte, and axe in both themes. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
-        <li><b>Version after this batch</b> <span>2.46. Three capability releases: 2.44 is the deciding, 2.45 the exporting, 2.46 acting on what you picked. What has landed since is fixes, which take the increment digit and no version bump.</span></li>
+        <li><b>Production</b> <span>v2.62, carrying two documentation commits since, which change nothing you see.</span></li>
+        <li><b>On staging</b> <span>v2.62, the same app as production. Nothing new is waiting there yet.</span></li>
+        <li><b>Last verified green</b> <span><code>f7ed4b4</code>: all seventeen checks in the Gates run passed, and the deploy for that exact commit passed. The run before it had failed at check ten, which meant the seven after it had never run on 2.62 at all. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
+        <li><b>Next version</b> <span>2.63, when masks gain their own amounts. The fixes before that take the increment digit and no version bump.</span></li>
       </ul>
 
       <div class="yours">
         <h2>Waiting on you</h2>
         <ul>
           <li>
-            <strong>A pass on staging.</strong> Production caught up on 2026-09-14 and
-            everything listed below is now live. What lands after this is what is
-            waiting. A count sat here and was wrong twice, because writing it into the
-            page is itself a commit.
+            <strong>Two decisions</strong>, each answerable in a word. They are
+            repeated in the chat that points here.
+            <ol>
+              <li>May the change that only rewords comments in the shipped page go
+                to production without a device pass, once the built app is proven
+                identical apart from those comments? Recommended: yes.</li>
+              <li>Should the two privacy checks run on every commit that touches
+                prose, at about thirty seconds each? Recommended: yes.</li>
+            </ol>
           </li>
           <li>
-            <strong>Three switches in the big session, then copy the report.</strong>
-            Open the 170-photo session, move between three photos, then press the version
-            number and copy the report. It now carries a <em>Last switch</em> line that
-            says where every part of those seconds went. Whether the next piece of work is
-            worth doing at all depends on what that line says — the container this was
-            built in cannot answer it, because its disk, its cores and its graphics are
-            not yours.
+            <strong>The web hosts for this session's research.</strong> They are
+            listed in the chat as one block to paste into the environment's network
+            settings. A session cannot change its own network access.
           </li>
           <li>
-            <strong>Three decisions</strong>, each answerable in a word. They are written
-            out in the plan and repeated in the chat that points here.
+            <strong>A device pass</strong>, once the fixes below reach staging. It
+            also covers the parts of 2.62 not yet checked on the iPad: launching
+            offline from the home screen, picking a <code>.cube</code> and a
+            <code>.zip</code> in Files, reaching the LUT manager three ways, the
+            Looks badge in both orientations, and the link to Rob Shea's LUTs from
+            the installed app.
           </li>
         </ul>
       </div>
 
       <h2>The stages</h2>
       <ul>
-        <li class="done"><span class="state">Shipped to staging</span>
-          <strong>The deciding keys work the moment Quick look opens.</strong>
-          P, X, U and C were correct from the day they landed and could not be reached:
-          they listen on the grid, and the grid never had the keyboard until a photo had
-          been tapped — which is itself the pick.
+        <li class="done"><span class="state">Done</span>
+          <strong>Production's checks are green again.</strong>
+          One word in the notes failed the check that looks for a person referred to
+          by pronoun. It only runs on the server, so nothing local caught it, and
+          2.62 went out while it was red, because the deploy does not wait for the
+          checks. Fixed; every check now passes on production's tree.
         </li>
-        <li class="done"><span class="state">Shipped to staging</span>
-          <strong>The switch says where its seconds went, and this page exists.</strong>
-          The version report gains a <em>Last switch</em> line whose parts add up to the
-          whole, and an <em>Edits held in memory</em> count. The test page gains a
-          measurement of what it costs to find one photo's pieces in a big session.
-          Nothing the app does changes.
+        <li class="now"><span class="state">In progress</span>
+          <strong>The records say what was wrong and what it measured, and nothing
+          else.</strong>
+          Some decision records and notes quote the conversation they came from or
+          name who asked. They are being rewritten as the engineering fact, and four
+          details that were simply wrong are being corrected in the same pass.
         </li>
-        <li class="done"><span class="state">Shipped to staging</span>
-          <strong>The photo you are opening jumps the decode queue.</strong>
-          Built, because the report from the device was the evidence it was waiting
-          for: moving between photos is slow specifically while the strip is filling
-          in, and Quick look — which has the decoders to itself — is fine. The photo
-          you tapped now goes to the head of the queue instead of behind the
-          pictures being built for photos you have not asked for.
+        <li class="now"><span class="state">Researching</span>
+          <strong>Why Aerochrome draws red around steel against the sky.</strong>
+          The wires themselves render red, soft round red spots sit along them, one
+          face of each pylon is red, and the sky seen through the lattice is grey.
+          Being checked against published sources and reproduced on the practice
+          photos stage by stage, with every render opened, before any answer about
+          reflectance is given.
         </li>
-        <li class="done"><span class="state">Shipped to staging</span>
-          <strong>A default look, set once.</strong>
-          In Settings, under the colour pickers. Every photo opens wearing it, in
-          every session, until you change it. Pressing a look still changes the set
-          you are in; Reset keeps it; Hold: Untouched still shows the bare file.
-          Part one of three in the next capability release.
+        <li class="now"><span class="state">Researching</span>
+          <strong>Masks that mask, with every control acting inside them.</strong>
+          How Lightroom, Capture One, darktable and others let a selected mask take
+          the ordinary controls, which of this app's controls can do that and at what
+          cost, and how sharp a mask's edge can be. This reopens an option the mask
+          record had rejected, and the record is being rewritten around it.
         </li>
-        <li class="done"><span class="state">Shipped to staging</span>
-          <strong>Pick and reject on the photo you are looking at.</strong>
-          The same two words and the same two keys Quick look already uses, on the
-          session: two buttons in the strip's own bar, P and X and U from the
-          keyboard, the verdict written on the tile in a word, counted in the
-          strip's line, and still there after a reload. A pick made in Quick look
-          now arrives in the session as a pick. Part two of three in the next
-          capability release.
+        <li class="later"><span class="state">Next</span>
+          <strong>The top bar and the start card.</strong>
+          Measured: the bar needs about 1020 pixels and gets 736 on a landscape
+          iPad, so it wraps; in portrait it takes four rows and leaves the photo 14%
+          of the screen; the start card hides the practice photos below the fold.
+          Shorter labels or icons do not fix it, because the bar carries three kinds
+          of action at once. Three layouts will be drawn in both themes at three
+          sizes and shown to you as pictures. The side panel that folds away is part
+          of the same question.
         </li>
-        <li class="done"><span class="state">Shipped to staging</span>
-          <strong>Deciding lets the app put the photo down.</strong>
-          Marking a photo you are finished with frees what it was holding, once the
-          saved copy is really on the device. Walking a six-photo set and deciding on
-          each holds two instead of six. Coming back rebuilds it from the saved copy:
-          the picture, the look and every slider return, the undo history does not,
-          and the tile says so before you press anything. A photo with brush masks, an
-          imported LUT or a warp is kept instead, and the strip says which and why.
-          This one carries the release: <strong>v2.44</strong>.
+        <li class="later"><span class="state">Next</span>
+          <strong>LUTs you tap through on your own photo.</strong>
+          Comparing eighteen LUTs today means eighteen round trips through a
+          full-screen list. The usual shape is a browser beside the photo, each tile
+          drawn from your picture, None first, tapping the chosen one again for its
+          strength, and import, share and delete kept apart. Browsing must not fill
+          the undo history, and a LUT must survive the iPad closing the tab. Four
+          layouts will be drawn and shown as pictures.
         </li>
-        <li class="done"><span class="state">Shipped to staging</span>
-          <strong>Export stops owning the screen.</strong>
-          The same export and the same two presses, with the editor live while it
-          runs: move to another photo, grade it, drag a slider — the file being
-          written is the one you pressed Export on, proven byte for byte against the
-          old flow. Progress and the finished file sit on a line over the photo, so
-          they are reachable whichever panel tab you are on. A failure explains
-          itself, offers Try again, and is remembered in the report.
+        <li class="later"><span class="state">Queued</span>
+          <strong>One staging build of small fixes.</strong>
+          The Share icon on the start page, which draws a character the iPad has no
+          font for; five messages that still send you to "Profiles &amp; LUTs"; the
+          licence text the four fonts require; and a line saying where the app's
+          colour numbers come from.
         </li>
-        <li class="done"><span class="state">Shipped to staging</span>
-          <strong>Every screen is measured now, and six buttons were too small.</strong>
-          The accessibility sweep was rebuilt from nothing before each release and
-          lived nowhere; it is in the repository now, and its list of screens is a
-          rule rather than a note. It had been opening three of the fifteen dialogs
-          in the editor and checking one of the seven pages. Given all of them it
-          found six buttons at 35&nbsp;px &mdash; on the dialog that asks what
-          happens to the location written into your photograph, and on the one that
-          asks you to confirm &mdash; against the 44&nbsp;px a finger needs. Every
-          dialog button clears it now, and every screen is checked on every run.
+        <li class="later"><span class="state">Queued</span>
+          <strong>The checks that should have caught the red.</strong>
+          The privacy checks run before a commit instead of only on the server, and
+          the records refuse wording that says who asked.
         </li>
-        <li class="done"><span class="state">Shipped to staging</span>
-          <strong>Four ways a tile lied about the photograph.</strong>
-          The tiles are how you decide, so a tile is a promise about what tapping it
-          will show. Four things broke that promise and all four are fixed together.
-          A quick look kept its rendered tiles on the device and handed them back
-          under a <em>different</em> look, saying so in its own words. Opening a
-          photograph flattened its own tile. Restore depth changed what every tile in
-          the strip would show and redrew none of them. And a look pressed on the
-          photograph you were looking at reached every tile except that one. Each is a
-          picture that was wrong rather than code that was, which is why green gates
-          never saw them; the walk that does now lives in the repo.
-        </li>
-        <li class="done"><span class="state">Shipped to staging</span>
-          <strong>Export the photos you picked.</strong>
-          The Export panel says how many are picked and exports them all in one
-          press, into the same collection that hands over as one file or one zip.
-          Each goes through the app's own open and the same export the button runs,
-          proven byte for byte — including a photo picked in Quick look and never
-          opened. Stoppable, and it puts you back on the photo you were on. With it:
-          a quarter-turn now survives leaving a photo, and straightening gained a
-          tenth-of-a-degree button either side of the slider, which measures
-          0.429&deg; per pixel of drag. <strong>v2.46</strong>.
-        </li>
-        <li class="done"><span class="state">Shipped to staging</span>
-          <strong>Everything you exported saves in one go.</strong>
-          Every finished export is kept until you ask for it — one press hands over
-          the file itself when there is one, a zip when there are more. They survive
-          closing the tab, and they are kept apart from Batch, so saving a batch
-          cannot sweep a morning's keepers. This one carries
-          <strong>v2.45</strong>.
+        <li class="later"><span class="state">Queued</span>
+          <strong>Masks, in code.</strong>
+          First, a tool aimed at a mask respects how that mask was combined; then
+          the ordinary controls act inside a selected mask, in stages, each one its
+          own device pass.
         </li>
       </ul>
 
       <h2>Found, and not fixed</h2>
       <p class="lede">
-        Things measured on the way through that are real and are not being repaired by
-        this work. They are written down so they are not re-discovered as new.
+        Things measured on the way through that are real and are not yet repaired.
+        They are written down so they are not re-discovered as new.
       </p>
       <ul>
         <li>
-          <strong>Finding a photo's pieces is not what makes a big session slow, on the
-          machine this was measured on.</strong> Picking 850 stored pieces out of 144,500
-          took 9.2&nbsp;ms against 6.8&nbsp;ms out of an empty store. Worth re-running on
-          your own device from the test page, because that is the one that matters.
+          <strong>Two old offline copies stay on the device after an update.</strong>
+          The device report from staging lists the 2.58.12 and 2.58.15 caches
+          alongside 2.62, which should have removed them. To be checked in the next
+          round of walks.
         </li>
         <li>
-          <strong>The strip is rebuilt on every thumbnail that lands</strong>, and each
-          rebuild forces the browser to lay the row out twice. On a long set that is a
-          few hundred layouts nobody asked for. Now measured rather than assumed — it was
-          2&nbsp;ms per switch on a six-photo set here, and the number that matters is the
-          one from a long session.
+          <strong>A tool aimed at a mask may ignore an area subtracted from
+          it.</strong> Found by reading the code, not yet seen in a render. It is the
+          first code step of the mask work.
         </li>
         <li>
-          <strong>An UNDECIDED photo is still never let go of.</strong> Releasing is
-          tied to a verdict, so a session walked without deciding holds every photo it
-          has visited, exactly as before. The count is visible in the report.
+          <strong>Foliage can only be set for the whole photo.</strong> It selects a
+          colour, not a place, so bright cladding on a building reddens along with
+          the grass. Owned by the mask work.
         </li>
         <li>
-          <strong>A photo that has been healed, stickered or warped exports on one
-          thread</strong>, and the sliders stutter while it does. The parallel export
-          refuses those. Measured here: 15.1&nbsp;s for a 5.2&nbsp;megapixel frame,
-          4.9&nbsp;s of it paused to let the screen keep up, against 6.6&nbsp;s on
-          three threads.
+          <strong>Full view shows on the start screen and does nothing
+          there</strong>, and a pressed Histogram is drawn exactly like the Open
+          button. Owned by the top-bar work.
         </li>
         <li>
-          <strong>A verdict pressed at the instant the page reloads can be lost.</strong>
-          The mark is written to storage durably, and a reload can beat the write:
-          the one lost is always the last one pressed. It matters more than it
-          sounds, because an iPad drops background tabs and reloads them by itself,
-          which is what a long culling session looks like. Repairing it is a
-          decision about when to write, not a patch.
+          <strong>A LUT does not survive the iPad closing the tab.</strong> The rest
+          of the edit comes back and the LUT does not. Help says so; the LUT work
+          changes it, using the way a saved look already keeps its LUT.
         </li>
       </ul>
 
