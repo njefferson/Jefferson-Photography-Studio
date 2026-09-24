@@ -674,6 +674,10 @@
             <p class="note">Swaps the red and blue channels &mdash; the building block under every colour look, not a look itself. <strong>On its own it usually goes flat and purple:</strong> set white balance first (tap foliage) or pick a look, and this becomes the switch that flips the result.</p>
             <div class="sub-title">Looks</div>
             <div class="looks-grid">
+              <!-- NONE COMES FIRST (064). A look could not be pressed off: no
+                   look button removed one, and Reset brings back a look the
+                   photograph opened wearing. -->
+              <button id="lookNone" type="button">None<small class="look-sub"></small></button>
               <!-- THE ID STAYS `lookAero`. Only the printed name moved: this
                    look is the R&#8646;B swap with saturation, which is not what
                    the film did, and the walks press this button by id. -->
@@ -686,7 +690,7 @@
               <button id="lookSepia" type="button">Sepia IR<small class="look-sub"></small></button>
               <button id="lookHie" type="button">HIE B&amp;W<small class="look-sub"></small></button>
             </div>
-            <p class="note">Looks showing <strong>norm / R&#8646;B</strong> under the name flip that swap when you press them again. <strong>Aerochrome</strong> shows <strong>film</strong> instead: the swap is part of its recipe rather than an option on top of it, so there is nothing to flip &mdash; the swap button above and the Grade tab's channel mixer are there if you want to take it apart yourself.</p>
+            <p class="note">Looks showing <strong>norm / R&#8646;B</strong> under the name flip that swap when you press them again. <strong>Aerochrome</strong> shows <strong>film</strong> instead: the swap is part of its recipe rather than an option on top of it, so there is nothing to flip &mdash; the swap button above and the Grade tab's channel mixer are there if you want to take it apart yourself. <strong>None</strong> takes the look off this photograph, back to its own balance, and the photographs you open next start without one; an imported LUT stays.</p>
             <button id="finishOpen" type="button" class="accent-outline full-btn" hidden>Finish this look</button>
             <!-- The one-band notice, and the choice it used to make for you.
                  Before 2026-09-11 a camera JPEG like this was always balanced
