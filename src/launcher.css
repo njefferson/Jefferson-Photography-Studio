@@ -188,6 +188,9 @@ body {
   margin: 1.1rem auto 0;
   display: inline-flex; align-items: center; gap: 0.4rem;
   padding: 0.45rem 0.95rem; border-radius: 999px;
+  /* 44px: it measured 30 tall, and no walk saw it because it only shows in
+     the installed app. Found while looking at its icon. */
+  min-height: 44px;
   background: var(--surface-2); color: var(--txt-2);
   border: 1px solid var(--line);
   font: 500 0.85rem/1 var(--ui);
@@ -462,3 +465,15 @@ body {
 .pal-sw[data-pal="mono"] { --sw-n-page: var(--pal-mono-night-page); --sw-n-surface: var(--pal-mono-night-surface); --sw-n-rail: var(--pal-mono-night-rail); --sw-n-txt: var(--pal-mono-night-txt); --sw-n-accent: var(--pal-mono-night-accent); --sw-d-page: var(--pal-mono-day-page); --sw-d-surface: var(--pal-mono-day-surface); --sw-d-rail: var(--pal-mono-day-rail); --sw-d-txt: var(--pal-mono-day-txt); --sw-d-accent: var(--pal-mono-day-accent); }
 .pal-sw[data-pal="soft"] { --sw-n-page: var(--pal-soft-night-page); --sw-n-surface: var(--pal-soft-night-surface); --sw-n-rail: var(--pal-soft-night-rail); --sw-n-txt: var(--pal-soft-night-txt); --sw-n-accent: var(--pal-soft-night-accent); --sw-d-page: var(--pal-soft-day-page); --sw-d-surface: var(--pal-soft-day-surface); --sw-d-rail: var(--pal-soft-day-rail); --sw-d-txt: var(--pal-soft-day-txt); --sw-d-accent: var(--pal-soft-day-accent); }
 .pal-txt { min-width: 0; flex: 1; }
+
+/* THE SHARE ARROW IS DRAWN, NOT TYPED. It was the character U+2BAD, which no
+   font on the iPad carries, so the launcher's Share button showed an empty box
+   while the editor beside it drew the same arrow as this SVG. The editor sizes
+   it in style.css, which this page does not load, so the rule is repeated here
+   rather than imported with everything else in that file. */
+.share-ico {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.14em;
+  flex: none;
+}

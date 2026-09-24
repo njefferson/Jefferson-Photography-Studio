@@ -1,14 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
 planhash=8d04fd9fd78137bb
-diffhash=4b3190076537839c
-verdict=IN-SCOPE: every change is on the plan's Security baseline list (dependabot.yml, commit pins, deploy.yml read-only with no persisted credentials or cache, asset-factory inputs through env:); the sharp bump and zizmor hard gate are left owed in NOTES; wrangler-action v4.0.0 is the reuse of the hub's vetted pin, disclosed.
-# Docs lane, security baseline (internal): deploy.yml gets read-only permissions, a checkout that does not
-# persist credentials, no npm cache in the deploying job (setup-node's own default cache switched off), and
-# commit pins for checkout, setup-node and wrangler-action taken from the hub's own deploy (wrangler-action
-# moves v3 -> v4.0.0 as a consequence); asset-factory.yml passes every dispatch input through env: (eight
-# template-injection sites), pins checkout and setup-node, keeps its credentials for its push step with a
-# stated suppression; .github/dependabot.yml keeps action pins current (actions only, Chore prefix). zizmor
-# 1.29.0 from the hub's hash-pinned requirements: 20 findings before, 1 after (upload-artifact still on a
-# tag, no vetted pin). NOTES records the owed items: that pin, the sharp bump on the factory branch, and
-# switching zizmor on in gates.yml once clean. Judged by an independent subagent that read the plan by path.
+diffhash=45002d5323c3f909
+verdict=IN-SCOPE: plan Unit 3d exactly (the launcher's Share icon as the inline SVG in both index.html sites, the .share-ico size rules in launcher.css and macro.css, the 44px target), replayed unchanged from staging under Remaining 2.
+# Promotion of v2.62.10 on the go (plan Remaining 2), commit 1 of 4, replayed unchanged from staging 5fc0f58: Unit 3d, the launcher's Share icon drawn as the inline SVG the editor and Macro Studio use, with a .share-ico size rule in launcher.css and macro.css and a 44px target. Judged by an independent subagent that read the plan by path and the commit's diff.

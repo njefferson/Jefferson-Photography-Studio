@@ -474,3 +474,14 @@ dialog#helpDlg a:not(.hub-row) { text-decoration: underline; text-underline-offs
 .pal-sw[data-pal="mono"] { --sw-n-page: var(--pal-mono-night-page); --sw-n-surface: var(--pal-mono-night-surface); --sw-n-rail: var(--pal-mono-night-rail); --sw-n-txt: var(--pal-mono-night-txt); --sw-n-accent: var(--pal-mono-night-accent); --sw-d-page: var(--pal-mono-day-page); --sw-d-surface: var(--pal-mono-day-surface); --sw-d-rail: var(--pal-mono-day-rail); --sw-d-txt: var(--pal-mono-day-txt); --sw-d-accent: var(--pal-mono-day-accent); }
 .pal-sw[data-pal="soft"] { --sw-n-page: var(--pal-soft-night-page); --sw-n-surface: var(--pal-soft-night-surface); --sw-n-rail: var(--pal-soft-night-rail); --sw-n-txt: var(--pal-soft-night-txt); --sw-n-accent: var(--pal-soft-night-accent); --sw-d-page: var(--pal-soft-day-page); --sw-d-surface: var(--pal-soft-day-surface); --sw-d-rail: var(--pal-soft-day-rail); --sw-d-txt: var(--pal-soft-day-txt); --sw-d-accent: var(--pal-soft-day-accent); }
 .pal-txt { min-width: 0; flex: 1; }
+
+/* THE SHARE ARROW'S SIZE. Macro Studio's Share button carries the same SVG as
+   the editor's, and the only rule sizing it lived in style.css, which this page
+   does not load, so the arrow had no size of its own here. Repeated rather than
+   imported with everything else in that file, as the launcher does. */
+.share-ico {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.14em;
+  flex: none;
+}
