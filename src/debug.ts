@@ -107,6 +107,31 @@ async function copy(text: string, btn: HTMLButtonElement, label: string, fallbac
 /** A full-frame GPU render, and then a small synchronous readback of it. The
  *  readback is what the histogram does on every redraw; on a desktop software
  *  renderer it measures the software, which is why it has to be run here. */
+/** How much the edit shader can still hold, on THIS device. Decision 042 gives
+ *  masks their own values for the ordinary controls, and the cheapest way to
+ *  carry them is as shader uniforms; how many masks that allows depends on a
+ *  limit no container measures, because the container's graphics are not the
+ *  reader's. About 19 rows a mask (75 floats) is the working estimate from the
+ *  record; the row says how many masks that leaves room for, and when the
+ *  answer is "not eight", the parameter texture is the route instead. */
+function shaderRoom(): void {
+  const canvas = document.createElement("canvas");
+  let r: Renderer | undefined;
+  try {
+    r = new Renderer(canvas);
+    const b = r.shaderBudget();
+    const PER_MASK = 19;
+    const room = Math.floor((b.maxVectors - b.vectors) / PER_MASK);
+    row("Edit shader: uniforms", `${b.vectors} of ${b.maxVectors} rows`, `${b.uniforms} uniforms in the linked program. Room for about ${room} masks' own values at ${PER_MASK} rows each${room >= 8 ? " — eight fit" : " — eight do NOT fit, so per-mask values need a parameter texture"}.`);
+    row("Edit shader: textures", `${b.samplers} of ${b.maxUnits} units`, `${b.maxUnits - b.samplers} texture unit(s) free for the fragment shader (${b.maxCombined} combined). A parameter texture for per-mask values needs one.`);
+  } catch (e) {
+    row("Edit shader", "not run", `The editor's graphics could not start here (${(e as Error).message.replace(/\.$/, "")}).`);
+  } finally {
+    // The CONTEXT, not just the canvas — see Renderer.dispose.
+    r?.dispose();
+  }
+}
+
 async function graphics(): Promise<void> {
   const p = note("Graphics…");
   const cv = document.createElement("canvas");
@@ -1424,6 +1449,7 @@ async function fullResolutionPreview(): Promise<void> {
   // One moment for the whole block: the report is re-taken with the numbers,
   // and it is what "Copy the results" puts above them.
   await refreshReport();
+  shaderRoom();
   await graphics();
   threads();
   await exportOnTheGpu();

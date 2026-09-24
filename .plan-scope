@@ -1,8 +1,8 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
 planhash=6c1eec799b84c8fb
-diffhash=ffbc81d79a6e0ed1
-verdict=IN-SCOPE: the promotion replay of 92a3080, byte-identical outside the scope ledger, on the owner's go
+diffhash=9451ce7a74203c18
+verdict=IN-SCOPE: the promotion replay of dd32298, byte-identical outside the scope ledger, on the owner's go
 # IN-SCOPE: the staged diff is byte-identical to 92a3080 apart from .plan-scope, dd32298 is the unchanged next commit (also differing only in .plan-scope), the two commits are exactly and only what origin/staging holds above 9b0eb32 in the right order, and neither commit's message or diff contains any owner quotation/attribution, session link, or model name.
 # 
 # 1. The replay of 92a3080 stages docs/ARCHITECTURE.md, src/raw/demosaic.ts and tools/.preview-pipeline, byte-identical to 92a3080's; .plan-scope is re-recorded, not replayed.
