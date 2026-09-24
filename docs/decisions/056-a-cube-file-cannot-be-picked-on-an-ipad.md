@@ -70,7 +70,7 @@ a picked JPEG is answered with "That file doesn't look like a 3D LUT — no
 LUT_3D_SIZE found." rather than anything silent. The button beside the picker
 says what is wanted, which is where a reader reads it.
 
-**And a pack arrives as one file.** Asked for after the first half was built,
+**And a pack arrives as one file.** Added after the first half was built,
 and it is the same finding used the other way round: `.zip` IS a type the
 platform registers, which is why the keep file ends in one. LUTs are published
 as packs — the one this was built against holds eighteen `.cube` files in two
@@ -106,9 +106,9 @@ around the app on a device where their file is already correct.
 installed app's `Info.plist`. This app has no bundle by design, so this option
 does not exist for it.
 
-**5, require a zip for everything.** The instruction that added the pack work
-said the reader *has to* zip before uploading, and with the `accept` list gone
-that is no longer true — a single `.cube` is selectable. Copy saying otherwise
+**5, require a zip for everything.** The pack work began on the premise that a
+zip was the only way in, and with the `accept` list gone that is no longer true
+— a single `.cube` is selectable. Copy saying otherwise
 would be false on the device it is written for, and a reader with one file would
 be sent to make an archive for no reason. What is true either way, and what the
 panel says, is that a zip brings a whole pack and is the route that always
@@ -116,7 +116,7 @@ works.
 
 ## Rank
 
-Shipped immediately rather than queued. It is a reported defect whose cause was
+Shipped immediately rather than queued. It is a defect whose cause was
 already established in the repository, whose fix is one attribute, and which
 needs no measurement — so the ranking question the queue exists to answer did
 not arise. Nothing above it in the queue reads the picker and nothing above it
@@ -138,7 +138,7 @@ come back as a tidy-up.
 
 **What cannot be verified here, and was not claimed to be.** Chromium does not
 reproduce type-identifier filtering, so no walk and no headless run can tell a
-fixed picker from a broken one. The only real test is the reader's, on the iPad.
+fixed picker from a broken one. The only real test is on the iPad itself.
 
 **What the fix does not cover, found while making it.** The same defect is
 latent on `.ipslook`, whose remedy is not free — renaming it the way 043 renamed
@@ -185,7 +185,7 @@ fixture was clean ASCII. The walk now carries a marked file for exactly this,
 and reads the store straight out of IndexedDB rather than through the app, so
 the importer cannot agree with itself.
 
-**Three defects in the reader's own summary, found by review rather than by
+**Three defects in the importer's own summary, found by review rather than by
 running it.** A device that refused the write reported the LUTs as unreadable,
 sending the reader to check the wrong thing; the count of what "did not fit" was
 taken against the slots ATTEMPTED rather than the slots FILLED, so two failures

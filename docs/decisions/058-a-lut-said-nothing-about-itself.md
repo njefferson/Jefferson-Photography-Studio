@@ -2,13 +2,9 @@
 
 ## Context
 
-Asked in chat: what happens when Aerochrome and an imported LUT are both
-applied, should Looks and LUTs group, are IR recipes the same thing as a
-LUT, and — the reader wants to add Rob Shea's LUT pack with attribution —
-what's the convention. Answering the first three (recorded in this
-session's chat, not repeated here) surfaced two silences, both found while
-tracing `updateLookUI()` and the (i) dialog rather than something either
-question asked for directly:
+Tracing how a built-in Look such as Aerochrome composes with an imported
+LUT, and how a third-party LUT pack should be credited in the app, surfaced
+two silences, both found in `updateLookUI()` and the (i) dialog:
 
 **A LUT stacked on a Look was invisible where a Look is pressed.** Built-in
 Looks compose fully and correctly with an imported LUT — the LUT is the
@@ -23,19 +19,19 @@ strip — a full scroll from the Looks row on IR.
 
 **Nothing in the app named where a LUT could come from.** The (i) dialog
 has no Sources/Credits section (Doctrine §7e wants one, generally, for
-"every feed and dataset, with its terms or attribution" — not built here,
-see Rejected). A reader who wants to try the LUT feature has no pointer to
+"every feed and dataset, with its terms or attribution" — not built by
+this record, and still owed). A reader who wants to try the LUT feature has no pointer to
 a real pack.
 
-The reader's follow-up made both calls: **link to recommend Rob Shea's
-pack (don't bundle it), and give the stacked LUT a badge — that's this
-app's own convention already** (`.lut-badge`, used on the Grade tab's
+Both calls were settled before building: **link to Rob Shea's pack rather
+than bundle it, and give the stacked LUT a badge, reusing a convention the
+app already has** (`.lut-badge`, used on the Grade tab's
 `#lutActive` strip).
 
 ## Looked up
 
 **Rob Shea's site, before writing any in-app copy** (this repo's "go and
-read about it first" cadence). The pack already in the reader's uploads
+read about it first" cadence). The pack used for testing
 (`license.txt`: MIT, Copyright 2024 Robert C. Shea; `readme.txt`: "Color
 Infrared LUTs for Video and Photography," pointing to `https://590.red/dl`)
 resolves through Rob Shea's own short-link domain to
@@ -110,7 +106,7 @@ badge tracks LUT apply/remove live.
 ## Looked at
 
 **Rendered headless and OPENED**, not inferred from the CSS numbers alone —
-the stated risk was whether `.lut-badge`'s pill (border, 6px horizontal
+the risk was whether `.lut-badge`'s pill (border, 6px horizontal
 padding) would fit inside `.look-sub`'s tight, single-line space, and that
 is a question about appearance, not arithmetic.
 
@@ -134,7 +130,7 @@ redistributing it means keeping the notice correct if the pack is ever
 updated, for a gap (unknown provenance) a link closes for free.
 
 **3, leave it as bring-your-own with no pointer.** Answers "can a LUT be
-imported" but not "whose LUT, from where" — the reader asked for exactly
+imported" but not "whose LUT, from where" — this record exists to supply exactly
 this pointer, and 056's own reasoning for not bundling (this is somebody
 else's material) applies equally to not naming it, which was never the
 intent — 056 built zip-import assuming a reader would already know to go
@@ -149,9 +145,9 @@ Grade.
 
 ## Rank
 
-Shipped immediately alongside this session's other work. Both halves are
-reported/asked in chat, with cause and fix already established while
-answering the question that raised them — the ranking question the queue
+Shipped immediately alongside this session's other work. Both halves had
+cause and fix already established by the code tracing that found them —
+the ranking question the queue
 exists to answer (would anything above this have to be redone) does not
 arise; nothing above it in the queue touches the Looks row, the (i)
 dialog's link list, or LUT state.
@@ -168,7 +164,7 @@ Look's `.look-sub` when `params.lut` is set; `applyLutToEdit()` and the
 `lutRemoveBtn` click handler each call `updateLookUI()` so the badge tracks
 LUT state live.
 
-**Verified, not assumed — this is a visual change.** The stated risk going
+**Verified, not assumed — this is a visual change.** The risk going
 in was whether `.lut-badge`'s pill (border, 6px horizontal padding) would
 fit inside `.look-sub`'s tight, single-line space, worst case on a
 swap-type Look whose `.look-sub` already holds a two-segment norm/R⇄B

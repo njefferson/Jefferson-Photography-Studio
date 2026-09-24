@@ -557,7 +557,7 @@ crop), subject sharper than the argmax baseline, smooth bokeh, ~34 s, no OOM.
   Preview additionally HOLDS the small frames (single decode pass, faster);
   full-res re-decodes in pass 2 to never hold more than one 20 MP frame.
 - ALIGN: coarse integer translation per frame vs frame 0 (SSD on downsampled
-  luma). Noah's set was tripod-steady (drift ≈0); rotation + breathing-scale
+  luma). The test set was tripod-steady (drift ≈0); rotation + breathing-scale
   deferred until a set needs them.
 - Verified in headless chromium on the real 11-frame set: sharper than frame 0
   across the subject, NO halos (high-mag petal-edge crop), smooth bokeh, no

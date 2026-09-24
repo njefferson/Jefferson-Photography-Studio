@@ -5,8 +5,8 @@
 //   node tools/fix-brush-walk.mjs [--port=8131] [--plant]
 //
 // WHY IT EXISTS (decision 040). Two halves of one report: the correction brush
-// "only gives me a big brush that doesn't get small enough", and "I can't see
-// until I touch the canvas".
+// would not go small enough, and its size could not be seen until the canvas
+// was touched.
 //
 // THE SECOND HALF IS A TOUCH PROBLEM AND IS CHECKED AS ONE. A ring that only
 // follows a pointer answers nothing on a tablet, where there is no hover — so

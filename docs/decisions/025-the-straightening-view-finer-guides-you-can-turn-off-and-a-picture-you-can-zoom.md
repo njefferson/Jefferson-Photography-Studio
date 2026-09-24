@@ -42,7 +42,7 @@ help, and Julieanne Kost's crop-and-straighten notes.
 **Neither of those two inputs exists on a tablet.** A spacebar and a letter
 key are a desktop's modifiers; this app is used by touch, so whatever the
 shapes become here, each needs a control a finger can reach — which is the
-same constraint 024 is about, and the reason the toggle the owner asked for
+same constraint 024 is about, and the reason the requested toggle
 belongs on the straighten card rather than on a key.
 
 ## Weighed against

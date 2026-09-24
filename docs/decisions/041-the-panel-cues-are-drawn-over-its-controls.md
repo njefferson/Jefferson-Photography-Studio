@@ -49,7 +49,7 @@ on a contrast argument this repo can settle itself.
 - `#panelUp` / `#panelDown` and their CSS are gone; `updateScrollCues` in
   `src/main.ts` is what is left of them.
 - **`.welcome-cue` is a different element and is untouched** — the first-visit
-  card's own cue, which was an owner ask, sits over a card with nothing under
+  card's own cue, added 2026-07-15, sits over a card with nothing under
   it and covers nothing.
 - The `^ Sections` button (`.section-back`) already carried the up cue's whole
   meaning, under the identical condition, one line away in the same function.

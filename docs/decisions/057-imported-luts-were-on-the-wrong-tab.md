@@ -2,11 +2,11 @@
 
 ## Context
 
-Reported in chat 2026-09-24: "LUTs is in export and doesn't belong there? I
-need a r<->b swap near them I can use in conjunction with them, or make them
-have an invert button each?"
+2026-09-24: the "Imported LUTs" block sat on the Export tab, and no R⇄B swap
+sat near it to use together with a LUT. Two remedies besides moving it were
+weighed: a swap control beside the LUTs, or an invert button on each LUT.
 
-**The location complaint was right.** `ir.html`'s `export` tab held Keep-file,
+**The location was wrong.** `ir.html`'s `export` tab held Keep-file,
 Export & Save, My looks, then, after two `<hr>`s, "Profiles & LUTs" (the
 `.cube`/`.dcp` export buttons) and finally "Imported LUTs" itself. Picking and
 applying a third-party colour file is not an export action — it changes the
@@ -22,7 +22,7 @@ The channel mixer's own "R⇄B swap" preset chip (`MIX3_PRESETS[1]`,
 `src/main.ts`) lives on the **Grade** tab and writes the same permutation into
 `params.mix3`. Both were live, both are ordinary `EditParams` fields, and per
 `pipeline.ts`'s own doc comment they are meant to compose: "swap + mix + hue
-compose." So the two proposed alternatives — a duplicate swap control next to
+compose." So the two other remedies — a duplicate swap control next to
 LUTs, or a per-LUT invert button — were both answering a need that a plain
 relocation already satisfies for less.
 
@@ -87,8 +87,8 @@ in exactly one place.
 ## Options
 
 **Move "Imported LUTs" from Export to Grade, directly after the channel
-mixer's R⇄B swap chip.** Chosen. Gets the stated need — a swap usable in
-conjunction with a LUT — from a control that already exists and already
+mixer's R⇄B swap chip.** Chosen. Gets the need — a swap usable together
+with a LUT — from a control that already exists and already
 composes correctly, for a markup-only change: no new EditParams field, no new
 pipeline operation, no new persisted state.
 
@@ -99,7 +99,7 @@ pipeline operation, no new persisted state.
 ## Rejected
 
 **2, a duplicate swap toggle next to LUTs.** This app has never duplicated a
-control across two tabs, and Export already has an open complaint about being
+control across two tabs, and Export already has an open record about being
 crowded with too many similarly-named things (054). Adding a fourth
 colour-adjacent control to a tab whose own record says to disambiguate rather
 than add would repeat the mistake that record exists to fix. It also produces
@@ -122,7 +122,7 @@ reach whatever is already applied). But the cost comparison doesn't matter:
 at either cost, "invert" has no fixed, predictable meaning for an arbitrary
 imported LUT (see Looked up). A button whose effect a reader can't predict
 from its label is worse than no button, and the relocation achieves the
-underlying want — swap, then apply a LUT, together — without inventing one.
+underlying need — swap, then apply a LUT, together — without inventing one.
 
 ## Rank
 
