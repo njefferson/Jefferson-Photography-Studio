@@ -84,7 +84,7 @@
       <ul class="facts">
         <li><b>Production</b> <span>v2.62.14: the small fixes that were on staging as v2.62.10, promoted on your go. The number moved because the last digit counts every commit; the content did not.</span></li>
         <li><b>On staging</b> <span>v2.62.16: the export edge fix and two new rows on the device test page. Your pass came back good; it waits for your go.</span></li>
-        <li><b>Built and held</b> <span>The first stage of the mask work, three changes on top of v2.62.16. It goes to staging once v2.62.16 is on production, because staging holds one build at a time. It is kept in this session's copy of the repository until then.</span></li>
+        <li><b>Built and held</b> <span>Five changes on top of v2.62.16: the first stage of the mask work (three), the LUT grid and the None button for looks. It goes to staging once v2.62.16 is on production, because staging holds one build at a time. It is kept in this session's copy of the repository until then.</span></li>
         <li><b>Last verified green</b> <span><code>10f0a7f</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
         <li><b>Next version</b> <span>2.63, when masks gain their own amounts. The fixes before that take the increment digit and no version bump.</span></li>
       </ul>
@@ -173,14 +173,18 @@
           bar to one row is in the repository and fails today, as it should. The
           side panel that folds away stays a separate question.
         </li>
-        <li class="now"><span class="state">Next</span>
-          <strong>LUTs you tap through on your own photo.</strong>
-          Decided: a grid on the Grade tab. None first, then each of your LUTs
-          as a tile drawn from the photograph you have open, then Manage… for
-          importing, sharing and deleting. What it is to do: each tap shows on
-          the photograph straight away, tapping the chosen one again takes you to
-          its strength, a run of taps is one undo step, and the LUT comes back
-          with the photograph if the iPad closes the tab. It is not built yet.
+        <li class="waiting"><span class="state">Built, held</span>
+          <strong>LUTs you tap through on your own photo, and a None for looks.</strong>
+          The Grade tab shows your LUTs as a grid: None first, then each one as a
+          tile drawn from the photograph you have open, then Manage…. A tap shows
+          on the photograph straight away, tapping the chosen one again takes you
+          to its strength, a run of taps is one step to undo, and the LUT comes
+          back with the photograph after the iPad closes the tab and you resume.
+          None is now the first of the looks: it takes the look off, back to the
+          photograph's own balance, and the next photographs open without one; a
+          LUT stays. Checked on a raw and a camera JPEG: the photograph comes back
+          exactly as it opened. Every walk passed. It goes to staging with the
+          mask work.
         </li>
         <li class="done"><span class="state">On production</span>
           <strong>One build of small fixes, promoted on your go.</strong>
@@ -282,8 +286,16 @@
         </li>
         <li>
           <strong>A LUT does not survive the iPad closing the tab.</strong> The rest
-          of the edit comes back and the LUT does not. Help says so; the LUT work
-          changes it, using the way a saved look already keeps its LUT.
+          of the edit comes back and the LUT does not. Fixed in the held build,
+          which has not reached you yet.
+        </li>
+        <li>
+          <strong>The deploys install whatever wrangler version is newest.</strong>
+          The hub's deploy failed once today on a wrangler release published
+          minutes earlier that the package registry was not yet serving; a re-run
+          went green. This app's deploy runs the same unpinned install. Naming a
+          version in the workflow is the remedy; it is not done here because the
+          deploy workflows are outside this piece of work.
         </li>
       </ul>
 

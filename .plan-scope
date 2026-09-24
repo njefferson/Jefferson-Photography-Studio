@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=4c24ae676c8c146e
-diffhash=699cf159e103bcfb
-verdict=IN-SCOPE: record 062's two additions restate only its chosen layout and rank; the status entry reads Next, decided, not built yet; no product code; no owner quotation.
-# Docs commit per the plan's first 062 bullet: record 062 records the chosen layout (a grid on the Grade tab) and, under Rank, why the grid does not wait on 060; the status page follows (top bar re-asked with redrawn pictures; the LUT entry reads Next, decided, not built yet).
+planhash=6be7a72a195b3c59
+diffhash=4407fd446edf367f
+verdict=IN-SCOPE: only NOTES.md and the status page, recording the held grid and None with numbers the plan's night paragraph carries; the held build is described as not on staging or production; no product code; no owner quotation.
+# Docs commit per the plan's 'Built and held (2026-09-24, night)' paragraph: NOTES' held paragraph records the LUT grid and None with their evidence; the status page's builds line and a 'Built, held' entry record them; 'found, not fixed' marks the LUT-survives item fixed in the held build and gains the unpinned wrangler install.
