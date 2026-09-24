@@ -123,6 +123,11 @@ Chosen for the parts every candidate shares:
 Each is rendered at iPad landscape and portrait, in both themes, with tiles
 from the reader's photograph beside a sample and a chart.
 
+**Chosen 2026-09-24 from the rendered layouts: a grid on the Grade tab.** None
+is the first tile, each stored file follows as a tile drawn from the open
+photograph, and Manage… is the last. The strength row under it stays where it
+is, and tapping the chosen tile again takes the reader to it.
+
 ## Rejected
 
 - **Keeping Apply-and-close as it is and adding thumbnails to the rows**: the round trip is the defect; thumbnails in a dialog that closes on every choice still hide the photograph behind the chooser.
@@ -138,3 +143,9 @@ Directly below 060, because its door on the start card waits on 060's
 layout, and above 012, because 012 does not touch it. It does not block 042,
 and it must not claim the panel column as a second place before 042's stage 2
 shape is chosen.
+
+**The grid does not wait on 060.** Only the start card's door to this
+browser does, and until 060's layout is chosen that door stays 059's "Manage
+your LUTs" button, unchanged. The grid lives inside the Grade tab and claims no
+second place in the panel column, so it touches neither 060's bar nor 042's
+stage 2.

@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=3874d0391dafa42a
-diffhash=485e8d51072c6089
-verdict=IN-SCOPE: docs only (public/conveyor-status.html, NOTES.md), the docs commit the plan names plus the standing status-page rule; every number matches the plan; the held candidate is described as not on staging or production; no owner quotation.
-# Docs commit per the plan's 'One docs commit for this': public/conveyor-status.html (builds list: staging passed and waits for the go, a 'Built and held' line, last green 10f0a7f; Waiting on you re-listed as promote, M1, M3, M2 with the top bar and LUT browser noted as still open; the masks stage split into 'Built, held' stage one and 'Next' stage two; the fixed aimed-tool finding replaced by the component-sliders finding) and NOTES.md (a paragraph recording the held candidate, its evidence, and why the per-mask store waits).
+planhash=4c24ae676c8c146e
+diffhash=699cf159e103bcfb
+verdict=IN-SCOPE: record 062's two additions restate only its chosen layout and rank; the status entry reads Next, decided, not built yet; no product code; no owner quotation.
+# Docs commit per the plan's first 062 bullet: record 062 records the chosen layout (a grid on the Grade tab) and, under Rank, why the grid does not wait on 060; the status page follows (top bar re-asked with redrawn pictures; the LUT entry reads Next, decided, not built yet).
