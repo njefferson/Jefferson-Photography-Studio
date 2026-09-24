@@ -1,11 +1,11 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=239130df1620f707
-diffhash=d945ad2d1ce8a41f
-verdict=IN-SCOPE: the diff rewrites attribution and quotation into engineering fact across non-shipped docs and applies the four accuracy fixes Unit 2 names, touching no shipped file
-# Unit 2: quotations, role-based reports, chat provenance and the name rewritten as the engineering fact
-# across NOTES.md, IR-SCIENCE.md, docs/ARCHITECTURE.md (outside the generated region), eight decision
-# records and two walk headers, plus the four named accuracy fixes (058 pointer, 059 control-walk
-# mechanism, the 056 line, the VERSION paragraph). No shipped file, measurement, decision marker or
-# heading structure changed; two heading texts lost a name and are referenced nowhere else. Judged by
-# an independent subagent that read the plan by path and the whole word diff.
+planhash=5b00020b894d7788
+diffhash=80527b4767d77982
+verdict=IN-SCOPE: the docs-only candidate (record 060, the bar-fit walk wired into no gate, one roadmap bullet, the status page) matches the chrome record's First step and changes no product code
+# Docs lane, the chrome record: decision 060 written with the research outcome, its Depends covering
+# every record its prose cites (012 as touches, per the corrected First-step line), tools/bar-fit-walk.mjs
+# holding one row at 1194x834, 834x1194 and the phone plus practice photos above the fold at 1180x820,
+# failing today and wired into no gate, one roadmap bullet, and the status page updated for the stages
+# reached. No product code; none of A, B or C chosen. Judged by an independent subagent that read the
+# plan by path.
