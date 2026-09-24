@@ -58,6 +58,8 @@ the `VERSION` file plus automatic point releases from commit counts.
 
 ## License
 
-All rights reserved — see `LICENSE`. The app is free to use at the
-published URL; the source code and the example photographs (all
-© Noah Jefferson) are not licensed for reuse.
+The source code is under the PolyForm Noncommercial License 1.0.0 — see
+`LICENSE`. The app is free to use at the published URL. The example and
+practice photographs (all © Noah Jefferson) are not licensed for reuse. The
+web fonts are third-party work under the SIL Open Font License 1.1
+(`public/fonts/OFL.txt`).
