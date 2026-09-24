@@ -4277,10 +4277,10 @@ updateMix3UI();
 // they inherit the whole IR pipeline and grain settles over them. Placement
 // lives in params.stickers → undo/session for free; excluded from looks/batch. ---
 
-// Sticker library — grouped, category-organized, and DYNAMIC (owner, 2026-07-19:
-// "split into two kinds of overlays — Creatures & craft, and Evidence"; the
+// Sticker library — grouped, category-organized, and DYNAMIC (2026-07-19:
+// split into two kinds of overlays — Creatures & craft, and Evidence; the
 // evidence overlays read more believable because they tuck into a scene; a third
-// "Scene & nature" group of everyday overlays added 2026-07-19 to receive the
+// Scene & nature group of everyday overlays added 2026-07-19 to receive the
 // asset factory's full set). Assets live at public/stickers/<category>/<name>.png;
 // a build-time manifest.json lists what's present, so the owner drops a PNG into a
 // category folder and it appears (auto-precached) with no code change. The
@@ -4440,7 +4440,7 @@ function ensureStickerAsset(key: string): Promise<void> {
         // Decode via <img> + decode(), NOT createImageBitmap: iOS Safari's
         // createImageBitmap rotates the bitmap 90° where <img> (and the file, and
         // Chromium) do not — so baked stickers came out sideways on iPad while the
-        // <img> drag-ghost stayed upright (owner-caught 2026-07-20). This matches
+        // <img> drag-ghost stayed upright (caught on the device, 2026-07-20). This matches
         // the ghost's decode path exactly.
         const url = `./stickers/${key}.png`;
         const img = new Image();
@@ -4604,7 +4604,7 @@ function stickerLibraryByCat(): Map<string, string[]> {
 }
 
 /** An add-a-sticker tile: a little thumbnail of the art with its label beneath,
- *  so you can see what each one is before dropping it (owner ask, 2026-07-21).
+ *  so you can see what each one is before dropping it (asked for, 2026-07-21).
  *  The PNG is loaded straight as an <img> (precached, no rasterization) — the
  *  full StickerAsset only builds lazily on placement. */
 function stickerTile(key: string): HTMLButtonElement {
@@ -4925,7 +4925,7 @@ $("stkMatchPhoto").addEventListener("click", () => {
 });
 
 // Auto re-match on move — re-sample the scene whenever a sticker is dropped in a
-// new spot, so it stays matched as you move it (owner ask, 2026-07-21). Default
+// new spot, so it stays matched as you move it (asked for, 2026-07-21). Default
 // on; the toggle locks the current match.
 function reMatchOnDrop() {
   const s = selSticker();
@@ -5322,7 +5322,7 @@ function stickerRotateHandle(pts: [number, number][]): { mid: [number, number]; 
 /** Draw the selected sticker's box as the selection cue, plus draggable handles:
  *  when Perspective is armed, the 4 corner-skew handles; otherwise 4 resize
  *  corners + a rotate knob on a stem (so resize/rotate are right there on the
- *  photo, not only in the sliders — owner, 2026-07-21). Repositions IN PLACE
+ *  photo, not only in the sliders — 2026-07-21). Repositions IN PLACE
  *  when the handle set is unchanged, so a live drag keeps its pointer capture
  *  (a replaceChildren would destroy the handle mid-gesture). */
 function positionStickerOverlay() {
@@ -7222,7 +7222,7 @@ const openLens = () => {
 // are already looking at the sliders it replaces.
 // `barLensBtn` was here and is gone with the button: measuring a lens is a
 // once-per-lens setup job and the top bar is for what you do to the photograph
-// in front of you (owner report, 2026-09-16). A dead id in a list is the stale
+// in front of you (reported from the device, 2026-09-16). A dead id in a list is the stale
 // thing this repo keeps paying for, so it leaves in the same commit.
 for (const id of ["welcomeLensBtn", "verLens", "lensMeasureBtn"]) {
   document.getElementById(id)?.addEventListener("click", openLens);
@@ -7238,7 +7238,7 @@ if (new URLSearchParams(location.search).has("lens")) {
 // above: importing, browsing and deleting a stored one need nothing open, so
 // this dialog works from the start screen and the (i) button too, not only
 // from Grade — moved out of #sec-grade (which panel.hidden gates on `current`)
-// in the same commit, per owner report 2026-09-24. #lutImportBtn/#lutFile/
+// in the same commit, reported from the device on 2026-09-24. #lutImportBtn/#lutFile/
 // #lutList are all id-based already (057's own finding), so the move itself
 // changed no JS; only the wiring below is new.
 const lutManageDlg = $("lutManageDlg") as HTMLDialogElement;
@@ -7269,7 +7269,7 @@ helpDlg.addEventListener("click", (e) => {
 // "Tutorials — learn by doing on real infrared photos" closed the editor and
 // showed the landing screen, with the tutorials off-screen and nothing saying
 // where they were. Reported as being dumped back on the landing screen, which
-// is precisely what it did. (Owner report, 2026-09-16.)
+// is precisely what it did. (Reported from the device, 2026-09-16.)
 $("helpTutorials").addEventListener("click", () => {
   helpDlg.close();
   goHome();
@@ -7644,7 +7644,7 @@ function pageZoomDiagnostic(): string {
 // the cursor-anchored wheel both drive the SAME zoom/pan the pinch uses, so a
 // desktop without a touchscreen (or a laptop with no scroll wheel) can still
 // magnify to brush up close — and they work while a brush tool owns the canvas
-// gestures (owner, 2026-07-21). ---
+// gestures (2026-07-21). ---
 const zoomCtl = $("zoomCtl") as HTMLDivElement;
 const zoomPctEl = $("zoomPct") as HTMLSpanElement;
 const zoomInBtn = $("zoomIn") as HTMLButtonElement;
@@ -7875,7 +7875,7 @@ function syncWarpField() {
 }
 // The most recent heal stays ACTIVE (accented ring): the Spot size slider
 // resizes it live — tap first, then dial the size until the fix looks right
-// (owner ask 2026-07-14: no way to size before the tap, none to adjust after).
+// (asked for 2026-07-14: no way to size before the tap, none to adjust after).
 let activeSpotIdx = -1;
 // While the slider moves with no active spot, a preview ring at the middle of
 // the view shows how big the next tap will heal. Timestamp it fades at.
@@ -8271,7 +8271,7 @@ function syncSpotsToTexture() {
   const stk = (params.stickers ?? []).filter((s) => stickerAssets[s.asset] && s !== liveId); // only bakeable, non-live
   // Two kinds now: IN-LOOK stickers bake INTO the source (they take on the IR
   // palette); ON-TOP stickers (the default) go into a separate overlay texture
-  // blended AFTER the pipeline, so they keep their own colours (owner, 2026-07-21).
+  // blended AFTER the pipeline, so they keep their own colours (2026-07-21).
   const inLook = stk.filter((s) => !isOnTop(s));
   const onTop = stk.filter(isOnTop);
   // On-top splits by blend: glows SCREEN (add light), everything else (incl. black
@@ -8412,7 +8412,7 @@ const cropResetBtn = $("cropReset") as HTMLButtonElement;
 const straightenBtn = $("straightenBtn") as HTMLButtonElement;
 const geoLbl = $("geoLbl") as HTMLSpanElement;
 const MIN_CROP = 0.1;
-// Crop and Straighten are SEPARATE tools, each activated on its own (owner ask,
+// Crop and Straighten are SEPARATE tools, each activated on its own (asked for,
 // repeatedly): Crop's box corners resize, Straighten's corners rotate (+ its
 // slider). `geoMode` picks which; `cropArmed` stays the derived "a geometry tool
 // owns the frame" flag the whole-frame render / canvas-lock / drawer-hide key off.
@@ -8459,7 +8459,7 @@ function outViewScale(): number {
 }
 
 /** The magnification at which the crop box just fills the frame — the default,
- *  box-first view (owner ask 2026-07-16). Always >= 1 (box-fill is never more
+ *  box-first view (asked for 2026-07-16). Always >= 1 (box-fill is never more
  *  zoomed-out than the whole tilt). The box's binding side (larger crop
  *  fraction) touches the frame edge; the other axis shows the dimmed
  *  continuation around it. */
@@ -8558,9 +8558,9 @@ const RATIOS: { key: string; label: string; r: number | null; invertible?: boole
 ];
 let cropRatioKey = localStorage.getItem("ips-crop-ratio") ?? "free";
 // Repeat-tapping the active chip flips it to its INVERSE (4:5 ⇄ 5:4) — the
-// look buttons' repeat-press R⇄B pattern (owner ask 2026-07-18, on-device).
+// look buttons' repeat-press R⇄B pattern (asked for 2026-07-18, on-device).
 let cropRatioInv = localStorage.getItem("ips-crop-ratio-inv") === "1";
-// The Custom chip's W:H pair, e.g. "7:5" (owner ask, same pass).
+// The Custom chip's W:H pair, e.g. "7:5" (same pass).
 let cropRatioCustom = localStorage.getItem("ips-crop-ratio-custom") ?? "";
 if (!RATIOS.some((x) => x.key === cropRatioKey)) cropRatioKey = "free";
 if (cropRatioKey === "custom" && !parseCustomRatio(cropRatioCustom)) cropRatioKey = "free";
@@ -8981,7 +8981,7 @@ for (const handle of handleEls) {
 }
 // The overlay captures pointers over the photo (the box is display-only,
 // pointer-events:none; handles capture resize). ONE finger repositions the crop;
-// TWO fingers pinch-zoom the VIEW (owner ask 2026-07-16) — box-fill in, whole
+// TWO fingers pinch-zoom the VIEW (asked for 2026-07-16) — box-fill in, whole
 // tilt out — by driving viewZoom + re-rendering (not a CSS magnify; the crop
 // view re-renders the GL scene). Preview-only: params.crop / export untouched.
 const cropPointers = new Map<number, { x: number; y: number }>();
@@ -11058,8 +11058,8 @@ async function makeThumb(img: DecodedImage, MAX = 260, lens?: LensCurve | null, 
   // Render the thumb through the REAL pipeline with the photo's own auto
   // baseline PLUS the live creative state (swap/looks/grade persist across
   // opens), so a thumbnail matches what tapping it will show — a bare
-  // WB+matrix render diverged the moment a look was active (owner-caught,
-  // IMG_1256: yellow/blue thumb vs the teal/orange it opened into).
+  // WB+matrix render diverged the moment a look was active (caught on the
+  // device, IMG_1256: yellow/blue thumb vs the teal/orange it opened into).
   // Spatial/per-image extras (masks, glow, clarity, LUT, grain) are cleared —
   // they need maps or textures a thumb doesn't have.
   // THE LOOK'S WB BIAS HAS TO COME WITH IT. applyLook bakes the bias INTO
@@ -14173,8 +14173,8 @@ const galRaw = (key: string, label: string, rotate?: number): GalleryTile => ({
   rotate,
 });
 // 2x2-binned half-res DNGs from the owner's NEFs (10 MB each, under the 25 MB
-// Pages limit) — one tile per scene (a JPEG twin briefly existed; owner called
-// the duplication out, 2026-07-14). Each opens on ITS home lesson; orientation
+// Pages limit) — one tile per scene (a JPEG twin briefly existed; the
+// duplication was called out, 2026-07-14). Each opens on ITS home lesson; orientation
 // rides in the file.
 const galNef = (key: string, label: string, lesson?: number): GalleryTile => ({
   key: `${key}-raw`,
@@ -14188,7 +14188,7 @@ const GALLERY: GalleryTile[] = [
   galRaw("canopy", "Golden canopy", 3),
   galRaw("lodge", "Motor lodge", 3),
   galRaw("hillside", "Hillside & sky"),
-  // A RAW practice photo for every lesson, in lesson order (owner ask
+  // A RAW practice photo for every lesson, in lesson order (asked for
   // 2026-07-14: each practice photo opens on its own lesson).
   galNef("NIR_1638", "Lakeside beach", 0),
   galNef("NIR_1701", "White forest", 1),
@@ -14587,7 +14587,7 @@ const library = $("library") as HTMLDialogElement;
 }
 
 // The app's OWN practice photos (tutorial + library) export with the Studio
-// corner mark baked in — the user's photos NEVER do (owner ask 2026-07-15).
+// corner mark baked in — the user's photos NEVER do (asked for 2026-07-15).
 // The Export tab says so while a practice photo is open (labels stay honest).
 let bundledSource = false;
 function setBundledSource(v: boolean) {

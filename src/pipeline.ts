@@ -330,7 +330,7 @@ export interface Sticker {
   warmth?: number; // -1..1 R↑/B↓ (warm) vs R↓/B↑ (cool)
   sat?: number; // -1..1 saturation (−1 = grey, +1 = ~2×)
   /** Overall opacity 0..1 (1 = solid). Multiplies the sticker's coverage so it
-   *  can be faded into the scene (owner, 2026-07-21). */
+   *  can be faded into the scene (2026-07-21). */
   opacity?: number;
   /** Luminance: a gamma-style lightness, out = c^(1/lum). >1 lifts, <1 darkens —
    *  gentler than the linear Brightness, won't blow out. 1 = neutral. */
@@ -350,28 +350,28 @@ export interface Sticker {
    *  `matchAmt`) in its own display-space layer, so it takes on the scene's
    *  infrared palette without being cooked. A sticker is a different kind of
    *  picture; this mimics the look instead of forcing it through the same filters
-   *  (owner, 2026-07-21). */
+   *  (2026-07-21). */
   matchScene?: [number, number, number];
   /** Re-run the colour match automatically whenever the sticker is dropped in a
    *  new spot (default on; undefined = on). Off locks the current match so moving
-   *  it won't recolour it (owner, 2026-07-21). */
+   *  it won't recolour it (2026-07-21). */
   reMatch?: boolean;
   /** A cast SHADOW of another sticker: same asset, rendered as a flat near-black
    *  silhouette so it darkens the ground like a real shadow (black over the scene
    *  == Multiply). `shadowOpacity` is its strength. Skips the colour match. The
-   *  squash/skew onto the ground is carried by `corners` (owner, 2026-07-21). */
+   *  squash/skew onto the ground is carried by `corners` (2026-07-21). */
   shadow?: boolean;
   shadowOpacity?: number;
   /** A cast shadow GLUED to its creature: the id of the sticker it shadows. While
    *  set, the shadow follows the creature's position/scale/spin on every settle so
    *  the two stay lined up. Dragging (or resizing/spinning) the shadow itself
    *  clears this — it detaches and stays where you put it, which doubles as the
-   *  light-direction control: offset the shadow to place the light (owner,
-   *  2026-07-21). */
+   *  light-direction control: offset the shadow to place the light
+   *  (2026-07-21). */
   linkTo?: string;
   /** A glowing light — composites with SCREEN (adds light to the scene) instead
    *  of sitting on top, so a beam/aura/orb reads as real light. Set once at
-   *  placement from the asset (owner, 2026-07-21). */
+   *  placement from the asset (2026-07-21). */
   screen?: boolean;
   /** Per-sticker erase/restore mask in ASSET-LOCAL space (paint to tuck the
    *  sticker behind foreground). 0 = hidden, 255 = shown; absent = fully
@@ -387,7 +387,7 @@ export interface Sticker {
   /** ON TOP of the infrared look (the default). A sticker is a DIFFERENT kind of
    *  picture than the IR photo, so by default it is composited AFTER the whole
    *  pipeline — it keeps its own colours instead of being channel-swapped,
-   *  white-balanced and saturated into neon (owner, 2026-07-21). Set false to
+   *  white-balanced and saturated into neon (2026-07-21). Set false to
    *  bake it INTO the source before the pipeline so it takes on the IR palette
    *  (the old "creature in infrared" effect). Undefined = on top. */
   onTop?: boolean;

@@ -50,7 +50,7 @@ export function toast(msg: string, ms = 2200): void {
       transition: "opacity 0.18s ease",
       pointerEvents: "none",
       // NOT break-all: that breaks ordinary prose at any character, so a
-      // sentence could wrap after the first letter of a word (owner-caught on
+      // sentence could wrap after the first letter of a word (caught on the
       // device). `anywhere` only breaks a word that cannot fit a line on its
       // own — which is what this was for: an unspaced look code or URL.
       overflowWrap: "anywhere",

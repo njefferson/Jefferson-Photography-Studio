@@ -286,7 +286,7 @@ function compositePixel(
       const dy = py + 0.5 - s.y * H;
       // Counter the photo's display rotation (dispRotDeg = EXIF orientation, in
       // 90° steps) so the sticker reads upright on the DISPLAYED photo, not on
-      // the un-rotated sensor buffer it bakes into (owner-caught: stickers came
+      // the un-rotated sensor buffer it bakes into (caught on the device: stickers came
       // out rotated on portrait/orientation-8 practice photos, 2026-07-20).
       const a = (-(s.rot - dispRotDeg) * Math.PI) / 180; // inverse rotation
       const cs = Math.cos(a), sn = Math.sin(a);

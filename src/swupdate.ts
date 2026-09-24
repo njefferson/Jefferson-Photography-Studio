@@ -6,8 +6,8 @@
 import "./swstrip.css";
 // Shared "Update to the latest version" wiring for all three PWAs — the Studio
 // chooser, Infrared, and Macro. One service worker at root scope serves the
-// whole site, so this same flow works from any page (owner ask, 2026-07-20:
-// wants the button on the chooser and Macro too, not just IR's Settings).
+// whole site, so this same flow works from any page (asked for 2026-07-20:
+// the button on the chooser and Macro too, not just IR's Settings).
 //
 // It reloads ONLY once the new worker has actually taken control. Reloading on
 // a blind timer (the old bug) dropped you back onto the old cached code, because
