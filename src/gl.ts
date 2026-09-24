@@ -2013,6 +2013,39 @@ export class Renderer {
    *  GL's origin is the bottom-left and every consumer in this app counts rows
    *  from the top. The context is created with `preserveDrawingBuffer`, so this
    *  is valid after the frame has been composited as well as before. */
+  /**
+   * What the edit shader uses of this device's shader limits, read from the
+   * LINKED program rather than counted by hand, because a hand count goes stale
+   * the first time a uniform is added.
+   * Takes nothing. Gives back the active non-sampler uniforms, the vec4 rows
+   * they need under the conservative rule (one row per scalar, vector or array
+   * element, two to four per matrix; packing can only do better), the samplers,
+   * and the device's own maxima for each.
+   * Consumer: the test page's shader-budget row, which is what decision 042's
+   * per-mask values are sized against. The rows used must stay below
+   * `maxVectors`, or the shader fails to link on the device and draws nothing.
+   */
+  shaderBudget(): { uniforms: number; vectors: number; samplers: number; maxVectors: number; maxUnits: number; maxCombined: number } {
+    const gl = this.gl;
+    const n = gl.getProgramParameter(this.prog, gl.ACTIVE_UNIFORMS) as number;
+    const samplerTypes = new Set<number>([gl.SAMPLER_2D, gl.SAMPLER_3D, gl.SAMPLER_2D_ARRAY, gl.SAMPLER_CUBE, gl.INT_SAMPLER_2D, gl.UNSIGNED_INT_SAMPLER_2D]);
+    const rowsOf = (t: number): number => (t === gl.FLOAT_MAT2 ? 2 : t === gl.FLOAT_MAT3 ? 3 : t === gl.FLOAT_MAT4 ? 4 : 1);
+    let uniforms = 0, vectors = 0, samplers = 0;
+    for (let i = 0; i < n; i++) {
+      const u = gl.getActiveUniform(this.prog, i);
+      if (!u) continue;
+      if (samplerTypes.has(u.type)) { samplers += u.size; continue; }
+      uniforms += 1;
+      vectors += rowsOf(u.type) * u.size;
+    }
+    return {
+      uniforms, vectors, samplers,
+      maxVectors: gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_VECTORS) as number,
+      maxUnits: gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS) as number,
+      maxCombined: gl.getParameter(gl.MAX_COMBINED_TEXTURE_IMAGE_UNITS) as number,
+    };
+  }
+
   readFrame(): Uint8ClampedArray {
     const gl = this.gl;
     const w = this.canvas.width, h = this.canvas.height;
