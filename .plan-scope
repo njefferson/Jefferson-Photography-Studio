@@ -1,14 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=2c1902d1e385acf6
-diffhash=2ab327e22caa87de
-verdict=IN-SCOPE: docs only; the staged-candidate record and status page (Standing steps), the promotion and staging recorded (Remaining 2 and 3), 061's outcome from the raw files (3.4), the stale-cache result.
-# Docs after the promotion: NOTES' staging entry now describes v2.62.16 (the export edge fix and the
-# test page's shader-room rows) and records v2.62.10's promotion; the NOTES entry on the patch-note
-# gate failing in a worktree (a found defect, not fixed, with its known remedy); record 061 carries the
-# measurement on the reported frame's own raw (NIR_3461: the red wires and pylons are the foliage band,
-# Foliage 0 takes 16,430 strongly red pixels to 0, co-siting changes nothing; NIR_3463's lens term) with
-# both frames in Looked at and a touches-042 relation, and its roadmap bullet and Shown-as line say the
-# same; the status page follows the run (production v2.62.14 verified live, staging v2.62.16, the stale-
-# cache check's Chromium result, the look records, the locked-down workflows).
-# Judged by an independent subagent that read the plan by path.
+planhash=3874d0391dafa42a
+diffhash=485e8d51072c6089
+verdict=IN-SCOPE: docs only (public/conveyor-status.html, NOTES.md), the docs commit the plan names plus the standing status-page rule; every number matches the plan; the held candidate is described as not on staging or production; no owner quotation.
+# Docs commit per the plan's 'One docs commit for this': public/conveyor-status.html (builds list: staging passed and waits for the go, a 'Built and held' line, last green 10f0a7f; Waiting on you re-listed as promote, M1, M3, M2 with the top bar and LUT browser noted as still open; the masks stage split into 'Built, held' stage one and 'Next' stage two; the fixed aimed-tool finding replaced by the component-sliders finding) and NOTES.md (a paragraph recording the held candidate, its evidence, and why the per-mask store waits).

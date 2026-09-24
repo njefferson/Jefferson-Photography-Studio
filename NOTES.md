@@ -80,6 +80,34 @@ export check and the accessibility sweep again after.
 - The device's offline copies are the current build and the examples cache,
   nothing older.
 
+**The next candidate is built and held, 2026-09-24:** decision 042's first
+stage, three commits on top of v2.62.16. It is not on staging, because staging
+holds v2.62.16 until the go, and it goes there once v2.62.16 is on production.
+
+- A "here only" tool no longer reaches an area subtracted from its mask. It
+  was rendered before it was built, on NIR_1651: a Sky mask aiming Dehaze
+  rendered byte-identical with and without a Radial subtracted, while the
+  mask's own brightness moved 8.71% of the frame under the same Radial. A
+  head a Colour mask is joined to cannot be aimed, and the panel says why. A
+  component's own aim keeps its own shape, so a saved edit that aimed one does
+  not move.
+- A mask can add to the one above it, "Add to it" (decision 048), folded as
+  a third case beside subtract and intersect. `tools/join-fold-check.mjs`
+  holds all three joins on every commit; it failed on the code before the
+  union and passes after.
+- The device test page times a frame with eight masks beside the same draw
+  with none.
+
+The per-mask store is not in it. What a stored value means is M1's question,
+and decision 042 rejects answering it in code before it is put.
+
+Walks run against the whole candidate: aim-walk, whose grouped arm failed on
+the build before the fix; the agreement walk; the export check; and the
+accessibility sweep. Two one-off comparisons of preview against export:
+Dehaze aimed through a subtraction changes the same pixels in both, 96.6%
+one way and 98.2% the other, and a union changes the same pixels in both,
+99% of them shared.
+
 ## Confirmed
 
 - Camera: **Nikon Z50, IR-converted**. Filters tested: **red, 530nm, 720nm,
