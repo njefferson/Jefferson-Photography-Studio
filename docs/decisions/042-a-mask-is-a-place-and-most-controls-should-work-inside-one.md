@@ -37,6 +37,31 @@ It arrived with three measured reasons from the device, on the same day:
 - Everything else is whole-frame, and the look's own stages (the foliage and
   sky bands, the sky stages) run where no aim reaches.
 
+**Stage 0's instrument, answered on the target device, 2026-09-24.** The edit
+shader uses 148 of 1024 fragment uniform rows and 14 of 16 texture units. At
+about 19 rows a mask there is room for about 46 masks' own values, so per-mask
+values live in uniforms; a parameter texture would take one of only two free
+units and is not needed. Frame time with eight masks is still owed, and lands
+with stage 1.
+
+**Stage 3's foliage band, measured on the reported frames' own raw files the
+same day.** Three reports from the device land on it: a gradient cannot draw
+the grass's edge, the wires and pylons against cloud turn red, and the cladding
+on a building turns red with the grass. The band selects a colour, not a place:
+
+- NIR_3461, Aerochrome as shipped against the same with Foliage saturation at
+  0: strongly red pixels above the horizon go from 16,430 to 0.
+- NIR_3467: on the building, 13,561 to 0; on the ground, 87,991 to 0. The
+  grass needs the band and the building does not, which is the whole case for
+  limiting it to a place.
+
+It stays in stage 3, with no reorder. The band runs before the mask stage
+(`src/gl.ts`, the band ahead of the mask loop), so it needs a place mask's
+weight evaluated early, and a selected mask can only offer it once stage 2's
+switch exists. Its scope is place masks: gradient, radial, brush and the sky
+bitmap. A colour mask keys on the colour after the band, so limiting the band
+by one would be circular.
+
 ## Looked up
 
 **The editor whose shape matches the ruling is Capture One, not Lightroom
@@ -170,6 +195,11 @@ These EXIST, and this record is the next layer over them, not a second version.
 - **The Aerochrome red-edge research, still running.** It must be settled
   before anyone claims per-mask Foliage fixes red wires. A 1024-texel
   selection cannot follow a 1-3px wire.
+
+## Looked at
+
+- The reported frame NIR_3461: the editing view in Aerochrome as shipped and with Foliage saturation at 0, the wires, the far pylon and the near pylon.
+- The frame NIR_3467: the editing view in Aerochrome as shipped and with Foliage saturation at 0, the building and the ground.
 
 ## Depends
 

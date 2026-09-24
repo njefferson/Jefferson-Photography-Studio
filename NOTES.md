@@ -68,6 +68,18 @@ for byte the same), the multi-core TIFF check, the agreement walk and the
 accessibility sweep, on the candidate before it was moved onto 2.62.14; the
 export check and the accessibility sweep again after.
 
+**The device pass came back good, 2026-09-24, and the build waits for the go.**
+
+- A full-size export from the target device (NIR_3467, 5600x3728) is clean on
+  all four sides: each outer row and column matches the pixels 20 in. The
+  export from the build before it had a red line along the top and left, on
+  the same measure.
+- The test page on the target device reads 148 of 1024 uniform rows and 14 of
+  16 texture units, so per-mask values go in uniforms. That answer is recorded
+  in decision 042.
+- The device's offline copies are the current build and the examples cache,
+  nothing older.
+
 ## Confirmed
 
 - Camera: **Nikon Z50, IR-converted**. Filters tested: **red, 530nm, 720nm,

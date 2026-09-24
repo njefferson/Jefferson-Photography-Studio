@@ -32,7 +32,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { internalWords } from "./reader-words.mjs";
 import { execSync } from "node:child_process";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 const repo = process.argv.find((a) => a.startsWith("--repo="))?.split("=")[1] ?? ".";
 const LEAD = /^(Fixed|New|Faster|Changed): \S/;
@@ -142,10 +142,17 @@ if (process.argv.includes("--above-main")) {
 }
 
 // PRE-COMMIT: the refusal itself is a commit-msg hook, so check it is there.
+//
+// ASK GIT WHERE THE HOOK LIVES; never assume `<repo>/.git/hooks`. In a linked
+// worktree `.git` is a FILE pointing at the shared git directory, so the
+// assumed path never exists and this check refused every commit made there
+// with "is MISSING" while git itself was running the shared hook correctly
+// (found 2026-09-24 committing a held candidate from a worktree). `--git-path`
+// resolves the hooks directory git actually uses, in a worktree or not.
 const tracked = join(repo, ".githooks", "commit-msg");
-const live = join(repo, ".git", "hooks", "commit-msg");
+const live = resolve(repo, execSync(`git -C ${repo} rev-parse --git-path hooks/commit-msg`, { encoding: "utf8" }).trim());
 if (!existsSync(tracked)) fail(".githooks/commit-msg is missing — the tracked source of the patch-note refusal");
-else if (!existsSync(live)) fail(".git/hooks/commit-msg is MISSING. Install it:  cp .githooks/commit-msg .git/hooks/ && chmod +x .git/hooks/commit-msg");
-else if (readFileSync(tracked, "utf8") !== readFileSync(live, "utf8")) fail(".git/hooks/commit-msg has drifted from the tracked copy — git is running the OLD rule.");
+else if (!existsSync(live)) fail(`${live} is MISSING. Install it:  cp .githooks/commit-msg "${live}" && chmod +x "${live}"`);
+else if (readFileSync(tracked, "utf8") !== readFileSync(live, "utf8")) fail(`${live} has drifted from the tracked copy — git is running the OLD rule.`);
 if (!failed) console.log("  ok    the patch-note refusal is installed and current");
 process.exit(failed ? 1 : 0);
