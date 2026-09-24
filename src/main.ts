@@ -75,7 +75,8 @@ import {
 } from "./look";
 import { parseCube, CUBE_FILE_MAX } from "./cubeimport";
 import { listPackedCubes, readPackedCube, PackedCubeTooLarge } from "./lutpack";
-import { putLut, getLut, listLuts, deleteLut, LUT_COUNT_CAP } from "./luts";
+import { putLut, getLut, listLuts, deleteLut, LUT_COUNT_CAP, type LutRecord, type LutMeta } from "./luts";
+import { sampleLut3d } from "./lut3d";
 import { extractLookFromJpeg } from "./lookmark";
 import { encodeQr, drawQr } from "./qr";
 import { wireThemePicker } from "./theme";
@@ -2314,6 +2315,10 @@ const redoStack: Snapshot[] = []; // undone states, waiting to be redone; any ne
 let settled: Snapshot | null = null; // last recorded state (advances on settle)
 let baseline: Snapshot | null = null; // fresh-open automatic baseline (Reset target)
 let recordTimer = 0;
+/** From the first tap on a LUT tile until the reader does anything else (062).
+ *  Declared here rather than beside the grid because `draw()` asks `recordSoon`
+ *  on every frame from start-up, before the grid's block has run. */
+let lutBrowsing = false;
 const HISTORY_MAX = 100;
 
 const undoBtn = $("undoBtn") as HTMLButtonElement;
@@ -2345,6 +2350,7 @@ function flushRecord() {
 
 function recordSoon() {
   if (!settled || painting || stkCornerLive || stkHandleLive) return; // a stroke/corner/handle-drag commits once, on pointerup
+  if (lutBrowsing) return; // a run of LUT taps commits once, when the reader moves on (062)
   clearTimeout(recordTimer);
   recordTimer = window.setTimeout(flushRecord, 350);
 }
@@ -10697,9 +10703,13 @@ function fmtSize(bytes: number): string {
 function editToJson(): string {
   const s = snapshot();
   // Masks (bitmaps) and the imported LUT (Float32Array lattice) are runtime
-  // data — stripped here; a durable resume restores neither (Help says so).
+  // data — stripped here. The LUT comes back all the same (062): `lutRef` names
+  // the stored file and its strength, the way a saved look already does, and a
+  // resume looks the file up again (`restoreLutRef`). The lattice itself is
+  // never written here; it is in the LUT store once already.
   return JSON.stringify({
     params: { ...s.params, masks: [], lut: null, warp: null },
+    lutRef: s.params.lut ? { id: s.params.lut.id, strength: s.params.lut.strength } : null,
     activeLook: s.activeLook, lookBias: s.lookBias, lookMark,
     // Which way up, kept with the edit so a resumed session and a bulk export
     // both show the photograph the way it was left rather than the way the
@@ -10773,7 +10783,7 @@ function activateCurrent(id: string) {
     const view = sessionPhotos.find((p) => p.id === id);
     if (view?.edit) {
       try {
-        const stored = JSON.parse(view.edit) as Snapshot & { lookMark?: LookMark | null; rot?: number; flip?: number };
+        const stored = JSON.parse(view.edit) as Snapshot & { lookMark?: LookMark | null; rot?: number; flip?: number; lutRef?: { id?: unknown; strength?: unknown } | null };
         applyView(stored.rot, stored.flip);
         applySnapshot(stored);
         // The stored mark, not the one establishFreshEdit just made: the grade
@@ -10792,6 +10802,8 @@ function activateCurrent(id: string) {
         // when a decided photo started coming back this way too. `baseline` is
         // deliberately NOT moved — Reset still returns to how the photo opens.
         settled = snapshot();
+        const ref = stored.lutRef;
+        if (ref && typeof ref.id === "string") void restoreLutRef(id, ref.id, Number(ref.strength));
       } catch {
         /* corrupt stored edit — keep the fresh baseline */
       }
@@ -16143,6 +16155,12 @@ const lutActiveName = $("lutActiveName") as HTMLSpanElement;
 const lutStrength = $("lutStrength") as HTMLInputElement;
 const lutStrengthVal = $("lutStrengthVal") as HTMLSpanElement;
 const lutList = $("lutList") as HTMLDivElement;
+/** The stored files as `renderLutList` last read them. The grid on the Grade
+ *  tab (062) draws from this rather than reading the store again, because
+ *  `listLuts` reads every lattice and every original file to build its list,
+ *  and the grid asks after every edit while the tab is open. The list only
+ *  changes on an import or a delete, both of which end in `renderLutList`. */
+let lutMetasKnown: LutMeta[] | null = null;
 
 /** Reflect params.lut into the panel — called from syncToUI so undo/redo,
  *  Reset, session switches and slot loads all update the row for free. */
@@ -16340,6 +16358,7 @@ $("lutRemoveBtn").addEventListener("click", () => {
  *  sized, and deletable. All names render via textContent. */
 async function renderLutList() {
   const metas = await listLuts().catch(() => []);
+  lutMetasKnown = metas;
   lutList.replaceChildren(
     ...metas.map((m) => {
       const row = document.createElement("div");
@@ -16384,8 +16403,218 @@ async function renderLutList() {
     }),
   );
   lutList.hidden = metas.length === 0;
+  scheduleLutGrid(0); // the grid on the Grade tab lists the same files
 }
 void renderLutList();
+
+/** PUT A PHOTOGRAPH'S LUT BACK AFTER A RESUME (062). Takes the photo the edit
+ *  belongs to, the stored file's id and the strength it was at. Looks the file
+ *  up; if the reader is still on that photo and has not chosen a LUT meanwhile,
+ *  lays it on and re-settles the history, because a restore is not something the
+ *  reader did and must not wait behind Undo. If the file is gone it says so,
+ *  rather than letting the photograph change without a word. Returns once done.
+ *  What the caller relies on: it never raises, and it never touches a photo the
+ *  reader has moved away from. */
+async function restoreLutRef(photoId: string, lutId: string, strength: number): Promise<void> {
+  const rec = await getLut(lutId).catch(() => null);
+  if (activePhotoId !== photoId || params.lut) return;
+  if (!rec) {
+    toast("This photograph had a LUT that is no longer on this device, so it opens without it.", 3600);
+    return;
+  }
+  params.lut = { id: rec.id, name: rec.name, size: rec.size, data: rec.data, strength: isFinite(strength) ? Math.min(1, Math.max(0, strength)) : 1 };
+  syncLutUI();
+  updateLookUI();
+  draw();
+  settled = snapshot();
+  void captureActiveEdit();
+  scheduleLutGrid(0);
+}
+
+// --- THE LUT GRID ON THE GRADE TAB (062) ---
+// None, then one tile per stored file drawn from the open photograph, then
+// Manage…. Choosing is the reason it exists, so each tap shows on the
+// photograph at once and the grid stays where it is.
+const lutGrid = $("lutGrid") as HTMLDivElement;
+const lutGridNote = $("lutGridNote") as HTMLParagraphElement;
+const lutManageTile = $("lutManageBtn") as HTMLButtonElement;
+const gradeSection = $("sec-grade") as HTMLElement;
+// A run of taps is ONE undo step: eighteen would push real edits off a
+// 100-step history and hold eighteen lattices in it (062, Rejected). The flag
+// that holds the run open, `lutBrowsing`, sits with the history state above.
+let lutGridTimer = 0;
+let lutGridGen = 0;
+let lutChooseSeq = 0;
+/** What the tiles were last drawn from: the photo and its edit WITHOUT the LUT,
+ *  and the stored list. Browsing changes neither, so it never redraws them. */
+let lutGridSig = "";
+
+/** Commit a run of taps as the one undo step it is. Takes nothing; returns
+ *  nothing. Called on the first press or key anywhere outside the grid, which
+ *  runs BEFORE that control's own handler, so the next edit is a step of its
+ *  own rather than folded into the browsing. Undo commits it too: undo()
+ *  flushes first. */
+function commitLutBrowse(): void {
+  if (!lutBrowsing) return;
+  lutBrowsing = false;
+  flushRecord();
+}
+for (const type of ["pointerdown", "keydown"] as const) {
+  document.addEventListener(type, (e) => {
+    if (lutBrowsing && !lutGrid.contains(e.target as Node)) commitLutBrowse();
+  }, true);
+}
+
+/** One file (or none, for `id` null) on the photograph, straight away. Takes
+ *  the stored id. Tapping the chosen tile again goes to its strength instead.
+ *  A new file always starts at full strength, because a strength carried over
+ *  at 0 would make every later tap look dead (062). Returns once applied.
+ *  What the caller relies on: the first tap of a run commits whatever was
+ *  pending first, and no later tap in the run records anything. */
+async function chooseLut(id: string | null): Promise<void> {
+  if (!current) return;
+  if (id === (params.lut?.id ?? null)) {
+    if (id && params.lut) {
+      lutActive.scrollIntoView({ block: "nearest" });
+      lutStrength.focus();
+      lutGridNote.textContent = `${params.lut.name}: its strength is just below.`;
+    }
+    return;
+  }
+  const seq = ++lutChooseSeq;
+  let lut: EditParams["lut"] = null;
+  if (id) {
+    const rec = await getLut(id).catch(() => null);
+    if (seq !== lutChooseSeq) return; // a later tap won
+    if (!rec) {
+      lutGridNote.textContent = "That LUT is no longer stored on this device. Import its .cube file again from Manage…";
+      scheduleLutGrid(0);
+      return;
+    }
+    lut = { id: rec.id, name: rec.name, size: rec.size, data: rec.data, strength: 1 };
+  }
+  if (!lutBrowsing) {
+    flushRecord();
+    lutBrowsing = true;
+  }
+  params.lut = lut;
+  syncLutUI();
+  updateLookUI();
+  draw();
+  markLutGrid();
+  lutGridNote.textContent = lut ? `${lut.name} on this photograph. Tap it again for its strength.` : "No LUT on this photograph.";
+}
+
+/** The open photograph with one file's lattice on it. Takes the base tile —
+ *  the photograph's own edit, without a LUT, as 8-bit display colour — and the
+ *  stored record; returns a new picture. What it must satisfy: the lattice is
+ *  sampled by `sampleLut3d` at full strength on the final display colour,
+ *  which is exactly where both render paths apply it, so a tile shows what
+ *  choosing it does. */
+function lutTilePicture(base: ImageData, rec: LutRecord): ImageData {
+  const out = new ImageData(base.width, base.height);
+  const s = base.data, d = out.data, t = new Float32Array(3);
+  for (let i = 0; i < s.length; i += 4) {
+    sampleLut3d(rec.data, rec.size, s[i] / 255, s[i + 1] / 255, s[i + 2] / 255, t);
+    d[i] = Math.round(t[0] * 255);
+    d[i + 1] = Math.round(t[1] * 255);
+    d[i + 2] = Math.round(t[2] * 255);
+    d[i + 3] = 255;
+  }
+  return out;
+}
+
+/** One tile. Takes the stored id (null for None), its name and its picture;
+ *  returns the button. The name is a file's, so it is only ever text. */
+function lutTile(id: string | null, name: string, pic: ImageData): HTMLButtonElement {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "toggle lut-tile";
+  b.dataset.lut = id ?? "";
+  b.dataset.name = name;
+  const cv = document.createElement("canvas");
+  cv.setAttribute("aria-hidden", "true");
+  cv.width = pic.width;
+  cv.height = pic.height;
+  cv.getContext("2d")?.putImageData(pic, 0, 0);
+  const label = document.createElement("span");
+  label.className = "lut-tile-name";
+  b.append(cv, label);
+  b.addEventListener("click", () => void chooseLut(id));
+  return b;
+}
+
+/** Which tile is chosen, in words and in state. Takes nothing; returns
+ *  nothing. The check mark is in the NAME so the choice survives greyscale. */
+function markLutGrid(): void {
+  const on = params.lut?.id ?? "";
+  for (const b of lutGrid.querySelectorAll<HTMLButtonElement>(".lut-tile")) {
+    const chosen = (b.dataset.lut ?? "") === on;
+    b.setAttribute("aria-pressed", String(chosen));
+    const n = b.querySelector(".lut-tile-name");
+    if (n) n.textContent = chosen ? `✓ ${b.dataset.name ?? ""}` : (b.dataset.name ?? "");
+  }
+}
+
+/** Ask for the tiles to be brought up to date, after `ms`. Takes the delay;
+ *  returns nothing. Cheap to call often: the rebuild compares what the tiles
+ *  were drawn from and redraws only when that moved. */
+function scheduleLutGrid(ms = 600): void {
+  clearTimeout(lutGridTimer);
+  lutGridTimer = window.setTimeout(() => void buildLutGrid(), ms);
+}
+
+/** Draw the grid for the open photograph. Takes nothing; returns once drawn or
+ *  once a newer build has taken over. Only while the Grade tab is showing and a
+ *  photograph is open: a hidden grid is not worth a render. What it must
+ *  satisfy: None is first and Manage… last, one tile per stored file between,
+ *  every picture drawn from the same base tile of the edit as it stands, and
+ *  the pressed tile is the LUT on the photograph. */
+async function buildLutGrid(): Promise<void> {
+  if (gradeSection.hidden || !current || !currentFile) return;
+  const gen = ++lutGridGen;
+  const metas = lutMetasKnown ?? (lutMetasKnown = await listLuts().catch(() => []));
+  if (gen !== lutGridGen) return;
+  const own = snapshot();
+  own.params.lut = null;
+  const sig = `${activePhotoId}|${metas.map((m) => m.id).join(",")}|${snapSig(own)}`;
+  if (sig === lutGridSig && lutGrid.querySelector(".lut-tile")) { markLutGrid(); return; }
+  let base: ImageData;
+  try {
+    const buf = await makeThumb(current, 184, lensCurveFor(currentFile), own);
+    const bmp = await createImageBitmap(new Blob([buf], { type: "image/jpeg" }));
+    const c = document.createElement("canvas");
+    c.width = bmp.width;
+    c.height = bmp.height;
+    const g = c.getContext("2d");
+    if (!g) return;
+    g.drawImage(bmp, 0, 0);
+    bmp.close();
+    base = g.getImageData(0, 0, c.width, c.height);
+  } catch {
+    return; // the photograph went away under it; the next build will run
+  }
+  if (gen !== lutGridGen) return;
+  const tiles: HTMLButtonElement[] = [lutTile(null, "None", base)];
+  for (const m of metas) {
+    const rec = await getLut(m.id).catch(() => null);
+    if (gen !== lutGridGen) return;
+    if (rec) tiles.push(lutTile(m.id, m.name, lutTilePicture(base, rec)));
+  }
+  lutGrid.replaceChildren(...tiles, lutManageTile);
+  lutGridSig = sig;
+  markLutGrid();
+  if (!metas.length) lutGridNote.textContent = "No LUTs on this device yet. Manage… imports a .cube file or a pack.";
+}
+
+// WHEN THE TILES CAN GO STALE: the Grade tab coming into view, an edit, a
+// photograph changing, the stored list changing. The tab is watched rather than
+// hooked, because setPanelTab runs at start-up, before this block exists.
+new MutationObserver(() => { if (!gradeSection.hidden) scheduleLutGrid(0); })
+  .observe(gradeSection, { attributes: true, attributeFilter: ["hidden"] });
+for (const type of ["input", "click", "keyup"] as const) {
+  document.addEventListener(type, () => { if (!gradeSection.hidden) scheduleLutGrid(); }, true);
+}
 
 // A shared look arriving in the URL fragment (#look=TOKEN). The fragment
 // never reaches the network or the service worker, so links work offline.

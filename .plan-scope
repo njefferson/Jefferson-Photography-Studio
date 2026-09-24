@@ -1,10 +1,12 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=57a4a72df437f124
-diffhash=19550c3780fe6a7f
-verdict=IN-SCOPE: both hunks (the eightMasks helper and the timed row in fullResolutionPreview, reusing the same passes, median and spread, plus the generated line count) match the plan bullet; no per-mask store or UI change; the row's copy makes no delivery promise; no owner quotation.
-# Commit: plan item 3, 042 stage 1, third commit: "The test page's frame time with eight masks, the rest of stage 0's instrument."
-# - src/debug.ts: inside the existing full-resolution draw timing (fullResolutionPreview), for the "full resolution" source only, the same draw is timed again with eight masks — same N, same three passes, median, spread printed, and the gap against no masks. eightMasks() builds eight active masks (radial, gradient, colour; one subtracted, one added) with a stated contract; imports neutralMask and the MaskLayer type.
-# - docs/ARCHITECTURE.md: generated line count.
-# Evidence: the test page was run headless on the candidate build; the row printed with three runs and no page errors (container numbers, not device numbers).
-# Not in this commit: nothing else.
+planhash=4c24ae676c8c146e
+diffhash=088892aeb03327d8
+verdict=IN-SCOPE: the judged grid change unchanged, plus docs/ARCHITECTURE.md's generated line count for src/main.ts corrected to 17259.
+# Commit: the plan's 062 product commit ("So item 7's 062 half is authorised now", second bullet), on the held candidate branch after the three stage-1 commits.
+# - ir.html: on the Grade tab, #lutGrid holds the existing #lutManageBtn (label now "Manage…") as its last element; #lutGridNote is a polite live status line; the explanatory note says what a tap does. Help's sentence that a resume cannot restore a LUT now says a LUT comes back while the file is still stored.
+# - src/style.css: the grid and tile rules (44px floor; check mark in the name so the state does not ride on colour).
+# - src/main.ts: lutBrowsing declared with the history state and recordSoon stands down while a run of taps is open (draw() calls recordSoon on every frame, which made each tap its own step until this); commitLutBrowse on the next pointerdown or keydown outside the grid; chooseLut (live apply at full strength, second tap focuses the strength row, a sequence number so a later tap wins); lutTilePicture (sampleLut3d on a makeThumb base tile of the edit without its LUT); lutTile, markLutGrid, scheduleLutGrid, buildLutGrid (redraws only when the photo, the edit without its LUT, or the stored list changes); a MutationObserver on #sec-grade's hidden attribute plus document-level input/click/keyup listeners schedule it; renderLutList keeps the list it reads (lutMetasKnown) so the grid never re-reads every lattice, and schedules the grid; editToJson writes lutRef {id, strength}; the resume path calls restoreLutRef, which lays the file back without an undo step, or says it is gone.
+# - docs/ARCHITECTURE.md: generated line counts.
+# Evidence: a scratch walk through the real build (two practice raws, eight imported .cube files): None first and Manage… last, one tile per file, every picture distinct, live taps, full strength on a new file, second tap lands on the strength row, ONE Undo takes back a run of taps (this check failed with the recordSoon guard removed, passed with it), imports stay their own steps, Redo, and after a reload and Resume the LUT is back with nothing to undo. The grid was opened in a screenshot. lutpack and a11y walks pass on this build; the control walk reports the same 55 findings as the build before it (531 controls against 530, the None tile).
+# Not in this commit: 064's None button for looks (its own commit next); the start card's door (waits on 060); list order and boot-time memory (in 062's Context, not in its chosen options).
