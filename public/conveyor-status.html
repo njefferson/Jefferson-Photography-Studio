@@ -83,8 +83,9 @@
       <h2>Where the builds are</h2>
       <ul class="facts">
         <li><b>Production</b> <span>v2.62.14: the small fixes that were on staging as v2.62.10, promoted on your go. The number moved because the last digit counts every commit; the content did not.</span></li>
-        <li><b>On staging</b> <span>v2.62.16: the export edge fix and two new rows on the device test page, waiting for a pass on the iPad.</span></li>
-        <li><b>Last verified green</b> <span><code>2e45873</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
+        <li><b>On staging</b> <span>v2.62.16: the export edge fix and two new rows on the device test page. Your pass came back good; it waits for your go.</span></li>
+        <li><b>Built and held</b> <span>The first stage of the mask work, three changes on top of v2.62.16. It goes to staging once v2.62.16 is on production, because staging holds one build at a time. It is kept in this session's copy of the repository until then.</span></li>
+        <li><b>Last verified green</b> <span><code>10f0a7f</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
         <li><b>Next version</b> <span>2.63, when masks gain their own amounts. The fixes before that take the increment digit and no version bump.</span></li>
       </ul>
 
@@ -95,8 +96,14 @@
             <strong>Decisions</strong>, each answerable in a word or a letter.
             They are repeated in the chat that points here.
             <ol>
-              <li>Should the two privacy checks run on every commit that touches
-                prose, at about thirty seconds each? Recommended: yes.</li>
+              <li>Put v2.62.16 on production? Recommended: yes. It also lets the
+                mask work below go to staging.</li>
+              <li>What a mask's own value means, offset or value inside the mask?
+                Recommended: offset. Pictures on your photographs come with the
+                question in the chat.</li>
+              <li>Where the mask list lives, chips above the tabs or the Masks
+                place with an Editing line in the heading? Recommended: chips.
+                Pictures come with the question.</li>
               <li>Which top bar: A, B or C? Recommended: A. The pictures come with
                 the question when it is asked in the chat.</li>
               <li>Which LUT browser layout: 1, 2, 3 or 4? Recommended: 2, a place
@@ -105,14 +112,8 @@
               <li>Do the colour swap and the channel mixer stay whole-photo when
                 masks gain their own settings? Recommended: yes.</li>
             </ol>
-          </li>
-          <li>
-            <strong>A device pass on staging</strong>, v2.62.16, in two steps.
-            Export one photograph at full size and look at its four edges: no
-            line of colour one pixel wide. Then, in the editor, tap the version
-            number, then Test this device, press Run the speed tests, and copy the
-            results into the chat; the first two rows are the new ones, and their
-            number decides how the mask work is built on your iPad.
+            The top bar and the LUT browser are still open, and are asked again
+            with their pictures once these are settled.
           </li>
         </ul>
       </div>
@@ -236,11 +237,22 @@
           graphics (148 of 1,024 rows used), so masks carry their values directly.
           Waiting for your go to put it on production.
         </li>
+        <li class="waiting"><span class="state">Built, held</span>
+          <strong>Masks, stage one.</strong>
+          A "here only" tool now stays out of an area subtracted from its mask:
+          rendered first, the tool reached the subtracted area while the mask's
+          own adjustment did not, and the check written for it failed on the old
+          build before it passed on the new one. A mask can now add to the one
+          above it, "Add to it", so a Colour mask can finish a sky the automatic
+          selection missed; a check holds all three joins on every commit. The
+          device test page times a frame with eight masks. Every walk passed on
+          it. It goes to staging after v2.62.16 reaches production.
+        </li>
         <li class="now"><span class="state">Next</span>
-          <strong>Masks, in code.</strong>
-          First, a tool aimed at a mask respects how that mask was combined; then
-          the ordinary controls act inside a selected mask, in stages, each one its
-          own device pass. Foliage limited to a mask is the stage that fixes the red
+          <strong>Masks, stage two and after.</strong>
+          The ordinary controls act inside a selected mask, in stages, each one its
+          own device pass, once you have answered what a mask's value means and
+          where the mask list lives. Foliage limited to a mask is the stage that fixes the red
           wires, pylons and cladding: on your building, Foliage at 0 takes the red
           on the cladding from 13,561 pixels to none and the red on the grass from
           87,991 to none, and the grass needs it while the building does not.
@@ -254,9 +266,11 @@
       </p>
       <ul>
         <li>
-          <strong>A tool aimed at a mask may ignore an area subtracted from
-          it.</strong> Found by reading the code, not yet seen in a render. It is the
-          first code step of the mask work.
+          <strong>A mask joined to the one above still shows its own Brightness,
+          Contrast and Saturation sliders</strong>, which nothing reads once it is
+          joined: the adjustment above is the one that applies. Read in the code,
+          not yet seen on screen. Owned by the mask work's second stage, where the
+          controls follow the selected mask.
         </li>
         <li>
           <strong>Foliage can only be set for the whole photo.</strong> It selects a
