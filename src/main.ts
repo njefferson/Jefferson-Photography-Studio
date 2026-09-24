@@ -2024,6 +2024,7 @@ const lookButtons: Record<string, HTMLButtonElement> = {
   sepia: ui.lookSepia,
   hie: ui.lookHie,
 };
+const lookNoneBtn = $("lookNone") as HTMLButtonElement;
 
 function updateLookUI() {
   lookState();
@@ -2061,6 +2062,12 @@ function updateLookUI() {
       sub.innerHTML = tag;
     }
   }
+  // NONE IS A LOOK BUTTON TOO (064): pressed, with its state in words, when no
+  // look is on, the same way the others show theirs.
+  const none = activeLook === null;
+  lookNoneBtn.classList.toggle("active", none);
+  const noneSub = lookNoneBtn.querySelector(".look-sub") as HTMLElement | null;
+  if (noneSub) noneSub.textContent = none ? "no look on" : "take it off";
 }
 
 function pressLook(key: string) {
@@ -2083,6 +2090,93 @@ function pressLook(key: string) {
 for (const key of Object.keys(lookButtons)) {
   lookButtons[key].addEventListener("click", () => pressLook(key));
 }
+
+/** TAKE THE LOOK OFF (064). Takes nothing; returns nothing. One undo step.
+ *
+ *  Undoes what `applyLook` wrote and nothing else, using `applyLook`'s own rules
+ *  for handing things back, so the two cannot disagree about what a look is:
+ *  the look's white-balance bias is divided out, so a balance set by hand
+ *  survives and an untouched one is the photograph's own again; a camera-made
+ *  file the look had balanced goes back to how the camera made it; a denoise
+ *  floor goes back to the photograph's own measurement and a look's texture to
+ *  none, each only if the reader has not moved it since; every creative field
+ *  `applyLook` assigns goes to the value it uses when a look carries none; the
+ *  channel swap goes to what a photograph opens with when no look is on; and
+ *  Restore depth re-solves the way a look-less open does.
+ *
+ *  What the caller relies on: an imported LUT stays (058), Reset keeps meaning
+ *  the photograph as it opened, and the session look becomes none, so the next
+ *  photographs open without one. Settings' Default look is not touched. With no
+ *  look on, it only makes sure the next photographs open without one. */
+function takeLookOff(): void {
+  if (!current) return;
+  if (activeLook === null) {
+    sessionLook = null;
+    updateLookUI();
+    return;
+  }
+  flushRecord(); // whatever was pending is its own step
+  const step = (a: number, b: number) => Math.abs(a - b) < 0.01;
+  const base: [number, number, number] = [
+    params.wb[0] / lookBias[0], params.wb[1] / lookBias[1], params.wb[2] / lookBias[2],
+  ];
+  if (lookWb && !current.isRaw && base.every((v, i) => step(v, lookWb![i]))) {
+    base[0] = 1; base[1] = 1; base[2] = 1;
+    if (origParams) params.exposure = origParams.exposure;
+  }
+  params.wb = [clamp(base[0], 0.02, 16), clamp(base[1], 0.02, 16), clamp(base[2], 0.02, 16)];
+  lookBias = [1, 1, 1];
+  lookWb = null;
+  params.swapRB = freshBaseline(current).swapRB;
+  params.hue = 0;
+  params.sat = 1;
+  params.contrast = 1;
+  params.tint = [1, 1, 1];
+  params.glow = 0;
+  params.sky = [0, 1, 1];
+  params.foliage = [0, 1, 1];
+  params.tone = [...TONE_DEFAULT];
+  params.toneR = [...TONE_DEFAULT];
+  params.toneG = [...TONE_DEFAULT];
+  params.toneB = [...TONE_DEFAULT];
+  params.lum = 1;
+  params.hsl = hslDefault();
+  params.bwOn = false;
+  params.bwMix = [1, 1, 1];
+  params.grade = [...GRADE_DEFAULT];
+  params.grainAmt = 0;
+  params.grainSize = 1.5;
+  params.vigAmt = 0;
+  params.vigMid = 0.5;
+  params.mix3 = [...MIX3_DEFAULT];
+  params.skySmooth = 0;
+  params.skyDepth = 0;
+  params.skySat = 0;
+  const same = (a: number, b: number) => Math.abs(a - b) < 0.005;
+  if (lookDenoise != null && measuredDenoise != null && same(params.denoise, lookDenoise)) params.denoise = measuredDenoise;
+  lookDenoise = null;
+  if (lookTexture != null && same(params.texture, lookTexture)) params.texture = 0;
+  lookTexture = null;
+  liftApplied = null;
+  if (autoLift) applyLift(false); // no look on the frame now
+  activeLook = null;
+  sessionLook = null; // and the next photographs open without one
+  closeFinish();
+  // THE ROUND TRIP THE OPEN MAKES, and the reason None can land on the open's
+  // exact frame. Restore depth solves its tone points at full precision and the
+  // tone control holds them at its step; `establishFreshEdit` ends with
+  // syncToUI then syncFromUI, so the photograph opens on the snapped values.
+  // Without the same two lines here the curve differed from the open's in the
+  // third decimal and the frame was not the one the photograph opened with.
+  syncToUI();
+  syncFromUI();
+  updateLookUI();
+  draw();
+  markLook();
+  restripForGrade();
+  flushRecord();
+}
+lookNoneBtn.addEventListener("click", takeLookOff);
 
 /** "Balance it anyway" — the one-band rendering the reader did not get to pick.
  *
