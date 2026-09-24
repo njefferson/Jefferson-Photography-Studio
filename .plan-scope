@@ -1,11 +1,10 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=5b00020b894d7788
-diffhash=80527b4767d77982
-verdict=IN-SCOPE: the docs-only candidate (record 060, the bar-fit walk wired into no gate, one roadmap bullet, the status page) matches the chrome record's First step and changes no product code
-# Docs lane, the chrome record: decision 060 written with the research outcome, its Depends covering
-# every record its prose cites (012 as touches, per the corrected First-step line), tools/bar-fit-walk.mjs
-# holding one row at 1194x834, 834x1194 and the phone plus practice photos above the fold at 1180x820,
-# failing today and wired into no gate, one roadmap bullet, and the status page updated for the stages
-# reached. No product code; none of A, B or C chosen. Judged by an independent subagent that read the
-# plan by path.
+planhash=e643191cd7b74f81
+diffhash=ba63b5cf6f5d166b
+verdict=IN-SCOPE: the three-file docs candidate records the staging push and the re-measured 059 count, changes no product code, and its numbers match the control-walk log
+# Docs: NOTES records the staging candidate (URL and v2.62.10) with its device-pass checklist; 059's
+# Outcome states the re-measured control-walk count (54, the LUT manager's three controls reached); the
+# status page follows the run. No product code. Judged by an independent subagent that read the plan by
+# path; after the verdict, the NOTES heading was reworded from a possessive to "waiting on a device
+# pass" because the third-person gate refused the possessive.
