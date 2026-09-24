@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=6be7a72a195b3c59
-diffhash=4407fd446edf367f
-verdict=IN-SCOPE: only NOTES.md and the status page, recording the held grid and None with numbers the plan's night paragraph carries; the held build is described as not on staging or production; no product code; no owner quotation.
-# Docs commit per the plan's 'Built and held (2026-09-24, night)' paragraph: NOTES' held paragraph records the LUT grid and None with their evidence; the status page's builds line and a 'Built, held' entry record them; 'found, not fixed' marks the LUT-survives item fixed in the held build and gains the unpinned wrangler install.
+planhash=045c454b661423b3
+diffhash=8f1a3d8dd3f51277
+verdict=IN-SCOPE: 060 records the chosen bar and 042 records M1, M2 and M3 as answered by convention, each supported by the record's own Looked up; the status page's one open decision is the v2.62.16 go; nothing claims the bar is built; no product code; no owner quotation.
+# Docs commit per the plan's 'Ruled 2026-09-24, late' paragraph, first bullet: record 060 records the chosen bar (A's bar, the histogram collapsing to its own icon in place, Help as a ? button; the start card later) as settled by convention, citing its own Looked up research; record 042 records M1 offset, M2 whole-photo, M3 chips above the tabs, answered by convention; the status page's one open decision is the v2.62.16 go, the top bar entry reads Next and decided, and mask stage two says the three are settled.

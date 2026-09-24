@@ -157,6 +157,16 @@ walks drive it.
   practice photos, then a row of the four tools, with what this is at the
   bottom. This answers 003's "what the start screen does" most strongly.
 
+**Chosen 2026-09-24, settled by convention rather than chosen from the
+pictures:** A's bar, with two changes. The histogram over the photograph
+collapses to its own icon where it sits, and a tap brings it back, so it
+leaves the bar and the More sheet alike; and Help is a "?" button in the bar.
+So the bar is Home, Undo, Redo, Hold: Before, "?" and More, and More holds
+Reset and Full view (this photo) and Open, Quick look and Develop unattended
+(photos). That is the shape the research above found: Lightroom for iPad ends
+its bar in More, Darkroom keeps reset in a "•••" menu, and Photoshop on iPad
+puts Help in its header. The start card's regrouping is a later step.
+
 ## Rejected
 
 **1, icons in place of words.** Eleven 44px icons are 564px, more than the 376

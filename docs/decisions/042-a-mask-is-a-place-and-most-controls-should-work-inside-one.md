@@ -280,6 +280,15 @@ targeted, and each with a convention to point to:**
   the tabs, one tap to switch. The alternative is the mask place, then an
   "Editing" banner over the tabs.
 
+**M1, M2 and M3 answered 2026-09-24 by convention, not by the pictures:** a
+mask's value is an offset on the whole-photo value, starting at no change (M1,
+Lightroom and Capture One); the channel swap and the 3x3 mixer stay whole-photo
+(M2, both); and the masks sit as a row of chips above the tabs, one tap to
+switch (M3, the recommendation above: it is the most direct form of the Capture
+One model this record chose, where picking a mask makes the ordinary tools
+follow it; the research does not establish where Capture One places its own
+list). Stage 2 builds on these three.
+
 ## Rejected
 
 - **Lightroom Classic's separate local slider set**: a submenu under another name, which the 2026-09-24 ruling rules out; and two panels holding the same sliders is two answers to one question.
