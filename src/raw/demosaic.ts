@@ -104,8 +104,17 @@ export function demosaicPixelLinearInto(c: RawCfa, x: number, y: number, out: [n
         if (dx === 0 && dy === 0) continue;
         const xx = x + dx, yy = y + dy;
         if (pattern[(yy & 1) * 2 + (xx & 1)] === ch) {
-          const cx = xx < 0 ? 0 : xx >= width ? width - 1 : xx;
-          const cy = yy < 0 ? 0 : yy >= height ? height - 1 : yy;
+          // MIRROR, NOT CLAMP, AT THE BORDER. The colour is chosen by the
+          // neighbour's position, so the photosite read must be one of that
+          // colour. Clamping -1 to 0 (and `width` to `width - 1`) read the OTHER
+          // parity, which put a line of the wrong colour along all four edges of
+          // every export (measured on a full-resolution JPEG of NIR_0063: the top
+          // row at 173,159,114 and the right column at 46,97,15, against
+          // 99,175,185 and 30,85,100 twenty pixels in). Reflecting -1 to 1 and
+          // `width` to `width - 2` keeps the parity, so the colour picked is the
+          // colour read; nothing more than one pixel in from an edge changes.
+          const cx = xx < 0 ? -xx : xx >= width ? 2 * (width - 1) - xx : xx;
+          const cy = yy < 0 ? -yy : yy >= height ? 2 * (height - 1) - yy : yy;
           sum += Math.max(0, (cfa[cy * width + cx] - black) * scale);
           n++;
         }
