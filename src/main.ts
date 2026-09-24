@@ -7214,7 +7214,7 @@ lensDlg.addEventListener("click", (e) => {
 const openLens = () => {
   // Opened from inside the ⓘ or the version panel as well as from the start
   // screen; two open modals stack badly, so whatever is up closes first.
-  for (const id of ["infoDlg", "verDlg"]) (document.getElementById(id) as HTMLDialogElement | null)?.close();
+  for (const id of ["infoDlg", "verDlg", "lutManageDlg"]) (document.getElementById(id) as HTMLDialogElement | null)?.close();
   lensDlg.showModal();
 };
 // A LENS IS NOT A PHOTOGRAPH, so every route to this works with nothing open:
@@ -7231,6 +7231,27 @@ wireLensRig(lensDlg);
 // The test page links here with ?lens=1 rather than keeping its own copy.
 if (new URLSearchParams(location.search).has("lens")) {
   requestAnimationFrame(() => { try { openLens(); } catch { /* never block the app */ } });
+}
+
+// --- Manage your LUTs --------------------------------------------------------
+// A COLOUR FILE IS NOT A PHOTOGRAPH EITHER, same reasoning as the lens rig
+// above: importing, browsing and deleting a stored one need nothing open, so
+// this dialog works from the start screen and the (i) button too, not only
+// from Grade — moved out of #sec-grade (which panel.hidden gates on `current`)
+// in the same commit, per owner report 2026-09-24. #lutImportBtn/#lutFile/
+// #lutList are all id-based already (057's own finding), so the move itself
+// changed no JS; only the wiring below is new.
+const lutManageDlg = $("lutManageDlg") as HTMLDialogElement;
+for (const id of ["lutManageClose", "lutManageCloseTop"]) $(id).addEventListener("click", () => lutManageDlg.close());
+lutManageDlg.addEventListener("click", (e) => {
+  if (e.target === lutManageDlg) lutManageDlg.close(); // tap outside to dismiss
+});
+const openLutManage = () => {
+  for (const id of ["infoDlg", "verDlg", "lensDlg"]) (document.getElementById(id) as HTMLDialogElement | null)?.close();
+  lutManageDlg.showModal();
+};
+for (const id of ["welcomeLutBtn", "infoLutBtn", "lutManageBtn"]) {
+  document.getElementById(id)?.addEventListener("click", openLutManage);
 }
 
 const helpDlg = $("helpDlg") as HTMLDialogElement;
@@ -16324,6 +16345,7 @@ async function renderLutList() {
         if (!rec) { toast("That LUT is no longer stored — re-import its .cube file", 3200); void renderLutList(); return; }
         applyLutToEdit({ id: rec.id, name: rec.name, size: rec.size, data: rec.data, strength: 1 });
         toast(`LUT applied — ${rec.name}`);
+        if (lutManageDlg.open) lutManageDlg.close(); // so the result is what's on screen next
       });
       const share = document.createElement("button");
       share.type = "button";

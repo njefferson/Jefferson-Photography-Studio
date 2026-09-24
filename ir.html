@@ -319,6 +319,8 @@
           <p class="welcome-batch-hint">Develops a whole set into one .zip, unattended.</p>
           <button class="welcome-batch" id="welcomeLensBtn" type="button">Measure your lens&hellip;</button>
           <p class="welcome-batch-hint">Works out your lens&rsquo;s bright centre, from your own sky frames.</p>
+          <button class="welcome-batch" id="welcomeLutBtn" type="button">Manage your LUTs&hellip;</button>
+          <p class="welcome-batch-hint">Import a colour file or a pack, or clear one out &mdash; no photo needed.</p>
           <button id="resumeSession" class="welcome-batch" type="button" hidden>Resume session</button>
           <button id="recoverBatch" class="welcome-batch" type="button" hidden>Recover images from an interrupted batch</button>
           <hr class="welcome-div" />
@@ -778,29 +780,14 @@
                  swap route plus a LUT already produces the combined result —
                  nothing about how a LUT is applied changed to make this move. -->
             <div class="sub-title">Imported LUTs <span>.cube, applied after your grade</span></div>
-            <button id="lutImportBtn" type="button">Import .cube LUTs&hellip;</button>
-            <p class="note">Pick one <strong>.cube</strong>, or a <strong>.zip</strong> holding a whole pack &mdash; as many as there is room for come in at once, folders and all. <strong>On an iPad a .zip is the surest route</strong>, and it saves picking them one at a time. The R&#8646;B swap above runs first, so it composes with whatever you pick below.</p>
-            <!-- NO accept, AND THAT IS THE FIX RATHER THAN AN OVERSIGHT. It was
-                 `.cube,text/plain`, and on an iPad the Files picker greyed every
-                 .cube out — six of them, one fully downloaded at 885 KB,
-                 unselectable. iOS filters by type identifier: `.cube` is
-                 registered to nothing so it matches no allowed type, and
-                 text/plain resolves to public.plain-text, which does not claim a
-                 file the system has typed public.data. Neither entry could ever
-                 match. src/keepfile.ts:27 is the same finding measured on this
-                 device for .ipskeep, and the remedy there — end the name in a
-                 type the platform registers — is not open to us, because the
-                 reader brings this file rather than the app writing it.
-                 A NARROWER LIST IS NOT ACHIEVABLE. Anything that makes a .cube
-                 selectable makes everything selectable, application/octet-stream
-                 included: it maps to public.data, the root every file descends
-                 from, so it reads like a filter and is none. The markup should
-                 not pretend. parseCube refuses non-LUT text with a sentence
-                 written for a reader; a single .cube is checked against the
-                 size cap first. A picked .zip is routed by its own header
-                 (src/lutpack.ts) and its per-entry ceiling is checked there,
-                 before each LUT inside it is read. -->
-            <input id="lutFile" type="file" hidden />
+            <!-- IMPORT, YOUR LIBRARY AND APPLY ALL MOVED TO lutManageDlg. None of
+                 that needs a photo open — only what is below this button does
+                 (the currently-applied strip) — so it now works from the start
+                 screen and the (i) button too, the same convention as "Measure
+                 your lens" beside it: a destination in its own right, opened
+                 from wherever a reader is. -->
+            <button id="lutManageBtn" type="button">Manage your LUTs&hellip;</button>
+            <p class="note">Import a .cube or a pack, apply one, or remove it &mdash; opens the same panel as the start screen and the (i) button. The R&#8646;B swap above runs first, so it composes with whatever you apply there.</p>
             <div id="lutActive" class="lut-active" hidden>
               <div class="lut-active-name"><span class="lut-badge">LUT</span> <span id="lutActiveName"></span></div>
               <label class="lut-strength-row">Strength
@@ -809,8 +796,7 @@
               </label>
               <button id="lutRemoveBtn" type="button">Remove LUT</button>
             </div>
-            <div id="lutList" class="lut-list"></div>
-            <small class="note">A LUT recolours the finished image on top of everything above &mdash; in the preview and every export alike. An exported <strong>.cube</strong> includes it baked in; <strong>.dcp</strong> can't carry it. LUTs are stored on this device (sizes shown) &mdash; delete any time. Links and look codes can't carry a LUT; share its .cube file instead. A pack imports as many as there is room for and says what it could not take.</small>
+            <small class="note">A LUT recolours the finished image on top of everything above &mdash; in the preview and every export alike. An exported <strong>.cube</strong> includes it baked in; <strong>.dcp</strong> can't carry it. Links and look codes can't carry a LUT; share its .cube file instead.</small>
           </section>
 
           <!-- ===== STICKERS (Creative) ===== -->
@@ -1417,6 +1403,10 @@
       </p>
       <h3 class="rm-head" id="settingsHead">Settings</h3>
       <div class="set-row">
+        <button id="infoLutBtn" type="button">Manage your LUTs&hellip;</button>
+        <small class="note">Import a colour file or a pack, apply one, or clear one out &mdash; works with no photo open, same panel as the start screen.</small>
+      </div>
+      <div class="set-row">
         <button id="infoDiag" type="button">Something&rsquo;s wrong &mdash; the report to send</button>
         <small class="note">Opens a plain-text report of what this device is and how the app is set up here, ready to copy into a message, plus a page that measures how fast this device actually runs. It carries nothing about your photos.</small>
       </div>
@@ -1532,6 +1522,48 @@
         </div>
       </div>
       <button id="lensClose" type="button">Close</button>
+    </dialog>
+
+    <!-- Imported LUTs — your library and applying one. A destination in its
+         own right, same reasoning as lensDlg above it: importing, browsing
+         and deleting a stored colour file need no photo open, so this works
+         from the start screen and the (i) button too, not only from Grade.
+         Only the currently-applied strip (#lutActive, on Grade) stays tied
+         to an open photo — everything here is id-based already (057), so
+         moving this markup out of #sec-grade changed no JS. -->
+    <dialog id="lutManageDlg" aria-labelledby="lutManageDlgTitle">
+      <div class="dlg-bar">
+        <h2 id="lutManageDlgTitle">Manage your LUTs</h2>
+        <button id="lutManageCloseTop" type="button" class="dlg-x" aria-label="Close">&#10005;</button>
+      </div>
+      <div class="dlg-body">
+        <button id="lutImportBtn" type="button">Import .cube LUTs&hellip;</button>
+        <p class="note">Pick one <strong>.cube</strong>, or a <strong>.zip</strong> holding a whole pack &mdash; as many as there is room for come in at once, folders and all. <strong>On an iPad a .zip is the surest route</strong>, and it saves picking them one at a time.</p>
+        <!-- NO accept, AND THAT IS THE FIX RATHER THAN AN OVERSIGHT. It was
+             `.cube,text/plain`, and on an iPad the Files picker greyed every
+             .cube out — six of them, one fully downloaded at 885 KB,
+             unselectable. iOS filters by type identifier: `.cube` is
+             registered to nothing so it matches no allowed type, and
+             text/plain resolves to public.plain-text, which does not claim a
+             file the system has typed public.data. Neither entry could ever
+             match. src/keepfile.ts:27 is the same finding measured on this
+             device for .ipskeep, and the remedy there — end the name in a
+             type the platform registers — is not open to us, because the
+             reader brings this file rather than the app writing it.
+             A NARROWER LIST IS NOT ACHIEVABLE. Anything that makes a .cube
+             selectable makes everything selectable, application/octet-stream
+             included: it maps to public.data, the root every file descends
+             from, so it reads like a filter and is none. The markup should
+             not pretend. parseCube refuses non-LUT text with a sentence
+             written for a reader; a single .cube is checked against the
+             size cap first. A picked .zip is routed by its own header
+             (src/lutpack.ts) and its per-entry ceiling is checked there,
+             before each LUT inside it is read. -->
+        <input id="lutFile" type="file" hidden />
+        <div id="lutList" class="lut-list"></div>
+        <p class="note">If a photo is open, <strong>Apply</strong> puts it on that photo's edit — this panel closes so you see it straight away. LUTs are stored on this device (sizes shown) &mdash; delete any time. A pack imports as many as there is room for and says what it could not take.</p>
+      </div>
+      <button id="lutManageClose" type="button">Close</button>
     </dialog>
 
     <dialog id="askDlg" aria-labelledby="askTitle">
