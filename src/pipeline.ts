@@ -991,35 +991,80 @@ export function sampleBrush(b: BrushMask, u: number, v: number): number {
 }
 
 /** Mask weight 0..1 at image-uv (u,v). Kept numerically identical to the shader. */
-/** HOW MUCH OF AN AIMED STAGE APPLIES AT THIS PIXEL (decision 030).
+/** WHETHER A HEAD'S AIM CAN REACH ITS GROUP (decision 042, stage 1).
  *
- *  Takes the mask list, one AIM_* bit, and the pixel's `u`, `v`. Returns 1 when
- *  no mask aims at that stage — which is the whole point: an unaimed stage is
- *  whole-frame and renders exactly as it always has.
+ *  Takes one group, head first; returns false when any member is a colour mask.
  *
- *  Otherwise it returns the UNION of the aiming masks' own weights, so two
+ *  What the caller relies on: an aim is read BEFORE the mask stage, where a
+ *  colour mask has no key, so a group that a colour mask shapes has no area an
+ *  aim could use there. Such a head's aim is then skipped rather than applied to
+ *  the head's shape alone, which would put the tool where the reader subtracted
+ *  it or outside where they intersected it. `aimWeight`, `aimsAt`, the shader's
+ *  `aimWeightOf` and the mask panel's note all use this one rule (032's
+ *  boundary: a colour key is not a place). */
+export function groupCanAim(group: readonly MaskLayer[]): boolean {
+  for (const m of group) if (m.type === 3) return false;
+  return true;
+}
+
+/** HOW MUCH OF AN AIMED STAGE APPLIES AT THIS PIXEL (decisions 030, 042).
+ *
+ *  Takes `groups`, the active groups (`maskGroupsForRender`, head first in each,
+ *  the same order the shader indexes once flattened), one AIM_* `bit`, and the
+ *  pixel's `u`, `v`. Returns 1 when nothing aims at that stage — which is the whole point: an
+ *  unaimed stage is whole-frame and renders exactly as it always has.
+ *
+ *  Otherwise it returns the UNION (the largest) of the aiming weights, so two
  *  masks aimed at one stage cover the union of their areas rather than
  *  multiplying each other down to nothing.
  *
- *  Takes the FLATTENED active groups — heads and components, the same list and
- *  order the shader indexes — so the two paths cannot walk different sets.
+ *  A HEAD'S AIM IS ITS GROUP'S AREA. The head's weight is folded with its
+ *  components through `groupWeight`, the same function the mask stage uses, so
+ *  a Radial subtracted from an aimed Sky mask takes the tool back out of that
+ *  area. Before 042's stage 1 this read the head's own shape alone, and an aimed
+ *  tool reached the subtracted area while the mask's own adjustment did not —
+ *  rendered on NIR_1651, the aimed frame was byte-identical with and without the
+ *  subtraction.
+ *
+ *  A COMPONENT'S OWN AIM stays on the component's own shape, as it rendered
+ *  before, so an edit saved with an aimed component does not move.
  *
  *  What the caller relies on: this is computable BEFORE the mask stage, because
- *  it reads only geometry and bitmaps. Colour masks are skipped — their key
- *  does not exist this early — so a reader who aims one gets no effect rather
- *  than a wrong one, and the UI does not offer it. `src/gl.ts` carries the same
- *  arithmetic and `tools/agreement-walk.mjs` is what holds the two together. */
-export function aimWeight(masks: readonly MaskLayer[], bit: number, u: number, v: number): number {
+ *  it reads only geometry and bitmaps. Colour masks are skipped — their key does
+ *  not exist this early — and so is a head whose group contains one
+ *  (`groupCanAim`); a reader who aims either gets no effect rather than a wrong
+ *  one, and the panel says why. `src/gl.ts` carries the same arithmetic and
+ *  `tools/agreement-walk.mjs` is what holds the two together. */
+export function aimWeight(groups: readonly (readonly MaskLayer[])[], bit: number, u: number, v: number): number {
   let w = 0, any = false;
-  for (const m of masks) {
-    if (!(m.aims && (m.aims & bit))) continue;
-    if (m.type === 3) continue; // no key this early — see MaskLayer.aims
-    any = true;
-    const mw = maskWeight(m, u, v);
-    if (mw > w) w = mw;
-    if (w >= 1) break;
+  for (const g of groups) {
+    for (let k = 0; k < g.length; k++) {
+      const m = g[k];
+      if (!(m.aims && (m.aims & bit))) continue;
+      if (m.type === 3) continue; // no key this early — see MaskLayer.aims
+      if (k === 0 && !groupCanAim(g)) continue;
+      any = true;
+      const mw = k === 0 ? groupWeight(g, (c) => maskWeight(c, u, v)) : maskWeight(m, u, v);
+      if (mw > w) w = mw;
+      if (w >= 1) return w;
+    }
   }
   return any ? w : 1;
+}
+
+/** Whether any mask in `groups` aims at the stage `bit` in a way `aimWeight`
+ *  reads. Takes the active groups and one AIM_* bit; returns true iff
+ *  `aimWeight` could return something other than 1. What the caller relies on:
+ *  it is the same predicate, so a stage skipped here is one `aimWeight` would
+ *  have left whole-frame anyway. */
+export function aimsAt(groups: readonly (readonly MaskLayer[])[], bit: number): boolean {
+  for (const g of groups) {
+    for (let k = 0; k < g.length; k++) {
+      const m = g[k];
+      if (m.aims && (m.aims & bit) && m.type !== 3 && (k > 0 || groupCanAim(g))) return true;
+    }
+  }
+  return false;
 }
 
 /** One pixel of linear source, by integer position — `raw/denoise.ts`'s
@@ -1035,7 +1080,7 @@ type LinearTap = (x: number, y: number) => ArrayLike<number>;
  *  @param off    the sampler as it was BEFORE this filter — what an aimed-away
  *                pixel gets back.
  *  @param on     the filtered sampler.
- *  @param masks  the flattened active groups, as `aimWeight` takes them.
+ *  @param groups the active groups, as `aimWeight` takes them.
  *  @param bit    one AIM_* bit.
  *  @param w      the source's pixel width, for pixel-to-uv.
  *  @param h      the source's pixel height, the same.
@@ -1060,16 +1105,16 @@ type LinearTap = (x: number, y: number) => ArrayLike<number>;
 export function aimedSampler(
   off: LinearTap,
   on: LinearTap,
-  masks: readonly MaskLayer[],
+  groups: readonly (readonly MaskLayer[])[],
   bit: number,
   w: number,
   h: number,
 ): LinearTap {
   if (off === on) return on; // the filter was already a no-op at these settings
-  if (!masks.some((m) => m.aims && (m.aims & bit) && m.type !== 3)) return on;
+  if (!aimsAt(groups, bit)) return on;
   const out = [0, 0, 0];
   return (x, y) => {
-    const k = aimWeight(masks, bit, (x + 0.5) / w, (y + 0.5) / h);
+    const k = aimWeight(groups, bit, (x + 0.5) / w, (y + 0.5) / h);
     if (k >= 1) return on(x, y);
     // WEIGHT 0 MUST NOT RUN THE FILTER, and the first version of this did.
     // `on` was called before the weight was branched on, so every pixel the
@@ -1782,12 +1827,12 @@ export function compileEdit(
   // groups whose head does something, and only then cap.
   const maskGroupsActive = maskGroupsForRender(p.masks);
   const masks = maskGroupsActive.map((g) => g[0]);
-  // THE FLATTENED LIST, HEADS AND COMPONENTS ALIKE, and it is what the shader
-  // indexes too (src/gl.ts flattens the same groups into its uniform arrays).
-  // Aiming reads this rather than `masks` above so the two paths walk exactly
-  // the same set in exactly the same order — the agreement walk is what would
-  // otherwise find them apart, after the fact.
-  const aimMasks = maskGroupsActive.flat();
+  // THE SAME GROUPS THE SHADER INDEXES (src/gl.ts flattens them, in this order,
+  // into its uniform arrays). Aiming reads these rather than `masks` above so the
+  // two paths walk exactly the same set in exactly the same order, and it reads
+  // them as GROUPS so a head's aim covers its group's area (042, stage 1) — the
+  // agreement walk is what would otherwise find the two apart, after the fact.
+  const aimGroups = maskGroupsActive;
   const hasColorMask = masks.some((m) => m.type === 3);
   const lensOn = (p.hotspot ?? 0) !== 0 || (p.vignette ?? 0) !== 0 || (p.hotspotColor ?? 0) !== 0;
   // The measured curve is its own stage: it must run whether or not any of the
@@ -1854,8 +1899,8 @@ export function compileEdit(
       // to aim a stage has exactly that: nothing of its own to do. Reading the
       // filtered list would have made the feature silently inert for the most
       // obvious way to use it.
-      const dzA = dz * aimWeight(aimMasks, AIM_DEHAZE, u, v);
-      const clA = cl * aimWeight(aimMasks, AIM_CLARITY, u, v);
+      const dzA = dz * aimWeight(aimGroups, AIM_DEHAZE, u, v);
+      const clA = cl * aimWeight(aimGroups, AIM_CLARITY, u, v);
       if (dzA !== 0) {
         // HUE-PRESERVING haze removal: veil-subtract the LUMINANCE only, then
         // scale all channels by the same factor. (Per-channel subtraction in
@@ -1897,7 +1942,7 @@ export function compileEdit(
       // hot-spot AMOUNT, never the combined gain — `vignette` rides the same
       // function and is whole-frame on purpose. gHot is linear in the amount,
       // so this is exactly the hot spot's own gain blended toward 1.
-      const lw = aimWeight(aimMasks, AIM_LENS, u, v);
+      const lw = aimWeight(aimGroups, AIM_LENS, u, v);
       const gain = radialGain(p.hotspot * lw, p.hotspotSize, p.vignette, u, v, aspect);
       r *= gain; g *= gain; b *= gain;
       // The COLOUR half, on the same circle. Before the swap and the matrix, so
@@ -1922,7 +1967,7 @@ export function compileEdit(
       // scaled strength — `lensGain` is 1/(1+(k-1)s) and is not linear in s,
       // so scaling the strength here and blending in the shader would be two
       // different renderings of the same edit. The shader blends too.
-      const lw = aimWeight(aimMasks, AIM_LENS, u, v);
+      const lw = aimWeight(aimGroups, AIM_LENS, u, v);
       r *= 1 + (lensGr![i] - 1) * lw;
       b *= 1 + (lensGb![i] - 1) * lw;
       if (lensGg) g *= 1 + (lensGg[i] - 1) * lw;
@@ -2093,7 +2138,7 @@ export function compileEdit(
     // EditParams.shadowSat for why the balance is not shared and what this is
     // for. Before the grade on purpose: any tint the reader adds then lands on
     // a neutral shadow. Same in the shader.
-    const shA = u !== undefined && v !== undefined ? shSat * aimWeight(aimMasks, AIM_SHADOW, u, v) : shSat;
+    const shA = u !== undefined && v !== undefined ? shSat * aimWeight(aimGroups, AIM_SHADOW, u, v) : shSat;
     if (shA > 0) {
       const L = out[0] * 0.2126 + out[1] * 0.7152 + out[2] * 0.0722;
       const k = 1 - shA * (1 - smooth01(0.05, 0.6, L));

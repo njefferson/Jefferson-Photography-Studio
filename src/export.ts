@@ -580,17 +580,17 @@ export async function exportImage(
   // AIMED, WHERE A MASK SAYS SO (decision 030). The flattened active groups are
   // the same list and order the shader indexes, taken here rather than reaching
   // into compileEdit's, because these pre-passes are composed before it runs.
-  const aimMasks = maskGroupsForRender(params.masks).flat();
+  const aimGroups = maskGroupsForRender(params.masks);
   const denoised = makeRowDenoiser(warped, srcW, srcH, params.denoise, proxyFactor, params.chroma ?? 0, params.despeckle ?? 0);
   // Back toward `warped` — the pixel as it ARRIVED, before the despeckle median
   // as well as the bilateral, because both are inside AIM_NOISE and the shader
   // mixes toward the same pre-despeckle value. See AIM_NOISE.
-  const noiseAimed = aimedSampler(warped, denoised, aimMasks, AIM_NOISE, srcW, srcH);
+  const noiseAimed = aimedSampler(warped, denoised, aimGroups, AIM_NOISE, srcW, srcH);
   const detailed = makeRowDetail(warped, noiseAimed, srcW, srcH, params.sharpen ?? 0, params.texture ?? 0, proxyFactor);
   // Back toward the sampler detail was GIVEN, not toward `warped`: detail's
   // base is the denoise result, so holding it back must restore that and not
   // undo the denoise with it.
-  const sampleLinear = aimedSampler(noiseAimed, detailed, aimMasks, AIM_TEXTURE, srcW, srcH);
+  const sampleLinear = aimedSampler(noiseAimed, detailed, aimGroups, AIM_TEXTURE, srcW, srcH);
   // THE SKY MAP, from THE SAME PRE-PASSED SAMPLER the pixels come through — not
   // the raw source. Built from the raw source it targeted a sky 16% more
   // saturated than the rendered one (skymap.ts has the numbers), because the

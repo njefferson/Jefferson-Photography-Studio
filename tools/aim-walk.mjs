@@ -14,6 +14,16 @@
 //   3. The aim HOLDS SOMETHING BACK: aimed differs from whole-frame.
 //   4. The aim still DOES something: aimed differs from the baseline.
 //
+// And for Dehaze, one more arm and two more statements (042, stage 1): the Sky
+// mask aims, with a Radial joined to it by "Subtract from it".
+//
+//   5. THE SUBTRACTED AREA TAKES THE TOOL BACK OUT: grouped differs from aimed.
+//      Before 042's first stage an aim read the head's own shape and ignored the
+//      join, and on this frame the two renders were byte-identical while the
+//      mask's own adjustment moved 8.7% of the picture under the same Radial.
+//      Made to fail once on that build before it was trusted.
+//   6. The rest of the aimed area keeps it: grouped differs from the baseline.
+//
 // And one number, printed rather than bounded: the share of the frame the aimed
 // arm moved, beside the share the Sky mask says it covers. They should be close;
 // they will not be equal, because the mask's edge is feathered and the stage is
@@ -35,7 +45,10 @@
 // reasoning is wrong.
 //
 //   python3 -m http.server 8131 --directory dist   (in another shell)
-//   node tools/aim-walk.mjs [--port=8131] [--shots=DIR]
+//   node tools/aim-walk.mjs [--port=8131] [--shots=DIR] [--only=dehaze]
+//
+// --only runs one stage's arms (and, for dehaze, the grouped arm), for proving a
+// new check fails on an old build without paying for the whole walk twice.
 import { chromium } from "/home/user/Jefferson-Photography-Studio/node_modules/playwright-core/index.mjs";
 import { requireFreshDist } from "./fresh-dist.mjs";
 requireFreshDist();
@@ -46,6 +59,7 @@ import { join } from "node:path";
 
 const PORT = (process.argv.find((a) => a.startsWith("--port=")) || "--port=8131").split("=")[1];
 const SHOTS = process.argv.find((a) => a.startsWith("--shots="))?.split("=")[1] ?? "";
+const ONLY = process.argv.find((a) => a.startsWith("--only="))?.split("=")[1] ?? "";
 const FILE = new URL("../public/examples/NIR_1651.dng", import.meta.url).pathname;
 if (SHOTS) mkdirSync(SHOTS, { recursive: true });
 
@@ -147,6 +161,7 @@ try {
   /** One stage, four arms, the four statements. `tab`/`id`/`value` name the
    *  whole-frame slider; `aimId` names the toggle on the mask panel. */
   async function stage(label, tab, id, value, aimId) {
+    if (ONLY && ONLY !== label) return null;
     console.log(`\n${label}  —  #${id} = ${value}, aimed with #${aimId}`);
     const setIt = async (p) => { await p.click(`#${tab}`); return setValue(p, id, value); };
     const base = await arm(`${label}-1-baseline`, async () => ({}));
@@ -170,9 +185,36 @@ try {
     // REPORTED, NOT BOUNDED. The mask's edge is feathered and no stage is
     // linear in the weight, so these two are near neighbours rather than equal.
     console.log(`        aimed arm moved ${(dAimed.moved * 100).toFixed(1)}% of the frame · ${aimed.notes.sky}`);
+    return { base, aimed, setIt };
   }
 
-  await stage("dehaze", "ptab-color", "dehaze", "0.8", "mAimDehaze");
+  /** THE AIM FOLLOWS THE JOIN (042, stage 1). Takes the label and aim button of
+   *  a stage `stage()` has just run, and its returned arms; adds one arm where a
+   *  Radial is subtracted from the aimed Sky mask, and asserts statements 5 and
+   *  6 against the aimed and baseline arms. A new Radial arrives with its
+   *  coverage tint on, so it is turned off before the read. */
+  async function grouped(label, aimId, arms) {
+    if (!arms) return;
+    const g = await arm(`${label}-5-aimed-minus-radial`, async (p) => {
+      const v = await arms.setIt(p);
+      const sky = await neutralSky(p, aimId);
+      await p.click("#addRadial"); await settle(p);
+      await p.click("#mJoinSub"); await settle(p);
+      if ((await p.getAttribute("#mOutline", "aria-pressed")) === "true") { await p.click("#mOutline"); await settle(p); }
+      return {
+        v, ...sky,
+        outline: await p.getAttribute("#mOutline", "aria-pressed"),
+        rows: await p.evaluate(() => [...document.querySelectorAll("#maskList .mask-row .mask-pick")].map((e) => e.textContent).join(" | ")),
+      };
+    });
+    check(`${label}: the grouped arm is the Sky mask aimed, with a Radial subtracted`, g.notes.aim === "true" && g.notes.own === "1,1,1,0,0" && /minus Radial/.test(g.notes.rows) && g.notes.outline === "false", `${g.notes.rows} · aim ${g.notes.aim} · own ${g.notes.own} · tint ${g.notes.outline}`);
+    const dJoin = diff(arms.aimed.f, g.f);
+    check(`${label}: 5 · the subtracted area takes the aimed tool back out`, !dJoin.same, `moved ${(dJoin.moved * 100).toFixed(2)}%, mean |RGB| ${dJoin.mean.toFixed(3)}`);
+    const dKeep = diff(arms.base.f, g.f);
+    check(`${label}: 6 · the rest of the aimed area keeps it`, !dKeep.same, `moved ${(dKeep.moved * 100).toFixed(2)}%, mean |RGB| ${dKeep.mean.toFixed(3)}`);
+  }
+
+  await grouped("dehaze", "mAimDehaze", await stage("dehaze", "ptab-color", "dehaze", "0.8", "mAimDehaze"));
   await stage("hotspot", "ptab-corrections", "hotspot", "0.8", "mAimLens");
   // THE TWO SPATIAL STAGES. Everything above scales a per-pixel gain; these mix
   // a filtered result back toward the unfiltered one, in two languages — the

@@ -424,19 +424,39 @@ float maskWeightOf(int i, vec3 cKey){
   return maskWeight(i, v_uv);
 }
 
-// HOW MUCH OF AN AIMED STAGE APPLIES HERE (decision 030). The mirror of
-// aimWeight() in pipeline.ts, walking the same flattened list in the same
+// HOW MUCH OF AN AIMED STAGE APPLIES HERE (decisions 030, 042). The mirror of
+// aimWeight() in pipeline.ts, walking the same flattened groups in the same
 // order. 1.0 when nothing aims, so an unaimed frame renders exactly as it did
 // before this existed. Colour masks are skipped: their key is the pixel as it
 // DISPLAYS at the mask stage and does not exist this early.
+// A HEAD'S AIM IS ITS GROUP'S AREA (042, stage 1): its weight is folded with its
+// components exactly as groupWeight() does, so an area subtracted from an aimed
+// mask stops getting the tool. A head whose group holds a colour mask cannot be
+// aimed at all (groupCanAim() in pipeline.ts); a component's own aim stays on
+// its own shape, as before.
 float aimWeightOf(int bit){
   float w = 0.0;
   bool any = false;
   for (int i = 0; i < u_maskCount; i++) {
     if ((u_maskAims[i] & bit) == 0) continue;
     if (u_maskType[i] == 3) continue;
+    float g = maskWeightOf(i, vec3(0.0));
+    if (u_maskOp[i] == 0) {
+      bool canAim = true;
+      for (int j = i + 1; j < u_maskCount; j++) {
+        if (u_maskOp[j] == 0) break;
+        if (u_maskType[j] == 3) { canAim = false; break; }
+      }
+      if (!canAim) continue;
+      for (int j = i + 1; j < u_maskCount; j++) {
+        if (u_maskOp[j] == 0) break;
+        if (g <= 0.0) break;
+        float wc = maskWeightOf(j, vec3(0.0));
+        g *= (u_maskOp[j] == 1) ? (1.0 - wc) : wc;
+      }
+    }
     any = true;
-    w = max(w, maskWeightOf(i, vec3(0.0)));
+    w = max(w, g);
     if (w >= 1.0) break;
   }
   return any ? w : 1.0;
