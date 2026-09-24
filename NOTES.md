@@ -569,26 +569,27 @@ user-scalable=no.
 > ships as **2.0**, not 1.2 (owner call, 2026-07-18). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
-- [ ] **A mask is a place, and most of the controls should work inside one** <!-- decision: 042 -->
-  **Shown as:** Masks get a place of their own, with far more of the controls working inside one.
-  filed 2026-09-21: masks should come out of the tab strip into a place of
-  their own, and inside a mask the reader should not be limited to the handful
-  of controls the mask menu offers.
-  **The menu is short because the pipeline is, not because the menu was written
-  short.** A mask carries five adjustments — brightness, contrast, saturation,
-  hue and warmth — folded in at one point in `compileEdit` and mirrored in the
-  shader, while `EditParams` carries about forty knobs that are all
-  whole-frame. So this is 030 arriving through the surface instead of through
-  the scope gate, and it is ranked directly below it.
-  **The editor this is modelled on is the one that limits the set**: Lightroom
-  hosts a fixed local list — tone, colour, effects and detail — and keeps
-  vibrance, the tone curve, the colour mixer, colour grading, lens corrections
-  and calibration global. darktable is the one that gives you everything, and
-  it does it by hanging a mask on every MODULE rather than on a panel. Which
-  means "every control inside a mask" is darktable's architecture, reachable
-  only by letting a selection gate a stage — 030's work, not a longer menu.
-  The mode and the first aimed controls therefore land together; a mode holding
-  today's five would promise more than it has. See
+- [ ] **A mask is a place, and the ordinary controls act inside it** <!-- decision: 042 -->
+  **Shown as:** Pick a mask and the ordinary controls work inside it — no separate mask menu.
+  The place shipped in 2.61; this is the second half, settled 2026-09-24:
+  selection quality is part of the job, and the ordinary controls act inside a
+  selected mask with no mask-only submenu. The shape that
+  matches is Capture One's: pick a mask and the tabs follow it. No editor
+  masks everything. Geometry, the decode, the look choice, the LUT file, the
+  absolute white point and the Auto buttons stay whole-photo, and each says
+  why in words.
+  Staged, and each stage is its own release:
+  - Stage 1 fixes a tool aimed at a mask ignoring what that mask subtracts.
+  - Stage 2 is the switch, with every stage after the mask stage per mask.
+    The five mask sliders and the six "here only" toggles go at the same
+    time.
+  - Stage 3 covers exposure, white balance and the foliage band. That band
+    limited to a place is the standard fix for cladding reddening with the
+    grass.
+  - Stage 4 covers clarity and dehaze, then sharpen and texture, then noise.
+  - Stage 5 covers the sky stages, with 052.
+  Three choices are answered from pictures: what a mask's value means, whether
+  the swap and mixer stay whole-photo, and where the mask list lives. See
   `docs/decisions/042-a-mask-is-a-place-and-most-controls-should-work-inside-one.md`.
 - [ ] **The red cast in the shadows comes off by hand, and should not have to** <!-- decision: 034 -->
   **Shown as:** The red cast in shadows comes off on its own, without reaching for the colour wheels.
@@ -682,6 +683,17 @@ user-scalable=no.
   card) are rendered and chosen from as pictures. `tools/bar-fit-walk.mjs`
   holds the two properties and fails today. See
   `docs/decisions/060-the-top-bar-wraps-and-the-start-card-has-become-a-noticeboard.md`.
+- [ ] **Choosing a colour file means leaving the photograph, eighteen times** <!-- decision: 062 -->
+  **Shown as:** Tap through your colour files and watch each one on your photograph, without leaving it.
+  Reported from the device 2026-09-24. The LUT manager is a full-screen list,
+  and comparing eighteen files means Apply, close, look and reopen eighteen
+  times. The convention (Lightroom on iPad, Apple Photos, Instagram) is a
+  browser beside the photograph with None first: a tap applies live, a second
+  tap gives strength, and Manage sits at the end. Its tiles are drawn from the
+  reader's own photograph, which is the only honest source here, because a
+  swap-type file undoes the app's own swap. Browsing must be one undo step, and
+  a file must survive the tab closing. Four layouts are rendered for choosing.
+  See `docs/decisions/062-choosing-a-colour-file-means-leaving-the-photograph.md`.
 - [ ] **A photograph that fills the screen with no way back out** <!-- decision: 012 --> — reported
   **Shown as:** Always get back to the whole photograph from the full view.
   from the iPad 2026-09-17: a photograph in the full view appeared zoomed in, and
@@ -759,6 +771,20 @@ user-scalable=no.
   that is — the same dependency test that put 023 at the top of the queue. See
   `docs/decisions/052-the-looks-sky-adjustments-read-a-selection-the-reader-cannot-see.md`.
 
+- [ ] **Red and blue do not line up at thin edges, and Aerochrome paints the difference** <!-- decision: 061 -->
+  **Shown as:** Thin dark lines against the sky, such as wires and pylons, stop picking up red and blue edges in Aerochrome.
+  Reported from the device 2026-09-24 against a full-resolution export of
+  pylons and wires. It is not the metal's reflectance: one black post is blue
+  on one edge and red on the other. Red and blue sit about half a preview
+  pixel apart after the editing copy's 2x2 binning, and the lens adds lateral
+  chromatic aberration toward the corners. Aerochrome's mixer turns a blue
+  error red at about 2.1x, where the swap passes it at 1x. Co-siting plus a
+  lens cancel took a post's edge from 469 red and 667 blue pixels to 149 and
+  0. The round spots along the wires are 013's Sky colour smoothing. The thin
+  red border lines are a demosaic clamp defect, fixed first. Then comes
+  per-photograph CA correction on the raw together with co-siting, rendered on
+  the reported frame's NEF before any code. See
+  `docs/decisions/061-red-and-blue-do-not-line-up-at-thin-edges.md`.
 - [ ] **Aerochrome is the right colour and comes out splotchy** <!-- decision: 013 --> — reported
   **Shown as:** Aerochrome comes out smooth instead of breaking into hard-edged patches.
   from the iPad 2026-09-17 with two frames, on the look that shipped the same day:
