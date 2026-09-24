@@ -788,8 +788,16 @@
                  screen and the (i) button too, the same convention as "Measure
                  your lens" beside it: a destination in its own right, opened
                  from wherever a reader is. -->
-            <button id="lutManageBtn" type="button">Manage your LUTs&hellip;</button>
-            <p class="note">Import a .cube or a pack, apply one, or delete one from this device &mdash; opens the same panel as the start screen and the (i) button. The R&#8646;B swap above runs first, so it composes with whatever you apply there.</p>
+            <!-- A GRID YOU TAP THROUGH, ON YOUR OWN PHOTOGRAPH (062). None first,
+                 one tile per stored file drawn from the photograph that is open,
+                 and Manage... last, which is the same 059 dialog the start screen
+                 and the (i) button open. A run of taps is one undo step; tapping
+                 the chosen tile again goes to its strength below. -->
+            <div id="lutGrid" class="lut-grid" role="group" aria-label="Your LUTs, each drawn on this photograph">
+              <button id="lutManageBtn" type="button" class="lut-manage">Manage&hellip;</button>
+            </div>
+            <p id="lutGridNote" class="note" role="status" aria-live="polite"></p>
+            <p class="note">Tap a LUT to see it on your photograph, and tap it again for its strength. A run of taps is one step to undo. <strong>Manage&hellip;</strong> imports a .cube or a pack, shares one, or deletes one from this device &mdash; the same panel as the start screen and the (i) button. The R&#8646;B swap above runs first, so it composes with whatever you choose here.</p>
             <div id="lutActive" class="lut-active" hidden>
               <div class="lut-active-name"><span class="lut-badge">LUT</span> <span id="lutActiveName"></span></div>
               <label class="lut-strength-row">Strength
@@ -1634,8 +1642,8 @@
           <li><strong>Open image(s)</strong> (or pick a practice photo). RAW — NEF or DNG — unlocks the full color range.
           Pick several and they become a <strong>session</strong>: a strip of previews along the bottom, tap to switch,
           each photo keeping its own edit — held safely, so a closed tab offers to <em>Resume</em> right where you were
-          (masks and imported LUTs are the two things a resume can't restore — they reset with a fresh open;
-          re-apply a LUT in a tap from <strong>Manage your LUTs</strong>).
+          (masks are the one thing a resume can't restore — they reset with a fresh open; an imported LUT
+          comes back with its photograph as long as it is still stored on this device).
           <strong>Done</strong> (on the strip) ends the session and frees the space.</li>
           <li><strong>Quick look a folder</strong> (top bar, and on the start screen) when you just want to <em>see</em> what's in a set:
           an instant grid of auto-balanced previews, nothing saved. Tap the keepers and <strong>Keep in a session</strong>
