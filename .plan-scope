@@ -1,15 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
 planhash=57a4a72df437f124
-diffhash=1c8f20b0b0fb53b2
-verdict=IN-SCOPE: all 9 changed files match the plan's item 3 and its 'Item 3 in progress' elaboration: the group-weight fold with groupCanAim/aimsAt, the panel note, the preview version bump, aim-walk's grouped arm with --only, generated line counts. No per-mask store, union, frame-time row, or owner quotation.
-# Commit: plan item 3, 042 stage 1, first commit: an aimed tool respects mask joins. Local branch stage1-cand on origin/staging (dd32298), per the plan's "Item 3 in progress" section.
-# - src/pipeline.ts: aimWeight takes the active groups and folds a head's aim through groupWeight; groupCanAim (a group with a colour mask cannot be aimed, 032's boundary) and aimsAt (the same predicate for aimedSampler's early exit); a component's own aim keeps its own shape. aimedSampler takes groups. The aim list is the groups, not the flattened list.
-# - src/export.ts: passes groups instead of the flattened list.
-# - src/gl.ts: aimWeightOf mirrors the fold and the colour rule.
-# - src/main.ts + ir.html: on a head a Colour mask is joined to, the aim toggles are disabled and one note (#mAimColourNote) says why ("says why it can't be aimed").
-# - src/previewcache.ts + tools/.preview-pipeline: PREVIEW_PIPELINE 56 -> 57 ("the preview version bumps").
-# - tools/aim-walk.mjs: the grouped arm (statements 5 and 6) and an --only=<stage> option used to run the fail-once on the old build at five arms instead of seventeen (named in the plan's Item 3 section).
-# - docs/ARCHITECTURE.md: generated line counts only.
-# Evidence: join defect rendered and opened before building (B == A byte-identical, C != C0 by 8.71%); aim-walk grouped check 5 FAILED on the old build, all aim-walk checks pass on the fix; agreement, export-bytes and a11y walks pass; a one-off preview-vs-export check on a grouped aim shows the export changes where the preview does (Dehaze 96.6%/98.2% overlap).
-# Not in this commit: 048's union and its gate, the frame-time row (later commits in the same candidate); the per-mask store (waits for M1, per the plan).
+diffhash=0e183b0edf0faf9d
+verdict=IN-SCOPE: HEAD's tree matches the judged union change file for file; the amend changes only the commit message, dropping an unverified example.
+# Message-only amend of d74309a (the union commit): drops the unverified example 'or behind a branch'. Tree unchanged from the judged union change.

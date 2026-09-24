@@ -129,7 +129,7 @@ uniform int u_maskSlot[8];   // brush/sky: which packed channel (0..3); -1 other
 uniform sampler2DArray u_maskTex; // brush/sky masks, four per RGBA layer (MAX_BITMAP_MASKS max)
 uniform sampler2DArray u_maskFineTex; // sky masks (type 4) refined to the picture's edges, same slots
 uniform bool u_maskFineOn;      // false when no sky mask has a refinement to read
-uniform int u_maskOp[8];     // 0 head (starts a group) · 1 subtract · 2 intersect (026)
+uniform int u_maskOp[8];     // 0 head (starts a group) · 1 subtract · 2 intersect (026) · 3 union (048)
 uniform int u_maskAims[8];   // bitmask of stages this mask gates: 1 dehaze, 2 clarity, 4 shadow colour, 8 lens hot-spot fix, 16 noise, 32 detail (030)
                              // LITERAL 8, like every array above it: MAX_MASKS is a
                              // TypeScript constant and means nothing inside GLSL —
@@ -450,9 +450,9 @@ float aimWeightOf(int bit){
       if (!canAim) continue;
       for (int j = i + 1; j < u_maskCount; j++) {
         if (u_maskOp[j] == 0) break;
-        if (g <= 0.0) break;
+        if (g <= 0.0 && u_maskOp[j] != 3) continue;
         float wc = maskWeightOf(j, vec3(0.0));
-        g *= (u_maskOp[j] == 1) ? (1.0 - wc) : wc;
+        g = (u_maskOp[j] == 1) ? g * (1.0 - wc) : (u_maskOp[j] == 3) ? g + wc - g * wc : g * wc;
       }
     }
     any = true;
@@ -820,9 +820,9 @@ void main() {
     // holds the two to each other.
     for (int j = i + 1; j < u_maskCount; j++) {
       if (u_maskOp[j] == 0) break;          // next head: this group is done
-      if (w <= 0.0) break;
+      if (w <= 0.0 && u_maskOp[j] != 3) continue; // only a union can raise a zero (048)
       float wc = maskWeightOf(j, cKey);
-      w *= (u_maskOp[j] == 1) ? (1.0 - wc) : wc;
+      w = (u_maskOp[j] == 1) ? w * (1.0 - wc) : (u_maskOp[j] == 3) ? w + wc - w * wc : w * wc;
     }
     if (i == u_maskViz) vizW = w; // the true post-invert coverage of the shown mask
     if (w <= 0.0) continue;
@@ -1908,7 +1908,7 @@ export class Renderer {
       const adj = new Float32Array(MAX_MASKS * 4);
       const hue = new Float32Array(MAX_MASKS);
       const slot = new Int32Array(MAX_MASKS).fill(-1);
-      const op = new Int32Array(MAX_MASKS);   // 0 head · 1 subtract · 2 intersect (026)
+      const op = new Int32Array(MAX_MASKS);   // 0 head · 1 subtract · 2 intersect (026) · 3 union (048)
       masks.forEach((m, i) => {
         types[i] = m.type;
         // The FIRST mask uploaded always starts a group, whatever it carries:

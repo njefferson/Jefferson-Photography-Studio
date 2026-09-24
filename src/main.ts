@@ -5956,6 +5956,7 @@ const mUI = {
   aimColourNote: $("mAimColourNote") as HTMLElement,
   joinRow: $("mJoinRow") as HTMLFieldSetElement,
   joinAdd: $("mJoinAdd") as HTMLInputElement,
+  joinUni: $("mJoinUni") as HTMLInputElement,
   joinSub: $("mJoinSub") as HTMLInputElement,
   joinInt: $("mJoinInt") as HTMLInputElement,
   brushControls: $("brushControls") as HTMLElement,
@@ -6489,7 +6490,7 @@ function updateMaskUI() {
       // beside a mask name is not self-explaining either. The first mask can
       // never be a component — the shader forces the first uploaded mask to be
       // a head — so its op is not consulted.
-      const joinWord = i > 0 && m.op === 1 ? "minus " : i > 0 && m.op === 2 ? "within " : "";
+      const joinWord = i > 0 && m.op === 1 ? "minus " : i > 0 && m.op === 2 ? "within " : i > 0 && m.op === 3 ? "plus " : "";
       // THE NAME THE READER GAVE IT, or the derived one (040). A name REPLACES
       // the type and number rather than sitting beside them — two labels on one
       // row is how a list stops being scannable — but the join word stays in
@@ -6598,6 +6599,7 @@ function updateMaskUI() {
     $("mJoinNote").hidden = first;
     const op = m.op ?? 0;
     mUI.joinAdd.checked = op === 0;
+    mUI.joinUni.checked = op === 3;
     mUI.joinSub.checked = op === 1;
     mUI.joinInt.checked = op === 2;
   }
@@ -6683,7 +6685,7 @@ mUI.invert.addEventListener("click", () => {
 // The join operator (026). Changing it re-groups the list, so the mask panel
 // redraws: a mask that becomes a component stops owning an adjustment, and the
 // one above it gains a shape.
-for (const [el, v] of [[mUI.joinAdd, 0], [mUI.joinSub, 1], [mUI.joinInt, 2]] as const) {
+for (const [el, v] of [[mUI.joinAdd, 0], [mUI.joinUni, 3], [mUI.joinSub, 1], [mUI.joinInt, 2]] as const) {
   el.addEventListener("change", () => {
     const m = currentMask();
     if (!m || !el.checked) return;

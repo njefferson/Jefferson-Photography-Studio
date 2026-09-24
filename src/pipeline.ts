@@ -771,15 +771,16 @@ export interface MaskLayer {
    *  selections combining into one region have no sensible answer to "whose
    *  adjustment applies" unless one of them owns it.
    *
-   *  Soft edges compose multiplicatively rather than by hard set logic, which
-   *  is darktable's exclusive/inclusive algebra: subtract is `w * (1 - wc)`,
-   *  intersect is `w * wc`. Both reduce to the boolean operation when the
-   *  masks are 0/1 and stay continuous in between.
+   *  Soft edges compose by darktable's exclusive/inclusive algebra rather than
+   *  by hard set logic: subtract (1) is `w * (1 - wc)`, intersect (2) is
+   *  `w * wc`, and union (3, decision 048) is `w + wc - w * wc` — invert,
+   *  multiply, invert. All three reduce to the boolean operation when the masks
+   *  are 0/1 and stay continuous in between.
    *
    *  A file written before this field has it absent everywhere, which reads as
    *  every mask starting its own group — exactly today's behaviour, so old
    *  edits and undo snapshots migrate by doing nothing. */
-  op?: 0 | 1 | 2;
+  op?: 0 | 1 | 2 | 3;
   /** WHAT THE READER CALLS THIS MASK (040), or absent for the derived name.
    *
    *  Absent means the list shows what it has always shown — the type and the
@@ -904,9 +905,19 @@ export function maskGroups(masks: readonly MaskLayer[]): MaskLayer[][] {
  */
 export function groupWeight(group: readonly MaskLayer[], weightOf: (m: MaskLayer) => number): number {
   let w = weightOf(group[0]);
-  for (let i = 1; i < group.length && w > 0; i++) {
+  for (let i = 1; i < group.length; i++) {
+    const op = group[i].op;
+    // A ZERO WEIGHT STAYS ZERO UNDER SUBTRACT AND INTERSECT, so their component
+    // need not be read — but a UNION can raise it (048), so the fold can never
+    // stop early the way it did before union existed.
+    if (w <= 0 && op !== 3) continue;
     const c = weightOf(group[i]);
-    w *= group[i].op === 1 ? 1 - c : c;   // subtract : intersect
+    // THREE CASES, AND INTERSECT KEEPS ITS OWN (048): union is added beside the
+    // multiply, never folded into it, so "Only where both" cannot be lost to a
+    // later simplification. tools/join-fold-check.mjs holds all three.
+    if (op === 1) w *= 1 - c;             // subtract
+    else if (op === 3) w = w + c - w * c; // union
+    else w *= c;                          // intersect
   }
   return w;
 }
