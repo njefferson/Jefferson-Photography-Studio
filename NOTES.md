@@ -43,31 +43,30 @@ because they floor temperature at ~2000K.
 
 ## On staging, waiting on a device pass
 
-**v2.62.10 at https://staging.jefferson-photo-studio.pages.dev, pushed
-2026-09-24.** Four commits on top of production:
+**v2.62.16 at https://staging.jefferson-photo-studio.pages.dev, pushed
+2026-09-24.** Two commits on top of production. v2.62.10, the build that was
+here before, went to production on the go the same day, as 2.62.14 (the last
+digit counts every commit, so the number moved while the content did not).
 
-- the Share icon on the start page draws on the iPad, and its button is a
-  44px target;
-- the comments in the shipped pages no longer credit anyone (internal: a
-  build diff proved every script and stylesheet byte-identical);
-- the messages about colour-file storage being full point to Manage your
-  LUTs, and so does Help;
-- the ⓘ panel says where the app's numbers come from, and links the fonts'
-  licence, which now ships with them.
+- full-size exports no longer have a line of the wrong colour along their
+  edges: the export read a neighbouring pixel of the wrong colour at the
+  border, on all four sides;
+- the device test page reports how much room the editor's graphics have for
+  masks with their own settings, which decides how that work is built.
 
-**What the device pass covers**, including the parts of 2.62 not yet checked
-on the iPad:
+**What the device pass covers:**
 
-1. The start page's Share button, in the installed app: an arrow, not a box.
-2. Offline launch from the home screen.
-3. A single `.cube` and a `.zip` picked in Files.
-4. Manage your LUTs from the start screen, from the ⓘ panel and from Grade.
-5. The Looks badge in both orientations.
-6. The Rob Shea link and the new Fonts link, from the installed app.
+1. Export one photograph at full size and look at its four edges: no line of
+   magenta, green or any other colour one pixel wide.
+2. In the editor, tap the version number, then Test this device, and press Run
+   the speed tests. The first two rows are new, Edit shader: uniforms and Edit
+   shader: textures. Copy the results and send them; that number is the one
+   the mask work needs from the iPad.
 
-Walks run against this build: a11y-walk, lutpack-walk and offline-shell-walk
-pass. control-walk (advisory) reports 54 controls to answer for, the same
-backlog as before; the LUT manager's three controls are among those reached.
+Walks run against this build: the export check (one core and several, byte
+for byte the same), the multi-core TIFF check, the agreement walk and the
+accessibility sweep, on the candidate before it was moved onto 2.62.14; the
+export check and the accessibility sweep again after.
 
 ## Confirmed
 
@@ -792,7 +791,7 @@ user-scalable=no.
   `docs/decisions/052-the-looks-sky-adjustments-read-a-selection-the-reader-cannot-see.md`.
 
 - [ ] **Red and blue do not line up at thin edges, and Aerochrome paints the difference** <!-- decision: 061 -->
-  **Shown as:** Thin dark lines against the sky, such as wires and pylons, stop picking up red and blue edges in Aerochrome.
+  **Shown as:** Dark posts against the sky stop turning red on one side and blue on the other in Aerochrome.
   Reported from the device 2026-09-24 against a full-resolution export of
   pylons and wires. It is not the metal's reflectance: one black post is blue
   on one edge and red on the other. Red and blue sit about half a preview
@@ -802,8 +801,13 @@ user-scalable=no.
   lens cancel took a post's edge from 469 red and 667 blue pixels to 149 and
   0. The round spots along the wires are 013's Sky colour smoothing. The thin
   red border lines are a demosaic clamp defect, fixed first. Then comes
-  per-photograph CA correction on the raw together with co-siting, rendered on
-  the reported frame's NEF before any code. See
+  per-photograph CA correction on the raw together with co-siting.
+  **Measured on the reported frame's raw, NIR_3461, the same day, and it moves
+  that frame's answer:** its red wires and pylons are the foliage band
+  selecting by colour, not the channels. Foliage at 0 takes strongly red
+  pixels above the horizon from 16,430 to 0; co-siting takes none. That
+  frame's remedy is the foliage band limited to a place, which is 042's. The
+  channel work still answers edges like NIR_3430's posts. See
   `docs/decisions/061-red-and-blue-do-not-line-up-at-thin-edges.md`.
 - [ ] **Aerochrome is the right colour and comes out splotchy** <!-- decision: 013 --> — reported
   **Shown as:** Aerochrome comes out smooth instead of breaking into hard-edged patches.
@@ -1327,6 +1331,18 @@ user-scalable=no.
   The decision that comes with it is the owner's: a drawn export cannot be
   byte-identical to today's, because a graphics chip computes in float where the
   processor uses doubles. It would match the PREVIEW instead.
+
+## The patch-note check cannot pass in a git worktree, 2026-09-24
+
+Found committing a held candidate from a worktree. `tools/patch-note-check.mjs`
+builds the live hook's path as `<repo>/.git/hooks/commit-msg` (line 146). In a
+worktree `.git` is a FILE pointing at the shared git directory, so that path
+never exists and the pre-commit chain refuses every commit with "is MISSING",
+while git itself runs the shared `commit-msg` hook correctly. The known fix is
+to ask git where the hook lives: `git rev-parse --git-path hooks/commit-msg`.
+Not fixed here, because changing a gate was not in the plan in force; the two
+candidate commits were made in the main checkout on a local branch instead,
+and every gate in the chain ran on them.
 
 ## The workflows are pinned, and one action is not yet, 2026-09-24
 
