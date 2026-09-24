@@ -156,8 +156,10 @@ inside the new dialog. The explanation first written here was wrong: that
 sweep does not drive trigger buttons, it opens every dialog declared in
 `tools/surfaces.mjs`'s `PAGES` with `showModal()` and sweeps what is
 inside, and `lutManageDlg` is declared there. So those three should have
-been reached. The count is re-measured on the next staging candidate before
-any cause is written down.
+been reached, and they are: re-measured 2026-09-24 against the build of the
+next staging candidate, the sweep reports 54 controls to answer for, with
+`lutManageClose`, `lutManageCloseTop` and `lutImportBtn` all reached. The
+54-to-57 figure was never true of this dialog.
 
 **What was not re-litigated.** The currently-applied strip's own copy
 ("A LUT recolours the finished image on top of everything above...") was

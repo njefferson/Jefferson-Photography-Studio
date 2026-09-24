@@ -83,8 +83,8 @@
       <h2>Where the builds are</h2>
       <ul class="facts">
         <li><b>Production</b> <span>v2.62, carrying documentation commits since, which change nothing you see.</span></li>
-        <li><b>On staging</b> <span>v2.62, the same app as production. Nothing new is waiting there yet.</span></li>
-        <li><b>Last verified green</b> <span><code>a5e5052</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
+        <li><b>On staging</b> <span>v2.62.10: the small fixes below, waiting for a pass on the iPad.</span></li>
+        <li><b>Last verified green</b> <span><code>ca03d00</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
         <li><b>Next version</b> <span>2.63, when masks gain their own amounts. The fixes before that take the increment digit and no version bump.</span></li>
       </ul>
 
@@ -110,12 +110,13 @@
             settings. A session cannot change its own network access.
           </li>
           <li>
-            <strong>A device pass</strong>, once the fixes below reach staging. It
+            <strong>A device pass on staging</strong>, v2.62.10. It
             also covers the parts of 2.62 not yet checked on the iPad: launching
             offline from the home screen, picking a <code>.cube</code> and a
             <code>.zip</code> in Files, reaching the LUT manager three ways, the
-            Looks badge in both orientations, and the link to Rob Shea's LUTs from
-            the installed app.
+            Looks badge in both orientations, and the Rob Shea and Fonts links from
+            the installed app. The Share button on the start page should show an
+            arrow, not a box.
           </li>
         </ul>
       </div>
@@ -136,13 +137,15 @@
           named who asked. More than 330 places were rewritten as the engineering fact, and
           four details that were simply wrong were corrected in the same pass.
         </li>
-        <li class="now"><span class="state">Researching</span>
+        <li class="done"><span class="state">Answered</span>
           <strong>Why Aerochrome draws red around steel against the sky.</strong>
-          The wires themselves render red, soft round red spots sit along them, one
-          face of each pylon is red, and the sky seen through the lattice is grey.
-          Being checked against published sources and reproduced on the practice
-          photos stage by stage, with every render opened, before any answer about
-          reflectance is given.
+          Not the metal's reflectance, for the colour outside it: one black post is
+          blue on one edge and red on the other. Red and blue sit about half a pixel
+          apart in the editing copy, the lens adds its own offset toward the
+          corners, and Aerochrome's mixer turns that difference red at about twice
+          its size. The round spots are Sky colour smoothing, and they go at 0. The
+          fix belongs on the raw at decode, rendered on your own photograph first,
+          which needs the NEF.
         </li>
         <li class="now"><span class="state">Researched</span>
           <strong>Masks that mask, with every control acting inside them.</strong>
@@ -173,17 +176,22 @@
           the undo history, and a LUT must survive the iPad closing the tab. Four
           layouts will be drawn and shown as pictures.
         </li>
-        <li class="now"><span class="state">In progress</span>
+        <li class="waiting"><span class="state">On staging</span>
           <strong>One staging build of small fixes.</strong>
           The Share icon on the start page, which draws a character the iPad has no
-          font for; five messages that still send you to "Profiles &amp; LUTs"; the
-          licence text the four fonts require; and a line saying where the app's
-          colour numbers come from.
+          font for, and its button is now a full 44-pixel target; the messages that
+          still sent you to "Profiles &amp; LUTs"; the licence text the four fonts
+          require; and a paragraph saying where the app's numbers come from. The
+          comments in the shipped pages no longer credit anyone, proven to change
+          nothing else in the build.
         </li>
-        <li class="later"><span class="state">Queued</span>
+        <li class="now"><span class="state">In progress</span>
           <strong>The checks that should have caught the red.</strong>
-          The privacy checks run before a commit instead of only on the server, and
-          the records refuse wording that says who asked.
+          Done on the hub: seven lessons carry the day's evidence, the lessons
+          check reads every enforcement line (it was missing 23), and the doctrine
+          sync names each lesson that changed. Still to come: the privacy checks
+          before a commit, which waits on your answer, and the records refusing
+          wording that says who asked.
         </li>
         <li class="later"><span class="state">Queued</span>
           <strong>Masks, in code.</strong>

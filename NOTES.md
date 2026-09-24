@@ -41,6 +41,34 @@ because they floor temperature at ~2000K.
 - No pseudo code or drafts: finished work only, after **repeated review
   passes**.
 
+## On staging, waiting on a device pass
+
+**v2.62.10 at https://staging.jefferson-photo-studio.pages.dev, pushed
+2026-09-24.** Four commits on top of production:
+
+- the Share icon on the start page draws on the iPad, and its button is a
+  44px target;
+- the comments in the shipped pages no longer credit anyone (internal: a
+  build diff proved every script and stylesheet byte-identical);
+- the messages about colour-file storage being full point to Manage your
+  LUTs, and so does Help;
+- the ⓘ panel says where the app's numbers come from, and links the fonts'
+  licence, which now ships with them.
+
+**What the device pass covers**, including the parts of 2.62 not yet checked
+on the iPad:
+
+1. The start page's Share button, in the installed app: an arrow, not a box.
+2. Offline launch from the home screen.
+3. A single `.cube` and a `.zip` picked in Files.
+4. Manage your LUTs from the start screen, from the ⓘ panel and from Grade.
+5. The Looks badge in both orientations.
+6. The Rob Shea link and the new Fonts link, from the installed app.
+
+Walks run against this build: a11y-walk, lutpack-walk and offline-shell-walk
+pass. control-walk (advisory) reports 54 controls to answer for, the same
+backlog as before; the LUT manager's three controls are among those reached.
+
 ## Confirmed
 
 - Camera: **Nikon Z50, IR-converted**. Filters tested: **red, 530nm, 720nm,
