@@ -151,6 +151,33 @@ if (!bad) ok("every record is about the item that claims it");
 // ---- 3. EVERY RECORD IS FILLED IN. A heading with nothing under it is the
 // slot this whole system exists to refuse: the shape of having done the
 // thinking, without the thinking.
+// A RECORD SAYS WHAT WAS WRONG AND WHAT IT MEASURED, NEVER WHO SAID IT OR WHERE.
+// Measured 2026-09-24: two records opened with a chat message pasted in after
+// "Reported in chat", a third credited its decisions to "the reader's
+// follow-up", and every privacy gate passed, because each of those patterns
+// anchors on a name or on "the owner" and none of these carried either. These
+// are the shapes that got through, and they are refused in every record, open
+// or archived. "The reader wants X" stays legal: a record describing what
+// readers in general want is the job. Only provenance is refused.
+const PROVENANCE = [
+  [/\b(?:asked|reported|said|filed|raised|mentioned|told)\s+in\s+(?:the\s+|this\s+)?(?:session'?s?\s+)?chat\b/i, "chat provenance"],
+  [/\bin\s+(?:this|the)\s+(?:session'?s?\s+)?chat\b/i, "chat provenance"],
+  [/\bthe\s+reader'?s\s+follow-up\b/i, "a decision credited to a reader"],
+  [/\bthe\s+reader\s+asked\b/i, "a request credited to a reader"],
+  [/\bowner[- ](?:report|ask|asked|caught)\b/i, "a report credited by role"],
+  [/\(owner[,)]/i, "a report credited by role"],
+];
+let provenanceHits = 0;
+for (const f of files) {
+  const text = readFileSync(join(DIR, f), "utf8");
+  text.split("\n").forEach((line, i) => {
+    for (const [re, what] of PROVENANCE) {
+      if (re.test(line)) { provenanceHits++; fail(`docs/decisions/${f}:${i + 1} carries ${what}. Say what was wrong and what it measured; never who said it or where.`); }
+    }
+  });
+}
+if (!provenanceHits) ok("no record says who asked, or that it was asked in chat");
+
 const OPEN_SECTIONS = ["Context", "Looked up", "Weighed against", "Options", "Rejected", "Rank"];
 const body = (text, h) => {
   const m = text.match(new RegExp(`^##\\s+${h}\\b[^\\n]*\\n([\\s\\S]*?)(?=^##\\s|$(?![\\s\\S]))`, "mi"));

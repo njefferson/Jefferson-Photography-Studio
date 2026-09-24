@@ -1,11 +1,11 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
 planhash=e643191cd7b74f81
-diffhash=b2a14ef73b64c25f
-verdict=IN-SCOPE: docs-only rewrite of 042, new records 061 and 062, three matching roadmap bullets and the status page, implementing Units 5, 3.4 and 3.5 with no product code and no attribution
-# Docs: record 042 rewritten around the 2026-09-24 ruling (stated as three requirements, not quoted), with
-# the 2.61 commits in Built already, parseable Rejected bullets, the narrowed Rejected 3, Capture One as
-# the model, stages 0-5 and M1-M3 open; record 061 carries 3.4's outcome and ownership split; record 062
-# carries 3.5's convention and problems with the layout left to pictures; three roadmap bullets; the
-# status page. No product code. Judged by an independent subagent that read the plan by path, after a
-# first review caught a quoted phrase of the ruling, which was reworded.
+diffhash=11e4be98bc8c621d
+verdict=IN-SCOPE: the five-file diff implements exactly the four listed JPS items from Close the gates, with no drift and no pronoun or attribution violations
+# Unit 4, the JPS items: decisions-check refuses chat provenance and credit to a reader or a role in
+# every record (each pattern planted and refused; "the reader wants" left legal for readers in general);
+# notes-check counts what notes.html renders through the build's own Shown-as filter and refuses zero
+# (planted and refused; 5 rendered, matching the built page); the hub pin and .doctrine-sync moved
+# together to 5c57d1f; CLAUDE.md's staging check is by content; notes-check's header names the shape it
+# cannot see. Judged by an independent subagent that read the plan by path.
