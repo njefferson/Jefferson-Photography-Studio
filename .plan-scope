@@ -1,40 +1,51 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=89267207db3a7a43
-diffhash=9748f9246eeca58a
-verdict=IN-SCOPE: the staged diff moves Imported LUTs from Export to Grade exactly as planned, with the breadcrumb, the tab-name fix, and the archived decision record, and nothing else.
-# Independent scope judge, reading the plan by path and the staged diff.
+planhash=a808e7de1361cd99
+diffhash=150a47a62fd458c3
+verdict=IN-SCOPE: all five changed files map to the approved plan's four steps or are mechanical consequences of existing repo gates (decisions-check.mjs's roadmap-claim requirement, architecture-check.mjs's line-count sync); no scope creep found
+# Plan's own stated scope (/root/.claude/plans/linear-baking-island.md): answer
+# three chat questions with research only (Aerochrome+LUT composition,
+# Looks/LUT grouping, recipe-vs-LUT vocabulary — no code from these), then ship
+# the one real decision the owner's follow-up authorized: (1) fix a two-fact
+# stale text passage in ir.html's Help dialog, (2) add a credit link to Rob
+# Shea's free infrared LUT pack in the (i) dialog, (3) badge a stacked LUT on
+# the built-in Looks row via updateLookUI()/applyLutToEdit()/lutRemoveBtn, and
+# (4) write decision record 058 covering both (2) and (3), touching 056 and
+# 057.
 # 
-# The staged diff (ir.html, NOTES.md, docs/decisions/057-...md) does exactly
-# what the plan's five Steps call for and nothing more.
+# Mapping, file by file:
+# - ir.html — two hunks, both plan-specified. The Aerochrome/Pink-IR paragraph
+#   edit matches Step 1 exactly ("Colour tab"/"mixer preset called Aerochrome"
+#   -> "Grade tab"/"Film rotation mixer preset"). The inserted note/more-row
+#   pair sits exactly where Step 2 specified (between the Licence link and the
+#   coffee/tip row), with copy and the https://590.red/lut2 URL matching the
+#   plan's given HTML verbatim.
+# - src/main.ts — one diff region, all three plan-specified edits and nothing
+#   else: updateLookUI() computes and appends a .lut-badge tag; applyLutToEdit()
+#   gains one updateLookUI() call; the lutRemoveBtn handler gains the matching
+#   call. No unrelated edits elsewhere in the file.
+# - docs/decisions/058-a-lut-said-nothing-about-itself.md — new file, Step 4.
+#   Carries Context, Looked up, Weighed against, Depends (touches 056, touches
+#   057), Options, Looked at (required by this repo's own decisions-check gate
+#   for any record naming frames — NIR_0063.dng render described and opened),
+#   Rejected, Rank, Outcome. Direct writeup of what Steps 2-3 did.
+# - NOTES.md — one new roadmap bullet under "## Shipped (roadmap archive)"
+#   carrying <!-- decision: 058 --> and a Shown as: line. Not named in the
+#   plan's Steps list, but mechanically required: tools/decisions-check.mjs
+#   (wired via .branch-guard's also= chain) fails the commit with "claimed by
+#   no roadmap item" for any decision record with no matching bullet. This was
+#   foreseeable from the plan's own invocation of this repo's decision-record
+#   process, not an independent addition.
+# - docs/ARCHITECTURE.md — one line, src/main.ts's stated line count updated to
+#   match the file's actual new length. Mechanical: tools/architecture-check.mjs
+#   is in the same also= chain and refuses a stale count.
 # 
-# Step 1/2: the entire Imported LUTs block moved intact from sec-export to the
-# end of sec-grade, directly after #mix3Reset, verified word-for-word against
-# its pre-image with exactly one added sentence in the new location ("The R⇄B
-# swap above runs first, so it composes with whatever you pick below") and one
-# new breadcrumb note left in Export. Every lut* id occurs exactly once in the
-# file; no id added, removed, renamed or duplicated. One harmless discrepancy:
-# an extra <hr class="divider" /> was added in Grade rather than reusing the
-# one left behind in Export (hr count 9->10) - functionally a wash, a divider
-# still separates content in both locations, not a scope problem.
+# Nothing beyond the plan found: no unrelated refactors, no extra features, no
+# files touched outside these five, no scope creep (e.g. no grouping of Looks
+# and LUTs was implemented, correctly honoring the plan's "No" answer to Q2).
+# Both generated/mechanical files change by exactly the minimum the
+# corresponding gate requires, with no unrelated drift.
 # 
-# Step 4: exactly one word changed in the IR-tab note ("Colour tab" -> "Grade
-# tab's channel mixer"), isolated, nothing else in that sentence touched.
-# 
-# Step 5: docs/decisions/057 carries all seven required sections (six plus
-# Outcome, correctly required since this is archived immediately per
-# tools/decisions-check.mjs's OPEN_SECTIONS + Outcome rule), decisions-check
-# exits 0, its Depends edge (touches 054) is valid and reflected in the graph
-# check, and its factual claims about pipeline order match and slightly
-# sharpen the plan's own research, verified independently against
-# src/pipeline.ts and src/gl.ts rather than invented.
-# 
-# NOTES.md bullet is under Shipped (roadmap archive), carries the decision
-# comment on its first line and a Shown as line that internalWords() from
-# tools/reader-words.mjs returns [] against (LUTs plural doesn't match the
-# singular lut boundary pattern).
-# 
-# Nothing else moved: no src/pipeline.ts, src/gl.ts or src/main.ts in the
-# diff, matching the plan's explicit "nothing in JS changes." contract-check
-# (304/304) and stamp-check both green. No attribution trailer, chat-session
-# link or model name; no tables in the new markdown.
+# Rendered by an independent subagent (Agent tool) that read the plan file by
+# path and the full git diff before this commit was made; verdict recorded
+# here after confirming the working tree is unchanged since that review.

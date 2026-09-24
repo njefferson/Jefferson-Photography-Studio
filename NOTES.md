@@ -3839,6 +3839,29 @@ read as authoritative, and an invented one is worse than a missing one.
 
 ## Shipped (roadmap archive)
 
+- [x] **A LUT said nothing about itself** <!-- decision: 058 -->
+  **Shown as:** A stacked LUT now shows on the Looks row, and the (i) dialog links to a free infrared LUT pack.
+  Asked in chat 2026-09-24, alongside whether Aerochrome and a LUT compose
+  (they do — the LUT is unconditionally the last colour stage) and whether
+  Looks and LUTs should group (no — different kinds of thing, per 057):
+  tracing the answer found a built-in Look never reads or writes
+  `params.lut`, so a LUT stacked on top of one was invisible anywhere on the
+  IR tab, and the (i) dialog named no source for a LUT at all.
+  **The Looks row now badges a stacked LUT.** `updateLookUI()` appends the
+  app's existing `.lut-badge` tag — already used on the Grade tab's own LUT
+  strip — to the active Look button when a LUT is applied; verified
+  headless against a real photograph with a real LUT pack imported and
+  applied, at two widths and both themes, because the tight space a Look
+  button's sub-label lives in was a real risk for the badge to overflow. It
+  did not: `norm` / `R⇄B` / `LUT` fit on one line in every case checked.
+  Clearing the LUT automatically when a Look is pressed was considered and
+  rejected — a silent, undoable-feeling loss for a LUT the reader may have
+  deliberately kept on.
+  **And the (i) dialog now recommends Rob Shea's free infrared LUTs**, with
+  a link, not a bundle — decision 056 already declined to ship his pack in
+  this repository, and this doesn't reopen that: nothing is redistributed,
+  only linked. See
+  `docs/decisions/058-a-lut-said-nothing-about-itself.md`.
 - [x] **Imported LUTs were on the wrong tab** <!-- decision: 057 -->
   **Shown as:** Imported LUTs moved to the Grade tab, next to the R⇄B swap you can use with them.
   reported in chat 2026-09-24: LUTs living on the Export tab didn't belong

@@ -2026,18 +2026,23 @@ const lookButtons: Record<string, HTMLButtonElement> = {
 
 function updateLookUI() {
   lookState();
+  // A built-in Look never touches params.lut (unlike a saved look, which
+  // manages it explicitly) -- so a LUT stacked on top of the active Look is
+  // otherwise invisible here, a full scroll from the Grade tab's own strip.
+  const lutTag = params.lut ? '<span class="lut-badge">LUT</span>' : "";
   for (const [key, btn] of Object.entries(lookButtons)) {
     const active = activeLook === key;
     btn.classList.toggle("active", active);
     const sub = btn.querySelector(".look-sub") as HTMLElement | null;
     if (!sub) continue;
     const look = LOOKS[key];
+    const tag = active ? lutTag : "";
     if (look.toggleSwap) {
       // Mini two-segment toggle: shows BOTH states so it reads as pressable;
       // the active look fills its current segment.
       const normOn = active && !params.swapRB ? " on" : "";
       const swapOn = active && params.swapRB ? " on" : "";
-      sub.innerHTML = `<span class="seg${normOn}">norm</span><span class="seg${swapOn}">R⇄B</span>`;
+      sub.innerHTML = `<span class="seg${normOn}">norm</span><span class="seg${swapOn}">R⇄B</span>${tag}`;
     } else if (key === "eir") {
       // WHY THIS ONE HAS NO TOGGLE, said on the button rather than in the Help.
       // Every other colour look here is the R<->B swap with different numbers.
@@ -2048,11 +2053,11 @@ function updateLookUI() {
       //
       // The label said "rotate" while the look carried the film's bare
       // three-channel rotation. It no longer does.
-      sub.textContent = "film";
+      sub.innerHTML = `film${tag}`;
     } else if (key === "hie") {
-      sub.textContent = "glow";
+      sub.innerHTML = `glow${tag}`;
     } else {
-      sub.textContent = "";
+      sub.innerHTML = tag;
     }
   }
 }
@@ -16123,6 +16128,7 @@ function applyLutToEdit(lut: NonNullable<EditParams["lut"]>) {
   flushRecord();
   params.lut = lut;
   syncLutUI();
+  updateLookUI();
   draw();
   flushRecord();
 }
@@ -16291,6 +16297,7 @@ $("lutRemoveBtn").addEventListener("click", () => {
   flushRecord();
   params.lut = null;
   syncLutUI();
+  updateLookUI();
   draw();
   flushRecord();
 });
