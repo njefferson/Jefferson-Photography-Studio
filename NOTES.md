@@ -3877,7 +3877,7 @@ read as authoritative, and an invented one is worse than a missing one.
   rejected — a silent, undoable-feeling loss for a LUT the reader may have
   deliberately kept on.
   **And the (i) dialog now recommends Rob Shea's free infrared LUTs**, with
-  a link, not a bundle — decision 056 already declined to ship his pack in
+  a link, not a bundle — decision 056 already declined to ship that pack in
   this repository, and this doesn't reopen that: nothing is redistributed,
   only linked. See
   `docs/decisions/058-a-lut-said-nothing-about-itself.md`.
