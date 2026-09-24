@@ -641,6 +641,19 @@ user-scalable=no.
   those inputs exists on a tablet, so each needs a control a finger reaches.
   See
   `docs/decisions/025-the-straightening-view-finer-guides-you-can-turn-off-and-a-picture-you-can-zoom.md`.
+- [ ] **The top bar wraps, and the start card has become a noticeboard** <!-- decision: 060 -->
+  **Shown as:** The top bar fits on one row, and the start screen shows the practice photos without scrolling.
+  reported from the device 2026-09-24. Measured: the bar's right-hand group
+  needs about 1020px and gets 736 on a landscape iPad, so it wraps; in portrait
+  it is four rows and the photograph gets 14% of the screen; on a phone the
+  actions scroll sideways. It carries three kinds of action at once (this
+  photograph, the session, the app), which is why icons or shorter labels do
+  not fix it. The start card at 1180x820 shows no practice photograph above its
+  fold, against its own short-screen rule. Three layouts (a photo bar with a
+  More sheet; view controls in the floating Fit group; a library-first start
+  card) are rendered and chosen from as pictures. `tools/bar-fit-walk.mjs`
+  holds the two properties and fails today. See
+  `docs/decisions/060-the-top-bar-wraps-and-the-start-card-has-become-a-noticeboard.md`.
 - [ ] **A photograph that fills the screen with no way back out** <!-- decision: 012 --> — reported
   **Shown as:** Always get back to the whole photograph from the full view.
   from the iPad 2026-09-17: a photograph in the full view appeared zoomed in, and

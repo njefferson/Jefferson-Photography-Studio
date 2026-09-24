@@ -82,9 +82,9 @@
 
       <h2>Where the builds are</h2>
       <ul class="facts">
-        <li><b>Production</b> <span>v2.62, carrying two documentation commits since, which change nothing you see.</span></li>
+        <li><b>Production</b> <span>v2.62, carrying documentation commits since, which change nothing you see.</span></li>
         <li><b>On staging</b> <span>v2.62, the same app as production. Nothing new is waiting there yet.</span></li>
-        <li><b>Last verified green</b> <span><code>f7ed4b4</code>: all seventeen checks in the Gates run passed, and the deploy for that exact commit passed. The run before it had failed at check ten, which meant the seven after it had never run on 2.62 at all. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
+        <li><b>Last verified green</b> <span><code>a5e5052</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
         <li><b>Next version</b> <span>2.63, when masks gain their own amounts. The fixes before that take the increment digit and no version bump.</span></li>
       </ul>
 
@@ -92,14 +92,16 @@
         <h2>Waiting on you</h2>
         <ul>
           <li>
-            <strong>Two decisions</strong>, each answerable in a word. They are
-            repeated in the chat that points here.
+            <strong>Decisions</strong>, each answerable in a word or a letter.
+            They are repeated in the chat that points here.
             <ol>
               <li>May the change that only rewords comments in the shipped page go
                 to production without a device pass, once the built app is proven
                 identical apart from those comments? Recommended: yes.</li>
               <li>Should the two privacy checks run on every commit that touches
                 prose, at about thirty seconds each? Recommended: yes.</li>
+              <li>Which top bar: A, B or C? Six comparison pictures were sent in
+                the chat.</li>
             </ol>
           </li>
           <li>
@@ -127,12 +129,12 @@
           2.62 went out while it was red, because the deploy does not wait for the
           checks. Fixed; every check now passes on production's tree.
         </li>
-        <li class="now"><span class="state">In progress</span>
+        <li class="done"><span class="state">Done</span>
           <strong>The records say what was wrong and what it measured, and nothing
           else.</strong>
-          Some decision records and notes quote the conversation they came from or
-          name who asked. They are being rewritten as the engineering fact, and four
-          details that were simply wrong are being corrected in the same pass.
+          Some decision records and notes quoted the conversation they came from or
+          named who asked. More than 330 places were rewritten as the engineering fact, and
+          four details that were simply wrong were corrected in the same pass.
         </li>
         <li class="now"><span class="state">Researching</span>
           <strong>Why Aerochrome draws red around steel against the sky.</strong>
@@ -142,22 +144,25 @@
           photos stage by stage, with every render opened, before any answer about
           reflectance is given.
         </li>
-        <li class="now"><span class="state">Researching</span>
+        <li class="now"><span class="state">Researched</span>
           <strong>Masks that mask, with every control acting inside them.</strong>
-          How Lightroom, Capture One, darktable and others let a selected mask take
-          the ordinary controls, which of this app's controls can do that and at what
-          cost, and how sharp a mask's edge can be. This reopens an option the mask
-          record had rejected, and the record is being rewritten around it.
+          The model is Capture One's: pick a mask and the ordinary tabs follow it.
+          No editor masks everything; geometry, the decode, the look choice and the
+          LUT file stay whole-photo, with the reason shown in words. It can be built
+          in stages, each its own release, and the first stage also fixes a tool
+          aimed at a mask ignoring what that mask subtracts. The mask record is
+          rewritten next, with pictures of the panel before any code.
         </li>
-        <li class="later"><span class="state">Next</span>
+        <li class="waiting"><span class="state">Waiting on you</span>
           <strong>The top bar and the start card.</strong>
           Measured: the bar needs about 1020 pixels and gets 736 on a landscape
           iPad, so it wraps; in portrait it takes four rows and leaves the photo 14%
           of the screen; the start card hides the practice photos below the fold.
           Shorter labels or icons do not fix it, because the bar carries three kinds
-          of action at once. Three layouts will be drawn in both themes at three
-          sizes and shown to you as pictures. The side panel that folds away is part
-          of the same question.
+          of action at once. Three layouts were drawn in the real app and sent as
+          pictures; each gives a one-row bar at every size. A check that holds the
+          bar to one row is in the repository and fails today, as it should. The
+          side panel that folds away stays a separate question.
         </li>
         <li class="later"><span class="state">Next</span>
           <strong>LUTs you tap through on your own photo.</strong>
@@ -168,7 +173,7 @@
           the undo history, and a LUT must survive the iPad closing the tab. Four
           layouts will be drawn and shown as pictures.
         </li>
-        <li class="later"><span class="state">Queued</span>
+        <li class="now"><span class="state">In progress</span>
           <strong>One staging build of small fixes.</strong>
           The Share icon on the start page, which draws a character the iPad has no
           font for; five messages that still send you to "Profiles &amp; LUTs"; the
