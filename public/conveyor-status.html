@@ -84,7 +84,7 @@
       <ul class="facts">
         <li><b>Production</b> <span>v2.62.14: the small fixes that were on staging as v2.62.10, promoted on your go. The number moved because the last digit counts every commit; the content did not.</span></li>
         <li><b>On staging</b> <span>v2.62.16: the export edge fix and two new rows on the device test page, waiting for a pass on the iPad.</span></li>
-        <li><b>Last verified green</b> <span><code>9b0eb32</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
+        <li><b>Last verified green</b> <span><code>2e45873</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
         <li><b>Next version</b> <span>2.63, when masks gain their own amounts. The fixes before that take the increment digit and no version bump.</span></li>
       </ul>
 
@@ -230,14 +230,20 @@
           settings, which decides how the mask work is built on your iPad. Every
           check passed on it: the export check, exports across cores against one
           core, every view agreeing, and the accessibility sweep, and the export
-          check and sweep again once it sat on top of v2.62.14. On staging as
-          v2.62.16, waiting for your pass.
+          check and sweep again once it sat on top of v2.62.14. <strong>Your
+          pass came back good:</strong> your export's four edges are clean, and
+          your iPad has room for about 46 masks' own settings in the editor's
+          graphics (148 of 1,024 rows used), so masks carry their values directly.
+          Waiting for your go to put it on production.
         </li>
-        <li class="later"><span class="state">Queued</span>
+        <li class="now"><span class="state">Next</span>
           <strong>Masks, in code.</strong>
           First, a tool aimed at a mask respects how that mask was combined; then
           the ordinary controls act inside a selected mask, in stages, each one its
-          own device pass.
+          own device pass. Foliage limited to a mask is the stage that fixes the red
+          wires, pylons and cladding: on your building, Foliage at 0 takes the red
+          on the cladding from 13,561 pixels to none and the red on the grass from
+          87,991 to none, and the grass needs it while the building does not.
         </li>
       </ul>
 
@@ -247,16 +253,6 @@
         They are written down so they are not re-discovered as new.
       </p>
       <ul>
-        <li>
-          <strong>Two old offline copies stay on the device after an update.</strong>
-          The device report from staging lists the 2.58.12 and 2.58.15 caches
-          alongside 2.62. Checked in Chromium with three releases in a row: an old
-          copy stays while a newer version is waiting, and every one is removed
-          the moment the update is taken, whether by the button or by closing the
-          app. So the iPad is doing something Chromium does not, or went through a
-          sequence the check does not reproduce. The next step is the diagnostic
-          report saying which version each copy belongs to.
-        </li>
         <li>
           <strong>A tool aimed at a mask may ignore an area subtracted from
           it.</strong> Found by reading the code, not yet seen in a render. It is the
