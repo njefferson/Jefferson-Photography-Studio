@@ -1328,6 +1328,36 @@ user-scalable=no.
   byte-identical to today's, because a graphics chip computes in float where the
   processor uses doubles. It would match the PREVIEW instead.
 
+## The workflows are pinned, and one action is not yet, 2026-09-24
+
+The security baseline for `.github/`, measured with the hub's zizmor (1.29.0,
+installed from the hub's hash-pinned `.github/requirements-ci.txt`, run
+`--offline --strict-collection`): **20 findings before, 1 after.**
+
+- `deploy.yml` reads the repository and nothing more (`permissions: contents:
+  read`), the checkout does not leave its token in `.git/config`, the job no
+  longer restores an npm cache into the build that goes live, and every action
+  is pinned by commit to the pins the hub's own deploy runs. The Cloudflare step
+  moves from `wrangler-action` v3 to v4.0.0 as a result, because v4.0.0 is the
+  only commit anyone here has vetted; the first deploy after it is the test,
+  and it is read by SHA.
+- `asset-factory.yml` passes every dispatch input through `env:`, so a typed
+  category is a string and never script (eight injection sites). Its checkout
+  keeps its credentials on purpose, because its last step pushes, and says so
+  where zizmor reads it.
+- `.github/dependabot.yml` keeps the pins current, actions only, with a
+  `Chore` prefix so no bump reaches the in-app patch notes.
+
+**Owed, in order:**
+
+- `actions/upload-artifact@v4` in `asset-factory.yml` is still a tag, and is the
+  one finding left. No pin for it has been vetted in this repository or the
+  hub, and a commit copied from a search result is a pin nobody checked.
+- `sharp` 0.33.5 lives in the factory code on the branch that workflow checks
+  out by default, not on `main`; its bump belongs with a change to that default.
+- zizmor becomes a hard step in `gates.yml` once the finding above is gone, so
+  that it goes on green rather than red.
+
 ## The app would not open offline, and the harness could not have seen it, 2026-09-23
 
 Reported from the device on 2.61: an iPad with no network, showing "Safari

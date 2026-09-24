@@ -15,6 +15,16 @@ concurrency:
   group: pages-deploy-${{ github.ref }}
   cancel-in-progress: true
 
+# Nothing in this job writes to the repository. The Cloudflare token is what
+# deploys, and it is a secret, not a permission.
+permissions:
+  contents: read
+
+# Actions are pinned by commit, not tag: a tag is a pointer someone else can
+# move, and these steps run holding the Cloudflare token. The pins are the ones
+# the hub's own deploy runs (noahjefferson .github/workflows/deploy.yml), and
+# .github/dependabot.yml keeps them current.
+
 jobs:
   deploy:
     # Only main (production) and staging may deploy — a manual dispatch from a
@@ -22,27 +32,34 @@ jobs:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Full history + tags: the build derives real version numbers from
           # the commit count (v0.N) and shows an exact tag (v1.0+) when present.
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+          # Nothing here pushes, so the token does not stay in .git/config for
+          # every later step to read.
+          persist-credentials: false
+      # No npm cache in the job that deploys: a cache is shared with other
+      # workflows' runs, and whatever is restored from it ends up in the build
+      # that goes live. `npm ci` from the lockfile every time.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 20
-          cache: npm
+          # From v5 this action caches on its own unless told not to.
+          package-manager-cache: false
       - run: npm ci
       - run: npm run build
       # Create the Pages project on first run; harmless (and ignored) afterwards.
       - name: Ensure Cloudflare Pages project exists
         continue-on-error: true
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages project create jefferson-photo-studio --production-branch=main
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -55,7 +72,7 @@ jobs:
       # Production pushes only — staging must never touch the old prod domain.
       - name: Redirect the old domain to the new one
         if: github.ref_name == 'main'
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
