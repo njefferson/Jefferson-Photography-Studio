@@ -1,11 +1,11 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
 planhash=6c1eec799b84c8fb
-diffhash=21a1d98879c3e77e
-verdict=IN-SCOPE: stage 2b's design in record 042 and one status line, clause for clause with plan item 6 and its looked-up paragraph
-# IN-SCOPE: both changed files are docs (the 042 decision record and public/conveyor-status.html), and the added design/Looked-up content matches plan item 6 ("Then stage 2b...") clause for clause, with only buildability elaboration and source-naming that the plan and repo rules permit.
+diffhash=ffbc81d79a6e0ed1
+verdict=IN-SCOPE: the promotion replay of 92a3080, byte-identical outside the scope ledger, on the owner's go
+# IN-SCOPE: the staged diff is byte-identical to 92a3080 apart from .plan-scope, dd32298 is the unchanged next commit (also differing only in .plan-scope), the two commits are exactly and only what origin/staging holds above 9b0eb32 in the right order, and neither commit's message or diff contains any owner quotation/attribution, session link, or model name.
 # 
-# 1. Files: only the 042 record and public/conveyor-status.html.
-# 2. Design matches item 6: HSL and grade as adding offsets; luminance and LUT strength one row a mask; curves as the mask's own curve after the whole photo's, eight in one texture, 15 of 16 units; shadow colour last with its Convert designed when built; contrast needs nothing more; black and white to the whole-photo list; one commit each in that order. Rank, Depends, Weighed against, Looked at and Built already are untouched.
-# 3. The Looked up block holds exactly the plan's four claims, headed as search extracts, with the source named for two; an earlier draft carrying details beyond the plan was judged out of scope and trimmed.
-# 4. No owner quotation or attribution, no session link, no model name.
+# 1. The replay of 92a3080 stages docs/ARCHITECTURE.md, src/raw/demosaic.ts and tools/.preview-pipeline, byte-identical to 92a3080's; .plan-scope is re-recorded, not replayed.
+# 2. dd32298 is the shader-room instrument (Renderer.shaderBudget and the test page's shaderRoom row) with its module-map line counts, nothing beyond it.
+# 3. git log 9b0eb32..origin/staging is exactly 92a3080 then dd32298.
+# 4. No owner quotation or attribution, no session link, no model name, no trailer. Promotion is plan item "Next, in order" 1, on the owner's go.
