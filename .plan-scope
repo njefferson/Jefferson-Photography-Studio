@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
 planhash=2c1902d1e385acf6
-diffhash=4b81662a89aac6b6
-verdict=IN-SCOPE: Unit 3b exactly (Profiles & LUTs renamed to Manage your LUTs in the three alerts, the Help text and the stale comment) plus the Grade note wording that Remaining 2's record of the go names.
-# Promotion of v2.62.10 on the go (plan Remaining 2), commit 3 of 4, replayed unchanged from staging 903f19a: Unit 3b, the LUT storage messages and Help name "Manage your LUTs" instead of the retired "Profiles & LUTs". Judged by an independent subagent that read the plan by path and the commit's diff.
+diffhash=8e8d3e78a5c724e6
+verdict=IN-SCOPE: Unit 3c (OFL.txt, the Fonts row beside Licence, LICENSE and README credits, the one sentence on where the numbers come from), the Macro Studio Fonts row completing the same obligation.
+# Promotion of v2.62.10 on the go (plan Remaining 2), commit 4 of 4, replayed unchanged from staging 0935359: Unit 3c, OFL.txt shipped beside the fonts, the ⓘ Fonts row, LICENSE and README credits corrected, and one sentence on where the colour numbers come from. Judged by an independent subagent that read the plan by path and the commit's diff.

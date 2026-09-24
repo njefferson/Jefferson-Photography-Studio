@@ -11,8 +11,9 @@ Required Notice: Copyright © 2026 Noah Jefferson (https://github.com/njefferson
 >   images under `public/examples/` — remains the exclusive property of Noah
 >   Jefferson. They may NOT be copied, redistributed, sold, or used to train
 >   machine-learning models without explicit written permission.
-> - Third-party icons (**game-icons.net**, CC BY 3.0) are credited in-app and
->   keep their own license.
+> - The four web fonts under `public/fonts/` (Geist, Space Grotesk and Space
+>   Mono) are third-party work under the SIL Open Font License 1.1, whose text
+>   and copyright notices ship beside them in `public/fonts/OFL.txt`.
 
 ## Acceptance
 

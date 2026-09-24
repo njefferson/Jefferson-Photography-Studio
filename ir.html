@@ -1394,6 +1394,17 @@
       <p class="more-row">
         <a href="https://polyformproject.org/licenses/noncommercial/1.0.0" target="_blank" rel="noopener">Licence &mdash; PolyForm Noncommercial &rarr;</a>
       </p>
+      <!-- §7e item 5: where the numbers come from. Written from what src/ uses:
+           color.ts (the Z 50 matrix is Adobe's published coefficients; the
+           D5300's is the one the Rob Shea Infrared Temp -100 profile writes into
+           a Lightroom DNG; a DNG's own ColorMatrix wins over both, decode.ts),
+           src/raw/nef.ts and src/raw/dngRaw.ts (levels from the file's own
+           tags), color.ts sensorPitchMicrons
+           (diffraction.cam) and hotspotProfiles.ts (the app's own lens rig). -->
+      <p class="note">Where the numbers come from: a DNG's colour is converted with the camera matrix it carries; a Nikon NEF carries none, so the Z&nbsp;50 uses Adobe's published matrix and the D5300 the one Rob Shea's <em>Infrared Temp &minus;100</em> profile writes. Black and white levels are read from the file itself. The diffraction limits are from Rob Shea's <a href="https://diffraction.cam" target="_blank" rel="noopener">diffraction.cam</a>, and the lens profiles that ship were measured with this app's own lens rig.</p>
+      <p class="more-row">
+        <a href="./fonts/OFL.txt" target="_blank" rel="noopener">Fonts &mdash; SIL Open Font License &rarr;</a>
+      </p>
       <p class="note">This app can apply an imported LUT but ships none &mdash; bring your own .cube file or pack. Rob Shea's Color Infrared LUTs are free and built for exactly this.</p>
       <p class="more-row">
         <a href="https://590.red/lut2" target="_blank" rel="noopener">Rob Shea's infrared LUTs &rarr;</a>
