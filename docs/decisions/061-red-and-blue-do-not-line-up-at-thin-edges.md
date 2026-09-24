@@ -64,6 +64,40 @@ the preview.
   exported, every edge then matches the interior and no pixel more than 16px
   from an edge changes.
 
+**Measured on the reported frame's own raw, 2026-09-24, and it moves the
+answer for that frame.** The frame is NIR_3461 (77 mm, f/5). Every render
+below went through the app, and every one was opened.
+
+- **The lens adds almost nothing on this frame.** Median red and blue radial
+  offsets on the raw planes are within 0.07 px even in the corners. The
+  misregistration is the binning offset alone: red and blue sit about 0.48
+  preview px apart, the same everywhere.
+- **Lining the channels up does not clear the red.** Rendered as shipped,
+  co-sited, and co-sited with the lens offset cancelled, in the editing view
+  and in the full export: the wires stay red in all three, and co-siting
+  widens the red core from one pixel to two.
+- **The red is the wire's own colour, amplified.** Across one wire the centre
+  pixel renders (255,0,0). In the raw, that pixel differs from the sky beside
+  it by 5 to 13 percent, red over green lower and blue over green higher, the
+  same way on both centre pixels. A misregistration pushes the two sides of a
+  line in opposite directions; only the left-edge pixel does that here.
+- **It is the foliage band that paints it.** With Foliage saturation at 0 and
+  nothing else changed, the centre pixel renders (136,135,138), strongly red
+  pixels above the horizon go from 16,430 to 0, and the round discs go too,
+  because they are Sky colour smoothing spreading red wire. The cost is the
+  one already rejected below: the grass loses its red.
+- **What surrounds the wire decides it.** On NIR_3463 (62 mm) one wire renders
+  grey against blue sky and red where it crosses white cloud. That frame does
+  carry a lens term, blue about 0.27 px outward in the corners, which is the
+  per-photograph case the options below were written for.
+
+So on the reported frame the red on the metal is the foliage band selecting by
+colour, and the remedy for what was reported is the foliage band limited to a
+place: 042's stage for the look's own bands, the same fix 042 already names
+for cladding that reddens with the grass. The channel geometry below is still
+real on NIR_3430's posts and NIR_3463's corners, and its steps stand, but it
+does not fix the reported frame.
+
 ## Looked up
 
 - **Where a raw pipeline corrects channel geometry.** darktable's order
@@ -125,11 +159,14 @@ are listed in the plan and were asked for on 2026-09-24.
 - distinct-from 015 — a brightness correction, not a geometric one.
 - touches 052 — sky through the lattice is a selection the look reads; this record does not reach it.
 - touches 028 — the grey sky inside the lattice is 028's sky-through-an-occluder.
+- touches 042 — on the reported frame the red is the foliage band, and 042's stage for the look's own bands is its remedy.
 
 ## Looked at
 
 - The practice frame NIR_3430: the post and lamp-head crops, as shipped, co-sited, co-sited with the lens cancel, and with the offset doubled.
 - The practice frame NIR_0063: full-resolution JPEG exports with Aerochrome, before and after the border fix, full frame and all four corners at 8x.
+- The reported frame NIR_3461: the editing view and the full export, as shipped, co-sited, and co-sited with the lens offset cancelled; wires, the near and far pylons, the mid pylons and the top edge; and the editing view with Foliage saturation at 0.
+- The frame NIR_3463: the editing view as shipped and co-sited, at the tree's edge and the near pylon.
 
 ## Options
 

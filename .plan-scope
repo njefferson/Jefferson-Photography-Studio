@@ -1,6 +1,14 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
 planhash=2c1902d1e385acf6
-diffhash=8e8d3e78a5c724e6
-verdict=IN-SCOPE: Unit 3c (OFL.txt, the Fonts row beside Licence, LICENSE and README credits, the one sentence on where the numbers come from), the Macro Studio Fonts row completing the same obligation.
-# Promotion of v2.62.10 on the go (plan Remaining 2), commit 4 of 4, replayed unchanged from staging 0935359: Unit 3c, OFL.txt shipped beside the fonts, the ⓘ Fonts row, LICENSE and README credits corrected, and one sentence on where the colour numbers come from. Judged by an independent subagent that read the plan by path and the commit's diff.
+diffhash=2ab327e22caa87de
+verdict=IN-SCOPE: docs only; the staged-candidate record and status page (Standing steps), the promotion and staging recorded (Remaining 2 and 3), 061's outcome from the raw files (3.4), the stale-cache result.
+# Docs after the promotion: NOTES' staging entry now describes v2.62.16 (the export edge fix and the
+# test page's shader-room rows) and records v2.62.10's promotion; the NOTES entry on the patch-note
+# gate failing in a worktree (a found defect, not fixed, with its known remedy); record 061 carries the
+# measurement on the reported frame's own raw (NIR_3461: the red wires and pylons are the foliage band,
+# Foliage 0 takes 16,430 strongly red pixels to 0, co-siting changes nothing; NIR_3463's lens term) with
+# both frames in Looked at and a touches-042 relation, and its roadmap bullet and Shown-as line say the
+# same; the status page follows the run (production v2.62.14 verified live, staging v2.62.16, the stale-
+# cache check's Chromium result, the look records, the locked-down workflows).
+# Judged by an independent subagent that read the plan by path.

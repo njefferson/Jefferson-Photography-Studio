@@ -82,9 +82,9 @@
 
       <h2>Where the builds are</h2>
       <ul class="facts">
-        <li><b>Production</b> <span>v2.62, carrying documentation commits since, which change nothing you see.</span></li>
-        <li><b>On staging</b> <span>v2.62.10: the small fixes below, waiting for a pass on the iPad.</span></li>
-        <li><b>Last verified green</b> <span><code>90fa699</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
+        <li><b>Production</b> <span>v2.62.14: the small fixes that were on staging as v2.62.10, promoted on your go. The number moved because the last digit counts every commit; the content did not.</span></li>
+        <li><b>On staging</b> <span>v2.62.16: the export edge fix and two new rows on the device test page, waiting for a pass on the iPad.</span></li>
+        <li><b>Last verified green</b> <span><code>9b0eb32</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
         <li><b>Next version</b> <span>2.63, when masks gain their own amounts. The fixes before that take the increment digit and no version bump.</span></li>
       </ul>
 
@@ -97,28 +97,22 @@
             <ol>
               <li>Should the two privacy checks run on every commit that touches
                 prose, at about thirty seconds each? Recommended: yes.</li>
-              <li>Which top bar: A, B or C? Six comparison pictures were sent in
-                the chat. Recommended: A.</li>
-              <li>Which LUT browser layout: 1, 2, 3 or 4? Pictures in both
-                orientations and both themes were sent in the chat. Recommended: 2,
-                a place of its own beside the photograph.</li>
+              <li>Which top bar: A, B or C? Recommended: A. The pictures come with
+                the question when it is asked in the chat.</li>
+              <li>Which LUT browser layout: 1, 2, 3 or 4? Recommended: 2, a place
+                of its own beside the photograph. The pictures come with the
+                question.</li>
               <li>Do the colour swap and the channel mixer stay whole-photo when
                 masks gain their own settings? Recommended: yes.</li>
             </ol>
           </li>
           <li>
-            <strong>The web hosts for this session's research.</strong> They are
-            listed in the chat as one block to paste into the environment's network
-            settings. A session cannot change its own network access.
-          </li>
-          <li>
-            <strong>A device pass on staging</strong>, v2.62.10. It
-            also covers the parts of 2.62 not yet checked on the iPad: launching
-            offline from the home screen, picking a <code>.cube</code> and a
-            <code>.zip</code> in Files, reaching the LUT manager three ways, the
-            Looks badge in both orientations, and the Rob Shea and Fonts links from
-            the installed app. The Share button on the start page should show an
-            arrow, not a box.
+            <strong>A device pass on staging</strong>, v2.62.16, in two steps.
+            Export one photograph at full size and look at its four edges: no
+            line of colour one pixel wide. Then, in the editor, tap the version
+            number, then Test this device, press Run the speed tests, and copy the
+            results into the chat; the first two rows are the new ones, and their
+            number decides how the mask work is built on your iPad.
           </li>
         </ul>
       </div>
@@ -145,10 +139,17 @@
           blue on one edge and red on the other. Red and blue sit about half a pixel
           apart in the editing copy, the lens adds its own offset toward the
           corners, and Aerochrome's mixer turns that difference red at about twice
-          its size. The round spots are Sky colour smoothing, and they go at 0. The
-          fix belongs on the raw at decode, rendered on your own photograph first,
-          which needs the NEF. It has its own record now, ranked just above the
-          splotchy-sky work it would otherwise change underneath.
+          its size. The round spots are Sky colour smoothing, and they go at 0.
+          <strong>Then your own raw files answered it for your photograph.</strong>
+          On NIR_3461, the frame you exported, the red on the wires and pylons is
+          Aerochrome's foliage band: it picks by colour, and a thin dark wire
+          against white cloud falls inside the foliage colours. With Foliage at 0,
+          the strongly red pixels above the horizon go from 16,430 to none, the
+          round spots go with them, and the grass loses its red too. Lining up the
+          colour channels changes nothing on that frame. So the clean answer is
+          Foliage applied only to the ground, which is the foliage-inside-a-mask
+          you asked for and a stage of the mask work. Lowering Foliage cleans the
+          metal today, at the cost of the grass.
         </li>
         <li class="now"><span class="state">Researched</span>
           <strong>Masks that mask, with every control acting inside them.</strong>
@@ -182,14 +183,15 @@
           made from a real photograph and sent as pictures. It is built once you
           pick one.
         </li>
-        <li class="waiting"><span class="state">On staging</span>
-          <strong>One staging build of small fixes.</strong>
+        <li class="done"><span class="state">On production</span>
+          <strong>One build of small fixes, promoted on your go.</strong>
           The Share icon on the start page, which draws a character the iPad has no
           font for, and its button is now a full 44-pixel target; the messages that
           still sent you to "Profiles &amp; LUTs"; the licence text the four fonts
           require; and a paragraph saying where the app's numbers come from. The
           comments in the shipped pages no longer credit anyone, proven to change
-          nothing else in the build.
+          nothing else in the build. Production serves it as v2.62.14, checked
+          against the live site.
         </li>
         <li class="done"><span class="state">Done</span>
           <strong>The checks that should have caught the red.</strong>
@@ -201,17 +203,35 @@
           reporting 12); and the shared checks run from the newest hub. Only the
           privacy checks before a commit are left, and that waits on your answer.
         </li>
-        <li class="now"><span class="state">Built, held</span>
-          <strong>The next staging build.</strong>
+        <li class="done"><span class="state">Done</span>
+          <strong>The build and deploy workflows are locked down.</strong>
+          Every action they run is pinned to a checked commit, the deploy can read
+          the repository and nothing more, and a value typed into the asset
+          workflow is treated as text, never as a command. The security scanner
+          went from 20 findings to 1; the one left is written down with why. The
+          first deploy on the new setup was read step by step and went out.
+        </li>
+        <li class="done"><span class="state">Recorded</span>
+          <strong>Two things about looks.</strong>
+          A look cannot be taken off: no look button removes it, Reset brings it
+          back if the photograph opened wearing it, and the only way out is a
+          setting called Default look. And a look saved as a file is expected to be
+          greyed out in Files on the iPad, the same way the colour files were. Both
+          have records with a remedy and a rank.
+        </li>
+        <li class="waiting"><span class="state">On staging</span>
+          <strong>The export edges, and a measurement for the mask work.</strong>
           Every full-size export had a line of the wrong colour along all four
           edges, one pixel wide, not just the top and left: the export read a
           neighbouring pixel of the wrong colour at the border. Fixed and measured
           on a practice photograph: every edge now matches the pixels beside it,
           and nothing further in changes. The device test page also gains a row
           saying how much room the editor's graphics have for masks with their own
-          settings, which decides how the mask work is built on your iPad. It waits
-          for your pass on v2.62.10, because only one build goes to staging at a
-          time.
+          settings, which decides how the mask work is built on your iPad. Every
+          check passed on it: the export check, exports across cores against one
+          core, every view agreeing, and the accessibility sweep, and the export
+          check and sweep again once it sat on top of v2.62.14. On staging as
+          v2.62.16, waiting for your pass.
         </li>
         <li class="later"><span class="state">Queued</span>
           <strong>Masks, in code.</strong>
@@ -230,8 +250,12 @@
         <li>
           <strong>Two old offline copies stay on the device after an update.</strong>
           The device report from staging lists the 2.58.12 and 2.58.15 caches
-          alongside 2.62, which should have removed them. To be checked in the next
-          round of walks.
+          alongside 2.62. Checked in Chromium with three releases in a row: an old
+          copy stays while a newer version is waiting, and every one is removed
+          the moment the update is taken, whether by the button or by closing the
+          app. So the iPad is doing something Chromium does not, or went through a
+          sequence the check does not reproduce. The next step is the diagnostic
+          report saying which version each copy belongs to.
         </li>
         <li>
           <strong>A tool aimed at a mask may ignore an area subtracted from
