@@ -52,11 +52,17 @@ the preview.
   map averages each texel from four point samples (`src/skymap.ts`). One on
   a red wire tints the whole texel, and upsampling spreads it into a disc.
   That is 013's shipped stage. The disc remedy belongs to 013, not here.
-- **The top and left border lines are a demosaic defect.** The export's
-  bilinear demosaic (`src/raw/demosaic.ts`) picks a neighbour's colour by the
-  coordinate before clamping but reads the photosite after clamping, so at
-  the border it reads the wrong colour. The export's edge rows measure
-  (196,64,58) against (54,70,88) twenty rows in.
+- **The border lines are a demosaic defect, on all four edges.** The
+  export's bilinear demosaic (`src/raw/demosaic.ts`) picks a neighbour's
+  colour by the coordinate before clamping but reads the photosite after
+  clamping, so at the border it reads the wrong colour. The export's edge
+  rows measure (196,64,58) against (54,70,88) twenty rows in. A full-resolution
+  JPEG of the practice frame NIR_0063 has it on every edge, not only the two
+  in the report: the top row at (173,159,114) and the right column at
+  (46,97,15), against (99,175,185) and (30,85,100) twenty pixels in. Reading
+  the neighbour by reflection rather than clamping keeps its colour; built and
+  exported, every edge then matches the interior and no pixel more than 16px
+  from an edge changes.
 
 ## Looked up
 
@@ -123,6 +129,7 @@ are listed in the plan and were asked for on 2026-09-24.
 ## Looked at
 
 - The practice frame NIR_3430: the post and lamp-head crops, as shipped, co-sited, co-sited with the lens cancel, and with the offset doubled.
+- The practice frame NIR_0063: full-resolution JPEG exports with Aerochrome, before and after the border fix, full frame and all four corners at 8x.
 
 ## Options
 

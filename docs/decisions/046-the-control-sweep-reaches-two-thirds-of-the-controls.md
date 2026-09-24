@@ -27,6 +27,17 @@ opened a photograph. Coverage is the half that makes the rest mean anything.
 morning, for keeping a photograph and for straightening to a drawn line. Every
 feature that adds a control widens this gap, and nothing was running to say so.
 
+**Re-measured 2026-09-24 on the 2.62.10 build: 54 unexcused, down from 71.**
+`ir.html` 163 of 225 reached with 17 declared, leaving 45; `macro.html` 7 of
+13, leaving 6; `debug.html` 3 of 6, leaving 3; `index.html` clean. `#keptOpen`
+is reached now and `#cropLine` still is not. Thirty of the 45 on the editor
+sit in groups the triage can take one at a time: the stickers panel (`stk*`,
+nine), the busy dialog (`busy*`, four), the lens rig's run controls
+(`lensStop`, `lensUse`, `lensBackup2`, `lensCopy2`, `lensSave2`), the session
+and finish dialogs (`session*`, `finish*`, five), the quick look (`ql*`,
+three), and installed-only or failure-only states (`shareBtn`, `a2hsInstall`,
+`a2hsClose`, `glLostReload`). The other fifteen are single controls.
+
 ## Looked up
 
 **Nothing outside bears on it, and that is the honest answer.** This is not a

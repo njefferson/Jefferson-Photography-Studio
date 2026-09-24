@@ -1,7 +1,7 @@
 # CONTROLS WHOSE LABEL HONESTLY CANNOT CARRY THE WHOLE SENTENCE.
 #
 # One `page#id` per line, then an em-dash and the REASON. Checked both ways by
-# tools/control-check.mjs — a line for a control that no longer fails is a
+# tools/control-walk.mjs — a line for a control that no longer fails is a
 # failure itself, so this file can only shrink by somebody deleting a line.
 # Every reason prints on every run: a list that hides what it excuses is a list
 # nobody audits.
@@ -17,7 +17,7 @@ ir.html#askCancel — Written at call time, the other half of #askOk above.
 # can drive it instead of inheriting the excuse. These are not "not looked at
 # yet": each needs a condition outside the app's own controls.
 
-index.html#swStripGo — The update strip, which appears only when a second service worker is installed and waiting. tools/ has a walk that drives a REAL second worker by rewriting the served sw.js; wiring that into this sweep is the way to reach it, not a wider selector.
+index.html#swStripGo — The update strip, which appears only when a second service worker is installed and waiting. The walk that drove a REAL second worker by rewriting the served sw.js with a new cache name (sw-walk, NOTES 2026-09-10) was never moved into tools/, so nothing here can manufacture that state today. Committing that walk and sweeping the strip from inside it is the way to reach it, not a wider selector.
 index.html#swStripLater — The other half of the update strip above.
 ir.html#swStripGo — The update strip on the editor page; same condition as index.html's.
 ir.html#swStripLater — The other half of the editor's update strip.
