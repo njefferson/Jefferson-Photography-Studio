@@ -496,7 +496,7 @@
                and the reader concluded it could not be done. This is the
                sentence that says otherwise, and it sits above the list rather
                than inside the editor so it is read before a mask is made. -->
-          <p id="maskCombineNote" class="note">Masks combine. Add a second one and it can subtract from the first, or keep only where the two overlap &mdash; so you can take a colour back out of a sky, or grade just the place where two selections meet.</p>
+          <p id="maskCombineNote" class="note">Masks combine. Add a second one and it can add to the first, subtract from it, or keep only where the two overlap &mdash; so you can finish a sky the automatic selection missed with a colour, take a colour back out of it, or grade just the place where two selections meet.</p>
           <div class="mask-add">
             <button id="addRadial" type="button">+ Radial</button>
             <button id="addLinear" type="button">+ Gradient</button>
@@ -565,10 +565,11 @@
             <fieldset id="mJoinRow" class="mask-join">
               <legend>How this joins the mask above</legend>
               <label><input type="radio" name="mJoin" id="mJoinAdd" value="0" checked /> On its own</label>
+              <label><input type="radio" name="mJoin" id="mJoinUni" value="3" /> Add to it</label>
               <label><input type="radio" name="mJoin" id="mJoinSub" value="1" /> Subtract from it</label>
               <label><input type="radio" name="mJoin" id="mJoinInt" value="2" /> Only where both</label>
             </fieldset>
-            <p id="mJoinNote" class="note">On its own, this mask gets its own adjustment. Joined to the mask above, it shapes that one's area instead and the adjustment above is the one that applies &mdash; so you can take a colour back out of a sky, or keep only where two masks overlap.</p>
+            <p id="mJoinNote" class="note">On its own, this mask gets its own adjustment. Joined to the mask above, it shapes that one's area instead and the adjustment above is the one that applies &mdash; so you can add a colour to a sky the automatic selection missed, take a colour back out of it, or keep only where two masks overlap.</p>
           </details>
           <details class="mask-group" id="mgTone" open>
             <summary>Tone</summary>

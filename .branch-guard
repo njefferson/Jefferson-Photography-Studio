@@ -108,6 +108,12 @@ also=tools/palette-spec-check.mjs
 # functions are pure, so this needs no browser and costs milliseconds.
 also=tools/lens-store-check.mjs
 
+# Run on every commit: a mask joins the one above it three ways (048) and all
+# three must survive. The union was added beside subtract and intersect, and the
+# old fold made intersect its default branch, so one careless edit could drop
+# "Only where both" with nothing going red. Pure functions, no browser.
+also=tools/join-fold-check.mjs
+
 # Run on every commit: every exported function says what it takes, what it does
 # and what it gives back. The repo commented richly and stated contracts almost
 # nowhere — 10 of 246 when this was added — and the gap cost a release: bumpFrom
