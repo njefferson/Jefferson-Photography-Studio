@@ -3839,6 +3839,25 @@ read as authoritative, and an invented one is worse than a missing one.
 
 ## Shipped (roadmap archive)
 
+- [x] **A colour file is not a photograph either** <!-- decision: 059 -->
+  **Shown as:** Manage your LUTs no longer needs a photo open — it's on the start screen and in the (i) dialog too.
+  Reported in chat 2026-09-24: having to open a photo just to reach LUT
+  import and the stored list was the wrong convention, since none of that
+  reads or writes anything about a specific photograph — only applying one
+  does.
+  **This app had already solved the identical problem once, for lens
+  measurement** — a shared dialog opened from three places (start screen,
+  version panel, Corrections), with the code's own comment saying why: "a
+  lens is not a photograph." The same pattern now applies to LUTs: import,
+  browse, share and delete a stored colour file live in a new shared
+  dialog, reachable from the start screen, the (i) dialog's Settings, and a
+  teaser button on Grade. Only the strip showing what's applied to the
+  open photo right now stays tied to having one.
+  **Un-gating the whole panel from every tab needing a photo was considered
+  and rejected** — every other tab genuinely depends on one throughout its
+  rendering; the LUT library was the one exception, so it got the
+  exception's fix rather than an app-wide one. See
+  `docs/decisions/059-a-colour-file-is-not-a-photograph-either.md`.
 - [x] **A LUT said nothing about itself** <!-- decision: 058 -->
   **Shown as:** A stacked LUT now shows on the Looks row, and the (i) dialog links to a free infrared LUT pack.
   Asked in chat 2026-09-24, alongside whether Aerochrome and a LUT compose
