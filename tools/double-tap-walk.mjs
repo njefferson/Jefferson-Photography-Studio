@@ -21,6 +21,7 @@
 // same gesture on the slider beside it, and different from Reset.
 import { chromium } from "playwright-core";
 import { requireFreshDist } from "./fresh-dist.mjs";
+import { openMasks, closeMasks, setMaskValue } from "./walk-input.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
 // directory to this tree. See tools/fresh-dist.mjs.
 requireFreshDist();
@@ -121,6 +122,32 @@ try {
     after === sl.was
       ? ok(`double-tap puts a slider back too (${sl.now} -> ${after})`)
       : fail(`double-tap left the slider at ${after}, not the ${sl.was} the photo opened with`);
+  }
+
+  // AND WITH A MASK PICKED (042, stage 2), where a slider shows the MASK'S own
+  // value: double-tap goes back to the mask's no change, not to where the photo
+  // opened. It sent Foliage saturation's offset to +1 and the mask's Saturation
+  // to the photo's opening value, because "where the photo opened" is a
+  // whole-photo number. A Gradient mask, its Foliage saturation at -1 and its
+  // own Saturation at 1.4, then each double-tapped.
+  await openMasks(p);
+  await p.click("#addLinear");
+  await p.waitForTimeout(1200);
+  await setMaskValue(p, "folSat", "-1");
+  await setMaskValue(p, "saturation", "1.4");
+  await closeMasks(p);
+  for (const [id, want] of [["folSat", "0"], ["sat", "1"]]) {
+    await p.click("#ptab-color").catch(() => {});
+    await p.waitForTimeout(300);
+    const at = await p.evaluate((i) => { const el = document.getElementById(i); const r = el.getBoundingClientRect(); return { was: el.value, x: r.x + r.width / 2, y: r.y + r.height / 2 }; }, id);
+    await p.touchscreen.tap(at.x, at.y);
+    await p.waitForTimeout(90);
+    await p.touchscreen.tap(at.x, at.y);
+    await p.waitForTimeout(500);
+    const got = await p.evaluate((i) => document.getElementById(i).value, id);
+    got === want
+      ? ok(`with a mask picked, double-tap puts #${id} back to the mask's no change (${at.was} -> ${got})`)
+      : fail(`with a mask picked, double-tap left #${id} at ${got}, not the mask's no change ${want}`);
   }
 } finally { await br.close(); }
 console.log(bad ? `\n${bad} failed\n` : "\ndouble-tap returns every control it is offered on\n");

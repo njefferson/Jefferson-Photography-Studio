@@ -12596,7 +12596,14 @@ function wireSliderReset(): void {
       : "Double-tap to put this back to where the photo opened";
   }
   const back = (el: HTMLInputElement) => {
-    const to = PREF_SLIDER_DEFAULTS[el.id] ?? sliderDefaults.get(el.id);
+    // WITH A MASK PICKED, a slider that follows it shows the MASK'S value, so
+    // "where the photo opened" is the wrong place to send it: that is a
+    // whole-photo number, and written to the mask it became an offset (Foliage
+    // saturation went to +1). It goes back to the mask's own no change instead,
+    // read through the same `get` the switch shows it with (042, stage 2).
+    const tm = overlayReady ? targetMask() : null;
+    const mc = tm ? maskCtls().find((k) => k.el === el) : undefined;
+    const to = tm && mc ? String(mc.get(neutralMask(tm.type))) : (PREF_SLIDER_DEFAULTS[el.id] ?? sliderDefaults.get(el.id));
     if (to === undefined || el.disabled || el.value === to) return;
     el.value = to;
     el.dispatchEvent(new Event("input", { bubbles: true }));
