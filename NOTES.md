@@ -143,6 +143,69 @@ horizon in the full export go from 233,425 to 43,733 with the workaround on.
 first; the quick-look preview version moved to 59, because those previews come
 from the same pipeline.
 
+**Three more on the held candidate, 2026-09-24 night into 09-25: the screen's
+sky smoothing follows the masks, the switch with Foliage first (decision 042,
+stage 2), and the sweeps reach it.**
+
+- With Sky colour smoothing on, the screen kept the smoothing it had before a
+  mask changed until another control moved, while the saved photo used the
+  new one: `syncSkyMap` keyed its rebuild on the edit without the masks, and
+  `buildSkyMap` renders every sample through the masks. The key now carries
+  them without their four bitmaps; a stroke or a regenerated sky bumps the
+  mask's `rev`, which the key keeps (52cfc7d). Measured with a mask's own
+  saturation, a whole-photo Saturation change and one Undo: the old key came
+  back to a different sky (97,096 pixels up to 34 levels off), the new one
+  byte-identical.
+- The switch (096efa2): a row of mask names above the tabs; the picked mask's
+  name in the heading with Back to whole photo; Exposure, Warmth, Hue shift,
+  Saturation, Contrast and the Foliage band acting on the picked mask, each
+  starting at no change; everything else inert, with a note saying why. A
+  mask's Foliage is an offset added where its group reaches, read before the
+  band in the shader and in `compileEdit`, and refused for a mask that is or
+  joins a colour mask. The mask panel's five sliders left; six walks set them
+  through the tabs now, by `setMaskValue` in `tools/walk-input.mjs`.
+- The sweeps (69b58b1): the accessibility walk's mask step left the mask place
+  open, where the chips and the Editing line hide, so axe and the 44px check
+  never saw them, and the control sweep listed Back to whole photo as never
+  reached. The walk now closes the place with a mask picked and refuses when
+  the chips or the Editing line do not appear (seen failing on production's
+  build, which has neither); the control sweep sweeps once in that state. On
+  the held build: axe clean with a mask picked in both themes at both shapes,
+  every target at least 44px at 402 and 900px, and the control sweep down from
+  55 controls to answer for to 54, the one new entry of the switch now reached.
+- Walks on the held build: agreement, aim, mask-panel, mask-slots, mask-truth,
+  mask-fix-export, export-bytes, a11y and the control sweep; plus a scratch walk
+  on the practice frames (chips, heading, ranges, inert controls, the way back,
+  a whole-photo change leaving the mask alone, Undo byte-exact at both steps, a
+  colour mask refusing Foliage, the next photograph opening clean).
+- **Lens correction bears on the wire fix, measured the same night.** The
+  matched shipped profile (50-250) opens at 0 in a fresh session and is then
+  remembered per lens and aperture. At 1, in Aerochrome: NIR_3463's cloud loses
+  the pink-red at its centre (strongly red above the horizon on screen, 125,122
+  to 112,923); NIR_3461's wires, lattice and discs do not change (39,711 to
+  37,252); NIR_3467's export loses most of the cladding's red (1,706,226 to
+  239,550 above the line). So the switch was rendered with the profile at 1, as
+  a reader has it, and took the rest: in the full export, strongly red above
+  the line went from 114,416 to 0 on NIR_3461 and from 239,550 to 0 on NIR_3467,
+  with screen and export agreeing (0 and 0). Its cost, looked at: the horizon
+  trees on NIR_3461 and a small tree on NIR_3467 grey with it, and the
+  gradient's feather reaches into the grass, which goes from 54.5% to 52.1% of
+  the area below the line strongly red on NIR_3461 and from 55.3% to 53.6% on
+  NIR_3467. A pylon leg standing in the grass stays red; the route there is a
+  colour mask joined to a brush.
+- **Checked, not a defect: with the lens on and no masks the screen counts more
+  strongly red pixels than the export** (NIR_3467, 3.480% against 1.434% above
+  the line; with the lens off, 11.24% against 10.22%). Drawn at the preview's
+  size the export counts the same as at full size, so it is not scale, and per
+  radial ring the two differ by at most 1.5 levels in 255 with the lens on or
+  off, so it is not the lens path. The lens moves the cladding close to the
+  count's threshold, where a level flips many pixels.
+- **Still found, not fixed:** masks do not survive the tab closing
+  (`editToJson` strips them, and Help says so), which matters more now that a
+  mask carries the wire fix. And whether 52cfc7d accounts for the round discs
+  that differed between screen and export with the workaround on has not been
+  re-measured.
+
 ## Confirmed
 
 - Camera: **Nikon Z50, IR-converted**. Filters tested: **red, 530nm, 720nm,

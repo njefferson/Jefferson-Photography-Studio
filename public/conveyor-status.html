@@ -84,8 +84,8 @@
       <ul class="facts">
         <li><b>Production</b> <span>v2.62.14: the small fixes that were on staging as v2.62.10, promoted on your go. The number moved because the last digit counts every commit; the content did not.</span></li>
         <li><b>On staging</b> <span>v2.62.16: the export edge fix and two new rows on the device test page. Your pass came back good; it waits for your go.</span></li>
-        <li><b>Built and held</b> <span>Six changes on top of v2.62.16: the first stage of the mask work (three), the LUT grid, the None button for looks, and a fix: a colour mask joined to another mask now reaches the saved photo, not only the screen. It goes to staging once v2.62.16 is on production, because staging holds one build at a time. It is kept in this session's copy of the repository until then.</span></li>
-        <li><b>Last verified green</b> <span><code>283748f</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
+        <li><b>Built and held</b> <span>Eight changes on top of v2.62.16: the first stage of the mask work (three), the LUT grid, the None button for looks, two fixes (a colour mask joined to another mask now reaches the saved photo, and the screen's sky smoothing follows a mask's changes), and the switch: pick a mask and the ordinary controls act on it, Foliage first. It goes to staging once v2.62.16 is on production, because staging holds one build at a time. It is kept in this session's copy of the repository until then.</span></li>
+        <li><b>Last verified green</b> <span><code>a24bd0c</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
         <li><b>Next version</b> <span>2.63, when masks gain their own amounts. The fixes before that take the increment digit and no version bump.</span></li>
       </ul>
 
@@ -237,9 +237,21 @@
           device test page times a frame with eight masks. Every walk passed on
           it. It goes to staging after v2.62.16 reaches production.
         </li>
-        <li class="now"><span class="state">Now</span>
+        <li class="now"><span class="state">Built, held</span>
           <strong>The wire fix, moved up: masks, stage two, with Foliage
           first.</strong>
+          Built: a row of mask names above the tabs; pick one and Exposure,
+          Warmth, Hue shift, Saturation, Contrast and the Foliage band act on it,
+          with its name in the heading and Back to whole photo beside it. To take
+          the red off wires or cladding: set the lens profile on the Corrections
+          tab first (it takes the hot spot's pink and much of the cladding's red
+          on its own), then pick a gradient over everything above the grass and
+          lower its Foliage saturation. In the full export the red above the
+          horizon went to none on both frames, with the lens profile on. The cost:
+          the red trees on the horizon go grey with it, the gradient's soft edge
+          takes a little red off the grass near the horizon, and a pylon leg
+          standing in the grass stays red. It waits behind v2.62.16 with the rest
+          of the held build. What follows is the record from before it was built.
           Foliage limited to a mask is the stage that fixes the red wires, pylons
           and cladding: on your building, Foliage at 0 takes the red on the
           cladding from 13,561 pixels to none and the red on the grass from 87,991
@@ -270,21 +282,28 @@
         <li>
           <strong>A mask joined to the one above still shows its own Brightness,
           Contrast and Saturation sliders</strong>, which nothing reads once it is
-          joined: the adjustment above is the one that applies. Read in the code,
-          not yet seen on screen. Owned by the mask work's second stage, where the
-          controls follow the selected mask.
+          joined. Fixed in the held build: those sliders left the mask panel, and
+          the tabs act on the picked mask's group.
         </li>
         <li>
           <strong>Foliage can only be set for the whole photo.</strong> It selects a
           colour, not a place, so bright cladding on a building reddens along with
-          the grass. Owned by the mask work, and moved up to its next stage.
+          the grass. Fixed in the held build: pick a mask and lower its Foliage.
+        </li>
+        <li>
+          <strong>Masks do not survive the tab closing.</strong> The rest of the
+          edit comes back after the iPad closes the tab, and the masks, with
+          anything set on them, do not. Help says so. It matters more now that a
+          mask carries the wire fix.
         </li>
         <li>
           <strong>The round pink spots differ between the screen and the saved
           photo when masks are on.</strong> With the wire workaround applied they
           stay pink on screen and are faint in the export; with no masks the two
           agree. They come from Sky colour smoothing, which runs after the masks.
-          Owned by the Aerochrome smoothness work.
+          One cause is fixed in the held build (the screen's smoothing did not
+          follow a mask's changes); whether that is all of it has not been
+          measured again. Owned by the Aerochrome smoothness work.
         </li>
         <li>
           <strong>Full view shows on the start screen and does nothing

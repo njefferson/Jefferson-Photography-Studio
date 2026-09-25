@@ -85,6 +85,45 @@ is that route's cost. Two things were found on the way:
   screen and are faint in the export. As shipped, the two agree on the whole
   (1.088% and 1.075% of the area above the horizon strongly red), so the
   difference sits in how the sky map sees the masks. The discs are 013's.
+  One cause was found and fixed on the held build (52cfc7d): the screen's sky
+  map was keyed on the edit without its masks, so it kept the map from before
+  a mask changed. Whether that is the whole of the discs' difference has not
+  been measured again.
+
+**Stage 2 built and held, 2026-09-25 (096efa2, with the sweeps in 69b58b1).**
+The chip row, the Editing line with Back to whole photo, and Exposure, Warmth,
+Hue shift, Saturation, Contrast and the Foliage band acting on the picked mask;
+everything else inert with its reason. A mask's Foliage is M1's offset on the
+whole-photo value, summed where masks overlap and clamped, read before the band
+through the group weight; a mask that is or joins a colour mask refuses it
+(`groupCanAim`).
+
+**Lens correction bears on it, measured the same night.** The matched shipped
+profile (50-250) opens at 0 in a fresh session and is remembered per lens and
+aperture after that. At 1, in Aerochrome:
+
+- NIR_3463: the pink-red at the centre of the cloud goes; strongly red above
+  the horizon on screen, 125,122 to 112,923. That colour shift is the hot spot
+  reaching the band, which the lens profile corrects before the swap.
+- NIR_3461: the wires, the far pylon's lattice and the discs are as red at 1 as
+  at 0 (39,711 to 37,252). The lens profile is not the wire fix.
+- NIR_3467: in the export, strongly red above the line goes from 1,706,226 to
+  239,550, most of it the cladding.
+
+So the switch was rendered with the profile at 1, as a reader has it. In the
+full export, strongly red above the line went from 114,416 to 0 on NIR_3461
+and from 239,550 to 0 on NIR_3467, with a gradient over everything above the
+grass at a Foliage saturation offset of -2; screen and export agree (0 and 0).
+Its cost, looked at: the red trees on NIR_3461's horizon and a small tree on
+NIR_3467 go grey; the gradient's feather reaches the grass, which goes from
+54.5% to 52.1% of the area below the line strongly red on NIR_3461 and from
+55.3% to 53.6% on NIR_3467; a pylon leg standing in the grass stays red, where
+the route is a colour mask joined to a brush. With the lens on and no masks the
+screen counted more strongly red than the export (3.480% against 1.434% on
+NIR_3467); drawn at the preview's size the export counts the same, and per
+radial ring the two differ by at most 1.5 levels in 255 with the lens on or
+off, so it is a threshold count on a surface the lens moves close to it, not
+a lens-path disagreement.
 
 ## Looked up
 
@@ -232,6 +271,9 @@ These EXIST, and this record is the next layer over them, not a second version.
 - The reported frame NIR_3461: the editing view in Aerochrome as shipped and with Foliage saturation at 0, the wires, the far pylon and the near pylon.
 - The frame NIR_3467: the editing view in Aerochrome as shipped and with Foliage saturation at 0, the building and the ground.
 - NIR_3461 again, 2026-09-24, night: the full export in Aerochrome as shipped against the same with the workaround masks, full frame and at full size on the wires against cloud, the far pylon, and the horizon trees and grass; and the editing view against the export on the far pylon, where the discs differ.
+- NIR_3463, 2026-09-25: the editing view in Aerochrome with the lens profile at 0 and at 1, full frame, the cloud's centre.
+- NIR_3461, 2026-09-25: the far pylon with the lens profile at 0 and at 1; then the full export with the profile at 1 against the same through the switch, full frame and on the wires, the far pylon, the horizon trees, and a pylon leg in the grass.
+- NIR_3467, 2026-09-25: the export's cladding with the lens profile at 0 and at 1, and the editing view against the export with it at 1; then the full export with the profile at 1 against the same through the switch, full frame and on the building, the small tree and the grass.
 
 ## Depends
 
