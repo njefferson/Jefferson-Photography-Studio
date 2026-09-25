@@ -557,16 +557,34 @@ try {
     } finally { await page.close(); }
   }
 
-  // 5. A MASK'S OWN COLOUR MIXER (042, stage 2b). The mixer's offsets live on
+  // 5. A MASK'S OWN VALUES AFTER THE MASK STAGE (042, stage 2b). They live on
   //    the mask and reach two renderers: the shader reads the weight its mask
   //    loop kept, and compileEdit keeps the same weight per pixel. Arm 4 holds
-  //    the aim; this holds the offsets, with the same instrument, so a renderer
-  //    that dropped them (the export's path did drop a joined colour key once)
-  //    shows as a hue apart. A Sky mask, its own saturation neutral, every band
-  //    of its mixer shifted +60 degrees: the sky moves a sixth of the wheel on
-  //    screen, and the saved file has to move with it.
-  {
-    const label = "mask mixer";
+  //    the aim; these hold a mask's own values, with the same instrument, so a
+  //    renderer that dropped them (the export's path did drop a joined colour
+  //    key once) shows as a hue apart. Each on a Sky mask with its own
+  //    saturation neutral: the colour mixer with every band shifted +60 degrees
+  //    (the sky moves a sixth of the wheel), and the grade with strong midtone
+  //    and highlight wheels. The saved file has to move with the screen.
+  const MASK_ARMS = [
+    { label: "mask mixer", what: "a Sky mask's mixer, every band +60", check: "hslHue", want: "60",
+      set: async (page) => {
+        await page.click("#ptab-color");
+        for (let band = 0; band < 8; band++) {
+          await page.locator("#hslChips button").nth(band).click();
+          await setMaskValue(page, "hslHue", "60");
+        }
+      } },
+    { label: "mask grade", what: "a Sky mask's grade, midtones 200/80, highlights 30/100", check: "gradeAmount2", want: "100",
+      set: async (page) => {
+        await setMaskValue(page, "gradeHue1", "200");
+        await setMaskValue(page, "gradeAmount1", "80");
+        await setMaskValue(page, "gradeHue2", "30");
+        await setMaskValue(page, "gradeAmount2", "100");
+      } },
+  ];
+  for (const arm of MASK_ARMS) {
+    const label = arm.label;
     const page = await br.newPage({ viewport: { width: 1000, height: 820 }, acceptDownloads: true });
     try {
       await page.goto(`${BASE}/ir.html`, { waitUntil: "load" });
@@ -581,16 +599,12 @@ try {
       await page.click("#mOutline");
       await setMaskValue(page, "saturation", "1");
       // setMaskValue puts the mask place back when it found it open, and the
-      // place covers the Colour tab, so it is closed before the band chips.
+      // place covers the tabs, so it is closed before the arm's own controls.
       await closeMasks(page);
-      await page.click("#ptab-color");
-      for (let band = 0; band < 8; band++) {
-        await page.locator("#hslChips button").nth(band).click();
-        await setMaskValue(page, "hslHue", "60");
-      }
+      await arm.set(page);
       await page.waitForTimeout(1500);
-      const own = await page.evaluate(() => document.getElementById("hslHue")?.value);
-      if (own !== "60") { fail(`${label}: the mask's mixer did not take the offset (it reads ${own}), so nothing below measures it`); throw new Error("not armed"); }
+      const own = await page.evaluate((id) => document.getElementById(id)?.value, arm.check);
+      if (own !== arm.want) { fail(`${label}: the mask did not take its value (${arm.check} reads ${own}), so nothing below measures it`); throw new Error("not armed"); }
 
       const shown = await page.evaluate(`(() => {
         const read = ${READ};
@@ -628,11 +642,11 @@ try {
       if (!saved) { fail(`${label}: the exported file has no colour to read`); throw new Error("no export"); }
 
       const dh = dHist(shown.p, saved.p), dl2 = Math.abs(shown.light - saved.light);
-      console.log(`  ${label.padEnd(12)} shown biggest bin ${String(shown.hue).padStart(3)} (${(shown.share*100).toFixed(0)}%) light ${shown.light.toFixed(1)}% mean ${JSON.stringify(shown.mean)}   [a Sky mask's mixer, every band +60]`);
+      console.log(`  ${label.padEnd(12)} shown biggest bin ${String(shown.hue).padStart(3)} (${(shown.share*100).toFixed(0)}%) light ${shown.light.toFixed(1)}% mean ${JSON.stringify(shown.mean)}   [${arm.what}]`);
       console.log(`  ${"".padEnd(12)} saved biggest bin ${String(saved.hue).padStart(3)} (${(saved.share*100).toFixed(0)}%) light ${saved.light.toFixed(1)}% mean ${JSON.stringify(saved.mean)}`);
       console.log(`  ${"".padEnd(12)} ${dh}deg of hue apart (bar ${HUE_BAR}), ${dl2.toFixed(1)} points of lightness (bar 8)`);
-      if (dh > HUE_BAR || dl2 > 8) fail(`${label}: the preview and the export disagree on a mask's own colour mixer — ${dh}deg and ${dl2.toFixed(1)} points. The shader and compileEdit read the offsets or the weight differently.`);
-      else ok(`${label}: preview and export agree on a mask's own colour mixer`);
+      if (dh > HUE_BAR || dl2 > 8) fail(`${label}: the preview and the export disagree on ${arm.what} — ${dh}deg and ${dl2.toFixed(1)} points. The shader and compileEdit read the mask's values or its weight differently.`);
+      else ok(`${label}: preview and export agree on ${arm.what}`);
     } catch (e) {
       if (!/not armed|no preview|no export/.test(String(e && e.message))) fail(`${label}: the arm could not run — ${e}`);
     } finally { await page.close(); }

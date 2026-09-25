@@ -5,7 +5,7 @@
 
 // Single source of truth for edit parameters lives in pipeline.ts so the GPU
 // preview and CPU export can never drift apart.
-import { toneEvaluator, toneIsIdentity, maskGroupsForRender, groupHslOffset, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, LENS_GAIN_LO, LENS_GAIN_HI, SAT_GUARD_LO, SAT_GUARD_HI, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, lensAreaMean, type EditParams, type LocalMap, type SkyMap, type BrushMask, type CropRect } from "./pipeline";
+import { toneEvaluator, toneIsIdentity, maskGroupsForRender, groupHslOffset, groupGradeOf, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, LENS_GAIN_LO, LENS_GAIN_HI, SAT_GUARD_LO, SAT_GUARD_HI, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, lensAreaMean, type EditParams, type LocalMap, type SkyMap, type BrushMask, type CropRect } from "./pipeline";
 import { toHalfBuffer } from "./half";
 export type { EditParams };
 
@@ -135,6 +135,9 @@ uniform vec3 u_maskFol[8];   // a HEAD's own Foliage offsets [hue, sat, lum] (04
 uniform bool u_maskFolOn;    // false when no head carries one, so the band reads u_fol and nothing else
 uniform vec3 u_maskHsl[64];  // a HEAD's own colour-mixer offsets (042 stage 2b), 8 bands per mask slot, head i at i*8; zero elsewhere
 uniform bool u_maskHslOn;    // false when no head carries any, so the mixer reads u_hsl and nothing else
+uniform vec3 u_maskGrade[24]; // a HEAD's own grade (042 stage 2b): amount x tint for shadows, midtones, highlights, head i at i*3
+uniform float u_maskGradeBal[8]; // that head's own balance
+uniform bool u_maskGradeOn;  // false when no head carries a grade, so the grade reads the whole photo's alone
                              // LITERAL 8, like every array above it: MAX_MASKS is a
                              // TypeScript constant and means nothing inside GLSL —
                              // written as MAX_MASKS first, and the shader silently
@@ -960,14 +963,31 @@ void main() {
   // weighted by smoothstep bands over the display luminance; balance shifts
   // the shadow/highlight crossovers. AFTER B&W (so it tones mono too),
   // before global lum. 0.35 = pipeline.ts GRADE_K. Matches compileEdit.
-  if (u_gradeOn) {
+  if (u_gradeOn || u_maskGradeOn) {
     float Lg = dot(g, LUMA_W);
-    float wS = 1.0 - smoothstep(0.05, 0.6 + 0.2 * u_gradeBal, Lg);
-    float wH = smoothstep(0.4 + 0.2 * u_gradeBal, 0.95, Lg);
-    float wM = max(0.0, 1.0 - wS - wH);
-    g = clamp(g + 0.35 * (wS * u_gradeAmt.x * u_gradeTintS
-                        + wM * u_gradeAmt.y * u_gradeTintM
-                        + wH * u_gradeAmt.z * u_gradeTintH), 0.0, 1.0);
+    vec3 gg = g;
+    if (u_gradeOn) {
+      float wS = 1.0 - smoothstep(0.05, 0.6 + 0.2 * u_gradeBal, Lg);
+      float wH = smoothstep(0.4 + 0.2 * u_gradeBal, 0.95, Lg);
+      float wM = max(0.0, 1.0 - wS - wH);
+      gg = g + 0.35 * (wS * u_gradeAmt.x * u_gradeTintS
+                     + wM * u_gradeAmt.y * u_gradeTintM
+                     + wH * u_gradeAmt.z * u_gradeTintH);
+    }
+    // A mask's own wheels (042, stage 2b): the same bands over the same
+    // luminance at the mask's own balance, weighted by its group as the mask
+    // loop kept it, added before the one clamp. The mirror of compileEdit.
+    if (u_maskGradeOn) {
+      for (int i = 0; i < u_maskCount; i++) {
+        if (u_maskOp[i] != 0 || gW[i] <= 0.0) continue;
+        float bm = u_maskGradeBal[i];
+        float mS = 1.0 - smoothstep(0.05, 0.6 + 0.2 * bm, Lg);
+        float mH = smoothstep(0.4 + 0.2 * bm, 0.95, Lg);
+        float mM = max(0.0, 1.0 - mS - mH);
+        gg += 0.35 * gW[i] * (mS * u_maskGrade[i * 3] + mM * u_maskGrade[i * 3 + 1] + mH * u_maskGrade[i * 3 + 2]);
+      }
+    }
+    g = clamp(gg, 0.0, 1.0);
   }
   // Sky colour smoothing: blend chroma toward the coarse map of the sky's own
   // rendered chroma, by the sky bitmap's weight, luma exactly preserved. After
@@ -1246,7 +1266,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskOp", "u_maskAims", "u_maskFol", "u_maskFolOn", "u_maskHsl", "u_maskHslOn", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_maskMatte", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskOp", "u_maskAims", "u_maskFol", "u_maskFolOn", "u_maskHsl", "u_maskHslOn", "u_maskGrade", "u_maskGradeBal", "u_maskGradeOn", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_maskMatte", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -1856,6 +1876,8 @@ export class Renderer {
     gl.uniform1i(this.loc.u_hslOn, mixerOn ? 1 : 0);
     if (mixerOn) gl.uniform3fv(this.loc.u_hsl, new Float32Array(p.hsl));
     gl.uniform1i(this.loc.u_maskHslOn, maskHslOn ? 1 : 0);
+    const maskGradeOn = maskGroupsForRender(p.masks).some((g) => !!groupGradeOf(g));
+    gl.uniform1i(this.loc.u_maskGradeOn, maskGradeOn ? 1 : 0);
     gl.uniform1i(this.loc.u_bwOn, p.bwOn ? 1 : 0);
     const bwMix = p.bwMix ?? [1, 1, 1];
     gl.uniform3f(this.loc.u_bwMix, bwMix[0], bwMix[1], bwMix[2]);
@@ -2002,6 +2024,22 @@ export class Renderer {
       const fol = new Float32Array(MAX_MASKS * 3);
       masks.forEach((m, i) => { if ((i === 0 || (m.op ?? 0) === 0) && m.fol) fol.set(m.fol, i * 3); });
       gl.uniform3fv(this.loc.u_maskFol, fol);
+      if (maskGradeOn) {
+        // Each head's three bands as amount x tint, by the same gradeTintVec
+        // the CPU path uses, and its own balance.
+        const gt = new Float32Array(MAX_MASKS * 9);
+        const gb = new Float32Array(MAX_MASKS);
+        masks.forEach((m, i) => {
+          if (!((i === 0 || (m.op ?? 0) === 0) && m.grade && m.grade.length === 7)) return;
+          for (let band = 0; band < 3; band++) {
+            const t = gradeTintVec(m.grade[band * 2] ?? 0), a = m.grade[band * 2 + 1] ?? 0;
+            gt.set([t[0] * a, t[1] * a, t[2] * a], (i * 3 + band) * 3);
+          }
+          gb[i] = m.grade[6] ?? 0;
+        });
+        gl.uniform3fv(this.loc.u_maskGrade, gt);
+        gl.uniform1fv(this.loc.u_maskGradeBal, gb);
+      }
       if (maskHslOn) {
         const hsl = new Float32Array(MAX_MASKS * 24);
         masks.forEach((m, i) => { if ((i === 0 || (m.op ?? 0) === 0) && m.hsl && m.hsl.length === 24) hsl.set(m.hsl, i * 24); });

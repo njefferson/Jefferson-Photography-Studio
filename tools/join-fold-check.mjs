@@ -26,7 +26,8 @@
 // So a head that is full at a pixel, carrying offsets, renders that pixel
 // exactly as the same offsets on the whole photo would; a group that reaches
 // nowhere there changes nothing; and a colour mask, which Foliage refuses,
-// can carry them, because the mixer runs after the mask stage.
+// can carry them, because the mixer runs after the mask stage. The same four
+// hold a mask's own grade, whose wheels add to the whole photo's.
 //
 // Runs on every commit and needs no browser. Bundled with esbuild so it checks
 // the functions the app ships rather than a copy of them.
@@ -103,5 +104,17 @@ check("a head whose group reaches nowhere here changes nothing", diff(px([{ ...n
 const keyed = { ...neutralMask(3), hueTarget: 20, satTarget: 0.9, colorRange: 0.9, hsl: off };
 check("a colour mask can carry the mixer's offsets", diff(px([keyed]), bare) > 0.02 ? 1 : 0, 1);
 
-console.log(bad ? `\n${bad} check(s) failed` : "\nthe three joins, an aim through them, and a mask's own mixer hold");
+// 042 stage 2b: the mask's own grade. A full head's wheels render as the same
+// wheels on the whole photo; wheels at zero, or a group that reaches nowhere,
+// change nothing; a colour mask can carry them.
+const pxg = (masks, grade) => { const p = plain(); p.masks = masks; if (grade) p.grade = grade; const o = new Float32Array(4); compileEdit(p, undefined, 1.5)(0.55, 0.45, 0.4, o, 0, 0.5, 0.5); return o; };
+const G = [30, 0.8, 200, 0.6, 60, 0.5, 0.2];
+const bareG = pxg([]);
+check("a grade on the whole photo changes the pixel (so the case is live)", diff(pxg([], G), bareG) > 0.02 ? 1 : 0, 1);
+check("a full head's grade renders as the same grade on the whole photo", diff(pxg([{ ...neutralMask(0), grade: G }]), pxg([], G)), 0);
+check("a grade with every amount at zero changes nothing", diff(pxg([{ ...neutralMask(0), grade: [30, 0, 200, 0, 60, 0, 0.2], brightness: 1.0001 }]), pxg([{ ...neutralMask(0), brightness: 1.0001 }])), 0);
+check("a head whose group reaches nowhere here changes nothing with a grade", diff(pxg([{ ...neutralMask(0), grade: G }, { ...neutralMask(0), op: 1 }]), bareG), 0);
+check("a colour mask can carry a grade", diff(pxg([{ ...neutralMask(3), hueTarget: 20, satTarget: 0.3, colorRange: 0.9, grade: G }]), bareG) > 0.02 ? 1 : 0, 1);
+
+console.log(bad ? `\n${bad} check(s) failed` : "\nthe three joins, an aim through them, and a mask's own mixer and grade hold");
 process.exit(bad ? 1 : 0);

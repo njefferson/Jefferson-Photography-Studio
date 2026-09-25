@@ -1,3 +1,5 @@
 # Written by tools/preview-version-check.mjs --record. Not hand-edited.
-version=61
-hash=f7cfd473a2fcb83c
+version=62
+hash=6cea5d9522cd2575
+# Recorded WITHOUT a version bump. The evidence the pictures did not change:
+proven=the only change since version 62 was recorded is groupHslOffset's contract comment moved back above groupHslOffset from above groupGradeOf; no code line changed

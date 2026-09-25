@@ -183,7 +183,13 @@ export async function setMaskValue(page, field, value) {
   const where = { brightness: ["basic", "expo"], warmth: ["basic", "maskWarmth"], hue: ["color", "hue"], saturation: ["color", "sat"],
     contrast: ["color", "con"], folHue: ["color", "folHue"], folSat: ["color", "folSat"], folLum: ["color", "folLum"],
     // The colour mixer's three (042, stage 2b), for whichever band its chips have selected.
-    hslHue: ["color", "hslHue"], hslSat: ["color", "hslSat"], hslLum: ["color", "hslLum"] }[field];
+    hslHue: ["color", "hslHue"], hslSat: ["color", "hslSat"], hslLum: ["color", "hslLum"],
+    // The grade's seven (042, stage 2b): each band's Hue and Amount (0 shadows,
+    // 1 midtones, 2 highlights), and Balance.
+    gradeHue0: ["grade", "gradeHue0"], gradeAmount0: ["grade", "gradeAmount0"],
+    gradeHue1: ["grade", "gradeHue1"], gradeAmount1: ["grade", "gradeAmount1"],
+    gradeHue2: ["grade", "gradeHue2"], gradeAmount2: ["grade", "gradeAmount2"],
+    gradeBal: ["grade", "gradeBal"] }[field];
   assert.ok(where, `setMaskValue: no mask control is called ${field}`);
   const [tab, id] = where;
   const wasOpen = await page.evaluate(() => !document.getElementById("maskPlace")?.hidden);
