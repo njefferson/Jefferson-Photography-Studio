@@ -308,7 +308,9 @@ needs its own.
 
 ## Rank
 
-**Second.** It is in production, it is about the look currently being judged, and
+**Re-ranked 2026-09-25: second, directly below 052.** The Aerochrome work leads the queue; this is second because 052 changes the sky population this stage smooths, and 066's film model is tuned against the chroma this stage leaves. The round discs along wires and round pylons, seen at full resolution on NIR_3461 in both the shipped and the tuned look, are this stage's own texels averaging a wire's colour in.
+
+**Originally second.** It is in production, it is about the look currently being judged, and
 its first step is cheap — render the same frame at several saturations and with
 the chroma stage stubbed, and the sheet says how much of the splotch is
 amplification. Below the full-view item because that one takes the photograph away
@@ -349,3 +351,7 @@ instrument rather than the data.
 
 So the first candidate rendered for THIS record starts by measuring at both
 scales, through `skySatSel`, and printing which control it drove.
+
+## Looked at
+
+- NIR_3461, 2026-09-25: as shipped and tuned to the film, lens profile at 1, every 1400 by 932 tile opened at full resolution; the round discs along the wires and round the near and far pylons, and a 1:1 crop of them.

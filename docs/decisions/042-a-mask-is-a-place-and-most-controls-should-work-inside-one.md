@@ -524,3 +524,12 @@ CPU pre-pass, and the Foliage band on a place mask meets that same test, since
 its early weights already exist. It sat in stage 3 only because of where the
 band runs. So the switch ships with Foliage first, and the eight follow as stage
 2b. Nothing else in the queue was ahead of it.
+
+**Re-ranked 2026-09-25: below the Aerochrome work (052, 013, 065, 066, 061,
+067).** Settled that day: the Aerochrome work leads the queue. None of those
+items needs this one, and this one needs none of them. Its remaining stages
+(2b, 3 and 4) act on the reader's masks and not on the look's own sky stages,
+and its stage 5 meets 052 and builds on whatever 052 settles. 013 and 016
+were kept below both lanes because the lanes change what they would be tuned
+against. For 013 that now happens through 052, which leads, and 016 is
+archived.

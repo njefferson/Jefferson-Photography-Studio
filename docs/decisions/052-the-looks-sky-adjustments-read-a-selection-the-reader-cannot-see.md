@@ -48,6 +48,39 @@ a crisp look depth. The SELECTION was not unified. Its own Option 1 ends by
 naming per-population strengths reading `skySel` as later items, so a follow-on
 was anticipated; this is that follow-on arriving as a report instead.
 
+**2026-09-25: the halo under a sky depth, measured, and what could not fix it.**
+With Aerochrome's Sky depth on, a light band stands beside every building and
+pylon leg. The depth multiplies brightness by the look's selection, and a probe
+of that selection read it at 0.29 at 10 px from the tall building's edge on
+NIR_3466, 0.56 at 70 and 0.95 at 190, with the export's brightness against the
+shipped look 0.91 at 10 px and 0.65 in open sky. The sky map's keying byte read
+1.0 throughout, so the selection alone is the cause. Inside NIR_3461's near
+pylon the selection is 0: the sky seen through the lattice is not selected. On
+NIR_3466 the tall building's pale face is selected as sky, with a hole in it.
+
+Tried in a scratch copy, each rendered or mapped and opened, none kept:
+
+- **The Sky mask's own colour grow** (`growSkyByColour`), unlimited or snapped
+  after: it reaches the edges and takes in whole clouds on NIR_1651 and the
+  blurred background of NIR_0627.
+- **The grow limited to the old selection's feather:** the halo goes (0.649
+  against 0.648 in open sky at the pylon leg on NIR_3461), but binary
+  membership puts hard edges through the wispy clouds of NIR_1651 and NIR_1827.
+- **A per-pixel whiteness weight subtracting cloud:** it finds the cirrus on
+  NIR_3466 and NIR_3461, misses NIR_1651's cloud, reads the bright haze round
+  NIR_1827's sun as white, and is grainy near the horizon.
+- **The weighted guided filter** the literature names (Liba et al. 2020, a
+  large window, near-zero confidence along the uncertain edge): the sky beside
+  the building still rises from 0.61 to 0.98 over 300 px, and at the pylon it
+  is worse than the shipped filter. It assumes the coarse mask is right away
+  from its edge, and here it is wrong over whole regions: the lattice and the
+  building face. No refinement can fix wrong labels.
+
+So the halo is this selection being wrong, not its edge being soft. The field
+starts from a learned segmentation (Lightroom's Select Sky; the paper's
+pipeline), and on-device sky segmentation is being researched before anything
+further is built (IR-SCIENCE 4b-ix has the refinement literature).
+
 ## Looked up
 
 **The field's convention is one selection, visible and editable, with the
@@ -68,6 +101,31 @@ it is what this app has by accident of the order the two features were built.
 
 Sources: Adobe, "Apply Masking for local adjustments" (Lightroom);
 darktable user manual, "combining drawn & parametric masks" and "masks".
+
+## Built already
+
+What exists that this item will use, so a second one does not get written
+(LESSONS 330):
+
+- **The detection and its refinement.** `buildSkyMask` in `src/sky.ts` (the
+  coarse 384 px selection, with its horizon from `src/skyhorizon.ts`), and in
+  `src/skyfine.ts` `refineSkyMask` (the guided filter the look uses today),
+  `growSkyByColour` and `skyGrowKey` (the Sky mask's colour grow), and
+  `buildSkySelectionFrom`, which builds the look's pair at open.
+- **The look's use of it.** `src/skymap.ts` `buildSkyMap` (the 128-texel sky
+  map, its depth key and grey guard) and the sky stages in `src/gl.ts` and
+  `compileEdit`.
+- **The reader's Sky mask**, a type-4 mask with Reach, Feather, by-colour and
+  hand corrections: the editable thing this record's chosen option makes the
+  look read.
+- **Instruments.** `tools/mask-truth-walk.mjs` (coverage at the edge and in
+  open sky from the reader's side), `tools/sky-probe.mjs` (why the grow
+  stopped), `tools/sky-stage-walk.mjs` (the exported sky, measured whole) and
+  `tools/aerochrome-walk.mjs`.
+- **Not in the repository:** the selection lab used on 2026-09-25, which builds
+  each candidate selection from one photograph and writes its map, lives in
+  the session scratchpad. It is the first thing to move into `tools/` when a
+  learned segmenter is tried.
 
 ## Weighed against
 
@@ -150,20 +208,22 @@ told about in words.
 
 ## Rank
 
-**Ninth, directly above 013.**
+**First.** Settled 2026-09-25: the Aerochrome work leads the queue, ahead of
+the completeness work, because nothing ranked above it was needed by it. Within
+that work this is first because everything the look renders in the sky is
+measured over this selection: the chroma noise 013 works on, the tuning 066
+replaces, and the halo above. Built later, each of those would be measured
+again.
 
-A reported defect ranks where it naturally goes, and nothing about being
-reported moves it. What moves this one is the dependency test: 013 tunes the
-Aerochrome sky against the population the look's sky stages read, and this item
-changes which population that is. Tuned first, those values are tuned against
-ground that is about to move — the same test that put 023 at the top of the
-queue when the look's population work was found to read the sky selection.
+It no longer waits on 042. The two meet at 042's stage 5, and 042's remaining
+stages act on the reader's masks, not on the look's own sky stages, so nothing
+in 042 moves what this item is measured against. 042's stage 5 builds on
+whatever this item settles.
 
-It sits below 042 rather than above it because the two meet in the middle and
-042 was asked for first, as a principle covering every control rather than this
-one; whichever is built first should shape the other, and building this one
-blind to 042 risks a sky-shaped special case in a system that is meant to
-generalise.
+## Looked at
 
-It does not go above 051, 030 or 042, none of which it invalidates, and it does
-not go above 034 or 032, which are about a different stage entirely.
+- NIR_3466, 2026-09-25: exports as shipped and tuned to the film from the shipped build and from each variant, 1:1 crops beside the tall building's right edge, the antennas and the low roofs; selection maps at full selection resolution.
+- NIR_3461, 2026-09-25: the same, 1:1 crops of the near pylon's legs and lattice and the pylons along the horizon.
+- NIR_1651, 2026-09-25: selection maps for every variant, and exports from two variants with 1:1 crops of the cloud above the tree and the tree's left edge.
+- NIR_1827, 2026-09-25: selection maps for every variant, and exports with a 1:1 crop of the clouds and tree tops on the right.
+- NIR_0627, 2026-09-25: selection maps and exports, with a 1:1 crop of the flower against its blurred background.
