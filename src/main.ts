@@ -3919,20 +3919,39 @@ for (let i = 0; i < 8; i++) {
   hslChips.push(b);
 }
 
+/** The mixer's chips and sliders for whatever the controls act on. Takes
+ *  nothing; returns nothing. With a mask picked (042, stage 2b) they show the
+ *  mask's own offsets, whose neutral is 0 on all three, so a chip is marked
+ *  only where the MASK moved that band; otherwise the whole photo's values. */
 function updateHslUI() {
+  const t = overlayReady ? targetMask() : null;
+  const vals: readonly number[] | null = t ? (t.hsl && t.hsl.length === 24 ? t.hsl : null) : params.hsl;
+  const at = (i: number) => (vals ? vals[i] : 0);
+  const n = t ? [0, 0, 0] : [0, 1, 1];
   hslChips.forEach((b, i) => {
     b.classList.toggle("active", i === hslSel);
-    const tweaked = params.hsl[i * 3] !== 0 || params.hsl[i * 3 + 1] !== 1 || params.hsl[i * 3 + 2] !== 1;
+    const tweaked = at(i * 3) !== n[0] || at(i * 3 + 1) !== n[1] || at(i * 3 + 2) !== n[2];
     b.classList.toggle("tweaked", tweaked && i !== hslSel);
   });
-  hslUI.hue.value = String(params.hsl[hslSel * 3]);
-  hslUI.sat.value = String(params.hsl[hslSel * 3 + 1]);
-  hslUI.lum.value = String(params.hsl[hslSel * 3 + 2]);
+  hslUI.hue.value = String(at(hslSel * 3));
+  hslUI.sat.value = String(at(hslSel * 3 + 1));
+  hslUI.lum.value = String(at(hslSel * 3 + 2));
 }
 
-hslUI.hue.addEventListener("input", () => { params.hsl[hslSel * 3] = Number(hslUI.hue.value); updateHslUI(); draw(); });
-hslUI.sat.addEventListener("input", () => { params.hsl[hslSel * 3 + 1] = Number(hslUI.sat.value); updateHslUI(); draw(); });
-hslUI.lum.addEventListener("input", () => { params.hsl[hslSel * 3 + 2] = Number(hslUI.lum.value); updateHslUI(); draw(); });
+/** One mixer slider moved. Takes the component (0 hue, 1 saturation, 2
+ *  luminance) and its slider; returns the listener. It writes the picked
+ *  mask's offset for the selected band when a mask is picked, else the whole
+ *  photo's value, which is the one place the two routes divide. */
+const hslInput = (k: 0 | 1 | 2, el: HTMLInputElement) => () => {
+  const t = overlayReady ? targetMask() : null;
+  if (t) hslMaskSet(k)(t, Number(el.value));
+  else params.hsl[hslSel * 3 + k] = Number(el.value);
+  updateHslUI();
+  draw();
+};
+hslUI.hue.addEventListener("input", hslInput(0, hslUI.hue));
+hslUI.sat.addEventListener("input", hslInput(1, hslUI.sat));
+hslUI.lum.addEventListener("input", hslInput(2, hslUI.lum));
 $("hslReset").addEventListener("click", () => {
   params.hsl = hslDefault();
   updateHslUI();
@@ -6168,6 +6187,16 @@ const folSetter = (k: 0 | 1 | 2) => (m: MaskLayer, v: number) => {
   f[k] = v;
   m.fol = f;
 };
+/** Write one colour-mixer offset on a mask, for the band the chips have
+ *  selected. Takes the component; returns the setter. A NEW ARRAY, never
+ *  written in place, for the same reason as folSetter. */
+function hslMaskSet(k: 0 | 1 | 2): (m: MaskLayer, v: number) => void {
+  return (m, v) => {
+    const a = m.hsl && m.hsl.length === 24 ? m.hsl.slice() : new Array<number>(24).fill(0);
+    a[hslSel * 3 + k] = v;
+    m.hsl = a;
+  };
+}
 let maskCtlList: MaskCtl[] | null = null;
 /** The controls that follow a picked mask (042, stage 2), built once. Takes
  *  nothing; returns the list the switch, `syncFromUI` and `syncToUI` read, so
@@ -6186,6 +6215,12 @@ function maskCtls(): MaskCtl[] {
     { el: ui.folHue, min: -120, max: 120, step: 1, get: (m) => m.fol?.[0] ?? 0, set: folSetter(0), whole: () => params.foliage[0], fol: 0 },
     { el: ui.folSat, min: -2, max: 2, step: 0.01, get: (m) => m.fol?.[1] ?? 0, set: folSetter(1), whole: () => params.foliage[1], fol: 1 },
     { el: ui.folLum, min: -1, max: 1, step: 0.01, get: (m) => m.fol?.[2] ?? 0, set: folSetter(2), whole: () => params.foliage[2], fol: 2 },
+    // The colour mixer (042, stage 2b): the selected band's offsets, each range
+    // as wide as the whole photo's so an offset can reach either end from any
+    // whole-photo value; the sum is held to the slider's own range.
+    { el: hslUI.hue, min: -120, max: 120, step: 1, get: (m) => m.hsl?.[hslSel * 3] ?? 0, set: hslMaskSet(0), whole: () => params.hsl[hslSel * 3] },
+    { el: hslUI.sat, min: -2, max: 2, step: 0.01, get: (m) => m.hsl?.[hslSel * 3 + 1] ?? 0, set: hslMaskSet(1), whole: () => params.hsl[hslSel * 3 + 1] },
+    { el: hslUI.lum, min: -1.4, max: 1.4, step: 0.01, get: (m) => m.hsl?.[hslSel * 3 + 2] ?? 0, set: hslMaskSet(2), whole: () => params.hsl[hslSel * 3 + 2] },
   ];
   return maskCtlList;
 }
@@ -6222,7 +6257,9 @@ function holdsPerMask(el: Element, ids: Set<string>): boolean {
  *  it sets with data-mask-inert, so going back undoes exactly that. */
 function inertOthers(root: Element, ids: Set<string>): void {
   for (const child of Array.from(root.children)) {
-    if (child === maskTargetNote || child === folMaskNote) continue;
+    // The mixer's band chips and its pick only choose WHICH band the sliders
+    // show, so they stay live with a mask picked (042, stage 2b).
+    if (child === maskTargetNote || child === folMaskNote || child === hslChipsEl || child === hslPickBtn) continue;
     if (holdsPerMask(child, ids)) {
       if (child.tagName !== "LABEL" && !ids.has((child as HTMLElement).id)) inertOthers(child, ids);
       continue;
@@ -6276,6 +6313,10 @@ function applyMaskTargetUI(): void {
     }
   }
   folMaskNote.hidden = !m || folOk;
+  // The drag tool writes the whole photo's mixer and goes inert with a mask
+  // picked, so it is put down rather than left armed under the photo.
+  if (m && tatArmed) setTat(false);
+  updateHslUI();
   maskWarmthRow.hidden = !m;
   for (const r of wbGainRows) r.hidden = !!m;
   // Inert: undo whatever the last pick set, then set it again for this one.

@@ -1,6 +1,10 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=7c914773552402db
-diffhash=727f6d1ccbb083a4
-verdict=IN-SCOPE: plan item 4's bullet on the unmeasured picked-mask state
-# IN-SCOPE: every change is one of the two additions the plan's item-4 bullet names, the picked-mask state in the accessibility walk's axe and hit-area sections and one picked-mask sweep in the control walk, with no other files touched.
+planhash=6c1eec799b84c8fb
+diffhash=a85fba8dac76307f
+verdict=IN-SCOPE: VERSION 2.63 amended into the held build's last reader-facing commit, as the plan and NOTES' versioning rule say
+# IN-SCOPE: the VERSION bump to 2.63, amended into the tip commit, is exactly what the plan, NOTES.md's versioning rule, and the status page all specify for this point in the work.
+# 
+# 1. The plan's per-mask-amounts unit: "VERSION 2.63 rides the last reader-facing commit"; the status page names 2.63 for when masks gain their own amounts; the tip commit is the mask colour mixer, the first 2b commit.
+# 2. NOTES' versioning rule: a capability release bumps the middle number in its last reader-facing commit, and a VERSION-only commit is filtered from the changelog, so amending into the tip is the rule's shape.
+# 3. Only VERSION is staged.

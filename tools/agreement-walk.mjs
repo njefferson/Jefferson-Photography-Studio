@@ -556,6 +556,87 @@ try {
       if (!/not armed|no preview|no export/.test(String(e && e.message))) fail(`${label}: the arm could not run — ${e}`);
     } finally { await page.close(); }
   }
+
+  // 5. A MASK'S OWN COLOUR MIXER (042, stage 2b). The mixer's offsets live on
+  //    the mask and reach two renderers: the shader reads the weight its mask
+  //    loop kept, and compileEdit keeps the same weight per pixel. Arm 4 holds
+  //    the aim; this holds the offsets, with the same instrument, so a renderer
+  //    that dropped them (the export's path did drop a joined colour key once)
+  //    shows as a hue apart. A Sky mask, its own saturation neutral, every band
+  //    of its mixer shifted +60 degrees: the sky moves a sixth of the wheel on
+  //    screen, and the saved file has to move with it.
+  {
+    const label = "mask mixer";
+    const page = await br.newPage({ viewport: { width: 1000, height: 820 }, acceptDownloads: true });
+    try {
+      await page.goto(`${BASE}/ir.html`, { waitUntil: "load" });
+      await page.setInputFiles("#file", [AIM_FILE]);
+      await page.waitForFunction(() => document.getElementById("welcome")?.hidden, null, { timeout: 300000 });
+      await page.waitForFunction(() => !document.getElementById("busy")?.hasAttribute("open"), null, { timeout: 300000 });
+      await page.waitForTimeout(2500);
+      await openMasks(page);
+      await page.click("#addSky");
+      await page.waitForFunction(() => !document.getElementById("skyControls")?.hidden, null, { timeout: 120000 });
+      await page.waitForTimeout(1500);
+      await page.click("#mOutline");
+      await setMaskValue(page, "saturation", "1");
+      // setMaskValue puts the mask place back when it found it open, and the
+      // place covers the Colour tab, so it is closed before the band chips.
+      await closeMasks(page);
+      await page.click("#ptab-color");
+      for (let band = 0; band < 8; band++) {
+        await page.locator("#hslChips button").nth(band).click();
+        await setMaskValue(page, "hslHue", "60");
+      }
+      await page.waitForTimeout(1500);
+      const own = await page.evaluate(() => document.getElementById("hslHue")?.value);
+      if (own !== "60") { fail(`${label}: the mask's mixer did not take the offset (it reads ${own}), so nothing below measures it`); throw new Error("not armed"); }
+
+      const shown = await page.evaluate(`(() => {
+        const read = ${READ};
+        const c = document.querySelector("#view");
+        const o = document.createElement("canvas");
+        o.width = c.width; o.height = c.height;
+        o.getContext("2d").drawImage(c, 0, 0);
+        return read(o.getContext("2d").getImageData(0, 0, o.width, o.height).data);
+      })()`);
+      if (!shown) { fail(`${label}: the preview has no colour to read`); throw new Error("no preview"); }
+      await page.click("#ptab-export");
+      await page.click("#exBtn");
+      await page.waitForFunction(
+        () => /^Ready \u2014/.test(document.getElementById("exportStripText")?.textContent || ""),
+        null, { timeout: 600000 },
+      );
+      await page.waitForFunction(
+        () => { const a = document.getElementById("exportStripActions"); return a && !a.hidden; },
+        null, { timeout: 120000 },
+      );
+      const dl = page.waitForEvent("download", { timeout: 120000 });
+      dl.catch(() => {});
+      await page.click("#exportSave");
+      const file = await (await dl).path();
+      const b64 = readFileSync(file).toString("base64");
+      const saved = await page.evaluate(`(async () => {
+        const read = ${READ};
+        const img = new Image();
+        await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = "data:image/jpeg;base64," + ${JSON.stringify(b64)}; });
+        const c = document.createElement("canvas");
+        c.width = img.naturalWidth; c.height = img.naturalHeight;
+        c.getContext("2d").drawImage(img, 0, 0);
+        return read(c.getContext("2d").getImageData(0, 0, c.width, c.height).data);
+      })()`);
+      if (!saved) { fail(`${label}: the exported file has no colour to read`); throw new Error("no export"); }
+
+      const dh = dHist(shown.p, saved.p), dl2 = Math.abs(shown.light - saved.light);
+      console.log(`  ${label.padEnd(12)} shown biggest bin ${String(shown.hue).padStart(3)} (${(shown.share*100).toFixed(0)}%) light ${shown.light.toFixed(1)}% mean ${JSON.stringify(shown.mean)}   [a Sky mask's mixer, every band +60]`);
+      console.log(`  ${"".padEnd(12)} saved biggest bin ${String(saved.hue).padStart(3)} (${(saved.share*100).toFixed(0)}%) light ${saved.light.toFixed(1)}% mean ${JSON.stringify(saved.mean)}`);
+      console.log(`  ${"".padEnd(12)} ${dh}deg of hue apart (bar ${HUE_BAR}), ${dl2.toFixed(1)} points of lightness (bar 8)`);
+      if (dh > HUE_BAR || dl2 > 8) fail(`${label}: the preview and the export disagree on a mask's own colour mixer — ${dh}deg and ${dl2.toFixed(1)} points. The shader and compileEdit read the offsets or the weight differently.`);
+      else ok(`${label}: preview and export agree on a mask's own colour mixer`);
+    } catch (e) {
+      if (!/not armed|no preview|no export/.test(String(e && e.message))) fail(`${label}: the arm could not run — ${e}`);
+    } finally { await page.close(); }
+  }
 } finally { await br.close(); }
 console.log(bad ? `\n${bad} failed\n` : "\nevery path renders the same photograph the same way\n");
 process.exit(bad ? 1 : 0);

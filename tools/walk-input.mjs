@@ -181,7 +181,9 @@ export async function closeMasks(page) {
  *  own ends, which are the mask's 0.3 and 2 while a mask is picked. */
 export async function setMaskValue(page, field, value) {
   const where = { brightness: ["basic", "expo"], warmth: ["basic", "maskWarmth"], hue: ["color", "hue"], saturation: ["color", "sat"],
-    contrast: ["color", "con"], folHue: ["color", "folHue"], folSat: ["color", "folSat"], folLum: ["color", "folLum"] }[field];
+    contrast: ["color", "con"], folHue: ["color", "folHue"], folSat: ["color", "folSat"], folLum: ["color", "folLum"],
+    // The colour mixer's three (042, stage 2b), for whichever band its chips have selected.
+    hslHue: ["color", "hslHue"], hslSat: ["color", "hslSat"], hslLum: ["color", "hslLum"] }[field];
   assert.ok(where, `setMaskValue: no mask control is called ${field}`);
   const [tab, id] = where;
   const wasOpen = await page.evaluate(() => !document.getElementById("maskPlace")?.hidden);

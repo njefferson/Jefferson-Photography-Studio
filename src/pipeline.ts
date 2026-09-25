@@ -759,6 +759,15 @@ export interface MaskLayer {
    *  Always replaced as a new array, never written in place, because an undo
    *  snapshot copies a mask shallowly. */
   fol?: [number, number, number];
+  /** THE MASK'S OWN COLOUR MIXER (042, stage 2b): offsets on the whole-photo
+   *  `hsl`, 24 numbers laid out as it is (per band: hue degrees, saturation,
+   *  luminance), each starting at 0 for no change and added where this mask's
+   *  group reaches. Absent means no change, so every edit saved before it
+   *  renders as it did. Read on a group's HEAD only. A colour mask can carry
+   *  it: the mixer runs after the mask stage, where the group's weight,
+   *  colour key included, already exists. Always replaced as a new array,
+   *  never written in place, because an undo snapshot copies a mask shallowly. */
+  hsl?: number[];
   cx: number; // radial: centre x; linear: start x
   cy: number; // radial: centre y; linear: start y
   rx: number; // radial: x radius (uv fraction)
@@ -974,6 +983,7 @@ export function maskIsActive(m: MaskLayer): boolean {
   // lose it, silently, in the most obvious way to use the feature.
   if (m.aims) return true;
   if (m.fol && (m.fol[0] !== 0 || m.fol[1] !== 0 || m.fol[2] !== 0)) return true;
+  if (m.hsl && m.hsl.some((x) => x !== 0)) return true;
   return m.brightness !== 1 || m.contrast !== 1 || m.saturation !== 1 || m.hue !== 0 || m.warmth !== 0;
 }
 
@@ -1103,6 +1113,24 @@ export function groupFolOffset(group: readonly MaskLayer[]): readonly [number, n
   if (!h || !h.fol || h.type === 3 || !groupCanAim(group)) return null;
   if (h.fol[0] === 0 && h.fol[1] === 0 && h.fol[2] === 0) return null;
   return h.fol;
+}
+
+/** The colour mixer's own ranges, as the Colour tab's sliders set them: a
+ *  band's value with masks' offsets added is held to these, [hue, saturation,
+ *  luminance]. */
+export const HSL_MIN: readonly [number, number, number] = [-60, 0, 0.3];
+export const HSL_MAX: readonly [number, number, number] = [60, 2, 1.7];
+
+/** The colour-mixer offsets a GROUP adds (042, stage 2b), or null when it adds
+ *  none. Takes one group (head first); returns the head's `hsl` when it has 24
+ *  numbers and any is non-zero. Unlike Foliage a colour mask can carry them,
+ *  because the mixer runs after the mask stage. What the caller relies on: null
+ *  means the group can be skipped at the mixer, and the renderer uploads a head
+ *  for exactly the groups this returns non-null for. */
+export function groupHslOffset(group: readonly MaskLayer[]): readonly number[] | null {
+  const h = group[0];
+  if (!h || !h.hsl || h.hsl.length !== 24 || !h.hsl.some((x) => x !== 0)) return null;
+  return h.hsl;
 }
 
 /** THE FOLIAGE BAND'S VALUE AT ONE PIXEL (042, stage 2): the whole-photo value
@@ -1908,6 +1936,13 @@ export function compileEdit(
   // join. tools/join-fold-check.mjs holds the joined case.
   const hasColorMask = maskGroupsActive.some((g) => g.some((m) => m.type === 3));
   const folGroups = folGroupsOf(maskGroupsActive);
+  // THE MASKS' OWN COLOUR MIXER (042, stage 2b): each group that carries
+  // offsets, by its index in maskGroupsActive, and that group's weight as the
+  // mask stage folded it, kept per pixel so the mixer reads the same weight
+  // rather than computing a second one.
+  const hslGroups: { gi: number; off: readonly number[] }[] = [];
+  maskGroupsActive.forEach((g, gi) => { const off = groupHslOffset(g); if (off) hslGroups.push({ gi, off }); });
+  const groupW = new Float64Array(maskGroupsActive.length);
   if (folGroups.length) bandsActive = true;
   const folPx: [number, number, number] = [0, 0, 0];
   const lensOn = (p.hotspot ?? 0) !== 0 || (p.vignette ?? 0) !== 0 || (p.hotspotColor ?? 0) !== 0;
@@ -1929,7 +1964,7 @@ export function compileEdit(
   const cl = p.clarity ?? 0;
   const dz = p.dehaze ?? 0;
   const localOn = local && (cl !== 0 || dz !== 0);
-  const mixerOn = !hslIsNeutral(p.hsl);
+  const mixerOn = !hslIsNeutral(p.hsl) || hslGroups.length > 0;
   const bwOn = !!p.bwOn;
   const bwMix = p.bwMix ?? [1, 1, 1];
   // Normalised weights: only the ratio matters. An all-zero mix divides by the
@@ -2139,6 +2174,7 @@ export function compileEdit(
         kg = toGamma((ng - 0.5) * con + 0.5);
         kb = toGamma((nb - 0.5) * con + 0.5);
       }
+      if (hslGroups.length) groupW.fill(0);
       for (let gi = 0; gi < maskGroupsActive.length; gi++) {
         const group = maskGroupsActive[gi];
         const m = group[0];
@@ -2148,6 +2184,7 @@ export function compileEdit(
         let w = group.length === 1
           ? (m.type === 3 ? colorMaskWeight(m, kr, kg, kb) : maskWeight(m, u, v))
           : groupWeight(group, (c) => (c.type === 3 ? colorMaskWeight(c, kr, kg, kb) : maskWeight(c, u, v)));
+        if (hslGroups.length) groupW[gi] = w > 0 ? w : 0;
         if (w <= 0) continue;
         // warmth (linear temp shift)
         nr *= 1 + 0.5 * m.warmth * w;
@@ -2197,7 +2234,28 @@ export function compileEdit(
     // image — field feedback 2026-07-05.)
     if (mixerOn) {
       let [h, s, v] = rgb2hsv(out[0], out[1], out[2]);
-      const [dh, ds, dl] = hslAt(p.hsl, h);
+      let [dh, ds, dl] = hslAt(p.hsl, h);
+      // A mask's own offsets (042, stage 2b), interpolated by hue the way the
+      // whole photo's are, weighted by its group and summed where masks
+      // overlap, then held to the sliders' ranges. hslAt is linear in the
+      // values, so interpolating each group's offsets and adding them is the
+      // same as interpolating the sum. Nothing is added where no group reaches,
+      // so an edit with no offsets renders as it did.
+      if (hslGroups.length && u !== undefined && v !== undefined) {
+        let any = false;
+        for (const { gi, off } of hslGroups) {
+          const gw = groupW[gi];
+          if (gw <= 0) continue;
+          const [oh, os, ol] = hslAt(off, h);
+          dh += oh * gw; ds += os * gw; dl += ol * gw;
+          any = true;
+        }
+        if (any) {
+          dh = Math.min(HSL_MAX[0], Math.max(HSL_MIN[0], dh));
+          ds = Math.min(HSL_MAX[1], Math.max(HSL_MIN[1], ds));
+          dl = Math.min(HSL_MAX[2], Math.max(HSL_MIN[2], dl));
+        }
+      }
       h += dh;
       // POWER-curve saturation, not a multiplier: s^(1/ds) moves low-sat
       // pixels visibly (IR skies live near s≈0.05, where a multiplier does

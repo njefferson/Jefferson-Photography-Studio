@@ -21,6 +21,13 @@
 // ignored the join. The last check holds a joined colour mask to the same
 // result as the same mask on its own, where the mask it joins is full.
 //
+// And a mask's own colour mixer (042, stage 2b) has to mean what the switch
+// says it means: offsets added to the whole photo's where the group reaches.
+// So a head that is full at a pixel, carrying offsets, renders that pixel
+// exactly as the same offsets on the whole photo would; a group that reaches
+// nowhere there changes nothing; and a colour mask, which Foliage refuses,
+// can carry them, because the mixer runs after the mask stage.
+//
 // Runs on every commit and needs no browser. Bundled with esbuild so it checks
 // the functions the app ships rather than a copy of them.
 import { build } from "esbuild";
@@ -82,5 +89,19 @@ const untouched = rendered([]), alone = rendered([red(0)]), joined = rendered([g
 check("the colour mask on its own changes the red pixel (so the case is live)", Math.abs(alone[0] - untouched[0]) > 0.1 ? 1 : 0, 1);
 check("a colour mask joined to a full gradient changes it the same in the export's pipeline", Math.max(...[0, 1, 2].map((k) => Math.abs(joined[k] - alone[k]))), 0);
 
-console.log(bad ? `\n${bad} check(s) failed` : "\nthe three joins, and an aim through them, hold");
+// 042 stage 2b: the mask's own colour mixer, in the export's pipeline. An
+// orange pixel at the centre, where a radial head is full.
+const px = (masks, hsl) => { const p = plain(); p.masks = masks; if (hsl) p.hsl = hsl; const o = new Float32Array(4); compileEdit(p, undefined, 1.5)(0.8, 0.35, 0.1, o, 0, 0.5, 0.5); return o; };
+const off = Array.from({ length: 8 }, () => [25, 0.6, -0.2]).flat();
+const whole = hslDefault().map((x, i) => x + off[i]);
+const diff = (a, b) => Math.max(...[0, 1, 2].map((k) => Math.abs(a[k] - b[k])));
+const bare = px([]);
+check("offsets on the whole photo change the pixel (so the case is live)", diff(px([], whole), bare) > 0.02 ? 1 : 0, 1);
+check("a full head's offsets render as the same offsets on the whole photo", diff(px([{ ...neutralMask(0), hsl: off }]), px([], whole)), 0);
+check("offsets of zero change nothing", diff(px([{ ...neutralMask(0), hsl: new Array(24).fill(0), brightness: 1.0001 }]), px([{ ...neutralMask(0), brightness: 1.0001 }])), 0);
+check("a head whose group reaches nowhere here changes nothing", diff(px([{ ...neutralMask(0), hsl: off }, { ...neutralMask(0), op: 1 }]), bare), 0);
+const keyed = { ...neutralMask(3), hueTarget: 20, satTarget: 0.9, colorRange: 0.9, hsl: off };
+check("a colour mask can carry the mixer's offsets", diff(px([keyed]), bare) > 0.02 ? 1 : 0, 1);
+
+console.log(bad ? `\n${bad} check(s) failed` : "\nthe three joins, an aim through them, and a mask's own mixer hold");
 process.exit(bad ? 1 : 0);
