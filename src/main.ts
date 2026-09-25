@@ -4113,6 +4113,29 @@ const PUCK_MAX = 33; // keep the puck's centre inside the ring
  *  the hue on the way in, which is the defect. */
 const GRADE_HUE_MIN_R = 5;
 
+/** Write one grade value (an index into the seven) to whatever the controls
+ *  act on. Takes the index and value; returns nothing. With a mask picked
+ *  (042, stage 2b) it writes the mask's own grade as a NEW array, because an
+ *  undo snapshot copies a mask shallowly; otherwise the whole photo's. Every
+ *  grade control writes through this, so none can reach the other target. */
+function writeGrade(i: number, v: number): void {
+  const t = overlayReady ? targetMask() : null;
+  if (t) {
+    const a = t.grade && t.grade.length === 7 ? t.grade.slice() : [...GRADE_DEFAULT];
+    a[i] = v;
+    t.grade = a;
+  } else {
+    params.grade![i] = v;
+  }
+}
+/** The seven grade values the controls show: the picked mask's own (zero
+ *  amounts where it has none), else the whole photo's. Takes nothing. */
+function shownGrade(): readonly number[] {
+  const t = overlayReady ? targetMask() : null;
+  if (t) return t.grade && t.grade.length === 7 ? t.grade : GRADE_DEFAULT;
+  return params.grade ?? (params.grade = [...GRADE_DEFAULT]);
+}
+
 for (let band = 0; band < 3; band++) {
   const row = document.createElement("div");
   row.className = "grade-band";
@@ -4163,8 +4186,8 @@ for (let band = 0; band < 3; band++) {
   gradeBandUI.push({ hue, amt, puck, val, wheel });
 
   const setFromSliders = () => {
-    params.grade![band * 2] = Number(hue.value);
-    params.grade![band * 2 + 1] = Number(amt.value) / 100;
+    writeGrade(band * 2, Number(hue.value));
+    writeGrade(band * 2 + 1, Number(amt.value) / 100);
     updateGradeUI();
     draw(); // undo coalesces per drag via recordSoon, like every slider
   };
@@ -4190,8 +4213,8 @@ for (let band = 0; band < 3; band++) {
       // reported 2026-09-20 in those words. Below this radius the angle is
       // noise, so only the amount is written — which is exactly what the Amount
       // slider beside the wheel already does, and the two controls now agree.
-      if (r >= GRADE_HUE_MIN_R) params.grade![band * 2] = Math.round(((deg % 360) + 360) % 360);
-      params.grade![band * 2 + 1] = Math.min(1, r / PUCK_MAX);
+      if (r >= GRADE_HUE_MIN_R) writeGrade(band * 2, Math.round(((deg % 360) + 360) % 360));
+      writeGrade(band * 2 + 1, Math.min(1, r / PUCK_MAX));
       updateGradeUI();
       draw();
     };
@@ -4254,7 +4277,7 @@ for (const [el, key] of [
 /** Reflect params.grade + grain/vignette into wheels, sliders, readouts and
  *  preset chips — called from syncToUI so undo/redo/loads refresh everything. */
 function updateGradeUI() {
-  const g = params.grade ?? (params.grade = [...GRADE_DEFAULT]);
+  const g = shownGrade();
   for (let band = 0; band < 3; band++) {
     const ui2 = gradeBandUI[band];
     const hue = g[band * 2] ?? 0;
@@ -4288,7 +4311,7 @@ function updateGradeUI() {
 }
 
 gradeBalEl.addEventListener("input", () => {
-  params.grade![6] = Number(gradeBalEl.value);
+  writeGrade(6, Number(gradeBalEl.value));
   draw();
 });
 $("gradeReset").addEventListener("click", () => {
@@ -6221,6 +6244,16 @@ function maskCtls(): MaskCtl[] {
     { el: hslUI.hue, min: -120, max: 120, step: 1, get: (m) => m.hsl?.[hslSel * 3] ?? 0, set: hslMaskSet(0), whole: () => params.hsl[hslSel * 3] },
     { el: hslUI.sat, min: -2, max: 2, step: 0.01, get: (m) => m.hsl?.[hslSel * 3 + 1] ?? 0, set: hslMaskSet(1), whole: () => params.hsl[hslSel * 3 + 1] },
     { el: hslUI.lum, min: -1.4, max: 1.4, step: 0.01, get: (m) => m.hsl?.[hslSel * 3 + 2] ?? 0, set: hslMaskSet(2), whole: () => params.hsl[hslSel * 3 + 2] },
+    // The grade (042, stage 2b): the mask's own wheels, on the same ranges as
+    // the whole photo's, because its tints add to them. Written through
+    // writeGrade like every grade control.
+    ...gradeBandUI.flatMap((b, band) => [
+      { el: b.hue, min: 0, max: 360, step: 1, get: (m: MaskLayer) => Math.round(m.grade?.[band * 2] ?? 0),
+        set: (_m: MaskLayer, v: number) => writeGrade(band * 2, v), whole: () => Math.round(params.grade?.[band * 2] ?? 0) },
+      { el: b.amt, min: 0, max: 100, step: 1, get: (m: MaskLayer) => Math.round((m.grade?.[band * 2 + 1] ?? 0) * 100),
+        set: (_m: MaskLayer, v: number) => writeGrade(band * 2 + 1, v / 100), whole: () => Math.round((params.grade?.[band * 2 + 1] ?? 0) * 100) },
+    ]),
+    { el: gradeBalEl, min: -1, max: 1, step: 0.01, get: (m) => m.grade?.[6] ?? 0, set: (_m, v) => writeGrade(6, v), whole: () => params.grade?.[6] ?? 0 },
   ];
   return maskCtlList;
 }
@@ -6260,6 +6293,9 @@ function inertOthers(root: Element, ids: Set<string>): void {
     // The mixer's band chips and its pick only choose WHICH band the sliders
     // show, so they stay live with a mask picked (042, stage 2b).
     if (child === maskTargetNote || child === folMaskNote || child === hslChipsEl || child === hslPickBtn) continue;
+    // A grade wheel is the pointer route to the same values as the sliders
+    // beside it (042, stage 2b), so it stays live with them.
+    if ((child as HTMLElement).classList?.contains("grade-wheel-box")) continue;
     if (holdsPerMask(child, ids)) {
       if (child.tagName !== "LABEL" && !ids.has((child as HTMLElement).id)) inertOthers(child, ids);
       continue;
@@ -6317,6 +6353,7 @@ function applyMaskTargetUI(): void {
   // picked, so it is put down rather than left armed under the photo.
   if (m && tatArmed) setTat(false);
   updateHslUI();
+  updateGradeUI();
   maskWarmthRow.hidden = !m;
   for (const r of wbGainRows) r.hidden = !!m;
   // Inert: undo whatever the last pick set, then set it again for this one.

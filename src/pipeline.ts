@@ -768,6 +768,16 @@ export interface MaskLayer {
    *  colour key included, already exists. Always replaced as a new array,
    *  never written in place, because an undo snapshot copies a mask shallowly. */
   hsl?: number[];
+  /** THE MASK'S OWN GRADE (042, stage 2b): three wheels and a balance laid
+   *  out as `grade` is, [hueS, amtS, hueM, amtM, hueH, amtH, balance], every
+   *  amount starting at 0 for no change. Its tints add to the whole photo's
+   *  where this mask's group reaches: the tints are chroma vectors, so the
+   *  mask's own wheels and an offset on the whole photo's are the same thing.
+   *  Absent means no change. Read on a group's HEAD only; a colour mask can
+   *  carry it, the grade running after the mask stage. Always replaced as a new
+   *  array, never written in place, because an undo snapshot copies a mask
+   *  shallowly. */
+  grade?: number[];
   cx: number; // radial: centre x; linear: start x
   cy: number; // radial: centre y; linear: start y
   rx: number; // radial: x radius (uv fraction)
@@ -984,6 +994,7 @@ export function maskIsActive(m: MaskLayer): boolean {
   if (m.aims) return true;
   if (m.fol && (m.fol[0] !== 0 || m.fol[1] !== 0 || m.fol[2] !== 0)) return true;
   if (m.hsl && m.hsl.some((x) => x !== 0)) return true;
+  if (m.grade && !gradeIsNeutral(m.grade)) return true;
   return m.brightness !== 1 || m.contrast !== 1 || m.saturation !== 1 || m.hue !== 0 || m.warmth !== 0;
 }
 
@@ -1120,6 +1131,18 @@ export function groupFolOffset(group: readonly MaskLayer[]): readonly [number, n
  *  luminance]. */
 export const HSL_MIN: readonly [number, number, number] = [-60, 0, 0.3];
 export const HSL_MAX: readonly [number, number, number] = [60, 2, 1.7];
+
+/** The grade a GROUP adds (042, stage 2b), or null when it adds none. Takes
+ *  one group (head first); returns the head's `grade` when it has seven numbers
+ *  and any amount is non-zero. A colour mask can carry it, because the grade
+ *  runs after the mask stage. What the caller relies on: null means the group
+ *  can be skipped at the grade, and the renderer uploads a head's wheels for
+ *  exactly the groups this returns non-null for. */
+export function groupGradeOf(group: readonly MaskLayer[]): readonly number[] | null {
+  const h = group[0];
+  if (!h || !h.grade || h.grade.length !== 7 || gradeIsNeutral(h.grade)) return null;
+  return h.grade;
+}
 
 /** The colour-mixer offsets a GROUP adds (042, stage 2b), or null when it adds
  *  none. Takes one group (head first); returns the head's `hsl` when it has 24
@@ -1942,6 +1965,13 @@ export function compileEdit(
   // rather than computing a second one.
   const hslGroups: { gi: number; off: readonly number[] }[] = [];
   maskGroupsActive.forEach((g, gi) => { const off = groupHslOffset(g); if (off) hslGroups.push({ gi, off }); });
+  // A mask's own grade (042, stage 2b), with its three tints computed once.
+  const gradeGroups: { gi: number; aS: number; aM: number; aH: number; bal: number; tS: [number, number, number]; tM: [number, number, number]; tH: [number, number, number] }[] = [];
+  maskGroupsActive.forEach((g, gi) => {
+    const gr = groupGradeOf(g);
+    if (gr) gradeGroups.push({ gi, aS: gr[1] ?? 0, aM: gr[3] ?? 0, aH: gr[5] ?? 0, bal: gr[6] ?? 0, tS: gradeTintVec(gr[0] ?? 0), tM: gradeTintVec(gr[2] ?? 0), tH: gradeTintVec(gr[4] ?? 0) });
+  });
+  const keepW = hslGroups.length > 0 || gradeGroups.length > 0;
   const groupW = new Float64Array(maskGroupsActive.length);
   if (folGroups.length) bandsActive = true;
   const folPx: [number, number, number] = [0, 0, 0];
@@ -1983,7 +2013,7 @@ export function compileEdit(
   const skySatAmt = skyFine ? Math.min(2, Math.max(0, p.skySat ?? 0)) : 0;
   const grade = p.grade ?? GRADE_DEFAULT;
   const gAmtS = grade[1] ?? 0, gAmtM = grade[3] ?? 0, gAmtH = grade[5] ?? 0;
-  const gradeOn = gAmtS !== 0 || gAmtM !== 0 || gAmtH !== 0;
+  const gradeOn = gAmtS !== 0 || gAmtM !== 0 || gAmtH !== 0 || gradeGroups.length > 0;
   const gBal = grade[6] ?? 0;
   const gTintS = gradeTintVec(grade[0] ?? 0);
   const gTintM = gradeTintVec(grade[2] ?? 0);
@@ -2174,7 +2204,7 @@ export function compileEdit(
         kg = toGamma((ng - 0.5) * con + 0.5);
         kb = toGamma((nb - 0.5) * con + 0.5);
       }
-      if (hslGroups.length) groupW.fill(0);
+      if (keepW) groupW.fill(0);
       for (let gi = 0; gi < maskGroupsActive.length; gi++) {
         const group = maskGroupsActive[gi];
         const m = group[0];
@@ -2184,7 +2214,7 @@ export function compileEdit(
         let w = group.length === 1
           ? (m.type === 3 ? colorMaskWeight(m, kr, kg, kb) : maskWeight(m, u, v))
           : groupWeight(group, (c) => (c.type === 3 ? colorMaskWeight(c, kr, kg, kb) : maskWeight(c, u, v)));
-        if (hslGroups.length) groupW[gi] = w > 0 ? w : 0;
+        if (keepW) groupW[gi] = w > 0 ? w : 0;
         if (w <= 0) continue;
         // warmth (linear temp shift)
         nr *= 1 + 0.5 * m.warmth * w;
@@ -2297,9 +2327,31 @@ export function compileEdit(
       const wH = smooth01(0.4 + 0.2 * gBal, 0.95, L);
       const wM = Math.max(0, 1 - wS - wH);
       const cS = wS * gAmtS * GRADE_K, cM = wM * gAmtM * GRADE_K, cH = wH * gAmtH * GRADE_K;
-      out[0] = Math.min(1, Math.max(0, out[0] + cS * gTintS[0] + cM * gTintM[0] + cH * gTintH[0]));
-      out[1] = Math.min(1, Math.max(0, out[1] + cS * gTintS[1] + cM * gTintM[1] + cH * gTintH[1]));
-      out[2] = Math.min(1, Math.max(0, out[2] + cS * gTintS[2] + cM * gTintM[2] + cH * gTintH[2]));
+      // The whole photo's sum in the order it has always had, so an edit with
+      // no mask grade is bit-identical to before.
+      let a0 = out[0] + cS * gTintS[0] + cM * gTintM[0] + cH * gTintH[0];
+      let a1 = out[1] + cS * gTintS[1] + cM * gTintM[1] + cH * gTintH[1];
+      let a2 = out[2] + cS * gTintS[2] + cM * gTintM[2] + cH * gTintH[2];
+      // A mask's own wheels (042, stage 2b): the same bands over the same
+      // luminance, at the mask's own balance, weighted by its group as the mask
+      // stage folded it, added before the one clamp. Nothing is added where no
+      // group reaches, so an edit with no mask grade renders as it did.
+      if (gradeGroups.length && u !== undefined && v !== undefined) {
+        for (const q of gradeGroups) {
+          const gw = groupW[q.gi];
+          if (gw <= 0) continue;
+          const mS = 1 - smooth01(0.05, 0.6 + 0.2 * q.bal, L);
+          const mH = smooth01(0.4 + 0.2 * q.bal, 0.95, L);
+          const mM = Math.max(0, 1 - mS - mH);
+          const kS = mS * q.aS * GRADE_K * gw, kM = mM * q.aM * GRADE_K * gw, kH = mH * q.aH * GRADE_K * gw;
+          a0 += kS * q.tS[0] + kM * q.tM[0] + kH * q.tH[0];
+          a1 += kS * q.tS[1] + kM * q.tM[1] + kH * q.tH[1];
+          a2 += kS * q.tS[2] + kM * q.tM[2] + kH * q.tH[2];
+        }
+      }
+      out[0] = Math.min(1, Math.max(0, a0));
+      out[1] = Math.min(1, Math.max(0, a1));
+      out[2] = Math.min(1, Math.max(0, a2));
     }
     // Sky colour smoothing: blend this pixel's chroma toward the coarse map of
     // the sky's own rendered chroma, by the sky bitmap's weight, luma exactly

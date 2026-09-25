@@ -1,10 +1,11 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=6c1eec799b84c8fb
-diffhash=a85fba8dac76307f
-verdict=IN-SCOPE: VERSION 2.63 amended into the held build's last reader-facing commit, as the plan and NOTES' versioning rule say
-# IN-SCOPE: the VERSION bump to 2.63, amended into the tip commit, is exactly what the plan, NOTES.md's versioning rule, and the status page all specify for this point in the work.
+planhash=aaf601fbdcf8c02f
+diffhash=01c3003f06d4474e
+verdict=IN-SCOPE: the grade per mask, the second of 2b's ordered commits, with its preview bump, module map, checks and walk arm
+# IN-SCOPE: this is exactly plan item 6 / decision 042 stage 2b's "Grade" sub-bullet — the second stage-2b commit (grade per mask only), with no bleed from luminance/LUT/curves/shadow colour and no unrelated or gate-wiring changes.
 # 
-# 1. The plan's per-mask-amounts unit: "VERSION 2.63 rides the last reader-facing commit"; the status page names 2.63 for when masks gain their own amounts; the tip commit is the mask colour mixer, the first 2b commit.
-# 2. NOTES' versioning rule: a capability release bumps the middle number in its last reader-facing commit, and a VERSION-only commit is filtered from the changelog, so amending into the tip is the rule's shape.
-# 3. Only VERSION is staged.
+# 1. MaskLayer.grade holds the mask's seven grade values; its tints add where the group reaches at the mask's own balance, in compileEdit and the shader, before the one clamp, and an edit with no mask grade computes exactly as before; every grade control writes the mask's grade through writeGrade when a mask is picked, the wheels stay live; the note and Help name the grade wheels. groupHslOffset's own contract comment is back above it.
+# 2. PREVIEW_PIPELINE 61 to 62 with its record (the comment move re-recorded with --proven); module-map line counts; join-fold-check's grade cases; the agreement walk's mask arm as a loop over the mixer and the grade, instrument unchanged; setMaskValue's grade fields. No gate wiring changed.
+# 3. The copy matches what the switch enables and leaves for later.
+# 4. No owner quotation or attribution, no session link, no model name.
