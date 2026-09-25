@@ -82,21 +82,22 @@
 
       <h2>Where the builds are</h2>
       <ul class="facts">
-        <li><b>Production</b> <span>v2.62.14: the small fixes that were on staging as v2.62.10, promoted on your go. The number moved because the last digit counts every commit; the content did not.</span></li>
-        <li><b>On staging</b> <span>v2.62.16: the export edge fix and two new rows on the device test page. Your pass came back good; it waits for your go.</span></li>
-        <li><b>Built and held</b> <span>Eight changes on top of v2.62.16: the first stage of the mask work (three), the LUT grid, the None button for looks, two fixes (a colour mask joined to another mask now reaches the saved photo, and the screen's sky smoothing follows a mask's changes), and the switch: pick a mask and the ordinary controls act on it, Foliage first. It goes to staging once v2.62.16 is on production, because staging holds one build at a time. It is kept in this session's copy of the repository until then.</span></li>
-        <li><b>Last verified green</b> <span><code>47d4feb</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
-        <li><b>Next version</b> <span>2.63, when masks gain their own amounts. The fixes before that take the increment digit and no version bump.</span></li>
+        <li><b>Production</b> <span>v2.62.26: the export edge fix and the test page's shader rows, which were on staging as v2.62.16, promoted on your go. Checked on the live site: its offline copy is named for 2.62.26 and the test page carries the new rows. The number moved because the last digit counts every commit; the content did not.</span></li>
+        <li><b>On staging</b> <span>v2.63: the wire fix (pick a mask and lower its Foliage), a mask's own colour mixer, the first stage of the mask work, the LUT grid and None for looks. It waits on your device pass; the steps are below.</span></li>
+        <li><b>Built and held</b> <span>Nothing yet. The mask work's stage 2b goes on, with the grade on a picked mask next, and waits behind v2.63.</span></li>
+        <li><b>Last verified green</b> <span><code>99d1e20</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
+        <li><b>Next version</b> <span>2.63 is the staged build's number, because masks gain their own amounts in it. The next release that adds something takes 2.64.</span></li>
       </ul>
 
       <div class="yours">
         <h2>Waiting on you</h2>
         <ul>
           <li>
-            <strong>One decision:</strong> put v2.62.16 on production? Recommended:
-            yes. Everything built since waits behind it, because staging holds one
-            build at a time. The layout questions are settled by convention now
-            and are not asked.
+            <strong>The device pass on v2.63</strong>, at
+            staging.jefferson-photo-studio.pages.dev. The steps are in NOTES under
+            "On staging": the wire fix on one of your frames and its export, the row
+            of mask names in both orientations, a mask's colour mixer, the LUT grid,
+            None, "Add to it", and the test page's timing with eight masks.
           </li>
         </ul>
       </div>
@@ -145,9 +146,12 @@
           rewritten around this, with its stages and the three choices it leaves
           you; pictures of the panel come before any code.
         </li>
-        <li class="now"><span class="state">Next</span>
+        <li class="now"><span class="state">Now</span>
           <strong>Masks, stage 2b: the rest of the colour and tone tools on a
           picked mask.</strong>
+          The colour mixer is built and on staging: pick a mask, pick one of the
+          eight colours, and it moves only where the mask reaches; its export was
+          checked against the screen and opened. The grade is next.
           HSL, the grade, luminance with LUT strength, the curves, then shadow
           colour, each its own change on the held build. A mask's curve is its own
           and applies after the whole photo's, as in Lightroom and Capture One;
@@ -171,7 +175,7 @@
           bar to one row is in the repository and fails today, as it should. The
           side panel that folds away stays a separate question.
         </li>
-        <li class="waiting"><span class="state">Built, held</span>
+        <li class="waiting"><span class="state">On staging</span>
           <strong>LUTs you tap through on your own photo, and a None for looks.</strong>
           The Grade tab shows your LUTs as a grid: None first, then each one as a
           tile drawn from the photograph you have open, then Manage…. A tap shows
@@ -181,8 +185,7 @@
           None is now the first of the looks: it takes the look off, back to the
           photograph's own balance, and the next photographs open without one; a
           LUT stays. Checked on a raw and a camera JPEG: the photograph comes back
-          exactly as it opened. Every walk passed. It goes to staging with the
-          mask work.
+          exactly as it opened. Every walk passed. On staging, in v2.63.
         </li>
         <li class="done"><span class="state">On production</span>
           <strong>One build of small fixes, promoted on your go.</strong>
@@ -220,7 +223,7 @@
           greyed out in Files on the iPad, the same way the colour files were. Both
           have records with a remedy and a rank.
         </li>
-        <li class="waiting"><span class="state">On staging</span>
+        <li class="done"><span class="state">On production</span>
           <strong>The export edges, and a measurement for the mask work.</strong>
           Every full-size export had a line of the wrong colour along all four
           edges, one pixel wide, not just the top and left: the export read a
@@ -235,9 +238,9 @@
           pass came back good:</strong> your export's four edges are clean, and
           your iPad has room for about 46 masks' own settings in the editor's
           graphics (148 of 1,024 rows used), so masks carry their values directly.
-          Waiting for your go to put it on production.
+          Promoted on your go, as v2.62.26.
         </li>
-        <li class="waiting"><span class="state">Built, held</span>
+        <li class="waiting"><span class="state">On staging</span>
           <strong>Masks, stage one.</strong>
           A "here only" tool now stays out of an area subtracted from its mask:
           rendered first, the tool reached the subtracted area while the mask's
@@ -246,9 +249,9 @@
           above it, "Add to it", so a Colour mask can finish a sky the automatic
           selection missed; a check holds all three joins on every commit. The
           device test page times a frame with eight masks. Every walk passed on
-          it. It goes to staging after v2.62.16 reaches production.
+          it. On staging, in v2.63.
         </li>
-        <li class="now"><span class="state">Built, held</span>
+        <li class="waiting"><span class="state">On staging</span>
           <strong>The wire fix, moved up: masks, stage two, with Foliage
           first.</strong>
           Built: a row of mask names above the tabs; pick one and Exposure,
@@ -261,8 +264,8 @@
           horizon went to none on both frames, with the lens profile on. The cost:
           the red trees on the horizon go grey with it, the gradient's soft edge
           takes a little red off the grass near the horizon, and a pylon leg
-          standing in the grass stays red. It waits behind v2.62.16 with the rest
-          of the held build. What follows is the record from before it was built.
+          standing in the grass stays red. On staging, in v2.63: use it there. What
+          follows is the record from before it was built.
           Foliage limited to a mask is the stage that fixes the red wires, pylons
           and cladding: on your building, Foliage at 0 takes the red on the
           cladding from 13,561 pixels to none and the red on the grass from 87,991
