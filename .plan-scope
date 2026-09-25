@@ -1,6 +1,340 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=f1791fb3cecaa9b5
-diffhash=65219e720579a90c
-verdict=IN-SCOPE: This is a docs-only commit matching "Now" step 5's list (record 065, record 042's additions plus 1d, NOTES' 065 bullet, held-stack and smoothing-map finding, the status page) and "Next" item 2's spec for record 065 (Looked up: Capture One's Magic Brush and Lightroom's colour-range fill; Weighed against 028/048/050/049/052; Options/Rejected/Rank by dependency/Depends edges; Looked at naming NIR_3461's mattes). The Aerochrome decision record is left out because it cannot be written until the owner answers the look question from step 3; that is a narrower delivery, not scope creep. Record 065's relations to 031, 023 and 032 are required by the repo's own Depends gate for decisions cited in prose.
-# IN-SCOPE: This is a docs-only commit matching "Now" step 5's list (record 065, record 042's additions plus 1d, NOTES' 065 bullet, held-stack and smoothing-map finding, the status page) and "Next" item 2's spec for record 065 (Looked up: Capture One's Magic Brush and Lightroom's colour-range fill; Weighed against 028/048/050/049/052; Options/Rejected/Rank by dependency/Depends edges; Looked at naming NIR_3461's mattes). The Aerochrome decision record is left out because it cannot be written until the owner answers the look question from step 3; that is a narrower delivery, not scope creep. Record 065's relations to 031, 023 and 032 are required by the repo's own Depends gate for decisions cited in prose.
+planhash=ce66d8f83ec1449f
+diffhash=58e1b95907551843
+verdict=IN-SCOPE: This is exactly the plan's opening section, Research first (2026-09-25, directed after this plan was approved), which directs findings from the four named research areas to be written into IR-SCIENCE.md as 4b-viii and 4b-ix as one Docs: commit by PR to main. The diff adds precisely those two sections with sources named and read status given, and touches no code.
+# diff --git a/IR-SCIENCE.md b/IR-SCIENCE.md
+# index 79f94c8..cea8647 100644
+# --- a/IR-SCIENCE.md
+# +++ b/IR-SCIENCE.md
+# @@ -1113,6 +1113,330 @@ a picture of the film's PALETTE on these frames' structure, for judging the
+#  app's distance from it; it is not a pipeline. The full sheet (the app beside
+#  both filters, seven rows) was sent on 2026-09-18 rather than described.
+#  
+# +### 4b-viii. THE FILM FROM KODAK'S OWN DATA SHEETS — IT IS NOT A CLEAN ROTATION
+# +
+# +**Researched 2026-09-25, after a day of building and tuning Aerochrome
+# +candidates without first reading what the film physically did.** 4b's mapping
+# +came from practitioners' summaries; this comes from Kodak's own technical data,
+# +read in full, with the published curves digitised from the PDFs' vector paths.
+# +
+# +**Primary documents, all read in full:**
+# +
+# +- KODAK AEROCHROME III Infrared Film 1443, publication AS-77 / TI-2562
+# +  (2005, revised 11-05): 125px.com/docs/unsorted/kodak/EN_ti2562.pdf
+# +- KODAK EKTACHROME Professional Infrared EIR Film, TI-2323 (2005):
+# +  125px.com/docs/film/kodak/ti2323-Ektachrome_EIR.pdf, and the 1996/97
+# +  edition at chrysis.net
+# +- EIR processing, CIS-188: 125px.com/docs/techpubs/kodak/cis188.pdf
+# +- KODAK Filters, B-3 (1999): 125px.com/docs/techpubs/kodak/b3akic.pdf
+# +
+# +**THE LAYERS, as sensitivity curves** (log sensitivity to reach density 1.0,
+# +Process AR-5):
+# +
+# +- **Green layer (forms yellow dye):** flat from 400 to 570 nm, peak near
+# +  550–560 nm, gone by 600 nm. Through the Wratten 12 it is a clean band, half
+# +  power 519–577 nm.
+# +- **Red layer (forms magenta dye):** a blue lobe, then a sharp peak at 650 nm,
+# +  gone by 690 nm. Half power 628–664 nm through the filter. It sees essentially
+# +  no infrared.
+# +- **Infrared layer (forms cyan dye):** the strongest blue response of the
+# +  three, then a steady rise through the red to a broad maximum near 730 nm,
+# +  half power at 850 nm, gone by about 900 nm (Kodak: sensitive "to
+# +  approximately 900 nm").
+# +- **Wratten 12:** about 2% at 500 nm, 50% at 517 nm, flat near 75% from 540
+# +  to 890 nm.
+# +
+# +**WHAT 4b LEFT OUT, AND IT MATTERS FOR ANY EMULATION.** Through the Wratten 12
+# +the infrared layer is at half its peak or more from about 533 nm all the way to
+# +849 nm. It is a broad red-and-infrared layer, not an infrared one. Computed from
+# +the curves for a grey card in clear daylight: **only about 53% of that layer's
+# +exposure is infrared (700–900 nm); about 28% is visible red and 16% visible
+# +green.** The red layer is about 87% red, the green layer about 99% green. So the
+# +film's red output is not "infrared" — it is mostly infrared with a large share
+# +of the visible, and the three-way rotation is an idealisation of it.
+# +
+# +**AND THE INFRARED LAYER IS SLOW ON PURPOSE.** From the characteristic curves
+# +the infrared layer needs 0.2–0.3 log more daylight exposure than the other two
+# +to reach density 1.0; computed spectrally for a grey subject it receives
+# +0.41–0.43 log (about 1.4 stops) less. A 1978 Photogrammetric Engineering &
+# +Remote Sensing abstract on Aerochrome Infrared 2443 (vol. 44, p. 601, read as a
+# +search summary only) states that the infrared layer's daylight sensitivity is
+# +deliberately made about 1½ stops less than the red and green layers'. The
+# +calculation and the abstract agree independently. **The consequence is the
+# +sky.**
+# +
+# +**THE TONE CURVES** (AS-77, AR-5, Status A): maximum densities 3.3–3.7,
+# +minimum 0.12–0.15, mid-scale gradients 3.6 (infrared), 2.6 (red), 4.3 (green).
+# +Density 3.0 down to 0.5 spans only 0.74–0.96 log exposure — 2.5 to 3.2 stops.
+# +TI-2323 gives exposure latitude as ±½ stop. It is a high-contrast film with
+# +almost no latitude. E-6 processing gives results "higher in contrast" and "more
+# +saturated" than AR-5; no E-6 or C-41 curves are published.
+# +
+# +**THE DYES** (AS-77, preliminary data): yellow peaks at 443 nm, magenta at 551
+# +nm with about 0.15 unwanted blue density, cyan at about 670 nm with 0.13 at 550
+# +nm and 0.19 at 410 nm.
+# +
+# +**WHY FOLIAGE STAYS RED AND DOES NOT WASH OUT** (derived through the Kodak
+# +curves from a PROSPECT/SAIL leaf-and-canopy spectrum, not a published figure).
+# +A healthy canopy is very dark in the visible — reflectance about 0.08 at 550 nm
+# +and 0.02 at 670 nm — so its red-layer and green-layer exposures sit 0.3–0.8 log
+# +below a grey card, and at gradients of 2.6–4.3 that is 2–3 density units of
+# +magenta and yellow dye. Because the infrared layer is slow AND partly fed by
+# +visible light, foliage lands only about +0.1 log above a grey card in that
+# +layer: its cyan stays near mid-scale instead of clearing. **The red of the film
+# +is dense magenta and yellow dye from foliage being dark in the visible — not a
+# +saturated infrared record.** Overexposed by one to one and a half stops, the
+# +magenta and yellow layers climb into their toe and foliage drifts from crimson
+# +toward magenta-pink and loses saturation. That is the washed-out grass, and it
+# +is the film's behaviour too when overexposed; it is not a defect peculiar to a
+# +digital emulation.
+# +
+# +**WHAT THE FILM RENDERS, in Kodak's own words** (AS-77 and TI-2323):
+# +
+# +- healthy deciduous trees "magenta or red"; healthy evergreens "brownish red";
+# +  deciduous have "much higher infrared reflectivity" than evergreens; stressed
+# +  or dying foliage "from dark red to green or even yellow"
+# +- painted objects "purple or blue" against red foliage; water "very dark"; ice
+# +  light; algae "pink swirls"
+# +- in AR-5, a red barn "pastel-green", foliage red, the sky "blue-green"
+# +- in E-6, flesh "more sallow" with "yellow lips"
+# +- autumn yellow leaves photograph white, red leaves yellow
+# +
+# +**THE SKY, DERIVED.** Skylight through the Wratten 12 is mostly green, less red,
+# +very little infrared. So the green layer is well exposed (little yellow dye),
+# +the red layer moderately (some magenta), and the slow infrared layer barely at
+# +all (heavy cyan): blue. Under Kodak's own balance the model gives the sky hue
+# +186–193° — cyan-blue, matching "blue-green". **A sky as bright as a grey card
+# +renders mid-to-dark blue (value about 0.27–0.44) because its cyan layer is
+# +underexposed.** Clouds render near-white, with a slight cyan cast under Kodak's
+# +balance. The film's dark sky is the slow infrared layer seeing almost nothing.
+# +
+# +**TWO TARGETS, NOT ONE.** The two photographs measured in 4b-iii — foliage 6–9°,
+# +sky 204–217° — sit close to the model when the scan is balanced so grey reads
+# +neutral (foliage 354–359°, sky 196–205°). Under Kodak's own balance with the
+# +Wratten 12 the same film gives magenta-crimson foliage and a cyan-blue sky, with
+# +neutrals cyan. Most Aerochrome images in circulation are E-6 or C-41,
+# +colour-balanced when scanned. **Which of the two the app aims at is a look
+# +choice, to be shown as renders, not settled here.**
+# +
+# +**FILTERS.** Kodak: the Wratten 12 is "required" (AS-77); No. 15 gives "greater
+# +blue attenuation" (B-3); TI-2323's colour-shift table lists CC corrections. A
+# +film shooting guide (robwalwyn.com/aerochrome, read): #12 an overall blue cast
+# +with magenta foliage; #16 the most neutral, "deep natural blue" skies; #21 and
+# +#22 foliage toward red and skies deep blue or cyan; #25 predominantly yellow;
+# +an R72 gives monochrome magenta. The model, with filter edges approximated by
+# +shifting the Wratten 12 curve: #21 gives scarlet foliage with a greenish-cyan
+# +sky; #25 and #29 everything yellow-orange.
+# +
+# +**The digitised curves and the film model** (spectral sensitivities,
+# +characteristic curves, dye densities, Wratten 12, and the script that renders a
+# +reflectance spectrum through them) were kept outside the repository with the
+# +session's scratch; the numbers above are the parts any later work needs.
+# +
+# +### 4b-ix. WHAT CAN BE DONE WITH THIS CAMERA'S ONE AXIS — THE FIELD, THE LUTS AND THE LITERATURE
+# +
+# +Researched 2026-09-25, from practitioners' long-form tutorials, the LUT and
+# +profile products, and the published science. Read status is given where it
+# +matters; many academic hosts were refused by this environment's network
+# +policy, and those are named at the end.
+# +
+# +**THE ONE AXIS IS A VEGETATION INDEX.** Model the white-balanced red channel as
+# +a visible part plus an infrared part and green as infrared alone; then the
+# +difference `d = R − G` over `G` is `f × (visible/infrared − 1)`, where `f` is
+# +the visible share of the red channel for this conversion. **So the chroma axis
+# +this camera records (4c-iii) is a red-to-infrared ratio scaled by one camera
+# +constant — the same quantity as NDVI**, the standard vegetation index of remote
+# +sensing. With a 665 nm filter the visible part is roughly 665–700 nm, where
+# +chlorophyll absorbs, which is a genuine narrow NDVI red; with a 720 nm filter it
+# +is only the dye's chromatic response between 720 and 800 nm, a red-edge proxy.
+# +Above about 800 nm the colour filter array carries no colour at all (Park and
+# +Kang, "Color Restoration of RGBN Multispectral Filter Array Sensor Images Based
+# +on Spectral Decomposition", Sensors 16(5):719, 2016, read), which is why green
+# +and blue agree within 0.6% here. This derivation is the researcher's own and not
+# +a paper's; its physics is consistent with Wang et al., "Precise Estimation of
+# +NDVI with a Simple NIR Sensitive RGB Camera", Sensors 20(11):3208, 2020 (read):
+# +four unknowns against three responses, so red and infrared cannot be separated
+# +without restricting the spectrum.
+# +
+# +**THE PHYSICS OF THE MATERIALS on that axis.** Leaf reflectance rises by a
+# +factor of five or more between 700 and 750 nm, and a canopy darkens the visible
+# +further (Seager et al., "Vegetation's Red Edge", Astrobiology 5(3), 2005, read).
+# +A clear sky's red-to-infrared ratio is roughly 3–4 by Rayleigh scattering;
+# +foliage's roughly 0.1 — **a 30 to 40 times difference, which is the physical
+# +content of the axis.** Clouds, snow and concrete are near spectrally flat
+# +(neutral on the axis). Water absorbs strongly in the infrared (Pope and Fry,
+# +Applied Optics 36:8710, 1997), so it shows only surface reflection. Haze
+# +flattens the sky toward neutral. No verified numbers for asphalt, concrete or
+# +soil could be read (every spectral-library host was refused).
+# +
+# +**WHAT CANNOT BE RECOVERED, BY ANY PROCESSING.** Wavelengths the conversion's
+# +filter blocks never reach the sensor. Visible green is absent, so **the film's
+# +green layer — which drives Aerochrome's BLUE output — must be synthesised**;
+# +with a 720 nm filter the red layer must be too. Fredembach and Süsstrunk
+# +("Colouring the Near-Infrared", CIC 2008, abstract): the differences between
+# +visible and infrared follow material and atmosphere, not colour, so no global
+# +map from infrared to colour exists. Limmer and Lensch ("Infrared Colorization
+# +Using Deep Convolutional Neural Networks", ICMLA 2016, read): what is absent
+# +from the infrared "is not recoverable".
+# +
+# +**THE PUBLISHED PRACTICE FOR A MISSING BAND — weather satellites, which have
+# +the same problem.** GOES-16 carries no green band and synthesises one as a fixed
+# +blend `G = 0.45·blue + 0.45·red + 0.10·NIR` (Bah, Gunshor and Schmit,
+# +"Generation of GOES-16 True Color Imagery without a Green Band", Earth and
+# +Space Science 5, 2018, abstract; coefficients confirmed in satpy's
+# +`SimulatedGreen`, read). Himawari's green misses the vegetation peak and blends
+# +in infrared (Miller et al., BAMS 97, 2016). **satpy's `NDVIHybridGreen` makes
+# +the blend weight a function of each pixel's vegetation index** (read, from the
+# +source). That is this camera's situation solved operationally: a missing band
+# +built per pixel from what was measured, driven by the one index the sensor
+# +does measure. The other published route is a colour lookup learned from
+# +registered reference images (Hogervorst and Toet, "Fast natural color mapping
+# +for night-time imagery", Information Fusion 11(2), 2010, abstract), which works
+# +for any target palette, including a film reference.
+# +
+# +**THE PRINCIPLED RENDER, AS THE LITERATURE ASSEMBLES IT** (the researcher's
+# +synthesis of the sources above, not one paper's method):
+# +
+# +1. Take the two measured quantities: infrared luminance (clean, high signal) and
+# +   the vegetation index `d/L`.
+# +2. Synthesise the film's three layer exposures from them — the infrared layer
+# +   mostly from luminance, the red layer from the index, the green layer as a
+# +   function of the index as satellites build a missing green — fitted from
+# +   reflectance spectra through the Kodak curves of 4b-viii, or from registered
+# +   reference frames.
+# +3. Run the exposures through the film's characteristic curves and dyes, so the
+# +   dark sky, the white clouds and red-not-white foliage come out of the film's
+# +   own behaviour rather than from tuning.
+# +4. Estimate the colour smoothly at low resolution and re-attach it to the clean
+# +   infrared detail with an edge-aware filter — the route Limmer and Lensch
+# +   take (colour predicted at low frequency, then joint-bilateral filtered with
+# +   the infrared image as guide), and Son and Zhang's contrast-preserving
+# +   mapping (IEEE TIP 26(11), 2017, abstract).
+# +5. Where the colour signal is weak, shrink the gain rather than amplify it: Lim
+# +   and Silverstein, "Spatially Varying Color Correction Matrices for Reduced
+# +   Noise", HP Labs HPL-2004-99, 2004 (read) — a correlated channel pair gives a
+# +   high condition number, and the remedy is a spatially varying, Wiener-type
+# +   matrix.
+# +
+# +**NOISE, IN ONE LINE OF ARITHMETIC.** `d` carries noise about √2 times a
+# +channel's; any saturation gain scales signal and noise together, so **no gain
+# +changes the colour's signal-to-noise ratio** — only averaging or a prior can.
+# +Denoise in raw or linear space and judge the result after the colour transform
+# +(Brooks et al., "Unprocessing Images for Learned Raw Denoising", CVPR 2019,
+# +read). An edge-aware denoiser does not commute with a gain, so its thresholds
+# +have to be scaled by the gain that follows it.
+# +
+# +**WHAT PRACTITIONERS SAY ABOUT 665 AND 720 NM** (all read unless marked):
+# +
+# +- LifePixel: Aerochrome from a 720 nm camera works "to a lesser degree"; the
+# +  filter guide says at 720 nm "only the blue sky effect is possible".
+# +- Kolari: 550 nm is the conversion "inspired by false color IR film"; 720 nm
+# +  gives "mild color". Kolari's LUT pack by Pierre-Louis Ferrer has pink and
+# +  gold foliage looks for 550–665 nm only, and no pink or red-foliage LUT for
+# +  695–720 nm.
+# +- David Kennard's test of 23 filters on a full-spectrum body
+# +  (davidkennardphotography.com): red foliage and blue sky together appear only
+# +  at 580 nm and below; at 650–720 nm a swap or hue rotation gives pink with
+# +  teal, or orange with blue.
+# +- Cuchara Valley Landscapes: a 720 nm capture "may not work as well".
+# +- **Why, in the researcher's own reasoning, consistent with Kennard and with
+# +  4c-i's solve:** when green equals blue after white balance, every pixel sits
+# +  on one line through grey, so any global linear operation — swap, mixer, or a
+# +  LUT that is a mixer — puts the two ends of the scene at nearly complementary
+# +  hues. The film's foliage and sky (4b-iii) are 162° apart, not 180°. Both at
+# +  once needs a hue-selective step or a mask, and practitioners name the costs:
+# +  noise, blotching, halos at edges.
+# +
+# +**THE ONLY ROUTE TO THE FILM'S REAL MAPPING FOR THIS CAMERA IS TWO IMAGES.**
+# +An infrared frame (this camera) and an ordinary colour frame of the same scene,
+# +aligned, mapped infrared to red, visible red to green, visible green to blue.
+# +Documented by JW Wong (flickr.com/photos/jw_wong, read), and it is how Kodak's
+# +own digital colour-infrared cameras (DCS 420CIR and 460CIR, patent US6292212)
+# +worked with a full-spectrum sensor. Hidden Realms (hiddenrealms.ch, read)
+# +describes the same with an 830 nm frame and a hot-mirror frame. Costs: a
+# +tripod, and ghosting on anything that moves. Channel subtraction in these
+# +methods must be done in linear light (JW Wong; a linear mixer on gamma data
+# +"didn't work as well"). Joshua Bird's trichrome (three filtered exposures)
+# +is the same idea on film (joshuabird.com, read).
+# +
+# +**THE OPTICAL ROUTES NEED A FULL-SPECTRUM BODY and cannot apply here.** Kolari
+# +IR Chrome and IR Chrome Lite, Candy Chrome, Midwest Optical's triple band-pass,
+# +and yellow or 550 nm filters with channel arithmetic all require a
+# +full-spectrum or two-spectrum camera; Kolari says IR Chrome will not work on a
+# +590 nm camera or stacked with an IR filter. Hidden Realms, the most rigorous
+# +source, is openly critical even of IR Chrome: foliage orange-red rather than
+# +red, colours too uniform, red objects staying red where the film turns them
+# +yellow.
+# +
+# +**LUTS AND PROFILES — WHAT EACH EXPECTS AS INPUT.** No LUT, free or paid, claims
+# +to turn a 665 or 720 nm file into Aerochrome.
+# +
+# +- **Built for infrared files like this one:** Rob Shea's free Color Infrared
+# +  LUTs v2 (470–720 nm; MIT licence, copyright 2024 Robert C. Shea, so it may be
+# +  bundled with the notice kept), Rob Shea's paid PRO LUTs and Lightroom
+# +  swap profiles (which name 665 and 720 nm), Kolari's False Color actions
+# +  (including "Only Blue" for 720 nm), Kolari/Ferrer's pack, and PictureFX
+# +  "Channel Swap for IR" (claims 550–720 nm; its author owns no IR filter).
+# +  **Every one of them is a channel swap, sometimes with a curve, and every one
+# +  expects the white-balanced frame BEFORE any swap.** The app applies an
+# +  imported LUT last, over the look — so on a swapping look, Rob Shea's
+# +  "IR RB Swap" undoes the swap outright (measured: that cube is an exact R⇄B
+# +  swap). That is a real interaction for the app's LUT feature, recorded here.
+# +- **Built for a full-spectrum capture with a filter:** Kolari's IR Chrome and
+# +  Candy Chrome LUTs; irlab.uk's "Aerochrome 1443" and "EIR" presets (irlab.uk,
+# +  a browser tool that overlaps this app, read).
+# +- **Built for ordinary colour photos (faux infrared):** PictureFX Kodak
+# +  Aerochrome V1.0 (marcrphoto.wordpress.com; its site states CC BY-SA 4.0 on
+# +  that post, CC BY-NC 4.0 elsewhere, and reserves all rights in its footer —
+# +  bundling needs the author's written permission), RNI Aerochrome, Sickboat,
+# +  Kurosu, Envato and Run N Gun AeroLux packs, VSCO IR presets, Nik's Infrared
+# +  Film. **Probed on test colours, PictureFX maps mid-grey to mauve and white to
+# +  pink**, so on a near-neutral infrared frame it casts the whole image magenta.
+# +
+# +**THE SKY, HOW PRACTITIONERS AND THE LITERATURE HANDLE IT.** Practitioners move
+# +the Cyan band toward blue (LifePixel), use HSL aqua and blue (Cuchara), or
+# +select the sky with channel luminosity masks — the blue channel selects sky and
+# +clouds, masks sharpened by multiplying the channel by itself (Pierre-Louis
+# +Ferrer at Kolari, read). Lightroom users diagnose a sky mask by dropping
+# +exposure hard and build a Color Range mask from a dragged box (Fstoppers,
+# +read). darktable's masks carry a "feathering guide" that aligns a mask's edge
+# +to the image's edges before blurring (docs.darktable.org, read). Several
+# +sources say swaps fringe where foliage meets sky; the remedies named are
+# +optical, apertures around f/5.6–f/8, and the raw converter's chromatic
+# +aberration tools.
+# +
+# +**THE SKY SELECTION'S HALO, AND THE PUBLISHED FIX.** Liba et al., "Sky
+# +Optimization: Semantically aware image processing of skies in low-light
+# +photography", CVPR Workshops 2020, arXiv 2006.10172 (method read): the sky mask
+# +is inferred at low resolution and refined by a **weighted** guided filter, with
+# +each pixel weighted by a confidence that falls to about 0.01 in the uncertain
+# +band around the boundary, so uncertain pixels are filled from confident
+# +neighbours through the local linear model. **It needs a large window: a
+# +support of 64 was right, 16 missed bridge cables.** Their user study found
+# +binary masks produce worse sky edits. Lischinski et al., "Interactive Local
+# +Adjustment of Tonal Values", SIGGRAPH 2006 (read, partial): propagate the
+# +ADJUSTMENT as an edge-aware field, rather than blending two renders across a
+# +soft mask; a hand-made mask must follow the boundary closely and be carefully
+# +feathered to avoid artefacts. Hessel and Morel (arXiv 1808.09411, read): a halo
+# +is an edge smoothed where it should have been preserved, and the plain guided
+# +filter is among the filters that produce one. **This app's `refineSkyMask`
+# +uses the plain filter with a window of 12 at 1024 px and gives every pixel equal
+# +weight** — including the coarse bitmap's soft boundary it exists to correct,
+# +which is where the measured halo sits (NIR_3466: selection 29% at 10 px from a
+# +building, 90% only at 160 px). The weighted filter with a large support is the
+# +published remedy, and it is the first thing to build.
+# +
+# +**SOURCES THIS ENVIRONMENT REFUSED**, for a later session with more access:
+# +the spectral libraries (pubs.usgs.gov, speclib.jpl.nasa.gov,
+# +ecostress.jpl.nasa.gov), hal.science (Rabatel, Gorretta and Labbé 2014, the
+# +closest paper to this camera: simulating a band from a single converted
+# +camera's filtered sensitivities), mdpi.com (Fent and Meldrum 2016, the only
+# +paper targeting EIR hues directly, by a Foveon sensor and a green-pass filter),
+# +www.asprs.org (Fritz 1967 on the film's sensitometry), truecolorinfrared.com
+# +(a measured IR Chrome transmission curve), freshluts.com, gumroad.com,
+# +kurosu.co, www.dropbox.com (dl.dropboxusercontent.com worked), and
+# +www.plferrer.photos.
+# +
+#  ## 4c. THE CRUX IS NIR CONTAMINATION, AND A ROTATION ALONE CANNOT FIX IT
+#  
+#  **Researched 2026-09-16, after shipping the rotation bare and reporting that it
