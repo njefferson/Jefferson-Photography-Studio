@@ -14,8 +14,10 @@
 //
 // SO THE TEST NEEDS TWO BITMAPS THAT DIFFER, and it gets them the cheapest way
 // there is: the four low slots are EMPTY brush masks (created and never
-// painted, so their bitmaps are all zero, and active by their own default
-// adjustment so they are uploaded rather than dropped), and the fifth mask is
+// painted, so their bitmaps are all zero, and given a brightness of their own
+// so they count as active and are uploaded rather than dropped: a new mask
+// starts at no change since 2026-09-25, and an inactive one takes no slot), and
+// the fifth mask is
 // a SKY mask, whose bitmap is nonzero exactly where the sky is. The sky mask
 // therefore lands in slot 4 — layer 1, channel 0 — and it is the only mask in
 // the frame that can darken anything.
@@ -30,7 +32,7 @@
 // (`float(s >> 2)` -> `0.0`): "a sky mask in slot 4 renders as it does in slot
 // 0" failed with the frame undarkened, which is the aliasing this exists to
 // catch.
-import { openMasks, setMaskValue } from "./walk-input.mjs";
+import { openMasks, closeMasks, setMaskValue } from "./walk-input.mjs";
 import { chromium } from "playwright-core";
 import { requireFreshDist } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
@@ -103,15 +105,18 @@ try {
   // B: four empty brush masks first, so the same sky mask lands in slot 4 —
   // the second layer of the atlas.
   const p2 = await openFrame(b, PORT);
-  for (let i = 0; i < EMPTIES; i++) { await p2.click("#addBrush"); await settle(p2); }
+  // Each empty gets a brightness so it is uploaded and takes a slot; with no
+  // paint it still covers nothing.
+  for (let i = 0; i < EMPTIES; i++) {
+    await p2.click("#addBrush"); await settle(p2);
+    await setMaskValue(p2, "brightness", 1.25); await settle(p2);
+  }
   const added = await p2.evaluate(() => document.querySelectorAll(".mask-pick").length);
   check(`${EMPTIES} empty brush masks were accepted`, added === EMPTIES, `the list holds ${added}`);
   await tintOff(p2);
-  // READ THE EMPTIES BEFORE THE SKY MASK JOINS THEM. Taken afterwards this
-  // number carries the sky mask's own default adjustment — addMask gives a new
-  // sky mask saturation 1.3, so it is already changing the photograph before
-  // any slider is touched, and the first version of this walk reported that
-  // 1.96 as the empty masks failing to be empty.
+  // READ THE EMPTIES BEFORE THE SKY MASK JOINS THEM. The first version of this
+  // walk read them afterwards, when a new sky mask still arrived at saturation
+  // 1.3, and reported that 1.96 as the empty masks failing to be empty.
   const withEmpties = await mean(p2);
   check("empty brush masks change nothing", Math.abs(withEmpties - bare) < 0.5,
     `unmasked ${bare.toFixed(2)} -> ${withEmpties.toFixed(2)} with ${EMPTIES} empty masks`);
@@ -126,6 +131,33 @@ try {
   // the darkening vanishes, landing this back at `bare`.
   check(`a Sky mask in slot ${EMPTIES} renders as it does in slot 0`, Math.abs(slot4 - alone) < 1.0,
     `slot 0 ${alone.toFixed(2)} vs slot ${EMPTIES} ${slot4.toFixed(2)}, and undarkened would be ${bare.toFixed(2)}`);
+
+  // C: A NEW MASK CHANGES NOTHING UNTIL A CONTROL IS MOVED (042, M1: every
+  // value starts at no change). addMask used to give a new mask "a gentle
+  // default so it does something": brightness 1.25 on a radial, 1.15 on a
+  // gradient, saturation 1.3 on a Sky mask. Since the switch those values sit
+  // on the Basic and Colour tabs, where nothing says so, and every new mask
+  // lightened the photograph on the target device. Read with the mask place
+  // closed, where the coverage tint is not drawn.
+  const p3 = await openFrame(b, PORT);
+  await closeMasks(p3); await settle(p3);
+  const before = await mean(p3);
+  for (const [add, name] of [["addRadial", "radial"], ["addLinear", "gradient"], ["addSky", "Sky mask"]]) {
+    await openMasks(p3); await p3.click(`#${add}`); await settle(p3);
+    // AND ITS AREA STILL SHOWS WHILE IT IS PLACED. The renderer uploads only
+    // masks that change something, so a new mask at no change would give the
+    // coverage tint nothing to draw; the tint dims everything outside the
+    // mask, so drawn, it moves the frame's mean a long way.
+    if (add === "addRadial") {
+      if ((await p3.getAttribute("#mOutline", "aria-pressed")) !== "true") { await p3.click("#mOutline"); await settle(p3); }
+      const tinted = await mean(p3);
+      check("a new radial's area shows while it is placed", Math.abs(tinted - before) > 5, `unmasked ${before.toFixed(2)}, with the tint on ${tinted.toFixed(2)}`);
+    }
+    await closeMasks(p3); await settle(p3);
+    const now = await mean(p3);
+    check(`a new ${name} changes nothing until a control is moved`, Math.abs(now - before) < 0.5, `unmasked ${before.toFixed(2)} -> ${now.toFixed(2)}`);
+  }
+  await p3.context().close();
 } finally { await b.close(); }
-console.log(failed ? `\n${failed} failed — a bitmap mask past the fourth is not reading its own layer of the atlas` : "\nbitmap masks reach the second atlas layer");
+console.log(failed ? `\n${failed} failed — see the FAIL lines above` : "\nbitmap masks reach the second atlas layer, and a new mask changes nothing until a control is moved");
 process.exit(failed ? 1 : 0);

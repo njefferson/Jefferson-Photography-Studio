@@ -6468,11 +6468,14 @@ function addMask(type: 0 | 1 | 2 | 3 | 4) {
   // Brush/sky are limited further by the shared bitmap texture's 4 channels.
   if ((type === 2 || type === 4) && bitmapMaskCount() >= MAX_BITMAP_MASKS) return;
   maskAdjusting = false; // adding a mask re-engages the overlay
+  // EVERY VALUE STARTS AT NO CHANGE (042, M1). A new mask used to arrive with a
+  // value of its own so it did something at once: brightness 1.25 on a brush or
+  // radial, 1.15 on a gradient, saturation 1.4 on a colour mask and 1.3 on a Sky
+  // mask. Since the switch those values sit on the Basic and Colour tabs, where
+  // nothing says so, and every new mask lightened the photograph with nothing
+  // moved. Its area still shows while it is placed: the renderer uploads the
+  // mask the coverage tint is showing even when it changes nothing (gl.ts).
   const m = neutralMask(type);
-  // A gentle default so a fresh mask does something. Colour and sky masks lean
-  // on saturation (the owner's taste — make the matched area pop).
-  if (type === 3 || type === 4) m.saturation = type === 4 ? 1.3 : 1.4;
-  else m.brightness = type === 1 ? 1.15 : 1.25;
   if (type === 2) {
     const s = Math.min(1, BRUSH_MAX_EDGE / Math.max(current.width, current.height));
     const bw = Math.max(1, Math.round(current.width * s));

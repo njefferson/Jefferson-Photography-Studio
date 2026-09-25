@@ -45,7 +45,7 @@
 //
 // NOT in .branch-guard's `also=`: it drives a real browser and decodes a RAW.
 // Run it before a release, or through tools/walk-all.mjs.
-import { openMasks } from "./walk-input.mjs";
+import { openMasks, setMaskValue } from "./walk-input.mjs";
 import { chromium } from "/home/user/Jefferson-Photography-Studio/node_modules/playwright-core/index.mjs";
 import { requireFreshDist } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
@@ -157,6 +157,13 @@ try {
       await press(p, "lookEir");
       await openMasks(p);
       await p.click("#addSky");
+      await settle(p);
+      // A MASK THAT RENDERS. A new mask starts at no change and the renderer
+      // drops a mask that changes nothing, so the arm gives it the saturation a
+      // new Sky mask used to arrive with; otherwise "with a Sky mask" would be
+      // the no-mask arm again.
+      await setMaskValue(p, "saturation", "1.3");
+      await openMasks(p);
       await settle(p);
     }
     return { p, ctx };

@@ -5,7 +5,7 @@
 
 // Single source of truth for edit parameters lives in pipeline.ts so the GPU
 // preview and CPU export can never drift apart.
-import { toneEvaluator, toneIsIdentity, maskGroupsForRender, groupHslOffset, groupGradeOf, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, LENS_GAIN_LO, LENS_GAIN_HI, SAT_GUARD_LO, SAT_GUARD_HI, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, lensAreaMean, type EditParams, type LocalMap, type SkyMap, type BrushMask, type CropRect } from "./pipeline";
+import { toneEvaluator, toneIsIdentity, maskGroups, maskGroupsForRender, groupHslOffset, groupGradeOf, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, LENS_GAIN_LO, LENS_GAIN_HI, SAT_GUARD_LO, SAT_GUARD_HI, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, lensAreaMean, type EditParams, type LocalMap, type SkyMap, type BrushMask, type CropRect } from "./pipeline";
 import { toHalfBuffer } from "./half";
 export type { EditParams };
 
@@ -1967,6 +1967,21 @@ export class Renderer {
     // only — into the flat uniform arrays the shader indexes, components
     // following their head.
     const groups = maskGroupsForRender(p.masks);
+    // THE MASK BEING SHOWN GOES UP EVEN WHEN IT CHANGES NOTHING, for the
+    // coverage tint and matte only. A new mask starts at no change (042, M1)
+    // and maskGroupsForRender drops a group that changes nothing, so without
+    // this the tint and the matte would point at nothing while a new mask is
+    // placed. Its values are all no change, so it moves no pixel; compileEdit
+    // and the export never see it; and with the tint off nothing extra goes up.
+    // Appended last, so every other mask keeps its bitmap slot.
+    if (maskViz >= 0) {
+      const vm = (p.masks ?? [])[maskViz];
+      if (vm && !groups.some((g) => g.includes(vm))) {
+        const vg = maskGroups(p.masks ?? []).find((g) => g.includes(vm));
+        const used = groups.reduce((n, g) => n + g.length, 0);
+        if (vg && used + vg.length <= MAX_MASKS) groups.push(vg);
+      }
+    }
     const masks: EditParams["masks"] = [];
     for (const g of groups) for (const m of g) masks.push(m);
     // Slot map: brush(2)/sky(4) masks claim packed channels 0..3 in appearance

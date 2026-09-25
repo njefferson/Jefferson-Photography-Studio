@@ -30,10 +30,12 @@
 // not linear in the weight.
 //
 // WHAT THIS WALK'S OWN FIRST RUN CAUGHT, which is why check 1 is first. A fresh
-// Sky mask is NOT neutral: `addMask` gives it Saturation 1.3 on purpose, so a
-// new mask does something visible. An earlier version of this comparison left it
-// there and reported the aim moving half the frame — which was 30% of extra
-// chroma over 54% of the picture and nothing whatever to do with the aim.
+// Sky mask was NOT neutral then: `addMask` gave it Saturation 1.3, so a new mask
+// did something visible. An earlier version of this comparison left it there and
+// reported the aim moving half the frame — which was 30% of extra chroma over
+// 54% of the picture and nothing whatever to do with the aim. A new mask starts
+// at no change since 2026-09-25; the walk still sets Saturation 1 itself, so it
+// does not depend on what a new mask starts at.
 //
 // A NOTE ON DRIVING THE CONTROLS. Plain value sliders take `setValue` from
 // tools/walk-input.mjs — dispatched events, value read back, which is exact and
@@ -231,7 +233,7 @@ try {
   // are the pair most able to drift apart. The four statements are the same.
   //
   // DENOISE DOES NOT OPEN AT ZERO on a raw: it is set from the frame's measured
-  // noise, which is a confound of the same family as the fresh Sky mask's
+  // noise, which is a confound of the same family as the fresh Sky mask's old
   // Saturation 1.3 this walk's header records. It does not break the four
   // statements — the baseline arm carries the measured value in every arm
   // equally, and what is asserted is the DIFFERENCE each arm makes — but a
