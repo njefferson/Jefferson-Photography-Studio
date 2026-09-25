@@ -133,6 +133,8 @@ uniform int u_maskOp[8];     // 0 head (starts a group) · 1 subtract · 2 inter
 uniform int u_maskAims[8];   // bitmask of stages this mask gates: 1 dehaze, 2 clarity, 4 shadow colour, 8 lens hot-spot fix, 16 noise, 32 detail (030)
 uniform vec3 u_maskFol[8];   // a HEAD's own Foliage offsets [hue, sat, lum] (042 stage 2); zero on components
 uniform bool u_maskFolOn;    // false when no head carries one, so the band reads u_fol and nothing else
+uniform vec3 u_maskSkyBand[8]; // a HEAD's own Sky band offsets [hue, sat, lum] (042 stage 2, beside Foliage); zero on components
+uniform bool u_maskSkyBandOn; // false when no head carries one, so the band reads u_sky and nothing else
 uniform vec3 u_maskHsl[64];  // a HEAD's own colour-mixer offsets (042 stage 2b), 8 bands per mask slot, head i at i*8; zero elsewhere
 uniform bool u_maskHslOn;    // false when no head carries any, so the mixer reads u_hsl and nothing else
 uniform vec3 u_maskGrade[24]; // a HEAD's own grade (042 stage 2b): amount x tint for shadows, midtones, highlights, head i at i*3
@@ -469,19 +471,15 @@ float aimWeightOf(int bit){
   return any ? w : 1.0;
 }
 
-// THE FOLIAGE BAND'S VALUE HERE (042, stage 2). The mirror of foliageAt() in
-// pipeline.ts: the whole-photo u_fol plus each head's own offsets times its
-// group's joined place weight, summed where masks overlap, then held to the
-// Colour tab's ranges. A group with a colour mask in it adds nothing, as
-// groupFolOffset() says: its key does not exist this early. u_fol exactly
-// wherever no offset reaches, so an edit with none renders as before.
-vec3 foliageHere(){
-  vec3 f = u_fol;
-  if (!u_maskFolOn) return f;
+// One band's value here, whichever band the last argument picks; the body of
+// foliageHere and skyBandHere, so the two bands cannot drift apart.
+vec3 bandHere(vec3 base, bool on, bool sky){
+  vec3 f = base;
+  if (!on) return f;
   bool any = false;
   for (int i = 0; i < u_maskCount; i++) {
     if (u_maskOp[i] != 0) continue;
-    vec3 off = u_maskFol[i];
+    vec3 off = sky ? u_maskSkyBand[i] : u_maskFol[i];
     if (off == vec3(0.0) || u_maskType[i] == 3) continue;
     bool canAim = true;
     for (int j = i + 1; j < u_maskCount; j++) {
@@ -502,6 +500,18 @@ vec3 foliageHere(){
   }
   return any ? clamp(f, vec3(-60.0, 0.0, 0.5), vec3(60.0, 2.0, 1.5)) : f;
 }
+
+// THE FOLIAGE BAND'S VALUE HERE (042, stage 2). The mirror of foliageAt() in
+// pipeline.ts: the whole-photo u_fol plus each head's own offsets times its
+// group's joined place weight, summed where masks overlap, then held to the
+// Colour tab's ranges. A group with a colour mask in it adds nothing, as
+// groupFolOffset() says: its key does not exist this early. u_fol exactly
+// wherever no offset reaches, so an edit with none renders as before.
+vec3 foliageHere(){ return bandHere(u_fol, u_maskFolOn, false); }
+
+// THE SKY BAND'S VALUE HERE (042, stage 2, beside Foliage). The mirror of
+// skyBandAt() in pipeline.ts, through the same body as foliageHere.
+vec3 skyBandHere(){ return bandHere(u_sky, u_maskSkyBandOn, true); }
 
 void main() {
   // Outside the source image, output transparent so the dark stage shows through
@@ -794,16 +804,17 @@ void main() {
   // Per-colour bands (complementary halves), matching pipeline.ts. The swap
   // reflects hue (h -> 240 - h), so the sky band re-centres to stay glued to
   // the same real-world subject in both swap states.
-  if (u_sky != vec3(0.0, 1.0, 1.0) || u_fol != vec3(0.0, 1.0, 1.0) || u_maskFolOn) {
+  if (u_sky != vec3(0.0, 1.0, 1.0) || u_fol != vec3(0.0, 1.0, 1.0) || u_maskFolOn || u_maskSkyBandOn) {
     vec3 fol = foliageHere(); // a mask's own Foliage, where one reaches (042)
+    vec3 sky = skyBandHere(); // a mask's own Sky band, the same way
     vec3 hsv = rgb2hsv(max(c, 0.0));
     float h = hsv.x * 360.0;
     // pipeline.ts skyBandCentre: the swapped centre only while no mixer is on
     float wS = bandWeight(h, (u_swap && !u_mix3On) ? 30.0 : 210.0, 55.0, 105.0);
     float wF = 1.0 - wS;
-    h += u_sky.x * wS + fol.x * wF;
-    float s = min(1.0, hsv.y * bandGain(u_sky.y, wS, hsv.y) * bandGain(fol.y, wF, hsv.y));
-    float v = hsv.z * (1.0 + (u_sky.z - 1.0) * wS) * (1.0 + (fol.z - 1.0) * wF);
+    h += sky.x * wS + fol.x * wF;
+    float s = min(1.0, hsv.y * bandGain(sky.y, wS, hsv.y) * bandGain(fol.y, wF, hsv.y));
+    float v = hsv.z * (1.0 + (sky.z - 1.0) * wS) * (1.0 + (fol.z - 1.0) * wF);
     c = hsv2rgb(vec3(fract(h / 360.0), s, v));
   }
 
@@ -1266,7 +1277,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskOp", "u_maskAims", "u_maskFol", "u_maskFolOn", "u_maskHsl", "u_maskHslOn", "u_maskGrade", "u_maskGradeBal", "u_maskGradeOn", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_maskMatte", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskOp", "u_maskAims", "u_maskFol", "u_maskFolOn", "u_maskSkyBand", "u_maskSkyBandOn", "u_maskHsl", "u_maskHslOn", "u_maskGrade", "u_maskGradeBal", "u_maskGradeOn", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_maskMatte", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -1988,6 +1999,8 @@ export class Renderer {
     // switch is off unless one is non-zero, so the band costs nothing extra.
     const folOn = masks.some((m, i) => (i === 0 || (m.op ?? 0) === 0) && !!m.fol && (m.fol[0] !== 0 || m.fol[1] !== 0 || m.fol[2] !== 0));
     gl.uniform1i(this.loc.u_maskFolOn, folOn ? 1 : 0);
+    const skyBandOn = masks.some((m, i) => (i === 0 || (m.op ?? 0) === 0) && !!m.skyBand && (m.skyBand[0] !== 0 || m.skyBand[1] !== 0 || m.skyBand[2] !== 0));
+    gl.uniform1i(this.loc.u_maskSkyBandOn, skyBandOn ? 1 : 0);
     if (masks.length) {
       const types = new Int32Array(MAX_MASKS);
       const geoA = new Float32Array(MAX_MASKS * 4);
@@ -2024,6 +2037,9 @@ export class Renderer {
       const fol = new Float32Array(MAX_MASKS * 3);
       masks.forEach((m, i) => { if ((i === 0 || (m.op ?? 0) === 0) && m.fol) fol.set(m.fol, i * 3); });
       gl.uniform3fv(this.loc.u_maskFol, fol);
+      const skyB = new Float32Array(MAX_MASKS * 3);
+      masks.forEach((m, i) => { if ((i === 0 || (m.op ?? 0) === 0) && m.skyBand) skyB.set(m.skyBand, i * 3); });
+      gl.uniform3fv(this.loc.u_maskSkyBand, skyB);
       if (maskGradeOn) {
         // Each head's three bands as amount x tint, by the same gradeTintVec
         // the CPU path uses, and its own balance.

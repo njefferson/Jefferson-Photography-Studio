@@ -759,6 +759,13 @@ export interface MaskLayer {
    *  Always replaced as a new array, never written in place, because an undo
    *  snapshot copies a mask shallowly. */
   fol?: [number, number, number];
+  /** THE MASK'S OWN SKY BAND (042, stage 2, beside Foliage): offsets on the
+   *  whole-photo `sky` [hue degrees, saturation, luminance], added where this
+   *  mask's group reaches, each starting at 0 for no change. Absent means no
+   *  change. The same rules as `fol`, for the same reason: read on a group's
+   *  HEAD only, only for a group with no colour mask in it, because the band
+   *  runs before the mask stage; always replaced as a new array. */
+  skyBand?: [number, number, number];
   /** THE MASK'S OWN COLOUR MIXER (042, stage 2b): offsets on the whole-photo
    *  `hsl`, 24 numbers laid out as it is (per band: hue degrees, saturation,
    *  luminance), each starting at 0 for no change and added where this mask's
@@ -993,6 +1000,7 @@ export function maskIsActive(m: MaskLayer): boolean {
   // lose it, silently, in the most obvious way to use the feature.
   if (m.aims) return true;
   if (m.fol && (m.fol[0] !== 0 || m.fol[1] !== 0 || m.fol[2] !== 0)) return true;
+  if (m.skyBand && (m.skyBand[0] !== 0 || m.skyBand[1] !== 0 || m.skyBand[2] !== 0)) return true;
   if (m.hsl && m.hsl.some((x) => x !== 0)) return true;
   if (m.grade && !gradeIsNeutral(m.grade)) return true;
   return m.brightness !== 1 || m.contrast !== 1 || m.saturation !== 1 || m.hue !== 0 || m.warmth !== 0;
@@ -1126,6 +1134,19 @@ export function groupFolOffset(group: readonly MaskLayer[]): readonly [number, n
   return h.fol;
 }
 
+/** The Sky band offsets a GROUP adds (042, stage 2, beside Foliage), or null
+ *  when it adds none. Takes one group (head first); returns the head's
+ *  `skyBand` when it is non-zero, the head is not a colour mask, and nothing in
+ *  the group is one (`groupCanAim`). What the caller relies on: null means the
+ *  group can be skipped at the band, and the shader's `skyBandHere` makes the
+ *  same test. */
+export function groupSkyOffset(group: readonly MaskLayer[]): readonly [number, number, number] | null {
+  const h = group[0];
+  if (!h || !h.skyBand || h.type === 3 || !groupCanAim(group)) return null;
+  if (h.skyBand[0] === 0 && h.skyBand[1] === 0 && h.skyBand[2] === 0) return null;
+  return h.skyBand;
+}
+
 /** The colour mixer's own ranges, as the Colour tab's sliders set them: a
  *  band's value with masks' offsets added is held to these, [hue, saturation,
  *  luminance]. */
@@ -1170,10 +1191,39 @@ export function foliageAt(
   v: number,
   out: [number, number, number],
 ): void {
+  bandAt(base, groups, groupFolOffset, u, v, out);
+}
+
+/** THE SKY BAND'S VALUE AT ONE PIXEL (042, stage 2, beside Foliage), the same
+ *  sum as `foliageAt` over each group's `skyBand`, held to the same ranges,
+ *  which the Sky band's sliders share with Foliage's. Takes `base` (the
+ *  whole-photo `sky`), the active groups, image uv and `out`, which it fills;
+ *  returns nothing. What the result must satisfy: `base` exactly wherever no
+ *  offset reaches, and what the shader's `skyBandHere` computes at that uv. */
+export function skyBandAt(
+  base: readonly [number, number, number],
+  groups: readonly (readonly MaskLayer[])[],
+  u: number,
+  v: number,
+  out: [number, number, number],
+): void {
+  bandAt(base, groups, groupSkyOffset, u, v, out);
+}
+
+/** One band's value at one pixel, whichever band `offsetOf` reads; the body of
+ *  `foliageAt` and `skyBandAt`, so the two bands cannot drift apart. */
+function bandAt(
+  base: readonly [number, number, number],
+  groups: readonly (readonly MaskLayer[])[],
+  offsetOf: (g: readonly MaskLayer[]) => readonly [number, number, number] | null,
+  u: number,
+  v: number,
+  out: [number, number, number],
+): void {
   out[0] = base[0]; out[1] = base[1]; out[2] = base[2];
   let any = false;
   for (const g of groups) {
-    const f = groupFolOffset(g);
+    const f = offsetOf(g);
     if (!f) continue;
     const w = groupWeight(g, (c) => maskWeight(c, u, v));
     if (w <= 0) continue;
@@ -1975,6 +2025,10 @@ export function compileEdit(
   const groupW = new Float64Array(maskGroupsActive.length);
   if (folGroups.length) bandsActive = true;
   const folPx: [number, number, number] = [0, 0, 0];
+  // A MASK'S OWN SKY BAND, beside Foliage and read the same way.
+  const skyGroups = maskGroupsActive.filter((g) => groupSkyOffset(g) !== null);
+  if (skyGroups.length) bandsActive = true;
+  const skyPx: [number, number, number] = [0, 0, 0];
   const lensOn = (p.hotspot ?? 0) !== 0 || (p.vignette ?? 0) !== 0 || (p.hotspotColor ?? 0) !== 0;
   // The measured curve is its own stage: it must run whether or not any of the
   // manual lens sliders are off zero.
@@ -2158,6 +2212,11 @@ export function compileEdit(
       foliageAt(fol, folGroups, u, v, folPx);
       f = folPx;
     }
+    let sk: readonly [number, number, number] = sky;
+    if (bandsActive && skyGroups.length && u !== undefined && v !== undefined) {
+      skyBandAt(sky, skyGroups, u, v, skyPx);
+      sk = skyPx;
+    }
     if (bandsActive) {
       const cr = Math.max(0, nr);
       const cg = Math.max(0, ng);
@@ -2169,11 +2228,11 @@ export function compileEdit(
       // displayed (skyBandCentre has the measurement).
       const wS = bandWeight(h, skyBandCentre(swap, p.mix3), 55, 105);
       const wF = 1 - wS;
-      h += sky[0] * wS + f[0] * wF;
+      h += sk[0] * wS + f[0] * wF;
       // A boost acts only where there is colour to boost (bandGain's guard);
       // the guard reads THIS pixel's saturation before either band touches it.
-      s = Math.min(1, s * bandGain(sky[1], wS, s) * bandGain(f[1], wF, s));
-      v = v * (1 + (sky[2] - 1) * wS) * (1 + (f[2] - 1) * wF);
+      s = Math.min(1, s * bandGain(sk[1], wS, s) * bandGain(f[1], wF, s));
+      v = v * (1 + (sk[2] - 1) * wS) * (1 + (f[2] - 1) * wF);
       [nr, ng, nb] = hsv2rgb(h, s, v);
     }
     // Tone tint (sepia etc.) after saturation so it survives mono looks.

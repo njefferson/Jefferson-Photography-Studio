@@ -1181,9 +1181,12 @@ function syncFromUI() {
   params.chroma = Number(ui.chroma.value);
   params.despeckle = Number(ui.despeckle.value);
   params.recover = Number(ui.recover.value);
-  params.sky = [Number(ui.skyHue.value), Number(ui.skySat.value), Number(ui.skyLum.value)];
-  if (!tm) params.foliage = [Number(ui.folHue.value), Number(ui.folSat.value), Number(ui.folLum.value)];
-  else writeMaskControls(tm);
+  // With a mask picked the two bands' sliders show THE MASK'S offsets, so
+  // neither is read into the whole photo then; writeMaskControls takes them.
+  if (!tm) {
+    params.sky = [Number(ui.skyHue.value), Number(ui.skySat.value), Number(ui.skyLum.value)];
+    params.foliage = [Number(ui.folHue.value), Number(ui.folSat.value), Number(ui.folLum.value)];
+  } else writeMaskControls(tm);
   {
     const t = activeTone();
     for (let i = 0; i < 5; i++) {
@@ -6165,6 +6168,7 @@ const maskTargetNote = $("maskTargetNote") as HTMLElement;
 const maskWarmthRow = $("maskWarmthRow") as HTMLElement;
 const maskWarmthEl = $("maskWarmth") as HTMLInputElement;
 const folMaskNote = $("folMaskNote") as HTMLElement;
+const skyMaskNote = $("skyMaskNote") as HTMLElement;
 const wbGainRows = [ui.wbR, ui.wbG, ui.wbB].map((el) => el.closest("label") as HTMLElement);
 
 /** The index in `params.masks` of the picked mask's group HEAD, or -1 when
@@ -6200,10 +6204,17 @@ interface MaskCtl {
   set(m: MaskLayer, v: number): void;
   /** The control's value for the whole photograph, put back on the way out. */
   whole(): number;
-  /** One of the Foliage band's three, which a colour mask cannot take. */
-  fol?: 0 | 1 | 2;
+  /** One of the Sky or Foliage bands' six, which a colour mask cannot take:
+   *  the bands run before the mask stage, where a colour key does not exist. */
+  band?: true;
 }
 const MASK_BRIGHT_LO = 0.3, MASK_BRIGHT_HI = 2; // the mask's brightness range, as its own slider had it
+const skySetter = (k: 0 | 1 | 2) => (m: MaskLayer, v: number) => {
+  // A NEW ARRAY, never written in place, for the same reason as folSetter.
+  const f: [number, number, number] = m.skyBand ? [m.skyBand[0], m.skyBand[1], m.skyBand[2]] : [0, 0, 0];
+  f[k] = v;
+  m.skyBand = f;
+};
 const folSetter = (k: 0 | 1 | 2) => (m: MaskLayer, v: number) => {
   // A NEW ARRAY, never written in place: an undo snapshot copies a mask shallowly.
   const f: [number, number, number] = m.fol ? [m.fol[0], m.fol[1], m.fol[2]] : [0, 0, 0];
@@ -6235,9 +6246,13 @@ function maskCtls(): MaskCtl[] {
     { el: ui.hue, min: -60, max: 60, step: 1, get: (m) => m.hue, set: (m, v) => { m.hue = v; }, whole: () => params.hue },
     { el: ui.sat, min: 0, max: 2, step: 0.01, get: (m) => m.saturation, set: (m, v) => { m.saturation = v; }, whole: () => params.sat },
     { el: ui.con, min: 0.5, max: 2, step: 0.01, get: (m) => m.contrast, set: (m, v) => { m.contrast = v; }, whole: () => params.contrast },
-    { el: ui.folHue, min: -120, max: 120, step: 1, get: (m) => m.fol?.[0] ?? 0, set: folSetter(0), whole: () => params.foliage[0], fol: 0 },
-    { el: ui.folSat, min: -2, max: 2, step: 0.01, get: (m) => m.fol?.[1] ?? 0, set: folSetter(1), whole: () => params.foliage[1], fol: 1 },
-    { el: ui.folLum, min: -1, max: 1, step: 0.01, get: (m) => m.fol?.[2] ?? 0, set: folSetter(2), whole: () => params.foliage[2], fol: 2 },
+    // The Sky band beside Foliage (042, stage 2), on the same terms.
+    { el: ui.skyHue, min: -120, max: 120, step: 1, get: (m) => m.skyBand?.[0] ?? 0, set: skySetter(0), whole: () => params.sky[0], band: true },
+    { el: ui.skySat, min: -2, max: 2, step: 0.01, get: (m) => m.skyBand?.[1] ?? 0, set: skySetter(1), whole: () => params.sky[1], band: true },
+    { el: ui.skyLum, min: -1, max: 1, step: 0.01, get: (m) => m.skyBand?.[2] ?? 0, set: skySetter(2), whole: () => params.sky[2], band: true },
+    { el: ui.folHue, min: -120, max: 120, step: 1, get: (m) => m.fol?.[0] ?? 0, set: folSetter(0), whole: () => params.foliage[0], band: true },
+    { el: ui.folSat, min: -2, max: 2, step: 0.01, get: (m) => m.fol?.[1] ?? 0, set: folSetter(1), whole: () => params.foliage[1], band: true },
+    { el: ui.folLum, min: -1, max: 1, step: 0.01, get: (m) => m.fol?.[2] ?? 0, set: folSetter(2), whole: () => params.foliage[2], band: true },
     // The colour mixer (042, stage 2b): the selected band's offsets, each range
     // as wide as the whole photo's so an offset can reach either end from any
     // whole-photo value; the sum is held to the slider's own range.
@@ -6292,7 +6307,7 @@ function inertOthers(root: Element, ids: Set<string>): void {
   for (const child of Array.from(root.children)) {
     // The mixer's band chips and its pick only choose WHICH band the sliders
     // show, so they stay live with a mask picked (042, stage 2b).
-    if (child === maskTargetNote || child === folMaskNote || child === hslChipsEl || child === hslPickBtn) continue;
+    if (child === maskTargetNote || child === folMaskNote || child === skyMaskNote || child === hslChipsEl || child === hslPickBtn) continue;
     // A grade wheel is the pointer route to the same values as the sliders
     // beside it (042, stage 2b), so it stays live with them.
     if ((child as HTMLElement).classList?.contains("grade-wheel-box")) continue;
@@ -6332,7 +6347,7 @@ function applyMaskTargetUI(): void {
       c.el.max = String(c.max);
       c.el.step = String(c.step);
       c.el.value = String(c.get(m));
-      const off = c.fol !== undefined && !folOk;
+      const off = !!c.band && !folOk;
       if (off && !c.el.disabled) { c.el.disabled = true; c.el.dataset.maskOff = ""; }
       if (!off && c.el.dataset.maskOff !== undefined) { c.el.disabled = false; delete c.el.dataset.maskOff; }
     } else {
@@ -6349,6 +6364,7 @@ function applyMaskTargetUI(): void {
     }
   }
   folMaskNote.hidden = !m || folOk;
+  skyMaskNote.hidden = !m || folOk;
   // The drag tool writes the whole photo's mixer and goes inert with a mask
   // picked, so it is put down rather than left armed under the photo.
   if (m && tatArmed) setTat(false);

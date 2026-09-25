@@ -3735,6 +3735,10 @@ li.plat-you { font-weight: 600; }
 /* The picked mask's name in the pinned heading, and the way back beside it. It
    is allowed to wrap: the name is the fact the reader needs, never clipped. */
 .mask-target { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 0; font-size: 0.8125rem; color: var(--txt); }
+/* The reason a dimmed control is dimmed, in the heading that stays in view
+   however far the panel is scrolled: the note below the heading says it at
+   length, and scrolled to the lower bands it was a screen away. */
+.mask-target-why { flex-basis: 100%; color: var(--txt-2); }
 .mask-target-back { min-height: 44px; padding: 8px 12px; border: 1px solid var(--line-2); border-radius: 10px; background: transparent; color: var(--txt); font: 600 0.8125rem/1.2 var(--ui); }
 /* A control that does not follow the picked mask is inert, and looks it; the
    note under the heading says why in words, so the dimming is never the only

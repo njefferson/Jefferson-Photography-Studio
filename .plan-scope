@@ -1,11 +1,12 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=aaf601fbdcf8c02f
-diffhash=01c3003f06d4474e
-verdict=IN-SCOPE: the grade per mask, the second of 2b's ordered commits, with its preview bump, module map, checks and walk arm
-# IN-SCOPE: this is exactly plan item 6 / decision 042 stage 2b's "Grade" sub-bullet — the second stage-2b commit (grade per mask only), with no bleed from luminance/LUT/curves/shadow colour and no unrelated or gate-wiring changes.
+planhash=ee857fc7b928755b
+diffhash=6b6e04aa0b4a179a
+verdict=IN-SCOPE: item 1a, the Sky read guarded with a mask picked and the agreement walk's check that picking a neutral mask leaves the photo unchanged, with the regenerated module-map line count, amended into the held Sky band commit
+# IN-SCOPE: the staged diff is exactly item 1a — the syncFromUI guard fix and the agreement-walk byte-identity check — nothing else.
 # 
-# 1. MaskLayer.grade holds the mask's seven grade values; its tints add where the group reaches at the mask's own balance, in compileEdit and the shader, before the one clamp, and an edit with no mask grade computes exactly as before; every grade control writes the mask's grade through writeGrade when a mask is picked, the wheels stay live; the note and Help name the grade wheels. groupHslOffset's own contract comment is back above it.
-# 2. PREVIEW_PIPELINE 61 to 62 with its record (the comment move re-recorded with --proven); module-map line counts; join-fold-check's grade cases; the agreement walk's mask arm as a loop over the mixer and the grade, instrument unchanged; setMaskValue's grade fields. No gate wiring changed.
-# 3. The copy matches what the switch enables and leaves for later.
-# 4. No owner quotation or attribution, no session link, no model name.
+# 1. src/main.ts: syncFromUI's Sky read moves inside the same if (!tm) branch as Foliage's, so with a mask picked neither band is read into the whole photo; writeMaskControls takes both. tools/agreement-walk.mjs: a settledView hash before the mask exists and after it is picked with its values at no change, failing the arm if they differ. Nothing else.
+# 2. Amended into the held tip, which has never been on staging or main, so no reader saw the defect and a Fixed note would describe nothing a reader met.
+# 3. No owner quotation or attribution, no session link, no model name.
+# 
+# Re-checked after the commit gate asked for the module map: the only additions are docs/ARCHITECTURE.md's generated line count for src/main.ts (17656 to 17659, the net +3 of the main.ts hunk) and the scope ledger itself.

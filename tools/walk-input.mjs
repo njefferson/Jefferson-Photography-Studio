@@ -168,7 +168,8 @@ export async function closeMasks(page) {
 /** A PICKED MASK'S OWN VALUE, set the way a reader sets it now (042, stage 2).
  *
  *  Takes `page`, `field` and `value`. `field` is one of brightness, contrast,
- *  saturation, hue, warmth, folHue, folSat or folLum; `value` is in the mask's
+ *  saturation, hue, warmth, folHue, folSat, folLum, skyHue, skySat, skyLum, or
+ *  a colour-mixer or grade control; `value` is in the mask's
  *  own units (brightness as a multiplier, 0.3 to 2; Foliage as an offset, 0 for
  *  no change). Returns the value the control carries afterwards, as a string.
  *
@@ -182,6 +183,7 @@ export async function closeMasks(page) {
 export async function setMaskValue(page, field, value) {
   const where = { brightness: ["basic", "expo"], warmth: ["basic", "maskWarmth"], hue: ["color", "hue"], saturation: ["color", "sat"],
     contrast: ["color", "con"], folHue: ["color", "folHue"], folSat: ["color", "folSat"], folLum: ["color", "folLum"],
+    skyHue: ["color", "skyHue"], skySat: ["color", "skySat"], skyLum: ["color", "skyLum"],
     // The colour mixer's three (042, stage 2b), for whichever band its chips have selected.
     hslHue: ["color", "hslHue"], hslSat: ["color", "hslSat"], hslLum: ["color", "hslLum"],
     // The grade's seven (042, stage 2b): each band's Hue and Amount (0 shadows,
