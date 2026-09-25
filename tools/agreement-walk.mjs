@@ -577,8 +577,17 @@ try {
           await setMaskValue(page, "hslHue", "60");
         }
       } },
-    { label: "mask sky band", what: "a Sky mask's Sky band, hue +60", check: "skyHue", want: "60",
-      set: async (page) => { await setMaskValue(page, "skyHue", "60"); } },
+    // THIS ARM WEARS AEROCHROME, OR IT CANNOT FAIL. NIR_1651 opens with a
+    // near-grey sky, outside the Sky band's hues (centred on 210), so hue +60
+    // passed with the export's half discarded, and luminance -0.5 on top moved
+    // the whole frame by 0.4 points of lightness against a bar of 8. Under the
+    // look the sky is blue, inside the band, and the frame's biggest hue bin.
+    { label: "mask sky band", what: "a Sky mask's Sky band under Aerochrome, hue +60, luminance -0.5", check: "skyLum", want: "-0.5",
+      look: "lookEir",
+      set: async (page) => {
+        await setMaskValue(page, "skyHue", "60");
+        await setMaskValue(page, "skyLum", "-0.5");
+      } },
     { label: "mask grade", what: "a Sky mask's grade, midtones 200/80, highlights 30/100", check: "gradeAmount2", want: "100",
       set: async (page) => {
         await setMaskValue(page, "gradeHue1", "200");
@@ -587,6 +596,15 @@ try {
         await setMaskValue(page, "gradeAmount2", "100");
       } },
   ];
+  // The photograph as the reader sees it, in the READ measures the bars use.
+  const readView = (page) => page.evaluate(`(() => {
+    const read = ${READ};
+    const c = document.querySelector("#view");
+    const o = document.createElement("canvas");
+    o.width = c.width; o.height = c.height;
+    o.getContext("2d").drawImage(c, 0, 0);
+    return read(o.getContext("2d").getImageData(0, 0, o.width, o.height).data);
+  })()`);
   // The photograph's pixels as one number, once they stop changing: read off
   // the canvas the reader sees.
   const settledView = async (page) => {
@@ -614,6 +632,12 @@ try {
       await page.waitForFunction(() => document.getElementById("welcome")?.hidden, null, { timeout: 300000 });
       await page.waitForFunction(() => !document.getElementById("busy")?.hasAttribute("open"), null, { timeout: 300000 });
       await page.waitForTimeout(2500);
+      if (arm.look) {
+        await page.click("#ptab-ir");
+        await page.click(`#${arm.look}`);
+        await page.waitForFunction(() => !document.getElementById("busy")?.hasAttribute("open"), null, { timeout: 300000 });
+        await page.waitForTimeout(2500);
+      }
       const bare = await settledView(page);
       await openMasks(page);
       await page.click("#addSky");
@@ -632,20 +656,22 @@ try {
       // where screen against export cannot see it because both move together.
       const picked = await settledView(page);
       if (picked !== bare) { fail(`${label}: picking a mask with its values at no change changed the photograph (${bare} to ${picked}); a control is writing the whole photo from a slider that shows the mask`); throw new Error("not armed"); }
+      const pre = await readView(page);
       await arm.set(page);
       await page.waitForTimeout(1500);
+      await settledView(page);
       const own = await page.evaluate((id) => document.getElementById(id)?.value, arm.check);
       if (own !== arm.want) { fail(`${label}: the mask did not take its value (${arm.check} reads ${own}), so nothing below measures it`); throw new Error("not armed"); }
 
-      const shown = await page.evaluate(`(() => {
-        const read = ${READ};
-        const c = document.querySelector("#view");
-        const o = document.createElement("canvas");
-        o.width = c.width; o.height = c.height;
-        o.getContext("2d").drawImage(c, 0, 0);
-        return read(o.getContext("2d").getImageData(0, 0, o.width, o.height).data);
-      })()`);
+      const shown = await readView(page);
       if (!shown) { fail(`${label}: the preview has no colour to read`); throw new Error("no preview"); }
+      // AN ARM THE BARS CANNOT SEE CANNOT FAIL. Its own change on screen, by the
+      // same two measures the comparison below uses, has to clear a bar, or a
+      // disagreement the same size would pass as agreement. The Sky band's first
+      // two arms moved the frame 0.4 points and passed with the export's half
+      // thrown away, which is what this refuses.
+      const armDh = dHist(pre.p, shown.p), armDl = Math.abs(pre.light - shown.light);
+      if (armDh <= HUE_BAR && armDl <= 8) { fail(`${label}: the arm moves the photograph only ${armDh}deg and ${armDl.toFixed(1)} points on screen, under both bars, so agreement here would prove nothing`); throw new Error("not armed"); }
       await page.click("#ptab-export");
       await page.click("#exBtn");
       await page.waitForFunction(
