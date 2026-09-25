@@ -805,6 +805,126 @@ user-scalable=no.
 > ships as **2.0**, not 1.2 (owner call, 2026-07-18). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
+- [ ] **The look's sky adjustments read a selection you cannot see** <!-- decision: 052 -->
+  **Shown as:** Aerochrome's sky sliders work on the sky you selected, not one you cannot see.
+  **Leads the queue from 2026-09-25, with the halo.** Under Aerochrome's Sky
+  depth a light band stands beside every building and pylon, and the sky inside
+  a pylon's lattice is not darkened: measured, it is this selection, wrong over
+  whole regions next to objects. Four refinements were tried and measured,
+  including the weighted guided filter the literature names; none can fix
+  wrong labels. On-device sky segmentation, the field's starting point, is
+  being researched before anything is built.
+  reported 2026-09-22 from the device against Aerochrome: its sky adjustment
+  cannot be reproduced with a mask on sky the look does not reach, and the
+  shape suggested was that the look should open its own sky mask to start from,
+  which you then add to and subtract from, with Reach and Feather kept.
+  **Read off the source, and there are TWO sky selections on one photograph.**
+  The look's is `skyBitmap` and `skyFine` in `src/main.ts`, built at open and
+  assigned in six places, none of them reachable from any control — no Reach,
+  no Feather, no by-colour, no hand corrections — and it is what `skySmooth`,
+  `skyDepth` and `skySat` act through. The reader's is a type-4 Sky mask, which
+  has every one of those controls and drives nothing but the mask's own five
+  adjustments. `regenerateSkyMask` never touches the look's pair. So every
+  control over a sky selection is attached to the one the sky sliders ignore.
+  **It cannot be closed by finding a better slider value.** `skySat` multiplies
+  chroma about luma gated on each pixel's own saturation; `skyDepth` darkens
+  toward the film's value gated on the sky map's keying byte; a mask's
+  saturation folds in linear space at the mask stage before gamma, the tone
+  curves, the HSL mixer and the grade. Different operations, different
+  populations, different points in the pipeline.
+  **018's title is "One sky selection, built at open, for every sky-aware
+  tool", and this is the half that did not ship** — it unified the refinement
+  filter, not the selection, and its own Option 1 named per-population
+  strengths reading `skySel` as later items.
+  **Looked up.** Lightroom's Select Sky produces the mask the reader then
+  refines with Add and Subtract before using any slider on it: the automatic
+  detection IS the editable thing. darktable combines a parametric selection
+  with drawn shapes, with a polarity toggle so a component subtracts. Neither
+  exposes a detected selection that the module's own sliders read while the
+  reader edits a different one.
+  So: the detection that runs at open becomes a Sky mask the reader can see,
+  and the look's sky stages read it. Rejected: the sliders without the
+  detection (half of this, and 042 already owns that half); a second set of
+  Reach and Feather on the look's own selection (two skies in one app is what
+  018 exists to remove); and leaving it, which the source refutes rather than
+  taste. **Ranked above 013** because 013 tunes the Aerochrome sky against
+  whatever population the look's stages read, and this changes which population
+  that is — the same dependency test that put 023 at the top of the queue. See
+  `docs/decisions/052-the-looks-sky-adjustments-read-a-selection-the-reader-cannot-see.md`.
+- [ ] **Aerochrome is the right colour and comes out splotchy** <!-- decision: 013 --> — reported
+  **Shown as:** Aerochrome comes out smooth instead of breaking into hard-edged patches.
+  from the iPad 2026-09-17 with two frames, on the look that shipped the same day:
+  the colour is right, the foliage breaks into hard-edged patches and the gravel
+  carries a coarse mottle. Searched before touching anything, and it named the
+  mechanism: the standard order is to reduce COLOUR noise first and hard, because
+  colour blotches rarely carry real information, while luminance speckle overlaps
+  real texture in foliage and deserves a lighter hand. This app has ONE denoise, a
+  luma-guided bilateral, and no chroma stage at all — and then applies a mixer
+  with coefficients over 1.4 and a 3x saturation on top of whatever chroma noise
+  is left. First measurement is a sheet of the same frame at several saturations,
+  to say how much of the splotch is amplification. **The sky half shipped
+  2026-09-17**: its colour is smoothed after the look amplifies it, inside the
+  sky's own selection, mean colour kept — the file's one untested direction,
+  made free by acting on the sky only. **And on 2026-09-18 that stage was
+  found corrupting every TIFF export** — a channel a hundredth past the range
+  wrapped in the 16-bit write; cyan branches, yellow sky, clean on screen and
+  in JPEGs — fixed by clamping the stage and the write, with a walk that
+  measures the exported file whole (§9l-ii). The gravel half stays open. The
+  sources go into `IR-SCIENCE.md` (9l for what shipped). See
+  `docs/decisions/013-aerochrome-splotchy-chroma.md`.
+- [ ] **Sky inside a lattice cannot be filled into the Sky mask** <!-- decision: 065 -->
+  **Shown as:** Fill the sky between a pylon's struts into the Sky mask with one stroke.
+  — found on the target device on v2.63: on NIR_3461 the Sky mask leaves the
+  whole near pylon out, sky between the struts included, because the grow
+  reaches sky only along sky-coloured paths and the struts cut every one. The
+  union (048) is the route today and leaves specks and the lit steel edges.
+  The chosen shape is Capture One's Magic Brush as a third hand correction on
+  the Sky mask: a stroke inside the gaps fills the connected pixels of similar
+  colour and brightness, with a Tolerance, replayed like Add by hand. Under
+  Aerochrome it reaches the look's own sky only with 052. See
+  `docs/decisions/065-sky-inside-a-lattice-cannot-be-filled-into-the-sky-mask.md`.
+- [ ] **Aerochrome is rendered from a model of the film, not tuned toward it** <!-- decision: 066 -->
+  **Shown as:** Aerochrome built the way the film worked, so the sky goes dark and foliage stays red without the halos.
+  Measured at full resolution 2026-09-25: tuning the look toward the film's
+  numbers darkens the sky but leaves a halo at every edge, darkens a pale
+  building as sky, clips the grass to white and reddens a grey road; Pink IR
+  tuned the same way gives orange foliage, ringed cladding and fringed steel.
+  Researched the same day from Kodak's data sheets and the literature
+  (IR-SCIENCE 4b-viii, 4b-ix): the film's red foliage is dense dye from
+  foliage being dark in the visible, its dark sky is a deliberately slow
+  infrared layer, and this camera's one colour axis is a vegetation index. So
+  the look is to be rendered from a model: the film's three layer exposures
+  synthesised from infrared brightness and that index, run through the film's
+  own curves, the colour re-attached to the clean detail. Kodak's own balance
+  and a scan balanced to grey are shown as renders before one is chosen. See
+  `docs/decisions/066-aerochrome-is-rendered-from-a-model-of-the-film.md`.
+- [ ] **Red and blue do not line up at thin edges, and Aerochrome paints the difference** <!-- decision: 061 -->
+  **Shown as:** Dark posts against the sky stop turning red on one side and blue on the other in Aerochrome.
+  Reported from the device 2026-09-24 against a full-resolution export of
+  pylons and wires. It is not the metal's reflectance: one black post is blue
+  on one edge and red on the other. Red and blue sit about half a preview
+  pixel apart after the editing copy's 2x2 binning, and the lens adds lateral
+  chromatic aberration toward the corners. Aerochrome's mixer turns a blue
+  error red at about 2.1x, where the swap passes it at 1x. Co-siting plus a
+  lens cancel took a post's edge from 469 red and 667 blue pixels to 149 and
+  0. The round spots along the wires are 013's Sky colour smoothing. The thin
+  red border lines are a demosaic clamp defect, fixed first. Then comes
+  per-photograph CA correction on the raw together with co-siting.
+  **Measured on the reported frame's raw, NIR_3461, the same day, and it moves
+  that frame's answer:** its red wires and pylons are the foliage band
+  selecting by colour, not the channels. Foliage at 0 takes strongly red
+  pixels above the horizon from 16,430 to 0; co-siting takes none. That
+  frame's remedy is the foliage band limited to a place, which is 042's. The
+  channel work still answers edges like NIR_3430's posts. See
+  `docs/decisions/061-red-and-blue-do-not-line-up-at-thin-edges.md`.
+- [ ] **Two images give the film's real mapping** <!-- decision: 067 -->
+  **Shown as:** Add an ordinary colour photo of the same scene for true Aerochrome colour.
+  A future option. The film recorded infrared, visible red and visible green;
+  this camera's conversion blocks visible green, so one frame can only
+  approximate it (066). Practitioners and Kodak's own colour-infrared cameras
+  reach the real mapping from two records: the infrared frame, and an ordinary
+  colour frame of the same scene aligned with it. Costs a tripod and ghosts on
+  anything that moves. See `docs/decisions/067-two-images-give-the-films-real-mapping.md`.
 - [ ] **A mask is a place, and the ordinary controls act inside it** <!-- decision: 042 -->
   **Shown as:** Pick a mask and the ordinary controls work inside it — no separate mask menu.
   The place shipped in 2.61; this is the second half, settled 2026-09-24:
@@ -861,7 +981,6 @@ user-scalable=no.
   corrected: the app REPORTS the measurement in the ⓘ diagnostic as "Shadow
   light" and suggests no amount. IR-SCIENCE 9j-ii has the run and names the two
   candidates that are not more tuning — read it before touching this again.
-
 - [ ] **A mask keys the photograph, not the grade** <!-- decision: 032 -->
   **Shown as:** A colour selection stays on the same pixels when you change the look.
   the Colour mask keys on the colour the pixel DISPLAYS — the decode through
@@ -976,7 +1095,6 @@ user-scalable=no.
   where it naturally goes and only dependency privileges it. Nothing above needs
   this first, and the graph puts this ground at 012's rank. See
   `docs/decisions/053-the-session-strip-takes-the-stage-on-a-phone.md`.
-
 - [ ] **A shared look file cannot be picked on an iPad** <!-- decision: 063 -->
   **Shown as:** Open a look someone sent you as a file, from Files on an iPad.
   Found by reading, 2026-09-24, and not yet seen on the device. A shared look is
@@ -986,87 +1104,6 @@ user-scalable=no.
   platform does type, add `json` to what Open accepts, and let the content
   sniff keep deciding. See
   `docs/decisions/063-a-shared-look-file-cannot-be-picked-on-an-ipad.md`.
-
-- [ ] **The look's sky adjustments read a selection you cannot see** <!-- decision: 052 -->
-  **Shown as:** Aerochrome's sky sliders work on the sky you selected, not one you cannot see.
-  reported 2026-09-22 from the device against Aerochrome: its sky adjustment
-  cannot be reproduced with a mask on sky the look does not reach, and the
-  shape suggested was that the look should open its own sky mask to start from,
-  which you then add to and subtract from, with Reach and Feather kept.
-  **Read off the source, and there are TWO sky selections on one photograph.**
-  The look's is `skyBitmap` and `skyFine` in `src/main.ts`, built at open and
-  assigned in six places, none of them reachable from any control — no Reach,
-  no Feather, no by-colour, no hand corrections — and it is what `skySmooth`,
-  `skyDepth` and `skySat` act through. The reader's is a type-4 Sky mask, which
-  has every one of those controls and drives nothing but the mask's own five
-  adjustments. `regenerateSkyMask` never touches the look's pair. So every
-  control over a sky selection is attached to the one the sky sliders ignore.
-  **It cannot be closed by finding a better slider value.** `skySat` multiplies
-  chroma about luma gated on each pixel's own saturation; `skyDepth` darkens
-  toward the film's value gated on the sky map's keying byte; a mask's
-  saturation folds in linear space at the mask stage before gamma, the tone
-  curves, the HSL mixer and the grade. Different operations, different
-  populations, different points in the pipeline.
-  **018's title is "One sky selection, built at open, for every sky-aware
-  tool", and this is the half that did not ship** — it unified the refinement
-  filter, not the selection, and its own Option 1 named per-population
-  strengths reading `skySel` as later items.
-  **Looked up.** Lightroom's Select Sky produces the mask the reader then
-  refines with Add and Subtract before using any slider on it: the automatic
-  detection IS the editable thing. darktable combines a parametric selection
-  with drawn shapes, with a polarity toggle so a component subtracts. Neither
-  exposes a detected selection that the module's own sliders read while the
-  reader edits a different one.
-  So: the detection that runs at open becomes a Sky mask the reader can see,
-  and the look's sky stages read it. Rejected: the sliders without the
-  detection (half of this, and 042 already owns that half); a second set of
-  Reach and Feather on the look's own selection (two skies in one app is what
-  018 exists to remove); and leaving it, which the source refutes rather than
-  taste. **Ranked above 013** because 013 tunes the Aerochrome sky against
-  whatever population the look's stages read, and this changes which population
-  that is — the same dependency test that put 023 at the top of the queue. See
-  `docs/decisions/052-the-looks-sky-adjustments-read-a-selection-the-reader-cannot-see.md`.
-
-- [ ] **Red and blue do not line up at thin edges, and Aerochrome paints the difference** <!-- decision: 061 -->
-  **Shown as:** Dark posts against the sky stop turning red on one side and blue on the other in Aerochrome.
-  Reported from the device 2026-09-24 against a full-resolution export of
-  pylons and wires. It is not the metal's reflectance: one black post is blue
-  on one edge and red on the other. Red and blue sit about half a preview
-  pixel apart after the editing copy's 2x2 binning, and the lens adds lateral
-  chromatic aberration toward the corners. Aerochrome's mixer turns a blue
-  error red at about 2.1x, where the swap passes it at 1x. Co-siting plus a
-  lens cancel took a post's edge from 469 red and 667 blue pixels to 149 and
-  0. The round spots along the wires are 013's Sky colour smoothing. The thin
-  red border lines are a demosaic clamp defect, fixed first. Then comes
-  per-photograph CA correction on the raw together with co-siting.
-  **Measured on the reported frame's raw, NIR_3461, the same day, and it moves
-  that frame's answer:** its red wires and pylons are the foliage band
-  selecting by colour, not the channels. Foliage at 0 takes strongly red
-  pixels above the horizon from 16,430 to 0; co-siting takes none. That
-  frame's remedy is the foliage band limited to a place, which is 042's. The
-  channel work still answers edges like NIR_3430's posts. See
-  `docs/decisions/061-red-and-blue-do-not-line-up-at-thin-edges.md`.
-- [ ] **Aerochrome is the right colour and comes out splotchy** <!-- decision: 013 --> — reported
-  **Shown as:** Aerochrome comes out smooth instead of breaking into hard-edged patches.
-  from the iPad 2026-09-17 with two frames, on the look that shipped the same day:
-  the colour is right, the foliage breaks into hard-edged patches and the gravel
-  carries a coarse mottle. Searched before touching anything, and it named the
-  mechanism: the standard order is to reduce COLOUR noise first and hard, because
-  colour blotches rarely carry real information, while luminance speckle overlaps
-  real texture in foliage and deserves a lighter hand. This app has ONE denoise, a
-  luma-guided bilateral, and no chroma stage at all — and then applies a mixer
-  with coefficients over 1.4 and a 3x saturation on top of whatever chroma noise
-  is left. First measurement is a sheet of the same frame at several saturations,
-  to say how much of the splotch is amplification. **The sky half shipped
-  2026-09-17**: its colour is smoothed after the look amplifies it, inside the
-  sky's own selection, mean colour kept — the file's one untested direction,
-  made free by acting on the sky only. **And on 2026-09-18 that stage was
-  found corrupting every TIFF export** — a channel a hundredth past the range
-  wrapped in the 16-bit write; cyan branches, yellow sky, clean on screen and
-  in JPEGs — fixed by clamping the stage and the write, with a walk that
-  measures the exported file whole (§9l-ii). The gravel half stays open. The
-  sources go into `IR-SCIENCE.md` (9l for what shipped). See
-  `docs/decisions/013-aerochrome-splotchy-chroma.md`.
 - [ ] **The mask system is short of standard convention** <!-- decision: 050 -->
   **Shown as:** Draw a box or circle to work inside, and add, subtract and combine masks.
   filed 2026-09-22: a drawn box or circle that ISOLATES part of the
@@ -1156,17 +1193,6 @@ user-scalable=no.
   going red. Union lands as a third fold case, darktable's inclusive operator
   `w + c - w*c`, beside the existing multiply and never in place of it. See
   `docs/decisions/048-colour-cannot-finish-a-selection-an-occluder-has-split.md`.
-- [ ] **Sky inside a lattice cannot be filled into the Sky mask** <!-- decision: 065 -->
-  **Shown as:** Fill the sky between a pylon's struts into the Sky mask with one stroke.
-  — found on the target device on v2.63: on NIR_3461 the Sky mask leaves the
-  whole near pylon out, sky between the struts included, because the grow
-  reaches sky only along sky-coloured paths and the struts cut every one. The
-  union (048) is the route today and leaves specks and the lit steel edges.
-  The chosen shape is Capture One's Magic Brush as a third hand correction on
-  the Sky mask: a stroke inside the gaps fills the connected pixels of similar
-  colour and brightness, with a Tolerance, replayed like Add by hand. Under
-  Aerochrome it reaches the look's own sky only with 052. See
-  `docs/decisions/065-sky-inside-a-lattice-cannot-be-filled-into-the-sky-mask.md`.
 - [ ] **Sky seen through a canopy takes no sky adjustment** <!-- decision: 028 -->
   **Shown as:** Sky showing between leaves takes the sky adjustments too.
   — the Sky mask spreads only through pixels that are JOINED to the sky, which
@@ -1579,6 +1605,45 @@ user-scalable=no.
   The decision that comes with it is the owner's: a drawn export cannot be
   byte-identical to today's, because a graphics chip computes in float where the
   processor uses doubles. It would match the PREVIEW instead.
+
+## Aerochrome at full size, the research, and why the halo happens, 2026-09-25
+
+**Every earlier whole-frame judgement of the Aerochrome candidates was made
+from a thumbnail.** The session's image reader fits anything over 2000 px on
+the long edge, measured with a 1-pixel grating card, so a 5600 px export was
+read at about a third of its size. Hub lesson 366 records it. All six exports
+(NIR_3461 and NIR_3466; as shipped, Aerochrome tuned to the film, Pink IR tuned
+to the film) were then cut into 1400 by 932 tiles, 96 in all, and every one
+opened. The findings and their numbers are in record 066's Context. One more
+worth keeping on its own: a faint vertical colour band at x 5230–5270 in both
+Aerochrome renders on both frames (red minus blue falls about 10 levels across
+40 px), absent from Pink IR, cause not established.
+
+**Then the research that should have come first** (IR-SCIENCE 4b-viii, 4b-ix):
+- Kodak's own data sheets: the film's infrared layer takes visible light too
+  and is deliberately about 1.4 stops slow, which is what darkens the sky.
+- The field: no LUT or recipe produces Aerochrome from a 665–720 nm camera,
+  and the infrared LUTs are channel swaps expecting the frame before any swap.
+- The literature: this camera's one colour axis is a vegetation index, and a
+  missing band is synthesised the way weather satellites build a missing
+  green.
+
+That moved the roadmap: the Aerochrome work leads the queue (052, 013, 065,
+066, 061, 067) ahead of the completeness work, with 042 next.
+
+**The halo is the look's sky selection being wrong, not soft** (record 052,
+measured): four refinements were tried, and none fixes regions labelled
+wrongly. On-device sky segmentation is being researched next, before anything
+is built.
+
+**Found, not fixed:**
+- the vertical colour band above;
+- the tall building's pale face on NIR_3466 taken into the sky selection, with
+  a hole in it;
+- the grass clipping to white under a strong foliage luminance;
+- and an interaction in the app's LUT feature: an infrared LUT applied last
+  over a swapping look undoes the swap (Rob Shea's "IR RB Swap" is an exact
+  R⇄B swap).
 
 ## The patch-note check cannot pass in a git worktree, 2026-09-24
 

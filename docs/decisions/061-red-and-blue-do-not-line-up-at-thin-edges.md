@@ -202,8 +202,9 @@ the cost control for leaf edges.
 
 ## Rank
 
-Directly above 013 and below 052. It goes above 013 because 013's open work
-measures edge colour, and this changes it. It sits below 052 because 052
-changes what the sky stages read and does not depend on this. It is
-independent of 042 and 060. The border fix is small and can ship with any
-product candidate.
+**Re-ranked 2026-09-25: fifth, below 066 and above 067.** The Aerochrome work
+leads the queue. This goes below 052, 013 and 065, which change the sky it is
+seen against, and below 066, because the film model's colour re-attachment
+respects thin edges and nothing in it is tuned against them, while this work
+is the largest piece and touches thin edges only. It stays independent of 042
+and 060. The border fix is small and can ship with any product candidate.

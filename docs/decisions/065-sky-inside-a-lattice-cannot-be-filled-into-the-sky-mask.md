@@ -125,16 +125,14 @@ where the colour does.
 
 ## Rank
 
-**Directly below 048 and above 028.**
-
-Nothing ranked above it has to be redone once it lands: it adds to a reader's
-Sky mask, and nothing above tunes against that mask, since the look's sky stages
-read their own selection until 052. It sits below 052 because the reported case
-is under Aerochrome, where the fill's full value arrives only when the look reads
-the reader's sky. It sits below 048 because the union is the route it refines
-and ships first. It sits above 028 because the fill covers 028's case by hand
-where the cap declines, while 028 cannot cover a gap whose colour is not the
-sky's.
+**Re-ranked 2026-09-25: third, below 052 and 013, above 066.** The Aerochrome
+work leads the queue. It sits below 052 because a learned sky selection may
+take the lattice's sky without a stroke, which would change what this fill has
+left to do. It sits above 066 because a fill changes which sky a reader's mask
+holds. It now sits above 048, whose union already ships in the build on
+staging, so the route it refines exists without 048's record closing first,
+and above 028, because the fill covers 028's case by hand where the cap
+declines.
 
 ## Looked at
 

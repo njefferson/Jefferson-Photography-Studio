@@ -84,8 +84,8 @@
       <ul class="facts">
         <li><b>Production</b> <span>v2.62.26: the export edge fix and the test page's shader rows, which were on staging as v2.62.16, promoted on your go. Checked on the live site: its offline copy is named for 2.62.26 and the test page carries the new rows. The number moved because the last digit counts every commit; the content did not.</span></li>
         <li><b>On staging</b> <span>v2.63.7, replacing v2.63: everything v2.63 carried (the wire fix, a mask's own colour mixer, the first stage of the mask work, the LUT grid and None for looks), plus a picked mask's own grade and Sky band, a line under "Editing" saying dimmed controls stay with the whole photo, new masks that change nothing until a control is moved, and double-tap that puts a mask's slider back to no change and is no longer lost while the photo redraws. It waits on your device pass; the steps are in NOTES.</span></li>
-        <li><b>Built and held</b> <span>Nothing. The mask work's stage 2b goes on after the device pass and your Aerochrome answer.</span></li>
-        <li><b>Last verified green</b> <span><code>ec29ded</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
+        <li><b>Built and held</b> <span>Nothing. The Aerochrome work now leads the queue, ahead of the rest of the mask work: the sky selection behind the halo (052), the round spots (013), the fill for sky inside a lattice (065), Aerochrome rendered from a model of the film (066), red and blue lining up at thin edges (061), and the two-photo route (067). The mask work's stage 2b follows.</span></li>
+        <li><b>Last verified green</b> <span><code>b7ce1ee</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
         <li><b>Next version</b> <span>2.63 is the staged build's number, because masks gain their own amounts in it. The next release that adds something takes 2.64.</span></li>
       </ul>
 
@@ -102,25 +102,32 @@
             colour mixer, the LUT grid, None, "Add to it", and the test page's
             timing with eight masks).
           </li>
-          <li>
-            <strong>Which the Aerochrome button should be</strong>: as shipped, or
-            Pink IR with your Sky and Foliage band values plus Aerochrome's own
-            denoise. The pictures went with the question: the second has no round
-            spots, a deeper sky and crimson grass, and a slightly more textured sky
-            at full size.
-          </li>
-          <li>
-            <strong>Whether the look's sky should read your Sky mask next</strong>
-            (record 052), after the Sky band commit and ahead of the rest of stage
-            2b. Yes is recommended: it is what lets anything added to the Sky mask,
-            by "Add to it" or by a fill, reach Aerochrome's own sky. No keeps it
-            ninth.
-          </li>
         </ul>
       </div>
 
       <h2>The stages</h2>
       <ul>
+        <li class="now"><span class="state">Now</span>
+          <strong>Researching on-device sky segmentation, before anything is built.</strong>
+          The halo beside buildings and pylons under Aerochrome is the look's sky
+          selection being wrong over whole regions: the sky inside a pylon's
+          lattice left out, a pale building face taken in. Four refinements were
+          tried and measured, including the one the published literature names,
+          and none can fix wrong labels. Editors with clean sky edges start from a
+          learned segmentation, so which models could run in the app on an iPad,
+          offline, and whether they work on infrared, is being read now. Their
+          maps come to you before anything is built.
+        </li>
+        <li class="done"><span class="state">Done</span>
+          <strong>The research that should have come first is written down.</strong>
+          What the film physically did, from Kodak's own data sheets; what
+          practitioners, LUT makers and the published science say about getting
+          Aerochrome from a camera like this one. No LUT or recipe produces it
+          from a 665–720 nm conversion; the film's red is dense dye from foliage
+          being dark in the visible, and its dark sky a deliberately slow
+          infrared layer. It is in IR-SCIENCE, sections 4b-viii and 4b-ix, and it
+          reshaped the Aerochrome plan into a model of the film (066).
+        </li>
         <li class="done"><span class="state">Done</span>
           <strong>Production's checks are green again.</strong>
           One word in the notes failed the check that looks for a person referred to
@@ -163,7 +170,7 @@
           rewritten around this, with its stages and the three choices it leaves
           you; pictures of the panel come before any code.
         </li>
-        <li class="now"><span class="state">Now</span>
+        <li class="now"><span class="state">After the Aerochrome work</span>
           <strong>Masks, stage 2b: the rest of the colour and tone tools on a
           picked mask.</strong>
           The colour mixer, the grade and the Sky band are on staging: pick a
@@ -310,6 +317,24 @@
         They are written down so they are not re-discovered as new.
       </p>
       <ul>
+        <li>
+          <strong>A faint vertical colour band sits at the same place on two
+          different photographs under Aerochrome</strong>, x 5230–5270 of the
+          full export, red minus blue falling about 10 levels across it. Absent
+          under Pink IR. Cause not established.
+        </li>
+        <li>
+          <strong>Aerochrome's sky selection takes in a pale building face</strong>
+          on NIR_3466, with a hole in it, so a sky depth darkens the building.
+          Part of 052.
+        </li>
+        <li>
+          <strong>An infrared LUT applied over a swapping look undoes the
+          swap.</strong> The infrared LUTs available (Rob Shea's, Kolari's,
+          PictureFX's) all expect the frame before any swap, and the app applies a
+          LUT last. Measured on Rob Shea's "IR RB Swap", which is an exact
+          red-blue swap.
+        </li>
         <li>
           <strong>A mask joined to the one above still shows its own Brightness,
           Contrast and Saturation sliders</strong>, which nothing reads once it is
