@@ -30,7 +30,7 @@
 // (`float(s >> 2)` -> `0.0`): "a sky mask in slot 4 renders as it does in slot
 // 0" failed with the frame undarkened, which is the aliasing this exists to
 // catch.
-import { openMasks } from "./walk-input.mjs";
+import { openMasks, setMaskValue } from "./walk-input.mjs";
 import { chromium } from "playwright-core";
 import { requireFreshDist } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
@@ -79,16 +79,6 @@ async function openFrame(b, port) {
   return p;
 }
 
-/** Move a slider and let the render settle.
- *  Takes the page, the input's id and the value; returns nothing.
- *  What it must satisfy: the change reaches the app through the same `input`
- *  event a finger produces, so the app's own listener chain runs. */
-async function setSlider(p, id, v) {
-  await p.evaluate(([i, x]) => { const el = document.getElementById(i); if (!el) return;
-    el.value = String(x); el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); }, [id, v]);
-  await settle(p);
-}
-
 /** Turn the coverage tint off once, and prove it went off.
  *  Takes the page; returns nothing. Counts a failure rather than throwing, so
  *  a run still reports the rest. */
@@ -105,7 +95,7 @@ try {
   const bare = await mean(p1);
   await p1.click("#addSky"); await settle(p1);
   await tintOff(p1);
-  await setSlider(p1, "mBrightness", BRIGHT);
+  await setMaskValue(p1, "brightness", BRIGHT); await settle(p1);
   const alone = await mean(p1);
   check("the Sky mask darkens the frame from slot 0", alone < bare - 1, `unmasked ${bare.toFixed(2)} -> ${alone.toFixed(2)}`);
   await p1.context().close();
@@ -126,7 +116,7 @@ try {
   check("empty brush masks change nothing", Math.abs(withEmpties - bare) < 0.5,
     `unmasked ${bare.toFixed(2)} -> ${withEmpties.toFixed(2)} with ${EMPTIES} empty masks`);
   await p2.click("#addSky"); await settle(p2);
-  await setSlider(p2, "mBrightness", BRIGHT);
+  await setMaskValue(p2, "brightness", BRIGHT); await settle(p2);
   const slot4 = await mean(p2);
   await p2.context().close();
 

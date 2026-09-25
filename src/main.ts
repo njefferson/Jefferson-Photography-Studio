@@ -1143,15 +1143,20 @@ function fromPos(p: number, lo: number, hi: number): number {
 }
 
 function syncFromUI() {
+  // A PICKED MASK TAKES THE CONTROLS THAT FOLLOW IT (042, stage 2): those
+  // write to the mask below, and the whole photo's own values stay as they are.
+  const tm = overlayReady ? targetMask() : null;
   params.wb = [
     fromPos(Number(ui.wbR.value), WB_LO, WB_HI),
     fromPos(Number(ui.wbG.value), WB_LO, WB_HI),
     fromPos(Number(ui.wbB.value), WB_LO, WB_HI),
   ];
-  params.exposure = fromPos(Number(ui.expo.value), EX_LO, EX_HI);
-  params.hue = Number(ui.hue.value);
-  params.sat = Number(ui.sat.value);
-  params.contrast = Number(ui.con.value);
+  if (!tm) {
+    params.exposure = fromPos(Number(ui.expo.value), EX_LO, EX_HI);
+    params.hue = Number(ui.hue.value);
+    params.sat = Number(ui.sat.value);
+    params.contrast = Number(ui.con.value);
+  }
   params.glow = Number(ui.glow.value);
   params.lum = fromPos(Number(ui.lum.value), LUM_LO, LUM_HI);
   params.hotspot = Number(ui.hotspot.value);
@@ -1177,7 +1182,8 @@ function syncFromUI() {
   params.despeckle = Number(ui.despeckle.value);
   params.recover = Number(ui.recover.value);
   params.sky = [Number(ui.skyHue.value), Number(ui.skySat.value), Number(ui.skyLum.value)];
-  params.foliage = [Number(ui.folHue.value), Number(ui.folSat.value), Number(ui.folLum.value)];
+  if (!tm) params.foliage = [Number(ui.folHue.value), Number(ui.folSat.value), Number(ui.folLum.value)];
+  else writeMaskControls(tm);
   {
     const t = activeTone();
     for (let i = 0; i < 5; i++) {
@@ -1254,7 +1260,7 @@ function syncToUI() {
   updateStickerUI(); // hoisted; sticker controls follow undo/redo/session restore
   syncLutUI(); // hoisted; reflects params.lut so undo/redo/reset/loads all update the LUT row
   syncMirrors(); // the finishing panel's second controls follow the tabs' own
-
+  if (overlayReady) applyMaskTargetUI(); // a picked mask's values over the whole photo's (042)
 }
 
 // The per-color bands follow the subject through a channel swap (the swap
@@ -3007,7 +3013,9 @@ function syncMirrors(): void {
   finishSteps.querySelectorAll<HTMLElement>("[data-mirror]").forEach((m) => {
     const primary = document.getElementById(m.dataset.mirror ?? "") as HTMLInputElement | HTMLButtonElement | null;
     if (!primary) return;
-    if (m instanceof HTMLInputElement && primary instanceof HTMLInputElement) { m.value = primary.value; m.disabled = primary.disabled; }
+    // The RANGE too: a picked mask gives a control its own range (042), and a
+    // mirror left on the whole photo's would show the value on the wrong scale.
+    if (m instanceof HTMLInputElement && primary instanceof HTMLInputElement) { m.min = primary.min; m.max = primary.max; m.step = primary.step; m.value = primary.value; m.disabled = primary.disabled; }
     else if (m instanceof HTMLButtonElement) {
       if (primary.hasAttribute("aria-pressed")) m.setAttribute("aria-pressed", primary.getAttribute("aria-pressed") ?? "false");
       m.disabled = primary.disabled;
@@ -3121,7 +3129,7 @@ function setMaskPlace(on: boolean): void {
   updateScrollCues();
   // Same guard setPanelTab uses: the overlay system does not exist yet at the
   // init-time call, and a tint rendered before it does would throw.
-  if (overlayReady) { maskAdjusting = false; renderMaskOverlay(); }
+  if (overlayReady) { maskAdjusting = false; renderMaskOverlay(); applyMaskTargetUI(); }
 }
 
 /** Show the mask place. Takes nothing, returns nothing; used by the opener and
@@ -6043,11 +6051,6 @@ const addBrushBtn = $("addBrush") as HTMLButtonElement;
 const addColorBtn = $("addColor") as HTMLButtonElement;
 const addSkyBtn = $("addSky") as HTMLButtonElement;
 const mUI = {
-  brightness: $("mBrightness") as HTMLInputElement,
-  contrast: $("mContrast") as HTMLInputElement,
-  sat: $("mSat") as HTMLInputElement,
-  hue: $("mHue") as HTMLInputElement,
-  warmth: $("mWarmth") as HTMLInputElement,
   feather: $("mFeather") as HTMLInputElement,
   featherRow: $("mFeatherRow") as HTMLElement,
   outline: $("mOutline") as HTMLButtonElement,
@@ -6106,6 +6109,217 @@ let showMaskMatte = false;
 // — it clears the moment you re-engage: pick a mask, drag a handle, add a mask,
 // tap Show mask, or re-enter the Masks tab.
 let maskAdjusting = false;
+// THE SWITCH (042, stage 2). ONE SELECTION: the mask picked in the list or on a
+// chip is the one the ordinary controls act on, through its group's HEAD, which
+// owns the group's adjustment. Nothing picked is the whole photograph. The
+// controls that follow a mask take the mask's own range while it is picked and
+// write to the mask; everything else in the tabs is inert, with the reason in
+// words, until the reader goes back to the whole photo.
+const maskChipsEl = $("maskChips") as HTMLDivElement;
+const maskTargetEl = $("maskTarget") as HTMLElement;
+const maskTargetText = $("maskTargetText") as HTMLElement;
+const maskTargetBack = $("maskTargetBack") as HTMLButtonElement;
+const maskTargetNote = $("maskTargetNote") as HTMLElement;
+const maskWarmthRow = $("maskWarmthRow") as HTMLElement;
+const maskWarmthEl = $("maskWarmth") as HTMLInputElement;
+const folMaskNote = $("folMaskNote") as HTMLElement;
+const wbGainRows = [ui.wbR, ui.wbG, ui.wbB].map((el) => el.closest("label") as HTMLElement);
+
+/** The index in `params.masks` of the picked mask's group HEAD, or -1 when
+ *  nothing is picked. Takes nothing. What the caller relies on: a component's
+ *  pick resolves to its head, because the head's adjustment is the group's. */
+function targetHeadIndex(): number {
+  const m = currentMask();
+  if (!m) return -1;
+  const g = maskGroups(params.masks).find((gr) => gr.includes(m));
+  return g ? params.masks.indexOf(g[0]) : -1;
+}
+
+/** The picked mask's group head, or null for the whole photograph. Takes
+ *  nothing; `syncFromUI` writes the following controls to it when non-null. */
+function targetMask(): MaskLayer | null {
+  const i = targetHeadIndex();
+  return i >= 0 ? params.masks[i] : null;
+}
+
+/** A mask's name as the list shows it. Takes the mask and its index; returns
+ *  the reader's name for it, or its type and number. The chips and the heading
+ *  read this so they cannot call a mask something the list does not. */
+function maskShownName(m: MaskLayer, i: number): string {
+  return m.name?.trim() || `${maskTypeLabel(m.type)} ${i + 1}`;
+}
+
+interface MaskCtl {
+  el: HTMLInputElement;
+  /** The mask's own range, set on the control while a mask is picked. */
+  min: number; max: number; step: number;
+  /** The control's value for the mask, and back. */
+  get(m: MaskLayer): number;
+  set(m: MaskLayer, v: number): void;
+  /** The control's value for the whole photograph, put back on the way out. */
+  whole(): number;
+  /** One of the Foliage band's three, which a colour mask cannot take. */
+  fol?: 0 | 1 | 2;
+}
+const MASK_BRIGHT_LO = 0.3, MASK_BRIGHT_HI = 2; // the mask's brightness range, as its own slider had it
+const folSetter = (k: 0 | 1 | 2) => (m: MaskLayer, v: number) => {
+  // A NEW ARRAY, never written in place: an undo snapshot copies a mask shallowly.
+  const f: [number, number, number] = m.fol ? [m.fol[0], m.fol[1], m.fol[2]] : [0, 0, 0];
+  f[k] = v;
+  m.fol = f;
+};
+let maskCtlList: MaskCtl[] | null = null;
+/** The controls that follow a picked mask (042, stage 2), built once. Takes
+ *  nothing; returns the list the switch, `syncFromUI` and `syncToUI` read, so
+ *  a control added to it is added to all three. Each mask value starts at no
+ *  change: the five existing ones at their neutral, Foliage at offset 0. */
+function maskCtls(): MaskCtl[] {
+  if (maskCtlList) return maskCtlList;
+  maskCtlList = [
+    { el: ui.expo, min: toPos(MASK_BRIGHT_LO, EX_LO, EX_HI), max: toPos(MASK_BRIGHT_HI, EX_LO, EX_HI), step: 1,
+      get: (m) => toPos(m.brightness, EX_LO, EX_HI), set: (m, v) => { m.brightness = clamp(fromPos(v, EX_LO, EX_HI), MASK_BRIGHT_LO, MASK_BRIGHT_HI); },
+      whole: () => toPos(params.exposure, EX_LO, EX_HI) },
+    { el: maskWarmthEl, min: -1, max: 1, step: 0.01, get: (m) => m.warmth, set: (m, v) => { m.warmth = v; }, whole: () => 0 },
+    { el: ui.hue, min: -60, max: 60, step: 1, get: (m) => m.hue, set: (m, v) => { m.hue = v; }, whole: () => params.hue },
+    { el: ui.sat, min: 0, max: 2, step: 0.01, get: (m) => m.saturation, set: (m, v) => { m.saturation = v; }, whole: () => params.sat },
+    { el: ui.con, min: 0.5, max: 2, step: 0.01, get: (m) => m.contrast, set: (m, v) => { m.contrast = v; }, whole: () => params.contrast },
+    { el: ui.folHue, min: -120, max: 120, step: 1, get: (m) => m.fol?.[0] ?? 0, set: folSetter(0), whole: () => params.foliage[0], fol: 0 },
+    { el: ui.folSat, min: -2, max: 2, step: 0.01, get: (m) => m.fol?.[1] ?? 0, set: folSetter(1), whole: () => params.foliage[1], fol: 1 },
+    { el: ui.folLum, min: -1, max: 1, step: 0.01, get: (m) => m.fol?.[2] ?? 0, set: folSetter(2), whole: () => params.foliage[2], fol: 2 },
+  ];
+  return maskCtlList;
+}
+
+/** Write the following controls to a picked mask. Takes the mask (a group
+ *  head); returns nothing. Only a control whose value MOVED is written, by
+ *  more than half its step: Exposure's track is logarithmic and rounded, so
+ *  rewriting every control on every input would drift a mask's brightness
+ *  each time some other control moved. */
+function writeMaskControls(m: MaskLayer): void {
+  for (const c of maskCtls()) {
+    if (c.el.disabled) continue;
+    const v = Number(c.el.value);
+    if (Math.abs(v - c.get(m)) > c.step / 2) c.set(m, v);
+  }
+}
+
+/** The ids of the controls that follow a mask, and of the rows that hold only
+ *  the switch's own words; everything else in a section goes inert while a
+ *  mask is picked. */
+function perMaskIds(): Set<string> {
+  return new Set(maskCtls().map((c) => c.el.id));
+}
+function holdsPerMask(el: Element, ids: Set<string>): boolean {
+  const own = (el as HTMLElement).id;
+  const mir = (el as HTMLElement).dataset?.mirror;
+  if (ids.has(own) || (mir && ids.has(mir))) return true;
+  for (const id of ids) if (el.querySelector(`#${id}, [data-mirror="${id}"]`)) return true;
+  return false;
+}
+/** Mark everything under `root` that holds no following control inert, so it
+ *  can neither be pressed nor reached while a mask is picked, recursing only
+ *  into containers that hold one. Takes the root; returns nothing. Marks what
+ *  it sets with data-mask-inert, so going back undoes exactly that. */
+function inertOthers(root: Element, ids: Set<string>): void {
+  for (const child of Array.from(root.children)) {
+    if (child === maskTargetNote || child === folMaskNote) continue;
+    if (holdsPerMask(child, ids)) {
+      if (child.tagName !== "LABEL" && !ids.has((child as HTMLElement).id)) inertOthers(child, ids);
+      continue;
+    }
+    if (!(child as HTMLElement).inert) {
+      (child as HTMLElement).inert = true;
+      child.setAttribute("data-mask-inert", "");
+    }
+  }
+}
+
+let maskTargetShown = "";
+/** THE SWITCH'S STATE ON SCREEN (042, stage 2). Takes nothing, returns
+ *  nothing; called by syncToUI, updateMaskUI and setMaskPlace. With a mask
+ *  picked: the following controls take its own range and values, Warmth
+ *  replaces the three gains, the rest of the tabs goes inert, and the heading
+ *  names the mask. With none: every one of those is put back exactly, and the
+ *  following controls return to the whole photo's values. What the caller
+ *  relies on: going back leaves no control on a mask's range or inert. */
+function applyMaskTargetUI(): void {
+  const t = targetHeadIndex();
+  const m = t >= 0 ? params.masks[t] : null;
+  const ctls = maskCtls();
+  const group = m ? maskGroups(params.masks).find((g) => g[0] === m) : undefined;
+  const folOk = !!m && m.type !== 3 && !!group && groupCanAim(group);
+  for (const c of ctls) {
+    if (m) {
+      if (c.el.dataset.wholeMin === undefined) {
+        c.el.dataset.wholeMin = c.el.min;
+        c.el.dataset.wholeMax = c.el.max;
+        c.el.dataset.wholeStep = c.el.step;
+      }
+      c.el.min = String(c.min);
+      c.el.max = String(c.max);
+      c.el.step = String(c.step);
+      c.el.value = String(c.get(m));
+      const off = c.fol !== undefined && !folOk;
+      if (off && !c.el.disabled) { c.el.disabled = true; c.el.dataset.maskOff = ""; }
+      if (!off && c.el.dataset.maskOff !== undefined) { c.el.disabled = false; delete c.el.dataset.maskOff; }
+    } else {
+      if (c.el.dataset.wholeMin !== undefined) {
+        c.el.min = c.el.dataset.wholeMin;
+        c.el.max = c.el.dataset.wholeMax ?? c.el.max;
+        c.el.step = c.el.dataset.wholeStep ?? c.el.step;
+        delete c.el.dataset.wholeMin;
+        delete c.el.dataset.wholeMax;
+        delete c.el.dataset.wholeStep;
+        c.el.value = String(c.whole());
+      }
+      if (c.el.dataset.maskOff !== undefined) { c.el.disabled = false; delete c.el.dataset.maskOff; }
+    }
+  }
+  folMaskNote.hidden = !m || folOk;
+  maskWarmthRow.hidden = !m;
+  for (const r of wbGainRows) r.hidden = !!m;
+  // Inert: undo whatever the last pick set, then set it again for this one.
+  document.querySelectorAll("[data-mask-inert]").forEach((el) => {
+    (el as HTMLElement).inert = false;
+    el.removeAttribute("data-mask-inert");
+  });
+  if (m) {
+    const ids = perMaskIds();
+    panelSections.forEach((sec) => { if (sec.dataset.tab !== "export") inertOthers(sec, ids); });
+    inertOthers(finishSteps, ids);
+  }
+  const showing = !!m && !maskPlaceIsOpen;
+  maskTargetEl.hidden = !showing;
+  maskTargetNote.hidden = !showing;
+  const words = m ? `Editing: ${maskShownName(m, t)}` : "";
+  if (words !== maskTargetShown) { maskTargetText.textContent = words; maskTargetShown = words; }
+  renderMaskChips(t);
+  syncMirrors();
+}
+
+/** The chip row: Whole photo, then one chip per group head, the picked one
+ *  pressed with a check mark in its name (never colour alone). Takes the
+ *  picked head's index; returns nothing. Hidden with no masks, and while the
+ *  mask place is open, which has its own list. */
+function renderMaskChips(t: number): void {
+  const heads = params.masks.map((m, i) => ({ m, i })).filter(({ m, i }) => i === 0 || (m.op ?? 0) === 0);
+  maskChipsEl.hidden = !current || heads.length === 0 || maskPlaceIsOpen;
+  if (maskChipsEl.hidden) { maskChipsEl.replaceChildren(); return; }
+  const chip = (label: string, idx: number) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "mask-chip";
+    const on = idx === t;
+    b.setAttribute("aria-pressed", String(on));
+    b.textContent = (on ? "✓ " : "") + label;
+    b.addEventListener("click", () => { if (idx !== targetHeadIndex()) selectMask(idx); });
+    return b;
+  };
+  maskChipsEl.replaceChildren(chip("Whole photo", -1), ...heads.map(({ m, i }) => chip(maskShownName(m, i), i)));
+}
+maskTargetBack.addEventListener("click", () => selectMask(-1));
+maskWarmthEl.addEventListener("input", syncFromUI);
+
 overlayReady = true; // the overlay's DOM + deps now exist (see setPanelTab)
 
 /** Step the coverage tint aside for hands-on slider tuning (outline stays).
@@ -6673,11 +6887,6 @@ function updateMaskUI() {
     ? `${total} of ${MAX_MASKS} mask${total === 1 ? "" : "s"}${full ? " — limit reached" : ""}`
     : "";
   if (m) {
-    mUI.brightness.value = String(m.brightness);
-    mUI.contrast.value = String(m.contrast);
-    mUI.sat.value = String(m.saturation);
-    mUI.hue.value = String(m.hue);
-    mUI.warmth.value = String(m.warmth);
     mUI.feather.value = String(m.feather);
     // Feather is the soft edge for radial, colour AND sky masks (transition width).
     mUI.featherRow.hidden = m.type !== 0 && m.type !== 3 && m.type !== 4;
@@ -6713,6 +6922,7 @@ function updateMaskUI() {
   // If the armed pick's mask vanished under it (undo, delete, photo switch),
   // disarm so the banner never lies about what a tap will do.
   if (colorPickArmed && (!m || m.type !== 3)) setColorPick(false);
+  if (overlayReady) applyMaskTargetUI(); // chips, heading and controls follow the list (042)
 }
 
 /** Reflect the tapped target colour on the swatch + label. The swatch shows
@@ -6739,11 +6949,6 @@ function syncMaskFromUI() {
   // regenerate — but ONLY when it actually moved (this handler also fires for
   // brightness/sat/etc., which don't touch the bitmap).
   const skyNeedsRebuild = m.type === 4 && m.feather !== newFeather;
-  m.brightness = Number(mUI.brightness.value);
-  m.contrast = Number(mUI.contrast.value);
-  m.saturation = Number(mUI.sat.value);
-  m.hue = Number(mUI.hue.value);
-  m.warmth = Number(mUI.warmth.value);
   m.feather = newFeather;
   m.colorRange = Number(mUI.colorRange.value);
   if (skyNeedsRebuild) { regenerateSkyMask(m); updateSkyStatus(); }
@@ -6751,7 +6956,7 @@ function syncMaskFromUI() {
   positionMaskOverlay(); // feather changes the outline
 }
 
-for (const el of [mUI.brightness, mUI.contrast, mUI.sat, mUI.hue, mUI.warmth, mUI.feather, mUI.colorRange]) {
+for (const el of [mUI.feather, mUI.colorRange]) {
   el.addEventListener("input", () => { beginMaskAdjust(); syncMaskFromUI(); });
 }
 // Sky "Reach" scales the detection tolerances — regenerate the bitmap on drag
