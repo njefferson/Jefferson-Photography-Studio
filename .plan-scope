@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=81a7dc0ec142b9c2
-diffhash=6fa2a3989d438771
-verdict=IN-SCOPE: plan item 4, the switch with Foliage per place mask, with its carried walk helper and Help entry
-# IN-SCOPE: every one of the 15 staged files implements plan item 4, the switch with Foliage per place mask, as record 042's stage 2 scopes it, with its carried walk helper and Help entry, and the module map and preview record following mechanically; the note under the heading names 042's stage-2b list and its whole-photo-only list; no owner quotation or attribution.
+planhash=7c914773552402db
+diffhash=727f6d1ccbb083a4
+verdict=IN-SCOPE: plan item 4's bullet on the unmeasured picked-mask state
+# IN-SCOPE: every change is one of the two additions the plan's item-4 bullet names, the picked-mask state in the accessibility walk's axe and hit-area sections and one picked-mask sweep in the control walk, with no other files touched.
