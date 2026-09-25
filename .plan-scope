@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=b318cd7f0d758c5b
-diffhash=8087be43cf576c31
-verdict=IN-SCOPE: plan item 4a with the module map line the architecture gate forces
-# IN-SCOPE: the three staged files are item 4a's fix in src/main.ts plus its two mechanical companions, docs/ARCHITECTURE.md's regenerated line count for src/main.ts and the .plan-scope record the standing steps require.
+planhash=81a7dc0ec142b9c2
+diffhash=6fa2a3989d438771
+verdict=IN-SCOPE: plan item 4, the switch with Foliage per place mask, with its carried walk helper and Help entry
+# IN-SCOPE: every one of the 15 staged files implements plan item 4, the switch with Foliage per place mask, as record 042's stage 2 scopes it, with its carried walk helper and Help entry, and the module map and preview record following mechanically; the note under the heading names 042's stage-2b list and its whole-photo-only list; no owner quotation or attribution.

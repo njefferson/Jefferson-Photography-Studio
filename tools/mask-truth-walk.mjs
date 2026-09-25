@@ -66,7 +66,7 @@
 // readings — 52% on NIR_0063 — and the unplanted run must not. A split that
 // moves no number on any frame is reading nothing, and its green means
 // nothing.
-import { openMasks } from "./walk-input.mjs";
+import { openMasks, setMaskValue } from "./walk-input.mjs";
 import { chromium } from "playwright-core";
 import { requireFreshDist } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
@@ -375,7 +375,10 @@ try {
     // nothing" removed it, and two runs of this walk read an empty coverage
     // and called every frame skyless. 1.01 keeps it active and moves the
     // covered chroma by one part in a hundred, well inside the key's Range.
-    await setSlider(p, "mSat", 1.01); // as good as nothing, and still a mask — and the tint steps aside
+    await setMaskValue(p, "saturation", 1.01); await settle(p); // as good as nothing, and still a mask
+    // Moving it in the tab leaves the tint on (the mask place's own slider used
+    // to step it aside), so it is pressed off here for the no-tint read.
+    await p.click("#mOutline"); await settle(p);
     await readInto(p, "B");
     await p.click("#mOutline"); await settle(p); // brings the tint back
     await readInto(p, "A");

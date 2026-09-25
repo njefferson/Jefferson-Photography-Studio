@@ -54,7 +54,7 @@
 // THE RAW ARM IS THE CONTROL. The assemblers differ on FILE KIND, so a walk with
 // only one kind cannot see the disagreement; and an arm that passes in both
 // states is what says the walk is not vacuous.
-import { openMasks, closeMasks } from "./walk-input.mjs";
+import { openMasks, closeMasks, setMaskValue } from "./walk-input.mjs";
 import { chromium } from "playwright-core";
 import { requireFreshDist } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
@@ -474,12 +474,7 @@ try {
       await page.waitForFunction(() => !document.getElementById("skyControls")?.hidden, null, { timeout: 120000 });
       await page.waitForTimeout(1500);
       await page.click("#mOutline"); // the coverage tint is drawn ON the canvas
-      await page.evaluate(() => {
-        const sv = document.getElementById("mSat");
-        sv.value = "1";
-        sv.dispatchEvent(new Event("input", { bubbles: true }));
-        sv.dispatchEvent(new Event("change", { bubbles: true }));
-      });
+      await setMaskValue(page, "saturation", "1"); // the picked mask's own Saturation (042)
       await page.waitForTimeout(800);
       await page.click("#mAimNoise");
       await page.waitForTimeout(1500);

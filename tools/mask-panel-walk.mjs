@@ -44,7 +44,7 @@
 // --plant makes the name check read the row it wrote rather than the row after
 // the undo, which is the shape of the defect this exists for. Two checks must
 // go red.
-import { openMasks } from "./walk-input.mjs";
+import { openMasks, setMaskValue } from "./walk-input.mjs";
 import { chromium } from "playwright-core";
 import { requireFreshDist } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
@@ -107,12 +107,7 @@ try {
   check("the name replaces the derived one", named[0]?.label === "Sky over the barn",
     `row reads "${named[0]?.label ?? "(none)"}"`);
 
-  await p.evaluate(() => {
-    const el = document.getElementById("mBrightness");
-    el.value = "1.4";
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-    el.dispatchEvent(new Event("change", { bubbles: true }));
-  });
+  await setMaskValue(p, "brightness", 1.4);
   await settle(p);
   const afterEdit = await rows(p);
   check("it survives an unrelated edit", afterEdit[0]?.label === "Sky over the barn",

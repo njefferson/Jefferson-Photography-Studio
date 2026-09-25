@@ -406,6 +406,12 @@
              count so the reader can see there are masks without opening it, and
              it is what the accessibility sweep and the control sweep reach. -->
         <button id="maskPlaceOpen" type="button" class="mask-place-open" aria-expanded="false" aria-controls="maskPlace">Masks<span id="maskPlaceCount" class="mask-place-count"></span></button>
+        <!-- WHAT THE CONTROLS ACT ON (042 stage 2, M3). Whole photo first, then
+             one chip per mask; one tap picks, and the ordinary tabs follow the
+             picked mask. It is the same selection the mask list makes, so the
+             two can never disagree. Shown only while the photograph has a mask,
+             and hidden while the mask place is open, which has its own list. -->
+        <div id="maskChips" class="mask-chips" role="group" aria-label="What the controls act on" hidden></div>
         <div id="panelTabs" class="panel-tabs" role="tablist" aria-label="Editor sections">
             <button id="ptab-basic" aria-controls="sec-basic" class="ptab active" type="button" data-tab="basic" role="tab" aria-selected="true">Basic</button>
             <button id="ptab-ir" aria-controls="sec-ir" class="ptab" type="button" data-tab="ir" role="tab" aria-selected="false">IR</button>
@@ -459,10 +465,14 @@
             <div class="section-head-txt">
               <h2 id="sectionTitle" class="section-title">Basic</h2>
               <p id="sectionSub" class="section-sub">White balance, exposure &amp; detail</p>
+              <!-- WHICH THING THE CONTROLS ARE ACTING ON, in the heading that
+                   stays pinned (042 stage 2), with the way back beside it. -->
+              <p id="maskTarget" class="mask-target" hidden><span id="maskTargetText" role="status" aria-live="polite"></span> <button id="maskTargetBack" type="button" class="mask-target-back">Back to whole photo</button></p>
             </div>
             <button id="sectionBack" type="button" class="section-back" hidden
                     title="Back to the list of sections">&#8963;&#8202;Sections</button>
           </div>
+          <p id="maskTargetNote" class="note mask-target-note" hidden>Exposure, Warmth, Hue shift, Saturation, Contrast and the Foliage band act on this mask, added to the whole photo's. The others are off until you go back to the whole photo. The curves, HSL, black and white, shadow colour, grade and LUT strength come to masks next; Dehaze, Clarity and the other here-only tools stay in Masks until they do. The look, crop and straighten, heal, the lens corrections and the Auto buttons act on the whole photo only.</p>
 
         <!-- MASKS ARE A PLACE, NOT A TAB (decision 042). Asked from the device
              2026-09-21: masks should come out of the tab strip and be their own
@@ -571,17 +581,9 @@
             </fieldset>
             <p id="mJoinNote" class="note">On its own, this mask gets its own adjustment. Joined to the mask above, it shapes that one's area instead and the adjustment above is the one that applies &mdash; so you can add a colour to a sky the automatic selection missed, take a colour back out of it, or keep only where two masks overlap.</p>
           </details>
-          <details class="mask-group" id="mgTone" open>
-            <summary>Tone</summary>
-            <label>Brightness <input id="mBrightness" type="range" min="0.3" max="2" step="0.01" value="1" /></label>
-            <label>Contrast <input id="mContrast" type="range" min="0.5" max="2" step="0.01" value="1" /></label>
-          </details>
-          <details class="mask-group" id="mgColour" open>
-            <summary>Colour</summary>
-            <label>Saturation <input id="mSat" type="range" min="0" max="2" step="0.01" value="1" /></label>
-            <label>Hue <input id="mHue" type="range" min="-60" max="60" step="1" value="0" /></label>
-            <label>Warmth <input id="mWarmth" type="range" min="-1" max="1" step="0.01" value="0" /></label>
-          </details>
+          <!-- THE FIVE ADJUSTMENTS LEFT THIS PLACE (042 stage 2): they are the
+               ordinary tab controls now, acting on the picked mask. -->
+          <p id="mMovedNote" class="note">Brightness, contrast, saturation, hue, warmth and Foliage for this mask are the ordinary controls now: choose Done with masks and they act on the mask you picked, with its name in the heading.</p>
           <details class="mask-group" id="mgAims" open>
             <summary>Whole-photo tools, here only</summary>
             <!-- DECISION 030: a selection stops being usable at exactly one
@@ -623,6 +625,10 @@
             <!-- Log-scale tracks: the input stores a 0..1000 position; main.ts
                  maps it exponentially so 1x sits near mid-track (values below = 1.0). -->
             <label>Exposure <input id="expo" type="range" min="0" max="1000" step="1" value="419" /></label>
+            <!-- A MASK GETS A RELATIVE WARM OR COOL, never an absolute white
+                 point (042), so while a mask is picked this takes the place of
+                 the three gains below. -->
+            <label id="maskWarmthRow" hidden>Warmth <input id="maskWarmth" type="range" min="-1" max="1" step="0.01" value="0" /></label>
             <label>Red gain <input id="wbR" type="range" min="0" max="1000" step="1" value="585" /></label>
             <label>Green gain <input id="wbG" type="range" min="0" max="1000" step="1" value="585" /></label>
             <label>Blue gain <input id="wbB" type="range" min="0" max="1000" step="1" value="585" /></label>
@@ -971,6 +977,7 @@
               <label>Hue <input id="folHue" type="range" min="-60" max="60" step="1" value="0" /></label>
               <label>Saturation <input id="folSat" type="range" min="0" max="2" step="0.01" value="1" /></label>
               <label>Luminance <input id="folLum" type="range" min="0.5" max="1.5" step="0.01" value="1" /></label>
+              <p id="folMaskNote" class="note" hidden>This mask selects by colour, and Foliage runs before any colour selection exists, so Foliage cannot follow it. Pick a gradient, radial, brush or sky mask for this.</p>
             </div>
             <button id="pcReset" type="button">Reset per-color</button>
             <hr class="divider" />
@@ -1850,7 +1857,7 @@
           <li><strong>Clarity</strong> — punches up local structure (or softens, pulled left). <strong>Dehaze</strong> — cuts the veil that flattens distant subjects; brightness-only, so colors stay put.</li>
           <li><strong>Sharpen</strong> &amp; <strong>Texture</strong> (Basic) — Sharpen crisps fine edges; Texture works the mid-size surface structure (left smooths it). Both are luminance-only, so colors never shift.</li>
           <li><strong>Tone curve + Luminance</strong> — the curve shapes blacks through highlights; Luminance lifts or drops the whole image without clipping either end.</li>
-          <li><strong>Masks</strong> — radial, gradient, painted brush, tap-a-color, or automatic sky: local adjustments for one area only. Masks belong to the photo; saved looks stay portable.</li>
+          <li><strong>Masks</strong> — radial, gradient, painted brush, tap-a-color, or automatic sky: local adjustments for one area only. Pick a mask, in the list or on the row of names above the tabs, and Exposure, Warmth, Hue shift, Saturation, Contrast and the Foliage band act on that area, added to the whole photo's; <strong>Back to whole photo</strong> in the heading returns them. The other controls wait until you go back. Masks belong to the photo; saved looks stay portable.</li>
           <li><strong>Dust &amp; spots</strong> (Corrections tab) — arm <em>Heal spots</em> and tap a dust mote: it's patched from clean pixels nearby, in the preview and the export alike. <em>Visualize spots</em> makes dust jump out of flat skies and updates as you heal &mdash; a fix that still leaves a ring there was smaller than the dust, so raise <em>Spot size</em>; <em>Find spots automatically</em> sweeps the smooth areas, heals what it finds, and rings every fix for review &mdash; tap a ring to put that one back. Heals belong to the photo — they never ride in saved looks, profiles or a batch.</li>
           <li><strong>IR lens fixes</strong> (Corrections tab) — pulls down the center hot-spot IR-converted lenses produce, takes the <em>colour</em> out of it as well (the disc that shows up in a plain sky once a Look is on), and corrects (or adds) corner vignette.</li>
           <li><strong>Crop &amp; straighten</strong> (panel tab) — three one-tap tools, each with its own <em>Done</em>: <strong>Rotate 90&deg;</strong> turns the whole photo in quarter turns and nothing else; <strong>Crop</strong> shows the box with a rule-of-thirds grid — drag a corner to resize, drag the photo to slide it under the box; <strong>Straighten</strong> adds a fine alignment grid and a degree slider — line a horizon up against the grid (the crop auto-shrinks so no empty corner shows). Pinch to zoom the view while either tool is open. A view onto the photo, not a re-bake — masks and healed spots stay exactly where they are underneath. Composition-specific: never rides in saved looks, profiles or a batch.</li>

@@ -52,7 +52,7 @@
 import { chromium } from "/home/user/Jefferson-Photography-Studio/node_modules/playwright-core/index.mjs";
 import { requireFreshDist } from "./fresh-dist.mjs";
 requireFreshDist();
-import { setValue, getValue, openMasks } from "./walk-input.mjs";
+import { setValue, getValue, openMasks, setMaskValue } from "./walk-input.mjs";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { deflateSync } from "node:zlib";
 import { join } from "node:path";
@@ -147,8 +147,17 @@ try {
     // The coverage tint is drawn ON THE CANVAS: leaving it on would compare a
     // photograph against a photograph with a yellow wash over half of it.
     await p.click("#mOutline"); await settle(p);
-    await setValue(p, "mSat", "1"); // see the header: a fresh Sky mask is 1.3
-    const own = await p.evaluate(() => ["mBrightness", "mContrast", "mSat", "mHue", "mWarmth"].map((i) => document.getElementById(i).value).join(","));
+    await setMaskValue(p, "saturation", "1"); // see the header: a fresh Sky mask is 1.3
+    // The mask's own five, read where they live now: the tab controls, which
+    // carry the picked mask's values (042, stage 2).
+    // Exposure's track is logarithmic, so its position is turned back into the
+    // mask's brightness from the track's own ends (the mask's 0.3 and 2).
+    const own = await p.evaluate(() => {
+      const ex = document.getElementById("expo");
+      const t = (Number(ex.value) - Number(ex.min)) / (Number(ex.max) - Number(ex.min));
+      const bright = (0.3 * Math.pow(2 / 0.3, t)).toFixed(2);
+      return [bright, ...["con", "sat", "hue", "maskWarmth"].map((i) => document.getElementById(i).value)].join(",");
+    });
     if (aimId) { await p.click(`#${aimId}`); await settle(p); }
     return {
       own,
@@ -169,7 +178,7 @@ try {
     const off = await arm(`${label}-3-control-aim-off`, async (p) => { const v = await setIt(p); return { v, after: await getValue(p, id), ...(await neutralSky(p, null)) }; });
     const aimed = await arm(`${label}-4-aimed`, async (p) => { const v = await setIt(p); return { v, after: await getValue(p, id), ...(await neutralSky(p, aimId)) }; });
 
-    check(`${label}: the mask's own adjustment is neutral in both mask arms`, off.notes.own === "1,1,1,0,0" && aimed.notes.own === "1,1,1,0,0", `${off.notes.own} / ${aimed.notes.own}`);
+    check(`${label}: the mask's own adjustment is neutral in both mask arms`, off.notes.own === "1.00,1,1,0,0" && aimed.notes.own === "1.00,1,1,0,0", `${off.notes.own} / ${aimed.notes.own}`);
     check(`${label}: the coverage tint is off in both mask arms`, off.notes.outline === "false" && aimed.notes.outline === "false", `${off.notes.outline} / ${aimed.notes.outline}`);
     check(`${label}: the slider holds the same value across all three`, whole.notes.v === value && off.notes.after === value && aimed.notes.after === value, `${whole.notes.v} / ${off.notes.after} / ${aimed.notes.after}`);
     check(`${label}: the aim reads pressed`, aimed.notes.aim === "true", aimed.notes.aim);
@@ -207,7 +216,7 @@ try {
         rows: await p.evaluate(() => [...document.querySelectorAll("#maskList .mask-row .mask-pick")].map((e) => e.textContent).join(" | ")),
       };
     });
-    check(`${label}: the grouped arm is the Sky mask aimed, with a Radial subtracted`, g.notes.aim === "true" && g.notes.own === "1,1,1,0,0" && /minus Radial/.test(g.notes.rows) && g.notes.outline === "false", `${g.notes.rows} · aim ${g.notes.aim} · own ${g.notes.own} · tint ${g.notes.outline}`);
+    check(`${label}: the grouped arm is the Sky mask aimed, with a Radial subtracted`, g.notes.aim === "true" && g.notes.own === "1.00,1,1,0,0" && /minus Radial/.test(g.notes.rows) && g.notes.outline === "false", `${g.notes.rows} · aim ${g.notes.aim} · own ${g.notes.own} · tint ${g.notes.outline}`);
     const dJoin = diff(arms.aimed.f, g.f);
     check(`${label}: 5 · the subtracted area takes the aimed tool back out`, !dJoin.same, `moved ${(dJoin.moved * 100).toFixed(2)}%, mean |RGB| ${dJoin.mean.toFixed(3)}`);
     const dKeep = diff(arms.base.f, g.f);

@@ -3719,6 +3719,28 @@ li.plat-you { font-weight: 600; }
    "Masks 3", so the number is not doing the work alone. */
 .mask-place-count { font: 400 0.8125rem/1.2 var(--mono); color: var(--txt-2); }
 
+/* ===== WHAT THE CONTROLS ACT ON (042, stage 2) =====
+   The chip row above the tab strip. Every chip is a 44px target, and the picked
+   one says so with a check mark in its name and a heavier border, so the state
+   never rides on colour alone. It wraps rather than scrolls: a row that hides a
+   mask off its edge is a mask the reader cannot see is there. */
+.mask-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
+.mask-chip {
+  min-height: 44px; padding: 8px 12px;
+  border: 1px solid var(--line-2); border-radius: 999px;
+  background: transparent; color: var(--txt);
+  font: 500 0.8125rem/1.2 var(--ui); touch-action: manipulation;
+}
+.mask-chip[aria-pressed="true"] { border-width: 2px; font-weight: 700; background: var(--surface-3); }
+/* The picked mask's name in the pinned heading, and the way back beside it. It
+   is allowed to wrap: the name is the fact the reader needs, never clipped. */
+.mask-target { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 0; font-size: 0.8125rem; color: var(--txt); }
+.mask-target-back { min-height: 44px; padding: 8px 12px; border: 1px solid var(--line-2); border-radius: 10px; background: transparent; color: var(--txt); font: 600 0.8125rem/1.2 var(--ui); }
+/* A control that does not follow the picked mask is inert, and looks it; the
+   note under the heading says why in words, so the dimming is never the only
+   carrier. */
+[data-mask-inert] { opacity: 0.4; }
+
 /* The place itself. A region, not a dialog — the same shape .finish uses, and
    for the same reason: the photograph stays in view. */
 .mask-place { margin: 0 0 12px; }

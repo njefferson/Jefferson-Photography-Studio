@@ -19,7 +19,7 @@
 // re-render: the stroke's band must move, and everything else must not.
 //
 // --plant skips the arming press; the first assertion must then go red.
-import { openMasks, closeMasks } from "./walk-input.mjs";
+import { openMasks, closeMasks, setMaskValue } from "./walk-input.mjs";
 import { chromium } from "playwright-core";
 import { requireFreshDist } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
@@ -99,8 +99,7 @@ try {
   await settle(p);
   await openMasks(p); await p.click("#addSky"); await settle(p);
   // A mask that does something visible: take the sky's brightness right down.
-  await p.evaluate(() => { const el = document.getElementById("mBrightness");
-    el.value = "0.35"; el.dispatchEvent(new Event("input",{bubbles:true})); el.dispatchEvent(new Event("change",{bubbles:true})); });
+  await setMaskValue(p, "brightness", 0.35);
   await settle(p);
   const a = await doExport(p, "before");
 

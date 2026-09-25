@@ -750,6 +750,15 @@ export interface MaskLayer {
    *  stages this aims at. That is decision 032's territory and the boundary is
    *  deliberate rather than an oversight. */
   aims?: number;
+  /** THE MASK'S OWN FOLIAGE BAND (042, stage 2): offsets on the whole-photo
+   *  `foliage` [hue degrees, saturation, luminance], added where this mask's
+   *  group reaches, each starting at 0 for no change. Absent means no change,
+   *  so every edit saved before it renders as it did. Read on a group's HEAD
+   *  only, and only for a group with no colour mask in it (`groupCanAim`): the
+   *  band runs before the mask stage, where a colour key does not exist yet.
+   *  Always replaced as a new array, never written in place, because an undo
+   *  snapshot copies a mask shallowly. */
+  fol?: [number, number, number];
   cx: number; // radial: centre x; linear: start x
   cy: number; // radial: centre y; linear: start y
   rx: number; // radial: x radius (uv fraction)
@@ -964,6 +973,7 @@ export function maskIsActive(m: MaskLayer): boolean {
   // function that decides what renders — so the CPU and the shader would both
   // lose it, silently, in the most obvious way to use the feature.
   if (m.aims) return true;
+  if (m.fol && (m.fol[0] !== 0 || m.fol[1] !== 0 || m.fol[2] !== 0)) return true;
   return m.brightness !== 1 || m.contrast !== 1 || m.saturation !== 1 || m.hue !== 0 || m.warmth !== 0;
 }
 
@@ -1076,6 +1086,51 @@ export function aimsAt(groups: readonly (readonly MaskLayer[])[], bit: number): 
     }
   }
   return false;
+}
+
+/** The Foliage band's own ranges, as the Colour tab's sliders set them: a value
+ *  with a mask's offsets added is held to these, [hue, saturation, luminance]. */
+export const FOL_MIN: readonly [number, number, number] = [-60, 0, 0.5];
+export const FOL_MAX: readonly [number, number, number] = [60, 2, 1.5];
+
+/** The Foliage offsets a GROUP adds to the band, or null when it adds none.
+ *  Takes one group (head first); returns the head's `fol` when it is non-zero,
+ *  the head is not a colour mask, and nothing in the group is one
+ *  (`groupCanAim`). What the caller relies on: null means the group can be
+ *  skipped at the band, and the shader's `foliageHere` makes the same test. */
+export function groupFolOffset(group: readonly MaskLayer[]): readonly [number, number, number] | null {
+  const h = group[0];
+  if (!h || !h.fol || h.type === 3 || !groupCanAim(group)) return null;
+  if (h.fol[0] === 0 && h.fol[1] === 0 && h.fol[2] === 0) return null;
+  return h.fol;
+}
+
+/** THE FOLIAGE BAND'S VALUE AT ONE PIXEL (042, stage 2): the whole-photo value
+ *  plus each group's offsets times that group's joined place weight, summed
+ *  where masks overlap, then held to FOL_MIN..FOL_MAX. Takes `base` (the
+ *  whole-photo `foliage`), the active groups, image uv and `out`, which it
+ *  fills; returns nothing. What the result must satisfy: it is `base` exactly
+ *  wherever no offset reaches, so an edit with no offsets renders unchanged,
+ *  and it is what the shader's `foliageHere` computes at the same uv. */
+export function foliageAt(
+  base: readonly [number, number, number],
+  groups: readonly (readonly MaskLayer[])[],
+  u: number,
+  v: number,
+  out: [number, number, number],
+): void {
+  out[0] = base[0]; out[1] = base[1]; out[2] = base[2];
+  let any = false;
+  for (const g of groups) {
+    const f = groupFolOffset(g);
+    if (!f) continue;
+    const w = groupWeight(g, (c) => maskWeight(c, u, v));
+    if (w <= 0) continue;
+    out[0] += f[0] * w; out[1] += f[1] * w; out[2] += f[2] * w;
+    any = true;
+  }
+  if (!any) return;
+  for (let k = 0; k < 3; k++) out[k] = Math.min(FOL_MAX[k], Math.max(FOL_MIN[k], out[k]));
 }
 
 /** One pixel of linear source, by integer position — `raw/denoise.ts`'s
@@ -1830,7 +1885,10 @@ export function compileEdit(
   const lumExp = p.lum && p.lum !== 1 ? 1 / p.lum : 0;
   const sky = p.sky;
   const fol = p.foliage;
-  const bandsActive =
+  // A MASK'S OWN FOLIAGE (042, stage 2) switches the band on too, and is read
+  // per pixel below; the groups are taken after maskGroupsActive exists.
+  const folGroupsOf = (gs: readonly (readonly MaskLayer[])[]) => gs.filter((g) => groupFolOffset(g) !== null);
+  let bandsActive =
     sky[0] !== 0 || sky[1] !== 1 || sky[2] !== 1 || fol[0] !== 0 || fol[1] !== 1 || fol[2] !== 1;
   // GROUPS, NOT MASKS (026). Filtering by maskIsActive first would drop a
   // component whose own adjustment is neutral — which is EVERY component,
@@ -1849,6 +1907,9 @@ export function compileEdit(
   // in every export while the shader keyed it, so the saved photo ignored the
   // join. tools/join-fold-check.mjs holds the joined case.
   const hasColorMask = maskGroupsActive.some((g) => g.some((m) => m.type === 3));
+  const folGroups = folGroupsOf(maskGroupsActive);
+  if (folGroups.length) bandsActive = true;
+  const folPx: [number, number, number] = [0, 0, 0];
   const lensOn = (p.hotspot ?? 0) !== 0 || (p.vignette ?? 0) !== 0 || (p.hotspotColor ?? 0) !== 0;
   // The measured curve is its own stage: it must run whether or not any of the
   // manual lens sliders are off zero.
@@ -2025,6 +2086,13 @@ export function compileEdit(
     nb = luma + (nb - luma) * satEff;
     // Per-colour bands (complementary cool/warm halves), matching the shader:
     // hue shift, sat scale and lum scale weighted by hue distance to the band.
+    // Where a mask carries its own Foliage, the band reads the value HERE.
+    // Taken outside the band's block, whose HSV `v` shadows the pixel's uv.
+    let f: readonly [number, number, number] = fol;
+    if (bandsActive && folGroups.length && u !== undefined && v !== undefined) {
+      foliageAt(fol, folGroups, u, v, folPx);
+      f = folPx;
+    }
     if (bandsActive) {
       const cr = Math.max(0, nr);
       const cg = Math.max(0, ng);
@@ -2036,11 +2104,11 @@ export function compileEdit(
       // displayed (skyBandCentre has the measurement).
       const wS = bandWeight(h, skyBandCentre(swap, p.mix3), 55, 105);
       const wF = 1 - wS;
-      h += sky[0] * wS + fol[0] * wF;
+      h += sky[0] * wS + f[0] * wF;
       // A boost acts only where there is colour to boost (bandGain's guard);
       // the guard reads THIS pixel's saturation before either band touches it.
-      s = Math.min(1, s * bandGain(sky[1], wS, s) * bandGain(fol[1], wF, s));
-      v = v * (1 + (sky[2] - 1) * wS) * (1 + (fol[2] - 1) * wF);
+      s = Math.min(1, s * bandGain(sky[1], wS, s) * bandGain(f[1], wF, s));
+      v = v * (1 + (sky[2] - 1) * wS) * (1 + (f[2] - 1) * wF);
       [nr, ng, nb] = hsv2rgb(h, s, v);
     }
     // Tone tint (sepia etc.) after saturation so it survives mono looks.

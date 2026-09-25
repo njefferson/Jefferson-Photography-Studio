@@ -164,3 +164,40 @@ export async function closeMasks(page) {
   await page.locator("#maskPlaceClose").click();
   await page.waitForFunction(() => !!document.getElementById("maskPlace")?.hidden, null, { timeout: 30000 });
 }
+
+/** A PICKED MASK'S OWN VALUE, set the way a reader sets it now (042, stage 2).
+ *
+ *  Takes `page`, `field` and `value`. `field` is one of brightness, contrast,
+ *  saturation, hue, warmth, folHue, folSat or folLum; `value` is in the mask's
+ *  own units (brightness as a multiplier, 0.3 to 2; Foliage as an offset, 0 for
+ *  no change). Returns the value the control carries afterwards, as a string.
+ *
+ *  The mask's five adjustments and its Foliage are the ordinary tab controls
+ *  now, acting on the picked mask, so this leaves the mask place, opens the
+ *  tab, moves the control, and goes back into the place if it was open.
+ *  THROWS when no mask is picked, because the same control would then move the
+ *  whole photograph and the walk would measure the wrong thing. Exposure's track
+ *  is logarithmic; a brightness is turned into its position from the track's
+ *  own ends, which are the mask's 0.3 and 2 while a mask is picked. */
+export async function setMaskValue(page, field, value) {
+  const where = { brightness: ["basic", "expo"], warmth: ["basic", "maskWarmth"], hue: ["color", "hue"], saturation: ["color", "sat"],
+    contrast: ["color", "con"], folHue: ["color", "folHue"], folSat: ["color", "folSat"], folLum: ["color", "folLum"] }[field];
+  assert.ok(where, `setMaskValue: no mask control is called ${field}`);
+  const [tab, id] = where;
+  const wasOpen = await page.evaluate(() => !document.getElementById("maskPlace")?.hidden);
+  if (wasOpen) await closeMasks(page);
+  const picked = await page.evaluate(() => !document.getElementById("maskTarget")?.hidden);
+  assert.ok(picked, "setMaskValue: no mask is picked, so the control would move the whole photograph");
+  await page.locator(`#ptab-${tab}`).click();
+  let v = String(value);
+  if (field === "brightness") {
+    v = await page.evaluate((b) => {
+      const el = document.getElementById("expo");
+      const lo = Number(el.min), hi = Number(el.max);
+      return String(Math.round(lo + ((hi - lo) * Math.log(b / 0.3)) / Math.log(2 / 0.3)));
+    }, Number(value));
+  }
+  const got = await setValue(page, id, v);
+  if (wasOpen) await openMasks(page);
+  return got;
+}
