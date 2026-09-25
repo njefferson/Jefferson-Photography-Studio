@@ -1,10 +1,11 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=20d6d976ab7d46bf
-diffhash=0a3a41c03829190a
-verdict=IN-SCOPE: plan item 3's record 042 re-slice with the NOTES and status-page updates the standing steps require
-# IN-SCOPE: every change in the diff lands in a file and section the plan names for this docs commit, and no sentence quotes or attributes anything to the owner by name or links to a chat.
-# - docs/decisions/042-...md: plan item 3 (record 042 re-sliced, the switch written as a buildable design), with item 2's Outcome and item 2b recorded in Context; Weighed against, Depends, Looked at, Options and Rank as item 3 lists.
-# - NOTES.md: the standing step that records each held or staged candidate; adds the sixth held commit (8b6f758) and the M1 answer.
-# - public/conveyor-status.html: the standing step that updates the status page at every stage; held count, last verified green SHA 283748f, the Now item, a found-not-fixed line, and item 5's wrangler wording.
-# No unauthorised files.
+planhash=d81d049244b8bfd2
+diffhash=4270564d73e20b30
+verdict=IN-SCOPE: all three files are docs; every number and SHA traces to the plan's lens outcome, item 4 and 4a, with no new rule, gate, reorder, quote or attribution
+# IN-SCOPE: All three staged files are docs files (NOTES.md, the 042 decision record, conveyor-status.html), and every number, commit SHA and finding in the diff traces to the plan's Lens-correction/Outcome/item-4/4a passages or to standing status-page/Looked-at requirements, with no new code, rule, gate, roadmap reorder, or attribution/quote/session-link violation.
+# 
+# 1. Files touched: NOTES.md, the 042 record, public/conveyor-status.html only; the plan says the lens findings and the switch go into record 042 and the status page with the switch's docs commit, and the status page is updated at every stage as a docs commit.
+# 2. No new plan item, rule, gate or reorder. The 042 record adds stage-2 and lens paragraphs restating plan content and three Looked at lines required by the repo's frame rule. The round discs are not claimed resolved (one cause fixed in 52cfc7d, not re-measured). "Masks do not survive the tab closing" is a pre-existing documented fact (src/main.ts, editToJson) disclosed in found-not-fixed, the status page's standing content (Doctrine 7i). The lens-off 11.24%/10.22% figure supports the same checked-not-a-defect conclusion.
+# 3. No quotation, attribution by name, session link or model name found.
+# 4. Numbers match the plan's Outcome bullet: 125,122 to 112,923; 39,711 to 37,252; 1,706,226 to 239,550; 114,416 to 0; 239,550 to 0; grass 54.5% to 52.1% and 55.3% to 53.6%; 3.480% vs 1.434%; at most 1.5 levels in 255; control sweep 55 to 54.
