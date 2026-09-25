@@ -458,9 +458,11 @@ try {
       await page.waitForTimeout(2500);
 
       // Denoise hard, then a Sky mask that aims it and does nothing else. The
-      // mask's own adjustment is neutralised for aim-walk's reason: a fresh Sky
-      // mask arrives at Saturation 1.3, and an arm that leaves it there is
-      // measuring chroma over half the picture and calling it the aim.
+      // mask's own adjustment is set to no change for aim-walk's reason: a fresh
+      // Sky mask once arrived at Saturation 1.3, and an arm that left it there
+      // measured chroma over half the picture and called it the aim. Set here
+      // rather than relied on, so the arm does not depend on what a new mask
+      // starts at.
       await page.click("#ptab-basic");
       await page.evaluate(() => {
         const d = document.getElementById("dn");
