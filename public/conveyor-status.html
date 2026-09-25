@@ -85,7 +85,7 @@
         <li><b>Production</b> <span>v2.62.14: the small fixes that were on staging as v2.62.10, promoted on your go. The number moved because the last digit counts every commit; the content did not.</span></li>
         <li><b>On staging</b> <span>v2.62.16: the export edge fix and two new rows on the device test page. Your pass came back good; it waits for your go.</span></li>
         <li><b>Built and held</b> <span>Eight changes on top of v2.62.16: the first stage of the mask work (three), the LUT grid, the None button for looks, two fixes (a colour mask joined to another mask now reaches the saved photo, and the screen's sky smoothing follows a mask's changes), and the switch: pick a mask and the ordinary controls act on it, Foliage first. It goes to staging once v2.62.16 is on production, because staging holds one build at a time. It is kept in this session's copy of the repository until then.</span></li>
-        <li><b>Last verified green</b> <span><code>a24bd0c</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
+        <li><b>Last verified green</b> <span><code>47d4feb</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
         <li><b>Next version</b> <span>2.63, when masks gain their own amounts. The fixes before that take the increment digit and no version bump.</span></li>
       </ul>
 
@@ -316,12 +316,13 @@
           which has not reached you yet.
         </li>
         <li>
-          <strong>The deploys install whatever wrangler version is newest.</strong>
-          The hub's deploy failed once today on a wrangler release published
-          minutes earlier that the package registry was not yet serving; a re-run
-          went green. This app's deploy runs the same unpinned install. Naming a
-          version in the workflow is the remedy, scheduled before the next push to
-          staging.
+          <strong>The deploys installed a range of wrangler versions.</strong>
+          The hub's deploy failed once on a wrangler release published minutes
+          earlier that the package registry was not yet serving; a re-run went
+          green. The same step ran 4.86.0 here and 4.139.0 in the hub on the same
+          night. Fixed on main: each deploy names the version its last green
+          deploy ran, so neither changes what it deploys with, and the next
+          deploy of each is read to confirm it.
         </li>
       </ul>
 
