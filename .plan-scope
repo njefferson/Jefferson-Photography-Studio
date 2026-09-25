@@ -1,11 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=ee857fc7b928755b
-diffhash=269e853d317296f8
-verdict=IN-SCOPE: item 1b, double-tap with a mask picked goes back to the mask's no change, with its walk case and module-map line count
-# IN-SCOPE: the staged diff is exactly item 1b (the wireSliderReset/back() fix), its two named supporting changes, and nothing else.
-# 
-# 1. back() in wireSliderReset: with a mask picked, a slider in maskCtls() goes back to that control's value on neutralMask(type); every other case falls through to the original PREF_SLIDER_DEFAULTS / sliderDefaults logic. One hunk.
-# 2. tools/double-tap-walk.mjs gains the picked-mask case (folSat -1 and saturation 1.4 on a Gradient mask, each double-tapped, expecting 0 and 1); docs/ARCHITECTURE.md's generated line count for src/main.ts. No gate wiring changed.
-# 3. A separate Fixed commit, because the defect is in the switch as staged in v2.63.
-# 4. No owner quotation or attribution, no session link, no model name.
+planhash=c53e2fb37ab8aae9
+diffhash=117d6a31f76f6068
+verdict=IN-SCOPE: This diff is exactly the "known fix" specified in plan item 1c ("Found verifying item 1a, 2026-09-25: the Sky band arm cannot fail"), which prescribes the fix "in the walk only, as its own 'Internal:' commit on top of the held stack (no rewrite of pushed held commits)" — the "mask sky band" arm switching to wear Aerochrome (`lookEir`) with hue +60 and luminance -0.5, plus "every mask arm refuses when its own change on screen, by the same two bars the comparison uses, clears neither." The diff's changes to tools/agreement-walk.mjs match this description precisely, touch only the walk file as the plan specifies, and do not rewrite already-pushed held commits.
+# IN-SCOPE: This diff is exactly the "known fix" specified in plan item 1c ("Found verifying item 1a, 2026-09-25: the Sky band arm cannot fail"), which prescribes the fix "in the walk only, as its own 'Internal:' commit on top of the held stack (no rewrite of pushed held commits)" — the "mask sky band" arm switching to wear Aerochrome (`lookEir`) with hue +60 and luminance -0.5, plus "every mask arm refuses when its own change on screen, by the same two bars the comparison uses, clears neither." The diff's changes to tools/agreement-walk.mjs match this description precisely, touch only the walk file as the plan specifies, and do not rewrite already-pushed held commits.
