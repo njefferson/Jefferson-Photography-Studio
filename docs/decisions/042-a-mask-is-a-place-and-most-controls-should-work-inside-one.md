@@ -162,6 +162,17 @@ Classic.**
 - darktable does mask its channel mixer. Lightroom and Capture One keep the
   colour space global.
 
+**For stage 2b, looked up 2026-09-25 (search extracts; no vendor page was
+fetched):**
+
+- Lightroom's mask curve is its own, separate from the whole-photo curve
+  (Adobe's April 2023 feature summary).
+- Capture One's curve, Colour Balance and Colour Editor work on layers
+  (Capture One support pages).
+- Capture One's Black & White is not a layer tool, and a Lightroom mask cannot
+  take a treatment.
+- Capture One cannot put a LUT on a layer; darktable masks its LUT module.
+
 **How a masked control gets its value: two models.**
 
 - In Lightroom and Capture One, the mask's value is an offset on top of the
@@ -344,10 +355,47 @@ selection; built in stages, each shippable and checkable on its own.** Chosen.
   - **Where it is held true.** The shader and `compileEdit` both, and every
     export and preview path through `compileEdit`; per-mask Foliage costs 8
     uniform rows of the 876 free.
-- **Stage 2b: the other stages after the mask stage, per mask:** contrast
-  beyond the mask's own, the curves, HSL, B&W, shadow colour, grade, luminance
-  and LUT strength. The curves need texture units, and 2 of 16 are free on the
-  iPad, so they are measured first.
+- **Stage 2b: the other stages after the mask stage, per mask.** Written out
+  2026-09-25 from the conventions under Looked up. Each is a control that
+  follows the picked mask through the switch, stored as an optional
+  `MaskLayer` field on the group head, absent meaning no change, so every saved
+  edit renders as before; the switch's note names what is still to come, one
+  commit at a time.
+  - **HSL:** the mask's own offsets per band on hue, saturation and luminance,
+    added to the whole photo's where the group reaches, summed where masks
+    overlap and held to the sliders' range, as Foliage combines (Capture One's
+    Colour Editor on a layer). 8 uniform rows a mask.
+  - **Grade:** the mask's own wheels, whose tints add to the whole photo's
+    where the group reaches (Capture One's Colour Balance on a layer). The
+    tints are chroma vectors that already add, so an offset and a value of its
+    own are the same thing here. 4 rows a mask.
+  - **Luminance and LUT strength:** the mask's own offsets, sharing one row a
+    mask. The LUT file stays whole-photo; its strength per mask follows
+    darktable, since Capture One cannot put a LUT on a layer at all.
+  - **Curves:** the mask's own curve, master and red, green and blue, starting
+    straight, applied after the whole photo's curve and blended by the group's
+    weight. Not an offset: a curve does not add (Lightroom's mask curve is
+    separate from the whole-photo curve; Capture One's curve works on a layer).
+    All eight masks' curves share one texture of eight rows, built by the
+    function that builds the whole photo's, so they take one of the two free
+    texture units rather than eight: 15 of 16 in use afterwards, which the test
+    page's shader-room row reads on the device.
+  - **Shadow colour last, with the Convert this record owes.** It is the one
+    tool here with an aim today, so its per-mask value replaces the aim, and a
+    saved aim has to become something. What an aim becomes where two aimed
+    masks overlap (one weight applied once, against two offsets that add) is
+    the one question in 2b the conventions do not answer, so its design is
+    written when it is built, before the code.
+  - **Contrast:** already the mask's own since stage 2. The whole-photo
+    contrast after the mask stage does not also go per mask: two contrasts on
+    one mask would be two sliders for one thing.
+  - **Black and white stays whole-photo** (the list below): Capture One's
+    Black & White is not a layer tool, and a Lightroom mask cannot take a
+    treatment. Here, a mask's own Saturation at its lowest is the local
+    route.
+  - **Order, one commit each:** HSL, grade, luminance with LUT strength, the
+    curves, then shadow colour. The uniforms come to about 110 rows for eight
+    masks, beside about 160 in use of 1024.
 - **Stage 3: the rest of the stages before the mask stage:** exposure beyond
   the mask's own brightness, white balance as relative gains, saturation, hue,
   tint and glow, for masks that are not colour masks.
@@ -371,6 +419,8 @@ targeted, and each with a convention to point to:**
 - the Auto and measurement buttons;
 - the choice of look;
 - the LUT file, though its strength can go per mask;
+- black and white, since a mask's Saturation at its lowest is the local route
+  (stage 2b);
 - despeckle.
 
 **Open, and answered from pictures or in a word:**
