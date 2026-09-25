@@ -54,7 +54,7 @@
 // THE RAW ARM IS THE CONTROL. The assemblers differ on FILE KIND, so a walk with
 // only one kind cannot see the disagreement; and an arm that passes in both
 // states is what says the walk is not vacuous.
-import { openMasks, closeMasks, setMaskValue } from "./walk-input.mjs";
+import { openMasks, closeMasks, setMaskValue, setValue } from "./walk-input.mjs";
 import { chromium } from "playwright-core";
 import { requireFreshDist } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
@@ -582,8 +582,13 @@ try {
     // passed with the export's half discarded, and luminance -0.5 on top moved
     // the whole frame by 0.4 points of lightness against a bar of 8. Under the
     // look the sky is blue, inside the band, and the frame's biggest hue bin.
+    // Sky colour smoothing goes to 0 under it: the look's smoothing map as
+    // built when the look is applied differs from any later rebuild with the
+    // same settings by up to 6 levels in 255 (measured 2026-09-25, cause not
+    // established), and adding a mask is a rebuild, so the byte-for-byte pick
+    // check below would read that as the mask moving the photograph.
     { label: "mask sky band", what: "a Sky mask's Sky band under Aerochrome, hue +60, luminance -0.5", check: "skyLum", want: "-0.5",
-      look: "lookEir",
+      look: "lookEir", after: { skySmooth: "0" },
       set: async (page) => {
         await setMaskValue(page, "skyHue", "60");
         await setMaskValue(page, "skyLum", "-0.5");
@@ -638,6 +643,7 @@ try {
         await page.waitForFunction(() => !document.getElementById("busy")?.hasAttribute("open"), null, { timeout: 300000 });
         await page.waitForTimeout(2500);
       }
+      for (const [id, v] of Object.entries(arm.after ?? {})) await setValue(page, id, v);
       const bare = await settledView(page);
       await openMasks(page);
       await page.click("#addSky");
