@@ -36,6 +36,20 @@ const ok = (s) => console.log(`ok    ${s}`);
 const br = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });
 try {
   const p = await br.newPage({ viewport: { width: 1000, height: 820 }, hasTouch: true });
+  // WAIT FOR THE PHOTOGRAPH TO FINISH DRAWING BEFORE A GESTURE. Playwright
+  // sends a tap and waits for the page to handle it, so a tap made while the
+  // page is still drawing is handled seconds later and the second tap goes out
+  // only after that: two taps 2.7 s apart by the browser's own clock, which is
+  // correctly not a double-tap, and a gesture no finger makes. Measured, when
+  // the timed path moved from the handling clock to the touch's own timestamp.
+  const settle = async () => {
+    let last = "", same = 0;
+    for (let i = 0; i < 100; i++) {
+      const h = await p.evaluate(() => { const c = document.querySelector("#view"); const u = c.toDataURL(); return u.length + u.slice(-64); });
+      if (h === last) { if (++same >= 3) return; } else { same = 0; last = h; }
+      await p.waitForTimeout(200);
+    }
+  };
   await p.goto(`${BASE}/ir.html`, { waitUntil: "load" });
   await p.setInputFiles("#file", [`${EX}/NIR_0063.dng`]);
   await p.waitForFunction(() => document.getElementById("welcome")?.hidden, null, { timeout: 300000 });
@@ -106,14 +120,19 @@ try {
     el.dispatchEvent(new Event("input", { bubbles: true }));
     el.dispatchEvent(new Event("change", { bubbles: true }));
     const r = el.getBoundingClientRect();
-    return { was, now: el.value, x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    // ON THE THUMB, not the middle: see the mask case below.
+    const f = (Number(el.value) - Number(el.min)) / (Number(el.max) - Number(el.min));
+    const half = r.height / 2;
+    return { was, now: el.value, x: r.x + half + (r.width - 2 * half) * f, y: r.y + r.height / 2 };
   });
   if (!sl) fail("no saturation slider to test");
   else {
-    await p.waitForTimeout(300);
+    await settle();
     // A tap on a range input sets it to the tapped position, so both taps land
-    // on the same spot on purpose: what is being tested is the second tap
-    // arriving inside the window, not where the first one left the value.
+    // on the thumb, where a tap leaves the value where it is: what is being
+    // tested is the second tap arriving inside the window. They used to land on
+    // the middle of the track, which is 1 on this slider, the value the photo
+    // opened with, so the first tap alone passed this check.
     await p.touchscreen.tap(sl.x, sl.y);
     await p.waitForTimeout(90);
     await p.touchscreen.tap(sl.x, sl.y);
@@ -139,7 +158,20 @@ try {
   for (const [id, want] of [["folSat", "0"], ["sat", "1"]]) {
     await p.click("#ptab-color").catch(() => {});
     await p.waitForTimeout(300);
-    const at = await p.evaluate((i) => { const el = document.getElementById(i); const r = el.getBoundingClientRect(); return { was: el.value, x: r.x + r.width / 2, y: r.y + r.height / 2 }; }, id);
+    // ON SCREEN, AND THE TAP LANDS ON THE SLIDER. The first version tapped the
+    // slider's centre wherever it was, and with a mask picked the chip row and
+    // the Editing heading push the Colour tab down: both taps landed below the
+    // window, on nothing, so this case failed with the fix and without it
+    // alike and proved nothing either way.
+    await p.evaluate((i) => document.getElementById(i).scrollIntoView({ block: "center" }), id);
+    await settle();
+    // AND ON THE THUMB. A tap on the track moves the slider to the tapped
+    // point, and the middle of these two tracks is 0 and 1, which are exactly
+    // the mask's no change: tapping the middle passed this case with the fix
+    // reverted. On the thumb, a tap leaves the value where it is, so only the
+    // double-tap can bring it back.
+    const at = await p.evaluate((i) => { const el = document.getElementById(i); const r = el.getBoundingClientRect(); const f = (Number(el.value) - Number(el.min)) / (Number(el.max) - Number(el.min)); const half = r.height / 2; const x = r.x + half + (r.width - 2 * half) * f, y = r.y + r.height / 2; return { was: el.value, x, y, onIt: document.elementFromPoint(x, y) === el }; }, id);
+    if (!at.onIt) { fail(`with a mask picked, the tap point is not on #${id}, so a double-tap there tests nothing`); continue; }
     await p.touchscreen.tap(at.x, at.y);
     await p.waitForTimeout(90);
     await p.touchscreen.tap(at.x, at.y);

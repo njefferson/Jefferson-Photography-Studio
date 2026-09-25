@@ -12658,7 +12658,11 @@ function wireSliderReset(): void {
       ? `tone:${toneChannel}:${i}`
       : ((e.target as HTMLElement | null)?.closest?.('input[type="range"]') as HTMLInputElement | null)?.id;
     if (!id) return;
-    const now = Date.now();
+    // WHEN THE TOUCH HAPPENED, not when it was handled. A first tap that moves
+    // the slider even slightly starts a redraw, and the second touch waits
+    // behind it: measured, 98 ms apart by their own timestamps and handled
+    // 3.3 s apart, so a clock read here saw two separate taps.
+    const now = e.timeStamp;
     if (id === lastId && now - lastAt < 350) {
       if (i >= 0) backTone(i);
       else {
