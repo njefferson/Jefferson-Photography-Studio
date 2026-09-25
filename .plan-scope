@@ -1,11 +1,10 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=6c1eec799b84c8fb
-diffhash=9451ce7a74203c18
-verdict=IN-SCOPE: the promotion replay of dd32298, byte-identical outside the scope ledger, on the owner's go
-# IN-SCOPE: the staged diff is byte-identical to 92a3080 apart from .plan-scope, dd32298 is the unchanged next commit (also differing only in .plan-scope), the two commits are exactly and only what origin/staging holds above 9b0eb32 in the right order, and neither commit's message or diff contains any owner quotation/attribution, session link, or model name.
+planhash=01bed44834ae22fe
+diffhash=5a315012181485e6
+verdict=IN-SCOPE: NOTES and the status page record v2.62.16 live as 2.62.26 and v2.63 on staging with its device-pass steps, as the plan says
+# IN-SCOPE: both staged diffs match exactly what the plan's cited passages authorize and what the commits/gates support — the JPS diff records only the promotion and staged device-pass state, and the hub diff is exactly the named handoff-check.mjs defect fix plus its lesson bookkeeping, with no attribution or session-link violations in either.
 # 
-# 1. The replay of 92a3080 stages docs/ARCHITECTURE.md, src/raw/demosaic.ts and tools/.preview-pipeline, byte-identical to 92a3080's; .plan-scope is re-recorded, not replayed.
-# 2. dd32298 is the shader-room instrument (Renderer.shaderBudget and the test page's shaderRoom row) with its module-map line counts, nothing beyond it.
-# 3. git log 9b0eb32..origin/staging is exactly 92a3080 then dd32298.
-# 4. No owner quotation or attribution, no session link, no model name, no trailer. Promotion is plan item "Next, in order" 1, on the owner's go.
+# 1. NOTES and the status page: v2.62.16 on main as bdedec8 and 99d1e20, live as 2.62.26 with how it was checked; v2.63 on staging at a8ce335 with its nine reader-facing subjects matching the commits (the tenth is internal); the device-pass steps phrased as pending; the walks and the colour mixer's record matching a8ce335. Nothing marked done that is not.
+# 2. The hub diff (committed separately as db9d1bc) is the named defect fix and its lesson.
+# 3. No owner quotation or attribution, no session link, no model name.

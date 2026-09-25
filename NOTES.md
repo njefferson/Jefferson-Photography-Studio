@@ -43,46 +43,59 @@ because they floor temperature at ~2000K.
 
 ## On staging, waiting on a device pass
 
-**v2.62.16 at https://staging.jefferson-photo-studio.pages.dev, pushed
-2026-09-24.** Two commits on top of production. v2.62.10, the build that was
-here before, went to production on the go the same day, as 2.62.14 (the last
-digit counts every commit, so the number moved while the content did not).
+**v2.63 at https://staging.jefferson-photo-studio.pages.dev, pushed
+2026-09-25 (a8ce335).** Ten commits on top of production. v2.62.16, the build
+that was here before, went to production on the go the same day, as 2.62.26:
+the live site's offline copy is named `ips-2.62.26` and its test page carries
+the Edit shader rows. The middle number moved to 2.63 in the last reader-facing
+commit, because masks gain their own amounts in this build.
 
-- full-size exports no longer have a line of the wrong colour along their
-  edges: the export read a neighbouring pixel of the wrong colour at the
-  border, on all four sides;
-- the device test page reports how much room the editor's graphics have for
-  masks with their own settings, which decides how that work is built.
+What a reader gets, by commit subject:
+
+- Fixed: a "here only" tool no longer reaches an area subtracted from its mask;
+- New: a mask can add to the one above it, so a colour can finish a sky;
+- New: the device test page times a frame with eight masks;
+- New: tap through your LUTs on the Grade tab and see each one on your
+  photograph;
+- New: a None button takes a look off your photograph;
+- Fixed: a colour mask joined to another mask now changes the saved photo, not
+  only the screen;
+- Fixed: with Sky colour smoothing on, the screen follows a mask's changes as
+  the saved photo does;
+- New: pick a mask and the ordinary controls act on it, starting with Foliage;
+- New: a picked mask takes its own colour mixer.
 
 **What the device pass covers:**
 
-1. Export one photograph at full size and look at its four edges: no line of
-   magenta, green or any other colour one pixel wide.
-2. In the editor, tap the version number, then Test this device, and press Run
-   the speed tests. The first two rows are new, Edit shader: uniforms and Edit
-   shader: textures. Copy the results and send them; that number is the one
-   the mask work needs from the iPad.
+1. The wire fix on one of the reported frames (NIR_3461 or NIR_3467), in
+   Aerochrome: on Corrections, the lens profile's strength at 1; in Masks, add
+   a Gradient over everything above the grass and close Masks; on Colour, move
+   Foliage Saturation to the left end. The wires, pylons and cladding go grey
+   and the grass keeps its red. Export it and look at the saved file.
+2. The row of mask names above the tabs, and "Editing: …" with Back to whole
+   photo, in both orientations: every name reachable by finger, the controls
+   that do not follow a mask dimmed and not pressable, Back returning
+   everything.
+3. With a mask picked, on Colour, pick one of the eight colours and move its
+   Hue: only the masked area changes.
+4. On Grade, tap through the LUT tiles, then Undo once: the whole run goes.
+5. None, the first of the looks, takes the look off.
+6. In Masks, "Add to it" joins a mask to the one above.
+7. On the test page, Run the speed tests and send the eight-mask frame time;
+   that number is still owed from the device.
 
-Walks run against this build: the export check (one core and several, byte
-for byte the same), the multi-core TIFF check, the agreement walk and the
-accessibility sweep, on the candidate before it was moved onto 2.62.14; the
-export check and the accessibility sweep again after.
+Masks still do not survive the iPad closing the tab (Help says so), so a wire
+fix made on staging is lost if the tab reloads before it is exported.
 
-**The device pass came back good, 2026-09-24, and the build waits for the go.**
+Walks run against this build: agreement (its new arm for a mask's colour mixer
+failed at 31.6 degrees apart with the export's half disabled, and passes at
+10.6), aim, mask-panel, mask-slots, mask-truth, mask-fix-export, export-bytes,
+accessibility, and the control sweep, which reports the same 54 controls to
+answer for as before the colour mixer. One export of a practice frame with a
+Sky mask's mixer shifted was opened: the sky moves, the tree does not.
 
-- A full-size export from the target device (NIR_3467, 5600x3728) is clean on
-  all four sides: each outer row and column matches the pixels 20 in. The
-  export from the build before it had a red line along the top and left, on
-  the same measure.
-- The test page on the target device reads 148 of 1024 uniform rows and 14 of
-  16 texture units, so per-mask values go in uniforms. That answer is recorded
-  in decision 042.
-- The device's offline copies are the current build and the examples cache,
-  nothing older.
-
-**The next candidate is built and held, 2026-09-24:** decision 042's first
-stage, three commits on top of v2.62.16. It is not on staging, because staging
-holds v2.62.16 until the go, and it goes there once v2.62.16 is on production.
+**How v2.63 was built, 2026-09-24 and 25, change by change.** First, decision
+042's first stage, three commits.
 
 - A "here only" tool no longer reaches an area subtracted from its mask. It
   was rendered before it was built, on NIR_1651: a Sky mask aiming Dehaze
@@ -205,6 +218,18 @@ stage 2), and the sweeps reach it.**
   mask carries the wire fix. And whether 52cfc7d accounts for the round discs
   that differed between screen and export with the workaround on has not been
   re-measured.
+
+**The last, 2026-09-25: a picked mask's own colour mixer (decision 042, stage
+2b, its first commit).** `MaskLayer.hsl` holds 24 offsets laid out as `hsl`,
+added where the group reaches: the shader keeps each head's joined weight from
+the mask loop in `gW` and `compileEdit` keeps the same weight per pixel, so the
+mixer reads the weight the mask stage folded rather than a second one. A colour
+mask can carry it, because the mixer runs after the mask stage. With a mask
+picked, the band chips and the pick stay live and the three sliders show the
+mask's offsets for the selected band; the drag tool is put down and goes inert.
+`tools/join-fold-check.mjs` holds a full head's offsets to the same offsets on
+the whole photo, and two of its new cases failed on the pipeline without the
+change. Black and white left stage 2b for the whole-photo list (record 042).
 
 ## Confirmed
 
