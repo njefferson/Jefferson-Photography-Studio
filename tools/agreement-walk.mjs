@@ -564,8 +564,10 @@ try {
   //    renderer that dropped them (the export's path did drop a joined colour
   //    key once) shows as a hue apart. Each on a Sky mask with its own
   //    saturation neutral: the colour mixer with every band shifted +60 degrees
-  //    (the sky moves a sixth of the wheel), and the grade with strong midtone
-  //    and highlight wheels. The saved file has to move with the screen.
+  //    (the sky moves a sixth of the wheel), the Sky band shifted +60 (the band
+  //    runs BEFORE the mask stage, so this one holds the early weight, as
+  //    Foliage's walk did), and the grade with strong midtone and highlight
+  //    wheels. The saved file has to move with the screen.
   const MASK_ARMS = [
     { label: "mask mixer", what: "a Sky mask's mixer, every band +60", check: "hslHue", want: "60",
       set: async (page) => {
@@ -575,6 +577,8 @@ try {
           await setMaskValue(page, "hslHue", "60");
         }
       } },
+    { label: "mask sky band", what: "a Sky mask's Sky band, hue +60", check: "skyHue", want: "60",
+      set: async (page) => { await setMaskValue(page, "skyHue", "60"); } },
     { label: "mask grade", what: "a Sky mask's grade, midtones 200/80, highlights 30/100", check: "gradeAmount2", want: "100",
       set: async (page) => {
         await setMaskValue(page, "gradeHue1", "200");
@@ -583,6 +587,24 @@ try {
         await setMaskValue(page, "gradeAmount2", "100");
       } },
   ];
+  // The photograph's pixels as one number, once they stop changing: read off
+  // the canvas the reader sees.
+  const settledView = async (page) => {
+    let last = "", same = 0;
+    for (let i = 0; i < 80; i++) {
+      const h = await page.evaluate(() => {
+        const cv = document.querySelector("#view"), g = cv.getContext("webgl2");
+        const b = new Uint8Array(cv.width * cv.height * 4);
+        g.readPixels(0, 0, cv.width, cv.height, g.RGBA, g.UNSIGNED_BYTE, b);
+        let x = 2166136261;
+        for (let k = 0; k < b.length; k += 4) { x ^= b[k] ^ (b[k + 1] << 8) ^ (b[k + 2] << 16); x = Math.imul(x, 16777619); }
+        return (x >>> 0).toString(16);
+      });
+      if (h === last) { if (++same >= 3) return h; } else { same = 0; last = h; }
+      await page.waitForTimeout(250);
+    }
+    return last;
+  };
   for (const arm of MASK_ARMS) {
     const label = arm.label;
     const page = await br.newPage({ viewport: { width: 1000, height: 820 }, acceptDownloads: true });
@@ -592,6 +614,7 @@ try {
       await page.waitForFunction(() => document.getElementById("welcome")?.hidden, null, { timeout: 300000 });
       await page.waitForFunction(() => !document.getElementById("busy")?.hasAttribute("open"), null, { timeout: 300000 });
       await page.waitForTimeout(2500);
+      const bare = await settledView(page);
       await openMasks(page);
       await page.click("#addSky");
       await page.waitForFunction(() => !document.getElementById("skyControls")?.hidden, null, { timeout: 120000 });
@@ -601,6 +624,14 @@ try {
       // setMaskValue puts the mask place back when it found it open, and the
       // place covers the tabs, so it is closed before the arm's own controls.
       await closeMasks(page);
+      // PICKING A MASK MUST NOT MOVE THE WHOLE PHOTO. With every value of the
+      // picked mask at no change, the photograph is what it was before the
+      // mask existed, byte for byte. A control that reads the whole photo's
+      // value from a slider now showing the mask's (the Sky band did, once:
+      // its offsets of 0 became a whole-photo luminance of 0) fails here,
+      // where screen against export cannot see it because both move together.
+      const picked = await settledView(page);
+      if (picked !== bare) { fail(`${label}: picking a mask with its values at no change changed the photograph (${bare} to ${picked}); a control is writing the whole photo from a slider that shows the mask`); throw new Error("not armed"); }
       await arm.set(page);
       await page.waitForTimeout(1500);
       const own = await page.evaluate((id) => document.getElementById(id)?.value, arm.check);

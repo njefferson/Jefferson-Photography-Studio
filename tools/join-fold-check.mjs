@@ -27,7 +27,10 @@
 // exactly as the same offsets on the whole photo would; a group that reaches
 // nowhere there changes nothing; and a colour mask, which Foliage refuses,
 // can carry them, because the mixer runs after the mask stage. The same four
-// hold a mask's own grade, whose wheels add to the whole photo's.
+// hold a mask's own grade, whose wheels add to the whole photo's. And a mask's
+// own Sky band, which runs BEFORE the mask stage like Foliage: its offsets add
+// the same way, and a group with a colour mask in it adds nothing, because the
+// colour key does not exist that early.
 //
 // Runs on every commit and needs no browser. Bundled with esbuild so it checks
 // the functions the app ships rather than a copy of them.
@@ -116,5 +119,16 @@ check("a grade with every amount at zero changes nothing", diff(pxg([{ ...neutra
 check("a head whose group reaches nowhere here changes nothing with a grade", diff(pxg([{ ...neutralMask(0), grade: G }, { ...neutralMask(0), op: 1 }]), bareG), 0);
 check("a colour mask can carry a grade", diff(pxg([{ ...neutralMask(3), hueTarget: 20, satTarget: 0.3, colorRange: 0.9, grade: G }]), bareG) > 0.02 ? 1 : 0, 1);
 
-console.log(bad ? `\n${bad} check(s) failed` : "\nthe three joins, an aim through them, and a mask's own mixer and grade hold");
+// 042 stage 2, beside Foliage: the mask's own Sky band, on a blue pixel inside
+// the sky band's hue range.
+const pxs = (masks, sky) => { const p = plain(); p.masks = masks; if (sky) p.sky = sky; const o = new Float32Array(4); compileEdit(p, undefined, 1.5)(0.2, 0.35, 0.8, o, 0, 0.5, 0.5); return o; };
+const SB = [20, 0.5, 0.2];
+const bareS = pxs([]);
+check("a Sky band on the whole photo changes the pixel (so the case is live)", diff(pxs([], [20, 1.5, 1.2]), bareS) > 0.02 ? 1 : 0, 1);
+check("a full head's Sky band renders as the same offsets on the whole photo", diff(pxs([{ ...neutralMask(0), skyBand: SB }]), pxs([], [20, 1.5, 1.2])), 0);
+check("a Sky band of zero changes nothing", diff(pxs([{ ...neutralMask(0), skyBand: [0, 0, 0], brightness: 1.0001 }]), pxs([{ ...neutralMask(0), brightness: 1.0001 }])), 0);
+check("a head whose group reaches nowhere here changes nothing with a Sky band", diff(pxs([{ ...neutralMask(0), skyBand: SB }, { ...neutralMask(0), op: 1 }]), bareS), 0);
+check("a colour mask cannot carry a Sky band (the band runs before its key exists)", diff(pxs([{ ...neutralMask(3), hueTarget: 220, satTarget: 0.7, colorRange: 0.9, skyBand: SB }]), bareS), 0);
+
+console.log(bad ? `\n${bad} check(s) failed` : "\nthe three joins, an aim through them, and a mask's own mixer, grade and Sky band hold");
 process.exit(bad ? 1 : 0);
