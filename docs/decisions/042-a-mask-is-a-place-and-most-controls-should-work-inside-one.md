@@ -98,6 +98,47 @@ whole-photo value, summed where masks overlap and clamped, read before the band
 through the group weight; a mask that is or joins a colour mask refuses it
 (`groupCanAim`).
 
+**v2.63 on staging, 2026-09-25: the colour mixer per mask, and what the first
+device use found.** On NIR_3461 with a brush picked, the Sky band sat dimmed
+beside a live Foliage band, and the reason for it was at the top of the Colour
+tab, a screen away from the band. Two things follow, both built and held after
+the grade on a mask:
+
+- **The Sky band follows a picked mask too**, beside Foliage and by the same
+  mechanism: the mask's own hue, saturation and luminance offsets on the whole
+  photo's Sky band, read before the band through the group weight, refused for
+  a group with a colour mask with the reason in the band itself. Foliage was
+  listed in stage 2 and its sibling band never was.
+- **The reason sits beside the dimmed controls**: the sticky Editing line now
+  carries "Dimmed controls stay with the whole photo", so it is in view
+  wherever the panel is scrolled.
+
+Two defects were found building it, each fixed with a check seen failing first.
+Reading the Sky sliders into the whole photo with a mask picked, while they show
+the mask's offsets, wrote offsets of 0 into the whole photo's Sky band and
+blackened every sky-hued pixel the moment any control was touched; it never
+left the held build, and the agreement walk now checks that picking a mask with
+its values at no change leaves the photograph byte-identical. And in v2.63 as
+staged, double-tapping a slider that shows a picked mask's value sent it to the
+whole photo's opening value, so a mask's Foliage saturation went to +1; it now
+goes to the mask's own no change.
+
+**And M1's "each starting at no change" was not what shipped.** Found on the
+target device the same day: every new mask lightened the photograph with
+nothing moved. `addMask` still gave a new mask a value of its own from before
+the switch (brightness 1.25 on a brush or radial, 1.15 on a gradient,
+saturation 1.4 on a colour mask, 1.3 on a Sky mask), which had sat on the
+mask's own sliders in view and since v2.63 sat on the Basic and Colour tabs.
+Every value now starts at no change. Those values had also been what made a
+new mask's coverage tint appear, because the renderer uploads only masks that
+change something; the mask the tint is showing is now uploaded even at no
+change, in the preview only, so a new mask shows its area while it is placed,
+as Lightroom's overlay does on a mask at zero. The double-tap walk that was to
+prove the +1 fix turned out to tap where a single tap already lands on the
+mask's no change; tapping on the thumb showed the fix needed, and also that
+the gesture missed a second tap arriving during the redraw a first tap had
+started, now timed by the touches' own timestamps.
+
 **Lens correction bears on it, measured the same night.** The matched shipped
 profile (50-250) opens at 0 in a fresh session and is remembered per lens and
 aperture after that. At 1, in Aerochrome:
@@ -323,7 +364,9 @@ selection; built in stages, each shippable and checkable on its own.** Chosen.
     row shows only while the photograph has a mask.
   - **The heading.** "Editing: Sky 1 · Back to whole photo" sits in the
     drawer's sticky heading, is announced in a live region when the target
-    changes, and its way back is a button at least 44px tall.
+    changes, and its way back is a button at least 44px tall. Beneath it, one
+    line says that dimmed controls stay with the whole photo, so the reason is
+    in view wherever the panel is scrolled.
   - **What follows a targeted mask in this release**, each starting at no
     change (M1):
     - the mask's five existing values, moved out of the mask place into the
@@ -334,7 +377,11 @@ selection; built in stages, each shippable and checkable on its own.** Chosen.
     - **the Foliage band on Colour (Hue, Saturation, Luminance)**, new: the
       mask's own offsets, stored as an optional `MaskLayer` field, absent
       meaning no change. The Aerochrome Finish panel's Foliage row follows on
-      its own, because it mirrors the Colour tab's slider by id.
+      its own, because it mirrors the Colour tab's slider by id;
+    - **the Sky band on Colour (Hue, Saturation, Luminance)**, added
+      2026-09-25 after the first device use of v2.63: the same shape as
+      Foliage, stored as its own optional field, combining the same way, and
+      refused the same way for a group with a colour mask.
   - **How a Foliage offset combines.** At a pixel the band's value is the
     whole-photo value plus each group's offset times that group's joined place
     weight, summed where masks overlap (the Lightroom convention), then held

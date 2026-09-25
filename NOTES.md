@@ -43,8 +43,82 @@ because they floor temperature at ~2000K.
 
 ## On staging, waiting on a device pass
 
-**v2.63 at https://staging.jefferson-photo-studio.pages.dev, pushed
-2026-09-25 (a8ce335).** Ten commits on top of production. v2.62.16, the build
+**v2.63.7 at https://staging.jefferson-photo-studio.pages.dev, pushed
+2026-09-25 (7003688).** Seven commits on top of v2.63 as it was first staged
+(a8ce335, the entry below), replacing it, because the first device use of
+v2.63 found the defects three of them fix. VERSION stays 2.63: the same
+capability release, not yet on production, so the automatic digit counts the
+seven.
+
+What a reader gets, beyond v2.63's list below:
+
+- New: a picked mask takes its own grade;
+- New: a picked mask takes its own Sky band, and a dimmed control says why;
+- Fixed: with a mask picked, double-tapping a slider puts it back to no change;
+- Fixed: a new mask changes nothing until you move a control;
+- Fixed: a double-tap on a slider is recognised even while the photo is
+  redrawing.
+
+**What the first device use of v2.63 found, and what came of it:**
+
+- **Every new mask lightened the photograph with nothing moved** (a brush on
+  NIR_3461, a radial on NIR_3467). A new mask started with a value of its own
+  so it did something at once (brightness 1.25 on a brush or radial, 1.15 on a
+  gradient, saturation 1.4 on a colour mask and 1.3 on a Sky mask), and since
+  the switch those values sat on the Basic and Colour tabs where nothing said
+  so. Reproduced on NIR_3461: the sky inside a painted brush went from 78.7,
+  129.1, 157.1 to 102.3, 154.7, 184.4, nothing outside it moved. Every value
+  now starts at no change. The starting values were also what made a new
+  mask's tint appear, because the renderer uploads only masks that change
+  something, so the mask the tint is showing now goes up even at no change, in
+  the preview only.
+- **The Sky band sat dimmed with its reason a screen away.** It now follows a
+  picked mask like Foliage, and the Editing line says dimmed controls stay
+  with the whole photo, wherever the panel is scrolled.
+- **The sky inside a pylon's lattice stays outside the Sky mask.** Recorded as
+  decision 065, ranked below 048; the route today is "Add to it" with a Colour
+  mask on the sky.
+
+**Double-tap, measured rather than assumed.** The walk that was meant to prove
+the double-tap fix had tapped each slider's middle, which on the mask's
+Foliage saturation and Saturation is exactly their no change, so it passed with
+the fix reverted; before that it had tapped below the window. Tapping on the
+thumb showed the gesture itself failing when the first tap nudged the slider:
+the redraw held the second touch, 98 ms after the first by its own timestamp,
+until 3.3 s later, and the gesture was timed by when touches were handled. It
+is timed by when they were made now. With `back()` reverted the mask's
+Foliage saturation goes to +1; with the timing reverted neither mask slider
+returns; with both in, every case passes.
+
+**What the device pass covers**, beyond v2.63's steps below:
+
+1. Add a Brush, a Radial, a Gradient, a Sky mask and a Colour mask, moving
+   nothing: the photograph does not change, and the tint shows each one while
+   it is placed.
+2. With a mask picked, on Colour, the Sky band acts on the mask; on a Colour
+   mask it is dimmed and says why.
+3. With a mask picked, on Grade, the wheels act on the mask's area only.
+4. With a mask picked, move Foliage saturation and Saturation, then
+   double-tap each: both go back to no change.
+
+Walks against this build (2b4feef, and the two changed since on 7003688):
+agreement (its Sky band arm fails at 19.3 degrees against a bar of 15 with the
+export's half discarded, after two earlier versions of the arm were found
+unable to fail), aim, mask-panel, mask-slots (a new radial, gradient and Sky
+mask change nothing; a new radial's tint shows; both seen failing first),
+mask-truth, mask-fix-export, export-bytes, accessibility, keep, fix-brush,
+mask-fix, fullview-mask, look round-trip and double-tap, all passing; the
+control sweep reports the same 54 controls to answer for as before. One export
+of NIR_3461 with a Sky mask's own Sky band moved was opened: the open sky
+inside the mask goes grey, the grass keeps its red.
+
+**Found, and not fixed:** under Aerochrome, the sky colour smoothing map as
+built when the look is applied differs from any later rebuild with the same
+settings by at most 6 levels in 255 (frame mean 0.45 on NIR_1651; the
+difference image opened shows faint contours in the sky). Invisible; cause not
+established; it breaks a byte-for-byte check, which is how it was found.
+
+**v2.63 as first staged, 2026-09-25 (a8ce335).** Ten commits on top of production. v2.62.16, the build
 that was here before, went to production on the go the same day, as 2.62.26:
 the live site's offline copy is named `ips-2.62.26` and its test page carries
 the Edit shader rows. The middle number moved to 2.63 in the last reader-facing
@@ -1082,6 +1156,17 @@ user-scalable=no.
   going red. Union lands as a third fold case, darktable's inclusive operator
   `w + c - w*c`, beside the existing multiply and never in place of it. See
   `docs/decisions/048-colour-cannot-finish-a-selection-an-occluder-has-split.md`.
+- [ ] **Sky inside a lattice cannot be filled into the Sky mask** <!-- decision: 065 -->
+  **Shown as:** Fill the sky between a pylon's struts into the Sky mask with one stroke.
+  — found on the target device on v2.63: on NIR_3461 the Sky mask leaves the
+  whole near pylon out, sky between the struts included, because the grow
+  reaches sky only along sky-coloured paths and the struts cut every one. The
+  union (048) is the route today and leaves specks and the lit steel edges.
+  The chosen shape is Capture One's Magic Brush as a third hand correction on
+  the Sky mask: a stroke inside the gaps fills the connected pixels of similar
+  colour and brightness, with a Tolerance, replayed like Add by hand. Under
+  Aerochrome it reaches the look's own sky only with 052. See
+  `docs/decisions/065-sky-inside-a-lattice-cannot-be-filled-into-the-sky-mask.md`.
 - [ ] **Sky seen through a canopy takes no sky adjustment** <!-- decision: 028 -->
   **Shown as:** Sky showing between leaves takes the sky adjustments too.
   — the Sky mask spreads only through pixels that are JOINED to the sky, which

@@ -1,10 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=01bed44834ae22fe
-diffhash=5a315012181485e6
-verdict=IN-SCOPE: NOTES and the status page record v2.62.16 live as 2.62.26 and v2.63 on staging with its device-pass steps, as the plan says
-# IN-SCOPE: both staged diffs match exactly what the plan's cited passages authorize and what the commits/gates support — the JPS diff records only the promotion and staged device-pass state, and the hub diff is exactly the named handoff-check.mjs defect fix plus its lesson bookkeeping, with no attribution or session-link violations in either.
-# 
-# 1. NOTES and the status page: v2.62.16 on main as bdedec8 and 99d1e20, live as 2.62.26 with how it was checked; v2.63 on staging at a8ce335 with its nine reader-facing subjects matching the commits (the tenth is internal); the device-pass steps phrased as pending; the walks and the colour mixer's record matching a8ce335. Nothing marked done that is not.
-# 2. The hub diff (committed separately as db9d1bc) is the named defect fix and its lesson.
-# 3. No owner quotation or attribution, no session link, no model name.
+planhash=f1791fb3cecaa9b5
+diffhash=65219e720579a90c
+verdict=IN-SCOPE: This is a docs-only commit matching "Now" step 5's list (record 065, record 042's additions plus 1d, NOTES' 065 bullet, held-stack and smoothing-map finding, the status page) and "Next" item 2's spec for record 065 (Looked up: Capture One's Magic Brush and Lightroom's colour-range fill; Weighed against 028/048/050/049/052; Options/Rejected/Rank by dependency/Depends edges; Looked at naming NIR_3461's mattes). The Aerochrome decision record is left out because it cannot be written until the owner answers the look question from step 3; that is a narrower delivery, not scope creep. Record 065's relations to 031, 023 and 032 are required by the repo's own Depends gate for decisions cited in prose.
+# IN-SCOPE: This is a docs-only commit matching "Now" step 5's list (record 065, record 042's additions plus 1d, NOTES' 065 bullet, held-stack and smoothing-map finding, the status page) and "Next" item 2's spec for record 065 (Looked up: Capture One's Magic Brush and Lightroom's colour-range fill; Weighed against 028/048/050/049/052; Options/Rejected/Rank by dependency/Depends edges; Looked at naming NIR_3461's mattes). The Aerochrome decision record is left out because it cannot be written until the owner answers the look question from step 3; that is a narrower delivery, not scope creep. Record 065's relations to 031, 023 and 032 are required by the repo's own Depends gate for decisions cited in prose.
