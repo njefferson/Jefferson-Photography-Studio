@@ -1,11 +1,11 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=9699d87e18194a54
-diffhash=7a16c3eb9ca33e91
-verdict=IN-SCOPE: the wrangler pin on three deploy steps and the status page's wrangler item and last-verified SHA, exactly item 5 and its read-first paragraph
-# IN-SCOPE: both diffs are exactly the wrangler pin (item 5, its "Read first (2026-09-25)" paragraph) plus the JPS status-page update it names, nothing more.
+planhash=6c1eec799b84c8fb
+diffhash=21a1d98879c3e77e
+verdict=IN-SCOPE: stage 2b's design in record 042 and one status line, clause for clause with plan item 6 and its looked-up paragraph
+# IN-SCOPE: both changed files are docs (the 042 decision record and public/conveyor-status.html), and the added design/Looked-up content matches plan item 6 ("Then stage 2b...") clause for clause, with only buildability elaboration and source-naming that the plan and repo rules permit.
 # 
-# 1. JPS diff: .github/workflows/deploy.yml adds the comment, workflow-level WRANGLER_VERSION "4.86.0", and wranglerVersion on exactly three wrangler-action steps (project create, deploy, redirect); no uses/SHA, permission or trigger lines changed. public/conveyor-status.html changes only the last-verified SHA (a24bd0c to 47d4feb) and the wrangler item, both named in item 5.
-# 2. Hub diff: deploy.yml only, WRANGLER_VERSION "4.139.0" and wranglerVersion on exactly two steps; the Doctrine 16.2 citation is accurate.
-# 3. Versions match the plan paragraph: 4.86.0 here, 4.139.0 in the hub.
-# 4. No new rule, gate or roadmap change; no quotation or attribution; no session link or model name.
+# 1. Files: only the 042 record and public/conveyor-status.html.
+# 2. Design matches item 6: HSL and grade as adding offsets; luminance and LUT strength one row a mask; curves as the mask's own curve after the whole photo's, eight in one texture, 15 of 16 units; shadow colour last with its Convert designed when built; contrast needs nothing more; black and white to the whole-photo list; one commit each in that order. Rank, Depends, Weighed against, Looked at and Built already are untouched.
+# 3. The Looked up block holds exactly the plan's four claims, headed as search extracts, with the source named for two; an earlier draft carrying details beyond the plan was judged out of scope and trimmed.
+# 4. No owner quotation or attribution, no session link, no model name.
