@@ -83,9 +83,9 @@
       <h2>Where the builds are</h2>
       <ul class="facts">
         <li><b>Production</b> <span>v2.62.26: the export edge fix and the test page's shader rows, which were on staging as v2.62.16, promoted on your go. Checked on the live site: its offline copy is named for 2.62.26 and the test page carries the new rows. The number moved because the last digit counts every commit; the content did not.</span></li>
-        <li><b>On staging</b> <span>v2.63: the wire fix (pick a mask and lower its Foliage), a mask's own colour mixer, the first stage of the mask work, the LUT grid and None for looks. It waits on your device pass; the steps are below.</span></li>
-        <li><b>Built and held</b> <span>Nothing yet. The mask work's stage 2b goes on, with the grade on a picked mask next, and waits behind v2.63.</span></li>
-        <li><b>Last verified green</b> <span><code>99d1e20</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
+        <li><b>On staging</b> <span>v2.63.7, replacing v2.63: everything v2.63 carried (the wire fix, a mask's own colour mixer, the first stage of the mask work, the LUT grid and None for looks), plus a picked mask's own grade and Sky band, a line under "Editing" saying dimmed controls stay with the whole photo, new masks that change nothing until a control is moved, and double-tap that puts a mask's slider back to no change and is no longer lost while the photo redraws. It waits on your device pass; the steps are in NOTES.</span></li>
+        <li><b>Built and held</b> <span>Nothing. The mask work's stage 2b goes on after the device pass and your Aerochrome answer.</span></li>
+        <li><b>Last verified green</b> <span><code>ec29ded</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
         <li><b>Next version</b> <span>2.63 is the staged build's number, because masks gain their own amounts in it. The next release that adds something takes 2.64.</span></li>
       </ul>
 
@@ -93,11 +93,28 @@
         <h2>Waiting on you</h2>
         <ul>
           <li>
-            <strong>The device pass on v2.63</strong>, at
+            <strong>The device pass on v2.63.7</strong>, at
             staging.jefferson-photo-studio.pages.dev. The steps are in NOTES under
-            "On staging": the wire fix on one of your frames and its export, the row
-            of mask names in both orientations, a mask's colour mixer, the LUT grid,
-            None, "Add to it", and the test page's timing with eight masks.
+            "On staging": new masks of every kind changing nothing until a control
+            moves, with each one's tint while it is placed; the Sky band and the
+            grade on a picked mask; double-tap on a mask's slider; then v2.63's own
+            steps (the wire fix and its export, the row of mask names, a mask's
+            colour mixer, the LUT grid, None, "Add to it", and the test page's
+            timing with eight masks).
+          </li>
+          <li>
+            <strong>Which the Aerochrome button should be</strong>: as shipped, or
+            Pink IR with your Sky and Foliage band values plus Aerochrome's own
+            denoise. The pictures went with the question: the second has no round
+            spots, a deeper sky and crimson grass, and a slightly more textured sky
+            at full size.
+          </li>
+          <li>
+            <strong>Whether the look's sky should read your Sky mask next</strong>
+            (record 052), after the Sky band commit and ahead of the rest of stage
+            2b. Yes is recommended: it is what lets anything added to the Sky mask,
+            by "Add to it" or by a fill, reach Aerochrome's own sky. No keeps it
+            ninth.
           </li>
         </ul>
       </div>
@@ -149,11 +166,11 @@
         <li class="now"><span class="state">Now</span>
           <strong>Masks, stage 2b: the rest of the colour and tone tools on a
           picked mask.</strong>
-          The colour mixer is built and on staging: pick a mask, pick one of the
-          eight colours, and it moves only where the mask reaches; its export was
-          checked against the screen and opened. The grade is next.
+          The colour mixer, the grade and the Sky band are on staging: pick a
+          mask and each moves only where the mask reaches, with every export
+          checked against the screen. Luminance with LUT strength is next.
           HSL, the grade, luminance with LUT strength, the curves, then shadow
-          colour, each its own change on the held build. A mask's curve is its own
+          colour, each its own change. A mask's curve is its own
           and applies after the whole photo's, as in Lightroom and Capture One;
           the others add to the whole photo's where the mask reaches. Black and
           white stays for the whole photo, as it does in both: a mask's own
@@ -282,8 +299,8 @@
           gradient over everything above the grass, joined to a colour mask on the
           red with its saturation at 0, takes the red above the horizon in the
           full export from 233,425 pixels to 43,733 and leaves the grass alone; the
-          red trees on the horizon go dark with it. It needs the fix, so it is
-          usable once the held build ships, not today.
+          red trees on the horizon go dark with it. It needs the fix, which is on
+          staging.
         </li>
       </ul>
 
@@ -296,13 +313,54 @@
         <li>
           <strong>A mask joined to the one above still shows its own Brightness,
           Contrast and Saturation sliders</strong>, which nothing reads once it is
-          joined. Fixed in the held build: those sliders left the mask panel, and
-          the tabs act on the picked mask's group.
+          joined. Fixed on staging, in v2.63: those sliders left the mask panel,
+          and the tabs act on the picked mask's group.
         </li>
         <li>
           <strong>Foliage can only be set for the whole photo.</strong> It selects a
           colour, not a place, so bright cladding on a building reddens along with
-          the grass. Fixed in the held build: pick a mask and lower its Foliage.
+          the grass. Fixed on staging, in v2.63: pick a mask and lower its Foliage.
+        </li>
+        <li>
+          <strong>With a mask picked, the Sky band was dimmed and said nothing
+          about why where you were looking.</strong> The reason sat at the top of
+          the Colour tab. Fixed on staging, in v2.63.7: the Sky band follows a picked
+          mask, and the line under "Editing" says dimmed controls stay with the
+          whole photo, wherever the panel is scrolled.
+        </li>
+        <li>
+          <strong>Double-tapping a slider that shows a picked mask's value sent it
+          to the whole photo's opening value</strong>, so a mask's Foliage
+          saturation went to +1 rather than to no change. In v2.63 as first
+          staged. Fixed on staging, in v2.63.7, and the gesture no longer loses a
+          second tap that arrives while the photo is still redrawing.
+        </li>
+        <li>
+          <strong>Every new mask lightened the photograph with nothing
+          moved.</strong> A new mask started with a value of its own (a brush or
+          radial brighter by a third of a stop, a Sky or Colour mask more
+          saturated), which since the switch sat on tabs where nothing said so.
+          Fixed on staging, in v2.63.7: every value starts at no change, and the
+          tint still shows a new mask's area while you place it.
+        </li>
+        <li>
+          <strong>Aerochrome's sky smoothing comes out very slightly different the
+          first time it is drawn.</strong> The smoothing map built when the look
+          is applied differs from any later rebuild with the same settings by at
+          most 6 levels in 255, and fewer than one pixel in ten thousand moves more
+          than 4. Invisible, but
+          it breaks a byte-for-byte check, which is how it was found. Why is not
+          yet known.
+        </li>
+        <li>
+          <strong>Sky inside a pylon's lattice stays outside the Sky mask.</strong>
+          The Sky mask reaches sky only along sky-coloured paths, and the struts
+          cut every one. The route today is "Add to it" with a Colour mask on the
+          sky, which leaves specks and takes the lit steel edges. A fill, a stroke
+          inside the struts that takes the similar sky around it (the way Capture
+          One's Magic Brush works), is recorded as decision 065 and ranked
+          eighteenth; under Aerochrome it reaches the look's own sky only once 052
+          lands.
         </li>
         <li>
           <strong>Masks do not survive the tab closing.</strong> The rest of the
@@ -315,7 +373,7 @@
           photo when masks are on.</strong> With the wire workaround applied they
           stay pink on screen and are faint in the export; with no masks the two
           agree. They come from Sky colour smoothing, which runs after the masks.
-          One cause is fixed in the held build (the screen's smoothing did not
+          One cause is fixed on staging (the screen's smoothing did not
           follow a mask's changes); whether that is all of it has not been
           measured again. Owned by the Aerochrome smoothness work.
         </li>
@@ -326,8 +384,8 @@
         </li>
         <li>
           <strong>A LUT does not survive the iPad closing the tab.</strong> The rest
-          of the edit comes back and the LUT does not. Fixed in the held build,
-          which has not reached you yet.
+          of the edit comes back and the LUT does not. Fixed on staging, in
+          v2.63.
         </li>
         <li>
           <strong>The deploys installed a range of wrangler versions.</strong>
