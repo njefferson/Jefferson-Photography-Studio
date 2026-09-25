@@ -1,11 +1,11 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=d81d049244b8bfd2
-diffhash=4270564d73e20b30
-verdict=IN-SCOPE: all three files are docs; every number and SHA traces to the plan's lens outcome, item 4 and 4a, with no new rule, gate, reorder, quote or attribution
-# IN-SCOPE: All three staged files are docs files (NOTES.md, the 042 decision record, conveyor-status.html), and every number, commit SHA and finding in the diff traces to the plan's Lens-correction/Outcome/item-4/4a passages or to standing status-page/Looked-at requirements, with no new code, rule, gate, roadmap reorder, or attribution/quote/session-link violation.
+planhash=9699d87e18194a54
+diffhash=7a16c3eb9ca33e91
+verdict=IN-SCOPE: the wrangler pin on three deploy steps and the status page's wrangler item and last-verified SHA, exactly item 5 and its read-first paragraph
+# IN-SCOPE: both diffs are exactly the wrangler pin (item 5, its "Read first (2026-09-25)" paragraph) plus the JPS status-page update it names, nothing more.
 # 
-# 1. Files touched: NOTES.md, the 042 record, public/conveyor-status.html only; the plan says the lens findings and the switch go into record 042 and the status page with the switch's docs commit, and the status page is updated at every stage as a docs commit.
-# 2. No new plan item, rule, gate or reorder. The 042 record adds stage-2 and lens paragraphs restating plan content and three Looked at lines required by the repo's frame rule. The round discs are not claimed resolved (one cause fixed in 52cfc7d, not re-measured). "Masks do not survive the tab closing" is a pre-existing documented fact (src/main.ts, editToJson) disclosed in found-not-fixed, the status page's standing content (Doctrine 7i). The lens-off 11.24%/10.22% figure supports the same checked-not-a-defect conclusion.
-# 3. No quotation, attribution by name, session link or model name found.
-# 4. Numbers match the plan's Outcome bullet: 125,122 to 112,923; 39,711 to 37,252; 1,706,226 to 239,550; 114,416 to 0; 239,550 to 0; grass 54.5% to 52.1% and 55.3% to 53.6%; 3.480% vs 1.434%; at most 1.5 levels in 255; control sweep 55 to 54.
+# 1. JPS diff: .github/workflows/deploy.yml adds the comment, workflow-level WRANGLER_VERSION "4.86.0", and wranglerVersion on exactly three wrangler-action steps (project create, deploy, redirect); no uses/SHA, permission or trigger lines changed. public/conveyor-status.html changes only the last-verified SHA (a24bd0c to 47d4feb) and the wrangler item, both named in item 5.
+# 2. Hub diff: deploy.yml only, WRANGLER_VERSION "4.139.0" and wranglerVersion on exactly two steps; the Doctrine 16.2 citation is accurate.
+# 3. Versions match the plan paragraph: 4.86.0 here, 4.139.0 in the hub.
+# 4. No new rule, gate or roadmap change; no quotation or attribution; no session link or model name.

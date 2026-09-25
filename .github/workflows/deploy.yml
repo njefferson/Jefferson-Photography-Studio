@@ -25,6 +25,18 @@ permissions:
 # the hub's own deploy runs (noahjefferson .github/workflows/deploy.yml), and
 # .github/dependabot.yml keeps them current.
 
+# Wrangler itself is pinned too, for the same reason. Without a version the
+# action checks for its own default and, when it is missing (always, on a fresh
+# runner), installs `wrangler@4`, a range, in the job holding the Cloudflare
+# token. The same action at the same commit ran 4.86.0 here and 4.139.0 in the
+# hub on the same night, and the hub's deploy failed once on a release npm was
+# not yet serving. 4.86.0 is what this repo's last green deploy ran (read from
+# its log on 2026-09-25), so pinning it changes nothing that deploys. Dependabot
+# does not move this; changing it is a deliberate edit, read against a deploy
+# log afterwards.
+env:
+  WRANGLER_VERSION: "4.86.0"
+
 jobs:
   deploy:
     # Only main (production) and staging may deploy — a manual dispatch from a
@@ -57,12 +69,14 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: ${{ env.WRANGLER_VERSION }}
           command: pages project create jefferson-photo-studio --production-branch=main
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: ${{ env.WRANGLER_VERSION }}
           # staging branch -> preview URL (staging.jefferson-photo-studio.pages.dev);
           # everything else -> production (jefferson-photo-studio.pages.dev).
           command: pages deploy dist --project-name=jefferson-photo-studio --branch=${{ github.ref_name == 'staging' && 'staging' || 'main' }} --commit-dirty=true
@@ -76,4 +90,5 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: ${{ env.WRANGLER_VERSION }}
           command: pages deploy redirect --project-name=infrared-photography-studio --branch=main --commit-dirty=true
