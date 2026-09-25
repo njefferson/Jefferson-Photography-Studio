@@ -45,7 +45,7 @@
 //
 // NOT in .branch-guard's `also=`: it drives a real browser and decodes a RAW.
 // Run it before a release, or through tools/walk-all.mjs.
-import { openMasks, setMaskValue } from "./walk-input.mjs";
+import { openMasks, closeMasks, setMaskValue } from "./walk-input.mjs";
 import { chromium } from "/home/user/Jefferson-Photography-Studio/node_modules/playwright-core/index.mjs";
 import { requireFreshDist } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
@@ -163,6 +163,12 @@ try {
       // new Sky mask used to arrive with; otherwise "with a Sky mask" would be
       // the no-mask arm again.
       await setMaskValue(p, "saturation", "1.3");
+      // BACK TO THE WHOLE PHOTO, as the arm stood before: with the mask picked
+      // the controls this walk reads show the MASK'S values (Contrast among
+      // them, the one control Sepia and B&W IR differ by), and the walk went
+      // blind on that pair.
+      await closeMasks(p);
+      await p.click("#maskTargetBack");
       await openMasks(p);
       await settle(p);
     }
