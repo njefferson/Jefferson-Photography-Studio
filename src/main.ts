@@ -1753,7 +1753,14 @@ function syncSkyMap(): void {
     return;
   }
   const { skySmooth: _s, skyDepth: _d, masks: _m, spots: _sp, stickers: _st, crop: _c, straighten: _str, warp: _w, grainAmt: _g, vigAmt: _v, ...rest } = params as EditParams & Record<string, unknown>;
-  const key = JSON.stringify(rest);
+  // THE MASKS ARE IN THE KEY, without their four bitmaps. buildSkyMap renders
+  // each sample through compileEdit with the masks at its own position, so a
+  // mask's change moves the map's target; keyed without them, the screen kept a
+  // stale map after a mask changed while the export built a fresh one, and an
+  // Undo there came back to a different sky. A stroke or a regenerated sky
+  // changes a bitmap in place, and bumps `rev`, which the key does carry.
+  const maskKey = (params.masks ?? []).map(({ brush: _b, fine: _f, eff: _e, effFine: _ef, ...m }) => m);
+  const key = JSON.stringify([rest, maskKey]);
   if (key === skyMapKey) return;
   skyMapKey = key;
   const img = current;

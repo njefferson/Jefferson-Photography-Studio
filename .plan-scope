@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=20d6d976ab7d46bf
-diffhash=5564645aa9794821
-verdict=IN-SCOPE: the amend adds only the .plan-scope record of item 2b's verdict
-# IN-SCOPE: the amend only stages .plan-scope, the plan-hash/diff-hash/verdict record of the judgment given for c9c6205's unchanged five-file diff, which the plan's standing steps require for each commit; not a source change of its own.
+planhash=b318cd7f0d758c5b
+diffhash=8087be43cf576c31
+verdict=IN-SCOPE: plan item 4a with the module map line the architecture gate forces
+# IN-SCOPE: the three staged files are item 4a's fix in src/main.ts plus its two mechanical companions, docs/ARCHITECTURE.md's regenerated line count for src/main.ts and the .plan-scope record the standing steps require.
