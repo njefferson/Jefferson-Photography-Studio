@@ -5,7 +5,7 @@
 
 // Single source of truth for edit parameters lives in pipeline.ts so the GPU
 // preview and CPU export can never drift apart.
-import { toneEvaluator, toneIsIdentity, maskGroupsForRender, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, LENS_GAIN_LO, LENS_GAIN_HI, SAT_GUARD_LO, SAT_GUARD_HI, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, lensAreaMean, type EditParams, type LocalMap, type SkyMap, type BrushMask, type CropRect } from "./pipeline";
+import { toneEvaluator, toneIsIdentity, maskGroupsForRender, groupHslOffset, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, LENS_GAIN_LO, LENS_GAIN_HI, SAT_GUARD_LO, SAT_GUARD_HI, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, lensAreaMean, type EditParams, type LocalMap, type SkyMap, type BrushMask, type CropRect } from "./pipeline";
 import { toHalfBuffer } from "./half";
 export type { EditParams };
 
@@ -133,6 +133,8 @@ uniform int u_maskOp[8];     // 0 head (starts a group) · 1 subtract · 2 inter
 uniform int u_maskAims[8];   // bitmask of stages this mask gates: 1 dehaze, 2 clarity, 4 shadow colour, 8 lens hot-spot fix, 16 noise, 32 detail (030)
 uniform vec3 u_maskFol[8];   // a HEAD's own Foliage offsets [hue, sat, lum] (042 stage 2); zero on components
 uniform bool u_maskFolOn;    // false when no head carries one, so the band reads u_fol and nothing else
+uniform vec3 u_maskHsl[64];  // a HEAD's own colour-mixer offsets (042 stage 2b), 8 bands per mask slot, head i at i*8; zero elsewhere
+uniform bool u_maskHslOn;    // false when no head carries any, so the mixer reads u_hsl and nothing else
                              // LITERAL 8, like every array above it: MAX_MASKS is a
                              // TypeScript constant and means nothing inside GLSL —
                              // written as MAX_MASKS first, and the shader silently
@@ -825,6 +827,10 @@ void main() {
 
   // Local masks: each adjustment weighted by the mask, in linear space before
   // global contrast/gamma. Identical math to compileEdit in pipeline.ts.
+  // Each HEAD's joined weight is kept in gW for the stages after this one that
+  // take a mask's own values (042, stage 2b), so they read the weight this loop
+  // folded rather than folding a second one.
+  float gW[8] = float[8](0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
   for (int i = 0; i < u_maskCount; i++) {
     // A COMPONENT WAS ALREADY FOLDED INTO ITS HEAD (026) — skip it here, or its
     // adjustment would be applied a second time on its own.
@@ -862,6 +868,7 @@ void main() {
       w = (u_maskOp[j] == 1) ? w * (1.0 - wc) : (u_maskOp[j] == 3) ? w + wc - w * wc : w * wc;
     }
     if (i == u_maskViz) vizW = w; // the true post-invert coverage of the shown mask
+    gW[i] = max(w, 0.0);
     if (w <= 0.0) continue;
     vec4 adj = u_maskAdj[i]; // brightness, contrast, saturation, warmth
     c.r *= 1.0 + 0.5 * adj.w * w;
@@ -916,6 +923,19 @@ void main() {
     float t = (h - CTR[bi]) / (CTR[bi + 1] - CTR[bi]);
     float w = t * t * (3.0 - 2.0 * t);
     vec3 adj = mix(u_hsl[bi], u_hsl[bj], w);
+    // A mask's own offsets (042, stage 2b), interpolated the same way, weighted
+    // by its group as the mask stage folded it, summed, then held to the
+    // sliders' ranges. The mirror of the mixer in compileEdit.
+    if (u_maskHslOn) {
+      bool anyM = false;
+      for (int i = 0; i < u_maskCount; i++) {
+        if (u_maskOp[i] != 0 || gW[i] <= 0.0) continue;
+        vec3 o = mix(u_maskHsl[i * 8 + bi], u_maskHsl[i * 8 + bj], w);
+        adj += o * gW[i];
+        anyM = true;
+      }
+      if (anyM) adj = clamp(adj, vec3(-60.0, 0.0, 0.3), vec3(60.0, 2.0, 1.7));
+    }
     // Power-curve saturation (see pipeline.ts): visible on low-sat IR pixels.
     float s2 = pow(clamp(hsv.y, 0.0, 1.0), 1.0 / max(0.05, adj.y));
     g = hsv2rgb(vec3(fract((h + adj.x) / 360.0), s2, min(1.0, hsv.z * adj.z)));
@@ -1226,7 +1246,7 @@ export class Renderer {
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskOp", "u_maskAims", "u_maskFol", "u_maskFolOn", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_maskMatte", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"]) {
+    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskOp", "u_maskAims", "u_maskFol", "u_maskFolOn", "u_maskHsl", "u_maskHslOn", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_maskMatte", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"]) {
       this.loc[u] = gl.getUniformLocation(this.prog, u);
     }
     // Float textures (for 14-bit linear raw) need this extension to be color-
@@ -1829,9 +1849,13 @@ export class Renderer {
     gl.uniform1f(this.loc.u_recover, p.recover ?? 0);
     gl.uniform1f(this.loc.u_clarity, p.clarity ?? 0);
     gl.uniform1f(this.loc.u_dehaze, p.dehaze ?? 0);
-    const mixerOn = !hslIsNeutral(p.hsl);
+    // A head's own colour mixer switches the mixer on too (042, stage 2b), even
+    // with the whole photo's neutral.
+    const maskHslOn = maskGroupsForRender(p.masks).some((g) => !!groupHslOffset(g));
+    const mixerOn = !hslIsNeutral(p.hsl) || maskHslOn;
     gl.uniform1i(this.loc.u_hslOn, mixerOn ? 1 : 0);
     if (mixerOn) gl.uniform3fv(this.loc.u_hsl, new Float32Array(p.hsl));
+    gl.uniform1i(this.loc.u_maskHslOn, maskHslOn ? 1 : 0);
     gl.uniform1i(this.loc.u_bwOn, p.bwOn ? 1 : 0);
     const bwMix = p.bwMix ?? [1, 1, 1];
     gl.uniform3f(this.loc.u_bwMix, bwMix[0], bwMix[1], bwMix[2]);
@@ -1978,6 +2002,11 @@ export class Renderer {
       const fol = new Float32Array(MAX_MASKS * 3);
       masks.forEach((m, i) => { if ((i === 0 || (m.op ?? 0) === 0) && m.fol) fol.set(m.fol, i * 3); });
       gl.uniform3fv(this.loc.u_maskFol, fol);
+      if (maskHslOn) {
+        const hsl = new Float32Array(MAX_MASKS * 24);
+        masks.forEach((m, i) => { if ((i === 0 || (m.op ?? 0) === 0) && m.hsl && m.hsl.length === 24) hsl.set(m.hsl, i * 24); });
+        gl.uniform3fv(this.loc.u_maskHsl, hsl);
+      }
     }
     gl.uniform1i(this.loc.u_glowTex, 1);
     gl.uniform1i(this.loc.u_toneTex, 2);
