@@ -85,7 +85,7 @@
         <li><b>Production</b> <span>v2.62.26: the export edge fix and the test page's shader rows, which were on staging as v2.62.16, promoted on your go. Checked on the live site: its offline copy is named for 2.62.26 and the test page carries the new rows. The number moved because the last digit counts every commit; the content did not.</span></li>
         <li><b>On staging</b> <span>v2.63.7, replacing v2.63: everything v2.63 carried (the wire fix, a mask's own colour mixer, the first stage of the mask work, the LUT grid and None for looks), plus a picked mask's own grade and Sky band, a line under "Editing" saying dimmed controls stay with the whole photo, new masks that change nothing until a control is moved, and double-tap that puts a mask's slider back to no change and is no longer lost while the photo redraws. It waits on your device pass; the steps are in NOTES.</span></li>
         <li><b>Built and held</b> <span>Nothing. The Aerochrome work now leads the queue, ahead of the rest of the mask work: the sky selection behind the halo (052), the round spots (013), the fill for sky inside a lattice (065), Aerochrome rendered from a model of the film (066), red and blue lining up at thin edges (061), and the two-photo route (067). The mask work's stage 2b follows.</span></li>
-        <li><b>Last verified green</b> <span><code>b7ce1ee</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
+        <li><b>Last verified green</b> <span><code>9c7f20a</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
         <li><b>Next version</b> <span>2.63 is the staged build's number, because masks gain their own amounts in it. The next release that adds something takes 2.64.</span></li>
       </ul>
 
@@ -102,21 +102,30 @@
             colour mixer, the LUT grid, None, "Add to it", and the test page's
             timing with eight masks).
           </li>
+          <li>
+            <strong>Which sky model the selection is built from</strong>, from the maps
+            already sent. Two were tried on six practice frames; each is right where
+            the other is wrong. Nothing is built until this is settled.
+          </li>
         </ul>
       </div>
 
       <h2>The stages</h2>
       <ul>
         <li class="now"><span class="state">Now</span>
-          <strong>Researching on-device sky segmentation, before anything is built.</strong>
+          <strong>Two sky models tried on infrared; the choice between them is next.</strong>
           The halo beside buildings and pylons under Aerochrome is the look's sky
-          selection being wrong over whole regions: the sky inside a pylon's
-          lattice left out, a pale building face taken in. Four refinements were
-          tried and measured, including the one the published literature names,
-          and none can fix wrong labels. Editors with clean sky edges start from a
-          learned segmentation, so which models could run in the app on an iPad,
-          offline, and whether they work on infrared, is being read now. Their
-          maps come to you before anything is built.
+          selection being wrong over whole regions, and no refinement fixes a wrong
+          label. Two models that can be downloaded here and are MIT-licensed were
+          run on six practice frames exported with the lens profile at 1, in the
+          scratch lab only. Neither works on the frame as the app shows it:
+          infrared makes the grass the brightest thing in the picture, and the
+          models call it sky. Re-colouring the frame so foliage is green and sky is
+          blue, from the frame's own colour axis, is what makes them work. The small
+          model (u2netp) then finds the sky between the steel of a pylon and every
+          wire, and calls a pale building face sky. The larger one (BiSeNetV2)
+          knows the building and turns the pylon into a solid grey shape. The
+          research, the numbers and the sources are in IR-SCIENCE 4b-x.
         </li>
         <li class="done"><span class="state">Done</span>
           <strong>The research that should have come first is written down.</strong>

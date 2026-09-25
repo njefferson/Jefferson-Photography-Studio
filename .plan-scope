@@ -1,847 +1,217 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
 planhash=41b5025595b090df
-diffhash=0c822a53de21b152
-verdict=IN-SCOPE: Every bullet of item 3 is covered: the roadmap reordered with the Aerochrome cluster first, new records 066 and 067, record 052's halo measurements with the Built already, Rank and Looked at sections the decisions gate requires, Shown as lines, and the status page. The rank rewrites in 013, 061, 065 and 042 are the gate-required consequence of the reorder; no code is touched.
-# diff --git a/NOTES.md b/NOTES.md
-# index efc5dfe..9d63811 100644
-# --- a/NOTES.md
-# +++ b/NOTES.md
-# @@ -805,6 +805,126 @@ user-scalable=no.
-#  > ships as **2.0**, not 1.2 (owner call, 2026-07-18). The big-image / full-bleed direction
-#  > continues as the parallel design track below.
+diffhash=814281c84ccd5ee3
+verdict=IN-SCOPE: The added bullet closes the gap noted previously without exceeding it; offline caching, the absence of published iPad timings, and the refusal to substitute container timings for a device measurement are documented. Docs-only (IR-SCIENCE.md and conveyor-status.html), nothing measured on-device or built, and item 2's four research areas are now all covered.
+# diff --git a/IR-SCIENCE.md b/IR-SCIENCE.md
+# index cea8647..493709c 100644
+# --- a/IR-SCIENCE.md
+# +++ b/IR-SCIENCE.md
+# @@ -1437,6 +1437,155 @@ www.asprs.org (Fritz 1967 on the film's sensitometry), truecolorinfrared.com
+#  kurosu.co, www.dropbox.com (dl.dropboxusercontent.com worked), and
+#  www.plferrer.photos.
 #  
-# +- [ ] **The look's sky adjustments read a selection you cannot see** <!-- decision: 052 -->
-# +  **Shown as:** Aerochrome's sky sliders work on the sky you selected, not one you cannot see.
-# +  **Leads the queue from 2026-09-25, with the halo.** Under Aerochrome's Sky
-# +  depth a light band stands beside every building and pylon, and the sky inside
-# +  a pylon's lattice is not darkened: measured, it is this selection, wrong over
-# +  whole regions next to objects. Four refinements were tried and measured,
-# +  including the weighted guided filter the literature names; none can fix
-# +  wrong labels. On-device sky segmentation, the field's starting point, is
-# +  being researched before anything is built.
-# +  reported 2026-09-22 from the device against Aerochrome: its sky adjustment
-# +  cannot be reproduced with a mask on sky the look does not reach, and the
-# +  shape suggested was that the look should open its own sky mask to start from,
-# +  which you then add to and subtract from, with Reach and Feather kept.
-# +  **Read off the source, and there are TWO sky selections on one photograph.**
-# +  The look's is `skyBitmap` and `skyFine` in `src/main.ts`, built at open and
-# +  assigned in six places, none of them reachable from any control — no Reach,
-# +  no Feather, no by-colour, no hand corrections — and it is what `skySmooth`,
-# +  `skyDepth` and `skySat` act through. The reader's is a type-4 Sky mask, which
-# +  has every one of those controls and drives nothing but the mask's own five
-# +  adjustments. `regenerateSkyMask` never touches the look's pair. So every
-# +  control over a sky selection is attached to the one the sky sliders ignore.
-# +  **It cannot be closed by finding a better slider value.** `skySat` multiplies
-# +  chroma about luma gated on each pixel's own saturation; `skyDepth` darkens
-# +  toward the film's value gated on the sky map's keying byte; a mask's
-# +  saturation folds in linear space at the mask stage before gamma, the tone
-# +  curves, the HSL mixer and the grade. Different operations, different
-# +  populations, different points in the pipeline.
-# +  **018's title is "One sky selection, built at open, for every sky-aware
-# +  tool", and this is the half that did not ship** — it unified the refinement
-# +  filter, not the selection, and its own Option 1 named per-population
-# +  strengths reading `skySel` as later items.
-# +  **Looked up.** Lightroom's Select Sky produces the mask the reader then
-# +  refines with Add and Subtract before using any slider on it: the automatic
-# +  detection IS the editable thing. darktable combines a parametric selection
-# +  with drawn shapes, with a polarity toggle so a component subtracts. Neither
-# +  exposes a detected selection that the module's own sliders read while the
-# +  reader edits a different one.
-# +  So: the detection that runs at open becomes a Sky mask the reader can see,
-# +  and the look's sky stages read it. Rejected: the sliders without the
-# +  detection (half of this, and 042 already owns that half); a second set of
-# +  Reach and Feather on the look's own selection (two skies in one app is what
-# +  018 exists to remove); and leaving it, which the source refutes rather than
-# +  taste. **Ranked above 013** because 013 tunes the Aerochrome sky against
-# +  whatever population the look's stages read, and this changes which population
-# +  that is — the same dependency test that put 023 at the top of the queue. See
-# +  `docs/decisions/052-the-looks-sky-adjustments-read-a-selection-the-reader-cannot-see.md`.
-# +- [ ] **Aerochrome is the right colour and comes out splotchy** <!-- decision: 013 --> — reported
-# +  **Shown as:** Aerochrome comes out smooth instead of breaking into hard-edged patches.
-# +  from the iPad 2026-09-17 with two frames, on the look that shipped the same day:
-# +  the colour is right, the foliage breaks into hard-edged patches and the gravel
-# +  carries a coarse mottle. Searched before touching anything, and it named the
-# +  mechanism: the standard order is to reduce COLOUR noise first and hard, because
-# +  colour blotches rarely carry real information, while luminance speckle overlaps
-# +  real texture in foliage and deserves a lighter hand. This app has ONE denoise, a
-# +  luma-guided bilateral, and no chroma stage at all — and then applies a mixer
-# +  with coefficients over 1.4 and a 3x saturation on top of whatever chroma noise
-# +  is left. First measurement is a sheet of the same frame at several saturations,
-# +  to say how much of the splotch is amplification. **The sky half shipped
-# +  2026-09-17**: its colour is smoothed after the look amplifies it, inside the
-# +  sky's own selection, mean colour kept — the file's one untested direction,
-# +  made free by acting on the sky only. **And on 2026-09-18 that stage was
-# +  found corrupting every TIFF export** — a channel a hundredth past the range
-# +  wrapped in the 16-bit write; cyan branches, yellow sky, clean on screen and
-# +  in JPEGs — fixed by clamping the stage and the write, with a walk that
-# +  measures the exported file whole (§9l-ii). The gravel half stays open. The
-# +  sources go into `IR-SCIENCE.md` (9l for what shipped). See
-# +  `docs/decisions/013-aerochrome-splotchy-chroma.md`.
-# +- [ ] **Sky inside a lattice cannot be filled into the Sky mask** <!-- decision: 065 -->
-# +  **Shown as:** Fill the sky between a pylon's struts into the Sky mask with one stroke.
-# +  — found on the target device on v2.63: on NIR_3461 the Sky mask leaves the
-# +  whole near pylon out, sky between the struts included, because the grow
-# +  reaches sky only along sky-coloured paths and the struts cut every one. The
-# +  union (048) is the route today and leaves specks and the lit steel edges.
-# +  The chosen shape is Capture One's Magic Brush as a third hand correction on
-# +  the Sky mask: a stroke inside the gaps fills the connected pixels of similar
-# +  colour and brightness, with a Tolerance, replayed like Add by hand. Under
-# +  Aerochrome it reaches the look's own sky only with 052. See
-# +  `docs/decisions/065-sky-inside-a-lattice-cannot-be-filled-into-the-sky-mask.md`.
-# +- [ ] **Aerochrome is rendered from a model of the film, not tuned toward it** <!-- decision: 066 -->
-# +  **Shown as:** Aerochrome built the way the film worked, so the sky goes dark and foliage stays red without the halos.
-# +  Measured at full resolution 2026-09-25: tuning the look toward the film's
-# +  numbers darkens the sky but leaves a halo at every edge, darkens a pale
-# +  building as sky, clips the grass to white and reddens a grey road; Pink IR
-# +  tuned the same way gives orange foliage, ringed cladding and fringed steel.
-# +  Researched the same day from Kodak's data sheets and the literature
-# +  (IR-SCIENCE 4b-viii, 4b-ix): the film's red foliage is dense dye from
-# +  foliage being dark in the visible, its dark sky is a deliberately slow
-# +  infrared layer, and this camera's one colour axis is a vegetation index. So
-# +  the look is to be rendered from a model: the film's three layer exposures
-# +  synthesised from infrared brightness and that index, run through the film's
-# +  own curves, the colour re-attached to the clean detail. Kodak's own balance
-# +  and a scan balanced to grey are shown as renders before one is chosen. See
-# +  `docs/decisions/066-aerochrome-is-rendered-from-a-model-of-the-film.md`.
-# +- [ ] **Red and blue do not line up at thin edges, and Aerochrome paints the difference** <!-- decision: 061 -->
-# +  **Shown as:** Dark posts against the sky stop turning red on one side and blue on the other in Aerochrome.
-# +  Reported from the device 2026-09-24 against a full-resolution export of
-# +  pylons and wires. It is not the metal's reflectance: one black post is blue
-# +  on one edge and red on the other. Red and blue sit about half a preview
-# +  pixel apart after the editing copy's 2x2 binning, and the lens adds lateral
-# +  chromatic aberration toward the corners. Aerochrome's mixer turns a blue
-# +  error red at about 2.1x, where the swap passes it at 1x. Co-siting plus a
-# +  lens cancel took a post's edge from 469 red and 667 blue pixels to 149 and
-# +  0. The round spots along the wires are 013's Sky colour smoothing. The thin
-# +  red border lines are a demosaic clamp defect, fixed first. Then comes
-# +  per-photograph CA correction on the raw together with co-siting.
-# +  **Measured on the reported frame's raw, NIR_3461, the same day, and it moves
-# +  that frame's answer:** its red wires and pylons are the foliage band
-# +  selecting by colour, not the channels. Foliage at 0 takes strongly red
-# +  pixels above the horizon from 16,430 to 0; co-siting takes none. That
-# +  frame's remedy is the foliage band limited to a place, which is 042's. The
-# +  channel work still answers edges like NIR_3430's posts. See
-# +  `docs/decisions/061-red-and-blue-do-not-line-up-at-thin-edges.md`.
-# +- [ ] **Two images give the film's real mapping** <!-- decision: 067 -->
-# +  **Shown as:** Add an ordinary colour photo of the same scene for true Aerochrome colour.
-# +  A future option. The film recorded infrared, visible red and visible green;
-# +  this camera's conversion blocks visible green, so one frame can only
-# +  approximate it (066). Practitioners and Kodak's own colour-infrared cameras
-# +  reach the real mapping from two records: the infrared frame, and an ordinary
-# +  colour frame of the same scene aligned with it. Costs a tripod and ghosts on
-# +  anything that moves. See `docs/decisions/067-two-images-give-the-films-real-mapping.md`.
-#  - [ ] **A mask is a place, and the ordinary controls act inside it** <!-- decision: 042 -->
-#    **Shown as:** Pick a mask and the ordinary controls work inside it — no separate mask menu.
-#    The place shipped in 2.61; this is the second half, settled 2026-09-24:
-# @@ -861,7 +981,6 @@ user-scalable=no.
-#    corrected: the app REPORTS the measurement in the ⓘ diagnostic as "Shadow
-#    light" and suggests no amount. IR-SCIENCE 9j-ii has the run and names the two
-#    candidates that are not more tuning — read it before touching this again.
-# -
-#  - [ ] **A mask keys the photograph, not the grade** <!-- decision: 032 -->
-#    **Shown as:** A colour selection stays on the same pixels when you change the look.
-#    the Colour mask keys on the colour the pixel DISPLAYS — the decode through
-# @@ -976,7 +1095,6 @@ user-scalable=no.
-#    where it naturally goes and only dependency privileges it. Nothing above needs
-#    this first, and the graph puts this ground at 012's rank. See
-#    `docs/decisions/053-the-session-strip-takes-the-stage-on-a-phone.md`.
-# -
-#  - [ ] **A shared look file cannot be picked on an iPad** <!-- decision: 063 -->
-#    **Shown as:** Open a look someone sent you as a file, from Files on an iPad.
-#    Found by reading, 2026-09-24, and not yet seen on the device. A shared look is
-# @@ -986,87 +1104,6 @@ user-scalable=no.
-#    platform does type, add `json` to what Open accepts, and let the content
-#    sniff keep deciding. See
-#    `docs/decisions/063-a-shared-look-file-cannot-be-picked-on-an-ipad.md`.
-# -
-# -- [ ] **The look's sky adjustments read a selection you cannot see** <!-- decision: 052 -->
-# -  **Shown as:** Aerochrome's sky sliders work on the sky you selected, not one you cannot see.
-# -  reported 2026-09-22 from the device against Aerochrome: its sky adjustment
-# -  cannot be reproduced with a mask on sky the look does not reach, and the
-# -  shape suggested was that the look should open its own sky mask to start from,
-# -  which you then add to and subtract from, with Reach and Feather kept.
-# -  **Read off the source, and there are TWO sky selections on one photograph.**
-# -  The look's is `skyBitmap` and `skyFine` in `src/main.ts`, built at open and
-# -  assigned in six places, none of them reachable from any control — no Reach,
-# -  no Feather, no by-colour, no hand corrections — and it is what `skySmooth`,
-# -  `skyDepth` and `skySat` act through. The reader's is a type-4 Sky mask, which
-# -  has every one of those controls and drives nothing but the mask's own five
-# -  adjustments. `regenerateSkyMask` never touches the look's pair. So every
-# -  control over a sky selection is attached to the one the sky sliders ignore.
-# -  **It cannot be closed by finding a better slider value.** `skySat` multiplies
-# -  chroma about luma gated on each pixel's own saturation; `skyDepth` darkens
-# -  toward the film's value gated on the sky map's keying byte; a mask's
-# -  saturation folds in linear space at the mask stage before gamma, the tone
-# -  curves, the HSL mixer and the grade. Different operations, different
-# -  populations, different points in the pipeline.
-# -  **018's title is "One sky selection, built at open, for every sky-aware
-# -  tool", and this is the half that did not ship** — it unified the refinement
-# -  filter, not the selection, and its own Option 1 named per-population
-# -  strengths reading `skySel` as later items.
-# -  **Looked up.** Lightroom's Select Sky produces the mask the reader then
-# -  refines with Add and Subtract before using any slider on it: the automatic
-# -  detection IS the editable thing. darktable combines a parametric selection
-# -  with drawn shapes, with a polarity toggle so a component subtracts. Neither
-# -  exposes a detected selection that the module's own sliders read while the
-# -  reader edits a different one.
-# -  So: the detection that runs at open becomes a Sky mask the reader can see,
-# -  and the look's sky stages read it. Rejected: the sliders without the
-# -  detection (half of this, and 042 already owns that half); a second set of
-# -  Reach and Feather on the look's own selection (two skies in one app is what
-# -  018 exists to remove); and leaving it, which the source refutes rather than
-# -  taste. **Ranked above 013** because 013 tunes the Aerochrome sky against
-# -  whatever population the look's stages read, and this changes which population
-# -  that is — the same dependency test that put 023 at the top of the queue. See
-# -  `docs/decisions/052-the-looks-sky-adjustments-read-a-selection-the-reader-cannot-see.md`.
-# -
-# -- [ ] **Red and blue do not line up at thin edges, and Aerochrome paints the difference** <!-- decision: 061 -->
-# -  **Shown as:** Dark posts against the sky stop turning red on one side and blue on the other in Aerochrome.
-# -  Reported from the device 2026-09-24 against a full-resolution export of
-# -  pylons and wires. It is not the metal's reflectance: one black post is blue
-# -  on one edge and red on the other. Red and blue sit about half a preview
-# -  pixel apart after the editing copy's 2x2 binning, and the lens adds lateral
-# -  chromatic aberration toward the corners. Aerochrome's mixer turns a blue
-# -  error red at about 2.1x, where the swap passes it at 1x. Co-siting plus a
-# -  lens cancel took a post's edge from 469 red and 667 blue pixels to 149 and
-# -  0. The round spots along the wires are 013's Sky colour smoothing. The thin
-# -  red border lines are a demosaic clamp defect, fixed first. Then comes
-# -  per-photograph CA correction on the raw together with co-siting.
-# -  **Measured on the reported frame's raw, NIR_3461, the same day, and it moves
-# -  that frame's answer:** its red wires and pylons are the foliage band
-# -  selecting by colour, not the channels. Foliage at 0 takes strongly red
-# -  pixels above the horizon from 16,430 to 0; co-siting takes none. That
-# -  frame's remedy is the foliage band limited to a place, which is 042's. The
-# -  channel work still answers edges like NIR_3430's posts. See
-# -  `docs/decisions/061-red-and-blue-do-not-line-up-at-thin-edges.md`.
-# -- [ ] **Aerochrome is the right colour and comes out splotchy** <!-- decision: 013 --> — reported
-# -  **Shown as:** Aerochrome comes out smooth instead of breaking into hard-edged patches.
-# -  from the iPad 2026-09-17 with two frames, on the look that shipped the same day:
-# -  the colour is right, the foliage breaks into hard-edged patches and the gravel
-# -  carries a coarse mottle. Searched before touching anything, and it named the
-# -  mechanism: the standard order is to reduce COLOUR noise first and hard, because
-# -  colour blotches rarely carry real information, while luminance speckle overlaps
-# -  real texture in foliage and deserves a lighter hand. This app has ONE denoise, a
-# -  luma-guided bilateral, and no chroma stage at all — and then applies a mixer
-# -  with coefficients over 1.4 and a 3x saturation on top of whatever chroma noise
-# -  is left. First measurement is a sheet of the same frame at several saturations,
-# -  to say how much of the splotch is amplification. **The sky half shipped
-# -  2026-09-17**: its colour is smoothed after the look amplifies it, inside the
-# -  sky's own selection, mean colour kept — the file's one untested direction,
-# -  made free by acting on the sky only. **And on 2026-09-18 that stage was
-# -  found corrupting every TIFF export** — a channel a hundredth past the range
-# -  wrapped in the 16-bit write; cyan branches, yellow sky, clean on screen and
-# -  in JPEGs — fixed by clamping the stage and the write, with a walk that
-# -  measures the exported file whole (§9l-ii). The gravel half stays open. The
-# -  sources go into `IR-SCIENCE.md` (9l for what shipped). See
-# -  `docs/decisions/013-aerochrome-splotchy-chroma.md`.
-#  - [ ] **The mask system is short of standard convention** <!-- decision: 050 -->
-#    **Shown as:** Draw a box or circle to work inside, and add, subtract and combine masks.
-#    filed 2026-09-22: a drawn box or circle that ISOLATES part of the
-# @@ -1156,17 +1193,6 @@ user-scalable=no.
-#    going red. Union lands as a third fold case, darktable's inclusive operator
-#    `w + c - w*c`, beside the existing multiply and never in place of it. See
-#    `docs/decisions/048-colour-cannot-finish-a-selection-an-occluder-has-split.md`.
-# -- [ ] **Sky inside a lattice cannot be filled into the Sky mask** <!-- decision: 065 -->
-# -  **Shown as:** Fill the sky between a pylon's struts into the Sky mask with one stroke.
-# -  — found on the target device on v2.63: on NIR_3461 the Sky mask leaves the
-# -  whole near pylon out, sky between the struts included, because the grow
-# -  reaches sky only along sky-coloured paths and the struts cut every one. The
-# -  union (048) is the route today and leaves specks and the lit steel edges.
-# -  The chosen shape is Capture One's Magic Brush as a third hand correction on
-# -  the Sky mask: a stroke inside the gaps fills the connected pixels of similar
-# -  colour and brightness, with a Tolerance, replayed like Add by hand. Under
-# -  Aerochrome it reaches the look's own sky only with 052. See
-# -  `docs/decisions/065-sky-inside-a-lattice-cannot-be-filled-into-the-sky-mask.md`.
-#  - [ ] **Sky seen through a canopy takes no sky adjustment** <!-- decision: 028 -->
-#    **Shown as:** Sky showing between leaves takes the sky adjustments too.
-#    — the Sky mask spreads only through pixels that are JOINED to the sky, which
-# @@ -1580,6 +1606,45 @@ user-scalable=no.
-#    byte-identical to today's, because a graphics chip computes in float where the
-#    processor uses doubles. It would match the PREVIEW instead.
+# +### 4b-x. A LEARNED SKY SELECTION ON INFRARED — WHAT THE FIELD HAS, AND TWO MODELS ON SIX FRAMES
+# +
+# +**Why this section exists.** 052's halo was measured on 2026-09-25: the look's
+# +coarse sky bitmap is wrong over whole regions (the sky inside the near pylon's
+# +lattice on NIR_3461 is labelled not-sky; the pale face of the tall building on
+# +NIR_3466 is labelled sky), and four refinement routes, the weighted guided
+# +filter of the paragraph above included, were built in the scratch lab and could
+# +not correct a label that is wrong across a region. **So the paragraph above that
+# +calls the weighted filter "the first thing to build" is revised: the labels come
+# +first, the filter second.** A refinement moves an edge; it cannot turn a building
+# +into a building.
+# +
+# +**What the field has.**
+# +
+# +- **Liba et al.** (arXiv 2006.10172, sections 3.1–3.3 read): public datasets'
+# +  sky masks are "coarse and inaccurate" and omit the holes through which sky is
+# +  visible, and models trained on them inherit that. Their system needed three
+# +  things: labels refined before training, a colour-density inpaint that
+# +  relabels undetermined pixels as sky above a probability of 0.6, and the
+# +  confidence-weighted guided filter. The network is a UNet at 256 px, 3.7 MB
+# +  after MorphNet and fp16, IoU 0.9237 on their set, 50 ms on a mobile GPU, with
+# +  the filter upsampling to 1024 x 768 in 190 ms. **The sky between cables and
+# +  lattice comes from the fill and the filter, not from the network.**
+# +- **Visible-trained models on near infrared.** Stillger, Hamscher, Hahn, Mütze,
+# +  Meisen and Maag, arXiv 2606.15072 (June 2026; setup and Tables 1, 11 and 21
+# +  read), is the one study that measures the same visible-trained models on
+# +  registered RGB and NIR street scenes (RANUS). DeepLabV3+ fell from 37.75 to
+# +  21.98 mIoU and SegFormer-B5 from 40.89 to 29.50. Sky held partly, at an IoU
+# +  of 51 to 69; vegetation collapsed to 7.5 to 12.5 because foliage is bright
+# +  in infrared. Only Mask2Former with a Swin-L backbone held (61.68 to 59.4),
+# +  and it is far too large for a browser. Limmer and Lensch (arXiv 1604.02245,
+# +  section IV-A read) saw the same thing qualitatively: visible-trained
+# +  colourisers on NIR "are able to colorize the sky, but fail for trees and
+# +  grass". Salamati, Larlus, Csurka and Süsstrunk (arXiv 1406.6147, read) trained
+# +  per modality, so it is not a zero-shot test. **No source compares input
+# +  preparations for NIR**: grey luminance in three channels is the default
+# +  everywhere and is the control.
+# +- **What could run in the app, and under what licence.**
+# +  - onnxruntime-web's plain WASM build is 14.2 MB and runs in a Worker. It is
+# +    single-threaded, because the app sends no COOP/COEP headers. Its WebGPU
+# +    builds (28.3 and 26.8 MB) are over Cloudflare Pages' 25 MiB file limit.
+# +    TF.js has had no release since October 2024.
+# +  - EfficientViT-Seg B1 (Apache-2.0, ADE20K mIoU 42.84) has its weights on
+# +    huggingface.co, and PP-MobileSeg-Tiny (Apache-2.0, 36.39) on bj.bcebos.com.
+# +    Both hosts are refused by this session's network policy.
+# +  - TF.js DeepLab for ADE20K (Apache-2.0, 24.8 MB) sits behind tfhub.dev and
+# +    www.kaggle.com, both refused. storage.googleapis.com answers, but refuses
+# +    the object path the package names.
+# +  - SegFormer is excluded: NVIDIA's licence limits it to research or
+# +    evaluation.
+# +  - Two models are reachable from here and both are MIT, their LICENSE files
+# +    read: xiongzhu666's sky model (a u2netp, 2.3 MB fp16 in ncnn format, 384
+# +    px) and CoinCheung's BiSeNetV2 trained on ADE20K (22.4 MB, 150 classes).
+# +  - **Offline, speed and memory are not known for the device.** A model file
+# +    would be precached by the service worker like any other asset, and both
+# +    reachable models fit under Pages' 25 MiB per-file limit. No iPad Safari
+# +    timing or memory figure is published for any model here. The only
+# +    published timing is Liba's 50 ms on a mobile GPU, which this app would not
+# +    have in a single-threaded WASM Worker. The container's timings, about
+# +    0.4 s per frame for u2netp on its CPU, measure the container and not the
+# +    reader's tablet (hub doctrine §7j). So speed and peak memory are a test-page
+# +    measurement on the device, taken before anything ships.
+# +
+# +**The trial, 2026-09-25, in the scratch lab only.**
+# +
+# +- **Frames.** Six frames were exported through the app with the lens profile
+# +  at 1: NIR_3461, NIR_3466, NIR_1644, NIR_1827, NIR_1651 and NIR_0627. The
+# +  last has no sky in it, so the right answer there is none.
+# +- **Checking the preparation first.** Each model was run on the model author's
+# +  own daylight samples and segmented them correctly: u2netp gives a sharp
+# +  mask, and BiSeNetV2 labels sky, trees and two pylons as tower. So a failure
+# +  on infrared is the domain, not the input preparation.
+# +- **Five inputs:**
+# +  - the app with no look (the swap render: sky teal-grey, foliage pale pink);
+# +  - the Aerochrome look;
+# +  - luminance in three channels;
+# +  - a **natural-hue** render: the swap render's one colour axis re-mapped so
+# +    that its foliage side goes green and its sky side goes blue, with the
+# +    brightness kept;
+# +  - the same with visible-light **brightness order** as well: foliage
+# +    darkened, sky lifted.
+# +- **The instrument failed once, and was caught by a repeat.** ncnn's Python
+# +  `Mat`, built from a numpy array, shares that array's memory rather than
+# +  copying it. The first script passed it a temporary that was freed before
+# +  the network read it, and four runs on one file gave two answers (0.1% and
+# +  11.6% sky). Every number below is from the fixed script, where the array is
+# +  held and the `Mat` cloned. Five repeats per model now agree exactly. The
+# +  faulty run had differed in the top-left corner of each map and in two
+# +  no-look results.
+# +- **Every map was opened.** There is a sheet per frame and model, and each map
+# +  is 384 px or less inside the model, so a 576 px panel shows everything it
+# +  holds. Then 1:1 crops at the export size of the near pylon (NIR_3461, x
+# +  0–1500, y 300–2300) and the building (NIR_3466, x 2000–3900, y 1300–2800),
+# +  with the app's own selection beside each.
+# +
+# +**What the maps show.**
+# +
+# +- **The natural-hue input is what makes a visible-light model work on these
+# +  frames.**
+# +  - On the no-look, Aerochrome and grey inputs, u2netp labels NIR_3461's bright
+# +    grass field as sky and the sky as not-sky: 0.7% of the frame is marked sky,
+# +    against a true share of about 70%.
+# +  - On the natural-hue input it marks 71.6%: clean pylons, the gaps in the near
+# +    pylon's lattice as sky, and each wire as not-sky.
+# +  - On NIR_0627, which has no sky, it marks the whole frame as sky on the
+# +    no-look and grey inputs (100%) and none of it on the natural-hue input.
+# +  - BiSeNetV2 moves the same way: the field goes from its class "earth" to
+# +    "grass", and open sky above NIR_3466's building from 0.77 to 0.97.
+# +- **u2netp on the natural-hue input.**
+# +  - Clean tree lines on NIR_1644 and NIR_1827, and no sky on NIR_0627, which is
+# +    right.
+# +  - On NIR_1651, a close-up tree against clear sky and cloud, it finds almost no
+# +    sky on any input (0.1%).
+# +  - On NIR_3466 it marks the pale face as sky: a mean of 0.70, against 0.85 for
+# +    the app's selection today and 0.92 with brightness order. It marks the
+# +    narrow pale tower on the right as sky too (1.00), which the app's selection
+# +    gets right (0.00).
+# +  - **Brightness order made the face worse, not better**: a reduced sheet had
+# +    suggested the opposite, and the 1:1 crop and the mean corrected it (hub
+# +    lesson 366).
+# +- **EGE-UNet**, from the same repository at 0.2 MB, is coarser and loses most
+# +  of the sky on NIR_3466 with brightness order. It was not pursued.
+# +- **BiSeNetV2 on the natural-hue input.**
+# +  - The right regions on all six frames: 69.7% sky on NIR_3461, 45.8% on
+# +    NIR_1651, where u2netp found none, and 0% on NIR_0627.
+# +  - On NIR_3466 the pale face is 0.20 and the narrow tower 0.49.
+# +  - But it decides at an eighth of its 640 px input, about 70 px at the export
+# +    size, so its edges are soft.
+# +  - It draws every pylon as a solid tower, because ADE20K labels towers solid.
+# +    The near pylon's lattice is a wash of 0.6 to 0.9 with no gaps.
+# +
+# +**What it means.** The two models fail in opposite places:
+# +
+# +- **BiSeNetV2 knows what a building is and cannot see through a lattice.**
+# +- **u2netp sees through a lattice and does not know what a building is.**
+# +
+# +Neither alone is a selection. The structure Liba describes fits what the maps
+# +show: a coarse semantic label that knows sky from building, a confidence that
+# +leaves the boundary undetermined, then a colour fill and a weighted filter at
+# +full resolution for the edges and the holes. That is also the only route by
+# +which the app's existing `refineSkyMask` stage would finally get labels worth
+# +refining. Whether a sky-only model can instead be trained on this camera's
+# +frames, which is the route Liba's own system took, needs a GPU this app has
+# +never needed.
+# +
+# +**Hosts refused on this topic:** huggingface.co, bj.bcebos.com, tfhub.dev,
+# +www.kaggle.com, sceneparsing.csail.mit.edu and download.pytorch.org.
+# +GitHub's release downloads and raw.githubusercontent.com both worked.
+# +
+#  ## 4c. THE CRUX IS NIR CONTAMINATION, AND A ROTATION ALONE CANNOT FIX IT
 #  
-# +## Aerochrome at full size, the research, and why the halo happens, 2026-09-25
-# +
-# +**Every earlier whole-frame judgement of the Aerochrome candidates was made
-# +from a thumbnail.** The session's image reader fits anything over 2000 px on
-# +the long edge, measured with a 1-pixel grating card, so a 5600 px export was
-# +read at about a third of its size. Hub lesson 366 records it. All six exports
-# +(NIR_3461 and NIR_3466; as shipped, Aerochrome tuned to the film, Pink IR tuned
-# +to the film) were then cut into 1400 by 932 tiles, 96 in all, and every one
-# +opened. The findings and their numbers are in record 066's Context. One more
-# +worth keeping on its own: a faint vertical colour band at x 5230–5270 in both
-# +Aerochrome renders on both frames (red minus blue falls about 10 levels across
-# +40 px), absent from Pink IR, cause not established.
-# +
-# +**Then the research that should have come first** (IR-SCIENCE 4b-viii, 4b-ix):
-# +- Kodak's own data sheets: the film's infrared layer takes visible light too
-# +  and is deliberately about 1.4 stops slow, which is what darkens the sky.
-# +- The field: no LUT or recipe produces Aerochrome from a 665–720 nm camera,
-# +  and the infrared LUTs are channel swaps expecting the frame before any swap.
-# +- The literature: this camera's one colour axis is a vegetation index, and a
-# +  missing band is synthesised the way weather satellites build a missing
-# +  green.
-# +
-# +That moved the roadmap: the Aerochrome work leads the queue (052, 013, 065,
-# +066, 061, 067) ahead of the completeness work, with 042 next.
-# +
-# +**The halo is the look's sky selection being wrong, not soft** (record 052,
-# +measured): four refinements were tried, and none fixes regions labelled
-# +wrongly. On-device sky segmentation is being researched next, before anything
-# +is built.
-# +
-# +**Found, not fixed:**
-# +- the vertical colour band above;
-# +- the tall building's pale face on NIR_3466 taken into the sky selection, with
-# +  a hole in it;
-# +- the grass clipping to white under a strong foliage luminance;
-# +- and an interaction in the app's LUT feature: an infrared LUT applied last
-# +  over a swapping look undoes the swap (Rob Shea's "IR RB Swap" is an exact
-# +  R⇄B swap).
-# +
-#  ## The patch-note check cannot pass in a git worktree, 2026-09-24
-#  
-#  Found committing a held candidate from a worktree. `tools/patch-note-check.mjs`
-# diff --git a/docs/decisions/013-aerochrome-splotchy-chroma.md b/docs/decisions/013-aerochrome-splotchy-chroma.md
-# index b53b7eb..4549dfb 100644
-# --- a/docs/decisions/013-aerochrome-splotchy-chroma.md
-# +++ b/docs/decisions/013-aerochrome-splotchy-chroma.md
-# @@ -308,7 +308,9 @@ needs its own.
-#  
-#  ## Rank
-#  
-# -**Second.** It is in production, it is about the look currently being judged, and
-# +**Re-ranked 2026-09-25: second, directly below 052.** The Aerochrome work leads the queue; this is second because 052 changes the sky population this stage smooths, and 066's film model is tuned against the chroma this stage leaves. The round discs along wires and round pylons, seen at full resolution on NIR_3461 in both the shipped and the tuned look, are this stage's own texels averaging a wire's colour in.
-# +
-# +**Originally second.** It is in production, it is about the look currently being judged, and
-#  its first step is cheap — render the same frame at several saturations and with
-#  the chroma stage stubbed, and the sheet says how much of the splotch is
-#  amplification. Below the full-view item because that one takes the photograph away
-# @@ -349,3 +351,7 @@ instrument rather than the data.
-#  
-#  So the first candidate rendered for THIS record starts by measuring at both
-#  scales, through `skySatSel`, and printing which control it drove.
-# +
-# +## Looked at
-# +
-# +- NIR_3461, 2026-09-25: as shipped and tuned to the film, lens profile at 1, every 1400 by 932 tile opened at full resolution; the round discs along the wires and round the near and far pylons, and a 1:1 crop of them.
-# diff --git a/docs/decisions/042-a-mask-is-a-place-and-most-controls-should-work-inside-one.md b/docs/decisions/042-a-mask-is-a-place-and-most-controls-should-work-inside-one.md
-# index a0f2a89..6d1424a 100644
-# --- a/docs/decisions/042-a-mask-is-a-place-and-most-controls-should-work-inside-one.md
-# +++ b/docs/decisions/042-a-mask-is-a-place-and-most-controls-should-work-inside-one.md
-# @@ -524,3 +524,12 @@ CPU pre-pass, and the Foliage band on a place mask meets that same test, since
-#  its early weights already exist. It sat in stage 3 only because of where the
-#  band runs. So the switch ships with Foliage first, and the eight follow as stage
-#  2b. Nothing else in the queue was ahead of it.
-# +
-# +**Re-ranked 2026-09-25: below the Aerochrome work (052, 013, 065, 066, 061,
-# +067).** Settled that day: the Aerochrome work leads the queue. None of those
-# +items needs this one, and this one needs none of them. Its remaining stages
-# +(2b, 3 and 4) act on the reader's masks and not on the look's own sky stages,
-# +and its stage 5 meets 052 and builds on whatever 052 settles. 013 and 016
-# +were kept below both lanes because the lanes change what they would be tuned
-# +against. For 013 that now happens through 052, which leads, and 016 is
-# +archived.
-# diff --git a/docs/decisions/052-the-looks-sky-adjustments-read-a-selection-the-reader-cannot-see.md b/docs/decisions/052-the-looks-sky-adjustments-read-a-selection-the-reader-cannot-see.md
-# index b8cab9d..ce790d3 100644
-# --- a/docs/decisions/052-the-looks-sky-adjustments-read-a-selection-the-reader-cannot-see.md
-# +++ b/docs/decisions/052-the-looks-sky-adjustments-read-a-selection-the-reader-cannot-see.md
-# @@ -48,6 +48,39 @@ a crisp look depth. The SELECTION was not unified. Its own Option 1 ends by
-#  naming per-population strengths reading `skySel` as later items, so a follow-on
-#  was anticipated; this is that follow-on arriving as a report instead.
-#  
-# +**2026-09-25: the halo under a sky depth, measured, and what could not fix it.**
-# +With Aerochrome's Sky depth on, a light band stands beside every building and
-# +pylon leg. The depth multiplies brightness by the look's selection, and a probe
-# +of that selection read it at 0.29 at 10 px from the tall building's edge on
-# +NIR_3466, 0.56 at 70 and 0.95 at 190, with the export's brightness against the
-# +shipped look 0.91 at 10 px and 0.65 in open sky. The sky map's keying byte read
-# +1.0 throughout, so the selection alone is the cause. Inside NIR_3461's near
-# +pylon the selection is 0: the sky seen through the lattice is not selected. On
-# +NIR_3466 the tall building's pale face is selected as sky, with a hole in it.
-# +
-# +Tried in a scratch copy, each rendered or mapped and opened, none kept:
-# +
-# +- **The Sky mask's own colour grow** (`growSkyByColour`), unlimited or snapped
-# +  after: it reaches the edges and takes in whole clouds on NIR_1651 and the
-# +  blurred background of NIR_0627.
-# +- **The grow limited to the old selection's feather:** the halo goes (0.649
-# +  against 0.648 in open sky at the pylon leg on NIR_3461), but binary
-# +  membership puts hard edges through the wispy clouds of NIR_1651 and NIR_1827.
-# +- **A per-pixel whiteness weight subtracting cloud:** it finds the cirrus on
-# +  NIR_3466 and NIR_3461, misses NIR_1651's cloud, reads the bright haze round
-# +  NIR_1827's sun as white, and is grainy near the horizon.
-# +- **The weighted guided filter** the literature names (Liba et al. 2020, a
-# +  large window, near-zero confidence along the uncertain edge): the sky beside
-# +  the building still rises from 0.61 to 0.98 over 300 px, and at the pylon it
-# +  is worse than the shipped filter. It assumes the coarse mask is right away
-# +  from its edge, and here it is wrong over whole regions: the lattice and the
-# +  building face. No refinement can fix wrong labels.
-# +
-# +So the halo is this selection being wrong, not its edge being soft. The field
-# +starts from a learned segmentation (Lightroom's Select Sky; the paper's
-# +pipeline), and on-device sky segmentation is being researched before anything
-# +further is built (IR-SCIENCE 4b-ix has the refinement literature).
-# +
-#  ## Looked up
-#  
-#  **The field's convention is one selection, visible and editable, with the
-# @@ -69,6 +102,31 @@ it is what this app has by accident of the order the two features were built.
-#  Sources: Adobe, "Apply Masking for local adjustments" (Lightroom);
-#  darktable user manual, "combining drawn & parametric masks" and "masks".
-#  
-# +## Built already
-# +
-# +What exists that this item will use, so a second one does not get written
-# +(LESSONS 330):
-# +
-# +- **The detection and its refinement.** `buildSkyMask` in `src/sky.ts` (the
-# +  coarse 384 px selection, with its horizon from `src/skyhorizon.ts`), and in
-# +  `src/skyfine.ts` `refineSkyMask` (the guided filter the look uses today),
-# +  `growSkyByColour` and `skyGrowKey` (the Sky mask's colour grow), and
-# +  `buildSkySelectionFrom`, which builds the look's pair at open.
-# +- **The look's use of it.** `src/skymap.ts` `buildSkyMap` (the 128-texel sky
-# +  map, its depth key and grey guard) and the sky stages in `src/gl.ts` and
-# +  `compileEdit`.
-# +- **The reader's Sky mask**, a type-4 mask with Reach, Feather, by-colour and
-# +  hand corrections: the editable thing this record's chosen option makes the
-# +  look read.
-# +- **Instruments.** `tools/mask-truth-walk.mjs` (coverage at the edge and in
-# +  open sky from the reader's side), `tools/sky-probe.mjs` (why the grow
-# +  stopped), `tools/sky-stage-walk.mjs` (the exported sky, measured whole) and
-# +  `tools/aerochrome-walk.mjs`.
-# +- **Not in the repository:** the selection lab used on 2026-09-25, which builds
-# +  each candidate selection from one photograph and writes its map, lives in
-# +  the session scratchpad. It is the first thing to move into `tools/` when a
-# +  learned segmenter is tried.
-# +
-#  ## Weighed against
-#  
-#  **018**, whose title this completes and whose Outcome explains why only the
-# @@ -150,20 +208,22 @@ told about in words.
-#  
-#  ## Rank
-#  
-# -**Ninth, directly above 013.**
-# -
-# -A reported defect ranks where it naturally goes, and nothing about being
-# -reported moves it. What moves this one is the dependency test: 013 tunes the
-# -Aerochrome sky against the population the look's sky stages read, and this item
-# -changes which population that is. Tuned first, those values are tuned against
-# -ground that is about to move — the same test that put 023 at the top of the
-# -queue when the look's population work was found to read the sky selection.
-# -
-# -It sits below 042 rather than above it because the two meet in the middle and
-# -042 was asked for first, as a principle covering every control rather than this
-# -one; whichever is built first should shape the other, and building this one
-# -blind to 042 risks a sky-shaped special case in a system that is meant to
-# -generalise.
-# -
-# -It does not go above 051, 030 or 042, none of which it invalidates, and it does
-# -not go above 034 or 032, which are about a different stage entirely.
-# +**First.** Settled 2026-09-25: the Aerochrome work leads the queue, ahead of
-# +the completeness work, because nothing ranked above it was needed by it. Within
-# +that work this is first because everything the look renders in the sky is
-# +measured over this selection: the chroma noise 013 works on, the tuning 066
-# +replaces, and the halo above. Built later, each of those would be measured
-# +again.
-# +
-# +It no longer waits on 042. The two meet at 042's stage 5, and 042's remaining
-# +stages act on the reader's masks, not on the look's own sky stages, so nothing
-# +in 042 moves what this item is measured against. 042's stage 5 builds on
-# +whatever this item settles.
-# +
-# +## Looked at
-# +
-# +- NIR_3466, 2026-09-25: exports as shipped and tuned to the film from the shipped build and from each variant, 1:1 crops beside the tall building's right edge, the antennas and the low roofs; selection maps at full selection resolution.
-# +- NIR_3461, 2026-09-25: the same, 1:1 crops of the near pylon's legs and lattice and the pylons along the horizon.
-# +- NIR_1651, 2026-09-25: selection maps for every variant, and exports from two variants with 1:1 crops of the cloud above the tree and the tree's left edge.
-# +- NIR_1827, 2026-09-25: selection maps for every variant, and exports with a 1:1 crop of the clouds and tree tops on the right.
-# +- NIR_0627, 2026-09-25: selection maps and exports, with a 1:1 crop of the flower against its blurred background.
-# diff --git a/docs/decisions/061-red-and-blue-do-not-line-up-at-thin-edges.md b/docs/decisions/061-red-and-blue-do-not-line-up-at-thin-edges.md
-# index e851b0a..fbb5473 100644
-# --- a/docs/decisions/061-red-and-blue-do-not-line-up-at-thin-edges.md
-# +++ b/docs/decisions/061-red-and-blue-do-not-line-up-at-thin-edges.md
-# @@ -202,8 +202,9 @@ the cost control for leaf edges.
-#  
-#  ## Rank
-#  
-# -Directly above 013 and below 052. It goes above 013 because 013's open work
-# -measures edge colour, and this changes it. It sits below 052 because 052
-# -changes what the sky stages read and does not depend on this. It is
-# -independent of 042 and 060. The border fix is small and can ship with any
-# -product candidate.
-# +**Re-ranked 2026-09-25: fifth, below 066 and above 067.** The Aerochrome work
-# +leads the queue. This goes below 052, 013 and 065, which change the sky it is
-# +seen against, and below 066, because the film model's colour re-attachment
-# +respects thin edges and nothing in it is tuned against them, while this work
-# +is the largest piece and touches thin edges only. It stays independent of 042
-# +and 060. The border fix is small and can ship with any product candidate.
-# diff --git a/docs/decisions/065-sky-inside-a-lattice-cannot-be-filled-into-the-sky-mask.md b/docs/decisions/065-sky-inside-a-lattice-cannot-be-filled-into-the-sky-mask.md
-# index 14e1ee6..8d27173 100644
-# --- a/docs/decisions/065-sky-inside-a-lattice-cannot-be-filled-into-the-sky-mask.md
-# +++ b/docs/decisions/065-sky-inside-a-lattice-cannot-be-filled-into-the-sky-mask.md
-# @@ -125,16 +125,14 @@ where the colour does.
-#  
-#  ## Rank
-#  
-# -**Directly below 048 and above 028.**
-# -
-# -Nothing ranked above it has to be redone once it lands: it adds to a reader's
-# -Sky mask, and nothing above tunes against that mask, since the look's sky stages
-# -read their own selection until 052. It sits below 052 because the reported case
-# -is under Aerochrome, where the fill's full value arrives only when the look reads
-# -the reader's sky. It sits below 048 because the union is the route it refines
-# -and ships first. It sits above 028 because the fill covers 028's case by hand
-# -where the cap declines, while 028 cannot cover a gap whose colour is not the
-# -sky's.
-# +**Re-ranked 2026-09-25: third, below 052 and 013, above 066.** The Aerochrome
-# +work leads the queue. It sits below 052 because a learned sky selection may
-# +take the lattice's sky without a stroke, which would change what this fill has
-# +left to do. It sits above 066 because a fill changes which sky a reader's mask
-# +holds. It now sits above 048, whose union already ships in the build on
-# +staging, so the route it refines exists without 048's record closing first,
-# +and above 028, because the fill covers 028's case by hand where the cap
-# +declines.
-#  
-#  ## Looked at
-#  
-# diff --git a/docs/decisions/066-aerochrome-is-rendered-from-a-model-of-the-film.md b/docs/decisions/066-aerochrome-is-rendered-from-a-model-of-the-film.md
-# new file mode 100644
-# index 0000000..2be587b
-# --- /dev/null
-# +++ b/docs/decisions/066-aerochrome-is-rendered-from-a-model-of-the-film.md
-# @@ -0,0 +1,150 @@
-# +# 066 · Aerochrome is rendered from a model of the film, not tuned toward it
-# +
-# +## Context
-# +
-# +The Aerochrome look reaches the film's colours by per-hue band shifts and
-# +saturation stages tuned against the film's measured numbers (4b-iii). On
-# +2026-09-25 two tuned candidates were built and inspected at full resolution,
-# +96 tiles of 1400 by 932 on NIR_3461 and NIR_3466, each opened:
-# +
-# +- **Aerochrome tuned to the film** (Sky depth 0.35, the look's sky saturation
-# +  at its maximum 2, Foliage saturation 2, Foliage luminance 1.5, lens profile
-# +  at 1). The sky darkens, but a light halo about 200 px wide stands beside
-# +  every building and pylon leg (the sky's brightness against the shipped look
-# +  0.91 at 10 px from the NIR_3466 building's edge, 0.65 in open sky), the
-# +  sky inside the near pylon's lattice is not darkened at all, the tall
-# +  building's pale face is darkened as if it were sky (210 to 135) with a
-# +  bright round hole in it, the lit grass clips to flat white (22.8% of one
-# +  tile at 245 or more in every channel, against 2.6% as shipped), and the grey
-# +  road carries twice the red speckle (38.3% of road pixels at saturation 0.35
-# +  or more, against 18.3%).
-# +- **Pink IR tuned to the film** (global saturation 3, band values solved):
-# +  orange foliage and grass, cladding ringed in yellow-green and purple, red
-# +  and blue fringes on every steel member, mottled cloud, and the upper sky
-# +  crushed to black (29–37% of the corner tiles at 12 or below). Applied to
-# +  the second frame with the first frame's values, its foliage lands 16° off.
-# +
-# +Every one of those numbers was reached by moving the app's own controls and
-# +measuring its own output, which is the loop IR-SCIENCE 4b-viii and 4b-ix now
-# +replace with what the film and the field say.
-# +
-# +## Looked up
-# +
-# +IR-SCIENCE.md 4b-viii and 4b-ix, researched 2026-09-25, carry the sources in
-# +full. What bears on this record:
-# +
-# +- **The film, from Kodak's data sheets** (AS-77/TI-2562, TI-2323): the
-# +  infrared layer takes visible red and green too (only about 53% of its
-# +  daylight exposure is infrared) and is deliberately about 1.4 stops slower
-# +  than the other two; the tone curves are steep (gradients 2.6–4.3, about
-# +  three stops from dense to clear). The film's red foliage is dense magenta
-# +  and yellow dye from foliage being dark in the visible, not a saturated
-# +  infrared record; its dark sky is the slow infrared layer seeing almost
-# +  nothing of skylight; clouds come out near-white; overexposed foliage drifts
-# +  toward magenta-pink.
-# +- **This camera's one colour axis is a red-to-infrared ratio**, a vegetation
-# +  index scaled by one camera constant; the film's green layer is not in the
-# +  file and must be synthesised.
-# +- **The published practice for a missing band** is a blend built per pixel
-# +  from the bands measured, with its weights driven by a vegetation index
-# +  (satpy `NDVIHybridGreen`; GOES-16's synthetic green), or a colour lookup
-# +  fitted to registered reference images (Hogervorst and Toet 2010).
-# +- **Colour at low frequency, re-attached to the clean infrared detail with an
-# +  edge-aware filter** (Limmer and Lensch 2016), and a gain that shrinks where
-# +  the colour signal is weak rather than amplifying it (Lim and Silverstein,
-# +  HP Labs 2004): no saturation gain improves the chroma's signal-to-noise.
-# +- **No LUT claims Aerochrome from a 665–720 nm file**; the infrared-specific
-# +  LUTs are channel swaps expecting the frame before any swap, and PictureFX's
-# +  Aerochrome maps mid-grey to mauve.
-# +- **Practitioners say Aerochrome from a 720 nm camera works "to a lesser
-# +  degree"** (LifePixel), and Kennard's filter test reaches red foliage with a
-# +  blue sky only at 580 nm and below.
-# +
-# +## Weighed against
-# +
-# +- **052, "The look's sky adjustments read a selection the reader cannot see"**:
-# +  the current look darkens the sky through a selection, and that selection is
-# +  where the halo comes from (052's 2026-09-25 measurements). A per-pixel film
-# +  model derives the sky's darkness from the index itself, so whether it needs
-# +  a sky selection at all is the first thing its build has to measure.
-# +- **013, "Aerochrome is the right colour and comes out splotchy"**: the chroma
-# +  noise this record's model has to control is 013's defect; the model's
-# +  low-frequency colour is the literature's answer to it.
-# +- **017, "Aerochrome's sky depth against the film"** (archived): the sky-depth
-# +  stage this model would replace.
-# +- **016 and 019** (archived): the look's population work, which a film model
-# +  supersedes if it ships.
-# +- **061, "Red and blue do not line up at thin edges"**: edges the model's
-# +  colour re-attachment has to respect.
-# +- **065 and 028**: sky the selection cannot reach, which a per-pixel model
-# +  would not need to reach.
-# +- **The two-image route** (IR-SCIENCE 4b-ix): an infrared frame and an
-# +  ordinary colour frame give the film's real mapping; this record approximates
-# +  it from one image.
-# +
-# +## Depends
-# +
-# +- touches 052 — the model derives the sky per pixel; whether it still needs the look's selection is measured when it is built.
-# +- touches 013 — the chroma noise the model controls is 013's defect.
-# +- touches 017 — the sky-depth stage this model would replace.
-# +- touches 061 — the colour re-attachment has to respect the edges 061 corrects.
-# +- touches 065 — sky inside a lattice, which a per-pixel model does not need a selection to reach.
-# +- touches 028 — sky through a canopy, the same.
-# +- touches 016 — the look's foliage population work, which this model supersedes if it ships.
-# +- touches 019 — the look's sky population work, the same.
-# +
-# +## Options
-# +
-# +1. **A film model.** Chosen.
-# +   - Take the two things the file measures: infrared luminance, and the
-# +     vegetation index on the one colour axis.
-# +   - Synthesise the film's three layer exposures from them. The infrared
-# +     layer comes mostly from luminance, and the red and green layers from the
-# +     index, in the way satellites build a missing green. The mapping is
-# +     fitted from reflectance spectra run through Kodak's curves (4b-viii), or
-# +     from registered reference frames.
-# +   - Run those exposures through the film's own characteristic curves and
-# +     dyes.
-# +   - Carry the colour at low frequency and re-attach it to the infrared
-# +     detail with an edge-aware filter.
-# +   - The two balances the sources describe (Kodak's own, and a scan balanced
-# +     so grey reads neutral) are rendered and shown before one is chosen.
-# +2. Keep tuning the current look's band shifts, saturation stages and sky
-# +   depth against the film's numbers.
-# +3. Pink IR re-tuned as the Aerochrome button.
-# +4. An existing Aerochrome LUT over one of the looks.
-# +5. Leave Aerochrome as it ships.
-# +
-# +## Rejected
-# +
-# +- **2, keep tuning.** Measured on 2026-09-25 at full resolution: the tuned
-# +  look halos at every edge, darkens a pale building as sky, clips the grass to
-# +  white and reddens a grey road. Those numbers came from the app's own
-# +  controls, and the dark sky depends on a selection that is wrong over whole
-# +  regions. Tuning more constants against one frame's numbers is the loop the
-# +  research replaces.
-# +- **3, Pink IR.** At full resolution it gives orange foliage, ringed cladding,
-# +  fringed steel, mottled cloud and a crushed sky. It misses the film on the
-# +  second frame by 16° in foliage. Its saturation of 3 amplifies the channel
-# +  residual that 4c-iv names.
-# +- **4, a LUT.** None exists for this input. The Aerochrome LUTs are for
-# +  ordinary colour photos (PictureFX turns grey mauve) or for full-spectrum
-# +  captures with a filter. The infrared LUTs are channel swaps that undo the
-# +  app's own swap when applied last.
-# +- **5, leave it.** Its sky is not dark and the film's is.
-# +
-# +## Rank
-# +
-# +**Fourth**, after 052, 013 and 065, and above 061, in the Aerochrome work the
-# +queue now leads with (settled 2026-09-25). It sits below 052 and 013 because
-# +both change the ground it is measured on: the sky selection, and the chroma
-# +noise the model must control. It sits below 065 because a fill changes which
-# +sky a reader's mask holds. It sits above 061 because 061's channel alignment
-# +touches thin edges only, which the model's colour re-attachment respects, and
-# +nothing in the model is tuned against them. Its first measurement decides
-# +whether it needs 052 at all.
-# +
-# +## Looked at
-# +
-# +- NIR_3461, 2026-09-25: as shipped, Aerochrome tuned to the film and Pink IR tuned to the film, lens profile at 1, each cut into 16 tiles of 1400 by 932 and every tile opened; 1:1 crops of the halo at the near pylon, the round discs, the white blotches in the darkened sky and the clipped grass.
-# +- NIR_3466, 2026-09-25: the same three renders and tiles, every tile opened; 1:1 crops of the halo beside the tall building, the building face darkened as sky, the red on the grey road, the cloud mottle and the crushed upper sky.
-# diff --git a/docs/decisions/067-two-images-give-the-films-real-mapping.md b/docs/decisions/067-two-images-give-the-films-real-mapping.md
-# new file mode 100644
-# index 0000000..3c18991
-# --- /dev/null
-# +++ b/docs/decisions/067-two-images-give-the-films-real-mapping.md
-# @@ -0,0 +1,81 @@
-# +# 067 · Two images give the film's real mapping
-# +
-# +## Context
-# +
-# +The film maps infrared to red, visible red to green and visible green to blue
-# +(IR-SCIENCE 4b, 4b-viii). This camera's conversion blocks visible green before
-# +it reaches the sensor, so one infrared frame carries one colour axis and the
-# +film's green layer, which drives its blue output, is not in the file
-# +(4b-ix). One image can approximate the film (066); it cannot reproduce it.
-# +
-# +The only documented route to the real mapping for a camera like this one is a
-# +second photograph: an ordinary colour frame of the same scene, from a phone or
-# +an unconverted camera, aligned with the infrared frame, so the visible red and
-# +green the film recorded come from a real record rather than a synthesis.
-# +
-# +## Looked up
-# +
-# +- **JW Wong** (flickr.com/photos/jw_wong, read): an infrared frame at 700 nm or
-# +  above and a normal colour frame, from one full-spectrum camera with a filter
-# +  change or from two cameras, aligned and mapped infrared to red, red to green,
-# +  green to blue, visible blue unused. Described as a reproduction rather than a
-# +  simulation. Channel subtraction in these methods has to be done in linear
-# +  light; a linear mixer on gamma-encoded data "didn't work as well".
-# +- **Kodak's own digital colour-infrared cameras** (DCS 420CIR and 460CIR,
-# +  patent US6292212): a full-spectrum sensor behind a band-pass filter, with
-# +  the infrared subtracted from the red and green channels before the same
-# +  mapping.
-# +- **Hidden Realms** (hiddenrealms.ch, read): the same with an 830 nm frame and a
-# +  hot-mirror frame.
-# +- **Joshua Bird** (joshuabird.com, read): trichrome on film, three filtered
-# +  exposures combined, called the most authentic method; moving subjects give
-# +  colour artefacts.
-# +- **The remote-sensing colour-infrared composite** (IR-SCIENCE 4b-ix): the
-# +  standard, from separately recorded bands.
-# +
-# +## Weighed against
-# +
-# +- **066, "Aerochrome is rendered from a model of the film"**: the one-image
-# +  approximation. This record is the two-image reproduction; neither replaces
-# +  the other, because most photographs will only ever have one frame.
-# +- **043, the keep file**: a second photograph carried with the first would
-# +  travel in the same container.
-# +- **004, full-bleed crop**, and the geometry tools: the second frame has to be
-# +  aligned, and any crop or straighten applies to both.
-# +
-# +## Depends
-# +
-# +- needs 066 — it renders through 066's film curves; that record synthesises the missing layers from one frame, this one records them with a second.
-# +- touches 043 — a second photograph would be carried with the first in the keep file.
-# +- touches 004 — the second frame is aligned and cropped with the first.
-# +
-# +## Options
-# +
-# +1. **A second, ordinary colour photograph of the same scene, imported beside
-# +   the infrared frame.** Chosen, as a future option.
-# +   - The app aligns the two frames.
-# +   - It builds the film's three layer exposures from real records: infrared
-# +     from this camera, and visible red and green from the colour frame.
-# +   - It runs them through the same film curves 066 builds.
-# +   - The seams it costs are named in the app: moving subjects, and a change of
-# +     light between the two frames.
-# +2. Three filtered exposures (trichrome).
-# +3. Leave it to one image.
-# +
-# +## Rejected
-# +
-# +- **2, trichrome.** It needs filters for green and red on a camera that can
-# +  take them. A 665–720 nm internal conversion cannot record visible green or
-# +  most of the visible red, so two of the three exposures would have to come
-# +  from another camera anyway, which is option 1 with an extra frame.
-# +- **3, one image only.** It is what 066 does, and 066 cannot reach the film's
-# +  real colour changes: red objects to yellow, yellow flowers to white, green
-# +  water to blue. The sources name a second frame as the only way to get them
-# +  with this conversion.
-# +
-# +## Rank
-# +
-# +**Sixth, the last of the Aerochrome work**, below 061, and deliberately a
-# +future option. It needs 066's film curves to render through, and it is a new
-# +capability, a second photograph per edit, where the items above it fix or
-# +complete what already exists. Nothing above it waits on it.
+#  **Researched 2026-09-16, after shipping the rotation bare and reporting that it
 # diff --git a/public/conveyor-status.html b/public/conveyor-status.html
-# index 3327d5d..19d24b7 100644
+# index 19d24b7..b23a103 100644
 # --- a/public/conveyor-status.html
 # +++ b/public/conveyor-status.html
-# @@ -84,8 +84,8 @@
-#        <ul class="facts">
+# @@ -85,7 +85,7 @@
 #          <li><b>Production</b> <span>v2.62.26: the export edge fix and the test page's shader rows, which were on staging as v2.62.16, promoted on your go. Checked on the live site: its offline copy is named for 2.62.26 and the test page carries the new rows. The number moved because the last digit counts every commit; the content did not.</span></li>
 #          <li><b>On staging</b> <span>v2.63.7, replacing v2.63: everything v2.63 carried (the wire fix, a mask's own colour mixer, the first stage of the mask work, the LUT grid and None for looks), plus a picked mask's own grade and Sky band, a line under "Editing" saying dimmed controls stay with the whole photo, new masks that change nothing until a control is moved, and double-tap that puts a mask's slider back to no change and is no longer lost while the photo redraws. It waits on your device pass; the steps are in NOTES.</span></li>
-# -        <li><b>Built and held</b> <span>Nothing. The mask work's stage 2b goes on after the device pass and your Aerochrome answer.</span></li>
-# -        <li><b>Last verified green</b> <span><code>ec29ded</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
-# +        <li><b>Built and held</b> <span>Nothing. The Aerochrome work now leads the queue, ahead of the rest of the mask work: the sky selection behind the halo (052), the round spots (013), the fill for sky inside a lattice (065), Aerochrome rendered from a model of the film (066), red and blue lining up at thin edges (061), and the two-photo route (067). The mask work's stage 2b follows.</span></li>
-# +        <li><b>Last verified green</b> <span><code>b7ce1ee</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
+#          <li><b>Built and held</b> <span>Nothing. The Aerochrome work now leads the queue, ahead of the rest of the mask work: the sky selection behind the halo (052), the round spots (013), the fill for sky inside a lattice (065), Aerochrome rendered from a model of the film (066), red and blue lining up at thin edges (061), and the two-photo route (067). The mask work's stage 2b follows.</span></li>
+# -        <li><b>Last verified green</b> <span><code>b7ce1ee</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
+# +        <li><b>Last verified green</b> <span><code>9c7f20a</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
 #          <li><b>Next version</b> <span>2.63 is the staged build's number, because masks gain their own amounts in it. The next release that adds something takes 2.64.</span></li>
 #        </ul>
 #  
-# @@ -102,25 +102,32 @@
+# @@ -102,21 +102,30 @@
 #              colour mixer, the LUT grid, None, "Add to it", and the test page's
 #              timing with eight masks).
 #            </li>
-# -          <li>
-# -            <strong>Which the Aerochrome button should be</strong>: as shipped, or
-# -            Pink IR with your Sky and Foliage band values plus Aerochrome's own
-# -            denoise. The pictures went with the question: the second has no round
-# -            spots, a deeper sky and crimson grass, and a slightly more textured sky
-# -            at full size.
-# -          </li>
-# -          <li>
-# -            <strong>Whether the look's sky should read your Sky mask next</strong>
-# -            (record 052), after the Sky band commit and ahead of the rest of stage
-# -            2b. Yes is recommended: it is what lets anything added to the Sky mask,
-# -            by "Add to it" or by a fill, reach Aerochrome's own sky. No keeps it
-# -            ninth.
-# -          </li>
+# +          <li>
+# +            <strong>Which sky model the selection is built from</strong>, from the maps
+# +            already sent. Two were tried on six practice frames; each is right where
+# +            the other is wrong. Nothing is built until this is settled.
+# +          </li>
 #          </ul>
 #        </div>
 #  
 #        <h2>The stages</h2>
 #        <ul>
-# +        <li class="now"><span class="state">Now</span>
-# +          <strong>Researching on-device sky segmentation, before anything is built.</strong>
-# +          The halo beside buildings and pylons under Aerochrome is the look's sky
-# +          selection being wrong over whole regions: the sky inside a pylon's
-# +          lattice left out, a pale building face taken in. Four refinements were
-# +          tried and measured, including the one the published literature names,
-# +          and none can fix wrong labels. Editors with clean sky edges start from a
-# +          learned segmentation, so which models could run in the app on an iPad,
-# +          offline, and whether they work on infrared, is being read now. Their
-# +          maps come to you before anything is built.
-# +        </li>
-# +        <li class="done"><span class="state">Done</span>
-# +          <strong>The research that should have come first is written down.</strong>
-# +          What the film physically did, from Kodak's own data sheets; what
-# +          practitioners, LUT makers and the published science say about getting
-# +          Aerochrome from a camera like this one. No LUT or recipe produces it
-# +          from a 665–720 nm conversion; the film's red is dense dye from foliage
-# +          being dark in the visible, and its dark sky a deliberately slow
-# +          infrared layer. It is in IR-SCIENCE, sections 4b-viii and 4b-ix, and it
-# +          reshaped the Aerochrome plan into a model of the film (066).
-# +        </li>
-#          <li class="done"><span class="state">Done</span>
-#            <strong>Production's checks are green again.</strong>
-#            One word in the notes failed the check that looks for a person referred to
-# @@ -163,7 +170,7 @@
-#            rewritten around this, with its stages and the three choices it leaves
-#            you; pictures of the panel come before any code.
+#          <li class="now"><span class="state">Now</span>
+# -          <strong>Researching on-device sky segmentation, before anything is built.</strong>
+# +          <strong>Two sky models tried on infrared; the choice between them is next.</strong>
+#            The halo beside buildings and pylons under Aerochrome is the look's sky
+# -          selection being wrong over whole regions: the sky inside a pylon's
+# -          lattice left out, a pale building face taken in. Four refinements were
+# -          tried and measured, including the one the published literature names,
+# -          and none can fix wrong labels. Editors with clean sky edges start from a
+# -          learned segmentation, so which models could run in the app on an iPad,
+# -          offline, and whether they work on infrared, is being read now. Their
+# -          maps come to you before anything is built.
+# +          selection being wrong over whole regions, and no refinement fixes a wrong
+# +          label. Two models that can be downloaded here and are MIT-licensed were
+# +          run on six practice frames exported with the lens profile at 1, in the
+# +          scratch lab only. Neither works on the frame as the app shows it:
+# +          infrared makes the grass the brightest thing in the picture, and the
+# +          models call it sky. Re-colouring the frame so foliage is green and sky is
+# +          blue, from the frame's own colour axis, is what makes them work. The small
+# +          model (u2netp) then finds the sky between the steel of a pylon and every
+# +          wire, and calls a pale building face sky. The larger one (BiSeNetV2)
+# +          knows the building and turns the pylon into a solid grey shape. The
+# +          research, the numbers and the sources are in IR-SCIENCE 4b-x.
 #          </li>
-# -        <li class="now"><span class="state">Now</span>
-# +        <li class="now"><span class="state">After the Aerochrome work</span>
-#            <strong>Masks, stage 2b: the rest of the colour and tone tools on a
-#            picked mask.</strong>
-#            The colour mixer, the grade and the Sky band are on staging: pick a
-# @@ -310,6 +317,24 @@
-#          They are written down so they are not re-discovered as new.
-#        </p>
-#        <ul>
-# +        <li>
-# +          <strong>A faint vertical colour band sits at the same place on two
-# +          different photographs under Aerochrome</strong>, x 5230–5270 of the
-# +          full export, red minus blue falling about 10 levels across it. Absent
-# +          under Pink IR. Cause not established.
-# +        </li>
-# +        <li>
-# +          <strong>Aerochrome's sky selection takes in a pale building face</strong>
-# +          on NIR_3466, with a hole in it, so a sky depth darkens the building.
-# +          Part of 052.
-# +        </li>
-# +        <li>
-# +          <strong>An infrared LUT applied over a swapping look undoes the
-# +          swap.</strong> The infrared LUTs available (Rob Shea's, Kolari's,
-# +          PictureFX's) all expect the frame before any swap, and the app applies a
-# +          LUT last. Measured on Rob Shea's "IR RB Swap", which is an exact
-# +          red-blue swap.
-# +        </li>
-#          <li>
-#            <strong>A mask joined to the one above still shows its own Brightness,
-#            Contrast and Saturation sliders</strong>, which nothing reads once it is
+#          <li class="done"><span class="state">Done</span>
+#            <strong>The research that should have come first is written down.</strong>
