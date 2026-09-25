@@ -343,6 +343,19 @@ try {
           rows.push(...(await controlsOn(page, `${s.file} · ${t} · ${add}`)));
           ctlRows.push(...(await explainedOn(page, `${s.file} · ${t} · ${add}`)));
         }
+        // AND WITH THE LAST ONE PICKED AND THE PLACE CLOSED (042, stage 2). The
+        // chip row, the Editing line with Back to whole photo, and Warmth in
+        // place of the three gains exist only in this state, so a sweep of the
+        // open place leaves them declared and never reached. The place is
+        // opened again so the lines below see what they always saw.
+        await page.evaluate(() => document.getElementById("maskPlaceClose")?.click());
+        await page.waitForTimeout(300);
+        await page.evaluate(() => document.getElementById("ptab-basic")?.click());
+        await page.waitForTimeout(150);
+        rows.push(...(await controlsOn(page, `${s.file} · a mask picked`)));
+        ctlRows.push(...(await explainedOn(page, `${s.file} · a mask picked`)));
+        await page.evaluate(() => document.getElementById("maskPlaceOpen")?.click());
+        await page.waitForTimeout(150);
       }
       rows.push(...(await controlsOn(page, `${s.file} · ${t}`)));
       ctlRows.push(...(await explainedOn(page, `${s.file} · ${t}`)));

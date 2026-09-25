@@ -176,6 +176,26 @@ const makeAndSaveMask = async (page, where) => {
   return true;
 };
 
+/** A PICKED MASK IS A STATE OF THE WHOLE PANEL (042, stage 2). Takes the page,
+ *  with a mask just made and the mask place still open, and a label; closes
+ *  the place with a real press and returns true once the chip row and the
+ *  heading's "Editing" line are showing, false (with a failure) when they do
+ *  not. What the caller relies on: after true, the tabs are the picked mask's —
+ *  its controls live, the rest inert with the note saying why — which is the
+ *  state a reader works in and the one a sweep of the open mask place never
+ *  reaches, because the chips and the heading hide while the place is open. */
+const pickedMaskState = async (page, where) => {
+  const close = page.locator("#maskPlaceClose");
+  if (!(await close.isVisible().catch(() => false))) { fail(`${where}: the mask place is not open, so the picked-mask state is unmeasured`); return false; }
+  await close.click();
+  const shown = await page.waitForFunction(
+    () => { const t = document.getElementById("maskTarget"), c = document.getElementById("maskChips"); return !!t && !!c && !t.hidden && !c.hidden && c.children.length > 1; }, null, { timeout: 20000 },
+  ).then(() => true).catch(() => false);
+  if (!shown) { fail(`${where}: closing the mask place left no chip row or Editing line, so the picked-mask state is unmeasured`); return false; }
+  await page.waitForTimeout(400);
+  return true;
+};
+
 /** The colour a reader actually sees: the first ancestor that paints, composited
  *  down. `getComputedStyle` hands back the rgba AS WRITTEN, so a 15% accent over
  *  a dark surface reads as the accent while it is on screen as near-black — a
@@ -243,6 +263,15 @@ try {
         if (serious.length) { fail(`${line}: ${serious.length} serious/critical`); for (const v of serious) for (const n of v.nodes) note(`[${v.impact}] ${v.id}: ${n.target.join(" ")}`); }
         else ok(`${line}: nothing serious or critical${r.violations.length ? ` (${r.violations.length} minor)` : ""}`);
         for (const v of r.violations.filter((v) => !serious.includes(v))) note(`  minor · ${v.id} x${v.nodes.length}`);
+        // AND WITH THAT MASK PICKED (042, stage 2): the chip row, the Editing
+        // line and the tabs acting on the mask, which the open place hides.
+        if (s.file === "ir.html" && await pickedMaskState(page, `${line} picked mask`)) {
+          const rp = await page.evaluate(async (rules) => await window.axe.run(document, { runOnly: rules }), RULES);
+          const sp = rp.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+          if (sp.length) { fail(`${line} with a mask picked: ${sp.length} serious/critical`); for (const v of sp) for (const n of v.nodes) note(`[${v.impact}] ${v.id}: ${n.target.join(" ")}`); }
+          else ok(`${line} with a mask picked: nothing serious or critical${rp.violations.length ? ` (${rp.violations.length} minor)` : ""}`);
+          for (const v of rp.violations.filter((v) => !sp.includes(v))) note(`  minor · ${v.id} x${v.nodes.length}`);
+        }
       } finally { await page.close(); }
     }
   }
@@ -451,6 +480,12 @@ try {
           if (inside.small.length) fail(`${s.file} ${vw}px sky mask editor and saved list: ${inside.small.join(" · ")}`);
           else ok(`${s.file} ${vw}px sky mask editor and saved list: all >= 44`);
           if (inside.exempt.length) note(`inline in a sentence, exempt (SC 2.5.8): ${inside.exempt.join(" · ")}`);
+          if (await pickedMaskState(page, `${s.file} ${vw}px picked mask`)) {
+            const picked = await page.evaluate(HIT);
+            if (picked.small.length) fail(`${s.file} ${vw}px with a mask picked (chips, Editing line, tabs): ${picked.small.join(" · ")}`);
+            else ok(`${s.file} ${vw}px with a mask picked (chips, Editing line, tabs): all >= 44`);
+            if (picked.exempt.length) note(`inline in a sentence, exempt (SC 2.5.8): ${picked.exempt.join(" · ")}`);
+          }
         }
 
         // THE PICK/REJECT SHEET IS A STATE, AND SO IS ITS WAITING HALF.
