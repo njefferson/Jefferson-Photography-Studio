@@ -1437,6 +1437,155 @@ www.asprs.org (Fritz 1967 on the film's sensitometry), truecolorinfrared.com
 kurosu.co, www.dropbox.com (dl.dropboxusercontent.com worked), and
 www.plferrer.photos.
 
+### 4b-x. A LEARNED SKY SELECTION ON INFRARED — WHAT THE FIELD HAS, AND TWO MODELS ON SIX FRAMES
+
+**Why this section exists.** 052's halo was measured on 2026-09-25: the look's
+coarse sky bitmap is wrong over whole regions (the sky inside the near pylon's
+lattice on NIR_3461 is labelled not-sky; the pale face of the tall building on
+NIR_3466 is labelled sky), and four refinement routes, the weighted guided
+filter of the paragraph above included, were built in the scratch lab and could
+not correct a label that is wrong across a region. **So the paragraph above that
+calls the weighted filter "the first thing to build" is revised: the labels come
+first, the filter second.** A refinement moves an edge; it cannot turn a building
+into a building.
+
+**What the field has.**
+
+- **Liba et al.** (arXiv 2006.10172, sections 3.1–3.3 read): public datasets'
+  sky masks are "coarse and inaccurate" and omit the holes through which sky is
+  visible, and models trained on them inherit that. Their system needed three
+  things: labels refined before training, a colour-density inpaint that
+  relabels undetermined pixels as sky above a probability of 0.6, and the
+  confidence-weighted guided filter. The network is a UNet at 256 px, 3.7 MB
+  after MorphNet and fp16, IoU 0.9237 on their set, 50 ms on a mobile GPU, with
+  the filter upsampling to 1024 x 768 in 190 ms. **The sky between cables and
+  lattice comes from the fill and the filter, not from the network.**
+- **Visible-trained models on near infrared.** Stillger, Hamscher, Hahn, Mütze,
+  Meisen and Maag, arXiv 2606.15072 (June 2026; setup and Tables 1, 11 and 21
+  read), is the one study that measures the same visible-trained models on
+  registered RGB and NIR street scenes (RANUS). DeepLabV3+ fell from 37.75 to
+  21.98 mIoU and SegFormer-B5 from 40.89 to 29.50. Sky held partly, at an IoU
+  of 51 to 69; vegetation collapsed to 7.5 to 12.5 because foliage is bright
+  in infrared. Only Mask2Former with a Swin-L backbone held (61.68 to 59.4),
+  and it is far too large for a browser. Limmer and Lensch (arXiv 1604.02245,
+  section IV-A read) saw the same thing qualitatively: visible-trained
+  colourisers on NIR "are able to colorize the sky, but fail for trees and
+  grass". Salamati, Larlus, Csurka and Süsstrunk (arXiv 1406.6147, read) trained
+  per modality, so it is not a zero-shot test. **No source compares input
+  preparations for NIR**: grey luminance in three channels is the default
+  everywhere and is the control.
+- **What could run in the app, and under what licence.**
+  - onnxruntime-web's plain WASM build is 14.2 MB and runs in a Worker. It is
+    single-threaded, because the app sends no COOP/COEP headers. Its WebGPU
+    builds (28.3 and 26.8 MB) are over Cloudflare Pages' 25 MiB file limit.
+    TF.js has had no release since October 2024.
+  - EfficientViT-Seg B1 (Apache-2.0, ADE20K mIoU 42.84) has its weights on
+    huggingface.co, and PP-MobileSeg-Tiny (Apache-2.0, 36.39) on bj.bcebos.com.
+    Both hosts are refused by this session's network policy.
+  - TF.js DeepLab for ADE20K (Apache-2.0, 24.8 MB) sits behind tfhub.dev and
+    www.kaggle.com, both refused. storage.googleapis.com answers, but refuses
+    the object path the package names.
+  - SegFormer is excluded: NVIDIA's licence limits it to research or
+    evaluation.
+  - Two models are reachable from here and both are MIT, their LICENSE files
+    read: xiongzhu666's sky model (a u2netp, 2.3 MB fp16 in ncnn format, 384
+    px) and CoinCheung's BiSeNetV2 trained on ADE20K (22.4 MB, 150 classes).
+  - **Offline, speed and memory are not known for the device.** A model file
+    would be precached by the service worker like any other asset, and both
+    reachable models fit under Pages' 25 MiB per-file limit. No iPad Safari
+    timing or memory figure is published for any model here. The only
+    published timing is Liba's 50 ms on a mobile GPU, which this app would not
+    have in a single-threaded WASM Worker. The container's timings, about
+    0.4 s per frame for u2netp on its CPU, measure the container and not the
+    reader's tablet (hub doctrine §7j). So speed and peak memory are a test-page
+    measurement on the device, taken before anything ships.
+
+**The trial, 2026-09-25, in the scratch lab only.**
+
+- **Frames.** Six frames were exported through the app with the lens profile
+  at 1: NIR_3461, NIR_3466, NIR_1644, NIR_1827, NIR_1651 and NIR_0627. The
+  last has no sky in it, so the right answer there is none.
+- **Checking the preparation first.** Each model was run on the model author's
+  own daylight samples and segmented them correctly: u2netp gives a sharp
+  mask, and BiSeNetV2 labels sky, trees and two pylons as tower. So a failure
+  on infrared is the domain, not the input preparation.
+- **Five inputs:**
+  - the app with no look (the swap render: sky teal-grey, foliage pale pink);
+  - the Aerochrome look;
+  - luminance in three channels;
+  - a **natural-hue** render: the swap render's one colour axis re-mapped so
+    that its foliage side goes green and its sky side goes blue, with the
+    brightness kept;
+  - the same with visible-light **brightness order** as well: foliage
+    darkened, sky lifted.
+- **The instrument failed once, and was caught by a repeat.** ncnn's Python
+  `Mat`, built from a numpy array, shares that array's memory rather than
+  copying it. The first script passed it a temporary that was freed before
+  the network read it, and four runs on one file gave two answers (0.1% and
+  11.6% sky). Every number below is from the fixed script, where the array is
+  held and the `Mat` cloned. Five repeats per model now agree exactly. The
+  faulty run had differed in the top-left corner of each map and in two
+  no-look results.
+- **Every map was opened.** There is a sheet per frame and model, and each map
+  is 384 px or less inside the model, so a 576 px panel shows everything it
+  holds. Then 1:1 crops at the export size of the near pylon (NIR_3461, x
+  0–1500, y 300–2300) and the building (NIR_3466, x 2000–3900, y 1300–2800),
+  with the app's own selection beside each.
+
+**What the maps show.**
+
+- **The natural-hue input is what makes a visible-light model work on these
+  frames.**
+  - On the no-look, Aerochrome and grey inputs, u2netp labels NIR_3461's bright
+    grass field as sky and the sky as not-sky: 0.7% of the frame is marked sky,
+    against a true share of about 70%.
+  - On the natural-hue input it marks 71.6%: clean pylons, the gaps in the near
+    pylon's lattice as sky, and each wire as not-sky.
+  - On NIR_0627, which has no sky, it marks the whole frame as sky on the
+    no-look and grey inputs (100%) and none of it on the natural-hue input.
+  - BiSeNetV2 moves the same way: the field goes from its class "earth" to
+    "grass", and open sky above NIR_3466's building from 0.77 to 0.97.
+- **u2netp on the natural-hue input.**
+  - Clean tree lines on NIR_1644 and NIR_1827, and no sky on NIR_0627, which is
+    right.
+  - On NIR_1651, a close-up tree against clear sky and cloud, it finds almost no
+    sky on any input (0.1%).
+  - On NIR_3466 it marks the pale face as sky: a mean of 0.70, against 0.85 for
+    the app's selection today and 0.92 with brightness order. It marks the
+    narrow pale tower on the right as sky too (1.00), which the app's selection
+    gets right (0.00).
+  - **Brightness order made the face worse, not better**: a reduced sheet had
+    suggested the opposite, and the 1:1 crop and the mean corrected it (hub
+    lesson 366).
+- **EGE-UNet**, from the same repository at 0.2 MB, is coarser and loses most
+  of the sky on NIR_3466 with brightness order. It was not pursued.
+- **BiSeNetV2 on the natural-hue input.**
+  - The right regions on all six frames: 69.7% sky on NIR_3461, 45.8% on
+    NIR_1651, where u2netp found none, and 0% on NIR_0627.
+  - On NIR_3466 the pale face is 0.20 and the narrow tower 0.49.
+  - But it decides at an eighth of its 640 px input, about 70 px at the export
+    size, so its edges are soft.
+  - It draws every pylon as a solid tower, because ADE20K labels towers solid.
+    The near pylon's lattice is a wash of 0.6 to 0.9 with no gaps.
+
+**What it means.** The two models fail in opposite places:
+
+- **BiSeNetV2 knows what a building is and cannot see through a lattice.**
+- **u2netp sees through a lattice and does not know what a building is.**
+
+Neither alone is a selection. The structure Liba describes fits what the maps
+show: a coarse semantic label that knows sky from building, a confidence that
+leaves the boundary undetermined, then a colour fill and a weighted filter at
+full resolution for the edges and the holes. That is also the only route by
+which the app's existing `refineSkyMask` stage would finally get labels worth
+refining. Whether a sky-only model can instead be trained on this camera's
+frames, which is the route Liba's own system took, needs a GPU this app has
+never needed.
+
+**Hosts refused on this topic:** huggingface.co, bj.bcebos.com, tfhub.dev,
+www.kaggle.com, sceneparsing.csail.mit.edu and download.pytorch.org.
+GitHub's release downloads and raw.githubusercontent.com both worked.
+
 ## 4c. THE CRUX IS NIR CONTAMINATION, AND A ROTATION ALONE CANNOT FIX IT
 
 **Researched 2026-09-16, after shipping the rotation bare and reporting that it
