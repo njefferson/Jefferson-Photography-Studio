@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- THE HOST SERVES THIS FOR ANY ADDRESS IT DOES NOT HAVE, with a 404
+         (decision 071). Without it, Cloudflare Pages treats the site as a
+         single-page app and answers every missing path with the start page and
+         a 200 — so an offline copy downloading while a newer release lands
+         could store the start page under a program file's name. Every link
+         here is ABSOLUTE, because this page is served at whatever address was
+         missing, and a relative one would point into a folder that is not
+         there either. -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#08080b" />
+    <meta name="robots" content="noindex" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192-light.png" />
+    <title>Not here — Photography Studio</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; padding: 2rem 1.2rem 4rem; background: radial-gradient(120% 90% at 50% 0%, var(--bg-2), var(--bg)); min-height: 100vh; color: var(--txt); font: 1rem/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+      main { max-width: 620px; margin: 0 auto; }
+      a { color: var(--accent); }
+      ::selection { background: var(--accent-soft); color: var(--txt); }
+      @media (prefers-contrast: more) { :root { --txt-3: var(--txt-2); } }
+      h1 { font-size: 1.6rem; margin: 0.4rem 0 1rem; letter-spacing: -0.02em; }
+      p { color: var(--txt); }
+      /* Doctrine §4: a standalone link clears 44px. */
+      .home { display: inline-flex; align-items: center; min-height: 44px; text-decoration: underline; text-underline-offset: 2px; }
+    </style>
+    <link rel="stylesheet" href="/palette.css" />
+    <!-- The same theme and palette read as every other page, before first
+         paint, so this one is in the reader's colours too. -->
+    <script>
+      try {
+        var d = document.documentElement, s = localStorage;
+        var t = s.getItem("studio-theme");
+        if (t !== "dawn" && t !== "dark") t = matchMedia("(prefers-color-scheme: light)").matches ? "dawn" : "dark";
+        if (t === "dawn") d.setAttribute("data-theme", "dawn");
+        var p = s.getItem("studio-palette");
+        if (p && /^(paper|mono|soft)$/.test(p)) d.setAttribute("data-palette", p);
+        var m = document.querySelector('meta[name=theme-color]');
+        var bg = getComputedStyle(d).getPropertyValue("--bg").trim();
+        if (m && bg) m.setAttribute("content", bg);
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <main>
+      <h1>This page is not here</h1>
+      <p>The address may have moved in an update, or part of it may be mistyped.
+      Your photographs are not affected: they stay on this device.</p>
+      <a class="home" href="/">Open the Studio</a>
+    </main>
+  </body>
+</html>
