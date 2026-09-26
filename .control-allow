@@ -17,10 +17,10 @@ ir.html#askCancel — Written at call time, the other half of #askOk above.
 # can drive it instead of inheriting the excuse. These are not "not looked at
 # yet": each needs a condition outside the app's own controls.
 
-index.html#swStripGo — The update strip, which appears only when a second service worker is installed and waiting. The walk that drove a REAL second worker by rewriting the served sw.js with a new cache name (sw-walk, NOTES 2026-09-10) was never moved into tools/, so nothing here can manufacture that state today. Committing that walk and sweeping the strip from inside it is the way to reach it, not a wider selector.
-index.html#swStripLater — The other half of the update strip above.
-ir.html#swStripGo — The update strip on the editor page; same condition as index.html's.
-ir.html#swStripLater — The other half of the editor's update strip.
+index.html#swStripGo — The update strip, which appears only while a second service worker is downloading or waiting — a state a cold sweep cannot manufacture. The strip is ONE module (src/swupdate.ts) on four pages, and tools/offline-shell-walk.mjs drives it on ir.html with a REAL second worker, served as a genuinely different sw.js (decision 071): it presses Update now and checks the takeover and the old cache's removal, presses Not now during a download and OK after a failed one, and reads the downloading, ready and failed notices. This page's copy of the markup is not driven by that walk, and this sweep still cannot reach it.
+index.html#swStripLater — The other half of the update strip above; offline-shell-walk presses it on ir.html, not here.
+ir.html#swStripGo — The update strip on the editor page. A cold sweep cannot manufacture a second worker, so it stays declared here; tools/offline-shell-walk.mjs drives it with a real one and presses it (check 11).
+ir.html#swStripLater — The other half of the editor's update strip; tools/offline-shell-walk.mjs presses it during a download and after a failed one (checks 13 and 14).
 index.html#shareBtn — Revealed by setupInstalledShare only when the page is running as an INSTALLED standalone app. A browser tab is by definition not that, so a headless sweep can never see it; the walk would have to fake the display-mode media query, which would be measuring the fake.
 ir.html#locTip — The location tip, shown only when the opened file carries GPS data. Reachable by adding a GPS-bearing fixture to tools/fixtures and opening it.
 ir.html#tatBanner — An armed-tool banner over the photograph; appears only while that tool is armed with a stroke in progress.

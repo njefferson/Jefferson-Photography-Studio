@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
 planhash=63bc0e468fac2e3c
-diffhash=b40a525c3aa7f587
-verdict=IN-SCOPE: plan item 1, the device measurement recorded in 071 and NOTES
-# The 071 record gains the dated measurement under option 1 and lifts Rejected 2 and 6 on what was measured (42 s cold build on the PC, 1.45 Mb/s connection), deferring the build work; its test-page description now matches the shipped row. NOTES adds the PC test-page reading to the v2.63.12 staging entry and updates 071's Shown-as line. Plan item 1's 'Record the choices in 071'.
+diffhash=4ea180cf0c3d8d08
+verdict=IN-SCOPE: plan item 1, download only what changed, the stickers cache, the progress strip and same-build takeover, with the walks Verification names
+# All ten files implement plan item 1 (071 update path): download only what changed (vite.config.ts revisions and build id, sw.js copy-forward install with mustBeWhole and HEADERS_REV in labels), the stable ips-stickers cache and its routing, the progress strip with its failed state (swupdate.ts, swstrip.css), and the same-build takeover (ADOPT, adoptIfAlone). diagnostic.ts installLine is what offline-shell-walk check 12 reads; offline-shell-walk and shell-grid-walk are the Verification plants; .contract-allow, .control-allow and ARCHITECTURE.md are forced by those edits. No "Preparing the editor" or KHR_parallel_shader_compile work is present.
