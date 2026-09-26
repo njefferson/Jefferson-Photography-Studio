@@ -1,102 +1,1278 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=10605a20589553f8
-diffhash=c4ae723bb4a20ef5
-verdict=IN-SCOPE. Plan step 2 for this repository: decision 052 records that the learned selection was built, compared whole frame against today's, found worse on every frame with sky and taken out, with the three facts found on the way and its Looked at lines; the status page drops the sky-model question, marks the stage stopped and names the last verified-green commit. Docs only; nothing new starts.
+planhash=084700d8ba9e1afb
+diffhash=ee7e364f7d5f0b28
+verdict=IN-SCOPE. Plan steps 1-4: record 068 (the finder chosen per Sky mask) with every section the plan names; records 069 (the look's sky stages act on what has no colour) and 070 (the look's sky found on the wrong edge of a turned photograph) filed because none covered them, ranked above 068; the roadmap reads 069, 070, 052, 013, 068 and every Rank agrees; 052's paragraph and code claims made accurate and its provenance wording removed; the status page line updated. Docs only; nothing built.
+# diff --git a/NOTES.md b/NOTES.md
+# index 9d63811..b2ea50e 100644
+# --- a/NOTES.md
+# +++ b/NOTES.md
+# @@ -805,27 +805,64 @@ user-scalable=no.
+#  > ships as **2.0**, not 1.2 (owner call, 2026-07-18). The big-image / full-bleed direction
+#  > continues as the parallel design track below.
+#  
+# +- [ ] **The look's sky adjustments tint and darken what has no colour** <!-- decision: 069 -->
+# +  **Shown as:** Clouds inside Aerochrome's sky stay white or grey under its sky sliders instead of turning blue-grey.
+# +  Sky colour smoothing pulls a white or grey pixel inside the sky toward the
+# +  sky's colour, Sky saturation then reads the tint, and Sky depth darkens
+# +  whatever the selection holds. Under the learned selection taken out on
+# +  2026-09-26, NIR_1651's and NIR_1644's clouds went blue-grey through these
+# +  stages; 052's verdict on that selection stands. The chosen shape is one rule
+# +  stated once, with no new constant: what arrives without colour leaves without
+# +  colour, read on the pixel as it reaches the sky stages, on 019's existing
+# +  gate, for all three stages. The selection keeps the cloud. It promises
+# +  nothing for steel: no ranked item is built to put NIR_3461's pale steel
+# +  under these stages, and the red on that steel and the round red glows arrive
+# +  with colour and stay 061's and 013's. It must pass the whiteness weight's
+# +  three measured failures (052) and keep 013's speckle gone, and if the
+# +  speckle comes back the option fails rather than gaining a width tuned on the
+# +  practice frames. Its cloud checks wait for the rotation fix (070). First: the
+# +  rotation fix needs it, and 052's Option 1 brings every cloud the Sky mask
+# +  holds under these stages.
+# +  See `docs/decisions/069-the-looks-sky-adjustments-tint-and-darken-what-has-no-colour.md`.
+# +- [ ] **The look's sky is found on the wrong edge of a turned photograph** <!-- decision: 070 -->
+# +  **Shown as:** On a photo turned on its side, Aerochrome's sky sliders find the sky from the edge that is up on screen.
+# +  `buildSkySelectionFrom` passes rotation 0 to the detector, so on a turned
+# +  photograph the look's own sky is seeded from a side of the picture: NIR_1651
+# +  reads 18.2% of the frame against 52.2% at its rotation. The reader's Sky mask
+# +  already passes the renderer's rotation. The chosen shape builds the look's
+# +  selection at the rotation the picture is shown at, on every path: the open
+# +  photograph and its export, `skyMaskFor`'s cache and `shadowCastFor`'s for
+# +  tiles, the lift and the shadow cast, a batch, and the main-thread build for a
+# +  photo picked on its own or opened from the gallery; and again when the turn
+# +  changes. That it then brings NIR_1651's and NIR_1644's clouds under the sky
+# +  stages is read off selection maps, not renders, so it waits for the white
+# +  guard (069), and its renders are 069's cloud checks. 052's Option 1 would
+# +  retire the path only for the three sky stages on the open photograph, so
+# +  this touches 052 rather than being superseded by it. Second, below the white
+# +  guard (069), which it needs. See
+# +  `docs/decisions/070-the-looks-sky-is-found-on-the-wrong-edge-of-a-turned-photograph.md`.
+#  - [ ] **The look's sky adjustments read a selection you cannot see** <!-- decision: 052 -->
+#    **Shown as:** Aerochrome's sky sliders work on the sky you selected, not one you cannot see.
+# -  **Leads the queue from 2026-09-25, with the halo.** Under Aerochrome's Sky
+# +  **Third from 2026-09-26, below the white guard (069) and the rotation fix
+# +  (070); led the queue from 2026-09-25, with the halo.** Under Aerochrome's Sky
+#    depth a light band stands beside every building and pylon, and the sky inside
+#    a pylon's lattice is not darkened: measured, it is this selection, wrong over
+#    whole regions next to objects. Four refinements were tried and measured,
+#    including the weighted guided filter the literature names; none can fix
+# -  wrong labels. On-device sky segmentation, the field's starting point, is
+# -  being researched before anything is built.
+# -  reported 2026-09-22 from the device against Aerochrome: its sky adjustment
+# -  cannot be reproduced with a mask on sky the look does not reach, and the
+# -  shape suggested was that the look should open its own sky mask to start from,
+# -  which you then add to and subtract from, with Reach and Feather kept.
+# +  wrong labels. A learned sky selection, the field's starting point, was built
+# +  on 2026-09-26 as the look's automatic selection and taken out: it was
+# +  better only on NIR_0627, which has no sky; on the photographs with sky it was
+# +  worse, and on NIR_1827 the two renders nearly match. Aerochrome's sky
+# +  adjustment cannot be reproduced with a mask on sky the look does not reach.
+#    **Read off the source, and there are TWO sky selections on one photograph.**
+#    The look's is `skyBitmap` and `skyFine` in `src/main.ts`, built at open and
+# -  assigned in six places, none of them reachable from any control — no Reach,
+# +  assigned in five places, none of them steered by any control — no Reach,
+#    no Feather, no by-colour, no hand corrections — and it is what `skySmooth`,
+#    `skyDepth` and `skySat` act through. The reader's is a type-4 Sky mask, which
+# -  has every one of those controls and drives nothing but the mask's own five
+# -  adjustments. `regenerateSkyMask` never touches the look's pair. So every
+# -  control over a sky selection is attached to the one the sky sliders ignore.
+# +  has every one of those controls and drives its own five adjustments and any
+# +  whole-photo tool aimed at it, never the look's sky stages.
+# +  `regenerateSkyMask` never touches the look's pair. So every control over a
+# +  sky selection is attached to the one the sky sliders ignore.
+#    **It cannot be closed by finding a better slider value.** `skySat` multiplies
+#    chroma about luma gated on each pixel's own saturation; `skyDepth` darkens
+#    toward the film's value gated on the sky map's keying byte; a mask's
+# @@ -872,6 +909,29 @@ user-scalable=no.
+#    measures the exported file whole (§9l-ii). The gravel half stays open. The
+#    sources go into `IR-SCIENCE.md` (9l for what shipped). See
+#    `docs/decisions/013-aerochrome-splotchy-chroma.md`.
+# +- [ ] **Choose which finder draws each Sky mask** <!-- decision: 068 -->
+# +  **Shown as:** Deciding whether a Sky mask should also offer a second way of finding the sky; today's stays the default whatever is decided.
+# +  Whether a reader should be able to choose the learned sky finder on a Sky
+# +  mask. As the look's automatic selection it was built and taken out on
+# +  2026-09-26 (052): it was better only on NIR_0627, which has no sky. On the
+# +  photographs with sky it was worse, and on NIR_1827 the two renders nearly
+# +  match. That verdict stands. The blue clouds also show a defect in the look's
+# +  sky stages (069), and the stages dulled the steel too; neither changes the
+# +  verdict. The learned finder is never the default and never draws a mask the
+# +  reader has not chosen it on. A reader may choose it on any Sky mask,
+# +  including, after 052's Option 1, the one the look reads, and that choice is
+# +  what this item is for. A mask with no stored choice is always drawn by
+# +  today's finder. No editor surveyed picks a model for a painted region, and
+# +  only darktable picks one at all, for the whole app. If a choice is built, it
+# +  is one choice per Sky mask and one undo step, the models download only when
+# +  a reader chooses the learned finder, and region control comes from the joins
+# +  that already exist. The white guard (069), the rotation fix (070) and 052's
+# +  Option 1 come first. Then the two finders are compared again on a Sky mask,
+# +  on practice frames neither was developed on, not the six the learned
+# +  finder's constants were set on, and no constant is tuned against practice
+# +  frames. The switch is built only if each finder loses somewhere the other
+# +  does not. Otherwise today's finder stays alone and nothing is built. See
+# +  `docs/decisions/068-choose-which-finder-draws-each-sky-mask.md`.
+#  - [ ] **Sky inside a lattice cannot be filled into the Sky mask** <!-- decision: 065 -->
+#    **Shown as:** Fill the sky between a pylon's struts into the Sky mask with one stroke.
+#    — found on the target device on v2.63: on NIR_3461 the Sky mask leaves the
+# diff --git a/docs/decisions/013-aerochrome-splotchy-chroma.md b/docs/decisions/013-aerochrome-splotchy-chroma.md
+# index 4549dfb..7dd1cf0 100644
+# --- a/docs/decisions/013-aerochrome-splotchy-chroma.md
+# +++ b/docs/decisions/013-aerochrome-splotchy-chroma.md
+# @@ -308,7 +308,7 @@ needs its own.
+#  
+#  ## Rank
+#  
+# -**Re-ranked 2026-09-25: second, directly below 052.** The Aerochrome work leads the queue; this is second because 052 changes the sky population this stage smooths, and 066's film model is tuned against the chroma this stage leaves. The round discs along wires and round pylons, seen at full resolution on NIR_3461 in both the shipped and the tuned look, are this stage's own texels averaging a wire's colour in.
+# +**Re-ranked 2026-09-26: fourth, below 069, 070 and 052.** It sits below the white guard (069) and the rotation fix (070) because the guard changes what this stage does to every pale pixel in the sky, and the rotation moves the selection this stage smooths through on a turned photograph. The Aerochrome work leads the queue; this sits below 052 because 052 changes the sky population this stage smooths, and above 066 because 066's film model is tuned against the chroma this stage leaves. The round discs along wires and round pylons, seen at full resolution on NIR_3461 in both the shipped and the tuned look, are this stage's own texels averaging a wire's colour in.
+#  
+#  **Originally second.** It is in production, it is about the look currently being judged, and
+#  its first step is cheap — render the same frame at several saturations and with
 # diff --git a/docs/decisions/052-the-looks-sky-adjustments-read-a-selection-the-reader-cannot-see.md b/docs/decisions/052-the-looks-sky-adjustments-read-a-selection-the-reader-cannot-see.md
-# index ce790d3..ca53bc1 100644
+# index ca53bc1..bb803d3 100644
 # --- a/docs/decisions/052-the-looks-sky-adjustments-read-a-selection-the-reader-cannot-see.md
 # +++ b/docs/decisions/052-the-looks-sky-adjustments-read-a-selection-the-reader-cannot-see.md
-# @@ -81,6 +81,33 @@ starts from a learned segmentation (Lightroom's Select Sky; the paper's
-#  pipeline), and on-device sky segmentation is being researched before anything
-#  further is built (IR-SCIENCE 4b-ix has the refinement literature).
+# @@ -2,28 +2,26 @@
 #  
-# +**2026-09-26: a learned selection was built, and taken out.** Two models
-# +(BiSeNetV2 for sky against building and tree, u2netp for the steel and wires
-# +inside it) were fused and refined into the look's selection, and exported
-# +through the app beside today's build on six frames. Compared whole frame
-# +against whole frame, it was worse on every frame with sky and better only on
-# +NIR_0627, which has none:
-# +
-# +- **Clouds** on NIR_1651 and NIR_1644 were taken into the sky and turned
-# +  blue-grey under the sky stages; today's selection leaves them out and white.
-# +- **Steel** in NIR_3461's near pylon went dull, with round red glows. The
-# +  selection is built at 1024 px and the steel is narrower than one of its
-# +  pixels.
-# +- **Sky was missed** above NIR_3466's roof and beside NIR_1651's upper tree.
-# +
-# +It never reached staging. The code is commit a963548, on no branch; do not
-# +rebuild it as it was. Three facts found on the way, not fixed:
-# +
-# +- the hand-built detector is given rotation 0 on a photograph turned on its
-# +  side, so it seeds its sky on the wrong edge (NIR_1651: 18% of the frame found
-# +  against 52% with the rotation);
-# +- the sky settings have no per-pixel guard against white: Sky colour
-# +  smoothing tints a neutral pixel, Sky saturation then reads the tint, and Sky
-# +  depth darkens whatever the selection holds;
-# +- a photograph picked on its own or opened from the gallery does not ask for
-# +  the sky selection at open, so its selection is built later on the main
-# +  thread.
-# +
+#  ## Context
+#  
+# -Reported 2026-09-22 from the device, against Aerochrome: the look's sky
+# -adjustment cannot be reproduced with a mask on sky the look does not reach, and
+# -the suggested shape was that the look should open its own sky mask to start
+# -from, which the reader then adds to and subtracts from, without losing Reach,
+# -Feather and the rest.
+# +Aerochrome's sky adjustment cannot be reproduced with a mask on sky the look
+# +does not reach.
+#  
+# -**Read off the source rather than from the symptom, and the report is exactly
+# -right. There are TWO sky selections on one photograph and the reader can steer
+# -only one of them.**
+# +**Read off the source rather than from the symptom: there are TWO sky
+# +selections on one photograph and the reader can steer only one of them.**
+#  
+#  The look's selection is the module-level `skyBitmap` and `skyFine` in
+#  `src/main.ts`. It is built at open — `buildSkySelectionFrom(prepareSkySource(img))`,
+# -or from `img.skySel` on a photograph already decoded — and assigned in exactly
+# -six places, none of which is reachable from any control. It carries no Reach, no
+# -Feather, no by-colour toggle and no hand corrections. It is what `skySmooth`,
+# +or from `img.skySel` on a photograph already decoded — and assigned in five
+# +places, once in `syncSkyMap` and four times on the open path, none of which any
+# +control steers. It carries no Reach, no Feather, no by-colour toggle and no hand
+# +corrections. It is what `skySmooth`,
+#  `skyDepth` and `skySat` act through, which are the Aerochrome sky sliders.
+#  
+#  The reader's selection is a type-4 Sky mask in `params.masks`. It has all of
+#  those controls: `regenerateSkyMask` shapes the seed with `m.reach` and
+#  `m.feather`, 023's by-colour grow reaches the sky between branches, and 031's
+# -`fix` strokes are replayed over whatever the detection returns. It drives
+# -nothing but the mask's own five adjustments.
+# +`fix` strokes are replayed over whatever the detection returns. It drives its
+# +own five adjustments and any whole-photo tool aimed at it, never the look's sky
+# +stages.
+#  
+#  `regenerateSkyMask` writes `m.brush` and `m.fine` on the mask layer. It never
+#  touches `skyBitmap` or `skyFine`. So every control the reader has over a sky
+# @@ -37,7 +35,7 @@ gated on the sky map's keying byte, so a grey and an overcast sky are left
+#  byte-identical. A mask's `saturation` is a plain saturation adjustment folded in
+#  linear space at the mask stage, before the global gamma and contrast, before
+#  the tone curves, the HSL mixer and the grade. They are different operations, on
+# -different populations, at different points in the pipeline. The report is a
+# +different populations, at different points in the pipeline. This is a
+#  capability gap, not a tuning problem.
+#  
+#  **018's title is "One sky selection, built at open, for every sky-aware tool",
+# @@ -46,7 +44,7 @@ REFINEMENT: a Sky mask's `fine` is now built by the same `refineSkyMask` the
+#  look's stages use, so one photograph no longer carries a soft hand-made sky and
+#  a crisp look depth. The SELECTION was not unified. Its own Option 1 ends by
+#  naming per-population strengths reading `skySel` as later items, so a follow-on
+# -was anticipated; this is that follow-on arriving as a report instead.
+# +was anticipated, and this is that follow-on.
+#  
+#  **2026-09-25: the halo under a sky depth, measured, and what could not fix it.**
+#  With Aerochrome's Sky depth on, a light band stands beside every building and
+# @@ -85,8 +83,9 @@ further is built (IR-SCIENCE 4b-ix has the refinement literature).
+#  (BiSeNetV2 for sky against building and tree, u2netp for the steel and wires
+#  inside it) were fused and refined into the look's selection, and exported
+#  through the app beside today's build on six frames. Compared whole frame
+# -against whole frame, it was worse on every frame with sky and better only on
+# -NIR_0627, which has none:
+# +against whole frame, as the look's automatic selection it was better only on
+# +NIR_0627, which has no sky. On the photographs with sky it was worse, and on
+# +NIR_1827 the two renders nearly match:
+#  
+#  - **Clouds** on NIR_1651 and NIR_1644 were taken into the sky and turned
+#    blue-grey under the sky stages; today's selection leaves them out and white.
+# @@ -94,9 +93,13 @@ NIR_0627, which has none:
+#    selection is built at 1024 px and the steel is narrower than one of its
+#    pixels.
+#  - **Sky was missed** above NIR_3466's roof and beside NIR_1651's upper tree.
+# +- **NIR_1827**: along the treetops, where today's render has a thin pale rim
+# +  against the sky, the learned one has a soft pink-red fringe, and parts of the
+# +  broken cloud at the upper right come out bluer.
+#  
+# -It never reached staging. The code is commit a963548, on no branch; do not
+# -rebuild it as it was. Three facts found on the way, not fixed:
+# +It never reached staging. The code is in commits a963548 and ed11d08, on no
+# +published branch; kept locally only. Do not rebuild it as the look's automatic
+# +selection. Three facts found on the way, not fixed:
+#  
+#  - the hand-built detector is given rotation 0 on a photograph turned on its
+#    side, so it seeds its sky on the wrong edge (NIR_1651: 18% of the frame found
+# @@ -104,9 +107,10 @@ rebuild it as it was. Three facts found on the way, not fixed:
+#  - the sky settings have no per-pixel guard against white: Sky colour
+#    smoothing tints a neutral pixel, Sky saturation then reads the tint, and Sky
+#    depth darkens whatever the selection holds;
+# -- a photograph picked on its own or opened from the gallery does not ask for
+# -  the sky selection at open, so its selection is built later on the main
+# -  thread.
+# +- a photograph picked on its own or opened from the gallery is not given its
+# +  sky pair by the sky worker at open: its coarse half comes from `skyMaskFor`
+# +  at open and the refined pair from `syncSkyMap` on the first edit with Sky
+# +  depth or Sky saturation, both on the main thread.
+#  
 #  ## Looked up
 #  
-#  **The field's convention is one selection, visible and editable, with the
-# @@ -227,3 +254,5 @@ whatever this item settles.
-#  - NIR_1651, 2026-09-25: selection maps for every variant, and exports from two variants with 1:1 crops of the cloud above the tree and the tree's left edge.
+# @@ -161,14 +165,14 @@ refinement was unified: the record's own Option 1 was about what a type-4 mask
+#  IS on the sampling side, and it named per-population strengths reading `skySel`
+#  as separate later items.
+#  
+# -**042**, which is this meeting from the other side — the ask that every control
+# -should be usable inside a mask. If `skySat`, `skyDepth` and `skySmooth` became
+# -mask adjustments, half of this is discharged. The other half is that the reader
+# +**042**, which is this meeting from the other side: every control usable
+# +inside a mask. If `skySat`, `skyDepth` and `skySmooth` became mask
+# +adjustments, half of this is discharged. The other half is that the reader
+#  should INHERIT the detection rather than build a selection from scratch on every
+#  frame, which 042 does not cover.
+#  
+#  **013**, the Aerochrome look's own population work, and the reason this is
+# -ranked where it is rather than where a new report naturally lands.
+# +ranked where it is rather than where a new item naturally lands.
+#  
+#  **049 and 048**, which give the reader control over the sky selection's border
+#  and let a split selection be completed. Both act on the mask's selection. They
+# @@ -203,7 +207,7 @@ told about in words.
+#  ## Options
+#  
+#  1. **The look's sky stages read a reader-visible Sky mask, seeded automatically
+# -   at open.** Chosen, because it is the field's shape and the reported one. The
+# +   at open.** Chosen, because it is the field's shape and closes the gap. The
+#     detection that runs at open becomes a type-4 mask the reader can see, with
+#     Reach, Feather, by-colour and hand corrections already attached to it because
+#     a type-4 mask already has them; `skySmooth`, `skyDepth` and `skySat` read
+# @@ -235,11 +239,17 @@ told about in words.
+#  
+#  ## Rank
+#  
+# -**First.** Settled 2026-09-25: the Aerochrome work leads the queue, ahead of
+# -the completeness work, because nothing ranked above it was needed by it. Within
+# -that work this is first because everything the look renders in the sky is
+# -measured over this selection: the chroma noise 013 works on, the tuning 066
+# -replaces, and the halo above. Built later, each of those would be measured
+# +**Third, re-ranked 2026-09-26, below the white guard (069) and the rotation
+# +fix (070).** It sits below both because each changes what this item is judged
+# +on: 069 decides what the sky stages do to the cloud a Sky mask holds once the
+# +look reads it, and 070 decides which edge of a turned photograph the detection
+# +this item turns into a Sky mask finds its sky from.
+# +
+# +Settled 2026-09-25: the Aerochrome work leads the queue, ahead of the
+# +completeness work, because nothing ranked above it was needed by it. Within the
+# +rest of that work this comes first because everything the look renders in the
+# +sky is measured over this selection: the chroma noise 013 works on, the tuning
+# +066 replaces, and the halo above. Built later, each of those would be measured
+#  again.
+#  
+#  It no longer waits on 042. The two meet at 042's stage 5, and 042's remaining
+# @@ -255,4 +265,5 @@ whatever this item settles.
 #  - NIR_1827, 2026-09-25: selection maps for every variant, and exports with a 1:1 crop of the clouds and tree tops on the right.
 #  - NIR_0627, 2026-09-25: selection maps and exports, with a 1:1 crop of the flower against its blurred background.
-# +- NIR_1644, 2026-09-26: exports through the learned selection and today's, whole frame, side by side.
-# +- The six frames, 2026-09-26: exports through the learned selection and today's, whole frame side by side, and 1:1 crops of NIR_3461's pylons, NIR_3466's roof and NIR_1651's cloud beside the tree.
+#  - NIR_1644, 2026-09-26: exports through the learned selection and today's, whole frame, side by side.
+# +- NIR_1827, 2026-09-26: the whole-frame exports through today's selection and the learned one, side by side, a difference image of the two, and the treetops and the broken cloud at the upper right enlarged from both. They nearly match; today's has a thin pale rim along the treetops where the learned one has a soft pink-red fringe, and parts of the broken cloud at the upper right come out bluer in the learned one.
+#  - The six frames, 2026-09-26: exports through the learned selection and today's, whole frame side by side, and 1:1 crops of NIR_3461's pylons, NIR_3466's roof and NIR_1651's cloud beside the tree.
+# diff --git a/docs/decisions/065-sky-inside-a-lattice-cannot-be-filled-into-the-sky-mask.md b/docs/decisions/065-sky-inside-a-lattice-cannot-be-filled-into-the-sky-mask.md
+# index 8d27173..188bbf2 100644
+# --- a/docs/decisions/065-sky-inside-a-lattice-cannot-be-filled-into-the-sky-mask.md
+# +++ b/docs/decisions/065-sky-inside-a-lattice-cannot-be-filled-into-the-sky-mask.md
+# @@ -125,14 +125,20 @@ where the colour does.
+#  
+#  ## Rank
+#  
+# -**Re-ranked 2026-09-25: third, below 052 and 013, above 066.** The Aerochrome
+# -work leads the queue. It sits below 052 because a learned sky selection may
+# -take the lattice's sky without a stroke, which would change what this fill has
+# -left to do. It sits above 066 because a fill changes which sky a reader's mask
+# -holds. It now sits above 048, whose union already ships in the build on
+# -staging, so the route it refines exists without 048's record closing first,
+# -and above 028, because the fill covers 028's case by hand where the cap
+# -declines.
+# +**Re-ranked 2026-09-26: sixth, below 069, 070, 052, 013 and 068, above 066.**
+# +The Aerochrome work leads the queue. It sits below the white guard (069) and
+# +the rotation fix (070) because both come before 052, and under a look what a
+# +fill adds reaches the sky stages only through 052, where 069 decides what those
+# +stages do to the pale pixels a fill takes in. It sits below 052 because until
+# +the look reads the reader's Sky mask, a fill changes that mask and not the
+# +look's sky. It sits below 068 because 068's comparison says whether a Sky mask
+# +can be drawn by a second finder, and so whether this fill's strokes are
+# +replayed onto one finder or two; today's finder stays the default, so the fill
+# +keeps all of its work either way. It sits above 066 because a fill changes
+# +which sky a reader's mask holds. It now sits above 048, whose union already
+# +ships in the build on staging, so the route it refines exists without 048's
+# +record closing first, and above 028, because the fill covers 028's case by hand
+# +where the cap declines.
+#  
+#  ## Looked at
+#  
+# diff --git a/docs/decisions/066-aerochrome-is-rendered-from-a-model-of-the-film.md b/docs/decisions/066-aerochrome-is-rendered-from-a-model-of-the-film.md
+# index 2be587b..e4c903f 100644
+# --- a/docs/decisions/066-aerochrome-is-rendered-from-a-model-of-the-film.md
+# +++ b/docs/decisions/066-aerochrome-is-rendered-from-a-model-of-the-film.md
+# @@ -135,14 +135,19 @@ full. What bears on this record:
+#  
+#  ## Rank
+#  
+# -**Fourth**, after 052, 013 and 065, and above 061, in the Aerochrome work the
+# -queue now leads with (settled 2026-09-25). It sits below 052 and 013 because
+# -both change the ground it is measured on: the sky selection, and the chroma
+# -noise the model must control. It sits below 065 because a fill changes which
+# -sky a reader's mask holds. It sits above 061 because 061's channel alignment
+# -touches thin edges only, which the model's colour re-attachment respects, and
+# -nothing in the model is tuned against them. Its first measurement decides
+# -whether it needs 052 at all.
+# +**Seventh**, after 069, 070, 052, 013, 068 and 065, and above 061, in the
+# +Aerochrome work the queue now leads with (settled 2026-09-25). It sits below
+# +the white guard (069) and the rotation fix (070) because both change the sky it
+# +is measured against: 069 is the rule its clouds must meet if it replaces the sky
+# +stages, and 070 moves the look's own sky on a turned photograph. It sits below
+# +052 and 013 because both change the ground it is measured on: the sky
+# +selection, and the chroma noise the model must control. It sits below 068,
+# +which follows the three records it needs directly and changes nothing this
+# +model is measured on, since today's finder stays the default on every Sky mask.
+# +It sits below 065 because a fill changes which sky a reader's mask holds. It
+# +sits above 061 because 061's channel alignment touches thin edges only, which
+# +the model's colour re-attachment respects, and nothing in the model is tuned
+# +against them. Its first measurement decides whether it needs 052 at all.
+#  
+#  ## Looked at
+#  
+# diff --git a/docs/decisions/068-choose-which-finder-draws-each-sky-mask.md b/docs/decisions/068-choose-which-finder-draws-each-sky-mask.md
+# new file mode 100644
+# index 0000000..400c065
+# --- /dev/null
+# +++ b/docs/decisions/068-choose-which-finder-draws-each-sky-mask.md
+# @@ -0,0 +1,350 @@
+# +# 068 · Choose which finder draws each Sky mask
+# +
+# +## Context
+# +
+# +The app has two ways to find a sky. Today's hand-built finder (a horizon, then
+# +a grow by colour) draws every Sky mask. A learned one (two segmentation models,
+# +fused) was built as the look's own selection on 2026-09-26, compared with
+# +today's whole frame against whole frame, and taken out the same day (052).
+# +
+# +**That verdict stands, and this record does not reopen it.** As the look's
+# +automatic selection, the learned one was better only on NIR_0627, which has no
+# +sky. On the photographs with sky it was worse, and on NIR_1827 the two renders
+# +nearly match. It was taken out. It does not come back as the look's automatic
+# +selection, and it is never the default.
+# +
+# +**What is left to decide is narrower: whether a reader may choose it.** Whether
+# +the learned finder should exist at all as a second finder the reader can choose
+# +on a Sky mask, so that a mask could be drawn by whichever finder misses less
+# +sky on the photograph in front of the reader, without losing the hand
+# +corrections, Reach and Feather already on it; and if it should, how far the
+# +choice reaches: the whole photograph, a painted region, or one mask.
+# +
+# +- **The learned finder is never applied without the reader choosing it on a
+# +  mask.** A mask with no stored choice is always drawn by today's finder, and
+# +  that default does not change.
+# +- **A reader may choose it on any Sky mask**, including, once 052's Option 1 is
+# +  built, the Sky mask the look reads. That choice is the point of this record:
+# +  a reader who picks the learned finder there picks it for the look's sky on
+# +  that one photograph.
+# +- **Whether any switch is built is decided by a comparison**, once 052's
+# +  Option 1, 069 and 070 have landed, on a Sky mask, on practice frames that
+# +  neither finder was developed on. A switch is built only if each finder loses
+# +  somewhere the other does not. Otherwise today's finder stays alone and
+# +  nothing is built.
+# +
+# +**What each of the learned selection's faults touches, read off the source and
+# +the six whole-frame comparisons of 2026-09-26.** These are facts for building on
+# +a Sky mask. None of them changes the verdict.
+# +
+# +- **The clouds.** The learned selection took the white clouds of NIR_1651 and
+# +  NIR_1644 into the sky, and the look's sky stages turned them blue-grey. The
+# +  finder took them in; the stages tinted them. The stages also have a defect
+# +  of their own: none has a guard against white. Sky colour smoothing tints a
+# +  neutral pixel, Sky saturation then reads the tint, and Sky depth has no
+# +  per-pixel gate, so it darkens whatever the selection holds (069). Under 052's
+# +  Option 1 that defect reaches cloud in a Sky mask whichever finder drew it:
+# +  069 records the Sky mask's own colour grow taking NIR_1651's cloud too. 069
+# +  is the remedy for the stages' half. None of it changes the verdict: through
+# +  the look, the learned selection rendered these frames worse.
+# +- **The steel.** The learned selection took in the steel of NIR_3461's near
+# +  pylon, which is narrower than one pixel of its 1024 px map, and the stages
+# +  dulled it. That steel arrives red on one face from the foliage band (061), so
+# +  it is not a pixel without colour, and 069's guard is not shown to spare it.
+# +  This one is the finder's resolution and the stages together.
+# +- **The missed sky.** The learned selection left out a sliver above NIR_3466's
+# +  roof and a band beside NIR_1651's upper tree. This lives in the finder. On a
+# +  Sky mask, Add by hand covers what a finder leaves out.
+# +- **NIR_1827**, the sixth frame, has sky. The two renders nearly match. Along
+# +  the treetops, where today's render has a thin pale rim against the sky, the
+# +  learned one has a soft pink-red fringe; and parts of the broken cloud at the
+# +  upper right come out bluer.
+# +- **Today's finder claims sky on NIR_0627**, a flower macro with no sky in it:
+# +  about three quarters of the frame (75.9% on the acceptance instrument after
+# +  the horizon landed). The 2026-09-20 rule in `NOTES.md` on what the Sky mask
+# +  is for does not count that as a failure: a photograph with no sky is one the
+# +  reader does not reach for the Sky mask on. 029 is still open on it. It is the
+# +  one frame where the learned finder did better, and it has no sky.
+# +
+# +**And today a choice on a mask would reach nothing the comparison showed.**
+# +Those six renders were the look's sky stages reading the learned selection. A
+# +Sky mask drives its own five adjustments and any whole-photo tool aimed at it,
+# +never the look's sky stages: `regenerateSkyMask` writes the mask's `brush` and
+# +`fine` and never the look's `skyBitmap` or `skyFine`. Until 052's Option 1 is
+# +built, a finder chosen on a mask changes that mask's adjustments and whatever
+# +is aimed at it, and leaves the look's sky where it was, which is two skies on
+# +one photograph.
+# +
+# +## Looked up
+# +
+# +Read 2026-09-26, from the vendor's own documentation where it would load; a
+# +source that is not the vendor's says "third-party" beside it.
+# +
+# +- **darktable 5.6** is the only editor that lets the user pick the model. One
+# +  model is active per task, chosen in preferences, AI, "like a radio button",
+# +  and it applies to every image. It does not find a sky by itself; the user
+# +  clicks the object. Sources:
+# +  docs.darktable.org/usermanual/development/en/preferences-settings/ai/ and
+# +  docs.darktable.org/usermanual/development/en/darkroom/masking-and-blending/masks/ai-masking/.
+# +- **Photoshop** chooses where Select Subject runs, Cloud or Device, in
+# +  Preferences, Image Processing, for the whole app; Adobe says the cloud gives
+# +  "more detailed results". That is where the work runs, not a model the user
+# +  picks. Source for the Cloud or Device choice:
+# +  helpx.adobe.com/photoshop/desktop/make-selections/automatic-color-based-selections/improved-select-subject-and-remove-background-results.html.
+# +  Select, Sky is a one-click command of its own (third-party:
+# +  jkost.com/blog/2020/10/adobe-announces-updates-to-photoshop-2021-v22.html).
+# +- **Affinity** (by Canva, 3.x) offers its built-in selection tools and Canva
+# +  AI versions of them, and the user picks which to run each time. Source
+# +  (third-party): amateurphotographer.com/review/affinity-by-canva-review/;
+# +  Affinity's own help pages load their text by script and returned nothing.
+# +- **Lightroom Classic, Lightroom and Camera Raw** document no model choice.
+# +  Each mask picks a category, and there are two separate sky finders, Select
+# +  Sky and Landscape, Sky, each making a mask of its own. A detected mask is
+# +  kept to a region by adding, subtracting or intersecting a brush, a gradient
+# +  or a range mask. Sources:
+# +  helpx.adobe.com/lightroom-classic/desktop/process-and-develop-photos/masking.html
+# +  and
+# +  helpx.adobe.com/camera-raw/desktop/edit-and-enhance-images/masking-and-local-adjustments/masking.html.
+# +- **Capture One, DxO PhotoLab, Luminar Neo and Pixelmator Pro** pick a
+# +  category per mask and offer no model choice. Capture One's Combine Masks
+# +  adds, subtracts or intersects; DxO has no intersect and its users invert
+# +  twice to get one. Sources:
+# +  support.captureone.com/hc/en-us/articles/14055231933853-AI-Masking,
+# +  support.captureone.com/hc/en-us/articles/30695491704349-Combine-Masks,
+# +  forum.dxo.com/t/local-adjustments-more-masks-interactions/53942,
+# +  support.skylum.com/editing-tools/masking-options/mask-ai and
+# +  support.apple.com/guide/pixelmator-pro/make-intelligent-selections-pixefcaa405e/mac.
+# +
+# +**So the field has a model choice for the whole app (darktable), a processing
+# +choice for the whole app (Photoshop), a choice of tool per use (Affinity), and
+# +a category per mask everywhere else. No editor picks a model for a painted
+# +region. Region control is always done by composing masks: add, subtract,
+# +intersect.**
+# +
+# +## Built already
+# +
+# +What exists that this item will use, so a second one does not get written:
+# +
+# +- **The Sky mask's finder has one door.** `regenerateSkyMask` in `src/main.ts`
+# +  is the one place a Sky mask's selection is made: `buildSkyMask` in
+# +  `src/sky.ts` (the 384 px seed, with its horizon from `src/skyhorizon.ts`),
+# +  then `growSkyByColour` or `refineSkyMask` in `src/skyfine.ts`, then
+# +  `applyMaskFix` replays the hand strokes. Adding the mask, Reach, Feather, the
+# +  colour toggle, a saved mask applied, and `rebuildSkyMasks` on rotate, flip
+# +  and reopening a kept file all come through it. A second finder is a branch
+# +  here, not a second function.
+# +- **Its joins.** The mask's `op` in `src/pipeline.ts`, grouped by
+# +  `maskGroups` and `groupWeight`: "Subtract from it" and "Only where both" in
+# +  v2.62 on main, and "Add to it" in v2.63 on staging. They are the region
+# +  control this record chooses: a learned Sky mask "Only where both" a Brush
+# +  keeps it inside a painted area, and today's Sky mask "Add to it" a learned
+# +  one picks up the strips the first missed.
+# +- **A field on a mask travels by itself.** `cloneParams` copies each mask
+# +  whole and `snapSig` serialises it, so a switch followed by one `flushRecord`
+# +  is one undo step, as the colour toggle already is; saved masks
+# +  (`src/maskstore.ts`) and kept files carry it. The five places rule for an
+# +  `EditParams` field does not apply to a mask field.
+# +- **The learned finder, on no published branch.** Commits a963548 (the build)
+# +  and ed11d08 (an export waits for the sky), kept on the local branch
+# +  held/learned-sky-rejected. In src/skysegrun.ts at those commits,
+# +  `learnedSkySelection` returns a 384 px coarse map and a 1024 px refined map,
+# +  the sizes of a Sky mask's `brush` and `fine`; src/skyseg.ts holds the pure
+# +  half, `fuseSky`, `coarseFrom` and `segPicture`. The models load lazily in the
+# +  one sky worker (`src/skyClient.ts`, `src/sky.worker.ts`). Two things there
+# +  made the download eager and must not come back: the worker ran the models for
+# +  every photograph opened, and `public/sw.js` fetched them at install. It also
+# +  passed the file's own rotation where a mask needs the renderer's.
+# +- **Its fusion constants were set on the six comparison frames.** At a963548,
+# +  src/skyseg.ts says everything in it was first written and measured against
+# +  six practice frames, and IR-SCIENCE.md 4b-xi there names them: NIR_3461,
+# +  NIR_3466, NIR_1644, NIR_1827, NIR_1651 and NIR_0627. `SEG_AGREE` (0.9) is
+# +  documented as 1.00 on five of them and 0.35 on the one where it failed; the
+# +  floor that counts BiSeNetV2's towers, poles and streetlights as sky was set
+# +  from NIR_3461's right pylon against NIR_3466's pale face; and the minimum of
+# +  sure sky, `SEG_MIN_SEED`, was added because NIR_0627 found sky in a corner.
+# +  A comparison on those six measures the learned finder on the frames it was
+# +  fitted to.
+# +- **Its cost, measured in the container only.** 23.5 MB to download
+# +  (BiSeNetV2 7.0 MB, u2netp 2.3 MB, the WebAssembly runtime about 14 MB), run
+# +  on one thread, with the selection ready 21 to 60 s after open. The total,
+# +  the BiSeNetV2 size, the one thread and the timing are IR-SCIENCE.md 4b-xi as
+# +  committed at a963548; u2netp's size is its model file there, and the
+# +  runtime's is the sky worker's own note at ed11d08. Nothing was timed on the
+# +  iPad, and that build's test page carries a button for it.
+# +- **Instruments.** `tools/mask-truth-walk.mjs`, `tools/sky-probe.mjs` and
+# +  `tools/sky-stage-walk.mjs`; and `tools/a11y-walk.mjs`, which must reach any
+# +  new control on the Sky mask's panel.
+# +
+# +## Weighed against
+# +
+# +- **052, "The look's sky adjustments read a selection the reader cannot see"**:
+# +  its Option 1, chosen and not built, is what gives a finder on a mask anything
+# +  to reach. Once the look's sky stages read a reader-visible Sky mask, a reader
+# +  who chooses the learned finder on that mask chooses it for the look's sky on
+# +  that photograph, and that choice is what this record is for. 052's
+# +  2026-09-26 paragraph records the learned selection that was built as the
+# +  look's automatic selection and taken out. This record does not bring that
+# +  back: the learned finder is never the default, it draws a mask only when the
+# +  reader chooses it there, and a switch is built only if the comparison in
+# +  Option 1 finds each finder losing somewhere the other does not. 052's
+# +  Rejected 3, "Two skies in one app is the inconsistency 018 exists to remove",
+# +  is why this needs 052.
+# +- **029, "The Sky mask claims things that are not sky"**: open on NIR_0627.
+# +  Its Rejected 4 turned segmentation down as "out of scope for an offline
+# +  on-device app with no model". A model now exists at a963548 that runs in the
+# +  app's own worker with no server and, once downloaded, offline. It has been
+# +  timed only in the container, not on the iPad. So that reason no longer holds
+# +  for a finder the reader chooses; the 2026-09-20 rule on what the Sky mask is
+# +  for still answers a photograph with no sky by the reader not reaching for the
+# +  Sky mask.
+# +- **018, "One sky selection, built at open, for every sky-aware tool"**: "the
+# +  sky is one thing in the app rather than three". After 052, a photograph
+# +  still has one sky, the Sky mask the look reads, whichever finder the reader
+# +  chose for it. Before 052 it would have two.
+# +- **031, "A generated selection can be corrected by hand"**: hand strokes are
+# +  stored and replayed over whatever the finder returns, so a switch keeps
+# +  them. Its own Depends says "A correction stroke recorded against one
+# +  generated selection and replayed onto a different one is a different
+# +  correction", so the status line says which finder the strokes were drawn
+# +  against.
+# +- **032, "A mask keys the photograph, not the grade"**: its Rejected 3 is why
+# +  the choice is stored on the mask, and why a mask without a stored choice is
+# +  always drawn by today's finder. The default does not change, so nothing
+# +  moves what a finished photograph selects.
+# +- **042, "A mask is a place, and the ordinary controls act inside it"**: its
+# +  stage 2 rule, that a control which cannot act shows disabled with its reason,
+# +  applies to Reach and Feather on a learned mask, whose thresholds are fixed.
+# +- **049, "Show the border and let it be moved"**: the border it moves is
+# +  today's finder's horizon, one depth per column. A learned mask has no such
+# +  border, so 049's control, once built, shows disabled there with the reason.
+# +  Its Rejected section bounds options 2 and 3.
+# +- **050, "The mask system is short of standard convention"**: its rejected "A
+# +  control for 'constrain this mask to that region'" is why a region here is a
+# +  composition and not a control.
+# +- **065, "Sky inside a lattice cannot be filled into the Sky mask"**: its Rank
+# +  sets it below this record, because this comparison says whether a Sky mask
+# +  can be drawn by a second finder, and so whether a fill's strokes are
+# +  replayed onto one finder or two. The learned selection did take the sky
+# +  inside NIR_3461's near pylon, and the steel with it. A mask with no stored
+# +  choice is drawn by today's finder, so on every Sky mask as it is added the
+# +  fill keeps all of its work. 065's Rejected 3, a mask type of its own, is why
+# +  the choice here is a switch on the Sky mask and not a second Sky mask type.
+# +
+# +## Depends
+# +
+# +- needs 052 — until the look's sky stages read a reader-visible Sky mask, a finder the reader chooses on a mask never reaches the look's sky, and the photograph has two skies.
+# +- needs 069 — the comparison is judged through the look's sky stages, and until they have a guard against white, cloud in a Sky mask is turned blue-grey whichever finder drew it.
+# +- needs 070 — the Sky mask 052's Option 1 seeds would most naturally start from the look's own selection, which is built at rotation 0 on a turned photograph, and three of the six frames are turned; the Sky mask's own finder already reads the renderer's rotation, so the comparison waits until both paths agree which edge is up.
+# +- touches 013 — Sky colour smoothing is 013's stage and the comparison is judged through it; a mask with no stored choice is drawn by today's finder, so nothing built here moves what 013 tunes against.
+# +- touches 061 — NIR_3461's pylon steel arrives red on one face from the foliage band, so what the sky stages do to steel a Sky mask takes in is not the white guard's to fix.
+# +- touches 029 — 029 is open on NIR_0627, the one frame where the learned finder did better, and it has no sky; an answer to either changes what the other has left.
+# +- touches 031 — hand strokes are replayed over whichever finder draws the mask, and a stroke replayed onto a different selection is a different correction.
+# +- touches 018 — a second finder is a second way to build the sky; per mask, with the look reading that mask, the photograph still has one.
+# +- touches 032 — the choice is stored on the mask, a mask without one is always drawn by today's finder, and the default does not change, so nothing moves a finished photograph's selection.
+# +- touches 042 — Reach and Feather cannot act on a learned mask and show disabled with the reason, by 042's stage 2 rule.
+# +- touches 049 — 049's movable border belongs to today's finder's horizon, which a learned mask does not have.
+# +- touches 050 — a finder kept to a region is the composition 050 already names, not a control of its own.
+# +- touches 065 — a learned Sky mask may take a lattice's sky without a stroke, which changes what 065's fill has left to do on that mask; on a mask with no stored choice, drawn by today's finder, it changes nothing.
+# +
+# +## Options
+# +
+# +1. **By mask.** Chosen, as the shape a choice takes if a choice survives the
+# +   comparison below.
+# +   - A two-way choice on the Sky mask's panel: today's finder, first and the
+# +     default, and the learned one. It is on every Sky mask, including, once
+# +     052's Option 1 is built, the Sky mask the look reads. A mask with no
+# +     choice stored is always drawn by today's finder, the default does not
+# +     change, and every photograph already finished keeps its sky.
+# +   - One choice is one undo step. The hand strokes are kept and replayed onto
+# +     the new selection, and the status line says which finder drew the mask
+# +     and which one the strokes were drawn against.
+# +   - Region control is the joins that exist, not a new control: a learned Sky
+# +     mask "Only where both" a Brush, or today's Sky mask "Add to it" a learned
+# +     one.
+# +   - The models download only when the reader chooses the learned finder on a
+# +     mask. Before the first download the reader is told its size in words;
+# +     offline before it, the mask stays with today's finder and says so. While
+# +     the learned finder runs, a live region says it is finding the sky, its
+# +     arrival adds no undo step, and an export waits for it. Its time is
+# +     measured on the iPad before it is offered; the container's 21 to 60 s
+# +     measures the container.
+# +   - Reach and Feather show disabled with the reason on a learned mask.
+# +   - **The first step is not the switch.** Once 052's Option 1, 069 and 070
+# +     have landed, the two finders are compared again on a Sky mask, whole
+# +     frame, through the look, on practice frames that neither finder was
+# +     developed on: not the six of 2026-09-26, which the learned finder's fusion
+# +     constants were set on (Built already), and not the frames today's finder
+# +     is measured on in `tools/mask-truth-walk.mjs`. No constant in either
+# +     finder is tuned against practice frames for it. If the learned finder
+# +     still loses wherever there is sky, today's finder stays alone and no
+# +     switch is built. The switch is built only if each finder loses somewhere
+# +     the other does not. Either way the learned finder is never the default
+# +     and never draws a mask the reader has not chosen it on.
+# +2. **The whole photo.** One choice per photograph, or one for the whole app
+# +   as darktable has it.
+# +3. **By painted region.** The reader paints an area and picks the finder
+# +   inside it.
+# +4. **No switch.** Today's finder stays the only finder on a Sky mask.
+# +
+# +## Rejected
+# +
+# +- **2, the whole photo.** As one setting for the app it is darktable's shape: it draws every Sky mask on every photograph with the learned finder without the reader choosing it on any of them, and changing it moves what every finished photograph selects, which 032's Rejected 3 calls "the one thing a non-destructive editor may not do". Per photograph, the choice is made once for the photograph rather than on a mask, so it draws Sky masks the reader never chose it for, and it moves the sky in every mask at once, which is 049's objection to one control: it "moves every column including all the ones that are already right". It is also the cheapest to build, which is why it is written down.
+# +- **3, by painted region.** No editor surveyed does it; every one composes masks instead. It costs the reader most (paint, pick, then judge a seam where the two finders meet) and costs most to build (a stored region, two runs, a blend, strokes replayed across both). It is the shape 050 already refused: "It is already Radial plus Only where both, and adding a second route to it would give the app two ways to do one thing that can disagree." It is 049's rejected shape too, where "a moved column would obey a different rule from the detected column beside it and a reader would have to know which". And a finder run inside a drawn area moves what the reader drew, which 018's Rejected 3 refuses for brush masks.
+# +- **4, no switch.** Not the answer now, though it may be where this ends, and it is where this ends unless the comparison finds each finder losing somewhere the other does not. The verdict on the learned selection as the look's automatic selection stands (Context). What is not yet known is whether, as the finder a reader chooses for one Sky mask, it finds sky today's finder misses on practice frames neither was developed on, once 052's Option 1, 069 and 070 have landed. With one finder the reader has only hand strokes for whatever it misses.
+# +
+# +**The case against option 1, recorded as the open risk and not as a
+# +rejection.** A switch asks the reader to choose, photograph by photograph,
+# +between two finders that fail in different ways. That is the work 052's
+# +Rejected 2 says the reader wants to inherit rather than do; it rejected an
+# +option because it "still makes them build the sky selection by hand on every
+# +photograph". The learned finder's only win, NIR_0627, is a photograph on which,
+# +by the 2026-09-20 rule on what the Sky mask is for, the reader does not reach
+# +for the Sky mask, and 052's Option 1 leaves open whether a photograph may have
+# +no seeded mask, which may answer it without a 23.5 MB download. So the order
+# +this record carries is: the white guard, the rotation fix and 052's Option 1
+# +first, then the comparison on a Sky mask, on frames neither finder was
+# +developed on. If the learned finder still loses wherever there is sky, today's
+# +finder stays alone and no switch is built. The switch is built only if each
+# +finder loses somewhere the other does not. The learned finder is never the
+# +default, and it draws a mask only when the reader chooses it there.
+# +
+# +## Rank
+# +
+# +**Fifth: below 069, 070, 052 and 013, above 065.**
+# +
+# +**The three it needs are reasons, not a sequence.** This record says only that
+# +all three come before it; the order they go in among themselves (069, then 070,
+# +then 052) is argued in their own records, not here.
+# +
+# +- **It needs 069**, because the comparison is judged through the look's sky
+# +  stages, and until they have a guard against white, cloud in a Sky mask is
+# +  turned blue-grey whichever finder drew it.
+# +- **It needs 070**, because the Sky mask 052's Option 1 seeds would most
+# +  naturally start from the look's own selection, which is built on the wrong
+# +  edge of a turned photograph until 070 lands, and three of the six frames are
+# +  turned.
+# +- **It needs 052**, because until the look reads a reader-visible Sky mask, a
+# +  finder the reader chooses on a mask never reaches the look's sky, and the
+# +  photograph has two skies.
+# +
+# +**Below 013, which it does not need.** Sky colour smoothing is 013's stage and
+# +the comparison is judged through it, so comparing first would judge through a
+# +stage 013 then changes. Nothing here moves what 013 tunes against, because a
+# +mask with no stored choice is drawn by today's finder.
+# +
+# +**Above 065, where 065's own Rank sets it.** 065 sits below this item because
+# +this comparison says whether a Sky mask can be drawn by a second finder, and so
+# +whether a fill's strokes are replayed onto one finder or two. The answer is
+# +bounded before it arrives: a mask with no stored choice is drawn by today's
+# +finder, so on every Sky mask as it is added the fill keeps all of its work, and
+# +where the learned selection took NIR_3461's lattice sky it took the steel with
+# +it.
+# +
+# +## Looked at
+# +
+# +- NIR_3461, 2026-09-26: the export through today's selection and through the learned one, whole frame side by side, opened again while writing this record. With the learned selection the halo beside the near pylon goes, the pylon's steel turns from pale to a dull red-brown, and the low hills on the horizon come out paler.
+# +- NIR_3466, 2026-09-26: the same pair, whole frame, and the tall building and its roof enlarged. With the learned selection the halo beside the building and the pale spot on its face go, and a pale sliver of sky stands above the right of the roof where the selection missed it.
+# +- NIR_1651, 2026-09-26: the same pair, whole frame. With the learned selection the white cloud deck turns blue-grey with a round glow near the tree's top right, and a lighter band stands beside the upper tree where sky was missed.
+# +- NIR_1644, 2026-09-26: the same pair, whole frame. With the learned selection the white cloud band behind the treetops turns blue-grey with a faint green and pink tint.
+# +- NIR_1827, 2026-09-26: the same pair, whole frame, a difference image of the two, and the treetops and the upper right enlarged, opened again for this revision. They nearly match. Along the treetops, where today's render has a thin pale rim against the sky, the learned one has a soft pink-red fringe; and parts of the broken cloud at the upper right come out bluer.
+# +- NIR_0627, 2026-09-26: the same pair, whole frame. Today's selection takes the defocused garden behind the flower as sky, and it renders a bright red with dark-rimmed grey blotches; through the learned selection, which takes none of it, it stays a darker red with softer blotches.
+# diff --git a/docs/decisions/069-the-looks-sky-adjustments-tint-and-darken-what-has-no-colour.md b/docs/decisions/069-the-looks-sky-adjustments-tint-and-darken-what-has-no-colour.md
+# new file mode 100644
+# index 0000000..814e005
+# --- /dev/null
+# +++ b/docs/decisions/069-the-looks-sky-adjustments-tint-and-darken-what-has-no-colour.md
+# @@ -0,0 +1,304 @@
+# +# 069 · The look's sky adjustments tint and darken what has no colour
+# +
+# +## Context
+# +
+# +Found 2026-09-26, while a learned sky selection was built, exported beside
+# +today's and taken out, and recorded in 052 as one of three facts not fixed.
+# +**The look's three sky stages have no guard against white.** Read off the
+# +shader in `src/gl.ts` and `compileEdit` in `src/pipeline.ts`, in the order they
+# +run:
+# +
+# +- **Sky colour smoothing** (`skySmooth`) blends each selected pixel's chroma
+# +  toward the sky colour of its texel in the 128-texel-wide sky map
+# +  (`SKY_MAP_W` in `src/skymap.ts`), gated on the pixel's chroma DISTANCE from
+# +  that colour (`SKY_GATE_LO..HI`, 0.12 to 0.25). The gate was built to spare a
+# +  branch, which sits far from the sky. A neutral pixel under a pale sky sits
+# +  close to it, so a cloud inside the selection is pulled toward the sky's
+# +  colour.
+# +- **Sky saturation** (`skySat`) is gated on the pixel's own saturation
+# +  (`SKY_SAT_GATE_LO..HI`, 0.05 to 0.13, decision 019) so that a cloud stays
+# +  grey. It runs after the smoothing and reads the pixel the smoothing has just
+# +  tinted, so the gate that exists to spare the cloud reads a cloud that is no
+# +  longer grey.
+# +- **Sky depth** (`skyDepth`) multiplies the pixel's value through the refined
+# +  selection and the sky map's keying byte. The key is per photograph and its
+# +  grey guard is per texel (IR-SCIENCE 4b-v); nothing reads the pixel itself. A
+# +  cloud inside a blue texel is darkened with the sky round it.
+# +
+# +**What that did, looked at.** On the whole-frame exports of 2026-09-26 the
+# +learned selection took NIR_1651's cloud and NIR_1644's band of cloud behind the
+# +crowns into the sky, and the stages turned both blue-grey, with patches of
+# +green and pink in them. Under today's selection both stayed white. NIR_3461's
+# +near pylon went dull, with round red glows, where the learned selection covered
+# +its steel. 052's verdict on that selection stands. As the look's automatic
+# +selection it was better only on the one frame with no sky. On the photographs
+# +with sky it was worse, and on NIR_1827 the two renders nearly match, differing
+# +only along the treetops and in the broken cloud at the upper right. It was
+# +taken out. What this record takes from those exports is a fact about the
+# +stages: the blue-grey cloud is what they do to cloud inside any selection that
+# +holds it.
+# +
+# +**Of the steel, only one part is this record's.** 052 puts the cover down to
+# +the learned selection: it is built at 1024 px and the steel is narrower than one
+# +of its pixels, so it took steel in. That part is 052's and nothing here changes it.
+# +Under that cover Sky depth darkened the steel and the smoothing pulled it toward
+# +the sky's colour; for steel that arrives without colour, that is this defect.
+# +But 061 measured NIR_3461's steel arriving red: the foliage band, which runs
+# +before the sky stages, paints the wires and one face of each pylon member, so
+# +that steel arrives carrying colour and a guard on what arrives without colour
+# +leaves the stages acting on it as they do today. And the round red glows are
+# +not the steel's pixels at all. They are the smoothing's texels averaging red
+# +wire into the sky round it (013, 061): sky pixels that arrive with colour and
+# +are moved. So this record covers pale steel under a selection that covers it,
+# +and does not claim the red steel, the glows or the cover.
+# +
+# +Cloud is sky by the Sky mask's own purpose (`NOTES.md` "## What the Sky mask is
+# +FOR, ruled 2026-09-20": all of the sky and not more), and the Sky mask's colour
+# +grow takes NIR_1651's cloud in for that reason. Any selection that holds all of
+# +the sky holds cloud.
+# +
+# +**And the rotation fix brings those clouds into the look's own selection.**
+# +NIR_1651 and NIR_1644 are turned photographs, and the look's selection
+# +is built as though they were not (070). Built at their own rotation, the
+# +selection map takes NIR_1651's cloud and most of NIR_1644's band in. That is
+# +read off selection maps drawn over the frames, not off renders through the
+# +stages: no export with the selection built at their rotation has been made. So
+# +this defect is not waiting on a new finder. 070 puts those clouds inside the
+# +look's own selection, and 052's Option 1 puts every cloud the reader's Sky mask
+# +holds under these stages. That they would then go blue-grey is expected from
+# +what the stages did to cloud on 2026-09-26, and is confirmed by render (Options).
+# +
+# +**The rule this breaks is already written.** 019's intended outcome is that "a
+# +pixel that arrives without colour leaves without colour". The film says the
+# +same thing physically: Kodak's data puts clouds near-white, with the film's
+# +dark sky coming from its slow infrared layer seeing almost nothing of clear
+# +skylight (IR-SCIENCE 4b-viii), and the film reference built outside the app
+# +kept NIR_1651's cloud white with a per-pixel guard on the infrared axis
+# +(4b-vii). 019 wrote the rule for one stage. The other two never had it, and the
+# +one that has it reads the pixel after the smoothing has moved it.
+# +
+# +**How a guard on the stages differs from what 052 rejected.** 052 tried "a
+# +per-pixel whiteness weight subtracting cloud" as a fix for the SELECTION. A
+# +guard is not a selection. The selection keeps the cloud, so the reader's Sky
+# +mask, its matte, its coverage line, its hand corrections and its own five
+# +adjustments are untouched, and nothing is carved out of the sky to leave an
+# +edge through a wisp. What changes is what the three stages do to a pixel inside
+# +it: they move only colour that arrived. The guard puts 019's question, whether
+# +this pixel carries colour, and not the whiteness weight's, whether this pixel
+# +is sky.
+# +
+# +**But the whiteness weight's three measured failures were failures of a
+# +per-pixel reading, and a guard reads per pixel too.** It missed NIR_1651's
+# +cloud, read the bright haze round NIR_1827's sun as white, and was grainy near
+# +the horizon. Each is a check any guard must pass before it ships, beside two
+# +from the same family, both measured on Sky depth read per pixel: it snowed a
+# +pale sky, darkening half its pixels and sparing the rest, which is why its key
+# +is per photograph today (IR-SCIENCE 4b-iv and 4b-v); and on NIR_1651 it spared
+# +the cloud and not the clear sky beneath it, with a seam at the gate's width
+# +rather than at the cloud's edge (4b-iv).
+# +
+# +**And one more, which is the smoothing's own purpose.** 013's sky speckle is
+# +single pale pixels, much less saturated than the sky round them, and giving
+# +them the sky's colour back is what Sky colour smoothing was built to do. A guard
+# +that reads a lone dot as "arrived without colour" brings the speckle back, and
+# +under Sky depth leaves the dot standing pale in a darkened sky. A dot and a
+# +cloud are both pale. What separates them is size, and a rule that read size
+# +would need a width that nothing here fixes without choosing it on these frames.
+# +So the speckle is a check the rule must pass as it stands, and can fail it; it
+# +is not a parameter to set.
+# +
+# +## Looked up
+# +
+# +- **Kodak's own data for the film**: AEROCHROME III Infrared Film 1443 (AS-77 /
+# +  TI-2562) and EKTACHROME EIR (TI-2323), read in full 2026-09-25 and modelled in
+# +  IR-SCIENCE 4b-viii. Skylight through the Wratten 12 is mostly green with very
+# +  little infrared, so the infrared layer barely exposes and a clear sky renders
+# +  blue and dark; clouds render near-white. The film's dark sky belongs to clear
+# +  skylight, not to everything above the horizon.
+# +- **Photoshop's Blend If**: Adobe, *Layer opacity and blending modes*
+# +  (helpx.adobe.com/photoshop/using/layer-opacity-blending.html), read
+# +  2026-09-26. Beside a layer's mask, the Underlying Layer sliders set which
+# +  pixels of the picture below may be changed, by their brightness per channel,
+# +  and split sliders give a range of partial blending so there is no hard edge.
+# +  The mask says where; Blend If says which pixels, by what they are. It reads
+# +  brightness, not colour.
+# +- **Lightroom's answer to a sky adjustment that spills**: intersect the sky
+# +  mask with a range mask (Fstoppers, *Sky masking in Lightroom: fix halos and
+# +  gaps*, fstoppers.com/lightroom/sky-masking-lightroom-fix-halos-and-gaps-721200,
+# +  read 2026-09-25). That is the selection route, the one the whiteness weight
+# +  took.
+# +- **What a saturation control does to a neutral**, read off the app's own
+# +  stages rather than a source: a stage that multiplies chroma about luma leaves
+# +  a pixel with no chroma where it is, by construction, and a blend toward a
+# +  target colour does not. That is why Sky saturation alone would never tint a
+# +  cloud, and why the smoothing before it does.
+# +
+# +So the field keeps two things apart: the mask decides where an adjustment
+# +applies, and a guard on the adjustment decides which pixels it may change. The
+# +film decides what the guard keeps: a cloud comes out white.
+# +
+# +## Built already
+# +
+# +What exists that this item will use, so a second one does not get written
+# +(LESSONS 330):
+# +
+# +- **The three stages**: the sky block of the shader in `src/gl.ts` and
+# +  `compileEdit` in `src/pipeline.ts`, with `SKY_GATE_LO`, `SKY_SAT_GATE_LO` and
+# +  their pairs. The two must compute the same picture, which
+# +  `tools/agreement-walk.mjs` checks.
+# +- **The sky map**: `buildSkyMap` in `src/skymap.ts`, with its per-photograph
+# +  depth key and its per-texel grey guard (`SKY_DEPTH_GREY_LO..HI`).
+# +- **The definition of colourless in the sky**: 019's `SKY_SAT_GATE_LO..HI` on
+# +  the pixel's own saturation, which Sky saturation already uses and this record
+# +  extends.
+# +- **Instruments**: `tools/look-sheet.mjs` renders a frame through the build in
+# +  `dist`, the app's own path, with `--file` naming the frame;
+# +  `tools/sky-stage-walk.mjs` measures the exported sky whole and fails a
+# +  smoothing stage that moves nothing; `tools/aerochrome-walk.mjs` checks the
+# +  look's declared amounts; the report's "Sky map" line prints each photograph's
+# +  depth key; `tools/film-reference.mjs` carries the per-pixel infrared guard
+# +  that kept NIR_1651's cloud white, for comparison.
+# +
+# +## Weighed against
+# +
+# +- **019, "Aerochrome's saturation by population: foliage and sky each their
+# +  own amount, nothing colourless touched"**: the rule is 019's, and so is the
+# +  one gate that already carries it. This extends it from one stage to three and
+# +  moves where it is read.
+# +- **013, "Aerochrome is the right colour and comes out splotchy"**: Sky colour
+# +  smoothing is 013's stage, and its sky half was resolved by giving pale grain
+# +  the sky's colour back. The guard must not undo that. 013's round discs along
+# +  wires are the smoothing's texels averaging a wire's colour into the sky round
+# +  it: the sky's pixels moved, not the wire's. This record does not claim them.
+# +- **061, "Red and blue do not line up at thin edges, and Aerochrome paints the
+# +  difference"**: on NIR_3461 it measured the red on the steel as the foliage
+# +  band's, painted before the sky stages run, and the round discs as the
+# +  smoothing spreading red wire. Both arrive with colour, so the guard leaves
+# +  both as they are. Its remedy for the red is 042's stage for the look's own
+# +  bands.
+# +- **052, "The look's sky adjustments read a selection the reader cannot see"**:
+# +  it rejected the whiteness weight as a selection fix and recorded this defect,
+# +  and its Option 1 puts the reader's Sky mask, cloud included, under these
+# +  stages. The steel's cover by a 1024 px selection is its finding and stays
+# +  with it.
+# +- **023, "The Sky mask reads the sky's colour as well as its place"**: its grow
+# +  takes NIR_1651's cloud into the Sky mask on purpose, which is what reaches
+# +  these stages under 052.
+# +- **066, "Aerochrome is rendered from a model of the film, not tuned toward
+# +  it"**: a film model makes cloud white from the film's own curves. If it
+# +  replaces these stages, this rule is the one its clouds must meet, and the
+# +  guard goes only with the stage it sits in.
+# +- The rotation (070) declares its relation from its own side: it cannot ship
+# +  before this.
+# +
+# +## Depends
+# +
+# +- touches 019 — the rule is 019's and so is the gate that carries it; this extends it to all three stages and moves where it is read, so a change to either definition moves the other.
+# +- touches 013 — Sky colour smoothing is 013's stage and its sky half works by giving pale grain the sky's colour back; a guard that reads grain as colourless undoes it.
+# +- touches 052 — 052 rejected a whiteness weight as a selection fix, and its Option 1 puts every cloud the Sky mask holds under these stages; this is what those clouds meet there.
+# +- touches 023 — the Sky mask's colour grow takes cloud into the sky on purpose, and under 052 that cloud reaches these stages.
+# +- touches 066 — a film model renders cloud white from the film's own behaviour; this rule is what its clouds must meet if it replaces these stages.
+# +- distinct-from 061 — both are about NIR_3461's steel under the look, and they are different pixels: 061's steel arrives red from the foliage band and its discs are sky moved toward red wire, neither of which this guard reaches; this record's are the steel and cloud that arrive without colour.
+# +
+# +## Options
+# +
+# +1. **One rule for the three sky stages, stated once: what arrives without
+# +   colour leaves without colour, and at its own value.** Chosen.
+# +   - One weight, read once on the pixel as it ARRIVES at the first sky stage,
+# +     before anything has tinted it, and every stage multiplies by it. Smoothing
+# +     moves only colour that was there; Sky saturation reads what arrived, not
+# +     what the smoothing made; Sky depth darkens only what arrived carrying
+# +     colour.
+# +   - The weight is 019's gate as it stands: `SKY_SAT_GATE_LO..HI` on the
+# +     arriving pixel's own saturation, the gate Sky saturation already carries,
+# +     read on the same pixel in the same pass. No new constant and no new pass:
+# +     the rule written for one stage becomes the rule for three, and if 019's
+# +     definition ever moves it moves for all three at once.
+# +   - Read per pixel, as 019's gate is, and that is its risk: 013's speckle and
+# +     the snow a per-pixel key left on a pale sky are both pale pixels a
+# +     per-pixel guard may spare. Both are acceptance checks below, and either
+# +     can fail the option. Neither is answered by reading over a neighbourhood
+# +     or by moving the gate: a width or a threshold chosen by rendering these
+# +     frames is a constant tuned to them (Rejected, 2). If a check fails, this
+# +     option fails as written and the record goes back to its options.
+# +   - The smoothing's distance gate stays: it guards the other side, a coloured
+# +     thing that is not sky, such as a branch. Sky depth's per-photograph key and
+# +     per-texel grey guard stay: they decide whether a sky is blue enough to
+# +     darken at all.
+# +   - The selection is not touched. The Sky mask, and under 052 the look, keeps
+# +     the cloud.
+# +   - **Before it ships**, each check is rendered through `tools/look-sheet.mjs`
+# +     and opened, whole frame and at 1:1. The haze round NIR_1827's sun: as it
+# +     is today unless the film says otherwise, shown rather than argued. The sky
+# +     near the horizon on NIR_1827 and NIR_3461: no grain. 013's speckle frames
+# +     (IR-SCIENCE 9l: three of ten carry it): the speckle stays gone. A pale sky
+# +     that Sky depth still darkens, found by its key on the report's "Sky map"
+# +     line: no pale dots left standing in it. And `tools/sky-stage-walk.mjs`
+# +     still passes, so the smoothing still moves the sky it moved, and
+# +     `tools/agreement-walk.mjs` holds the shader and `compileEdit` to one
+# +     picture.
+# +   - **Waiting for 070**: NIR_1651's cloud and NIR_1644's band, white rather
+# +     than blue-grey, with no seam where cloud meets clear sky. The app builds
+# +     the look's selection at rotation 0, whose map on these two frames leaves
+# +     NIR_1651's cloud and most of NIR_1644's band outside it, and
+# +     `tools/look-sheet.mjs` renders the app's path, so no instrument puts them
+# +     under these stages at this rank. They are run as 070's acceptance, and 070
+# +     does not ship until they pass.
+# +   - **Waiting for a selection that covers steel**: NIR_3461's near pylon, the
+# +     steel that arrives pale keeping its colour and value. Today's selection is
+# +     0 inside that pylon (052), and no ranked item is built to cover that
+# +     steel, so there is nothing there for the guard to act on and this option
+# +     promises nothing for steel. The one recorded way it would be covered is a
+# +     reader choosing the learned finder on the Sky mask the look reads, once
+# +     052's Option 1 is in, and 068 builds that choice only if its comparison
+# +     finds each finder losing somewhere the other does not. The steel that
+# +     arrives red is 061's, and is not a check of this option.
+# +2. Tune each stage against the practice frames: a narrower smoothing window, a
+# +   higher saturation gate, and a depth threshold fitted to NIR_1651 and
+# +   NIR_1644.
+# +3. Take the cloud out of the selection: 052's per-pixel whiteness weight.
+# +4. The film reference's guard: a pixel on the infrared-bright side of the axis
+# +   inside the selection is left alone (4b-vii, the axis above +0.04).
+# +5. Guard the smoothing alone, since it is the stage that adds the colour.
+# +6. Leave it: today's selection leaves most cloud out.
+# +
+# +## Rejected
+# +
+# +- **2, tune the constants.** Constants fitted to six frames fix those six and move on the next. 029 refused this shape for the seed, where no setting of its constants satisfied both ends, and 013 refused a per-photograph strength fitted to one positive example. Three gates reading three different states of one pixel is how this defect arose, and tuning keeps three.
+# +- **3, take the cloud out of the selection.** 052 measured it and rejected it: it missed NIR_1651's cloud, read NIR_1827's sun haze as white and was grainy near the horizon. It also moves the wrong thing. By the purpose ruling cloud is sky and the Sky mask holds it; carving it out moves the reader's matte, coverage, corrections and five adjustments in order to fix three stages, and puts an edge through every wisp.
+# +- **4, the infrared axis.** It is the one reading known to have kept NIR_1651's cloud white, and it stays the comparison the first render is checked against. As the rule it tests whether a pixel is sky, which is the selection's question put in the stages' place; it needs the linear axis carried past the grade to stages that run after it; a camera-rendered file has no such axis; and its +0.04 was fitted on seven frames.
+# +- **5, the smoothing alone.** Sky depth darkens a cloud grey with no tint at all, and the film leaves it near-white. Half the rule is a second place for the other half to be forgotten.
+# +- **6, leave it.** Refuted by the rotation (070): read off the selection maps, at the right rotation the look's own selection takes NIR_1651's cloud and most of NIR_1644's band in, and 052's Option 1 takes in every cloud the Sky mask holds. The defect is waiting on fixes already ranked, not on a new finder.
+# +
+# +## Rank
+# +
+# +**First, above the rotation (070) and 052.** Argued by what would be redone,
+# +not by severity.
+# +
+# +- **The rotation needs it**, and says so in its own record: built at their
+# +  rotation, the look's selection maps take NIR_1651's cloud and most of
+# +  NIR_1644's band in, and these stages turned such cloud blue-grey on
+# +  2026-09-26. That is a prediction from the maps; the render that confirms it
+# +  is 070's acceptance.
+# +- **052's Option 1 puts every cloud the reader's Sky mask holds under these
+# +  stages.** Built first, it would ship blue cloud, or be judged against stages
+# +  about to change.
+# +- **013 and 066 tune the sky the look renders.** The guard changes what the
+# +  smoothing and the depth do to every pale pixel in it, so either one tuned
+# +  first would be tuned again.
+# +- **The finder choice filed beside this (068)** compares the two finders
+# +  through these stages, on practice frames neither finder was developed on, so
+# +  it comes after them.
+# +
+# +Nothing it is ranked above changes shape because of it, since it does not
+# +change which pixels are selected. Its own acceptance renders are repeated once
+# +070 and 052 move the selection. That is a re-render of fixed checks, and it
+# +costs less than measuring 052's selection through stages about to change, which
+# +is the argument that puts it above 052.
+# +
+# +## Looked at
+# +
+# +- NIR_1651, 2026-09-26: the whole-frame export through today's selection beside the learned selection's, one sheet, full frame; and the look's own selection at rotation 0 and at the frame's rotation, drawn in yellow over the frame as displayed, full frame side by side.
+# +- NIR_1644, 2026-09-26: the same two sheets; the band of cloud behind the crowns in both.
+# +- NIR_3461, 2026-09-26: the whole-frame exports through today's selection and the learned one, side by side; the near pylon at the left edge.
+# +- NIR_1827, 2026-09-26: the whole-frame exports through today's selection and the learned one, side by side, and a difference image of the two; the haze round the sun. They nearly match; what differs lies along the treetops and in the broken cloud at the upper right.
+# diff --git a/docs/decisions/070-the-looks-sky-is-found-on-the-wrong-edge-of-a-turned-photograph.md b/docs/decisions/070-the-looks-sky-is-found-on-the-wrong-edge-of-a-turned-photograph.md
+# new file mode 100644
+# index 0000000..201e269
+# --- /dev/null
+# +++ b/docs/decisions/070-the-looks-sky-is-found-on-the-wrong-edge-of-a-turned-photograph.md
+# @@ -0,0 +1,239 @@
+# +# 070 · The look's sky is found on the wrong edge of a turned photograph
+# +
+# +## Context
+# +
+# +Found 2026-09-26, while a learned sky selection was built, and recorded in 052
+# +as one of three facts not fixed. Measured again for this record the same day.
+# +
+# +**`buildSkySelectionFrom` in `src/skyfine.ts` passes rotation 0 to
+# +`buildSkyMask`.** Rotation is the one input that tells the detector which edge
+# +of the picture is up: the border it finds runs down each column from the top of
+# +the picture as shown, and sky is everything above it. `SkySource` carries no
+# +rotation, so on a photograph turned on its side the look's own sky is seeded
+# +from the edge that is up in the file, which is a side of the picture as it is
+# +shown.
+# +
+# +**Measured on three practice frames the file stores turned** (each carries
+# +rotation 3), with the look's selection built as the app builds it and then at
+# +the frame's own rotation, both drawn over the frame and opened:
+# +
+# +- **NIR_1651**: 18.2% of the frame at rotation 0, against 52.2%. At rotation 0
+# +  the selection is the sky down the left side; it never reaches the cloud or
+# +  the clear sky right of the tree. At its rotation it is all of the sky down to
+# +  the crown, cloud included.
+# +- **NIR_1644**: 32.6% against 37.2%. At rotation 0 the selection stops along a
+# +  level line and leaves out most of the band of white cloud behind the crowns;
+# +  at its rotation it runs down to them.
+# +- **NIR_0627**, which has no sky: 59.0% against 57.7%. The rotation does not
+# +  touch what 029 is about.
+# +
+# +All three are among the seven frames the look's sky depth was solved on
+# +(IR-SCIENCE 4b-iv).
+# +
+# +**The reader's Sky mask does not have this.** `regenerateSkyMask` in
+# +`src/main.ts` passes `renderer.rotation`, `skyPrepFor` keys its cache on the
+# +image and the rotation, and a quarter-turn rebuilds the mask
+# +(`rebuildSkyMasks`). `renderer.rotation` is the turn the reader sees: set from
+# +the file's own turn when a photograph is shown (`img.rotate`, in
+# +`showDecoded`), replaced by a stored edit's turn when one is restored
+# +(`applyView`) and by a gallery example's fixed turn (`openGalleryPhoto`), and
+# +moved a quarter by the Rotate button. The look's pair reads none of these, and
+# +is not rebuilt on a turn either.
+# +
+# +**Everything that reads the look's selection inherits it.** On a turned
+# +photograph:
+# +
+# +- Sky colour smoothing, Sky saturation and Sky depth act on the wrong region,
+# +  on screen and in the export, so NIR_1651's clear sky right of the tree is not
+# +  deepened at all.
+# +- Restore depth's lift (`solveLift`) measures the sky's saturation through
+# +  `skyMaskFor`: on the open photograph (`applyLift`), on tiles (`makeThumb`)
+# +  and in a batch (`batchParamsFor`).
+# +- The shadow cast (`shadowCastFor`) takes the sky out of its measurement
+# +  through `skyMaskFor`, so the report's Shadow light line takes out the wrong
+# +  part.
+# +- Tiles build their sky from `skyMaskFor`. A batch's sky stages take the pair
+# +  the sky worker built at decode, or build it with `buildSkySelectionFrom`,
+# +  without going through `skyMaskFor`.
+# +- At open, the sky worker builds the pair a photograph starts from when its
+# +  decode is given `sky: true`: a set, the strip, a resumed session, a keep file
+# +  and a batch. A photograph picked on its own or opened from the gallery is
+# +  not (052's third fact): its coarse half comes from `skyMaskFor` at open and
+# +  the refined pair from `syncSkyMap` on the first edit with Sky depth or Sky
+# +  saturation, both on the main thread. The fix has to reach both.
+# +
+# +**And it has already cost measurements.** 023 found the same hard-coded 0 in
+# +`tools/sky-probe.mjs` and fixed the instrument, noting that NIR_1651's seed had
+# +read 9.7% of the frame against the app's own 30%; the app's own path kept the
+# +0. IR-SCIENCE 4b-v, measured through the app, records Sky depth barely moving
+# +NIR_1651 because the bitmap finds 9.7% of the frame, "the cloud-topped strip at
+# +the top edge", and gives the frame's cloud as the reason. 9.7% is the figure
+# +023 got at rotation 0, so that reading was very probably this defect.
+# +
+# +**What the fix does to NIR_1651's and NIR_1644's clouds is a prediction, not a
+# +render.** Built at
+# +their rotation, the selection maps take NIR_1651's cloud and most of NIR_1644's
+# +band in. Under the learned selection the same stages turned such cloud
+# +blue-grey, so this is expected to put blue-grey cloud on turned photographs
+# +with cloud in the sky unless 069 is in. No export with the selection built at
+# +their rotation has been made; the renders are this item's acceptance.
+# +
+# +## Looked up
+# +
+# +- **Adobe, *Masking* in Lightroom Classic**
+# +  (helpx.adobe.com/lightroom-classic/desktop/process-and-develop-photos/masking.html),
+# +  read 2026-09-26: "Update AI Masks" is offered for when an AI mask needs
+# +  updating, including when the image "has been rotated". A detected selection
+# +  is treated as a function of which way the picture is turned, and redone when
+# +  that changes.
+# +- **Shen and Wang, "Sky Region Detection in a Single Image for Autonomous
+# +  Ground Robot Navigation"**, International Journal of Advanced Robotic Systems
+# +  10(10), 2013 (doi 10.5772/56884), read 2026-09-20 for IR-SCIENCE 9o and the
+# +  method this app's border follows: one border row per column, the first row
+# +  from the top whose gradient passes a threshold, and sky is everything above
+# +  it. The method is only defined once "up" is known.
+# +
+# +So the field tells its sky detectors which way is up, and redoes the detection
+# +when that changes. This app already does both, for the reader's Sky mask only.
+# +
+# +## Built already
+# +
+# +What exists that this item will use, so a second one does not get written
+# +(LESSONS 330):
+# +
+# +- **The builder**: `prepareSkySource`, `SkySource` and `buildSkySelectionFrom`
+# +  in `src/skyfine.ts`, the last with the 0 in its call to `buildSkyMask`.
+# +- **The detector**: `buildSkyMask` in `src/sky.ts` already takes `rotate` and
+# +  hands it to `skyPrepare`'s horizon search, its seed band and `depthOf`, so
+# +  passing the reader's rotation is enough. The comment in `buildSkyMask` saying
+# +  only `depthOf` depends on the rotation is stale.
+# +- **The pattern to copy**: `regenerateSkyMask` and `skyPrepFor` in
+# +  `src/main.ts`, which build at `renderer.rotation` and cache per image and
+# +  rotation; and `rebuildSkyMasks`, which runs on a turn and on reopening a kept
+# +  photograph. Beside them, `syncSkyMap` and the open path in `showDecoded`
+# +  assign the look's pair, `skyMaskFor` builds and holds its coarse half, and
+# +  `img.skySel` carries the pair on the photograph.
+# +- **The worker path**: given `sky: true`, the decode worker
+# +  (`src/decode.worker.ts`) prepares the `SkySource` beside the picture, and
+# +  `src/decodeClient.ts` hands it to `requestSkySelection` in `src/skyClient.ts`,
+# +  where the sky worker (`src/sky.worker.ts`) builds the pair, or the main
+# +  thread does when there is no worker.
+# +- **Instruments**: `tools/sky-probe.mjs` already passes each frame's own
+# +  rotation; `tools/look-sheet.mjs` renders a frame through the build in `dist`,
+# +  so once this lands it renders the look's sky at the frame's rotation;
+# +  `tools/rotation-walk.mjs` asserts that a turn survives leaving the
+# +  photograph, and is where a check that the look's sky follows the turn
+# +  belongs.
+# +
+# +## Weighed against
+# +
+# +- **052, "The look's sky adjustments read a selection the reader cannot
+# +  see"**: recorded this defect and is the item it bears on most. **The relation
+# +  is touches, not superseded-by and not needs.** Its Option 1 makes the three
+# +  sky stages read the reader's Sky mask, which is built at `renderer.rotation`,
+# +  so on the open photograph it would retire this path for those three stages.
+# +  It would not retire it for tiles, a batch, Restore depth's lift or the shadow
+# +  cast, which read the look's selection through `skyMaskFor` or, for a batch's
+# +  sky stages, straight from the pair the sky worker built at decode, and have
+# +  no reader's mask to read; and the mask Option 1 seeds at open would most
+# +  naturally be seeded from the pair the sky worker already builds at decode,
+# +  which is this one. It is not needs either: this fix is a parameter, a
+# +  rotation on `skyMaskFor`'s cache and `shadowCastFor`'s, and a rebuild, and
+# +  waits on nothing in 052.
+# +- **029, "The Sky mask claims things that are not sky"**: its Built already
+# +  names the hard-coded zero as having cost one measurement. This is the same
+# +  zero in the app rather than the instrument. NIR_0627 is 029's frame, and the
+# +  rotation leaves it as it is.
+# +- **023, "The Sky mask reads the sky's colour as well as its place"**: it fixed
+# +  this zero in its probe and left the app's.
+# +- **034, "The red cast in the shadows comes off by hand, and should not have
+# +  to"**: its measurement of the shadow cast takes the sky out through this
+# +  selection.
+# +- **013, "Aerochrome is the right colour and comes out splotchy"**: it tunes the
+# +  sky the look renders, and NIR_1651 and NIR_1644, both turned, are among the
+# +  frames the sky's chroma has been measured on.
+# +- The white guard (069) is declared below: this cannot ship before it.
+# +
+# +## Depends
+# +
+# +- needs 069 — built at its rotation, the look's selection map takes NIR_1651's cloud and most of NIR_1644's band in; under the learned selection the same stages turned such cloud blue-grey, so fixed alone this is expected to ship blue-grey cloud on turned photographs with cloud in the sky. A prediction from the selection maps, not a render; the renders are this item's acceptance.
+# +- touches 052 — its Option 1 retires this path for the three sky stages on the open photograph but not for tiles, a batch, the lift or the shadow cast, and its seeded mask would start from this pair; whichever lands first, the other is measured on what it leaves.
+# +- touches 029 — the seed is 029's subject, and this decides which edge it is seeded from on a turned photograph.
+# +- touches 023 — 023 fixed the same zero in its probe; the app's own path kept it.
+# +- touches 034 — the shadow cast takes the sky out of its measurement through this selection.
+# +- touches 013 — 013 tunes the look's sky on frames that include turned ones, whose sky this moves.
+# +
+# +## Options
+# +
+# +1. **Build the look's selection at the rotation the reader sees, on every path,
+# +   and again when it turns.** Chosen.
+# +   - `SkySource` carries the rotation and `buildSkySelectionFrom` passes it to
+# +     `buildSkyMask`. The decode worker's `SkySource` carries the file's own
+# +     turn (`img.rotate`), so the pair the sky worker builds at decode is built
+# +     at it. The pair records the rotation it was built at, and is
+# +     rebuilt when the rotation shown differs from it: after `applyView`
+# +     restores a stored edit's turn, after a gallery example's fixed turn, and
+# +     on the Rotate button, beside `rebuildSkyMasks`.
+# +   - `skyMaskFor` takes the rotation. It returns `img.skySel`'s coarse half
+# +     only when that was built at the same rotation, and keys its cache,
+# +     `skyMaskOf`, on the image and the rotation, as `skyPrepFor` keys its
+# +     cache; `shadowCastFor` keys its own, `shadowCastOf`, the same way. Each
+# +     caller passes the rotation its picture is shown at: the open
+# +     photograph `renderer.rotation` (the open path, `applyLift`, the shadow
+# +     cast); a tile and a batch `img.rotate`, which is the turn `makeThumb` lays
+# +     a tile out at and `runBatch` exports at. A batch's sky stages, which take
+# +     the sky worker's pair or build their own rather than calling `skyMaskFor`,
+# +     build at that same turn. With that, the lift and the shadow cast follow.
+# +   - `syncSkyMap`, which builds the refined pair on the main thread when the
+# +     decode built none (a photograph picked on its own or opened from the
+# +     gallery), builds at `renderer.rotation`.
+# +   - One rule: every path that means the sky builds it from the same inputs as
+# +     the reader's Sky mask, so the two never disagree about which edge is up.
+# +   - **Before it ships**, NIR_1651 and NIR_1644 are rendered through
+# +     `tools/look-sheet.mjs` with 069 in, and opened whole frame and at 1:1: the
+# +     look's sky reaches the clear sky right of NIR_1651's tree and down to
+# +     NIR_1644's crowns, and the cloud stays white, with no seam where it meets
+# +     clear sky. These are 069's cloud checks, which cannot run before this.
+# +     `tools/rotation-walk.mjs` gains the check that the look's sky follows a
+# +     quarter-turn.
+# +2. The file's own rotation only, taken at decode.
+# +3. Wait for 052's Option 1 to retire the path.
+# +4. Find the up edge from the picture: run the detector from all four edges and
+# +   keep the best.
+# +
+# +## Rejected
+# +
+# +- **2, the file's rotation only.** A quarter-turn by hand, and a turn restored with a stored edit (`NOTES.md` "## A quarter-turn that stays turned, 2026-09-14"), would leave the look's sky on the old edge while the reader's Sky mask moves to the new one. The learned build made exactly this choice, reading the file's own turn rather than the renderer's.
+# +- **3, wait for 052.** Option 1 retires this path for the three stages on the open photograph only; tiles, a batch, the lift and the shadow cast keep it, and the mask Option 1 seeds would start from it.
+# +- **4, guess the up edge from the picture.** The reader has already said which way is up by turning the photograph, and the camera by its orientation tag. Guessing it from content is a confidence question of the kind 029 raised for whether there is a sky at all and left unanswered on NIR_0627, and where the guess differed from the turn the look's sky and the reader's Sky mask would disagree on the same photograph: two skies again.
+# +
+# +## Rank
+# +
+# +**Second, directly below the white guard (069) and above 052.** Argued by what
+# +would be redone.
+# +
+# +- **It needs the guard.** Fixed alone, the selection maps show it bringing
+# +  NIR_1651's cloud and most of NIR_1644's band into the look's own selection,
+# +  under stages that turned such cloud blue-grey under the learned selection.
+# +  That is a prediction, and the render is this item's acceptance.
+# +- **Above 052**, because 052's Option 1 is built and measured over this
+# +  selection on turned photographs; the mask its Option 1 seeds would start from
+# +  this pair; and this path survives 052 for tiles, a batch, the lift and the
+# +  shadow cast. Fixed after 052, 052's acceptance on every turned frame would be
+# +  measured again.
+# +- **Above 013 and 066**, which tune the look's sky over frames that include
+# +  turned ones.
+# +- **Above the finder choice (068)**, which compares the two finders on Sky
+# +  masks after 052's Option 1, on practice frames neither finder was developed
+# +  on. The mask Option 1 seeds would start from this pair, so any of those
+# +  frames that is turned would be seeded on the wrong edge until this lands.
+# +
+# +It costs a parameter, a rotation on `skyMaskFor`'s cache and `shadowCastFor`'s,
+# +and a rebuild when the rotation changes; nothing ranked above it changes shape
+# +because of it.
+# +
+# +## Looked at
+# +
+# +- NIR_1651, 2026-09-26: the look's selection built at rotation 0 and at the frame's own rotation, each drawn in yellow over the frame as displayed, full frame side by side; and the whole-frame exports through today's selection and the learned one, side by side.
+# +- NIR_1644, 2026-09-26: the same two sheets; where each selection stops above the crowns, against the band of white cloud in the exports.
+# +- NIR_0627, 2026-09-26: the two selections, full frame side by side.
 # diff --git a/public/conveyor-status.html b/public/conveyor-status.html
-# index b23a103..09d6e80 100644
+# index 09d6e80..3f4965c 100644
 # --- a/public/conveyor-status.html
 # +++ b/public/conveyor-status.html
-# @@ -85,7 +85,7 @@
+# @@ -84,7 +84,7 @@
+#        <ul class="facts">
 #          <li><b>Production</b> <span>v2.62.26: the export edge fix and the test page's shader rows, which were on staging as v2.62.16, promoted on your go. Checked on the live site: its offline copy is named for 2.62.26 and the test page carries the new rows. The number moved because the last digit counts every commit; the content did not.</span></li>
 #          <li><b>On staging</b> <span>v2.63.7, replacing v2.63: everything v2.63 carried (the wire fix, a mask's own colour mixer, the first stage of the mask work, the LUT grid and None for looks), plus a picked mask's own grade and Sky band, a line under "Editing" saying dimmed controls stay with the whole photo, new masks that change nothing until a control is moved, and double-tap that puts a mask's slider back to no change and is no longer lost while the photo redraws. It waits on your device pass; the steps are in NOTES.</span></li>
-#          <li><b>Built and held</b> <span>Nothing. The Aerochrome work now leads the queue, ahead of the rest of the mask work: the sky selection behind the halo (052), the round spots (013), the fill for sky inside a lattice (065), Aerochrome rendered from a model of the film (066), red and blue lining up at thin edges (061), and the two-photo route (067). The mask work's stage 2b follows.</span></li>
-# -        <li><b>Last verified green</b> <span><code>9c7f20a</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
-# +        <li><b>Last verified green</b> <span><code>dd77414</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
+# -        <li><b>Built and held</b> <span>Nothing. The Aerochrome work now leads the queue, ahead of the rest of the mask work: the sky selection behind the halo (052), the round spots (013), the fill for sky inside a lattice (065), Aerochrome rendered from a model of the film (066), red and blue lining up at thin edges (061), and the two-photo route (067). The mask work's stage 2b follows.</span></li>
+# +        <li><b>Built and held</b> <span>Nothing. The queue now starts with two sky defects found while the learned selection was being judged: the look's sky sliders tint and darken what has no colour, so clouds go blue-grey and steel goes dull (069); and on a photo turned on its side the look finds its sky from the wrong edge (070), which needs 069 first. Then the reader-visible sky selection (052) and the round spots (013). Choosing which finder draws each Sky mask (068) sits after those, and starts by comparing the two finders again.</span></li>
+#          <li><b>Last verified green</b> <span><code>dd77414</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
 #          <li><b>Next version</b> <span>2.63 is the staged build's number, because masks gain their own amounts in it. The next release that adds something takes 2.64.</span></li>
 #        </ul>
-#  
-# @@ -102,30 +102,20 @@
-#              colour mixer, the LUT grid, None, "Add to it", and the test page's
-#              timing with eight masks).
-#            </li>
-# -          <li>
-# -            <strong>Which sky model the selection is built from</strong>, from the maps
-# -            already sent. Two were tried on six practice frames; each is right where
-# -            the other is wrong. Nothing is built until this is settled.
-# -          </li>
-#          </ul>
-#        </div>
-#  
-#        <h2>The stages</h2>
-#        <ul>
-# -        <li class="now"><span class="state">Now</span>
-# -          <strong>Two sky models tried on infrared; the choice between them is next.</strong>
-# -          The halo beside buildings and pylons under Aerochrome is the look's sky
-# -          selection being wrong over whole regions, and no refinement fixes a wrong
-# -          label. Two models that can be downloaded here and are MIT-licensed were
-# -          run on six practice frames exported with the lens profile at 1, in the
-# -          scratch lab only. Neither works on the frame as the app shows it:
-# -          infrared makes the grass the brightest thing in the picture, and the
-# -          models call it sky. Re-colouring the frame so foliage is green and sky is
-# -          blue, from the frame's own colour axis, is what makes them work. The small
-# -          model (u2netp) then finds the sky between the steel of a pylon and every
-# -          wire, and calls a pale building face sky. The larger one (BiSeNetV2)
-# -          knows the building and turns the pylon into a solid grey shape. The
-# -          research, the numbers and the sources are in IR-SCIENCE 4b-x.
-# +        <li class="done"><span class="state">Stopped</span>
-# +          <strong>A learned sky selection was built, and taken out.</strong>
-# +          Two models were fused into the look's sky selection and exported beside
-# +          today's build. Whole frame against whole frame it was worse on every
-# +          photo with sky: clouds turned blue-grey, the steel in the near pylon went
-# +          dull with red glows, and sky was missed above a roof and beside a tree.
-# +          It was better only on the photo with no sky. It never reached staging.
-# +          What was found on the way is written in decision 052, so it is not built
-# +          again as it was.
-#          </li>
-#          <li class="done"><span class="state">Done</span>
-#            <strong>The research that should have come first is written down.</strong>
