@@ -31,7 +31,7 @@ function identityRgbaRamp(): Uint8Array {
   return a;
 }
 
-const VERT = `#version 300 es
+export const VERT = `#version 300 es
 in vec2 a_pos;
 out vec2 v_uv;
 out vec2 v_cropUv; // fraction of the OUTPUT (cropped) frame — for grain/vignette
@@ -68,7 +68,7 @@ void main() {
   gl_Position = vec4(a_pos, 0.0, 1.0);
 }`;
 
-const FRAG = `#version 300 es
+export const FRAG = `#version 300 es
 precision highp float;
 // SAMPLER ARRAYS HAVE NO DEFAULT PRECISION, and a plain sampler2D does — which
 // is why this line is needed and nothing warned about its absence (026). GLSL
