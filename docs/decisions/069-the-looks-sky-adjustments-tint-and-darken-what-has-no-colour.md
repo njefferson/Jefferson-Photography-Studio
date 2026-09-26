@@ -286,6 +286,19 @@ What exists that this item will use, so a second one does not get written
    with no render, and its texels disagree along every edge of the selection
    ("Measured before a render" below). Nothing is chosen, and the record holds
    no option that stands.
+8. **MEASURED OFF THE MAP, 2026-09-26, and not rendered: build each texel from
+   sky samples only.** A tap counts as sky where the refined selection scores it
+   above one half (the level the refinement already cuts at); a texel with less
+   than one sample of sky is filled from its neighbours ring by ring (pull-push
+   fill, Gortler et al. 1996); the photograph's depth key and the grey guard's
+   reference keep today's samples, so Sky depth is unchanged. Against bars fixed
+   and hashed before the run: edge disagreement fell from 31–83% to 0–14% and
+   passes on six of seven frames with sky; it created at most 3 red-ward texels
+   on any frame; the key is bit-identical to today on every frame. It fails on
+   NIR_1703, whose edge band stays at 14.4%, and every disagreeing cell there
+   traces to red crown tips the refined selection itself scores as sky, which the
+   fill then spreads. What is left of this record is the look's selection
+   holding what is not sky (073, 052), not the map.
 
 ## Rejected
 
@@ -295,6 +308,7 @@ What exists that this item will use, so a second one does not get written
 - **4, the infrared axis.** It is the one reading known to have kept NIR_1651's cloud white, and it stays the comparison the first render is checked against. As the rule it tests whether a pixel is sky, which is the selection's question put in the stages' place; it needs the linear axis carried past the grade to stages that run after it; a camera-rendered file has no such axis; and its +0.04 was fitted on seven frames.
 - **5, the smoothing alone.** Sky depth darkens a cloud grey with no tint at all, and the film leaves it near-white. Half the rule is a second place for the other half to be forgotten.
 - **7, read the surroundings at the sky map's scale — designed, measured off the map, and rejected before a render.** The texels along the selection's edge average the sky with whatever the bitmap's feather took in, so they disagree with their neighbours on every frame: 31% to 83% of the cells along the edge, against 0% to 8% inside the sky. A rule that acts where the neighbours disagree therefore acts in a band about two texels wide along every treeline, roofline and horizon, and there it hands the stages to the pixel's own reading, which is Option 1's grain in the place Option 1 grained. None of the three rules reaches the inside of a cloud wider than two texels either. What would make the surroundings readable is a map whose edge texels carry the sky's colour; that is a change to how the map is built, not to the stages, and it is not an option here until it is researched.
+- **8, the map from sky samples only — measured off the map, and failed before a render.** It is 7's missing half, researched and built in the scratch harness: each texel averages only the taps the refined selection scores as sky, and a texel with less than one such tap is filled from its neighbours. Against bars fixed before the run, the edge disagreement fell from 31–83% to 0–14%, and it passed on six of seven frames with sky. On NIR_1703 the edge band stays at 14.4%, and every disagreeing cell there traces to red crown tips the selection itself scores as sky, which the fill then spreads. What it cannot fix is what the selection holds (073, 052), so it was not rendered and it is not built.
 - **6, leave it.** Refuted by the rotation (070): read off the selection maps, at the right rotation the look's own selection takes NIR_1651's cloud and most of NIR_1644's band in, and 052's Option 1 takes in every cloud the Sky mask holds. The defect is waiting on fixes already ranked, not on a new finder.
 
 ## Built and measured, 2026-09-26
@@ -386,6 +400,10 @@ whether the hot spot is corrected, not on these stages.
 
 **It holds no standing option as of 2026-09-26**, so what waits on it waits on
 research, not on a build.
+Option 8 put what is left of it in the selection rather than the map or the
+stages: the one frame it failed on fails where the selection holds treetops,
+which is 073's and 052's ground. The rank stands because the rotation still
+needs this record's answer, whatever that answer turns out to act on.
 
 **First, above the rotation (070) and 052.** Argued by what would be redone,
 not by severity.
@@ -427,6 +445,7 @@ is the argument that puts it above 052.
 - NIR_0627, 2026-09-26: the guard beside today's build, whole frame at the look's own settings.
 - NIR_3406, 2026-09-26: the sky-map sheet with correction at 1 and again at its default, each texel's colour relative to its sky's mean on the left and candidate B's gate on the right, over the export; the round pale patch at the hot-spot centre with correction off, and the band along the roofline in both.
 - NIR_1703, 2026-09-26: the sky-map sheet, the pale patch at the frame's centre and B's band along the whole treeline; and today's export with Sky depth at 0.5 again, the colourless patch with the guard's square white blocks in it.
+- NIR_1703, 2026-09-26: option 8's cause sheet. Its 278 disagreeing edge cells are outlined by cause over the frame, and two crops are shown in colour. Every cell traces to a red-leaning seed: 62 hold one, 72 are the texel's own red sky-scored taps, and 144 were carried in by the fill. None comes from two ordinary seeds, and the fill creates none. In the left crop the selection's line runs inside a red crown and the fill carries it inward.
 - NIR_3461, 2026-09-26: the sky-map sheet, the pale cloud band at upper left, and B's gate on every pylon, along the wires and along the horizon.
 - NIR_1651, 2026-09-26: the sky-map sheet, the pale texels inside the treetop and B's gate on a diagonal through the cloud and round the treetop.
 - NIR_1827, 2026-09-26: the sky-map sheet, B's band along the treeline.

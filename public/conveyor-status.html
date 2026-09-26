@@ -83,9 +83,9 @@
       <h2>Where the builds are</h2>
       <ul class="facts">
         <li><b>Production</b> <span>v2.63.7: a picked mask takes its own settings, the LUT grid, None for looks, and the fixes that came with them. Promoted on your go on 2026-09-26, by pull request with the tree unchanged. Checked on the live site: its offline copy is named for 2.63.7, and the Gates run and the deploy for that commit both passed.</span></li>
-        <li><b>On staging</b> <span>v2.63.12: the report's Start-up line, the test page's timing of the editor's graphics, a real "not here" answer for a missing address, and an update notice that never offers an older version. Pushed 2026-09-26. The Gates run and the deploy for that commit both passed, and a missing address on staging was read answering 404.</span></li>
-        <li><b>Built and held</b> <span>Nothing. The look's sky sliders tinting what has no colour (069) has no standing answer: the first was built and failed its checks, and the second, which reads a pixel's surroundings, was measured off the app's own sky map and rejected before anything was rendered. The rotation fix (070) and the reader-visible sky selection (052) wait on it.</span></li>
-        <li><b>Last verified green</b> <span><code>f763bee</code>, on staging: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
+        <li><b>On staging</b> <span>v2.63.21: an update downloads only what changed and never the sticker library again, with the notice counting the files; the start screen answers and says "Preparing the editor…" while the editor's graphics are built; stickers kept in an export after resuming a session; and v2.63.12's measurement and two update fixes beneath them. Pushed 2026-09-26. The Gates run and the deploy for that commit both passed, and staging's offline worker was read naming it exactly.</span></li>
+        <li><b>Built and held</b> <span>Nothing. The look's sky sliders tinting what has no colour (069) has no standing answer. Three were tried: the first was built and failed its checks, and the second and third were measured off the app's own sky map and stopped before a render. The third fixed the map on six of seven photos, and failed on the seventh where the look's selection holds treetops, which is the scarlet tree's ground (073) and 052's. The rotation fix (070) and the reader-visible sky selection (052) wait on it.</span></li>
+        <li><b>Last verified green</b> <span><code>23cc31e</code>, on staging: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
         <li><b>Next version</b> <span>2.63 is production's number. The next release that adds something takes 2.64.</span></li>
       </ul>
 
@@ -93,36 +93,48 @@
         <h2>Waiting on you</h2>
         <ul>
           <li>
-            <strong>A measurement on staging, on the PC and then the iPad.</strong>
-            Open the editor on staging; when it answers, tap the version number,
-            press "Copy the report" and send the Start-up line. Then "Test this
-            device…", "Run the speed tests", "Copy the results", and send the rows
-            "Building the picture code (first time)" and "Building it again (a
-            normal launch)". There is nothing to judge by eye.
+            <strong>The update and the first start on staging, on the PC and then
+            the iPad.</strong> Open the editor on staging. The notice at the top
+            should count the files while it downloads, then say a new version is
+            ready: press Update now. The first start after it should say
+            "Preparing the editor…" with a count of seconds, and Help should open
+            while it counts. When it says the editor is ready, tap the version
+            number, press "Copy the report", and send the lines that start
+            "Start-up" and "Offline worker".
           </li>
           <li>
-            The sky record's next
-            option comes to you with pictures once it is researched. Two questions
-            about how an update reaches you are in the chat: whether the offline
-            copy catching up to the version already on screen takes over without a
-            press, and whether a new reader gets the stickers one at a time or all
-            at once.
+            The sky record's next option comes to you with pictures once there is
+            one that passes its checks off the map.
           </li>
         </ul>
       </div>
 
       <h2>The stages</h2>
       <ul>
-        <li class="now"><span class="state">Investigating</span>
+        <li class="waiting"><span class="state">On staging</span>
           <strong>The first launch after the release froze for about a minute,
-          and nothing said why.</strong> Reported from the PC. Every release
-          requests and stores the whole offline copy again, 28 MB, 25 MB of it the
-          sticker library, which has not changed since July, and nothing on screen
-          says a download is running. Whether that download is what froze the page is not
-          established: the other candidate is the editor compiling its picture
-          code from scratch after a release that changed it. The app will measure
-          both on the device before either is called the cause. The measurement
-          is on staging in v2.63.12, waiting on the PC and the iPad.
+          and nothing said why.</strong> Measured on the PC: building the editor's
+          picture code from scratch took 42 seconds while the page waited, and
+          557 ms on the iPad. The 28 MB every release downloaded was a second cost,
+          about two and a half minutes on the PC's connection. Both are fixed on
+          staging in v2.63.21: an update keeps what the device already has and
+          downloads only the rest, the notice counts the files, and the start
+          screen answers and says it is preparing the editor while the code is
+          built. The first reading, from a PC in Firefox: the update kept 211
+          files and downloaded 7, and the start froze for 44 seconds in silence.
+          Firefox offers no way to build off the page and reused nothing from its
+          last start, so it pays the build every time, and the words went up only
+          for a build the app expected to be slow. That is being fixed next: a
+          browser whose last build was slow gets the words before it starts.
+          Making the build itself faster is the next plan.
+        </li>
+        <li class="done"><span class="state">Stopped</span>
+          <strong>The third answer to the sky sliders tinting clouds was
+          measured, and stopped before a render.</strong> Build the sky map's
+          squares from sky only. It fixed the squares along the sky's edge on six
+          of seven photos with sky, and failed on the seventh, where every square
+          that still disagreed traced to red treetops the look's selection itself
+          counts as sky. What is left is the selection, not the map.
         </li>
         <li class="done"><span class="state">Stopped</span>
           <strong>The second answer to the sky sliders tinting clouds was
@@ -353,6 +365,50 @@
         They are written down so they are not re-discovered as new.
       </p>
       <ul>
+        <li>
+          <strong>In Firefox on the PC, every start holds the page for 44
+          seconds</strong> while the editor's picture code is built, because that
+          browser can neither build it off the page nor reuse the last build. The
+          words saying so are being fixed now; a faster build is the next plan.
+        </li>
+        <li>
+          <strong>A photo far along a long strip cannot be opened until the
+          thumbnails reach it.</strong> Reported from the PC with 222 photos. Noted
+          for later; it gets a record and a rank first.
+        </li>
+        <li>
+          <strong>The layout of the editor's grid of tabs was reported from the
+          device:</strong> eleven tabs three to a row with the last row one short,
+          and the explanations switch alone beneath them. Noted for later; it gets
+          a record and a rank first.
+        </li>
+        <li>
+          <strong>On a darker photo the look's sky selection takes in a tree,
+          and Aerochrome paints it scarlet</strong> (073). Found on the IR Chrome
+          frame, 2.4 stops under: the selection covered 46% of the frame against
+          21% on the same scene exposed normally, and Sky saturation boosts
+          anything the selection holds that has colour. The normally exposed frame
+          shows it on willow strands in front of the sky. Recorded and ranked after
+          052; research comes first.
+        </li>
+        <li>
+          <strong>A photo shot well under opens grainier than a normal one</strong>
+          (072). Automatic noise reduction removes a fixed share of the noise, and
+          a dark frame starts with more. Raise Noise reduction by hand for now.
+          The one design tried was refuted before it was built.
+        </li>
+        <li>
+          <strong>Edits to the photo that is open are lost if the page is
+          reloaded or the tab is closed before you move to another photo.</strong>
+          A session saves a photo's edits when you leave it, so the one on screen
+          has not been saved yet. Found while testing the sticker fix; the next
+          plan records and fixes it.
+        </li>
+        <li>
+          <strong>Stickers on a photo you returned to after resuming a session
+          were missing from its export</strong> until the Stickers tab was opened.
+          Fixed on staging, in v2.63.21.
+        </li>
         <li>
           <strong>The update strip can offer an older waiting version as new</strong>,
           because it asks whether the waiting version is different, not whether it
