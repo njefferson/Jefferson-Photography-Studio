@@ -239,8 +239,8 @@ told about in words.
 
 ## Rank
 
-**Third, re-ranked 2026-09-26, below the white guard (069) and the rotation
-fix (070).** It sits below both because each changes what this item is judged
+**Fourth, re-ranked 2026-09-26, below the white guard (069), the update-path
+record (071) and the rotation fix (070).** 071 shares no ground with this. It sits below both because each changes what this item is judged
 on: 069 decides what the sky stages do to the cloud a Sky mask holds once the
 look reads it, and 070 decides which edge of a turned photograph the detection
 this item turns into a Sky mask finds its sky from.

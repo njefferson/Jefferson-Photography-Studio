@@ -209,7 +209,7 @@ What exists that this item will use, so a second one does not get written
 
 ## Rank
 
-**Second, directly below the white guard (069) and above 052.** Argued by what
+**Third, below the white guard (069) and the update-path record (071), and above 052.** 071 went in second on 2026-09-26 because it shares no ground with this and was the next item that could be built. Argued by what
 would be redone.
 
 - **It needs the guard.** Fixed alone, the selection maps show it bringing
