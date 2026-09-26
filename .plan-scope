@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
 planhash=9f6f5a45fc333f1b
-diffhash=4ffdc43933e0311a
-verdict=IN-SCOPE: plan B.1 (the 071 record, its bullet, 068 needs 071, the status page's held-back lines) and the neighbour-rank corrections its Rank second requires
-# Watcher read /root/.claude/plans/linear-baking-island.md by path and the diff over 38e00fb (HEAD = origin/main), three passes. docs/decisions/071 (new): Options headed by "measure before choosing a fix", matching B.2 and B.3; cause of the minute stated as not established; Rank second, with the one item above having nothing to build and the sky records below sharing no ground (argued in the record, so no relation declared to them); Depends 060, 002, 042, 014. 068: needs 071, and its Rank now sixth including 071. NOTES: the 071 bullet between 069 and 070 with a Shown-as line that passes reader-words; 070's and 052's bullets moved to third and fourth. 013, 052, 070, 065, 066: one-line Rank corrections forced by "Rank second", matching the gate's rank print (069, 071, 070, 052, 013, 068, 065, 066). public/conveyor-status.html: the Investigating stage, three found-not-fixed entries, and the Waiting-on-you questions (plan B.1 and "Yours to settle"). decisions-check and roadmap-copy-check exit 0.
+diffhash=f81494dd73a10140
+verdict=IN-SCOPE: plan B.4's staging entry with the device steps, and the live status page
+# Every hunk in NOTES.md and public/conveyor-status.html is plan B.4 (the NOTES staging entry with the device steps) plus the doctrine's live status page; every factual claim was checked against CI, the live staging site and the held build's labels. The one finding, the status page abbreviating two row names, is fixed in this diff by naming both rows in full.
