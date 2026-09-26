@@ -83,9 +83,9 @@
       <h2>Where the builds are</h2>
       <ul class="facts">
         <li><b>Production</b> <span>v2.63.7: a picked mask takes its own settings, the LUT grid, None for looks, and the fixes that came with them. Promoted on your go on 2026-09-26, by pull request with the tree unchanged. Checked on the live site: its offline copy is named for 2.63.7, and the Gates run and the deploy for that commit both passed.</span></li>
-        <li><b>On staging</b> <span>The same build, v2.63.7. Nothing is waiting on a device pass.</span></li>
+        <li><b>On staging</b> <span>v2.63.12: the report's Start-up line, the test page's timing of the editor's graphics, a real "not here" answer for a missing address, and an update notice that never offers an older version. Pushed 2026-09-26. The Gates run and the deploy for that commit both passed, and a missing address on staging was read answering 404.</span></li>
         <li><b>Built and held</b> <span>Nothing. The first answer to the look's sky sliders tinting what has no colour (069) was built and failed its own checks, so it was taken back out; every option that record held is now rejected, and it needs a new one. The rotation fix (070) and the reader-visible sky selection (052) wait on it.</span></li>
-        <li><b>Last verified green</b> <span><code>a85cca0</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
+        <li><b>Last verified green</b> <span><code>f763bee</code>, on staging: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
         <li><b>Next version</b> <span>2.63 is production's number. The next release that adds something takes 2.64.</span></li>
       </ul>
 
@@ -93,7 +93,15 @@
         <h2>Waiting on you</h2>
         <ul>
           <li>
-            <strong>Nothing to test on a device yet.</strong> The sky record's next
+            <strong>A measurement on staging, on the PC and then the iPad.</strong>
+            Open the editor on staging; when it answers, tap the version number,
+            press "Copy the report" and send the Start-up line. Then "Test this
+            device…", "Run the speed tests", "Copy the results", and send the rows
+            "Building the picture code (first time)" and "Building it again (a
+            normal launch)". There is nothing to judge by eye.
+          </li>
+          <li>
+            The sky record's next
             option comes to you with pictures once it is researched. Two questions
             about how an update reaches you are in the chat: whether the offline
             copy catching up to the version already on screen takes over without a
@@ -113,7 +121,8 @@
           says a download is running. Whether that download is what froze the page is not
           established: the other candidate is the editor compiling its picture
           code from scratch after a release that changed it. The app will measure
-          both on the device before either is called the cause.
+          both on the device before either is called the cause. The measurement
+          is on staging in v2.63.12, waiting on the PC and the iPad.
         </li>
         <li class="done"><span class="state">Stopped</span>
           <strong>The first answer to the sky sliders tinting clouds was built,
@@ -337,13 +346,15 @@
           <strong>The update strip can offer an older waiting version as new</strong>,
           because it asks whether the waiting version is different, not whether it
           is newer; taking it deletes the newer version's half-finished download.
-          Read from the code, not yet reproduced.
+          Read from the code, not yet reproduced. Fixed on staging, in v2.63.12:
+          it offers only a newer version.
         </li>
         <li>
           <strong>The host answers any missing file with the start page and a
           success code</strong>, so a release landing in the middle of a download
           can leave a page stored under a program file's name until the next
-          release. Checked against production.
+          release. Checked against production. Fixed on staging, in v2.63.12: a
+          missing address answers 404, read on staging.
         </li>
         <li>
           <strong>Stickers placed on a photo whose edit is restored are missing from

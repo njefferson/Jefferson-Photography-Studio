@@ -43,7 +43,54 @@ because they floor temperature at ~2000K.
 
 ## On staging, waiting on a device pass
 
-**Nothing is waiting, 2026-09-26.** v2.63.7 went to production on the go the
+**v2.63.12 at https://staging.jefferson-photo-studio.pages.dev, pushed
+2026-09-26 (f763bee).** Decision 071's first step: measure the frozen first
+launch, and fix the two live defects in the update path beside it. Three
+commits on production's v2.63.7, after the two docs commits between. VERSION
+stays 2.63: a line in the report and a measurement on the test page add nothing
+a reader edits with, and the other two are fixes, so the automatic digit counts
+them. The Gates run and the deploy for f763bee both passed, staging's offline
+copy is named for 2.63.12, and a missing address on staging answers 404 with
+the new "This page is not here" page, all read off the live site.
+
+What a reader gets:
+
+- New: the report shows where a slow start-up spent its time, and the test
+  page times building the editor's graphics;
+- Fixed: an update can no longer store the start page in place of one of the
+  app's files;
+- Fixed: the update notice no longer offers a version older than the one you
+  are running.
+
+**What the device pass is.** This is a measurement, not a look to judge. The
+PC first, because that is where the minute happened, then the iPad:
+
+1. Open https://staging.jefferson-photo-studio.pages.dev/ir.html. If staging
+   was opened on that device before, this first launch is an update from
+   2.63.7, which is exactly the case being measured, so note roughly how long
+   it sat before answering.
+2. When it answers, tap the version number, press "Copy the report", and send
+   the line that starts "Start-up".
+3. In the same dialog press "Test this device…", then "Run the speed tests".
+   When it finishes, press "Copy the results" and send the two rows "Building
+   the picture code (first time)" and "Building it again (a normal launch)".
+
+What the numbers decide: a first-time build of several seconds on the PC says
+the minute was the editor's graphics being built while the page waited; a
+short one, with the Start-up line showing an update downloading across the
+longest pause, says it was the download. Either way the fix is 071's next plan.
+
+What was verified here, and what was not. In headless Chromium: the Start-up
+line fills every field or says it is unavailable, and the test page's first-time
+build ran 19 to 25 ms against about 3 ms warm, which only shows the measurement
+defeats the stored copy; this container draws in software, so its numbers say
+nothing about the PC. The offline-shell walk refuses the old behaviour with a
+plant (a missing file answered 200 with the start page) and passes with
+404.html; the version comparison was checked on nine cases, including the old
+rule offering 2.55 over 2.63.7. The accessibility walk passed, the new page
+included. Nothing has run on a real PC or iPad.
+
+**v2.63.7 went to production, 2026-09-26.** v2.63.7 went to production on the go the
 same day, by pull request with the tree unchanged, as a85cca0. Production and
 staging both serve the offline copy `ips-2.63.7`, read off both live sites, and
 the Gates run and the deploy for a85cca0 both passed. The number did not move
