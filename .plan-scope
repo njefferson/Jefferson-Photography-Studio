@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=9f6f5a45fc333f1b
-diffhash=bcc25718220c4b30
-verdict=IN-SCOPE: plan A's 069 option 7, its rejection before a render, IR-SCIENCE 9p and the status page's 069 stage
-# Every hunk is plan A: 069 option 7 with its Looked up and Rejected entries, the measurements off the sky map that rejected it before a render, IR-SCIENCE 9p with sources, and the status page's 069 stage. Nothing is marked chosen and no build is promised. Three corrections were made after the first pass (0.36 for the uncorrected twentieth; the noise-reduction entry removed as outside the plan; the clear-sky floor stated as none below 0.43 and 99% above 0.65), each checked against the cited measurement files.
+planhash=63bc0e468fac2e3c
+diffhash=bf400524f50b73df
+verdict=IN-SCOPE: documents for plan items 1 to 5, with two device reports recorded for later
+# Documents only. Every file maps to a plan item: 071's choices and the v2.63.21 staging entry and status page (item 1), 072 recorded (item 2), 069 option 8 measured and not rendered per the plan's gate (item 3), the Kolari findings in IR-SCIENCE and the Z50 filter corrections in NOTES, the field guide, PLAN.md and gallery-examples (item 4), 073 recorded and ranked (item 5). The two Open-requests entries and the Firefox device reading are recorded and deferred, committing no work. The watcher's one accuracy finding, 072 restating the 2026-07-12 calibration as clearing "banding" instead of "grain", is corrected in this diff.

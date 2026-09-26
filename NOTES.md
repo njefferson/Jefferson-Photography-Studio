@@ -40,8 +40,74 @@ because they floor temperature at ~2000K.
 - **Identify and avoid the common pitfalls.**
 - No pseudo code or drafts: finished work only, after **repeated review
   passes**.
+- **The editor's tab grid, its layout reported from the device 2026-09-26, for
+  later.**
+  Masks spans the drawer; below it Basic, IR, B&W, Color, Tone, Export,
+  Corrections, Crop & straighten, Grade, Stickers and Warp sit three to a row
+  with the last row one short, and "Explanations off" sits alone under them at
+  the right. No record covers it; 060 is the top bar. It gets a record and a
+  rank before anything is built.
+- **A photo far along a long strip cannot be opened until the thumbnails
+  reach it, reported 2026-09-26 from a PC (Firefox 156) with 222 photos, for
+  later.** The report showed 2 thumbnails being built and 3 decoders running.
+  It gets a record and a rank before anything is built.
 
 ## On staging, waiting on a device pass
+
+**v2.63.21 at https://staging.jefferson-photo-studio.pages.dev, pushed
+2026-09-26 (23cc31e).** Decision 071's fix, both halves, on top of v2.63.12's
+three commits and the stickers export fix, replacing it. VERSION stays 2.63:
+one is faster, the rest are fixes. The Gates run and the deploy for 23cc31e
+both passed, and staging's worker was read naming 23cc31e exactly, with
+offline copy `ips-2.63.21`.
+
+What a reader gets, beyond v2.63.12's three:
+
+- Fixed: stickers on a photo you return to after resuming a session are in
+  its export;
+- Fixed: the test page shows what building the editor's graphics costs a
+  launch, not an average;
+- Faster: an update downloads only the files that changed, and never the
+  sticker library again;
+- Fixed: after an update the start screen answers and says it is preparing
+  the editor, and a photo you choose opens when it is ready.
+
+**What the device pass is.** The PC first, then the iPad.
+
+1. Open https://staging.jefferson-photo-studio.pages.dev/ir.html. The notice
+   at the top should say "Downloading the update… N of M" and then that a new
+   version is ready. This one download is still the whole app, because
+   2.63.12's copy carries no labels to reuse. Press Update now.
+2. The first start after it builds the editor's picture code from scratch.
+   On the PC, "Preparing the editor…" should show with a count of seconds, and
+   Help on the start screen should open while it counts. Note whether it does.
+3. When it says the editor is ready, tap the version number, press "Copy the
+   report", and send the lines that start "Start-up" and "Offline worker".
+4. The next staging update after this one should count only a handful of
+   files.
+
+**The first reading, 2026-09-26, a PC in Firefox 156 (GTX 980 through
+Direct3D, 12 cores), a session of 222.** The update worked as built: "its
+install kept 211 files already on this device and downloaded 7, every sticker
+on the device". The install took 45.4 s, and the cause is not known. The
+start did not: "graphics built 0.15 s–44.25 s (44.11 s; the page waited —
+longest pause 44.10 s; no way to build off the page offered)", with no
+"said it was preparing". So the page froze for 44 seconds in silence.
+Firefox offers no way to build off the page (Mozilla bug 1736076). The
+missing words mean an earlier launch of the same picture code in this browser
+had finished and been recorded, so this launch expected a quick build and
+got 44 s. This Firefox keeps no built copy that it reuses, and pays the build
+on every start. The one-second fallback cannot fire while the page is held.
+**Defect, fixed next:** the launch remembers how long the last build took,
+and a browser whose last build was slow says so before it starts. Making the
+build itself faster is the other half, which the next plan carries.
+
+What was verified here: the offline walk (25 checks, including an update that
+changed one file making 2 requests, and 0 of 162 stickers fetched on a second
+release), the new build-wait walk (seen failing 17 checks against the old
+build), the journey walk and the full accessibility walk, all in headless
+Chromium. Whether Edge on the PC builds off the page once asked is not known
+until step 3's Start-up line.
 
 **v2.63.12 at https://staging.jefferson-photo-studio.pages.dev, pushed
 2026-09-26 (f763bee).** Decision 071's first step: measure the frozen first
@@ -79,6 +145,44 @@ What the numbers decide: a first-time build of several seconds on the PC says
 the minute was the editor's graphics being built while the page waited; a
 short one, with the Start-up line showing an update downloading across the
 longest pause, says it was the download. Either way the fix is 071's next plan.
+
+**The iPad's reading, 2026-09-26, installed app on staging:** page arrived at
+0.24 s, main code from the stored copy at 0.55 s, started 0.67 s, graphics built
+0.69 to 0.77 s (88 ms), controls ready 0.83 s, longest pause 191 ms, and "no update
+this launch". So the iPad does not freeze, but this was not the first launch after
+an update, which is the case that froze on the PC; the PC's reading is still the
+one that decides it. The same report listed an old release's offline copy,
+`ips-2.63`, still held beside `ips-2.63.12`, which activation deletes. Only the
+offline worker writes caches, and `caches.open` makes a missing one, so the likely
+path is the old worker finishing a request it had started after the new one
+deleted its cache. Recorded here for the update-path work (071).
+
+**The PC's reading, 2026-09-26, installed app on staging (Edge 154, GTX 1650
+through Direct3D):** page arrived 0.26 to 0.31 s, main code from the stored copy
+at 0.28 s, started 0.36 s, graphics built 0.37 to 0.43 s (66 ms), controls ready
+0.46 s, longest pause 92 ms, "no update this launch", and a connection the browser
+reads as 1.45 Mb/s at 50 ms. Not the launch that froze either; but at that speed
+the 28 MB every release fetches takes about two and a half minutes, which is the
+case for fetching only what changed whatever the graphics turn out to cost. The
+PC holds only `ips-2.63.12` beside the practice files: the stale copy is the
+iPad's alone.
+
+**The iPad's test page, 2026-09-26:** "Building the picture code (first time)"
+read 23 ms, but its three runs were 557, 22 and 22 ms. The first is the one a
+launch after a release pays; the later two ran after the graphics had started in
+that page. The row led with the median, which hid it; it leads with the first
+build now.
+
+**THE PC'S TEST PAGE, 2026-09-26 — THE CAUSE OF THE FROZEN MINUTE, MEASURED.**
+"Building the picture code (first time)": 42,678 ms, 42,284 ms and 41,558 ms to
+build, then 5 to 26 ms for the first picture; "Building it again (a normal
+launch)": 20 ms. The same program on the iPad: 557 ms, then 22. So on this PC,
+through Direct3D, building the editor's graphics from scratch takes about 42
+seconds while the page waits, and a browser keeps the built copy keyed by its
+source, so every release that changes that code pays it once, on the first
+launch after it. That is the minute with the start screen showing and nothing
+answering. The same page read one tile at 1,032 ms on the PC against 28 ms on
+the iPad, which is not explained yet.
 
 What was verified here, and what was not. In headless Chromium: the Start-up
 line fills every field or says it is unavailable, and the test page's first-time
@@ -361,8 +465,12 @@ change. Black and white left stage 2b for the whole-photo list (record 042).
 
 ## Confirmed
 
-- Camera: **Nikon Z50, IR-converted**. Filters tested: **red, 530nm, 720nm,
-  none**. Red gives the most color; 720nm is near-monochrome ("white forest").
+- Camera: **Nikon Z50, internal infrared conversion, no lens filter**
+  (IR-SCIENCE §1). This line used to say "Filters tested: red, 530nm, 720nm,
+  none", with red giving the most colour and 720nm near-monochrome. That does not
+  describe this body: measured on 2026-09-26 (IR-SCIENCE 9q), no visible light
+  reaches its sensor, so a screw-on colour filter has nothing to act on. The
+  filter-by-filter results came from a different setup and are not about it.
 - Input formats validated on the real files:
   - **Lossy linear DNG** (8-bit, baseline-JPEG tile) — decodes natively.
   - **Mosaiced DNG** (14-bit, lossless-JPEG, Bayer) — pure-JS LJ92 decoder
@@ -884,8 +992,15 @@ user-scalable=no.
   option the record held is now rejected; the record needs a new option,
   researched and written before anything is built. What each frame showed is in
   the record.
+  **Two more options, 2026-09-26, neither rendered.** Option 7 read each
+  pixel's surroundings; it was measured off the app's own sky map and rejected
+  before a render. Option 8 builds each texel of the map from sky samples only.
+  Against bars fixed before the run, it passed on six of seven frames with sky.
+  It failed on NIR_1703, where every disagreeing cell traces to red crown tips
+  that the look's selection itself scores as sky. What is left is that
+  selection holding what is not sky (073, 052), not the map.
 - [ ] **The first launch after an update froze with nothing said, and every update fetches the whole app again** <!-- decision: 071 -->
-  **Shown as:** The first time the app opens after an update it can sit still for a minute with nothing on screen; the app will measure why, and an update will download only what changed.
+  **Shown as:** After an update the start screen answers and says it is preparing the editor, and an update downloads only what changed; on staging, waiting to be confirmed on the PC where the minute was measured.
   Reported from the PC after v2.63.7: the start screen showed and nothing
   answered for about a minute. Every release requests and re-stores the whole
   app offline, 218 files and 28 MB, 25 MB of it the sticker library, with
@@ -895,6 +1010,18 @@ user-scalable=no.
   report and a cold compile on the test page. Two live defects in the same path
   are fixed alongside: the host answers a missing file with the start page, and
   the strip can offer an older version as new.
+  **Measured 2026-09-26: the minute was the compile**, 42 s on the PC and
+  557 ms on the iPad; the PC's connection makes each 28 MB release a second
+  cost of about two and a half minutes. **Both halves built the same day and
+  on staging in v2.63.21.** An update keeps every file the device already has
+  and downloads only the rest, the sticker library once per device. The strip
+  counts the files. The build of the same version on screen takes over by
+  itself in one window. The editor's picture code builds without holding the
+  start screen where the browser allows, with "Preparing the editor…" on
+  screen and a photo chosen meanwhile opening when it is ready. **Still
+  open:** whether the PC's browser really builds off the page, which the
+  report's Start-up line answers on the first launch; the busy card has no
+  count while it waits; and making the code compile faster on Direct3D.
   See `docs/decisions/071-the-first-launch-after-an-update-froze-with-nothing-said-and-every-update-downloads-the-whole-app.md`.
 - [ ] **The look's sky is found on the wrong edge of a turned photograph** <!-- decision: 070 -->
   **Shown as:** On a photo turned on its side, Aerochrome's sky sliders find the sky from the edge that is up on screen.
@@ -962,6 +1089,22 @@ user-scalable=no.
   whatever population the look's stages read, and this changes which population
   that is — the same dependency test that put 023 at the top of the queue. See
   `docs/decisions/052-the-looks-sky-adjustments-read-a-selection-the-reader-cannot-see.md`.
+- [ ] **On a darker frame the look's sky selection takes in a tree, and Sky saturation paints it scarlet** <!-- decision: 073 -->
+  **Shown as:** A tree in front of the sky keeps its own colour under Aerochrome instead of turning scarlet.
+  Found 2026-09-26 on NIR_3471, shot through a Kolari IR Chrome 2.4 stops
+  darker than NIR_3472 of the same scene: a scarlet block over a willow that
+  goes only with Sky saturation at 0. Two things combine. The look's selection
+  covered 45.7% of the frame against 20.5%, its border search running down
+  into the tree; its thresholds are quantiles of the photograph's own
+  gradient, so a noisier frame counts more texture as smooth sky. And Sky
+  saturation's gate asks only whether a pixel has colour, so anything the
+  selection holds is boosted up to 2.8 times; NIR_3472, properly exposed,
+  shows the same on willow strands in front of the sky. Research first: how
+  the border method behaves as noise rises. Then choose between a threshold
+  that allows for the frame's noise, a hue gate on Sky saturation, or both.
+  **Ranked after 052** because it changes what the selection holds, as 052
+  does, and 069's acceptance renders are repeated once either changes.
+  See `docs/decisions/073-on-a-darker-frame-the-looks-sky-selection-takes-in-a-tree-and-sky-saturation-paints-it-scarlet.md`.
 - [ ] **Aerochrome is the right colour and comes out splotchy** <!-- decision: 013 --> — reported
   **Shown as:** Aerochrome comes out smooth instead of breaking into hard-edged patches.
   from the iPad 2026-09-17 with two frames, on the look that shipped the same day:
@@ -1455,6 +1598,17 @@ user-scalable=no.
   settled in the record. A later session renders the panel and looks at it
   before claiming the words read better. See
   `docs/decisions/054-the-export-panel-says-save-twice.md`.
+- [ ] **A photograph shot well under opens grainier than a normal one** <!-- decision: 072 -->
+  **Shown as:** A photo shot well under exposure opens grainier than a normal one; raise Noise reduction by hand for now.
+  Found 2026-09-26 on an IR Chrome filter pair: the filtered frame, 2.4 stops
+  darker, opened with automatic noise reduction 0.41 against 0.51 and its sky
+  carried 3.6 times the grain. The lower number is not a weaker filter: both
+  the estimate and the denoiser read noise relative to brightness with a floor,
+  so on a dark frame it smooths relatively harder. What stays is that the
+  automatic setting removes a fixed share of the noise, and a frame shot under
+  starts with more. Changing that means choosing the exposure the 2026-07-12
+  calibration should hold at, which is not on record; the one design tried was
+  refuted before it was built. Ranked here: it invalidates nothing above it.
 - [ ] **Creative — a third app for regular photos** — owner direction 2026-07-19 <!-- decision: 002 -->
   **Shown as:** A third app for ordinary colour photographs, beside infrared and macro.
   A NEW entry point beside the
