@@ -4398,3 +4398,61 @@ IEEE TIP 2010). Blocked by this environment's network policy, so the primary
 papers were not read: link.springer.com, www.cse.cuhk.edu.hk,
 kops.uni-konstanz.de, www.sciencedirect.com, www.academia.edu, pubmed.ncbi.nlm.nih.gov,
 www.semanticscholar.org and www.ipol.im.
+
+### 9q. THE KOLARI IR CHROME ON THIS CAMERA — A DARK FILTER, NOT A COLOUR ONE (measured 2026-09-26)
+
+**What the filter is for.** A blue-cyan glass filter for FULL-SPECTRUM bodies:
+it passes most of the blue, a third of the green, about a tenth of the red and a
+little infrared, so on a camera that sees visible light the red channel carries
+mostly infrared and the palette comes out Aerochrome-like with no channel swap.
+Kolari says it is "designed for use with a Full-Spectrum digital camera only",
+that it "will not work properly when combined with any other IR filter", and
+that stacked filters multiply. Its designer describes it as the complement of
+the yellow filter the film used. Measured curves reached this session only as
+search summaries: about 90% from 400 to 460 nm, about 33% at 550, 8 to 10% from
+600 to 700, then 16% at 720, 23% at 760, 12% at 850 and 6% at 1000.
+
+**What it does here, measured on two pairs** (NIR_3471 with the filter and
+NIR_3472 without, facing the sun; NIR_3473 with and NIR_3474 without, facing
+away; each pair seconds apart at 1/200 s and f/5, auto ISO; decoded with
+`src/raw/nef.ts`, black 1008, white 15520):
+
+- **Every channel loses about the same.** Registered, ISO-corrected: red 2.41,
+  green 2.45 and blue 2.70 stops on the first pair (transmission about 19.0%,
+  18.3% and 15.4%); 2.43, 2.48 and 2.71 on the second, each pair aligned first
+  (the second by `scratchpad/irchrome/refute_p2.py`). Within about 10%
+  everywhere in the frame, the sky losing slightly more than the shade. That is
+  the filter's infrared leak and nothing else: this body's
+  internal filter (§1) already removes the visible light the IR Chrome is built
+  to pass.
+- **It separates nothing.** Sky against foliage, a difference that no white
+  balance changes: 0.2086 with the filter against 0.2078 without. The spread of
+  colour across the frame after a neutral balance is never wider with the
+  filter and is narrower by 5% to 28%, depending on the pair and on which two
+  channels are compared. The extra quarter-stop the blue channel loses is a cast, which
+  white balance removes.
+- **The camera does not make up the light.** Auto ISO moved from 100 to 125 and
+  from 100 to 180, a third to three-quarters of a stop against 2.4 lost, so both
+  filtered frames are about two stops under and their skies about 2.2 times
+  noisier (signal-to-noise 21.6 against 49.4).
+- **If it is used anyway**: give it about 2.5 stops more exposure than the
+  camera picks. The darker frame opens grainier at the automatic noise
+  reduction; why, and what could change it, is decision 072.
+
+**The standing error this settles.** Some of this repository's early notes and
+its field guide describe screw-on red, 530/590 nm and 720 nm filters on this
+body. §1 says there is no lens filter, and a filter that passes 90% of blue
+changed the blue channel least of all three here, the opposite of what it would
+do on a body that saw visible light. Those notes are marked as not describing
+this camera.
+
+**Sources.** Kolari's IR Chrome product page
+(kolarivision.com/product/kolari-vision-ir-chrome-lens-filter/), its story of the
+filter with the reader Q&A
+(kolarivision.com/the-irchrome-infrared-photography-filter-our-digital-version-of-kodak-aerochrome/),
+its filter guide (kolarivision.com/choosing-an-infrared-filter/) and its article
+on stacked transmission (kolarivision.com/articles/internal-cut-filter-transmission/);
+Hidden Realms (hiddenrealms.ch/how-to-build-your-own-ir-chrome-filter/), read in
+full. The transmission figures came only as search summaries of
+truecolorinfrared.com, which this environment blocks, as it does
+www.ultravioletphotography.com and zv.io.

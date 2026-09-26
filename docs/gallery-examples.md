@@ -1,6 +1,6 @@
 # Teaching gallery — shareable low-res IR frames
 
-Eight of Noah Jefferson's infrared frames (Nikon Z50, IR-converted, red filter),
+Eight of Noah Jefferson's infrared frames (Nikon Z50, internal infrared conversion),
 downscaled to a **1600 px long edge, JPEG q80** so users have plenty to play with
 without giving away the full-resolution originals. Originals are **not** stored in
 this repo — only these low-res copies ship / deploy.

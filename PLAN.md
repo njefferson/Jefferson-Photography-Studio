@@ -96,6 +96,9 @@ params to **full resolution only on export**.
 
 ## What we learned from the real files
 
+> Correction, 2026-09-26: the Z50 has no lens filter (IR-SCIENCE §1 and 9q). The
+> filter-by-filter lines below came from a different setup and do not describe it.
+
 - **Filter drives the look.** Red filter → most color (Aerochrome). 530nm →
   moderate. 720nm → near-monochrome "white forest". No filter → similar to red.
 - Best color source = **red filter, exported as DNG**.

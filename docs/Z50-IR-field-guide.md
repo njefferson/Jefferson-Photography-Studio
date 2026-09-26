@@ -3,6 +3,14 @@
 How to get the closest possible *in-camera* result for color-IR work, and what
 still has to happen in Infrared Photography Studio (IPS).
 
+> **Correction, 2026-09-26: this camera has no lens filter.** The Z50 this app is
+> used with is an internal infrared conversion (IR-SCIENCE.md §1), and a
+> measurement with a colour filter on the lens found no visible light reaching
+> its sensor (IR-SCIENCE.md 9q). Everything below that is organised by screw-on
+> filter (the red, 530/590 nm and 720 nm presets, the picture controls per
+> filter, "No filter, full-spectrum") was written for a different setup and does
+> not apply to it. The white-balance and RAW advice still does.
+
 > Reality check: the camera can do the hard part — the deep **white balance** —
 > via PRE (Preset Manual) WB. It **cannot** do the red↔blue **channel swap**, so
 > the final Aerochrome look (blue sky / red foliage) still happens in the app.

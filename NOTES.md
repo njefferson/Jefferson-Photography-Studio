@@ -80,6 +80,32 @@ the minute was the editor's graphics being built while the page waited; a
 short one, with the Start-up line showing an update downloading across the
 longest pause, says it was the download. Either way the fix is 071's next plan.
 
+**The iPad's reading, 2026-09-26, installed app on staging:** page arrived at
+0.24 s, main code from the stored copy at 0.55 s, started 0.67 s, graphics built
+0.69 to 0.77 s (88 ms), controls ready 0.83 s, longest pause 191 ms, and "no update
+this launch". So the iPad does not freeze, but this was not the first launch after
+an update, which is the case that froze on the PC; the PC's reading is still the
+one that decides it. The same report listed an old release's offline copy,
+`ips-2.63`, still held beside `ips-2.63.12`, which activation deletes. Only the
+offline worker writes caches, and `caches.open` makes a missing one, so the likely
+path is the old worker finishing a request it had started after the new one
+deleted its cache. Recorded here for the update-path work (071).
+
+**The PC's reading, 2026-09-26, installed app on staging (Edge 154, GTX 1650
+through Direct3D):** page arrived 0.26 to 0.31 s, main code from the stored copy
+at 0.28 s, started 0.36 s, graphics built 0.37 to 0.43 s (66 ms), controls ready
+0.46 s, longest pause 92 ms, "no update this launch", and a connection the browser
+reads as 1.45 Mb/s at 50 ms. Not the launch that froze either; but at that speed
+the 28 MB every release fetches takes about two and a half minutes, which is the
+case for fetching only what changed whatever the graphics turn out to cost. The
+PC holds only `ips-2.63.12` beside the practice files: the stale copy is the
+iPad's alone.
+
+**The iPad's test page, 2026-09-26:** "Building the picture code (first time)"
+read 23 ms, but its three runs were 557, 22 and 22 ms. The first is the one a
+launch after a release pays; the later two ran after the graphics had started in
+that page. The row leads with the median, which hides it.
+
 What was verified here, and what was not. In headless Chromium: the Start-up
 line fills every field or says it is unavailable, and the test page's first-time
 build ran 19 to 25 ms against about 3 ms warm, which only shows the measurement
@@ -361,8 +387,12 @@ change. Black and white left stage 2b for the whole-photo list (record 042).
 
 ## Confirmed
 
-- Camera: **Nikon Z50, IR-converted**. Filters tested: **red, 530nm, 720nm,
-  none**. Red gives the most color; 720nm is near-monochrome ("white forest").
+- Camera: **Nikon Z50, internal infrared conversion, no lens filter**
+  (IR-SCIENCE §1). This line used to say "Filters tested: red, 530nm, 720nm,
+  none", with red giving the most colour and 720nm near-monochrome. That does not
+  describe this body: measured on 2026-09-26 (IR-SCIENCE 9q), no visible light
+  reaches its sensor, so a screw-on colour filter has nothing to act on. The
+  filter-by-filter results came from a different setup and are not about it.
 - Input formats validated on the real files:
   - **Lossy linear DNG** (8-bit, baseline-JPEG tile) — decodes natively.
   - **Mosaiced DNG** (14-bit, lossless-JPEG, Bayer) — pure-JS LJ92 decoder
@@ -1455,6 +1485,17 @@ user-scalable=no.
   settled in the record. A later session renders the panel and looks at it
   before claiming the words read better. See
   `docs/decisions/054-the-export-panel-says-save-twice.md`.
+- [ ] **A photograph shot well under opens grainier than a normal one** <!-- decision: 072 -->
+  **Shown as:** A photo shot well under exposure opens grainier than a normal one; raise Noise reduction by hand for now.
+  Found 2026-09-26 on an IR Chrome filter pair: the filtered frame, 2.4 stops
+  darker, opened with automatic noise reduction 0.41 against 0.51 and its sky
+  carried 3.6 times the grain. The lower number is not a weaker filter: both
+  the estimate and the denoiser read noise relative to brightness with a floor,
+  so on a dark frame it smooths relatively harder. What stays is that the
+  automatic setting removes a fixed share of the noise, and a frame shot under
+  starts with more. Changing that means choosing the exposure the 2026-07-12
+  calibration should hold at, which is not on record; the one design tried was
+  refuted before it was built. Ranked here: it invalidates nothing above it.
 - [ ] **Creative — a third app for regular photos** — owner direction 2026-07-19 <!-- decision: 002 -->
   **Shown as:** A third app for ordinary colour photographs, beside infrared and macro.
   A NEW entry point beside the
