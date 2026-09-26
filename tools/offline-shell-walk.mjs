@@ -57,6 +57,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { join, extname } from "node:path";
 import { requireFreshDist } from "./fresh-dist.mjs";
+import { execSync } from "node:child_process";
 
 requireFreshDist();
 // --plant, --plant=NAME. An unknown name stops rather than running a walk with
@@ -375,6 +376,28 @@ function serve() {
   if (inShell) bad.push(`${inShell} sticker pictures are still in the app's own list`);
   check(`4 every revision the build lists is the SHA-256 of the file it ships (${ENTRIES.length} app files, ${STICKER_FILES.length} stickers, _headers)`,
     bad.length === 0, bad.length ? bad.slice(0, 4).join("; ") : `v${V}, build ${BUILD.slice(0, 12)}…`);
+}
+
+// ---- 4b — THE STAMP NAMES THE TREE THE BUILD WAS MADE FROM ----
+// The same-build takeover (adoptIfAlone) trusts this stamp, and the report
+// prints it. vite.config.ts buildId appends a digest when the tree has changes
+// nobody committed; restated here from the same two git reads, so a stamp that
+// claims changes the tree does not have goes red. It did: Vite writes a
+// temporary copy of its own config beside it for the length of a load, the
+// stamp's git read ran in that window, and every build of a clean commit was
+// stamped as modified with a digest that differed from build to build.
+{
+  const git = (c) => execSync(c, { encoding: "utf8" }).trim();
+  let want = "(git could not be read)";
+  try {
+    const sha = git("git rev-parse HEAD");
+    const changed = git("git status --porcelain");
+    want = changed
+      ? `${sha}+${createHash("sha256").update(changed).update(execSync("git diff HEAD", { maxBuffer: 1 << 28 })).digest("hex").slice(0, 12)}`
+      : sha;
+  } catch { /* want says so */ }
+  check("4b the build is stamped with the tree it was built from, and nothing else",
+    BUILD === want, BUILD === want ? BUILD.slice(0, 20) + "…" : `stamped ${BUILD}, the tree is ${want}`);
 }
 
 const server = await serve().catch((err) => {

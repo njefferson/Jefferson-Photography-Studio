@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
 planhash=63bc0e468fac2e3c
-diffhash=f66180f9ee9a0a42
-verdict=IN-SCOPE: plan item 1, the start screen says what it is doing, with the build moved to parallel compile and every caller made to wait for it
-# Every hunk implements plan item 1's "The start screen says what it is doing": the words before the build with frames yielded (main.ts, ir.html, style.css), the build moved to KHR_parallel_shader_compile and polled without holding the page (gl.ts), every caller that must now wait for the build (main.ts open paths, gpuexport.ts, debug.ts), failure handling for a build that can fail after construction (glBroken panel), and the report line saying what the build cost (startup.ts). build-wait-walk, slow-build and a11y-walk section 7 are its verification; ARCHITECTURE.md and .contract-allow are generated or forced. No Part 2 work, and nothing from the other bullets or items 2-6.
+diffhash=d787f9195b7ed3c9
+verdict=IN-SCOPE: plan item 1, the build stamp the same-version takeover compares, repaired and verified
+# The .gitignore line stops Vite's temporary config copy from reaching buildId()'s git status read, so a clean commit is stamped with its SHA alone and reproducibly; offline-shell-walk check 4b recomputes the stamp from the tree and failed before the line was added. Both repair and verify the build stamp that item 1's same-version takeover compares. Nothing else in the diff.
