@@ -101,6 +101,9 @@ const PLANTS = {
     find: '  if (!u.endsWith(".html")) return null;',
     swap: "  return null; // PLANTED: .html keys only, which is what the list generates",
   },
+  // Not a line of sw.js: the SERVER behaves as the host does with no 404.html
+  // in the deploy, answering a missing file with the start page and a 200.
+  no404: { server: true },
 };
 if (PLANT && !PLANTS[PLANT]) {
   console.error(`unknown plant "${PLANT}" — one of: ${Object.keys(PLANTS).join(", ")}`);
@@ -154,7 +157,7 @@ function serve() {
     if (!extname(file)) file += ".html";
     try {
       let body = await readFile(join(DIST, file));
-      if (PLANT && file === "sw.js") {
+      if (PLANT && !PLANTS[PLANT].server && file === "sw.js") {
         const text = body.toString("utf8");
         const { find, swap } = PLANTS[PLANT];
         if (text.includes(find)) { body = Buffer.from(text.replace(find, swap)); planted = true; }
@@ -162,7 +165,19 @@ function serve() {
       res.writeHead(200, { "Content-Type": TYPES[extname(file)] ?? "application/octet-stream" });
       res.end(body);
     } catch {
-      res.writeHead(404); res.end("not found");
+      // WHAT THE HOST DOES WITH AN ADDRESS IT DOES NOT HAVE (decision 071):
+      // Cloudflare Pages serves 404.html with a 404 when the deploy has one,
+      // and otherwise treats the site as a single-page app and answers with
+      // index.html and a 200. The second is what let an install store the start
+      // page under a program file's name. --plant=no404 serves as though the
+      // deploy had no 404.html.
+      const has404 = PLANT !== "no404" && await readFile(join(DIST, "404.html")).then(() => true, () => false);
+      if (has404) {
+        res.writeHead(404, { "Content-Type": "text/html" }); res.end(await readFile(join(DIST, "404.html")));
+      } else {
+        if (PLANT === "no404") planted = true;
+        res.writeHead(200, { "Content-Type": "text/html" }); res.end(await readFile(join(DIST, "index.html")));
+      }
     }
   });
   return new Promise((ok, no) => {
@@ -211,10 +226,28 @@ try {
   // did not actually substitute would print two honest-looking reds about a
   // fixed worker, which is the failure mode "made to fail once" exists to
   // prevent rather than to demonstrate.
-  if (PLANT && !planted) {
+  if (PLANT && !PLANTS[PLANT].server && !planted) {
     console.log(`FAIL  the plant did not apply — dist/sw.js does not contain the line it replaces`);
     failed++;
   }
+
+  // 0 — A FILE THE DEPLOY DOES NOT HAVE IS NOT FOUND, and nothing is stored
+  // under its name (decision 071). Asked through the worker, the way an
+  // install or a stale page asks: with the host's single-page fallback it came
+  // back as the start page with a 200, and the worker kept it.
+  const missing404 = await p.evaluate(async () => {
+    const u = "/assets/not-in-this-deploy-071.js";
+    const r = await fetch(u, { cache: "no-store" });
+    const stored = await caches.match(u);
+    return { status: r.status, type: r.headers.get("content-type") ?? "", stored: !!stored };
+  });
+  if (PLANT === "no404" && !planted) {
+    console.log("FAIL  the no404 plant did not apply — the server was never asked for a missing file");
+    failed++;
+  }
+  check("0 a file the deploy does not have answers 404, and nothing is stored under its name",
+    missing404.status === 404 && !missing404.stored,
+    `status ${missing404.status} (${missing404.type})${missing404.stored ? ", and the worker stored it" : ""}`);
 
   // 1 — NOTHING IN THE CACHE MAY BE REDIRECTED. This is the property, stated
   // once, rather than a list of the URLs that happen to redirect today.

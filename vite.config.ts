@@ -365,6 +365,9 @@ function precacheManifest(): Plugin {
         // all-or-nothing, so they would also be half a megabyte of new ways for
         // an install to fail on a thin connection.
         .filter((p) => !p.startsWith("screenshots/"))
+        // The host serves 404.html itself, for an address it does not have; the
+        // app never asks for it, so it is no part of the offline copy (071).
+        .filter((p) => p !== "404.html")
         .filter((p) => statSync(resolve(dist, p)).isFile()) // drop directory entries
         .map((p) => "./" + p);
       // The chooser PWA launches at "./" (start_url in manifest.webmanifest), so
