@@ -43,6 +43,13 @@ because they floor temperature at ~2000K.
 
 ## On staging, waiting on a device pass
 
+**Nothing is waiting, 2026-09-26.** v2.63.7 went to production on the go the
+same day, by pull request with the tree unchanged, as a85cca0. Production and
+staging both serve the offline copy `ips-2.63.7`, read off both live sites, and
+the Gates run and the deploy for a85cca0 both passed. The number did not move
+because the commit count since VERSION was set is the same on both lines. What
+v2.63.7 carried, and how it was built, stays below as the record.
+
 **v2.63.7 at https://staging.jefferson-photo-studio.pages.dev, pushed
 2026-09-25 (7003688).** Seven commits on top of v2.63 as it was first staged
 (a8ce335, the entry below), replacing it, because the first device use of
@@ -811,7 +818,7 @@ user-scalable=no.
   sky's colour, Sky saturation then reads the tint, and Sky depth darkens
   whatever the selection holds. Under the learned selection taken out on
   2026-09-26, NIR_1651's and NIR_1644's clouds went blue-grey through these
-  stages; 052's verdict on that selection stands. The chosen shape is one rule
+  stages; 052's verdict on that selection stands. The shape first chosen was one rule
   stated once, with no new constant: what arrives without colour leaves without
   colour, read on the pixel as it reaches the sky stages, on 019's existing
   gate, for all three stages. The selection keeps the cloud. It promises
@@ -824,6 +831,12 @@ user-scalable=no.
   rotation fix needs it, and 052's Option 1 brings every cloud the Sky mask
   holds under these stages.
   See `docs/decisions/069-the-looks-sky-adjustments-tint-and-darken-what-has-no-colour.md`.
+  **Built 2026-09-26 and failed.** The one rule brought 013's speckle back at
+  the look's own settings on NIR_3406, snowed its sky with pale dots under Sky
+  depth, and grained the sky above NIR_3461's and NIR_3466's horizons. Every
+  option the record held is now rejected; the record needs a new option,
+  researched and written before anything is built. What each frame showed is in
+  the record.
 - [ ] **The look's sky is found on the wrong edge of a turned photograph** <!-- decision: 070 -->
   **Shown as:** On a photo turned on its side, Aerochrome's sky sliders find the sky from the edge that is up on screen.
   `buildSkySelectionFrom` passes rotation 0 to the detector, so on a turned

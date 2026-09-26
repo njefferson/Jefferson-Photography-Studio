@@ -82,31 +82,34 @@
 
       <h2>Where the builds are</h2>
       <ul class="facts">
-        <li><b>Production</b> <span>v2.62.26: the export edge fix and the test page's shader rows, which were on staging as v2.62.16, promoted on your go. Checked on the live site: its offline copy is named for 2.62.26 and the test page carries the new rows. The number moved because the last digit counts every commit; the content did not.</span></li>
-        <li><b>On staging</b> <span>v2.63.7, replacing v2.63: everything v2.63 carried (the wire fix, a mask's own colour mixer, the first stage of the mask work, the LUT grid and None for looks), plus a picked mask's own grade and Sky band, a line under "Editing" saying dimmed controls stay with the whole photo, new masks that change nothing until a control is moved, and double-tap that puts a mask's slider back to no change and is no longer lost while the photo redraws. It waits on your device pass; the steps are in NOTES.</span></li>
-        <li><b>Built and held</b> <span>Nothing. The queue now starts with two sky defects found while the learned selection was being judged: the look's sky sliders tint and darken what has no colour, so clouds go blue-grey and steel goes dull (069); and on a photo turned on its side the look finds its sky from the wrong edge (070), which needs 069 first. Then the reader-visible sky selection (052) and the round spots (013). Choosing which finder draws each Sky mask (068) sits after those, and starts by comparing the two finders again.</span></li>
-        <li><b>Last verified green</b> <span><code>dd77414</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
-        <li><b>Next version</b> <span>2.63 is the staged build's number, because masks gain their own amounts in it. The next release that adds something takes 2.64.</span></li>
+        <li><b>Production</b> <span>v2.63.7: a picked mask takes its own settings, the LUT grid, None for looks, and the fixes that came with them. Promoted on your go on 2026-09-26, by pull request with the tree unchanged. Checked on the live site: its offline copy is named for 2.63.7, and the Gates run and the deploy for that commit both passed.</span></li>
+        <li><b>On staging</b> <span>The same build, v2.63.7. Nothing is waiting on a device pass.</span></li>
+        <li><b>Built and held</b> <span>Nothing. The first answer to the look's sky sliders tinting what has no colour (069) was built and failed its own checks, so it was taken back out; every option that record held is now rejected, and it needs a new one. The rotation fix (070) and the reader-visible sky selection (052) wait on it.</span></li>
+        <li><b>Last verified green</b> <span><code>a85cca0</code>: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
+        <li><b>Next version</b> <span>2.63 is production's number. The next release that adds something takes 2.64.</span></li>
       </ul>
 
       <div class="yours">
         <h2>Waiting on you</h2>
         <ul>
           <li>
-            <strong>The device pass on v2.63.7</strong>, at
-            staging.jefferson-photo-studio.pages.dev. The steps are in NOTES under
-            "On staging": new masks of every kind changing nothing until a control
-            moves, with each one's tint while it is placed; the Sky band and the
-            grade on a picked mask; double-tap on a mask's slider; then v2.63's own
-            steps (the wire fix and its export, the row of mask names, a mask's
-            colour mixer, the LUT grid, None, "Add to it", and the test page's
-            timing with eight masks).
+            <strong>Nothing to test on a device.</strong> The sky record's next
+            option comes to you with pictures once it is researched.
           </li>
         </ul>
       </div>
 
       <h2>The stages</h2>
       <ul>
+        <li class="done"><span class="state">Stopped</span>
+          <strong>The first answer to the sky sliders tinting clouds was built,
+          and taken out.</strong> One rule for the three sky stages: what arrives
+          without colour leaves without colour. It kept clouds white under Sky
+          depth and took the red haze off treetops, and it brought the pale
+          speckle back into a clear blue sky at the look's own settings, grained
+          the sky above the horizon, and broke cloud edges into dots. Those were
+          checks it could fail, so it failed. It never reached staging.
+        </li>
         <li class="done"><span class="state">Stopped</span>
           <strong>A learned sky selection was built, and taken out.</strong>
           Two models were fused into the look's sky selection and exported beside

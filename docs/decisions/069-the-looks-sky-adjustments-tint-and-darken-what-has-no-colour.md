@@ -202,8 +202,11 @@ What exists that this item will use, so a second one does not get written
 
 ## Options
 
-1. **One rule for the three sky stages, stated once: what arrives without
-   colour leaves without colour, and at its own value.** Chosen.
+1. **FAILED, built 2026-09-26: one rule for the three sky stages, stated once:
+   what arrives without colour leaves without colour, and at its own value.**
+   Nothing is chosen now. It was built and failed three of its own checks
+   (Rejected, 1, and "Built and measured, 2026-09-26" below), and every other
+   option here was already rejected, so the record needs a new option.
    - One weight, read once on the pixel as it ARRIVES at the first sky stage,
      before anything has tinted it, and every stage multiplies by it. Smoothing
      moves only colour that was there; Sky saturation reads what arrived, not
@@ -264,11 +267,56 @@ What exists that this item will use, so a second one does not get written
 
 ## Rejected
 
+- **1, one rule read on each pixel as it arrives — built 2026-09-26, and failed.** Read per pixel it cannot tell 013's speckle from a cloud, which is the risk this record named before it was built. At the look's own settings NIR_3406's sky filled with rust-coloured blotches at 1:1 where today's is even; with Sky depth at 0.5 that whole sky snowed with pale dots; NIR_3461 and NIR_3466 took grain above the horizon and dotted cloud edges; NIR_1651's small cloud mottled. Moving its gate or reading it over a width chosen on these frames is 2.
 - **2, tune the constants.** Constants fitted to six frames fix those six and move on the next. 029 refused this shape for the seed, where no setting of its constants satisfied both ends, and 013 refused a per-photograph strength fitted to one positive example. Three gates reading three different states of one pixel is how this defect arose, and tuning keeps three.
 - **3, take the cloud out of the selection.** 052 measured it and rejected it: it missed NIR_1651's cloud, read NIR_1827's sun haze as white and was grainy near the horizon. It also moves the wrong thing. By the purpose ruling cloud is sky and the Sky mask holds it; carving it out moves the reader's matte, coverage, corrections and five adjustments in order to fix three stages, and puts an edge through every wisp.
 - **4, the infrared axis.** It is the one reading known to have kept NIR_1651's cloud white, and it stays the comparison the first render is checked against. As the rule it tests whether a pixel is sky, which is the selection's question put in the stages' place; it needs the linear axis carried past the grade to stages that run after it; a camera-rendered file has no such axis; and its +0.04 was fitted on seven frames.
 - **5, the smoothing alone.** Sky depth darkens a cloud grey with no tint at all, and the film leaves it near-white. Half the rule is a second place for the other half to be forgotten.
 - **6, leave it.** Refuted by the rotation (070): read off the selection maps, at the right rotation the look's own selection takes NIR_1651's cloud and most of NIR_1644's band in, and 052's Option 1 takes in every cloud the Sky mask holds. The defect is waiting on fixes already ranked, not on a new finder.
+
+## Built and measured, 2026-09-26
+
+**What was built.** 019's gate read once on the pixel before the smoothing and
+multiplied into the smoothing, Sky saturation and Sky depth, in the shader and in
+`compileEdit` alike. It was committed as a45cf07 on the work branch and taken off
+it the same day; it is on no branch. Nothing reached staging.
+
+**What the numbers said, and why they were not the verdict.** The walk case
+written for it, pixels that arrive under saturation 0.04 and are moved by more
+than 2 levels with Sky depth at 0.5 on the walk's own frame, read 25.6% on the
+build before and none after, and the Aerochrome walk was otherwise green; the
+sky-stage walk passed. The rule did exactly what it says. The agreement walk
+was not run: the tree was reset before it started, and its stale-build check
+refused. The pictures are what failed it.
+
+**Whole frames, today beside the guard, at the look's own settings and with Sky
+depth at 0.5, every pair opened, then 1:1 where they differed:**
+
+- NIR_3406 (the one speckle frame any record names; IR-SCIENCE 9l's other two
+  are named nowhere): worse. The speckle is back at the look's own settings, and
+  under Sky depth the sky is covered in pale dots.
+- NIR_3461: mixed, and fails. Under Sky depth the cloud keeps its own white
+  where today it goes grey, but a grainy pale band sits above the horizon and
+  the cloud edges break into dots. At the look's own settings the red glow
+  round the far pylon is fainter.
+- NIR_3466: mixed, and fails the same way. The clouds and the building's pale
+  face keep their value, and the low sky beside the building grains.
+- NIR_1651: worse under Sky depth. The small cloud mottles and a pale band runs
+  along the tree's left edge.
+- NIR_1703: better under Sky depth. Today the cloud is an even grey with square
+  white blocks in it; with the guard the cloud is white and the blocks are gone.
+- NIR_1827: better at the look's own settings. The red haze bleeding from the
+  treetops into the pale sky goes; its sun haze is unchanged; its depth key is
+  0.00, so Sky depth never reaches it.
+- NIR_1644 and NIR_0627: the same.
+
+**What it shows for the next option.** The gains and the failures are all pale
+pixels. What separates them is what surrounds them: the haze round NIR_1827's
+trees is a pale pixel in pale sky, and a speckle dot is a pale pixel alone in
+saturated blue. The sky map already carries each texel's own colour, so a rule
+can read the surroundings without a width chosen on these frames. That is an
+observation, not a chosen option; it is researched and written as an option
+before anything is built.
 
 ## Rank
 
@@ -302,3 +350,11 @@ is the argument that puts it above 052.
 - NIR_1644, 2026-09-26: the same two sheets; the band of cloud behind the crowns in both.
 - NIR_3461, 2026-09-26: the whole-frame exports through today's selection and the learned one, side by side; the near pylon at the left edge.
 - NIR_1827, 2026-09-26: the whole-frame exports through today's selection and the learned one, side by side, and a difference image of the two; the haze round the sun. They nearly match; what differs lies along the treetops and in the broken cloud at the upper right.
+- NIR_3406, 2026-09-26: option 1's guard beside today's build, whole-frame exports at the look's own settings and with Sky depth at 0.5; the sky at 1:1 at 2400,300 in both builds at the look's own settings.
+- NIR_3461, 2026-09-26: the guard beside today's build, whole frames at both settings; at 1:1, the horizon at 1400,2450 and the cloud edge at 3700,300 with Sky depth at 0.5, and the far pylon at 4100,1100 at the look's own settings.
+- NIR_3466, 2026-09-26: the guard beside today's build, whole frames at both settings.
+- NIR_1703, 2026-09-26: the guard beside today's build, whole frames at both settings, and today's alone at both.
+- NIR_1827, 2026-09-26: the guard beside today's build, whole frames at both settings; the tall tree at 1:1 at 1300,1000 at the look's own settings.
+- NIR_1651, 2026-09-26: the guard beside today's build, whole frames at both settings.
+- NIR_1644, 2026-09-26: the guard beside today's build, whole frame with Sky depth at 0.5.
+- NIR_0627, 2026-09-26: the guard beside today's build, whole frame at the look's own settings.
