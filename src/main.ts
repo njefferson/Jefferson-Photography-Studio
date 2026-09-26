@@ -2426,6 +2426,9 @@ function applySnapshot(s: Snapshot) {
     straightenVal.textContent = `${params.straighten.toFixed(1)}°`;
   }
   draw();
+  // A RESTORED EDIT'S STICKERS LOAD HERE, not when the Stickers tab is next
+  // opened: until they do, the bake skips them and an export leaves them out.
+  if (params.stickers?.length) void ensurePlacedStickerAssets();
 }
 
 const undoStack: Snapshot[] = [];
@@ -4623,12 +4626,48 @@ function ensureStickerAsset(key: string): Promise<void> {
         stickerAssets[key] = makeStickerAsset(key, c.width, c.height, rgba);
         stickerAssetUrls[key] = url;
       } catch {
-        /* asset missing/offline — the sticker just won't bake until it loads */
+        // Missing or offline: the sticker does not bake until it loads. The
+        // pending entry is DROPPED so the next ask tries again — kept, it
+        // answered every later ask with the same failure until a reload, and
+        // an export waiting on it would wait on nothing.
+        stickerAssetPending.delete(key);
       }
     })();
     stickerAssetPending.set(key, p);
   }
   return p;
+}
+
+/** Load the image of every sticker placed on the current edit.
+ *  Takes nothing: reads `params.stickers`. Starts `ensureStickerAsset` for each
+ *  distinct asset, waits for all of them, and redraws when any arrived so the
+ *  bake picks them up. Returns how many placed stickers still have no image —
+ *  0 means an export made now carries every one; both export paths report a
+ *  non-zero count in words rather than dropping them in silence (the single
+ *  export through `missingStickersNote`, a picked run in its own summary).
+ *  WHY IT EXISTS: a restored edit (a resumed session, undo, reset) set
+ *  `params.stickers` and loaded nothing, so the bake skipped them and an export
+ *  left them out with nothing said until the Stickers tab happened to be opened.
+ *  Measured before the fix: a sticker placed, the session resumed, the export
+ *  differed from the one made before the reload by exactly the sticker. */
+async function ensurePlacedStickerAssets(): Promise<number> {
+  const keys = [...new Set((params.stickers ?? []).map((s) => s.asset))];
+  const missingBefore = keys.filter((k) => !stickerAssets[k]).length;
+  if (missingBefore) {
+    await Promise.all(keys.map((k) => ensureStickerAsset(k)));
+    if (keys.filter((k) => !stickerAssets[k]).length < missingBefore) draw();
+  }
+  return (params.stickers ?? []).filter((s) => !stickerAssets[s.asset]).length;
+}
+
+/** The words the single export's Ready line adds when placed stickers could
+ *  not be loaded. Takes the count from `ensurePlacedStickerAssets`; returns ""
+ *  for 0, else a clause beginning " · " that names how many are missing from
+ *  the file and what to do. Consumed by `runExport` only: a picked run says it
+ *  per photo in its own summary. */
+function missingStickersNote(n: number): string {
+  if (!n) return "";
+  return ` · ${n === 1 ? "1 sticker" : `${n} stickers`} could not be loaded and ${n === 1 ? "is" : "are"} not in it; export again once online`;
 }
 
 /** Load the manifest (what's on disk), build the picker, and make sure any
@@ -4645,9 +4684,7 @@ async function loadStickerAssets() {
     }
     renderStickerPicker();
   }
-  const placed = new Set((params.stickers ?? []).map((s) => s.asset));
-  await Promise.all([...placed].map((k) => ensureStickerAsset(k)));
-  draw(); // assets arrived — re-bake any placed stickers
+  await ensurePlacedStickerAssets(); // redraws when any arrived
 }
 
 // While a sticker is being dragged/resized, it is held OUT of the CPU bake and
@@ -15415,6 +15452,9 @@ async function exportPicked(): Promise<void> {
   const startedOn = activePhotoId;
   let done = 0;
   const skipped: string[] = [];
+  // EXPORTED, BUT WITHOUT SOMETHING: said apart from `skipped`, which is the
+  // list of photos that were not exported at all.
+  const partial: string[] = [];
   try {
     const taken = new Set((await EXPORTS.frameMetas()).map((m) => m.name));
     for (let i = 0; i < picks.length; i++) {
@@ -15432,6 +15472,8 @@ async function exportPicked(): Promise<void> {
       // it was picked from, which is exactly what happened before this.
       if (view.id !== activePhotoId) await switchToPhoto(view.id, { quiet: true });
       if (activePhotoId !== view.id || !current || !currentFile) { skipped.push(`${view.name} (could not be opened)`); continue; }
+      const stickersMissing = await ensurePlacedStickerAssets();
+      if (stickersMissing) partial.push(`${view.name} was exported without ${stickersMissing === 1 ? "1 sticker" : `${stickersMissing} stickers`} that could not be loaded; export it again once online`);
       const job = openPhotoExportJob();
       if (!job) { skipped.push(`${view.name} (could not be opened)`); continue; }
 
@@ -15474,7 +15516,8 @@ async function exportPicked(): Promise<void> {
     : `Exported ${done} of ${picks.length}.`;
   // WHAT DID NOT WORK, named rather than counted away.
   const trouble = skipped.length ? ` ${skipped.length === 1 ? skipped[0] : `${skipped.length} could not be done: ${skipped[0]}`}` : "";
-  showExportStrip(head + trouble, { actions: true });
+  const without = partial.length ? ` ${partial.length === 1 ? partial[0] : `${partial.length} were exported without stickers that could not be loaded: ${partial[0]}`}.` : "";
+  showExportStrip(head + trouble + without, { actions: true });
 }
 
 exportPickedBtn.addEventListener("click", () => void exportPicked());
@@ -15587,6 +15630,8 @@ async function runExport(): Promise<void> {
     showExportStrip("This device is low on memory right now. Close a few tabs, or end the session and open the photo on its own.", { actions: true });
     return;
   }
+  // Placed stickers are loaded before the job copies the images it will bake.
+  const stickersMissing = await ensurePlacedStickerAssets();
   const job = openPhotoExportJob();
   if (!job) return;
   const { file, frame, params: snapParams, opts, lens } = job;
@@ -15626,7 +15671,7 @@ async function runExport(): Promise<void> {
     // The measured size, so the Quality slider has something to be judged
     // against: change it, export, watch this number move. Measured, never
     // estimated — the file is already made by the time this is written.
-    showExportStrip(`Ready — ${result.name} · ${fmtExportSize(result.blob.size)}`, { actions: true, save: true });
+    showExportStrip(`Ready — ${result.name} · ${fmtExportSize(result.blob.size)}${missingStickersNote(stickersMissing)}`, { actions: true, save: true });
   } catch (err) {
     // Kept rather than shown once and lost: an alert is gone the moment it is
     // dismissed, and no export path recorded a failure before this.
