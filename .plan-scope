@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
 planhash=63bc0e468fac2e3c
-diffhash=bf400524f50b73df
-verdict=IN-SCOPE: documents for plan items 1 to 5, with two device reports recorded for later
-# Documents only. Every file maps to a plan item: 071's choices and the v2.63.21 staging entry and status page (item 1), 072 recorded (item 2), 069 option 8 measured and not rendered per the plan's gate (item 3), the Kolari findings in IR-SCIENCE and the Z50 filter corrections in NOTES, the field guide, PLAN.md and gallery-examples (item 4), 073 recorded and ranked (item 5). The two Open-requests entries and the Firefox device reading are recorded and deferred, committing no work. The watcher's one accuracy finding, 072 restating the 2026-07-12 calibration as clearing "banding" instead of "grain", is corrected in this diff.
+diffhash=e03afb2032083d04
+verdict=IN-SCOPE: plan item 6's restored-sticker export defect, reproduced and fixed
+# Every hunk serves plan item 6's first bullet: a restored edit loads its stickers' images in applySnapshot, both export paths wait for them and report any that could not load (a picked run apart from photos not exported), and a failed sticker load can be retried. Reproduced before (export after resume differs by 3.03% of the frame, exactly the sticker) and fixed after (0). Persistence timing is untouched. typecheck, contract-check and architecture-check pass.
