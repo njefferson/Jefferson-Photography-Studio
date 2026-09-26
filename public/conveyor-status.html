@@ -84,7 +84,7 @@
       <ul class="facts">
         <li><b>Production</b> <span>v2.63.7: a picked mask takes its own settings, the LUT grid, None for looks, and the fixes that came with them. Promoted on your go on 2026-09-26, by pull request with the tree unchanged. Checked on the live site: its offline copy is named for 2.63.7, and the Gates run and the deploy for that commit both passed.</span></li>
         <li><b>On staging</b> <span>v2.63.12: the report's Start-up line, the test page's timing of the editor's graphics, a real "not here" answer for a missing address, and an update notice that never offers an older version. Pushed 2026-09-26. The Gates run and the deploy for that commit both passed, and a missing address on staging was read answering 404.</span></li>
-        <li><b>Built and held</b> <span>Nothing. The first answer to the look's sky sliders tinting what has no colour (069) was built and failed its own checks, so it was taken back out; every option that record held is now rejected, and it needs a new one. The rotation fix (070) and the reader-visible sky selection (052) wait on it.</span></li>
+        <li><b>Built and held</b> <span>Nothing. The look's sky sliders tinting what has no colour (069) has no standing answer: the first was built and failed its checks, and the second, which reads a pixel's surroundings, was measured off the app's own sky map and rejected before anything was rendered. The rotation fix (070) and the reader-visible sky selection (052) wait on it.</span></li>
         <li><b>Last verified green</b> <span><code>f763bee</code>, on staging: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
         <li><b>Next version</b> <span>2.63 is production's number. The next release that adds something takes 2.64.</span></li>
       </ul>
@@ -123,6 +123,17 @@
           code from scratch after a release that changed it. The app will measure
           both on the device before either is called the cause. The measurement
           is on staging in v2.63.12, waiting on the PC and the iPad.
+        </li>
+        <li class="done"><span class="state">Stopped</span>
+          <strong>The second answer to the sky sliders tinting clouds was
+          researched, and rejected before a render.</strong> Judge a pale pixel
+          by what surrounds it, read off the app's own sky map. Measured on eight
+          photos: the map's squares disagree with their neighbours along every
+          edge of the sky, not inside it, so the rule would act in a band along
+          every treeline, roofline and horizon, which is where the first answer
+          grained the sky. And the inside of a cloud reads the same as the centre
+          of an uncorrected hot spot, so no colour rule can spare one and not the
+          other. Nothing was built.
         </li>
         <li class="done"><span class="state">Stopped</span>
           <strong>The first answer to the sky sliders tinting clouds was built,

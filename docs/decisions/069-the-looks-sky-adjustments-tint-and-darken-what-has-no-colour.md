@@ -137,6 +137,16 @@ So the field keeps two things apart: the mask decides where an adjustment
 applies, and a guard on the adjustment decides which pixels it may change. The
 film decides what the guard keeps: a cloud comes out white.
 
+- **How the field tells a lone outlier from a region**, for option 7
+  (IR-SCIENCE 9p, with the sources): RawTherapee's impulse noise reduction and
+  defringe, read in its source; the robust bilateral filter (arXiv
+  1505.00074); the guided filter, the rolling guidance filter and joint
+  bilateral upsampling; darktable's hot pixels, ROAD and the Hampel
+  identifier. Every method decides by how much support a pixel finds round it,
+  and the ones with no fitted constant take their scale either from a
+  structure already computed or from the data's own spread. In this app that
+  structure is the sky map.
+
 ## Built already
 
 What exists that this item will use, so a second one does not get written
@@ -264,6 +274,18 @@ What exists that this item will use, so a second one does not get written
    inside the selection is left alone (4b-vii, the axis above +0.04).
 5. Guard the smoothing alone, since it is the stage that adds the colour.
 6. Leave it: today's selection leaves most cloud out.
+7. **REJECTED before a render, 2026-09-26: read the surroundings, not the
+   pixel.** Option 1's own finding, researched (IR-SCIENCE 9p) and designed as
+   three rules on the four sky-map texels round each pixel. B scales each stage
+   by how colourless the sky's colour is at the pixel's own brightness, only
+   where those four texels disagree; A also pulls each pixel toward the texels
+   it resembles; C gives Sky depth A's choice as well. A reading of the code
+   against every recorded failure rejected A and C before anything was
+   measured: which texel a pixel resembles follows its own noise, which is
+   Rejected 1 again. B was measured off the sky map itself on the eight frames,
+   with no render, and its texels disagree along every edge of the selection
+   ("Measured before a render" below). Nothing is chosen, and the record holds
+   no option that stands.
 
 ## Rejected
 
@@ -272,6 +294,7 @@ What exists that this item will use, so a second one does not get written
 - **3, take the cloud out of the selection.** 052 measured it and rejected it: it missed NIR_1651's cloud, read NIR_1827's sun haze as white and was grainy near the horizon. It also moves the wrong thing. By the purpose ruling cloud is sky and the Sky mask holds it; carving it out moves the reader's matte, coverage, corrections and five adjustments in order to fix three stages, and puts an edge through every wisp.
 - **4, the infrared axis.** It is the one reading known to have kept NIR_1651's cloud white, and it stays the comparison the first render is checked against. As the rule it tests whether a pixel is sky, which is the selection's question put in the stages' place; it needs the linear axis carried past the grade to stages that run after it; a camera-rendered file has no such axis; and its +0.04 was fitted on seven frames.
 - **5, the smoothing alone.** Sky depth darkens a cloud grey with no tint at all, and the film leaves it near-white. Half the rule is a second place for the other half to be forgotten.
+- **7, read the surroundings at the sky map's scale — designed, measured off the map, and rejected before a render.** The texels along the selection's edge average the sky with whatever the bitmap's feather took in, so they disagree with their neighbours on every frame: 31% to 83% of the cells along the edge, against 0% to 8% inside the sky. A rule that acts where the neighbours disagree therefore acts in a band about two texels wide along every treeline, roofline and horizon, and there it hands the stages to the pixel's own reading, which is Option 1's grain in the place Option 1 grained. None of the three rules reaches the inside of a cloud wider than two texels either. What would make the surroundings readable is a map whose edge texels carry the sky's colour; that is a change to how the map is built, not to the stages, and it is not an option here until it is researched.
 - **6, leave it.** Refuted by the rotation (070): read off the selection maps, at the right rotation the look's own selection takes NIR_1651's cloud and most of NIR_1644's band in, and 052's Option 1 takes in every cloud the Sky mask holds. The defect is waiting on fixes already ranked, not on a new finder.
 
 ## Built and measured, 2026-09-26
@@ -318,7 +341,51 @@ can read the surroundings without a width chosen on these frames. That is an
 observation, not a chosen option; it is researched and written as an option
 before anything is built.
 
+## Measured before a render, 2026-09-26
+
+**The instrument.** A scratch build that hands the app's own sky map to the
+harness, opened on the eight frames at the look's own settings with lens colour
+correction at 1, as this record's renders use, and again on NIR_3406, NIR_1703
+and NIR_3461 with correction at its default, which is off. Nothing was
+rendered: every number below is read off the map's bytes, and each frame's
+sheet draws them over its export.
+
+**Where candidate B's gate fires.** The share of bilinear cells whose four
+texels disagree by more than half the smoothing's own tolerance, inside the
+sky and along the selection's edge: NIR_3406 0% and 31%, NIR_1703 3% and 83%,
+NIR_3461 8% and 65%, NIR_1651 0% and 35%, NIR_1827 1% and 60%, NIR_3466 0% and
+54%, NIR_1644 1% and 49%. On NIR_0627, the frame with no sky, it fires on
+every outline the bitmap draws. The sheets show the edge share as one band
+along the treeline, the roofline, the building, the horizon and every pylon.
+
+**The question the design left for a measurement.** Whether the inside of a
+cloud can be told from the palest clear sky by its texel's colour relative to
+its sky's mean, which is what the grey guard reads.
+
+- With correction at 1, NIR_3406's clear sky has no texel below 0.43 of its
+  mean and 99% of it above 0.65, while 8% of NIR_1703's sky and 16% of NIR_3461's sits between the
+  guard's top (0.25) and 0.43. Read alone, that is a gap.
+- With correction at its default, NIR_3406's palest twentieth reads 0.36 and
+  9% of its clear sky sits in that same band: the hot-spot centre, drawn as
+  a round patch where the lens put it. So on the path a reader gets without
+  touching the correction, no cut on a texel's own colour spares those clouds
+  from Sky depth without sparing a hot-spot centre, which is the pale centre
+  inside a ring that the guard's window was set to avoid (IR-SCIENCE 4b-v).
+- NIR_1703's colourless patch sits at the frame's centre, and the correction
+  changed nothing on that frame. Whether it is cloud or an uncorrected hot
+  spot is not established, and Option 1's gain on it is recorded as a gain on
+  a colourless patch rather than on a cloud until it is.
+
+**What it shows for the next option.** Two things, both measured. A rule that
+reads the surroundings needs edge texels that carry the sky, which is a change
+to how the map is built. And Sky depth's half of this record, clouds kept
+white, cannot be separated by colour from an uncorrected hot spot; it turns on
+whether the hot spot is corrected, not on these stages.
+
 ## Rank
+
+**It holds no standing option as of 2026-09-26**, so what waits on it waits on
+research, not on a build.
 
 **First, above the rotation (070) and 052.** Argued by what would be redone,
 not by severity.
@@ -358,3 +425,11 @@ is the argument that puts it above 052.
 - NIR_1651, 2026-09-26: the guard beside today's build, whole frames at both settings.
 - NIR_1644, 2026-09-26: the guard beside today's build, whole frame with Sky depth at 0.5.
 - NIR_0627, 2026-09-26: the guard beside today's build, whole frame at the look's own settings.
+- NIR_3406, 2026-09-26: the sky-map sheet with correction at 1 and again at its default, each texel's colour relative to its sky's mean on the left and candidate B's gate on the right, over the export; the round pale patch at the hot-spot centre with correction off, and the band along the roofline in both.
+- NIR_1703, 2026-09-26: the sky-map sheet, the pale patch at the frame's centre and B's band along the whole treeline; and today's export with Sky depth at 0.5 again, the colourless patch with the guard's square white blocks in it.
+- NIR_3461, 2026-09-26: the sky-map sheet, the pale cloud band at upper left, and B's gate on every pylon, along the wires and along the horizon.
+- NIR_1651, 2026-09-26: the sky-map sheet, the pale texels inside the treetop and B's gate on a diagonal through the cloud and round the treetop.
+- NIR_1827, 2026-09-26: the sky-map sheet, B's band along the treeline.
+- NIR_3466, 2026-09-26: the sky-map sheet, the pale cloud streak at upper left, and B's gate round the building and along the horizon.
+- NIR_1644, 2026-09-26: the sky-map sheet, B's gate in a band down the right side.
+- NIR_0627, 2026-09-26: the sky-map sheet, B's gate on every outline of the blurred background.

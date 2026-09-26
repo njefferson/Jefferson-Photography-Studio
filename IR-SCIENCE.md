@@ -4313,3 +4313,88 @@ matrix, in place of λ1; darktable manual, parametric masks
 (docs.darktable.org/usermanual/development/en/darkroom/masking-and-blending/
 masks/parametric/), for the convention that a mask keys the module's INPUT and
 that both input and output sliders are offered.
+
+### 9p. A LONE PALE PIXEL OR A PALE REGION — WHAT THE FIELD HAS, AND WHAT THE SKY MAP CAN TELL (decision 069, 2026-09-26)
+
+**The question.** 069's first option read "colourless" on each pixel as it
+arrived and could not tell 013's pale speckle from a cloud (069, Rejected 1).
+What it left was an observation: its gains and its failures were all pale
+pixels, and what separated them was their surroundings. So: how does the field
+tell an isolated outlier from a region, and can the sky map carry that?
+
+**What the field has.** Read in full unless marked.
+
+- **RawTherapee, impulse noise reduction** (source read,
+  `rtengine/impulse_denoise.cc`). A pixel is flagged when its distance from a
+  Gaussian low-pass exceeds a multiple of the mean distance of the other 24 in
+  its 5x5 block, and flagged pixels are replaced from unflagged neighbours. The
+  neighbourhood sets the width, not a constant. It reads luminance only, and a
+  cluster of 2 to 5 pixels raises its neighbours' deviation and hides itself.
+- **RawTherapee, defringe** (source read, `rtengine/PF_correct_RT.cc`). The
+  threshold is a multiple of the photograph's own mean chroma residual, and the
+  repair weights each neighbour by 1/(its own residual + that mean), so an
+  outlier does not feed its own replacement.
+- **Chaudhury and Rithwik, robust bilateral filter** (arXiv 1505.00074, §2
+  read): decide similarity on a box-filtered value, never on the pixel's own.
+  That is the literature's answer to the failure 4c-ix recorded, and the one
+  069's Option 1 repeated.
+- **The guided filter** (He, Sun and Tang; read through the OpenCV header and
+  the encyclopaedia entry, the paper itself was blocked): the edge-or-flat
+  choice is made on a window's variance, never on one pixel's difference.
+- **The rolling guidance filter** (Zhang, Shen, Xu and Jia, ECCV 2014; OpenCV's
+  implementation read, the paper blocked): structures smaller than the first
+  pass's kernel are removed and never brought back, so outlier-or-region is
+  decided by a scale already in use.
+- **Joint bilateral upsampling** (Kopf, Cohen, Lischinski and Uyttendaele,
+  SIGGRAPH 2007; the abstract read, the paper blocked): decide at coarse
+  resolution, then weight each coarse sample by how like it the fine pixel is.
+- **Counting agreeing neighbours**: darktable's hot-pixel module (manual read),
+  ROAD (Garnett et al. 2005, read as restated in arXiv 1205.3999), the Hampel
+  identifier (read), and the Lee sigma filter (search summary only).
+- **The median's breakdown point** (robust statistics, read): a robust
+  statistic works only where the outliers are a minority of its window. 4c-x
+  measured the mottle as roughly half the pixels at two to four pixels across,
+  which is why its 3x3 median was another sample of the same distribution.
+
+**What that means here.** Every method has a scale, and the ones with no fitted
+constant take it either from a structure already computed or from the data's
+own spread. In this app that structure is the sky map: 1/128 of the frame per
+texel, about 44 pixels at a full-size export and 22 in the preview, each texel
+four taps. Three rules were designed on it, all acting where the four texels
+round a pixel disagree, and checked against the code before anything was
+built (069, option 7).
+
+**Measured off the map itself, 2026-09-26, eight frames, nothing rendered.**
+
+- **The texels disagree along the selection's edge, not inside the sky.**
+  Cells whose four texels differ by more than half the smoothing's tolerance
+  (0.06 in opponent chroma) are 0% to 8% of the cells inside the sky and 31% to
+  83% of the cells along its edge. An edge texel averages the sky with whatever
+  the bitmap's feather took in, red treetop or dark roof, so any rule reading
+  disagreement fires in a band about two texels wide along every edge.
+- **A cloud and an uncorrected hot-spot centre read the same.** Relative to its
+  sky's mean colour, which is what the grey guard reads: with lens colour
+  correction at 1, NIR_3406's clear sky has no texel below 0.43 and 99% of it above 0.65, while 8% of
+  NIR_1703's sky and 16% of NIR_3461's sits between 0.25 and 0.43. With the
+  correction at its default, which is off, NIR_3406's palest twentieth is 0.36
+  and 9% of its clear sky sits in that same band, drawn as a round patch at the
+  hot-spot centre. The comment above `SKY_DEPTH_GREY_LO` in `src/skymap.ts`
+  gives 0.36 for that sky; it is the uncorrected reading.
+
+**Sources.** RawTherapee source at raw.githubusercontent.com/Beep6581/RawTherapee
+(dev branch, `rtengine/impulse_denoise.cc` and `rtengine/PF_correct_RT.cc`);
+arxiv.org/pdf/1505.00074; OpenCV contrib at
+raw.githubusercontent.com/opencv/opencv_contrib (4.x,
+`modules/ximgproc/include/opencv2/ximgproc/edge_filter.hpp` and
+`modules/ximgproc/src/rolling_guidance_filter.cpp`);
+en.wikipedia.org/wiki/Guided_filter; the joint bilateral upsampling abstract at
+microsoft.com/en-us/research/publication/joint-bilateral-upsampling/;
+docs.darktable.org (the hot pixels, denoise (profiled), astrophoto denoise and
+color reconstruction modules); arxiv.org/html/1205.3999 for ROAD;
+en.wikipedia.org/wiki/Hampel_test; en.wikipedia.org/wiki/Robust_statistics.
+Search summaries only, not verified: the Lee sigma filter (Lee 1983, CVGIP
+24:255–269), peer-group filters, and the switching bilateral filter (Lin et al.,
+IEEE TIP 2010). Blocked by this environment's network policy, so the primary
+papers were not read: link.springer.com, www.cse.cuhk.edu.hk,
+kops.uni-konstanz.de, www.sciencedirect.com, www.academia.edu, pubmed.ncbi.nlm.nih.gov,
+www.semanticscholar.org and www.ipol.im.

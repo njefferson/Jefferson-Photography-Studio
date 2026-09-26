@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
 planhash=9f6f5a45fc333f1b
-diffhash=f81494dd73a10140
-verdict=IN-SCOPE: plan B.4's staging entry with the device steps, and the live status page
-# Every hunk in NOTES.md and public/conveyor-status.html is plan B.4 (the NOTES staging entry with the device steps) plus the doctrine's live status page; every factual claim was checked against CI, the live staging site and the held build's labels. The one finding, the status page abbreviating two row names, is fixed in this diff by naming both rows in full.
+diffhash=bcc25718220c4b30
+verdict=IN-SCOPE: plan A's 069 option 7, its rejection before a render, IR-SCIENCE 9p and the status page's 069 stage
+# Every hunk is plan A: 069 option 7 with its Looked up and Rejected entries, the measurements off the sky map that rejected it before a render, IR-SCIENCE 9p with sources, and the status page's 069 stage. Nothing is marked chosen and no build is promised. Three corrections were made after the first pass (0.36 for the uncorrected twentieth; the noise-reduction entry removed as outside the plan; the clear-sky floor stated as none below 0.43 and 99% above 0.65), each checked against the cited measurement files.
