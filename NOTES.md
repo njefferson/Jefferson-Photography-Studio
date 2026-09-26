@@ -805,27 +805,64 @@ user-scalable=no.
 > ships as **2.0**, not 1.2 (owner call, 2026-07-18). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
+- [ ] **The look's sky adjustments tint and darken what has no colour** <!-- decision: 069 -->
+  **Shown as:** Clouds inside Aerochrome's sky stay white or grey under its sky sliders instead of turning blue-grey.
+  Sky colour smoothing pulls a white or grey pixel inside the sky toward the
+  sky's colour, Sky saturation then reads the tint, and Sky depth darkens
+  whatever the selection holds. Under the learned selection taken out on
+  2026-09-26, NIR_1651's and NIR_1644's clouds went blue-grey through these
+  stages; 052's verdict on that selection stands. The chosen shape is one rule
+  stated once, with no new constant: what arrives without colour leaves without
+  colour, read on the pixel as it reaches the sky stages, on 019's existing
+  gate, for all three stages. The selection keeps the cloud. It promises
+  nothing for steel: no ranked item is built to put NIR_3461's pale steel
+  under these stages, and the red on that steel and the round red glows arrive
+  with colour and stay 061's and 013's. It must pass the whiteness weight's
+  three measured failures (052) and keep 013's speckle gone, and if the
+  speckle comes back the option fails rather than gaining a width tuned on the
+  practice frames. Its cloud checks wait for the rotation fix (070). First: the
+  rotation fix needs it, and 052's Option 1 brings every cloud the Sky mask
+  holds under these stages.
+  See `docs/decisions/069-the-looks-sky-adjustments-tint-and-darken-what-has-no-colour.md`.
+- [ ] **The look's sky is found on the wrong edge of a turned photograph** <!-- decision: 070 -->
+  **Shown as:** On a photo turned on its side, Aerochrome's sky sliders find the sky from the edge that is up on screen.
+  `buildSkySelectionFrom` passes rotation 0 to the detector, so on a turned
+  photograph the look's own sky is seeded from a side of the picture: NIR_1651
+  reads 18.2% of the frame against 52.2% at its rotation. The reader's Sky mask
+  already passes the renderer's rotation. The chosen shape builds the look's
+  selection at the rotation the picture is shown at, on every path: the open
+  photograph and its export, `skyMaskFor`'s cache and `shadowCastFor`'s for
+  tiles, the lift and the shadow cast, a batch, and the main-thread build for a
+  photo picked on its own or opened from the gallery; and again when the turn
+  changes. That it then brings NIR_1651's and NIR_1644's clouds under the sky
+  stages is read off selection maps, not renders, so it waits for the white
+  guard (069), and its renders are 069's cloud checks. 052's Option 1 would
+  retire the path only for the three sky stages on the open photograph, so
+  this touches 052 rather than being superseded by it. Second, below the white
+  guard (069), which it needs. See
+  `docs/decisions/070-the-looks-sky-is-found-on-the-wrong-edge-of-a-turned-photograph.md`.
 - [ ] **The look's sky adjustments read a selection you cannot see** <!-- decision: 052 -->
   **Shown as:** Aerochrome's sky sliders work on the sky you selected, not one you cannot see.
-  **Leads the queue from 2026-09-25, with the halo.** Under Aerochrome's Sky
+  **Third from 2026-09-26, below the white guard (069) and the rotation fix
+  (070); led the queue from 2026-09-25, with the halo.** Under Aerochrome's Sky
   depth a light band stands beside every building and pylon, and the sky inside
   a pylon's lattice is not darkened: measured, it is this selection, wrong over
   whole regions next to objects. Four refinements were tried and measured,
   including the weighted guided filter the literature names; none can fix
-  wrong labels. On-device sky segmentation, the field's starting point, is
-  being researched before anything is built.
-  reported 2026-09-22 from the device against Aerochrome: its sky adjustment
-  cannot be reproduced with a mask on sky the look does not reach, and the
-  shape suggested was that the look should open its own sky mask to start from,
-  which you then add to and subtract from, with Reach and Feather kept.
+  wrong labels. A learned sky selection, the field's starting point, was built
+  on 2026-09-26 as the look's automatic selection and taken out: it was
+  better only on NIR_0627, which has no sky; on the photographs with sky it was
+  worse, and on NIR_1827 the two renders nearly match. Aerochrome's sky
+  adjustment cannot be reproduced with a mask on sky the look does not reach.
   **Read off the source, and there are TWO sky selections on one photograph.**
   The look's is `skyBitmap` and `skyFine` in `src/main.ts`, built at open and
-  assigned in six places, none of them reachable from any control — no Reach,
+  assigned in five places, none of them steered by any control — no Reach,
   no Feather, no by-colour, no hand corrections — and it is what `skySmooth`,
   `skyDepth` and `skySat` act through. The reader's is a type-4 Sky mask, which
-  has every one of those controls and drives nothing but the mask's own five
-  adjustments. `regenerateSkyMask` never touches the look's pair. So every
-  control over a sky selection is attached to the one the sky sliders ignore.
+  has every one of those controls and drives its own five adjustments and any
+  whole-photo tool aimed at it, never the look's sky stages.
+  `regenerateSkyMask` never touches the look's pair. So every control over a
+  sky selection is attached to the one the sky sliders ignore.
   **It cannot be closed by finding a better slider value.** `skySat` multiplies
   chroma about luma gated on each pixel's own saturation; `skyDepth` darkens
   toward the film's value gated on the sky map's keying byte; a mask's
@@ -872,6 +909,29 @@ user-scalable=no.
   measures the exported file whole (§9l-ii). The gravel half stays open. The
   sources go into `IR-SCIENCE.md` (9l for what shipped). See
   `docs/decisions/013-aerochrome-splotchy-chroma.md`.
+- [ ] **Choose which finder draws each Sky mask** <!-- decision: 068 -->
+  **Shown as:** Deciding whether a Sky mask should also offer a second way of finding the sky; today's stays the default whatever is decided.
+  Whether a reader should be able to choose the learned sky finder on a Sky
+  mask. As the look's automatic selection it was built and taken out on
+  2026-09-26 (052): it was better only on NIR_0627, which has no sky. On the
+  photographs with sky it was worse, and on NIR_1827 the two renders nearly
+  match. That verdict stands. The blue clouds also show a defect in the look's
+  sky stages (069), and the stages dulled the steel too; neither changes the
+  verdict. The learned finder is never the default and never draws a mask the
+  reader has not chosen it on. A reader may choose it on any Sky mask,
+  including, after 052's Option 1, the one the look reads, and that choice is
+  what this item is for. A mask with no stored choice is always drawn by
+  today's finder. No editor surveyed picks a model for a painted region, and
+  only darktable picks one at all, for the whole app. If a choice is built, it
+  is one choice per Sky mask and one undo step, the models download only when
+  a reader chooses the learned finder, and region control comes from the joins
+  that already exist. The white guard (069), the rotation fix (070) and 052's
+  Option 1 come first. Then the two finders are compared again on a Sky mask,
+  on practice frames neither was developed on, not the six the learned
+  finder's constants were set on, and no constant is tuned against practice
+  frames. The switch is built only if each finder loses somewhere the other
+  does not. Otherwise today's finder stays alone and nothing is built. See
+  `docs/decisions/068-choose-which-finder-draws-each-sky-mask.md`.
 - [ ] **Sky inside a lattice cannot be filled into the Sky mask** <!-- decision: 065 -->
   **Shown as:** Fill the sky between a pylon's struts into the Sky mask with one stroke.
   — found on the target device on v2.63: on NIR_3461 the Sky mask leaves the

@@ -125,14 +125,20 @@ where the colour does.
 
 ## Rank
 
-**Re-ranked 2026-09-25: third, below 052 and 013, above 066.** The Aerochrome
-work leads the queue. It sits below 052 because a learned sky selection may
-take the lattice's sky without a stroke, which would change what this fill has
-left to do. It sits above 066 because a fill changes which sky a reader's mask
-holds. It now sits above 048, whose union already ships in the build on
-staging, so the route it refines exists without 048's record closing first,
-and above 028, because the fill covers 028's case by hand where the cap
-declines.
+**Re-ranked 2026-09-26: sixth, below 069, 070, 052, 013 and 068, above 066.**
+The Aerochrome work leads the queue. It sits below the white guard (069) and
+the rotation fix (070) because both come before 052, and under a look what a
+fill adds reaches the sky stages only through 052, where 069 decides what those
+stages do to the pale pixels a fill takes in. It sits below 052 because until
+the look reads the reader's Sky mask, a fill changes that mask and not the
+look's sky. It sits below 068 because 068's comparison says whether a Sky mask
+can be drawn by a second finder, and so whether this fill's strokes are
+replayed onto one finder or two; today's finder stays the default, so the fill
+keeps all of its work either way. It sits above 066 because a fill changes
+which sky a reader's mask holds. It now sits above 048, whose union already
+ships in the build on staging, so the route it refines exists without 048's
+record closing first, and above 028, because the fill covers 028's case by hand
+where the cap declines.
 
 ## Looked at
 

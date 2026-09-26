@@ -2,28 +2,26 @@
 
 ## Context
 
-Reported 2026-09-22 from the device, against Aerochrome: the look's sky
-adjustment cannot be reproduced with a mask on sky the look does not reach, and
-the suggested shape was that the look should open its own sky mask to start
-from, which the reader then adds to and subtracts from, without losing Reach,
-Feather and the rest.
+Aerochrome's sky adjustment cannot be reproduced with a mask on sky the look
+does not reach.
 
-**Read off the source rather than from the symptom, and the report is exactly
-right. There are TWO sky selections on one photograph and the reader can steer
-only one of them.**
+**Read off the source rather than from the symptom: there are TWO sky
+selections on one photograph and the reader can steer only one of them.**
 
 The look's selection is the module-level `skyBitmap` and `skyFine` in
 `src/main.ts`. It is built at open — `buildSkySelectionFrom(prepareSkySource(img))`,
-or from `img.skySel` on a photograph already decoded — and assigned in exactly
-six places, none of which is reachable from any control. It carries no Reach, no
-Feather, no by-colour toggle and no hand corrections. It is what `skySmooth`,
+or from `img.skySel` on a photograph already decoded — and assigned in five
+places, once in `syncSkyMap` and four times on the open path, none of which any
+control steers. It carries no Reach, no Feather, no by-colour toggle and no hand
+corrections. It is what `skySmooth`,
 `skyDepth` and `skySat` act through, which are the Aerochrome sky sliders.
 
 The reader's selection is a type-4 Sky mask in `params.masks`. It has all of
 those controls: `regenerateSkyMask` shapes the seed with `m.reach` and
 `m.feather`, 023's by-colour grow reaches the sky between branches, and 031's
-`fix` strokes are replayed over whatever the detection returns. It drives
-nothing but the mask's own five adjustments.
+`fix` strokes are replayed over whatever the detection returns. It drives its
+own five adjustments and any whole-photo tool aimed at it, never the look's sky
+stages.
 
 `regenerateSkyMask` writes `m.brush` and `m.fine` on the mask layer. It never
 touches `skyBitmap` or `skyFine`. So every control the reader has over a sky
@@ -37,7 +35,7 @@ gated on the sky map's keying byte, so a grey and an overcast sky are left
 byte-identical. A mask's `saturation` is a plain saturation adjustment folded in
 linear space at the mask stage, before the global gamma and contrast, before
 the tone curves, the HSL mixer and the grade. They are different operations, on
-different populations, at different points in the pipeline. The report is a
+different populations, at different points in the pipeline. This is a
 capability gap, not a tuning problem.
 
 **018's title is "One sky selection, built at open, for every sky-aware tool",
@@ -46,7 +44,7 @@ REFINEMENT: a Sky mask's `fine` is now built by the same `refineSkyMask` the
 look's stages use, so one photograph no longer carries a soft hand-made sky and
 a crisp look depth. The SELECTION was not unified. Its own Option 1 ends by
 naming per-population strengths reading `skySel` as later items, so a follow-on
-was anticipated; this is that follow-on arriving as a report instead.
+was anticipated, and this is that follow-on.
 
 **2026-09-25: the halo under a sky depth, measured, and what could not fix it.**
 With Aerochrome's Sky depth on, a light band stands beside every building and
@@ -85,8 +83,9 @@ further is built (IR-SCIENCE 4b-ix has the refinement literature).
 (BiSeNetV2 for sky against building and tree, u2netp for the steel and wires
 inside it) were fused and refined into the look's selection, and exported
 through the app beside today's build on six frames. Compared whole frame
-against whole frame, it was worse on every frame with sky and better only on
-NIR_0627, which has none:
+against whole frame, as the look's automatic selection it was better only on
+NIR_0627, which has no sky. On the photographs with sky it was worse, and on
+NIR_1827 the two renders nearly match:
 
 - **Clouds** on NIR_1651 and NIR_1644 were taken into the sky and turned
   blue-grey under the sky stages; today's selection leaves them out and white.
@@ -94,9 +93,13 @@ NIR_0627, which has none:
   selection is built at 1024 px and the steel is narrower than one of its
   pixels.
 - **Sky was missed** above NIR_3466's roof and beside NIR_1651's upper tree.
+- **NIR_1827**: along the treetops, where today's render has a thin pale rim
+  against the sky, the learned one has a soft pink-red fringe, and parts of the
+  broken cloud at the upper right come out bluer.
 
-It never reached staging. The code is commit a963548, on no branch; do not
-rebuild it as it was. Three facts found on the way, not fixed:
+It never reached staging. The code is in commits a963548 and ed11d08, on no
+published branch; kept locally only. Do not rebuild it as the look's automatic
+selection. Three facts found on the way, not fixed:
 
 - the hand-built detector is given rotation 0 on a photograph turned on its
   side, so it seeds its sky on the wrong edge (NIR_1651: 18% of the frame found
@@ -104,9 +107,10 @@ rebuild it as it was. Three facts found on the way, not fixed:
 - the sky settings have no per-pixel guard against white: Sky colour
   smoothing tints a neutral pixel, Sky saturation then reads the tint, and Sky
   depth darkens whatever the selection holds;
-- a photograph picked on its own or opened from the gallery does not ask for
-  the sky selection at open, so its selection is built later on the main
-  thread.
+- a photograph picked on its own or opened from the gallery is not given its
+  sky pair by the sky worker at open: its coarse half comes from `skyMaskFor`
+  at open and the refined pair from `syncSkyMap` on the first edit with Sky
+  depth or Sky saturation, both on the main thread.
 
 ## Looked up
 
@@ -161,14 +165,14 @@ refinement was unified: the record's own Option 1 was about what a type-4 mask
 IS on the sampling side, and it named per-population strengths reading `skySel`
 as separate later items.
 
-**042**, which is this meeting from the other side — the ask that every control
-should be usable inside a mask. If `skySat`, `skyDepth` and `skySmooth` became
-mask adjustments, half of this is discharged. The other half is that the reader
+**042**, which is this meeting from the other side: every control usable
+inside a mask. If `skySat`, `skyDepth` and `skySmooth` became mask
+adjustments, half of this is discharged. The other half is that the reader
 should INHERIT the detection rather than build a selection from scratch on every
 frame, which 042 does not cover.
 
 **013**, the Aerochrome look's own population work, and the reason this is
-ranked where it is rather than where a new report naturally lands.
+ranked where it is rather than where a new item naturally lands.
 
 **049 and 048**, which give the reader control over the sky selection's border
 and let a split selection be completed. Both act on the mask's selection. They
@@ -203,7 +207,7 @@ told about in words.
 ## Options
 
 1. **The look's sky stages read a reader-visible Sky mask, seeded automatically
-   at open.** Chosen, because it is the field's shape and the reported one. The
+   at open.** Chosen, because it is the field's shape and closes the gap. The
    detection that runs at open becomes a type-4 mask the reader can see, with
    Reach, Feather, by-colour and hand corrections already attached to it because
    a type-4 mask already has them; `skySmooth`, `skyDepth` and `skySat` read
@@ -235,11 +239,17 @@ told about in words.
 
 ## Rank
 
-**First.** Settled 2026-09-25: the Aerochrome work leads the queue, ahead of
-the completeness work, because nothing ranked above it was needed by it. Within
-that work this is first because everything the look renders in the sky is
-measured over this selection: the chroma noise 013 works on, the tuning 066
-replaces, and the halo above. Built later, each of those would be measured
+**Third, re-ranked 2026-09-26, below the white guard (069) and the rotation
+fix (070).** It sits below both because each changes what this item is judged
+on: 069 decides what the sky stages do to the cloud a Sky mask holds once the
+look reads it, and 070 decides which edge of a turned photograph the detection
+this item turns into a Sky mask finds its sky from.
+
+Settled 2026-09-25: the Aerochrome work leads the queue, ahead of the
+completeness work, because nothing ranked above it was needed by it. Within the
+rest of that work this comes first because everything the look renders in the
+sky is measured over this selection: the chroma noise 013 works on, the tuning
+066 replaces, and the halo above. Built later, each of those would be measured
 again.
 
 It no longer waits on 042. The two meet at 042's stage 5, and 042's remaining
@@ -255,4 +265,5 @@ whatever this item settles.
 - NIR_1827, 2026-09-25: selection maps for every variant, and exports with a 1:1 crop of the clouds and tree tops on the right.
 - NIR_0627, 2026-09-25: selection maps and exports, with a 1:1 crop of the flower against its blurred background.
 - NIR_1644, 2026-09-26: exports through the learned selection and today's, whole frame, side by side.
+- NIR_1827, 2026-09-26: the whole-frame exports through today's selection and the learned one, side by side, a difference image of the two, and the treetops and the broken cloud at the upper right enlarged from both. They nearly match; today's has a thin pale rim along the treetops where the learned one has a soft pink-red fringe, and parts of the broken cloud at the upper right come out bluer in the learned one.
 - The six frames, 2026-09-26: exports through the learned selection and today's, whole frame side by side, and 1:1 crops of NIR_3461's pylons, NIR_3466's roof and NIR_1651's cloud beside the tree.

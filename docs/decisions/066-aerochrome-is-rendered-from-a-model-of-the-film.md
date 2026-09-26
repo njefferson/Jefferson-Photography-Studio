@@ -135,14 +135,19 @@ full. What bears on this record:
 
 ## Rank
 
-**Fourth**, after 052, 013 and 065, and above 061, in the Aerochrome work the
-queue now leads with (settled 2026-09-25). It sits below 052 and 013 because
-both change the ground it is measured on: the sky selection, and the chroma
-noise the model must control. It sits below 065 because a fill changes which
-sky a reader's mask holds. It sits above 061 because 061's channel alignment
-touches thin edges only, which the model's colour re-attachment respects, and
-nothing in the model is tuned against them. Its first measurement decides
-whether it needs 052 at all.
+**Seventh**, after 069, 070, 052, 013, 068 and 065, and above 061, in the
+Aerochrome work the queue now leads with (settled 2026-09-25). It sits below
+the white guard (069) and the rotation fix (070) because both change the sky it
+is measured against: 069 is the rule its clouds must meet if it replaces the sky
+stages, and 070 moves the look's own sky on a turned photograph. It sits below
+052 and 013 because both change the ground it is measured on: the sky
+selection, and the chroma noise the model must control. It sits below 068,
+which follows the three records it needs directly and changes nothing this
+model is measured on, since today's finder stays the default on every Sky mask.
+It sits below 065 because a fill changes which sky a reader's mask holds. It
+sits above 061 because 061's channel alignment touches thin edges only, which
+the model's colour re-attachment respects, and nothing in the model is tuned
+against them. Its first measurement decides whether it needs 052 at all.
 
 ## Looked at
 
