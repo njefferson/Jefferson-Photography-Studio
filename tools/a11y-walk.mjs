@@ -39,6 +39,7 @@
 //   4  the palette spec still describes what the app paints
 //   5  decoration that paints has a box to paint in
 //   6  the (i) control, and orientation that is moved rather than copied
+//   7  the start screen while the editor is being prepared, and when it cannot be
 //
 // Feature-specific a11y probes stay in the scratchpad, per release. What makes
 // this one repo-worthy is the coverage assertion: it is the only thing here
@@ -53,8 +54,14 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { repo, surfaces, allowed, check as checkSurfaces } from "./surfaces.mjs";
 import { sweepRenders } from "./palette-spec.mjs";
+import { slowBuild } from "./slow-build.mjs";
 
 const PORT = (process.argv.find((a) => a.startsWith("--port=")) || "--port=8131").split("=")[1];
+// `--only=7` (or `--only=1,7`) runs those sections alone; section 0, the
+// coverage assertion, always runs because it costs nothing and is the one that
+// knows what exists. Without it, everything runs, as before.
+const ONLY = (process.argv.find((a) => a.startsWith("--only=")) || "").split("=")[1]?.split(",").map(Number).filter((n) => !Number.isNaN(n));
+const want = (n) => !ONLY || !ONLY.length || ONLY.includes(n);
 const BASE = `http://127.0.0.1:${PORT}`;
 const axeSrc = readFileSync(join(repo, "node_modules/axe-core/axe.min.js"), "utf8");
 const EX = join(repo, "public/examples");
@@ -230,8 +237,8 @@ try {
   else note("nothing excused — every declared dialog is opened below");
 
   // ── 1 ────────────────────────────────────────────────────────────────────
-  console.log("\n1 — axe over every deployed page, in both themes and both shapes");
-  for (const s of surfaces()) {
+  if (want(1)) console.log("\n1 — axe over every deployed page, in both themes and both shapes");
+  if (want(1)) for (const s of surfaces()) {
     for (const theme of THEMES) for (const size of SIZES) {
       const page = await browser.newPage({ ...size.opts, colorScheme: theme });
       page.on("dialog", (d) => d.accept());
@@ -281,8 +288,8 @@ try {
   // the point rather than a tidy-up: 430 was a round number standing in for
   // "a phone", and 402 is the width the reader's own diagnostic reports. It is
   // also narrower, so nothing that passed at 430 is now unmeasured.
-  console.log("\n2 — hit areas at 402px and 900px, on every page and inside every dialog");
-  for (const s of surfaces()) {
+  if (want(2)) console.log("\n2 — hit areas at 402px and 900px, on every page and inside every dialog");
+  if (want(2)) for (const s of surfaces()) {
     for (const vw of [402, 900]) {
       const page = await browser.newPage({ viewport: { width: vw, height: 850 } });
       page.on("dialog", (d) => d.accept());
@@ -525,8 +532,8 @@ try {
   }
 
   // ── 3 ────────────────────────────────────────────────────────────────────
-  console.log("\n3 — the colours that carry meaning, read composited");
-  for (const theme of THEMES) {
+  if (want(3)) console.log("\n3 — the colours that carry meaning, read composited");
+  if (want(3)) for (const theme of THEMES) {
     const page = await browser.newPage({ viewport: { width: 1100, height: 850 }, colorScheme: theme });
     page.on("dialog", (d) => d.accept());
     try {
@@ -583,8 +590,8 @@ try {
   // The sweep is IMPORTED from the generator rather than reimplemented. Two
   // implementations of one measurement is how a check comes to agree with
   // itself and with nothing else.
-  console.log("\n4 — the palette spec still describes what the app paints");
-  {
+  if (want(4)) console.log("\n4 — the palette spec still describes what the app paints");
+  if (want(4)) {
     const spec = JSON.parse(readFileSync(join(repo, "palettes/studio.json"), "utf8"));
     const swept = await sweepRenders(browser, PORT);
     for (const t of swept.trouble) fail(`the sweep could not account for ${t}`);
@@ -616,8 +623,8 @@ try {
   // asserted to have a box big enough to paint into, whether or not anybody can
   // press it. Deliberately about the box and not about the glyph: a glyph that
   // overflows is the symptom, and a box collapsed by its container is the class.
-  console.log("\n5 — decoration that paints has a box to paint in");
-  {
+  if (want(5)) console.log("\n5 — decoration that paints has a box to paint in");
+  if (want(5)) {
     const page = await browser.newPage({ viewport: { width: 900, height: 780 }, deviceScaleFactor: 2 });
     for (const s of surfaces()) {
       await page.goto(`${BASE}/${s.file}`, { waitUntil: "load" });
@@ -686,8 +693,8 @@ try {
   // measurable: the start screen's route and the (i)'s route must land on the
   // SAME element. Two buttons that open two copies of the same prose pass a
   // human read and fail this.
-  console.log("\n6 — the (i) control, and orientation that is moved rather than copied");
-  {
+  if (want(6)) console.log("\n6 — the (i) control, and orientation that is moved rather than copied");
+  if (want(6)) {
     const page = await browser.newPage(SIZES[1].opts); // at the reader's own shape
     page.on("dialog", (d) => d.accept());
     await page.goto(`${BASE}/ir.html`, { waitUntil: "load" });
@@ -736,6 +743,66 @@ try {
       else ok(`both routes open the same orientation, expanded: "${a.text.slice(0, 60)}…"`);
     }
     await page.close();
+  }
+  // ── 7 ──────────────────────────────────────────────────
+  // THE START SCREEN WHILE THE EDITOR IS BEING PREPARED (decision 071). The
+  // start card gained a live region that speaks only when the build is slow, a
+  // busy card that waits for it, and a panel for a build the driver refused —
+  // three states no other section can reach, because the container builds the
+  // editor's graphics in about twenty milliseconds. tools/slow-build.mjs makes
+  // the build slow from outside, so every state here is the real app's.
+  if (want(7)) console.log("\n7 — the start screen while the editor is being prepared, and when it cannot be");
+  if (want(7)) {
+    // PRESENT AND EMPTY AT PARSE, or its first words are not announced: a live
+    // region created with its text in it is not a change.
+    const html = await fetch(`${BASE}/ir.html`).then((r) => r.text());
+    if (/<p id="preparing" role="status" aria-live="polite"><\/p>/.test(html)) ok("the preparing line is a live region, present and empty in the page as served");
+    else fail("the preparing line is not an empty role=status live region in the page as served");
+    const axeLine = async (page, line) => {
+      await page.addScriptTag({ content: axeSrc });
+      const r = await page.evaluate(async (rules) => await window.axe.run(document, { runOnly: rules }), RULES);
+      const serious = r.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+      if (serious.length) { fail(`${line}: ${serious.length} serious/critical`); for (const v of serious) for (const n of v.nodes) note(`[${v.impact}] ${v.id}: ${n.target.join(" ")}`); }
+      else ok(`${line}: nothing serious or critical${r.violations.length ? ` (${r.violations.length} minor)` : ""}`);
+    };
+    for (const theme of THEMES) for (const size of SIZES) {
+      const where = `[${theme} ${size.name}]`;
+      // A FRESH PAGE HAS NO RECORD OF A BUILD, so this launch expects a cold
+      // one and the words are up from the start; eight seconds leaves room to
+      // look at the count, then at a photo waiting in the busy card.
+      const page = await browser.newPage({ ...size.opts, colorScheme: theme });
+      page.on("dialog", (d) => d.accept());
+      try {
+        await page.addInitScript(slowBuild, { delay: 8000, par: true });
+        await page.goto(`${BASE}/ir.html`, { waitUntil: "commit" });
+        await page.waitForFunction(() => window.__bw && window.__bw.linkAt > 0 && performance.now() - window.__bw.linkAt > 2300, null, { timeout: 60000, polling: 100 });
+        const said = await page.evaluate(() => [document.getElementById("preparing")?.textContent ?? "", document.getElementById("preparingFor")?.textContent ?? ""]);
+        if (!said[0]) fail(`${where} the preparing line is empty while the editor is being prepared`);
+        else note(`${where} showing: "${said[0]}" "${said[1]}"`);
+        await axeLine(page, `ir.html ${where} start screen, preparing`);
+        await page.setInputFiles("#welcomeFile", join(EX, "canopy.jpg"));
+        await page.waitForFunction(() => document.getElementById("busy")?.open, null, { timeout: 5000 }).catch(() => {});
+        const busy = await page.evaluate(() => ({ open: !!document.getElementById("busy")?.open, text: document.getElementById("busyText")?.textContent ?? "", early: !window.__bw.releasedAt }));
+        if (!busy.open || !busy.early) fail(`${where} a photo chosen during the build did not raise the busy card before the build ended`);
+        else { note(`${where} busy card: "${busy.text}"`); await axeLine(page, `ir.html ${where} busy card, waiting for the editor`); }
+      } finally { await page.close(); }
+    }
+    // THE PANEL FOR A BUILD THE DRIVER REFUSED, which covers the whole page:
+    // axe, and its two buttons against the touch minimum.
+    for (const theme of THEMES) {
+      const page = await browser.newPage({ ...SIZES[1].opts, colorScheme: theme });
+      page.on("dialog", (d) => d.accept());
+      try {
+        await page.addInitScript(slowBuild, { delay: 300, par: true, fail: true });
+        await page.goto(`${BASE}/ir.html`, { waitUntil: "commit" });
+        const up = await page.waitForFunction(() => document.getElementById("glBroken")?.hidden === false, null, { timeout: 30000 }).then(() => true).catch(() => false);
+        if (!up) { fail(`[${theme} phone] a refused build did not raise its panel`); continue; }
+        await axeLine(page, `ir.html [${theme} phone] the editor could not get ready`);
+        const small = await page.evaluate(() => [...document.querySelectorAll("#glBroken button")].map((b) => { const r = b.getBoundingClientRect(); return { id: b.id, w: Math.round(r.width), h: Math.round(r.height) }; }).filter((b) => b.w < 44 || b.h < 44));
+        if (small.length) fail(`[${theme} phone] #glBroken: ${small.map((b) => `${b.id} ${b.w}x${b.h}`).join(" · ")}`);
+        else ok(`[${theme} phone] #glBroken: all >= 44`);
+      } finally { await page.close(); }
+    }
   }
 } finally {
   await browser.close();

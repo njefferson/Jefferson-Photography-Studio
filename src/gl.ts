@@ -1119,9 +1119,44 @@ void main() {
   frag = vec4(g, 1.0);
 }`;
 
+/** The next animation frame, as a promise. Takes nothing; resolves inside the
+ *  next frame callback. Frames rather than a timer: a frame is the unit a reader
+ *  sees, and a hidden page gets none, so a build polled this way costs nothing
+ *  while nobody is looking. Used only by `Renderer.build`. */
+const nextFrame = (): Promise<void> => new Promise((resolve) => requestAnimationFrame(() => resolve()));
+const LOST = "the graphics were taken away before the editor was ready";
+
+/** HOW THE EDIT PROGRAM IS BUILT (decision 071). The editor passes the hooks so
+ *  the start screen can say what is happening; the test page passes none.
+ *  Every hook is optional and none of them may throw. */
+export interface BuildOptions {
+  /** Called synchronously inside the constructor, before anything is handed to
+   *  the driver, with whether this browser offers to build without holding the
+   *  page. Returns true when the caller has just put words on screen that must
+   *  be PAINTED before the build starts; the build then waits two frames first
+   *  (the first frame callback runs before that frame paints, the second after
+   *  it has). Returns false, or is absent, and the build starts at once. */
+  beforeBuild?: (parallel: boolean) => boolean;
+  /** Called once as the build is handed to the driver, after any frames
+   *  `beforeBuild` asked for, so a start-up mark taken here times the build and
+   *  not the wait for words to paint. `parallel`: whether the browser offered
+   *  to build it without holding the page. Whether it actually did is for the
+   *  frame monitor to say, not this flag (startup.ts). */
+  onBuildStart?: (parallel: boolean) => void;
+  /** Each frame the build is still running, with milliseconds since it was
+   *  handed to the driver. Never called while the page is held: there are no
+   *  frames to call it from. */
+  onWaiting?: (elapsedMs: number) => void;
+}
+
+/** Every uniform the edit program declares that a draw sets, looked up once
+ *  the program has linked. */
+const UNIFORMS = ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskOp", "u_maskAims", "u_maskFol", "u_maskFolOn", "u_maskSkyBand", "u_maskSkyBandOn", "u_maskHsl", "u_maskHslOn", "u_maskGrade", "u_maskGradeBal", "u_maskGradeOn", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_maskMatte", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"] as const;
+
 export class Renderer {
   private gl: WebGL2RenderingContext;
-  private prog: WebGLProgram;
+  /** Null until `ready` resolves; read only through `program`. */
+  private prog: WebGLProgram | null = null;
   private tex: WebGLTexture;
   private loc: Record<string, WebGLUniformLocation | null> = {};
   private imgW = 0;
@@ -1143,6 +1178,31 @@ export class Renderer {
   get lost(): boolean {
     return this.contextLost || this.gl.isContextLost();
   }
+
+  /** THE EDIT PROGRAM, READY OR NOT (decision 071). Resolves once the program
+   *  is linked, in use, and every uniform found; rejects with every log the
+   *  driver wrote if it does not build, or with a lost-context message if the
+   *  graphics go first. Until it resolves, every method that DRAWS behaves as if
+   *  no photograph were loaded — `render` draws nothing, `histogram` and the
+   *  pixel reads return null — and every method that only UPLOADS works as
+   *  normal. Awaited by main.ts `editorReady` before any photograph is shown,
+   *  by `drawFrame`, and by every test-page row that builds a Renderer. */
+  readonly ready: Promise<void>;
+
+  /** True once `ready` has resolved. Takes nothing; returns whether a draw
+   *  would draw. */
+  get built(): boolean { return this.prog !== null; }
+
+  /** The linked program, for the two places that bind it. Throws rather than
+   *  drawing nothing: arriving here before `ready` is a missing await, and a
+   *  blank frame would hide it. Guarded upstream by `drawable`. */
+  private get program(): WebGLProgram {
+    if (!this.prog) throw new Error("drawn before the editor's picture code was ready");
+    return this.prog;
+  }
+  /** A photograph is loaded AND the program is built: the one test every
+   *  drawing method makes before touching the program. */
+  private get drawable(): boolean { return this.imgW > 0 && this.prog !== null; }
   private camMatrix: Float32Array | null = null;
   private patchHalf = new Uint16Array(0); // reused scratch for half-float patches
   private glowTex: WebGLTexture;
@@ -1238,7 +1298,11 @@ export class Renderer {
 
   private tapScale = 1;
 
-  constructor(private canvas: HTMLCanvasElement) {
+  /** A renderer on `canvas`, whose edit program is still being built when this
+   *  returns (see `ready`). Takes the canvas and the build hooks `opts`; throws
+   *  only when the browser gives no WebGL2 context at all. Everything that does
+   *  not need the program — the quad, every texture — is set up here, at once. */
+  constructor(private canvas: HTMLCanvasElement, opts: BuildOptions = {}) {
     const gl = canvas.getContext("webgl2", { preserveDrawingBuffer: true });
     if (!gl) throw new Error("WebGL2 is required and not available on this device.");
     this.gl = gl;
@@ -1267,22 +1331,30 @@ export class Renderer {
       // work. The flag stays set until a reload builds a real one.
       this.onContextRestored?.();
     });
-    this.prog = link(gl, VERT, FRAG);
-    gl.useProgram(this.prog);
+    // Float textures (for 14-bit linear raw) need this extension to be color-
+    // renderable; sampling works regardless, and we filter NEAREST. Asked for
+    // BEFORE the build: enabling an extension makes ANGLE release its shader
+    // compiler, and doing that with a compile in flight is a risk with no gain.
+    gl.getExtension("EXT_color_buffer_float");
+
+    // THE BUILD STARTS HERE AND FINISHES LATER (decision 071). On a PC through
+    // Direct3D the link took 42 s the first time after a release, and the page
+    // used to sit inside this constructor for all of it with the start screen
+    // painted and nothing said. `build` hands the program to the driver and
+    // returns; `ready` says when it is done.
+    this.ready = this.build(opts);
+    // Observed by every caller that awaits it; this only stops a renderer
+    // disposed mid-build from reporting an unhandled rejection.
+    this.ready.catch(() => {});
 
     const quad = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, quad);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-    const a = gl.getAttribLocation(this.prog, "a_pos");
-    gl.enableVertexAttribArray(a);
-    gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
-
-    for (const u of ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskOp", "u_maskAims", "u_maskFol", "u_maskFolOn", "u_maskSkyBand", "u_maskSkyBandOn", "u_maskHsl", "u_maskHslOn", "u_maskGrade", "u_maskGradeBal", "u_maskGradeOn", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_maskMatte", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"]) {
-      this.loc[u] = gl.getUniformLocation(this.prog, u);
-    }
-    // Float textures (for 14-bit linear raw) need this extension to be color-
-    // renderable; sampling works regardless, and we filter NEAREST.
-    gl.getExtension("EXT_color_buffer_float");
+    // ATTRIBUTE 0 BY DECLARATION, NOT BY ASKING: `build` binds a_pos to 0 before
+    // linking, so the layout can be set now. getAttribLocation would make the
+    // browser finish the link first, which is the wait this exists to remove.
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
 
     this.tex = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, this.tex);
@@ -1440,6 +1512,89 @@ export class Renderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
+  }
+
+  /** THE EDIT PROGRAM, BUILT WITHOUT HOLDING THE PAGE WHERE THE BROWSER ALLOWS
+   *  IT (decision 071). Takes the constructor's `opts`. Returns a promise that
+   *  resolves once the program is linked, in use, and `loc` holds every uniform;
+   *  rejects with every non-empty log the driver wrote, or LOST.
+   *
+   *  What callers rely on: nothing reads `prog` or `loc` before it resolves, and
+   *  nothing in it asks the program a question in the task that linked it, nor
+   *  before COMPLETION_STATUS_KHR says the link is done. LINK_STATUS, useProgram,
+   *  getUniformLocation and every other program query make the browser finish
+   *  the link before answering (ANGLE getProgramResolveLink), which is the freeze
+   *  this exists to remove. A browser that offers the extension and then answers
+   *  the poll by finishing the link anyway still holds the page, but only after
+   *  a painted frame — and the frame monitor, not this code, says which it did. */
+  private async build(opts: BuildOptions): Promise<void> {
+    const gl = this.gl;
+    // REQUESTED, NOT JUST TESTED FOR: off in WebGL until a page asks, and asking
+    // is what moves the compiler off the browser's graphics thread. The editor
+    // never asked until 071; the test page did, so its 42 s was measured on a
+    // different thread from the launch it was meant to explain.
+    const par = gl.getExtension("KHR_parallel_shader_compile");
+    if (opts.beforeBuild?.(!!par)) {
+      await nextFrame();
+      await nextFrame();
+    }
+    if (this.lost) throw new Error(LOST);
+    opts.onBuildStart?.(!!par);
+    const t0 = performance.now();
+    const vs = this.shader(gl.VERTEX_SHADER, VERT);
+    const fs = this.shader(gl.FRAGMENT_SHADER, FRAG);
+    const p = gl.createProgram()!;
+    gl.attachShader(p, vs);
+    gl.attachShader(p, fs);
+    gl.bindAttribLocation(p, 0, "a_pos");
+    gl.linkProgram(p);
+    // Sent now, not whenever the browser next flushes: the poll can only ever
+    // say yes to a link the graphics process has actually been handed.
+    gl.flush();
+    // ONE FRAME BEFORE THE FIRST QUESTION, whichever way it is asked. Without
+    // the extension the question below holds the page for the whole link; with
+    // it, a browser may still answer by finishing the link. Either way the
+    // start screen has painted once before that can happen.
+    await nextFrame();
+    if (this.lost) throw new Error(LOST);
+    if (par) {
+      // ONLY COMPLETION_STATUS_KHR, and on animation frames (three.js's
+      // compileAsync polls the same query; Babylon.js polls it too).
+      while (!gl.getProgramParameter(p, par.COMPLETION_STATUS_KHR)) {
+        await nextFrame();
+        if (this.lost) throw new Error(LOST);
+        opts.onWaiting?.(performance.now() - t0);
+      }
+    }
+    // A LOST CONTEXT ANSWERS "COMPLETE" (the extension's own rule) and then
+    // fails LINK_STATUS; checked first so it is reported as lost, not broken.
+    if (this.lost) throw new Error(LOST);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+      // EVERY LOG, JOINED. Compile errors surface here — nothing asked
+      // COMPILE_STATUS on the way in, because that question waits too — and on
+      // a compile error the program's own log is a generic "Fragment shader is
+      // not compiled", which would hide the one line that says why.
+      const logs = [["program", gl.getProgramInfoLog(p)], ["fragment", gl.getShaderInfoLog(fs)], ["vertex", gl.getShaderInfoLog(vs)]]
+        .map(([what, log]) => [what, (log ?? "").trim()])
+        .filter(([, log]) => log)
+        .map(([what, log]) => `${what}: ${log}`);
+      throw new Error("the editor's picture code did not build — " + (logs.join(" · ") || "the driver gave no reason"));
+    }
+    gl.useProgram(p);
+    for (const u of UNIFORMS) this.loc[u] = gl.getUniformLocation(p, u);
+    this.prog = p;
+  }
+
+  /** One shader, compiled and NOT asked whether it compiled: COMPILE_STATUS
+   *  waits for the compiler as surely as LINK_STATUS waits for the link. Takes
+   *  the stage `type` and its source `src`; returns the shader. An error
+   *  surfaces at the link, where `build` attaches this shader's log. */
+  private shader(type: number, src: string): WebGLShader {
+    const gl = this.gl;
+    const s = gl.createShader(type)!;
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    return s;
   }
 
   /** (Re)allocate the on-top overlay to the source size, cleared to transparent.
@@ -1823,7 +1978,7 @@ export class Renderer {
    *  otherwise remap out from under callers like clientToImageUv. */
   private bindPipeline(p: EditParams, split: number, rot: number, readMode = 0, spotVis = 0, applyCrop = true, maskViz = -1, maskMatte = false) {
     const gl = this.gl;
-    gl.useProgram(this.prog);
+    gl.useProgram(this.program);
     gl.uniform1i(this.loc.u_tex, 0);
     const crop = applyCrop ? p.crop ?? CROP_DEFAULT : CROP_DEFAULT;
     const straighten = applyCrop ? p.straighten ?? 0 : 0;
@@ -2157,7 +2312,7 @@ export class Renderer {
   /** @param split 0..1 — denoise applies right of this fraction (0 = whole image). */
   render(p: EditParams, split = 0) {
     const gl = this.gl;
-    if (!this.imgW) return;
+    if (!this.drawable) return;
     const crop = p.crop ?? CROP_DEFAULT;
     if (crop.x !== this.crop.x || crop.y !== this.crop.y || crop.w !== this.crop.w || crop.h !== this.crop.h) {
       this.crop = crop;
@@ -2189,12 +2344,13 @@ export class Renderer {
    */
   shaderBudget(): { uniforms: number; vectors: number; samplers: number; maxVectors: number; maxUnits: number; maxCombined: number } {
     const gl = this.gl;
-    const n = gl.getProgramParameter(this.prog, gl.ACTIVE_UNIFORMS) as number;
+    const prog = this.program;
+    const n = gl.getProgramParameter(prog, gl.ACTIVE_UNIFORMS) as number;
     const samplerTypes = new Set<number>([gl.SAMPLER_2D, gl.SAMPLER_3D, gl.SAMPLER_2D_ARRAY, gl.SAMPLER_CUBE, gl.INT_SAMPLER_2D, gl.UNSIGNED_INT_SAMPLER_2D]);
     const rowsOf = (t: number): number => (t === gl.FLOAT_MAT2 ? 2 : t === gl.FLOAT_MAT3 ? 3 : t === gl.FLOAT_MAT4 ? 4 : 1);
     let uniforms = 0, vectors = 0, samplers = 0;
     for (let i = 0; i < n; i++) {
-      const u = gl.getActiveUniform(this.prog, i);
+      const u = gl.getActiveUniform(prog, i);
       if (!u) continue;
       if (samplerTypes.has(u.type)) { samplers += u.size; continue; }
       uniforms += 1;
@@ -2259,7 +2415,7 @@ export class Renderer {
    */
   histogram(p: EditParams): { r: Uint32Array; g: Uint32Array; b: Uint32Array; l: Uint32Array } | null {
     const gl = this.gl;
-    if (!this.imgW) return null;
+    if (!this.drawable) return null;
     const { w, h } = this.renderOffscreen(p);
     const buf = this.histBuf!;
     gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
@@ -2328,7 +2484,7 @@ export class Renderer {
    *  grabs is the colour BEFORE the mixer — stable no matter how far that colour
    *  has already been pushed, and the chip that actually controls the area. */
   readUvPixel(p: EditParams, u: number, v: number): [number, number, number] | null {
-    if (!this.imgW) return null;
+    if (!this.drawable) return null;
     const gl = this.gl;
     const { w, h } = this.renderOffscreen(p);
     const x = Math.max(0, Math.min(w - 1, Math.round(u * w)));
@@ -2345,7 +2501,7 @@ export class Renderer {
    *  the shader's u_readMode). The colour mask's tap-to-pick reads this so the
    *  colour you touch is the colour that selects itself. */
   readColorKeyPixel(p: EditParams, u: number, v: number): [number, number, number] | null {
-    if (!this.imgW) return null;
+    if (!this.drawable) return null;
     const gl = this.gl;
     const { w, h } = this.renderOffscreen(p, 1);
     const x = Math.max(0, Math.min(w - 1, Math.round(u * w)));
@@ -2428,24 +2584,4 @@ export class Renderer {
 /** Row-major 3x3 -> column-major Float32Array for uniformMatrix3fv. */
 function rowToColMajor(m: number[]): Float32Array {
   return new Float32Array([m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]]);
-}
-
-function link(gl: WebGL2RenderingContext, vs: string, fs: string): WebGLProgram {
-  const compile = (type: number, src: string) => {
-    const s = gl.createShader(type)!;
-    gl.shaderSource(s, src);
-    gl.compileShader(s);
-    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
-      throw new Error("Shader compile error: " + gl.getShaderInfoLog(s));
-    }
-    return s;
-  };
-  const p = gl.createProgram()!;
-  gl.attachShader(p, compile(gl.VERTEX_SHADER, vs));
-  gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs));
-  gl.linkProgram(p);
-  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
-    throw new Error("Program link error: " + gl.getProgramInfoLog(p));
-  }
-  return p;
 }

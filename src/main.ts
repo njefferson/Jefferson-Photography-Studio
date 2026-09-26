@@ -23,7 +23,7 @@ import { wireForceUpdate, wireUpdateStrip, setUpdateCost } from "./swupdate";
 import { type DecodedImage, pickLargestPreview, linearAt, grayWorldWB, lumNormalize } from "./decode";
 import { decodeOffThread, decodeLanes, decodeLaneTarget, type DecodeTiming } from "./decodeClient";
 import { sourceIsMosaiced, type ExportOptions } from "./export";
-import { Renderer, type EditParams } from "./gl";
+import { Renderer, VERT, FRAG, type EditParams } from "./gl";
 import { exportImage, saveBlob, lastExportProfile, exportThreadsNow, exportFallbackReason, getSource, proxyFactorFor, type ExportFormat } from "./export";
 import { writeKeepFile, readKeepFile, sniffKeep, KEEP_EXT, KEEP_SNIFF_BYTES } from "./keepfile";
 import { buildLinearSourceInBands } from "./gpuexport";
@@ -115,22 +115,92 @@ const pickerHandlers = new Map<string, (files: File[]) => void>();
 
 const canvas = $("view") as HTMLCanvasElement;
 const hint = $("hint") as HTMLParagraphElement;
+const preparingLine = $("preparingLine") as HTMLDivElement;
+const preparing = $("preparing") as HTMLParagraphElement;
+const preparingFor = $("preparingFor") as HTMLSpanElement;
 const panel = $("panel") as HTMLElement;
 const panelBody = $("panelBody") as HTMLElement;
 const sectionHead = document.querySelector(".section-head") as HTMLElement;
 const sectionBack = $("sectionBack") as HTMLButtonElement;
 
+// THE EDITOR'S PICTURE CODE IS BUILT WITHOUT HOLDING THE PAGE (decision 071).
+// Measured 2026-09-26: 42 s on a PC through Direct3D the first time after a
+// release, 557 ms on an iPad, about 20 ms once the browser keeps the built
+// copy. The renderer starts the build and returns; the controls below are
+// wired at once; a photograph waits for `editorReady` and nothing else does.
+const PREPARING = "Preparing the editor…";
+const PREPARING_OPEN = "Preparing the editor — your photo opens as soon as it's ready.";
+const READY = "The editor is ready.";
+/** How long a build with the page free runs before the words go up, on a
+ *  launch that did not expect a slow one. A warm launch (about 20 ms) and the
+ *  iPad's cold one (557 ms) both finish first, so neither flashes a sentence
+ *  that is gone before it can be read — or spoken and then deleted. */
+const PREPARING_AFTER_MS = 1000;
+/** WHAT THIS LAUNCH EXPECTS, from the last one that finished building. A
+ *  browser keeps a built program keyed by its source text and its own version,
+ *  so it builds from scratch when the picture code's text changes or the
+ *  browser updates, and the pair below changes on exactly those. Not the app's
+ *  version: most releases leave the picture code alone, and keying on the
+ *  version flashed the words and then "ready" on every one of them. Written
+ *  only after a build succeeds. */
+const GRAPHICS_KEY = "ips-graphics-built";
+const graphicsKey = (() => {
+  // FNV-1a over the program's whole text: about 60 KB, well under a
+  // millisecond, and only ever compared with itself.
+  let h = 0x811c9dc5;
+  const src = VERT + FRAG;
+  for (let i = 0; i < src.length; i++) h = Math.imul(h ^ src.charCodeAt(i), 0x01000193);
+  return `${(h >>> 0).toString(16)} ${navigator.userAgent}`;
+})();
+const likelyCold = (() => {
+  // UNKNOWN COUNTS AS COLD. Storage refused means no record either way, and the
+  // two mistakes are not equal: guessing cold wrongly says one sentence and then
+  // that the editor is ready; guessing warm wrongly is 071's silent wait.
+  try { return localStorage.getItem(GRAPHICS_KEY) !== graphicsKey; } catch { return true; }
+})();
+let preparingShown = false;
+let preparingSecs = -1;
+/** Put the preparing words on the start screen, once. Takes nothing; returns
+ *  nothing. Touches only what is declared above it, because `beforeBuild`
+ *  calls it from inside the Renderer constructor, while everything declared
+ *  further down this module is still in its temporal dead zone. */
+function sayPreparing(): void {
+  if (preparingShown) return;
+  preparingShown = true;
+  preparing.textContent = PREPARING;
+  markStartup("graphics-words");
+}
+
 // No WebGL2 -> a clear explanation with options instead of a blank page. The
 // throw halts this module; the static overlay needs no scripting to stay up.
-// Timed for the report's "Start-up" line: building the picture code is one of
-// the two candidates for a first launch after a release that sat for a minute
-// with nothing answering (decision 071), and the page waits for it here.
+// A program that fails to BUILD arrives later, in graphicsReady's rejection,
+// and has a panel of its own: this one says WebGL2 is missing, which is false
+// for a driver that refused the code.
 const renderer = (() => {
   try {
-    markStartup("graphics-start");
-    const r = new Renderer(canvas);
-    markStartup("graphics-built");
-    return r;
+    return new Renderer(canvas, {
+      // WORDS BEFORE A BUILD THAT IS PROBABLY COLD, painted before it starts,
+      // whether or not the browser offered to build it off the page: offering
+      // is not doing, and a browser that holds the page anyway would otherwise
+      // hold it in silence. A warm launch says nothing and does not wait.
+      beforeBuild: () => {
+        if (!likelyCold) return false;
+        sayPreparing();
+        return true;
+      },
+      onBuildStart: (parallel) => {
+        markStartup("graphics-start");
+        if (parallel) markStartup("graphics-parallel");
+      },
+      onWaiting: (ms) => {
+        if (ms < PREPARING_AFTER_MS) return;
+        sayPreparing();
+        // THE SECONDS ARE FOR EYES ONLY (aria-hidden in ir.html): a count spoken
+        // every second would drown the sentence it counts for.
+        const secs = Math.floor(ms / 1000);
+        if (secs >= 2 && secs !== preparingSecs) { preparingSecs = secs; preparingFor.textContent = `${secs} s`; }
+      },
+    });
   } catch (err) {
     document.getElementById("unsupported")!.hidden = false;
     throw err;
@@ -149,7 +219,108 @@ renderer.onContextLost = () => {
 {
   const b = document.getElementById("glLostReload");
   if (b) b.addEventListener("click", () => location.reload());
+  document.getElementById("glBrokenReload")?.addEventListener("click", () => location.reload());
 }
+
+/** A photograph was asked for and the editor cannot draw one: its picture code
+ *  did not build, or the graphics went while it was being built. Thrown by
+ *  `editorReady` so every open path's `finally` runs — the wake lock, the busy
+ *  card, a set's write lanes — rather than waiting forever on a promise that
+ *  never settles. Its panel is up before anybody catches it, so the open paths
+ *  that would say something of their own skip it. */
+class EditorUnavailable extends Error {}
+/** What the driver said when the build failed, for the report (`Graphics
+ *  build`); null while nothing has failed. */
+let graphicsFailure: string | null = null;
+
+// THE BUILD ENDING IS HANDLED ONCE, HERE. These callbacks cannot run before this
+// module has finished evaluating — `build` always yields a frame before it can
+// settle, and even a context lost at birth rejects through a microtask — so the
+// `let`s and `const`s declared below are initialised by then.
+const graphicsReady: Promise<void> = renderer.ready.then(() => {
+  markStartup("graphics-built");
+  try { localStorage.setItem(GRAPHICS_KEY, graphicsKey); } catch { /* the next launch says it again, which is honest */ }
+  if (preparingShown) sayReady();
+  // THE BACKSTOP. A photograph that reached the renderer early drew nothing;
+  // this is the frame it was owed. No open path does that today.
+  if (current) draw();
+}, (err: unknown) => {
+  markStartup("graphics-failed");
+  graphicsFailure = err instanceof Error ? err.message : String(err);
+  preparing.textContent = "";
+  preparingFor.textContent = "";
+  // A lost context has its own panel, which onContextLost has raised already; a
+  // program the driver refused gets one that does not claim WebGL2 is missing.
+  document.getElementById(renderer.lost ? "glLost" : "glBroken")!.hidden = false;
+  hideBusy();
+  console.error(err);
+  throw new EditorUnavailable(graphicsFailure);
+});
+// Observed by every open path through editorReady; this only stops a launch in
+// which nothing was opened from reporting an unhandled rejection.
+graphicsReady.catch(() => {});
+
+/** The modal dialog open now, if any. Takes nothing; returns it, or null. While
+ *  one is open everything outside it is inert, and a live region there is not
+ *  heard. */
+function openModal(): HTMLDialogElement | null {
+  for (const d of document.querySelectorAll<HTMLDialogElement>("dialog[open]")) {
+    try { if (d.matches(":modal")) return d; } catch { return d; } // :modal is newer than dialog itself
+  }
+  return null;
+}
+
+/** THE BUILD'S END, SAID WHERE IT WILL BE HEARD (decision 071). Takes nothing;
+ *  returns nothing. Called once, on success, and only when the preparing words
+ *  went up: a sentence a screen reader spoke is answered rather than silently
+ *  deleted. Behind an open modal the line is inert and what it says is
+ *  dropped, so while one is open this waits for it to close and says it again.
+ *  A photograph opening makes it moot: the start screen has gone. The line is
+ *  emptied a few seconds later, and an emptied polite region says nothing. */
+function sayReady(): void {
+  preparingFor.textContent = "";
+  if (welcome.hidden) { preparing.textContent = ""; return; }
+  preparing.textContent = READY;
+  const heard = (): void => {
+    const modal = openModal();
+    if (!modal) {
+      setTimeout(() => { if (preparing.textContent === READY) preparing.textContent = ""; }, 5000);
+      return;
+    }
+    modal.addEventListener("close", () => {
+      if (welcome.hidden || preparing.textContent !== READY) return;
+      // SAID AGAIN, because the first time was inside an inert page. A live
+      // region speaks a CHANGE, so it is emptied and refilled a frame apart;
+      // the same words written twice in one task are no change at all.
+      preparing.textContent = "";
+      requestAnimationFrame(() => { preparing.textContent = READY; heard(); });
+    }, { once: true });
+  };
+  heard();
+}
+
+/** WAIT FOR THE EDITOR'S PICTURE CODE BEFORE SHOWING A PHOTOGRAPH (decision 071).
+ *  Takes nothing. Returns at once when the program is built; otherwise says so
+ *  in the busy card — raising it if nothing has — and resolves when the build
+ *  finishes. Rejects with EditorUnavailable, after closing that card, when the
+ *  build cannot finish, so the caller's `finally` blocks run.
+ *  What callers rely on: every call to showDecoded is preceded by
+ *  `await editorReady()`, so a photograph never reaches a renderer that cannot
+ *  draw it; and nothing that deletes stored work (resetSessionState) runs
+ *  before it, so a build that fails cannot cost the reader a session. */
+async function editorReady(): Promise<void> {
+  if (renderer.built) return;
+  if (graphicsFailure !== null) throw new EditorUnavailable(graphicsFailure);
+  if (busy.open) busyText.textContent = PREPARING_OPEN;
+  else showBusy(PREPARING_OPEN);
+  try {
+    await graphicsReady;
+  } catch (err) {
+    hideBusy();
+    throw err;
+  }
+}
+
 let current: DecodedImage | null = null;
 let currentFile: ImportedFile | null = null;
 // --- Hot-spot profile correction: a SEPARATE stage from the manual
@@ -3210,6 +3381,10 @@ function wireVersionMenu() {
     const kept = await previewStats().catch(() => ({ rows: 0, bytes: 0 }));
     text.value = await buildDiagnostic(__APP_VERSION__, [
       { k: "Open now", v: current ? `a photo is open${real >= 2 ? ` in a session of ${real}` : ""}` : "nothing open" },
+      // WHAT THE DRIVER SAID, when the editor's picture code did not build
+      // (decision 071). Its panel says what to do; this is what it takes to fix
+      // it, and it is the driver's text alone — nothing of the reader's.
+      { k: "Graphics build", v: graphicsBuildLine() },
       { k: "Restore depth", v: autoLift ? `on at ${Math.round(liftAmount * 100)}% strength` : "off" },
       // THE SKY MAP'S TWO NUMBERS. The depth key is decided once per photograph
       // from the sky's mean rendered chroma (skymap.ts); a key of 0 is why a
@@ -3320,6 +3495,10 @@ function wireVersionMenu() {
     (document.getElementById("infoDlg") as HTMLDialogElement | null)?.close();
     void open();
   });
+  // AND FROM THE PANEL A FAILED BUILD RAISES (decision 071), which covers the
+  // version number: the report carries what the driver said, and that panel is
+  // where the reader who needs it is standing. The dialog opens above it.
+  document.getElementById("glBrokenReport")?.addEventListener("click", () => void open());
   copyBtn.addEventListener("click", async () => {
     const was = copyBtn.textContent;
     try {
@@ -10328,6 +10507,11 @@ let lessonCardParked = false; // lesson card open when Home was pressed
 function setStartScreen(up: boolean): void {
   welcome.hidden = !up;
   panel.hidden = up || !current;
+  // THE PREPARING LINE'S ROOM GOES WHEN THE CARD DOES, never while it is on
+  // screen: the line is reserved so nothing on the card moves as the words come
+  // and go, and once the editor is built and the card has left there is nothing
+  // left for it to say on any later visit (decision 071).
+  if (!up && renderer.built) preparingLine.hidden = true;
 }
 
 function goHome() {
@@ -11434,6 +11618,7 @@ async function switchToPhoto(id: string, opts?: { quiet?: boolean }) {
     const t1 = performance.now();
     const imported: ImportedFile = { name: view.name, kind: view.kind, bytes, looksTranscoded: false };
     const img = await decodeWithLens(imported, { onTiming: (t) => { decode.t = t; }, front: true, sky: true });
+    await editorReady(); // the strip only exists once the editor is up, so this costs nothing
     const t2 = performance.now();
     showDecoded(img, imported);
     const t3 = performance.now();
@@ -11513,6 +11698,7 @@ async function switchToPhoto(id: string, opts?: { quiet?: boolean }) {
     };
   } catch (err) {
     watch.heldDuring(t0, performance.now()); // disconnect the observer on the way out
+    if (err instanceof EditorUnavailable) return; // its own panel says so
     recordFailure("opening a photo", err, { name: view.name, kind: view.kind });
     alert("Couldn't open that photo: " + (err as Error).message);
   } finally {
@@ -11880,6 +12066,11 @@ async function openPicked(files: File[], ready?: Map<File, ReadyFile>) {
 async function openSorted(files: File[], append: boolean, ready?: Map<File, ReadyFile>) {
   // Single file, not adding to a session → the fast, ephemeral path of old.
   if (files.length === 1 && !append) {
+    // THE EDITOR BEFORE THE RESET (decision 071). A photo picked while the
+    // editor is still being prepared waits here, and if it cannot be prepared
+    // the reset below never runs: a session left from last time stays there to
+    // resume, instead of being deleted for a photo that can never be shown.
+    await editorReady();
     await resetSessionState(true); // drop a lone photo or un-resumed leftovers
     hint.textContent = "Loading…";
     hint.hidden = false;
@@ -11916,6 +12107,7 @@ async function openSingle(file: File) {
   // Track it as a (strip-less) lone photo so a follow-up multi-pick can ask
   // sensibly; it isn't persisted (nothing to resume from a single edit).
   const img = await decodeWithLens(imported);
+  await editorReady();
   showDecoded(img, imported);
   hideBusy(); // there is a photo on screen now — nothing left to wait for
   const id = "lone";
@@ -11969,7 +12161,6 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
   // as a keep and a second open cannot inherit the first one's clock.
   const pressedAt = keepPressedAt;
   keepPressedAt = 0;
-  const tReset = performance.now();
   // A HEAD START ON THE ONE FILE THE READER IS WAITING FOR.
   //
   // The two lines below touch STORAGE and nothing else: ending the last
@@ -12001,6 +12192,16 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
       }
     })();
   }
+  // THE EDITOR BEFORE ANYTHING IS DELETED (decision 071). A set picked while the
+  // editor is still being prepared waits here, with its first file already being
+  // read and decoded beside it by the head start above. If the editor cannot be
+  // prepared, the reset below never runs, and a session left from last time is
+  // still there to resume. Timed on its own, because the reader waited for it
+  // and none of the parts after it contain it.
+  const tEditor = performance.now();
+  await editorReady();
+  const msEditor = performance.now() - tEditor;
+  const tReset = performance.now();
   if (!append) await resetSessionState(true); // fresh session — clear leftovers
   // THE ONE PLACE THE DELETE IS STILL WORTH WAITING FOR. Ending a session and
   // immediately opening another is the only collision: the old bytes are still
@@ -12221,6 +12422,7 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
         firstNewId = slot.id;
         const tShow = performance.now();
         if (firstImg) {
+          await editorReady(); // waited for above, before the reset; this is the invariant, said where it holds
           showDecoded(firstImg, imported);
           activateCurrent(slot.id);
         }
@@ -12232,7 +12434,7 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
           lastKeepProfile = {
             kept: files.length,
             carried: ready ? [...ready.values()].filter((r) => r.thumb && r.thumb.byteLength).length : 0,
-            reset: msReset, sweep: msSweep, read: msRead, decode: msDecode, show: msShow,
+            editor: msEditor, reset: msReset, sweep: msSweep, read: msRead, decode: msDecode, show: msShow,
             total: performance.now() - pressedAt,
           };
         }
@@ -13184,6 +13386,17 @@ function quickLookSplit(): string {
   );
 }
 
+/** THE EDITOR'S PICTURE CODE, FOR THE REPORT (decision 071). Takes nothing;
+ *  returns one line: built, still building, or — when it failed — every log
+ *  the driver wrote, flattened to one line and capped so the report stays
+ *  something a reader can paste. */
+function graphicsBuildLine(): string {
+  if (renderer.built) return "built";
+  if (graphicsFailure === null) return "still building";
+  const said = graphicsFailure.replace(/\s+/g, " ").trim();
+  return said.length > 1500 ? `${said.slice(0, 1500)}… (${said.length - 1500} more characters)` : said;
+}
+
 /** WHERE THE SECONDS AFTER **Keep** WENT — the press to the editor appearing.
  *
  *  The sweep is called out on its own because it is the one stage whose cost
@@ -13195,7 +13408,7 @@ function keepSplit(): string {
   if (!p) return "none this session";
   const t = (ms: number) => (ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)}s`);
   return (
-    `${p.kept} kept in ${t(p.total)} — ending the last session ${t(p.reset)}, waiting on its delete ${t(p.sweep)}` +
+    `${p.kept} kept in ${t(p.total)} — waiting for the editor ${t(p.editor)}, ending the last session ${t(p.reset)}, waiting on its delete ${t(p.sweep)}` +
     `, reading the first file ${t(p.read)}, decoding it ${t(p.decode)}, first paint ${t(p.show)}` +
     `; ${p.carried} of ${p.kept} arrived with a picture already rendered`
   );
@@ -13289,10 +13502,12 @@ async function resumeSession() {
     const bytes = await Session.getBytes(first.id);
     const imported: ImportedFile = { name: first.name, kind: first.kind, bytes, looksTranscoded: false };
     const img = await decodeWithLens(imported, { front: true, sky: true });
+    await editorReady();
     showDecoded(img, imported);
     activateCurrent(first.id);
     void realThumbnails(); // finish any thumbnails the last visit never reached
   } catch (err) {
+    if (err instanceof EditorUnavailable) return; // its own panel says so; the stored session is untouched
     recordFailure("resuming the session", err);
     alert("Couldn't resume the session: " + (err as Error).message);
   } finally {
@@ -13718,10 +13933,12 @@ async function openKeepFile(f: File): Promise<void> {
       looksTranscoded: false,
     };
     const img = await decodeWithLens(imported, { front: true, sky: true });
+    await editorReady();
     showDecoded(img, imported);
     showLoneWithEdit(manifest.original, imported.kind, original.length, editJson, readKeepBytes(editJson, parts));
     toast(`Opened \u201c${manifest.name}\u201d`, 2000);
   } catch (err) {
+    if (err instanceof EditorUnavailable) return; // its own panel says so
     recordFailure("opening a keep file", err);
     await noticeDialog("That file could not be opened", (err as Error).message);
   } finally {
@@ -14146,13 +14363,16 @@ let lastQuickProfile: QuickProfile | null = null;
  *  for before it reads a byte — a cost that scales with the set being REPLACED
  *  rather than the one being opened, which is why it has its own field and is
  *  not folded into "before the first file". `show` is the first paint: GL
- *  upload, shader compile and the rest of `showDecoded`.
+ *  upload and the rest of `showDecoded`. `editor` is the wait for the editor's
+ *  picture code to finish building (decision 071): nothing before the first
+ *  release of 071 waited for it here, and none of the other parts contains it.
  *
  *  `carried` is how many of the kept photographs arrived with a picture from
  *  the grid, against `kept`. Record 014 turns on that pair. */
 interface KeepProfile {
   kept: number;
   carried: number;
+  editor: number;
   reset: number;
   sweep: number;
   read: number;
@@ -15109,6 +15329,11 @@ async function openGalleryPhoto(key: string) {
     const imported: ImportedFile = { name: `${key}.${ext}`, kind: tile.kind, bytes, looksTranscoded: false };
     const img = await decodeWithLens(imported);
     if (gen !== galleryGen) return;
+    // AND THE EDITOR READY, before the previous session is torn down (decision
+    // 071): a second practice tap during the wait wins, and a build that fails
+    // leaves the session where it was.
+    await editorReady();
+    if (gen !== galleryGen) return;
     // Only NOW — with a decodable photo in hand — end the previous session.
     // Tearing it down before the download/decode succeeded meant a failed
     // open destroyed the user's session (review find, 2026-07-15).
@@ -15137,8 +15362,8 @@ async function openGalleryPhoto(key: string) {
     // Last, so establishFreshEdit's fold-everything doesn't undo the expand.
     setLearnMode(true);
     showLesson(tile.lesson ?? 0);
-  } catch {
-    if (gen !== galleryGen) return;
+  } catch (err) {
+    if (gen !== galleryGen || err instanceof EditorUnavailable) return;
     // The download succeeded, so this is not a connection problem — say so.
     alert("The photo downloaded but couldn't be opened on this device — that can happen when memory runs low. Close other tabs or apps and try again.");
   } finally {

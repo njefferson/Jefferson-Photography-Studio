@@ -1414,6 +1414,17 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 .welcome-batch:active { background: var(--surface-3); }
 .welcome-batch-hint { max-width: 30rem; margin: 2px auto 0; font-size: 0.78125rem; line-height: 1.5; color: var(--txt-3); }
 .welcome-open-hint { max-width: 30rem; margin: 2px auto 4px; font-size: 0.78125rem; line-height: 1.5; color: var(--txt-2); }
+/* The editor being prepared (decision 071). ONE LINE, RESERVED whether or not
+   anything is in it, so the words arriving and leaving move nothing on the card
+   — the start card is centred, so a line that grew would shift everything above
+   AND below it. The words are short enough to stay on one line at a phone's
+   width. The count sits in a slot of its own width with an empty twin on the
+   other side, so the sentence stays centred and does not step sideways as the
+   seconds go from one digit to two. */
+.welcome-preparing { max-width: 30rem; min-height: 1.5em; margin: 2px auto 0; display: flex; gap: 0.5em; justify-content: center; align-items: baseline; font-size: 0.78125rem; line-height: 1.5; color: var(--txt-2); }
+.welcome-preparing::before { content: ""; flex: 0 0 3.5em; }
+.welcome-preparing p { margin: 0; }
+#preparingFor { flex: 0 0 3.5em; text-align: left; font-variant-numeric: tabular-nums; }
 #resumeSession { border-color: var(--accent); color: var(--accent); }
 /* Prominent "return to what you were doing" control at the top of the start
    screen — shown only when a photo or session is still open behind it. */
@@ -2820,6 +2831,7 @@ button.toggletip {
    the same kind of moment: something outside the reader's control stopped the
    editor working, and what they need is what happened and what fixes it. */
 #glLost,
+#glBroken,
 #unsupported {
   position: fixed;
   inset: 0;
@@ -2834,7 +2846,9 @@ button.toggletip {
    is held to the touch minimum explicitly rather than inheriting whatever .btn
    happens to be. It measured 34px — under the 44px floor — and nothing caught
    that until a test drove the real failure and looked at the button. */
-#glLostReload {
+#glLostReload,
+#glBrokenReload,
+#glBrokenReport {
   min-height: 44px;
   padding-inline: 18px;
   font-size: 0.9375rem;

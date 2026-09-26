@@ -209,15 +209,23 @@ export function buildLinearSource(file: ImportedFile, current: DecodedImage, hal
 }
 
 /** Draw one frame of an export through the app's own renderer and hand back its
- *  pixels, top row first, in the same RGBA layout the computed path produces. */
-export function drawFrame(
+ *  pixels, top row first, in the same RGBA layout the computed path produces.
+ *  Takes the picked `file` and its decode `current`, the edit `params`, the
+ *  lens curve `lens` (or null), and the view's `rotate` and `flip`. Returns a
+ *  promise of the frame and where its time went; it resolves once drawn, and
+ *  rejects if the editor's picture code does not build here (decision 071: a
+ *  new Renderer's program is still building when the constructor returns, and
+ *  a draw before it is ready draws nothing). Consumer: the test page's drawn
+ *  export row, which compares `data` pixel for pixel with the computed export,
+ *  so it must be the same size and layout as that path's output. */
+export async function drawFrame(
   file: ImportedFile,
   current: DecodedImage,
   params: EditParams,
   lens: LensCurve | null,
   rotate = 0,
   flip = 0,
-): DrawnFrame {
+): Promise<DrawnFrame> {
   // ONE PASS, EVERY PIXEL. The computed export does this per output pixel inside
   // its sampler chain, which is more work in total — but it never holds a whole
   // frame, and this does: four bytes a channel, 334 MB on a 21-megapixel raw.
@@ -233,6 +241,7 @@ export function drawFrame(
   const canvas = document.createElement("canvas");
   const r = new Renderer(canvas);
   try {
+    await r.ready;
     let t = performance.now();
     r.setImage(image);
     // THE FOOTPRINT THE READER PREVIEWED, not the one a full-resolution texture
