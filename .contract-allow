@@ -201,8 +201,6 @@ src/sticker.ts:stickerPatches
 src/sticker.ts:compositeStickersOverlay8
 src/sticker.ts:makeStickerOverlaySampler
 src/straighten.ts:findTilt
-src/swupdate.ts:setUpdateCost
-src/swupdate.ts:wireForceUpdate
 src/theme.ts:currentChoice
 src/theme.ts:resolveMode
 src/theme.ts:currentTheme

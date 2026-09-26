@@ -92,6 +92,31 @@ function workerVersion(w: ServiceWorker): Promise<string | null> {
   });
 }
 
+/** WHAT THE ACTIVE RELEASE'S INSTALL DID (decision 071), for the "Offline
+ *  worker" line: how many files it kept from this device, how many it
+ *  downloaded, and whether the sticker library is all here. Record 071's claim
+ *  that every release downloads the whole app is checked on the device by this
+ *  clause, not assumed.
+ *  Takes `version`, the active worker's release. Returns a clause beginning
+ *  " · ", or "" when that install left no summary (a release from before this,
+ *  or storage refused). Never creates a cache: caches.open would, so it asks
+ *  caches.has first. What the caller relies on: it never throws. */
+async function installLine(version: string): Promise<string> {
+  try {
+    const name = `ips-${version}`;
+    if (!(await caches.has(name))) return "";
+    const r = await (await caches.open(name)).match("./__install-summary");
+    if (!r) return "";
+    const s = (await r.json()) as { kept: number; fetched: number; unverified: number; stickersMissing: number; ms: number };
+    return ` · its install kept ${s.kept} files already on this device and downloaded ${s.fetched}`
+      + `${s.unverified ? ` (${s.unverified} not matching the build)` : ""}`
+      + `, ${s.stickersMissing ? `${s.stickersMissing} stickers still to fetch` : "every sticker on the device"}`
+      + `, in ${(s.ms / 1000).toFixed(1)} s`;
+  } catch {
+    return "";
+  }
+}
+
 async function swLine(version: string): Promise<string> {
   try {
     if (!("serviceWorker" in navigator)) return "not supported";
@@ -119,6 +144,7 @@ async function swLine(version: string): Promise<string> {
     }
     const active = reg.active ? await workerVersion(reg.active) : null;
     const activeNote = active && active !== version ? ` · the worker serving this page is v${active}` : "";
+    const installNote = active ? await installLine(active) : "";
     // THE CACHE LIST IS READ LAST, AND THAT ORDER IS THE POINT.
     //
     // It used to be read before the workers were questioned, and a report came
@@ -126,14 +152,14 @@ async function swLine(version: string): Promise<string> {
     // which looks exactly like a worker that reached "waiting" without its cache
     // and would have been a serious defect, since taking that update would leave
     // a broken offline copy. It was not: install populates the cache before a
-    // worker can wait at all, and `addAll` is all-or-nothing so a failure aborts
+    // worker can wait at all, and the install is all-or-nothing so a failure aborts
     // the install entirely. What actually happened is that a worker finished
     // installing in the gap between the snapshot and the question, so the list
     // was simply older than the answer beside it. A diagnostic that reports two
     // facts gathered at different moments as though they were one moment
     // invents contradictions for its reader to chase.
     const names = await caches.keys();
-    return `${state}${waitingNote}${activeNote} · caches: ${names.join(", ") || "none"}`;
+    return `${state}${waitingNote}${activeNote}${installNote} · caches: ${names.join(", ") || "none"}`;
   } catch {
     return "unavailable";
   }

@@ -54,3 +54,14 @@
   flex: 0 0 auto;
   padding-top: calc(8px + env(safe-area-inset-top, 0px));
 }
+
+/* THE DOWNLOAD'S COUNT (decision 071): drawn for the eye and hidden from
+   assistive tech in the markup swupdate.ts builds, because the strip is a live
+   region and would otherwise be read again for every file. Tabular figures so
+   "9 of 12" to "10 of 12" does not shuffle the line. */
+.sw-strip-count { margin-left: 0.5em; font-variant-numeric: tabular-nums; color: var(--txt-2); }
+.sw-strip-count:empty { display: none; }
+/* Nothing to take while it downloads, and nothing to take after a failure:
+   the one button left is Not now, or OK. */
+.sw-strip[data-state="downloading"] .sw-strip-go,
+.sw-strip[data-state="failed"] .sw-strip-go { display: none; }

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// THE APP SHELL'S GRID, AT EVERY WIDTH, WITH THE UPDATE STRIP BOTH WAYS.
+// THE APP SHELL'S GRID, AT EVERY WIDTH, WITH THE UPDATE STRIP BOTH WAYS — and,
+// since decision 071, in its downloading state with a count beside the words.
 //
 // WHY IT EXISTS, reported from an iPhone 2026-09-22: a landscape photograph on
 // a phone held in portrait gave a black screen that could not be tapped out of.
@@ -57,9 +58,34 @@ const READ = `(() => {
     colText: cs.gridTemplateColumns,
     app: w(app), stage: w(document.getElementById("stage")),
     bar: w(document.querySelector(".bar")), strip: w(document.getElementById("swStrip")),
+    count: w(document.querySelector("#swStrip .sw-strip-count")),
+    goShown: getComputedStyle(document.getElementById("swStripGo")).display !== "none",
     vw: innerWidth, scrollW: document.documentElement.scrollWidth,
   };
 })()`;
+
+/** THE INVARIANT, for one state of the strip against the shell without it.
+ *  Takes the line's `label`, `what` is showing, and the two READ results;
+ *  prints one ok or FAIL line and returns nothing. What the caller relies on:
+ *  the same six conditions for every state, so a new state cannot be measured
+ *  against a weaker rule than the one that broke. */
+function judge(label, what, before, after) {
+  if (after.cols !== before.cols) {
+    fail(`${label}: showing ${what} changed the column count ${before.cols} -> ${after.cols} (${after.colText}) — it landed outside the explicit grid`);
+  } else if (after.rows > before.rows + 1) {
+    fail(`${label}: showing ${what} added ${after.rows - before.rows} rows — it landed outside the explicit grid`);
+  } else if (after.stage < before.stage) {
+    fail(`${label}: the stage narrowed from ${before.stage} to ${after.stage} when ${what} appeared`);
+  } else if (after.bar !== before.bar) {
+    fail(`${label}: the top bar changed width ${before.bar} -> ${after.bar} when ${what} appeared — its controls have moved off the screen`);
+  } else if (after.scrollW > after.vw + 1) {
+    fail(`${label}: the page overflows its viewport by ${after.scrollW - after.vw}px with ${what} shown`);
+  } else if (after.strip < 1) {
+    fail(`${label}: the update strip has no width, so the reader is not told after all`);
+  } else {
+    ok(`${label}: ${what} takes a row and the shell is unchanged`);
+  }
+}
 
 const br = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });
 try {
@@ -81,22 +107,31 @@ try {
       console.log(`  ${label.padEnd(30)} ${width}x${height}`);
       console.log(`  ${"".padEnd(30)} strip hidden: ${before.cols} col / ${before.rows} row · stage ${before.stage} · bar ${before.bar}`);
       console.log(`  ${"".padEnd(30)} strip shown : ${after.cols} col / ${after.rows} row · stage ${after.stage} · bar ${after.bar} · strip ${after.strip}`);
+      judge(`${label}`, "the update strip", before, after);
 
-      if (after.cols !== before.cols) {
-        fail(`${label}: showing the update strip changed the column count ${before.cols} -> ${after.cols} (${after.colText}) — it landed outside the explicit grid`);
-      } else if (after.rows > before.rows + 1) {
-        fail(`${label}: showing the update strip added ${after.rows - before.rows} rows — it landed outside the explicit grid`);
-      } else if (after.stage < before.stage) {
-        fail(`${label}: the stage narrowed from ${before.stage} to ${after.stage} when the strip appeared`);
-      } else if (after.bar !== before.bar) {
-        fail(`${label}: the top bar changed width ${before.bar} -> ${after.bar} when the strip appeared — its controls have moved off the screen`);
-      } else if (after.scrollW > after.vw + 1) {
-        fail(`${label}: the page overflows its viewport by ${after.scrollW - after.vw}px with the strip shown`);
-      } else if (after.strip < 1) {
-        fail(`${label}: the update strip has no width, so the reader is not told after all`);
-      } else {
-        ok(`${label}: the strip takes a row and the shell is unchanged`);
-      }
+      // DECISION 071's STATE: an update downloading, with its count. The
+      // sentence and the count are written into the two spans swupdate.ts
+      // builds, the way render() writes them, so what is measured is the
+      // longest line the strip really carries — a forced data-state alone would
+      // leave the count empty and measure nothing new. The Update button is
+      // hidden in this state, so the row holds different things than above.
+      const built = await page.evaluate(() => {
+        const s = document.getElementById("swStrip");
+        const sentence = s.querySelector(".sw-strip-sentence"), count = s.querySelector(".sw-strip-count");
+        if (!sentence || !count) return false;
+        s.dataset.state = "downloading";
+        sentence.textContent = "Downloading the update…";
+        count.textContent = "118 of 162";
+        document.getElementById("swStripLater").textContent = "Not now";
+        return true;
+      });
+      await page.waitForTimeout(300);
+      const dl = await page.evaluate(READ);
+      console.log(`  ${"".padEnd(30)} downloading : ${dl.cols} col / ${dl.rows} row · stage ${dl.stage} · bar ${dl.bar} · strip ${dl.strip} · count ${dl.count}`);
+      if (!built) fail(`${label}: the strip has no sentence and count spans — wireUpdateStrip did not build them, so the downloading state cannot be shown`);
+      else if (dl.count < 1) fail(`${label}: the download's count has no width — "118 of 162" is not on screen`);
+      else if (dl.goShown) fail(`${label}: the Update button is still offered while there is nothing to take yet`);
+      else judge(`${label} (downloading)`, "the downloading notice", before, dl);
     } catch (e) {
       fail(`${label}: the walk could not run — ${e}`);
     } finally { await ctx.close(); }

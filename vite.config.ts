@@ -1,6 +1,7 @@
 import { defineConfig, type Plugin } from "vite";
 import { execSync } from "node:child_process";
-import { readFileSync, writeFileSync, readdirSync, statSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 // Offline-first PWA, no framework. Relative base so it runs from any path
@@ -212,6 +213,49 @@ function appVersion() {
   }
 }
 
+/** WHICH BUILD THIS IS, EXACTLY (decision 071). Takes nothing; returns one id,
+ *  computed ONCE per build (BUILD_ID below) and written into both halves — the
+ *  page as `__BUILD_ID__` and public/sw.js as its BUILD — so the two can be
+ *  compared and can never disagree about what they are.
+ *
+ *  WHY NOT THE VERSION, AND WHY NOT A FILE NAME. The version is a count of
+ *  commits since VERSION moved, so a staging force-push with the same count, or
+ *  an amended commit, is a DIFFERENT build under the SAME version. A chunk's
+ *  hashed name was the first idea and is no better: `assets/swupdate-<hash>.js`
+ *  imports nothing, so its hash moves only with that one file and the version
+ *  string. What the same-version takeover in sw.js needs is "the page on screen
+ *  is this exact build", and only the commit says that.
+ *
+ *  The commit's SHA on a clean tree, which is every CI build. A tree with local
+ *  changes gets the SHA plus a digest of those changes, so two different local
+ *  builds do not share an id. No git at all gives a one-off id, which can only
+ *  ever match itself — the failure it chooses is "never taken over silently",
+ *  the side the takeover is safe on. What the caller relies on: equal ids mean
+ *  the same source, with the one exception of untracked files' contents, which
+ *  only a local build has. */
+function buildId(): string {
+  try {
+    const sha = git("git rev-parse HEAD");
+    const changed = git("git status --porcelain");
+    if (!changed) return sha;
+    const diff = execSync("git diff HEAD", { maxBuffer: 1 << 28 });
+    return `${sha}+${createHash("sha256").update(changed).update(diff).digest("hex").slice(0, 12)}`;
+  } catch {
+    return `unversioned-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+}
+const BUILD_ID = buildId();
+
+/** THE REVISION OF ONE BUILT FILE (decision 071): the first sixteen hex digits
+ *  of the SHA-256 of its bytes. Takes an absolute path inside dist; returns the
+ *  revision. public/sw.js computes the SAME digest of the bytes it downloads
+ *  (its revOf) and labels a stored copy only when the two agree — one rule in
+ *  two languages, which tools/offline-shell-walk.mjs recomputes independently
+ *  and fails on if the worker's list and the files ever disagree. */
+function revOf(file: string): string {
+  return createHash("sha256").update(readFileSync(file)).digest("hex").slice(0, 16);
+}
+
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 /** Emit `dist/notes.html` — the PUBLIC "What's new & roadmap" page the ⓘ
@@ -328,7 +372,15 @@ ${shipped.map((i) => li(esc(i.title))).join("\n").replace(/<li>/g, '<li class="s
  *  (see public/sw.js). Runs in `closeBundle`, after Vite has copied publicDir
  *  into dist, so it sees BOTH the hashed bundles and the static shell (fonts,
  *  icons, manifests). Excludes the huge practice-photo `examples/` tree and
- *  sourcemaps — examples load on demand into their own version-stable cache. */
+ *  sourcemaps — examples load on demand into their own version-stable cache.
+ *
+ *  SINCE DECISION 071 every entry carries its REVISION ([url, revision], see
+ *  revOf), so an install downloads only what changed; the sticker pictures are
+ *  a second list the worker keeps in a cache that outlives releases; and the
+ *  worker is stamped with this build's id and with a revision of `_headers`,
+ *  because a copy carried forward keeps the response headers it was first
+ *  stored with. Five exact-string substitutions, each of which fails the build
+ *  if its placeholder is missing. */
 function precacheManifest(): Plugin {
   return {
     name: "precache-manifest",
@@ -343,17 +395,27 @@ function precacheManifest(): Plugin {
       // Sticker library manifest: the keys (paths without .png) of every sticker
       // PNG present, so the app knows what's on disk and the picker is dynamic
       // (drop a PNG into public/stickers/<category>/ and it appears — no code).
+      const isStickerPng = (p: string) => p.startsWith("stickers/") && p.endsWith(".png");
       const stickerKeys = rel
-        .filter((p) => p.startsWith("stickers/") && p.endsWith(".png"))
+        .filter(isStickerPng)
         .map((p) => p.slice("stickers/".length, -".png".length))
         .sort();
       writeFileSync(resolve(dist, "stickers/manifest.json"), JSON.stringify(stickerKeys));
+      // THE STICKER PICTURES ARE LISTED APART (decision 071): 162 files, 25 MB,
+      // unchanged since July and re-requested by every release because they sat
+      // in the shell's list. They go to a cache of their own that outlives
+      // releases (sw.js STICKERS), filled best-effort. The manifest.json beside
+      // them stays in the shell: the picker cannot list anything without it.
+      const stickerFiles = rel
+        .filter(isStickerPng)
+        .sort()
+        .map((p) => ["./" + p, revOf(resolve(dist, p))]);
       const shell = rel
         .filter((p) => !p.startsWith("examples/")) // practice photos: on-demand, own cache
         .filter((p) => p !== "sw.js" && !p.endsWith(".map"))
         // Cloudflare Pages CONFIG files are consumed by the platform, never
         // served — precaching them would 404 during SW install and break the
-        // entire offline shell (addAll is all-or-nothing).
+        // entire offline shell (the install is all-or-nothing).
         .filter((p) => p !== "_headers" && p !== "_redirects")
         // Social-share images are fetched by link scrapers (GitHub/Cloudflare/
         // OpenGraph), never by the app itself — no reason to precache the bytes.
@@ -361,13 +423,14 @@ function precacheManifest(): Plugin {
         // Manifest screenshots are the same shape: the BROWSER's install dialog
         // reads them, the app never does. Precaching them put half a megabyte
         // into every install and into every release's fresh cache, for pictures
-        // no reader ever sees from inside the app — and addAll is
+        // no reader ever sees from inside the app — and the install is
         // all-or-nothing, so they would also be half a megabyte of new ways for
         // an install to fail on a thin connection.
         .filter((p) => !p.startsWith("screenshots/"))
         // The host serves 404.html itself, for an address it does not have; the
         // app never asks for it, so it is no part of the offline copy (071).
         .filter((p) => p !== "404.html")
+        .filter((p) => !isStickerPng(p)) // their own list, above
         .filter((p) => statSync(resolve(dist, p)).isFile()) // drop directory entries
         .map((p) => "./" + p);
       // The chooser PWA launches at "./" (start_url in manifest.webmanifest), so
@@ -376,18 +439,29 @@ function precacheManifest(): Plugin {
       // The sticker manifest is written above, after the dist walk, so add it by
       // hand — the picker needs it offline.
       shell.push("./stickers/manifest.json");
-      const list = JSON.stringify([...new Set(shell)]);
-      const sw = readFileSync(swPath, "utf8");
-      let out = sw.replace("[/* __PRECACHE_MANIFEST__ */]", list);
+      // [url, revision] pairs. "./" is index.html's bytes under the root key.
+      const entries = [...new Set(shell)].map((u) => [u, revOf(resolve(dist, u === "./" ? "index.html" : u.slice(2)))]);
+      // The host's header rules. Folded into every label the worker writes, so a
+      // change here stops old copies being carried forward with old headers.
+      const headersRev = existsSync(resolve(dist, "_headers")) ? revOf(resolve(dist, "_headers")) : "none";
+      let out = readFileSync(swPath, "utf8");
       // Fail the build loudly — a shipped-but-unpopulated SW would silently
-      // reintroduce the offline blackout this plugin exists to prevent.
-      if (out === sw) throw new Error("precache-manifest: placeholder not found in dist/sw.js");
+      // reintroduce the offline blackout this plugin exists to prevent. A
+      // FUNCTION replacement, so nothing in a value is read as a `$` pattern.
+      const stamp = (needle: string, value: string, what: string) => {
+        const next = out.replace(needle, () => value);
+        if (next === out) throw new Error(`precache-manifest: ${what} placeholder not found in dist/sw.js`);
+        out = next;
+      };
+      stamp("[/* __PRECACHE_MANIFEST__ */]", JSON.stringify(entries), "precache");
+      stamp("[/* __STICKER_MANIFEST__ */]", JSON.stringify(stickerFiles), "sticker");
+      stamp('/* __BUILD_ID__ */ ""', JSON.stringify(BUILD_ID), "build-id");
+      stamp('/* __HEADERS_REV__ */ ""', JSON.stringify(headersRev), "headers-revision");
       // Stamp the cache name with the app's real version. Every deploy is a
       // commit, so every deploy gets a fresh cache with no hand-numbered
       // pseudo-version to bump (or forget).
-      const stamped = out.replace('"ips-" + "__BUILD_VERSION__"', JSON.stringify("ips-" + appVersion()));
-      if (stamped === out) throw new Error("precache-manifest: cache-stamp placeholder not found in dist/sw.js");
-      writeFileSync(swPath, stamped);
+      stamp('"ips-" + "__BUILD_VERSION__"', JSON.stringify("ips-" + appVersion()), "cache-stamp");
+      writeFileSync(swPath, out);
     },
   };
 }
@@ -420,5 +494,9 @@ export default defineConfig({
     // than a list typed into a panel where nothing can notice it going stale.
     __MACRO_TODO__: JSON.stringify(checklist(/^##\s+Macro Studio — not right yet/i).filter((i) => !i.done)),
     __APP_VERSION__: JSON.stringify(appVersion()),
+    // The same id public/sw.js is stamped with (buildId above): the page sends
+    // it when it asks a waiting worker to take over, and the worker agrees only
+    // when it is its own (decision 071).
+    __BUILD_ID__: JSON.stringify(BUILD_ID),
   },
 });
