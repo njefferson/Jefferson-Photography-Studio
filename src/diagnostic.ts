@@ -13,6 +13,7 @@
 // the session walk opens a named practice file and greps the built report for
 // its name. Anything added here has to survive the same test.
 
+import { startupLine } from "./startup";
 import { device } from "./platform";
 
 export interface DiagLine { k: string; v: string }
@@ -247,6 +248,10 @@ export async function buildDiagnostic(
     { k: "Cores", v: String(navigator.hardwareConcurrency ?? "not reported") },
     { k: "Graphics", v: glLine() },
     { k: "Offline worker", v: await swLine(version) },
+    // Where this launch's time went, so a frozen first launch after a release
+    // can be told apart: the page, the code, the picture code, or a download
+    // (decision 071).
+    { k: "Start-up", v: startupLine() },
     { k: "Storage", v: await storageLine(standalone) },
     // The line that turns an origin-wide number into something actionable.
     { k: "App is holding", v: await holdingsLine() },

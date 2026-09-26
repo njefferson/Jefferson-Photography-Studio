@@ -11,6 +11,8 @@
 // export — has to reconstruct by hand what opening it would do, and why those
 // reconstructions drift apart. `freshBaseline` exists to be the single copy of
 // that ruling; tools/agreement-walk.mjs exists because they still disagree.
+// FIRST, so its clock starts before anything else this page loads (decision 071).
+import { markStartup } from "./startup";
 import { writeVersionStamp } from "./verstamp";
 import "./style.css";
 // The shared chrome stylesheet. The editor does not use verdlg.ts yet — see the
@@ -120,9 +122,15 @@ const sectionBack = $("sectionBack") as HTMLButtonElement;
 
 // No WebGL2 -> a clear explanation with options instead of a blank page. The
 // throw halts this module; the static overlay needs no scripting to stay up.
+// Timed for the report's "Start-up" line: building the picture code is one of
+// the two candidates for a first launch after a release that sat for a minute
+// with nothing answering (decision 071), and the page waits for it here.
 const renderer = (() => {
   try {
-    return new Renderer(canvas);
+    markStartup("graphics-start");
+    const r = new Renderer(canvas);
+    markStartup("graphics-built");
+    return r;
   } catch (err) {
     document.getElementById("unsupported")!.hidden = false;
     throw err;
@@ -17660,6 +17668,9 @@ setupInstallFromApp("irInstallFromApp");
  *  `#panel` being `hidden` until a photograph opens does not stop a listener
  *  being attached to something inside it. */
 wireToggletips();
+
+// The last of the wiring: from here every control answers (decision 071).
+markStartup("controls-wired");
 
 // Offline support.
 if ("serviceWorker" in navigator) {

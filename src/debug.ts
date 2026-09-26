@@ -23,7 +23,7 @@ import { makeRowDenoiser } from "./raw/denoise";
 import { compileEdit, TONE_DEFAULT, GRADE_DEFAULT, MIX3_DEFAULT, hslDefault, CROP_DEFAULT, neutralMask, type EditParams, type MaskLayer } from "./pipeline";
 import { exportImage } from "./export";
 import { drawFrame, canDrawFrame, buildLinearSource } from "./gpuexport";
-import { Renderer } from "./gl";
+import { Renderer, VERT, FRAG } from "./gl";
 
 declare const __APP_VERSION__: string;
 
@@ -199,6 +199,89 @@ async function graphics(): Promise<void> {
     read / N > 60
       ? "SLOW. This is the pause the histogram causes on every redraw, because reading forces the graphics chip to finish everything first. On this device it is worth avoiding."
       : "Fine. Reading pixels back forces the graphics chip to catch up, and on this device that costs little — the histogram is not what makes the editor feel slow.");
+}
+
+/** WHAT BUILDING THE EDITOR'S PICTURE CODE COSTS ON THIS DEVICE (decision 071).
+ *  The first launch after a release sat for about a minute on a PC with the
+ *  start screen painted and nothing answering, and one candidate is this: the
+ *  editor builds its whole fragment program while it starts, and the page
+ *  waits for the driver. A browser keeps built programs keyed by their source,
+ *  so a release that changes the program pays it again once. This builds the
+ *  editor's own VERT and FRAG — not a stand-in — made unique each time so no
+ *  stored copy can answer, three times, and then the first of them once more,
+ *  unchanged, to show what a warm launch pays. Each is drawn once into a
+ *  16-pixel frame so the driver has to finish it; nothing is kept. */
+async function buildingThePictureCode(): Promise<void> {
+  const p = note("Building the editor's picture code…");
+  const cv = document.createElement("canvas");
+  cv.width = 16; cv.height = 16;
+  const gl = cv.getContext("webgl2");
+  if (!gl) { p.remove(); row("Building the picture code", "WebGL2 unavailable", "The editor cannot run on this device."); return; }
+  const parallel = !!gl.getExtension("KHR_parallel_shader_compile");
+  const tri = gl.createBuffer()!;
+  gl.bindBuffer(gl.ARRAY_BUFFER, tri);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  const px = new Uint8Array(4);
+  // Everything queued before a run is finished first, so no run is billed for
+  // the one before it — the first version of this row was, and read 20 ms for
+  // its first build and 350 for the next two.
+  const drain = () => gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  // Not a comment: a shader translator may drop comments before the driver's
+  // own cache is consulted (inferred, not measured on a device), and then every
+  // "cold" build would be answered from the copy the editor already made. A
+  // unique constant in a branch no pixel takes survives translation and changes
+  // nothing that is drawn; in the container it read 19-25 ms cold against 3 ms
+  // warm, so it does defeat the cache there.
+  // BUILT, THEN DRAWN, timed apart: some drivers finish the picture code only
+  // when it first draws, so the build alone can look cheap while the first
+  // picture pays for it.
+  const build = (tag: number): { link: number; draw: number } => {
+    drain();
+    const t0 = performance.now();
+    const mk = (type: number, src: string) => { const s = gl.createShader(type)!; gl.shaderSource(s, src); gl.compileShader(s); return s; };
+    const vs = mk(gl.VERTEX_SHADER, VERT);
+    const fs = mk(gl.FRAGMENT_SHADER, FRAG.replace("void main() {",
+      `void main() {\n  if (gl_FragCoord.x < -${tag}.0) { frag = vec4(${tag}.0 / 1e9); return; }`));
+    const prog = gl.createProgram()!;
+    gl.attachShader(prog, vs); gl.attachShader(prog, fs);
+    gl.linkProgram(prog);
+    // Reading the status is what makes the page wait, exactly as the editor's
+    // own start does.
+    const ok = gl.getProgramParameter(prog, gl.LINK_STATUS);
+    const t1 = performance.now();
+    if (!ok) throw new Error("the editor's picture code did not build on this device");
+    gl.useProgram(prog);
+    const loc = gl.getAttribLocation(prog, "a_pos");
+    if (loc >= 0) { gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0); }
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    drain();
+    const t2 = performance.now();
+    gl.useProgram(null);
+    gl.deleteProgram(prog); gl.deleteShader(vs); gl.deleteShader(fs);
+    return { link: t1 - t0, draw: t2 - t1 };
+  };
+  try {
+    const stamp = 1000 + Math.floor(Math.random() * 8e8);
+    const cold: { link: number; draw: number }[] = [];
+    for (let i = 0; i < 3; i++) { cold.push(build(stamp + i)); await tick(); }
+    const warm = build(stamp);
+    p.remove();
+    const tot = (r: { link: number; draw: number }) => r.link + r.draw;
+    const med = [...cold].sort((a, b) => tot(a) - tot(b))[1];
+    const runs = cold.map((r) => `${ms(r.link)} + ${ms(r.draw)}`).join(", ");
+    row("Building the picture code (first time)", ms(tot(med)),
+      tot(med) > 5000
+        ? "SLOW. The editor waits this long for its graphics the first time after a release that changes them, with the start screen showing and nothing answering. On this device that is the likely cause of a frozen first launch."
+        : "The editor waits this long for its graphics the first time after a release that changes them. On this device it is not what would freeze a launch.",
+      `${runs} (built + first picture)`);
+    row("Building it again (a normal launch)", ms(tot(warm)),
+      `What an ordinary launch pays once the device has kept the built program: ${ms(warm.link)} to build and ${ms(warm.draw)} for the first picture.${parallel ? " This device can build it without making the page wait, which the editor does not use yet." : " This device offers no way to build it without making the page wait."}`);
+  } catch (err) {
+    p.remove();
+    row("Building the picture code", "failed", (err as Error).message);
+  } finally {
+    gl.deleteBuffer(tri);
+  }
 }
 
 /** Decoding a real raw file, on the main thread and in the worker. */
@@ -1493,6 +1576,7 @@ async function fullResolutionPreview(): Promise<void> {
   await refreshReport();
   shaderRoom();
   await graphics();
+  await buildingThePictureCode();
   threads();
   await exportOnTheGpu();
   await decoding();
