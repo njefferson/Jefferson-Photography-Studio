@@ -159,6 +159,30 @@ function followModals(strip: HTMLElement): void {
   }).observe(document.documentElement, { attributes: true, attributeFilter: ["open"], subtree: true });
 }
 
+/** IS A WAITING VERSION NEWER THAN THE ONE ON SCREEN (decision 071)?
+ *  Takes `candidate`, the version a waiting worker reports ("2.63.8"), and
+ *  `current`, the page's own (`__APP_VERSION__`). Returns true only when the
+ *  candidate is numerically higher, segment by segment, a missing segment
+ *  counting as 0 — so "2.63.10" is newer than "2.63.9" and "2.55" is older than
+ *  "2.63.7". Either side not made of numbers falls back to "different", the
+ *  strip's behaviour before this, because informing wrongly is the smaller
+ *  failure than silence about a real update.
+ *  WHY IT EXISTS: the strip asked only whether the waiting version was
+ *  DIFFERENT. Pages load network-first, so the page is often newer than the
+ *  waiting worker; the strip then offered the older one, and taking it ran that
+ *  worker's cleanup, which deletes the newer version's half-filled download.
+ *  Consumed by `isNewerThanThisPage` below. */
+export function isNewerVersion(candidate: string, current: string): boolean {
+  const parse = (v: string) => (/^\d+(\.\d+)*$/.test(v) ? v.split(".").map(Number) : null);
+  const a = parse(candidate), b = parse(current);
+  if (!a || !b) return candidate !== current;
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const d = (a[i] ?? 0) - (b[i] ?? 0);
+    if (d !== 0) return d > 0;
+  }
+  return false;
+}
+
 /** §7h's other half: the reader is TOLD, without having to go looking.
  *  wireForceUpdate above is a PULL — it only helps somebody who already
  *  suspects there is a new version and knows which panel to open. A newcomer
@@ -196,7 +220,7 @@ export function wireUpdateStrip(): void {
       const done = (v: boolean) => { if (!settled) { settled = true; resolve(v); } };
       try {
         const ch = new MessageChannel();
-        ch.port1.onmessage = (e) => done(String(e.data ?? "") !== __APP_VERSION__);
+        ch.port1.onmessage = (e) => done(isNewerVersion(String(e.data ?? ""), __APP_VERSION__));
         w.postMessage({ type: "VERSION" }, [ch.port2]);
       } catch { done(true); }
       setTimeout(() => done(true), 1500);
