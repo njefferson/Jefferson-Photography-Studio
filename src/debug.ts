@@ -267,13 +267,18 @@ async function buildingThePictureCode(): Promise<void> {
     const warm = build(stamp);
     p.remove();
     const tot = (r: { link: number; draw: number }) => r.link + r.draw;
-    const med = [...cold].sort((a, b) => tot(a) - tot(b))[1];
+    // THE FIRST RUN IS THE HEADLINE, NOT THE MEDIAN. It is the only one of the
+    // three made the way a launch makes it, as the first program in a fresh
+    // context; the two after it ran with the driver already started and can be
+    // far cheaper. Measured on an iPad, 2026-09-26: 557 ms, then 22 and 22, and
+    // the median it used to lead with (23 ms) hid the number this row exists for.
+    const first = cold[0];
     const runs = cold.map((r) => `${ms(r.link)} + ${ms(r.draw)}`).join(", ");
-    row("Building the picture code (first time)", ms(tot(med)),
-      tot(med) > 5000
+    row("Building the picture code (first time)", ms(tot(first)),
+      tot(first) > 5000
         ? "SLOW. The editor waits this long for its graphics the first time after a release that changes them, with the start screen showing and nothing answering. On this device that is the likely cause of a frozen first launch."
         : "The editor waits this long for its graphics the first time after a release that changes them. On this device it is not what would freeze a launch.",
-      `${runs} (built + first picture)`);
+      `${runs} (built + first picture). The first is what a launch after a release pays; the later ones ran in the same page after the graphics had started, and can be much cheaper.`);
     row("Building it again (a normal launch)", ms(tot(warm)),
       `What an ordinary launch pays once the device has kept the built program: ${ms(warm.link)} to build and ${ms(warm.draw)} for the first picture.${parallel ? " This device can build it without making the page wait, which the editor does not use yet." : " This device offers no way to build it without making the page wait."}`);
   } catch (err) {

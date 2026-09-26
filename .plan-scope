@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
 planhash=63bc0e468fac2e3c
-diffhash=a5dbc00e0e8e6ffd
-verdict=IN-SCOPE: plan items 1, 2 (record 072) and 4 (Kolari findings and Z50 corrections)
-# The diff covers plan item 1 (the device readings in the v2.63.12 staging entry), item 2's first step (072 recorded and ranked 31, its proposed fix designed and refuted, no pixel code touched) and item 4 (IR-SCIENCE 9q with sources and figures checked against the scratch measurements; the Z50 screw-on-filter lines marked as not describing this camera). Five findings from the first pass were acted on and verified. decisions-check, roadmap-copy-check and docs-check pass.
+diffhash=90705470b3d0ecd9
+verdict=IN-SCOPE: plan item 1, the test page's first-time row leads with the first build
+# src/debug.ts changes only the first-time row's headline from the median of three cold builds to the first (the one a launch pays) with every run still printed; docs/ARCHITECTURE.md is its generated line count. Plan item 1's measurement.
