@@ -55,7 +55,7 @@ The field's answer to an underexposed frame is the reader's slider.
 - `estimateDenoise` (`src/main.ts`): median of |la − lb| / (m + 0.01) over the
   darkest 40% of the half-size frame, before white balance and exposure; target
   sigma 0.75 × median; slider s = √(sigma / 0.1), capped at 0.6. Calibrated on
-  2026-07-12 so the default "barely clears the grain", against the 5x5 filter
+  2026-07-12 so the default "barely clears the banding", against the 5x5 filter
   of the time; the filter has been 13x13 since 2026-09-17 and the mapping was not
   re-checked.
 - `rangeSigma` and the range term (`src/raw/denoise.ts`, `src/gl.ts`): relative
