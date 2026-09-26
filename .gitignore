@@ -15,3 +15,8 @@ asset-factory/logs/
 # disposable review branch, but it must never ride main.
 asset-factory/review/
 .claude/PLAN
+
+# Vite writes a bundled copy of its config here for the length of a load, and
+# the build stamp (vite.config.ts buildId) reads git status in that window; a
+# visible copy stamped every clean build as modified. offline-shell-walk 4b.
+vite.config.ts.timestamp-*
