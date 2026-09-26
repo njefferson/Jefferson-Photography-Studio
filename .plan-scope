@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
 planhash=63bc0e468fac2e3c
-diffhash=e03afb2032083d04
-verdict=IN-SCOPE: plan item 6's restored-sticker export defect, reproduced and fixed
-# Every hunk serves plan item 6's first bullet: a restored edit loads its stickers' images in applySnapshot, both export paths wait for them and report any that could not load (a picked run apart from photos not exported), and a failed sticker load can be retried. Reproduced before (export after resume differs by 3.03% of the frame, exactly the sticker) and fixed after (0). Persistence timing is untouched. typecheck, contract-check and architecture-check pass.
+diffhash=a5dbc00e0e8e6ffd
+verdict=IN-SCOPE: plan items 1, 2 (record 072) and 4 (Kolari findings and Z50 corrections)
+# The diff covers plan item 1 (the device readings in the v2.63.12 staging entry), item 2's first step (072 recorded and ranked 31, its proposed fix designed and refuted, no pixel code touched) and item 4 (IR-SCIENCE 9q with sources and figures checked against the scratch measurements; the Z50 screw-on-filter lines marked as not describing this camera). Five findings from the first pass were acted on and verified. decisions-check, roadmap-copy-check and docs-check pass.
