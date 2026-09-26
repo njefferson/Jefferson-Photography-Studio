@@ -81,6 +81,33 @@ starts from a learned segmentation (Lightroom's Select Sky; the paper's
 pipeline), and on-device sky segmentation is being researched before anything
 further is built (IR-SCIENCE 4b-ix has the refinement literature).
 
+**2026-09-26: a learned selection was built, and taken out.** Two models
+(BiSeNetV2 for sky against building and tree, u2netp for the steel and wires
+inside it) were fused and refined into the look's selection, and exported
+through the app beside today's build on six frames. Compared whole frame
+against whole frame, it was worse on every frame with sky and better only on
+NIR_0627, which has none:
+
+- **Clouds** on NIR_1651 and NIR_1644 were taken into the sky and turned
+  blue-grey under the sky stages; today's selection leaves them out and white.
+- **Steel** in NIR_3461's near pylon went dull, with round red glows. The
+  selection is built at 1024 px and the steel is narrower than one of its
+  pixels.
+- **Sky was missed** above NIR_3466's roof and beside NIR_1651's upper tree.
+
+It never reached staging. The code is commit a963548, on no branch; do not
+rebuild it as it was. Three facts found on the way, not fixed:
+
+- the hand-built detector is given rotation 0 on a photograph turned on its
+  side, so it seeds its sky on the wrong edge (NIR_1651: 18% of the frame found
+  against 52% with the rotation);
+- the sky settings have no per-pixel guard against white: Sky colour
+  smoothing tints a neutral pixel, Sky saturation then reads the tint, and Sky
+  depth darkens whatever the selection holds;
+- a photograph picked on its own or opened from the gallery does not ask for
+  the sky selection at open, so its selection is built later on the main
+  thread.
+
 ## Looked up
 
 **The field's convention is one selection, visible and editable, with the
@@ -227,3 +254,5 @@ whatever this item settles.
 - NIR_1651, 2026-09-25: selection maps for every variant, and exports from two variants with 1:1 crops of the cloud above the tree and the tree's left edge.
 - NIR_1827, 2026-09-25: selection maps for every variant, and exports with a 1:1 crop of the clouds and tree tops on the right.
 - NIR_0627, 2026-09-25: selection maps and exports, with a 1:1 crop of the flower against its blurred background.
+- NIR_1644, 2026-09-26: exports through the learned selection and today's, whole frame, side by side.
+- The six frames, 2026-09-26: exports through the learned selection and today's, whole frame side by side, and 1:1 crops of NIR_3461's pylons, NIR_3466's roof and NIR_1651's cloud beside the tree.
