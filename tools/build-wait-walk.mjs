@@ -32,6 +32,10 @@
 //   5  a browser with no way to build off the page: the words are PAINTED —
 //      two frames — before the page is held, and the Start-up line admits the
 //      page waited
+//   5b the same browser starting again, its last build slow: the words are
+//      painted before the page is held again. A record of the same picture code
+//      is not a promise of a quick build (Firefox 156 on a PC paid 44 s every
+//      start, and said nothing on the second).
 //   6  a build that fails has its own panel, not "WebGL2 is missing", its
 //      report carries what the driver said, and a photo chosen during it did
 //      not cost the session stored from last time
@@ -63,9 +67,12 @@ const ms = (n) => `${Math.round(n)} ms`;
  *  card is in the document. Not to "load": a build that holds the page holds
  *  the load event with it, and the old code is what this walk must be able to
  *  run against. */
-async function open(ctx, cfg) {
+async function open(ctx, cfg, record) {
   const p = await ctx.newPage();
   p.on("dialog", (d) => d.accept());
+  // WHAT THE LAST BUILD LEFT ON RECORD, when an arm needs a particular one: set
+  // before the app's own code reads it.
+  if (record) await p.addInitScript((r) => { try { localStorage.setItem("ips-graphics-built", r); } catch { /* the arm's checks say so */ } }, record);
   await p.addInitScript(slowBuild, cfg);
   await p.goto(PAGE, { waitUntil: "commit" });
   await p.waitForSelector("#welcomeWhat", { state: "attached", timeout: 60000 });
@@ -110,6 +117,7 @@ try {
   // ── 1 ─────────────────────────────────────────────────────────────────────
   console.log("\n1 — a launch that expects a cold build (nothing recorded for this picture code), 3 s build");
   const warmCtx = await browser.newContext(PHONE);
+  let warmRecord = null;
   {
     const p = await open(warmCtx, { delay: 3000, par: true });
     await linked(p);
@@ -137,14 +145,23 @@ try {
       behind.text === READY && after.includes(READY),
       `behind the dialog: "${behind.text}" · written after it closed: ${after.length ? after.map((t) => `"${t}"`).join(", ") : "nothing"}`);
     const stored = await p.evaluate(() => { try { return localStorage.getItem("ips-graphics-built"); } catch { return null; } });
-    check("a finished build is recorded, so the next launch expects it warm", !!stored, stored ? "recorded" : "nothing recorded");
+    let rec = null;
+    try { rec = JSON.parse(stored); } catch { /* reported below */ }
+    check("a finished build is recorded with what it cost",
+      !!rec && typeof rec.key === "string" && typeof rec.ms === "number" && rec.ms >= 2500,
+      rec ? `key recorded, ${ms(rec.ms)}` : `recorded as ${JSON.stringify(stored)}`);
+    // THE RECORD A WARM BROWSER HOLDS: this picture code, built quickly. Arms 2
+    // to 4 start from it, because a build of seconds leaves a record that says
+    // the next one will be slow too, and what they ask about is a launch that
+    // expected a quick one.
+    warmRecord = JSON.stringify({ key: rec ? rec.key : "", ms: 20 });
     await p.close();
   }
 
   // ── 2 ─────────────────────────────────────────────────────────────────────
   console.log("\n2 — a launch that expected a warm build and got a 6 s one, at phone size");
   {
-    const p = await open(warmCtx, { delay: 6000, par: true });
+    const p = await open(warmCtx, { delay: 6000, par: true }, warmRecord);
     await linked(p);
     await sinceLink(p, 400);
     const before = await box(p);
@@ -184,7 +201,7 @@ try {
   // ── 3 ─────────────────────────────────────────────────────────────────────
   console.log("\n3 — a photo chosen during a 5 s build");
   {
-    const p = await open(warmCtx, { delay: 5000, par: true });
+    const p = await open(warmCtx, { delay: 5000, par: true }, warmRecord);
     await linked(p);
     await sinceLink(p, 300);
     await p.setInputFiles("#welcomeFile", JPG[0]);
@@ -204,7 +221,7 @@ try {
   // ── 4 ─────────────────────────────────────────────────────────────────────
   console.log("\n4 — a warm launch that builds in 300 ms");
   {
-    const p = await open(warmCtx, { delay: 300, par: true });
+    const p = await open(warmCtx, { delay: 300, par: true }, warmRecord);
     await released(p);
     await sinceRelease(p, 1500);
     const s = await seen(p);
@@ -228,6 +245,24 @@ try {
       w && held ? `"${w[0]}" at frame ${w[2]}, held by ${held[0]} at frame ${held[2]}` : `words ${w ? "written" : "never written"}, ${held ? `held by ${held[0]}` : "never held"}`);
     const r = await report(p);
     check("and the report admits the page waited", /the page waited/.test(r.startup), r.startup.replace(/^.*?(graphics)/, "$1").split(" · ")[0]);
+    await p.close();
+
+    // ── 5b ───────────────────────────────────────────────────────────────────
+    // THE SECOND START IN THAT BROWSER. Firefox 156 on a PC offers no way to
+    // build off the page and reuses nothing from its last start: 44 s, every
+    // time, with the same picture code. The first start above recorded its
+    // build; this one must not take that record as a promise of a quick one,
+    // because a page held by its build cannot run the one-second fallback.
+    console.log("\n5b — the same browser starting again: no way to build off the page, and its last build was slow");
+    const p2 = await open(ctx, { delay: 1500, par: false });
+    await released(p2);
+    await p2.waitForTimeout(300);
+    const s2 = await seen(p2);
+    const w2 = s2.said.find(([t]) => t === PREPARING);
+    const held2 = s2.early[0];
+    check("the words are painted before the page is held, on a start after a slow one",
+      !!w2 && !!held2 && held2[1] > w2[1] && held2[2] - w2[2] >= 2,
+      w2 && held2 ? `"${w2[0]}" at frame ${w2[2]}, held by ${held2[0]} at frame ${held2[2]}` : `words ${w2 ? "written" : "never written"}, ${held2 ? `held by ${held2[0]} at frame ${held2[2]}` : "never held"}`);
     await ctx.close();
   }
 

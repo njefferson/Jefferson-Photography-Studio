@@ -152,12 +152,28 @@ const graphicsKey = (() => {
   for (let i = 0; i < src.length; i++) h = Math.imul(h ^ src.charCodeAt(i), 0x01000193);
   return `${(h >>> 0).toString(16)} ${navigator.userAgent}`;
 })();
+/** WHAT THE LAST BUILD COST, stored beside its key: `{ key, ms }`.
+ *
+ *  A SAME KEY IS NOT A FAST BUILD. Firefox 156 on a PC (2026-09-26) keeps no
+ *  built copy it reuses and offers no way to build off the page, so it paid 44 s
+ *  on every start. With only the key on record the second start expected a quick
+ *  build, said nothing, and the one-second fallback below could never fire,
+ *  because a browser building on the page cannot run a timer until it is done.
+ *  So a browser whose last build took a second or more is expected to be slow
+ *  again, and gets the words before it starts. */
 const likelyCold = (() => {
   // UNKNOWN COUNTS AS COLD. Storage refused means no record either way, and the
   // two mistakes are not equal: guessing cold wrongly says one sentence and then
-  // that the editor is ready; guessing warm wrongly is 071's silent wait.
-  try { return localStorage.getItem(GRAPHICS_KEY) !== graphicsKey; } catch { return true; }
+  // that the editor is ready; guessing warm wrongly is 071's silent wait. A
+  // record in the older shape (the bare key) counts as unknown, once.
+  try {
+    const rec = JSON.parse(localStorage.getItem(GRAPHICS_KEY) ?? "null") as { key?: unknown; ms?: unknown } | null;
+    return !rec || rec.key !== graphicsKey || typeof rec.ms !== "number" || !(rec.ms < PREPARING_AFTER_MS);
+  } catch { return true; }
 })();
+/** When the build was handed to the driver, for the record above. Set from
+ *  `onBuildStart`, inside the Renderer constructor, so it is declared here. */
+let buildStartedAt = 0;
 let preparingShown = false;
 let preparingSecs = -1;
 /** Put the preparing words on the start screen, once. Takes nothing; returns
@@ -189,6 +205,7 @@ const renderer = (() => {
         return true;
       },
       onBuildStart: (parallel) => {
+        buildStartedAt = performance.now();
         markStartup("graphics-start");
         if (parallel) markStartup("graphics-parallel");
       },
@@ -239,7 +256,9 @@ let graphicsFailure: string | null = null;
 // `let`s and `const`s declared below are initialised by then.
 const graphicsReady: Promise<void> = renderer.ready.then(() => {
   markStartup("graphics-built");
-  try { localStorage.setItem(GRAPHICS_KEY, graphicsKey); } catch { /* the next launch says it again, which is honest */ }
+  try {
+    localStorage.setItem(GRAPHICS_KEY, JSON.stringify({ key: graphicsKey, ms: Math.round(performance.now() - buildStartedAt) }));
+  } catch { /* the next launch says it again, which is honest */ }
   if (preparingShown) sayReady();
   // THE BACKSTOP. A photograph that reached the renderer early drew nothing;
   // this is the frame it was owed. No open path does that today.
