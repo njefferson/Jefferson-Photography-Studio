@@ -32,11 +32,22 @@ if (typeof document !== "undefined") {
   });
 }
 const FRAME_WATCH_MS = 60000;
+// EVERY PAUSE WORTH NAMING, with where it began, so the graphics build can be
+// judged by what the page DID while it ran rather than by what the browser
+// offered to do (decision 071): offering to build without holding the page is
+// not the same as not holding it, and only the frames can tell them apart.
+const GAP_KEPT_MS = 50;
+const gaps: [number, number][] = [];
+const graphicsBuilding = () => marks.has("graphics-start") && !marks.has("graphics-built") && !marks.has("graphics-failed");
 const onFrame = (t: number) => {
   const gap = t - lastFrame;
   if (gap > longestGap) { longestGap = gap; longestAt = lastFrame; }
+  if (gap >= GAP_KEPT_MS && gaps.length < 500) gaps.push([lastFrame, t]);
   lastFrame = t;
-  if (t - T0 < FRAME_WATCH_MS) requestAnimationFrame(onFrame);
+  // WATCHED PAST THE MINUTE WHILE THE GRAPHICS ARE STILL BUILDING: a build that
+  // ran longer than the watch would otherwise be judged on frames that stopped
+  // being counted.
+  if (t - T0 < FRAME_WATCH_MS || graphicsBuilding()) requestAnimationFrame(onFrame);
 };
 if (typeof requestAnimationFrame === "function") requestAnimationFrame(onFrame);
 
@@ -64,7 +75,9 @@ if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
 
 /** Records a named moment of this launch.
  *  Takes `name`, one of the moments the start-up line knows how to print
- *  ("graphics-start", "graphics-built", "controls-wired"); stores the time since
+ *  ("graphics-start", "graphics-built", "graphics-failed", "graphics-parallel"
+ *  — the browser offered to build without holding the page — "graphics-words" —
+ *  the start screen said it was preparing — and "controls-wired"); stores the time since
  *  the page began and returns nothing. The first call for a name wins, so a
  *  moment re-reached later in the session (a second renderer, say) cannot move
  *  it. Read by `startupLine`. */
@@ -74,6 +87,24 @@ export function markStartup(name: string): void {
 
 const at = (n: number | undefined | null) => (n == null ? "—" : `${(n / 1000).toFixed(2)} s`);
 const took = (n: number) => (n < 1000 ? `${n.toFixed(0)} ms` : `${(n / 1000).toFixed(2)} s`);
+
+/** WHETHER THE PAGE STAYED FREE WHILE THE GRAPHICS BUILT, from the frames.
+ *  Takes the build's start `from` and its end `to` (the end is now while it is
+ *  still building). Returns the clause the start-up line prints. A pause
+ *  counts when it began inside the build — the build holding the page after
+ *  a painted frame — or spans the whole of it — the build holding the page
+ *  from the start; one that began before the build and ended inside it is the
+ *  rest of the page's own start, not the build. Over 250 ms is a pause a
+ *  reader feels, and is reported as the page waiting. */
+function heldDuring(from: number, to: number): string {
+  let worst = 0;
+  for (const [a, b] of gaps) if ((a >= from && a < to) || (a < from && b > to)) worst = Math.max(worst, b - a);
+  // An unfinished pause: the page has not drawn since before the build ended.
+  if (lastFrame < to && to - lastFrame > worst && lastFrame >= from) worst = to - lastFrame;
+  const wasHidden = hidden.some(([a, b]) => a < to && b > from) || (hiddenSince !== null && hiddenSince < to);
+  const tail = wasHidden ? ", and the page was hidden for part of it" : "";
+  return worst > 250 ? `the page waited — longest pause ${took(worst)}${tail}` : `the page stayed free — longest pause ${worst >= GAP_KEPT_MS ? took(worst) : `under ${GAP_KEPT_MS} ms`}${tail}`;
+}
 
 /** The report's "Start-up" line: where this launch's time went.
  *  Takes nothing; reads the browser's own timing records for the page and its
@@ -95,8 +126,16 @@ export function startupLine(): string {
     parts.push(`main code ${at(main.responseEnd)} (${via})`);
   } else parts.push("main code timing not reported");
   parts.push(`started ${at(marks.get("module"))}`);
-  const gs = marks.get("graphics-start"), gb = marks.get("graphics-built");
-  parts.push(gs != null && gb != null ? `graphics built ${at(gs)}–${at(gb)} (${took(gb - gs)})` : "no graphics on this page");
+  // THE GRAPHICS BUILD, whichever way it went (decision 071). "No graphics on
+  // this page" used to be printed for a report copied DURING the build too,
+  // which is the one moment a report about a slow build is most likely taken.
+  const gs = marks.get("graphics-start"), gb = marks.get("graphics-built"), gf = marks.get("graphics-failed");
+  const offered = marks.has("graphics-parallel") ? "building off the page offered" : "no way to build off the page offered";
+  const said = marks.has("graphics-words") ? `; said it was preparing at ${at(marks.get("graphics-words"))}` : "";
+  parts.push(gs != null && gb != null ? `graphics built ${at(gs)}–${at(gb)} (${took(gb - gs)}; ${heldDuring(gs, gb)}; ${offered}${said})`
+    : gs != null && gf != null ? `graphics failed ${at(gf)}, ${took(gf - gs)} after starting (${offered}${said})`
+    : gs != null ? `graphics still building since ${at(gs)} (${heldDuring(gs, performance.now())} so far; ${offered}${said})`
+    : "no graphics on this page");
   parts.push(marks.has("controls-wired") ? `controls wired ${at(marks.get("controls-wired"))}` : "controls not marked on this page");
   const gapEnd = longestAt + longestGap;
   const wasHidden = hidden.some(([a, b]) => a < gapEnd && b > longestAt) || (hiddenSince !== null && hiddenSince < gapEnd);

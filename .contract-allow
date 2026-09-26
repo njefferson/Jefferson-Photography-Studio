@@ -53,7 +53,6 @@ src/gps.ts:stripLocation
 src/gpuexport.ts:canDrawFrame
 src/gpuexport.ts:buildLinearSourceInBands
 src/gpuexport.ts:buildLinearSource
-src/gpuexport.ts:drawFrame
 src/half.ts:toHalf
 src/half.ts:fromHalf
 src/half.ts:toHalfBuffer

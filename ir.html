@@ -298,6 +298,17 @@
           <button id="welcomeClose" class="welcome-close" type="button" hidden aria-label="Close the welcome panel">&#10005;</button>
           <button id="welcomeBack" class="welcome-back" type="button" hidden>&#8249; Back to your photo</button>
           <p id="hint" role="status" aria-live="polite">Edit infrared photos — RAW (NEF / DNG) unlocks the full color magic.</p>
+          <!-- THE EDITOR BEING PREPARED, SAID WHERE THE READER IS ALREADY LOOKING
+               (decision 071). Its line is RESERVED, so the card does not move
+               when the words come and go; main.ts gives the room back once the
+               card has left and the editor is built. Present and EMPTY at
+               parse, because a live region created with its words is not
+               announced. The seconds are for eyes only: a count spoken every
+               second would drown the sentence it counts for. -->
+          <div id="preparingLine" class="welcome-preparing">
+            <p id="preparing" role="status" aria-live="polite"></p>
+            <span id="preparingFor" aria-hidden="true"></span>
+          </div>
           <label class="open-btn welcome-open"><input id="welcomeFile" class="file-input" type="file" accept=".dng,.nef,.zip,.ipslook,.ipskeep,image/*" multiple />Open image(s)</label>
           <p class="welcome-open-hint">One photo, or a set to work through &mdash; each keeps its own edit.</p>
           <!-- DOCTRINE 7e's first-run half, said on the first screen every reader
@@ -1164,6 +1175,19 @@
         <p><strong>Reloading the page fixes it.</strong> Your saved photos and looks are untouched — but anything open and unsaved in this session will be lost, which is why this is asking rather than doing it.</p>
         <p><button id="glLostReload" type="button" class="btn primary">Reload the page</button></p>
         <p>If it keeps happening, opening fewer photographs at once is the thing most likely to help.</p>
+      </div>
+    </div>
+    <!-- THE EDITOR'S PICTURE CODE REFUSED BY THE DRIVER (decision 071). Not the
+         panel below, which says WebGL2 is missing: here it is present, and what
+         failed is building the editor's graphics on it. What the driver said
+         goes into the report, which is what it takes to fix. -->
+    <div id="glBroken" hidden>
+      <div class="unsupported-card">
+        <h2>The editor could not get ready on this device</h2>
+        <p>This browser has the graphics the editor needs, but preparing the editor on them failed. Your saved photos and looks are untouched.</p>
+        <p><button id="glBrokenReload" type="button" class="btn primary">Reload the page</button></p>
+        <p>If it fails again, the report says what the graphics driver answered, which is what it takes to fix it.</p>
+        <p><button id="glBrokenReport" type="button" class="btn">Show the report</button></p>
       </div>
     </div>
     <div id="unsupported" hidden>

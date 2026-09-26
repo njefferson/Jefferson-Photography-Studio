@@ -608,7 +608,7 @@ cannot describe something the code does not say about itself.
 - **`src/color.ts`** (88 lines) — Camera color science.
 - **`src/cubeimport.ts`** (136 lines) — .cube (Adobe/Resolve 3D LUT) IMPORT parser.
 - **`src/dcp.ts`** (247 lines) — DNG Camera Profile (.dcp) export for Lightroom / Camera Raw.
-- **`src/debug.ts`** (1602 lines) — The test page behind the version number.
+- **`src/debug.ts`** (1604 lines) — The test page behind the version number.
 - **`src/decode.ts`** (394 lines) — Image decoding. Three real paths, no big WASM dependency: - JPEG/PNG: native bitmap decode.
 - **`src/decode.worker.ts`** (57 lines) — Decoding, off the main thread.
 - **`src/decodeClient.ts`** (260 lines) — Main-thread side of the decode workers.
@@ -618,11 +618,11 @@ cannot describe something the code does not say about itself.
 - **`src/export.worker.ts`** (70 lines) — ONE BAND OF AN EXPORT, ON ANOTHER CORE.
 - **`src/exportparallel.ts`** (343 lines) — AN EXPORT, SPLIT ACROSS CORES.
 - **`src/framecache.ts`** (139 lines) — What the lens rig has already measured, so an interrupted run is not thrown away.
-- **`src/gl.ts`** (2452 lines) — WebGL2 edit pipeline.
+- **`src/gl.ts`** (2588 lines) — WebGL2 edit pipeline.
 - **`src/glow.ts`** (110 lines) — HIE-style halation glow.
 - **`src/glprobe.worker.ts`** (39 lines) — CAN A WORKER DRAW? Asked from inside one, because that is the only place the answer is true or false rather than a specification.
 - **`src/gps.ts`** (245 lines) — Location-data guard: find and remove GPS location from a photo FILE's own bytes — the original the user loaded, not the app's exports (exports are re-encoded and carry no EXIF at all today).
-- **`src/gpuexport.ts`** (272 lines) — AN EXPORT DRAWN RATHER THAN COMPUTED — the measurement, not yet the product.
+- **`src/gpuexport.ts`** (281 lines) — AN EXPORT DRAWN RATHER THAN COMPUTED — the measurement, not yet the product.
 - **`src/half.ts`** (69 lines) — IEEE half-precision, both directions, in one place.
 - **`src/heal.ts`** (811 lines) — Dust & spot healing: a per-photo list of feathered clone spots that REWRITES
 - **`src/histogram.ts`** (114 lines) — Lightroom-style floating histogram.
@@ -647,7 +647,7 @@ cannot describe something the code does not say about itself.
 - **`src/macro/export.worker.ts`** (23 lines) — Full-resolution stacking runs here, OFF the main thread, so the long tiled render never janks the UI (the preview stack stays on the main thread — it's quick).
 - **`src/macro/main.ts`** (460 lines) — MACRO FOCUS-STACKING MODE: the second discipline, its own page and its own entry point.
 - **`src/macro/stack.ts`** (387 lines) — Macro focus-stacking engine (JPEG-first).
-- **`src/main.ts`** (17729 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
+- **`src/main.ts`** (17954 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
 - **`src/maskstore.ts`** (186 lines) — On-device store for SAVED MASKS (IndexedDB "ips-masks").
 - **`src/palette.ts`** (118 lines) — Palette family picker, shared across all three pages.
 - **`src/pipeline.ts`** (2515 lines) — CPU version of the GPU edit pipeline, kept numerically identical to the fragment shader in gl.ts so exports match the on-screen preview exactly.
@@ -672,7 +672,7 @@ cannot describe something the code does not say about itself.
 - **`src/skyhorizon.ts`** (589 lines) — Where the sky ENDS, as a horizon line the photograph itself draws — one border depth per display column, found by the published method rather than invented here.
 - **`src/skymap.ts`** (257 lines) — The sky's colour, smoothed AFTER the look has amplified it — a small map rebuilt per edit, blended back in by the sky's own selection.
 - **`src/stamp.ts`** (27 lines) — ONE HASH, BECAUSE THE SECOND COPY IS WHERE THE TWO ANSWERS COME FROM.
-- **`src/startup.ts`** (111 lines) — WHAT THE FIRST SECONDS OF THIS LAUNCH COST, AND WHERE (decision 071).
+- **`src/startup.ts`** (150 lines) — WHAT THE FIRST SECONDS OF THIS LAUNCH COST, AND WHERE (decision 071).
 - **`src/sticker.ts`** (576 lines) — Sticker compositing — rhymes with heal.ts (src/heal.ts): stickers are baked INTO the linear source (pre-pipeline), so each one inherits the channel swap / WB / looks / grade / grain and lands in the I
 - **`src/straighten.ts`** (279 lines) — FINDING THE ANGLE A FRAME IS OFF BY.
 - **`src/swupdate.ts`** (404 lines) — THE STANDING "A NEW VERSION IS WAITING" STRIP, for all three PWAs (Doctrine §7h).

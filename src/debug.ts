@@ -22,7 +22,7 @@ import { linearAt } from "./decode";
 import { makeRowDenoiser } from "./raw/denoise";
 import { compileEdit, TONE_DEFAULT, GRADE_DEFAULT, MIX3_DEFAULT, hslDefault, CROP_DEFAULT, neutralMask, type EditParams, type MaskLayer } from "./pipeline";
 import { exportImage } from "./export";
-import { drawFrame, canDrawFrame, buildLinearSource } from "./gpuexport";
+import { drawFrame, canDrawFrame, buildLinearSource, type DrawnFrame } from "./gpuexport";
 import { Renderer, VERT, FRAG } from "./gl";
 
 declare const __APP_VERSION__: string;
@@ -114,11 +114,12 @@ async function copy(text: string, btn: HTMLButtonElement, label: string, fallbac
  *  reader's. About 19 rows a mask (75 floats) is the working estimate from the
  *  record; the row says how many masks that leaves room for, and when the
  *  answer is "not eight", the parameter texture is the route instead. */
-function shaderRoom(): void {
+async function shaderRoom(): Promise<void> {
   const canvas = document.createElement("canvas");
   let r: Renderer | undefined;
   try {
     r = new Renderer(canvas);
+    await r.ready; // the program is still building when the constructor returns (071)
     const b = r.shaderBudget();
     const PER_MASK = 19;
     const room = Math.floor((b.maxVectors - b.vectors) / PER_MASK);
@@ -276,11 +277,11 @@ async function buildingThePictureCode(): Promise<void> {
     const runs = cold.map((r) => `${ms(r.link)} + ${ms(r.draw)}`).join(", ");
     row("Building the picture code (first time)", ms(tot(first)),
       tot(first) > 5000
-        ? "SLOW. The editor waits this long for its graphics the first time after a release that changes them, with the start screen showing and nothing answering. On this device that is the likely cause of a frozen first launch."
-        : "The editor waits this long for its graphics the first time after a release that changes them. On this device it is not what would freeze a launch.",
+        ? `SLOW. The editor takes this long to get ready the first time after a release that changes its graphics.${parallel ? " The start screen says it is preparing, and should stay usable meanwhile — the report's Start-up line says whether it did." : " This device offers no way to build it without holding the page, so the start screen says it is preparing and then waits."}`
+        : "The editor takes this long to get ready the first time after a release that changes its graphics. On this device it is not what would hold up a launch.",
       `${runs} (built + first picture). The first is what a launch after a release pays; the later ones ran in the same page after the graphics had started, and can be much cheaper.`);
     row("Building it again (a normal launch)", ms(tot(warm)),
-      `What an ordinary launch pays once the device has kept the built program: ${ms(warm.link)} to build and ${ms(warm.draw)} for the first picture.${parallel ? " This device can build it without making the page wait, which the editor does not use yet." : " This device offers no way to build it without making the page wait."}`);
+      `What an ordinary launch pays once the device has kept the built program: ${ms(warm.link)} to build and ${ms(warm.draw)} for the first picture.${parallel ? " This device offers to build it without holding the page, and the editor now asks it to." : " This device offers no way to build it without holding the page, so on a first start after an update the editor says it is preparing before it waits."}`);
   } catch (err) {
     p.remove();
     row("Building the picture code", "failed", (err as Error).message);
@@ -960,10 +961,10 @@ async function drawnVersusComputed(): Promise<void> {
     // second number is small, the port's remaining work is confined to two
     // functions rather than spread through the pipeline.
     const flat: EditParams = { ...params, denoise: 0, sharpen: 0, texture: 0 };
-    const runs: { label: string; drawn: ReturnType<typeof drawFrame>; computed: { data?: Uint8ClampedArray; width: number; height?: number }; computedMs: number }[] = [];
+    const runs: { label: string; drawn: DrawnFrame; computed: { data?: Uint8ClampedArray; width: number; height?: number }; computedMs: number }[] = [];
     const pairs: [string, EditParams][] = [["with the noise reduction and sharpening on", params], ["with both of those off", flat]];
     for (const [label, pr] of pairs) {
-      const drawn = drawFrame(file, img, pr, null);
+      const drawn = await drawFrame(file, img, pr, null);
       await tick();
       const t0 = performance.now();
       const computed = await exportImage(file, img, pr, { format: "jpeg", scale: 1, quality: 0.92, raw: true });
@@ -1022,7 +1023,7 @@ async function drawnVersusComputed(): Promise<void> {
   }
 }
 
-function compareOne(label: string, drawn: ReturnType<typeof drawFrame>, computed: { data?: Uint8ClampedArray; width: number; height?: number }, computedMs: number): void {
+function compareOne(label: string, drawn: DrawnFrame, computed: { data?: Uint8ClampedArray; width: number; height?: number }, computedMs: number): void {
   {
     const a = drawn.data, b = computed.data;
     if (!b || a.length !== b.length) {
@@ -1479,6 +1480,7 @@ async function fullResolutionPreview(): Promise<void> {
       let r;
       try {
         r = new Renderer(canvas);
+        await r.ready; // built before anything is timed: this row measures drawing, not building
         const t0 = performance.now();
         r.setImage(image);
         const upload = performance.now() - t0;
@@ -1579,7 +1581,7 @@ async function fullResolutionPreview(): Promise<void> {
   // One moment for the whole block: the report is re-taken with the numbers,
   // and it is what "Copy the results" puts above them.
   await refreshReport();
-  shaderRoom();
+  await shaderRoom();
   await graphics();
   await buildingThePictureCode();
   threads();
