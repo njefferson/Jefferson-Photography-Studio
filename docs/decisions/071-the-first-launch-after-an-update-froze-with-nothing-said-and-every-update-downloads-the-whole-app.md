@@ -165,6 +165,10 @@ GitHub copies instead, and WebKit's storage policy only as search snippets.
      worker; a digest check that never matches would stop every update for
      good; a "Hide" that reuses the dismiss flag would silence the ready notice;
      `debug.html` is a fourth page with the strip.
+   - **Two questions only the owner can settle, asked 2026-09-26:** whether a
+     waiting version that is the same as the page on screen takes over without a
+     press, and whether a new reader gets the stickers one at a time with a
+     "keep all" button and small previews, or all at once in the background.
    - **MEASURED, 2026-09-26: THE MINUTE WAS THE COMPILE.** On the PC (Edge
      154, GTX 1650 through Direct3D) the test page built the editor's picture
      code from scratch in 42,678, 42,284 and 41,558 ms, and 20 ms when the
@@ -176,62 +180,6 @@ GitHub copies instead, and WebKit's storage policy only as search snippets.
      two and a half minutes, so the download is a second cost, not the freeze.
      That lifts the reason options 2 and 6 were rejected; both are the second
      step, under the plan approved the same day.
-   - **The two questions were settled 2026-09-26, by the record rather than
-     by asking.** Neither has two outcomes the record cannot rank.
-     - **A waiting version that is the build on screen takes over with no
-       press.** It changes nothing the reader can see: it is the offline copy
-       catching up with the page. It is matched by the build (the commit,
-       stamped into the page and the worker), not the version, because a
-       staging force-push can repeat a version. It happens only when the app is
-       open in one window, because a second window may be an older build. Hub
-       Doctrine §7h.1 carries the exception, and `pwa-check`'s pass line
-       names it.
-     - **A new reader gets the stickers all at once, in the background, into
-       a cache of their own.** No picker and no previews. The library fetches
-       once per device and no release fetches it again, so a one-at-a-time
-       picker would save a first install 25 MB, once, at the cost of a new
-       surface.
-   - **BUILT 2026-09-26, the download half.**
-     - Every precache entry carries a revision: the first sixteen hex digits of
-       the SHA-256 of the file as built. Every stored copy carries the revision
-       it was checked against, plus the host's header rules, so a change to
-       `_headers` downloads everything again.
-     - Install copies each entry forward from any cache on the device holding
-       those bytes, then downloads the rest one at a time, all or nothing.
-       Stickers come last, best effort, cut off at 80% of the browser's time
-       for an install. The cache is then read back by name and must be whole.
-       That last check closes a hole the per-file design opened: closing the app
-       mid-install could otherwise activate a partial cache.
-     - The strip says "Downloading the update… N of M" while it runs, and says
-       so if the download fails.
-     - Activate keeps a newer release's cache and the sticker cache.
-     - `tools/offline-shell-walk.mjs` asserts each of these against a real
-       second worker (checks 5 to 24).
-     - **What turned out wrong:** staging's first deploy stamped the build
-       as modified. Vite writes a temporary copy of its config beside it while
-       loading, and the stamp read git's status in that window. The takeover
-       stayed safe, because page and worker of one build share the stamp, but
-       two builds of one commit never matched. Fixed the same day by ignoring
-       that file; check 4b recomputes the stamp from the tree.
-   - **BUILT 2026-09-26, the compile half.**
-     - The renderer asks for `KHR_parallel_shader_compile`, starts the link and
-       returns. It polls `COMPLETION_STATUS_KHR` on animation frames, and a
-       photograph waits on `editorReady()` while nothing else does.
-     - "Preparing the editor…" goes up before a build the launch expects to be
-       cold, painted first, and after a second on any other build. It is keyed
-       on the picture code's text and the browser, which is what the browser
-       keys its built copy on, not on the app's version. "The editor is ready"
-       is said when it finishes.
-     - A build that fails has its own panel and puts the driver's log in the
-       report. The Start-up line says whether the page stayed free, read off
-       its own frames.
-     - `tools/build-wait-walk.mjs` fails 17 checks against the synchronous
-       build.
-     - **Not yet known:** whether Edge on the PC really builds off the page
-       once asked. The Start-up line answers it from the first launch.
-   - **Still open:** the busy card has no seconds count and cannot be put
-     aside during a long wait. Making the code itself compile faster on
-     Direct3D (Rejected 6's other half) waits for that launch's reading.
 2. Build the redesign now.
 3. Words only: say a download is running, change nothing about it.
 4. Take the stickers out of the precache and change nothing else.

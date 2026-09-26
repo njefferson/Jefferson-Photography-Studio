@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
 planhash=63bc0e468fac2e3c
-diffhash=90705470b3d0ecd9
-verdict=IN-SCOPE: plan item 1, the test page's first-time row leads with the first build
-# src/debug.ts changes only the first-time row's headline from the median of three cold builds to the first (the one a launch pays) with every run still printed; docs/ARCHITECTURE.md is its generated line count. Plan item 1's measurement.
+diffhash=b40a525c3aa7f587
+verdict=IN-SCOPE: plan item 1, the device measurement recorded in 071 and NOTES
+# The 071 record gains the dated measurement under option 1 and lifts Rejected 2 and 6 on what was measured (42 s cold build on the PC, 1.45 Mb/s connection), deferring the build work; its test-page description now matches the shipped row. NOTES adds the PC test-page reading to the v2.63.12 staging entry and updates 071's Shown-as line. Plan item 1's 'Record the choices in 071'.
