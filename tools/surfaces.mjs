@@ -57,6 +57,8 @@ export const PAGES = [
   { file: "notes.html", dialogs: [] },
   { file: "privacy.html", dialogs: [] },
   { file: "conveyor-status.html", dialogs: [] },
+  // Served by the host at any address it does not have (decision 071).
+  { file: "404.html", dialogs: [] },
 ];
 
 /** What is in the build right now: page -> the dialog ids its markup declares. */
