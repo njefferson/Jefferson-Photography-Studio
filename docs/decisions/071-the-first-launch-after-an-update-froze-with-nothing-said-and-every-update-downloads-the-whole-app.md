@@ -144,8 +144,8 @@ GitHub copies instead, and WebKit's storage policy only as search snippets.
      install's start and end; and the connection's downlink and round-trip time
      where the browser gives them. The test page gains "Compile the editor's
      shader": the real program, built cold with a unique comment appended so no
-     cache can answer, three runs with the median and spread, then one warm
-     run, and whether parallel compile is available. One launch after the next
+     cache can answer, three runs with the first as the headline and every
+     run printed beside it, then one warm run, and whether parallel compile is available. One launch after the next
      release that changes the picture code, on the PC and on the iPad, says
      which of the page request, the code arriving, the compile or the download
      took the time.
@@ -169,6 +169,17 @@ GitHub copies instead, and WebKit's storage policy only as search snippets.
      waiting version that is the same as the page on screen takes over without a
      press, and whether a new reader gets the stickers one at a time with a
      "keep all" button and small previews, or all at once in the background.
+   - **MEASURED, 2026-09-26: THE MINUTE WAS THE COMPILE.** On the PC (Edge
+     154, GTX 1650 through Direct3D) the test page built the editor's picture
+     code from scratch in 42,678, 42,284 and 41,558 ms, and 20 ms when the
+     browser already held the built copy; on the iPad 557 ms, then 22. A browser
+     keys that copy by the code's text, so every release that changes the
+     picture code costs the PC about 42 seconds on its first launch, with the
+     start screen painted and the page waiting. The same PC reads its
+     connection at 1.45 Mb/s, where the 28 MB every release fetches takes about
+     two and a half minutes, so the download is a second cost, not the freeze.
+     That lifts the reason options 2 and 6 were rejected; both are the second
+     step, under the plan approved the same day.
 2. Build the redesign now.
 3. Words only: say a download is running, change nothing about it.
 4. Take the stickers out of the precache and change nothing else.
@@ -182,7 +193,8 @@ GitHub copies instead, and WebKit's storage policy only as search snippets.
 - **2, the redesign now.** The minute's cause is not established, and the
   measurement is one release away; a redesign judged against the wrong cause
   ships its own risks (the six holes listed under 1) for a symptom it may not
-  touch.
+  touch. LIFTED 2026-09-26: the measurement puts 2.5 minutes of download on the
+  PC's connection behind every release, whatever froze the page.
 - **3, words only.** If the minute was the compile, the strip lives in code
   that is waiting on it and cannot speak; and the cost is unchanged.
 - **4, stickers only.** It removes 25 MB and leaves the silence, the 218
@@ -193,7 +205,9 @@ GitHub copies instead, and WebKit's storage policy only as search snippets.
   same saving and keeps the rule.
 - **6, compile without blocking, now.** The right remedy if the compile is the
   minute, and a guess until the measurement says so; it changes when the editor
-  becomes usable on every device.
+  becomes usable on every device. LIFTED 2026-09-26: the measurement says so, 42
+  seconds on the PC. Making the code itself compile faster on Direct3D is the
+  other half, measured on the device before it ships.
 - **7, leave it.** Two live defects can break an install or delete a newer one,
   and the reader is told nothing either way.
 

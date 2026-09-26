@@ -104,7 +104,19 @@ iPad's alone.
 **The iPad's test page, 2026-09-26:** "Building the picture code (first time)"
 read 23 ms, but its three runs were 557, 22 and 22 ms. The first is the one a
 launch after a release pays; the later two ran after the graphics had started in
-that page. The row leads with the median, which hides it.
+that page. The row led with the median, which hid it; it leads with the first
+build now.
+
+**THE PC'S TEST PAGE, 2026-09-26 — THE CAUSE OF THE FROZEN MINUTE, MEASURED.**
+"Building the picture code (first time)": 42,678 ms, 42,284 ms and 41,558 ms to
+build, then 5 to 26 ms for the first picture; "Building it again (a normal
+launch)": 20 ms. The same program on the iPad: 557 ms, then 22. So on this PC,
+through Direct3D, building the editor's graphics from scratch takes about 42
+seconds while the page waits, and a browser keeps the built copy keyed by its
+source, so every release that changes that code pays it once, on the first
+launch after it. That is the minute with the start screen showing and nothing
+answering. The same page read one tile at 1,032 ms on the PC against 28 ms on
+the iPad, which is not explained yet.
 
 What was verified here, and what was not. In headless Chromium: the Start-up
 line fills every field or says it is unavailable, and the test page's first-time
@@ -915,7 +927,7 @@ user-scalable=no.
   researched and written before anything is built. What each frame showed is in
   the record.
 - [ ] **The first launch after an update froze with nothing said, and every update fetches the whole app again** <!-- decision: 071 -->
-  **Shown as:** The first time the app opens after an update it can sit still for a minute with nothing on screen; the app will measure why, and an update will download only what changed.
+  **Shown as:** The first time the app opens after an update it can sit still for most of a minute while it prepares its graphics; it will stay responsive and say so, and an update will download only what changed.
   Reported from the PC after v2.63.7: the start screen showed and nothing
   answered for about a minute. Every release requests and re-stores the whole
   app offline, 218 files and 28 MB, 25 MB of it the sticker library, with
